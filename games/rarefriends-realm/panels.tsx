@@ -18,6 +18,7 @@ import { friendRows, renderWorldMap } from "./render.ts";
 import { isUnderground, realPoint } from "./world.ts";
 import type { NetState } from "./net.ts";
 import type { TradeView } from "./trade.ts";
+import { recipeBook, skillGuide } from "./guide.ts";
 import { artUrl, emoteArt, itemArt, orbArt, prayerArt, skillArt, spellArt, tabArt, type TabIcon } from "./icons.ts";
 import { friendSprite } from "./sprites.ts";
 import { figureArt } from "./wardrobe.ts";
@@ -110,6 +111,8 @@ export type PanelProps = {
   friendSprites: ReadonlyMap<number, GenerationSprites>; loadFriend: (id: number) => void; settings: Settings; setSettings: (settings: Settings) => void;
   friend: GenerationSprites | null; trackName: string; trackId: string; playTrack: (id: string) => void; openCard: () => void; openHelp: () => void; paused: boolean; saved: string; relicCounts: readonly number[]; openCaskets: () => void;
   /** Playing together: who's around, and the friends list. */
+  /** The skill guide (a skill) or the recipe book (null). */
+  openGuide?: (skill: Skill | null) => void;
   /** Save codes: copy or download yours, or restore one (resolves to an error message, or null). */
   onExportSave?: (action: "copy" | "download") => void; onRestoreSave?: (code: string) => Promise<string | null>; backupStatus?: string;
   net?: NetState; onSocial?: (op: "add" | "remove" | "ignore" | "unignore", id: number) => void; onWhisper?: (id: number) => void; onOnline?: (on: boolean) => void;
@@ -160,7 +163,7 @@ function CombatTab({ game, refresh, openMenu }: PanelProps) {
     </div>
   );
 }
-function SkillsTab({ game, openMenu }: PanelProps) {
+function SkillsTab({ game, openMenu, openGuide }: PanelProps) {
   const player = game.player, [focus, setFocus] = useState<Skill | null>(null);
   const info = (skill: Skill) => {
     const xp = Math.floor(player.xp[skill]), level = levelForXp(xp), next = level < 99 ? XP_TABLE[level + 1] : null;
@@ -173,8 +176,8 @@ function SkillsTab({ game, openMenu }: PanelProps) {
           const level = levelForXp(player.xp[skill]), current = skill === "hitpoints" ? player.hp : skill === "prayer" ? Math.ceil(player.prayer) : level;
           const next = level < 99 ? XP_TABLE[level + 1] : XP_TABLE[99], base = XP_TABLE[level], progress = level >= 99 ? 1 : (player.xp[skill] - base) / Math.max(1, next - base);
           return (
-            <button key={skill} type="button" className="realm-skill" title={info(skill)} aria-label={info(skill)} onClick={() => setFocus(focus === skill ? null : skill)} onMouseEnter={() => setFocus(skill)}
-              {...rightClick(openMenu, () => [{ verb: "View", noun: SKILL_NAMES[skill], run: () => setFocus(skill) }, { verb: "Check", noun: SKILL_NAMES[skill], run: () => message(game, info(skill)) }])}>
+            <button key={skill} type="button" className="realm-skill" title={info(skill)} aria-label={info(skill)} onClick={() => openGuide?.(skill)} onMouseEnter={() => setFocus(skill)}
+              {...rightClick(openMenu, () => [{ verb: "Guide", noun: SKILL_NAMES[skill], run: () => openGuide?.(skill) }, { verb: "Check", noun: SKILL_NAMES[skill], run: () => message(game, info(skill)) }])}>
               <PixelIcon art={skillArt(skill)} size={27} /><span>{current}<small>/{level}</small></span>
               <em style={{ width: `${Math.round(progress * 100)}%` }} />
             </button>
@@ -183,6 +186,8 @@ function SkillsTab({ game, openMenu }: PanelProps) {
         <div className="realm-skill total"><span>Total level:<br /><b>{totalLevel(player)}</b></span></div>
       </div>
       <p className="realm-skill-info">{focus ? info(focus) : `Total XP: ${totalXp(player).toLocaleString()} · XP rate ×${xpMultiplier(player).toFixed(2)}`}</p>
+      <button type="button" className="realm-wide" onClick={() => openGuide?.(null)}>Recipe book</button>
+      <p className="realm-note">Click a skill for its guide: everything it unlocks, and when.</p>
     </div>
   );
 }
@@ -682,6 +687,63 @@ export function TradeModal({ game, view, onOffer, onAccept, onDecline, openMenu 
           <section><h3>In return you will receive:</h3><ul>{view.theirs.map(slot => <li key={slot.id}>{item(slot.id).name} × {slot.n.toLocaleString()}</li>)}{!view.theirs.length && <li>Absolutely nothing!</li>}</ul><small>Value: {worth(view.theirs).toLocaleString()} coins</small></section>
         </div>
       </div>}
+    </Modal>
+  );
+}
+/** Skill guides (what unlocks at each level) and the recipe book (everything you can make). */
+export function GuideModal({ game, skill, onSkill, onClose }: { game: Game; skill: Skill | null; onSkill: (skill: Skill | null) => void; onClose: () => void }) {
+  const player = game.player, [search, setSearch] = useState(""), [makeable, setMakeable] = useState(false), [bookSkill, setBookSkill] = useState<Skill | "all">("all");
+  const levelOf = (s: Skill) => levelForXp(player.xp[s]);
+  const tabs = (
+    <div className="realm-guide-skills" role="tablist" aria-label="Skills">
+      {SKILLS.map(entry => <button key={entry} type="button" role="tab" aria-selected={skill === entry} title={SKILL_NAMES[entry]} aria-label={SKILL_NAMES[entry]} onClick={() => onSkill(entry)}><PixelIcon art={skillArt(entry)} size={22} /></button>)}
+      <button type="button" role="tab" aria-selected={skill === null} className="realm-guide-book" onClick={() => onSkill(null)}>Recipe book</button>
+    </div>
+  );
+  if (skill) {
+    const entries = skillGuide(skill), level = levelOf(skill), next = entries.find(entry => entry.level > level);
+    return (
+      <Modal title={`${SKILL_NAMES[skill]} guide`} onClose={onClose} wide>
+        {tabs}
+        <p className="realm-muted">Your level: <b>{level}</b>{next ? ` · next unlock at ${next.level}: ${next.name}` : " · everything unlocked!"}</p>
+        <ul className="realm-guide">
+          {entries.map((entry, index) => {
+            const open = level >= entry.level;
+            return <li key={index} data-open={open} data-next={entry === next}>
+              <b className="realm-guide-level">{entry.level}</b>
+              {entry.icon ? <ItemIcon slot={{ id: entry.icon, n: 1 }} size={30} bare /> : entry.spell ? (() => { const spell = SPELLS.find(s => s.id === entry.spell)!; return <PixelIcon art={spellArt(spell.id, spell.element, spell.kind)} size={24} />; })() : <PixelIcon art={skillArt(skill)} size={22} />}
+              <span><b>{entry.name}</b><small>{entry.detail}</small></span>
+              {open && <i aria-label="Unlocked">✓</i>}
+            </li>;
+          })}
+        </ul>
+      </Modal>
+    );
+  }
+  const has = (id: string, n: number) => count(player, id) >= n;
+  const recipes = recipeBook().filter(recipe => (bookSkill === "all" || recipe.skill === bookSkill) && (!search || recipe.label.toLowerCase().includes(search.toLowerCase()) || Object.keys(recipe.inputs).some(id => item(id).name.toLowerCase().includes(search.toLowerCase())))
+    && (!makeable || (levelOf(recipe.skill) >= recipe.level && Object.entries(recipe.inputs).every(([id, n]) => has(id, n)))));
+  const skills = [...new Set(recipeBook().map(recipe => recipe.skill))];
+  return (
+    <Modal title="Recipe book" onClose={onClose} wide>
+      {tabs}
+      <div className="realm-bank-bar">
+        <input type="search" placeholder="Search recipes or ingredients" value={search} onChange={event => setSearch(event.target.value)} aria-label="Search recipes" />
+        <select value={bookSkill} onChange={event => setBookSkill(event.target.value as Skill | "all")} aria-label="Skill">{["all", ...skills].map(entry => <option key={entry} value={entry}>{entry === "all" ? "All skills" : SKILL_NAMES[entry as Skill]}</option>)}</select>
+        <label className="realm-check"><input type="checkbox" checked={makeable} onChange={event => setMakeable(event.target.checked)} /> Can make now</label>
+      </div>
+      <ul className="realm-guide recipes">
+        {recipes.map((recipe, index) => {
+          const level = levelOf(recipe.skill) >= recipe.level;
+          return <li key={index} data-open={level}>
+            <b className="realm-guide-level" title={SKILL_NAMES[recipe.skill]}>{recipe.level}</b>
+            <ItemIcon slot={{ id: Object.keys(recipe.outputs)[0], n: Object.values(recipe.outputs)[0] }} size={30} bare />
+            <span><b>{recipe.label}</b><small>{SKILL_NAMES[recipe.skill]} · {recipe.xp} XP · {recipe.where}{recipe.chance ? ` · ${Math.round(recipe.chance * 100)}% success` : ""}</small></span>
+            <span className="realm-guide-inputs">{Object.entries(recipe.inputs).map(([id, n]) => <span key={id} data-have={has(id, n)} title={item(id).name}><ItemIcon slot={{ id, n: 1 }} size={24} bare />{n}</span>)}</span>
+          </li>;
+        })}
+        {!recipes.length && <li className="realm-muted">No recipes match.</li>}
+      </ul>
     </Modal>
   );
 }

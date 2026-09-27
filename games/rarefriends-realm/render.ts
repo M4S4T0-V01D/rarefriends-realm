@@ -1144,8 +1144,9 @@ function drawPeer(ctx: CanvasRenderingContext2D, scene: Scene, peer: PeerView, h
     ctx.save(); ctx.translate(s.x + side * 6 * px, s.y - 7 * px); ctx.scale(side, 1); ctx.rotate(0.75 + swing); ctx.imageSmoothingEnabled = false; ctx.drawImage(art, -size * 0.25, -size * 0.78, size, size); ctx.restore();
   }
   hits.push({ ...rect, pick: { kind: "peer", id: peer.p.id } });
+  if (peer.p.hp < peer.p.maxHp || peer.p.fight) hpBar(ctx, s.x, rect.y - 22, peer.p.hp / Math.max(1, peer.p.maxHp), z);
   ctx.font = `bold ${Math.round(11 * Math.max(0.9, Math.min(1.4, z)))}px ui-monospace, Menlo, Consolas, monospace`; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
-  const tag = `#${peer.p.id} (level-${peer.p.combat})`, tagY = rect.y - 2;
+  const tag = `#${peer.p.id} (level-${peer.p.combat})`, tagY = rect.y - (peer.p.hp < peer.p.maxHp || peer.p.fight ? 26 : 2);
   ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.strokeText(tag, s.x, tagY); ctx.fillStyle = peer.friend ? "#9fe0a8" : "#ffffff"; ctx.fillText(tag, s.x, tagY);
   if (peer.said) overheadText(ctx, peer.said, s.x, tagY - 14);
   else if (motion?.text) overheadText(ctx, motion.text, s.x, tagY - 14, "#ffffff");

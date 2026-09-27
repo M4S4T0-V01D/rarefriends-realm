@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skill guides · RareFriends Realm</title>
+<meta name="description" content="Every skill in RareFriends Realm: what unlocks at each level, from level 1 to the mastery cape at 99, and the full recipe book.">
+<meta property="og:title" content="RareFriends Realm skill guides">
+<meta property="og:description" content="What unlocks at every level in all 19 skills, and every recipe.">
+<meta property="og:image" content="https://m4s4t0-v01d.github.io/rarefriends-realm/preview/img/skill-guide.png">
+<style>
+:root {
+  color-scheme: light;
+  --ink: #161616; --paper: #efede7; --card: #f7f5f0; --muted: #6d6b67; --gold: #f2e28f; --butter: #e2d7ad;
+  --mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.55 var(--mono);
+  background-image: radial-gradient(rgba(22,22,22,.06) 1px, transparent 1.2px); background-size: 12px 12px; }
+a { color: inherit; }
+.wrap { width: min(1100px, 100% - 32px); margin: 0 auto; }
+.top { background: var(--ink); color: var(--paper); padding: 18px 0; }
+.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.logo { font-weight: 800; letter-spacing: .1em; text-transform: uppercase; text-decoration: none; }
+.top nav { display: flex; gap: 18px; font-size: 13px; }
+.top nav a { color: #d6d3cc; text-decoration: none; }
+.top nav a:hover { color: var(--gold); }
+h1 { font-size: clamp(28px, 5vw, 44px); margin: 34px 0 6px; }
+.sub { color: var(--muted); margin: 0 0 22px; }
+.picker { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
+.picker button { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border: 2px solid var(--ink); background: var(--card); font: 700 13px var(--mono); cursor: pointer; box-shadow: 3px 3px 0 var(--ink); }
+.picker button[aria-pressed="true"] { background: var(--gold); }
+.picker img { width: 22px; height: 22px; image-rendering: pixelated; }
+.card { background: #fff; border: 2px solid var(--ink); box-shadow: 5px 5px 0 var(--ink); padding: 18px 20px; }
+.card h2 { margin: 0 0 4px; display: flex; align-items: center; gap: 10px; }
+.card h2 img { width: 32px; height: 32px; image-rendering: pixelated; }
+.card p.intro { margin: 0 0 14px; color: var(--muted); }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1.5px solid #e4e1d9; vertical-align: middle; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+td.level { font-weight: 800; font-size: 17px; width: 56px; text-align: center; }
+td.icon { width: 44px; }
+td.icon img { width: 32px; height: 32px; image-rendering: pixelated; display: block; }
+td small { color: var(--muted); }
+.inputs { display: flex; gap: 8px; flex-wrap: wrap; }
+.inputs span { display: inline-flex; align-items: center; gap: 2px; font-weight: 700; font-size: 12px; }
+.inputs img { width: 22px; height: 22px; image-rendering: pixelated; }
+.search { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.search input, .search select { font: 14px var(--mono); padding: 6px 10px; border: 2px solid var(--ink); background: var(--card); }
+footer { margin: 40px 0; color: var(--muted); font-size: 13px; }
+@media (max-width: 640px) { td.icon { display: none; } }
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap"><a class="logo" href="./">⚔ RareFriends Realm</a>
+  <nav aria-label="Pages"><a href="./">Preview</a><a href="./guides.html">Skill guides</a><a href="https://m4s4t0-v01d.github.io/rarefriends-realm/">Play</a></nav></div></header>
+<main class="wrap">
+  <h1>Skill guides</h1>
+  <p class="sub">Everything each skill unlocks, level by level, straight from the game's data. Pick a skill, or open the recipe book.</p>
+  <div class="picker" id="picker" role="toolbar" aria-label="Skills"></div>
+  <section class="card" id="guide" aria-live="polite"></section>
+  <footer>In the game, click any skill in the Skills tab for the same guide, with your own progress ticked off.</footer>
+</main>
+<script src="guides.js"></script>
+</body>
+</html>

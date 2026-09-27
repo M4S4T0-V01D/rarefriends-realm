@@ -1044,7 +1044,7 @@ function monsterTick(game: Game, monster: Monster) {
   const player = game.player;
   if (monster.dead) {
     if (game.tick >= monster.respawnAt) {
-      monster.dead = false; monster.hp = monster.def.hp; monster.curses = {}; monster.x = monster.spawn.x; monster.y = monster.spawn.y; monster.prev = { ...monster.spawn }; monster.target = false;
+      monster.dead = false; monster.hp = monster.def.hp; monster.curses = {}; monster.bornAt = game.tick; monster.x = monster.spawn.x; monster.y = monster.spawn.y; monster.prev = { ...monster.spawn }; monster.target = false;
     }
     return;
   }
@@ -1257,6 +1257,35 @@ function telegrab(game: Game, spellId: string, index: number) {
   emit(game, { type: "projectile", projectile: { from: { x: ground.x, y: ground.y }, to: { x: player.x, y: player.y }, start: game.tick, end: game.tick + 1, color: "#e6ecef", style: "magic", element: "wind" } });
 }
 export function setStyle(game: Game, style: CombatStyle) { game.player.style = style; }
+// ---------- Shared fights ----------
+/** The monster you're fighting right now, to tell other players (the same monster has the same uid in every game). */
+export function currentFight(game: Game) {
+  const player = game.player, monster = (player.combat !== null ? monsterByUid(game, player.combat) : null) ?? game.monsters.find(entry => entry.target && !entry.dead) ?? null;
+  return monster ? { u: monster.uid, id: monster.def.id, hp: monster.hp, x: monster.x, y: monster.y } : null;
+}
+/**
+ * Another player is fighting a monster: our copy takes the lower of the two HPs (so both players' hits count), and
+ * if it isn't fighting us it walks over to where theirs is. If their hits finish it, it dies here without loot for us.
+ */
+export function syncMonster(game: Game, fight: { u: number; id: string; hp: number; x: number; y: number }, by: number) {
+  const monster = game.monsters.find(entry => entry.uid === fight.u && entry.def.id === fight.id);
+  if (!monster || monster.dead || game.tick - (monster.bornAt ?? -99) < 8) return;
+  if (!monster.target) {
+    const far = Math.max(Math.abs(monster.x - fight.x), Math.abs(monster.y - fight.y));
+    if (far > 3) { monster.prev = { x: fight.x, y: fight.y }; monster.x = fight.x; monster.y = fight.y; }
+    else if (far > 0) stepMonsterToward(game, monster, { x: fight.x, y: fight.y });
+  }
+  const hp = Math.max(0, Math.min(monster.def.hp, Math.floor(fight.hp)));
+  if (hp >= monster.hp) return;
+  emit(game, { type: "hit", on: "monster", uid: monster.uid, damage: monster.hp - hp, tick: game.tick });
+  monster.hp = hp;
+  if (hp > 0) return;
+  monster.dead = true; monster.target = false; monster.respawnAt = game.tick + monster.def.respawn;
+  if (game.player.combat === monster.uid) { game.player.combat = null; game.player.queuedSpell = null; }
+  creature(game, monster, "death");
+  message(game, `Friend #${by} finished off the ${monster.def.name.toLowerCase()}.`);
+}
+
 // ---------- Emotes ----------
 /** Why you can't perform an emote (null if you can). */
 export function emoteProblem(game: Game, id: string) {

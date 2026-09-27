@@ -16,7 +16,8 @@ An old-school, tick-based RPG in a 2.5D isometric world. Your verified Rare Frie
 | Scroll, or + / − | Zoom (0.55× to 3×, close enough to watch every axe swing) |
 | M, or the map orb | World map (click a place to walk there) |
 | Minimap click | Walk there |
-| F1–F9, or I / K / L / O / P / N | Combat, Skills, Quests, Inventory, Equipment, Prayer, Magic, Friends, Settings |
+| F1–F10, or I / K / L / O / P / N | Combat, Skills, Quests, Inventory, Equipment, Prayer, Magic, Friends, Settings, Emotes |
+| Click a skill | Its guide: everything it unlocks, level by level (Recipe book button for every recipe) |
 | Enter | Chat (shown over your Friend's head) |
 | Space, 1–5 | Continue dialogue, pick an option |
 | Esc | Close interfaces |
@@ -216,6 +217,7 @@ and the badge by the minimap shows how many are online.
 | Talk | Type in the chat box (everyone sees it); `@1234 hello` whispers to Friend #1234 (Private tab) |
 | Player menu | Right-click a player: *Follow*, *Add-friend* / *Remove-friend*, *Message*, *Wave*, *Ignore*, *Examine* |
 | Friends list | Friends tab: who's online, where and at what level; message or remove; add by Friend # |
+| Fight together | Attack the same monster as another player: both of your hits count, it walks to where they're fighting it, and you see each other's health bars. The last hit in your game gets the loot |
 | Party bonus | +5% XP while a friend is within 12 tiles on your storey |
 | Trade | Right-click a player → *Trade with* (they accept from the prompt). Click or right-click items to offer (*Offer-1/5/10/All*), both press Accept, check the second screen, and Accept again. Any change clears both accepts. Untradeable items (quest items, capes) can't be offered |
 | Dropped items | Things you drop from your pack show on other players' screens; *Take* one and it's yours if you're first |

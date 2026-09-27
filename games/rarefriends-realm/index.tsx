@@ -9,11 +9,11 @@ import { FAMILY_NAMES, FAMILY_PERKS, RELICS, RF_BUNDLES, SKILL_ICONS, SPELLS, WA
 import { QUESTS, questPoints, MAX_QUEST_POINTS } from "./content.ts";
 import { TICK_MS, combatLevel, createGame, giveOrDrop, message, totalLevel, type Game, type Projectile } from "./state.ts";
 import {
-  chooseOption, closeInterfaces, collectFromCasket, performEmote, continueDialogue, grantBundle, menuFor, tailorChoices, unlockMusic, restore, serialize, setFollower, setHeld, setRelics, tick, toggleRun, walkTo, type OwnedFriend, type Selection,
+  chooseOption, closeInterfaces, collectFromCasket, performEmote, syncMonster, continueDialogue, grantBundle, menuFor, tailorChoices, unlockMusic, restore, serialize, setFollower, setHeld, setRelics, tick, toggleRun, walkTo, type OwnedFriend, type Selection,
 } from "./engine.ts";
 import { PITCH, VIEW, ZOOM, daylight, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
 import {
-  BankModal, ChatBox, ContextMenu, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
+  BankModal, ChatBox, ContextMenu, GuideModal, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
   cancelLongPress, longPress, rightClick, type MenuEntry, type Settings, type Tab,
 } from "./panels.tsx";
 import { REGULAR_SPRITES } from "./regulars.ts";
@@ -63,7 +63,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const [levelUps, setLevelUps] = useState<{ skill: Skill; level: number }[]>([]), [quest, setQuest] = useState<string | null>(null), [dead, setDead] = useState(false);
   const [settings, setSettingsState] = useState<Settings>(DEFAULT_SETTINGS), [roster, setRoster] = useState<OwnedFriend[]>([]), [rosterState, setRosterState] = useState<"waiting" | "ready" | "none">("waiting");
   const [hosted, setHosted] = useState<"waiting" | "linked" | "none">("waiting"), [hasSave, setHasSave] = useState<{ total: number; combat: number; qp: number; where: string } | null>(null);
-  const [tailorPick, setTailorPick] = useState(""), [backupStatus, setBackupStatus] = useState("");
+  const [tailorPick, setTailorPick] = useState(""), [backupStatus, setBackupStatus] = useState(""), [guide, setGuide] = useState<{ skill: Skill | null } | null>(null);
   // Playing together: other players (from the host), who you're following, and a whisper to start in the chat box.
   const players = useRef(new Players()), following = useRef<number | null>(null);
   // Trades, and other players' drops we've asked to take (owner:uid) or are walking to.
@@ -261,6 +261,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           // Playing together: tell the others where we are, follow whoever we're following, and count friends nearby.
           if (players.current.state.status !== "offline") window.parent.postMessage({ type: NET_PRESENCE, presence: presenceOf(state) }, "*");
           state.player.nearFriends = players.current.nearFriends(state);
+          // Shared fights: other players' hits on the same monsters (near us, on our layer) count here too.
+          for (const peer of players.current.state.peers) if (peer.fight && Math.max(Math.abs(peer.x - state.player.x), Math.abs(peer.y - state.player.y)) <= 24) syncMonster(state, peer.fight, peer.id);
           trades.current.tick(now);
           const target = walkingTo.current;
           if (target && Math.max(Math.abs(target.x - state.player.x), Math.abs(target.y - state.player.y)) <= 0) {
@@ -482,7 +484,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       if (CAMERA_KEYS.has(key)) { held.current.add(key); event.preventDefault(); return; }
       const fn = /^f(10|[1-9])$/.exec(key);
       if (fn) { setTab(TABS[Number(fn[1]) - 1].id); event.preventDefault(); return; }
-      if (key === "escape") { setMenu(null); setModal(null); setSelection(null); closeInterfaces(state); setLevelUps([]); refresh(); return; }
+      if (key === "escape") { setMenu(null); setModal(null); setGuide(null); setSelection(null); closeInterfaces(state); setLevelUps([]); refresh(); return; }
       if (key === " " || key === "spacebar") {
         if (live.current.phase === "playing") {
           if (levelUpsRef.current.length && !state.dialogue) setLevelUps(list => list.slice(1));
@@ -649,7 +651,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           {sideOpen && <SidePanel game={state} tab={tab} setTab={setTab} selection={selection} setSelection={setSelection} openMenu={(x, y, entries) => setMenu({ x, y, entries })}
             refresh={refresh} roster={roster} rosterState={rosterState} friendSprites={followerSprites.current} loadFriend={loadFriendSprite}
             net={netState} onSocial={(op, id) => window.parent.postMessage({ type: NET_SOCIAL, op, id }, "*")} onWhisper={id => setWhisper({ text: `@${id} `, at: performance.now() })}
-            onOnline={on => window.parent.postMessage({ type: NET_ONLINE, on }, "*")} backupStatus={backupStatus}
+            onOnline={on => window.parent.postMessage({ type: NET_ONLINE, on }, "*")} backupStatus={backupStatus} openGuide={skill => setGuide({ skill })}
             onExportSave={action => { const state = game.current; if (state) void makeSaveCode(state).then(text => window.parent.postMessage({ type: SAVE_EXPORT, action, text }, "*")); }}
             onRestoreSave={async code => { const state = game.current; if (!state) return "The game isn't ready."; const error = await restoreSaveCode(state, code);
               if (!error) { const at = realPoint(state.world, state.player.x, state.player.y); camera.current.x = at.x; camera.current.y = at.y; message(state, "Your adventure has been restored from a save code.", "info"); } return error; }} settings={settings} setSettings={setSettings}
@@ -659,6 +661,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
 
           {state.ui.bank && <BankModal game={state} refresh={refresh} onClose={() => { state.ui.bank = false; refresh(); }} openMenu={(x, y, entries) => setMenu({ x, y, entries })} />}
           <LampModal game={state} refresh={refresh} />
+          {guide && <GuideModal game={state} skill={guide.skill} onSkill={skill => setGuide({ skill })} onClose={() => setGuide(null)} />}
           {(() => { const view = trades.current.view(); return view ? <TradeModal game={state} view={view} openMenu={(x, y, entries) => setMenu({ x, y, entries })}
             onOffer={(id, n) => { trades.current.offer(state, id, n); refresh(); }} onAccept={() => { trades.current.accept(state); refresh(); }} onDecline={() => { trades.current.decline(state); refresh(); }} /> : null; })()}
           {!trades.current.view() && trades.current.incoming.size > 0 && <div className="realm-trade-requests" role="status">

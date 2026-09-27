@@ -62,8 +62,18 @@ try {
     await page.waitForTimeout(1200); await level(); await page.waitForTimeout(800);
     assert.equal(await button.getAttribute("aria-pressed"), "false");
     assert.ok(await level() < 0.002, `${name}: music kept playing after stop`);
+    // The skill guides page: a skill's unlocks, the recipe book and its search.
+    await page.goto(`http://127.0.0.1:${server.address().port}/preview/guides.html#woodcutting`);
+    await page.getByRole("heading", { name: "Woodcutting" }).waitFor();
+    assert.ok(await page.locator("#guide tbody tr").count() >= 10, `${name}: woodcutting unlocks`);
+    await page.getByRole("button", { name: /Recipe book/ }).click();
+    await page.getByRole("heading", { name: "Recipe book" }).waitFor();
+    assert.ok(await page.locator("#guide tbody tr").count() > 80, `${name}: the recipe book`);
+    await page.getByRole("searchbox", { name: "Search recipes" }).fill("yew");
+    assert.ok(await page.locator("#guide tbody tr").count() <= 3, `${name}: recipe search`);
+    if (name === "desktop") { await page.getByRole("button", { name: /Magic/ }).click(); await page.screenshot({ path: "./artifacts/site-guides.png" }); }
     assert.deepEqual(errors, []);
     await context.close();
   }
 } finally { await browser.close(); server.close(); }
-console.log("PASS preview page: main theme and jukebox");
+console.log("PASS preview page: main theme and jukebox; skill guides and recipe book");

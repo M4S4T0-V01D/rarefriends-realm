@@ -302,3 +302,21 @@
 .realm-trade-requests div { display: flex; align-items: center; gap: 6px; padding: 5px 8px; background: var(--paper); border: 2px solid var(--ink); box-shadow: 3px 3px 0 #000; font-size: 12px; }
 .realm-trade-buttons { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .realm-trade-buttons .realm-note { margin: 0; }
+
+/* Skill guides and the recipe book */
+.realm-guide-skills { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 8px; }
+.realm-guide-skills button { padding: 3px !important; min-height: 0 !important; }
+.realm-guide-skills button[aria-selected="true"] { background: #e2d7ad !important; }
+.realm-guide-book { font-size: 11px; padding: 3px 8px !important; }
+.realm-guide { list-style: none; margin: 0; padding: 0; max-height: 330px; overflow: auto; display: grid; gap: 3px; }
+.realm-guide li { display: grid; grid-template-columns: 34px 34px 1fr auto; align-items: center; gap: 8px; padding: 4px 8px; background: #fff; border: 2px solid #161616; opacity: 0.6; }
+.realm-guide li[data-open="true"] { opacity: 1; }
+.realm-guide li[data-next="true"] { outline: 3px solid #e2c46a; opacity: 1; }
+.realm-guide li span { display: grid; font-size: 12px; }
+.realm-guide li small { opacity: 0.8; font-size: 11px; }
+.realm-guide li i { font-style: normal; color: #3f8a4a; font-weight: 800; }
+.realm-guide-level { font-size: 15px; text-align: center; }
+.realm-guide.recipes li { grid-template-columns: 34px 34px 1fr auto; }
+.realm-guide-inputs { display: flex !important; gap: 4px; }
+.realm-guide-inputs span { display: flex !important; align-items: center; font-size: 11px; font-weight: 700; }
+.realm-guide-inputs span[data-have="false"] { color: #b04a4a; }

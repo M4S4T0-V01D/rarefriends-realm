@@ -177,6 +177,16 @@ try {
     for (const [id, n] of [["inkcrab", 1], ["inkcrab", 1], ["inkcrab", 1], ["sailfish", 1], ["breeze_sigil", 120], ["thought_sigil", 80], ["oak_logs", 1], ["blackiron_ore", 1], ["rough_moonstone", 1]]) { const i = p.inventory.indexOf(null); if (i >= 0) p.inventory[i] = { id, n }; }
     window.__realm.refresh(); });
   await game.getByRole("tab", { name: "Skills" }).click(); await page.waitForTimeout(300); await shot("skills");
+  // The skill guide (click a skill) and the recipe book.
+  await game.getByRole("button", { name: /^Woodcutting XP/ }).click();
+  await game.getByRole("dialog", { name: "Woodcutting guide" }).waitFor();
+  await game.getByText("Yew tree").waitFor();
+  await page.waitForTimeout(300); await shot("skill-guide");
+  await game.getByRole("tab", { name: "Recipe book" }).click();
+  await game.getByRole("dialog", { name: "Recipe book" }).waitFor();
+  await game.getByRole("searchbox", { name: "Search recipes" }).fill("arrow");
+  await page.waitForTimeout(300); await shot("recipe-book");
+  await game.getByRole("button", { name: "Close" }).click();
   await game.getByRole("tab", { name: "Quest journal" }).click(); await game.getByRole("button", { name: "Grumblin Trouble" }).click(); await game.getByText(/Grumblins defeated: 4\/6/).waitFor(); await shot("quests");
   await game.getByRole("tab", { name: "Worn equipment" }).click(); await shot("equipment");
   await game.getByRole("tab", { name: "Friends and wardrobe" }).click();

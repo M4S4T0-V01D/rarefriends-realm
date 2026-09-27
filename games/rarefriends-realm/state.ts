@@ -60,6 +60,8 @@ export type Player = {
 export type Monster = {
   uid: number; def: MonsterDef; x: number; y: number; prev: Point; spawn: Point; hp: number; heading: Point;
   target: boolean; attackTimer: number; respawnAt: number; dead: boolean; wander: number; moved: number; retreat: number;
+  /** The tick it last came back to life (shared fights ignore reports from its previous life for a moment). */
+  bornAt?: number;
   /** Curses and Bind: the tick each wears off. */
   curses: Partial<Record<"attack" | "strength" | "defence" | "bound", number>>;
 };

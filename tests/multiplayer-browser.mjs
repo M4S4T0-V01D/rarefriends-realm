@@ -156,6 +156,14 @@ try {
   await b.until(() => !window.__realm.game().player.inventory.some(slot => slot?.id === "yew_bow"), "B giving the bow");
   assert.equal(await a.state(() => window.__realm.game().player.inventory.reduce((n, slot) => n + (slot?.id === "coins" ? slot.n : 0), 0)), coinsA - 10, "A paid 10 coins");
 
+  // A shared fight: B attacks a cow, and A's copy of the same cow loses HP too; A sees B's health bar data.
+  await a.teleport(90, 111); await b.teleport(91, 112);
+  const cowUid = await b.frame().evaluate(() => { const g = window.__realm.game(), p = g.player; for (const s of ["attack", "strength"]) p.xp[s] = 30_000;
+    const cow = g.monsters.filter(m => m.def.id === "cow" && !m.dead).sort((m1, m2) => Math.hypot(m1.x - p.x, m1.y - p.y) - Math.hypot(m2.x - p.x, m2.y - p.y))[0]; cow.hp = cow.def.hp; p.combat = cow.uid; return cow.uid; });
+  await a.until(new Function(`const cow = window.__realm.game().monsters.find(m => m.uid === ${cowUid}); return cow.dead || cow.hp < cow.def.hp;`), "A seeing B's hits on the shared cow", 30_000);
+  await a.page.waitForTimeout(400);
+  await a.page.locator(".rf-game-frame").screenshot({ path: "./artifacts/shared-fight.png" });
+
   // A goes offline: B stops seeing #7730.
   await a.game.getByRole("tab", { name: "Settings" }).click();
   await a.game.getByLabel("Online: see and meet other players").click();
@@ -163,7 +171,7 @@ try {
   await b.until(() => !window.__realm.peers().some(peer => peer.id === 7730), "#7730 leaving", 25_000);
 
   assert.deepEqual(errors, [], "browser errors");
-  console.log("PASS multiplayer: two players see each other walk, right-click menu, friends list, party bonus, public chat, whispers (links stripped), emotes, shared drops, a trade by clicks, going offline");
+  console.log("PASS multiplayer: two players see each other walk, right-click menu, friends list, party bonus, public chat, whispers (links stripped), emotes, shared drops, a trade by clicks, a shared fight, going offline");
 } finally {
   await browser?.close();
   if (server) { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }

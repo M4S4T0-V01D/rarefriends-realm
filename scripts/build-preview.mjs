@@ -1,5 +1,5 @@
 // Build the shareable /preview/ page: copy the page and screenshots, and bundle its music player
-// (the game's procedural audio) into music.js.
+// (the game's procedural audio) into music.js, and the skill guides page into guides.js.
 import { build } from "esbuild";
 import { cp, mkdir, readdir } from "node:fs/promises";
 import path from "node:path";
@@ -11,9 +11,15 @@ const outdir = path.resolve(index >= 0 ? args[index + 1] : path.join(root, "game
 
 await mkdir(path.join(outdir, "img"), { recursive: true });
 await cp(path.join(root, "site/preview/index.html"), path.join(outdir, "index.html"));
+await cp(path.join(root, "site/preview/guides.html"), path.join(outdir, "guides.html"));
 for (const file of await readdir(path.join(root, "docs"))) if (file.endsWith(".png")) await cp(path.join(root, "docs", file), path.join(outdir, "img", file));
 await build({
   entryPoints: [path.join(root, "site/preview/music.ts")], outfile: path.join(outdir, "music.js"),
+  bundle: true, format: "iife", platform: "browser", target: "es2022", minify: true, logLevel: "warning",
+});
+// The skill guides page: the game's guide data and pixel icons, rendered in the browser.
+await build({
+  entryPoints: [path.join(root, "site/preview/guides.ts")], outfile: path.join(outdir, "guides.js"),
   bundle: true, format: "iife", platform: "browser", target: "es2022", minify: true, logLevel: "warning",
 });
 console.log(`Built ${outdir}`);

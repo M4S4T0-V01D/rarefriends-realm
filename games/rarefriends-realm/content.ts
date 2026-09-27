@@ -327,7 +327,7 @@ export function talk(game: Game, npcId: string): Dialogue {
       ]);
       if (s === 1) {
         if (count(player, "pewter_bar") < 3 || count(player, "blackiron_bar") < 2) return chat(name, npcSays(name, "Three pewter bars and two blackiron bars. The furnace is right there."));
-        return chat(name, npcSays(name, "Listen to that… the forge remembers! Here, a ashsteel pickaxe and some inkcoal to go with it."), undefined, () => {
+        return chat(name, npcSays(name, "Listen to that… the forge remembers! Here, an ashsteel pickaxe and some inkcoal to go with it."), undefined, () => {
           take(player, "pewter_bar", 3); take(player, "blackiron_bar", 2); giveOrDrop(game, "ashsteel_pickaxe"); giveOrDrop(game, "inkcoal", 10); giveOrDrop(game, "forge_ember");
           addXp(game, "smithing", 2500, { raw: true }); addXp(game, "mining", 1200, { raw: true });
           completeQuest(game, "cold_forge", ["1 Quest Point", "2,500 Smithing XP", "1,200 Mining XP", "Ashsteel pickaxe", "10 inkcoal"]);

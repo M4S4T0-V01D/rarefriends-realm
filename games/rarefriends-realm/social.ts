@@ -4,7 +4,8 @@
  */
 import { FAMILY_NAMES } from "./data.ts";
 import type { NetState, Presence } from "./net.ts";
-import { TICK_MS, combatLevel, totalLevel, type Game } from "./state.ts";
+import { TICK_MS, combatLevel, maxHp, totalLevel, type Game } from "./state.ts";
+import { currentFight } from "./engine.ts";
 import { isUnderground, realPoint, regionAt } from "./world.ts";
 
 export type Avatar = { p: Presence; fromX: number; fromY: number; at: number; emoteAt: number };
@@ -69,6 +70,7 @@ export function presenceOf(game: Game): Presence {
     activity: player.activity?.kind ?? (player.combat !== null ? "combat" : null), combat: combatLevel(player), total: totalLevel(player),
     region: regionAt(game.world, player.x, player.y).name,
     emote: player.emote && game.tick < player.emote.until ? player.emote.id : null,
+    hp: player.hp, maxHp: maxHp(player), fight: currentFight(game),
     drops: game.ground.filter(entry => entry.shared).slice(-16).map(entry => ({ u: entry.uid, id: entry.id, n: entry.n, x: entry.x, y: entry.y })),
   };
 }

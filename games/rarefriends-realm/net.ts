@@ -46,6 +46,8 @@ export type Presence = {
   emote: string | null;
   /** Items this player dropped from their pack, which anyone may pick up. */
   drops: Drop[];
+  /** Their hitpoints, and the monster they're fighting (shared fights). */
+  hp: number; maxHp: number; fight: { u: number; id: string; hp: number; x: number; y: number } | null;
 };
 export type NetStatus = "offline" | "connecting" | "online";
 export type NetState = { status: NetStatus; peers: Presence[]; friends: number[]; ignored: number[]; players: number };
@@ -65,6 +67,9 @@ export function cleanPresence(raw: unknown): Presence | null {
     worn, cape: word(r.cape), weapon: word(r.weapon), activity: word(r.activity), combat: int(r.combat, 3, 200) ?? 3, total: int(r.total, 1, 3000) ?? 1,
     region: typeof r.region === "string" ? r.region.slice(0, 32).replace(/[^\w' ]/g, "") : "",
     emote: word(r.emote),
+    hp: int(r.hp, 0, 99) ?? 10, maxHp: int(r.maxHp, 1, 99) ?? 10,
+    fight: (() => { const f = r.fight as Record<string, unknown> | null; if (!f || typeof f !== "object") return null; const u = int(f.u, 0, 1e9), fid = word(f.id, 40), fhp = int(f.hp, 0, 10_000), fx = int(f.x, 0, 239), fy = int(f.y, 0, 279);
+      return u !== null && fid && fhp !== null && fx !== null && fy !== null ? { u, id: fid, hp: fhp, x: fx, y: fy } : null; })(),
     drops: Array.isArray(r.drops) ? r.drops.slice(0, 16).flatMap(entry => { const e = entry as Record<string, unknown>, u = int(e?.u, 0, 1e12), id = word(e?.id, 40), n = int(e?.n, 1, 2_147_483_647), dx = int(e?.x, 0, 239), dy = int(e?.y, 0, 279);
       return u !== null && id && n && dx !== null && dy !== null ? [{ u, id, n, x: dx, y: dy }] : []; }) : [],
   };

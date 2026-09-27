@@ -751,3 +751,24 @@ test("Trading: request, offers (changes clear accepts), a second screen, the swa
   give(ga.player, "attack_cape"); a.offer(ga, "attack_cape", 1);
   assert.deepEqual(a.view().mine, []);
 });
+
+test("Shared fights: the same monster in two games takes both players' hits; a peer's kill gives no loot here", async () => {
+  const { syncMonster, currentFight } = await import("../games/rarefriends-realm/engine.ts");
+  const ga = newGame(), gb = newGame({ friendId: 3412 });
+  const cowA = ga.monsters.find(m => m.def.id === "cow"), cowB = gb.monsters.find(m => m.uid === cowA.uid);
+  assert.equal(cowB.def.id, "cow", "same uid, same monster in both games");
+  ga.tick = gb.tick = 50;
+  standNear(gb, cowB.x, cowB.y, 1); gb.player.combat = cowB.uid; cowB.hp -= 3;
+  const fight = currentFight(gb);
+  assert.deepEqual([fight.u, fight.hp], [cowB.uid, cowB.def.hp - 3]);
+  cowA.x += 6; syncMonster(ga, fight, 3412);
+  assert.equal(cowA.hp, cowB.def.hp - 3, "B's damage counts in A's game");
+  assert(Math.max(Math.abs(cowA.x - cowB.x), Math.abs(cowA.y - cowB.y)) <= 1, "A's copy goes to where B is fighting it");
+  const groundBefore = ga.ground.length;
+  syncMonster(ga, { ...fight, hp: 0 }, 3412);
+  assert(cowA.dead, "B's killing blow kills it here too");
+  assert.equal(ga.ground.length, groundBefore, "no loot for A from B's kill");
+  cowA.dead = false; cowA.hp = cowA.def.hp; cowA.bornAt = ga.tick;
+  syncMonster(ga, { ...fight, hp: 1 }, 3412);
+  assert.equal(cowA.hp, cowA.def.hp, "reports from its last life are ignored right after it respawns");
+});
