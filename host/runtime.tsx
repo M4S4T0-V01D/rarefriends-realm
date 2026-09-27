@@ -7,7 +7,9 @@
  *     so your other owned Friends can follow you in the Realm.
  *  2. Per-wallet saves. The sandbox has no storage, so this trusted page keeps each wallet's adventure
  *     in its own localStorage, keyed by wallet address and Friend.
- *  3. Sharing the adventurer card. On the player's click, it uses the share sheet, clipboard, a download or an
+ *  3. Playing together (host/net.ts): other players' Friends, chat and a friends list, peer to peer. Only Friend IDs
+ *     travel, and everything received is validated before the game sees it.
+ *  4. Sharing the adventurer card. On the player's click, it uses the share sheet, clipboard, a download or an
  *     X post link. The sandbox has none of these powers.
  * All of them reach the sandboxed game only over postMessage, when it asks. The watcher session only uses
  * `eth_accounts`: no signing and no extra prompts. GameHost still owns connection and selection.
@@ -21,6 +23,8 @@ import { createFriendPublicClient, createFriendWalletSession } from "@rarefriend
 import {
   HOST_HELLO, HOST_STATE, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, type ShareAction, type ShareOutcome,
 } from "../games/rarefriends-realm/roster.ts";
+import { NET_CHAT, NET_ONLINE, NET_PRESENCE, NET_SOCIAL } from "../games/rarefriends-realm/net.ts";
+import { NetHub } from "./net.ts";
 import gameJson from "../games/rarefriends-realm/game.json";
 import "@rarefriends/friendsdk/frame.css";
 import "@rarefriends/friendsdk/runtime.css";
@@ -70,17 +74,20 @@ function RealmHost() {
     const owns = (id: unknown) => !!roster?.some(entry => entry.split(":")[0] === String(id));
     const send = (target: Window) => { if (account && roster) target.postMessage({ type: HOST_STATE, ids: roster, save: owns(friend) ? readSave(account, friend) : null }, "*"); };
     const broadcast = () => frames().forEach(send);
+    // Playing together: tests (navigator.webdriver) meet over a same-origin channel, everyone else peer to peer.
+    const hub = new NetHub(message => frames().forEach(target => target.postMessage(message, "*")), navigator.webdriver);
+    const sync = () => hub.setPlayer(account, account && roster && owns(friend) ? Number(friend) : null);
     const check = () => {
       const snapshot = session.getSnapshot();
       const next = snapshot.status === "connected" ? snapshot.account : null;
       if (next === account) return;
-      account = next; controller?.abort(); roster = null;
+      account = next; controller?.abort(); roster = null; sync();
       if (!next) return;
       const current = controller = new AbortController();
       // Discovery can hit public-RPC rate limits, so retry a few times before giving up (the game then plays unsaved).
       const discover = (attempt: number): void => {
         void readOwnedFriends(client, next, { signal: current.signal })
-          .then(result => { if (!current.signal.aborted) { roster = result.friends.map(owned => `${owned.id}:${owned.generation}`); broadcast(); } })
+          .then(result => { if (!current.signal.aborted) { roster = result.friends.map(owned => `${owned.id}:${owned.generation}`); broadcast(); sync(); } })
           .catch(() => { if (!current.signal.aborted && attempt < 3) setTimeout(() => discover(attempt + 1), 1500 * (attempt + 1)); });
       };
       discover(0);
@@ -88,7 +95,11 @@ function RealmHost() {
     // Only the game frame we host may ask or save. Saves are accepted only for a Friend in this wallet's roster.
     const receive = (event: MessageEvent) => {
       if (!event.source || !frames().includes(event.source as Window)) return;
-      if (event.data?.type === HOST_HELLO) { friend = /^[0-9]{1,15}$/.test(String(event.data.friend)) ? String(event.data.friend) : null; send(event.source as Window); }
+      if (event.data?.type === HOST_HELLO) { friend = /^[0-9]{1,15}$/.test(String(event.data.friend)) ? String(event.data.friend) : null; send(event.source as Window); sync(); }
+      else if (event.data?.type === NET_PRESENCE) hub.presence(event.data.presence);
+      else if (event.data?.type === NET_CHAT) hub.chat(event.data.text, event.data.to);
+      else if (event.data?.type === NET_SOCIAL && typeof event.data.op === "string" && typeof event.data.id === "number") hub.changeSocial(event.data.op, event.data.id);
+      else if (event.data?.type === NET_ONLINE) hub.setOnline(event.data.on === true);
       else if (event.data?.type === SAVE_WRITE && account && owns(event.data.friend)) writeSave(account, String(event.data.friend), event.data.save);
       else if (event.data?.type === SHARE_REQUEST && ["post", "copy", "save"].includes(event.data.action) && event.data.image instanceof Blob
         && event.data.image.type === "image/png" && event.data.image.size < 5_000_000 && typeof event.data.text === "string" && event.data.text.length <= 1000) {
@@ -102,7 +113,9 @@ function RealmHost() {
     const unsubscribe = session.subscribe(check); check();
     // Pick up a connection made through GameHost even if the wallet emits no accountsChanged event.
     const poll = setInterval(() => { if (session.getSnapshot().status !== "connected") void session.refresh(); }, 2500);
-    return () => { clearInterval(poll); unsubscribe(); window.removeEventListener("message", receive); controller?.abort(); session.dispose(); };
+    const bye = () => hub.dispose();
+    window.addEventListener("pagehide", bye);
+    return () => { clearInterval(poll); unsubscribe(); window.removeEventListener("message", receive); window.removeEventListener("pagehide", bye); hub.dispose(); controller?.abort(); session.dispose(); };
   }, []);
   // The same wide layout as games/rarefriends-realm/host.css, set on the wrapper as HOST_INTEGRATION.md describes.
   return <div style={{ "--rf-game-max-width": "1280px", "--rf-game-aspect-ratio": "16 / 9" } as CSSProperties}><GameHost definition={definition} frameUrl="./game.html" /></div>;

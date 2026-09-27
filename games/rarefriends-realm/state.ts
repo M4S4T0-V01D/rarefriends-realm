@@ -52,6 +52,8 @@ export type Player = {
   courseStep: number; kills: number; deaths: number; overhead: { text: string; until: number } | null; music: string[];
   familyId: number; friendId: number; relics: number[]; followerGeneration: number | null; tutorial: number;
   lastHitBy: number | null; created: number; queuedSpell: string | null; castTimer: number;
+  /** Friends from your friends list playing near you right now (not saved): +5% XP while any are. */
+  nearFriends?: number;
 };
 export type Monster = {
   uid: number; def: MonsterDef; x: number; y: number; prev: Point; spawn: Point; hp: number; heading: Point;
@@ -77,7 +79,7 @@ export type GameEvent =
 export type SoundName =
   | "chop" | "mine" | "splash" | "catch" | "fire" | "sizzle" | "burn" | "smelt" | "anvil" | "hit" | "miss" | "hurt" | "eat" | "bury" | "coins"
   | "pickup" | "drop" | "door" | "level" | "quest" | "spell" | "teleport" | "death" | "stun" | "jump" | "click" | "equip" | "kill" | "pray" | "fell" | "bow";
-export type Message = { text: string; tone: "game" | "info" | "warn" | "quest" | "level" | "npc" | "public"; tick: number };
+export type Message = { text: string; tone: "game" | "info" | "warn" | "quest" | "level" | "npc" | "public" | "private"; tick: number };
 
 export type Game = {
   world: World; tick: number; player: Player; monsters: Monster[]; npcs: Npc[]; ground: GroundItem[]; fires: Fire[];
@@ -169,7 +171,7 @@ export function combatLevel(player: Player) {
 /** XP multiplier from the realm rate, kept Rare Relics and your follower's generation. */
 export function xpMultiplier(player: Player) {
   const plain = Math.min(RELICS[0].max, player.relics[0] ?? 0) * RELICS[0].xpPer, golden = (player.relics[3] ?? 0) > 0 ? RELICS[3].xpPer : 0;
-  return XP_RATE * (1 + plain + golden + followerBonus(player));
+  return XP_RATE * (1 + plain + golden + followerBonus(player) + ((player.nearFriends ?? 0) > 0 ? 0.05 : 0));
 }
 /** Owned-Friend followers: Gen 1 +5% XP … Gen 5 and later +1%. */
 export function followerBonus(player: Player) {

@@ -16,6 +16,7 @@ import {
 } from "./engine.ts";
 import { friendRows, renderWorldMap } from "./render.ts";
 import { isUnderground, realPoint } from "./world.ts";
+import type { NetState } from "./net.ts";
 import { artUrl, itemArt, orbArt, prayerArt, skillArt, spellArt, tabArt, type TabIcon } from "./icons.ts";
 import { friendSprite } from "./sprites.ts";
 import { figureArt } from "./wardrobe.ts";
@@ -106,6 +107,8 @@ export type PanelProps = {
   openMenu: (x: number, y: number, entries: MenuEntry[]) => void; refresh: () => void; roster: readonly OwnedFriend[]; rosterState: "waiting" | "ready" | "none";
   friendSprites: ReadonlyMap<number, GenerationSprites>; loadFriend: (id: number) => void; settings: Settings; setSettings: (settings: Settings) => void;
   friend: GenerationSprites | null; trackName: string; trackId: string; playTrack: (id: string) => void; openCard: () => void; openHelp: () => void; paused: boolean; saved: string; relicCounts: readonly number[]; openCaskets: () => void;
+  /** Playing together: who's around, and the friends list. */
+  net?: NetState; onSocial?: (op: "add" | "remove" | "ignore" | "unignore", id: number) => void; onWhisper?: (id: number) => void; onOnline?: (on: boolean) => void;
 };
 export function SidePanel(props: PanelProps) {
   const { tab, setTab } = props;
@@ -333,11 +336,32 @@ function MagicTab({ game, refresh, setSelection, selection, openMenu }: PanelPro
   );
 }
 function InfoCard({ children }: { children: ReactNode }) { return <div className="realm-info" aria-live="polite">{children}</div>; }
-function FriendsTab({ game, refresh, roster, rosterState, friendSprites, loadFriend, relicCounts, openCaskets, friend, openMenu }: PanelProps) {
-  const player = game.player, perk = FAMILY_PERKS[player.familyId];
+function FriendsTab({ game, refresh, roster, rosterState, friendSprites, loadFriend, relicCounts, openCaskets, friend, openMenu, net, onSocial, onWhisper, onOnline }: PanelProps) {
+  const player = game.player, perk = FAMILY_PERKS[player.familyId], [adding, setAdding] = useState("");
   useEffect(() => { for (const friend of roster.slice(0, 24)) loadFriend(friend.id); }, [roster, loadFriend]);
+  const online = (id: number) => net?.peers.find(peer => peer.id === id) ?? null;
   return (
     <div className="realm-friends">
+      <h3>Friends list <small>{net?.status === "online" ? `· ${net.players} in the Realm` : net?.status === "connecting" ? "· connecting…" : "· offline"}</small></h3>
+      {net?.status === "offline" ? <p className="realm-muted">You're playing offline. <button type="button" className="realm-link" onClick={() => onOnline?.(true)}>Go online</button> to see and meet other players.</p> : <>
+        <ul className="realm-social">
+          {(net?.friends ?? []).map(id => {
+            const here = online(id);
+            return <li key={id} data-online={!!here} {...rightClick(openMenu, () => [
+              ...(here ? [{ verb: "Message", noun: `Friend #${id}`, run: () => onWhisper?.(id) }] : []),
+              { verb: "Remove-friend", noun: `Friend #${id}`, run: () => onSocial?.("remove", id) }])}>
+              <i aria-hidden="true" /><b>#{id}</b><small>{here ? `${here.region || "Online"} · level-${here.combat}` : "Offline"}</small>
+              {here && <button type="button" onClick={() => onWhisper?.(id)} aria-label={`Message Friend #${id}`}>✉</button>}
+              <button type="button" onClick={() => onSocial?.("remove", id)} aria-label={`Remove Friend #${id}`}>✕</button>
+            </li>;
+          })}
+          {!net?.friends.length && <li className="realm-muted">Right-click a player and choose Add-friend, or add a Friend # below.</li>}
+        </ul>
+        <label className="realm-add-friend">Add Friend #<input inputMode="numeric" value={adding} onChange={event => setAdding(event.target.value.replace(/\D/g, "").slice(0, 12))} aria-label="Friend number to add"
+          onKeyDown={event => { if (event.key === "Enter" && adding) { event.preventDefault(); event.stopPropagation(); onSocial?.("add", Number(adding)); setAdding(""); } }} /></label>
+        {!!net?.ignored.length && <p className="realm-muted">Ignored: {net.ignored.map(id => <button key={id} type="button" className="realm-link" onClick={() => onSocial?.("unignore", id)} title="Stop ignoring">#{id}</button>)}</p>}
+        <p className="realm-note">Friends near you: +5% XP. Chat with <b>@1234 message</b> to whisper.</p>
+      </>}
       <p className="realm-perk"><b>{FAMILY_NAMES[player.familyId]}: {perk.title}.</b> {perk.text}</p>
       <h3>Followers</h3>
       {rosterState === "waiting" && <p className="realm-muted">Looking for your other Friends…</p>}
@@ -371,7 +395,7 @@ function FriendsTab({ game, refresh, roster, rosterState, friendSprites, loadFri
     </div>
   );
 }
-function SettingsTab({ game, settings, setSettings, trackName, trackId, playTrack, openHelp, saved, refresh, openMenu }: PanelProps) {
+function SettingsTab({ game, settings, setSettings, trackName, trackId, playTrack, openHelp, saved, refresh, openMenu, net, onOnline }: PanelProps) {
   const set = (patch: Partial<Settings>) => setSettings({ ...settings, ...patch });
   const unlocked = game.player.music;
   return (
@@ -390,6 +414,7 @@ function SettingsTab({ game, settings, setSettings, trackName, trackId, playTrac
       <label className="realm-check"><input type="checkbox" checked={settings.sfx} onChange={event => set({ sfx: event.target.checked })} /> Sound effects</label>
       <label className="realm-range">Effects volume <input type="range" min={0} max={100} value={Math.round(settings.sfxVolume * 100)} onChange={event => set({ sfxVolume: Number(event.target.value) / 100 })} /></label>
       <label className="realm-range">Zoom <input type="range" min={55} max={300} value={Math.round(settings.zoom * 100)} onChange={event => set({ zoom: Number(event.target.value) / 100 })} /></label>
+      <label className="realm-check"><input type="checkbox" checked={net?.status !== "offline"} onChange={event => onOnline?.(event.target.checked)} /> Online: see and meet other players</label>
       <label className="realm-check"><input type="checkbox" checked={settings.dayNight !== false} onChange={event => set({ dayNight: event.target.checked })} /> Day and night</label>
       <label className="realm-check"><input type="checkbox" checked={settings.shiftDrop} onChange={event => set({ shiftDrop: event.target.checked })} /> Shift-click to drop</label>
       <label className="realm-check"><input type="checkbox" checked={game.player.run} onChange={() => { toggleRun(game); refresh(); }} /> Run</label>
@@ -400,9 +425,12 @@ function SettingsTab({ game, settings, setSettings, trackName, trackId, playTrac
 }
 
 // ---------- Chat, dialogue, level-ups, production ----------
-export function ChatBox({ messages, onSend }: { messages: readonly Message[]; onSend: (text: string) => void }) {
-  const [filter, setFilter] = useState<"all" | "game" | "public">("all"), [draft, setDraft] = useState(""), list = useRef<HTMLDivElement>(null);
-  const shown = messages.filter(entry => filter === "all" || (filter === "public" ? entry.tone === "public" : entry.tone !== "public")).slice(-60);
+export function ChatBox({ messages, onSend, prefill }: { messages: readonly Message[]; onSend: (text: string) => void; prefill?: { text: string; at: number } | null }) {
+  const [filter, setFilter] = useState<"all" | "game" | "public" | "private">("all"), [draft, setDraft] = useState(""), list = useRef<HTMLDivElement>(null), input = useRef<HTMLInputElement>(null);
+  const social = (tone: string) => tone === "public" || tone === "private";
+  const shown = messages.filter(entry => filter === "all" || (filter === "game" ? !social(entry.tone) : entry.tone === filter)).slice(-60);
+  // "Message" on a player starts a private line to them.
+  useEffect(() => { if (prefill) { setDraft(prefill.text); setTimeout(() => input.current?.focus(), 0); } }, [prefill]);
   useEffect(() => { const node = list.current; if (node) node.scrollTop = node.scrollHeight; }, [shown.length, filter]);
   return (
     <section className="realm-chat" aria-label="Chat">
@@ -411,16 +439,16 @@ export function ChatBox({ messages, onSend }: { messages: readonly Message[]; on
       </div>
       {/* No <form>: the sandboxed game frame has no allow-forms, so a submit would be blocked. Enter sends. */}
       <div className="realm-chat-input">
-        <label><span>You:</span><input value={draft} maxLength={80} onChange={event => setDraft(event.target.value)} placeholder="Press Enter to chat" aria-label="Say something" data-chat="true"
+        <label><span>You:</span><input ref={input} value={draft} maxLength={88} onChange={event => setDraft(event.target.value)} placeholder="Press Enter to chat" aria-label="Say something" data-chat="true"
           onKeyDown={event => {
             if (event.key !== "Enter") return;
             event.preventDefault(); event.stopPropagation();
-            if (draft.trim()) onSend(draft.trim().slice(0, 80));
+            if (draft.trim()) onSend(draft.trim().slice(0, 88));
             setDraft(""); event.currentTarget.blur();
           }} /></label>
       </div>
       <div className="realm-chat-tabs" role="tablist">
-        {(["all", "game", "public"] as const).map(id => <button key={id} type="button" role="tab" aria-selected={filter === id} onClick={() => setFilter(id)}>{id === "all" ? "All" : id === "game" ? "Game" : "Public"}</button>)}
+        {(["all", "game", "public", "private"] as const).map(id => <button key={id} type="button" role="tab" aria-selected={filter === id} onClick={() => setFilter(id)}>{id === "all" ? "All" : id === "game" ? "Game" : id === "public" ? "Public" : "Private"}</button>)}
       </div>
     </section>
   );

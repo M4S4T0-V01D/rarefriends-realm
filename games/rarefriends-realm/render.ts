@@ -3,12 +3,13 @@
  * Draws in a 960 × 640 logical view; the caller scales the canvas for the device.
  */
 import type { GenerationSprites } from "@rarefriends/friendsdk/sprites";
-import { ROCKS, item, levelForXp, type Icon } from "./data.ts";
+import { ROCKS, isItem, item, levelForXp, type Icon } from "./data.ts";
 import { NPCS } from "./content.ts";
 import { TICK_MS, attackSpeed, type Facing, type Game, type Monster, type Npc, type Projectile } from "./state.ts";
 import { npcOverhead, type Pick } from "./engine.ts";
 import { FLOOR_Y, REGIONS, STOREY, T, W, H, complexAt, cornerHeight, floorAt, groundHeight, inBounds, isUnderground, objectAtTile, onLevel, realPoint, type Building, type Floor, type World, type WorldObject } from "./world.ts";
 import { itemArt } from "./icons.ts";
+import type { PeerView } from "./social.ts";
 import { drawPixels, shadeHex } from "./pixel.ts";
 import { TEX_PER_HEIGHT, TEX_PER_TILE, beginTextures, shingleTexture, texturedQuad, texturedTriangle, wallTexture, type WallStyle } from "./textures.ts";
 import { decorArt, rockArt, treeArt } from "./scenery.ts";
@@ -54,6 +55,8 @@ export type Scene = {
   sfx?: (name: string, gain?: number) => void;
   /** Time of day, 0–1 (0 midnight, 0.5 noon), or null for always day. */
   time?: number | null;
+  /** Other players, and their Friends' art once it has loaded. */
+  peers?: readonly PeerView[]; peerSprites?: (id: number) => GenerationSprites | null;
 };
 /** How dark it is (0 day … 1 deep night) and how warm the light is (dawn and dusk), for a time of day. */
 export function daylight(time: number | null | undefined) {
@@ -876,6 +879,11 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     const at = interpolate(monster, game, alpha), size = monster.def.size ?? 1;
     drawables.push({ depth: depth(at.x + (size - 1) / 2, at.y + (size - 1) / 2) + (size - 1) / 2 + 0.1, draw: () => drawMonster(ctx, scene, monster, at, hits) });
   }
+  // Other players, walking their own adventures through yours.
+  for (const peer of scene.peers ?? []) {
+    if (!shown(peer.x, peer.y)) continue;
+    drawables.push({ depth: depth(peer.x, peer.y) + 0.12, draw: () => drawPeer(ctx, scene, peer, hits) });
+  }
   // Your follower: an owned Friend walking the tiles you leave behind, animated like any NPC.
   if (scene.follower && game.pet && (shown(game.pet.x, game.pet.y) || realPoint(world, game.pet.x, game.pet.y).level === level)) {
     const pet = game.pet, at = interpolate(pet, game, alpha);
@@ -1015,6 +1023,26 @@ function drawNpc(ctx: CanvasRenderingContext2D, scene: Scene, npc: Npc, at: { x:
   if (said) overheadText(ctx, said, s.x, s.y - 50 * z, "#f2e28f");
 }
 const ROYAL_WEAR: Record<string, readonly string[]> = { king: ["paper_crown", "blue_cape"] };
+/** Another player: their Friend (canonical art once loaded, family art until then), wardrobe, cape and weapon, a name tag (green for friends) and their chat. */
+function drawPeer(ctx: CanvasRenderingContext2D, scene: Scene, peer: PeerView, hits: Hit[]) {
+  const { camera, now } = scene, z = camera.zoom, s = toScreen(camera, peer.x, peer.y), facing = screenFacing(camera, { x: peer.p.hx, y: peer.p.hy || 1 });
+  const sprites = scene.peerSprites?.(peer.p.id) ?? null, stride = peer.moving ? Math.floor(now / 80) % 8 : 0;
+  const rows = sprites ? friendRows(sprites, facing, peer.moving, stride) : peer.moving && Math.floor(now / 160) % 2 ? friendSprite(peer.p.family, peer.p.id).step : friendSprite(peer.p.family, peer.p.id).idle;
+  const px = 3.2 * z, worn = peer.p.cape ? [...peer.p.worn, peer.p.cape] : peer.p.worn, cloth = scene.reducedMotion ? 0 : peer.moving ? stride % 4 : Math.floor(now / 520) % 4;
+  ellipse(ctx, s.x, s.y, 15 * z, 6 * z, "rgba(22,22,22,0.18)", peer.friend ? "rgba(159,224,168,0.9)" : "rgba(255,255,255,0.6)", 1.5);
+  drawAuras(ctx, worn, s.x, s.y, px, now, scene.reducedMotion, "back");
+  const rect = drawFigure(ctx, figureArt(rows, worn, facing, cloth), s.x, s.y + 2 * z, px);
+  drawAuras(ctx, worn, s.x, s.y, px, now, scene.reducedMotion, "front");
+  if (peer.p.weapon && isItem(peer.p.weapon)) {
+    const art = itemArt(item(peer.p.weapon).icon), size = 12 * px, side = facing === "left" ? -1 : 1, swing = peer.p.activity && !scene.reducedMotion ? Math.sin(now / 180) * 0.6 : 0;
+    ctx.save(); ctx.translate(s.x + side * 6 * px, s.y - 7 * px); ctx.scale(side, 1); ctx.rotate(0.75 + swing); ctx.imageSmoothingEnabled = false; ctx.drawImage(art, -size * 0.25, -size * 0.78, size, size); ctx.restore();
+  }
+  hits.push({ ...rect, pick: { kind: "peer", id: peer.p.id } });
+  ctx.font = `bold ${Math.round(11 * Math.max(0.9, Math.min(1.4, z)))}px ui-monospace, Menlo, Consolas, monospace`; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+  const tag = `#${peer.p.id} (level-${peer.p.combat})`, tagY = rect.y - 2;
+  ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.strokeText(tag, s.x, tagY); ctx.fillStyle = peer.friend ? "#9fe0a8" : "#ffffff"; ctx.fillText(tag, s.x, tagY);
+  if (peer.said) overheadText(ctx, peer.said, s.x, tagY - 14);
+}
 function questMarkerFor(game: Game, npcId: string): string | null {
   const q = game.player.quests;
   const starts: Record<string, string> = { cook: "friends_feast", captain: "grumblin_trouble", smith: "cold_forge", priest: "hollow_whispers", glimmer: "lost_glimmer" };
@@ -1098,7 +1126,7 @@ export function mapIcons(world: World): MapIcon[] {
   return icons;
 }
 /** The minimap: the world turned to match the camera (45° plus its rotation), centred on the player. */
-export function renderMinimap(ctx: CanvasRenderingContext2D, game: Game, size: number, scale: number, angle: number) {
+export function renderMinimap(ctx: CanvasRenderingContext2D, game: Game, size: number, scale: number, angle: number, peers: readonly PeerView[] = []) {
   const world = game.world, image = worldImage(world), player = realPoint(world, game.player.x, game.player.y);
   ctx.save(); ctx.clearRect(0, 0, size, size);
   ctx.beginPath(); ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2); ctx.clip();
@@ -1117,6 +1145,8 @@ export function renderMinimap(ctx: CanvasRenderingContext2D, game: Game, size: n
   for (const npc of game.npcs) dot(npc.x, npc.y, "#f5e04a", 1.3);
   for (const monster of game.monsters) if (!monster.dead) dot(monster.x, monster.y, "#f5e04a", 1.3);
   if (game.pet) dot(game.pet.x, game.pet.y, "#ffffff", 1.3);
+  // Other players: white, friends green.
+  for (const peer of peers) dot(Math.round(peer.x), Math.round(peer.y), peer.friend ? "#7fe08f" : "#ffffff", 1.6);
   ctx.restore();
   // Map icons, drawn upright.
   ctx.save(); ctx.font = "bold 11px ui-monospace, Menlo, Consolas, monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";

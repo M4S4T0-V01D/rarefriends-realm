@@ -17,6 +17,8 @@ import {
   cancelLongPress, longPress, rightClick, type MenuEntry, type Settings, type Tab,
 } from "./panels.tsx";
 import { REGULAR_SPRITES } from "./regulars.ts";
+import { NET_CHAT, NET_CHAT_IN, NET_ONLINE, NET_PRESENCE, NET_SOCIAL, NET_STATE, cleanChat, cleanId, cleanPresence, type NetState, type Presence } from "./net.ts";
+import { Players, presenceOf } from "./social.ts";
 import { HOST_HELLO, HOST_STATE, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, parseRoster, type ShareAction, type ShareOutcome } from "./roster.ts";
 import { RealmAudio, trackFor, trackById, type SfxName, type TrackId } from "./audio.ts";
 import { renderCard, shareText } from "./card.ts";
@@ -60,6 +62,9 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const [settings, setSettingsState] = useState<Settings>(DEFAULT_SETTINGS), [roster, setRoster] = useState<OwnedFriend[]>([]), [rosterState, setRosterState] = useState<"waiting" | "ready" | "none">("waiting");
   const [hosted, setHosted] = useState<"waiting" | "linked" | "none">("waiting"), [hasSave, setHasSave] = useState<{ total: number; combat: number; qp: number; where: string } | null>(null);
   const [tailorPick, setTailorPick] = useState("");
+  // Playing together: other players (from the host), who you're following, and a whisper to start in the chat box.
+  const players = useRef(new Players()), following = useRef<number | null>(null);
+  const [netState, setNetState] = useState<NetState>(players.current.state), [whisper, setWhisper] = useState<{ text: string; at: number } | null>(null);
   const lastMinimapPoint = useRef<React.MouseEvent<HTMLCanvasElement> | null>(null);
   const [snapshot, setSnapshot] = useState<GameSnapshot | null>(null), [busy, setBusy] = useState(false), [casketError, setCasketError] = useState(""), [reveal, setReveal] = useState<CasketResult[] | null>(null);
   const [size, setSize] = useState({ width: 960, height: 640, scale: 1 }), [sideOpen, setSideOpen] = useState(true), [shareStatus, setShareStatus] = useState(""), [cardUrl, setCardUrl] = useState<string | null>(null);
@@ -137,6 +142,25 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         };
         setShareStatus(messages[event.data.result as ShareOutcome] ?? messages.failed); return;
       }
+      if (event.data?.type === NET_STATE) {
+        // Checked again here (the host already has): only well-formed players, at most 60.
+        const d = event.data as Record<string, unknown>, ids = (list: unknown) => Array.isArray(list) ? list.map(cleanId).filter((id): id is number => id !== null) : [];
+        const peers = (Array.isArray(d.peers) ? d.peers : []).map(cleanPresence).filter((p): p is Presence => !!p).slice(0, 60);
+        const status = d.status === "online" || d.status === "connecting" ? d.status : "offline", was = players.current.state.status;
+        const next: NetState = { status, peers, friends: ids(d.friends), ignored: ids(d.ignored), players: typeof d.players === "number" ? Math.max(0, Math.min(999, Math.floor(d.players))) : peers.length };
+        players.current.update(next, performance.now()); setNetState(next);
+        for (const peer of peers.slice(0, 30)) loadFriendSpriteRef.current?.(peer.id);
+        if (game.current && was !== "online" && status === "online") message(game.current, "You're online: other players in the Realm can see your Friend and your public chat.", "info");
+        return;
+      }
+      if (event.data?.type === NET_CHAT_IN) {
+        const from = cleanId(event.data.from), text = cleanChat(event.data.text), state = game.current;
+        if (from === null || !text || !state) return;
+        const whispered = event.data.private === true;
+        message(state, `${whispered ? "From " : ""}${players.current.name(from)}: ${text}`, whispered ? "private" : "public");
+        if (!whispered) players.current.say(from, text, performance.now());
+        refresh(); return;
+      }
       if (event.data?.type !== HOST_STATE) return;
       if (game.current) applyHost(event.data); else pendingSave.current = event.data;
     };
@@ -152,6 +176,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       // Automated browser tests only (navigator.webdriver): a handle for driving the camera and state.
       if (navigator.webdriver) (window as unknown as { __realm?: unknown }).__realm = {
         game: () => game.current, camera: () => ({ ...camera.current }), refresh: () => refresh(),
+        /** Other players as drawn now, and whether we're online. */
+        peers: () => players.current.view(performance.now()).map(peer => ({ id: peer.p.id, x: peer.p.x, y: peer.p.y, friend: peer.friend, said: peer.said })), net: () => players.current.state.status,
         /** Fix the time of day (0 midnight … 0.5 noon), or null to follow the clock. */
         time: (value: number | null) => { fixedTime = value; },
         view: (zoom: number, pitch: number, angle = 0) => { setSettings({ ...live.current.settings, zoom }); camera.current.pitch = pitch; camera.current.angle = angle; cameraGoal.current = null; },
@@ -166,6 +192,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     return () => { clearTimeout(hostTimer); window.removeEventListener("message", receive); audio.current?.dispose(); audio.current = null; };
   }, [friendId, client]);
 
+  const loadFriendSpriteRef = useRef<((id: number) => void) | null>(null);
   const loadFriendSprite = useCallback((id: number) => {
     if (followerSprites.current.has(id) || loadingSprites.current.has(id)) return;
     loadingSprites.current.add(id);
@@ -173,6 +200,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     void createFriendReader().read(BigInt(id)).then(sprites => { if (version === epoch.current) { followerSprites.current.set(id, sprites); refresh(); } })
       .catch(() => { /* Keep the stand-in art. */ }).finally(() => loadingSprites.current.delete(id));
   }, [refresh]);
+  loadFriendSpriteRef.current = loadFriendSprite;
 
   // ---------- Saving (through the trusted host, per wallet) ----------
   useEffect(() => {
@@ -204,6 +232,14 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         if (now - tickAt.current > TICK_MS * 6) tickAt.current = now - TICK_MS;
         while (now - tickAt.current >= TICK_MS) {
           tick(state); tickAt.current += TICK_MS;
+          // Playing together: tell the others where we are, follow whoever we're following, and count friends nearby.
+          if (players.current.state.status !== "offline") window.parent.postMessage({ type: NET_PRESENCE, presence: presenceOf(state) }, "*");
+          state.player.nearFriends = players.current.nearFriends(state);
+          if (following.current !== null) {
+            const them = players.current.get(following.current);
+            if (!them) { message(state, "They've gone out of sight."); following.current = null; }
+            else if (Math.max(Math.abs(them.x - state.player.x), Math.abs(them.y - state.player.y)) > 1 && !state.player.path.length) walkTo(state, them.x - them.hx, them.y - them.hy);
+          }
           const fresh = state.events.splice(0);
           const xp = new Map<Skill, number>();
           for (const event of fresh) {
@@ -270,10 +306,11 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         hoverTile: current === "playing" ? hoverTile.current : null, marker: marker.current, reducedMotion, hits: hits.current, fireworks: fireworks.current, chat: chat.current,
         projectiles: projectiles.current, sfx: (name, gain) => audio.current?.sfx(name as SfxName, gain),
         time: current === "playing" && live.current.settings.dayNight !== false ? timeOfDay() : null,
+        peers: current === "playing" ? players.current.view(now) : [], peerSprites: id => followerSprites.current.get(id) ?? null,
       });
       if (mini && current === "playing" && now - lastHud > 90) {
         lastHud = now; const size = mini.canvas.width;
-        renderMinimap(mini, state, size, miniZoom.current * (size / 152), camera.current.angle);
+        renderMinimap(mini, state, size, miniZoom.current * (size / 152), camera.current.angle, players.current.view(now));
       }
     };
     frame = requestAnimationFrame(loop);
@@ -329,14 +366,29 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     return { x: (clientX - rect.left) * VIEW.width / rect.width, y: (clientY - rect.top) * VIEW.height / rect.height };
   };
   const optionsAt = (x: number, y: number) => {
-    const state = game.current!, tile = toTile(camera.current, x, y);
-    return menuFor(state, pickAt(x, y), tile, live.current.selection);
+    const state = game.current!, tile = toTile(camera.current, x, y), picks = pickAt(x, y);
+    const options = menuFor(state, picks.filter(pick => pick.kind !== "peer"), tile, live.current.selection);
+    // Other players: Follow, Add-friend, Message, Wave, Ignore, Examine (after the first option, so a left-click still walks).
+    const peers = picks.filter(pick => pick.kind === "peer").flatMap(pick => { const p = players.current.get(pick.id); return p ? [p] : []; });
+    const social = peers.flatMap(p => {
+      const noun = `${players.current.name(p.id)} (level-${p.combat})`, friend = players.current.isFriend(p.id);
+      return [
+        { verb: "Follow", noun, tone: "plain" as const, run: () => { following.current = p.id; message(state, `You follow ${players.current.name(p.id)}.`); } },
+        { verb: friend ? "Remove-friend" : "Add-friend", noun, tone: "plain" as const, run: () => { window.parent.postMessage({ type: NET_SOCIAL, op: friend ? "remove" : "add", id: p.id }, "*"); message(state, friend ? `${players.current.name(p.id)} removed from your friends list.` : `${players.current.name(p.id)} added to your friends list.`); } },
+        { verb: "Message", noun, tone: "plain" as const, run: () => setWhisper({ text: `@${p.id} `, at: performance.now() }) },
+        { verb: "Wave", noun, tone: "plain" as const, run: () => say(`*waves at #${p.id}*`) },
+        { verb: "Ignore", noun, tone: "plain" as const, run: () => { window.parent.postMessage({ type: NET_SOCIAL, op: "ignore", id: p.id }, "*"); message(state, `You won't see ${players.current.name(p.id)} or their chat any more.`); } },
+        { verb: "Examine", noun, tone: "plain" as const, run: () => message(state, `${players.current.name(p.id)}: combat level ${p.combat}, total level ${p.total}${p.region ? `, in ${p.region}` : ""}.`) },
+      ];
+    });
+    return options.length ? [options[0], ...social, ...options.slice(1)] : social;
   };
   const act = (x: number, y: number) => {
     const state = game.current;
     if (!state || live.current.paused) return;
     const options = optionsAt(x, y), first = options[0], tile = toTile(camera.current, x, y);
     if (!first) return;
+    if (first.verb !== "Follow") following.current = null;
     first.run(state);
     marker.current = { x: tile.x, y: tile.y, at: performance.now(), red: first.verb !== "Walk here" };
     if (live.current.selection) setSelection(null);
@@ -347,6 +399,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     if (!state || live.current.paused) return;
     const tile = toTile(camera.current, x, y);
     setMenu({ x, y, entries: optionsAt(x, y).map(option => ({ verb: option.verb, noun: option.noun, tone: option.tone, run: () => {
+      if (option.verb !== "Follow" && option.verb !== "Examine") following.current = null;
       option.run(state); marker.current = { x: tile.x, y: tile.y, at: performance.now(), red: option.verb !== "Walk here" };
       if (live.current.selection) setSelection(null); refresh();
     } })) });
@@ -426,8 +479,18 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const say = (text: string) => {
     const state = game.current;
     if (!state) return;
-    message(state, `${FAMILY_NAMES[state.player.familyId]} #${state.player.friendId}: ${text}`, "public");
-    chat.current = { text, until: performance.now() + 3500 }; refresh();
+    // "@1234 hello" whispers to Friend #1234; anything else is said out loud, to everyone near enough to see you.
+    const whispered = /^@(\d{1,15})\s+(.+)$/.exec(text);
+    if (whispered) {
+      const to = Number(whispered[1]), words = whispered[2].slice(0, 80);
+      if (!players.current.get(to)) message(state, `${players.current.name(to)} isn't online.`, "warn");
+      else { message(state, `To ${players.current.name(to)}: ${words}`, "private"); window.parent.postMessage({ type: NET_CHAT, text: words, to }, "*"); }
+      refresh(); return;
+    }
+    const words = text.slice(0, 80);
+    message(state, `${FAMILY_NAMES[state.player.familyId]} #${state.player.friendId}: ${words}`, "public");
+    if (players.current.state.status === "online") window.parent.postMessage({ type: NET_CHAT, text: words }, "*");
+    chat.current = { text: words, until: performance.now() + 3500 }; refresh();
   };
 
   // ---------- Title ----------
@@ -524,6 +587,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
                 {...rightClick((x, y, entries) => setMenu({ x, y, entries }), () => ([["North", 0], ["East", -Math.PI / 2], ["South", Math.PI], ["West", Math.PI / 2]] as const).map(([name, turn]) => ({ verb: `Look ${name}`, noun: "", run: () => {
                   const from = cameraGoal.current?.angle ?? camera.current.angle, goal = NORTH + turn; cameraGoal.current = { angle: goal + Math.round((from - goal) / (Math.PI * 2)) * Math.PI * 2, pitch: cameraGoal.current?.pitch ?? camera.current.pitch }; } })))}
                 onClick={() => { const from = cameraGoal.current?.angle ?? camera.current.angle; cameraGoal.current = { angle: NORTH + Math.round((from - NORTH) / (Math.PI * 2)) * Math.PI * 2, pitch: cameraGoal.current?.pitch ?? camera.current.pitch }; }}><i aria-hidden="true">▲</i><b>N</b></button>
+              {netState.status !== "offline" && <span className="realm-online" title="Players in the Realm right now" onClick={() => setTab("friends")}>{netState.status === "online" ? `● ${netState.players} online` : "○ connecting"}</span>}
               {settings.dayNight !== false && (() => { const light = daylight(timeOfDay()); return <span className="realm-clock" title="Time of day">{light.label === "Night" ? "☾" : light.label === "Day" ? "☀" : "◐"} {light.label}</span>; })()}
             </div>
           </div>
@@ -537,11 +601,13 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
             {state.dialogue ? <DialogueBox game={state} sprites={friend.current} canonical={CANONICAL} refresh={refresh} />
               : levelUps.length ? <LevelUpBox skill={levelUps[0].skill} level={levelUps[0].level} onClose={() => setLevelUps(list => list.slice(1))} />
               : state.ui.production ? <ProductionBox game={state} refresh={refresh} openMenu={(x, y, entries) => setMenu({ x, y, entries })} />
-              : <ChatBox messages={state.messages} onSend={say} />}
+              : <ChatBox messages={state.messages} onSend={say} prefill={whisper} />}
           </div>
           <button type="button" className="realm-side-toggle" aria-expanded={sideOpen} onClick={() => setSideOpen(open => !open)}>{sideOpen ? "▾" : "▴"} Panels</button>
           {sideOpen && <SidePanel game={state} tab={tab} setTab={setTab} selection={selection} setSelection={setSelection} openMenu={(x, y, entries) => setMenu({ x, y, entries })}
-            refresh={refresh} roster={roster} rosterState={rosterState} friendSprites={followerSprites.current} loadFriend={loadFriendSprite} settings={settings} setSettings={setSettings}
+            refresh={refresh} roster={roster} rosterState={rosterState} friendSprites={followerSprites.current} loadFriend={loadFriendSprite}
+            net={netState} onSocial={(op, id) => window.parent.postMessage({ type: NET_SOCIAL, op, id }, "*")} onWhisper={id => setWhisper({ text: `@${id} `, at: performance.now() })}
+            onOnline={on => window.parent.postMessage({ type: NET_ONLINE, on }, "*")} settings={settings} setSettings={setSettings}
             friend={friend.current} trackName={audio.current?.trackName ?? ""} trackId={audio.current?.trackId ?? ""} playTrack={id => { audio.current?.play(id as TrackId); audio.current?.unlock(); setSettings({ ...settings, autoMusic: false }); }} openCard={openCard} openHelp={() => setModal("help")} paused={paused} saved={savedText}
             relicCounts={snapshot?.inventory.map(Number) ?? [0, 0, 0, 0]} openCaskets={() => setModal("caskets")} />}
           {selection && <div className="realm-selection" role="status">{selection.kind === "item" ? `Use ${player.inventory[selection.slot] ? itemName(player.inventory[selection.slot]!.id) : "item"} ->` : `Cast ${SPELLS.find(spell => spell.id === selection.spell)?.name ?? "spell"} ->`} pick a target <button type="button" onClick={() => setSelection(null)}>Cancel</button></div>}

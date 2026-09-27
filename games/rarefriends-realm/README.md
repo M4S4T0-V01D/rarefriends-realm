@@ -205,6 +205,23 @@ dying, spotting you and idling nearby (clucks, moos, squeaks, grumbles, rattles,
 and the Hollow King). Axes and pickaxes hit on the beat of the swing, NPCs talk in soft blips, footsteps change with the
 ground, fires crackle, forges roar, water laps, and each region has its own wildlife: birdsong, gulls, frogs, wind, drips.
 
+## Playing together
+
+Everyone online shares the Realm: other players' Friends walk around in their wardrobes, capes and weapons, with a
+name tag (green for friends) and their chat over their heads. Their dots show on the minimap (white, friends green),
+and the badge by the minimap shows how many are online.
+
+| Do | How |
+| --- | --- |
+| Talk | Type in the chat box (everyone sees it); `@1234 hello` whispers to Friend #1234 (Private tab) |
+| Player menu | Right-click a player: *Follow*, *Add-friend* / *Remove-friend*, *Message*, *Wave*, *Ignore*, *Examine* |
+| Friends list | Friends tab: who's online, where and at what level; message or remove; add by Friend # |
+| Party bonus | +5% XP while a friend is within 12 tiles on your storey |
+| Go offline | Settings → *Online* |
+
+Links are stripped from chat, chat is rate-limited, and ignored players disappear. Monsters, trees and drops are
+still your own (each player's world runs on their own machine).
+
 ## Saves
 
 Your adventure saves every few seconds through the trusted host page, per wallet and per Friend, on this device.

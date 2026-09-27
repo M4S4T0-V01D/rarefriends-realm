@@ -23,6 +23,7 @@
 - **A real spellbook.** Darts, Lances and Bursts in four elements; curses (Muddle, Wilt, Brittle) and Rootsnare; Gilded and Golden Touch, Forgeheart, Far Reach, Bonebloom, two enchantments and six ways to travel, paid in sigils.
 - **Six quests** from baking for the Realm Feast to defeating the Hollow King (level 92) in his throne room.
 - **A soundtrack for every region.** Eighteen procedural tracks in an old-school MIDI style (recorder, oboe, harp, pizzicato strings, glockenspiel, timpani), including a hand-written main theme, plus level-up and quest fanfares, synthesized live in WebAudio. Entering an area unlocks its track ("You have unlocked a new music track"), and the music player replays any you've found.
+- **Play together.** Everyone playing right now shares the Realm: you see other players' Friends walk around in their wardrobes and capes, chat in public (bubbles over their heads) or whisper (`@1234 hello`), and right-click a player to *Follow*, *Add-friend*, *Message*, *Wave*, *Ignore* or *Examine*. A friends list shows who's online and where, and friends near you add +5% XP. Peer to peer, no server: see [Playing together](#playing-together).
 - **Your other Friends follow you**, walking the tiles you leave behind like an old-school pet and adding XP by generation. **Rare Caskets** (simulated $RAREFRIENDS) hold relics and wardrobe pieces, and **Rare Market** traders in seven places sell nine bundles (tablets, food, XP lamps, Slayer points, a bow and arrows, a sigil sack, a fletcher's crate, a dragonslayer's kit, a wardrobe piece of your choice) on top of the caskets. **Progress saves per wallet.** Your **adventurer card** posts to X.
 
 | | |
@@ -46,6 +47,8 @@
 | ![Market Street](docs/market-street.png) | ![Night](docs/night.png) | ![Mastery cape](docs/mastery-cape.png) |
 | **The Rare Market** | **The Wizards' Tower** | **Wyrmreach and Old Cinder** |
 | ![Rare Market](docs/rare-market.png) | ![Wizards' Tower](docs/wizards-tower.png) | ![Wyrmreach](docs/wyrmreach.png) |
+| **Playing together** | **Right-click another player** | |
+| ![Two players](docs/multiplayer.png) | ![Player menu](docs/multiplayer-menu.png) | |
 | **Every item, redrawn** | **Pixel-art buildings** | **Right-click in every interface** |
 | ![Items](docs/items.png) | ![Buildings](docs/buildings.png) | ![Bank menu](docs/bank-menu.png) |
 | **Friendhollow Castle** | **King Hollis's throne room** | **On the castle roof** |
@@ -145,6 +148,8 @@ npm run test:browser   # SDK mock-wallet browser runs of the custom host (a two-
                        #  • adventurer card → Post to X (prefilled post + picture copied), a follower, a 14-region tour
                        #  • save written for the wallet and Friend, reload → "Continue your adventure"
                        #  • a phone in landscape (844 × 390, touch): tap to walk
+                       #  • two players in two tabs: they see each other walk, right-click menu, Add-friend, the party bonus,
+                       #    public chat and bubbles, whispers with links stripped, going offline
                        #  • preview page: the main theme and a jukebox track play audibly on desktop and phone
 ```
 
@@ -154,21 +159,41 @@ The mock wallet exists only in tests. `dev` and public builds always use the rea
 
 The runtime page is the SDK's own **`GameHost`**: wallet connection, owned-Friend picker, fresh
 `readGenerationEligibility` check, simulated ledger, confirmations and the `allow-scripts` sandbox.
-`host/runtime.tsx` adds three things the SDK doesn't supply:
+`host/runtime.tsx` adds four things the SDK doesn't supply:
 
 1. **Owned-Friend roster.** A read-only watcher (`eth_accounts` only) runs the SDK's account-filtered `readOwnedFriends` (with retries for public-RPC rate limits). It never scans the collection.
 2. **Per-wallet saves** in the trusted page's `localStorage` (the sandbox has no storage), keyed by wallet address and Friend, so each of your Friends has its own adventure.
-3. **Sharing the adventurer card.** On your click, the page uses the share sheet (phones) or copies the picture and opens a prefilled X post (desktop). Nothing posts without you pressing Post.
+3. **Playing together** (`host/net.ts`), below.
+4. **Sharing the adventurer card.** On your click, the page uses the share sheet (phones) or copies the picture and opens a prefilled X post (desktop). Nothing posts without you pressing Post.
 
 The game receives the roster and save only over `postMessage` from its parent window, and uses them only if the
 roster contains the Friend the runtime just verified. Saves are validated on load. There are no signatures,
 transactions or extra wallet prompts. Under the plain SDK CLI (`npx friendsdk dev` / `test`), the game runs without these extras.
 
+## Playing together
+
+The game frame keeps the SDK's restrictive CSP and never touches the network. The trusted host page connects players
+with [Trystero](https://github.com/dmotz/trystero): browsers talk directly over WebRTC data channels, introduced to
+each other through public Nostr relays, so the static GitHub Pages site needs no server. The host relays to the game
+over `postMessage`, the same way it relays saves.
+
+- **What's shared:** your Friend ID and family, where your Friend stands, what it wears (wardrobe, cape, weapon),
+  what it's doing, combat and total level, region, and your chat. Never your wallet address.
+- **What's checked:** everything from other players is untrusted. The host validates every field (`games/rarefriends-realm/net.ts`),
+  limits each player to five updates a second and three chat lines per five seconds, strips links from chat
+  (anti-scam), and drops anyone you ignore. The game validates again.
+- **Your lists:** friends and ignored players are kept per wallet in the host page. Settings → *Online* turns it off.
+- **What isn't shared:** each player's world still runs on their own machine. You see each other and talk, but
+  monsters, trees and drops are your own. Identities are self-reported Friend IDs (proving them would need a wallet
+  signature, which this game never asks for).
+- Tests meet over a same-origin `BroadcastChannel` instead of the public relays; `REAL_RELAYS=1 node tests/multiplayer-browser.mjs`
+  checks two browsers meeting over the real ones.
+
 ## Known issues and limitations
 
 - Saves live in this browser on this device, keyed by wallet address and Friend. They are client-side, so a determined player could edit their own (simulated) progress.
 - Caskets' RF balance and kept relics live in the SDK's session ledger and reset on reload; wardrobe pieces are saved.
-- The world is single-player: other players and trading need cross-player APIs the SDK doesn't have yet.
+- Multiplayer shares players and chat, not the world simulation: everyone has their own monsters and drops, and there's no trading. Friend IDs are self-reported. Peers behind very strict networks may not connect (no TURN relay).
 - Audio is synthesized in the browser and starts on your first tap. On iPhones before iOS 17, silent mode may keep it quiet.
 - Wallet support is the SDK's (injected / EIP-6963; no WalletConnect). Phones need a wallet with an in-app browser.
 - The browser tests use the SDK's mocked wallet. A real-wallet playtest on Robinhood mainnet is still needed; the build environment can't reach mainnet.

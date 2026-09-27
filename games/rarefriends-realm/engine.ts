@@ -155,7 +155,8 @@ function routeToTarget(game: Game) {
 }
 
 // ---------- Menus ----------
-export type Pick = { kind: "monster" | "npc" | "object" | "ground" | "fire"; id: number };
+/** Something under the pointer. "peer" is another player (its id is their Friend ID). */
+export type Pick = { kind: "monster" | "npc" | "object" | "ground" | "fire" | "peer"; id: number };
 export type MenuOption = { verb: string; noun: string; tone: "object" | "npc" | "monster" | "item" | "plain" | "level"; run: (game: Game) => void };
 export type Selection = { kind: "item"; slot: number } | { kind: "spell"; spell: string } | null;
 const OBJECT_EXAMINE: Partial<Record<string, string>> = {

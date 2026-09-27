@@ -271,3 +271,16 @@
 .realm-slot.shop.locked, .realm-inventory .realm-slot.locked { opacity: 0.45; }
 .realm-skills.lamp { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .realm-clock { position: absolute; right: -2px; bottom: -4px; padding: 1px 6px; font-size: 10px; font-weight: 700; background: var(--paper); border: 2px solid var(--ink); border-radius: 9px; box-shadow: 2px 2px 0 #000; pointer-events: none; }
+
+/* Playing together */
+.realm-social { list-style: none; margin: 4px 0 8px; padding: 0; display: grid; gap: 4px; }
+.realm-social li { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.realm-social li i { width: 8px; height: 8px; border-radius: 50%; background: #9a968f; border: 1px solid #000; }
+.realm-social li[data-online="true"] i { background: #7fe08f; }
+.realm-social li small { flex: 1; opacity: 0.8; }
+.realm-social li button { min-height: 20px !important; padding: 0 6px !important; font-size: 11px; }
+.realm-add-friend { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.realm-add-friend input { width: 90px; font: inherit; padding: 2px 4px; border: 2px solid #161616; background: #fff; color: #161616; }
+.realm-link { background: none !important; border: none !important; padding: 0 2px !important; min-height: 0 !important; text-decoration: underline; color: inherit; cursor: pointer; font: inherit; }
+.chat-private { color: #d9a6f2; }
+.realm-online { position: absolute; left: -4px; bottom: -4px; padding: 1px 6px; font-size: 10px; font-weight: 700; background: #1c1b1a; color: #9fe0a8; border: 2px solid var(--ink); border-radius: 9px; box-shadow: 2px 2px 0 #000; cursor: pointer; }
