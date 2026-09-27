@@ -30,7 +30,7 @@ export function renderCard(game: Game, friend: GenerationSprites | null, region:
   if (aura) { ctx.fillStyle = `${aura.color}aa`; ctx.beginPath(); ctx.ellipse(258, 250, 150, 130, 0, 0, Math.PI * 2); ctx.fill(); }
   if (friend) {
     // Your Friend as it looks in the Realm, wardrobe and all.
-    const art = figureArt(friendRows(friend, "down", false, 0), player.equipment.cape ? [...player.worn, player.equipment.cape] : player.worn, "down"), px = Math.floor(Math.min(340 / art.width, 300 / art.height));
+    const art = figureArt(friendRows(friend, "down", false, 0), [...player.worn, ...(player.equipment.cape ? [player.equipment.cape] : []), ...(player.equipment.head ? [player.equipment.head] : [])], "down"), px = Math.floor(Math.min(340 / art.width, 300 / art.height));
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(art, Math.round(258 - art.width * px / 2), Math.round(237 - art.height * px / 2 + px * 2), art.width * px, art.height * px);
   }

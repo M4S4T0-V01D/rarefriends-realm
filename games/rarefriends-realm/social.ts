@@ -70,7 +70,7 @@ export function presenceOf(game: Game): Presence {
     activity: player.activity?.kind ?? (player.combat !== null ? "combat" : null), combat: combatLevel(player), total: totalLevel(player),
     region: regionAt(game.world, player.x, player.y).name,
     emote: player.emote && game.tick < player.emote.until ? player.emote.id : null,
-    hp: player.hp, maxHp: maxHp(player), fight: currentFight(game),
+    head: player.equipment.head ?? null, hp: player.hp, maxHp: maxHp(player), fight: currentFight(game),
     drops: game.ground.filter(entry => entry.shared).slice(-16).map(entry => ({ u: entry.uid, id: entry.id, n: entry.n, x: entry.x, y: entry.y })),
   };
 }

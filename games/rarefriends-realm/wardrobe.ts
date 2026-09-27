@@ -37,7 +37,12 @@ type Piece = { id: string; kind: string; color: string; trim?: string };
 export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, phase = 0, ink = INK): HTMLCanvasElement {
   // An equipped cape (a mastery cape, the Cape of the Hollow…) is worn over any wardrobe cape, with its trim.
   const gear: Piece[] = worn.filter(id => isItem(id) && item(id).equip?.slot === "cape").map(id => ({ id, kind: "cape", color: item(id).icon.color, trim: item(id).icon.accent }));
-  const pieces: Piece[] = [...WARDROBE.filter(piece => worn.includes(piece.id) && piece.kind !== "aura" && piece.kind !== "lantern" && !(gear.length && piece.kind === "cape")), ...gear.slice(0, 1)];
+  // Headgear you wear (a helm, hood, hat or crown) shows too, unless a wardrobe hat is on top.
+  const wardrobeHat = WARDROBE.some(piece => worn.includes(piece.id) && piece.kind === "hat");
+  const headgear: Piece[] = wardrobeHat ? [] : worn.filter(id => isItem(id) && item(id).equip?.slot === "head").slice(0, 1).map(id => {
+    const icon = item(id).icon; return { id, kind: `gear_${icon.shape}`, color: icon.color, trim: icon.accent };
+  });
+  const pieces: Piece[] = [...WARDROBE.filter(piece => worn.includes(piece.id) && piece.kind !== "aura" && piece.kind !== "lantern" && !(gear.length && piece.kind === "cape")), ...gear.slice(0, 1), ...headgear];
   const key = `${ink}|${facing}|${phase & 3}|${pieces.map(piece => piece.id).join(",")}|${rows.join("")}`;
   let canvas = cache.get(key);
   if (canvas) return canvas;
@@ -140,6 +145,42 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
       }
       if (rarite) { p.set(Math.round(cx), band - 2, "#9fb4d0"); if ((phase & 3) === 1) { p.set(r, band - 8, "#ffffff"); p.set(r + 1, band - 9, "#ffffff"); } }
       else p.set(Math.round(cx), band - 2, "#d8b6b4");
+    }
+  }
+
+  // ---------- Equipped headgear ----------
+  for (const piece of pieces.filter(entry => entry.kind.startsWith("gear_"))) {
+    const color = piece.color, dark = shadeHex(color, -0.18), light = shadeHex(color, 0.16), l = Math.round(cx - headHalf) - 1, r = Math.round(cx + headHalf) + 1, top = headTop;
+    switch (piece.kind) {
+      case "gear_helm": {
+        // A metal cap over the brow, cheek guards and a nose guard; a crest if it has one.
+        p.poly([[l, top + 5], [l, top], [l + 2, top - 3], [r - 2, top - 3], [r, top], [r, top + 5], [r - 2, top + 5], [r - 2, top + 2], [l + 2, top + 2], [l + 2, top + 5]], color, null);
+        p.line(l + 1, top - 1, r - 2, top - 1, light); p.line(l, top + 2, r - 1, top + 2, dark);
+        p.rect(Math.round(cx) - 1, top + 2, 2, 3, color);
+        if (piece.trim) p.poly([[cx - 1, top - 3], [cx + 1, top - 3], [cx + 2, top - 8], [cx - 2, top - 7]], piece.trim, null);
+        break;
+      }
+      case "gear_hood": {
+        // A hood drawn over the head and down to the shoulders, face open.
+        p.poly([[l - 1, neckY + 2], [l - 1, top + 1], [l + 2, top - 3], [r - 2, top - 3], [r + 1, top + 1], [r + 1, neckY + 2], [r - 2, neckY], [r - 2, top + 2], [l + 2, top + 2], [l + 2, neckY]], color, null);
+        p.line(l + 1, top - 2, r - 2, top - 2, light); p.line(l + 2, top + 2, r - 2, top + 2, dark);
+        break;
+      }
+      case "gear_hat": {
+        // A pointed wizard's hat with a brim and a band.
+        const brimY = top + 1, tipX = Math.round(cx) + 3 + sway * 2 - side * 2;
+        p.disc(cx, brimY, headHalf + 4, 2.2, dark, null);
+        p.poly([[cx - headHalf + 1, brimY], [cx + headHalf - 1, brimY], [cx + 2, brimY - 8], [tipX + 1, brimY - 14], [cx - 2, brimY - 8]], color, null);
+        p.line(cx - headHalf + 2, brimY - 1, cx + headHalf - 2, brimY - 1, piece.trim ?? "#e2d49e");
+        break;
+      }
+      case "gear_crown": {
+        const band = top, points = 3, step = (r - l - 2) / points;
+        p.rect(l + 1, band - 2, r - l - 2, 3, color); p.line(l + 1, band, r - 2, band, dark);
+        for (let i = 0; i < points; i++) { const mid = l + 1 + step * (i + 0.5); p.poly([[mid - 1.5, band - 2], [mid, band - 6], [mid + 1.5, band - 2]], color, null); }
+        p.set(Math.round(cx), band - 1, piece.trim ?? "#cf6e6e");
+        break;
+      }
     }
   }
 

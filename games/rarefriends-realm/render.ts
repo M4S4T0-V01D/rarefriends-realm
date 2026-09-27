@@ -67,7 +67,7 @@ export function daylight(time: number | null | undefined) {
   const sun = -Math.cos(time * Math.PI * 2), dark = Math.max(0, Math.min(1, (0.25 - sun) / 0.75)), warm = Math.max(0, 1 - Math.abs(sun - 0.08) / 0.32);
   return { dark, warm, label: sun > 0.3 ? "Day" : sun < -0.3 ? "Night" : time < 0.5 ? "Dawn" : "Dusk" };
 }
-type Light = { x: number; y: number; r: number; color?: string };
+type Light = { x: number; y: number; r: number; color?: string; strength?: number };
 /** A hex colour at an alpha, for gradients. */
 const hexA = (hex: string, alpha: number) => { const n = parseInt(hex.slice(1, 7), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${Math.max(0, Math.min(1, alpha)).toFixed(3)})`; };
 let nightCanvas: HTMLCanvasElement | null = null;
@@ -83,7 +83,8 @@ function drawNight(ctx: CanvasRenderingContext2D, dark: number, warm: number, li
   n.globalCompositeOperation = "destination-out";
   for (const light of lights) {
     const glow = n.createRadialGradient(light.x, light.y, 0, light.x, light.y, light.r);
-    glow.addColorStop(0, "rgba(0,0,0,0.92)"); glow.addColorStop(0.55, "rgba(0,0,0,0.5)"); glow.addColorStop(1, "rgba(0,0,0,0)");
+    const k = light.strength ?? 1;
+    glow.addColorStop(0, `rgba(0,0,0,${(0.92 * k).toFixed(3)})`); glow.addColorStop(0.55, `rgba(0,0,0,${(0.5 * k).toFixed(3)})`); glow.addColorStop(1, "rgba(0,0,0,0)");
     n.fillStyle = glow; n.fillRect(light.x - light.r, light.y - light.r, light.r * 2, light.r * 2);
   }
   ctx.drawImage(canvas, 0, 0, VIEW.width, VIEW.height);
@@ -91,7 +92,8 @@ function drawNight(ctx: CanvasRenderingContext2D, dark: number, warm: number, li
   ctx.globalCompositeOperation = "lighter";
   for (const light of lights) {
     const glow = ctx.createRadialGradient(light.x, light.y, 0, light.x, light.y, light.r * 0.6);
-    glow.addColorStop(0, light.color ? hexA(light.color, 0.4 * dark) : `rgba(120,80,30,${(0.35 * dark).toFixed(3)})`); glow.addColorStop(1, "rgba(0,0,0,0)");
+    const k = light.strength ?? 1;
+    glow.addColorStop(0, light.color ? hexA(light.color, 0.4 * dark * k) : `rgba(120,80,30,${(0.35 * dark * k).toFixed(3)})`); glow.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = glow; ctx.fillRect(light.x - light.r, light.y - light.r, light.r * 2, light.r * 2);
   }
   ctx.globalCompositeOperation = "source-over";
@@ -755,7 +757,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   drawTerrain(ctx, scene, x0, y0, x1, y1);
   drawCloudShadows(ctx, project, camera, now, z, underground, scene.reducedMotion);
   const hits: Hit[] = [], drawables: Drawable[] = [], light = underground ? { dark: 0.95, warm: 0, label: "Dark" } : daylight(scene.time), lights: Light[] = [];
-  const glow = (x: number, y: number, lift: number, radius: number, color?: string) => { if (light.dark > 0.01) { const at = toScreen(camera, x, y, lift); if (at.x > -200 && at.x < VIEW.width + 200 && at.y > -200 && at.y < VIEW.height + 200) lights.push({ x: at.x, y: at.y, r: radius * z, color }); } };
+  const glow = (x: number, y: number, lift: number, radius: number, color?: string, strength = 1) => { if (light.dark > 0.01) { const at = toScreen(camera, x, y, lift); if (at.x > -200 && at.x < VIEW.width + 200 && at.y > -200 && at.y < VIEW.height + 200) lights.push({ x: at.x, y: at.y, r: radius * z, color, strength }); } };
   const player = game.player, pp = interpolate(player, game, alpha), playerDepth = depthOf(camera, pp.x, pp.y), depth = (x: number, y: number) => depthOf(camera, x, y);
   const me = toScreen(camera, pp.x, pp.y), meTop = me.y - 60 * z;
   const coversPlayer = (x: number, y: number) => { const at = toScreen(camera, x, y); return Math.abs(at.x - me.x) < 34 * z && at.y > meTop && at.y - 95 * z < me.y; };
@@ -954,7 +956,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     const restoreMotion = applyMotion(ctx, motion, s.x, s.y);
     drawAuras(ctx, player.worn, s.x, bodyY, px, now, scene.reducedMotion, "back");
     const stride = walking ? Math.floor(now / 80) % 8 : 0, cloth = scene.reducedMotion ? 0 : walking ? stride % 4 : Math.floor(now / 520) % 4;
-    const dressed = player.equipment.cape ? [...player.worn, player.equipment.cape] : player.worn;
+    const dressed = [...player.worn, ...(player.equipment.cape ? [player.equipment.cape] : []), ...(player.equipment.head ? [player.equipment.head] : [])];
     if (scene.friend) drawFigure(ctx, figureArt(friendRows(scene.friend, facing, walking, stride), dressed, facing, cloth), s.x, bodyY + 2 * z, px, pose.alpha);
     else ellipse(ctx, s.x, bodyY - 20 * z, 12 * z, 16 * z, INK);
     drawAuras(ctx, player.worn, s.x, bodyY, px, now, scene.reducedMotion, "front");
@@ -1022,28 +1024,21 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
       glow(wx, wy, lift0, 180, "#f08a4b");
       continue;
     }
-    // A spell: a comet of light, a bright core, and sparks circling its head.
-    for (let k = 8; k >= 0; k--) {
-      const t = progress - k * 0.032;
-      if (t < 0) continue;
-      const p = at(t), r = (11 - k * 1) * z;
-      const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 2.2);
-      g.addColorStop(0, hexA(look.glow, 0.75 - k * 0.07)); g.addColorStop(1, hexA(look.glow, 0));
-      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, r * 2.2, 0, Math.PI * 2); ctx.fill();
-    }
+    // A spell, shaped by its element: a flame, a wave, a whirlwind, a boulder, a curse's smoke, or a star.
+    const ahead = at(Math.min(1, progress + 0.05)), angle = Math.atan2(ahead.y - head.y, ahead.x - head.x);
     ctx.globalCompositeOperation = "source-over";
-    ellipse(ctx, head.x, head.y, 6.5 * z, 6.5 * z, look.core, INK, 1.4); ellipse(ctx, head.x - 2 * z, head.y - 2 * z, 2 * z, 2 * z, "#ffffff", null);
-    for (let i = 0; i < 4; i++) {
-      const a = (scene.reducedMotion ? 0 : now / 90) + i * Math.PI / 2, sx = head.x + Math.cos(a) * 9 * z, sy = head.y + Math.sin(a) * 5 * z, d = 2.2 * z;
-      poly(ctx, [[sx, sy - d], [sx + d, sy], [sx, sy + d], [sx - d, sy]], look.spark, null);
+    drawSpell(ctx, projectile.element ?? "", look, head, angle, at, progress, z, scene.reducedMotion ? 0 : now);
+    if (!scene.reducedMotion) {
+      const trail = SPELL_TRAILS[projectile.element ?? ""] ?? SPELL_TRAILS.moon;
+      if (Math.random() < trail.chance) burst(trail.kind, wx, wy, 24 + Math.random() * 6, 1, Math.random() < 0.5 ? look.spark : look.glow, { speed: trail.speed, up: trail.up, life: trail.life, size: trail.size, gravity: trail.gravity });
     }
-    if (!scene.reducedMotion && Math.random() < 0.8) burst("spark", wx, wy, 26, 1, look.spark, { speed: 0.2, up: 12, life: 0.45, size: 2 });
     glow(wx, wy, 26, 140, look.glow);
   }
   drawEffects(ctx, project, world, now, z);
   if (!underground) drawHaze(ctx, camera);
   // Night falls over the land (your Friend carries a small light; a lantern familiar a bigger one).
-  if (light.dark > 0.01 || light.warm > 0.01) { glow(pp.x, pp.y, 24, player.worn.includes("lantern_familiar") ? 170 : underground ? 125 : 90); drawNight(ctx, light.dark, light.warm, lights, underground ? "6,6,10" : undefined); }
+  // Your own light is faint: enough to see your feet by (a lantern familiar does better).
+  if (light.dark > 0.01 || light.warm > 0.01) { const lantern = player.worn.includes("lantern_familiar"); glow(pp.x, pp.y, 24, lantern ? 120 : underground ? 70 : 55, undefined, lantern ? 0.6 : 0.3); drawNight(ctx, light.dark, light.warm, lights, underground ? "6,6,10" : undefined); }
   // Click marker: an old-school cross, yellow for walking, red for actions.
   if (scene.marker && now - scene.marker.at < 450) {
     const s = toScreen(camera, scene.marker.x, scene.marker.y), k = 1 - (now - scene.marker.at) / 450, r = 8 * z * (0.6 + k * 0.4);
@@ -1061,7 +1056,7 @@ function uprightHold(id: string): "staff" | "bow" | null {
 function drawUpright(ctx: CanvasRenderingContext2D, art: HTMLCanvasElement, hx: number, hy: number, px: number, side: number, kind: "staff" | "bow", tilt = 0) {
   const size = (kind === "staff" ? 15 : 12) * px;
   ctx.save(); ctx.translate(hx, hy); ctx.scale(side, 1); ctx.imageSmoothingEnabled = false;
-  if (kind === "staff") { ctx.rotate(-0.68 + tilt); ctx.drawImage(art, -size * 0.16, -size * 0.94, size, size); }
+  if (kind === "staff") { ctx.rotate(-0.68 + tilt); ctx.drawImage(art, -size * 0.16, -size * 0.72, size, size); }
   else { ctx.rotate(-0.08 - tilt); ctx.drawImage(art, -size * 0.55, -size * 0.62, size, size); }
   ctx.restore();
 }
@@ -1072,6 +1067,89 @@ const MAGIC_LOOKS: Record<string, { core: string; glow: string; spark: string }>
   hollow: { core: "#efe2ff", glow: "#8a62c8", spark: "#c7a8f0" }, moon: { core: "#ffffff", glow: "#c6bed4", spark: "#efe2ff" }, gold: { core: "#fff6c8", glow: "#e2c46a", spark: "#fff0a0" },
 };
 const castFlashed = new WeakSet<object>(), impacted = new WeakSet<object>();
+/** What each element leaves behind it in the air. */
+const SPELL_TRAILS: Record<string, { kind: "spark" | "puff" | "drop" | "dust" | "glow"; chance: number; speed: number; up: number; life: number; size: number; gravity?: number }> = {
+  fire: { kind: "spark", chance: 0.95, speed: 0.25, up: 30, life: 0.5, size: 2.5, gravity: -20 }, water: { kind: "drop", chance: 0.8, speed: 0.3, up: 25, life: 0.45, size: 2 },
+  wind: { kind: "dust", chance: 0.6, speed: 0.5, up: 5, life: 0.4, size: 1.5 }, earth: { kind: "dust", chance: 0.9, speed: 0.3, up: 4, life: 0.6, size: 2.5 },
+  hollow: { kind: "puff", chance: 0.5, speed: 0.1, up: 8, life: 0.6, size: 3 }, moon: { kind: "spark", chance: 0.7, speed: 0.3, up: 10, life: 0.5, size: 2 },
+};
+type Screen = { x: number; y: number };
+/** Draw a spell's body at `head`, flying along `angle` (radians on screen). `now` is 0 with reduced motion. */
+function drawSpell(ctx: CanvasRenderingContext2D, element: string, look: { core: string; glow: string; spark: string }, head: Screen, angle: number, at: (t: number) => Screen, progress: number, z: number, now: number) {
+  const aura = (radius: number, alpha: number) => { const r = radius * 1.4, g = ctx.createRadialGradient(head.x, head.y, 0, head.x, head.y, r); g.addColorStop(0, hexA(look.glow, alpha)); g.addColorStop(1, hexA(look.glow, 0));
+    ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(head.x, head.y, r, 0, Math.PI * 2); ctx.fill(); ctx.restore(); };
+  const local = (draw: () => void, rotate = angle) => { ctx.save(); ctx.translate(head.x, head.y); ctx.rotate(rotate); ctx.scale(z * 1.5, z * 1.5); draw(); ctx.restore(); };
+  const shape = (points: [number, number][], fill: string, stroke: string | null = INK, width = 1.2) => { ctx.beginPath(); points.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = width / (z * 1.5) * 1.4; ctx.stroke(); } };
+  const flick = (k: number) => Math.sin(now / 55 + k * 2.1);
+  switch (element) {
+    case "fire": {
+      // A flame bolt: a tongue of fire streaming back from a white-hot tip, flickering.
+      aura(26 * z, 0.5);
+      local(() => {
+        shape([[9, 0], [2, -7 - flick(1) * 2], [-6, -9 + flick(2) * 2], [-4, -4], [-16 - flick(3) * 3, -6], [-10, -1], [-22 - flick(4) * 4, 1], [-10, 3], [-15 - flick(5) * 3, 8], [-4, 5], [2, 7 + flick(6) * 2]], "#e8662f");
+        shape([[8, 0], [1, -4], [-8, -3 + flick(7)], [-13 - flick(8) * 2, 0], [-8, 3], [1, 4]], "#f4a64a", null);
+        shape([[7, 0], [2, -2], [-4, -1], [-7, 0], [-4, 1.5], [2, 2]], "#fff2b0", null);
+      });
+      break;
+    }
+    case "water": {
+      // A curling wave: a blue body, a white foam crest breaking forward, and bubbles.
+      aura(22 * z, 0.45);
+      local(() => {
+        shape([[9, 2], [6, -5], [0, -8], [-7, -7], [-14, -3], [-18, 2 + flick(1)], [-12, 5], [-4, 6], [4, 6]], "#4f8fd8");
+        shape([[9, 2], [7, -4], [2, -7], [-2, -6], [3, -4], [5, -1], [4, 2]], "#e8f4ff", null);
+        ctx.strokeStyle = "#bfe0ff"; ctx.lineWidth = 1.2 / z; ctx.beginPath(); ctx.moveTo(-15, 1); ctx.quadraticCurveTo(-8, -2, -1, 1); ctx.stroke();
+        for (const [bx, by, r] of [[-20, -2, 1.6], [-24, 3, 1.2], [-17, 6, 1]] as const) { ctx.fillStyle = "#e8f4ff"; ctx.beginPath(); ctx.arc(bx + flick(bx) , by, r, 0, Math.PI * 2); ctx.fill(); }
+      });
+      break;
+    }
+    case "wind": {
+      // A whirlwind: three spinning gusts around a pale eye, with streaks behind.
+      aura(20 * z, 0.35);
+      const spin = now / 70;
+      local(() => {
+        ctx.lineCap = "round";
+        for (let i = 0; i < 3; i++) {
+          const a = spin + i * Math.PI * 2 / 3;
+          ctx.strokeStyle = INK; ctx.lineWidth = 3.4 / z * z; ctx.beginPath(); ctx.arc(0, 0, 7, a, a + 2.1); ctx.stroke();
+          ctx.strokeStyle = i ? "#e6f4fa" : "#ffffff"; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.arc(0, 0, 7, a, a + 2.1); ctx.stroke();
+        }
+        ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(0, 0, 2.2, 0, Math.PI * 2); ctx.fill();
+        ctx.lineCap = "butt";
+      }, 0);
+      local(() => { ctx.strokeStyle = "rgba(255,255,255,0.85)"; ctx.lineWidth = 1.2; ctx.lineCap = "round"; ctx.beginPath();
+        for (const [y, l] of [[-4, 14], [0, 20], [4, 12]] as const) { ctx.moveTo(-9, y); ctx.lineTo(-9 - l, y + flick(y) * 0.8); } ctx.stroke(); ctx.lineCap = "butt"; });
+      break;
+    }
+    case "earth": {
+      // A boulder tumbling end over end, cracked, shedding grit.
+      aura(16 * z, 0.25);
+      local(() => {
+        shape([[-7, -5], [-1, -8], [6, -6], [8, 1], [4, 7], [-4, 7], [-8, 2]], "#a07a4a", INK, 1.5);
+        shape([[-5, -4], [-1, -6], [3, -5], [0, -2], [-4, -1]], "#c8a26e", null);
+        ctx.strokeStyle = "#5e4428"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-2, -1); ctx.lineTo(2, 2); ctx.lineTo(1, 6); ctx.moveTo(2, 2); ctx.lineTo(6, 1); ctx.stroke();
+      }, now / 110);
+      break;
+    }
+    case "hollow": {
+      // A curse: a knot of dark smoke with two pale eyes, trailing wisps.
+      aura(22 * z, 0.4);
+      local(() => {
+        for (let i = 0; i < 4; i++) { const a = now / 120 + i * 1.6; ctx.fillStyle = hexA(i % 2 ? "#2a1f3d" : "#4a3570", 0.85); ctx.beginPath(); ctx.arc(Math.cos(a) * 3 - i * 3, Math.sin(a) * 3, 7 - i, 0, Math.PI * 2); ctx.fill(); }
+        ctx.strokeStyle = INK; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(0, 0, 7, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = "#e9d8ff"; ctx.fillRect(-1, -3, 2.2, 2.2); ctx.fillRect(3, -3, 2.2, 2.2);
+        ctx.strokeStyle = hexA("#8a62c8", 0.8); ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(-8, 3); ctx.quadraticCurveTo(-14, 7 + flick(1) * 2, -20, 3); ctx.moveTo(-8, -3); ctx.quadraticCurveTo(-15, -7 + flick(2) * 2, -19, -2); ctx.stroke();
+      });
+      break;
+    }
+    default: {
+      // Anything else: a turning four-point star.
+      aura(20 * z, 0.45);
+      local(() => { shape([[0, -9], [2, -2], [9, 0], [2, 2], [0, 9], [-2, 2], [-9, 0], [-2, -2]], look.core); shape([[0, -4], [1, -1], [4, 0], [1, 1], [0, 4], [-1, 1], [-4, 0], [-1, -1]], "#ffffff", null); }, now / 200);
+    }
+  }
+  void at; void progress;
+}
 const maxHpOf = (game: Game) => levelForXp(game.player.xp.hitpoints);
 /** What the player holds: a skilling tool mid-swing, a fishing line, or their weapon (swinging when they attack). */
 function drawHeld(ctx: CanvasRenderingContext2D, scene: Scene, pose: Pose, x: number, y: number, px: number, facing: Facing, project: (x: number, y: number, lift?: number) => { x: number; y: number }) {
@@ -1131,7 +1209,7 @@ function drawPeer(ctx: CanvasRenderingContext2D, scene: Scene, peer: PeerView, h
   if (peer.p.emote) emoteParticles(peer.p.emote, peer.emoteT, peer.x, peer.y, scene.reducedMotion, peer.p.cape && isItem(peer.p.cape) ? item(peer.p.cape).icon.color : undefined);
   const sprites = scene.peerSprites?.(peer.p.id) ?? null, stride = peer.moving ? Math.floor(now / 80) % 8 : 0;
   const rows = sprites ? friendRows(sprites, facing, peer.moving, stride) : peer.moving && Math.floor(now / 160) % 2 ? friendSprite(peer.p.family, peer.p.id).step : friendSprite(peer.p.family, peer.p.id).idle;
-  const px = 3.2 * z, worn = peer.p.cape ? [...peer.p.worn, peer.p.cape] : peer.p.worn, cloth = scene.reducedMotion ? 0 : peer.moving ? stride % 4 : Math.floor(now / 520) % 4;
+  const px = 3.2 * z, worn = [...peer.p.worn, ...(peer.p.cape ? [peer.p.cape] : []), ...(peer.p.head ? [peer.p.head] : [])], cloth = scene.reducedMotion ? 0 : peer.moving ? stride % 4 : Math.floor(now / 520) % 4;
   ellipse(ctx, s.x, s.y, 15 * z, 6 * z, "rgba(22,22,22,0.18)", peer.friend ? "rgba(159,224,168,0.9)" : "rgba(255,255,255,0.6)", 1.5);
   const restoreMotion = applyMotion(ctx, motion, s.x, s.y);
   drawAuras(ctx, worn, s.x, s.y, px, now, scene.reducedMotion, "back");
