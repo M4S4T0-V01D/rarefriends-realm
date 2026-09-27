@@ -52,6 +52,8 @@ export const regionIndex = (id: RegionId) => REGIONS.findIndex(region => region.
 
 export type World = {
   tiles: Uint8Array; region: Uint8Array; objects: WorldObject[]; objectAt: Int32Array; spawns: SpawnDef[];
+  /** Ground height (world pixels) at every tile corner: (W + 1) × (H + 1), corner (i, j) sits at (i − ½, j − ½). */
+  heights: Float32Array;
   places: Record<"spawn" | "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier" | "crypt" | "depths" | "king", { x: number; y: number }>;
 };
 
@@ -239,7 +241,7 @@ export function createWorld(seed = 20260927): World {
   building(125, 108, 131, 113, "s");                                       // General store
   building(106, 124, 114, 132, "e");                                       // Chapel of the Old Friend
   building(127, 126, 133, 131, "w");                                       // Tessa's tannery
-  building(133, 116, 138, 121, "w");                                       // Runa's Runes
+  building(133, 116, 138, 121, "w");                                       // Runa's Sigils
   building(113, 92, 129, 103, "s", T.STONE);                               // Hollow Hall (castle)
   fillRect(119, 104, 122, 107, T.PATH);
   for (let y = 93; y < 103; y++) { put(121, y, T.CARPET); put(122, y, T.CARPET); }
@@ -256,7 +258,7 @@ export function createWorld(seed = 20260927): World {
   for (let y = 126; y <= 130; y += 2) { decor(111, y, "bench"); decor(113, y, "bench"); }
   // Tannery.
   npc("tanner", 131, 128); add({ kind: "tanning", x: 132, y: 129, blocks: true, name: "Tanning rack" }); decor(128, 127, "barrel");
-  // Rune shop.
+  // Sigil shop.
   npc("runa", 136, 118); decor(137, 117, "shelf"); decor(137, 120, "shelf");
   // Castle.
   npc("captain", 124, 97, 2); npc("guard", 120, 100, 3); npc("guard", 126, 100, 3);
@@ -309,15 +311,15 @@ export function createWorld(seed = 20260927): World {
 
   // ---------- Ashen Hills: the mine ----------
   const mine = (x: number, y: number, kind: RockKind) => { if (get(x, y) === T.GRAVEL && objectAt[tileIndex(x, y)] < 0) rock(x, y, kind); };
-  for (let i = 0; i < 9; i++) { mine(104 + i * 2, 50 + (i % 3), i % 2 ? "tin" : "copper"); mine(105 + i * 2, 55 + (i % 2), i % 3 ? "copper" : "tin"); }
+  for (let i = 0; i < 9; i++) { mine(104 + i * 2, 50 + (i % 3), "pewter"); mine(105 + i * 2, 55 + (i % 2), "pewter"); }
   for (let i = 0; i < 5; i++) mine(100 + i, 45 + (i % 2) * 2, "clay");
-  for (let i = 0; i < 7; i++) mine(118 + i * 2, 42 + (i % 2) * 2, "iron");
-  for (let i = 0; i < 6; i++) mine(122 + (i % 3) * 2, 60 + Math.floor(i / 3) * 3, "coal");
-  mine(126, 36, "mithril"); mine(128, 37, "mithril"); mine(106, 38, "gem");
-  rockCluster(106, 52, 6, "copper", 5); rockCluster(110, 56, 6, "tin", 6); rockCluster(122, 44, 5, "iron", 4); rockCluster(124, 62, 5, "coal", 4);
+  for (let i = 0; i < 7; i++) mine(118 + i * 2, 42 + (i % 2) * 2, "blackiron");
+  for (let i = 0; i < 6; i++) mine(122 + (i % 3) * 2, 60 + Math.floor(i / 3) * 3, "inkcoal");
+  mine(126, 36, "moonsilver"); mine(128, 37, "moonsilver"); mine(106, 38, "gem");
+  rockCluster(106, 52, 6, "pewter", 5); rockCluster(110, 56, 6, "pewter", 6); rockCluster(122, 44, 5, "blackiron", 4); rockCluster(124, 62, 5, "inkcoal", 4);
   scatter(90, 30, 138, 70, 30, (x, y) => decor(x, y, "boulder"), (x, y) => free(x, y) && get(x, y) === T.GRAVEL);
   monsters("ink_rat", 98, 40, 130, 64, 8);
-  add({ kind: "sign", x: 114, y: 66, blocks: true, name: "Signpost", text: "Ashen Mine. Copper and tin to the west, iron to the north, coal to the east. Mind the rats." }); decor(110, 60, "crate"); decor(112, 61, "barrel");
+  add({ kind: "sign", x: 114, y: 66, blocks: true, name: "Signpost", text: "Ashen Mine. Pewter to the west, blackiron to the north, inkcoal to the east. Mind the rats." }); decor(110, 60, "crate"); decor(112, 61, "barrel");
   npc("miner", 116, 54, 3);
 
   // ---------- Emberforge ----------
@@ -333,8 +335,8 @@ export function createWorld(seed = 20260927): World {
   add({ kind: "bank", x: 157, y: 53, blocks: true, name: "Bank booth" }); add({ kind: "bank", x: 158, y: 53, blocks: true, name: "Bank booth" }); npc("banker", 157, 52);
   decor(162, 49, "lamp"); decor(170, 48, "barrel"); decor(153, 48, "crate");
   add({ kind: "range", x: 171, y: 50, blocks: true, name: "Cooking range" });
-  for (let i = 0; i < 4; i++) mine(174 + i * 2, 54, "coal");
-  scatter(170, 38, 186, 60, 8, (x, y) => rock(x, y, i2(random) ? "coal" : "iron"), (x, y) => free(x, y) && (get(x, y) === T.GRASS || get(x, y) === T.DARK_GRASS));
+  for (let i = 0; i < 4; i++) mine(174 + i * 2, 54, "inkcoal");
+  scatter(170, 38, 186, 60, 8, (x, y) => rock(x, y, i2(random) ? "inkcoal" : "blackiron"), (x, y) => free(x, y) && (get(x, y) === T.GRASS || get(x, y) === T.DARK_GRASS));
 
   // ---------- Frostpeak ----------
   building(192, 27, 199, 32, "w", T.WOOD);                                 // Frostpeak lodge
@@ -345,7 +347,7 @@ export function createWorld(seed = 20260927): World {
   decor(188, 34, "snowman", true, "Snow Friend");
   monsters("wolf", 180, 14, 204, 26, 8);
   monsters("frost_yeti", 210, 8, 232, 22, 5);
-  rockCluster(214, 36, 5, "adamantite", 5); rockCluster(226, 14, 5, "rarite", 3); rockCluster(206, 40, 4, "mithril", 4); rockCluster(186, 20, 4, "coal", 4);
+  rockCluster(214, 36, 5, "glimmer", 5); rockCluster(226, 14, 5, "rarite", 3); rockCluster(206, 40, 4, "moonsilver", 4); rockCluster(186, 20, 4, "inkcoal", 4);
   shoreSpots(214, 24, 230, 36, "deep", 3);
 
   // ---------- Glass Lake and Pike's Pier ----------
@@ -461,9 +463,9 @@ export function createWorld(seed = 20260927): World {
   for (let x = 25; x <= 49; x += 6) { decor(x, 218, "pillar"); decor(x, 232, "torch", true); }
   decor(66, 214, "chest", true, "Old chest");
 
-  // Hollow Depths (x 80..230): shades, hollow knights and the king's throne room behind a gate.
+  // Hollow Depths (x 80..230): shades, hollow sentinels and the king's throne room behind a gate.
   add({ kind: "ladder", x: 90, y: 208, blocks: true, name: "Rope", action: "Climb-up", to: { x: 122, y: 188 } });
-  monsters("shade", 86, 208, 100, 218, 5); monsters("shade", 104, 210, 148, 214, 6); monsters("hollow_knight", 122, 216, 148, 233, 8);
+  monsters("shade", 86, 208, 100, 218, 5); monsters("shade", 104, 210, 148, 214, 6); monsters("hollow_sentinel", 122, 216, 148, 233, 8);
   add({ kind: "gate", x: 176, y: 224, blocks: true, name: "Hollow gate", action: "Open", to: { x: 177, y: 224 }, requires: { quest: "hollow_king" } });
   for (let y = 221; y <= 227; y++) if (y !== 224) put(176, y, T.WALL);
   monster("hollow_king", 198, 224, 3);
@@ -491,7 +493,7 @@ export function createWorld(seed = 20260927): World {
     spawn: { x: 121, y: 123 }, hollow_square: { x: 121, y: 122 }, emberforge: { x: 162, y: 49 }, oasis: { x: 186, y: 115 },
     frostpeak: { x: 195, y: 34 }, pier: { x: 178, y: 150 }, crypt: { x: 40, y: 180 }, depths: { x: 122, y: 188 }, king: { x: 198, y: 224 },
   };
-  return { tiles, region, objects, objectAt, spawns, places };
+  return { tiles, region, objects, objectAt, spawns, places, heights: buildHeights(tiles, seed) };
 }
 const i2 = (random: () => number) => random() > 0.5;
 const TREE_NAMES: Record<TreeKind, string> = { tree: "Tree", oak: "Oak", willow: "Willow", maple: "Maple tree", yew: "Yew", ashwood: "Ashwood" };
@@ -514,6 +516,59 @@ export function walkable(world: World, x: number, y: number) {
   const object = objectAtTile(world, x, y);
   return !object || !object.blocks;
 }
+// ---------- Topology ----------
+/** How hilly each terrain is (peak height in world pixels). Flat ground (towns, floors, water) is 0. */
+const RELIEF: Record<number, number> = {
+  [T.GRASS]: 46, [T.DARK_GRASS]: 58, [T.PATH]: 26, [T.SAND]: 38, [T.SWAMP]: 10, [T.SNOW]: 84, [T.GRAVEL]: 60, [T.CLIFF]: 90, [T.FARMLAND]: 6,
+};
+const FLAT = new Set<number>([T.VOID, T.WATER, T.DEEP, T.BRIDGE, T.COBBLE, T.WOOD, T.STONE, T.CARPET, T.WALL, T.DUNGEON, T.ICE]);
+/**
+ * Rolling hills from two noise octaves, scaled by each terrain's relief, eased to flat ground near water, towns,
+ * buildings and bridges (so shores and streets stay level), then blurred once for gentle slopes.
+ */
+function buildHeights(tiles: Uint8Array, seed: number): Float32Array {
+  const broad = makeNoise(seed + 21, 13), fine = makeNoise(seed + 33, 5);
+  // Distance (in tiles, capped) from every tile to the nearest flat tile.
+  const distance = new Uint8Array(W * H).fill(255), queue: number[] = [];
+  for (let i = 0; i < W * H; i++) if (FLAT.has(tiles[i])) { distance[i] = 0; queue.push(i); }
+  for (let head = 0; head < queue.length; head++) {
+    const index = queue[head], x = index % W, y = (index - x) / W, d = distance[index];
+    if (d >= 6) continue;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+      const next = ny * W + nx;
+      if (distance[next] > d + 1) { distance[next] = d + 1; queue.push(next); }
+    }
+  }
+  const CW = W + 1, raw = new Float32Array(CW * (H + 1));
+  for (let j = 0; j <= H; j++) for (let i = 0; i <= W; i++) {
+    let relief = 0, near = 255, count = 0;
+    for (const [tx, ty] of [[i - 1, j - 1], [i, j - 1], [i - 1, j], [i, j]]) {
+      if (tx < 0 || ty < 0 || tx >= W || ty >= H) { near = 0; continue; }
+      const t = tiles[ty * W + tx];
+      relief += RELIEF[t] ?? 0; count++; near = Math.min(near, distance[ty * W + tx]);
+    }
+    const ease = Math.min(1, near / 4), smooth = ease * ease * (3 - 2 * ease);
+    const shape = broad(i, j) * 0.75 + fine(i, j) * 0.25;
+    raw[j * CW + i] = count ? (relief / count) * (0.12 + 0.88 * Math.pow(Math.max(0, shape), 1.6)) * smooth : 0;
+  }
+  const heights = new Float32Array(raw.length);
+  for (let j = 0; j <= H; j++) for (let i = 0; i <= W; i++) {
+    let sum = 0, n = 0;
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const x = i + di, y = j + dj; if (x >= 0 && y >= 0 && x <= W && y <= H) { sum += raw[y * CW + x]; n++; } }
+    heights[j * CW + i] = raw[j * CW + i] === 0 ? 0 : sum / n;
+  }
+  return heights;
+}
+/** Ground height under any point (tile centres are at integer coordinates), by bilinear interpolation of the corners. */
+export function groundHeight(world: World, x: number, y: number): number {
+  const u = Math.max(0, Math.min(W - 0.001, x + 0.5)), v = Math.max(0, Math.min(H - 0.001, y + 0.5)), i = Math.floor(u), j = Math.floor(v), fu = u - i, fv = v - j, CW = W + 1, h = world.heights;
+  const a = h[j * CW + i], b = h[j * CW + i + 1], c = h[(j + 1) * CW + i], d = h[(j + 1) * CW + i + 1];
+  return (a * (1 - fu) + b * fu) * (1 - fv) + (c * (1 - fu) + d * fu) * fv;
+}
+export function cornerHeight(world: World, i: number, j: number) { return world.heights[Math.max(0, Math.min(H, j)) * (W + 1) + Math.max(0, Math.min(W, i))]; }
+
 export function regionAt(world: World, x: number, y: number): Region {
   return REGIONS[inBounds(x, y) ? world.region[tileIndex(x, y)] : 0] ?? REGIONS[0];
 }

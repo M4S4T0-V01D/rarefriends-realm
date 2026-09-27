@@ -12,34 +12,30 @@ import {
 } from "./state.ts";
 import {
   buy, buyPrice, canCast, castSpell, chooseOption, continueDialogue, dialogueAtOptions, itemOptions, playerMaxHit, recipeProblem, sell, sellPrice,
-  setFollower, setStyle, startProduction, swapSlots, toggleRun, togglePrayer, toggleWorn, unequip, useItemOnItem, type OwnedFriend, type Selection,
+  castOnItem, setFollower, setStyle, startProduction, swapSlots, toggleRun, togglePrayer, toggleWorn, unequip, useItemOnItem, type OwnedFriend, type Selection,
 } from "./engine.ts";
-import { drawItemShape, friendRows, renderWorldMap } from "./render.ts";
+import { friendRows, renderWorldMap } from "./render.ts";
+import { artUrl, itemArt, orbArt, prayerArt, skillArt, spellArt, tabArt, type TabIcon } from "./icons.ts";
 import { friendSprite } from "./sprites.ts";
 import { TRACKS } from "./audio.ts";
 
 // ---------- Item icons ----------
-const iconCache = new Map<string, string>();
-export function itemIconUrl(id: string) {
-  let url = iconCache.get(id);
-  if (url) return url;
-  const canvas = document.createElement("canvas"); canvas.width = canvas.height = 64;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return "";
-  drawItemShape(ctx, item(id).icon, 0, 0, 64);
-  url = canvas.toDataURL(); iconCache.set(id, url);
-  return url;
-}
+export const itemIconUrl = (id: string) => artUrl(itemArt(item(id).icon));
 const shortCount = (n: number) => n >= 10_000_000 ? `${Math.floor(n / 1_000_000)}M` : n >= 100_000 ? `${Math.floor(n / 1000)}K` : String(n);
 const countColor = (n: number) => n >= 10_000_000 ? "#9fe0a8" : n >= 100_000 ? "#fff" : "#f2e28f";
-export function ItemIcon({ slot, size = 36, title }: { slot: Slot; size?: number; title?: string }) {
-  const stack = item(slot.id).stackable || slot.n > 1;
+export function ItemIcon({ slot, size = 46, title, bare }: { slot: Slot; size?: number; title?: string; bare?: boolean }) {
+  const stack = !bare && (item(slot.id).stackable || slot.n > 1);
   return (
     <span className="realm-item" style={{ width: size, height: size }} title={title ?? item(slot.id).name}>
-      <img src={itemIconUrl(slot.id)} alt="" width={size} height={size} draggable={false} />
+      <img src={itemIconUrl(slot.id)} alt="" width={size} height={size} draggable={false} className="pixel" />
       {stack && <b style={{ color: countColor(slot.n) }}>{shortCount(slot.n)}</b>}
     </span>
   );
+}
+
+/** A pixel-art icon, scaled up crisply. */
+export function PixelIcon({ art, size, label }: { art: HTMLCanvasElement; size: number; label?: string }) {
+  return <img className="pixel" src={artUrl(art)} width={size} height={size} alt={label ?? ""} aria-hidden={label ? undefined : true} draggable={false} />;
 }
 
 /** A Friend drawn from its mask (canonical or procedural). */
@@ -103,7 +99,7 @@ export function SidePanel(props: PanelProps) {
     <aside className="realm-side" aria-label="Game panels">
       <div className="realm-tabs" role="tablist">
         {TABS.map(entry => (
-          <button key={entry.id} type="button" role="tab" aria-selected={tab === entry.id} title={`${entry.label} (${entry.key})`} aria-label={entry.label} onClick={() => setTab(entry.id)}>{entry.glyph}</button>
+          <button key={entry.id} type="button" role="tab" aria-selected={tab === entry.id} title={`${entry.label} (${entry.key})`} aria-label={entry.label} onClick={() => setTab(entry.id)}><PixelIcon art={tabArt(entry.id as TabIcon)} size={27} /></button>
         ))}
       </div>
       <div className="realm-tab-body" role="tabpanel" aria-label={TABS.find(entry => entry.id === tab)?.label}>
@@ -149,7 +145,7 @@ function SkillsTab({ game }: PanelProps) {
           const next = level < 99 ? XP_TABLE[level + 1] : XP_TABLE[99], base = XP_TABLE[level], progress = level >= 99 ? 1 : (player.xp[skill] - base) / Math.max(1, next - base);
           return (
             <button key={skill} type="button" className="realm-skill" title={info(skill)} aria-label={info(skill)} onClick={() => setFocus(focus === skill ? null : skill)} onMouseEnter={() => setFocus(skill)}>
-              <i aria-hidden="true">{SKILL_ICONS[skill]}</i><span>{current}<small>/{level}</small></span>
+              <PixelIcon art={skillArt(skill)} size={27} /><span>{current}<small>/{level}</small></span>
               <em style={{ width: `${Math.round(progress * 100)}%` }} />
             </button>
           );
@@ -188,6 +184,11 @@ function InventoryTab({ game, selection, setSelection, openMenu, refresh, settin
   const click = (index: number, shift: boolean) => {
     if (paused) return;
     const slot = player.inventory[index];
+    if (selection?.kind === "spell") {
+      const spell = SPELLS.find(entry => entry.id === selection.spell);
+      if (spell?.target === "item" && slot) { castOnItem(game, spell.id, index); refresh(); return; }
+      setSelection(null); refresh(); return;
+    }
     if (selection?.kind === "item") {
       if (selection.slot !== index && slot) useItemOnItem(game, selection.slot, index);
       setSelection(null); refresh(); return;
@@ -254,43 +255,53 @@ function EquipmentTab({ game, refresh, openCard }: PanelProps) {
 }
 const signed = (n: number) => (n >= 0 ? `+${n}` : String(n));
 function PrayerTab({ game, refresh }: PanelProps) {
-  const player = game.player, level = levelForXp(player.xp.prayer);
+  const player = game.player, level = levelForXp(player.xp.prayer), [hover, setHover] = useState<string | null>(null);
   return (
     <div>
       <p className="realm-muted">Prayer points: <b>{Math.ceil(player.prayer)}</b> / {maxPrayer(player)} · Bonus {signed(bonuses(player).prayer)}</p>
-      <div className="realm-prayers">
+      <div className="realm-icon-grid prayers">
         {PRAYERS.map(prayer => (
-          <button key={prayer.id} type="button" aria-pressed={player.prayers.includes(prayer.id)} disabled={level < prayer.level} title={`${prayer.name} (level ${prayer.level}): ${prayer.description}`}
-            onClick={() => { togglePrayer(game, prayer.id); refresh(); }}>
-            <b>{prayer.name}</b><small>{level < prayer.level ? `Level ${prayer.level}` : prayer.description}</small>
+          <button key={prayer.id} type="button" aria-pressed={player.prayers.includes(prayer.id)} disabled={level < prayer.level} aria-label={`${prayer.name} (level ${prayer.level}): ${prayer.description}`}
+            onMouseEnter={() => setHover(prayer.id)} onFocus={() => setHover(prayer.id)} onClick={() => { togglePrayer(game, prayer.id); refresh(); }}>
+            <PixelIcon art={prayerArt(prayer.id)} size={36} />
           </button>
         ))}
       </div>
-      <p className="realm-note">Recharge at any altar. Bury bones to train Prayer.</p>
+      <InfoCard>{(() => { const prayer = PRAYERS.find(entry => entry.id === hover); return prayer ? <><b>{prayer.name}</b> <small>Level {prayer.level}</small><p>{prayer.description}. Drains {Math.round(prayer.drain * 100) / 100} points a tick.</p></> : <p>Recharge at any altar. Bury bones to train Prayer.</p>; })()}</InfoCard>
     </div>
   );
 }
-function MagicTab({ game, refresh, setSelection, setTab }: PanelProps) {
-  const player = game.player, level = levelForXp(player.xp.magic), staff = isStaffEquipped(player);
+const TARGET_HINT: Record<string, string> = { monster: "Cast on a monster", item: "Cast on an item in your pack", ground: "Cast on an item on the ground", self: "Casts straight away" };
+function MagicTab({ game, refresh, setSelection, selection }: PanelProps) {
+  const player = game.player, level = levelForXp(player.xp.magic), staff = isStaffEquipped(player), [hover, setHover] = useState<string | null>(null);
+  const shown = SPELLS.find(spell => spell.id === (hover ?? (selection?.kind === "spell" ? selection.spell : player.autocast)));
   return (
     <div>
-      <p className="realm-muted">Magic level <b>{level}</b>{staff ? " · Staff: click a spell to autocast" : " · Click a spell, then a target"}</p>
-      <div className="realm-spells">
+      <div className="realm-icon-grid spells">
         {SPELLS.map(spell => {
-          const problem = canCast(game, spell), usable = !problem || spell.id === "home";
-          const runes = Object.entries(spell.runes).map(([rune, n]) => `${n} ${item(rune).name.replace(" rune", "")}`).join(", ");
+          const usable = !canCast(game, spell) || spell.id === "home", armed = (selection?.kind === "spell" && selection.spell === spell.id) || player.autocast === spell.id;
           return (
-            <button key={spell.id} type="button" disabled={level < spell.level} data-usable={usable} aria-pressed={player.autocast === spell.id}
-              title={`${spell.name} (level ${spell.level}): ${spell.description}${runes ? ` Runes: ${runes}.` : ""}`}
-              onClick={() => { const selection = castSpell(game, spell.id); if (selection) { setSelection(selection); setTab("magic"); } refresh(); }}>
-              <b>{spell.name}</b><small>{level < spell.level ? `Level ${spell.level}` : runes || "Free"}</small>
+            <button key={spell.id} type="button" disabled={level < spell.level} data-usable={usable} aria-pressed={armed} aria-label={`${spell.name}, level ${spell.level}. ${spell.description}`}
+              onMouseEnter={() => setHover(spell.id)} onMouseLeave={() => setHover(null)} onFocus={() => setHover(spell.id)}
+              onClick={() => { const next = castSpell(game, spell.id); setSelection(next); refresh(); }}>
+              <PixelIcon art={spellArt(spell.id, spell.element, spell.kind)} size={28} />
             </button>
           );
         })}
       </div>
+      <InfoCard>
+        {shown ? <>
+          <b>{shown.name}</b> <small>Level {shown.level}{shown.maxHit ? ` · max hit ${shown.maxHit}` : ""}</small>
+          <p>{shown.description} <em>{TARGET_HINT[shown.target]}{shown.maxHit && staff ? " (or autocast with your staff)" : ""}.</em></p>
+          <div className="realm-sigils">{Object.entries(shown.sigils).map(([sigil, n]) => { const have = count(player, sigil) + (sigil === "breeze_sigil" && player.equipment.weapon === "breeze_staff" ? 999 : 0);
+            return <span key={sigil} data-short={have < n}><ItemIcon slot={{ id: sigil, n: 1 }} size={26} bare />{n}<small>/{have > 998 ? "∞" : have}</small></span>; })}
+            {!Object.keys(shown.sigils).length && <span>Free</span>}</div>
+        </> : <p>Magic level <b>{level}</b>. Hover a spell for details. Darts, lances and bursts, curses, Gilded Touch, Forgeheart, Far Reach, Bonebloom and six ways home.</p>}
+      </InfoCard>
     </div>
   );
 }
+function InfoCard({ children }: { children: ReactNode }) { return <div className="realm-info" aria-live="polite">{children}</div>; }
 function FriendsTab({ game, refresh, roster, rosterState, friendSprites, loadFriend, relicCounts, openCaskets }: PanelProps) {
   const player = game.player, perk = FAMILY_PERKS[player.familyId];
   useEffect(() => { for (const friend of roster.slice(0, 24)) loadFriend(friend.id); }, [roster, loadFriend]);
@@ -359,9 +370,16 @@ export function ChatBox({ messages, onSend }: { messages: readonly Message[]; on
       <div className="realm-chat-log" ref={list} role="log" aria-live="polite">
         {shown.map((entry, index) => <p key={`${entry.tick}-${index}`} className={`chat-${entry.tone}`}>{entry.text}</p>)}
       </div>
-      <form className="realm-chat-input" onSubmit={event => { event.preventDefault(); if (draft.trim()) onSend(draft.trim().slice(0, 80)); setDraft(""); (document.activeElement as HTMLElement | null)?.blur(); }}>
-        <label><span>You:</span><input value={draft} maxLength={80} onChange={event => setDraft(event.target.value)} placeholder="Press Enter to chat" aria-label="Say something" data-chat="true" /></label>
-      </form>
+      {/* No <form>: the sandboxed game frame has no allow-forms, so a submit would be blocked. Enter sends. */}
+      <div className="realm-chat-input">
+        <label><span>You:</span><input value={draft} maxLength={80} onChange={event => setDraft(event.target.value)} placeholder="Press Enter to chat" aria-label="Say something" data-chat="true"
+          onKeyDown={event => {
+            if (event.key !== "Enter") return;
+            event.preventDefault(); event.stopPropagation();
+            if (draft.trim()) onSend(draft.trim().slice(0, 80));
+            setDraft(""); event.currentTarget.blur();
+          }} /></label>
+      </div>
       <div className="realm-chat-tabs" role="tablist">
         {(["all", "game", "public"] as const).map(id => <button key={id} type="button" role="tab" aria-selected={filter === id} onClick={() => setFilter(id)}>{id === "all" ? "All" : id === "game" ? "Game" : "Public"}</button>)}
       </div>
@@ -396,7 +414,7 @@ export function LevelUpBox({ skill, level, onClose }: { skill: Skill; level: num
   return (
     <section className="realm-dialogue" aria-live="assertive">
       <button type="button" className="realm-line realm-levelup" onClick={onClose}>
-        <i aria-hidden="true">{SKILL_ICONS[skill]}</i>
+        <PixelIcon art={skillArt(skill)} size={54} />
         <span><b>Congratulations, you just advanced a{/^[AEIOU]/.test(SKILL_NAMES[skill]) ? "n" : ""} {SKILL_NAMES[skill]} level.</b>Your {SKILL_NAMES[skill]} level is now {level}.<em>Click here to continue (Space)</em></span>
       </button>
     </section>
@@ -462,7 +480,7 @@ export function BankModal({ game, refresh, onClose, openMenu }: { game: Game; re
         <div className="realm-inventory small" aria-label="Inventory (click to deposit)">
           {player.inventory.map((slot, index) => (
             <button key={index} type="button" className="realm-slot" aria-label={slot ? `Deposit ${item(slot.id).name}` : `Empty slot ${index + 1}`} onClick={() => { if (slot) { bankDeposit(player, index, amount); refresh(); } }}>
-              {slot && <ItemIcon slot={slot} size={30} />}
+              {slot && <ItemIcon slot={slot} size={38} />}
             </button>
           ))}
         </div>
@@ -481,7 +499,7 @@ export function ShopModal({ game, shopId, refresh, onClose }: { game: Game; shop
         <div className="realm-bank-grid" aria-label="Shop stock">
           {shop.stock.map(id => (
             <button key={id} type="button" className="realm-slot shop" aria-label={`Buy ${item(id).name} for ${buyPrice(game, id)} coins`} title={`${item(id).name}: ${buyPrice(game, id)} coins`} onClick={() => { buy(game, shopId, id, amount); refresh(); }}>
-              <ItemIcon slot={{ id, n: 1 }} size={32} /><small>{buyPrice(game, id).toLocaleString()}</small>
+              <ItemIcon slot={{ id, n: 1 }} size={40} /><small>{buyPrice(game, id).toLocaleString()}</small>
             </button>
           ))}
         </div>
@@ -489,7 +507,7 @@ export function ShopModal({ game, shopId, refresh, onClose }: { game: Game; shop
           {player.inventory.map((slot, index) => (
             <button key={index} type="button" className="realm-slot" aria-label={slot ? `Sell ${item(slot.id).name} for ${sellPrice(slot.id)} coins` : `Empty slot ${index + 1}`} title={slot ? `Sell for ${sellPrice(slot.id)} coins` : undefined}
               onClick={() => { if (slot) { sell(game, shopId, index, amount); refresh(); } }}>
-              {slot && <ItemIcon slot={slot} size={30} />}
+              {slot && <ItemIcon slot={slot} size={38} />}
             </button>
           ))}
         </div>
@@ -509,15 +527,28 @@ export function WorldMapModal({ game, onClose, onTravel }: { game: Game; onClose
     toTile.current = renderWorldMap(ctx, game, node.width, node.height, focus, underground);
   }, [focus, game, underground]);
   const point = (event: ReactMouseEvent<HTMLCanvasElement>) => { const rect = event.currentTarget.getBoundingClientRect(); return { x: (event.clientX - rect.left) * 760 / rect.width, y: (event.clientY - rect.top) * 470 / rect.height }; };
+  const zoomBy = (factor: number) => setFocus(current => ({ ...current, zoom: Math.max(1.2, Math.min(10, current.zoom * factor)) }));
+  const centre = () => setFocus(current => ({ ...current, x: game.player.x, y: game.player.y, zoom: Math.max(current.zoom, 4) }));
+  useEffect(() => {
+    const keys = (event: KeyboardEvent) => { if (event.key === "+" || event.key === "=") zoomBy(1.25); else if (event.key === "-" || event.key === "_") zoomBy(0.8); else if (event.key.toLowerCase() === "c") centre(); };
+    window.addEventListener("keydown", keys); return () => window.removeEventListener("keydown", keys);
+  });
   return (
     <Modal title={underground ? "World map: underground" : "World map of the Realm"} onClose={onClose} wide>
+      <div className="realm-map-tools">
+        <button type="button" onClick={() => zoomBy(1.3)} aria-label="Zoom in">+</button>
+        <input type="range" min={12} max={100} value={Math.round(focus.zoom * 10)} onChange={event => setFocus({ ...focus, zoom: Number(event.target.value) / 10 })} aria-label="Map zoom" />
+        <button type="button" onClick={() => zoomBy(0.77)} aria-label="Zoom out">−</button>
+        <button type="button" onClick={centre}>Centre on me (C)</button>
+        <button type="button" onClick={() => setFocus({ x: underground ? 130 : 120, y: underground ? 220 : 100, zoom: underground ? 3.2 : 2.3 })}>Whole Realm</button>
+      </div>
       <canvas ref={canvas} className="realm-worldmap" aria-label="World map. Drag to pan, scroll to zoom, click to walk there."
         onMouseDown={event => { const p = point(event); drag.current = { x: p.x, y: p.y, fx: focus.x, fy: focus.y, moved: false }; }}
         onMouseMove={event => { const d = drag.current; if (!d || event.buttons !== 1) return; const p = point(event), dx = (p.x - d.x) / focus.zoom, dy = (p.y - d.y) / focus.zoom;
           if (Math.hypot(p.x - d.x, p.y - d.y) > 4) d.moved = true; setFocus({ ...focus, x: d.fx - (dx + dy) * Math.SQRT1_2, y: d.fy - (dy - dx) * Math.SQRT1_2 }); }}
         onMouseUp={event => { const d = drag.current; drag.current = null; if (d && !d.moved && toTile.current) { const p = point(event), tile = toTile.current(p.x, p.y); onTravel(tile.x, tile.y); } }}
-        onWheel={event => setFocus({ ...focus, zoom: Math.max(1.2, Math.min(8, focus.zoom * (event.deltaY < 0 ? 1.15 : 0.87))) })} />
-      <p className="realm-note">Drag to pan · Scroll to zoom · Click to walk there · You are the white dot</p>
+        onWheel={event => zoomBy(event.deltaY < 0 ? 1.15 : 0.87)} />
+      <p className="realm-note">Drag to pan · Scroll or +/− to zoom · C centres on you · Click to walk there</p>
     </Modal>
   );
 }
@@ -540,17 +571,17 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
 }
 export function Orbs({ game, onRun, onMap, onZoom, onRotate }: { game: Game; onRun: () => void; onMap: () => void; onZoom: (delta: number) => void; onRotate: (delta: number) => void }) {
   const player = game.player, hpFraction = player.hp / maxHp(player), prayerFraction = player.prayer / Math.max(1, maxPrayer(player));
-  const orb = (label: string, value: number, fraction: number, color: string, onClick?: () => void, pressed?: boolean) => (
+  const orb = (label: string, value: number, fraction: number, color: string, art: HTMLCanvasElement, onClick?: () => void, pressed?: boolean) => (
     <button type="button" className="realm-orb" onClick={onClick} disabled={!onClick} aria-pressed={pressed} aria-label={`${label}: ${value}`} title={label}>
-      <i style={{ background: `conic-gradient(${color} ${Math.round(fraction * 360)}deg, #2a2a2a 0)` }} /><b>{value}</b>
+      <b>{value}</b><i style={{ background: `conic-gradient(${color} ${Math.round(fraction * 360)}deg, #3a3835 0)` }}><PixelIcon art={art} size={18} /></i>
     </button>
   );
   return (
     <div className="realm-orbs">
-      {orb("Hitpoints", player.hp, hpFraction, "#c98f95")}
-      {orb("Prayer", Math.ceil(player.prayer), prayerFraction, "#afbccb")}
-      {orb(player.run ? "Run: on" : "Run: off", Math.floor(player.energy), player.energy / 100, player.run ? "#e2d7ad" : "#9a968f", onRun, player.run)}
-      <button type="button" className="realm-orb map" onClick={onMap} aria-label="World map (M)" title="World map (M)">🗺</button>
+      {orb("Hitpoints", player.hp, hpFraction, "#cf6e6e", orbArt("hitpoints"))}
+      {orb("Prayer", Math.ceil(player.prayer), prayerFraction, "#9fb4d0", orbArt("prayer"))}
+      {orb(player.run ? "Run: on" : "Run: off", Math.floor(player.energy), player.energy / 100, player.run ? "#e2c46a" : "#9a968f", orbArt(player.run ? "run" : "walk"), onRun, player.run)}
+      <button type="button" className="realm-orb map" onClick={onMap} aria-label="World map (M)" title="World map (M)"><PixelIcon art={orbArt("map")} size={22} /></button>
       <div className="realm-zoom"><button type="button" onClick={() => onZoom(0.12)} aria-label="Zoom in">+</button><button type="button" onClick={() => onZoom(-0.12)} aria-label="Zoom out">−</button></div>
       <div className="realm-zoom"><button type="button" onClick={() => onRotate(-Math.PI / 4)} aria-label="Turn the camera left" title="Turn left (←)">⟲</button><button type="button" onClick={() => onRotate(Math.PI / 4)} aria-label="Turn the camera right" title="Turn right (→)">⟳</button></div>
     </div>

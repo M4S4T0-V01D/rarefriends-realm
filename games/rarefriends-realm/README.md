@@ -38,24 +38,44 @@ XP follows the classic curve (83 XP for level 2, 13,034,431 for 99), multiplied 
 | --- | --- | --- |
 | Attack / Strength / Defence | Melee combat (4 XP per damage to your style's skill) | Styles: Accurate, Aggressive, Defensive, Controlled |
 | Hitpoints | Any combat (1.33 XP per damage) | Starts at 10; regenerates 1 HP per minute |
-| Magic | Combat spells (base XP + 2 per damage), teleports | Staffs autocast; Staff of air gives unlimited air runes |
+| Magic | Spells paid in sigils (damage spells: base XP + 2 per damage) | Staffs autocast damage spells; the Breeze staff gives unlimited breeze sigils |
 | Prayer | Burying bones (4.5 / 15 / 50 XP) | Recharge at altars; prayers drain points |
 | Woodcutting | Trees 1, Oak 15, Willow 30, Maple 45, Yew 60, Ashwood 70 | Better axes cut faster |
 | Firemaking | Light logs (same levels as Woodcutting) | Fires last about a minute; cook on them |
-| Fishing | Net 1, Bait 5/10, Lure 20/30, Cage 40, Harpoon 50, Deep 76 | Bait and feathers are used up |
+| Fishing | Net 1 (minnows), Bait 5/10 (perch, carp), Lure 20/30 (char, grayling), Cage 40 (inkcrab), Harpoon 50 (sailfish), Deep 76 (inkshark) | Bait and feathers are used up |
 | Cooking | Ranges and fires | Burn chance falls with level, to zero at the stop-burn level |
-| Mining | Clay/Copper/Tin 1, Iron 15, Coal 30, Gems 40, Mithril 55, Adamantite 70, Rarite 85 | 1/256 random gem per swing |
-| Smithing | Furnace (bronze 1, iron 15 at 50%, steel 30, mithril 50, adamant 70, rarite 85) and anvil | Dagger to platebody, six metals |
-| Crafting | Leather (gloves 1 … chaps 18), gems (sapphire 20, emerald 27, ruby 34) | Tessa tans hides for 2 coins each |
+| Mining | Clay/Pewter 1, Blackiron 15, Inkcoal 30, Gems 40, Moonsilver 55, Glimmer 70, Rarite 85 | 1/256 random gem per swing |
+| Smithing | Furnace (pewter 1, blackiron 15 at 60%, ashsteel 30, moonsilver 50, glimmer 70, rarite 85; the higher metals add 1–4 inkcoal) and anvil | Dagger, axe, sword, pickaxe, helm, sabre, greaves, shield, cuirass in six metals |
+| Crafting | Leather (gloves 1 … leggings 18), gems (moonstone 20, sagestone 27, rosestone 34) | Tessa tans hides for 2 coins each |
 | Thieving | Villagers 1, merchant 25, guards 40; stalls 5 / 20 / 42 / 75 | Failing a pickpocket stuns you |
 | Agility | Friendhollow course (5 obstacles, +40 XP a lap), stepping stones (20) | Agility restores run energy faster |
+
+## The spellbook
+
+| Level | Spell | Kind |
+| --- | --- | --- |
+| 1 | Homeward | Free, slow teleport to Friendhollow (not in combat) |
+| 1 / 5 / 9 / 13 | Breeze, Tide, Stone and Ember Dart | Damage (max 2 / 4 / 6 / 8) |
+| 3 / 11 / 27 | Muddle, Wilt, Brittle | Curses: −10% accuracy, −10% strength, −12% defence for a minute |
+| 7 / 49 | Enchant Moonstone / Rosestone | Cut gem → moonstone or rosestone pendant |
+| 15 | Bonebloom | Every bone in your pack → sweetberries |
+| 17 / 23 / 35 | Breeze, Tide and Ember Lance | Damage (max 9 / 10 / 12) |
+| 20 | Rootsnare | Roots a monster in place for ten seconds |
+| 21 / 55 | Gilded Touch / Golden Touch | An item → 40% / 60% of its value in coins |
+| 25 / 31 / 37 / 45 / 48 | Glide to Friendhollow, Emberforge, the Oasis, Frostpeak, the Pier | Teleports |
+| 33 | Far Reach | Take a ground item from up to eight tiles away |
+| 41 / 59 | Breeze and Ember Burst | Damage (max 13 / 16) |
+| 43 | Forgeheart | Smelt ore into a bar in your hands (trains Smithing) |
+
+Prayers: Paper Shield, Warm Heart, Clear Ink, Quiet Mind, Stone Shield, Bright Heart, Sharp Ink, Deep Mind, Mountain Shield,
+Burning Heart, Perfect Ink and Friend's Ward (blocks most melee damage).
 
 ## Family perks
 
 Your Friend's Generations family gives one perk: Skeleton (bones +50% Prayer XP), Mask (better Thieving, shorter stuns),
 Family (shops 10% cheaper), Cellular (HP regenerates twice as fast), Asymmetry (8% chance of a second resource),
 Hoverer (run drains 40% slower), Colossus (+1 melee max hit), Sparkling (gems three times as often), Hollow (+10% magic accuracy,
-1 in 5 spells keeps its runes).
+1 in 5 spells keeps its sigils).
 
 ## Combat
 
@@ -72,7 +92,7 @@ next attack. **Death is safe:** you wake by the Friendhollow fountain with your 
 | Dune bandit | 22 | Pale Dunes |
 | Crypt skeleton | 25 | Murkmire Crypt |
 | Frost wolf, Frost yeti | 32, 55 | Frostpeak |
-| Shade, Hollow knight | 38, 64 | Hollow Depths |
+| Shade, Hollow sentinel | 38, 64 | Hollow Depths |
 | Moss colossus | 42 | Mossy Ruins |
 | **The Hollow King** | 92 | The throne room (boss) |
 
@@ -80,7 +100,7 @@ next attack. **Death is safe:** you wake by the Friendhollow fountain with your 
 
 1. **A Friend's Feast** (Cook Mabel, Hollow Hall kitchen): an egg, a pot of flour and a bucket of milk.
 2. **Grumblin Trouble** (Captain Rook, Hollow Hall): defeat six Grumblins.
-3. **The Cold Forge** (Brann, Emberforge): three bronze bars and two iron bars.
+3. **The Cold Forge** (Brann, Emberforge): three pewter bars and two blackiron bars.
 4. **Hollow Whispers** (Brother Ossic, the chapel): find the crypt key and lock the crypt altar.
 5. **The Lost Glimmer** (Old Glimmer, by the fountain): three shards: the Grumblin chief, a swamp lurker, the town well.
 6. **The Hollow King** (Old Glimmer, after 4 and 5): pass the Hollow gate and defeat the Hollow King.

@@ -10,7 +10,9 @@
 - **Your Friend is the hero.** The Friend you select walks the Realm in its canonical on-chain sprite, and its Generations family gives a perk (Hoverers run longer, Skeletons pray better, Colossi hit harder, and so on).
 - **Fifteen skills on the classic curve.** Attack, Strength, Defence, Hitpoints, Magic, Prayer, Woodcutting, Fishing, Cooking, Firemaking, Mining, Smithing, Crafting, Thieving and Agility, from level 1 to 99.
 - **Old-school controls.** Left-click does the first option; right-click lists them all (*Chop down Tree*, *Attack Grumblin (level-5)*, *Talk-to*, *Pickpocket*, *Examine*). WASD walks; the arrow keys (or a scroll-wheel drag) turn and tilt the camera, and the compass faces north again. Use items on things. Minimap, run orb, world map. Every monster shows its health and level.
-- **A large world.** A 240 × 240 tile island with 12 regions and 2 dungeons: towns, farms, forests, a mine, a forge, snowy peaks, a lake with a pier, dunes and an oasis, a swamp, ruins, a crypt and the Hollow Depths.
+- **A large, living world.** A 240 × 240 tile island with 12 regions and 2 dungeons: towns, farms, forests, a mine, a forge, snowy peaks, a lake with a pier, dunes and an oasis, a swamp, ruins, a crypt and the Hollow Depths. The land rolls in walkable hills (lit by slope, with ink contour lines), and it's alive: cloud shadows, birds, butterflies, falling leaves, snow, blowing dust, fireflies, jumping fish and forge smoke.
+- **Pixel art in the Rare Friends style.** Trees, rocks, decor, every item, weapon, skill, spell and prayer icon are pixel art with an ink edge (and the white halo of the canonical sprites), drawn procedurally. Walls are bricked, and skills animate: axes swing and chips fly, pickaxes spark, lines are cast, anvils ring, fires crackle, agility hops.
+- **A real spellbook.** Darts, Lances and Bursts in four elements; curses (Muddle, Wilt, Brittle) and Rootsnare; Gilded and Golden Touch, Forgeheart, Far Reach, Bonebloom, two enchantments and six ways to travel, paid in sigils.
 - **Six quests** from baking for the Realm Feast to defeating the Hollow King (level 92) in his throne room.
 - **A soundtrack for every region.** Sixteen procedural tracks, including a hand-written main theme, plus level-up and quest fanfares, synthesized live in WebAudio. Entering an area unlocks its track ("You have unlocked a new music track"), and the music player replays any you've found.
 - **Your other Friends follow you**, adding XP by generation. **Rare Caskets** (simulated $RAREFRIENDS) hold relics and wardrobe pieces. **Progress saves per wallet.** Your **adventurer card** posts to X.
@@ -38,8 +40,10 @@
 | ![Bank](docs/bank.png) | ![World map](docs/worldmap.png) | ![Caskets](docs/caskets.png) |
 | **Smelting at Emberforge** | **Level up!** | **Quest complete** |
 | ![Smelting menu](docs/smelting.png) | ![Level-up message](docs/level-up.png) | ![Quest complete](docs/quest-complete.png) |
-| **Camera turned and tilted** | **Health bars on every monster** | **Music unlocks** |
-| ![Camera turned](docs/camera-turned.png) | ![Grumblins with health bars](docs/combat.png) | ![Music player](docs/music.png) |
+| **Camera turned and tilted** | **Health bars on every monster** | **The spellbook** |
+| ![Camera turned](docs/camera-turned.png) | ![Grumblins with health bars](docs/combat.png) | ![Spellbook](docs/magic.png) |
+| **Chat over your head** | **Prayers** | **Music unlocks** |
+| ![Chat](docs/chat.png) | ![Prayers](docs/prayer.png) | ![Music player](docs/music.png) |
 | **A shop** | **On a phone (landscape)** | **Quest journal** |
 | ![Shop](docs/shop.png) | ![Phone layout](docs/phone.png) | ![Quest journal](docs/quests.png) |
 
@@ -52,7 +56,7 @@
 1. **Connect, pick your Friend, press Begin.** The main theme plays over a flight across Friendhollow; your saved adventure is listed if you have one.
 2. **Click to act.** The top-left text shows what a left-click does. Right-click (or long-press) anything for every option. WASD walks; ← → turn the camera and ↑ ↓ tilt it (or hold the scroll wheel and drag); click the compass to face north. R toggles run; M opens the world map.
 3. **Gather and make.** Chop trees and light the logs, fish at Glass Lake and cook on a range or your own fire, mine in the Ashen Hills and smith at Emberforge, tan hides and craft armour, cut gems.
-4. **Fight.** Pick a style (Accurate, Aggressive, Defensive, Controlled), eat when you're hurt, pray at altars. Monsters retaliate, some attack on sight, and all drop loot. Magic uses runes, and staffs autocast.
+4. **Fight.** Pick a style (Accurate, Aggressive, Defensive, Controlled), eat when you're hurt, pray at altars. Monsters retaliate, some attack on sight, and all drop loot. Magic uses sigils, and staffs autocast.
 5. **Quest.** Yellow markers float over quest givers. The quest journal tracks every step.
 6. **Train your Friends.** Owned Friends can follow you from the Friends tab. The Relic keeper in the Hollow Hall sells Rare Caskets.
 7. **Share.** The adventurer card (Worn equipment tab) shows your Friend, levels and quest points. **Post to X**, copy or save it.
@@ -108,10 +112,11 @@ npm run typecheck      # tsc strict (game, host and preview page)
 npm test               # engine tests: XP curve, world generation and reachability of every landmark, pathfinding,
                        # WASD, right-click menus, woodcutting/firemaking/cooking, fishing, mining/smelting/smithing,
                        # combat and loot, aggression and safe death, two quests end to end, thieving, an agility lap,
-                       # magic, prayer, shops and the bank, saves (round trip and tampering), caskets, followers, music unlocks
+                       # magic (combat, curses, Rootsnare, Gilded Touch, Forgeheart, enchanting, Far Reach, Bonebloom, glides),
+                       # prayer, shops and the bank, saves (round trip, tampering, pre-rename ids), caskets, followers, music unlocks
 npm run check          # friendsdk check
 npm run test:browser   # SDK mock-wallet browser runs of the custom host (a two-Friend wallet):
-                       #  • title screen, real mouse clicks (chop a tree), right-click menu, dialogue, WASD walking
+                       #  • title screen, real mouse clicks (chop a tree), right-click menu, dialogue, WASD walking, chat over your head
                        #  • camera: arrow keys turn and tilt, middle-drag turns, WASD follows the angle, the compass resets
                        #  • a level-up, smelting at the furnace, a shop, finishing A Friend's Feast (quest-complete scroll)
                        #  • combat by right-click, bank deposit/withdraw, world map, 5 caskets via the runtime's confirmations
@@ -151,4 +156,5 @@ transactions or extra wallet prompts. Under the plain SDK CLI (`npx friendsdk de
 Built for the Rare Friends Vibeathon by **M4S4T0** ([@M4S4T0-V01D](https://github.com/M4S4T0-V01D)) with an AI coding agent.
 FriendSDK and the Rare Friends artwork are by Rare Friends; see [NOTICE.md](NOTICE.md). The world, creatures,
 townsfolk, item art, music and sound effects are original procedural code. Gameplay inspired by classic browser RPGs such
-as *Old School RuneScape*; no assets, place names or code from them are used.
+as *Old School RuneScape*; the Realm's places, metals, gems, sigils, spells, prayers and items all have their own names, and
+no assets or code from it are used.

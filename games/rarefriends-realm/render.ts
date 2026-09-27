@@ -5,9 +5,13 @@
 import type { GenerationSprites } from "@rarefriends/friendsdk/sprites";
 import { ROCKS, WARDROBE, item, levelForXp, type Icon } from "./data.ts";
 import { NPCS } from "./content.ts";
-import { TICK_MS, type Facing, type Game, type Monster, type Npc, type Projectile } from "./state.ts";
+import { TICK_MS, attackSpeed, type Facing, type Game, type Monster, type Npc, type Projectile } from "./state.ts";
 import { npcOverhead, type Pick } from "./engine.ts";
-import { REGIONS, T, W, H, inBounds, objectAtTile, type World, type WorldObject } from "./world.ts";
+import { REGIONS, T, W, H, cornerHeight, groundHeight, inBounds, objectAtTile, type World, type WorldObject } from "./world.ts";
+import { itemArt } from "./icons.ts";
+import { drawPixels } from "./pixel.ts";
+import { decorArt, rockArt, treeArt } from "./scenery.ts";
+import { drawCloudShadows, drawEffects, playerPose, treeShake, updateEffects, type Pose } from "./effects.ts";
 import { creatureSprite, friendSprite, type Mask } from "./sprites.ts";
 
 /** The logical view size; the game sets it to match the frame (960 × 640 is the reference). */
@@ -30,7 +34,7 @@ const EDGE_CLASS: Record<number, number> = {
 };
 
 /** The camera: a point in tiles, zoom, rotation (radians, 0 = the classic view) and pitch (screen squash, 0.5 = classic). */
-export type Camera = { x: number; y: number; zoom: number; angle: number; pitch: number };
+export type Camera = { x: number; y: number; zoom: number; angle: number; pitch: number; base?: number };
 export const PITCH = { min: 0.36, max: 0.74, classic: 0.5 } as const;
 export type ClickMarker = { x: number; y: number; at: number; red: boolean };
 export type Firework = { at: number; color: string };
@@ -50,14 +54,26 @@ function rotate(camera: Camera, dx: number, dy: number) {
 }
 /** Heights shrink as the camera looks more from above. */
 const liftScale = (camera: Camera) => Math.sqrt(1 - camera.pitch * camera.pitch) / Math.sqrt(0.75);
+/** The ground under the scene (set each frame), so everything stands on the hills. */
+let ground: World | null = null;
+export function setGround(world: World | null) { ground = world; }
+const groundAt = (x: number, y: number) => ground ? groundHeight(ground, x, y) : 0;
+/** World point → screen, standing on the ground (`lift` is extra height above it). */
 export function toScreen(camera: Camera, x: number, y: number, lift = 0) {
-  const { rx, ry } = rotate(camera, x - camera.x, y - camera.y), half = TILE_W / 2;
-  return { x: (rx - ry) * half * camera.zoom + VIEW.width / 2, y: ((rx + ry) * half * camera.pitch - lift * liftScale(camera)) * camera.zoom + VIEW.height / 2 };
+  const { rx, ry } = rotate(camera, x - camera.x, y - camera.y), half = TILE_W / 2, height = lift + groundAt(x, y) - (camera.base ?? 0);
+  return { x: (rx - ry) * half * camera.zoom + VIEW.width / 2, y: ((rx + ry) * half * camera.pitch - height * liftScale(camera)) * camera.zoom + VIEW.height / 2 };
 }
+/** Screen → the tile under it, allowing for hills (a few refinement steps). */
 export function toTile(camera: Camera, sx: number, sy: number) {
-  const half = TILE_W / 2, a = (sx - VIEW.width / 2) / (camera.zoom * half), b = (sy - VIEW.height / 2) / (camera.zoom * half * camera.pitch);
-  const rx = (a + b) / 2, ry = (b - a) / 2, c = Math.cos(-camera.angle), s = Math.sin(-camera.angle);
-  return { x: Math.round(camera.x + rx * c - ry * s), y: Math.round(camera.y + rx * s + ry * c) };
+  const half = TILE_W / 2, c = Math.cos(-camera.angle), s = Math.sin(-camera.angle);
+  let x = camera.x, y = camera.y;
+  for (let step = 0; step < 4; step++) {
+    const height = step ? groundAt(x, y) - (camera.base ?? 0) : 0;
+    const a = (sx - VIEW.width / 2) / (camera.zoom * half), b = (sy - VIEW.height / 2 + height * liftScale(camera) * camera.zoom) / (camera.zoom * half * camera.pitch);
+    const rx = (a + b) / 2, ry = (b - a) / 2;
+    x = camera.x + rx * c - ry * s; y = camera.y + rx * s + ry * c;
+  }
+  return { x: Math.round(x), y: Math.round(y) };
 }
 /** Draw order: further from the camera first. */
 export function depthOf(camera: Camera, x: number, y: number) { const { rx, ry } = rotate(camera, x, y); return rx + ry; }
@@ -122,7 +138,7 @@ function shade(hex: string, amount: number) {
   return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`;
 }
 /** An isometric box on a tile footprint (w, d in tiles) and height h (world px). */
-function box(ctx: CanvasRenderingContext2D, camera: Camera, x: number, y: number, w: number, d: number, h: number, top: string, left: string, right: string, lift = 0, stroke: string | null = INK) {
+function box(ctx: CanvasRenderingContext2D, camera: Camera, x: number, y: number, w: number, d: number, h: number, top: string, left: string, right: string, lift = 0, stroke: string | null = INK, pattern: "brick" | "plank" | null = null) {
   const p = (px: number, py: number, z: number) => { const s = toScreen(camera, px, py, z); return [s.x, s.y] as const; };
   const x0 = x - w / 2, x1 = x + w / 2, y0 = y - d / 2, y1 = y + d / 2;
   // The four sides with their outward normals; draw the ones facing the camera, shaded by which way they face on screen.
@@ -131,25 +147,42 @@ function box(ctx: CanvasRenderingContext2D, camera: Camera, x: number, y: number
     const { rx, ry } = rotate(camera, nx, ny);
     if (rx + ry <= 0.001) continue;
     poly(ctx, [p(ax, ay, lift), p(bx, by, lift), p(bx, by, lift + h), p(ax, ay, lift + h)], rx - ry < 0 ? left : right, stroke);
+    if (pattern) {
+      // Courses of brick (staggered joints) or planks along the face.
+      ctx.strokeStyle = "rgba(22,22,22,0.28)"; ctx.lineWidth = 1; ctx.beginPath();
+      const rows = pattern === "brick" ? Math.max(2, Math.round(h / 7)) : Math.max(2, Math.round(h / 5));
+      for (let r = 1; r < rows; r++) { const z0 = lift + h * r / rows, a0 = p(ax, ay, z0), b0 = p(bx, by, z0); ctx.moveTo(a0[0], a0[1]); ctx.lineTo(b0[0], b0[1]); }
+      if (pattern === "brick") for (let r = 0; r < rows; r++) for (const t of r % 2 ? [0.25, 0.75] : [0.5]) {
+        const mx = ax + (bx - ax) * t, my = ay + (by - ay) * t, a0 = p(mx, my, lift + h * r / rows), b0 = p(mx, my, lift + h * (r + 1) / rows); ctx.moveTo(a0[0], a0[1]); ctx.lineTo(b0[0], b0[1]);
+      }
+      ctx.stroke();
+    }
   }
   poly(ctx, [p(x0, y0, lift + h), p(x1, y0, lift + h), p(x1, y1, lift + h), p(x0, y1, lift + h)], top, stroke);
 }
 
 // ---------- Terrain ----------
+const CONTOUR = 10;
+const isWaterTerrain = (terrain: number) => terrain === T.WATER || terrain === T.DEEP;
 function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, x0: number, y0: number, x1: number, y1: number) {
   const { camera, game, now } = scene, world = game.world, z = camera.zoom, hw = TILE_W / 2 * z, hh = hw * camera.pitch;
   const t = scene.reducedMotion ? 0 : now / 1000;
   // Screen offsets of half a tile along world x and y: tile corners are centre ± ex ± ey at any camera angle.
-  const o = toScreen(camera, camera.x, camera.y), px = toScreen(camera, camera.x + 0.5, camera.y), py = toScreen(camera, camera.x, camera.y + 0.5);
-  const ex = { x: px.x - o.x, y: px.y - o.y }, ey = { x: py.x - o.x, y: py.y - o.y };
+  const flat = (dx: number, dy: number) => { const { rx, ry } = rotate(camera, dx, dy); return { x: (rx - ry) * TILE_W / 2 * z, y: (rx + ry) * TILE_W / 2 * camera.pitch * z }; };
+  const o = { x: 0, y: 0 }, px = flat(0.5, 0), py = flat(0, 0.5);
+  const ex = { x: px.x - o.x, y: px.y - o.y }, ey = { x: py.x - o.x, y: py.y - o.y }, ls = liftScale(camera);
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
     if (!inBounds(x, y)) continue;
     const terrain = world.tiles[y * W + x];
     if (terrain === T.VOID) continue;
     const { x: sx, y: sy } = toScreen(camera, x, y);
     if (sx < -hw * 2 || sx > VIEW.width + hw * 2 || sy < -hh * 2 || sy > VIEW.height + hh * 4) continue;
-    const variation = (hash(x, y) - 0.5) * 0.035;
-    const ax = sx - ex.x - ey.x, ay = sy - ex.y - ey.y, bx = sx + ex.x - ey.x, by = sy + ex.y - ey.y, cx = sx + ex.x + ey.x, cy = sy + ex.y + ey.y, dx = sx - ex.x + ey.x, dy = sy - ex.y + ey.y;
+    // Corner heights lift each corner off the tile centre; slopes facing the north-west light are brighter.
+    const hA = cornerHeight(world, x, y), hB = cornerHeight(world, x + 1, y), hC = cornerHeight(world, x + 1, y + 1), hD = cornerHeight(world, x, y + 1), hMid = (hA + hB + hC + hD) / 4;
+    const slope = Math.max(-0.22, Math.min(0.22, ((hA + hD) - (hB + hC) + (hA + hB) - (hD + hC)) * 0.011));
+    const variation = (hash(x, y) - 0.5) * 0.035 + slope, lifted = ls * z;
+    const ax = sx - ex.x - ey.x, ay = sy - ex.y - ey.y - (hA - hMid) * lifted, bx = sx + ex.x - ey.x, by = sy + ex.y - ey.y - (hB - hMid) * lifted;
+    const cx = sx + ex.x + ey.x, cy = sy + ex.y + ey.y - (hC - hMid) * lifted, dx = sx - ex.x + ey.x, dy = sy - ex.y + ey.y - (hD - hMid) * lifted;
     ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.lineTo(cx, cy); ctx.lineTo(dx, dy); ctx.closePath();
     ctx.fillStyle = shade(TERRAIN_COLORS[terrain] ?? "#cccccc", variation); ctx.fill();
     // Texture details.
@@ -196,46 +229,38 @@ function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, x0: number, y0
     edge(x + 1, y, bx, by, cx, cy);
     edge(x, y + 1, cx, cy, dx, dy);
     edge(x - 1, y, dx, dy, ax, ay);
+    // Contour lines every CONTOUR pixels of height (marching squares on the tile), like a topographic map.
+    if (!isWaterTerrain(terrain)) {
+      const levels = [hA, hB, hC, hD].map(h => Math.floor(h / CONTOUR)), lo = Math.min(...levels), hi = Math.max(...levels);
+      if (hi > lo) {
+        const pts: [number, number][] = [[ax, ay], [bx, by], [cx, cy], [dx, dy]], hs = [hA, hB, hC, hD];
+        ctx.strokeStyle = "rgba(22,22,22,0.16)"; ctx.lineWidth = 1; ctx.beginPath();
+        for (let level = lo + 1; level <= hi; level++) {
+          const at = level * CONTOUR, cross: [number, number][] = [];
+          for (let e = 0; e < 4; e++) {
+            const h0 = hs[e], h1 = hs[(e + 1) % 4];
+            if ((h0 < at) !== (h1 < at)) { const t = (at - h0) / (h1 - h0), [x0, y0] = pts[e], [x1, y1] = pts[(e + 1) % 4]; cross.push([x0 + (x1 - x0) * t, y0 + (y1 - y0) * t]); }
+          }
+          for (let k = 0; k + 1 < cross.length; k += 2) { ctx.moveTo(cross[k][0], cross[k][1]); ctx.lineTo(cross[k + 1][0], cross[k + 1][1]); }
+        }
+        ctx.stroke();
+      }
+    }
   }
 }
 
 // ---------- Objects ----------
-const TREE_STYLE: Record<string, { canopy: string; shape: "round" | "broad" | "willow" | "cone" }> = {
-  tree: { canopy: "#b9c5ae", shape: "round" }, oak: { canopy: "#a7b39b", shape: "broad" }, willow: { canopy: "#c5cdb0", shape: "willow" },
-  maple: { canopy: "#dbb9a0", shape: "broad" }, yew: { canopy: "#8e9887", shape: "cone" }, ashwood: { canopy: "#e2e4e8", shape: "round" },
-};
-function drawTree(ctx: CanvasRenderingContext2D, camera: Camera, object: WorldObject, depleted: boolean, alpha: number, now: number) {
-  const z = camera.zoom, { x: sx, y: sy } = toScreen(camera, object.x, object.y), style = TREE_STYLE[object.tree!] ?? TREE_STYLE.tree;
-  ctx.globalAlpha = alpha;
-  ellipse(ctx, sx, sy + 2 * z, 18 * z, 7 * z, "rgba(22,22,22,0.12)", null);
-  if (depleted) { box(ctx, camera, object.x, object.y, 0.3, 0.3, 8, "#cdb9a0", "#9c8672", "#8a7563"); ctx.globalAlpha = 1; return { x: sx - 10 * z, y: sy - 16 * z, w: 20 * z, h: 20 * z }; }
-  const sway = Math.sin(now / 900 + object.x) * 1.2 * z, size = hash(object.x, object.y) * 0.25 + 0.9;
-  ctx.fillStyle = "#8a7563"; ctx.strokeStyle = INK; ctx.lineWidth = 1;
-  ctx.fillRect(sx - 3 * z, sy - 22 * z, 6 * z, 22 * z); ctx.strokeRect(sx - 3 * z, sy - 22 * z, 6 * z, 22 * z);
-  const top = sy - 22 * z;
-  if (style.shape === "cone") {
-    for (let i = 0; i < 3; i++) poly(ctx, [[sx + sway, top - (46 - i * 12) * z * size], [sx + (20 - i * 2) * z * size, top + (4 - i * 12) * z], [sx - (20 - i * 2) * z * size, top + (4 - i * 12) * z]], shade(style.canopy, i * 0.03));
-  } else if (style.shape === "willow") {
-    ellipse(ctx, sx + sway, top - 10 * z * size, 22 * z * size, 16 * z * size, style.canopy);
-    ctx.strokeStyle = shade(style.canopy, -0.2); ctx.lineWidth = 1.2 * z;
-    ctx.beginPath(); for (let i = -3; i <= 3; i++) { ctx.moveTo(sx + i * 6 * z + sway, top - 4 * z); ctx.quadraticCurveTo(sx + i * 7 * z + sway * 2, top + 10 * z, sx + i * 7 * z + sway * 2.5, top + 16 * z); } ctx.stroke();
-  } else {
-    const r = (style.shape === "broad" ? 24 : 19) * z * size;
-    ellipse(ctx, sx - r * 0.45 + sway, top - r * 0.2, r * 0.7, r * 0.6, style.canopy);
-    ellipse(ctx, sx + r * 0.45 + sway, top - r * 0.25, r * 0.7, r * 0.6, style.canopy);
-    ellipse(ctx, sx + sway, top - r * 0.75, r * 0.8, r * 0.7, shade(style.canopy, 0.04));
-    ctx.fillStyle = "rgba(255,255,255,0.35)"; ctx.fillRect(sx - r * 0.3 + sway, top - r * 1.05, 4 * z, 2 * z);
-  }
-  ctx.globalAlpha = 1;
-  return { x: sx - 24 * z, y: sy - 80 * z, w: 48 * z, h: 82 * z };
+/** Pixel art scale: two world pixels per art pixel. */
+const ART = 2;
+function drawTree(ctx: CanvasRenderingContext2D, camera: Camera, object: WorldObject, depleted: boolean, alpha: number, shake: number) {
+  const z = camera.zoom, { x: sx, y: sy } = toScreen(camera, object.x, object.y), variant = Math.floor(hash(object.x, object.y) * 4);
+  ellipse(ctx, sx, sy + 1 * z, (depleted ? 9 : 17) * z, (depleted ? 4 : 7) * z, "rgba(22,22,22,0.14)", null);
+  return drawPixels(ctx, treeArt(object.tree!, variant, depleted), sx + shake * z, sy + 3 * z, ART * z, alpha);
 }
 function drawRock(ctx: CanvasRenderingContext2D, camera: Camera, object: WorldObject, depleted: boolean) {
   const z = camera.zoom, { x: sx, y: sy } = toScreen(camera, object.x, object.y), rock = ROCKS[object.rock!];
-  const r = (hash(object.x, object.y) * 0.3 + 0.85) * z;
-  poly(ctx, [[sx - 20 * r, sy + 2 * z], [sx - 16 * r, sy - 14 * r], [sx - 4 * r, sy - 22 * r], [sx + 12 * r, sy - 18 * r], [sx + 20 * r, sy - 4 * r], [sx + 14 * r, sy + 5 * z], [sx - 8 * r, sy + 7 * z]], depleted ? "#b3aea6" : "#a39e96");
-  poly(ctx, [[sx - 4 * r, sy - 22 * r], [sx + 12 * r, sy - 18 * r], [sx + 6 * r, sy - 8 * r], [sx - 8 * r, sy - 10 * r]], depleted ? "#c3beb6" : "#bab5ad");
-  if (!depleted) for (const [ox, oy] of [[-8, -8], [6, -12], [10, -3], [-2, -2]]) ellipse(ctx, sx + ox * r, sy + oy * r, 3 * r, 2.4 * r, rock.color, INK, 0.8);
-  return { x: sx - 22 * z, y: sy - 26 * z, w: 44 * z, h: 34 * z };
+  ellipse(ctx, sx, sy + 2 * z, 18 * z, 6 * z, "rgba(22,22,22,0.14)", null);
+  return drawPixels(ctx, rockArt(rock.color, Math.floor(hash(object.x, object.y) * 3), depleted), sx, sy + 5 * z, ART * z);
 }
 function drawSpot(ctx: CanvasRenderingContext2D, camera: Camera, object: WorldObject, now: number, reduced: boolean) {
   const z = camera.zoom, { x: sx, y: sy } = toScreen(camera, object.x, object.y), t = reduced ? 0.5 : (now / 1400 + hash(object.x, object.y)) % 1;
@@ -335,6 +360,13 @@ function drawStation(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldO
 function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObject, alpha: number) {
   const { camera, now } = scene, z = camera.zoom, { x: sx, y: sy } = toScreen(camera, object.x, object.y), ox = object.x, oy = object.y, h = hash(ox, oy);
   const hit = (height: number, w = 36) => ({ x: sx - w / 2 * z, y: sy - height * z, w: w * z, h: (height + 10) * z });
+  const frame = object.decor === "torch" ? Math.floor(now / 160 + ox) % 2 : object.decor === "reeds" ? Math.floor(now / 900 + ox) % 2 : 0;
+  const art = scene.reducedMotion || object.decor !== "torch" ? decorArt(object.decor!, Math.floor(h * 3), frame) : decorArt("torch", 0, frame);
+  if (art) {
+    if (object.decor === "torch" || object.decor === "lamp") ellipse(ctx, sx, sy - (object.decor === "lamp" ? 54 : 36) * z, 16 * z, 11 * z, `rgba(242,220,160,${0.16 + Math.sin(now / 300 + ox) * 0.04})`, null);
+    else ellipse(ctx, sx, sy + 1 * z, art.width * z * 0.8, 4 * z, "rgba(22,22,22,0.12)", null);
+    return drawPixels(ctx, art, sx, sy + 2 * z, ART * z, alpha);
+  }
   ctx.globalAlpha = alpha;
   try {
     switch (object.decor) {
@@ -391,74 +423,7 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
   } finally { ctx.globalAlpha = 1; }
 }
 function drawIcon(ctx: CanvasRenderingContext2D, icon: Icon, x: number, y: number, size: number) {
-  // Tiny item art for ground items (the inventory uses the same shapes via drawItemIcon).
-  drawItemShape(ctx, icon, x - size / 2, y - size / 2, size);
-}
-
-/** Item icons for the inventory, bank, shops and ground: simple ink shapes in the item's colour. */
-export function drawItemShape(ctx: CanvasRenderingContext2D, icon: Icon, x: number, y: number, size: number) {
-  const s = size / 32, P = (px: number, py: number) => [x + px * s, y + py * s] as const, color = icon.color, accent = icon.accent ?? INK;
-  ctx.lineJoin = "round"; ctx.lineWidth = Math.max(1, 1.4 * s);
-  const line = (points: [number, number][], stroke = INK, width = 2.2) => { ctx.strokeStyle = stroke; ctx.lineWidth = width * s; ctx.beginPath(); points.forEach(([px, py], i) => i ? ctx.lineTo(x + px * s, y + py * s) : ctx.moveTo(x + px * s, y + py * s)); ctx.stroke(); };
-  const e = (cx: number, cy: number, rx: number, ry: number, fill: string, stroke: string | null = INK) => ellipse(ctx, x + cx * s, y + cy * s, rx * s, ry * s, fill, stroke, 1.2 * s);
-  const p = (points: [number, number][], fill: string) => poly(ctx, points.map(([px, py]) => P(px, py)), fill, INK, 1.2 * s);
-  switch (icon.shape) {
-    case "coins": e(12, 20, 7, 3.5, color); e(18, 17, 7, 3.5, color); e(15, 13, 7, 3.5, shade(color, 0.08)); break;
-    case "axe": line([[10, 26], [20, 8]], "#8a7563", 3); p([[16, 6], [26, 8], [24, 16], [19, 13]], color); break;
-    case "pickaxe": line([[12, 27], [18, 9]], "#8a7563", 3); p([[6, 11], [16, 5], [28, 8], [18, 10]], color); break;
-    case "sword": line([[8, 26], [24, 8]], INK, 5); line([[8, 26], [24, 8]], color, 3); line([[7, 19], [15, 27]], INK, 3); break;
-    case "dagger": line([[10, 24], [22, 12]], INK, 5); line([[10, 24], [22, 12]], color, 3); line([[8, 20], [14, 26]], INK, 3); break;
-    case "scimitar": ctx.strokeStyle = INK; ctx.lineWidth = 5 * s; ctx.beginPath(); ctx.moveTo(x + 9 * s, y + 25 * s); ctx.quadraticCurveTo(x + 14 * s, y + 8 * s, x + 26 * s, y + 6 * s); ctx.stroke(); ctx.strokeStyle = color; ctx.lineWidth = 3 * s; ctx.stroke(); line([[6, 21], [13, 27]], INK, 3); break;
-    case "helm": p([[8, 22], [8, 12], [16, 6], [24, 12], [24, 22]], color); line([[11, 16], [21, 16]], INK, 2); break;
-    case "cowl": p([[8, 24], [9, 11], [16, 6], [23, 11], [24, 24], [16, 20]], color); break;
-    case "hat": p([[6, 24], [26, 24], [18, 20], [16, 4], [14, 20]], color); break;
-    case "crown": p([[7, 24], [7, 12], [11, 17], [16, 9], [21, 17], [25, 12], [25, 24]], color); if (icon.accent) e(16, 19, 2, 2, accent, null); break;
-    case "body": p([[9, 8], [23, 8], [28, 14], [24, 17], [23, 27], [9, 27], [8, 17], [4, 14]], color); break;
-    case "legs": p([[9, 6], [23, 6], [24, 28], [18, 28], [16, 14], [14, 28], [8, 28]], color); break;
-    case "shield": p([[8, 7], [24, 7], [24, 17], [16, 28], [8, 17]], color); line([[16, 9], [16, 24]], INK, 1.5); break;
-    case "boots": p([[8, 10], [15, 10], [15, 22], [24, 22], [24, 27], [8, 27]], color); break;
-    case "gloves": p([[10, 26], [9, 12], [12, 8], [14, 12], [16, 7], [19, 12], [22, 10], [23, 26]], color); break;
-    case "vambrace": p([[9, 8], [23, 10], [22, 26], [10, 24]], color); line([[10, 14], [22, 16]], INK, 1.5); break;
-    case "cape": p([[10, 6], [22, 6], [27, 27], [5, 27]], color); if (icon.accent) line([[10, 20], [22, 20]], accent, 2); break;
-    case "amulet": ctx.strokeStyle = "#c9b77f"; ctx.lineWidth = 1.5 * s; ctx.beginPath(); ctx.arc(x + 16 * s, y + 12 * s, 8 * s, 0.2, Math.PI - 0.2); ctx.stroke(); e(16, 22, 4, 4.5, color); break;
-    case "log": e(10, 18, 4, 6, "#e8d9c8"); p([[10, 12], [24, 9], [26, 15], [24, 21], [10, 24]], color); e(10, 18, 4, 6, "#e8d9c8"); e(10, 18, 1.5, 2.5, shade(color, -0.1), null); break;
-    case "fish": p([[5, 16], [12, 10], [22, 12], [27, 16], [22, 20], [12, 22]], color); p([[24, 16], [30, 10], [30, 22]], color); e(10, 15, 1.2, 1.2, INK, null); break;
-    case "ore": p([[7, 22], [9, 12], [17, 7], [25, 12], [26, 22], [17, 27]], "#a39e96"); e(13, 15, 3, 2.5, color); e(20, 20, 3, 2.5, color); e(19, 12, 2, 1.8, color); break;
-    case "bar": p([[5, 18], [11, 12], [27, 12], [21, 18]], shade(color, 0.08)); p([[5, 18], [21, 18], [21, 24], [5, 24]], color); p([[21, 18], [27, 12], [27, 18], [21, 24]], shade(color, -0.1)); break;
-    case "bones": line([[8, 24], [24, 8]], INK, 5); line([[8, 24], [24, 8]], color, 3); e(7, 22, 3, 3, color); e(10, 26, 3, 3, color); e(22, 6, 3, 3, color); e(26, 10, 3, 3, color); break;
-    case "rune": p([[8, 10], [16, 5], [24, 10], [24, 22], [16, 27], [8, 22]], "#c8c5be"); e(16, 16, 4.5, 4.5, color); break;
-    case "staff": line([[8, 28], [22, 6]], INK, 4); line([[8, 28], [22, 6]], "#9c8672", 2.5); e(23, 5, 4, 4, icon.accent ?? color); break;
-    case "net": ctx.strokeStyle = INK; ctx.lineWidth = 1 * s; for (let i = 0; i < 4; i++) { line([[8 + i * 5, 8], [8 + i * 5, 26]], "#6d6b67", 1); line([[6, 10 + i * 5], [26, 10 + i * 5]], "#6d6b67", 1); } line([[4, 28], [10, 22]], "#8a7563", 3); break;
-    case "rod": line([[6, 28], [26, 4]], INK, 3); line([[6, 28], [26, 4]], color, 1.8); line([[26, 4], [28, 20]], "#6d6b67", 0.8); break;
-    case "harpoon": line([[6, 28], [24, 6]], INK, 3.5); line([[6, 28], [24, 6]], color, 2); p([[24, 6], [28, 3], [26, 10]], color); break;
-    case "pot": p([[9, 12], [23, 12], [25, 22], [20, 27], [12, 27], [7, 22]], color); e(16, 12, 7, 2.5, shade(color, -0.1)); break;
-    case "bucket": p([[8, 12], [24, 12], [21, 27], [11, 27]], color); e(16, 12, 8, 2.5, shade(color, -0.1)); ctx.strokeStyle = INK; ctx.beginPath(); ctx.arc(x + 16 * s, y + 12 * s, 8 * s, Math.PI, 0); ctx.stroke(); break;
-    case "milk": p([[8, 12], [24, 12], [21, 27], [11, 27]], "#9c8672"); e(16, 12, 8, 2.5, color); break;
-    case "flour": p([[9, 12], [23, 12], [25, 22], [20, 27], [12, 27], [7, 22]], "#b89c86"); e(16, 11, 7, 3, color); break;
-    case "egg": e(16, 17, 7, 9, color); break;
-    case "wheat": for (let i = -1; i <= 1; i++) { line([[16 + i * 4, 28], [16 + i * 6, 8]], "#8a7563", 1.2); e(16 + i * 6, 9, 2.5, 5, color); } break;
-    case "tinderbox": p([[7, 12], [25, 12], [25, 24], [7, 24]], color); e(21, 18, 2.5, 2.5, "#e3a58c"); break;
-    case "hammer": line([[10, 28], [18, 10]], "#8a7563", 3); p([[11, 6], [25, 10], [23, 16], [10, 12]], color); break;
-    case "knife": line([[8, 26], [14, 20]], "#8a7563", 4); p([[14, 20], [26, 6], [18, 22]], color); break;
-    case "needle": line([[8, 26], [24, 8]], color, 2); e(23, 9, 1.8, 1.8, "#fff"); break;
-    case "thread": e(16, 16, 8, 8, color); line([[10, 12], [22, 20]], "#6d6b67", 1); line([[10, 18], [22, 14]], "#6d6b67", 1); break;
-    case "chisel": line([[8, 26], [18, 16]], "#8a7563", 4); p([[18, 16], [26, 6], [22, 18]], color); break;
-    case "gem": p([[8, 14], [13, 8], [19, 8], [24, 14], [16, 26]], color); line([[8, 14], [24, 14]], INK, 1); break;
-    case "hide": p([[6, 10], [14, 7], [22, 8], [27, 14], [24, 25], [12, 27], [5, 20]], color); e(12, 15, 3, 2.5, accent, null); e(20, 20, 2.5, 2, accent, null); break;
-    case "leather": p([[7, 10], [25, 8], [26, 24], [8, 26]], color); break;
-    case "meat": e(16, 17, 10, 7, color); line([[24, 11], [29, 6]], "#f2efe8", 3); break;
-    case "feather": line([[8, 26], [24, 6]], "#8a7563", 1.2); p([[10, 22], [14, 12], [22, 6], [20, 16]], color); break;
-    case "bait": for (const [bx, by] of [[10, 14], [18, 12], [14, 21], [22, 20]]) e(bx, by, 3.5, 2.2, color); break;
-    case "cake": p([[6, 18], [16, 12], [26, 18], [26, 25], [16, 30], [6, 25]], color); p([[6, 18], [16, 12], [26, 18], [16, 23]], accent); break;
-    case "bread": e(16, 18, 11, 7, color); line([[10, 16], [13, 20]], INK, 1); line([[16, 15], [19, 19]], INK, 1); break;
-    case "key": e(10, 12, 5, 5, color); line([[13, 15], [25, 27]], color, 3); line([[21, 23], [24, 20]], color, 2.5); break;
-    case "lamp": p([[8, 22], [24, 22], [20, 14], [12, 14]], color); e(16, 11, 3, 3, "#fff"); break;
-    case "scroll": p([[8, 8], [24, 8], [24, 26], [8, 26]], color); line([[11, 13], [21, 13]], INK, 1); line([[11, 18], [21, 18]], INK, 1); break;
-    case "silk": p([[6, 12], [26, 8], [26, 22], [6, 26]], color); line([[8, 16], [24, 13]], "#fff", 1); break;
-    case "burnt": e(16, 18, 10, 6, color); break;
-    case "orb": e(16, 16, 9, 9, color); e(13, 13, 3, 3, "#fff", null); break;
-    case "trophy": p([[10, 6], [22, 6], [20, 16], [12, 16]], color); line([[16, 16], [16, 24]], INK, 2); p([[10, 24], [22, 24], [22, 28], [10, 28]], color); break;
-  }
+  drawPixels(ctx, itemArt(icon), x, y + size / 2, size / 26);
 }
 
 // ---------- Characters ----------
@@ -516,15 +481,21 @@ export function pickAt(x: number, y: number): Pick[] {
   }
   return out;
 }
+let lastFrame = 0;
 export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   const { game, camera, now } = scene, world = game.world, z = camera.zoom;
   const alpha = Math.max(0, Math.min(1, (now - scene.tickAt) / TICK_MS));
   const underground = game.player.y >= 200;
+  setGround(world); camera.base = groundHeight(world, camera.x, camera.y);
+  const dt = Math.min(0.05, Math.max(0, (now - (lastFrame || now)) / 1000)); lastFrame = now;
+  const project = (x: number, y: number, lift = 0) => toScreen(camera, x, y, lift);
+  updateEffects(game, camera, dt, scene.reducedMotion, 34 / Math.max(0.5, z));
   ctx.fillStyle = underground ? "#0e0e10" : "#8fa1b5"; ctx.fillRect(0, 0, VIEW.width, VIEW.height);
   // Visible tile bounds.
   const corners = [toTile(camera, 0, 0), toTile(camera, VIEW.width, 0), toTile(camera, 0, VIEW.height), toTile(camera, VIEW.width, VIEW.height)];
   const x0 = Math.min(...corners.map(c => c.x)) - 2, x1 = Math.max(...corners.map(c => c.x)) + 3, y0 = Math.min(...corners.map(c => c.y)) - 2, y1 = Math.max(...corners.map(c => c.y)) + 3;
   drawTerrain(ctx, scene, x0, y0, x1, y1);
+  drawCloudShadows(ctx, project, camera, now, z, underground, scene.reducedMotion);
   const hits: Hit[] = [], drawables: Drawable[] = [];
   const player = game.player, pp = interpolate(player, game, alpha), playerDepth = depthOf(camera, pp.x, pp.y), depth = (x: number, y: number) => depthOf(camera, x, y);
   const playerFacing = screenFacing(camera, player.heading);
@@ -540,7 +511,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
       drawables.push({ depth: d, draw: () => {
         const height = terrain === T.WALL ? (y >= 200 ? 34 : 26) : 22;
         ctx.globalAlpha = near ? 0.28 : 1;
-        if (terrain === T.WALL) box(ctx, camera, x, y, 1, 1, height, y >= 200 ? "#4a4950" : "#b9b4ab", y >= 200 ? "#3a3940" : "#a39e95", y >= 200 ? "#2f2e35" : "#8f8a82");
+        if (terrain === T.WALL) box(ctx, camera, x, y, 1, 1, height, y >= 200 ? "#4a4950" : "#b9b4ab", y >= 200 ? "#3a3940" : "#a39e95", y >= 200 ? "#2f2e35" : "#8f8a82", 0, INK, "brick");
         else box(ctx, camera, x, y, 1, 1, height + hash(x, y) * 10, "#a39e96", "#8f8a83", "#7c7771");
         ctx.globalAlpha = 1;
       } });
@@ -552,7 +523,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
       let rect: { x: number; y: number; w: number; h: number };
       const tall = object.kind === "tree" || (object.kind === "decor" && ["pine", "windmill", "palm", "pillar", "tent"].includes(object.decor!));
       const fade = tall && d > playerDepth + 0.5 && Math.abs(x - pp.x) + Math.abs(y - pp.y) < 4 ? 0.4 : 1;
-      if (object.kind === "tree") rect = drawTree(ctx, camera, object, game.depleted.has(object.id), fade, scene.reducedMotion ? 0 : now);
+      if (object.kind === "tree") rect = drawTree(ctx, camera, object, game.depleted.has(object.id), fade, scene.reducedMotion ? 0 : treeShake(game, object.id, now));
       else if (object.kind === "rock") rect = drawRock(ctx, camera, object, game.depleted.has(object.id));
       else if (object.kind === "spot") rect = drawSpot(ctx, camera, object, now, scene.reducedMotion);
       else if (object.kind === "decor") rect = drawDecor(ctx, scene, object, fade);
@@ -609,16 +580,20 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     } });
   }
   // The player.
+  const pose = playerPose(game, now, project, scene.reducedMotion);
   drawables.push({ depth: playerDepth + 0.15, draw: () => {
-    const s = toScreen(camera, pp.x, pp.y), px = 3.2 * z, walking = pp.moving || (!!player.path.length && alpha < 1);
-    ellipse(ctx, s.x, s.y, 15 * z, 6 * z, "rgba(22,22,22,0.2)", "rgba(255,255,255,0.75)", 1.5);
-    drawWardrobe(ctx, player.worn, s.x, s.y, px, "back", now, playerFacing);
-    if (scene.friend) drawMask(ctx, friendRows(scene.friend, playerFacing, walking, walking ? Math.floor(now / 80) % 8 : 0), s.x, s.y + 2 * z, px);
-    else ellipse(ctx, s.x, s.y - 20 * z, 12 * z, 16 * z, INK);
-    drawWardrobe(ctx, player.worn, s.x, s.y, px, "front", now, playerFacing);
-    drawWeapon(ctx, scene, s.x, s.y, px);
-    const activityPose = player.activity && ["woodcut", "mine", "fish", "cook", "produce"].includes(player.activity.kind);
-    if (activityPose && !scene.reducedMotion) { const bob = Math.sin(now / 120) * 3 * z; ellipse(ctx, s.x + 16 * z, s.y - 30 * z + bob, 2 * z, 2 * z, "rgba(22,22,22,0.4)", null); }
+    // Agility: glide from the start to the landing with a hop.
+    let at = pp;
+    if (player.activity?.kind === "obstacle") { const a = player.activity, total = world.objects[a.objectId].obstacle?.ticks ?? 3, k = Math.max(0, Math.min(1, 1 - (a.timer - alpha) / total)); at = { x: a.from.x + (a.to.x - a.from.x) * k, y: a.from.y + (a.to.y - a.from.y) * k, moving: true }; }
+    const s = toScreen(camera, at.x, at.y, pose.hop), feet = toScreen(camera, at.x, at.y), px = 3.2 * z, walking = at.moving || (!!player.path.length && alpha < 1);
+    const facing: Facing = pose.target ? (pose.side < 0 ? "left" : "right") : playerFacing;
+    ellipse(ctx, feet.x, feet.y, 15 * z, 6 * z, "rgba(22,22,22,0.2)", "rgba(255,255,255,0.75)", 1.5);
+    const bodyY = s.y - pose.bob * z;
+    drawWardrobe(ctx, player.worn, s.x, bodyY, px, "back", now, facing);
+    if (scene.friend) drawMask(ctx, friendRows(scene.friend, facing, walking, walking ? Math.floor(now / 80) % 8 : 0), s.x, bodyY + 2 * z, px, INK, false, pose.alpha);
+    else ellipse(ctx, s.x, bodyY - 20 * z, 12 * z, 16 * z, INK);
+    drawWardrobe(ctx, player.worn, s.x, bodyY, px, "front", now, facing);
+    drawHeld(ctx, scene, pose, s.x, bodyY, px, facing, project);
     if (player.hp < maxHpOf(game) || game.monsters.some(monster => monster.target && !monster.dead)) hpBar(ctx, s.x, s.y - 62 * z, player.hp / maxHpOf(game), z);
     for (const hit of scene.hits.filter(entry => entry.on === "player" && now - entry.at < 1100)) splat(ctx, s.x, s.y - 30 * z, hit.damage, z, (now - hit.at) / 1100);
     if (scene.chat && scene.chat.until > now) overheadText(ctx, scene.chat.text, s.x, s.y - 66 * z);
@@ -639,6 +614,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     const px = a.x + (b.x - a.x) * progress, py = a.y + (b.y - a.y) * progress - Math.sin(progress * Math.PI) * 20 * z;
     ellipse(ctx, px, py, 8 * z, 8 * z, `${projectile.color}88`, null); ellipse(ctx, px, py, 4 * z, 4 * z, projectile.color, INK);
   }
+  drawEffects(ctx, project, world, now, z);
   // Click marker: an old-school cross, yellow for walking, red for actions.
   if (scene.marker && now - scene.marker.at < 450) {
     const s = toScreen(camera, scene.marker.x, scene.marker.y), k = 1 - (now - scene.marker.at) / 450, r = 8 * z * (0.6 + k * 0.4);
@@ -653,12 +629,27 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   lastHits = hits;
 }
 const maxHpOf = (game: Game) => levelForXp(game.player.xp.hitpoints);
-function drawWeapon(ctx: CanvasRenderingContext2D, scene: Scene, x: number, y: number, px: number) {
-  const player = scene.game.player, weaponId = player.equipment.weapon;
-  if (!weaponId) return;
-  const icon = item(weaponId).icon, attacking = player.combat !== null && player.attackTimer >= 2;
-  const side = screenFacing(scene.camera, player.heading) === "left" ? -1 : 1, swing = attacking && !scene.reducedMotion ? Math.sin(scene.now / 60) * 0.6 : 0;
-  ctx.save(); ctx.translate(x + side * 7 * px, y - 7 * px); ctx.rotate(side * (0.5 + swing)); drawItemShape(ctx, icon, -5 * px, -9 * px, 10 * px); ctx.restore();
+/** What the player holds: a skilling tool mid-swing, a fishing line, or their weapon (swinging when they attack). */
+function drawHeld(ctx: CanvasRenderingContext2D, scene: Scene, pose: Pose, x: number, y: number, px: number, facing: Facing, project: (x: number, y: number, lift?: number) => { x: number; y: number }) {
+  const player = scene.game.player, side = facing === "left" ? -1 : 1, alpha = Math.max(0, Math.min(1, (scene.now - scene.tickAt) / TICK_MS));
+  let id = pose.tool, angle = pose.angle;
+  if (!id && player.equipment.weapon) {
+    id = player.equipment.weapon;
+    const attacking = player.combat !== null && player.attackTimer === attackSpeed(player);
+    angle = attacking && !scene.reducedMotion ? -1.4 + Math.min(1, alpha * 1.6) * 2.3 : 0.25;
+  }
+  if (!id) return;
+  const art = itemArt(item(id).icon), size = 12 * px, hx = x + side * (6 + pose.reach * 6) * px, hy = y - 7 * px;
+  ctx.save(); ctx.translate(hx, hy); ctx.scale(side, 1); ctx.rotate(angle + 0.5); ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(art, -size * 0.25, -size * 0.78, size, size);
+  ctx.restore();
+  if (pose.line && pose.target) {
+    // Rod tip (the art's top-right, rotated with the rod) to a bobber on the spot.
+    const turn = angle + 0.5, tipX = hx + side * (Math.cos(turn) * size * 0.55 + Math.sin(turn) * size * 0.55), tipY = hy + (Math.sin(turn) * size * 0.55 - Math.cos(turn) * size * 0.55);
+    const spot = project(pose.target.x, pose.target.y), bob = scene.reducedMotion ? 0 : Math.sin(scene.now / 300) * 1.5;
+    ctx.strokeStyle = "rgba(22,22,22,0.7)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(tipX, tipY); ctx.quadraticCurveTo((tipX + spot.x) / 2, Math.max(tipY, spot.y) + 10, spot.x, spot.y - 2 + bob); ctx.stroke();
+    ctx.fillStyle = "#cf6e6e"; ctx.fillRect(spot.x - 1.5, spot.y - 4 + bob, 3, 3); ctx.fillStyle = "#ffffff"; ctx.fillRect(spot.x - 1.5, spot.y - 5 + bob, 3, 1);
+  }
 }
 function drawNpc(ctx: CanvasRenderingContext2D, scene: Scene, npc: Npc, at: { x: number; y: number; moving: boolean }, hits: Hit[]) {
   const { camera, now, game } = scene, z = camera.zoom, s = toScreen(camera, at.x, at.y), def = NPCS[npc.id];

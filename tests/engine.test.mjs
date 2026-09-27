@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   buy, canWalk, castSpell, chooseOption, collectFromCasket, continueDialogue, createGame, equip, findPath, itemOptions, menuFor, restore, sell,
   serialize, setFollower, setRelics, setTarget, smeltingRecipes, smithingRecipes, startProduction, tick, togglePrayer, useItemOnItem, walkTo, setHeld,
-  successChance, hitChance, unlockMusic,
+  successChance, hitChance, unlockMusic, castOnItem, isBound,
 } from "../games/rarefriends-realm/engine.ts";
 import { ITEM_LIST, MONSTERS, SHOPS, SKILLS, SPELLS, TREES, XP_RATE, XP_TABLE, item, levelForXp } from "../games/rarefriends-realm/data.ts";
 import { NPCS, QUESTS, MAX_QUEST_POINTS, questPoints } from "../games/rarefriends-realm/content.ts";
@@ -66,7 +66,7 @@ test("a fresh adventurer: level 3, 10 hitpoints, a starter kit", () => {
   assert.equal(combatLevel(g.player), 3);
   assert.equal(level(g, "hitpoints"), 10);
   assert.equal(g.player.hp, 10);
-  for (const id of ["bronze_axe", "bronze_pickaxe", "small_net", "tinderbox"]) assert(has(g.player, id), id);
+  for (const id of ["pewter_axe", "pewter_pickaxe", "small_net", "tinderbox"]) assert(has(g.player, id), id);
   assert.equal(SKILLS.length, 15);
 });
 
@@ -142,9 +142,9 @@ test("right-click menus list every option in old-school order", () => {
   const chicken = g.monsters.find(monster => monster.def.id === "chicken");
   assert.equal(menuFor(g, [{ kind: "monster", id: chicken.uid }], null)[0].noun, "Chicken  (level-1)");
   // Use item -> object.
-  const slot = g.player.inventory.findIndex(entry => entry?.id === "shrimps");
+  const slot = g.player.inventory.findIndex(entry => entry?.id === "minnows");
   const use = menuFor(g, [{ kind: "object", id: tree.id }], null, { kind: "item", slot });
-  assert.equal(use[0].verb, "Use Shrimps ->");
+  assert.equal(use[0].verb, "Use Minnows ->");
   assert.deepEqual(itemOptions(g, slot).map(option => option.verb), ["Eat", "Use", "Drop", "Examine"]);
 });
 
@@ -163,54 +163,54 @@ test("woodcutting, firemaking and cooking: the classic loop", () => {
   itemOptions(g, logs).find(option => option.verb === "Light").run(g);
   until(g, () => g.fires.length === 1, 60);
   assert(g.player.xp.firemaking > 0);
-  // Cook a raw shrimp on it.
-  give(g.player, "raw_shrimps", 3);
+  // Cook raw minnows on it.
+  give(g.player, "raw_minnows", 3);
   const fire = g.fires[0];
   setTarget(g, { kind: "fire", uid: fire.uid, option: "Cook" });
-  until(g, () => !has(g.player, "raw_shrimps"), 200);
-  assert(count(g.player, "shrimps") + count(g.player, "burnt_food") >= 5, "Cooked (or burnt) all three");
+  until(g, () => !has(g.player, "raw_minnows"), 200);
+  assert(count(g.player, "minnows") + count(g.player, "burnt_food") >= 5, "Cooked (or burnt) all three");
   assert(g.player.xp.cooking > 0);
 });
 
-test("fishing shrimps at Glass Lake", () => {
+test("fishing minnows at Glass Lake", () => {
   const g = newGame();
   const spot = g.world.objects.find(object => object.kind === "spot" && object.spot === "net");
   standBy(g, spot);
   menuFor(g, [{ kind: "object", id: spot.id }], null)[0].run(g);
-  until(g, () => has(g.player, "raw_shrimps"), 400);
+  until(g, () => has(g.player, "raw_minnows"), 400);
   assert(g.player.xp.fishing >= 10 * XP_RATE);
 });
 
-test("mining, smelting and smithing a bronze dagger", () => {
+test("mining, smelting and smithing a pewter dagger", () => {
   const g = newGame();
   give(g.player, "hammer");
-  for (const kind of ["copper", "tin"]) {
+  for (const kind of ["pewter"]) {
     const rock = g.world.objects.find(object => object.kind === "rock" && object.rock === kind);
     standBy(g, rock);
     setTarget(g, { kind: "object", id: rock.id, option: "Mine" });
     until(g, () => has(g.player, `${kind}_ore`), 600);
   }
-  assert(g.player.xp.mining >= 17.5 * XP_RATE * 2);
+  assert(g.player.xp.mining >= 17.5 * XP_RATE);
   const furnace = g.world.objects.find(object => object.kind === "furnace");
   standBy(g, furnace);
   setTarget(g, { kind: "object", id: furnace.id, option: "Smelt" });
   until(g, () => g.ui.production !== null, 50);
   startProduction(g, smeltingRecipes()[0], 1);
-  until(g, () => has(g.player, "bronze_bar"), 50);
+  until(g, () => has(g.player, "pewter_bar"), 50);
   const anvil = g.world.objects.find(object => object.kind === "anvil");
   standBy(g, anvil);
   setTarget(g, { kind: "object", id: anvil.id, option: "Smith" });
   until(g, () => g.ui.production !== null, 50);
-  startProduction(g, smithingRecipes("bronze").find(recipe => recipe.label === "Bronze dagger"), 1);
-  until(g, () => count(g.player, "bronze_dagger") === 2, 50);
-  assert(g.player.xp.smithing >= (6.2 + 12.5) * XP_RATE);
+  startProduction(g, smithingRecipes("pewter").find(recipe => recipe.label === "Pewter dagger"), 1);
+  until(g, () => count(g.player, "pewter_dagger") === 2, 50);
+  assert(g.player.xp.smithing >= (8 + 12.5) * XP_RATE);
 });
 
 test("combat: equip a sword, kill a chicken, loot and bury its bones", () => {
   const g = newGame();
-  give(g.player, "bronze_sword");
-  equip(g, g.player.inventory.findIndex(slot => slot?.id === "bronze_sword"));
-  assert.equal(g.player.equipment.weapon, "bronze_sword");
+  give(g.player, "pewter_sword");
+  equip(g, g.player.inventory.findIndex(slot => slot?.id === "pewter_sword"));
+  assert.equal(g.player.equipment.weapon, "pewter_sword");
   const chicken = g.monsters.find(monster => monster.def.id === "chicken");
   teleport(g, chicken.x + 1, chicken.y);
   setTarget(g, { kind: "monster", uid: chicken.uid, option: "Attack" });
@@ -276,7 +276,7 @@ test("Grumblin Trouble counts kills and pays out", () => {
   const g = newGame();
   g.player.quests.grumblin_trouble = 1; g.player.questData.grumblins = 0;
   g.player.xp.attack = XP_TABLE[40]; g.player.xp.strength = XP_TABLE[40]; g.player.xp.defence = XP_TABLE[40]; g.player.xp.hitpoints = XP_TABLE[40]; g.player.hp = 40;
-  give(g.player, "steel_scimitar"); equip(g, g.player.inventory.findIndex(slot => slot?.id === "steel_scimitar"));
+  give(g.player, "ashsteel_sabre"); equip(g, g.player.inventory.findIndex(slot => slot?.id === "ashsteel_sabre"));
   let kills = 0;
   for (const grumblin of g.monsters.filter(monster => monster.def.id === "grumblin").slice(0, 6)) {
     teleport(g, grumblin.x, grumblin.y + 1);
@@ -314,29 +314,74 @@ test("agility: a full lap of the Friendhollow course", () => {
   assert(g.player.xp.agility >= (perObstacle + 40) * XP_RATE, "Lap bonus paid");
 });
 
-test("magic: Wind Strike uses runes and trains Magic", () => {
+test("magic: Breeze Dart uses sigils and trains Magic", () => {
   const g = newGame();
-  give(g.player, "air_rune", 20); give(g.player, "mind_rune", 20);
+  give(g.player, "breeze_sigil", 20); give(g.player, "thought_sigil", 20);
   const rat = g.monsters.find(monster => monster.def.id === "ink_rat");
-  const selection = castSpell(g, "wind_strike");
-  assert.deepEqual(selection, { kind: "spell", spell: "wind_strike" });
+  const selection = castSpell(g, "breeze_dart");
+  assert.deepEqual(selection, { kind: "spell", spell: "breeze_dart" });
   teleport(g, rat.x + 3, rat.y);
   if (!canWalk(g, rat.x + 3, rat.y)) teleport(g, rat.x, rat.y + 3);
   menuFor(g, [{ kind: "monster", id: rat.uid }], null, selection)[0].run(g);
-  until(g, () => count(g.player, "air_rune") < 20, 40);
+  until(g, () => count(g.player, "breeze_sigil") < 20, 40);
   assert(g.player.xp.magic >= 5.5 * XP_RATE);
   assert(SPELLS.length >= 10);
+});
+
+test("magic utility: Gilded Touch, Forgeheart, enchanting, Far Reach, Bonebloom, Rootsnare and glides", () => {
+  const g = newGame();
+  g.player.xp.magic = XP_TABLE[60]; g.player.xp.smithing = XP_TABLE[30];
+  for (const [id, n] of [["bloom_sigil", 20], ["ember_sigil", 60], ["star_sigil", 5], ["tide_sigil", 30], ["stone_sigil", 30], ["path_sigil", 10], ["breeze_sigil", 20], ["shade_sigil", 5]]) give(g.player, id, n);
+  // Gilded Touch: 40% of value in coins.
+  give(g.player, "ashsteel_sabre");
+  const coins = count(g.player, "coins"), value = item("ashsteel_sabre").value;
+  assert.deepEqual(castSpell(g, "gilded_touch"), { kind: "spell", spell: "gilded_touch" });
+  assert(castOnItem(g, "gilded_touch", g.player.inventory.findIndex(slot => slot?.id === "ashsteel_sabre")));
+  assert.equal(count(g.player, "coins") - coins, Math.floor(value * 0.4));
+  // Forgeheart: blackiron ore + inkcoal → an ashsteel bar (the best the pack allows), with Smithing XP.
+  give(g.player, "blackiron_ore"); give(g.player, "inkcoal"); run(g, 4);
+  const smithing = g.player.xp.smithing;
+  assert(castOnItem(g, "forgeheart", g.player.inventory.findIndex(slot => slot?.id === "blackiron_ore")));
+  assert(has(g.player, "ashsteel_bar")); assert(g.player.xp.smithing > smithing);
+  // Enchant Moonstone.
+  give(g.player, "moonstone"); run(g, 4);
+  assert(castOnItem(g, "enchant_moonstone", g.player.inventory.findIndex(slot => slot?.id === "moonstone")));
+  assert(has(g.player, "moonstone_pendant"));
+  // Bonebloom.
+  give(g.player, "bones", 3);
+  castSpell(g, "bonebloom");
+  assert.equal(count(g.player, "bones"), 0); assert.equal(count(g.player, "sweetberry"), 3);
+  // Far Reach: take an item from several tiles away.
+  let spot = null;
+  for (let dx = 6; dx > 2 && !spot; dx--) if (canWalk(g, g.player.x + dx, g.player.y)) spot = { x: g.player.x + dx, y: g.player.y };
+  g.ground.push({ uid: 999, id: "rough_rosestone", n: 1, x: spot.x, y: spot.y, expires: g.tick + 100 });
+  const reach = castSpell(g, "far_reach");
+  menuFor(g, [{ kind: "ground", id: 999 }], null, reach)[0].run(g);
+  until(g, () => has(g.player, "rough_rosestone"), 20);
+  // Rootsnare roots a monster in place.
+  const rat = g.monsters.find(monster => monster.def.id === "ink_rat");
+  standNear(g, rat.x, rat.y, 3);
+  for (let tries = 0; tries < 8 && !isBound(g, rat); tries++) { menuFor(g, [{ kind: "monster", id: rat.uid }], null, castSpell(g, "bind"))[0].run(g); run(g, 6); }
+  assert(isBound(g, rat), "Rootsnare lands");
+  const at = { x: rat.x, y: rat.y }; run(g, 8);
+  assert.deepEqual({ x: rat.x, y: rat.y }, at, "a rooted monster doesn't move");
+  // Glide to Emberforge.
+  g.player.combat = null; castSpell(g, "glide_emberforge"); run(g, 6);
+  assert.deepEqual({ x: g.player.x, y: g.player.y }, g.world.places.emberforge);
+  // Townsfolk can't be targeted by spells.
+  const villager = g.npcs.find(npc => npc.id === "villager");
+  assert.equal(menuFor(g, [{ kind: "npc", id: villager.uid }], null, { kind: "spell", spell: "breeze_dart" }).length, 0);
 });
 
 test("prayer: bury, pray at the altar, activate a prayer, it drains", () => {
   const g = newGame();
   g.player.xp.prayer = XP_TABLE[10]; g.player.prayer = 10;
-  togglePrayer(g, "thick_skin");
-  assert.deepEqual(g.player.prayers, ["thick_skin"]);
+  togglePrayer(g, "paper_shield");
+  assert.deepEqual(g.player.prayers, ["paper_shield"]);
   run(g, 30);
   assert(g.player.prayer < 10);
-  togglePrayer(g, "rock_skin");
-  assert.deepEqual(g.player.prayers, ["rock_skin"], "Overlapping prayers swap");
+  togglePrayer(g, "stone_shield");
+  assert.deepEqual(g.player.prayers, ["stone_shield"], "Overlapping prayers swap");
 });
 
 test("shops and the bank", () => {
@@ -347,8 +392,8 @@ test("shops and the bank", () => {
   const coins = count(g.player, "coins");
   sell(g, "general", g.player.inventory.findIndex(slot => slot?.id === "hammer"), 1);
   assert(!has(g.player, "hammer")); assert(count(g.player, "coins") >= coins);
-  assert.equal(buy(g, "runes", "mind_rune", 50), 50);
-  assert.equal(count(g.player, "mind_rune"), 50);
+  assert.equal(buy(g, "sigils", "thought_sigil", 50), 50);
+  assert.equal(count(g.player, "thought_sigil"), 50);
   for (const shop of Object.values(SHOPS)) for (const id of shop.stock) assert(item(id), `${shop.name} stocks ${id}`);
 });
 
@@ -362,18 +407,18 @@ test("items: every item has art, a name and an examine; equipment has a slot", (
 
 test("saves round-trip, and tampered saves are cleaned", () => {
   const g = newGame();
-  g.player.xp.woodcutting = 5000; give(g.player, "oak_logs", 3); g.player.bank.push({ id: "iron_bar", n: 12 }); g.player.quests.cold_forge = 1;
+  g.player.xp.woodcutting = 5000; give(g.player, "oak_logs", 3); g.player.bank.push({ id: "blackiron_bar", n: 12 }); g.player.quests.cold_forge = 1;
   g.player.wardrobe.push("rose_cape"); g.player.worn.push("rose_cape");
   const save = JSON.parse(JSON.stringify(serialize(g)));
   const fresh = newGame();
   assert(restore(fresh, save));
   assert.equal(fresh.player.xp.woodcutting, 5000);
   assert.equal(count(fresh.player, "oak_logs"), 3);
-  assert.deepEqual(fresh.player.bank.find(slot => slot.id === "iron_bar"), { id: "iron_bar", n: 12 });
+  assert.deepEqual(fresh.player.bank.find(slot => slot.id === "blackiron_bar"), { id: "blackiron_bar", n: 12 });
   assert.equal(fresh.player.quests.cold_forge, 1);
   assert.deepEqual(fresh.player.worn, ["rose_cape"]);
   // Tampering: unknown items, impossible XP, a wall position and a different Friend.
-  const bad = { ...save, xp: { ...save.xp, attack: 9e99 }, inventory: [{ id: "godsword", n: 1 }, { id: "coins", n: -5 }], x: 0, y: 0, equipment: { weapon: "bronze_platebody" } };
+  const bad = { ...save, xp: { ...save.xp, attack: 9e99 }, inventory: [{ id: "godsword", n: 1 }, { id: "coins", n: -5 }], x: 0, y: 0, equipment: { weapon: "pewter_cuirass" } };
   const other = newGame();
   assert(restore(other, bad));
   assert.equal(other.player.xp.attack, 200_000_000);
@@ -407,6 +452,16 @@ test("owned Friends follow you and add XP by generation", () => {
   assert(Math.abs(xpMultiplier(g.player) - base * 1.01) < 1e-9);
 });
 
+test("saves from before the Realm's own names still load, renamed", () => {
+  const g = newGame();
+  const old = { ...serialize(g), inventory: [{ id: "bronze_scimitar", n: 1 }, { id: "air_rune", n: 40 }, { id: "raw_lobster", n: 1 }, { id: "iron_full_helm", n: 1 }], equipment: { weapon: "steel_scimitar" }, bank: [{ id: "coal", n: 9 }] };
+  const fresh = newGame();
+  assert(restore(fresh, old));
+  assert.deepEqual(fresh.player.inventory.slice(0, 4).map(slot => slot?.id), ["pewter_sabre", "breeze_sigil", "raw_inkcrab", "blackiron_helm"]);
+  assert.equal(fresh.player.equipment.weapon, "ashsteel_sabre");
+  assert.deepEqual(fresh.player.bank, [{ id: "inkcoal", n: 9 }]);
+});
+
 test("music unlocks the first time you enter an area, and saves", () => {
   const g = newGame();
   assert.deepEqual(g.player.music, ["theme"]);
@@ -428,7 +483,7 @@ test("use item on item: tinderbox on logs lights a fire, chisel cuts gems", () =
   give(g.player, "logs");
   useItemOnItem(g, g.player.inventory.findIndex(slot => slot?.id === "tinderbox"), g.player.inventory.findIndex(slot => slot?.id === "logs"));
   until(g, () => g.fires.length > 0, 40);
-  g.player.xp.crafting = XP_TABLE[20]; give(g.player, "chisel"); give(g.player, "uncut_sapphire");
-  useItemOnItem(g, g.player.inventory.findIndex(slot => slot?.id === "chisel"), g.player.inventory.findIndex(slot => slot?.id === "uncut_sapphire"));
-  until(g, () => has(g.player, "sapphire"), 20);
+  g.player.xp.crafting = XP_TABLE[20]; give(g.player, "chisel"); give(g.player, "rough_moonstone");
+  useItemOnItem(g, g.player.inventory.findIndex(slot => slot?.id === "chisel"), g.player.inventory.findIndex(slot => slot?.id === "rough_moonstone"));
+  until(g, () => has(g.player, "moonstone"), 20);
 });

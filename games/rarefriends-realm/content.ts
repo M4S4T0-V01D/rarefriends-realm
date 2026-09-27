@@ -21,8 +21,8 @@ export const NPCS: Record<string, NpcDef> = {
   shop_general: { id: "shop_general", name: "Shopkeeper", examine: "Sells a bit of everything.", options: ["Talk-to", "Trade"], shop: "general", art: art(2, 31) },
   pike: { id: "pike", name: "Pike", examine: "Smells faintly of bait.", options: ["Talk-to", "Trade"], shop: "fishing", art: art(3, 41) },
   axel: { id: "axel", name: "Axel", examine: "Sells axes. And pickaxes, grudgingly.", options: ["Talk-to", "Trade"], shop: "axes", art: art(6, 51) },
-  armsmaster: { id: "armsmaster", name: "Armsmaster Vey", examine: "Sells swords, shields and the odd platebody.", options: ["Talk-to", "Trade"], shop: "swords", art: art(4, 61) },
-  runa: { id: "runa", name: "Runa", examine: "Her shop hums.", options: ["Talk-to", "Trade"], shop: "runes", art: art(8, 71) },
+  armsmaster: { id: "armsmaster", name: "Armsmaster Vey", examine: "Sells swords, shields and the odd cuirass.", options: ["Talk-to", "Trade"], shop: "swords", art: art(4, 61) },
+  runa: { id: "runa", name: "Runa", examine: "Her shop hums.", options: ["Talk-to", "Trade"], shop: "sigils", art: art(8, 71) },
   tanner: { id: "tanner", name: "Tessa", examine: "The tanner. Her hands are stained brown.", options: ["Talk-to", "Trade", "Tan-hides"], shop: "crafting", art: art(2, 81) },
   captain: { id: "captain", name: "Captain Rook", examine: "Captain of the Hollow Hall guard.", options: ["Talk-to"], art: art(6, 91) },
   guard: { id: "guard", name: "Hall guard", examine: "He looks bored.", options: ["Talk-to", "Pickpocket"], art: art(0, 101),
@@ -75,8 +75,8 @@ export const QUESTS: readonly QuestDef[] = [
       const s = stage(game, "cold_forge");
       if (s === 0) return ["Brann the smith in Emberforge, north-east past the Ashen Hills, looks troubled."];
       if (s === 1) return ["Brann needs metal to wake his forge. Bring him:",
-        `${count(game.player, "bronze_bar") >= 3 ? "✓" : "•"} 3 bronze bars (copper + tin at a furnace)`,
-        `${count(game.player, "iron_bar") >= 2 ? "✓" : "•"} 2 iron bars (iron ore, Mining 15, Smithing 15)`];
+        `${count(game.player, "pewter_bar") >= 3 ? "✓" : "•"} 3 pewter bars (pewter ore at a furnace)`,
+        `${count(game.player, "blackiron_bar") >= 2 ? "✓" : "•"} 2 blackiron bars (blackiron ore, Mining 15, Smithing 15)`];
       return ["The Emberforge burns again. QUEST COMPLETE!"];
     },
   },
@@ -165,7 +165,7 @@ export function searchWell(game: Game) {
 export function searchCryptChest(game: Game) {
   if (stage(game, "hollow_whispers") === 1 && !has(game.player, "crypt_key")) {
     giveOrDrop(game, "crypt_key"); game.player.quests.hollow_whispers = 2;
-    message(game, "Under a mouldy shroud you find a cold iron key.", "quest");
+    message(game, "Under a mouldy shroud you find a cold blackiron key.", "quest");
   } else message(game, "The chest is empty apart from dust.");
 }
 export function useCryptAltar(game: Game) {
@@ -190,15 +190,15 @@ export function talk(game: Game, npcId: string): Dialogue {
       return chat(name, npcSays(name, `Welcome to the Realm, ${family}. Your Friend's family gives you a perk: ${perk.title}. ${perk.text}`), [
         { label: "How do I play?", then: tips },
         { label: "Where should I go first?", then: () => chat(name, npcSays(name,
-          "Try the trees around town with your axe, then fish shrimps at Glass Lake to the south-east.",
+          "Try the trees around town with your axe, then fish minnows at Glass Lake to the south-east.",
           "Hollow Farms to the west has cows and chickens. Grumblins in Whisperwood are good practice, if you're brave.",
           "The bank is north-west of the fountain. Deposit what you don't need.")) },
         { label: "What are Rare Caskets?", then: () => chat(name, npcSays(name,
           "The Relic keeper in the Hollow Hall sells Rare Caskets for simulated $RAREFRIENDS.",
           "Each holds a Rare Relic you keep for a bonus or redeem for RF, plus a wardrobe piece for your Friend.")) },
         { label: "Can I get a new starter kit?", then: () => {
-          if (has(player, "bronze_axe") || has(player, "tinderbox")) return chat(name, npcSays(name, "You still have your tools. Check your inventory!"));
-          for (const id of ["bronze_axe", "bronze_pickaxe", "small_net", "tinderbox"]) giveOrDrop(game, id);
+          if (has(player, "pewter_axe") || has(player, "tinderbox")) return chat(name, npcSays(name, "You still have your tools. Check your inventory!"));
+          for (const id of ["pewter_axe", "pewter_pickaxe", "small_net", "tinderbox"]) giveOrDrop(game, id);
           return chat(name, npcSays(name, "Here you go: an axe, a pickaxe, a net and a tinderbox. Look after them."));
         } },
       ]);
@@ -233,9 +233,9 @@ export function talk(game: Game, npcId: string): Dialogue {
       ]);
       if (s === 1) {
         if (data(game, "grumblins") < 6) return chat(name, npcSays(name, `Only ${data(game, "grumblins")} so far. I still hear grumbling.`));
-        return chat(name, npcSays(name, "Silence at last! Take this scimitar. You've earned it."), undefined, () => {
-          giveOrDrop(game, "iron_scimitar"); addXp(game, "attack", 1200, { raw: true }); addXp(game, "strength", 1200, { raw: true }); giveOrDrop(game, "coins", 200);
-          completeQuest(game, "grumblin_trouble", ["1 Quest Point", "1,200 Attack XP", "1,200 Strength XP", "Iron scimitar", "200 coins"]);
+        return chat(name, npcSays(name, "Silence at last! Take this sabre. You've earned it."), undefined, () => {
+          giveOrDrop(game, "blackiron_sabre"); addXp(game, "attack", 1200, { raw: true }); addXp(game, "strength", 1200, { raw: true }); giveOrDrop(game, "coins", 200);
+          completeQuest(game, "grumblin_trouble", ["1 Quest Point", "1,200 Attack XP", "1,200 Strength XP", "Blackiron sabre", "200 coins"]);
         });
       }
       return chat(name, npcSays(name, "The Hall sleeps well thanks to you."));
@@ -244,15 +244,15 @@ export function talk(game: Game, npcId: string): Dialogue {
       const s = stage(game, "cold_forge");
       if (s === 0) return chat(name, npcSays(name, "The forge went cold when the ember was stolen. A forge needs metal to remember how to burn."), [
         { label: "What can I bring?", then: () => { player.quests.cold_forge = 1; message(game, "Quest started: The Cold Forge.", "quest");
-          return chat(name, npcSays(name, "Three bronze bars and two iron bars. Smelt them at my furnace. It still works if you coax it.")); } },
+          return chat(name, npcSays(name, "Three pewter bars and two blackiron bars. Smelt them at my furnace. It still works if you coax it.")); } },
         { label: "Good luck with that.", then: () => null },
       ]);
       if (s === 1) {
-        if (count(player, "bronze_bar") < 3 || count(player, "iron_bar") < 2) return chat(name, npcSays(name, "Three bronze bars and two iron bars. The furnace is right there."));
-        return chat(name, npcSays(name, "Listen to that… the forge remembers! Here, a steel pickaxe and some coal to go with it."), undefined, () => {
-          take(player, "bronze_bar", 3); take(player, "iron_bar", 2); giveOrDrop(game, "steel_pickaxe"); giveOrDrop(game, "coal", 10); giveOrDrop(game, "forge_ember");
+        if (count(player, "pewter_bar") < 3 || count(player, "blackiron_bar") < 2) return chat(name, npcSays(name, "Three pewter bars and two blackiron bars. The furnace is right there."));
+        return chat(name, npcSays(name, "Listen to that… the forge remembers! Here, a ashsteel pickaxe and some inkcoal to go with it."), undefined, () => {
+          take(player, "pewter_bar", 3); take(player, "blackiron_bar", 2); giveOrDrop(game, "ashsteel_pickaxe"); giveOrDrop(game, "inkcoal", 10); giveOrDrop(game, "forge_ember");
           addXp(game, "smithing", 2500, { raw: true }); addXp(game, "mining", 1200, { raw: true });
-          completeQuest(game, "cold_forge", ["1 Quest Point", "2,500 Smithing XP", "1,200 Mining XP", "Steel pickaxe", "10 coal"]);
+          completeQuest(game, "cold_forge", ["1 Quest Point", "2,500 Smithing XP", "1,200 Mining XP", "Ashsteel pickaxe", "10 inkcoal"]);
         });
       }
       return chat(name, npcSays(name, "Use my anvils any time. Hammer in your pack, bars in your hand."));
@@ -262,13 +262,13 @@ export function talk(game: Game, npcId: string): Dialogue {
       if (s === 0) return chat(name, npcSays(name, "Rattle rattle. Forgive me, old habit. I hear whispers at night, from the Murkmire crypt."), [
         { label: "I'll look into it.", then: () => { player.quests.hollow_whispers = 1; message(game, "Quest started: Hollow Whispers.", "quest");
           return chat(name, npcSays(name, "The crypt is south-west, past the farms, in the swamp. The skeletons there were Friends once. Be kind, and be quick.")); } },
-        { label: "How do I train Prayer?", then: () => chat(name, npcSays(name, "Bury bones. Big bones and ink bones are worth more. Pray at my altar to restore your prayer points.")) },
+        { label: "How do I train Prayer?", then: () => chat(name, npcSays(name, "Bury bones. Large bones and ink bones are worth more. Pray at my altar to restore your prayer points.")) },
         { label: "No thanks.", then: () => null },
       ]);
       if (s < 3) return chat(name, npcSays(name, "The whispers go on. The crypt is in Murkmire, south-west."));
       if (s === 3) return chat(name, npcSays(name, "Silence! You did it. Wear this. The Old Friend watches over those who wear it."), undefined, () => {
-        giveOrDrop(game, "holy_symbol"); addXp(game, "prayer", 2500, { raw: true }); giveOrDrop(game, "big_bones", 5);
-        completeQuest(game, "hollow_whispers", ["1 Quest Point", "2,500 Prayer XP", "Holy symbol", "5 big bones"]);
+        giveOrDrop(game, "friends_charm"); addXp(game, "prayer", 2500, { raw: true }); giveOrDrop(game, "large_bones", 5);
+        completeQuest(game, "hollow_whispers", ["1 Quest Point", "2,500 Prayer XP", "Old Friend's charm", "5 large bones"]);
       });
       return chat(name, npcSays(name, "May your bones rest easy, when the time comes. Not soon, I hope."));
     }
@@ -282,9 +282,9 @@ export function talk(game: Game, npcId: string): Dialogue {
       if (s === 1) {
         if (count(player, "glimmer_shard") < 3) return chat(name, npcSays(name, `You have ${count(player, "glimmer_shard")} of 3 shards. The grumbler, the mud, the well.`));
         return chat(name, npcSays(name, "Ahhh. It hums again. Take this staff. And this: the Realm remembers you now."), undefined, () => {
-          take(player, "glimmer_shard", 3); giveOrDrop(game, "staff_of_air"); giveOrDrop(game, "mind_rune", 100); giveOrDrop(game, "law_rune", 5);
+          take(player, "glimmer_shard", 3); giveOrDrop(game, "breeze_staff"); giveOrDrop(game, "thought_sigil", 100); giveOrDrop(game, "path_sigil", 5);
           addXp(game, "magic", 2500, { raw: true });
-          completeQuest(game, "lost_glimmer", ["2 Quest Points", "2,500 Magic XP", "Staff of air", "100 mind runes", "5 law runes"]);
+          completeQuest(game, "lost_glimmer", ["2 Quest Points", "2,500 Magic XP", "Breeze staff", "100 thought sigils", "5 path sigils"]);
         });
       }
       if (k === 0) {
@@ -305,7 +305,7 @@ export function talk(game: Game, npcId: string): Dialogue {
       return chat(name, npcSays(name, "Hover well, hero."));
     }
     case "miller": return chat(name, npcSays(name, "Pick grain from the wheat field, then use it on the hopper. Bring a pot to catch the flour. Easy!"));
-    case "miner": return chat(name, npcSays(name, "Copper and tin anyone can mine. Iron's further in. Coal at the south end. There's mithril and a gem rock at the north edge, if you're good."));
+    case "miner": return chat(name, npcSays(name, "Pewter anyone can mine. Blackiron's further in. Inkcoal at the south end. There's moonsilver and a gem rock at the north edge, if you're good."));
     case "banker": return chat(name, npcSays(name, "Good day. Would you like to access your bank account?"), [
       { label: "Yes please.", then: () => { game.ui.bank = true; return null; } },
       { label: "No thanks.", then: () => null },
@@ -316,7 +316,7 @@ export function talk(game: Game, npcId: string): Dialogue {
     ]);
     case "agility": return chat(name, npcSays(name, "Five obstacles, in order, then again! Finish a lap for a bonus. Agility makes your run energy come back faster."));
     case "witch": return chat(name, npcSays(name, "Heh heh. The stepping stones to the north need Agility 20. The crypt's the other way. Mind the lurkers, dearie."));
-    case "fisher": return chat(name, npcSays(name, "Cages for lobsters, harpoons for swordfish, off the end of the pier. Inksharks in the deep bit, if you've the skill. And there's a deep spot up on the Frostpeak tarn."));
+    case "fisher": return chat(name, npcSays(name, "Cages for inkcrabs, harpoons for sailfish, off the end of the pier. Inksharks in the deep bit, if you've the skill. And there's a deep spot up on the Frostpeak tarn."));
     case "tanner": return chat(name, npcSays(name, "I'll tan cowhides into leather for 2 coins each. Then use a needle and thread on the leather to craft armour."), [
       { label: "Tan my hides.", then: () => { tanHides(game); return null; } },
       { label: "Trade.", then: () => { game.ui.shop = "crafting"; return null; } },

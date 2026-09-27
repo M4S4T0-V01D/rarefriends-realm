@@ -138,6 +138,13 @@ try {
   const after = await state(() => ({ x: window.__realm.game().player.x, y: window.__realm.game().player.y }));
   assert(after.x + after.y >= before.x + before.y + 2, `S walks down-screen (toward the camera), sliding around obstacles (${JSON.stringify(before)} → ${JSON.stringify(after)})`);
 
+  // ---------- Chat: Enter, type, Enter; the line shows in the log and over your head ----------
+  await game.locator("canvas.realm-view").focus();
+  await page.keyboard.press("Enter"); await page.keyboard.type("hello realm"); await page.keyboard.press("Enter");
+  await game.getByText(/#7730: hello realm/).waitFor();
+  assert.equal(await game.getByRole("textbox", { name: "Say something" }).inputValue(), "", "the chat line clears after sending");
+  await shot("chat");
+
   // ---------- Camera: arrow keys turn and tilt, the scroll wheel drags it round, the compass faces north ----------
   await page.keyboard.down("ArrowRight"); await page.waitForTimeout(700); await page.keyboard.up("ArrowRight");
   await page.keyboard.down("ArrowUp"); await page.waitForTimeout(400); await page.keyboard.up("ArrowUp");
@@ -162,9 +169,9 @@ try {
   // ---------- Panels ----------
   await state(() => { const g = window.__realm.game(), p = g.player, table = [0, 0, 83, 174, 276, 388, 512, 650, 801, 969, 1154, 1358, 1584, 1833, 2107, 2411, 2746, 3115, 3523, 3973, 4470, 5018, 5624, 6291, 7028, 7842, 8740, 9730, 10824, 12031, 13363];
     Object.assign(p.xp, { attack: table[24], strength: table[26], defence: table[21], hitpoints: table[25], woodcutting: table[18], fishing: table[22], mining: table[16], smithing: table[12], cooking: table[20], firemaking: table[15], magic: table[13], prayer: table[9], crafting: table[7], thieving: table[11], agility: table[10] });
-    p.hp = 25; p.equipment.weapon = "steel_scimitar"; p.equipment.head = "iron_full_helm"; p.equipment.body = "iron_platebody"; p.equipment.shield = "iron_kiteshield"; p.equipment.cape = "team_cape";
+    p.hp = 25; p.equipment.weapon = "ashsteel_sabre"; p.equipment.head = "blackiron_helm"; p.equipment.body = "blackiron_cuirass"; p.equipment.shield = "blackiron_shield"; p.equipment.cape = "team_cape";
     p.wardrobe.push("rose_cape"); p.worn.push("rose_cape"); p.quests.friends_feast = 2; p.quests.grumblin_trouble = 1; p.questData.grumblins = 4;
-    for (const [id, n] of [["lobster", 1], ["lobster", 1], ["lobster", 1], ["swordfish", 1], ["air_rune", 120], ["mind_rune", 80], ["oak_logs", 1], ["iron_ore", 1], ["uncut_sapphire", 1]]) { const i = p.inventory.indexOf(null); if (i >= 0) p.inventory[i] = { id, n }; }
+    for (const [id, n] of [["inkcrab", 1], ["inkcrab", 1], ["inkcrab", 1], ["sailfish", 1], ["breeze_sigil", 120], ["thought_sigil", 80], ["oak_logs", 1], ["blackiron_ore", 1], ["rough_moonstone", 1]]) { const i = p.inventory.indexOf(null); if (i >= 0) p.inventory[i] = { id, n }; }
     window.__realm.refresh(); });
   await game.getByRole("tab", { name: "Skills" }).click(); await page.waitForTimeout(300); await shot("skills");
   await game.getByRole("tab", { name: "Quest journal" }).click(); await game.getByRole("button", { name: "Grumblin Trouble" }).click(); await game.getByText(/Grumblins defeated: 4\/6/).waitFor(); await shot("quests");
@@ -195,14 +202,14 @@ try {
 
   // ---------- Smelting at the Emberforge furnace ----------
   const furnace = await state(() => window.__realm.game().world.objects.find(o => o.kind === "furnace"));
-  await state(() => { const p = window.__realm.game().player; p.inventory = p.inventory.map(() => null); p.inventory[0] = { id: "hammer", n: 1 }; for (let i = 1; i < 9; i++) p.inventory[i] = { id: i % 2 ? "copper_ore" : "tin_ore", n: 1 }; window.__realm.refresh(); });
+  await state(() => { const p = window.__realm.game().player; p.inventory = p.inventory.map(() => null); p.inventory[0] = { id: "hammer", n: 1 }; for (let i = 1; i < 9; i++) p.inventory[i] = { id: i % 2 ? "pewter_ore" : "pewter_ore", n: 1 }; window.__realm.refresh(); });
   await teleport(furnace.x, furnace.y + 1);
   point = await screenOf(furnace.x, furnace.y);
   await page.mouse.click(point.x, point.y - 16);
   await game.getByRole("region", { name: "What would you like to smelt?" }).waitFor();
   await shot("smelting");
-  await game.getByRole("button", { name: /Bronze bar/ }).click();
-  await until(() => window.__realm.game().player.inventory.filter(slot => slot?.id === "bronze_bar").length >= 2, 30_000);
+  await game.getByRole("button", { name: /Pewter bar/ }).click();
+  await until(() => window.__realm.game().player.inventory.filter(slot => slot?.id === "pewter_bar").length >= 2, 30_000);
 
   // ---------- A shop ----------
   const shopkeeper = await state(() => window.__realm.game().npcs.find(npc => npc.id === "armsmaster"));
@@ -257,7 +264,7 @@ try {
   await game.getByRole("dialog", { name: "Bank of the Realm" }).waitFor();
   await game.getByRole("button", { name: "Deposit inventory" }).click();
   assert.equal(await state(() => window.__realm.game().player.inventory.filter(Boolean).length), 0, "inventory deposited");
-  await game.getByRole("button", { name: /^Withdraw Bronze bar/ }).click();
+  await game.getByRole("button", { name: /^Withdraw Pewter bar/ }).click();
   await shot("bank");
   await page.keyboard.press("Escape");
   await game.getByRole("button", { name: "Close" }).click().catch(() => {});

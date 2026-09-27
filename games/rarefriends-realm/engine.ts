@@ -118,6 +118,7 @@ function targetPoint(game: Game, target: Target): (Point & { size?: number; obje
 function magicRange(target: Target) { return target.kind === "monster" && (target.spell || target.option === "Attack") ? 8 : 0; }
 function inReach(game: Game, target: Target, at: Point, point: Point & { size?: number; object?: WorldObject }) {
   if (target.kind === "monster" && castingSpell(game, target)) return chebyshev(at, point) <= magicRange(target) && chebyshev(at, point) >= 1;
+  if (target.kind === "ground" && target.spell) return chebyshev(at, point) <= 8;
   if (target.kind === "ground") return at.x === point.x && at.y === point.y || (!canWalk(game, point.x, point.y) && adjacentTo(at.x, at.y, point.x, point.y));
   if (target.kind === "object" && point.object && !point.object.blocks) return chebyshev(at, point) <= 1;
   return adjacentTo(at.x, at.y, point.x, point.y, point.size ?? 1);
@@ -193,7 +194,7 @@ export function menuFor(game: Game, picks: readonly Pick[], tile: Point | null, 
       const monster = monsterByUid(game, pick.id);
       if (!monster) continue;
       const noun = `${monster.def.name}  (level-${monster.def.level})`;
-      if (spell) { out.push({ verb: useLabel!, noun, tone: "monster", run: g => setTarget(g, { kind: "monster", uid: monster.uid, option: "Cast", spell: spell.id }) }); continue; }
+      if (spell) { if (spell.target === "monster") out.push({ verb: useLabel!, noun, tone: "monster", run: g => setTarget(g, { kind: "monster", uid: monster.uid, option: "Cast", spell: spell.id }) }); continue; }
       if (used) { out.push({ verb: useLabel!, noun, tone: "monster", run: g => message(g, "Nothing interesting happens.") }); continue; }
       out.push({ verb: "Attack", noun, tone: "monster", run: g => setTarget(g, { kind: "monster", uid: monster.uid, option: "Attack" }) });
       out.push({ verb: "Examine", noun: monster.def.name, tone: "monster", run: g => message(g, monster.def.examine) });
@@ -201,7 +202,8 @@ export function menuFor(game: Game, picks: readonly Pick[], tile: Point | null, 
       const npc = npcByUid(game, pick.id);
       if (!npc) continue;
       const def = npcDef(npc.id);
-      if (useLabel) { out.push({ verb: useLabel, noun: def.name, tone: "npc", run: g => setTarget(g, { kind: "npc", uid: npc.uid, option: "Use", use: selection?.kind === "item" ? selection.slot : undefined }) }); continue; }
+      if (spell) continue;
+      if (used && selection?.kind === "item") { out.push({ verb: useLabel!, noun: def.name, tone: "npc", run: g => setTarget(g, { kind: "npc", uid: npc.uid, option: "Use", use: selection.slot }) }); continue; }
       for (const option of def.options) out.push({ verb: option, noun: def.name, tone: "npc", run: g => setTarget(g, { kind: "npc", uid: npc.uid, option }) });
       out.push({ verb: "Examine", noun: def.name, tone: "npc", run: g => message(g, def.examine) });
     } else if (pick.kind === "object") {
@@ -216,6 +218,7 @@ export function menuFor(game: Game, picks: readonly Pick[], tile: Point | null, 
       const ground = game.ground.find(entry => entry.uid === pick.id);
       if (!ground) continue;
       const noun = ground.n > 1 ? `${item(ground.id).name} (${ground.n})` : item(ground.id).name;
+      if (spell?.target === "ground") { out.push({ verb: useLabel!, noun, tone: "item", run: g => setTarget(g, { kind: "ground", uid: ground.uid, option: "Cast", spell: spell.id }) }); continue; }
       if (useLabel) continue;
       out.push({ verb: "Take", noun, tone: "item", run: g => setTarget(g, { kind: "ground", uid: ground.uid, option: "Take" }) });
       out.push({ verb: "Examine", noun: item(ground.id).name, tone: "item", run: g => message(g, examineItem(ground.id)) });
@@ -411,6 +414,7 @@ function interact(game: Game) {
     const index = game.ground.findIndex(entry => entry.uid === target.uid);
     if (index < 0) return;
     const ground = game.ground[index];
+    if (target.spell) { telegrab(game, target.spell, index); return; }
     if (!canHold(player, ground.id, ground.n)) { message(game, "You don't have enough inventory space to hold that item.", "warn"); return; }
     give(player, ground.id, ground.n); game.ground.splice(index, 1); sound(game, "pickup");
     return;
@@ -434,8 +438,8 @@ function startCooking(game: Game, source: "range" | "fire", sourceId: number, ra
 export const STALLS = {
   bakery: { level: 5, xp: 16, respawn: 4, loot: [["bread", 0.7], ["cake", 0.3]] },
   silk: { level: 20, xp: 24, respawn: 8, loot: [["silk", 1]] },
-  fish: { level: 42, xp: 42, respawn: 12, loot: [["raw_lobster", 0.6], ["raw_swordfish", 0.4]] },
-  gem: { level: 75, xp: 160, respawn: 30, loot: [["uncut_sapphire", 0.65], ["uncut_emerald", 0.25], ["uncut_ruby", 0.1]] },
+  fish: { level: 42, xp: 42, respawn: 12, loot: [["raw_inkcrab", 0.6], ["raw_sailfish", 0.4]] },
+  gem: { level: 75, xp: 160, respawn: 30, loot: [["rough_moonstone", 0.65], ["rough_sagestone", 0.25], ["rough_rosestone", 0.1]] },
 } as const;
 
 function interactObject(game: Game, object: WorldObject, option: string, use?: number) {
@@ -451,7 +455,7 @@ function interactObject(game: Game, object: WorldObject, option: string, use?: n
     }
     case "rock": {
       const rock = ROCKS[object.rock!];
-      if (option === "Prospect") { message(game, `This rock contains ${rock.ore === "uncut_sapphire" ? "gems" : item(rock.ore).name.toLowerCase().replace(" ore", "")}.`); return; }
+      if (option === "Prospect") { message(game, `This rock contains ${rock.ore === "rough_moonstone" ? "gems" : item(rock.ore).name.toLowerCase().replace(" ore", "")}.`); return; }
       if (level(game, "mining") < rock.level) { message(game, `You need a Mining level of ${rock.level} to mine this rock.`, "warn"); return; }
       if (!bestTool(game, "pickaxe")) { message(game, "You need a pickaxe to mine this rock. You do not have a pickaxe which you have the Mining level to use.", "warn"); return; }
       if (!freeSlots(player)) { message(game, "Your inventory is too full to hold any more ore.", "warn"); return; }
@@ -519,7 +523,7 @@ function useItemOnObject(game: Game, object: WorldObject, slotIndex: number) {
   const player = game.player, slot = player.inventory[slotIndex];
   if (!slot) return;
   if ((object.kind === "range") && COOKING[slot.id]) { startCooking(game, "range", object.id, slot.id); return; }
-  if (object.kind === "furnace" && (slot.id.endsWith("_ore") || slot.id === "coal")) { interactObject(game, object, "Smelt"); return; }
+  if (object.kind === "furnace" && (slot.id.endsWith("_ore") || slot.id === "inkcoal")) { interactObject(game, object, "Smelt"); return; }
   if (object.kind === "anvil" && slot.id.endsWith("_bar")) {
     const metal = slot.id.replace("_bar", "") as MetalId;
     if (!hasTool(player, "hammer")) { message(game, "You need a hammer to work the metal with.", "warn"); return; }
@@ -609,6 +613,7 @@ export function tick(game: Game) {
   const player = game.player;
   if (player.stunned > 0) player.stunned--;
   if (player.eatTimer > 0) player.eatTimer--;
+  if (player.castTimer > 0) player.castTimer--;
   if (player.attackTimer > 0) player.attackTimer--;
   if (player.overhead && player.overhead.until <= game.tick) player.overhead = null;
   movePlayer(game);
@@ -684,7 +689,7 @@ function runActivity(game: Game) {
     case "obstacle": return obstacleTick(game, activity);
     case "teleport": {
       player.activity = null;
-      travel(game, activity.to, `You teleport to ${SPELLS.find(spell => spell.id === activity.spell)?.teleport?.name ?? "safety"}.`); sound(game, "teleport");
+      travel(game, activity.to, `You teleport to ${TELEPORT_NAMES[SPELLS.find(spell => spell.id === activity.spell)?.teleport ?? "hollow_square"]}.`); sound(game, "teleport");
     }
   }
 }
@@ -707,12 +712,12 @@ function mineTick(game: Game, activity: Extract<Activity, { kind: "mine" }>) {
   activity.timer = 4; sound(game, "mine");
   const gemOdds = (player.familyId === 7 ? 3 : 1) / 256;
   if (game.rng() < gemOdds && freeSlots(player)) {
-    const gem = ["uncut_sapphire", "uncut_sapphire", "uncut_emerald", "uncut_ruby"][Math.floor(game.rng() * 4)];
+    const gem = ["rough_moonstone", "rough_moonstone", "rough_sagestone", "rough_rosestone"][Math.floor(game.rng() * 4)];
     give(player, gem); message(game, `You just found ${item(gem).name.toLowerCase().startsWith("uncut e") ? "an" : "a"} ${item(gem).name.replace("Uncut ", "").toLowerCase()}!`);
   }
   const chance = Math.min(0.95, successChance(level(game, "mining"), rock.low, rock.high) * (1 + 0.2 * (pick.tier - 1)) * gatherBonus(game));
   if (game.rng() >= chance) return;
-  const ore = object.rock === "gem" ? ["uncut_sapphire", "uncut_sapphire", "uncut_emerald", "uncut_ruby"][Math.floor(game.rng() * 4)] : rock.ore;
+  const ore = object.rock === "gem" ? ["rough_moonstone", "rough_moonstone", "rough_sagestone", "rough_rosestone"][Math.floor(game.rng() * 4)] : rock.ore;
   give(player, ore); addXp(game, "mining", rock.xp);
   if (player.familyId === 4 && game.rng() < 0.08 && freeSlots(player)) { give(player, ore); message(game, "Lopsided luck! You mine a second piece."); }
   message(game, `You manage to mine some ${item(ore).name.toLowerCase().replace(" ore", "")}.`);
@@ -731,7 +736,7 @@ function fishTick(game: Game, activity: Extract<Activity, { kind: "fish" }>) {
     if (spot.bait) take(player, spot.bait);
     give(player, entry.fish); addXp(game, "fishing", entry.xp); sound(game, "catch");
     if (player.familyId === 4 && game.rng() < 0.08 && freeSlots(player)) give(player, entry.fish);
-    message(game, `You catch ${entry.fish === "raw_shrimps" ? "some shrimps" : `a ${item(entry.fish).name.replace("Raw ", "").toLowerCase()}`}.`);
+    message(game, `You catch ${entry.fish === "raw_minnows" ? "some minnows" : `a ${item(entry.fish).name.replace("Raw ", "").toLowerCase()}`}.`);
     return;
   }
 }
@@ -812,17 +817,17 @@ export function playerMaxHit(game: Game) {
 export function playerAccuracy(game: Game, monster: Monster) {
   const player = game.player, boost = prayerBoost(player), style = STYLE_BONUS[player.style];
   const attack = (Math.floor(level(game, "attack") * (1 + boost.attack)) + style.attack + 8) * (bonuses(player).attack + 64);
-  const defence = (monster.def.defence + 9) * (monster.def.defenceBonus + 64);
+  const defence = (monster.def.defence * cursed(game, monster, "defence") + 9) * (monster.def.defenceBonus + 64);
   return hitChance(attack, defence);
 }
 function spellCost(game: Game, spell: Spell) {
-  const runes = { ...spell.runes } as Record<string, number>;
-  if (game.player.equipment.weapon === "staff_of_air") delete runes.air_rune;
-  return runes;
+  const sigils = { ...spell.sigils } as Record<string, number>;
+  if (game.player.equipment.weapon === "breeze_staff") delete sigils.breeze_sigil;
+  return sigils;
 }
 export function canCast(game: Game, spell: Spell) {
   if (level(game, "magic") < spell.level) return `You need a Magic level of ${spell.level} to cast this spell.`;
-  for (const [rune, n] of Object.entries(spellCost(game, spell))) if (count(game.player, rune) < n) return "You do not have enough runes to cast this spell.";
+  for (const [sigil, n] of Object.entries(spellCost(game, spell))) if (count(game.player, sigil) < n) return "You do not have enough sigils to cast this spell.";
   return null;
 }
 function playerCombat(game: Game) {
@@ -830,7 +835,7 @@ function playerCombat(game: Game) {
   if (player.combat === null) return;
   const monster = monsterByUid(game, player.combat);
   if (!monster) { player.combat = null; player.queuedSpell = null; return; }
-  const spellId = player.queuedSpell ?? player.autocast, spell = spellId ? SPELLS.find(entry => entry.id === spellId && entry.maxHit) ?? null : null;
+  const spellId = player.queuedSpell ?? player.autocast, spell = spellId ? SPELLS.find(entry => entry.id === spellId && entry.target === "monster") ?? null : null;
   const inRange = spell ? chebyshev(player, monster) <= 8 && chebyshev(player, monster) >= 1 : adjacentTo(player.x, player.y, monster.x, monster.y, footprint(monster));
   if (!inRange) {
     if (!player.path.length || player.path.length > 20) {
@@ -846,12 +851,21 @@ function playerCombat(game: Game) {
     const problem = canCast(game, spell);
     if (problem) { message(game, problem, "warn"); player.combat = null; player.queuedSpell = null; player.autocast = null; return; }
     const echo = player.familyId === 8 && game.rng() < 0.2;
-    if (!echo) for (const [rune, n] of Object.entries(spellCost(game, spell))) take(player, rune, n);
+    if (!echo) for (const [sigil, n] of Object.entries(spellCost(game, spell))) take(player, sigil, n);
     player.attackTimer = 5;
     const boost = prayerBoost(player), accuracy = (Math.floor(level(game, "magic") * (1 + boost.magic)) + 8) * (bonuses(player).magic + 64) * (player.familyId === 8 ? 1.1 : 1);
-    const defence = ((monster.def.magicDef ?? monster.def.defence) + 9) * (monster.def.defenceBonus + 64);
-    emit(game, { type: "projectile", projectile: { from: { x: player.x, y: player.y }, to: { x: monster.x, y: monster.y }, start: game.tick, end: game.tick + 1, color: SPELL_COLORS[spell.id] ?? "#c7d3dc" } });
+    const defence = ((monster.def.magicDef ?? monster.def.defence) * cursed(game, monster, "defence") + 9) * (monster.def.defenceBonus + 64);
+    emit(game, { type: "projectile", projectile: { from: { x: player.x, y: player.y }, to: { x: monster.x, y: monster.y }, start: game.tick, end: game.tick + 1, color: SPELL_COLORS[spell.id] ?? ELEMENT_COLORS[spell.element] ?? "#c7d3dc" } });
     sound(game, "spell");
+    if (!spell.maxHit) {
+      // Curses and Bind: a magic accuracy roll, then an effect instead of damage.
+      player.queuedSpell = null; player.combat = null;
+      if (game.rng() >= hitChance(accuracy, defence)) { message(game, "Your spell had no effect."); emit(game, { type: "hit", on: "monster", uid: monster.uid, damage: -1, tick: game.tick }); return; }
+      addXp(game, "magic", spell.xp);
+      if (spell.kind === "bind") { monster.curses.bound = game.tick + 16; message(game, `The ${monster.def.name.toLowerCase()} is rooted to the spot.`); }
+      else if (spell.curse) { monster.curses[spell.curse.stat] = game.tick + 100; message(game, `You ${spell.name.toLowerCase()} the ${monster.def.name.toLowerCase()}.`); }
+      return;
+    }
     const hit = game.rng() < hitChance(accuracy, defence) ? Math.floor(game.rng() * (spell.maxHit! + 1)) : -1;
     addXp(game, "magic", spell.xp);
     if (hit > 0) { addXp(game, "magic", hit * 2); addXp(game, "hitpoints", hit * 1.33); }
@@ -874,7 +888,7 @@ function playerCombat(game: Game) {
   sound(game, hit > 0 ? "hit" : "miss");
   damageMonster(game, monster, Math.max(0, hit), hit < 0);
 }
-const SPELL_COLORS: Record<string, string> = { wind_strike: "#dfe6ea", water_strike: "#9fb4d0", earth_strike: "#a89479", fire_strike: "#e3a58c", wind_bolt: "#eef2f4", water_bolt: "#8fa3c9", fire_bolt: "#e39a7c", wind_blast: "#ffffff", fire_blast: "#f0a080" };
+const SPELL_COLORS: Record<string, string> = { breeze_dart: "#dfe6ea", tide_dart: "#9fb4d0", stone_dart: "#a89479", ember_dart: "#e3a58c", breeze_lance: "#eef2f4", tide_lance: "#8fa3c9", ember_lance: "#e39a7c", breeze_burst: "#ffffff", ember_burst: "#f0a080" };
 function damageMonster(game: Game, monster: Monster, damage: number, missed: boolean) {
   const dealt = Math.min(damage, monster.hp);
   monster.hp -= dealt;
@@ -918,7 +932,7 @@ function monsterTick(game: Game, monster: Monster) {
   const player = game.player;
   if (monster.dead) {
     if (game.tick >= monster.respawnAt) {
-      monster.dead = false; monster.hp = monster.def.hp; monster.x = monster.spawn.x; monster.y = monster.spawn.y; monster.prev = { ...monster.spawn }; monster.target = false;
+      monster.dead = false; monster.hp = monster.def.hp; monster.curses = {}; monster.x = monster.spawn.x; monster.y = monster.spawn.y; monster.prev = { ...monster.spawn }; monster.target = false;
     }
     return;
   }
@@ -933,9 +947,9 @@ function monsterTick(game: Game, monster: Monster) {
       if (monster.attackTimer <= 0) {
         monster.attackTimer = monster.def.speed;
         const boost = prayerBoost(player), style = STYLE_BONUS[player.style];
-        const attack = (monster.def.attack + 9) * (monster.def.attackBonus + 64);
+        const attack = (monster.def.attack * cursed(game, monster, "attack") + 9) * (monster.def.attackBonus + 64);
         const defence = (Math.floor(level(game, "defence") * (1 + boost.defence)) + style.defence + 8) * (bonuses(player).defence + 64);
-        let hit = game.rng() < hitChance(attack, defence) ? Math.floor(game.rng() * (monster.def.maxHit + 1)) : 0;
+        let hit = game.rng() < hitChance(attack, defence) ? Math.floor(game.rng() * (Math.floor(monster.def.maxHit * cursed(game, monster, "strength")) + 1)) : 0;
         if (boost.protect) hit = Math.floor(hit * (monster.def.boss ? 0.4 : 0));
         damagePlayer(game, hit, monster);
       }
@@ -946,7 +960,7 @@ function monsterTick(game: Game, monster: Monster) {
   }
   // Idle wandering.
   if (monster.retreat > 0) { monster.retreat--; stepMonsterToward(game, monster, monster.spawn); return; }
-  if (game.rng() < 0.12) {
+  if (game.rng() < 0.12 && !isBound(game, monster)) {
     const dx = Math.floor(game.rng() * 3) - 1, dy = Math.floor(game.rng() * 3) - 1, nx = monster.x + dx, ny = monster.y + dy;
     if (Math.abs(nx - monster.spawn.x) <= monster.wander && Math.abs(ny - monster.spawn.y) <= monster.wander && monsterCanStep(game, monster, dx, dy)) moveMonster(game, monster, nx, ny);
   }
@@ -969,7 +983,15 @@ function gapTo(point: Point, x: number, y: number, size: number) {
  * Old-school "dumb" pathing: take the single step that brings the monster closest to its target, never onto the player.
  * Monsters don't search around walls, so they can get stuck behind things (safespots work).
  */
+/** A curse's multiplier on a monster stat (1 when uncursed). */
+function cursed(game: Game, monster: Monster, stat: "attack" | "strength" | "defence") {
+  const until = monster.curses[stat];
+  if (!until || until <= game.tick) return 1;
+  return 1 - (SPELLS.find(spell => spell.curse?.stat === stat)?.curse?.amount ?? 0);
+}
+export const isBound = (game: Game, monster: Monster) => (monster.curses.bound ?? 0) > game.tick;
 function stepMonsterToward(game: Game, monster: Monster, target: Point) {
+  if (isBound(game, monster)) return;
   const size = footprint(monster), player = game.player;
   const score = (x: number, y: number) => { const { gx, gy } = gapTo(target, x, y, size); return Math.max(gx, gy) * 10 + Math.min(gx, gy) * 3; };
   let best: [number, number] | null = null, bestScore = score(monster.x, monster.y);
@@ -1024,29 +1046,84 @@ export function togglePrayer(game: Game, id: string) {
   player.prayers = player.prayers.filter(other => !Object.keys(PRAYERS.find(entry => entry.id === other)?.effect ?? {}).some(key => keys.includes(key)));
   player.prayers.push(id); sound(game, "pray");
 }
-/** Clicking a spell: teleports cast straight away; combat spells arm "Cast X ->" (or autocast with a staff). */
+/**
+ * Clicking a spell. Self spells (teleports, Bonebloom) cast straight away. Damage spells autocast with a staff,
+ * otherwise they arm "Cast X ->" like curses and Rootsnare (monsters), item spells (Gilded/Golden Touch, Forgeheart, enchanting) and
+ * Far Reach (ground items).
+ */
 export function castSpell(game: Game, id: string): Selection {
   const player = game.player, spell = SPELLS.find(entry => entry.id === id);
   if (!spell) return null;
   const problem = canCast(game, spell);
   if (problem && spell.id !== "home") { message(game, problem, "warn"); return null; }
-  if (spell.teleport) {
+  if (spell.target === "self") {
+    if (spell.kind === "bloom") { bonebloom(game, spell); return null; }
     if (player.y >= 200 && spell.id !== "home") { message(game, "A dark force stops you from teleporting underground.", "warn"); return null; }
-    if (player.combat !== null && spell.id === "home") { message(game, "You can't use Home Teleport during combat.", "warn"); return null; }
+    if (player.combat !== null && spell.id === "home") { message(game, "You can't use Homeward during combat.", "warn"); return null; }
     stopAll(game); closeInterfaces(game);
-    for (const [rune, n] of Object.entries(spellCost(game, spell))) take(player, rune, n);
-    const places = game.world.places, to = spell.id === "forge_teleport" ? places.emberforge : places.hollow_square;
-    player.activity = { kind: "teleport", to, timer: spell.id === "home" ? 10 : 3, spell: spell.id };
+    for (const [sigil, n] of Object.entries(spellCost(game, spell))) take(player, sigil, n);
+    player.activity = { kind: "teleport", to: game.world.places[spell.teleport ?? "hollow_square"], timer: spell.id === "home" ? 10 : 3, spell: spell.id };
     if (spell.xp) addXp(game, "magic", spell.xp);
     message(game, spell.id === "home" ? "You begin to channel home…" : "You feel the Realm fold around you…"); sound(game, "spell");
     return null;
   }
-  if (isStaffEquipped(player)) {
+  if (spell.maxHit && isStaffEquipped(player)) {
     player.autocast = player.autocast === spell.id ? null : spell.id;
     message(game, player.autocast ? `Autocasting ${spell.name}. Attack to cast it; click it again to stop.` : "Autocast off.");
     return null;
   }
   return { kind: "spell", spell: spell.id };
+}
+const TELEPORT_NAMES: Record<string, string> = { hollow_square: "Friendhollow", emberforge: "Emberforge", oasis: "the Oasis", frostpeak: "Frostpeak", pier: "Pike's Pier" };
+const ELEMENT_COLORS: Record<string, string> = { wind: "#e6ecef", water: "#8fa3c9", earth: "#a89479", fire: "#e9a07a", hollow: "#6d6b67", moon: "#c6bed4", gold: "#e2d49e", home: "#e8d4c0" };
+function payRunes(game: Game, spell: Spell) { for (const [sigil, n] of Object.entries(spellCost(game, spell))) take(game.player, sigil, n); }
+function bonebloom(game: Game, spell: Spell) {
+  const player = game.player, slots = player.inventory.map((slot, index) => slot?.id === "bones" ? index : -1).filter(index => index >= 0);
+  if (!slots.length) { message(game, "You aren't holding any bones!", "warn"); return; }
+  payRunes(game, spell);
+  for (const index of slots) player.inventory[index] = { id: "sweetberry", n: 1 };
+  addXp(game, "magic", spell.xp); sound(game, "spell");
+  message(game, `Your ${slots.length > 1 ? `${slots.length} bones bloom` : "bone blooms"} into sweetberries.`);
+}
+/** Item spells: Gilded and Golden Touch, Forgeheart and enchanting, cast on an inventory slot. */
+export function castOnItem(game: Game, spellId: string, slotIndex: number) {
+  const player = game.player, spell = SPELLS.find(entry => entry.id === spellId), slot = player.inventory[slotIndex];
+  if (!spell || spell.target !== "item" || !slot) return false;
+  if (player.castTimer > 0) return false;
+  const problem = canCast(game, spell);
+  if (problem) { message(game, problem, "warn"); return false; }
+  const definition = item(slot.id);
+  if (spell.kind === "alchemy") {
+    if (slot.id === "coins") { message(game, "Coins are already made of gold.", "warn"); return false; }
+    if (definition.tradeable === false) { message(game, "You can't cast that on this item.", "warn"); return false; }
+    const coins = Math.max(1, Math.floor(definition.value * (spell.id === "golden_touch" ? 0.6 : 0.4)));
+    payRunes(game, spell); take(player, slot.id, 1); give(player, "coins", coins);
+    message(game, `The ${definition.name.toLowerCase()} turns into ${coins} coins.`); sound(game, "coins");
+  } else if (spell.kind === "superheat") {
+    const metal = METALS.slice().reverse().find(entry => SMELTING[entry.id].ores[slot.id] !== undefined && Object.entries(SMELTING[entry.id].ores).every(([id, n]) => count(player, id) >= n) && level(game, "smithing") >= SMELTING[entry.id].level);
+    if (!metal) { message(game, slot.id.endsWith("_ore") || slot.id === "inkcoal" ? "You need the right ores (and Smithing level) for Forgeheart to work." : "Forgeheart only works on ore.", "warn"); return false; }
+    payRunes(game, spell);
+    for (const [id, n] of Object.entries(SMELTING[metal.id].ores)) take(player, id, n);
+    give(player, `${metal.id}_bar`); addXp(game, "smithing", SMELTING[metal.id].xp);
+    message(game, `The ore melts into a ${metal.name.toLowerCase()} bar.`); sound(game, "smelt");
+  } else if (spell.kind === "enchant") {
+    const recipe = spell.id === "enchant_moonstone" ? ["moonstone", "moonstone_pendant"] : ["rosestone", "rosestone_pendant"];
+    if (slot.id !== recipe[0]) { message(game, `This spell works on a cut ${recipe[0]}.`, "warn"); return false; }
+    payRunes(game, spell); take(player, recipe[0], 1); give(player, recipe[1]);
+    message(game, `The ${recipe[0]} glows and becomes an ${item(recipe[1]).name.toLowerCase()}.`); sound(game, "spell");
+  }
+  addXp(game, "magic", spell.xp); player.castTimer = 3; player.activity = null;
+  emit(game, { type: "cast", spell: spell.id, tick: game.tick });
+  return true;
+}
+function telegrab(game: Game, spellId: string, index: number) {
+  const player = game.player, spell = SPELLS.find(entry => entry.id === spellId)!, ground = game.ground[index];
+  const problem = canCast(game, spell);
+  if (problem) { message(game, problem, "warn"); return; }
+  if (!canHold(player, ground.id, ground.n)) { message(game, "You don't have enough inventory space to hold that item.", "warn"); return; }
+  payRunes(game, spell); give(player, ground.id, ground.n); game.ground.splice(index, 1);
+  addXp(game, "magic", spell.xp); sound(game, "spell");
+  emit(game, { type: "projectile", projectile: { from: { x: ground.x, y: ground.y }, to: { x: player.x, y: player.y }, start: game.tick, end: game.tick + 1, color: "#e6ecef" } });
 }
 export function setStyle(game: Game, style: CombatStyle) { game.player.style = style; }
 
@@ -1151,9 +1228,29 @@ export function serialize(game: Game): SaveData {
 }
 const QUEST_IDS = ["friends_feast", "grumblin_trouble", "cold_forge", "hollow_whispers", "lost_glimmer", "hollow_king"];
 const int = (value: unknown, min: number, max: number, fallback: number) => typeof value === "number" && Number.isFinite(value) ? Math.max(min, Math.min(max, Math.floor(value))) : fallback;
+/** Item and spell ids from saves made before the Realm's own names (old id → new id). */
+const RENAMED: Record<string, string> = {
+  uncut_sapphire: "rough_moonstone", uncut_emerald: "rough_sagestone", uncut_ruby: "rough_rosestone", sapphire: "moonstone", emerald: "sagestone", ruby: "rosestone",
+  amulet_of_strength: "rosestone_pendant", amulet_of_accuracy: "moonstone_pendant", holy_symbol: "friends_charm", staff_of_air: "breeze_staff",
+  wizard_hat: "scholar_hat", wizard_robe: "scholar_robe", big_bones: "large_bones", leather_body: "leather_jerkin", leather_cowl: "leather_hood",
+  leather_vambraces: "leather_bracers", leather_chaps: "leather_leggings", lobster_pot: "crab_pot", banana: "sweetberry", copper_ore: "pewter_ore", tin_ore: "pewter_ore",
+  iron_ore: "blackiron_ore", coal: "inkcoal", mithril_ore: "moonsilver_ore", adamantite_ore: "glimmer_ore", raw_shark: "raw_inkshark", shark: "inkshark",
+  air_rune: "breeze_sigil", water_rune: "tide_sigil", earth_rune: "stone_sigil", fire_rune: "ember_sigil", mind_rune: "thought_sigil", chaos_rune: "storm_sigil",
+  law_rune: "path_sigil", death_rune: "hollow_sigil", nature_rune: "bloom_sigil", cosmic_rune: "star_sigil", body_rune: "shade_sigil",
+  wind_strike: "breeze_dart", water_strike: "tide_dart", earth_strike: "stone_dart", fire_strike: "ember_dart", wind_bolt: "breeze_lance", water_bolt: "tide_lance",
+  fire_bolt: "ember_lance", wind_blast: "breeze_burst", fire_blast: "ember_burst",
+};
+const RENAMED_PART: Record<string, string> = {
+  bronze: "pewter", iron: "blackiron", steel: "ashsteel", mithril: "moonsilver", adamant: "glimmer", scimitar: "sabre", platebody: "cuirass", platelegs: "greaves", kiteshield: "shield",
+  shrimps: "minnows", sardine: "perch", herring: "carp", trout: "char", salmon: "grayling", lobster: "inkcrab", swordfish: "sailfish",
+};
+export function migrateId(id: string) {
+  if (isItem(String(id)) || SPELLS.some(spell => spell.id === id)) return id;
+  return RENAMED[id] ?? id.replace("_full_helm", "_helm").split("_").map(part => RENAMED_PART[part] ?? part).join("_");
+}
 const slotOf = (value: unknown, maxN = 2_147_483_647): Slot | null => {
   if (!value || typeof value !== "object") return null;
-  const { id, n } = value as { id?: unknown; n?: unknown };
+  const { n } = value as { id?: unknown; n?: unknown }, raw = (value as { id?: unknown }).id, id = typeof raw === "string" ? migrateId(raw) : raw;
   if (!isItem(id) || typeof n !== "number" || !Number.isFinite(n) || n < 1) return null;
   const amount = int(n, 1, maxN, 0);
   if (!amount) return null;
@@ -1176,7 +1273,7 @@ export function restore(game: Game, raw: unknown): boolean {
   player.inventory = Array.from({ length: INVENTORY_SIZE }, (_, index) => slotOf(save.inventory?.[index]));
   player.equipment = {};
   for (const slot of EQUIP_SLOTS) {
-    const id = save.equipment?.[slot];
+    const saved = save.equipment?.[slot], id = typeof saved === "string" ? migrateId(saved) : saved;
     if (isItem(id) && item(id).equip?.slot === slot) player.equipment[slot] = id;
   }
   const bank: Slot[] = [];
@@ -1191,7 +1288,8 @@ export function restore(game: Game, raw: unknown): boolean {
   if (inBounds(x, y) && walkable(game.world, x, y)) { player.x = x; player.y = y; player.prev = { x, y }; }
   player.run = !!save.run; player.energy = int(save.energy, 0, 100, 100);
   player.style = (["accurate", "aggressive", "defensive", "controlled"] as const).includes(save.style as CombatStyle) ? save.style as CombatStyle : "accurate";
-  player.autocast = typeof save.autocast === "string" && SPELLS.some(spell => spell.id === save.autocast && spell.maxHit) && isStaffEquipped(player) ? save.autocast : null;
+  const autocast = typeof save.autocast === "string" ? migrateId(save.autocast) : null;
+  player.autocast = autocast && SPELLS.some(spell => spell.id === autocast && spell.maxHit) && isStaffEquipped(player) ? autocast : null;
   player.quests = {}; player.questData = {};
   for (const id of QUEST_IDS) { const value = int(save.quests?.[id], 0, 4, 0); if (value) player.quests[id] = value; }
   for (const [key, value] of Object.entries(save.questData ?? {})) if (/^[a-z_]{1,24}$/.test(key)) player.questData[key] = int(value, 0, 1000, 0);

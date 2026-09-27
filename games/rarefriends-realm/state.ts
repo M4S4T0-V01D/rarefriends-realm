@@ -21,7 +21,7 @@ export type Target =
   | { kind: "object"; id: number; option: string; use?: number }
   | { kind: "npc"; uid: number; option: string; use?: number }
   | { kind: "monster"; uid: number; option: string; spell?: string }
-  | { kind: "ground"; uid: number; option: string }
+  | { kind: "ground"; uid: number; option: string; spell?: string }
   | { kind: "fire"; uid: number; option: string; use?: number };
 export type Activity =
   | { kind: "woodcut"; objectId: number; timer: number }
@@ -51,11 +51,13 @@ export type Player = {
   wardrobe: WardrobeId[]; worn: WardrobeId[]; follower: number | null;
   courseStep: number; kills: number; deaths: number; overhead: { text: string; until: number } | null; music: string[];
   familyId: number; friendId: number; relics: number[]; followerGeneration: number | null; tutorial: number;
-  lastHitBy: number | null; created: number; queuedSpell: string | null;
+  lastHitBy: number | null; created: number; queuedSpell: string | null; castTimer: number;
 };
 export type Monster = {
   uid: number; def: MonsterDef; x: number; y: number; prev: Point; spawn: Point; hp: number; heading: Point;
   target: boolean; attackTimer: number; respawnAt: number; dead: boolean; wander: number; moved: number; retreat: number;
+  /** Curses and Bind: the tick each wears off. */
+  curses: Partial<Record<"attack" | "strength" | "defence" | "bound", number>>;
 };
 export type Npc = { uid: number; id: string; x: number; y: number; prev: Point; spawn: Point; wander: number; heading: Point; moved: number; busy: number };
 export type GroundItem = { uid: number; id: string; n: number; x: number; y: number; expires: number };
@@ -68,7 +70,8 @@ export type GameEvent =
   | { type: "sound"; name: SoundName; tick: number }
   | { type: "projectile"; projectile: Projectile }
   | { type: "death"; tick: number }
-  | { type: "quest"; quest: string; tick: number };
+  | { type: "quest"; quest: string; tick: number }
+  | { type: "cast"; spell: string; tick: number };
 export type SoundName =
   | "chop" | "mine" | "splash" | "catch" | "fire" | "sizzle" | "burn" | "smelt" | "anvil" | "hit" | "miss" | "hurt" | "eat" | "bury" | "coins"
   | "pickup" | "drop" | "door" | "level" | "quest" | "spell" | "teleport" | "death" | "stun" | "jump" | "click" | "equip" | "kill" | "pray";
@@ -106,7 +109,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
   const spawn = world.places.spawn, xp = Object.fromEntries(SKILLS.map(skill => [skill, 0])) as Record<Skill, number>;
   xp.hitpoints = XP_TABLE[10];
   const inventory: (Slot | null)[] = Array(INVENTORY_SIZE).fill(null);
-  ["bronze_axe", "bronze_pickaxe", "small_net", "tinderbox", "bronze_dagger", "shrimps", "shrimps", "bread"].forEach((id, index) => { inventory[index] = { id, n: 1 }; });
+  ["pewter_axe", "pewter_pickaxe", "small_net", "tinderbox", "pewter_dagger", "minnows", "minnows", "bread"].forEach((id, index) => { inventory[index] = { id, n: 1 }; });
   inventory[8] = { id: "coins", n: 25 };
   return {
     x: spawn.x, y: spawn.y, prev: { ...spawn }, heading: { x: 1, y: 1 }, moved: 0, path: [], run: false, energy: 100,
@@ -115,7 +118,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
     attackTimer: 0, eatTimer: 0, stunned: 0, regenTimer: 0, quests: {}, questData: {},
     wardrobe: [], worn: [], follower: null, courseStep: -1, kills: 0, deaths: 0, overhead: null, music: ["theme"],
     familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0,
-    lastHitBy: null, created: Date.now(), queuedSpell: null,
+    lastHitBy: null, created: Date.now(), queuedSpell: null, castTimer: 0,
   };
 }
 
@@ -130,7 +133,7 @@ export function createGame(options: { familyId: number; friendId: number; rng?: 
     const uid = game.nextUid++, at = { x: spawn.x, y: spawn.y };
     if (spawn.kind === "monster") {
       const def = MONSTERS[spawn.id];
-      game.monsters.push({ uid, def, x: at.x, y: at.y, prev: { ...at }, spawn: at, hp: def.hp, heading: { x: 1, y: 1 }, target: false, attackTimer: 0, respawnAt: 0, dead: false, wander: spawn.wander ?? def.wander, moved: 0, retreat: 0 });
+      game.monsters.push({ uid, def, x: at.x, y: at.y, prev: { ...at }, spawn: at, hp: def.hp, heading: { x: 1, y: 1 }, target: false, attackTimer: 0, respawnAt: 0, dead: false, wander: spawn.wander ?? def.wander, moved: 0, retreat: 0, curses: {} });
     } else game.npcs.push({ uid, id: spawn.id, x: at.x, y: at.y, prev: { ...at }, spawn: at, wander: spawn.wander ?? 0, heading: { x: 1, y: 1 }, moved: 0, busy: 0 });
   }
   message(game, "Welcome to the Realm. Talk to the Realm Guide by the fountain if you get lost.", "info");

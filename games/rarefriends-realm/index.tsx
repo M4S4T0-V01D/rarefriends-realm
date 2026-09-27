@@ -13,13 +13,14 @@ import {
 } from "./engine.ts";
 import { PITCH, VIEW, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
 import {
-  BankModal, ChatBox, ContextMenu, DialogueBox, FriendPortrait, HelpModal, LevelUpBox, Modal, Orbs, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
+  BankModal, ChatBox, ContextMenu, DialogueBox, FriendPortrait, HelpModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
   cancelLongPress, longPress, type MenuEntry, type Settings, type Tab,
 } from "./panels.tsx";
 import { REGULAR_SPRITES } from "./regulars.ts";
 import { HOST_HELLO, HOST_STATE, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, parseRoster, type ShareAction, type ShareOutcome } from "./roster.ts";
 import { RealmAudio, trackFor, trackById, type TrackId } from "./audio.ts";
 import { renderCard, shareText } from "./card.ts";
+import { skillArt } from "./icons.ts";
 import { regionAt } from "./world.ts";
 import "@rarefriends/friendsdk/frame.css";
 import "./style.css";
@@ -42,7 +43,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const game = useRef<Game | null>(null), friend = useRef<GenerationSprites | null>(null), audio = useRef<RealmAudio | null>(null);
   const followerSprites = useRef(new Map<number, GenerationSprites>()), loadingSprites = useRef(new Set<number>());
   const camera = useRef<Camera>({ x: 121, y: 121, zoom: DEFAULT_SETTINGS.zoom, angle: 0, pitch: PITCH.classic }), cameraGoal = useRef<{ angle: number; pitch: number } | null>(null),
-    compass = useRef<HTMLButtonElement>(null), orbit = useRef<{ x: number; y: number; angle: number; pitch: number } | null>(null), tickAt = useRef(0), hits = useRef<HitSplat[]>([]), fireworks = useRef<Firework[]>([]);
+    compass = useRef<HTMLButtonElement>(null), orbit = useRef<{ x: number; y: number; angle: number; pitch: number } | null>(null), miniZoom = useRef(3.2), tickAt = useRef(0), hits = useRef<HitSplat[]>([]), fireworks = useRef<Firework[]>([]);
   const projectiles = useRef<Projectile[]>([]), marker = useRef<ClickMarker | null>(null), hoverTile = useRef<{ x: number; y: number } | null>(null), chat = useRef<{ text: string; until: number } | null>(null);
   const held = useRef(new Set<string>()), linked = useRef(false), lastSave = useRef(""), region = useRef(""), epoch = useRef(0), pointer = useRef<{ x: number; y: number } | null>(null);
   const [phase, setPhase] = useState<Phase>("loading"), [status, setStatus] = useState("Waking your Friend and unfolding the Realm…");
@@ -250,7 +251,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       });
       if (mini && current === "playing" && now - lastHud > 90) {
         lastHud = now; const size = mini.canvas.width;
-        renderMinimap(mini, state, size, 3.2 * (size / 152), camera.current.angle);
+        renderMinimap(mini, state, size, miniZoom.current * (size / 152), camera.current.angle);
       }
     };
     frame = requestAnimationFrame(loop);
@@ -359,7 +360,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const onMinimap = (event: React.MouseEvent<HTMLCanvasElement>) => {
     const state = game.current, node = minimap.current;
     if (!state || !node || paused) return;
-    const rect = node.getBoundingClientRect(), size = node.width, scale = 3.2 * (size / 152);
+    const rect = node.getBoundingClientRect(), size = node.width, scale = miniZoom.current * (size / 152);
     const { x, y } = minimapTile(state, (event.clientX - rect.left) * size / rect.width - size / 2, (event.clientY - rect.top) * size / rect.height - size / 2, scale, camera.current.angle);
     walkTo(state, x, y); marker.current = { x, y, at: performance.now(), red: false }; refresh();
   };
@@ -447,13 +448,14 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
             <Orbs game={state} onRun={() => { toggleRun(state); refresh(); }} onMap={() => setModal("map")} onZoom={delta => setSettings({ ...settings, zoom: Math.max(0.55, Math.min(1.6, settings.zoom + delta)) })}
               onRotate={delta => { const from = cameraGoal.current?.angle ?? camera.current.angle; cameraGoal.current = { angle: from + delta, pitch: cameraGoal.current?.pitch ?? camera.current.pitch }; }} />
             <div className="realm-minimap">
-              <canvas ref={minimap} width={152} height={152} onClick={onMinimap} aria-label="Minimap: click to walk" />
+              <canvas ref={minimap} width={152} height={152} onClick={onMinimap} aria-label="Minimap: click to walk, scroll to zoom"
+                onWheel={event => { miniZoom.current = Math.max(1.6, Math.min(7, miniZoom.current * (event.deltaY < 0 ? 1.15 : 0.87))); }} />
               <button type="button" ref={compass} className="realm-compass" title="Face north (reset the camera)" aria-label="Compass: face north"
                 onClick={() => { const turns = Math.round(camera.current.angle / (Math.PI * 2)); cameraGoal.current = { angle: turns * Math.PI * 2, pitch: PITCH.classic }; }}><i aria-hidden="true">▲</i><b>N</b></button>
             </div>
           </div>
           <div className="realm-drops" aria-hidden="true">
-            {drops.map(drop => <span key={drop.id} style={{ animationDuration: reducedMotion ? "0s" : undefined }}>{SKILL_ICONS[drop.skill]} +{Math.round(drop.amount).toLocaleString()}</span>)}
+            {drops.map(drop => <span key={drop.id} style={{ animationDuration: reducedMotion ? "0s" : undefined }}><PixelIcon art={skillArt(drop.skill)} size={20} /> +{Math.round(drop.amount).toLocaleString()}</span>)}
           </div>
           {toast && <div className="realm-toast" role="status"><b>{toast.title}</b>{toast.sub && <small>♪ {toast.sub}</small>}</div>}
           {dead && <div className="realm-dead" role="alert">Oh dear, you are dead!</div>}
