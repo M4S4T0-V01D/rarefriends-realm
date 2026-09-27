@@ -1,157 +1,193 @@
 /**
- * The RF wardrobe, worn properly: pieces are painted into your Friend's own sprite frame, pixel for pixel.
- * Hats sit on the real top of the head, capes hang from the real shoulders (and show from behind), scarves wrap the
- * real neck, wings spread from the back. The whole figure then gets one ink edge and one white halo, like the canonical art.
+ * The RF wardrobe, worn properly. Pieces are painted into your Friend's own sprite frame on a grid twice as fine as the
+ * sprite (so a crown can have points and a cape can have folds), fitted to the real head, neck, shoulders and back, and
+ * animated: capes and scarves sway as you walk, wings flap, halos bob. The figure then gets one ink edge around the
+ * worn pieces and the canonical white halo around everything.
  */
 import { WARDROBE, type WardrobeId } from "./data.ts";
+import { Pixels, shadeHex } from "./pixel.ts";
 import type { Facing } from "./state.ts";
 
 export type Mask = readonly string[];
-const PAD_X = 6, PAD_TOP = 7, PAD_BOTTOM = 1;
-const INK = "#161616", WHITE = "#ffffff";
+/** Padding around the sprite, in sprite pixels (room for wings, hats and trailing capes). */
+const PAD_X = 7, PAD_TOP = 8, PAD_BOTTOM = 1, K = 2;
+const INK = "#161616";
 const cache = new Map<string, HTMLCanvasElement>();
-function shade(hex: string, amount: number) {
-  const n = parseInt(hex.slice(1, 7), 16), f = (v: number) => Math.max(0, Math.min(255, Math.round(v + amount * 255)));
-  return `#${[f(n >> 16), f((n >> 8) & 255), f(n & 255)].map(v => v.toString(16).padStart(2, "0")).join("")}`;
-}
-type Grid = (string | null)[][];
+type Span = { min: number; max: number };
 /** Silhouette measurements of a sprite frame (in sprite pixels). */
 function measure(rows: Mask) {
-  const spans: ({ min: number; max: number } | null)[] = rows.map(row => { const min = row.indexOf("#"), max = row.lastIndexOf("#"); return min < 0 ? null : { min, max }; });
-  const top = spans.findIndex(Boolean), bottom = spans.length - 1 - [...spans].reverse().findIndex(Boolean);
-  const head = spans[top] ?? { min: 6, max: 9 }, body = spans.slice(top, bottom + 1).filter(Boolean) as { min: number; max: number }[];
+  const spans: (Span | null)[] = rows.map(row => { const min = row.indexOf("#"), max = row.lastIndexOf("#"); return min < 0 ? null : { min, max }; });
+  const top = Math.max(0, spans.findIndex(Boolean)), bottom = spans.length - 1 - Math.max(0, [...spans].reverse().findIndex(Boolean));
+  const body = spans.slice(top, bottom + 1).filter(Boolean) as Span[];
   const left = Math.min(...body.map(span => span.min)), right = Math.max(...body.map(span => span.max));
-  // The neck: the narrowest row in the upper half (below the head), else 40% down.
   let neck = top + Math.round((bottom - top) * 0.4), narrowest = Infinity;
   for (let y = top + 2; y <= top + Math.round((bottom - top) * 0.6); y++) { const span = spans[y]; if (span && span.max - span.min < narrowest) { narrowest = span.max - span.min; neck = y; } }
-  // The head spans rows top..neck; its width is the widest row there.
-  const headRows = spans.slice(top, neck + 1).filter(Boolean) as { min: number; max: number }[];
+  const headRows = spans.slice(top, neck + 1).filter(Boolean) as Span[];
   const headLeft = Math.min(...headRows.map(span => span.min)), headRight = Math.max(...headRows.map(span => span.max));
-  return { spans, top, bottom, left, right, neck, head, headLeft, headRight, centre: (headLeft + headRight) / 2 };
+  // Headwear sits on the crown of the head: the centre and width of the top two rows.
+  const crownRows = spans.slice(top, top + 2).filter(Boolean) as Span[];
+  const crownLeft = Math.min(...crownRows.map(span => span.min)), crownRight = Math.max(...crownRows.map(span => span.max));
+  return { spans, top, bottom, left, right, neck, headLeft, headRight, centre: (crownLeft + crownRight + 1) / 2, crownWidth: crownRight - crownLeft + 1 };
 }
-/** Your Friend's frame with worn pieces, as a pixel canvas (drawn with its feet on the anchor, like the plain sprite). */
-export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, ink = INK): HTMLCanvasElement {
+/**
+ * Your Friend's frame with its worn pieces, as a pixel canvas twice the sprite's resolution.
+ * `phase` (0–3) animates cloth and wings; pass the walk frame so they sway with the stride.
+ */
+export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, phase = 0, ink = INK): HTMLCanvasElement {
   const pieces = WARDROBE.filter(piece => worn.includes(piece.id) && piece.kind !== "aura" && piece.kind !== "lantern");
-  const key = `${ink}|${facing}|${pieces.map(piece => piece.id).join(",")}|${rows.join("")}`;
+  const key = `${ink}|${facing}|${phase & 3}|${pieces.map(piece => piece.id).join(",")}|${rows.join("")}`;
   let canvas = cache.get(key);
   if (canvas) return canvas;
-  const height = rows.length, width = rows[0]?.length ?? 16, W = width + PAD_X * 2, H = height + PAD_TOP + PAD_BOTTOM;
-  const grid: Grid = Array.from({ length: H }, () => Array(W).fill(null));
-  const put = (x: number, y: number, color: string) => { const gx = Math.round(x) + PAD_X, gy = Math.round(y) + PAD_TOP; if (gx >= 0 && gy >= 0 && gx < W && gy < H) grid[gy][gx] = color; };
-  const m = measure(rows), back = facing === "up", side = facing === "left" ? -1 : facing === "right" ? 1 : 0;
+  const width = rows[0]?.length ?? 16, height = rows.length, W = (width + PAD_X * 2) * K, H = (height + PAD_TOP + PAD_BOTTOM) * K;
+  const p = new Pixels(W, H), m = measure(rows), back = facing === "up", side = facing === "left" ? -1 : facing === "right" ? 1 : 0;
+  // Fine-grid coordinates: sprite pixel (x, y) covers fine pixels [X(x), X(x)+1] × [Y(y), Y(y)+1].
+  const X = (x: number) => (x + PAD_X) * K, Y = (y: number) => (y + PAD_TOP) * K, sway = [0, 1, 0, -1][phase & 3];
+  const cx = X(m.centre) - 0.5, headTop = Y(m.top), neckY = Y(m.neck) + 1, feet = Y(m.bottom) + 1;
+  const headHalf = Math.max(4, Math.min(7, m.crownWidth * K / 2 + 1));
+  const bodySpan = (y: number) => m.spans[y] ?? { min: m.left, max: m.right };
   const cape = pieces.find(piece => piece.kind === "cape"), wings = pieces.find(piece => piece.kind === "wings");
-  // Behind the body.
+
+  // ---------- Behind the body ----------
   if (wings) {
-    const y0 = m.neck, span = m.spans[m.neck] ?? m.head, dark = shade(wings.color, -0.1);
-    for (let i = 0; i < 6; i++) for (let j = 0; j <= i && j < 5; j++) {
-      const y = y0 + j - Math.floor(i / 2) + 1, c = (i + j) % 2 ? wings.color : dark;
-      if (side <= 0) put(span.min - 1 - i, y, c);
-      if (side >= 0) put(span.max + 1 + i, y, c);
-    }
+    const shoulderL = X(bodySpan(m.neck + 1).min) - 1, shoulderR = X(bodySpan(m.neck + 1).max) + 2, y0 = neckY + 1, flap = [0, -2, -3, -1][phase & 3];
+    const light = shadeHex(wings.color, 0.18), dark = shadeHex(wings.color, -0.08);
+    const wing = (dir: 1 | -1, root: number) => {
+      // Three layered feather rows, longest at the top, flapping at the tips.
+      for (let row = 0; row < 3; row++) {
+        const reach = 11 - row * 2, y = y0 + row * 3;
+        p.poly([[root, y], [root + dir * reach, y - 4 + flap + row], [root + dir * (reach + 1), y - 1 + flap + row], [root + dir * (reach - 2), y + 2 + row], [root, y + 4]], row % 2 ? dark : wings.color, null);
+        p.line(root + dir * 2, y + 1, root + dir * (reach - 1), y - 2 + flap + row, light);
+      }
+    };
+    if (side <= 0) wing(-1, shoulderL);
+    if (side >= 0) wing(1, shoulderR);
   }
   if (cape && !back) {
-    const shoulder = m.neck + 1, dark = shade(cape.color, -0.12);
-    for (let y = shoulder; y < m.bottom; y++) {
-      const span = m.spans[y] ?? { min: m.left, max: m.right }, flare = Math.min(2, Math.floor((y - shoulder) / 3));
-      const from = span.min - 1 - flare + (side > 0 ? -1 : 0), to = span.max + 1 + flare + (side < 0 ? 1 : 0);
-      for (let x = from; x <= to; x++) put(x, y, (x + y) % 3 === 0 ? dark : cape.color);
-    }
+    const dark = shadeHex(cape.color, -0.12), trail = side ? -side * 5 : 0;
+    const top = bodySpan(m.neck + 1), shoulders = [X(top.min) - 1, X(top.max) + 2] as const;
+    const hemL = X(m.left) - 3 + trail + sway, hemR = X(m.right) + 4 + trail + sway;
+    p.poly([[shoulders[0], neckY], [shoulders[1], neckY], [hemR, feet - 1], [hemL, feet - 1]], cape.color, null);
+    for (let fold = 1; fold < 4; fold++) { const t = fold / 4; p.line(shoulders[0] + (shoulders[1] - shoulders[0]) * t, neckY + 2, hemL + (hemR - hemL) * t, feet - 2, dark); }
+    p.line(hemL, feet - 1, hemR, feet - 1, dark);
   }
-  // The Friend itself.
-  rows.forEach((row, y) => [...row].forEach((pixel, x) => { if (pixel === "#") put(x, y, ink); }));
-  // In front of the body.
+  if (pieces.some(piece => piece.kind === "scarf") && side) {
+    // The scarf's long tail streams out behind you.
+    const scarf = pieces.find(piece => piece.kind === "scarf")!, from = side > 0 ? X(bodySpan(m.neck).min) - 1 : X(bodySpan(m.neck).max) + 2;
+    for (let i = 0; i < 7; i++) { const x = from - side * i, y = neckY + 1 + Math.round(Math.sin((i + phase) * 1.1) * 1.2) + (i >> 2); p.rect(x, y, 1, 3, i % 3 ? scarf.color : shadeHex(scarf.color, -0.14)); }
+  }
+
+  // ---------- The Friend ----------
+  const inkValue = (() => { const probe = new Pixels(1, 1); probe.set(0, 0, ink); return probe.data[0]; })();
+  rows.forEach((row, y) => [...row].forEach((pixel, x) => { if (pixel === "#") p.rect(X(x), Y(y), K, K, ink); }));
+
+  // ---------- In front ----------
   if (cape && back) {
-    const shoulder = m.neck, dark = shade(cape.color, -0.12);
-    for (let y = shoulder; y < m.bottom; y++) {
-      const span = m.spans[y] ?? { min: m.left, max: m.right }, flare = Math.min(2, Math.floor((y - shoulder) / 3));
-      for (let x = span.min - flare; x <= span.max + flare; x++) put(x, y, x % 2 ? cape.color : dark);
-    }
+    const dark = shadeHex(cape.color, -0.12), top = bodySpan(m.neck), shoulders = [X(top.min) - 1, X(top.max) + 2] as const;
+    const hemL = X(m.left) - 3 + sway, hemR = X(m.right) + 4 + sway;
+    p.poly([[shoulders[0], neckY - 1], [shoulders[1], neckY - 1], [hemR, feet - 1], [hemL, feet - 1]], cape.color, null);
+    for (let fold = 1; fold < 5; fold++) { const t = fold / 5; p.line(shoulders[0] + (shoulders[1] - shoulders[0]) * t, neckY + 1, hemL + (hemR - hemL) * t, feet - 2, dark); }
+    p.rect(shoulders[0], neckY - 1, shoulders[1] - shoulders[0], 2, shadeHex(cape.color, 0.08));
   }
   for (const piece of pieces) {
-    const c = m.centre, top = m.top, halfHead = Math.max(3, Math.ceil((m.headRight - m.headLeft + 1) / 2));
-    if (piece.kind === "scarf" || piece.kind === "bow") {
-      const span = m.spans[m.neck] ?? m.head;
-      if (piece.kind === "scarf") {
-        for (let x = span.min - 1; x <= span.max + 1; x++) { put(x, m.neck, piece.color); put(x, m.neck + 1, x % 2 ? piece.color : shade(piece.color, -0.12)); }
-        const tail = side > 0 ? span.min - 1 : side < 0 ? span.max + 1 : span.max;
-        for (let y = m.neck + 2; y < m.neck + 5; y++) put(tail + (side > 0 ? -((y - m.neck) >> 1) : side < 0 ? (y - m.neck) >> 1 : 0), y, piece.color);
-      } else if (!back) {
-        put(c - 2, m.neck, piece.color); put(c - 1, m.neck, piece.color); put(c, m.neck, shade(piece.color, -0.2)); put(c + 1, m.neck, piece.color); put(c + 2, m.neck, piece.color);
-        put(c - 2, m.neck + 1, piece.color); put(c + 2, m.neck + 1, piece.color);
-      }
+    const color = piece.color, dark = shadeHex(color, -0.15), light = shadeHex(color, 0.14);
+    if (piece.kind === "scarf") {
+      const span = bodySpan(m.neck), l = X(span.min) - 2, r = X(span.max) + 3;
+      p.rect(l, neckY - 1, r - l, 3, color); p.line(l, neckY + 1, r - 1, neckY + 1, dark);
+      if (!side && !back) { const knot = X(span.max) - 1; p.rect(knot, neckY + 2, 3, 2, color); p.rect(knot + 1, neckY + 4, 2, 3, dark); }
     }
-    if (piece.kind === "hat") {
-      if (piece.id === "starlit_hood") {
-        // A peaked hood: a cap over the crown of the head, with side flaps that frame the face.
-        for (let y = top - 3; y <= top; y++) {
-          const half = halfHead + 1 - (top - y);
-          for (let x = Math.floor(c - half); x <= Math.ceil(c + half); x++) put(x, y, (x + y) % 4 === 0 ? shade(piece.color, 0.12) : piece.color);
-        }
-        for (let y = top + 1; y <= Math.min(m.neck, top + 4); y++) { const span = m.spans[y] ?? m.head; put(span.min - 1, y, piece.color); put(span.max + 1, y, piece.color); if (back) for (let x = span.min; x <= span.max; x++) put(x, y, piece.color); }
-        put(Math.round(c), top - 4, piece.color); put(Math.round(c) + 1, top - 5, "#e2d49e");
-      } else {
-        // Crowns: a band with three points.
-        const gold = piece.color, left = Math.floor(c - halfHead + 1), right = Math.ceil(c + halfHead - 1);
-        for (let x = left; x <= right; x++) { put(x, top - 1, gold); put(x, top - 2, (x - left) % 2 ? shade(gold, -0.15) : gold); }
-        for (const x of [left, Math.round(c), right]) { put(x, top - 3, gold); put(x, top - 4, gold); }
-        if (piece.id === "paper_crown") put(Math.round(c), top - 2, "#d8b6b4");
-        if (piece.id === "rarite_crown") { put(Math.round(c), top - 2, "#9fb4d0"); put(left, top - 5, "#ffffff"); }
-      }
+    if (piece.kind === "bow") {
+      // A big bow on the side of the head.
+      const bx = Math.round(cx + headHalf * 0.55) + (side < 0 ? -Math.round(headHalf) : 0), by = headTop - 1;
+      p.poly([[bx, by], [bx - 5, by - 4], [bx - 6, by + 2]], color, null); p.poly([[bx, by], [bx + 5, by - 4], [bx + 6, by + 2]], color, null);
+      p.line(bx - 4, by - 2, bx - 2, by, dark); p.line(bx + 4, by - 2, bx + 2, by, dark);
+      p.rect(bx - 1, by - 1, 3, 3, dark); p.set(bx, by - 1, light);
     }
     if (piece.kind === "halo") {
-      const y = top - 4, half = halfHead;
-      for (let x = Math.floor(c - half); x <= Math.ceil(c + half); x++) { if (x === Math.floor(c - half) || x === Math.ceil(c + half)) put(x, y + 1, piece.color); else { put(x, y, piece.color); put(x, y + 2, piece.color); } }
+      const hy = headTop - 7 + [0, -1, -1, 0][phase & 3], hx = Math.round(cx);
+      for (let a = 0; a < 40; a++) { const t = a / 40 * Math.PI * 2, x = hx + Math.cos(t) * (headHalf + 1), y = hy + Math.sin(t) * 2.2; p.set(x, y, Math.sin(t) > 0.3 ? dark : color); }
+      p.set(hx + headHalf - 1, hy - 2, "#ffffff"); p.set(hx + headHalf - 1, hy - 3, "#ffffff"); p.set(hx + headHalf, hy - 2, "#ffffff");
+    }
+    if (piece.kind === "hat" && piece.id === "starlit_hood") {
+      // A starry pointed hat: a wide brim and a cone whose tip bends with your stride.
+      const brimY = headTop + 2, tipX = Math.round(cx) + 3 + sway * 2 - side * 2;
+      p.disc(cx, brimY, headHalf + 4, 2.4, dark, null);
+      p.poly([[cx - headHalf + 1, brimY], [cx + headHalf - 1, brimY], [cx + 3, brimY - 9], [tipX + 1, brimY - 15], [cx - 1, brimY - 9]], color, null);
+      p.line(cx - headHalf + 2, brimY - 1, cx + headHalf - 2, brimY - 1, "#e2d49e");
+      for (const [sx, sy] of [[-2, -5], [2, -8], [0, -3]] as const) { p.set(cx + sx, brimY + sy, "#f2e28f"); }
+      p.set(tipX + 1, brimY - 16, "#f2e28f");
+    }
+    if (piece.kind === "hat" && piece.id !== "starlit_hood") {
+      // Crowns: a slim band and separate spikes; the paper one is folded cream, the rarite one rose metal with gems.
+      const rarite = piece.id === "rarite_crown", band = headTop, l = Math.round(cx - headHalf) + 1, r = Math.round(cx + headHalf) - 1;
+      p.rect(l, band - 2, r - l, 2, color); p.line(l, band - 1, r - 1, band - 1, dark);
+      const points = rarite ? 3 : 4, step = (r - l) / points;
+      for (let i = 0; i < points; i++) {
+        const mid = l + step * (i + 0.5), half = Math.max(1, step * 0.32), tall = rarite ? (i === Math.floor(points / 2) ? 6 : 4) : 4;
+        p.poly([[mid - half, band - 2], [mid, band - 2 - tall], [mid + half, band - 2]], i % 2 && !rarite ? light : color, null);
+        p.set(mid - 0.5, band - 1 - tall, light);
+        if (rarite) p.rect(mid - 0.5, band - 3 - tall, 1, 1, i === 1 ? "#9fb4d0" : "#e2d49e");
+      }
+      if (rarite) { p.set(Math.round(cx), band - 2, "#9fb4d0"); if ((phase & 3) === 1) { p.set(r, band - 8, "#ffffff"); p.set(r + 1, band - 9, "#ffffff"); } }
+      else p.set(Math.round(cx), band - 2, "#d8b6b4");
     }
   }
-  // Ink edge around the worn colours (not around the Friend, which is ink already), then a white halo around it all.
-  const filled = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && grid[y][x] !== null;
-  const colour = (x: number, y: number) => filled(x, y) && grid[y][x] !== ink;
-  const edged = grid.map(row => row.slice());
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (!grid[y][x] && (colour(x + 1, y) || colour(x - 1, y) || colour(x, y + 1) || colour(x, y - 1))) edged[y][x] = ink;
-  canvas = document.createElement("canvas"); canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext("2d")!;
-  ctx.fillStyle = WHITE;
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    if (edged[y][x]) continue;
-    let near = false;
-    for (let dy = -1; dy <= 1 && !near; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && y + dy >= 0 && x + dx >= 0 && y + dy < H && x + dx < W && edged[y + dy][x + dx]) { near = true; break; }
-    if (near) ctx.fillRect(x, y, 1, 1);
-  }
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (edged[y][x]) { ctx.fillStyle = edged[y][x]!; ctx.fillRect(x, y, 1, 1); }
-  if (cache.size > 600) cache.delete(cache.keys().next().value!);
+
+  // ---------- Edges: ink around the worn colours, then the white halo around everything (one sprite pixel) ----------
+  const data = p.data, filled = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && data[y * W + x] !== 0;
+  const coloured = (x: number, y: number) => filled(x, y) && data[y * W + x] !== inkValue;
+  const edged = data.slice();
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (!data[y * W + x] && (coloured(x + 1, y) || coloured(x - 1, y) || coloured(x, y + 1) || coloured(x, y - 1))) edged[y * W + x] = inkValue;
+  data.set(edged);
+  p.halo(); p.halo();
+  canvas = p.toCanvas();
+  if (cache.size > 800) cache.delete(cache.keys().next().value!);
   cache.set(key, canvas);
   return canvas;
 }
 /** Draw a figure with its feet on (x, y); `px` screen pixels per sprite pixel. Returns the drawn box. */
 export function drawFigure(ctx: CanvasRenderingContext2D, art: HTMLCanvasElement, x: number, y: number, px: number, alpha = 1) {
-  const w = art.width * px, h = art.height * px;
+  const w = art.width * px / K, h = art.height * px / K;
   ctx.globalAlpha = alpha; ctx.imageSmoothingEnabled = false;
   ctx.drawImage(art, Math.round(x - w / 2), Math.round(y - h + (1 + PAD_BOTTOM) * px), Math.round(w), Math.round(h));
   ctx.globalAlpha = 1;
   return { x: x - w / 2, y: y - h + (1 + PAD_BOTTOM) * px, w, h };
 }
-/** Aura glow and sparkles, and the lantern familiar, drawn around the figure (not part of the frame). */
+/** Auras and the lantern familiar, drawn around the figure (not part of the frame). */
 export function drawAuras(ctx: CanvasRenderingContext2D, worn: readonly string[], x: number, y: number, px: number, now: number, reduced: boolean, layer: "back" | "front") {
+  const t = reduced ? 0 : now / 1000, s = Math.max(1, Math.round(px / 2));
+  const dot = (dx: number, dy: number, color: string, size = 1) => { const q = s * size; ctx.fillStyle = INK; ctx.fillRect(Math.round(dx) - q, Math.round(dy) - q, q * 3, q * 3); ctx.fillStyle = color; ctx.fillRect(Math.round(dx), Math.round(dy), q, q); };
   for (const id of worn) {
     const piece = WARDROBE.find(entry => entry.id === id);
     if (!piece) continue;
-    if (piece.kind === "aura" && layer === "back") {
-      const pulse = reduced ? 1 : 1 + Math.sin(now / 600) * 0.06;
-      ctx.fillStyle = `${piece.color}40`; ctx.beginPath(); ctx.ellipse(x, y - 8 * px, 11 * px * pulse, 9 * px * pulse, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = `${piece.color}30`; ctx.beginPath(); ctx.ellipse(x, y - 1 * px, 10 * px, 3 * px, 0, 0, Math.PI * 2); ctx.fill();
+    if (piece.id === "golden_aura") {
+      if (layer === "back") {
+        // Slowly turning rays and a warm glow.
+        ctx.save(); ctx.translate(x, y - 8 * px); ctx.rotate(t * 0.4);
+        for (let i = 0; i < 10; i++) { ctx.rotate(Math.PI / 5); ctx.fillStyle = i % 2 ? "rgba(226,212,158,0.22)" : "rgba(226,212,158,0.12)"; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-2.2 * px, -15 * px); ctx.lineTo(2.2 * px, -15 * px); ctx.closePath(); ctx.fill(); }
+        ctx.restore();
+        const glow = ctx.createRadialGradient(x, y - 8 * px, 0, x, y - 8 * px, 12 * px); glow.addColorStop(0, "rgba(242,226,143,0.45)"); glow.addColorStop(1, "rgba(242,226,143,0)");
+        ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(x, y - 8 * px, 12 * px, 0, Math.PI * 2); ctx.fill();
+      } else if (!reduced) for (let i = 0; i < 4; i++) { const k = (t * 0.6 + i / 4) % 1; dot(x + Math.sin(i * 2.3 + t) * 8 * px, y - k * 18 * px, "#f2e28f"); }
     }
-    if (piece.kind === "aura" && layer === "front" && !reduced) {
-      for (let i = 0; i < 5; i++) {
-        const a = now / 1100 + i * (Math.PI * 2 / 5), sx = x + Math.cos(a) * 10 * px, sy = y - 8 * px + Math.sin(a) * 3 * px - ((now / 30 + i * 40) % 60) / 60 * 6 * px;
-        const s = Math.max(1, Math.round(px)); ctx.fillStyle = "#161616"; ctx.fillRect(Math.round(sx) - s, Math.round(sy) - s, s * 3, s * 3); ctx.fillStyle = piece.color; ctx.fillRect(Math.round(sx), Math.round(sy), s, s);
+    if (piece.id === "moon_wisps") {
+      if (layer === "back") { ctx.fillStyle = "rgba(175,188,203,0.25)"; ctx.beginPath(); ctx.ellipse(x, y, 11 * px, 3.5 * px, 0, 0, Math.PI * 2); ctx.fill(); }
+      for (let i = 0; i < 3; i++) {
+        const a = t * 1.3 + i * (Math.PI * 2 / 3), wx = x + Math.cos(a) * 10 * px, wy = y - 7 * px + Math.sin(a) * 3.5 * px, front = Math.sin(a) > 0;
+        if (front !== (layer === "front")) continue;
+        for (let k = 3; k >= 1; k--) { const ta = a - k * 0.18; ctx.fillStyle = `rgba(175,188,203,${0.18 * (4 - k)})`; ctx.fillRect(Math.round(x + Math.cos(ta) * 10 * px) - s, Math.round(y - 7 * px + Math.sin(ta) * 3.5 * px) - s, s * 2, s * 2); }
+        dot(wx, wy, "#dfe7f2", 1.5);
       }
     }
     if (piece.kind === "lantern" && layer === "front") {
-      const bob = reduced ? 0 : Math.sin(now / 420) * 2 * px, lx = x + 9 * px, ly = y - 17 * px + bob, s = Math.max(1, px);
-      ctx.fillStyle = "rgba(242,220,160,0.22)"; ctx.beginPath(); ctx.arc(lx, ly, 7 * s, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = "#ffffff"; ctx.fillRect(Math.round(lx - 3 * s), Math.round(ly - 4 * s), Math.round(6 * s), Math.round(8 * s));
-      ctx.fillStyle = "#161616"; ctx.fillRect(Math.round(lx - 2 * s), Math.round(ly - 3 * s), Math.round(4 * s), Math.round(6 * s)); ctx.fillRect(Math.round(lx - 1 * s), Math.round(ly - 6 * s), Math.round(2 * s), Math.round(2 * s));
-      ctx.fillStyle = piece.color; ctx.fillRect(Math.round(lx - 1 * s), Math.round(ly - 2 * s), Math.round(2 * s), Math.round(4 * s));
+      // A little lantern familiar: it bobs beside you, flickers, and has a face.
+      const bob = reduced ? 0 : Math.sin(now / 420) * 2 * px, lx = Math.round(x + 10 * px), ly = Math.round(y - 16 * px + bob), flicker = reduced ? 1 : 0.8 + Math.sin(now / 90) * 0.2;
+      const glow = ctx.createRadialGradient(lx, ly, 0, lx, ly, 9 * px); glow.addColorStop(0, `rgba(242,220,160,${0.4 * flicker})`); glow.addColorStop(1, "rgba(242,220,160,0)");
+      ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(lx, ly, 9 * px, 0, Math.PI * 2); ctx.fill();
+      const q = s;
+      ctx.fillStyle = "#ffffff"; ctx.fillRect(lx - 4 * q, ly - 6 * q, 8 * q, 11 * q);
+      ctx.fillStyle = INK; ctx.fillRect(lx - 3 * q, ly - 5 * q, 6 * q, 9 * q); ctx.fillRect(lx - 1 * q, ly - 8 * q, 2 * q, 3 * q); ctx.fillRect(lx - 3 * q, ly - 6 * q, 6 * q, 1 * q);
+      ctx.fillStyle = piece.color; ctx.fillRect(lx - 2 * q, ly - 4 * q, 4 * q, 6 * q);
+      ctx.fillStyle = INK; ctx.fillRect(lx - 1 * q, ly - 2 * q, q, q); ctx.fillRect(lx + 1 * q, ly - 2 * q, q, q);
     }
   }
 }

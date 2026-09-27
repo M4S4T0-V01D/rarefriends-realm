@@ -36,7 +36,10 @@ const EDGE_CLASS: Record<number, number> = {
 
 /** The camera: a point in tiles, zoom, rotation (radians, 0 = the classic view) and pitch (screen squash, 0.5 = classic). */
 export type Camera = { x: number; y: number; zoom: number; angle: number; pitch: number; base?: number };
-export const PITCH = { min: 0.36, max: 0.74, classic: 0.5 } as const;
+export const PITCH = { min: 0.13, max: 0.74, classic: 0.5 } as const;
+export const ZOOM = { min: 0.55, max: 3, classic: 0.8 } as const;
+/** How far the land is drawn, and where the haze begins (tiles from the camera). */
+const DRAW_DISTANCE = 44, HAZE_START = 24;
 export type ClickMarker = { x: number; y: number; at: number; red: boolean };
 export type Firework = { at: number; color: string };
 export type Scene = {
@@ -437,6 +440,18 @@ function drawIcon(ctx: CanvasRenderingContext2D, icon: Icon, x: number, y: numbe
   drawPixels(ctx, itemArt(icon), x, y + size / 2, size / 26);
 }
 
+// ---------- Distance haze ----------
+/** A soft sky haze over the far distance (visible when the camera looks low across the land). */
+function drawHaze(ctx: CanvasRenderingContext2D, camera: Camera) {
+  // "Away from the camera" in the world is screen-up; find where the haze starts and where the land ends on screen.
+  const c = Math.cos(-camera.angle), s = Math.sin(-camera.angle), ux = (-1 * c - -1 * s) * Math.SQRT1_2, uy = (-1 * s + -1 * c) * Math.SQRT1_2;
+  const start = toScreen(camera, camera.x + ux * HAZE_START, camera.y + uy * HAZE_START).y, end = toScreen(camera, camera.x + ux * (DRAW_DISTANCE - 4), camera.y + uy * (DRAW_DISTANCE - 4)).y;
+  if (start <= 0 || !(start > end)) return;
+  const haze = ctx.createLinearGradient(0, Math.max(-VIEW.height, end), 0, start);
+  haze.addColorStop(0, "rgba(207,215,220,0.97)"); haze.addColorStop(1, "rgba(215,220,222,0)");
+  ctx.fillStyle = haze; ctx.fillRect(0, 0, VIEW.width, Math.min(VIEW.height, start));
+}
+
 // ---------- Buildings ----------
 const WALL_H = 42;
 const roofAlpha = new Map<number, number>();
@@ -563,15 +578,21 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   const dt = Math.min(0.05, Math.max(0, (now - (lastFrame || now)) / 1000)); lastFrame = now;
   const project = (x: number, y: number, lift = 0) => toScreen(camera, x, y, lift);
   updateEffects(game, camera, dt, scene.reducedMotion, 34 / Math.max(0.5, z));
-  ctx.fillStyle = underground ? "#0e0e10" : "#8fa1b5"; ctx.fillRect(0, 0, VIEW.width, VIEW.height);
+  if (underground) { ctx.fillStyle = "#0e0e10"; ctx.fillRect(0, 0, VIEW.width, VIEW.height); }
+  else { const sky = ctx.createLinearGradient(0, 0, 0, VIEW.height); sky.addColorStop(0, "#b9c7d6"); sky.addColorStop(1, "#dcdfda"); ctx.fillStyle = sky; ctx.fillRect(0, 0, VIEW.width, VIEW.height); }
   // Visible tile bounds.
   const corners = [toTile(camera, 0, 0), toTile(camera, VIEW.width, 0), toTile(camera, 0, VIEW.height), toTile(camera, VIEW.width, VIEW.height)];
-  const x0 = Math.min(...corners.map(c => c.x)) - 2, x1 = Math.max(...corners.map(c => c.x)) + 3, y0 = Math.min(...corners.map(c => c.y)) - 2, y1 = Math.max(...corners.map(c => c.y)) + 3;
+  // Low camera angles see a long way: draw out to DRAW_DISTANCE and let the haze take the rest.
+  const cx = Math.round(camera.x), cy = Math.round(camera.y);
+  const x0 = Math.max(cx - DRAW_DISTANCE, Math.min(...corners.map(c => c.x)) - 2), x1 = Math.min(cx + DRAW_DISTANCE, Math.max(...corners.map(c => c.x)) + 3);
+  const y0 = Math.max(cy - DRAW_DISTANCE, Math.min(...corners.map(c => c.y)) - 2), y1 = Math.min(cy + DRAW_DISTANCE, Math.max(...corners.map(c => c.y)) + 3);
   drawTerrain(ctx, scene, x0, y0, x1, y1);
   drawCloudShadows(ctx, project, camera, now, z, underground, scene.reducedMotion);
   const hits: Hit[] = [], drawables: Drawable[] = [];
   const player = game.player, pp = interpolate(player, game, alpha), playerDepth = depthOf(camera, pp.x, pp.y), depth = (x: number, y: number) => depthOf(camera, x, y);
   const insideBuilding = inBounds(player.x, player.y) ? world.buildingAt[player.y * W + player.x] : 0;
+  const me = toScreen(camera, pp.x, pp.y), meTop = me.y - 60 * z;
+  const coversPlayer = (x: number, y: number) => { const at = toScreen(camera, x, y); return Math.abs(at.x - me.x) < 34 * z && at.y > meTop && at.y - 95 * z < me.y; };
   const playerFacing = screenFacing(camera, player.heading);
   // Hover highlight and click marker.
   const tileOutline = (tx: number, ty: number, color: string) => { const c = (dx: number, dy: number) => { const s = toScreen(camera, tx + dx, ty + dy); return [s.x, s.y] as const; }; poly(ctx, [c(-0.5, -0.5), c(0.5, -0.5), c(0.5, 0.5), c(-0.5, 0.5)], null, color, 1.5); };
@@ -598,7 +619,8 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     drawables.push({ depth: d, draw: () => {
       let rect: { x: number; y: number; w: number; h: number };
       const tall = object.kind === "tree" || (object.kind === "decor" && ["pine", "windmill", "palm", "pillar", "tent"].includes(object.decor!));
-      const fade = tall && d > playerDepth + 0.5 && Math.abs(x - pp.x) + Math.abs(y - pp.y) < 4 ? 0.4 : 1;
+      // Anything tall in front of your Friend that covers it on screen turns see-through (works at any angle and zoom).
+      const fade = tall && d > playerDepth + 0.3 && coversPlayer(x, y) ? 0.35 : 1;
       if (object.kind === "tree") rect = drawTree(ctx, camera, object, game.depleted.has(object.id), fade, scene.reducedMotion ? 0 : treeShake(game, object.id, now));
       else if (object.kind === "rock") rect = drawRock(ctx, camera, object, game.depleted.has(object.id));
       else if (object.kind === "spot") rect = drawSpot(ctx, camera, object, now, scene.reducedMotion);
@@ -679,7 +701,8 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     const bodyY = s.y - pose.bob * z;
     // Your Friend with its worn pieces composited into the same pixel frame.
     drawAuras(ctx, player.worn, s.x, bodyY, px, now, scene.reducedMotion, "back");
-    if (scene.friend) drawFigure(ctx, figureArt(friendRows(scene.friend, facing, walking, walking ? Math.floor(now / 80) % 8 : 0), player.worn, facing), s.x, bodyY + 2 * z, px, pose.alpha);
+    const stride = walking ? Math.floor(now / 80) % 8 : 0, cloth = scene.reducedMotion ? 0 : walking ? stride % 4 : Math.floor(now / 520) % 4;
+    if (scene.friend) drawFigure(ctx, figureArt(friendRows(scene.friend, facing, walking, stride), player.worn, facing, cloth), s.x, bodyY + 2 * z, px, pose.alpha);
     else ellipse(ctx, s.x, bodyY - 20 * z, 12 * z, 16 * z, INK);
     drawAuras(ctx, player.worn, s.x, bodyY, px, now, scene.reducedMotion, "front");
     drawHeld(ctx, scene, pose, s.x, bodyY, px, facing, project);
@@ -704,6 +727,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     ellipse(ctx, px, py, 8 * z, 8 * z, `${projectile.color}88`, null); ellipse(ctx, px, py, 4 * z, 4 * z, projectile.color, INK);
   }
   drawEffects(ctx, project, world, now, z);
+  if (!underground) drawHaze(ctx, camera);
   // Click marker: an old-school cross, yellow for walking, red for actions.
   if (scene.marker && now - scene.marker.at < 450) {
     const s = toScreen(camera, scene.marker.x, scene.marker.y), k = 1 - (now - scene.marker.at) / 450, r = 8 * z * (0.6 + k * 0.4);

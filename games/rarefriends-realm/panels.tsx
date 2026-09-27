@@ -353,7 +353,7 @@ function SettingsTab({ game, settings, setSettings, trackName, trackId, playTrac
       <label className="realm-range">Music volume <input type="range" min={0} max={100} value={Math.round(settings.musicVolume * 100)} onChange={event => set({ musicVolume: Number(event.target.value) / 100 })} /></label>
       <label className="realm-check"><input type="checkbox" checked={settings.sfx} onChange={event => set({ sfx: event.target.checked })} /> Sound effects</label>
       <label className="realm-range">Effects volume <input type="range" min={0} max={100} value={Math.round(settings.sfxVolume * 100)} onChange={event => set({ sfxVolume: Number(event.target.value) / 100 })} /></label>
-      <label className="realm-range">Zoom <input type="range" min={55} max={160} value={Math.round(settings.zoom * 100)} onChange={event => set({ zoom: Number(event.target.value) / 100 })} /></label>
+      <label className="realm-range">Zoom <input type="range" min={55} max={300} value={Math.round(settings.zoom * 100)} onChange={event => set({ zoom: Number(event.target.value) / 100 })} /></label>
       <label className="realm-check"><input type="checkbox" checked={settings.shiftDrop} onChange={event => set({ shiftDrop: event.target.checked })} /> Shift-click to drop</label>
       <label className="realm-check"><input type="checkbox" checked={game.player.run} onChange={() => { toggleRun(game); refresh(); }} /> Run</label>
       <p className="realm-note">{saved}</p>
@@ -559,7 +559,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
     <Modal title="Controls and tips" onClose={onClose}>
       <ul className="realm-help">
         <li><b>Left-click</b> does the first option (shown top-left). <b>Right-click</b> (or long-press) for every option.</li>
-        <li><b>WASD</b> walks. <b>← →</b> turn the camera, <b>↑ ↓</b> tilt it; or <b>drag with the scroll wheel held</b>. Click the <b>compass</b> to face north.</li>
+        <li><b>WASD</b> walks. <b>← →</b> turn the camera, <b>↑ ↓</b> tilt it from overhead right down to ground level; or <b>drag with the scroll wheel held</b>. Scroll zooms in close (up to 3×). Click the <b>compass</b> to face north.</li>
         <li><b>R</b> toggles run. <b>Scroll</b> zooms. <b>M</b> opens the world map.</li>
         <li><b>F1–F9</b> or the icons switch tabs. <b>Enter</b> to chat. <b>Space</b> continues dialogue, <b>1–5</b> pick options. <b>Esc</b> closes.</li>
         <li><b>Use</b> an item, then click another item or object: raw fish on a range, tinderbox on logs, needle on leather, chisel on a gem.</li>

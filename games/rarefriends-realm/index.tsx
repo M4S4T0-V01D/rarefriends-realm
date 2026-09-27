@@ -11,7 +11,7 @@ import { TICK_MS, combatLevel, createGame, message, totalLevel, type Game, type 
 import {
   chooseOption, closeInterfaces, collectFromCasket, continueDialogue, menuFor, unlockMusic, restore, serialize, setFollower, setHeld, setRelics, tick, toggleRun, walkTo, type OwnedFriend, type Selection,
 } from "./engine.ts";
-import { PITCH, VIEW, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
+import { PITCH, VIEW, ZOOM, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
 import {
   BankModal, ChatBox, ContextMenu, DialogueBox, FriendPortrait, HelpModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
   cancelLongPress, longPress, type MenuEntry, type Settings, type Tab,
@@ -143,7 +143,9 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       setPhase("title");
       // Automated browser tests only (navigator.webdriver): a handle for driving the camera and state.
       if (navigator.webdriver) (window as unknown as { __realm?: unknown }).__realm = {
-        game: () => game.current, camera: () => ({ ...camera.current }), refresh: () => refresh(), screenOf: (x: number, y: number) => {
+        game: () => game.current, camera: () => ({ ...camera.current }), refresh: () => refresh(),
+        view: (zoom: number, pitch: number, angle = 0) => { setSettings({ ...live.current.settings, zoom }); camera.current.pitch = pitch; camera.current.angle = angle; cameraGoal.current = null; },
+        screenOf: (x: number, y: number) => {
           const view = canvas.current!.getBoundingClientRect(), point = toScreen(camera.current, x, y);
           return { x: view.left + point.x * view.width / VIEW.width, y: view.top + point.y * view.height / VIEW.height };
         },
@@ -493,12 +495,12 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           onMouseDown={event => { if (event.button === 1) event.preventDefault(); }} onAuxClick={event => event.preventDefault()}
           onPointerLeave={() => { hoverTile.current = null; setHover(""); }}
           onContextMenu={event => { event.preventDefault(); const p = logicalPoint(event.clientX, event.clientY); openContext(p.x, p.y); }}
-          onWheel={event => { if (phase === "playing") setSettings({ ...settings, zoom: Math.max(0.55, Math.min(1.6, settings.zoom * (event.deltaY < 0 ? 1.08 : 0.93))) }); }} />
+          onWheel={event => { if (phase === "playing") setSettings({ ...settings, zoom: Math.max(ZOOM.min, Math.min(ZOOM.max, settings.zoom * (event.deltaY < 0 ? 1.08 : 0.93))) }); }} />
 
         {phase === "playing" && state && player && <>
           <div className="realm-hover" aria-hidden="true">{hover}</div>
           <div className="realm-topright">
-            <Orbs game={state} onRun={() => { toggleRun(state); refresh(); }} onMap={() => setModal("map")} onZoom={delta => setSettings({ ...settings, zoom: Math.max(0.55, Math.min(1.6, settings.zoom + delta)) })}
+            <Orbs game={state} onRun={() => { toggleRun(state); refresh(); }} onMap={() => setModal("map")} onZoom={delta => setSettings({ ...settings, zoom: Math.max(ZOOM.min, Math.min(ZOOM.max, settings.zoom * (delta > 0 ? 1.15 : 0.87))) })}
               onRotate={delta => { const from = cameraGoal.current?.angle ?? camera.current.angle; cameraGoal.current = { angle: from + delta, pitch: cameraGoal.current?.pitch ?? camera.current.pitch }; }} />
             <div className="realm-minimap">
               <canvas ref={minimap} width={152} height={152} onClick={onMinimap} aria-label="Minimap: click to walk, scroll to zoom"
