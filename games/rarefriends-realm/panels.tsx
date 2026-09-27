@@ -1,0 +1,546 @@
+/** The Realm's interface: side tabs, chat and dialogue, bank, shops, production, map and more. */
+import { useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import type { GenerationSprites } from "@rarefriends/friendsdk/sprites";
+import {
+  EQUIP_SLOTS, FAMILY_NAMES, FAMILY_PERKS, PRAYERS, RELICS, SHOPS, SKILLS, SKILL_ICONS, SKILL_NAMES, SPELLS, WARDROBE, XP_TABLE, item, levelForXp,
+  type EquipSlot, type Skill,
+} from "./data.ts";
+import { MAX_QUEST_POINTS, NPCS, QUESTS, finalStage, questPoints } from "./content.ts";
+import {
+  bankDeposit, bankDepositAll, bankDepositWorn, bankWithdraw, bonuses, combatLevel, count, isStaffEquipped, maxHp, maxPrayer, totalLevel, totalXp,
+  weapon, xpMultiplier, type Game, type Message, type Recipe, type Slot,
+} from "./state.ts";
+import {
+  buy, buyPrice, canCast, castSpell, chooseOption, continueDialogue, dialogueAtOptions, itemOptions, playerMaxHit, recipeProblem, sell, sellPrice,
+  setFollower, setStyle, startProduction, swapSlots, toggleRun, togglePrayer, toggleWorn, unequip, useItemOnItem, type OwnedFriend, type Selection,
+} from "./engine.ts";
+import { drawItemShape, friendRows, renderWorldMap } from "./render.ts";
+import { friendSprite } from "./sprites.ts";
+
+// ---------- Item icons ----------
+const iconCache = new Map<string, string>();
+export function itemIconUrl(id: string) {
+  let url = iconCache.get(id);
+  if (url) return url;
+  const canvas = document.createElement("canvas"); canvas.width = canvas.height = 64;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return "";
+  drawItemShape(ctx, item(id).icon, 0, 0, 64);
+  url = canvas.toDataURL(); iconCache.set(id, url);
+  return url;
+}
+const shortCount = (n: number) => n >= 10_000_000 ? `${Math.floor(n / 1_000_000)}M` : n >= 100_000 ? `${Math.floor(n / 1000)}K` : String(n);
+const countColor = (n: number) => n >= 10_000_000 ? "#9fe0a8" : n >= 100_000 ? "#fff" : "#f2e28f";
+export function ItemIcon({ slot, size = 36, title }: { slot: Slot; size?: number; title?: string }) {
+  const stack = item(slot.id).stackable || slot.n > 1;
+  return (
+    <span className="realm-item" style={{ width: size, height: size }} title={title ?? item(slot.id).name}>
+      <img src={itemIconUrl(slot.id)} alt="" width={size} height={size} draggable={false} />
+      {stack && <b style={{ color: countColor(slot.n) }}>{shortCount(slot.n)}</b>}
+    </span>
+  );
+}
+
+/** A Friend drawn from its mask (canonical or procedural). */
+export function FriendPortrait({ sprites, family, seed, size = 48 }: { sprites?: GenerationSprites | null; family?: number; seed?: number; size?: number }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = ref.current, ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    const rows = sprites ? friendRows(sprites, "down", false, 0) : friendSprite(family ?? 0, seed ?? 1).idle, px = Math.floor(size / 18);
+    canvas.width = canvas.height = size; ctx.clearRect(0, 0, size, size);
+    const off = (size - rows.length * px) / 2;
+    ctx.fillStyle = "#fff";
+    rows.forEach((row, y) => [...row].forEach((pixel, x) => { if (pixel === "#") ctx.fillRect(off + (x - 1) * px, off + (y - 1) * px, px * 3, px * 3); }));
+    ctx.fillStyle = "#161616";
+    rows.forEach((row, y) => [...row].forEach((pixel, x) => { if (pixel === "#") ctx.fillRect(off + x * px, off + y * px, px, px); }));
+  }, [sprites, family, seed, size]);
+  return <canvas ref={ref} className="realm-portrait" width={size} height={size} aria-hidden="true" />;
+}
+
+// ---------- Context menu ----------
+export type MenuEntry = { verb: string; noun?: string; tone?: string; run: () => void };
+export function ContextMenu({ x, y, entries, onClose }: { x: number; y: number; entries: MenuEntry[]; onClose: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ x, y });
+  useEffect(() => {
+    const node = ref.current, parent = node?.offsetParent as HTMLElement | null;
+    if (!node || !parent) return;
+    const w = node.offsetWidth, h = node.offsetHeight, pw = parent.clientWidth, ph = parent.clientHeight;
+    setPosition({ x: Math.max(2, Math.min(x - w / 2, pw - w - 2)), y: Math.max(2, Math.min(y - 8, ph - h - 2)) });
+  }, [x, y]);
+  return (
+    <div ref={ref} className="realm-menu" role="menu" style={{ left: position.x, top: position.y }} onMouseLeave={onClose} onContextMenu={event => event.preventDefault()}>
+      <div className="realm-menu-title">Choose Option</div>
+      {entries.map((entry, index) => (
+        <button key={index} type="button" role="menuitem" onClick={() => { onClose(); entry.run(); }}>
+          <span>{entry.verb}</span>{entry.noun ? <> <span className={`tone-${entry.tone ?? "plain"}`}>{entry.noun}</span></> : null}
+        </button>
+      ))}
+      <button type="button" role="menuitem" onClick={onClose}><span>Cancel</span></button>
+    </div>
+  );
+}
+
+// ---------- Side panel ----------
+export type Tab = "combat" | "skills" | "quests" | "inventory" | "equipment" | "prayer" | "magic" | "friends" | "settings";
+export const TABS: readonly { id: Tab; label: string; glyph: string; key: string }[] = [
+  { id: "combat", label: "Combat options", glyph: "⚔", key: "F1" }, { id: "skills", label: "Skills", glyph: "▦", key: "F2" }, { id: "quests", label: "Quest journal", glyph: "✎", key: "F3" },
+  { id: "inventory", label: "Inventory", glyph: "▣", key: "F4" }, { id: "equipment", label: "Worn equipment", glyph: "⛨", key: "F5" }, { id: "prayer", label: "Prayer", glyph: "✚", key: "F6" },
+  { id: "magic", label: "Magic", glyph: "✦", key: "F7" }, { id: "friends", label: "Friends and wardrobe", glyph: "☺", key: "F8" }, { id: "settings", label: "Settings", glyph: "⚙", key: "F9" },
+];
+export type Settings = { music: boolean; sfx: boolean; musicVolume: number; sfxVolume: number; zoom: number; shiftDrop: boolean };
+export type PanelProps = {
+  game: Game; tab: Tab; setTab: (tab: Tab) => void; selection: Selection; setSelection: (selection: Selection) => void;
+  openMenu: (x: number, y: number, entries: MenuEntry[]) => void; refresh: () => void; roster: readonly OwnedFriend[]; rosterState: "waiting" | "ready" | "none";
+  friendSprites: ReadonlyMap<number, GenerationSprites>; loadFriend: (id: number) => void; settings: Settings; setSettings: (settings: Settings) => void;
+  trackName: string; openCard: () => void; openHelp: () => void; paused: boolean; saved: string; relicCounts: readonly number[]; openCaskets: () => void;
+};
+export function SidePanel(props: PanelProps) {
+  const { tab, setTab } = props;
+  return (
+    <aside className="realm-side" aria-label="Game panels">
+      <div className="realm-tabs" role="tablist">
+        {TABS.map(entry => (
+          <button key={entry.id} type="button" role="tab" aria-selected={tab === entry.id} title={`${entry.label} (${entry.key})`} aria-label={entry.label} onClick={() => setTab(entry.id)}>{entry.glyph}</button>
+        ))}
+      </div>
+      <div className="realm-tab-body" role="tabpanel" aria-label={TABS.find(entry => entry.id === tab)?.label}>
+        {tab === "combat" && <CombatTab {...props} />}
+        {tab === "skills" && <SkillsTab {...props} />}
+        {tab === "quests" && <QuestsTab {...props} />}
+        {tab === "inventory" && <InventoryTab {...props} />}
+        {tab === "equipment" && <EquipmentTab {...props} />}
+        {tab === "prayer" && <PrayerTab {...props} />}
+        {tab === "magic" && <MagicTab {...props} />}
+        {tab === "friends" && <FriendsTab {...props} />}
+        {tab === "settings" && <SettingsTab {...props} />}
+      </div>
+    </aside>
+  );
+}
+function CombatTab({ game, refresh }: PanelProps) {
+  const player = game.player, held = weapon(player);
+  const styles = [["accurate", "Accurate", "Attack XP"], ["aggressive", "Aggressive", "Strength XP"], ["defensive", "Defensive", "Defence XP"], ["controlled", "Controlled", "Shared XP"]] as const;
+  return (
+    <div className="realm-combat">
+      <h3>{held?.name ?? "Unarmed"}</h3>
+      <p className="realm-muted">Combat level: <b>{combatLevel(player)}</b> · Max hit: <b>{playerMaxHit(game)}</b></p>
+      <div className="realm-styles">
+        {styles.map(([id, name, xp]) => <button key={id} type="button" aria-pressed={player.style === id} onClick={() => { setStyle(game, id); refresh(); }}><b>{name}</b><small>{xp}</small></button>)}
+      </div>
+      {player.autocast && <p className="realm-note">Autocasting {SPELLS.find(spell => spell.id === player.autocast)?.name}. Choose it again in Magic to stop.</p>}
+      <label className="realm-check"><input type="checkbox" checked={game.autoRetaliate} onChange={event => { game.autoRetaliate = event.target.checked; refresh(); }} /> Auto retaliate</label>
+    </div>
+  );
+}
+function SkillsTab({ game }: PanelProps) {
+  const player = game.player, [focus, setFocus] = useState<Skill | null>(null);
+  const info = (skill: Skill) => {
+    const xp = Math.floor(player.xp[skill]), level = levelForXp(xp), next = level < 99 ? XP_TABLE[level + 1] : null;
+    return `${SKILL_NAMES[skill]} XP: ${xp.toLocaleString()}${next ? ` · Next level at: ${next.toLocaleString()} · Remaining: ${(next - xp).toLocaleString()}` : ""}`;
+  };
+  return (
+    <div>
+      <div className="realm-skills">
+        {SKILLS.map(skill => {
+          const level = levelForXp(player.xp[skill]), current = skill === "hitpoints" ? player.hp : skill === "prayer" ? Math.ceil(player.prayer) : level;
+          const next = level < 99 ? XP_TABLE[level + 1] : XP_TABLE[99], base = XP_TABLE[level], progress = level >= 99 ? 1 : (player.xp[skill] - base) / Math.max(1, next - base);
+          return (
+            <button key={skill} type="button" className="realm-skill" title={info(skill)} aria-label={info(skill)} onClick={() => setFocus(focus === skill ? null : skill)} onMouseEnter={() => setFocus(skill)}>
+              <i aria-hidden="true">{SKILL_ICONS[skill]}</i><span>{current}<small>/{level}</small></span>
+              <em style={{ width: `${Math.round(progress * 100)}%` }} />
+            </button>
+          );
+        })}
+        <div className="realm-skill total"><span>Total level:<br /><b>{totalLevel(player)}</b></span></div>
+      </div>
+      <p className="realm-skill-info">{focus ? info(focus) : `Total XP: ${totalXp(player).toLocaleString()} · XP rate ×${xpMultiplier(player).toFixed(2)}`}</p>
+    </div>
+  );
+}
+function QuestsTab({ game }: PanelProps) {
+  const [open, setOpen] = useState<string | null>(null), quest = QUESTS.find(entry => entry.id === open);
+  if (quest) return (
+    <div className="realm-journal">
+      <button type="button" className="realm-back" onClick={() => setOpen(null)}>‹ Quest list</button>
+      <h3>{quest.name}</h3>
+      <p className="realm-muted">{quest.difficulty} · {quest.points} quest point{quest.points > 1 ? "s" : ""}{quest.requirements.length ? ` · ${quest.requirements.join(", ")}` : ""}</p>
+      {quest.journal(game).map((line, index) => <p key={index}>{line}</p>)}
+    </div>
+  );
+  return (
+    <div className="realm-quests">
+      <p className="realm-muted">Quest points: <b>{questPoints(game)}</b> / {MAX_QUEST_POINTS}</p>
+      <ul>
+        {QUESTS.map(entry => {
+          const stage = game.player.quests[entry.id] ?? 0, state = stage >= finalStage(entry.id) ? "done" : stage > 0 ? "started" : "new";
+          return <li key={entry.id}><button type="button" className={`quest-${state}`} onClick={() => setOpen(entry.id)}>{entry.name}</button></li>;
+        })}
+      </ul>
+      <p className="realm-note">Red: not started · Yellow: in progress · Green: complete</p>
+    </div>
+  );
+}
+function InventoryTab({ game, selection, setSelection, openMenu, refresh, settings, paused }: PanelProps) {
+  const player = game.player, drag = useRef<number | null>(null);
+  const click = (index: number, shift: boolean) => {
+    if (paused) return;
+    const slot = player.inventory[index];
+    if (selection?.kind === "item") {
+      if (selection.slot !== index && slot) useItemOnItem(game, selection.slot, index);
+      setSelection(null); refresh(); return;
+    }
+    if (!slot) return;
+    const options = itemOptions(game, index), first = settings.shiftDrop && shift ? options.find(option => option.verb === "Drop")! : options[0];
+    const result = first.run(game);
+    if (result) setSelection(result);
+    refresh();
+  };
+  const context = (target: Element, clientX: number, clientY: number, index: number) => {
+    const slot = player.inventory[index];
+    if (!slot || paused) return;
+    const [x, y] = stagePoint(target, clientX, clientY);
+    openMenu(x, y, itemOptions(game, index).map(option => ({
+      verb: option.verb, noun: item(slot.id).name, tone: "item", run: () => { const result = option.run(game); if (result) setSelection(result); refresh(); },
+    })));
+  };
+  return (
+    <div className="realm-inventory" onContextMenu={event => event.preventDefault()}>
+      {player.inventory.map((slot, index) => (
+        <button key={index} type="button" className="realm-slot" data-selected={selection?.kind === "item" && selection.slot === index}
+          aria-label={slot ? `${item(slot.id).name}${slot.n > 1 ? ` × ${slot.n}` : ""}` : `Empty slot ${index + 1}`}
+          draggable={!!slot} onDragStart={() => { drag.current = index; }} onDragOver={event => event.preventDefault()}
+          onDrop={() => { if (drag.current !== null) { swapSlots(game, drag.current, index); drag.current = null; refresh(); } }}
+          onClick={event => click(index, event.shiftKey)} onContextMenu={event => { event.preventDefault(); context(event.currentTarget, event.clientX, event.clientY, index); }}
+          onTouchStart={event => { const touch = event.touches[0], target = event.currentTarget; longPress(() => context(target, touch.clientX, touch.clientY, index)); }} onTouchEnd={cancelLongPress} onTouchMove={cancelLongPress}>
+          {slot && <ItemIcon slot={slot} />}
+        </button>
+      ))}
+    </div>
+  );
+}
+/** Convert a client point to stage (logical) coordinates; the stage may be scaled to fit the frame. */
+export function stagePoint(target: Element, clientX: number, clientY: number) {
+  const stage = target.closest(".realm-stage") as HTMLElement, rect = stage.getBoundingClientRect(), scale = rect.width / stage.offsetWidth;
+  return [(clientX - rect.left) / scale, (clientY - rect.top) / scale] as const;
+}
+let pressTimer: ReturnType<typeof setTimeout> | null = null;
+/** Touch: a long press opens the right-click menu. */
+export function longPress(action: () => void) { cancelLongPress(); pressTimer = setTimeout(() => { pressTimer = null; action(); }, 450); }
+export function cancelLongPress() { if (pressTimer) clearTimeout(pressTimer); pressTimer = null; }
+const SLOT_NAMES: Record<EquipSlot, string> = { head: "Head", cape: "Cape", neck: "Neck", weapon: "Weapon", body: "Body", shield: "Shield", legs: "Legs", hands: "Hands", feet: "Feet" };
+function EquipmentTab({ game, refresh, openCard }: PanelProps) {
+  const player = game.player, total = bonuses(player);
+  const layout: (EquipSlot | null)[] = [null, "head", null, "cape", "neck", null, "weapon", "body", "shield", null, "legs", null, "hands", "feet", null];
+  return (
+    <div className="realm-equipment">
+      <div className="realm-equip-grid">
+        {layout.map((slot, index) => slot ? (
+          <button key={index} type="button" className="realm-slot" aria-label={player.equipment[slot] ? `Remove ${item(player.equipment[slot]!).name}` : `${SLOT_NAMES[slot]}: empty`}
+            title={player.equipment[slot] ? `Remove ${item(player.equipment[slot]!).name}` : SLOT_NAMES[slot]} onClick={() => { unequip(game, slot); refresh(); }}>
+            {player.equipment[slot] ? <ItemIcon slot={{ id: player.equipment[slot]!, n: 1 }} /> : <span className="realm-slot-label">{SLOT_NAMES[slot]}</span>}
+          </button>
+        ) : <span key={index} />)}
+      </div>
+      <dl className="realm-bonuses">
+        <div><dt>Attack</dt><dd>{signed(total.attack)}</dd></div><div><dt>Strength</dt><dd>{signed(total.strength)}</dd></div>
+        <div><dt>Defence</dt><dd>{signed(total.defence)}</dd></div><div><dt>Magic</dt><dd>{signed(total.magic)}</dd></div><div><dt>Prayer</dt><dd>{signed(total.prayer)}</dd></div>
+      </dl>
+      <button type="button" className="realm-wide" onClick={openCard}>Adventurer card · Share on X</button>
+    </div>
+  );
+}
+const signed = (n: number) => (n >= 0 ? `+${n}` : String(n));
+function PrayerTab({ game, refresh }: PanelProps) {
+  const player = game.player, level = levelForXp(player.xp.prayer);
+  return (
+    <div>
+      <p className="realm-muted">Prayer points: <b>{Math.ceil(player.prayer)}</b> / {maxPrayer(player)} · Bonus {signed(bonuses(player).prayer)}</p>
+      <div className="realm-prayers">
+        {PRAYERS.map(prayer => (
+          <button key={prayer.id} type="button" aria-pressed={player.prayers.includes(prayer.id)} disabled={level < prayer.level} title={`${prayer.name} (level ${prayer.level}): ${prayer.description}`}
+            onClick={() => { togglePrayer(game, prayer.id); refresh(); }}>
+            <b>{prayer.name}</b><small>{level < prayer.level ? `Level ${prayer.level}` : prayer.description}</small>
+          </button>
+        ))}
+      </div>
+      <p className="realm-note">Recharge at any altar. Bury bones to train Prayer.</p>
+    </div>
+  );
+}
+function MagicTab({ game, refresh, setSelection, setTab }: PanelProps) {
+  const player = game.player, level = levelForXp(player.xp.magic), staff = isStaffEquipped(player);
+  return (
+    <div>
+      <p className="realm-muted">Magic level <b>{level}</b>{staff ? " · Staff: click a spell to autocast" : " · Click a spell, then a target"}</p>
+      <div className="realm-spells">
+        {SPELLS.map(spell => {
+          const problem = canCast(game, spell), usable = !problem || spell.id === "home";
+          const runes = Object.entries(spell.runes).map(([rune, n]) => `${n} ${item(rune).name.replace(" rune", "")}`).join(", ");
+          return (
+            <button key={spell.id} type="button" disabled={level < spell.level} data-usable={usable} aria-pressed={player.autocast === spell.id}
+              title={`${spell.name} (level ${spell.level}): ${spell.description}${runes ? ` Runes: ${runes}.` : ""}`}
+              onClick={() => { const selection = castSpell(game, spell.id); if (selection) { setSelection(selection); setTab("magic"); } refresh(); }}>
+              <b>{spell.name}</b><small>{level < spell.level ? `Level ${spell.level}` : runes || "Free"}</small>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+function FriendsTab({ game, refresh, roster, rosterState, friendSprites, loadFriend, relicCounts, openCaskets }: PanelProps) {
+  const player = game.player, perk = FAMILY_PERKS[player.familyId];
+  useEffect(() => { for (const friend of roster.slice(0, 24)) loadFriend(friend.id); }, [roster, loadFriend]);
+  return (
+    <div className="realm-friends">
+      <p className="realm-perk"><b>{FAMILY_NAMES[player.familyId]}: {perk.title}.</b> {perk.text}</p>
+      <h3>Followers</h3>
+      {rosterState === "waiting" && <p className="realm-muted">Looking for your other Friends…</p>}
+      {rosterState === "none" && <p className="realm-muted">Other Friends you own can follow you here. Each adds XP: Gen 1 +5% … Gen 5+ +1%.</p>}
+      <div className="realm-followers">
+        {roster.map(friend => (
+          <button key={friend.id} type="button" aria-pressed={player.follower === friend.id} title={`Friend #${friend.id}${friend.generation ? ` · Gen ${friend.generation}` : ""}`}
+            onClick={() => { setFollower(game, player.follower === friend.id ? null : friend); refresh(); }}>
+            <FriendPortrait sprites={friendSprites.get(friend.id) ?? null} family={friend.id % 9} seed={friend.id} size={36} />
+            <small>#{friend.id}{friend.generation ? ` G${friend.generation}` : ""}</small>
+          </button>
+        ))}
+      </div>
+      <h3>Wardrobe <small>({player.wardrobe.length}/{WARDROBE.length})</small></h3>
+      <div className="realm-wardrobe">
+        {WARDROBE.map(piece => {
+          const owned = player.wardrobe.includes(piece.id);
+          return <button key={piece.id} type="button" disabled={!owned} aria-pressed={player.worn.includes(piece.id)} title={owned ? `${piece.name}: click to ${player.worn.includes(piece.id) ? "remove" : "wear"}` : `${piece.name}: from Rare Caskets`}
+            onClick={() => { toggleWorn(game, piece.id); refresh(); }}><i style={{ background: owned ? piece.color : "transparent" } as CSSProperties} />{owned ? piece.name : "???"}</button>;
+        })}
+      </div>
+      <h3>Rare Relics</h3>
+      <ul className="realm-relics">{RELICS.map((relic, index) => <li key={relic.name}><b>{relic.name} × {relicCounts[index] ?? 0}</b><small>{relic.text}</small></li>)}</ul>
+      <button type="button" className="realm-wide" onClick={openCaskets}>Rare Caskets (simulated RF)</button>
+    </div>
+  );
+}
+function SettingsTab({ game, settings, setSettings, trackName, openHelp, saved, refresh }: PanelProps) {
+  const set = (patch: Partial<Settings>) => setSettings({ ...settings, ...patch });
+  return (
+    <div className="realm-settings">
+      <label className="realm-check"><input type="checkbox" checked={settings.music} onChange={event => set({ music: event.target.checked })} /> Music <small>({trackName})</small></label>
+      <label className="realm-range">Music volume <input type="range" min={0} max={100} value={Math.round(settings.musicVolume * 100)} onChange={event => set({ musicVolume: Number(event.target.value) / 100 })} /></label>
+      <label className="realm-check"><input type="checkbox" checked={settings.sfx} onChange={event => set({ sfx: event.target.checked })} /> Sound effects</label>
+      <label className="realm-range">Effects volume <input type="range" min={0} max={100} value={Math.round(settings.sfxVolume * 100)} onChange={event => set({ sfxVolume: Number(event.target.value) / 100 })} /></label>
+      <label className="realm-range">Zoom <input type="range" min={55} max={160} value={Math.round(settings.zoom * 100)} onChange={event => set({ zoom: Number(event.target.value) / 100 })} /></label>
+      <label className="realm-check"><input type="checkbox" checked={settings.shiftDrop} onChange={event => set({ shiftDrop: event.target.checked })} /> Shift-click to drop</label>
+      <label className="realm-check"><input type="checkbox" checked={game.player.run} onChange={() => { toggleRun(game); refresh(); }} /> Run</label>
+      <p className="realm-note">{saved}</p>
+      <button type="button" className="realm-wide" onClick={openHelp}>Controls and tips</button>
+    </div>
+  );
+}
+
+// ---------- Chat, dialogue, level-ups, production ----------
+export function ChatBox({ messages, onSend }: { messages: readonly Message[]; onSend: (text: string) => void }) {
+  const [filter, setFilter] = useState<"all" | "game" | "public">("all"), [draft, setDraft] = useState(""), list = useRef<HTMLDivElement>(null);
+  const shown = messages.filter(entry => filter === "all" || (filter === "public" ? entry.tone === "public" : entry.tone !== "public")).slice(-60);
+  useEffect(() => { const node = list.current; if (node) node.scrollTop = node.scrollHeight; }, [shown.length, filter]);
+  return (
+    <section className="realm-chat" aria-label="Chat">
+      <div className="realm-chat-log" ref={list} role="log" aria-live="polite">
+        {shown.map((entry, index) => <p key={`${entry.tick}-${index}`} className={`chat-${entry.tone}`}>{entry.text}</p>)}
+      </div>
+      <form className="realm-chat-input" onSubmit={event => { event.preventDefault(); if (draft.trim()) onSend(draft.trim().slice(0, 80)); setDraft(""); (document.activeElement as HTMLElement | null)?.blur(); }}>
+        <label><span>You:</span><input value={draft} maxLength={80} onChange={event => setDraft(event.target.value)} placeholder="Press Enter to chat" aria-label="Say something" data-chat="true" /></label>
+      </form>
+      <div className="realm-chat-tabs" role="tablist">
+        {(["all", "game", "public"] as const).map(id => <button key={id} type="button" role="tab" aria-selected={filter === id} onClick={() => setFilter(id)}>{id === "all" ? "All" : id === "game" ? "Game" : "Public"}</button>)}
+      </div>
+    </section>
+  );
+}
+export function DialogueBox({ game, sprites, canonical, refresh }: { game: Game; sprites: GenerationSprites | null; canonical: ReadonlyMap<number, GenerationSprites>; refresh: () => void }) {
+  const dialogue = game.dialogue!;
+  const options = dialogueAtOptions(dialogue) ? dialogue.options! : null, line = dialogue.lines[Math.min(dialogue.index, dialogue.lines.length - 1)];
+  const npc = Object.values(NPCS).find(entry => entry.name === dialogue.npc);
+  const portrait = line.who === "player" ? <FriendPortrait sprites={sprites} size={64} />
+    : npc && "canonical" in npc.art ? <FriendPortrait sprites={canonical.get(npc.art.canonical) ?? null} size={64} />
+    : npc && "family" in npc.art ? <FriendPortrait family={npc.art.family} seed={npc.art.seed} size={64} /> : null;
+  return (
+    <section className="realm-dialogue" aria-label={`Talking to ${dialogue.npc}`} aria-live="polite">
+      {options ? (
+        <div className="realm-options">
+          <h3>Select an option</h3>
+          {options.map((option, index) => <button key={index} type="button" onClick={() => { chooseOption(game, index); refresh(); }}><kbd>{index + 1}</kbd> {option.label}</button>)}
+        </div>
+      ) : (
+        <button type="button" className={`realm-line who-${line.who}`} onClick={() => { continueDialogue(game); refresh(); }}>
+          {line.who === "npc" && portrait}
+          <span><b>{line.who === "player" ? "You" : dialogue.npc}</b>{line.text}<em>Click here to continue (Space)</em></span>
+          {line.who === "player" && portrait}
+        </button>
+      )}
+    </section>
+  );
+}
+export function LevelUpBox({ skill, level, onClose }: { skill: Skill; level: number; onClose: () => void }) {
+  return (
+    <section className="realm-dialogue" aria-live="assertive">
+      <button type="button" className="realm-line realm-levelup" onClick={onClose}>
+        <i aria-hidden="true">{SKILL_ICONS[skill]}</i>
+        <span><b>Congratulations, you just advanced a{/^[AEIOU]/.test(SKILL_NAMES[skill]) ? "n" : ""} {SKILL_NAMES[skill]} level.</b>Your {SKILL_NAMES[skill]} level is now {level}.<em>Click here to continue (Space)</em></span>
+      </button>
+    </section>
+  );
+}
+export function ProductionBox({ game, refresh }: { game: Game; refresh: () => void }) {
+  const menu = game.ui.production!, [amount, setAmount] = useState(28);
+  const most = (recipe: Recipe) => Math.min(28, ...Object.entries(recipe.inputs).map(([id, n]) => Math.floor(count(game.player, id) / n)));
+  return (
+    <section className="realm-dialogue realm-make" aria-label={menu.title}>
+      <div className="realm-make-head"><h3>{menu.title}</h3>
+        <div className="realm-amounts">{[1, 5, 10, 28].map(n => <button key={n} type="button" aria-pressed={amount === n} onClick={() => setAmount(n)}>{n === 28 ? "All" : n}</button>)}
+          <button type="button" onClick={() => { game.ui.production = null; refresh(); }} aria-label="Close">✕</button></div>
+      </div>
+      <div className="realm-make-list">
+        {menu.recipes.map(recipe => {
+          const problem = recipeProblem(game, recipe), output = Object.keys(recipe.outputs)[0];
+          return (
+            <button key={recipe.label} type="button" disabled={!!problem} title={problem ?? `${recipe.label}: level ${recipe.level}, ${Object.entries(recipe.inputs).map(([id, n]) => `${n} ${item(id).name.toLowerCase()}`).join(", ")}`}
+              onClick={() => { startProduction(game, recipe, Math.min(amount, Math.max(1, most(recipe)))); refresh(); }}>
+              <ItemIcon slot={{ id: output, n: 1 }} size={32} /><small>{recipe.label}<br />Lv {recipe.level}</small>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+// ---------- Modals ----------
+export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
+  return (
+    <div className="realm-scrim" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
+      <section className={`realm-modal${wide ? " wide" : ""}`} role="dialog" aria-modal="true" aria-label={title}>
+        <header><h2>{title}</h2><button type="button" onClick={onClose} aria-label="Close">✕</button></header>
+        <div className="realm-modal-body">{children}</div>
+      </section>
+    </div>
+  );
+}
+export function BankModal({ game, refresh, onClose, openMenu }: { game: Game; refresh: () => void; onClose: () => void; openMenu: PanelProps["openMenu"] }) {
+  const player = game.player, [search, setSearch] = useState(""), [amount, setAmount] = useState<number>(1);
+  const shown = player.bank.filter(slot => !search || item(slot.id).name.toLowerCase().includes(search.toLowerCase()));
+  return (
+    <Modal title="Bank of the Realm" onClose={onClose} wide>
+      <div className="realm-bank-bar">
+        <input type="search" placeholder="Search" value={search} onChange={event => setSearch(event.target.value)} aria-label="Search the bank" />
+        <span>Withdraw/deposit:</span>{[1, 5, 10, Infinity].map(n => <button key={n} type="button" aria-pressed={amount === n} onClick={() => setAmount(n)}>{n === Infinity ? "All" : n}</button>)}
+        <button type="button" onClick={() => { bankDepositAll(player); refresh(); }}>Deposit inventory</button>
+        <button type="button" onClick={() => { bankDepositWorn(player); refresh(); }}>Deposit worn</button>
+      </div>
+      <div className="realm-bank">
+        <div className="realm-bank-grid" aria-label="Bank">
+          {shown.map(slot => (
+            <button key={slot.id} type="button" className="realm-slot" aria-label={`Withdraw ${item(slot.id).name} (${slot.n})`}
+              onClick={() => { bankWithdraw(player, slot.id, amount); refresh(); }}
+              onContextMenu={event => { event.preventDefault(); const [x, y] = stagePoint(event.currentTarget, event.clientX, event.clientY); openMenu(x, y, [1, 5, 10, Infinity].map(n => ({ verb: `Withdraw-${n === Infinity ? "All" : n}`, noun: item(slot.id).name, tone: "item", run: () => { bankWithdraw(player, slot.id, n); refresh(); } }))); }}>
+              <ItemIcon slot={slot} />
+            </button>
+          ))}
+          {!shown.length && <p className="realm-muted">{search ? "Nothing matches." : "Your bank is empty."}</p>}
+        </div>
+        <div className="realm-inventory small" aria-label="Inventory (click to deposit)">
+          {player.inventory.map((slot, index) => (
+            <button key={index} type="button" className="realm-slot" aria-label={slot ? `Deposit ${item(slot.id).name}` : `Empty slot ${index + 1}`} onClick={() => { if (slot) { bankDeposit(player, index, amount); refresh(); } }}>
+              {slot && <ItemIcon slot={slot} size={30} />}
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="realm-note">{player.bank.length} / 400 slots · Click to withdraw or deposit; right-click for amounts.</p>
+    </Modal>
+  );
+}
+export function ShopModal({ game, shopId, refresh, onClose }: { game: Game; shopId: string; refresh: () => void; onClose: () => void }) {
+  const shop = SHOPS[shopId], player = game.player, [amount, setAmount] = useState(1);
+  return (
+    <Modal title={shop.name} onClose={onClose} wide>
+      <div className="realm-bank-bar"><span>Buy/sell:</span>{[1, 5, 10, 50].map(n => <button key={n} type="button" aria-pressed={amount === n} onClick={() => setAmount(n)}>{n}</button>)}
+        <span className="realm-coins">Coins: <b>{count(player, "coins").toLocaleString()}</b></span></div>
+      <div className="realm-bank">
+        <div className="realm-bank-grid" aria-label="Shop stock">
+          {shop.stock.map(id => (
+            <button key={id} type="button" className="realm-slot shop" aria-label={`Buy ${item(id).name} for ${buyPrice(game, id)} coins`} title={`${item(id).name}: ${buyPrice(game, id)} coins`} onClick={() => { buy(game, shopId, id, amount); refresh(); }}>
+              <ItemIcon slot={{ id, n: 1 }} size={32} /><small>{buyPrice(game, id).toLocaleString()}</small>
+            </button>
+          ))}
+        </div>
+        <div className="realm-inventory small" aria-label="Inventory (click to sell)">
+          {player.inventory.map((slot, index) => (
+            <button key={index} type="button" className="realm-slot" aria-label={slot ? `Sell ${item(slot.id).name} for ${sellPrice(slot.id)} coins` : `Empty slot ${index + 1}`} title={slot ? `Sell for ${sellPrice(slot.id)} coins` : undefined}
+              onClick={() => { if (slot) { sell(game, shopId, index, amount); refresh(); } }}>
+              {slot && <ItemIcon slot={slot} size={30} />}
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="realm-note">{shop.general ? "The general store buys almost anything." : "This shop only buys what it sells."} {game.player.familyId === 2 ? "Big family: 10% off." : ""}</p>
+    </Modal>
+  );
+}
+export function WorldMapModal({ game, onClose, onTravel }: { game: Game; onClose: () => void; onTravel: (x: number, y: number) => void }) {
+  const canvas = useRef<HTMLCanvasElement>(null), underground = game.player.y >= 200;
+  const [focus, setFocus] = useState(() => ({ x: underground ? 130 : 120, y: underground ? 220 : 100, zoom: underground ? 3.2 : 2.3 }));
+  const toTile = useRef<((x: number, y: number) => { x: number; y: number }) | null>(null), drag = useRef<{ x: number; y: number; fx: number; fy: number; moved: boolean } | null>(null);
+  useEffect(() => {
+    const node = canvas.current, ctx = node?.getContext("2d");
+    if (!node || !ctx) return;
+    node.width = 760; node.height = 470;
+    toTile.current = renderWorldMap(ctx, game, node.width, node.height, focus, underground);
+  }, [focus, game, underground]);
+  const point = (event: ReactMouseEvent<HTMLCanvasElement>) => { const rect = event.currentTarget.getBoundingClientRect(); return { x: (event.clientX - rect.left) * 760 / rect.width, y: (event.clientY - rect.top) * 470 / rect.height }; };
+  return (
+    <Modal title={underground ? "World map: underground" : "World map of the Realm"} onClose={onClose} wide>
+      <canvas ref={canvas} className="realm-worldmap" aria-label="World map. Drag to pan, scroll to zoom, click to walk there."
+        onMouseDown={event => { const p = point(event); drag.current = { x: p.x, y: p.y, fx: focus.x, fy: focus.y, moved: false }; }}
+        onMouseMove={event => { const d = drag.current; if (!d || event.buttons !== 1) return; const p = point(event), dx = (p.x - d.x) / focus.zoom, dy = (p.y - d.y) / focus.zoom;
+          if (Math.hypot(p.x - d.x, p.y - d.y) > 4) d.moved = true; setFocus({ ...focus, x: d.fx - (dx + dy) * Math.SQRT1_2, y: d.fy - (dy - dx) * Math.SQRT1_2 }); }}
+        onMouseUp={event => { const d = drag.current; drag.current = null; if (d && !d.moved && toTile.current) { const p = point(event), tile = toTile.current(p.x, p.y); onTravel(tile.x, tile.y); } }}
+        onWheel={event => setFocus({ ...focus, zoom: Math.max(1.2, Math.min(8, focus.zoom * (event.deltaY < 0 ? 1.15 : 0.87))) })} />
+      <p className="realm-note">Drag to pan · Scroll to zoom · Click to walk there · You are the white dot</p>
+    </Modal>
+  );
+}
+export function HelpModal({ onClose }: { onClose: () => void }) {
+  return (
+    <Modal title="Controls and tips" onClose={onClose}>
+      <ul className="realm-help">
+        <li><b>Left-click</b> does the first option (shown top-left). <b>Right-click</b> (or long-press) for every option.</li>
+        <li><b>WASD / arrows</b> walk. <b>R</b> toggles run. <b>Scroll</b> zooms. <b>M</b> opens the world map.</li>
+        <li><b>F1–F9</b> or the icons switch tabs. <b>Enter</b> to chat. <b>Space</b> continues dialogue, <b>1–5</b> pick options. <b>Esc</b> closes.</li>
+        <li><b>Use</b> an item, then click another item or object: raw fish on a range, tinderbox on logs, needle on leather, chisel on a gem.</li>
+        <li>Train <b>15 skills</b> to 99 on the old-school XP curve (Realm rate ×3). Your Friend's family adds a perk.</li>
+        <li><b>Six quests</b>, from A Friend's Feast to The Hollow King. Look for yellow markers over quest givers.</li>
+        <li><b>Rare Caskets</b> use simulated $RAREFRIENDS: relics give bonuses while kept, and the wardrobe dresses your Friend.</li>
+        <li>Your adventure saves automatically for this wallet on this device.</li>
+      </ul>
+    </Modal>
+  );
+}
+export function Orbs({ game, onRun, onMap, onZoom }: { game: Game; onRun: () => void; onMap: () => void; onZoom: (delta: number) => void }) {
+  const player = game.player, hpFraction = player.hp / maxHp(player), prayerFraction = player.prayer / Math.max(1, maxPrayer(player));
+  const orb = (label: string, value: number, fraction: number, color: string, onClick?: () => void, pressed?: boolean) => (
+    <button type="button" className="realm-orb" onClick={onClick} disabled={!onClick} aria-pressed={pressed} aria-label={`${label}: ${value}`} title={label}>
+      <i style={{ background: `conic-gradient(${color} ${Math.round(fraction * 360)}deg, #2a2a2a 0)` }} /><b>{value}</b>
+    </button>
+  );
+  return (
+    <div className="realm-orbs">
+      {orb("Hitpoints", player.hp, hpFraction, "#c98f95")}
+      {orb("Prayer", Math.ceil(player.prayer), prayerFraction, "#afbccb")}
+      {orb(player.run ? "Run: on" : "Run: off", Math.floor(player.energy), player.energy / 100, player.run ? "#e2d7ad" : "#9a968f", onRun, player.run)}
+      <button type="button" className="realm-orb map" onClick={onMap} aria-label="World map (M)" title="World map (M)">🗺</button>
+      <div className="realm-zoom"><button type="button" onClick={() => onZoom(0.12)} aria-label="Zoom in">+</button><button type="button" onClick={() => onZoom(-0.12)} aria-label="Zoom out">−</button></div>
+    </div>
+  );
+}

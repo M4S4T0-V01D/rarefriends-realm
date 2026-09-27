@@ -1,0 +1,229 @@
+/* RareFriends Realm: ink, paper and greys with faded rose, sage, butter and dusty-blue accents. */
+.realm-game { --ink: #161616; --paper: #efede7; --card: #f7f5f0f2; --muted: #6d6b67; --rose: #d8b6b4; --sage: #b4c3ab; --butter: #e2d7ad; --blue: #afbccb; --panel: #242322; --panel-2: #2f2d2b; --gold: #f2e28f;
+  position: relative; width: 100%; height: 100%; overflow: hidden; background: #0e0e10; color: var(--ink); font: 12px/1.35 ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.realm-game * { box-sizing: border-box; }
+.realm-stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; overflow: hidden; }
+.realm-view { position: absolute; inset: 0; display: block; touch-action: none; cursor: default; outline: none; image-rendering: pixelated; }
+.realm-game button { font: inherit; color: inherit; cursor: pointer; }
+.realm-game button:focus-visible, .realm-game input:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+.realm-game button:disabled { cursor: default; }
+
+/* Buttons in paper panels. */
+.realm-modal button, .realm-title button, .realm-status button, .realm-wide, .realm-side-toggle {
+  min-height: 30px; padding: 5px 11px; border: 1.5px solid var(--ink); background: var(--paper); box-shadow: 2px 2px 0 var(--ink); }
+.realm-modal button:hover:not(:disabled), .realm-title button:hover:not(:disabled) { background: #fff; }
+.realm-modal button:active:not(:disabled), .realm-title button:active:not(:disabled) { transform: translate(1px, 1px); box-shadow: 1px 1px 0 var(--ink); }
+.realm-modal button:disabled { opacity: .45; box-shadow: none; }
+.realm-primary { background: var(--ink) !important; color: var(--paper) !important; }
+.realm-primary:hover:not(:disabled) { background: #333 !important; }
+.realm-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.realm-buttons.center { justify-content: center; }
+.realm-muted { color: #9a968f; margin: 4px 0; }
+.realm-note { font-size: 11px; color: var(--muted); margin: 6px 0; }
+.realm-error { color: #a0403c; font-weight: 700; }
+.realm-sim { padding: 6px 10px; background: var(--butter); border: 1px dashed var(--ink); margin: 0 0 8px; }
+
+/* Hover text: old-school top-left action text. */
+.realm-hover { position: absolute; left: 8px; top: 6px; max-width: 58%; color: #fff; font-weight: 700; font-size: 13px; text-shadow: 1px 1px 0 #000, -1px 0 0 #000, 0 -1px 0 #000; pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Top right: orbs and minimap. */
+.realm-topright { position: absolute; right: 8px; top: 8px; display: flex; gap: 4px; align-items: flex-start; pointer-events: none; }
+.realm-minimap { position: relative; width: 160px; height: 160px; border-radius: 50%; padding: 4px; background: var(--panel); border: 2px solid var(--ink); box-shadow: 0 0 0 2px #5a5753 inset, 3px 3px 0 #000; pointer-events: auto; }
+.realm-minimap canvas { width: 152px; height: 152px; border-radius: 50%; display: block; cursor: pointer; }
+.realm-compass { position: absolute; left: 2px; top: 2px; width: 26px; height: 26px; border-radius: 50%; background: var(--paper); border: 2px solid var(--ink); display: grid; place-items: center; font-weight: 800; font-size: 11px; transform: rotate(-45deg); }
+.realm-orbs { display: grid; gap: 4px; padding-top: 18px; pointer-events: auto; }
+.realm-orb { position: relative; width: 48px; height: 30px; display: flex; align-items: center; gap: 4px; padding: 2px 6px 2px 2px; border-radius: 16px; background: var(--panel); border: 2px solid var(--ink); color: #fff; box-shadow: 2px 2px 0 #000; }
+.realm-orb i { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid #000; flex: none; }
+.realm-orb b { font-size: 12px; min-width: 18px; text-align: center; color: var(--gold); }
+.realm-orb[aria-pressed="true"] { border-color: var(--butter); }
+.realm-orb.map { justify-content: center; font-size: 15px; filter: grayscale(1) contrast(1.2); }
+.realm-zoom { display: flex; gap: 3px; }
+.realm-zoom button { flex: 1; height: 22px; border: 2px solid var(--ink); background: var(--panel); color: #fff; font-weight: 700; border-radius: 4px; box-shadow: 2px 2px 0 #000; }
+
+/* XP drops. */
+.realm-drops { position: absolute; right: 250px; top: 24px; display: grid; justify-items: end; gap: 2px; pointer-events: none; }
+.realm-drops span { color: #fff; font-weight: 800; font-size: 13px; text-shadow: 1px 1px 0 #000, -1px 0 0 #000, 0 -1px 0 #000, 0 1px 0 #000; animation: realm-drop 1.8s ease-out forwards; }
+@keyframes realm-drop { from { transform: translateY(40px); opacity: 0; } 15% { opacity: 1; } to { transform: translateY(-30px); opacity: 0; } }
+
+/* Region banner, death, paused. */
+.realm-toast { position: absolute; left: 50%; top: 58px; transform: translateX(-50%); display: grid; justify-items: center; gap: 2px; padding: 8px 22px; background: #161616dd; color: var(--paper); border: 2px solid var(--gold); pointer-events: none; animation: realm-fade 3.4s ease forwards; }
+.realm-toast b { font-size: 20px; letter-spacing: .12em; text-transform: uppercase; color: var(--gold); }
+.realm-toast small { font-size: 11px; color: #d6d3cc; }
+@keyframes realm-fade { 0% { opacity: 0; transform: translate(-50%, -6px); } 12% { opacity: 1; transform: translate(-50%, 0); } 80% { opacity: 1; } 100% { opacity: 0; } }
+.realm-dead { position: absolute; inset: 0; display: grid; place-items: center; background: #00000099; color: #e07a7a; font-size: 34px; font-weight: 800; text-shadow: 2px 2px 0 #000; pointer-events: none; animation: realm-fade2 2.6s ease forwards; }
+@keyframes realm-fade2 { 0% { opacity: 0; } 15% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+.realm-paused { position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%); padding: 10px 24px; background: var(--paper); border: 2px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); font-size: 18px; font-weight: 800; }
+
+/* Bottom-left: chat and dialogue. */
+/* The SDK frame's toolbar sits bottom-left, so the chat box starts above it (--toolbar is set from the stage scale). */
+.realm-bottom { position: absolute; left: 6px; bottom: var(--toolbar, 54px); width: min(500px, calc(100% - 264px)); height: 150px; }
+.realm-chat, .realm-dialogue { position: absolute; inset: 0; background: #efede7ee; border: 2px solid var(--ink); box-shadow: 3px 3px 0 #000; display: flex; flex-direction: column; }
+.realm-chat-log { flex: 1; overflow-y: auto; padding: 5px 8px; scrollbar-width: thin; }
+.realm-chat-log p { margin: 0; line-height: 1.35; }
+.chat-game { color: var(--ink); } .chat-info { color: #3a5b86; } .chat-warn { color: #9a3b37; } .chat-quest { color: #7a4e8a; font-weight: 700; }
+.chat-level { color: #5b3f00; font-weight: 700; } .chat-npc { color: #333; } .chat-public { color: #2a2a8a; }
+.realm-chat-input { border-top: 1.5px solid var(--ink); padding: 3px 8px; }
+.realm-chat-input label { display: flex; gap: 6px; align-items: center; }
+.realm-chat-input span { font-weight: 700; }
+.realm-chat-input input { flex: 1; font: inherit; border: 0; background: transparent; color: #2a2a8a; outline: none; }
+.realm-chat-tabs { display: flex; border-top: 1.5px solid var(--ink); background: var(--panel); }
+.realm-chat-tabs button { flex: 1; border: 0; border-right: 1px solid #000; background: transparent; color: #d6d3cc; padding: 3px 0; }
+.realm-chat-tabs button[aria-selected="true"] { color: var(--gold); font-weight: 700; background: var(--panel-2); }
+.realm-line { flex: 1; display: flex; align-items: center; gap: 12px; padding: 8px 14px; border: 0; background: transparent; text-align: left; }
+.realm-line span { flex: 1; display: grid; gap: 4px; font-size: 13px; }
+.realm-line span b { color: #7a1e1e; font-size: 14px; }
+.realm-line.who-player span b { color: #1e3a7a; }
+.realm-line em { font-style: normal; color: #3a5b86; font-size: 11px; }
+.realm-line .realm-portrait { width: 72px; height: 72px; background: #fff; border: 1.5px solid var(--ink); image-rendering: pixelated; }
+.realm-levelup i { font-size: 38px; font-style: normal; filter: grayscale(1) contrast(1.3); }
+.realm-levelup span b { color: #5b3f00; }
+.realm-options { padding: 6px 12px; display: grid; gap: 2px; overflow-y: auto; }
+.realm-options h3 { margin: 0 0 3px; font-size: 12px; color: #7a1e1e; text-align: center; }
+.realm-options button { border: 0; background: transparent; text-align: left; padding: 3px 6px; font-size: 13px; }
+.realm-options button:hover { background: #fff; }
+.realm-options kbd { display: inline-block; min-width: 18px; text-align: center; border: 1px solid var(--ink); margin-right: 6px; font-size: 11px; }
+.realm-make { padding: 6px 10px; }
+.realm-make-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.realm-make-head h3 { margin: 0; font-size: 13px; }
+.realm-amounts { display: flex; gap: 3px; }
+.realm-amounts button { border: 1.5px solid var(--ink); background: var(--paper); padding: 1px 7px; }
+.realm-amounts button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.realm-make-list { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; overflow-y: auto; }
+.realm-make-list button { display: flex; align-items: center; gap: 4px; padding: 2px 6px 2px 2px; border: 1.5px solid var(--ink); background: #fff; font-size: 10px; text-align: left; }
+.realm-make-list button:disabled { opacity: .4; }
+
+/* Bottom-right: side panel. */
+.realm-side { position: absolute; right: 6px; bottom: 6px; width: 246px; height: 332px; background: var(--panel); border: 2px solid var(--ink); box-shadow: 3px 3px 0 #000; display: flex; flex-direction: column; color: #e8e5de; }
+.realm-tabs { display: grid; grid-template-columns: repeat(9, 1fr); border-bottom: 2px solid #000; }
+.realm-tabs button { height: 28px; border: 0; border-right: 1px solid #000; background: var(--panel-2); color: #c9c5bd; font-size: 14px; }
+.realm-tabs button[aria-selected="true"] { background: #4a3f36; color: var(--gold); box-shadow: inset 0 -3px 0 var(--rose); }
+.realm-tab-body { flex: 1; overflow-y: auto; padding: 7px; scrollbar-width: thin; }
+.realm-tab-body h3 { margin: 6px 0 4px; font-size: 12px; color: var(--gold); }
+.realm-side-toggle { position: absolute; right: 6px; bottom: 342px; min-height: 22px !important; padding: 1px 8px !important; font-size: 11px; display: none; }
+.realm-slot { position: relative; display: grid; place-items: center; width: 100%; aspect-ratio: 1; border: 1px solid transparent; background: transparent; padding: 0; border-radius: 3px; }
+.realm-slot:hover { background: #ffffff14; border-color: #ffffff22; }
+.realm-slot[data-selected="true"] { border-color: #fff; background: #ffffff22; }
+.realm-slot-label { font-size: 9px; color: #7d7a74; }
+.realm-item { position: relative; display: inline-block; }
+.realm-item img { display: block; image-rendering: auto; pointer-events: none; }
+.realm-item b { position: absolute; left: -2px; top: -4px; font-size: 10px; text-shadow: 1px 1px 0 #000, -1px 0 0 #000; }
+.realm-inventory { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; }
+.realm-combat h3 { text-align: center; }
+.realm-styles { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin: 8px 0; }
+.realm-styles button, .realm-prayers button, .realm-spells button { display: grid; gap: 1px; text-align: left; padding: 5px 7px; border: 1.5px solid #000; background: var(--panel-2); color: #e8e5de; border-radius: 3px; }
+.realm-styles button small, .realm-prayers button small, .realm-spells button small { color: #a8a39c; font-size: 10px; }
+.realm-styles button[aria-pressed="true"], .realm-prayers button[aria-pressed="true"], .realm-spells button[aria-pressed="true"] { background: #5b4a3b; border-color: var(--gold); color: var(--gold); }
+.realm-prayers, .realm-spells { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.realm-prayers button:disabled, .realm-spells button:disabled { opacity: .35; }
+.realm-spells button[data-usable="false"] b { color: #a8a39c; }
+.realm-check { display: flex; gap: 6px; align-items: center; margin: 6px 0; }
+.realm-range { display: grid; gap: 2px; margin: 6px 0; }
+.realm-range input { width: 100%; }
+.realm-skills { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
+.realm-skill { position: relative; display: flex; align-items: center; justify-content: space-between; height: 34px; padding: 0 6px; border: 1.5px solid #000; background: var(--panel-2); color: var(--gold); border-radius: 3px; overflow: hidden; }
+.realm-skill i { font-style: normal; font-size: 15px; filter: grayscale(1) brightness(1.6); }
+.realm-skill span { font-weight: 800; font-size: 13px; }
+.realm-skill span small { color: #c9c5bd; font-weight: 400; }
+.realm-skill em { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--sage); }
+.realm-skill.total { grid-column: span 3; justify-content: center; height: 36px; color: #e8e5de; text-align: center; }
+.realm-skill-info { font-size: 10px; color: #c9c5bd; margin: 6px 0 0; min-height: 26px; }
+.realm-quests ul { list-style: none; margin: 6px 0; padding: 0; display: grid; gap: 2px; }
+.realm-quests button { width: 100%; text-align: left; border: 0; background: transparent; padding: 3px 4px; font-weight: 700; }
+.realm-quests button:hover { background: #ffffff12; }
+.quest-new { color: #e07a7a; } .quest-started { color: var(--gold); } .quest-done { color: #9fe0a8; }
+.realm-journal p { margin: 5px 0; color: #e8e5de; }
+.realm-back { border: 0; background: transparent; color: var(--gold); padding: 0; }
+.realm-equip-grid { display: grid; grid-template-columns: repeat(3, 46px); justify-content: center; gap: 4px; }
+.realm-equip-grid .realm-slot { background: #00000033; border: 1.5px solid #000; }
+.realm-bonuses { display: grid; grid-template-columns: 1fr 1fr; gap: 1px 10px; margin: 8px 0; font-size: 11px; }
+.realm-bonuses div { display: flex; justify-content: space-between; }
+.realm-bonuses dt { color: #c9c5bd; } .realm-bonuses dd { margin: 0; color: var(--gold); }
+.realm-wide { width: 100%; margin-top: 6px; background: var(--paper) !important; color: var(--ink) !important; }
+.realm-perk { background: #00000033; border-left: 3px solid var(--rose); padding: 5px 7px; margin: 0 0 6px; font-size: 11px; }
+.realm-followers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.realm-followers button { display: grid; justify-items: center; padding: 3px; border: 1.5px solid #000; background: var(--paper); color: var(--ink); border-radius: 3px; }
+.realm-followers button[aria-pressed="true"] { background: var(--butter); box-shadow: 0 0 0 2px var(--gold); }
+.realm-followers small { font-size: 9px; }
+.realm-portrait { image-rendering: pixelated; }
+.realm-wardrobe { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+.realm-wardrobe button { display: flex; align-items: center; gap: 5px; padding: 3px 5px; border: 1.5px solid #000; background: var(--panel-2); color: #e8e5de; font-size: 10px; text-align: left; border-radius: 3px; }
+.realm-wardrobe button[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
+.realm-wardrobe button:disabled { opacity: .45; }
+.realm-wardrobe i { width: 12px; height: 12px; border: 1px solid #000; flex: none; }
+.realm-relics { list-style: none; padding: 0; margin: 4px 0; display: grid; gap: 4px; }
+.realm-relics li { display: grid; gap: 1px; }
+.realm-relics small { color: #a8a39c; font-size: 10px; }
+
+/* Selection banner. */
+.realm-selection { position: absolute; left: 50%; top: 32px; transform: translateX(-50%); padding: 3px 10px; background: #161616dd; color: #fff; border: 1.5px solid var(--gold); font-weight: 700; }
+.realm-selection button { margin-left: 8px; border: 1px solid #fff; background: transparent; color: #fff; padding: 0 6px; }
+
+/* Context menu. */
+.realm-menu { position: absolute; z-index: 30; min-width: 150px; background: #1c1b1a; border: 2px solid #000; box-shadow: 3px 3px 0 #000; padding-bottom: 2px; }
+.realm-menu-title { padding: 2px 6px; background: #000; color: #c9c5bd; font-weight: 700; }
+.realm-menu button { display: block; width: 100%; text-align: left; border: 0; background: transparent; color: #fff; padding: 2px 6px; white-space: nowrap; font-weight: 700; }
+.realm-menu button:hover, .realm-menu button:focus-visible { background: #3a3835; }
+.tone-npc, .tone-monster { color: #f2e28f; } .tone-object { color: #7fd7e0; } .tone-item { color: #f0a868; } .tone-plain { color: #fff; }
+
+/* Modals. */
+.realm-scrim { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; background: #16161677; padding: 12px; }
+.realm-modal { width: min(560px, 100%); max-height: 100%; display: flex; flex-direction: column; background: var(--paper); border: 2px solid var(--ink); box-shadow: 5px 5px 0 var(--ink); }
+.realm-modal.wide { width: min(820px, 100%); }
+.realm-modal header { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; background: #fff; border-bottom: 2px solid var(--ink); }
+.realm-modal header h2 { margin: 0; font-size: 15px; letter-spacing: .04em; }
+.realm-modal header button { box-shadow: none; border: 0; background: transparent; min-height: 26px; }
+.realm-modal-body { padding: 10px 14px; overflow-y: auto; }
+.realm-modal-body h3 { margin: 10px 0 4px; font-size: 13px; }
+.realm-bank-bar { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-bottom: 8px; }
+.realm-bank-bar input { font: inherit; padding: 4px 6px; border: 1.5px solid var(--ink); width: 130px; }
+.realm-bank-bar button { min-height: 26px !important; padding: 2px 8px !important; }
+.realm-bank-bar button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.realm-coins { margin-left: auto; }
+.realm-bank { display: grid; grid-template-columns: 1fr 190px; gap: 10px; }
+.realm-bank-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 3px; align-content: start; max-height: 330px; overflow-y: auto; padding: 6px; background: var(--panel); border: 2px solid var(--ink); }
+.realm-bank-grid .realm-slot { box-shadow: none; border: 1px solid transparent; background: transparent; min-height: 0; padding: 0; }
+.realm-bank-grid .realm-slot.shop { display: grid; gap: 0; }
+.realm-bank-grid .realm-slot.shop small { color: var(--gold); font-size: 9px; }
+.realm-bank-grid .realm-muted { grid-column: 1 / -1; }
+.realm-inventory.small { padding: 6px; background: var(--panel); border: 2px solid var(--ink); align-content: start; }
+.realm-inventory.small .realm-slot { box-shadow: none; border: 1px solid transparent; background: transparent; min-height: 0; padding: 0; }
+.realm-odds { width: 100%; border-collapse: collapse; font-size: 11px; margin: 8px 0; }
+.realm-odds th, .realm-odds td { padding: 4px; border-bottom: 1px solid #cfccc4; text-align: left; vertical-align: top; }
+.realm-odds th { border-bottom: 1.5px solid var(--ink); }
+.realm-reveal { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin: 8px 0; }
+.realm-reveal > div { display: grid; gap: 4px; padding: 8px; border: 2px solid var(--ink); background: #fff; animation: realm-pop .5s ease; }
+.realm-reveal .tier-2 { background: #eef0f3; } .realm-reveal .tier-3 { background: #e6ebf3; } .realm-reveal .tier-4 { background: #f6efcf; box-shadow: 0 0 0 3px var(--butter); }
+@keyframes realm-pop { from { transform: scale(.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.realm-modal .realm-relics li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; border-bottom: 1px solid #cfccc4; }
+.realm-modal .realm-relics small { color: var(--muted); display: block; }
+.realm-worldmap { width: 100%; aspect-ratio: 760 / 470; display: block; border: 2px solid var(--ink); cursor: grab; }
+.realm-card { width: 100%; border: 2px solid var(--ink); display: block; }
+.realm-help { margin: 0; padding-left: 18px; display: grid; gap: 7px; }
+.realm-quest-done { display: grid; justify-items: center; text-align: center; gap: 6px; }
+.realm-quest-done span { font-size: 40px; }
+.realm-quest-done h3 { margin: 0; font-size: 18px; }
+
+/* Title screen. */
+.realm-title { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 18px;
+  background: radial-gradient(ellipse at center, #16161622 0%, #16161688 70%, #161616cc 100%); }
+.realm-logo { text-align: center; color: var(--paper); text-shadow: 3px 3px 0 #000; }
+.realm-logo small { font-size: 13px; letter-spacing: .2em; text-transform: uppercase; color: var(--butter); }
+.realm-logo h1 { margin: 2px 0 0; font-size: 58px; line-height: .95; letter-spacing: .02em; }
+.realm-logo h1 span { display: block; font-size: 76px; color: var(--gold); letter-spacing: .18em; }
+.realm-title-card { display: flex; align-items: center; gap: 14px; max-width: 560px; padding: 12px 16px; background: var(--card); border: 2px solid var(--ink); box-shadow: 5px 5px 0 var(--ink); }
+.realm-title-card .realm-portrait { width: 96px; height: 96px; background: var(--rose); border: 2px solid var(--ink); flex: none; }
+.realm-title-card h2 { margin: 0 0 4px; font-size: 18px; }
+.realm-title-card p { margin: 3px 0; }
+.realm-save { padding: 4px 6px; background: var(--butter); border: 1px dashed var(--ink); }
+.realm-primary.big { font-size: 15px; padding: 9px 22px; }
+.realm-title-foot { margin: 0; color: #d6d3cc; font-size: 11px; text-shadow: 1px 1px 0 #000; }
+.realm-status { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; text-align: center; background: var(--paper); }
+.realm-status-glyph { font-size: 46px; animation: realm-float 1.6s ease-in-out infinite; }
+@keyframes realm-float { 50% { transform: translateY(-6px); } }
+
+/* Short frames (phones in landscape): the side panel folds away behind a toggle. */
+@media (max-height: 460px), (max-width: 700px) {
+  .realm-side-toggle { display: block; }
+}
+@media (prefers-reduced-motion: reduce) { .realm-drops span, .realm-toast, .realm-dead, .realm-reveal > div, .realm-status-glyph { animation: none; } }

@@ -1,0 +1,11 @@
+{
+  "name": "RareFriends Realm",
+  "consumable": "Rare Casket",
+  "price": "1000000000000000000",
+  "outcomes": [
+    { "name": "Plain Relic", "chanceBps": 6000, "reward": "500000000000000000" },
+    { "name": "Silver Relic", "chanceBps": 2800, "reward": "1000000000000000000" },
+    { "name": "Moonlit Relic", "chanceBps": 1000, "reward": "2000000000000000000" },
+    { "name": "Golden Relic", "chanceBps": 200, "reward": "5000000000000000000" }
+  ]
+}
