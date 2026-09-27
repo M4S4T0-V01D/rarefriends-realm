@@ -199,9 +199,9 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           const here = regionAt(state.world, state.player.x, state.player.y), throne = state.player.x >= 177 && state.player.y >= 212 && state.player.y <= 236;
           const key = `${here.id}:${throne}`;
           if (key !== region.current) {
-            const first = region.current === ""; region.current = key;
+            region.current = key;
             audio.current?.play(trackFor(here.id, throne));
-            if (!first) setToast({ title: throne ? "The Throne Room" : here.name, sub: trackById(trackFor(here.id, throne)).name });
+            setToast({ title: throne ? "The Throne Room" : here.name, sub: trackById(trackFor(here.id, throne)).name });
           }
           // Held keys walk.
           setHeld(state, heldDirection(held.current));
@@ -237,6 +237,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   }, [phase, reducedMotion, refresh]);
   useEffect(() => { if (paused && game.current) { held.current.clear(); setHeld(game.current, null); setMenu(null); } }, [paused]);
   useEffect(() => { if (!toast) return; const timer = setTimeout(() => setToast(null), 3400); return () => clearTimeout(timer); }, [toast]);
+  // Level-up messages step aside on their own after a few seconds, so long skilling sessions don't pile them up.
+  useEffect(() => { if (!levelUps.length) return; const timer = setTimeout(() => setLevelUps(list => list.slice(1)), 6000); return () => clearTimeout(timer); }, [levelUps]);
 
   // ---------- Input ----------
   const logicalPoint = (clientX: number, clientY: number) => {
