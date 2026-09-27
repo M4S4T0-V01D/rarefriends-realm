@@ -314,6 +314,8 @@ const OTHER_ITEMS: Item[] = [
     id: `tablet_${place}`, name: `${name} tablet`, examine: `Break it to travel to ${name === "Pier" ? "Pike's Pier" : name}.`, value: 120, stackable: true, tablet: place,
     icon: { shape: "tablet" as const, color: { hollow_square: "#e8d4c0", emberforge: "#e9a07a", oasis: "#e2d49e", frostpeak: "#c7d3dc", pier: "#8fa3c9" }[place] },
   })),
+  { id: "friendship_cape", name: "Friendship cape", examine: "Given to Friends who bring Friends. Wear it for the Friendship emote.", value: 0, tradeable: false,
+    icon: { shape: "cape", color: "#e7a9b0", accent: "#f7f5f0" }, equip: { slot: "cape", bonuses: { attack: 2, strength: 2, defence: 4, ranged: 2, magic: 2, prayer: 2 } } },
   { id: "insight_lamp", name: "Lamp of insight", examine: "Rub it to gain experience in a skill of your choice.", value: 0, tradeable: false, icon: { shape: "lamp", color: "#e2d49e" } },
 ];
 
@@ -556,6 +558,7 @@ export const EMOTES = [
   { id: "jump", name: "Jump for joy", ticks: 4 }, { id: "yes", name: "Yes", ticks: 3 }, { id: "no", name: "No", ticks: 3 }, { id: "spin", name: "Spin", ticks: 4 },
   { id: "flex", name: "Flex", ticks: 4 },
   { id: "skillcape", name: "Skillcape", ticks: 8, needs: "a mastery cape (wear one)" },
+  { id: "friendship", name: "Friendship", ticks: 8, needs: "the Friendship cape (wear it): refer a friend, or use a friend's code" },
 ] as const;
 export type EmoteId = typeof EMOTES[number]["id"];
 

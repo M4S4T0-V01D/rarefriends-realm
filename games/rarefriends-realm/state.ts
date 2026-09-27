@@ -8,6 +8,8 @@ import {
 import { createWorld, type World } from "./world.ts";
 
 export const TICK_MS = 600;
+/** Referrals: +15% XP for an hour of play, for both Friends, and 250 coins each. */
+export const REFERRAL_BOOST = 0.15, REFERRAL_TICKS = 6000, REFERRAL_COINS = 250;
 export const INVENTORY_SIZE = 28;
 export const BANK_SIZE = 400;
 export type Slot = { id: string; n: number };
@@ -52,6 +54,8 @@ export type Player = {
   courseStep: number; kills: number; deaths: number; overhead: { text: string; until: number } | null; music: string[];
   familyId: number; friendId: number; relics: number[]; followerGeneration: number | null; tutorial: number;
   lastHitBy: number | null; created: number; queuedSpell: string | null; castTimer: number;
+  /** Referrals: the Friend whose code you used, the Friends who used yours, and ticks of referral XP boost left. */
+  referredBy: number | null; referrals: number[]; boostTicks: number;
   /** The emote you're performing, and the tick it ends (not saved). */
   emote?: { id: string; start: number; until: number } | null;
   /** Friends from your friends list playing near you right now (not saved): +5% XP while any are. */
@@ -130,7 +134,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
     style: "accurate", autocast: null, prayers: [], target: null, activity: null, combat: null,
     attackTimer: 0, eatTimer: 0, stunned: 0, regenTimer: 0, quests: {}, questData: {},
     wardrobe: [], worn: [], follower: null, courseStep: -1, kills: 0, deaths: 0, overhead: null, music: ["theme"],
-    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0,
+    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, referredBy: null, referrals: [], boostTicks: 0,
     lastHitBy: null, created: Date.now(), queuedSpell: null, castTimer: 0,
   };
 }
@@ -177,7 +181,7 @@ export function combatLevel(player: Player) {
 /** XP multiplier from the realm rate, kept Rare Relics and your follower's generation. */
 export function xpMultiplier(player: Player) {
   const plain = Math.min(RELICS[0].max, player.relics[0] ?? 0) * RELICS[0].xpPer, golden = (player.relics[3] ?? 0) > 0 ? RELICS[3].xpPer : 0;
-  return XP_RATE * (1 + plain + golden + followerBonus(player) + ((player.nearFriends ?? 0) > 0 ? 0.05 : 0));
+  return XP_RATE * (1 + plain + golden + followerBonus(player) + ((player.nearFriends ?? 0) > 0 ? 0.05 : 0) + (player.boostTicks > 0 ? REFERRAL_BOOST : 0));
 }
 /** Owned-Friend followers: Gen 1 +5% XP … Gen 5 and later +1%. */
 export function followerBonus(player: Player) {

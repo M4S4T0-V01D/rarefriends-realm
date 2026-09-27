@@ -13,7 +13,7 @@ import type { PeerView } from "./social.ts";
 import { emoteMotion, emoteParticles, type Motion } from "./emotes.ts";
 import { drawPixels, shadeHex } from "./pixel.ts";
 import { TEX_PER_HEIGHT, TEX_PER_TILE, beginTextures, shingleTexture, texturedQuad, texturedTriangle, wallTexture, type WallStyle } from "./textures.ts";
-import { decorArt, rockArt, treeArt } from "./scenery.ts";
+import { decorArt, fireArt, rockArt, treeArt } from "./scenery.ts";
 import { burst, drawCloudShadows, drawEffects, playerPose, puff, treeShake, updateEffects, type Pose } from "./effects.ts";
 import { drawAuras, drawFigure, figureArt } from "./wardrobe.ts";
 import { creatureSprite, friendSprite, type Mask } from "./sprites.ts";
@@ -477,7 +477,10 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
   if (art) {
     if (object.decor === "torch" || object.decor === "lamp") ellipse(ctx, sx, sy - (object.decor === "lamp" ? 54 : 36) * z, 16 * z, 11 * z, `rgba(242,220,160,${0.16 + Math.sin(now / 300 + ox) * 0.04})`, null);
     else ellipse(ctx, sx, sy + 1 * z, art.width * z * 0.8, 4 * z, "rgba(22,22,22,0.12)", null);
-    return drawPixels(ctx, art, sx, sy + 2 * z, ART * z, alpha);
+    const rect = drawPixels(ctx, art, sx, sy + 2 * z, ART * z, alpha);
+    // A torch's flame is the pixel fire, flickering.
+    if (object.decor === "torch") drawPixels(ctx, fireArt(scene.reducedMotion ? 0 : Math.floor(now / 110 + ox * 5) % 8, 9, 13, 4 + (ox % 3)), sx, sy - 22 * z, ART * z, alpha);
+    return rect;
   }
   ctx.globalAlpha = alpha;
   try {
@@ -512,7 +515,7 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
       case "lily": ellipse(ctx, sx, sy, 7 * z, 3.5 * z, "#a9b59c"); ellipse(ctx, sx + 2 * z, sy - 1 * z, 2 * z, 1.5 * z, C.rose, null); return hit(6, 16);
       case "banner": ctx.strokeStyle = INK; ctx.lineWidth = 2 * z; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx, sy - 50 * z); ctx.stroke(); poly(ctx, [[sx, sy - 50 * z], [sx + 16 * z, sy - 46 * z], [sx + 16 * z, sy - 24 * z], [sx + 8 * z, sy - 30 * z], [sx, sy - 26 * z]], C.rose); return hit(54, 30);
       case "torch": { ctx.strokeStyle = "#8a7563"; ctx.lineWidth = 2.5 * z; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx, sy - 22 * z); ctx.stroke(); const f = scene.reducedMotion ? 0 : Math.sin(now / 80 + ox * 3) * 2 * z;
-        ellipse(ctx, sx, sy - 34 * z, 18 * z, 12 * z, "rgba(240,200,150,0.15)", null); poly(ctx, [[sx - 5 * z, sy - 22 * z], [sx + f * 0.5, sy - 36 * z - f], [sx + 5 * z, sy - 22 * z]], "#e9b48f"); return hit(38, 20); }
+        ellipse(ctx, sx, sy - 34 * z, 18 * z, 12 * z, "rgba(240,200,150,0.15)", null); void f; drawPixels(ctx, fireArt(scene.reducedMotion ? 0 : Math.floor(now / 110 + ox * 5) % 8, 9, 13, 5), sx, sy - 20 * z, ART * z); return hit(38, 20); }
       case "palm": ctx.strokeStyle = "#9c8672"; ctx.lineWidth = 4 * z; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.quadraticCurveTo(sx + 6 * z, sy - 24 * z, sx + 2 * z, sy - 46 * z); ctx.stroke();
         for (let i = 0; i < 6; i++) {
           const a = i / 6 * Math.PI * 2 + Math.sin(now / 900) * 0.06, tipX = sx + 2 * z + Math.cos(a) * 26 * z, tipY = sy - 44 * z + Math.sin(a) * 10 * z + 8 * z;
@@ -851,11 +854,10 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     if (!shown(fire.x, fire.y)) continue;
     glow(fire.x, fire.y, 10, 170);
     drawables.push({ depth: depth(fire.x, fire.y), draw: () => {
-      const s = toScreen(camera, fire.x, fire.y), f = scene.reducedMotion ? 0 : Math.sin(now / 70 + fire.uid) * 3 * z;
-      for (const [dx, dy] of [[-6, 0], [6, 0], [0, 3]]) { ctx.strokeStyle = INK; ctx.lineWidth = 4 * z; ctx.beginPath(); ctx.moveTo(s.x + dx * z - 6 * z, s.y + dy * z); ctx.lineTo(s.x + dx * z + 6 * z, s.y + dy * z - 3 * z); ctx.stroke(); }
-      ellipse(ctx, s.x, s.y - 10 * z, 22 * z, 16 * z, "rgba(240,190,140,0.18)", null);
-      poly(ctx, [[s.x - 9 * z, s.y], [s.x - 4 * z + f, s.y - 26 * z], [s.x + 1 * z, s.y - 12 * z], [s.x + 5 * z - f, s.y - 30 * z], [s.x + 9 * z, s.y]], "#e9b48f");
-      poly(ctx, [[s.x - 4 * z, s.y], [s.x + f * 0.5, s.y - 16 * z], [s.x + 4 * z, s.y]], "#f4dca0", null);
+      const s = toScreen(camera, fire.x, fire.y), frame = scene.reducedMotion ? 0 : Math.floor(now / 110 + fire.uid * 3) % 8;
+      for (const [dx, dy] of [[-6, 0], [6, 0], [0, 3]]) { ctx.strokeStyle = INK; ctx.lineWidth = 4 * z; ctx.beginPath(); ctx.moveTo(s.x + dx * z - 6 * z, s.y + dy * z); ctx.lineTo(s.x + dx * z + 6 * z, s.y + dy * z - 3 * z); ctx.stroke(); ctx.strokeStyle = "#8a6a50"; ctx.lineWidth = 2 * z; ctx.stroke(); }
+      ellipse(ctx, s.x, s.y - 12 * z, 24 * z, 18 * z, "rgba(240,170,110,0.16)", null);
+      drawPixels(ctx, fireArt(frame, 18, 26, fire.uid % 3 + 1), s.x, s.y + 3 * z, ART * z);
       hits.push({ x: s.x - 14 * z, y: s.y - 32 * z, w: 28 * z, h: 36 * z, pick: { kind: "fire", id: fire.uid } });
     } });
   }
@@ -949,7 +951,8 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     const motion = emote ? emoteMotion(emote.id, emoteT, playerFacing, scene.reducedMotion) : null;
     const s = toScreen(camera, at.x, at.y, pose.hop + (motion?.hop ?? 0)), feet = toScreen(camera, at.x, at.y), px = 3.2 * z, walking = at.moving || (!!player.path.length && alpha < 1);
     const facing: Facing = motion?.facing ?? (pose.target ? (pose.side < 0 ? "left" : "right") : playerFacing);
-    if (emote) { const capeColor = player.equipment.cape && isItem(player.equipment.cape) ? item(player.equipment.cape).icon.color : undefined; emoteParticles(emote.id, emoteT, at.x, at.y, scene.reducedMotion, capeColor); if (emote.id === "skillcape") skillcapeRays(ctx, feet.x, feet.y - 30 * z, z, now, capeColor ?? "#e2d49e", scene.reducedMotion); }
+    if (emote) { const capeColor = player.equipment.cape && isItem(player.equipment.cape) ? item(player.equipment.cape).icon.color : undefined; emoteParticles(emote.id, emoteT, at.x, at.y, scene.reducedMotion, capeColor); if (emote.id === "skillcape" || emote.id === "friendship") skillcapeRays(ctx, feet.x, feet.y - 30 * z, z, now, capeColor ?? "#e2d49e", scene.reducedMotion);
+      if (emote.id === "friendship" && !scene.reducedMotion) for (let i = 0; i < 3; i++) { const a = now / 500 + i * 2.1, hx = feet.x + Math.cos(a) * 26 * z, hy = feet.y - 44 * z + Math.sin(a) * 10 * z; heart(ctx, hx, hy, 5 * z); } }
     ellipse(ctx, feet.x, feet.y, 15 * z, 6 * z, "rgba(22,22,22,0.2)", "rgba(255,255,255,0.75)", 1.5);
     const bodyY = s.y - pose.bob * z;
     // Your Friend with its worn pieces composited into the same pixel frame (leaning and squashing for emotes).
@@ -1234,6 +1237,11 @@ function applyMotion(ctx: CanvasRenderingContext2D, motion: Motion | null, x: nu
   if (!motion || (motion.lean === 0 && motion.squash === 1)) return () => {};
   ctx.save(); ctx.translate(x, feetY); ctx.rotate(motion.lean); ctx.scale(1 + (1 - motion.squash) * 0.4, motion.squash); ctx.translate(-x, -feetY);
   return () => ctx.restore();
+}
+/** A little pixel heart. */
+function heart(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
+  ctx.fillStyle = "#e7677a"; ctx.strokeStyle = INK; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(x, y + r); ctx.bezierCurveTo(x - r * 1.6, y - r * 0.2, x - r * 0.8, y - r * 1.4, x, y - r * 0.5); ctx.bezierCurveTo(x + r * 0.8, y - r * 1.4, x + r * 1.6, y - r * 0.2, x, y + r); ctx.fill(); ctx.stroke();
 }
 /** The skillcape emote: rays of the cape's colour turning behind you. */
 function skillcapeRays(ctx: CanvasRenderingContext2D, x: number, y: number, z: number, now: number, color: string, reduced: boolean) {

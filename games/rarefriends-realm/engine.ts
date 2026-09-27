@@ -10,7 +10,7 @@ import {
 import { addSlayerPoints, slayerBoost, slayerKill, slayerProblem, taskText } from "./slayer.ts";
 import { NPCS, examineItem, npcDef, onMonsterKilled, questDone, searchCryptChest, searchWell, talk, tanHides, useCryptAltar } from "./content.ts";
 import {
-  BANK_SIZE, INVENTORY_SIZE, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
+  BANK_SIZE, INVENTORY_SIZE, REFERRAL_COINS, REFERRAL_TICKS, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
   level, maxHp, maxPrayer, message, prayerBoost, sound, take, weapon, combatLevel, createGame,
   type Activity, type CombatStyle, type Dialogue, type Game, type Monster, type Npc, type Point, type Recipe, type Slot, type Target,
 } from "./state.ts";
@@ -683,6 +683,7 @@ export function tick(game: Game) {
   if (player.attackTimer > 0) player.attackTimer--;
   if (player.overhead && player.overhead.until <= game.tick) player.overhead = null;
   movePlayer(game);
+  if (player.boostTicks > 0) { player.boostTicks--; if (player.boostTicks === 0) message(game, "Your referral XP boost has run out. Refer another friend for more!"); }
   // An emote ends when it's done, or when you walk off.
   if (player.emote && (game.tick >= player.emote.until || player.moved === game.tick || player.combat !== null || player.activity)) player.emote = null;
   updatePet(game);
@@ -1257,6 +1258,36 @@ function telegrab(game: Game, spellId: string, index: number) {
   emit(game, { type: "projectile", projectile: { from: { x: ground.x, y: ground.y }, to: { x: player.x, y: player.y }, start: game.tick, end: game.tick + 1, color: "#e6ecef", style: "magic", element: "wind" } });
 }
 export function setStyle(game: Game, style: CombatStyle) { game.player.style = style; }
+// ---------- Referrals ----------
+/** Your referral code: give it to a friend who hasn't played yet. */
+export const referralCode = (game: Game) => `RF-${game.player.friendId}`;
+const hasItem = (game: Game, id: string) => has(game.player, id) || game.player.bank.some(slot => slot.id === id) || Object.values(game.player.equipment).includes(id);
+function referralReward(game: Game) {
+  const player = game.player;
+  player.boostTicks += REFERRAL_TICKS; giveOrDrop(game, "coins", REFERRAL_COINS);
+  if (!hasItem(game, "friendship_cape")) giveOrDrop(game, "friendship_cape");
+  sound(game, "quest");
+}
+/** Use a friend's referral code, once. Returns an error message, or null when it worked. */
+export function applyReferral(game: Game, code: string) {
+  const player = game.player, match = /^\s*(?:RF-?)?\s*#?(\d{1,15})\s*$/i.exec(code), id = match ? Number(match[1]) : NaN;
+  if (!Number.isSafeInteger(id) || id < 1) return "That isn't a referral code. They look like RF-1234.";
+  if (id === player.friendId) return "That's your own code! Give it to a friend instead.";
+  if (player.referredBy !== null) return `You've already used Friend #${player.referredBy}'s code.`;
+  if (player.referrals.includes(id)) return `Friend #${id} used your code, so you can't use theirs.`;
+  player.referredBy = id; referralReward(game);
+  message(game, `Referral used! You and Friend #${id} each get 250 coins, a Friendship cape and +15% XP for an hour of play. They get theirs next time you're both online.`, "quest");
+  return null;
+}
+/** A player who used our code is online with us: reward us (once per Friend). */
+export function creditReferral(game: Game, from: number) {
+  const player = game.player;
+  if (from === player.friendId || player.referrals.includes(from) || player.referredBy === from || player.referrals.length >= 500) return false;
+  player.referrals.push(from); referralReward(game);
+  message(game, `Friend #${from} joined with your referral code! +250 coins, +15% XP for an hour of play${player.referrals.length === 1 ? ", and a Friendship cape" : ""}.`, "quest");
+  return true;
+}
+
 // ---------- Shared fights ----------
 /** The monster you're fighting right now, to tell other players (the same monster has the same uid in every game). */
 export function currentFight(game: Game) {
@@ -1292,6 +1323,7 @@ export function emoteProblem(game: Game, id: string) {
   const emote = EMOTES.find(entry => entry.id === id);
   if (!emote) return "You don't know that emote.";
   if (emote.id === "skillcape" && !item(game.player.equipment.cape ?? "coins").mastery) return "You need to be wearing a mastery cape to perform this emote.";
+  if (emote.id === "friendship" && game.player.equipment.cape !== "friendship_cape") return "You need to be wearing the Friendship cape to perform this emote.";
   return null;
 }
 /** Perform an emote: you stop where you are for its length. */
@@ -1498,6 +1530,7 @@ export type SaveData = {
   inventory: (Slot | null)[]; equipment: Record<string, string>; bank: Slot[]; style: CombatStyle; autocast: string | null;
   quests: Record<string, number>; questData: Record<string, number>; wardrobe: string[]; worn: string[]; follower: number | null; followerGeneration: number | null;
   kills: number; deaths: number; tutorial: number; created: number; playTicks: number; retaliate: boolean; music: string[];
+  referredBy?: number | null; referrals?: number[]; boostTicks?: number;
 };
 export function serialize(game: Game): SaveData {
   const player = game.player;
@@ -1507,6 +1540,7 @@ export function serialize(game: Game): SaveData {
     style: player.style, autocast: player.autocast, quests: { ...player.quests }, questData: { ...player.questData }, wardrobe: [...player.wardrobe], worn: [...player.worn],
     follower: player.follower, followerGeneration: player.followerGeneration, kills: player.kills, deaths: player.deaths, tutorial: player.tutorial, created: player.created,
     playTicks: game.playTicks, retaliate: game.autoRetaliate, music: [...player.music],
+    referredBy: player.referredBy, referrals: [...player.referrals], boostTicks: player.boostTicks,
   };
 }
 const QUEST_IDS = ["friends_feast", "grumblin_trouble", "cold_forge", "hollow_whispers", "lost_glimmer", "hollow_king"];
@@ -1584,6 +1618,10 @@ export function restore(game: Game, raw: unknown): boolean {
   player.created = int(save.created, 0, 1e15, Date.now());
   game.playTicks = int(save.playTicks, 0, 1e10, 0); game.autoRetaliate = save.retaliate !== false;
   player.music = ["theme", ...(Array.isArray(save.music) ? save.music : []).filter((id): id is string => typeof id === "string" && /^[a-z_]{1,24}$/.test(id) && id !== "theme")].slice(0, 32);
+  const friendNumber = (value: unknown) => typeof value === "number" && Number.isSafeInteger(value) && value > 0 && value < 1e15 && value !== player.friendId ? value : null;
+  player.referredBy = friendNumber(save.referredBy);
+  player.referrals = [...new Set((Array.isArray(save.referrals) ? save.referrals : []).map(friendNumber).filter((id): id is number => id !== null))].slice(0, 500);
+  player.boostTicks = int(save.boostTicks, 0, REFERRAL_TICKS * 50, 0);
   return true;
 }
 

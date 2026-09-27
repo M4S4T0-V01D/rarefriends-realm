@@ -384,6 +384,7 @@ export function emoteArt(id: string): HTMLCanvasElement {
       case "no": eyes(); p.line(7, 14, 12, 14, INK); p.line(15, 1, 19, 5, "#cf6e6e", 2); p.line(19, 1, 15, 5, "#cf6e6e", 2); break;
       case "spin": eyes(); p.line(7, 14, 12, 14, INK); p.polyline([[2, 6], [4, 2], [8, 1]], INK); p.polyline([[18, 14], [16, 18], [12, 19]], INK); break;
       case "flex": p.line(6, 9, 9, 10, INK); p.line(11, 10, 14, 9, INK); p.line(7, 14, 13, 14, INK); p.disc(17, 8, 2.5, 2.5, face); break;
+      case "friendship": eyes(); p.line(7, 13, 10, 15, INK); p.line(10, 15, 13, 13, INK); p.disc(4, 4, 2, 2, "#e7677a", null); p.disc(7, 4, 2, 2, "#e7677a", null); p.poly([[2, 5], [9, 5], [5.5, 9]], "#e7677a", null); break;
       case "skillcape": eyes(); p.line(7, 13, 10, 15, INK); p.line(10, 15, 13, 13, INK); p.poly([[3, 19], [6, 12], [14, 12], [17, 19]], "#6f7ea6"); break;
     }
     p.halo();

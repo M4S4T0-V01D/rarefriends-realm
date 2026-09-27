@@ -11,7 +11,7 @@ import {
   weapon, xpMultiplier, type Game, type Message, type Recipe, type Slot,
 } from "./state.ts";
 import {
-  bestArrow, bowRange, emoteProblem, performEmote, shopBuys, buy, buyPrice, canCast, capeProblem, castSpell, rangedMaxHit, rubLamp, chooseOption, continueDialogue, dialogueAtOptions, itemOptions, playerMaxHit, recipeProblem, sell, sellPrice,
+  bestArrow, bowRange, emoteProblem, performEmote, applyReferral, shopBuys, buy, buyPrice, canCast, capeProblem, castSpell, rangedMaxHit, rubLamp, chooseOption, continueDialogue, dialogueAtOptions, itemOptions, playerMaxHit, recipeProblem, sell, sellPrice,
   castOnItem, setFollower, setStyle, startProduction, swapSlots, toggleRun, togglePrayer, toggleWorn, unequip, useItemOnItem, type OwnedFriend, type Selection,
 } from "./engine.ts";
 import { friendRows, renderWorldMap } from "./render.ts";
@@ -365,11 +365,19 @@ function EmotesTab({ game, refresh, openMenu }: PanelProps) {
 }
 function InfoCard({ children }: { children: ReactNode }) { return <div className="realm-info" aria-live="polite">{children}</div>; }
 function FriendsTab({ game, refresh, roster, rosterState, friendSprites, loadFriend, relicCounts, openCaskets, friend, openMenu, net, onSocial, onWhisper, onOnline }: PanelProps) {
-  const player = game.player, perk = FAMILY_PERKS[player.familyId], [adding, setAdding] = useState("");
+  const player = game.player, perk = FAMILY_PERKS[player.familyId], [adding, setAdding] = useState(""), [referral, setReferral] = useState(""), [referralNote, setReferralNote] = useState("");
   useEffect(() => { for (const friend of roster.slice(0, 24)) loadFriend(friend.id); }, [roster, loadFriend]);
   const online = (id: number) => net?.peers.find(peer => peer.id === id) ?? null;
   return (
     <div className="realm-friends">
+      <h3>Referrals</h3>
+      <p className="realm-muted">Your code: <b className="realm-code">RF-{player.friendId}</b>. A friend who enters it and you each get <b>250 coins</b>, a <b>Friendship cape</b> (with its own emote) and <b>+15% XP</b> for an hour of play.</p>
+      {player.boostTicks > 0 && <p className="realm-note">Referral boost: +15% XP for {Math.ceil(player.boostTicks / 100)} more minute{player.boostTicks > 100 ? "s" : ""} of play.</p>}
+      {player.referrals.length > 0 && <p className="realm-note">Friends who joined with your code: {player.referrals.map(id => `#${id}`).join(", ")}</p>}
+      {player.referredBy === null ? <label className="realm-add-friend">Friend's code <input value={referral} onChange={event => { setReferral(event.target.value.slice(0, 24)); setReferralNote(""); }} placeholder="RF-1234" aria-label="A friend's referral code"
+        onKeyDown={event => { if (event.key === "Enter" && referral.trim()) { event.preventDefault(); event.stopPropagation(); setReferralNote(applyReferral(game, referral) ?? "Welcome aboard! Check your pack."); setReferral(""); refresh(); } }} /></label>
+        : <p className="realm-muted">You joined with Friend #{player.referredBy}'s code.</p>}
+      {referralNote && <p className="realm-note" role="status">{referralNote}</p>}
       <h3>Friends list <small>{net?.status === "online" ? `· ${net.players} in the Realm` : net?.status === "connecting" ? "· connecting…" : "· offline"}</small></h3>
       {net?.status === "offline" ? <p className="realm-muted">You're playing offline. <button type="button" className="realm-link" onClick={() => onOnline?.(true)}>Go online</button> to see and meet other players.</p> : <>
         <ul className="realm-social">

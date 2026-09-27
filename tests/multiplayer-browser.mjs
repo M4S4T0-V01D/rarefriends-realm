@@ -164,6 +164,14 @@ try {
   await a.page.waitForTimeout(400);
   await a.page.locator(".rf-game-frame").screenshot({ path: "./artifacts/shared-fight.png" });
 
+  // A referral: B enters A's code in the Friends tab; A's game rewards A too, since they're online together.
+  await b.game.getByRole("tab", { name: "Friends and wardrobe" }).click();
+  const code = b.game.getByRole("textbox", { name: "A friend's referral code" });
+  await code.fill("RF-7730"); await code.press("Enter");
+  await b.until(() => window.__realm.game().player.inventory.some(slot => slot?.id === "friendship_cape"), "B's Friendship cape");
+  await a.until(() => window.__realm.game().player.referrals.includes(3412), "A credited for referring #3412");
+  await b.page.waitForTimeout(300); await b.page.locator(".rf-game-frame").screenshot({ path: "./artifacts/referral.png" });
+
   // A goes offline: B stops seeing #7730.
   await a.game.getByRole("tab", { name: "Settings" }).click();
   await a.game.getByLabel("Online: see and meet other players").click();
@@ -171,7 +179,7 @@ try {
   await b.until(() => !window.__realm.peers().some(peer => peer.id === 7730), "#7730 leaving", 25_000);
 
   assert.deepEqual(errors, [], "browser errors");
-  console.log("PASS multiplayer: two players see each other walk, right-click menu, friends list, party bonus, public chat, whispers (links stripped), emotes, shared drops, a trade by clicks, a shared fight, going offline");
+  console.log("PASS multiplayer: two players see each other walk, right-click menu, friends list, party bonus, public chat, whispers (links stripped), emotes, shared drops, a trade by clicks, a shared fight, a referral, going offline");
 } finally {
   await browser?.close();
   if (server) { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }

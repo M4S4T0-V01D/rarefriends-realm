@@ -112,7 +112,7 @@ export function decorArt(kind: string, variant: number, frame = 0): HTMLCanvasEl
     case "crate": return pixelArt(key, 16, 16, p => { p.rect(1, 3, 14, 12, "#cdb9a0"); p.line(1, 3, 14, 14, COLORS.wood); p.line(1, 14, 14, 3, COLORS.wood); p.rect(1, 3, 14, 2, COLORS.woodLight); p.outline(); });
     case "tent": return pixelArt(key, 34, 22, p => { p.poly([[1, 21], [17, 1], [33, 21]], "#bfb49c", null); p.poly([[17, 1], [33, 21], [22, 21]], "#a99e86", null); p.poly([[14, 21], [17, 12], [20, 21]], "#3b3a38", null); p.line(17, 1, 17, 12, "#8a7563"); p.outline(); });
     case "lamp": return pixelArt(key, 10, 30, p => { p.rect(4, 8, 2, 21, "#3b3a38"); p.rect(2, 28, 6, 2, "#3b3a38"); p.rect(1, 1, 8, 7, "#f4ecc8"); p.rect(1, 1, 8, 1, "#3b3a38"); p.rect(4, 3, 2, 3, "#ffffff"); p.outline(); });
-    case "torch": return pixelArt(key, 10, 22, p => { p.rect(4, 9, 2, 12, BARK); p.poly(frame ? [[2, 9], [5, 1], [8, 9]] : [[2, 9], [4, 2], [8, 9]], "#e9a07a", null); p.poly([[4, 9], [5, 5], [6, 9]], "#f4dca0", null); p.outline(); });
+    case "torch": return pixelArt(key, 10, 22, p => { p.rect(4, 9, 2, 12, BARK); p.rect(3, 8, 4, 2, "#5f5e66"); p.outline(); });
     case "banner": return pixelArt(key, 14, 30, p => { p.rect(1, 1, 2, 28, "#3b3a38"); p.poly([[3, 2], [13, 3], [13, 17], [8, 14], [3, 17]], COLORS.rose, null); p.rect(6, 6, 4, 4, COLORS.paper); p.outline(); });
     case "grave": return pixelArt(key, 12, 16, p => { p.poly([[1, 15], [1, 5], [3, 2], [9, 2], [11, 5], [11, 15]], COLORS.stone, null); p.line(6, 5, 6, 11, COLORS.stoneDark); p.line(4, 7, 8, 7, COLORS.stoneDark); p.dither(COLORS.stoneDark, x => x > 7 ? 0.4 : 0, COLORS.stone); p.outline(); });
     case "rubble": return pixelArt(key, 18, 8, p => { for (let i = 0; i < 4; i++) { const x = 2 + random() * 12, y = 3 + random() * 3; p.poly([[x, y + 3], [x + 1, y], [x + 4, y], [x + 5, y + 3]], COLORS.stone, null); } p.outline(); });
@@ -120,4 +120,41 @@ export function decorArt(kind: string, variant: number, frame = 0): HTMLCanvasEl
     case "chest": return pixelArt(key, 16, 13, p => { p.rect(1, 5, 14, 7, COLORS.wood); p.poly([[1, 5], [3, 1], [13, 1], [15, 5]], "#a88f74", null); p.rect(7, 5, 2, 3, "#e2d49e"); p.line(1, 8, 14, 8, "#7a6553"); p.outline(); });
     default: return null;
   }
+}
+
+// ---------- Fire (after the pixel fire a friend of the game drew) ----------
+/** The fire palette, hottest first: cream core, butter, amber, orange, red-orange, red, crimson, and the dark plum shell. */
+const FIRE = ["#ead8b8", "#ebc26b", "#e6a24a", "#df7f3c", "#cd5836", "#a8352f", "#7c2435", "#4c1d2d"];
+const EMBERS = ["#cd5836", "#df7f3c", "#7c2435", "#e6a24a"];
+/**
+ * One frame of a flickering fire, `w` × `h` pixels. Heat falls off from a core low in the middle, stretched upwards so
+ * the flame tapers to a dark tip; rising noise tears the edge into tongues, and a few embers float above.
+ */
+export function fireArt(frame: number, w = 18, h = 26, seed = 1): HTMLCanvasElement {
+  return pixelArt(`fire:${w}:${h}:${seed}:${frame}`, w, h, p => {
+    const cx = (w - 1) / 2, cy = h * 0.74, t = frame * 0.9;
+    const n = (x: number, y: number) => {
+      // Rising value noise (two octaves), so tongues climb from frame to frame.
+      const f = (sx: number, sy: number, k: number) => { const X = Math.floor(sx), Y = Math.floor(sy), fx = sx - X, fy = sy - Y, r = (a: number, b: number) => { let q = Math.imul(a * 374761393 + b * 668265263 + (seed + k) * 982451653, 1274126177); q ^= q >>> 13; return ((Math.imul(q, 1103515245) >>> 0) % 1000) / 1000; };
+        const a = r(X, Y), b = r(X + 1, Y), c = r(X, Y + 1), d = r(X + 1, Y + 1), sx2 = fx * fx * (3 - 2 * fx), sy2 = fy * fy * (3 - 2 * fy);
+        return (a * (1 - sx2) + b * sx2) * (1 - sy2) + (c * (1 - sx2) + d * sx2) * sy2; };
+      return f(x / 3.2, (y + t * 3) / 3.2, 0) * 0.65 + f(x / 1.6, (y + t * 5) / 1.6, 7) * 0.35;
+    };
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const dx = (x - cx) / (w * 0.46), above = y < cy, dy = above ? (cy - y) / (h * 0.8) : (y - cy) / (h * 0.26);
+      // Narrower towards the top, a flat-ish base.
+      const width = above ? 1 + dy * 0.9 : 1;
+      let heat = Math.hypot(dx * width, dy) + (n(x, y) - 0.5) * (0.35 + dy * 0.55);
+      if (y === h - 1) heat += 0.12;
+      if (heat > 1.02) continue;
+      const band = heat < 0.28 ? 0 : heat < 0.42 ? 1 : heat < 0.54 ? 2 : heat < 0.66 ? 3 : heat < 0.78 ? 4 : heat < 0.87 ? 5 : heat < 0.95 ? 6 : 7;
+      // The shell is darkest on top; low down it stays red.
+      p.set(x, y, FIRE[band === 7 && !above ? 6 : band]);
+    }
+    // Embers: a few specks drifting up and away.
+    for (let i = 0; i < 5; i++) {
+      const life = ((frame * 0.23 + i * 0.37 + seed * 0.13) % 1), ex = Math.round(cx + Math.sin(i * 2.4 + seed) * w * 0.42 + life * (i % 2 ? 2 : -2)), ey = Math.round(h * 0.45 - life * h * 0.45);
+      if (ex >= 0 && ex < w && ey >= 0 && !p.get(ex, ey)) p.set(ex, ey, EMBERS[i % EMBERS.length]);
+    }
+  });
 }

@@ -9,7 +9,7 @@ import { FAMILY_NAMES, FAMILY_PERKS, RELICS, RF_BUNDLES, SKILL_ICONS, SPELLS, WA
 import { QUESTS, questPoints, MAX_QUEST_POINTS } from "./content.ts";
 import { TICK_MS, combatLevel, createGame, giveOrDrop, message, totalLevel, type Game, type Projectile } from "./state.ts";
 import {
-  chooseOption, closeInterfaces, collectFromCasket, performEmote, syncMonster, continueDialogue, grantBundle, menuFor, tailorChoices, unlockMusic, restore, serialize, setFollower, setHeld, setRelics, tick, toggleRun, walkTo, type OwnedFriend, type Selection,
+  chooseOption, closeInterfaces, collectFromCasket, creditReferral, performEmote, syncMonster, continueDialogue, grantBundle, menuFor, tailorChoices, unlockMusic, restore, serialize, setFollower, setHeld, setRelics, tick, toggleRun, walkTo, type OwnedFriend, type Selection,
 } from "./engine.ts";
 import { PITCH, VIEW, ZOOM, daylight, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
 import {
@@ -262,6 +262,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           if (players.current.state.status !== "offline") window.parent.postMessage({ type: NET_PRESENCE, presence: presenceOf(state) }, "*");
           state.player.nearFriends = players.current.nearFriends(state);
           // Shared fights: other players' hits on the same monsters (near us, on our layer) count here too.
+          // Referrals: a player who used our code is online with us.
+          for (const peer of players.current.state.peers) if (peer.referredBy === state.player.friendId) creditReferral(state, peer.id);
           for (const peer of players.current.state.peers) if (peer.fight && Math.max(Math.abs(peer.x - state.player.x), Math.abs(peer.y - state.player.y)) <= 24) syncMonster(state, peer.fight, peer.id);
           trades.current.tick(now);
           const target = walkingTo.current;

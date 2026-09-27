@@ -772,3 +772,23 @@ test("Shared fights: the same monster in two games takes both players' hits; a p
   syncMonster(ga, { ...fight, hp: 1 }, 3412);
   assert.equal(cowA.hp, cowA.def.hp, "reports from its last life are ignored right after it respawns");
 });
+
+test("Referrals: a friend's code gives both Friends coins, the Friendship cape and +15% XP; once each, saved", async () => {
+  const { applyReferral, creditReferral, referralCode, emoteProblem } = await import("../games/rarefriends-realm/engine.ts");
+  const newbie = newGame({ friendId: 3412 }), veteran = newGame(), coins = count(newbie.player, "coins"), base = xpMultiplier(newbie.player);
+  assert.equal(referralCode(veteran), "RF-7730");
+  assert.match(applyReferral(newbie, "RF-3412"), /own code/);
+  assert.equal(applyReferral(newbie, "rf-7730"), null);
+  assert.equal(count(newbie.player, "coins"), coins + 250); assert(has(newbie.player, "friendship_cape"));
+  assert(xpMultiplier(newbie.player) > base, "the boost is on");
+  assert.match(applyReferral(newbie, "RF-5555"), /already used/);
+  assert(creditReferral(veteran, 3412)); assert(!creditReferral(veteran, 3412), "credited once");
+  assert(has(veteran.player, "friendship_cape")); assert.equal(veteran.player.boostTicks, 6000);
+  assert(emoteProblem(veteran, "friendship"));
+  equip(veteran, veteran.player.inventory.findIndex(slot => slot?.id === "friendship_cape"));
+  assert.equal(emoteProblem(veteran, "friendship"), null);
+  const restored = newGame({ friendId: 3412 });
+  restore(restored, JSON.parse(JSON.stringify(serialize(newbie))));
+  assert.equal(restored.player.referredBy, 7730); assert.equal(restored.player.boostTicks, newbie.player.boostTicks);
+  run(newbie, 3); assert.equal(newbie.player.boostTicks, 5997, "the boost counts down with play");
+});

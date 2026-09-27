@@ -27,6 +27,7 @@ export function emoteMotion(id: string, t: number, base: Facing, reduced: boolea
     case "no": return { ...still, facing: Math.floor(t * 6) % 2 ? "left" : "right", text: "No!" };
     case "spin": return { ...still, facing: TURN[Math.floor(t * 6) % 4], hop: beat(1) * 3 };
     case "flex": return { ...still, squash: 1 + beat(1.5) * 0.1, text: "Hmph!" };
+    case "friendship": return { ...still, hop: beat(1.2) * 6, squash: 1 + beat(2.4) * 0.05, facing: t < 1.6 ? TURN[Math.floor(t * 5) % 4] : "down", text: t > 2 ? "Friends forever!" : null };
     case "skillcape": return { ...still, facing: t < 2.4 ? TURN[Math.floor(t * 5) % 4] : "down", hop: t > 2.6 && t < 3.4 ? Math.sin((t - 2.6) / 0.8 * Math.PI) * 26 : 0, text: t > 3 ? "Mastered!" : null };
     default: return still;
   }
@@ -38,5 +39,6 @@ export function emoteParticles(id: string, t: number, x: number, y: number, redu
   if (id === "cheer" && Math.random() < 0.25) burst("chip", x, y, 50, 2, ["#d8b6b4", "#e2d7ad", "#afbccb", "#b4c3ab", "#c6bed4"][Math.floor(Math.random() * 5)], { speed: 1, up: 60, life: 1, size: 2.5 });
   if (id === "cry" && Math.random() < 0.18) burst("drop", x + (Math.random() - 0.5) * 0.2, y, 44, 1, "#9fc6f0", { speed: 0.2, up: 10, life: 0.7, size: 2 });
   if (id === "skillcape" && Math.random() < 0.5) burst("spark", x, y, 20 + Math.random() * 40, 2, Math.random() < 0.5 ? color : "#ffffff", { speed: 1.1, up: 60, life: 0.9, size: 2.5 });
+  if (id === "friendship" && Math.random() < 0.35) burst("spark", x + (Math.random() - 0.5) * 0.4, y, 30 + Math.random() * 30, 1, Math.random() < 0.6 ? "#e7a9b0" : "#ffffff", { speed: 0.4, up: 45, life: 1.1, size: 3 });
   if (id === "jump" && t < 0.1 && Math.random() < 0.5) burst("dust", x, y, 2, 6, "#c8c5be", { speed: 0.6, up: 6, life: 0.5, size: 2 });
 }
