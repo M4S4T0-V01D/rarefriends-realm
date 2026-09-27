@@ -2,7 +2,7 @@
 
 *An old-school adventure starring the Rare Friend you own: nineteen skills, six quests, a large 2.5D world and a Hollow King to end.*
 
-**▶ Play: https://m4s4t0-v01d.github.io/rarefriends-realm/** · **Preview page: https://m4s4t0-v01d.github.io/rarefriends-realm/preview/** · **Skill guides: https://m4s4t0-v01d.github.io/rarefriends-realm/preview/guides.html**
+**▶ Play: https://m4s4t0-v01d.github.io/rarefriends-realm/** · **🎬 Trailer: https://m4s4t0-v01d.github.io/rarefriends-realm/preview/#trailer** · **Preview page: https://m4s4t0-v01d.github.io/rarefriends-realm/preview/** · **Skill guides: https://m4s4t0-v01d.github.io/rarefriends-realm/preview/guides.html**
 *(You need a browser wallet on Robinhood mainnet holding a hardwired Rare Friends Generations NFT.)*
 
 ![RareFriends Realm: Friendhollow square in greyscale isometric, with Rare Friends, a fountain and the minimap](docs/town.png)

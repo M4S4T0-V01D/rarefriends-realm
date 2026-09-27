@@ -10,7 +10,7 @@ import { chromium } from "playwright";
 
 const dir = path.join(await mkdtemp(path.join(tmpdir(), "realm-preview-")), "preview");
 execFileSync("node", ["scripts/build-preview.mjs", "--outdir", dir], { stdio: "inherit" });
-const types = { ".html": "text/html", ".js": "text/javascript", ".png": "image/png" };
+const types = { ".html": "text/html", ".js": "text/javascript", ".png": "image/png", ".mp4": "video/mp4", ".jpg": "image/jpeg" };
 const server = createServer(async (request, response) => {
   const file = path.join(dir, request.url.split("?")[0].replace(/^\/preview\/?/, "/").replace(/\/$/, "/index.html"));
   const body = await readFile(file).catch(() => null);
@@ -62,6 +62,17 @@ try {
     await page.waitForTimeout(1200); await level(); await page.waitForTimeout(800);
     assert.equal(await button.getAttribute("aria-pressed"), "false");
     assert.ok(await level() < 0.002, `${name}: music kept playing after stop`);
+    // The trailer sits at the top: served, muted until asked, and "Watch with sound" unmutes it.
+    const trailer = page.locator("#trailer-video");
+    assert.ok((await trailer.boundingBox()).y < (await page.locator(".hero h1").boundingBox()).y, `${name}: the trailer is above the hero`);
+    const size = await page.evaluate(async () => (await fetch("media/trailer.mp4")).headers.get("content-length") ?? (await (await fetch("media/trailer.mp4")).arrayBuffer()).byteLength);
+    assert.ok(Number(size) > 1_000_000, `${name}: trailer served (${size} bytes)`);
+    assert.equal(await trailer.evaluate(video => video.muted), true);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    const sound = page.locator("#trailer-sound");
+    await (touch ? sound.tap() : sound.click());
+    assert.equal(await trailer.evaluate(video => video.muted), false, `${name}: unmuted`);
+    assert.equal(await sound.isHidden(), true);
     // The skill guides page: a skill's unlocks, the recipe book and its search.
     await page.goto(`http://127.0.0.1:${server.address().port}/preview/guides.html#woodcutting`);
     await page.getByRole("heading", { name: "Woodcutting" }).waitFor();
@@ -76,4 +87,4 @@ try {
     await context.close();
   }
 } finally { await browser.close(); server.close(); }
-console.log("PASS preview page: main theme and jukebox; skill guides and recipe book");
+console.log("PASS preview page: trailer at the top; main theme and jukebox; skill guides and recipe book");

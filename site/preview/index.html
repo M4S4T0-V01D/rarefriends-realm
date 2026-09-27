@@ -56,6 +56,13 @@ img { max-width: 100%; height: auto; display: block; }
 .hero small { display: block; margin-top: 18px; color: #a8a39c; font-size: 12px; max-width: 480px; }
 .screen { position: relative; border: 3px solid #000; box-shadow: 10px 10px 0 #000; background: #000; }
 .screen img { width: 100%; }
+.trailer { padding: 22px 0 6px; }
+.trailer .frame { position: relative; border: 3px solid #000; box-shadow: 10px 10px 0 #000; background: #000; aspect-ratio: 16 / 9; }
+.trailer video { display: block; width: 100%; height: 100%; }
+.trailer .sound { position: absolute; left: 16px; bottom: 16px; z-index: 1; box-shadow: 4px 4px 0 #000; border-color: #000; }
+.trailer .sound[hidden] { display: none; }
+.trailer p { margin: 12px 0 0; color: #a8a39c; font-size: 13px; }
+@media (max-width: 640px) { .trailer { padding-top: 12px; } .trailer .sound { left: 8px; bottom: 8px; padding: 5px 9px; font-size: 12px; box-shadow: 2px 2px 0 #000; } .trailer .frame { box-shadow: 6px 6px 0 #000; } }
 .screen figcaption { position: absolute; left: -3px; bottom: -34px; font-size: 12px; color: #a8a39c; }
 
 /* Stats ribbon */
@@ -146,7 +153,15 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
 <header class="top">
   <div class="wrap bar">
     <a class="logo" href="#"><i>⚔</i> RareFriends Realm</a>
-    <nav aria-label="Sections"><a href="#explore">Explore</a><a href="#skills">Skills &amp; quests</a><a href="#music-section">Soundtrack</a><a href="#caskets">Caskets</a><a href="./guides.html">Skill guides</a><a href="#play">Play</a></nav>
+    <nav aria-label="Sections"><a href="#trailer">Trailer</a><a href="#explore">Explore</a><a href="#skills">Skills &amp; quests</a><a href="#music-section">Soundtrack</a><a href="#caskets">Caskets</a><a href="./guides.html">Skill guides</a><a href="#play">Play</a></nav>
+  </div>
+  <div class="wrap trailer" id="trailer">
+    <div class="frame">
+      <video id="trailer-video" src="media/trailer.mp4" poster="media/trailer-poster.jpg" autoplay muted loop playsinline controls preload="metadata"
+        aria-label="RareFriends Realm trailer: the castle, riding horses and unicorns, playing together, dragons, magic, skills, day and night, storms and the Wizards' Tower"></video>
+      <button class="btn primary sound" id="trailer-sound" type="button">🔊 Watch with sound</button>
+    </div>
+    <p>The trailer: one minute of the Realm as it plays today, recorded straight from the game, with its main theme.</p>
   </div>
   <div class="wrap hero">
     <div>
@@ -305,5 +320,16 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
 
 <button id="music" type="button" aria-pressed="false"><span class="disc" aria-hidden="true"></span><span class="music-label">Play the main theme</span></button>
 <script src="music.js"></script>
+<script>
+  // The trailer plays muted on a loop; "Watch with sound" restarts it with its soundtrack. It and the page's music player take turns.
+  (() => {
+    const video = document.getElementById("trailer-video"), sound = document.getElementById("trailer-sound"), music = document.getElementById("music");
+    const stopMusic = () => { if (music && music.getAttribute("aria-pressed") === "true") music.click(); };
+    sound.addEventListener("click", () => { video.muted = false; video.currentTime = 0; video.loop = false; stopMusic(); void video.play(); sound.hidden = true; });
+    video.addEventListener("volumechange", () => { sound.hidden = !video.muted; if (!video.muted) stopMusic(); });
+    document.addEventListener("click", event => { if (event.target.closest("[data-track], #music") && !video.muted) { video.muted = true; } });
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) { video.removeAttribute("autoplay"); video.pause(); }
+  })();
+</script>
 </body>
 </html>

@@ -13,6 +13,8 @@ await mkdir(path.join(outdir, "img"), { recursive: true });
 await cp(path.join(root, "site/preview/index.html"), path.join(outdir, "index.html"));
 await cp(path.join(root, "site/preview/guides.html"), path.join(outdir, "guides.html"));
 for (const file of await readdir(path.join(root, "docs"))) if (file.endsWith(".png")) await cp(path.join(root, "docs", file), path.join(outdir, "img", file));
+// The trailer and its poster.
+await cp(path.join(root, "site/preview/media"), path.join(outdir, "media"), { recursive: true });
 await build({
   entryPoints: [path.join(root, "site/preview/music.ts")], outfile: path.join(outdir, "music.js"),
   bundle: true, format: "iife", platform: "browser", target: "es2022", minify: true, logLevel: "warning",
