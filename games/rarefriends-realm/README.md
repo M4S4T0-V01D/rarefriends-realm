@@ -87,7 +87,7 @@ next attack. **Death is safe:** you wake by the Friendhollow fountain with your 
 A 240 × 240 tile island with 12 overworld regions (Friendhollow, Hollow Farms, Whisperwood, Ashen Hills, Emberforge,
 Frostpeak, Glass Lake, Pale Dunes, Oasis, Murkmire, Mossy Ruins and the Pale Coast) and two dungeons
 (Murkmire Crypt, Hollow Depths). Banks in Friendhollow, Emberforge, the Oasis, Frostpeak and a deposit box by Glass Lake.
-Each region has its own music.
+Each region has its own music, unlocked the first time you arrive. The music player in Settings replays any track you've unlocked (turn Auto back on to follow the areas again).
 
 ## Rare Caskets: RF costs, odds and rules (simulated)
 

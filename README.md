@@ -12,7 +12,7 @@
 - **Old-school controls.** Left-click does the first option; right-click lists them all (*Chop down Tree*, *Attack Grumblin (level-5)*, *Talk-to*, *Pickpocket*, *Examine*). WASD walks. Use items on things. Minimap, run orb, world map.
 - **A large world.** A 240 × 240 tile island with 12 regions and 2 dungeons: towns, farms, forests, a mine, a forge, snowy peaks, a lake with a pier, dunes and an oasis, a swamp, ruins, a crypt and the Hollow Depths.
 - **Six quests** from baking for the Realm Feast to defeating the Hollow King (level 92) in his throne room.
-- **A soundtrack for every region.** Sixteen procedural tracks, including a hand-written main theme, plus level-up and quest fanfares, synthesized live in WebAudio.
+- **A soundtrack for every region.** Sixteen procedural tracks, including a hand-written main theme, plus level-up and quest fanfares, synthesized live in WebAudio. Entering an area unlocks its track ("You have unlocked a new music track"), and the music player replays any you've found.
 - **Your other Friends follow you**, adding XP by generation. **Rare Caskets** (simulated $RAREFRIENDS) hold relics and wardrobe pieces. **Progress saves per wallet.** Your **adventurer card** posts to X.
 
 | | |
@@ -38,8 +38,8 @@
 | ![Bank](docs/bank.png) | ![World map](docs/worldmap.png) | ![Caskets](docs/caskets.png) |
 | **Smelting at Emberforge** | **Level up!** | **Quest complete** |
 | ![Smelting menu](docs/smelting.png) | ![Level-up message](docs/level-up.png) | ![Quest complete](docs/quest-complete.png) |
-| **A shop** | **On a phone (landscape)** | **Quest journal** |
-| ![Shop](docs/shop.png) | ![Phone layout](docs/phone.png) | ![Quest journal](docs/quests.png) |
+| **A shop** | **On a phone (landscape)** | **Music unlocks** |
+| ![Shop](docs/shop.png) | ![Phone layout](docs/phone.png) | ![Music player](docs/music.png) |
 
 **The adventurer card, ready to post on X:**
 
@@ -106,7 +106,7 @@ npm run typecheck      # tsc strict (game, host and preview page)
 npm test               # engine tests: XP curve, world generation and reachability of every landmark, pathfinding,
                        # WASD, right-click menus, woodcutting/firemaking/cooking, fishing, mining/smelting/smithing,
                        # combat and loot, aggression and safe death, two quests end to end, thieving, an agility lap,
-                       # magic, prayer, shops and the bank, saves (round trip and tampering), caskets, followers
+                       # magic, prayer, shops and the bank, saves (round trip and tampering), caskets, followers, music unlocks
 npm run check          # friendsdk check
 npm run test:browser   # SDK mock-wallet browser runs of the custom host (a two-Friend wallet):
                        #  • title screen, real mouse clicks (chop a tree), right-click menu, dialogue, WASD walking
