@@ -8,7 +8,7 @@ import type { RegionId } from "./world.ts";
 
 export type TrackId = RegionId | "theme" | "boss";
 export type SfxName = SoundName | "slash" | "stab" | "crush" | "punch" | "step_grass" | "step_stone" | "step_wood" | "step_sand" | "step_snow" | "step_swamp"
-  | "crackle" | "forge" | "water" | "bird" | "gull" | "frog" | "wind" | "drip";
+  | "crackle" | "forge" | "water" | "bird" | "gull" | "frog" | "wind" | "drip" | "rain" | "thunder";
 type VoiceKind = "cluck" | "moo" | "squeak" | "grumble" | "growl" | "rattle" | "gurgle" | "whisper" | "clank" | "rumble" | "roar" | "king";
 const VOICES: Record<string, { kind: VoiceKind; f0: number; length: number; bright: number; wobble?: number }> = {
   chicken: { kind: "cluck", f0: 620, length: 0.08, bright: 3000 }, cow: { kind: "moo", f0: 150, length: 0.9, bright: 900, wobble: 5 },
@@ -450,6 +450,13 @@ export class RealmAudio {
       case "death": for (let i = 0; i < 5; i++) tone("triangle", 67 - i * 3, t + i * 0.18, 0.3, 0.12); break;
       case "fell": this.thump(t, 140, 50, 0.5, 0.45, bus); this.noiseBurst(t + 0.05, 0.6, 600, 0.18, bus, "lowpass"); for (let i = 0; i < 4; i++) this.noiseBurst(t + 0.2 + i * 0.07, 0.06, 2200, 0.08, bus, "bandpass", 2); break;
       case "slash": this.sweep(t, 3200, 900, 0.16, 0.2, bus); break;
+      case "rain": for (let i = 0; i < 3; i++) this.noiseBurst(t + i * 0.28, 0.5, 2600 + Math.random() * 1200, 0.05, bus, "bandpass", 0.6); break;
+      case "thunder": {
+        // A crack, then a long low roll that rumbles away.
+        this.noiseBurst(t, 0.25, 1800, 0.35, bus, "lowpass", 0.8); this.thump(t, 90, 40, 0.8, 0.5, bus);
+        for (let i = 0; i < 6; i++) this.noiseBurst(t + 0.15 + i * 0.35 + Math.random() * 0.15, 0.9, 140 + Math.random() * 120, 0.45 - i * 0.06, bus, "lowpass", 0.9);
+        break;
+      }
       case "bow": tone("triangle", 45, t, 0.18, 0.18); this.thump(t, 520, 180, 0.12, 0.2, bus); this.sweep(t + 0.02, 4200, 2600, 0.12, 0.08, bus); break;
       case "stab": this.sweep(t, 2400, 1600, 0.08, 0.2, bus); this.thump(t + 0.06, 300, 180, 0.05, 0.12, bus); break;
       case "crush": this.sweep(t, 900, 300, 0.18, 0.22, bus); break;

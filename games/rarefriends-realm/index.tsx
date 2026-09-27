@@ -21,6 +21,7 @@ import { NET_ACT, NET_ACT_IN, NET_CHAT, NET_CHAT_IN, NET_ONLINE, NET_PRESENCE, N
 import { Players, presenceOf } from "./social.ts";
 import { Trades } from "./trade.ts";
 import { makeSaveCode, restoreSaveCode } from "./savecode.ts";
+import { strikeAt, weatherAt, type Weather } from "./weather.ts";
 import { HOST_HELLO, HOST_STATE, SAVE_EXPORT, SAVE_EXPORT_RESULT, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, parseRoster, type ShareAction, type ShareOutcome } from "./roster.ts";
 import { RealmAudio, trackFor, trackById, type SfxName, type TrackId } from "./audio.ts";
 import { renderCard, shareText } from "./card.ts";
@@ -44,6 +45,9 @@ const NORTH = -Math.PI / 4;
 /** A Realm day lasts 24 minutes. Automated test runs stay at noon unless they set the time. */
 const DAY_MS = 24 * 60_000;
 let fixedTime: number | null = typeof navigator !== "undefined" && navigator.webdriver ? 0.5 : null;
+/** Weather from the real clock (tests stay clear unless they set one). */
+let fixedWeather: Weather | null = typeof navigator !== "undefined" && navigator.webdriver ? { rain: 0, storm: false, fog: 0 } : null;
+let lastThunder = -1;
 const timeOfDay = () => fixedTime ?? ((Date.now() / DAY_MS + 0.3) % 1);
 const DEFAULT_SETTINGS: Settings = { music: true, sfx: true, musicVolume: 0.7, sfxVolume: 0.8, zoom: 0.8, shiftDrop: false, autoMusic: true, dayNight: true };
 
@@ -206,6 +210,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         takeDrop: (index: number) => { const drop = players.current.drops()[index]; if (drop) { walkingTo.current = { owner: drop.owner, u: drop.u, x: drop.x, y: drop.y }; } },
         /** Fix the time of day (0 midnight … 0.5 noon), or null to follow the clock. */
         time: (value: number | null) => { fixedTime = value; },
+        /** Fix the weather ({ rain, storm, fog }), or null to follow the clock. */
+        weather: (value: Weather | null) => { fixedWeather = value; },
         view: (zoom: number, pitch: number, angle = 0) => { setSettings({ ...live.current.settings, zoom }); camera.current.pitch = pitch; camera.current.angle = angle; cameraGoal.current = null; },
         screenOf: (x: number, y: number) => {
           const view = canvas.current!.getBoundingClientRect(), point = toScreen(camera.current, x, y);
@@ -343,6 +349,14 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         hoverTile: current === "playing" ? hoverTile.current : null, marker: marker.current, reducedMotion, hits: hits.current, fireworks: fireworks.current, chat: chat.current,
         projectiles: projectiles.current, sfx: (name, gain) => audio.current?.sfx(name as SfxName, gain),
         time: current === "playing" && live.current.settings.dayNight !== false ? timeOfDay() : null,
+        ...(() => {
+          if (current !== "playing" || live.current.settings.weather === false) return { weather: null, strike: null };
+          const wall = Date.now(), here = regionAt(state.world, state.player.x, state.player.y).id, below = isUnderground(state.player.y);
+          const weather = fixedWeather ?? weatherAt(wall, here, below, live.current.settings.dayNight !== false ? timeOfDay() : null), strike = weather.storm ? strikeAt(wall) : null;
+          // Thunder follows the flash (a second or two later, as if the storm were a little way off).
+          if (strike && strike.id !== lastThunder) { lastThunder = strike.id; setTimeout(() => audio.current?.sfx("thunder", 0.9), 500 + (strike.seed % 1500)); }
+          return { weather, strike, wallMs: wall };
+        })(),
         peers: current === "playing" ? players.current.view(now) : [], peerSprites: id => followerSprites.current.get(id) ?? null,
         peerDrops: current === "playing" ? players.current.drops() : [],
       });
@@ -362,13 +376,18 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   useEffect(() => { if (!levelUps.length) return; const timer = setTimeout(() => setLevelUps(list => list.slice(1)), 6000); return () => clearTimeout(timer); }, [levelUps]);
 
   // ---------- Sound: distance, footsteps, the world's ambience ----------
-  const ambientClock = useRef({ fire: 0, forge: 0, water: 0, wild: 4, creature: 5 });
+  const ambientClock = useRef({ fire: 0, forge: 0, water: 0, wild: 4, creature: 5, rain: 0 });
   /** Called once per tick: crackling fires, the forge, water, regional wildlife and idle monster calls, all by distance. */
   const ambience = (state: Game) => {
     const player = audio.current, clock = ambientClock.current, me = state.player;
     if (!player) return;
     for (const key of Object.keys(clock) as (keyof typeof clock)[]) clock[key] -= TICK_MS / 1000;
     const nearest = (points: Iterable<{ x: number; y: number }>) => { let best = Infinity; for (const p of points) best = Math.min(best, Math.hypot(p.x - me.x, p.y - me.y)); return best; };
+    if (clock.rain <= 0) {
+      const wall = Date.now(), weather = live.current.settings.weather === false ? null : fixedWeather ?? weatherAt(wall, regionAt(state.world, me.x, me.y).id, isUnderground(me.y), null);
+      if (weather && weather.rain > 0.05) player.sfx("rain", weather.rain * 0.8);
+      clock.rain = 0.8;
+    }
     if (clock.fire <= 0) {
       const fires = [...state.fires, ...state.world.objects.filter(o => o.decor === "torch" && Math.abs(o.x - me.x) < 8 && Math.abs(o.y - me.y) < 8)], d = nearest(fires);
       if (d < 8) player.sfx("crackle", Math.max(0, 1 - d / 8) * (state.fires.length ? 1 : 0.5));

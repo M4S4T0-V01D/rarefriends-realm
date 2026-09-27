@@ -152,6 +152,12 @@ except around lamps, torches, fires, forges, altars and your own small light (a 
 The badge under the minimap shows the time of day; Settings can turn the cycle off. The minimap uses clearer colours:
 green land, blue water, black walls, yellow dots for NPCs and monsters, red for items, white for your follower.
 
+**Weather.** Light pools on the ground around each lamp, torch and fire, torches and fires flicker, and nights and
+dungeons are darker than before. The sky comes from the real clock in four-minute spells, so every player sees the
+same weather at the same moment: clear, rain, or a storm with lightning (thunder follows the flash) and a darker sky.
+Deserts and the frozen peaks stay dry, dawn brings ground fog, and the Murkmire is always misty. Settings can turn
+weather off.
+
 **Friendhollow Castle**, north of the fountain, has three storeys. Spiral staircases in the north-west and north-east towers
 (click them: *Climb-up*, *Climb-down*) lead from the ground floor (kitchen, great hall, the Relic keeper, guard towers) to
 King Hollis's floor (throne room, royal library, bedchamber, banquet gallery, the tower bank), and the north-east stair

@@ -792,3 +792,20 @@ test("Referrals: a friend's code gives both Friends coins, the Friendship cape a
   assert.equal(restored.player.referredBy, 7730); assert.equal(restored.player.boostTicks, newbie.player.boostTicks);
   run(newbie, 3); assert.equal(newbie.player.boostTicks, 5997, "the boost counts down with play");
 });
+
+test("Weather: the same sky for every player at the same moment; storms strike, deserts stay dry, dawn is foggy", async () => {
+  const { weatherAt, strikeAt } = await import("../games/rarefriends-realm/weather.ts");
+  const ms = 1_790_000_000_000;
+  assert.deepEqual(weatherAt(ms, "friendhollow", false, 0.5), weatherAt(ms, "friendhollow", false, 0.5), "deterministic");
+  let storms = 0, rainy = 0, strikes = 0;
+  for (let spell = 0; spell < 400; spell++) {
+    const at = ms + spell * 240_000 + 120_000, w = weatherAt(at, "friendhollow", false, 0.5);
+    if (w.storm) { storms++; for (let s = 0; s < 60; s++) if (strikeAt(at + s * 1000)?.id === Math.floor((at + s * 1000) / 1000)) strikes++; }
+    if (w.rain > 0) rainy++;
+    assert.equal(weatherAt(at, "pale_dunes", false, 0.5).rain, 0, "no rain in the desert");
+    assert.equal(weatherAt(at, "crypt", true, 0.5).rain, 0, "none underground");
+  }
+  assert(storms > 20 && rainy > storms, `some rain and some storms (${rainy}, ${storms})`);
+  assert(strikes > 0, "lightning in storms");
+  assert(weatherAt(ms, "farmland", false, 0.27).fog > 0.6, "fog at dawn");
+});

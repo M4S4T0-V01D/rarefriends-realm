@@ -10,6 +10,7 @@ import { npcOverhead, type Pick } from "./engine.ts";
 import { FLOOR_Y, REGIONS, STOREY, T, W, H, complexAt, cornerHeight, floorAt, groundHeight, inBounds, isUnderground, objectAtTile, onLevel, realPoint, type Building, type Floor, type World, type WorldObject } from "./world.ts";
 import { itemArt } from "./icons.ts";
 import type { PeerView } from "./social.ts";
+import type { Strike, Weather } from "./weather.ts";
 import { emoteMotion, emoteParticles, type Motion } from "./emotes.ts";
 import { drawPixels, shadeHex } from "./pixel.ts";
 import { TEX_PER_HEIGHT, TEX_PER_TILE, beginTextures, shingleTexture, texturedQuad, texturedTriangle, wallTexture, type WallStyle } from "./textures.ts";
@@ -56,6 +57,8 @@ export type Scene = {
   sfx?: (name: string, gain?: number) => void;
   /** Time of day, 0–1 (0 midnight, 0.5 noon), or null for always day. */
   time?: number | null;
+  /** Rain, storms and fog (from weather.ts), and the latest lightning strike with the wall-clock time. */
+  weather?: Weather | null; strike?: Strike | null; wallMs?: number;
   /** Other players, and their Friends' art once it has loaded. */
   peers?: readonly PeerView[]; peerSprites?: (id: number) => GenerationSprites | null;
   /** Items other players dropped from their packs (anyone may take them). */
@@ -67,35 +70,38 @@ export function daylight(time: number | null | undefined) {
   const sun = -Math.cos(time * Math.PI * 2), dark = Math.max(0, Math.min(1, (0.25 - sun) / 0.75)), warm = Math.max(0, 1 - Math.abs(sun - 0.08) / 0.32);
   return { dark, warm, label: sun > 0.3 ? "Day" : sun < -0.3 ? "Night" : time < 0.5 ? "Dawn" : "Dusk" };
 }
-type Light = { x: number; y: number; r: number; color?: string; strength?: number };
+type Light = { x: number; y: number; r: number; color?: string; strength?: number; flicker?: boolean };
 /** A hex colour at an alpha, for gradients. */
 const hexA = (hex: string, alpha: number) => { const n = parseInt(hex.slice(1, 7), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${Math.max(0, Math.min(1, alpha)).toFixed(3)})`; };
 let nightCanvas: HTMLCanvasElement | null = null;
 /** Night: a blue dark over everything, with holes burnt through it by lamps, torches, fires and your own lantern. */
-function drawNight(ctx: CanvasRenderingContext2D, dark: number, warm: number, lights: readonly Light[], tint = "16,20,48") {
-  if (warm > 0.01) { ctx.fillStyle = `rgba(232,150,96,${(warm * 0.16).toFixed(3)})`; ctx.fillRect(0, 0, VIEW.width, VIEW.height); }
+/**
+ * Night: a blue dark over everything, with light pooling on the ground around every lamp, torch, fire, spell and your
+ * own small light (ellipses flattened by the camera's pitch, soft falloff, flames flickering), and warm light added on top.
+ */
+function drawNight(ctx: CanvasRenderingContext2D, dark: number, warm: number, lights: readonly Light[], tint = "10,13,38", squash = 0.6, now = 0) {
+  if (warm > 0.01) { ctx.fillStyle = `rgba(232,140,86,${(warm * 0.18).toFixed(3)})`; ctx.fillRect(0, 0, VIEW.width, VIEW.height); }
   if (dark < 0.01) return;
   const canvas = nightCanvas ??= document.createElement("canvas");
   if (canvas.width !== VIEW.width) { canvas.width = VIEW.width; canvas.height = VIEW.height; }
   const n = canvas.getContext("2d")!;
   n.globalCompositeOperation = "source-over"; n.clearRect(0, 0, VIEW.width, VIEW.height);
-  n.fillStyle = `rgba(${tint},${(0.64 * dark).toFixed(3)})`; n.fillRect(0, 0, VIEW.width, VIEW.height);
+  n.fillStyle = `rgba(${tint},${(0.74 * dark).toFixed(3)})`; n.fillRect(0, 0, VIEW.width, VIEW.height);
+  const flicker = (light: Light, i: number) => light.flicker && now ? 1 + Math.sin(now / 90 + i * 1.7) * 0.05 + Math.sin(now / 37 + i) * 0.03 : 1;
+  const pool = (target: CanvasRenderingContext2D, light: Light, i: number, stops: [number, string][], scale = 1) => {
+    const r = light.r * scale * flicker(light, i);
+    target.save(); target.translate(light.x, light.y); target.scale(1, squash);
+    const g = target.createRadialGradient(0, 0, 0, 0, 0, r); for (const [at, color] of stops) g.addColorStop(at, color);
+    target.fillStyle = g; target.fillRect(-r, -r, r * 2, r * 2); target.restore();
+  };
   n.globalCompositeOperation = "destination-out";
-  for (const light of lights) {
-    const glow = n.createRadialGradient(light.x, light.y, 0, light.x, light.y, light.r);
-    const k = light.strength ?? 1;
-    glow.addColorStop(0, `rgba(0,0,0,${(0.92 * k).toFixed(3)})`); glow.addColorStop(0.55, `rgba(0,0,0,${(0.5 * k).toFixed(3)})`); glow.addColorStop(1, "rgba(0,0,0,0)");
-    n.fillStyle = glow; n.fillRect(light.x - light.r, light.y - light.r, light.r * 2, light.r * 2);
-  }
+  lights.forEach((light, i) => { const k = light.strength ?? 1;
+    pool(n, light, i, [[0, `rgba(0,0,0,${(0.96 * k).toFixed(3)})`], [0.3, `rgba(0,0,0,${(0.78 * k).toFixed(3)})`], [0.62, `rgba(0,0,0,${(0.34 * k).toFixed(3)})`], [1, "rgba(0,0,0,0)"]]); });
   ctx.drawImage(canvas, 0, 0, VIEW.width, VIEW.height);
-  // A warm glow around each flame.
+  // Light adds colour: a warm (or the spell's) glow pooled around each source, brightest at its heart.
   ctx.globalCompositeOperation = "lighter";
-  for (const light of lights) {
-    const glow = ctx.createRadialGradient(light.x, light.y, 0, light.x, light.y, light.r * 0.6);
-    const k = light.strength ?? 1;
-    glow.addColorStop(0, light.color ? hexA(light.color, 0.4 * dark * k) : `rgba(120,80,30,${(0.35 * dark * k).toFixed(3)})`); glow.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = glow; ctx.fillRect(light.x - light.r, light.y - light.r, light.r * 2, light.r * 2);
-  }
+  lights.forEach((light, i) => { const k = (light.strength ?? 1) * dark, c = light.color ?? "#e89a4f";
+    pool(ctx, light, i, [[0, hexA(c, 0.5 * k)], [0.45, hexA(c, 0.2 * k)], [1, hexA(c, 0)]], 0.75); });
   ctx.globalCompositeOperation = "source-over";
 }
 export type HitSplat = { on: "player" | "monster"; uid?: number; damage: number; at: number };
@@ -759,8 +765,10 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   const y0 = Math.max(cy - DRAW_DISTANCE, Math.min(...corners.map(c => c.y)) - 2), y1 = Math.min(cy + DRAW_DISTANCE, Math.max(...corners.map(c => c.y)) + 3);
   drawTerrain(ctx, scene, x0, y0, x1, y1);
   drawCloudShadows(ctx, project, camera, now, z, underground, scene.reducedMotion);
-  const hits: Hit[] = [], drawables: Drawable[] = [], light = underground ? { dark: 0.95, warm: 0, label: "Dark" } : daylight(scene.time), lights: Light[] = [];
-  const glow = (x: number, y: number, lift: number, radius: number, color?: string, strength = 1) => { if (light.dark > 0.01) { const at = toScreen(camera, x, y, lift); if (at.x > -200 && at.x < VIEW.width + 200 && at.y > -200 && at.y < VIEW.height + 200) lights.push({ x: at.x, y: at.y, r: radius * z, color, strength }); } };
+  const sky = daylight(scene.time), weather = scene.weather ?? null, overcast = weather ? weather.rain * (weather.storm ? 0.45 : 0.28) : 0;
+  const hits: Hit[] = [], drawables: Drawable[] = [], light = underground ? { dark: 0.95, warm: 0, label: "Dark" } : { ...sky, dark: Math.min(1, sky.dark + overcast * (1 - sky.dark)), warm: sky.warm * (1 - (weather?.rain ?? 0)) }, lights: Light[] = [];
+  // Lights pool on the ground beneath their source (the lift only decides where the pool sits on screen, a little below).
+  const glow = (x: number, y: number, lift: number, radius: number, color?: string, strength = 1, flicker = false) => { if (light.dark > 0.01) { const at = toScreen(camera, x, y, lift * 0.3); if (at.x > -250 && at.x < VIEW.width + 250 && at.y > -250 && at.y < VIEW.height + 250) lights.push({ x: at.x, y: at.y, r: radius * z, color, strength, flicker }); } };
   const player = game.player, pp = interpolate(player, game, alpha), playerDepth = depthOf(camera, pp.x, pp.y), depth = (x: number, y: number) => depthOf(camera, x, y);
   const me = toScreen(camera, pp.x, pp.y), meTop = me.y - 60 * z;
   const coversPlayer = (x: number, y: number) => { const at = toScreen(camera, x, y); return Math.abs(at.x - me.x) < 34 * z && at.y > meTop && at.y - 95 * z < me.y; };
@@ -799,7 +807,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     const object = objectAtTile(world, x, y);
     if (!object || object.name === "__removed") return;
     if (object.kind === "decor" && SMALL_DECOR.has(object.decor!) && Math.abs(x - camera.x) + Math.abs(y - camera.y) > HAZE_START) return;
-    if (object.decor === "lamp") glow(x, y, 48, 150); else if (object.decor === "torch") glow(x, y, 32, 120);
+    if (object.decor === "lamp") glow(x, y, 48, 150, "#f2b261", 0.9); else if (object.decor === "torch") glow(x, y, 32, 130, "#ef9a4c", 1, true);
     else if (object.kind === "furnace" || object.kind === "range") glow(x, y, 16, 110); else if (object.kind === "altar") glow(x, y, 26, 70); else if (object.kind === "sigil_altar") glow(x, y, 30, 90);
     const d = depth(x, y) + (object.kind === "wheat" || object.kind === "spot" ? -0.4 : 0);
     drawables.push({ depth: d, draw: () => {
@@ -852,7 +860,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   // Fires.
   for (const fire of game.fires) {
     if (!shown(fire.x, fire.y)) continue;
-    glow(fire.x, fire.y, 10, 170);
+    glow(fire.x, fire.y, 10, 190, "#f08a3c", 1, true);
     drawables.push({ depth: depth(fire.x, fire.y), draw: () => {
       const s = toScreen(camera, fire.x, fire.y), frame = scene.reducedMotion ? 0 : Math.floor(now / 110 + fire.uid * 3) % 8;
       for (const [dx, dy] of [[-6, 0], [6, 0], [0, 3]]) { ctx.strokeStyle = INK; ctx.lineWidth = 4 * z; ctx.beginPath(); ctx.moveTo(s.x + dx * z - 6 * z, s.y + dy * z); ctx.lineTo(s.x + dx * z + 6 * z, s.y + dy * z - 3 * z); ctx.stroke(); ctx.strokeStyle = "#8a6a50"; ctx.lineWidth = 2 * z; ctx.stroke(); }
@@ -1039,9 +1047,17 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   }
   drawEffects(ctx, project, world, now, z);
   if (!underground) drawHaze(ctx, camera);
+  // Ground fog (dawn, the swamp, rain) drifting low over the land, under the night.
+  if (weather && weather.fog > 0.02 && !scene.reducedMotion) drawFog(ctx, camera, weather.fog, now);
+  else if (weather && weather.fog > 0.02) { ctx.fillStyle = `rgba(232,235,238,${(weather.fog * 0.25).toFixed(3)})`; ctx.fillRect(0, 0, VIEW.width, VIEW.height); }
   // Night falls over the land (your Friend carries a small light; a lantern familiar a bigger one).
   // Your own light is faint: enough to see your feet by (a lantern familiar does better).
-  if (light.dark > 0.01 || light.warm > 0.01) { const lantern = player.worn.includes("lantern_familiar"); glow(pp.x, pp.y, 24, lantern ? 120 : underground ? 70 : 55, undefined, lantern ? 0.6 : 0.3); drawNight(ctx, light.dark, light.warm, lights, underground ? "6,6,10" : undefined); }
+  if (light.dark > 0.01 || light.warm > 0.01) { const lantern = player.worn.includes("lantern_familiar"); glow(pp.x, pp.y, 24, lantern ? 120 : underground ? 70 : 55, undefined, lantern ? 0.6 : 0.3); drawNight(ctx, light.dark, light.warm, lights, underground ? "5,5,9" : undefined, 0.45 + camera.pitch * 0.7, scene.reducedMotion ? 0 : now); }
+  // Rain over everything, and lightning on top of that.
+  if (weather && weather.rain > 0.02) drawRain(ctx, weather.rain, scene.reducedMotion ? 0 : now, light.dark);
+  if (scene.strike && scene.wallMs !== undefined && !underground && weather?.storm) drawLightning(ctx, scene.strike, scene.wallMs, scene.reducedMotion);
+  // A soft vignette outdoors, for depth.
+  if (!underground) { const v = ctx.createRadialGradient(VIEW.width / 2, VIEW.height / 2, VIEW.height * 0.45, VIEW.width / 2, VIEW.height / 2, VIEW.width * 0.72); v.addColorStop(0, "rgba(14,16,28,0)"); v.addColorStop(1, `rgba(14,16,28,${(0.16 + light.dark * 0.2).toFixed(3)})`); ctx.fillStyle = v; ctx.fillRect(0, 0, VIEW.width, VIEW.height); }
   // Click marker: an old-school cross, yellow for walking, red for actions.
   if (scene.marker && now - scene.marker.at < 450) {
     const s = toScreen(camera, scene.marker.x, scene.marker.y), k = 1 - (now - scene.marker.at) / 450, r = 8 * z * (0.6 + k * 0.4);
@@ -1237,6 +1253,64 @@ function applyMotion(ctx: CanvasRenderingContext2D, motion: Motion | null, x: nu
   if (!motion || (motion.lean === 0 && motion.squash === 1)) return () => {};
   ctx.save(); ctx.translate(x, feetY); ctx.rotate(motion.lean); ctx.scale(1 + (1 - motion.squash) * 0.4, motion.squash); ctx.translate(-x, -feetY);
   return () => ctx.restore();
+}
+// ---------- Weather ----------
+let fogPuff: HTMLCanvasElement | null = null;
+/** Ground fog: soft white banks laid on the ground in world space, drifting slowly. */
+function drawFog(ctx: CanvasRenderingContext2D, camera: Camera, amount: number, now: number) {
+  if (!fogPuff) {
+    fogPuff = document.createElement("canvas"); fogPuff.width = fogPuff.height = 128;
+    const f = fogPuff.getContext("2d")!, g = f.createRadialGradient(64, 64, 0, 64, 64, 64);
+    g.addColorStop(0, "rgba(236,239,242,0.9)"); g.addColorStop(0.5, "rgba(236,239,242,0.45)"); g.addColorStop(1, "rgba(236,239,242,0)");
+    f.fillStyle = g; f.fillRect(0, 0, 128, 128);
+  }
+  const drift = now / 9000, step = 3.5, cx = Math.floor(camera.x / step) * step, cy = Math.floor(camera.y / step) * step, z = camera.zoom;
+  for (let j = -7; j <= 7; j++) for (let i = -7; i <= 7; i++) {
+    const wx = cx + i * step + Math.sin(drift + j * 1.3) * 1.2 + drift * 1.5, wy = cy + j * step + Math.cos(drift * 0.7 + i) * 0.8;
+    const density = hash(Math.round(cx / step) + i, Math.round(cy / step) + j);
+    if (density < 0.25) continue;
+    const at = toScreen(camera, wx, wy, 4), w = step * TILE_W * 1.35 * z, h = w * (0.35 + camera.pitch * 0.55);
+    if (at.x < -w || at.x > VIEW.width + w || at.y < -h || at.y > VIEW.height + h) continue;
+    ctx.globalAlpha = Math.min(0.85, amount * (0.35 + density * 0.55));
+    ctx.drawImage(fogPuff, at.x - w / 2, at.y - h / 2, w, h);
+  }
+  ctx.globalAlpha = 1;
+}
+/** Rain: slanted streaks falling across the screen, and splashes on the ground. */
+function drawRain(ctx: CanvasRenderingContext2D, amount: number, now: number, dark: number) {
+  const streaks = Math.round(260 * amount), t = now / 1000;
+  ctx.strokeStyle = `rgba(${dark > 0.4 ? "170,185,210" : "205,215,230"},${(0.38 + amount * 0.2).toFixed(2)})`; ctx.lineWidth = 1.2; ctx.beginPath();
+  for (let i = 0; i < streaks; i++) {
+    const speed = 900 + hash(i, 3) * 500, len = 10 + hash(i, 5) * 10;
+    const y = ((hash(i, 1) * VIEW.height + t * speed) % (VIEW.height + 40)) - 20, x = ((hash(i, 2) * (VIEW.width + 200) - t * speed * 0.28) % (VIEW.width + 200) + VIEW.width + 200) % (VIEW.width + 200) - 100;
+    ctx.moveTo(x, y); ctx.lineTo(x - len * 0.28, y + len);
+  }
+  ctx.stroke();
+  // Splashes: little rings that pop up and fade.
+  ctx.strokeStyle = `rgba(220,228,240,${(0.35 * amount).toFixed(2)})`; ctx.lineWidth = 1;
+  const beat = Math.floor(now / 140);
+  for (let i = 0; i < 40 * amount; i++) {
+    const x = hash(beat * 97 + i, 11) * VIEW.width, y = hash(beat * 89 + i, 12) * VIEW.height, r = 2 + hash(i, 13) * 3;
+    ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.4, 0, 0, Math.PI * 2); ctx.stroke();
+  }
+}
+/** A lightning strike: a white flash across the sky, and a forked bolt for a moment. */
+function drawLightning(ctx: CanvasRenderingContext2D, strike: Strike, ms: number, reduced: boolean) {
+  const age = ms - strike.at;
+  if (age < 0 || age > 900) return;
+  const flash = age < 80 ? 0.55 : age < 140 ? 0.15 : age < 220 ? 0.4 : Math.max(0, 0.3 * (1 - (age - 220) / 680));
+  ctx.fillStyle = `rgba(235,240,255,${(reduced ? flash * 0.3 : flash).toFixed(3)})`; ctx.fillRect(0, 0, VIEW.width, VIEW.height);
+  if (reduced || age > 260) return;
+  // The bolt: a jagged path from the top of the sky with a fork or two.
+  let seed = strike.seed; const rand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  const bolt = (x0: number, y0: number, y1: number, width: number) => {
+    const points: [number, number][] = [[x0, y0]]; let x = x0;
+    for (let y = y0; y < y1; y += 14 + rand() * 18) { x += (rand() - 0.5) * 38; points.push([x, y]); }
+    for (const [color, w] of [["rgba(160,190,255,0.5)", width * 4], ["#ffffff", width]] as const) { ctx.strokeStyle = color; ctx.lineWidth = w; ctx.beginPath(); points.forEach(([px, py], i) => i ? ctx.lineTo(px, py) : ctx.moveTo(px, py)); ctx.stroke(); }
+    return points;
+  };
+  const main = bolt(strike.x * VIEW.width, -10, strike.y * VIEW.height, 2.6);
+  for (let f = 0; f < 2; f++) { const from = main[Math.floor(main.length * (0.3 + rand() * 0.4))]; if (from) bolt(from[0], from[1], from[1] + 60 + rand() * 90, 1.4); }
 }
 /** A little pixel heart. */
 function heart(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
