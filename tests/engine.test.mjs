@@ -871,3 +871,15 @@ test("Trading: when both players ask at the same moment, both open the same trad
   a.accept(ga); b.accept(gb); flush(); a.accept(ga); b.accept(gb); flush();
   assert(has(ga.player, "yew_bow") && !has(gb.player, "yew_bow") && count(gb.player, "coins") >= 300, "swapped");
 });
+
+test("Referrals: at most five rewarded in any 24 hours; the rest wait for another day together", async () => {
+  const { creditReferral } = await import("../games/rarefriends-realm/engine.ts");
+  const game = newGame(), day = 86_400_000, t0 = 1_790_000_000_000;
+  for (let i = 0; i < 5; i++) assert(creditReferral(game, 5000 + i, t0 + i * 1000), `referral ${i + 1}`);
+  assert(!creditReferral(game, 6000, t0 + 60_000), "the sixth today waits");
+  assert(!game.player.referrals.includes(6000), "and isn't used up");
+  const save = JSON.parse(JSON.stringify(serialize(game))), fresh = newGame(); restore(fresh, save);
+  assert(!creditReferral(fresh, 6000, t0 + 3_600_000), "still capped after a reload");
+  assert(creditReferral(fresh, 6000, t0 + day + 5000), "credited the next day");
+  assert(!creditReferral(game, 5000, t0 + 2 * day), "each Friend only once");
+});

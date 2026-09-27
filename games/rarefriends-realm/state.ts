@@ -10,6 +10,8 @@ import { createWorld, type World } from "./world.ts";
 export const TICK_MS = 600;
 /** Referrals: +15% XP for an hour of play, for both Friends, and 250 coins each. */
 export const REFERRAL_BOOST = 0.15, REFERRAL_TICKS = 6000, REFERRAL_COINS = 250;
+/** Referral rewards a player can collect in any 24 hours (more wait until the next day you're online together). */
+export const REFERRALS_PER_DAY = 5, DAY_MS = 86_400_000;
 export const INVENTORY_SIZE = 28;
 export const BANK_SIZE = 400;
 export type Slot = { id: string; n: number };
@@ -56,6 +58,10 @@ export type Player = {
   lastHitBy: number | null; created: number; queuedSpell: string | null; castTimer: number;
   /** Referrals: the Friend whose code you used, the Friends who used yours, and ticks of referral XP boost left. */
   referredBy: number | null; referrals: number[]; boostTicks: number;
+  /** When (wall-clock ms) your recent referrals were credited: at most REFERRALS_PER_DAY in any 24 hours. */
+  referralTimes: number[];
+  /** You've been told today's referral limit is reached (not saved). */
+  referralCapNoted?: boolean;
   /** Mounts you own from the stables, and the one you're riding. */
   mounts: string[]; mount: string | null;
   /** The mount you rode last (not saved), for the ride button. */
@@ -140,7 +146,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
     style: "accurate", autocast: null, prayers: [], target: null, activity: null, combat: null,
     attackTimer: 0, eatTimer: 0, stunned: 0, regenTimer: 0, quests: {}, questData: {},
     wardrobe: [], worn: [], follower: null, courseStep: -1, kills: 0, deaths: 0, overhead: null, music: ["theme"],
-    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, referredBy: null, referrals: [], boostTicks: 0, mounts: [], mount: null,
+    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, referredBy: null, referrals: [], boostTicks: 0, referralTimes: [], mounts: [], mount: null,
     lastHitBy: null, created: Date.now(), queuedSpell: null, castTimer: 0,
   };
 }

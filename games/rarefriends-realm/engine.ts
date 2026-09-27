@@ -10,7 +10,7 @@ import {
 import { addSlayerPoints, slayerBoost, slayerKill, slayerProblem, taskText } from "./slayer.ts";
 import { NPCS, examineItem, npcDef, onMonsterKilled, questDone, searchCryptChest, searchWell, talk, tanHides, useCryptAltar } from "./content.ts";
 import {
-  BANK_SIZE, INVENTORY_SIZE, REFERRAL_COINS, REFERRAL_TICKS, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
+  BANK_SIZE, DAY_MS, INVENTORY_SIZE, REFERRAL_COINS, REFERRALS_PER_DAY, REFERRAL_TICKS, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
   level, maxHp, maxPrayer, message, prayerBoost, riding, sound, take, weapon, combatLevel, createGame,
   type Activity, type CombatStyle, type Dialogue, type Game, type Monster, type Npc, type Point, type Recipe, type Slot, type Target,
 } from "./state.ts";
@@ -1282,11 +1282,20 @@ export function applyReferral(game: Game, code: string) {
   message(game, `Referral used! You and Friend #${id} each get 250 coins, a Friendship cape and +15% XP for an hour of play. They get theirs next time you're both online.`, "quest");
   return null;
 }
-/** A player who used our code is online with us: reward us (once per Friend). */
-export function creditReferral(game: Game, from: number) {
+/**
+ * A player who used our code is online with us: reward us (once per Friend, and at most five Friends in any 24 hours;
+ * past that, they're credited the next time we're online together after the day has rolled on).
+ */
+export function creditReferral(game: Game, from: number, now = Date.now()) {
   const player = game.player;
   if (from === player.friendId || player.referrals.includes(from) || player.referredBy === from || player.referrals.length >= 500) return false;
-  player.referrals.push(from); referralReward(game);
+  player.referralTimes = player.referralTimes.filter(at => now - at < DAY_MS && at <= now);
+  if (player.referralTimes.length >= REFERRALS_PER_DAY) {
+    if (!player.referralCapNoted) { player.referralCapNoted = true; message(game, `Friend #${from} used your referral code! You've had ${REFERRALS_PER_DAY} referral rewards today; theirs will be waiting next time you're both online tomorrow.`, "info"); }
+    return false;
+  }
+  player.referralCapNoted = false;
+  player.referrals.push(from); player.referralTimes.push(now); referralReward(game);
   message(game, `Friend #${from} joined with your referral code! +250 coins, +15% XP for an hour of play${player.referrals.length === 1 ? ", and a Friendship cape" : ""}.`, "quest");
   return true;
 }
@@ -1576,7 +1585,7 @@ export type SaveData = {
   inventory: (Slot | null)[]; equipment: Record<string, string>; bank: Slot[]; style: CombatStyle; autocast: string | null;
   quests: Record<string, number>; questData: Record<string, number>; wardrobe: string[]; worn: string[]; follower: number | null; followerGeneration: number | null;
   kills: number; deaths: number; tutorial: number; created: number; playTicks: number; retaliate: boolean; music: string[];
-  referredBy?: number | null; referrals?: number[]; boostTicks?: number; mounts?: string[]; mount?: string | null;
+  referredBy?: number | null; referrals?: number[]; referralTimes?: number[]; boostTicks?: number; mounts?: string[]; mount?: string | null;
 };
 export function serialize(game: Game): SaveData {
   const player = game.player;
@@ -1586,7 +1595,7 @@ export function serialize(game: Game): SaveData {
     style: player.style, autocast: player.autocast, quests: { ...player.quests }, questData: { ...player.questData }, wardrobe: [...player.wardrobe], worn: [...player.worn],
     follower: player.follower, followerGeneration: player.followerGeneration, kills: player.kills, deaths: player.deaths, tutorial: player.tutorial, created: player.created,
     playTicks: game.playTicks, retaliate: game.autoRetaliate, music: [...player.music],
-    referredBy: player.referredBy, referrals: [...player.referrals], boostTicks: player.boostTicks, mounts: [...player.mounts], mount: player.mount,
+    referredBy: player.referredBy, referrals: [...player.referrals], referralTimes: [...player.referralTimes], boostTicks: player.boostTicks, mounts: [...player.mounts], mount: player.mount,
   };
 }
 const QUEST_IDS = ["friends_feast", "grumblin_trouble", "cold_forge", "hollow_whispers", "lost_glimmer", "hollow_king"];
@@ -1668,6 +1677,7 @@ export function restore(game: Game, raw: unknown): boolean {
   player.referredBy = friendNumber(save.referredBy);
   player.referrals = [...new Set((Array.isArray(save.referrals) ? save.referrals : []).map(friendNumber).filter((id): id is number => id !== null))].slice(0, 500);
   player.boostTicks = int(save.boostTicks, 0, REFERRAL_TICKS * 50, 0);
+  player.referralTimes = (Array.isArray(save.referralTimes) ? save.referralTimes : []).filter((at): at is number => typeof at === "number" && Number.isFinite(at) && at > 0).slice(-REFERRALS_PER_DAY);
   player.mounts = MOUNTS.filter(mount => Array.isArray(save.mounts) && save.mounts.includes(mount.id)).map(mount => mount.id);
   player.mount = typeof save.mount === "string" && player.mounts.includes(save.mount) ? save.mount : null;
   return true;

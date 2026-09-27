@@ -253,7 +253,7 @@ and the badge by the minimap shows how many are online.
 | Player menu | Right-click a player: *Follow*, *Add-friend* / *Remove-friend*, *Message*, *Wave*, *Ignore*, *Examine* |
 | Friends list | Friends tab: who's online, where and at what level; message or remove; add by Friend # |
 | Fight together | Attack the same monster as another player: both of your hits count, it walks to where they're fighting it, and you see each other's health bars. The last hit in your game gets the loot |
-| Referrals | Friends tab: your code is RF-<your Friend #>. A friend who enters it and you each get 250 coins, the Friendship cape and +15% XP for an hour of play (you, the next time you're both online; once per friend). Wear the cape for the Friendship emote |
+| Referrals | Friends tab: your code is RF-<your Friend #>. A friend who enters it and you each get 250 coins, the Friendship cape and +15% XP for an hour of play (you, the next time you're both online; once per friend, at most five in any 24 hours, with the rest credited later). Wear the cape for the Friendship emote |
 | Party bonus | +5% XP while a friend is within 12 tiles on your storey |
 | Trade | Right-click a player → *Trade with* (they accept from the prompt). Click or right-click items to offer (*Offer-1/5/10/All*), both press Accept, check the second screen, and Accept again. Any change clears both accepts. Untradeable items (quest items, capes) can't be offered |
 | Dropped items | Things you drop from your pack show on other players' screens; *Take* one and it's yours if you're first |
