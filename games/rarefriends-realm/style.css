@@ -119,6 +119,11 @@
 .realm-spells button[data-usable="false"] b { color: #a8a39c; }
 .realm-check { display: flex; gap: 6px; align-items: center; margin: 6px 0; }
 .realm-range { display: grid; gap: 2px; margin: 6px 0; }
+.realm-tracks { list-style: none; margin: 4px 0 8px; padding: 0; max-height: 132px; overflow-y: auto; display: grid; gap: 1px; }
+.realm-tracks button { width: 100%; text-align: left; border: 0; background: transparent; padding: 1px 4px; font-weight: 700; }
+.realm-tracks button.unlocked { color: #9fe0a8; } .realm-tracks button.locked { color: #e07a7a; }
+.realm-tracks button[aria-pressed="true"] { color: var(--gold); background: #ffffff12; }
+.realm-tracks button:hover:not(:disabled) { background: #ffffff1a; }
 .realm-range input { width: 100%; }
 .realm-skills { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
 .realm-skill { position: relative; display: flex; align-items: center; justify-content: space-between; height: 34px; padding: 0 6px; border: 1.5px solid #000; background: var(--panel-2); color: var(--gold); border-radius: 3px; overflow: hidden; }

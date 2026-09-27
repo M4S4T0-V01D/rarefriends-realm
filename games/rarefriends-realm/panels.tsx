@@ -16,6 +16,7 @@ import {
 } from "./engine.ts";
 import { drawItemShape, friendRows, renderWorldMap } from "./render.ts";
 import { friendSprite } from "./sprites.ts";
+import { TRACKS } from "./audio.ts";
 
 // ---------- Item icons ----------
 const iconCache = new Map<string, string>();
@@ -89,12 +90,12 @@ export const TABS: readonly { id: Tab; label: string; glyph: string; key: string
   { id: "inventory", label: "Inventory", glyph: "▣", key: "F4" }, { id: "equipment", label: "Worn equipment", glyph: "⛨", key: "F5" }, { id: "prayer", label: "Prayer", glyph: "✚", key: "F6" },
   { id: "magic", label: "Magic", glyph: "✦", key: "F7" }, { id: "friends", label: "Friends and wardrobe", glyph: "☺", key: "F8" }, { id: "settings", label: "Settings", glyph: "⚙", key: "F9" },
 ];
-export type Settings = { music: boolean; sfx: boolean; musicVolume: number; sfxVolume: number; zoom: number; shiftDrop: boolean };
+export type Settings = { music: boolean; sfx: boolean; musicVolume: number; sfxVolume: number; zoom: number; shiftDrop: boolean; autoMusic: boolean };
 export type PanelProps = {
   game: Game; tab: Tab; setTab: (tab: Tab) => void; selection: Selection; setSelection: (selection: Selection) => void;
   openMenu: (x: number, y: number, entries: MenuEntry[]) => void; refresh: () => void; roster: readonly OwnedFriend[]; rosterState: "waiting" | "ready" | "none";
   friendSprites: ReadonlyMap<number, GenerationSprites>; loadFriend: (id: number) => void; settings: Settings; setSettings: (settings: Settings) => void;
-  trackName: string; openCard: () => void; openHelp: () => void; paused: boolean; saved: string; relicCounts: readonly number[]; openCaskets: () => void;
+  trackName: string; trackId: string; playTrack: (id: string) => void; openCard: () => void; openHelp: () => void; paused: boolean; saved: string; relicCounts: readonly number[]; openCaskets: () => void;
 };
 export function SidePanel(props: PanelProps) {
   const { tab, setTab } = props;
@@ -322,10 +323,19 @@ function FriendsTab({ game, refresh, roster, rosterState, friendSprites, loadFri
     </div>
   );
 }
-function SettingsTab({ game, settings, setSettings, trackName, openHelp, saved, refresh }: PanelProps) {
+function SettingsTab({ game, settings, setSettings, trackName, trackId, playTrack, openHelp, saved, refresh }: PanelProps) {
   const set = (patch: Partial<Settings>) => setSettings({ ...settings, ...patch });
+  const unlocked = game.player.music;
   return (
     <div className="realm-settings">
+      <h3>Music <small>({unlocked.filter(id => TRACKS.some(track => track.id === id)).length}/{TRACKS.length} unlocked)</small></h3>
+      <label className="realm-check"><input type="checkbox" checked={settings.autoMusic} onChange={event => set({ autoMusic: event.target.checked })} /> Auto: play each area's track</label>
+      <ul className="realm-tracks" aria-label="Music tracks">
+        {TRACKS.map(track => {
+          const open = unlocked.includes(track.id);
+          return <li key={track.id}><button type="button" disabled={!open} aria-pressed={trackId === track.id} className={open ? "unlocked" : "locked"} onClick={() => playTrack(track.id)}>{open ? track.name : "???"}</button></li>;
+        })}
+      </ul>
       <label className="realm-check"><input type="checkbox" checked={settings.music} onChange={event => set({ music: event.target.checked })} /> Music <small>({trackName})</small></label>
       <label className="realm-range">Music volume <input type="range" min={0} max={100} value={Math.round(settings.musicVolume * 100)} onChange={event => set({ musicVolume: Number(event.target.value) / 100 })} /></label>
       <label className="realm-check"><input type="checkbox" checked={settings.sfx} onChange={event => set({ sfx: event.target.checked })} /> Sound effects</label>

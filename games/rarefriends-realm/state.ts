@@ -48,7 +48,7 @@ export type Player = {
   attackTimer: number; eatTimer: number; stunned: number; regenTimer: number;
   quests: Record<string, number>; questData: Record<string, number>;
   wardrobe: WardrobeId[]; worn: WardrobeId[]; follower: number | null;
-  courseStep: number; kills: number; deaths: number; overhead: { text: string; until: number } | null;
+  courseStep: number; kills: number; deaths: number; overhead: { text: string; until: number } | null; music: string[];
   familyId: number; friendId: number; relics: number[]; followerGeneration: number | null; tutorial: number;
   lastHitBy: number | null; created: number; queuedSpell: string | null;
 };
@@ -112,7 +112,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
     xp, hp: 10, prayer: 1, inventory, equipment: {}, bank: [{ id: "coins", n: 50 }],
     style: "accurate", autocast: null, prayers: [], target: null, activity: null, combat: null,
     attackTimer: 0, eatTimer: 0, stunned: 0, regenTimer: 0, quests: {}, questData: {},
-    wardrobe: [], worn: [], follower: null, courseStep: -1, kills: 0, deaths: 0, overhead: null,
+    wardrobe: [], worn: [], follower: null, courseStep: -1, kills: 0, deaths: 0, overhead: null, music: ["theme"],
     familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0,
     lastHitBy: null, created: Date.now(), queuedSpell: null,
   };

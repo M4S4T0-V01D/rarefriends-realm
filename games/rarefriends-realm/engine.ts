@@ -1138,7 +1138,7 @@ export type SaveData = {
   v: 1; friendId: number; x: number; y: number; run: boolean; energy: number; xp: Record<string, number>; hp: number; prayer: number;
   inventory: (Slot | null)[]; equipment: Record<string, string>; bank: Slot[]; style: CombatStyle; autocast: string | null;
   quests: Record<string, number>; questData: Record<string, number>; wardrobe: string[]; worn: string[]; follower: number | null; followerGeneration: number | null;
-  kills: number; deaths: number; tutorial: number; created: number; playTicks: number; retaliate: boolean;
+  kills: number; deaths: number; tutorial: number; created: number; playTicks: number; retaliate: boolean; music: string[];
 };
 export function serialize(game: Game): SaveData {
   const player = game.player;
@@ -1147,7 +1147,7 @@ export function serialize(game: Game): SaveData {
     inventory: player.inventory.map(slot => slot ? { ...slot } : null), equipment: { ...player.equipment } as Record<string, string>, bank: player.bank.map(slot => ({ ...slot })),
     style: player.style, autocast: player.autocast, quests: { ...player.quests }, questData: { ...player.questData }, wardrobe: [...player.wardrobe], worn: [...player.worn],
     follower: player.follower, followerGeneration: player.followerGeneration, kills: player.kills, deaths: player.deaths, tutorial: player.tutorial, created: player.created,
-    playTicks: game.playTicks, retaliate: game.autoRetaliate,
+    playTicks: game.playTicks, retaliate: game.autoRetaliate, music: [...player.music],
   };
 }
 const QUEST_IDS = ["friends_feast", "grumblin_trouble", "cold_forge", "hollow_whispers", "lost_glimmer", "hollow_king"];
@@ -1203,6 +1203,16 @@ export function restore(game: Game, raw: unknown): boolean {
   player.kills = int(save.kills, 0, 1e9, 0); player.deaths = int(save.deaths, 0, 1e9, 0); player.tutorial = int(save.tutorial, 0, 100, 0);
   player.created = int(save.created, 0, 1e15, Date.now());
   game.playTicks = int(save.playTicks, 0, 1e10, 0); game.autoRetaliate = save.retaliate !== false;
+  player.music = ["theme", ...(Array.isArray(save.music) ? save.music : []).filter((id): id is string => typeof id === "string" && /^[a-z_]{1,24}$/.test(id) && id !== "theme")].slice(0, 32);
+  return true;
+}
+
+// ---------- Music unlocks ----------
+/** Visiting an area unlocks its track, old-school style. Returns true the first time. */
+export function unlockMusic(game: Game, id: string, name: string) {
+  if (game.player.music.includes(id)) return false;
+  game.player.music.push(id);
+  message(game, `You have unlocked a new music track: ${name}.`, "info");
   return true;
 }
 

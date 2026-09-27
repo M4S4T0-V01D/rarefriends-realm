@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   buy, canWalk, castSpell, chooseOption, collectFromCasket, continueDialogue, createGame, equip, findPath, itemOptions, menuFor, restore, sell,
   serialize, setFollower, setRelics, setTarget, smeltingRecipes, smithingRecipes, startProduction, tick, togglePrayer, useItemOnItem, walkTo, setHeld,
-  successChance, hitChance,
+  successChance, hitChance, unlockMusic,
 } from "../games/rarefriends-realm/engine.ts";
 import { ITEM_LIST, MONSTERS, SHOPS, SKILLS, SPELLS, TREES, XP_RATE, XP_TABLE, item, levelForXp } from "../games/rarefriends-realm/data.ts";
 import { NPCS, QUESTS, MAX_QUEST_POINTS, questPoints } from "../games/rarefriends-realm/content.ts";
@@ -402,6 +402,20 @@ test("owned Friends follow you and add XP by generation", () => {
   assert(Math.abs(xpMultiplier(g.player) - base * 1.05) < 1e-9);
   setFollower(g, { id: 99, generation: 6 });
   assert(Math.abs(xpMultiplier(g.player) - base * 1.01) < 1e-9);
+});
+
+test("music unlocks the first time you enter an area, and saves", () => {
+  const g = newGame();
+  assert.deepEqual(g.player.music, ["theme"]);
+  assert.equal(unlockMusic(g, "emberforge", "Anvil Song"), true);
+  assert.equal(unlockMusic(g, "emberforge", "Anvil Song"), false);
+  assert.match(g.messages.at(-1).text, /You have unlocked a new music track: Anvil Song\./);
+  const fresh = newGame();
+  restore(fresh, JSON.parse(JSON.stringify(serialize(g))));
+  assert.deepEqual(fresh.player.music, ["theme", "emberforge"]);
+  const bad = newGame();
+  restore(bad, { ...serialize(g), music: ["<script>", 5, "frostpeak"] });
+  assert.deepEqual(bad.player.music, ["theme", "frostpeak"]);
 });
 
 test("use item on item: tinderbox on logs lights a fire, chisel cuts gems", () => {

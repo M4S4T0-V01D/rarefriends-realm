@@ -156,6 +156,10 @@ try {
   await game.getByRole("tab", { name: "Prayer" }).click(); await shot("prayer");
   await game.getByRole("tab", { name: "Magic" }).click(); await shot("magic");
   await game.getByRole("tab", { name: "Friends and wardrobe" }).click(); await shot("friends");
+  await game.getByRole("tab", { name: "Settings" }).click();
+  await game.getByRole("button", { name: "Hollow Square" }).waitFor();
+  assert.equal(await game.getByRole("button", { name: "Hollow Square" }).isEnabled(), true, "Friendhollow's track unlocked on arrival");
+  await shot("music");
   await game.getByRole("tab", { name: "Inventory" }).click();
 
   // ---------- A level-up: one more log takes Woodcutting to 19 ----------

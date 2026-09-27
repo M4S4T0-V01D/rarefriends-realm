@@ -9,7 +9,7 @@ import { FAMILY_NAMES, FAMILY_PERKS, RELICS, SKILL_ICONS, SPELLS, WARDROBE, item
 import { QUESTS, questPoints, MAX_QUEST_POINTS } from "./content.ts";
 import { TICK_MS, combatLevel, createGame, message, totalLevel, type Game, type Projectile } from "./state.ts";
 import {
-  chooseOption, closeInterfaces, collectFromCasket, continueDialogue, menuFor, restore, serialize, setFollower, setHeld, setRelics, tick, toggleRun, walkTo, type OwnedFriend, type Selection,
+  chooseOption, closeInterfaces, collectFromCasket, continueDialogue, menuFor, unlockMusic, restore, serialize, setFollower, setHeld, setRelics, tick, toggleRun, walkTo, type OwnedFriend, type Selection,
 } from "./engine.ts";
 import { VIEW, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
 import {
@@ -18,7 +18,7 @@ import {
 } from "./panels.tsx";
 import { REGULAR_SPRITES } from "./regulars.ts";
 import { HOST_HELLO, HOST_STATE, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, parseRoster, type ShareAction, type ShareOutcome } from "./roster.ts";
-import { RealmAudio, trackFor, trackById } from "./audio.ts";
+import { RealmAudio, trackFor, trackById, type TrackId } from "./audio.ts";
 import { renderCard, shareText } from "./card.ts";
 import { regionAt } from "./world.ts";
 import "@rarefriends/friendsdk/frame.css";
@@ -31,7 +31,7 @@ type XpDrop = { id: number; skill: Skill; amount: number; at: number };
 type CasketResult = { play: bigint; outcomeId: number; wardrobe: string | null; coins: number; redeemed: boolean };
 const CANONICAL = new Map<number, GenerationSprites>(REGULAR_SPRITES.map(sprites => [Number(sprites.tokenId), sprites]));
 const KEY_DIRECTIONS: Record<string, [number, number]> = { w: [0, -1], arrowup: [0, -1], s: [0, 1], arrowdown: [0, 1], a: [-1, 0], arrowleft: [-1, 0], d: [1, 0], arrowright: [1, 0] };
-const DEFAULT_SETTINGS: Settings = { music: true, sfx: true, musicVolume: 0.7, sfxVolume: 0.8, zoom: 0.8, shiftDrop: false };
+const DEFAULT_SETTINGS: Settings = { music: true, sfx: true, musicVolume: 0.7, sfxVolume: 0.8, zoom: 0.8, shiftDrop: false, autoMusic: true };
 
 /** RareFriends Realm. The SDK runtime supplies wallet connection, the verified owned Friend and the fixed (simulated) RF client. */
 export default function RareFriendsRealm({ friendId, client, paused }: GameComponentProps) {
@@ -73,12 +73,18 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
 
   // ---------- Audio ----------
   const setSettings = useCallback((next: Settings) => {
+    if (next.autoMusic && !live.current.settings.autoMusic) region.current = ""; // back to the area's own track on the next tick
     setSettingsState(next); camera.current.zoom = next.zoom;
     const player = audio.current;
     if (player) { player.setMusic(next.music); player.setSfx(next.sfx); player.setVolumes(next.musicVolume, next.sfxVolume); player.unlock(); }
   }, []);
   useEffect(() => {
-    const wake = () => { const player = audio.current, s = live.current.settings; if (!player) return; player.setMusic(s.music); player.setSfx(s.sfx); player.setVolumes(s.musicVolume, s.sfxVolume); player.unlock(); };
+    const wake = () => {
+      const player = audio.current, s = live.current.settings;
+      if (!player) return;
+      const was = player.ready; player.setMusic(s.music); player.setSfx(s.sfx); player.setVolumes(s.musicVolume, s.sfxVolume); player.unlock();
+      if (!was) setTimeout(() => setVersion(value => value + 1), 150);
+    };
     const events = ["pointerup", "click", "keydown", "touchend"] as const;
     for (const name of events) window.addEventListener(name, wake, { capture: true, passive: true });
     return () => { for (const name of events) window.removeEventListener(name, wake, { capture: true }); };
@@ -200,7 +206,9 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           const key = `${here.id}:${throne}`;
           if (key !== region.current) {
             region.current = key;
-            audio.current?.play(trackFor(here.id, throne));
+            const track = trackById(trackFor(here.id, throne));
+            unlockMusic(state, track.id, track.name);
+            if (live.current.settings.autoMusic) audio.current?.play(track.id);
             setToast({ title: throne ? "The Throne Room" : here.name, sub: trackById(trackFor(here.id, throne)).name });
           }
           // Held keys walk.
@@ -433,7 +441,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           <button type="button" className="realm-side-toggle" aria-expanded={sideOpen} onClick={() => setSideOpen(open => !open)}>{sideOpen ? "▾" : "▴"} Panels</button>
           {sideOpen && <SidePanel game={state} tab={tab} setTab={setTab} selection={selection} setSelection={setSelection} openMenu={(x, y, entries) => setMenu({ x, y, entries })}
             refresh={refresh} roster={roster} rosterState={rosterState} friendSprites={followerSprites.current} loadFriend={loadFriendSprite} settings={settings} setSettings={setSettings}
-            trackName={audio.current?.trackName ?? ""} openCard={openCard} openHelp={() => setModal("help")} paused={paused} saved={savedText}
+            trackName={audio.current?.trackName ?? ""} trackId={audio.current?.trackId ?? ""} playTrack={id => { audio.current?.play(id as TrackId); audio.current?.unlock(); setSettings({ ...settings, autoMusic: false }); }} openCard={openCard} openHelp={() => setModal("help")} paused={paused} saved={savedText}
             relicCounts={snapshot?.inventory.map(Number) ?? [0, 0, 0, 0]} openCaskets={() => setModal("caskets")} />}
           {selection && <div className="realm-selection" role="status">{selection.kind === "item" ? `Use ${player.inventory[selection.slot] ? itemName(player.inventory[selection.slot]!.id) : "item"} ->` : `Cast ${SPELLS.find(spell => spell.id === selection.spell)?.name ?? "spell"} ->`} pick a target <button type="button" onClick={() => setSelection(null)}>Cancel</button></div>}
 
@@ -504,7 +512,9 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
             </div>
             <div className="realm-buttons center">
               <button type="button" className="realm-primary big" onClick={begin}>{hasSave ? "Continue your adventure" : "Begin your adventure"}</button>
-              <button type="button" onClick={() => { const next = { ...settings, music: !settings.music }; setSettings(next); }} aria-pressed={settings.music}>{settings.music ? "♪ Music on" : "♪ Music off"}</button>
+              {audio.current?.ready || !settings.music
+                ? <button type="button" onClick={() => { const next = { ...settings, music: !settings.music }; setSettings(next); }} aria-pressed={settings.music}>{settings.music ? "♪ Music on" : "♪ Music off"}</button>
+                : <button type="button" onClick={() => setSettings({ ...settings })}>♪ Start the music</button>}
               <button type="button" onClick={() => setModal("help")}>How to play</button>
             </div>
             <p className="realm-title-foot">Now playing: {trackById("theme").name} · Simulated $RAREFRIENDS · Saves per wallet on this device</p>
