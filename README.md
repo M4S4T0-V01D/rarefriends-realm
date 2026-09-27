@@ -16,7 +16,7 @@
 - **Pixel art in the Rare Friends style.** Trees, rocks, decor, every item, weapon, skill, spell and prayer icon are pixel art with an ink edge (and the white halo of the canonical sprites), drawn procedurally. Walls are bricked, and skills animate: axes swing and chips fly, pickaxes spark, lines are cast, anvils ring, fires crackle, agility hops.
 - **A real spellbook.** Darts, Lances and Bursts in four elements; curses (Muddle, Wilt, Brittle) and Rootsnare; Gilded and Golden Touch, Forgeheart, Far Reach, Bonebloom, two enchantments and six ways to travel, paid in sigils.
 - **Six quests** from baking for the Realm Feast to defeating the Hollow King (level 92) in his throne room.
-- **A soundtrack for every region.** Sixteen procedural tracks, including a hand-written main theme, plus level-up and quest fanfares, synthesized live in WebAudio. Entering an area unlocks its track ("You have unlocked a new music track"), and the music player replays any you've found.
+- **A soundtrack for every region.** Sixteen procedural tracks in an old-school MIDI style (recorder, oboe, harp, pizzicato strings, glockenspiel, timpani), including a hand-written main theme, plus level-up and quest fanfares, synthesized live in WebAudio. Entering an area unlocks its track ("You have unlocked a new music track"), and the music player replays any you've found.
 - **Your other Friends follow you**, walking the tiles you leave behind like an old-school pet and adding XP by generation. **Rare Caskets** (simulated $RAREFRIENDS) hold relics and wardrobe pieces. **Progress saves per wallet.** Your **adventurer card** posts to X.
 
 | | |

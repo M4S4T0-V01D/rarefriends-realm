@@ -19,8 +19,9 @@ const VOICES: Record<string, { kind: VoiceKind; f0: number; length: number; brig
   frost_yeti: { kind: "roar", f0: 110, length: 0.8, bright: 1200, wobble: 6 }, shade: { kind: "whisper", f0: 400, length: 0.6, bright: 3000 },
   hollow_sentinel: { kind: "clank", f0: 90, length: 0.4, bright: 800 }, hollow_king: { kind: "king", f0: 60, length: 1.1, bright: 700, wobble: 2 },
 };
-type Voice = "lute" | "flute" | "bell" | "harp" | "organ" | "pad" | "bass" | "brass" | "pluck" | "choir";
-type Drum = "kick" | "snare" | "hat" | "shaker" | "tom" | "clank" | "hand" | "rim";
+/** General-MIDI-style instruments, like an old-school RPG soundtrack: bright leads up high, plucked strings, light drums. */
+type Voice = "lute" | "flute" | "recorder" | "oboe" | "trumpet" | "bell" | "glock" | "harp" | "pizz" | "strings" | "organ" | "pad" | "bass" | "brass" | "pluck" | "choir";
+type Drum = "kick" | "snare" | "hat" | "shaker" | "tom" | "clank" | "hand" | "rim" | "timpani" | "tambourine";
 type Note = { beat: number; voice: Voice; midi: number; length: number; velocity: number };
 type Hit = { beat: number; drum: Drum; velocity: number };
 export type Track = { id: TrackId; name: string; bpm: number; beats: number; notes: Note[]; hits: Hit[] };
@@ -55,18 +56,21 @@ function tune(text: string, voice: Voice, start = 0, velocity = 0.9): Note[] {
   }
   return notes;
 }
-function chordBed(chords: readonly (readonly number[])[], beatsPer: number, options: { pad?: Voice; arp?: Voice; bass?: boolean; arpPattern?: readonly number[] }) {
-  const notes: Note[] = [];
+/** Accompaniment: a bass (root and fifth, or oom-pah-pah in 3/4), a broken-chord harp or lute up in the fifth octave,
+ * and an optional light string bed. Registers stay bright: nothing below C3. */
+function chordBed(chords: readonly (readonly number[])[], beatsPer: number, options: { pad?: Voice; arp?: Voice; bass?: boolean | Voice; arpPattern?: readonly number[] }) {
+  const notes: Note[] = [], bassVoice: Voice = typeof options.bass === "string" ? options.bass : "bass";
   chords.forEach((chord, bar) => {
-    const start = bar * beatsPer;
-    if (options.pad) for (const midi of chord.slice(1)) notes.push({ beat: start, voice: options.pad, midi: midi + 48, length: beatsPer, velocity: 0.5 });
+    const start = bar * beatsPer, root = chord[0] + 48;
+    if (options.pad) for (const midi of chord.slice(2)) notes.push({ beat: start, voice: options.pad, midi: midi + 60, length: beatsPer, velocity: 0.35 });
     if (options.bass !== false) {
-      notes.push({ beat: start, voice: "bass", midi: chord[0] + 36, length: beatsPer / 2 - 0.1, velocity: 0.9 });
-      notes.push({ beat: start + beatsPer / 2, voice: "bass", midi: chord[0] + 36 + (bar % 2 ? 7 : 0), length: beatsPer / 2 - 0.1, velocity: 0.75 });
+      notes.push({ beat: start, voice: bassVoice, midi: root, length: 0.9, velocity: 0.9 });
+      if (beatsPer === 3) for (const b of [1, 2]) for (const midi of chord.slice(2)) notes.push({ beat: start + b, voice: "pizz", midi: midi + 60, length: 0.4, velocity: 0.45 });
+      else notes.push({ beat: start + 2, voice: bassVoice, midi: root + 7, length: 0.9, velocity: 0.75 });
     }
     if (options.arp) {
       const pattern = options.arpPattern ?? [0, 1, 2, 1, 3, 2, 1, 2], tones = [...chord.slice(1), chord[1] + 12].map(midi => midi + 60);
-      for (let step = 0; step < beatsPer * 2; step++) notes.push({ beat: start + step / 2, voice: options.arp, midi: tones[pattern[step % pattern.length] % tones.length], length: 0.45, velocity: 0.45 + (step % 4 === 0 ? 0.15 : 0) });
+      for (let step = 0; step < beatsPer * 2; step++) notes.push({ beat: start + step / 2, voice: options.arp, midi: tones[pattern[step % pattern.length] % tones.length], length: 0.45, velocity: 0.42 + (step % 4 === 0 ? 0.12 : 0) });
     }
   });
   return notes;
@@ -81,101 +85,127 @@ function themeTrack(): Track {
     G4:0.5 C5:0.5 E5:1 D5:0.5 C5:0.5 D5:1   E5:1.5 D5:0.5 B4:2   C5:0.5 E5:0.5 A5:1 G5:0.5 E5:0.5 G5:1   A5:1.5 G5:0.5 F5:2
     E5:0.5 G5:0.5 C6:1 B5:0.5 A5:0.5 G5:1   D5:1 E5:0.5 F5:0.5 G5:2   A5:0.5 G5:0.5 F5:0.5 E5:0.5 D5:1 C5:1   D5:3 r:1
     C6:1.5 B5:0.5 A5:2   A5:0.5 G5:0.5 F5:1 C5:2   E5:1 G5:1 C6:1 E6:1   D6:3 B5:1
-    C6:0.5 B5:0.5 A5:1 E5:1 A5:1   F5:0.5 G5:0.5 A5:1 C6:1 A5:1   G5:1.5 A5:0.5 B5:1 D6:1   C6:4`, "flute");
+    C6:0.5 B5:0.5 A5:1 E5:1 A5:1   F5:0.5 G5:0.5 A5:1 C6:1 A5:1   G5:1.5 A5:0.5 B5:1 D6:1   C6:4`, "recorder");
   const harmony = chords(0, "I", "V", "vi", "IV", "I", "V", "IV", "V", "vi", "IV", "I", "V", "vi", "IV", "V", "I");
-  const bed = chordBed(harmony, 4, { pad: "pad", arp: "harp", arpPattern: [0, 2, 1, 2, 3, 2, 1, 2] });
+  const bed = chordBed(harmony, 4, { pad: "strings", arp: "harp", bass: "pizz", arpPattern: [0, 2, 1, 2, 3, 2, 1, 2] });
   const counter = melody.filter((_, index) => index % 3 === 0).map(note => ({ ...note, voice: "lute" as Voice, midi: note.midi - 12, velocity: 0.35, beat: note.beat + 0.5 }));
   const hits: Hit[] = [];
   for (let bar = 0; bar < 16; bar++) {
-    hits.push({ beat: bar * 4, drum: "kick", velocity: 0.8 }, { beat: bar * 4 + 2, drum: "kick", velocity: 0.55 }, { beat: bar * 4 + 1, drum: "snare", velocity: 0.35 }, { beat: bar * 4 + 3, drum: "snare", velocity: 0.4 });
-    for (let e = 0; e < 8; e++) hits.push({ beat: bar * 4 + e / 2, drum: "shaker", velocity: e % 2 ? 0.2 : 0.3 });
+    hits.push({ beat: bar * 4, drum: "timpani", velocity: 0.55 }, { beat: bar * 4 + 2, drum: "hand", velocity: 0.4 });
+    for (let e = 1; e < 8; e += 2) hits.push({ beat: bar * 4 + e / 2, drum: "tambourine", velocity: 0.25 });
   }
-  // Second pass: brass takes the tune with a harmony a sixth below, the harp doubles, the drums grow.
+  // Second pass: a trumpet takes the tune with a glockenspiel sparkling above, and the drums march.
   const again = (notes: readonly Note[]) => notes.map(note => ({ ...note, beat: note.beat + 64 }));
-  const brass = melody.map(note => ({ ...note, beat: note.beat + 64, voice: "brass" as Voice, velocity: 0.7 }));
-  const sixth = melody.map(note => ({ ...note, beat: note.beat + 64, voice: "brass" as Voice, midi: note.midi - 9, velocity: 0.35 }));
-  const fuller = hits.map(hit => ({ ...hit, beat: hit.beat + 64, velocity: Math.min(1, hit.velocity * 1.25) }));
-  for (let bar = 16; bar < 32; bar++) hits.push({ beat: bar * 4 + 3.5, drum: "hat", velocity: 0.3 });
-  return { id: "theme", name: "RareFriends Realm", bpm: 92, beats: 128, notes: [...melody, ...counter, ...bed, ...again(melody), ...brass, ...sixth, ...again(bed)], hits: [...hits, ...fuller] };
+  const trumpet = melody.map(note => ({ ...note, beat: note.beat + 64, voice: "trumpet" as Voice, velocity: 0.8 }));
+  const glock = melody.filter((_, index) => index % 2 === 0).map(note => ({ ...note, beat: note.beat + 64, voice: "glock" as Voice, velocity: 0.4 }));
+  const fuller = hits.map(hit => ({ ...hit, beat: hit.beat + 64, velocity: Math.min(1, hit.velocity * 1.2) }));
+  for (let bar = 16; bar < 32; bar++) hits.push({ beat: bar * 4 + 1, drum: "snare", velocity: 0.22 }, { beat: bar * 4 + 3, drum: "snare", velocity: 0.26 });
+  return { id: "theme", name: "RareFriends Realm", bpm: 100, beats: 128, notes: [...melody, ...counter, ...bed, ...trumpet, ...glock, ...again(bed)], hits: [...hits, ...fuller] };
 }
 
-// ---------- Area tracks (composed from a motif per area) ----------
+// ---------- Area tracks ----------
+type Kit = "tavern" | "march" | "forge" | "desert" | "calm" | "boss" | "heartbeat" | "jig";
 type Style = {
-  id: TrackId; name: string; bpm: number; root: number; mode: keyof typeof MODES; progression: readonly number[]; beatsPer: 3 | 4;
-  lead: Voice; arp?: Voice; pad?: Voice; drums: "none" | "soft" | "march" | "forge" | "hand" | "drive" | "heartbeat"; density: number; octave: number; seed: number;
+  id: TrackId; name: string; bpm: number; root: number; mode: keyof typeof MODES; progression: readonly number[]; meter: 3 | 4;
+  lead: Voice; second: Voice; arp: Voice | null; bed: Voice | null; bass: Voice; kit: Kit; energy: number; seed: number; lift?: number;
 };
+/** Each area's band and mood. Melodies sit around C5–C6; accompaniment around C4–C5; basses from C3. */
 const STYLES: readonly Style[] = [
-  { id: "friendhollow", name: "Hollow Square", bpm: 96, root: 7, mode: "major", progression: [0, 3, 4, 0, 5, 3, 1, 4], beatsPer: 4, lead: "lute", arp: "harp", pad: "pad", drums: "soft", density: 0.7, octave: 5, seed: 11 },
-  { id: "farmland", name: "Hayfields", bpm: 112, root: 2, mode: "mixolydian", progression: [0, 6, 3, 0, 0, 6, 4, 0], beatsPer: 3, lead: "flute", arp: "pluck", drums: "soft", density: 0.8, octave: 5, seed: 23 },
-  { id: "whisperwood", name: "Whisperwood", bpm: 80, root: 9, mode: "dorian", progression: [0, 3, 0, 6, 2, 3, 4, 0], beatsPer: 4, lead: "flute", arp: "harp", pad: "pad", drums: "none", density: 0.5, octave: 5, seed: 31 },
-  { id: "ashen_hills", name: "Ashen Echoes", bpm: 74, root: 4, mode: "aeolian", progression: [0, 5, 6, 0, 3, 5, 4, 4], beatsPer: 4, lead: "organ", arp: "pluck", pad: "pad", drums: "heartbeat", density: 0.45, octave: 4, seed: 41 },
-  { id: "emberforge", name: "Anvil Song", bpm: 108, root: 5, mode: "harmonic", progression: [0, 0, 5, 4, 0, 3, 4, 0], beatsPer: 4, lead: "brass", arp: "pluck", drums: "forge", density: 0.65, octave: 4, seed: 53 },
-  { id: "frostpeak", name: "Frostpeak", bpm: 68, root: 11, mode: "lydian", progression: [0, 1, 0, 4, 5, 1, 4, 0], beatsPer: 4, lead: "bell", arp: "bell", pad: "choir", drums: "none", density: 0.45, octave: 5, seed: 61 },
-  { id: "glass_lake", name: "Glass Lake", bpm: 84, root: 0, mode: "major", progression: [0, 5, 3, 4, 0, 5, 1, 4], beatsPer: 3, lead: "flute", arp: "harp", pad: "pad", drums: "none", density: 0.55, octave: 5, seed: 71 },
-  { id: "pale_dunes", name: "Pale Dunes", bpm: 94, root: 2, mode: "hijaz", progression: [0, 1, 0, 6, 0, 1, 6, 0], beatsPer: 4, lead: "flute", arp: "pluck", pad: "pad", drums: "hand", density: 0.7, octave: 5, seed: 83 },
-  { id: "oasis", name: "Oasis Market", bpm: 116, root: 4, mode: "hijaz", progression: [0, 3, 1, 0, 0, 3, 6, 0], beatsPer: 4, lead: "lute", arp: "pluck", drums: "hand", density: 0.85, octave: 5, seed: 89 },
-  { id: "murkmire", name: "Murkmire", bpm: 66, root: 1, mode: "locrian", progression: [0, 1, 0, 4, 0, 1, 3, 0], beatsPer: 3, lead: "organ", arp: "pluck", pad: "choir", drums: "heartbeat", density: 0.4, octave: 4, seed: 97 },
-  { id: "mossy_ruins", name: "Old Stones", bpm: 72, root: 7, mode: "dorian", progression: [0, 6, 3, 4, 0, 6, 2, 4], beatsPer: 4, lead: "harp", arp: "harp", pad: "choir", drums: "soft", density: 0.5, octave: 5, seed: 103 },
-  { id: "coast", name: "The Pale Coast", bpm: 86, root: 5, mode: "major", progression: [0, 4, 5, 3, 0, 4, 3, 0], beatsPer: 3, lead: "flute", arp: "harp", pad: "pad", drums: "none", density: 0.5, octave: 5, seed: 107 },
-  { id: "crypt", name: "Crypt of Friends", bpm: 60, root: 3, mode: "harmonic", progression: [0, 5, 3, 4, 0, 5, 1, 4], beatsPer: 4, lead: "organ", pad: "choir", drums: "heartbeat", density: 0.4, octave: 4, seed: 113 },
-  { id: "hollow_depths", name: "Hollow Depths", bpm: 58, root: 6, mode: "phrygian", progression: [0, 1, 0, 6, 0, 1, 5, 4], beatsPer: 4, lead: "choir", arp: "bell", pad: "pad", drums: "heartbeat", density: 0.35, octave: 4, seed: 127 },
-  { id: "boss", name: "The Hollow King", bpm: 136, root: 4, mode: "harmonic", progression: [0, 0, 5, 4, 0, 0, 3, 4], beatsPer: 4, lead: "brass", arp: "pluck", pad: "choir", drums: "drive", density: 0.8, octave: 4, seed: 131 },
+  { id: "friendhollow", name: "Hollow Square", bpm: 108, root: 7, mode: "major", progression: [0, 3, 4, 0, 5, 3, 1, 4], meter: 4, lead: "recorder", second: "oboe", arp: "lute", bed: null, bass: "bass", kit: "tavern", energy: 0.75, seed: 11 },
+  { id: "farmland", name: "Hayfields", bpm: 126, root: 2, mode: "mixolydian", progression: [0, 6, 3, 0, 0, 6, 4, 0], meter: 3, lead: "oboe", second: "recorder", arp: "pizz", bed: null, bass: "bass", kit: "jig", energy: 0.85, seed: 23 },
+  { id: "whisperwood", name: "Whisperwood", bpm: 96, root: 9, mode: "dorian", progression: [0, 3, 0, 6, 2, 3, 4, 0], meter: 4, lead: "flute", second: "harp", arp: "harp", bed: "strings", bass: "pizz", kit: "calm", energy: 0.6, seed: 31 },
+  { id: "ashen_hills", name: "Ashen Echoes", bpm: 92, root: 4, mode: "aeolian", progression: [0, 5, 6, 0, 3, 5, 4, 4], meter: 4, lead: "oboe", second: "flute", arp: "pizz", bed: "strings", bass: "bass", kit: "march", energy: 0.6, seed: 41 },
+  { id: "emberforge", name: "Anvil Song", bpm: 116, root: 5, mode: "mixolydian", progression: [0, 0, 6, 3, 0, 3, 4, 0], meter: 4, lead: "trumpet", second: "oboe", arp: "lute", bed: null, bass: "bass", kit: "forge", energy: 0.75, seed: 53 },
+  { id: "frostpeak", name: "Frostpeak", bpm: 84, root: 11, mode: "lydian", progression: [0, 1, 0, 4, 5, 1, 4, 0], meter: 4, lead: "glock", second: "flute", arp: "harp", bed: "strings", bass: "pizz", kit: "calm", energy: 0.55, seed: 61 },
+  { id: "glass_lake", name: "Glass Lake", bpm: 100, root: 0, mode: "major", progression: [0, 5, 3, 4, 0, 5, 1, 4], meter: 3, lead: "harp", second: "flute", arp: "harp", bed: "strings", bass: "pizz", kit: "calm", energy: 0.65, seed: 71 },
+  { id: "pale_dunes", name: "Pale Dunes", bpm: 104, root: 2, mode: "hijaz", progression: [0, 1, 0, 6, 0, 1, 6, 0], meter: 4, lead: "oboe", second: "recorder", arp: "pizz", bed: null, bass: "bass", kit: "desert", energy: 0.7, seed: 83 },
+  { id: "oasis", name: "Oasis Market", bpm: 124, root: 4, mode: "hijaz", progression: [0, 3, 1, 0, 0, 3, 6, 0], meter: 4, lead: "recorder", second: "oboe", arp: "lute", bed: null, bass: "pizz", kit: "desert", energy: 0.85, seed: 89 },
+  { id: "murkmire", name: "Murkmire", bpm: 88, root: 1, mode: "phrygian", progression: [0, 1, 0, 6, 0, 1, 3, 0], meter: 3, lead: "oboe", second: "flute", arp: "pizz", bed: "strings", bass: "bass", kit: "calm", energy: 0.5, seed: 97 },
+  { id: "mossy_ruins", name: "Old Stones", bpm: 90, root: 7, mode: "dorian", progression: [0, 6, 3, 4, 0, 6, 2, 4], meter: 4, lead: "harp", second: "recorder", arp: "harp", bed: "strings", bass: "pizz", kit: "calm", energy: 0.6, seed: 103 },
+  { id: "coast", name: "The Pale Coast", bpm: 104, root: 5, mode: "major", progression: [0, 4, 5, 3, 0, 4, 3, 0], meter: 3, lead: "recorder", second: "harp", arp: "harp", bed: null, bass: "pizz", kit: "jig", energy: 0.7, seed: 107 },
+  { id: "crypt", name: "Crypt of Friends", bpm: 80, root: 3, mode: "harmonic", progression: [0, 5, 3, 4, 0, 5, 1, 4], meter: 4, lead: "organ", second: "glock", arp: "harp", bed: "choir", bass: "pizz", kit: "heartbeat", energy: 0.5, seed: 113 },
+  { id: "hollow_depths", name: "Hollow Depths", bpm: 78, root: 6, mode: "aeolian", progression: [0, 1, 0, 6, 0, 1, 5, 4], meter: 4, lead: "flute", second: "glock", arp: "harp", bed: "strings", bass: "pizz", kit: "heartbeat", energy: 0.45, seed: 127 },
+  { id: "boss", name: "The Hollow King", bpm: 144, root: 4, mode: "harmonic", progression: [0, 0, 5, 4, 0, 0, 3, 4], meter: 4, lead: "trumpet", second: "strings", arp: "pizz", bed: "strings", bass: "bass", kit: "boss", energy: 0.9, seed: 131 },
 ];
 /**
- * An area track in four sections: the theme (A), its answer an octave away (A'), a contrasting bridge on a new motif and
- * a rotated progression (B), and the theme again with a harmony a third above (A''). Drum fills close each section.
+ * An area track in four sections, written like a little folk tune: a two-bar motif that is repeated, sequenced and
+ * answered (A), the same tune with a second instrument in thirds (A'), a contrasting bridge (B), and the tune again
+ * with the glockenspiel or harp doubling it (A''). Phrases end on the fifth, then the tonic; long notes get grace notes.
  */
 function composeTrack(style: Style): Track {
-  const random = mulberry(style.seed), scale = MODES[style.mode], per = style.beatsPer, bars = style.progression.length, loop = bars * per;
+  const random = mulberry(style.seed), scale = MODES[style.mode], per = style.meter, bars = style.progression.length, loop = bars * per;
   const deg = (degree: number) => style.root + 12 * Math.floor(degree / 7) + scale[((degree % 7) + 7) % 7];
   const triad = (degree: number) => [deg(degree) % 12, deg(degree), deg(degree + 2), deg(degree + 4)];
-  const rhythms = per === 3 ? [[1, 1, 1], [2, 1], [1.5, 0.5, 1], [3]] : [[1, 1, 1, 1], [2, 1, 1], [1.5, 0.5, 2], [1, 0.5, 0.5, 2], [0.5, 0.5, 1, 2], [4]];
-  const motif = () => [0, 1].map(() => rhythms[Math.floor(random() * (rhythms.length - 1))].map(length => ({ length, step: Math.floor(random() * 5) - 2 })));
-  const octave = 7 * (style.octave - 5);
-  /** A melody over a progression from a two-bar motif, answered and varied (a a' b a''), landing on the tonic. */
-  const phrase = (progression: readonly number[], cells: { length: number; step: number }[][], offset: number, voice: Voice, lift = 0): Note[] => {
+  // The tune's home note lands between D4 and C#5 whatever the key, so melodies sit in a recorder's sweet spot.
+  const top = (style.root >= 2 ? 60 : 72) + (style.lift ?? 0);
+  const cells = per === 3
+    ? [[1, 0.5, 0.5, 1], [0.5, 0.5, 0.5, 0.5, 1], [1.5, 0.5, 1], [1, 1, 1], [2, 1]]
+    : [[1, 0.5, 0.5, 1, 1], [0.5, 0.5, 0.5, 0.5, 1, 1], [1.5, 0.5, 1, 1], [1, 1, 0.5, 0.5, 1], [0.75, 0.25, 1, 1, 1], [2, 1, 1]];
+  const pickCell = () => { const lively = random() < style.energy; return cells[lively ? Math.floor(random() * (cells.length - 1)) : cells.length - 1 - Math.floor(random() * 2)]; };
+  /** One bar of melody starting near `from` (a scale degree), over `chord`. */
+  const bar = (chord: number, from: number, rhythm: readonly number[]) => {
+    const degrees: number[] = [], tones = [chord, chord + 2, chord + 4, chord + 7, chord - 3];
+    let at = tones.reduce((best, tone) => Math.abs(tone - from) < Math.abs(best - from) ? tone : best, tones[0]);
+    for (let i = 0; i < rhythm.length; i++) {
+      if (i > 0) { const r = random(), dir = random() < (at > 6 ? 0.7 : at < 1 ? 0.3 : 0.5) ? -1 : 1; at += r < 0.62 ? dir : r < 0.88 ? dir * 2 : dir * 3; }
+      at = Math.max(-2, Math.min(8, at)); degrees.push(at);
+    }
+    return degrees;
+  };
+  /** An eight-bar phrase: motif, sequence, motif, cadence. */
+  const phrase = (progression: readonly number[], start: number) => {
+    const cellA = pickCell(), cellB = pickCell(), motif = [bar(progression[0], start, cellA), bar(progression[1], start + 2, cellB)];
+    const out: { degrees: number[]; rhythm: readonly number[] }[] = [];
+    progression.forEach((chord, i) => {
+      if (i === 3) { out.push({ degrees: [...bar(chord, 4, cellB).slice(0, -1), 4], rhythm: [...cellB.slice(0, -1), cellB[cellB.length - 1]] }); return; }  // half cadence on the fifth
+      if (i === bars - 1) { const lead = bar(chord, 2, [1]).concat([0]); out.push({ degrees: lead, rhythm: [1, per - 1] }); return; }            // full cadence on the tonic
+      const source = motif[i % 2], shift = i === 2 || i === 6 ? progression[i] - progression[i % 2] : 0;
+      out.push({ degrees: source.map(d => d + shift), rhythm: i % 2 ? cellB : cellA });
+    });
+    return out;
+  };
+  const render = (lines: ReturnType<typeof phrase>, offset: number, voice: Voice, shift = 0, velocity = 0.85, graces = true) => {
     const notes: Note[] = [];
-    progression.forEach((chord, bar) => {
-      const part = Math.floor(bar / 2), cell = cells[bar % 2], last = bar === progression.length - 1;
-      let beat = offset + bar * per, degree = chord + (part === 2 ? 2 : 0) + octave + lift;
-      for (const [index, { length, step }] of (last ? [{ length: per, step: 0 }] : cell).entries()) {
-        if (index > 0) degree += part === 1 ? -step : part === 3 ? step + (index === cell.length - 1 ? -1 : 0) : step;
-        if (index === 0 && !last) { const tones = [chord, chord + 2, chord + 4].map(tone => tone + octave + lift); degree = tones.reduce((best, tone) => Math.abs(tone - degree) < Math.abs(best - degree) ? tone : best, tones[0]); }
-        if (last) degree = octave + lift;
-        if (random() < style.density || index === 0) notes.push({ beat, voice, midi: deg(degree) + 60, length: length * 0.92, velocity: 0.75 + random() * 0.2 });
+    lines.forEach((line, b) => {
+      let beat = offset + b * per;
+      line.degrees.forEach((degree, i) => {
+        const length = line.rhythm[i] ?? 1, midi = deg(degree + shift) + top;
+        if (graces && length >= 1.5 && random() < 0.35) notes.push({ beat: beat - 0.125, voice, midi: deg(degree + shift + 1) + top, length: 0.12, velocity: velocity * 0.7 });
+        notes.push({ beat, voice, midi, length: length * 0.9, velocity: velocity * (i === 0 ? 1 : 0.85) });
         beat += length;
-      }
+      });
     });
     return notes;
   };
-  const main = motif(), bridge = motif();
-  const bridgeProgression = style.progression.map((_, bar) => style.progression[(bar + Math.floor(bars / 2)) % bars]).map((chord, bar) => bar === bars - 1 ? 4 : chord);
-  const bridgeVoice: Voice = style.arp && style.arp !== style.lead && style.arp !== "pluck" ? style.arp : style.lead === "flute" ? "bell" : "flute";
-  const a = phrase(style.progression, main, 0, style.lead);
-  const answer = a.map(note => ({ ...note, beat: note.beat + loop, midi: note.midi + (style.lead === "bell" ? 12 : -12), velocity: note.velocity * 0.8 }));
-  const b = phrase(bridgeProgression, bridge, loop * 2, bridgeVoice, 2);
-  const reprise = a.map(note => ({ ...note, beat: note.beat + loop * 3 }));
-  const harmony = reprise.map(note => ({ ...note, voice: bridgeVoice, midi: note.midi + (scale.includes((note.midi - style.root + 4) % 12) ? 4 : 3), velocity: note.velocity * 0.45 }));
-  const sections: [readonly number[], number, readonly number[] | undefined][] = [
-    [style.progression, 0, per === 3 ? [0, 1, 2, 1, 2, 1] : undefined], [style.progression, loop, per === 3 ? [0, 2, 1, 2, 3, 2] : [0, 2, 1, 3, 2, 1, 3, 2]],
-    [bridgeProgression, loop * 2, per === 3 ? [2, 1, 0, 1, 2, 3] : [3, 2, 1, 0, 1, 2, 3, 2]], [style.progression, loop * 3, per === 3 ? [0, 1, 2, 3, 2, 1] : [0, 1, 2, 3, 2, 3, 1, 2]],
+  const bridgeProgression = style.progression.map((_, i) => style.progression[(i + Math.floor(bars / 2)) % bars]).map((chord, i) => i === bars - 1 ? 4 : chord);
+  const a = phrase(style.progression, 2), b = phrase(bridgeProgression, 4);
+  const notes: Note[] = [
+    ...render(a, 0, style.lead),
+    ...render(a, loop, style.lead), ...render(a, loop, style.second, -2, 0.5, false),
+    ...render(b, loop * 2, style.second, 0, 0.85),
+    ...render(a, loop * 3, style.lead), ...render(a, loop * 3, style.lead === "glock" ? "harp" : "glock", 0, 0.34, false),
   ];
-  const bed = sections.flatMap(([progression, offset, pattern]) => chordBed(progression.map(triad), per, { pad: style.pad, arp: style.arp, arpPattern: pattern }).map(note => ({ ...note, beat: note.beat + offset })));
+  const patterns = per === 3 ? [[0, 1, 2, 1, 2, 1], [0, 2, 1, 2, 3, 2], [2, 1, 0, 1, 2, 3], [0, 1, 2, 3, 2, 1]] : [[0, 1, 2, 1, 3, 2, 1, 2], [0, 2, 1, 3, 2, 1, 3, 2], [3, 2, 1, 0, 1, 2, 3, 2], [0, 1, 2, 3, 2, 3, 1, 2]];
+  [style.progression, style.progression, bridgeProgression, style.progression].forEach((progression, section) => {
+    notes.push(...chordBed(progression.map(triad), per, { pad: style.bed ?? undefined, arp: style.arp ?? undefined, bass: style.bass, arpPattern: patterns[section] }).map(note => ({ ...note, beat: note.beat + loop * section })));
+  });
   const hits: Hit[] = [];
-  for (let bar = 0; bar < bars * 4; bar++) {
-    const b0 = bar * per, section = Math.floor(bar / bars), fill = bar % bars === bars - 1, lively = section === 2 ? 1.25 : 1;
-    switch (style.drums) {
-      case "soft": hits.push({ beat: b0, drum: "kick", velocity: 0.55 }); if (per === 4) hits.push({ beat: b0 + 2, drum: "rim", velocity: 0.35 }); for (let e = 0; e < per * 2; e++) hits.push({ beat: b0 + e / 2, drum: "shaker", velocity: 0.18 * lively }); break;
-      case "march": hits.push({ beat: b0, drum: "kick", velocity: 0.7 }, { beat: b0 + 1, drum: "snare", velocity: 0.4 }, { beat: b0 + 3, drum: "snare", velocity: 0.45 }); break;
-      case "forge": hits.push({ beat: b0, drum: "kick", velocity: 0.8 }, { beat: b0 + 1, drum: "clank", velocity: 0.55 }, { beat: b0 + 2.5, drum: "clank", velocity: 0.35 }, { beat: b0 + 3, drum: "clank", velocity: 0.6 }, { beat: b0 + 2, drum: "kick", velocity: 0.5 }); break;
-      case "hand": for (const [off, velocity] of [[0, 0.7], [0.75, 0.35], [1.5, 0.5], [2, 0.6], [2.5, 0.3], [3.25, 0.45]] as const) if (off < per) hits.push({ beat: b0 + off, drum: "hand", velocity }); for (let e = 0; e < per * 2; e++) hits.push({ beat: b0 + e / 2, drum: "shaker", velocity: 0.16 * lively }); break;
-      case "drive": for (let e = 0; e < 8; e++) hits.push({ beat: b0 + e / 2, drum: e % 4 === 2 ? "snare" : e % 2 ? "hat" : "kick", velocity: e % 4 === 2 ? 0.6 : 0.5 }); hits.push({ beat: b0 + 3.5, drum: "tom", velocity: 0.5 }); break;
-      case "heartbeat": hits.push({ beat: b0, drum: "kick", velocity: 0.55 }, { beat: b0 + 0.4, drum: "kick", velocity: 0.35 }); break;
-      case "none": if (bar % 2 === 0) hits.push({ beat: b0, drum: "shaker", velocity: 0.12 }); break;
+  for (let barIndex = 0; barIndex < bars * 4; barIndex++) {
+    const b0 = barIndex * per, fill = barIndex % bars === bars - 1, busy = Math.floor(barIndex / bars) % 2 === 1;
+    const off = (velocity: number) => { for (let e = 1; e < per * 2; e += 2) hits.push({ beat: b0 + e / 2, drum: "tambourine", velocity }); };
+    switch (style.kit) {
+      case "tavern": hits.push({ beat: b0, drum: "hand", velocity: 0.55 }, { beat: b0 + 2, drum: "hand", velocity: 0.4 }); off(busy ? 0.26 : 0.18); break;
+      case "jig": hits.push({ beat: b0, drum: "hand", velocity: 0.55 }); if (per === 3) hits.push({ beat: b0 + 1.5, drum: "hand", velocity: 0.3 }); off(0.22); break;
+      case "march": hits.push({ beat: b0, drum: "timpani", velocity: 0.5 }, { beat: b0 + 2, drum: "timpani", velocity: 0.35 }); if (busy) hits.push({ beat: b0 + 1, drum: "snare", velocity: 0.18 }, { beat: b0 + 3, drum: "snare", velocity: 0.22 }); break;
+      case "forge": hits.push({ beat: b0, drum: "timpani", velocity: 0.55 }, { beat: b0 + 1, drum: "clank", velocity: 0.4 }, { beat: b0 + 3, drum: "clank", velocity: 0.5 }); off(0.15); break;
+      case "desert": for (const [o, v] of [[0, 0.6], [0.75, 0.3], [1.5, 0.45], [2, 0.55], [2.5, 0.3], [3.25, 0.4]] as const) if (o < per) hits.push({ beat: b0 + o, drum: "hand", velocity: v }); off(0.15); break;
+      case "calm": if (barIndex % 2 === 0) hits.push({ beat: b0, drum: "shaker", velocity: 0.14 }); break;
+      case "boss": hits.push({ beat: b0, drum: "timpani", velocity: 0.7 }, { beat: b0 + 1.5, drum: "timpani", velocity: 0.5 }, { beat: b0 + 2, drum: "timpani", velocity: 0.6 }); for (let e = 0; e < 8; e++) if (e % 2) hits.push({ beat: b0 + e / 2, drum: "snare", velocity: 0.25 }); break;
+      case "heartbeat": hits.push({ beat: b0, drum: "timpani", velocity: 0.4 }, { beat: b0 + 0.5, drum: "timpani", velocity: 0.25 }); break;
     }
-    if (fill && style.drums !== "none") for (let e = 0; e < 4; e++) hits.push({ beat: b0 + per - 1 + e / 4, drum: "tom", velocity: 0.25 + e * 0.08 });
+    if (fill && style.kit !== "calm" && style.kit !== "heartbeat") for (let e = 0; e < 4; e++) hits.push({ beat: b0 + per - 1 + e / 4, drum: "timpani", velocity: 0.25 + e * 0.07 });
   }
-  return { id: style.id, name: style.name, bpm: style.bpm, beats: loop * 4, notes: [...a, ...answer, ...b, ...reprise, ...harmony, ...bed], hits };
+  return { id: style.id, name: style.name, bpm: style.bpm, beats: loop * 4, notes, hits };
 }
 export const TRACKS: readonly Track[] = [themeTrack(), ...STYLES.map(composeTrack)];
 export const trackById = (id: TrackId) => TRACKS.find(track => track.id === id) ?? TRACKS[0];
@@ -205,11 +235,11 @@ export class RealmAudio {
       output.gain.value = 1.3; glue.connect(output).connect(ctx.destination);
       this.master = ctx.createGain(); this.master.connect(glue);
       // A small hall: generated impulse response, so everything sits in the same space.
-      this.reverb = ctx.createConvolver(); this.wet = ctx.createGain(); this.wet.gain.value = 0.28;
+      this.reverb = ctx.createConvolver(); this.wet = ctx.createGain(); this.wet.gain.value = 0.13;
       const length = Math.floor(ctx.sampleRate * 2.2), impulse = ctx.createBuffer(2, length, ctx.sampleRate);
       for (let channel = 0; channel < 2; channel++) { const data = impulse.getChannelData(channel); for (let i = 0; i < length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / length) ** 2.6; }
       this.reverb.buffer = impulse; this.reverb.connect(this.wet).connect(this.master);
-      const warmth = ctx.createBiquadFilter(); warmth.type = "lowpass"; warmth.frequency.value = 6200; warmth.connect(this.master);
+      const warmth = ctx.createBiquadFilter(); warmth.type = "lowpass"; warmth.frequency.value = 11000; warmth.connect(this.master);
       this.musicBus = ctx.createGain(); this.musicBus.connect(warmth); this.musicBus.connect(this.reverb);
       this.sfxBus = ctx.createGain(); this.sfxBus.connect(this.master);
       this.noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
@@ -296,30 +326,59 @@ export class RealmAudio {
       case "lute": { const filter = ctx.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.setValueAtTime(3200, t); filter.frequency.exponentialRampToValueAtTime(700, t + 0.5); filter.connect(gain);
         this.osc("triangle", f, t, t + length + 0.6, filter); this.osc("sawtooth", f * 2, t, t + 0.3, filter, -4);
         this.env(gain, t, 0.12 * v, 0.005, 0, Math.min(1.2, length + 0.4)); break; }
-      case "flute": { const vibrato = ctx.createOscillator(), depth = ctx.createGain(); vibrato.frequency.value = 5.2; depth.gain.value = f * 0.006; vibrato.connect(depth);
-        const o = this.osc("sine", f, t, t + length + 0.3, gain); depth.connect(o.frequency); vibrato.start(t + 0.15); vibrato.stop(t + length + 0.3);
-        this.osc("triangle", f * 2, t, t + length + 0.3, gain).detune.value = 3;
-        this.env(gain, t, 0.09 * v, 0.06, Math.max(0, length - 0.1), 0.25); break; }
+      case "flute": case "recorder": {
+        // Breathy wind lead: a sine with delayed vibrato, a touch of octave and a puff of air at the start.
+        const vibrato = ctx.createOscillator(), depth = ctx.createGain(); vibrato.frequency.value = voice === "flute" ? 5.4 : 4.6; depth.gain.value = f * (voice === "flute" ? 0.007 : 0.004); vibrato.connect(depth);
+        const o = this.osc(voice === "flute" ? "sine" : "triangle", f, t, t + length + 0.2, gain); depth.connect(o.frequency); vibrato.start(t + 0.18); vibrato.stop(t + length + 0.2);
+        const octave = ctx.createGain(); octave.gain.value = voice === "flute" ? 0.18 : 0.1; octave.connect(gain); this.osc("sine", f * 2, t, t + length + 0.2, octave);
+        this.noiseBurst(t, 0.05, f * 2, 0.012 * v, gain, "bandpass", 2);
+        this.env(gain, t, (voice === "flute" ? 0.1 : 0.11) * v, 0.035, Math.max(0, length - 0.08), 0.12); break; }
+      case "oboe": {
+        // Reedy double-reed lead: a narrow pulse through a bright band.
+        const filter = ctx.createBiquadFilter(); filter.type = "bandpass"; filter.frequency.value = Math.min(4000, f * 3); filter.Q.value = 0.9; filter.connect(gain);
+        const vibrato = ctx.createOscillator(), depth = ctx.createGain(); vibrato.frequency.value = 5; depth.gain.value = f * 0.005; vibrato.connect(depth);
+        const o = this.osc("square", f, t, t + length + 0.15, filter); depth.connect(o.frequency); vibrato.start(t + 0.12); vibrato.stop(t + length + 0.15);
+        this.osc("sawtooth", f, t, t + length + 0.15, filter, 6);
+        this.env(gain, t, 0.08 * v, 0.03, Math.max(0, length - 0.06), 0.1); break; }
+      case "trumpet": {
+        const filter = ctx.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.setValueAtTime(900, t); filter.frequency.linearRampToValueAtTime(4200, t + 0.05); filter.frequency.exponentialRampToValueAtTime(2200, t + length); filter.connect(gain);
+        this.osc("sawtooth", f, t, t + length + 0.15, filter); this.osc("square", f, t, t + length + 0.15, filter, -4);
+        this.env(gain, t, 0.06 * v, 0.025, Math.max(0, length - 0.05), 0.1); break; }
+      case "glock": {
+        // A bright struck bar: pure tone plus a high partial that fades fast.
+        this.osc("sine", f, t, t + 1.3, gain); const ping = ctx.createGain(); ping.gain.setValueAtTime(0.6, t); ping.gain.exponentialRampToValueAtTime(0.001, t + 0.25); ping.connect(gain); this.osc("sine", f * 4.2, t, t + 0.3, ping);
+        this.env(gain, t, 0.07 * v, 0.002, 0, 1.1); break; }
+      case "pizz": {
+        const filter = ctx.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.setValueAtTime(3200, t); filter.frequency.exponentialRampToValueAtTime(700, t + 0.2); filter.connect(gain);
+        this.osc("sawtooth", f, t, t + 0.4, filter); this.osc("triangle", f, t, t + 0.4, filter);
+        this.env(gain, t, 0.09 * v, 0.004, 0, 0.26); break; }
+      case "strings": case "pad": {
+        // A light, bright string section (not a dark pad): detuned saws, gentle swell, open filter.
+        const filter = ctx.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.value = 3400; filter.connect(gain);
+        this.osc("sawtooth", f, t, t + length + 0.5, filter, -7); this.osc("sawtooth", f, t, t + length + 0.5, filter, 7);
+        this.env(gain, t, 0.022 * v, Math.min(0.35, length / 3), Math.max(0, length - 0.35), 0.4); break; }
       case "bell": { const mod = ctx.createOscillator(), depth = ctx.createGain(); mod.frequency.value = f * 3.5; depth.gain.setValueAtTime(f * 2, t); depth.gain.exponentialRampToValueAtTime(f * 0.1, t + 1.2);
         mod.connect(depth); const o = this.osc("sine", f, t, t + 2.4, gain); depth.connect(o.frequency); mod.start(t); mod.stop(t + 2.4);
         this.env(gain, t, 0.07 * v, 0.003, 0, 2.2); break; }
       case "harp": this.osc("triangle", f, t, t + 1.4, gain); this.osc("sine", f * 2, t, t + 0.6, gain); this.env(gain, t, 0.08 * v, 0.003, 0, 1.2); break;
       case "pluck": { const filter = ctx.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.setValueAtTime(2400, t); filter.frequency.exponentialRampToValueAtTime(400, t + 0.25); filter.connect(gain);
         this.osc("square", f, t, t + 0.5, filter); this.env(gain, t, 0.045 * v, 0.003, 0, 0.35); break; }
-      case "organ": for (const [ratio, level] of [[1, 1], [2, 0.5], [3, 0.25], [4, 0.12]] as const) { const g = ctx.createGain(); g.gain.value = level; g.connect(gain); this.osc("sine", f * ratio, t, t + length + 0.4, g); }
+      case "organ": for (const [ratio, level] of [[1, 1], [2, 0.6], [4, 0.3], [6, 0.12]] as const) { const g = ctx.createGain(); g.gain.value = level; g.connect(gain); this.osc("sine", f * ratio, t, t + length + 0.4, g); }
         this.env(gain, t, 0.06 * v, 0.04, Math.max(0, length - 0.05), 0.3); break;
       case "pad": { const filter = ctx.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.value = 1100; filter.connect(gain);
         this.osc("sawtooth", f, t, t + length + 1, filter, -8); this.osc("sawtooth", f, t, t + length + 1, filter, 8);
         this.env(gain, t, 0.022 * v, Math.min(0.8, length / 3), Math.max(0, length - 0.8), 0.9); break; }
-      case "choir": { const filter = ctx.createBiquadFilter(); filter.type = "bandpass"; filter.frequency.value = 900; filter.Q.value = 1.4; filter.connect(gain);
+      case "choir": { const filter = ctx.createBiquadFilter(); filter.type = "bandpass"; filter.frequency.value = 1500; filter.Q.value = 1.1; filter.connect(gain);
         for (const detune of [-10, 0, 10]) this.osc("sawtooth", f, t, t + length + 1.2, filter, detune);
         this.env(gain, t, 0.05 * v, Math.min(0.9, length / 2), Math.max(0, length - 0.9), 1.0); break; }
       case "brass": { const filter = ctx.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.setValueAtTime(500, t); filter.frequency.linearRampToValueAtTime(2200, t + 0.08); filter.frequency.exponentialRampToValueAtTime(900, t + length); filter.connect(gain);
         this.osc("sawtooth", f, t, t + length + 0.3, filter); this.osc("sawtooth", f, t, t + length + 0.3, filter, 7);
         this.env(gain, t, 0.07 * v, 0.03, Math.max(0, length - 0.05), 0.18); break; }
-      case "bass": { const filter = ctx.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.value = 480; filter.connect(gain);
-        this.osc("triangle", f, t, t + length + 0.2, filter); this.osc("square", f / 2, t, t + length + 0.2, filter).detune.value = 2;
-        this.env(gain, t, 0.2 * v, 0.01, Math.max(0, length - 0.1), 0.12); break; }
+      case "bass": {
+        // A plucked bass (acoustic, MIDI-style) in the third octave: no sub-octave rumble.
+        const filter = ctx.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.setValueAtTime(1600, t); filter.frequency.exponentialRampToValueAtTime(500, t + 0.3); filter.connect(gain);
+        this.osc("triangle", f, t, t + length + 0.2, filter); this.osc("sawtooth", f, t, t + 0.25, filter, 3);
+        this.env(gain, t, 0.13 * v, 0.006, Math.max(0, length * 0.4), 0.25); break; }
     }
   }
   private noiseBurst(t: number, length: number, frequency: number, level: number, bus: AudioNode, type: BiquadFilterType = "highpass", q = 0.7) {
@@ -335,7 +394,9 @@ export class RealmAudio {
   }
   private drum(drum: Drum, t: number, v: number, bus: AudioNode) {
     switch (drum) {
-      case "kick": this.thump(t, 120, 42, 0.28, 0.5 * v, bus); break;
+      case "kick": this.thump(t, 110, 55, 0.18, 0.3 * v, bus); break;
+      case "timpani": this.thump(t, 150, 105, 0.5, 0.32 * v, bus); this.noiseBurst(t, 0.05, 300, 0.05 * v, bus, "lowpass"); break;
+      case "tambourine": this.noiseBurst(t, 0.07, 7500, 0.07 * v, bus); for (const ratio of [1, 1.41]) { const g = this.ctx!.createGain(); g.connect(bus); this.osc("square", 5200 * ratio, t, t + 0.08, g); this.env(g, t, 0.004 * v, 0.001, 0, 0.07); } break;
       case "snare": this.noiseBurst(t, 0.16, 1800, 0.16 * v, bus); this.thump(t, 220, 160, 0.08, 0.12 * v, bus); break;
       case "hat": this.noiseBurst(t, 0.04, 7000, 0.07 * v, bus); break;
       case "shaker": this.noiseBurst(t, 0.06, 5200, 0.05 * v, bus, "bandpass", 1.2); break;
