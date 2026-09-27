@@ -78,7 +78,13 @@ function themeTrack(): Track {
     hits.push({ beat: bar * 4, drum: "kick", velocity: 0.8 }, { beat: bar * 4 + 2, drum: "kick", velocity: 0.55 }, { beat: bar * 4 + 1, drum: "snare", velocity: 0.35 }, { beat: bar * 4 + 3, drum: "snare", velocity: 0.4 });
     for (let e = 0; e < 8; e++) hits.push({ beat: bar * 4 + e / 2, drum: "shaker", velocity: e % 2 ? 0.2 : 0.3 });
   }
-  return { id: "theme", name: "RareFriends Realm", bpm: 92, beats: 64, notes: [...melody, ...counter, ...bed], hits };
+  // Second pass: brass takes the tune with a harmony a sixth below, the harp doubles, the drums grow.
+  const again = (notes: readonly Note[]) => notes.map(note => ({ ...note, beat: note.beat + 64 }));
+  const brass = melody.map(note => ({ ...note, beat: note.beat + 64, voice: "brass" as Voice, velocity: 0.7 }));
+  const sixth = melody.map(note => ({ ...note, beat: note.beat + 64, voice: "brass" as Voice, midi: note.midi - 9, velocity: 0.35 }));
+  const fuller = hits.map(hit => ({ ...hit, beat: hit.beat + 64, velocity: Math.min(1, hit.velocity * 1.25) }));
+  for (let bar = 16; bar < 32; bar++) hits.push({ beat: bar * 4 + 3.5, drum: "hat", velocity: 0.3 });
+  return { id: "theme", name: "RareFriends Realm", bpm: 92, beats: 128, notes: [...melody, ...counter, ...bed, ...again(melody), ...brass, ...sixth, ...again(bed)], hits: [...hits, ...fuller] };
 }
 
 // ---------- Area tracks (composed from a motif per area) ----------
@@ -103,49 +109,61 @@ const STYLES: readonly Style[] = [
   { id: "hollow_depths", name: "Hollow Depths", bpm: 58, root: 6, mode: "phrygian", progression: [0, 1, 0, 6, 0, 1, 5, 4], beatsPer: 4, lead: "choir", arp: "bell", pad: "pad", drums: "heartbeat", density: 0.35, octave: 4, seed: 127 },
   { id: "boss", name: "The Hollow King", bpm: 136, root: 4, mode: "harmonic", progression: [0, 0, 5, 4, 0, 0, 3, 4], beatsPer: 4, lead: "brass", arp: "pluck", pad: "choir", drums: "drive", density: 0.8, octave: 4, seed: 131 },
 ];
+/**
+ * An area track in four sections: the theme (A), its answer an octave away (A'), a contrasting bridge on a new motif and
+ * a rotated progression (B), and the theme again with a harmony a third above (A''). Drum fills close each section.
+ */
 function composeTrack(style: Style): Track {
-  const random = mulberry(style.seed), scale = MODES[style.mode], per = style.beatsPer, bars = style.progression.length;
+  const random = mulberry(style.seed), scale = MODES[style.mode], per = style.beatsPer, bars = style.progression.length, loop = bars * per;
   const deg = (degree: number) => style.root + 12 * Math.floor(degree / 7) + scale[((degree % 7) + 7) % 7];
   const triad = (degree: number) => [deg(degree) % 12, deg(degree), deg(degree + 2), deg(degree + 4)];
-  const harmony = style.progression.map(triad);
-  // A two-bar motif, answered and varied: A A' B A'' across the loop, landing on the tonic.
   const rhythms = per === 3 ? [[1, 1, 1], [2, 1], [1.5, 0.5, 1], [3]] : [[1, 1, 1, 1], [2, 1, 1], [1.5, 0.5, 2], [1, 0.5, 0.5, 2], [0.5, 0.5, 1, 2], [4]];
-  const motif: { length: number; step: number }[][] = [];
-  for (let bar = 0; bar < 2; bar++) {
-    const rhythm = rhythms[Math.floor(random() * (rhythms.length - 1))];
-    motif.push(rhythm.map(length => ({ length, step: Math.floor(random() * 5) - 2 })));
-  }
-  const notes: Note[] = [];
-  for (let bar = 0; bar < bars; bar++) {
-    const chord = style.progression[bar], phrase = Math.floor(bar / 2), cell = motif[bar % 2], last = bar === bars - 1;
-    let beat = bar * per, degree = chord + (phrase === 2 ? 2 : 0) + 7 * (style.octave - 5);
-    for (const [index, { length, step }] of (last ? [{ length: per, step: 0 }] : cell).entries()) {
-      if (index > 0) degree += phrase === 1 ? -step : phrase === 3 ? step + (index === cell.length - 1 ? -1 : 0) : step;
-      // Strong beats snap to a chord tone.
-      if (index === 0 && !last) { const tones = [chord, chord + 2, chord + 4].map(tone => tone + 7 * (style.octave - 5)); degree = tones.reduce((best, tone) => Math.abs(tone - degree) < Math.abs(best - degree) ? tone : best, tones[0]); }
-      if (last) degree = 7 * (style.octave - 5);
-      if (random() < style.density || index === 0) notes.push({ beat, voice: style.lead, midi: deg(degree) + 60, length: length * 0.92, velocity: 0.75 + random() * 0.2 });
-      beat += length;
-    }
-  }
-  // Answer phrase an octave down on the second pass, so the loop doesn't feel short.
-  const loop = bars * per, answer = notes.map(note => ({ ...note, beat: note.beat + loop, midi: note.midi + (style.lead === "bell" ? 12 : -12), velocity: note.velocity * 0.8 }));
-  const bed = [...chordBed(harmony, per, { pad: style.pad, arp: style.arp, arpPattern: per === 3 ? [0, 1, 2, 1, 2, 1] : undefined }),
-    ...chordBed(harmony, per, { pad: style.pad, arp: style.arp, arpPattern: per === 3 ? [0, 2, 1, 2, 3, 2] : [0, 2, 1, 3, 2, 1, 3, 2] }).map(note => ({ ...note, beat: note.beat + loop }))];
+  const motif = () => [0, 1].map(() => rhythms[Math.floor(random() * (rhythms.length - 1))].map(length => ({ length, step: Math.floor(random() * 5) - 2 })));
+  const octave = 7 * (style.octave - 5);
+  /** A melody over a progression from a two-bar motif, answered and varied (a a' b a''), landing on the tonic. */
+  const phrase = (progression: readonly number[], cells: { length: number; step: number }[][], offset: number, voice: Voice, lift = 0): Note[] => {
+    const notes: Note[] = [];
+    progression.forEach((chord, bar) => {
+      const part = Math.floor(bar / 2), cell = cells[bar % 2], last = bar === progression.length - 1;
+      let beat = offset + bar * per, degree = chord + (part === 2 ? 2 : 0) + octave + lift;
+      for (const [index, { length, step }] of (last ? [{ length: per, step: 0 }] : cell).entries()) {
+        if (index > 0) degree += part === 1 ? -step : part === 3 ? step + (index === cell.length - 1 ? -1 : 0) : step;
+        if (index === 0 && !last) { const tones = [chord, chord + 2, chord + 4].map(tone => tone + octave + lift); degree = tones.reduce((best, tone) => Math.abs(tone - degree) < Math.abs(best - degree) ? tone : best, tones[0]); }
+        if (last) degree = octave + lift;
+        if (random() < style.density || index === 0) notes.push({ beat, voice, midi: deg(degree) + 60, length: length * 0.92, velocity: 0.75 + random() * 0.2 });
+        beat += length;
+      }
+    });
+    return notes;
+  };
+  const main = motif(), bridge = motif();
+  const bridgeProgression = style.progression.map((_, bar) => style.progression[(bar + Math.floor(bars / 2)) % bars]).map((chord, bar) => bar === bars - 1 ? 4 : chord);
+  const bridgeVoice: Voice = style.arp && style.arp !== style.lead && style.arp !== "pluck" ? style.arp : style.lead === "flute" ? "bell" : "flute";
+  const a = phrase(style.progression, main, 0, style.lead);
+  const answer = a.map(note => ({ ...note, beat: note.beat + loop, midi: note.midi + (style.lead === "bell" ? 12 : -12), velocity: note.velocity * 0.8 }));
+  const b = phrase(bridgeProgression, bridge, loop * 2, bridgeVoice, 2);
+  const reprise = a.map(note => ({ ...note, beat: note.beat + loop * 3 }));
+  const harmony = reprise.map(note => ({ ...note, voice: bridgeVoice, midi: note.midi + (scale.includes((note.midi - style.root + 4) % 12) ? 4 : 3), velocity: note.velocity * 0.45 }));
+  const sections: [readonly number[], number, readonly number[] | undefined][] = [
+    [style.progression, 0, per === 3 ? [0, 1, 2, 1, 2, 1] : undefined], [style.progression, loop, per === 3 ? [0, 2, 1, 2, 3, 2] : [0, 2, 1, 3, 2, 1, 3, 2]],
+    [bridgeProgression, loop * 2, per === 3 ? [2, 1, 0, 1, 2, 3] : [3, 2, 1, 0, 1, 2, 3, 2]], [style.progression, loop * 3, per === 3 ? [0, 1, 2, 3, 2, 1] : [0, 1, 2, 3, 2, 3, 1, 2]],
+  ];
+  const bed = sections.flatMap(([progression, offset, pattern]) => chordBed(progression.map(triad), per, { pad: style.pad, arp: style.arp, arpPattern: pattern }).map(note => ({ ...note, beat: note.beat + offset })));
   const hits: Hit[] = [];
-  for (let bar = 0; bar < bars * 2; bar++) {
-    const b = bar * per;
+  for (let bar = 0; bar < bars * 4; bar++) {
+    const b0 = bar * per, section = Math.floor(bar / bars), fill = bar % bars === bars - 1, lively = section === 2 ? 1.25 : 1;
     switch (style.drums) {
-      case "soft": hits.push({ beat: b, drum: "kick", velocity: 0.55 }); if (per === 4) hits.push({ beat: b + 2, drum: "rim", velocity: 0.35 }); for (let e = 0; e < per * 2; e++) hits.push({ beat: b + e / 2, drum: "shaker", velocity: 0.18 }); break;
-      case "march": hits.push({ beat: b, drum: "kick", velocity: 0.7 }, { beat: b + 1, drum: "snare", velocity: 0.4 }, { beat: b + 3, drum: "snare", velocity: 0.45 }); break;
-      case "forge": hits.push({ beat: b, drum: "kick", velocity: 0.8 }, { beat: b + 1, drum: "clank", velocity: 0.55 }, { beat: b + 2.5, drum: "clank", velocity: 0.35 }, { beat: b + 3, drum: "clank", velocity: 0.6 }, { beat: b + 2, drum: "kick", velocity: 0.5 }); break;
-      case "hand": for (const [offset, velocity] of [[0, 0.7], [0.75, 0.35], [1.5, 0.5], [2, 0.6], [2.5, 0.3], [3.25, 0.45]] as const) if (offset < per) hits.push({ beat: b + offset, drum: "hand", velocity }); for (let e = 0; e < per * 2; e++) hits.push({ beat: b + e / 2, drum: "shaker", velocity: 0.16 }); break;
-      case "drive": for (let e = 0; e < 8; e++) hits.push({ beat: b + e / 2, drum: e % 4 === 2 ? "snare" : e % 2 ? "hat" : "kick", velocity: e % 4 === 2 ? 0.6 : 0.5 }); hits.push({ beat: b + 3.5, drum: "tom", velocity: 0.5 }); break;
-      case "heartbeat": hits.push({ beat: b, drum: "kick", velocity: 0.55 }, { beat: b + 0.4, drum: "kick", velocity: 0.35 }); break;
-      case "none": if (bar % 2 === 0) hits.push({ beat: b, drum: "shaker", velocity: 0.12 }); break;
+      case "soft": hits.push({ beat: b0, drum: "kick", velocity: 0.55 }); if (per === 4) hits.push({ beat: b0 + 2, drum: "rim", velocity: 0.35 }); for (let e = 0; e < per * 2; e++) hits.push({ beat: b0 + e / 2, drum: "shaker", velocity: 0.18 * lively }); break;
+      case "march": hits.push({ beat: b0, drum: "kick", velocity: 0.7 }, { beat: b0 + 1, drum: "snare", velocity: 0.4 }, { beat: b0 + 3, drum: "snare", velocity: 0.45 }); break;
+      case "forge": hits.push({ beat: b0, drum: "kick", velocity: 0.8 }, { beat: b0 + 1, drum: "clank", velocity: 0.55 }, { beat: b0 + 2.5, drum: "clank", velocity: 0.35 }, { beat: b0 + 3, drum: "clank", velocity: 0.6 }, { beat: b0 + 2, drum: "kick", velocity: 0.5 }); break;
+      case "hand": for (const [off, velocity] of [[0, 0.7], [0.75, 0.35], [1.5, 0.5], [2, 0.6], [2.5, 0.3], [3.25, 0.45]] as const) if (off < per) hits.push({ beat: b0 + off, drum: "hand", velocity }); for (let e = 0; e < per * 2; e++) hits.push({ beat: b0 + e / 2, drum: "shaker", velocity: 0.16 * lively }); break;
+      case "drive": for (let e = 0; e < 8; e++) hits.push({ beat: b0 + e / 2, drum: e % 4 === 2 ? "snare" : e % 2 ? "hat" : "kick", velocity: e % 4 === 2 ? 0.6 : 0.5 }); hits.push({ beat: b0 + 3.5, drum: "tom", velocity: 0.5 }); break;
+      case "heartbeat": hits.push({ beat: b0, drum: "kick", velocity: 0.55 }, { beat: b0 + 0.4, drum: "kick", velocity: 0.35 }); break;
+      case "none": if (bar % 2 === 0) hits.push({ beat: b0, drum: "shaker", velocity: 0.12 }); break;
     }
+    if (fill && style.drums !== "none") for (let e = 0; e < 4; e++) hits.push({ beat: b0 + per - 1 + e / 4, drum: "tom", velocity: 0.25 + e * 0.08 });
   }
-  return { id: style.id, name: style.name, bpm: style.bpm, beats: loop * 2, notes: [...notes, ...answer, ...bed], hits };
+  return { id: style.id, name: style.name, bpm: style.bpm, beats: loop * 4, notes: [...a, ...answer, ...b, ...reprise, ...harmony, ...bed], hits };
 }
 export const TRACKS: readonly Track[] = [themeTrack(), ...STYLES.map(composeTrack)];
 export const trackById = (id: TrackId) => TRACKS.find(track => track.id === id) ?? TRACKS[0];

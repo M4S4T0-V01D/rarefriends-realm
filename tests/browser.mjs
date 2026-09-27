@@ -153,13 +153,71 @@ try {
   assert.equal(await state(() => window.__realm.game().player.follower), 3412, "an owned Friend follows");
   await game.getByRole("tab", { name: "Inventory" }).click();
 
+  await game.getByRole("tab", { name: "Prayer" }).click(); await shot("prayer");
+  await game.getByRole("tab", { name: "Magic" }).click(); await shot("magic");
+  await game.getByRole("tab", { name: "Friends and wardrobe" }).click(); await shot("friends");
+  await game.getByRole("tab", { name: "Inventory" }).click();
+
+  // ---------- A level-up: one more log takes Woodcutting to 19 ----------
+  await state(() => { const p = window.__realm.game().player; p.xp.woodcutting = 3972; window.__realm.refresh(); });
+  const oak = await state(() => { const g = window.__realm.game(), p = g.player; return g.world.objects.filter(o => o.kind === "tree" && o.tree === "tree" && !g.depleted.has(o.id)).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0]; });
+  await teleport(oak.x - 2, oak.y - 2);
+  point = await screenOf(oak.x, oak.y);
+  await page.mouse.click(point.x, point.y - 6);
+  await game.getByText(/Congratulations, you just advanced a Woodcutting level/).waitFor({ timeout: 60_000 });
+  await shot("level-up");
+  await page.keyboard.press("Space");
+
+  // ---------- Smelting at the Emberforge furnace ----------
+  const furnace = await state(() => window.__realm.game().world.objects.find(o => o.kind === "furnace"));
+  await state(() => { const p = window.__realm.game().player; p.inventory = p.inventory.map(() => null); p.inventory[0] = { id: "hammer", n: 1 }; for (let i = 1; i < 9; i++) p.inventory[i] = { id: i % 2 ? "copper_ore" : "tin_ore", n: 1 }; window.__realm.refresh(); });
+  await teleport(furnace.x, furnace.y + 1);
+  point = await screenOf(furnace.x, furnace.y);
+  await page.mouse.click(point.x, point.y - 16);
+  await game.getByRole("region", { name: "What would you like to smelt?" }).waitFor();
+  await shot("smelting");
+  await game.getByRole("button", { name: /Bronze bar/ }).click();
+  await until(() => window.__realm.game().player.inventory.filter(slot => slot?.id === "bronze_bar").length >= 2, 30_000);
+
+  // ---------- A shop ----------
+  const shopkeeper = await state(() => window.__realm.game().npcs.find(npc => npc.id === "armsmaster"));
+  await teleport(shopkeeper.x, shopkeeper.y + 1);
+  point = await screenOf(shopkeeper.x, shopkeeper.y);
+  await page.mouse.click(point.x, point.y - 18, { button: "right" });
+  await game.getByRole("menuitem", { name: /Trade Armsmaster Vey/ }).click();
+  await game.getByRole("dialog", { name: "Emberforge Arms" }).waitFor();
+  await shot("shop");
+  await game.getByRole("button", { name: "Close" }).click();
+
+  // ---------- Finishing A Friend's Feast ----------
+  const cook = await state(() => window.__realm.game().npcs.find(npc => npc.id === "cook"));
+  await state(() => { const p = window.__realm.game().player; p.quests.friends_feast = 1; for (const id of ["egg", "pot_of_flour", "bucket_of_milk"]) p.inventory[p.inventory.indexOf(null)] = { id, n: 1 }; window.__realm.refresh(); });
+  await teleport(cook.x + 1, cook.y);
+  point = await screenOf(cook.x, cook.y);
+  await page.mouse.click(point.x, point.y - 18, { button: "right" });
+  await game.getByRole("menuitem", { name: /Talk-to Cook Mabel/ }).click();
+  await game.getByText(/I have everything!/).waitFor();
+  for (let i = 0; i < 3 && !(await game.getByRole("dialog", { name: "Quest complete!" }).isVisible()); i++) { await page.keyboard.press("Space"); await page.waitForTimeout(700); }
+  await game.getByRole("dialog", { name: "Quest complete!" }).waitFor();
+  await game.getByRole("heading", { name: "A Friend's Feast" }).waitFor();
+  await shot("quest-complete");
+  await game.getByRole("button", { name: "Continue", exact: true }).click();
+  assert.equal(await state(() => window.__realm.game().player.quests.friends_feast), 2);
+
   // ---------- Combat in Whisperwood (real click) ----------
   const grumblin = await state(() => { const g = window.__realm.game(); return g.monsters.find(m => m.def.id === "grumblin" && !m.dead); });
   await teleport(grumblin.x + 2, grumblin.y + 1);
-  const target = await state(() => { const g = window.__realm.game(), p = g.player; return g.monsters.filter(m => m.def.id === "grumblin" && !m.dead).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0]; });
-  point = await screenOf(target.x, target.y);
-  await page.mouse.click(point.x, point.y - 18, { button: "right" });
-  await game.getByRole("menuitem", { name: /Attack Grumblin/ }).click();
+  // Grumblins wander, so aim at the nearest one and retry if it stepped away before the click.
+  for (let attempt = 0; ; attempt++) {
+    const target = await state(() => { const g = window.__realm.game(), p = g.player; return g.monsters.filter(m => m.def.id === "grumblin" && !m.dead).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0]; });
+    point = await screenOf(target.x, target.y);
+    await page.mouse.click(point.x, point.y - 16, { button: "right" });
+    const attack = game.getByRole("menuitem", { name: /Attack Grumblin/ });
+    if (await attack.isVisible()) { await attack.click(); break; }
+    await page.keyboard.press("Escape"); await page.mouse.move(10, 10);
+    assert(attempt < 5, "could not target a Grumblin");
+    await page.waitForTimeout(400);
+  }
   await until(() => window.__realm.game().player.combat !== null || window.__realm.game().player.target !== null, 10_000);
   await page.waitForTimeout(2600);
   await shot("combat");
@@ -174,7 +232,7 @@ try {
   await game.getByRole("dialog", { name: "Bank of the Realm" }).waitFor();
   await game.getByRole("button", { name: "Deposit inventory" }).click();
   assert.equal(await state(() => window.__realm.game().player.inventory.filter(Boolean).length), 0, "inventory deposited");
-  await game.getByRole("button", { name: /^Withdraw Lobster/ }).click();
+  await game.getByRole("button", { name: /^Withdraw Bronze bar/ }).click();
   await shot("bank");
   await page.keyboard.press("Escape");
   await game.getByRole("button", { name: "Close" }).click().catch(() => {});
@@ -249,6 +307,27 @@ try {
   await game.getByRole("button", { name: "Continue your adventure" }).click();
   await game.locator('.realm-game[data-phase="playing"]').waitFor();
   assert(Number(await realm.getAttribute("data-total")) > 100, "levels restored");
+
+  // ---------- A phone in landscape: tap to walk, long-press for options ----------
+  const phone = await browser.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true });
+  const handset = await phone.newPage();
+  handset.on("pageerror", error => errors.push(error.message));
+  await installFixture(handset, origin, { artworkCall });
+  await handset.goto(origin);
+  await handset.getByRole("button", { name: /^Connect (wallet|Browser wallet)$/ }).tap();
+  await handset.getByRole("button", { name: /^Friend #7730\b/ }).tap();
+  const small = handset.frameLocator("iframe");
+  await small.getByRole("button", { name: /adventure/ }).tap();
+  await small.locator('.realm-game[data-phase="playing"]').waitFor();
+  await handset.waitForTimeout(1500);
+  await handset.locator(".rf-game-frame").screenshot({ path: "./artifacts/phone.png" });
+  const phoneFrame = handset.frames().find(entry => entry !== handset.mainFrame() && entry.url() !== "about:blank");
+  const start = await phoneFrame.evaluate(() => { const p = window.__realm.game().player; return p.x + p.y; });
+  const box = await handset.locator("iframe").boundingBox();
+  await handset.touchscreen.tap(box.x + box.width * 0.45, box.y + box.height * 0.3);
+  await handset.waitForTimeout(2500);
+  assert.notEqual(await phoneFrame.evaluate(() => { const p = window.__realm.game().player; return p.x + p.y; }), start, "a tap walks on a phone");
+  await phone.close();
 
   assert.deepEqual([...errors, ...fixture.errors], [], "browser errors");
   assert((await page.evaluate(() => window.__friendWalletTest.state.requests)).every(method =>

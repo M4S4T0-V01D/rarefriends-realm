@@ -36,6 +36,10 @@
 | ![Oasis](docs/region-oasis.png) | ![Crypt](docs/region-crypt.png) | ![The Hollow King](docs/region-throne.png) |
 | **Bank** | **World map** | **Rare Caskets** |
 | ![Bank](docs/bank.png) | ![World map](docs/worldmap.png) | ![Caskets](docs/caskets.png) |
+| **Smelting at Emberforge** | **Level up!** | **Quest complete** |
+| ![Smelting menu](docs/smelting.png) | ![Level-up message](docs/level-up.png) | ![Quest complete](docs/quest-complete.png) |
+| **A shop** | **On a phone (landscape)** | **Quest journal** |
+| ![Shop](docs/shop.png) | ![Phone layout](docs/phone.png) | ![Quest journal](docs/quests.png) |
 
 **The adventurer card, ready to post on X:**
 
@@ -106,9 +110,11 @@ npm test               # engine tests: XP curve, world generation and reachabili
 npm run check          # friendsdk check
 npm run test:browser   # SDK mock-wallet browser runs of the custom host (a two-Friend wallet):
                        #  • title screen, real mouse clicks (chop a tree), right-click menu, dialogue, WASD walking
+                       #  • a level-up, smelting at the furnace, a shop, finishing A Friend's Feast (quest-complete scroll)
                        #  • combat by right-click, bank deposit/withdraw, world map, 5 caskets via the runtime's confirmations
                        #  • adventurer card → Post to X (prefilled post + picture copied), a follower, a 14-region tour
                        #  • save written for the wallet and Friend, reload → "Continue your adventure"
+                       #  • a phone in landscape (844 × 390, touch): tap to walk
                        #  • preview page: the main theme and a jukebox track play audibly on desktop and phone
 ```
 
