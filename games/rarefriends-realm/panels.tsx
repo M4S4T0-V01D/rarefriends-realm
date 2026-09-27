@@ -17,6 +17,7 @@ import {
 import { friendRows, renderWorldMap } from "./render.ts";
 import { artUrl, itemArt, orbArt, prayerArt, skillArt, spellArt, tabArt, type TabIcon } from "./icons.ts";
 import { friendSprite } from "./sprites.ts";
+import { figureArt } from "./wardrobe.ts";
 import { TRACKS } from "./audio.ts";
 
 // ---------- Item icons ----------
@@ -39,19 +40,16 @@ export function PixelIcon({ art, size, label }: { art: HTMLCanvasElement; size: 
 }
 
 /** A Friend drawn from its mask (canonical or procedural). */
-export function FriendPortrait({ sprites, family, seed, size = 48 }: { sprites?: GenerationSprites | null; family?: number; seed?: number; size?: number }) {
-  const ref = useRef<HTMLCanvasElement>(null);
+export function FriendPortrait({ sprites, family, seed, size = 48, worn = [] }: { sprites?: GenerationSprites | null; family?: number; seed?: number; size?: number; worn?: readonly string[] }) {
+  const ref = useRef<HTMLCanvasElement>(null), wornKey = worn.join(",");
   useEffect(() => {
     const canvas = ref.current, ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
-    const rows = sprites ? friendRows(sprites, "down", false, 0) : friendSprite(family ?? 0, seed ?? 1).idle, px = Math.floor(size / 18);
-    canvas.width = canvas.height = size; ctx.clearRect(0, 0, size, size);
-    const off = (size - rows.length * px) / 2;
-    ctx.fillStyle = "#fff";
-    rows.forEach((row, y) => [...row].forEach((pixel, x) => { if (pixel === "#") ctx.fillRect(off + (x - 1) * px, off + (y - 1) * px, px * 3, px * 3); }));
-    ctx.fillStyle = "#161616";
-    rows.forEach((row, y) => [...row].forEach((pixel, x) => { if (pixel === "#") ctx.fillRect(off + x * px, off + y * px, px, px); }));
-  }, [sprites, family, seed, size]);
+    const rows = sprites ? friendRows(sprites, "down", false, 0) : friendSprite(family ?? 0, seed ?? 1).idle, art = figureArt(rows, worn, "down");
+    const px = Math.max(1, Math.floor(size / Math.max(art.width, art.height)));
+    canvas.width = canvas.height = size; ctx.clearRect(0, 0, size, size); ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(art, Math.round((size - art.width * px) / 2), Math.round((size - art.height * px) / 2 + px), art.width * px, art.height * px);
+  }, [sprites, family, seed, size, wornKey]); // eslint-disable-line react-hooks/exhaustive-deps
   return <canvas ref={ref} className="realm-portrait" width={size} height={size} aria-hidden="true" />;
 }
 
@@ -91,7 +89,7 @@ export type PanelProps = {
   game: Game; tab: Tab; setTab: (tab: Tab) => void; selection: Selection; setSelection: (selection: Selection) => void;
   openMenu: (x: number, y: number, entries: MenuEntry[]) => void; refresh: () => void; roster: readonly OwnedFriend[]; rosterState: "waiting" | "ready" | "none";
   friendSprites: ReadonlyMap<number, GenerationSprites>; loadFriend: (id: number) => void; settings: Settings; setSettings: (settings: Settings) => void;
-  trackName: string; trackId: string; playTrack: (id: string) => void; openCard: () => void; openHelp: () => void; paused: boolean; saved: string; relicCounts: readonly number[]; openCaskets: () => void;
+  friend: GenerationSprites | null; trackName: string; trackId: string; playTrack: (id: string) => void; openCard: () => void; openHelp: () => void; paused: boolean; saved: string; relicCounts: readonly number[]; openCaskets: () => void;
 };
 export function SidePanel(props: PanelProps) {
   const { tab, setTab } = props;
@@ -302,7 +300,7 @@ function MagicTab({ game, refresh, setSelection, selection }: PanelProps) {
   );
 }
 function InfoCard({ children }: { children: ReactNode }) { return <div className="realm-info" aria-live="polite">{children}</div>; }
-function FriendsTab({ game, refresh, roster, rosterState, friendSprites, loadFriend, relicCounts, openCaskets }: PanelProps) {
+function FriendsTab({ game, refresh, roster, rosterState, friendSprites, loadFriend, relicCounts, openCaskets, friend }: PanelProps) {
   const player = game.player, perk = FAMILY_PERKS[player.familyId];
   useEffect(() => { for (const friend of roster.slice(0, 24)) loadFriend(friend.id); }, [roster, loadFriend]);
   return (
@@ -324,8 +322,12 @@ function FriendsTab({ game, refresh, roster, rosterState, friendSprites, loadFri
       <div className="realm-wardrobe">
         {WARDROBE.map(piece => {
           const owned = player.wardrobe.includes(piece.id);
-          return <button key={piece.id} type="button" disabled={!owned} aria-pressed={player.worn.includes(piece.id)} title={owned ? `${piece.name}: click to ${player.worn.includes(piece.id) ? "remove" : "wear"}` : `${piece.name}: from Rare Caskets`}
-            onClick={() => { toggleWorn(game, piece.id); refresh(); }}><i style={{ background: owned ? piece.color : "transparent" } as CSSProperties} />{owned ? piece.name : "???"}</button>;
+          return <button key={piece.id} type="button" disabled={!owned} aria-pressed={player.worn.includes(piece.id)} title={owned ? `${piece.name}: click to ${player.worn.includes(piece.id) ? "take off" : "wear"}` : `${piece.name}: from Rare Caskets`}
+            aria-label={owned ? `${piece.name}${player.worn.includes(piece.id) ? " (worn)" : ""}` : "Undiscovered wardrobe piece"}
+            onClick={() => { toggleWorn(game, piece.id); refresh(); }}>
+            {owned ? <FriendPortrait sprites={friend} family={player.familyId} seed={1} size={40} worn={[piece.id]} /> : <span className="realm-mystery">?</span>}
+            <small>{owned ? piece.name : "???"}</small>
+          </button>;
         })}
       </div>
       <h3>Rare Relics</h3>

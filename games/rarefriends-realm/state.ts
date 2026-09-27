@@ -71,10 +71,12 @@ export type GameEvent =
   | { type: "projectile"; projectile: Projectile }
   | { type: "death"; tick: number }
   | { type: "quest"; quest: string; tick: number }
-  | { type: "cast"; spell: string; tick: number };
+  | { type: "cast"; spell: string; tick: number }
+  | { type: "creature"; id: string; action: "attack" | "hurt" | "death" | "aggro"; x: number; y: number; tick: number }
+  | { type: "swing"; weapon: "slash" | "stab" | "crush" | "punch"; tick: number };
 export type SoundName =
   | "chop" | "mine" | "splash" | "catch" | "fire" | "sizzle" | "burn" | "smelt" | "anvil" | "hit" | "miss" | "hurt" | "eat" | "bury" | "coins"
-  | "pickup" | "drop" | "door" | "level" | "quest" | "spell" | "teleport" | "death" | "stun" | "jump" | "click" | "equip" | "kill" | "pray";
+  | "pickup" | "drop" | "door" | "level" | "quest" | "spell" | "teleport" | "death" | "stun" | "jump" | "click" | "equip" | "kill" | "pray" | "fell";
 export type Message = { text: string; tone: "game" | "info" | "warn" | "quest" | "level" | "npc" | "public"; tick: number };
 
 export type Game = {
@@ -83,7 +85,10 @@ export type Game = {
   dialogue: Dialogue | null; ui: { shop: string | null; bank: boolean; production: ProductionMenu | null };
   held: { dx: number; dy: number } | null; autoRetaliate: boolean; playTicks: number;
   overheads: Map<number, { text: string; until: number }>;
+  /** Your owned-Friend follower, walking the tiles you leave behind. */
+  pet: Pet | null; trail: Point[];
 };
+export type Pet = { x: number; y: number; prev: Point; heading: Point; moved: number };
 export type DialogueLine = { who: "npc" | "player"; text: string; npc?: string };
 export type Dialogue = {
   npc: string; lines: DialogueLine[]; index: number;
@@ -127,7 +132,7 @@ export function createGame(options: { familyId: number; friendId: number; rng?: 
   const game: Game = {
     world, tick: 0, player: createPlayer(world, options.familyId, options.friendId), monsters: [], npcs: [], ground: [], fires: [],
     depleted: new Map(), messages: [], events: [], rng, nextUid: 1, dialogue: null, ui: { shop: null, bank: false, production: null },
-    held: null, autoRetaliate: true, playTicks: 0, overheads: new Map(),
+    held: null, autoRetaliate: true, playTicks: 0, overheads: new Map(), pet: null, trail: [],
   };
   for (const spawn of world.spawns) {
     const uid = game.nextUid++, at = { x: spawn.x, y: spawn.y };

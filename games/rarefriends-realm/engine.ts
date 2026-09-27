@@ -69,6 +69,7 @@ function face(game: Game, x: number, y: number) {
 }
 function moveTo(game: Game, x: number, y: number) {
   const player = game.player;
+  game.trail.push({ x: player.x, y: player.y }); if (game.trail.length > 8) game.trail.shift();
   player.prev = { x: player.x, y: player.y }; player.heading = headingTo(x - player.x, y - player.y, player.heading);
   player.x = x; player.y = y; player.moved = game.tick;
 }
@@ -587,6 +588,7 @@ function travel(game: Game, to: { x: number; y: number }, text: string) {
   const player = game.player;
   stopAll(game);
   player.prev = { x: to.x, y: to.y }; player.x = to.x; player.y = to.y; player.moved = game.tick - 10;
+  game.trail = [];
   for (const monster of game.monsters) monster.target = false;
   message(game, text); sound(game, "door");
 }
@@ -617,6 +619,7 @@ export function tick(game: Game) {
   if (player.attackTimer > 0) player.attackTimer--;
   if (player.overhead && player.overhead.until <= game.tick) player.overhead = null;
   movePlayer(game);
+  updatePet(game);
   if (player.target && !player.path.length) {
     const point = targetPoint(game, player.target);
     if (!point) player.target = null;
@@ -697,19 +700,19 @@ function gatherBonus(game: Game) { return 1 + Math.min(RELICS[2].max, game.playe
 function woodcutTick(game: Game, activity: Extract<Activity, { kind: "woodcut" }>) {
   const player = game.player, object = game.world.objects[activity.objectId], tree = TREES[object.tree!], axe = bestTool(game, "axe");
   if (game.depleted.has(object.id) || !axe) { player.activity = null; return; }
-  activity.timer = 4; sound(game, "chop");
+  activity.timer = 4; // the chop sound plays on the swing animation
   const chance = Math.min(0.95, successChance(level(game, "woodcutting"), tree.low, tree.high) * (1 + 0.18 * (axe.tier - 1)) * gatherBonus(game));
   if (game.rng() >= chance) return;
   give(player, tree.log); addXp(game, "woodcutting", tree.xp);
   if (player.familyId === 4 && game.rng() < 0.08 && freeSlots(player)) { give(player, tree.log); message(game, "Lopsided luck! You get an extra log."); }
   message(game, `You get some ${item(tree.log).name.toLowerCase()}.`);
-  if (game.rng() < tree.deplete) { game.depleted.set(object.id, game.tick + tree.respawn + Math.floor(game.rng() * tree.respawn)); player.activity = null; sound(game, "chop"); return; }
+  if (game.rng() < tree.deplete) { game.depleted.set(object.id, game.tick + tree.respawn + Math.floor(game.rng() * tree.respawn)); player.activity = null; sound(game, "fell"); return; }
   if (!freeSlots(player)) { message(game, "Your inventory is too full to hold any more logs.", "warn"); player.activity = null; }
 }
 function mineTick(game: Game, activity: Extract<Activity, { kind: "mine" }>) {
   const player = game.player, object = game.world.objects[activity.objectId], rock = ROCKS[object.rock!], pick = bestTool(game, "pickaxe");
   if (game.depleted.has(object.id) || !pick) { player.activity = null; return; }
-  activity.timer = 4; sound(game, "mine");
+  activity.timer = 4; // the pick sound plays on the swing animation
   const gemOdds = (player.familyId === 7 ? 3 : 1) / 256;
   if (game.rng() < gemOdds && freeSlots(player)) {
     const gem = ["rough_moonstone", "rough_moonstone", "rough_sagestone", "rough_rosestone"][Math.floor(game.rng() * 4)];
@@ -885,6 +888,7 @@ function playerCombat(game: Game) {
     else { addXp(game, "attack", xp / 3); addXp(game, "strength", xp / 3); addXp(game, "defence", xp / 3); }
     addXp(game, "hitpoints", damage * 1.33);
   }
+  emit(game, { type: "swing", weapon: weaponSound(player.equipment.weapon), tick: game.tick });
   sound(game, hit > 0 ? "hit" : "miss");
   damageMonster(game, monster, Math.max(0, hit), hit < 0);
 }
@@ -895,12 +899,13 @@ function damageMonster(game: Game, monster: Monster, damage: number, missed: boo
   emit(game, { type: "hit", on: "monster", uid: monster.uid, damage: missed ? -1 : dealt, tick: game.tick });
   if (monster.attackTimer <= 0) monster.attackTimer = 1;
   if (monster.hp <= 0) killMonster(game, monster);
+  else if (dealt > 0) creature(game, monster, "hurt");
 }
 function killMonster(game: Game, monster: Monster) {
   const player = game.player;
   monster.dead = true; monster.target = false; monster.respawnAt = game.tick + monster.def.respawn;
   if (player.combat === monster.uid) player.combat = null;
-  player.kills++; sound(game, "kill");
+  player.kills++; sound(game, "kill"); creature(game, monster, "death");
   const at = { x: monster.x, y: monster.y }, silver = Math.min(RELICS[1].max, player.relics[1] ?? 0) * RELICS[1].coinsPer;
   const roll = (drop: { item: string; min: number; max: number }) => {
     const n = drop.min + Math.floor(game.rng() * (drop.max - drop.min + 1));
@@ -939,7 +944,7 @@ function monsterTick(game: Game, monster: Monster) {
   if (monster.attackTimer > 0) monster.attackTimer--;
   const sameLayer = (monster.spawn.y >= 200) === (player.y >= 200);
   // Aggression: attack players whose combat level is at most twice the monster's.
-  if (!monster.target && monster.def.aggressive && sameLayer && chebyshev(monster, player) <= 4 && combatLevel(player) <= monster.def.level * 2) monster.target = true;
+  if (!monster.target && monster.def.aggressive && sameLayer && chebyshev(monster, player) <= 4 && combatLevel(player) <= monster.def.level * 2) { monster.target = true; creature(game, monster, "aggro"); }
   if (monster.target) {
     const leash = Math.max(Math.abs(monster.x - monster.spawn.x), Math.abs(monster.y - monster.spawn.y));
     if (!sameLayer || leash > monster.wander + 12 || chebyshev(monster, player) > 16) { monster.target = false; monster.retreat = 6; return; }
@@ -951,6 +956,7 @@ function monsterTick(game: Game, monster: Monster) {
         const defence = (Math.floor(level(game, "defence") * (1 + boost.defence)) + style.defence + 8) * (bonuses(player).defence + 64);
         let hit = game.rng() < hitChance(attack, defence) ? Math.floor(game.rng() * (Math.floor(monster.def.maxHit * cursed(game, monster, "strength")) + 1)) : 0;
         if (boost.protect) hit = Math.floor(hit * (monster.def.boss ? 0.4 : 0));
+        creature(game, monster, "attack");
         damagePlayer(game, hit, monster);
       }
       return;
@@ -983,6 +989,16 @@ function gapTo(point: Point, x: number, y: number, size: number) {
  * Old-school "dumb" pathing: take the single step that brings the monster closest to its target, never onto the player.
  * Monsters don't search around walls, so they can get stuck behind things (safespots work).
  */
+function creature(game: Game, monster: Monster, action: "attack" | "hurt" | "death" | "aggro") {
+  emit(game, { type: "creature", id: monster.def.id, action, x: monster.x, y: monster.y, tick: game.tick });
+}
+/** What a weapon sounds like when it swings. */
+function weaponSound(id: string | undefined): "slash" | "stab" | "crush" | "punch" {
+  if (!id) return "punch";
+  if (id.includes("dagger")) return "stab";
+  if (id.includes("sword") || id.includes("sabre")) return "slash";
+  return "crush";
+}
 /** A curse's multiplier on a monster stat (1 when uncursed). */
 function cursed(game: Game, monster: Monster, stat: "attack" | "strength" | "defence") {
   const until = monster.curses[stat];
@@ -1204,8 +1220,37 @@ export function toggleWorn(game: Game, id: WardrobeId) {
 export type OwnedFriend = { id: number; generation: number | null };
 export function setFollower(game: Game, friend: OwnedFriend | null) {
   const player = game.player;
-  player.follower = friend?.id ?? null; player.followerGeneration = friend?.generation ?? null;
+  player.follower = friend?.id ?? null; player.followerGeneration = friend?.generation ?? null; game.pet = null;
+  if (friend) updatePet(game);
   if (friend) message(game, `Friend #${friend.id} follows you now.`, "info");
+}
+
+/**
+ * The follower walks like an old-school pet: it steps onto the tile you just left (two when you run),
+ * waits beside you when you stop, and finds its way back to your side after a teleport.
+ */
+function updatePet(game: Game) {
+  const player = game.player;
+  if (player.follower === null) { game.pet = null; return; }
+  const pet = game.pet;
+  const beside = () => {
+    const behind = game.trail[game.trail.length - 1];
+    if (behind && Math.max(Math.abs(behind.x - player.x), Math.abs(behind.y - player.y)) === 1 && canWalk(game, behind.x, behind.y)) return behind;
+    for (const [dx, dy] of [[-player.heading.x, -player.heading.y], [1, 0], [0, 1], [-1, 0], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) if ((dx || dy) && canWalk(game, player.x + dx, player.y + dy)) return { x: player.x + dx, y: player.y + dy };
+    return { x: player.x, y: player.y };
+  };
+  if (!pet) { const at = beside(); game.pet = { x: at.x, y: at.y, prev: { ...at }, heading: { ...player.heading }, moved: 0 }; return; }
+  const far = Math.max(Math.abs(pet.x - player.x), Math.abs(pet.y - player.y));
+  if (far > 4) { const at = beside(); pet.prev = { ...at }; pet.x = at.x; pet.y = at.y; pet.moved = game.tick - 10; return; }
+  if (player.moved === game.tick && game.trail.length) {
+    const target = game.trail[game.trail.length - 1];
+    if (target.x !== pet.x || target.y !== pet.y) {
+      pet.prev = { x: pet.x, y: pet.y }; pet.heading = headingTo(target.x - pet.x, target.y - pet.y, pet.heading);
+      pet.x = target.x; pet.y = target.y; pet.moved = game.tick;
+    }
+  } else if (far === 0) {
+    const at = beside(); pet.prev = { x: pet.x, y: pet.y }; pet.x = at.x; pet.y = at.y; pet.moved = game.tick;
+  } else if (player.moved !== game.tick) pet.heading = headingTo(player.x - pet.x, player.y - pet.y, pet.heading);
 }
 
 // ---------- Saves ----------

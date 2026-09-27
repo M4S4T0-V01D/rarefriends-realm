@@ -19,6 +19,8 @@ function add(particle: Omit<Particle, "age" | "seed">) {
   if (particles.length >= MAX) particles.shift();
   particles.push({ ...particle, age: 0, seed: Math.random() * 1000 });
 }
+/** A slow grey puff of chimney or forge smoke. */
+export function puff(x: number, y: number, h: number) { add({ x, y, h, vx: 0.18, vy: -0.08, vh: 16, gravity: -3, life: 3.2, color: "#9a968f", size: 5, kind: "puff" }); }
 /** A burst of `n` particles from a world point. */
 export function burst(kind: Particle["kind"], x: number, y: number, h: number, n: number, color: string, options: { speed?: number; up?: number; life?: number; size?: number; gravity?: number } = {}) {
   for (let i = 0; i < n; i++) {
@@ -41,7 +43,7 @@ function toolId(game: Game, kind: "axe" | "pickaxe"): string | null {
  * How the player looks this frame while doing something, plus impact effects on the beat.
  * `side` is which way the target is on screen (so the tool swings toward it).
  */
-export function playerPose(game: Game, now: number, project: Project, reduced: boolean): Pose {
+export function playerPose(game: Game, now: number, project: Project, reduced: boolean, sfx: (name: string, gain?: number) => void = () => {}): Pose {
   const player = game.player, activity = player.activity, pose: Pose = { tool: null, angle: 0, side: 1, bob: 0, reach: 0, alpha: 1, hop: 0, target: null, line: false };
   if (!activity) return pose;
   const world = game.world, here = project(player.x, player.y);
@@ -50,18 +52,18 @@ export function playerPose(game: Game, now: number, project: Project, reduced: b
     const phase = (now % period) / period;
     pose.angle = phase < 0.65 ? -1.5 + phase / 0.65 * 0.4 : -1.1 + (phase - 0.65) / 0.35 * 1.8;
     if (phase < 0.15) pose.angle = -1.1 + (0.15 - phase) / 0.15 * -0.2;
-    if (!reduced && lastPhase < 0.85 && phase >= 0.85) onImpact();
+    if (lastPhase < 0.85 && phase >= 0.85) onImpact();
     lastPhase = phase;
   };
   switch (activity.kind) {
     case "woodcut": {
       const tree = world.objects[activity.objectId]; aim(tree.x, tree.y); pose.tool = toolId(game, "axe");
-      swing(760, () => burst("chip", tree.x, tree.y, 18, 4, "#b89c86", { speed: 1.6, up: 50, size: 2 }));
+      swing(760, () => { sfx("chop"); if (!reduced) burst("chip", tree.x, tree.y, 18, 4, "#b89c86", { speed: 1.6, up: 50, size: 2 }); });
       break;
     }
     case "mine": {
       const rock = world.objects[activity.objectId]; aim(rock.x, rock.y); pose.tool = toolId(game, "pickaxe");
-      swing(820, () => { burst("chip", rock.x, rock.y, 10, 4, "#a39e96", { speed: 1.4, up: 45 }); burst("spark", rock.x, rock.y, 12, 3, "#fff4c0", { speed: 2, up: 30, life: 0.3, size: 1.5, gravity: 60 }); });
+      swing(820, () => { sfx("mine"); if (reduced) return; burst("chip", rock.x, rock.y, 10, 4, "#a39e96", { speed: 1.4, up: 45 }); burst("spark", rock.x, rock.y, 12, 3, "#fff4c0", { speed: 2, up: 30, life: 0.3, size: 1.5, gravity: 60 }); });
       break;
     }
     case "fish": {
@@ -86,7 +88,7 @@ export function playerPose(game: Game, now: number, project: Project, reduced: b
       const station = activity.recipe.station;
       const near = station && station !== "none" ? world.objects.find(object => object.kind === station && Math.abs(object.x - player.x) <= 1 && Math.abs(object.y - player.y) <= 1) : null;
       if (near) aim(near.x, near.y);
-      if (station === "anvil" && near) { pose.tool = "hammer"; swing(600, () => burst("spark", near.x, near.y, 14, 5, "#f4dca0", { speed: 1.8, up: 35, life: 0.35, size: 1.5, gravity: 80 })); }
+      if (station === "anvil" && near) { pose.tool = "hammer"; swing(600, () => { sfx("anvil", 0.7); if (!reduced) burst("spark", near.x, near.y, 14, 5, "#f4dca0", { speed: 1.8, up: 35, life: 0.35, size: 1.5, gravity: 80 }); }); }
       else if (station === "furnace" && near) { pose.reach = 0.5; if (!reduced && Math.random() < 0.15) burst("spark", near.x, near.y, 24, 1, "#e9a07a", { speed: 0.4, up: 30, life: 0.8, gravity: -10 }); }
       else { pose.tool = activity.recipe.tools?.[0] ?? null; pose.angle = -0.2 + Math.sin(now / 180) * 0.25; }
       break;

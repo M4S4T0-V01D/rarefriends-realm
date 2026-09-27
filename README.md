@@ -11,11 +11,13 @@
 - **Fifteen skills on the classic curve.** Attack, Strength, Defence, Hitpoints, Magic, Prayer, Woodcutting, Fishing, Cooking, Firemaking, Mining, Smithing, Crafting, Thieving and Agility, from level 1 to 99.
 - **Old-school controls.** Left-click does the first option; right-click lists them all (*Chop down Tree*, *Attack Grumblin (level-5)*, *Talk-to*, *Pickpocket*, *Examine*). WASD walks; the arrow keys (or a scroll-wheel drag) turn and tilt the camera, and the compass faces north again. Use items on things. Minimap, run orb, world map. Every monster shows its health and level.
 - **A large, living world.** A 240 × 240 tile island with 12 regions and 2 dungeons: towns, farms, forests, a mine, a forge, snowy peaks, a lake with a pier, dunes and an oasis, a swamp, ruins, a crypt and the Hollow Depths. The land rolls in walkable hills (lit by slope, with ink contour lines), and it's alive: cloud shadows, birds, butterflies, falling leaves, snow, blowing dust, fireflies, jumping fish and forge smoke.
+- **Real buildings.** Brick walls with windows and pitched roofs in faded accent colours (Hollow Hall has battlements; chimneys smoke). Roofs lift away as you walk in, walls in front of you drop to a cutaway, and a roof fades whenever it would hide you.
+- **Sound everywhere.** Weapon swings, a voice for every creature, axes and picks on the beat, NPC speech blips, footsteps by ground, crackling fires, the forge, water, and regional wildlife.
 - **Pixel art in the Rare Friends style.** Trees, rocks, decor, every item, weapon, skill, spell and prayer icon are pixel art with an ink edge (and the white halo of the canonical sprites), drawn procedurally. Walls are bricked, and skills animate: axes swing and chips fly, pickaxes spark, lines are cast, anvils ring, fires crackle, agility hops.
 - **A real spellbook.** Darts, Lances and Bursts in four elements; curses (Muddle, Wilt, Brittle) and Rootsnare; Gilded and Golden Touch, Forgeheart, Far Reach, Bonebloom, two enchantments and six ways to travel, paid in sigils.
 - **Six quests** from baking for the Realm Feast to defeating the Hollow King (level 92) in his throne room.
 - **A soundtrack for every region.** Sixteen procedural tracks, including a hand-written main theme, plus level-up and quest fanfares, synthesized live in WebAudio. Entering an area unlocks its track ("You have unlocked a new music track"), and the music player replays any you've found.
-- **Your other Friends follow you**, adding XP by generation. **Rare Caskets** (simulated $RAREFRIENDS) hold relics and wardrobe pieces. **Progress saves per wallet.** Your **adventurer card** posts to X.
+- **Your other Friends follow you**, walking the tiles you leave behind like an old-school pet and adding XP by generation. **Rare Caskets** (simulated $RAREFRIENDS) hold relics and wardrobe pieces. **Progress saves per wallet.** Your **adventurer card** posts to X.
 
 | | |
 | --- | --- |
@@ -42,8 +44,8 @@
 | ![Smelting menu](docs/smelting.png) | ![Level-up message](docs/level-up.png) | ![Quest complete](docs/quest-complete.png) |
 | **Camera turned and tilted** | **Health bars on every monster** | **The spellbook** |
 | ![Camera turned](docs/camera-turned.png) | ![Grumblins with health bars](docs/combat.png) | ![Spellbook](docs/magic.png) |
-| **Chat over your head** | **Prayers** | **Music unlocks** |
-| ![Chat](docs/chat.png) | ![Prayers](docs/prayer.png) | ![Music player](docs/music.png) |
+| **Chat over your head** | **Friends and the wardrobe** | **Music unlocks** |
+| ![Chat](docs/chat.png) | ![Friends and wardrobe](docs/friends.png) | ![Music player](docs/music.png) |
 | **A shop** | **On a phone (landscape)** | **Quest journal** |
 | ![Shop](docs/shop.png) | ![Phone layout](docs/phone.png) | ![Quest journal](docs/quests.png) |
 
@@ -75,7 +77,7 @@ drawn with its own canonical art, and adds XP by generation (Gen 1 +5% … Gen 5
 
 - **RF sink:** a Rare Casket costs 1 RF and returns 0.88 RF in expected value; 12% of each purchase stays with the game as prize stake. Buying ×5 is supported.
 - **Keep or redeem:** relics keep a fixed RF value with no expiry, but only boost you while kept (+2% XP, +10% coins, 10% faster gathering, or +10% XP with a golden aura). Each casket reserves 5 RF, so redemptions stay funded.
-- **Wardrobe:** each casket also grants one of 8 RF-exclusive pieces (capes, hats, a halo, auras) drawn on your Friend. They carry no RF value, so they need no prize reserve. Duplicates become coins.
+- **Wardrobe:** each casket also grants one of 12 RF-exclusive pieces (capes, crowns, a hood, a halo, a bow, wings, auras and a lantern familiar), painted into your Friend's own sprite so they sit exactly on its head, shoulders and neck. They carry no RF value, so they need no prize reserve. Duplicates become coins.
 - **Two currencies:** coins are earned in the world and never convert to RF, so the game is complete without spending. RF gives bonuses and looks. It's a boost, not a paywall.
 
 **Future integrations** (not in the SDK v0.1.2 API):
@@ -113,7 +115,8 @@ npm test               # engine tests: XP curve, world generation and reachabili
                        # WASD, right-click menus, woodcutting/firemaking/cooking, fishing, mining/smelting/smithing,
                        # combat and loot, aggression and safe death, two quests end to end, thieving, an agility lap,
                        # magic (combat, curses, Rootsnare, Gilded Touch, Forgeheart, enchanting, Far Reach, Bonebloom, glides),
-                       # prayer, shops and the bank, saves (round trip, tampering, pre-rename ids), caskets, followers, music unlocks
+                       # prayer, shops and the bank, saves (round trip, tampering, pre-rename ids), caskets, a follower walking your trail,
+                       # music unlocks
 npm run check          # friendsdk check
 npm run test:browser   # SDK mock-wallet browser runs of the custom host (a two-Friend wallet):
                        #  • title screen, real mouse clicks (chop a tree), right-click menu, dialogue, WASD walking, chat over your head

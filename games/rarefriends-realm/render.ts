@@ -3,15 +3,16 @@
  * Draws in a 960 × 640 logical view; the caller scales the canvas for the device.
  */
 import type { GenerationSprites } from "@rarefriends/friendsdk/sprites";
-import { ROCKS, WARDROBE, item, levelForXp, type Icon } from "./data.ts";
+import { ROCKS, item, levelForXp, type Icon } from "./data.ts";
 import { NPCS } from "./content.ts";
 import { TICK_MS, attackSpeed, type Facing, type Game, type Monster, type Npc, type Projectile } from "./state.ts";
 import { npcOverhead, type Pick } from "./engine.ts";
-import { REGIONS, T, W, H, cornerHeight, groundHeight, inBounds, objectAtTile, type World, type WorldObject } from "./world.ts";
+import { REGIONS, T, W, H, cornerHeight, groundHeight, inBounds, objectAtTile, type Building, type World, type WorldObject } from "./world.ts";
 import { itemArt } from "./icons.ts";
 import { drawPixels } from "./pixel.ts";
 import { decorArt, rockArt, treeArt } from "./scenery.ts";
-import { drawCloudShadows, drawEffects, playerPose, treeShake, updateEffects, type Pose } from "./effects.ts";
+import { drawCloudShadows, drawEffects, playerPose, puff, treeShake, updateEffects, type Pose } from "./effects.ts";
+import { drawAuras, drawFigure, figureArt } from "./wardrobe.ts";
 import { creatureSprite, friendSprite, type Mask } from "./sprites.ts";
 
 /** The logical view size; the game sets it to match the frame (960 × 640 is the reference). */
@@ -42,6 +43,8 @@ export type Scene = {
   game: Game; now: number; tickAt: number; camera: Camera; friend: GenerationSprites | null; follower: GenerationSprites | null;
   canonical: ReadonlyMap<number, GenerationSprites>; hoverTile: { x: number; y: number } | null; marker: ClickMarker | null;
   reducedMotion: boolean; hits: HitSplat[]; fireworks: Firework[]; chat: { text: string; until: number } | null; projectiles: readonly Projectile[];
+  /** Plays a sound effect (swing impacts are timed by the animation). */
+  sfx?: (name: string, gain?: number) => void;
 };
 export type HitSplat = { on: "player" | "monster"; uid?: number; damage: number; at: number };
 type Hit = { x: number; y: number; w: number; h: number; pick: Pick };
@@ -138,7 +141,7 @@ function shade(hex: string, amount: number) {
   return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`;
 }
 /** An isometric box on a tile footprint (w, d in tiles) and height h (world px). */
-function box(ctx: CanvasRenderingContext2D, camera: Camera, x: number, y: number, w: number, d: number, h: number, top: string, left: string, right: string, lift = 0, stroke: string | null = INK, pattern: "brick" | "plank" | null = null) {
+function box(ctx: CanvasRenderingContext2D, camera: Camera, x: number, y: number, w: number, d: number, h: number, top: string, left: string, right: string, lift = 0, stroke: string | null = INK, pattern: "brick" | "plank" | "window" | null = null) {
   const p = (px: number, py: number, z: number) => { const s = toScreen(camera, px, py, z); return [s.x, s.y] as const; };
   const x0 = x - w / 2, x1 = x + w / 2, y0 = y - d / 2, y1 = y + d / 2;
   // The four sides with their outward normals; draw the ones facing the camera, shaded by which way they face on screen.
@@ -150,12 +153,20 @@ function box(ctx: CanvasRenderingContext2D, camera: Camera, x: number, y: number
     if (pattern) {
       // Courses of brick (staggered joints) or planks along the face.
       ctx.strokeStyle = "rgba(22,22,22,0.28)"; ctx.lineWidth = 1; ctx.beginPath();
-      const rows = pattern === "brick" ? Math.max(2, Math.round(h / 7)) : Math.max(2, Math.round(h / 5));
+      const rows = pattern === "plank" ? Math.max(2, Math.round(h / 5)) : Math.max(2, Math.round(h / 7));
       for (let r = 1; r < rows; r++) { const z0 = lift + h * r / rows, a0 = p(ax, ay, z0), b0 = p(bx, by, z0); ctx.moveTo(a0[0], a0[1]); ctx.lineTo(b0[0], b0[1]); }
-      if (pattern === "brick") for (let r = 0; r < rows; r++) for (const t of r % 2 ? [0.25, 0.75] : [0.5]) {
+      if (pattern !== "plank") for (let r = 0; r < rows; r++) for (const t of r % 2 ? [0.25, 0.75] : [0.5]) {
         const mx = ax + (bx - ax) * t, my = ay + (by - ay) * t, a0 = p(mx, my, lift + h * r / rows), b0 = p(mx, my, lift + h * (r + 1) / rows); ctx.moveTo(a0[0], a0[1]); ctx.lineTo(b0[0], b0[1]);
       }
       ctx.stroke();
+      if (pattern === "window" && h > 30) {
+        // A small leaded window in the middle of the face.
+        const q = (t: number, z0: number) => p(ax + (bx - ax) * t, ay + (by - ay) * t, lift + z0);
+        poly(ctx, [q(0.3, 13), q(0.7, 13), q(0.7, 29), q(0.3, 29)], "#3b3a38", INK, 1.2);
+        poly(ctx, [q(0.34, 15), q(0.66, 15), q(0.66, 27), q(0.34, 27)], "#5d6f84", null);
+        const m0 = q(0.5, 15), m1 = q(0.5, 27), h0 = q(0.34, 21), h1 = q(0.66, 21);
+        ctx.strokeStyle = PAPER; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(m0[0], m0[1]); ctx.lineTo(m1[0], m1[1]); ctx.moveTo(h0[0], h0[1]); ctx.lineTo(h1[0], h1[1]); ctx.stroke();
+      }
     }
   }
   poly(ctx, [p(x0, y0, lift + h), p(x1, y0, lift + h), p(x1, y1, lift + h), p(x0, y1, lift + h)], top, stroke);
@@ -426,6 +437,85 @@ function drawIcon(ctx: CanvasRenderingContext2D, icon: Icon, x: number, y: numbe
   drawPixels(ctx, itemArt(icon), x, y + size / 2, size / 26);
 }
 
+// ---------- Buildings ----------
+const WALL_H = 42;
+const roofAlpha = new Map<number, number>();
+type RoofVertex = [number, number, number];
+/** The roof's corners (with an overhang) and its ridge, in world coordinates and height. */
+function roofGeometry(building: Building) {
+  const o = 0.3, X0 = building.x0 - 0.5 - o, X1 = building.x1 + 0.5 + o, Y0 = building.y0 - 0.5 - o, Y1 = building.y1 + 0.5 + o;
+  const alongX = X1 - X0 >= Y1 - Y0, half = (alongX ? Y1 - Y0 : X1 - X0) / 2, rise = Math.max(20, Math.min(48, half * 11));
+  const base = WALL_H, top = base + rise, mid = alongX ? (Y0 + Y1) / 2 : (X0 + X1) / 2;
+  const A: RoofVertex = [X0, Y0, base], B: RoofVertex = [X1, Y0, base], C: RoofVertex = [X1, Y1, base], D: RoofVertex = [X0, Y1, base];
+  const R0: RoofVertex = alongX ? [X0, mid, top] : [mid, Y0, top], R1: RoofVertex = alongX ? [X1, mid, top] : [mid, Y1, top];
+  return { A, B, C, D, R0, R1, alongX, base, top, X0, X1, Y0, Y1 };
+}
+function roofHull(camera: Camera, building: Building) {
+  const g = roofGeometry(building), points = building.roof === "flat" ? [g.A, g.B, g.C, g.D].map(([x, y]) => [x, y, g.base + 12] as RoofVertex).concat([g.A, g.B, g.C, g.D]) : [g.A, g.B, g.C, g.D, g.R0, g.R1];
+  const screen = points.map(([x, y, h]) => { const s = toScreen(camera, x, y, h); return [s.x, s.y] as [number, number]; });
+  // Convex hull (monotone chain).
+  screen.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cross = (o: number[], a: number[], b: number[]) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lower: [number, number][] = [], upper: [number, number][] = [];
+  for (const point of screen) { while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], point) <= 0) lower.pop(); lower.push(point); }
+  for (const point of [...screen].reverse()) { while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], point) <= 0) upper.pop(); upper.push(point); }
+  return lower.slice(0, -1).concat(upper.slice(0, -1));
+}
+function pointInPolygon(x: number, y: number, polygon: readonly [number, number][]) {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const [xi, yi] = polygon[i], [xj, yj] = polygon[j];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+function drawRoof(ctx: CanvasRenderingContext2D, camera: Camera, building: Building, alpha: number, now: number, reduced: boolean) {
+  const g = roofGeometry(building), P = ([x, y, h]: RoofVertex) => { const s = toScreen(camera, x, y, h); return [s.x, s.y] as const; };
+  ctx.globalAlpha = alpha;
+  if (building.roof === "flat") {
+    // A flat roof with battlements.
+    const cx = (g.X0 + g.X1) / 2, cy = (g.Y0 + g.Y1) / 2;
+    box(ctx, camera, cx, cy, g.X1 - g.X0, g.Y1 - g.Y0, 5, shade(building.color, 0.08), shade(building.color, -0.06), shade(building.color, -0.14), g.base);
+    const merlon = (x: number, y: number) => box(ctx, camera, x, y, 0.42, 0.42, 8, shade(building.color, 0.12), shade(building.color, -0.04), shade(building.color, -0.12), g.base + 5);
+    const sides: [number, number][] = [];
+    for (let x = g.X0 + 0.3; x <= g.X1 - 0.2; x += 1.2) sides.push([x, g.Y0 + 0.25], [x, g.Y1 - 0.25]);
+    for (let y = g.Y0 + 1.5; y <= g.Y1 - 1.3; y += 1.2) sides.push([g.X0 + 0.25, y], [g.X1 - 0.25, y]);
+    sides.sort((a, b) => depthOf(camera, a[0], a[1]) - depthOf(camera, b[0], b[1])).forEach(([x, y]) => merlon(x, y));
+    ctx.globalAlpha = 1;
+    return;
+  }
+  const color = building.color, gable = "#cdb9a0";
+  const faces: { points: RoofVertex[]; fill: string; slope?: [RoofVertex, RoofVertex, RoofVertex, RoofVertex] }[] = g.alongX
+    ? [{ points: [g.A, g.B, g.R1, g.R0], fill: shade(color, 0.07), slope: [g.A, g.B, g.R1, g.R0] }, { points: [g.D, g.C, g.R1, g.R0], fill: shade(color, -0.07), slope: [g.D, g.C, g.R1, g.R0] },
+      { points: [g.A, g.D, g.R0], fill: gable }, { points: [g.B, g.C, g.R1], fill: shade(gable, -0.08) }]
+    : [{ points: [g.A, g.D, g.R1, g.R0], fill: shade(color, 0.07), slope: [g.A, g.D, g.R1, g.R0] }, { points: [g.B, g.C, g.R1, g.R0], fill: shade(color, -0.07), slope: [g.B, g.C, g.R1, g.R0] },
+      { points: [g.A, g.B, g.R0], fill: gable }, { points: [g.D, g.C, g.R1], fill: shade(gable, -0.08) }];
+  const centre = (points: RoofVertex[]) => depthOf(camera, points.reduce((sum, v) => sum + v[0], 0) / points.length, points.reduce((sum, v) => sum + v[1], 0) / points.length);
+  faces.sort((a, b) => centre(a.points) - centre(b.points));
+  for (const face of faces) {
+    poly(ctx, face.points.map(P), face.fill, INK, 1.2);
+    if (face.slope) {
+      // Shingle courses parallel to the ridge.
+      const [e0, e1, r1, r0] = face.slope;
+      ctx.strokeStyle = "rgba(22,22,22,0.22)"; ctx.lineWidth = 1; ctx.beginPath();
+      for (let k = 1; k < 5; k++) {
+        const t = k / 5, a: RoofVertex = [e0[0] + (r0[0] - e0[0]) * t, e0[1] + (r0[1] - e0[1]) * t, e0[2] + (r0[2] - e0[2]) * t], b: RoofVertex = [e1[0] + (r1[0] - e1[0]) * t, e1[1] + (r1[1] - e1[1]) * t, e1[2] + (r1[2] - e1[2]) * t];
+        const [ax, ay] = P(a), [bx, by] = P(b); ctx.moveTo(ax, ay); ctx.lineTo(bx, by);
+      }
+      ctx.stroke();
+    }
+  }
+  const [rx0, ry0] = P(g.R0), [rx1, ry1] = P(g.R1);
+  ctx.strokeStyle = INK; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(rx0, ry0); ctx.lineTo(rx1, ry1); ctx.stroke();
+  if (building.chimney) {
+    const cx = g.alongX ? g.X1 - 1.4 : (g.X0 + g.X1) / 2 + 0.6, cy = g.alongX ? (g.Y0 + g.Y1) / 2 + 0.6 : g.Y1 - 1.4;
+    box(ctx, camera, cx, cy, 0.55, 0.55, g.top - g.base + 6, "#8f8a83", "#a39e96", "#7c7771", g.base, INK, "brick");
+    if (!reduced && Math.random() < 0.06) puff(cx, cy, g.top + 8);
+  }
+  ctx.globalAlpha = 1;
+  void now;
+}
+
 // ---------- Characters ----------
 function interpolate(entity: { x: number; y: number; prev: { x: number; y: number }; moved: number }, game: Game, alpha: number) {
   if (entity.moved !== game.tick) return { x: entity.x, y: entity.y, moving: false };
@@ -452,23 +542,6 @@ function overheadText(ctx: CanvasRenderingContext2D, text: string, x: number, y:
   ctx.font = "bold 13px ui-monospace, Menlo, Consolas, monospace"; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
   ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.strokeText(text, x, y); ctx.fillStyle = color; ctx.fillText(text, x, y);
 }
-function drawWardrobe(ctx: CanvasRenderingContext2D, worn: readonly string[], x: number, y: number, px: number, layer: "back" | "front", now: number, facing: Facing) {
-  for (const id of worn) {
-    const piece = WARDROBE.find(entry => entry.id === id);
-    if (!piece) continue;
-    if (layer === "back" && piece.kind === "aura") {
-      const pulse = 1 + Math.sin(now / 500) * 0.06;
-      ellipse(ctx, x, y - 8 * px, 12 * px * pulse, 10 * px * pulse, `${piece.color}55`, null);
-      for (let i = 0; i < 4; i++) { const a = now / 900 + i * Math.PI / 2; ellipse(ctx, x + Math.cos(a) * 10 * px, y - 8 * px + Math.sin(a) * 4 * px, 0.8 * px, 0.8 * px, piece.color, null); }
-    }
-    if (layer === "back" && piece.kind === "cape" && facing !== "down") poly(ctx, [[x - 4 * px, y - 11 * px], [x + 4 * px, y - 11 * px], [x + 6 * px, y - 1 * px], [x - 6 * px, y - 1 * px]], piece.color);
-    if (layer === "front" && piece.kind === "cape" && facing === "down") { poly(ctx, [[x - 6 * px, y - 9 * px], [x - 4 * px, y - 1 * px], [x - 7 * px, y - 1 * px]], piece.color); poly(ctx, [[x + 6 * px, y - 9 * px], [x + 4 * px, y - 1 * px], [x + 7 * px, y - 1 * px]], piece.color); }
-    if (layer === "front" && piece.kind === "hat") poly(ctx, [[x - 5 * px, y - 15 * px], [x + 5 * px, y - 15 * px], [x + 2 * px, y - 19 * px], [x, y - 22 * px], [x - 2 * px, y - 19 * px]], piece.color);
-    if (layer === "front" && piece.kind === "halo") { ctx.strokeStyle = INK; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(x, y - 19 * px, 5 * px, 1.6 * px, 0, 0, Math.PI * 2); ctx.stroke(); ctx.strokeStyle = piece.color; ctx.lineWidth = 1.5; ctx.stroke(); }
-    if (layer === "front" && piece.kind === "scarf") { ctx.fillStyle = piece.color; ctx.strokeStyle = INK; ctx.lineWidth = 1; ctx.fillRect(x - 5 * px, y - 9 * px, 10 * px, 1.6 * px); ctx.strokeRect(x - 5 * px, y - 9 * px, 10 * px, 1.6 * px); ctx.fillRect(x + 2 * px, y - 8 * px, 1.6 * px, 4 * px); }
-  }
-}
-
 // ---------- Scene ----------
 type Drawable = { depth: number; draw: () => void };
 let lastHits: Hit[] = [];
@@ -498,6 +571,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   drawCloudShadows(ctx, project, camera, now, z, underground, scene.reducedMotion);
   const hits: Hit[] = [], drawables: Drawable[] = [];
   const player = game.player, pp = interpolate(player, game, alpha), playerDepth = depthOf(camera, pp.x, pp.y), depth = (x: number, y: number) => depthOf(camera, x, y);
+  const insideBuilding = inBounds(player.x, player.y) ? world.buildingAt[player.y * W + player.x] : 0;
   const playerFacing = screenFacing(camera, player.heading);
   // Hover highlight and click marker.
   const tileOutline = (tx: number, ty: number, color: string) => { const c = (dx: number, dy: number) => { const s = toScreen(camera, tx + dx, ty + dy); return [s.x, s.y] as const; }; poly(ctx, [c(-0.5, -0.5), c(0.5, -0.5), c(0.5, 0.5), c(-0.5, 0.5)], null, color, 1.5); };
@@ -507,11 +581,13 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     if (!inBounds(x, y)) continue;
     const terrain = world.tiles[y * W + x];
     if (terrain === T.WALL || terrain === T.CLIFF) {
-      const d = depth(x, y), near = Math.abs(x - pp.x) + Math.abs(y - pp.y) < 7 && d > playerDepth + 0.5;
+      const d = depth(x, y), owner = world.buildingAt[y * W + x], cut = owner !== 0 && owner === insideBuilding && d > playerDepth - 0.5;
+      const near = !cut && Math.abs(x - pp.x) + Math.abs(y - pp.y) < 7 && d > playerDepth + 0.5;
       drawables.push({ depth: d, draw: () => {
-        const height = terrain === T.WALL ? (y >= 200 ? 34 : 26) : 22;
-        ctx.globalAlpha = near ? 0.28 : 1;
-        if (terrain === T.WALL) box(ctx, camera, x, y, 1, 1, height, y >= 200 ? "#4a4950" : "#b9b4ab", y >= 200 ? "#3a3940" : "#a39e95", y >= 200 ? "#2f2e35" : "#8f8a82", 0, INK, "brick");
+        // Inside a building, the walls between you and the camera drop to a low cutaway.
+        const height = terrain === T.WALL ? (y >= 200 ? 34 : cut ? 9 : WALL_H) : 22;
+        ctx.globalAlpha = near ? 0.3 : 1;
+        if (terrain === T.WALL) box(ctx, camera, x, y, 1, 1, height, y >= 200 ? "#4a4950" : "#b9b4ab", y >= 200 ? "#3a3940" : "#a39e95", y >= 200 ? "#2f2e35" : "#8f8a82", 0, INK, owner && !cut && hash(x, y) < 0.34 ? "window" : "brick");
         else box(ctx, camera, x, y, 1, 1, height + hash(x, y) * 10, "#a39e96", "#8f8a83", "#7c7771");
         ctx.globalAlpha = 1;
       } });
@@ -570,17 +646,29 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     const at = interpolate(monster, game, alpha), size = monster.def.size ?? 1;
     drawables.push({ depth: depth(at.x + (size - 1) / 2, at.y + (size - 1) / 2) + (size - 1) / 2 + 0.1, draw: () => drawMonster(ctx, scene, monster, at, hits) });
   }
-  // Follower (owned Friend) trails a tile behind.
-  if (scene.follower && player.follower !== null) {
-    const fx = pp.x - Math.sign(player.x - player.prev.x || 1) * 0.9, fy = pp.y - Math.sign(player.y - player.prev.y || 1) * 0.9;
-    drawables.push({ depth: depth(fx, fy), draw: () => {
-      const s = toScreen(camera, fx, fy), frame = pp.moving ? Math.floor(now / 90) % 8 : 0;
-      ellipse(ctx, s.x, s.y, 10 * z, 4 * z, "rgba(22,22,22,0.15)", null);
-      drawMask(ctx, friendRows(scene.follower!, playerFacing, pp.moving, frame), s.x, s.y + 2 * z, 2.2 * z);
+  // Your follower: an owned Friend walking the tiles you leave behind, animated like any NPC.
+  if (scene.follower && game.pet) {
+    const pet = game.pet, at = interpolate(pet, game, alpha);
+    drawables.push({ depth: depth(at.x, at.y) + 0.05, draw: () => {
+      const s = toScreen(camera, at.x, at.y), facing = screenFacing(camera, pet.heading);
+      ellipse(ctx, s.x, s.y, 11 * z, 4.5 * z, "rgba(22,22,22,0.16)", null);
+      drawMask(ctx, friendRows(scene.follower!, facing, at.moving, at.moving ? Math.floor(now / 90) % 8 : 0), s.x, s.y + 2 * z, 2.6 * z);
     } });
   }
   // The player.
-  const pose = playerPose(game, now, project, scene.reducedMotion);
+  const pose = playerPose(game, now, project, scene.reducedMotion, scene.sfx);
+  // Roofs: every building's roof, fading out when you walk in or when it would hide you.
+  if (!underground) world.buildings.forEach((building, index) => {
+    if (building.roof === "none" || building.x1 < x0 - 4 || building.x0 > x1 + 4 || building.y1 < y0 - 4 || building.y0 > y1 + 4) return;
+    const front = Math.max(depth(building.x0, building.y0), depth(building.x1, building.y0), depth(building.x0, building.y1), depth(building.x1, building.y1)) + 0.5;
+    drawables.push({ depth: front, draw: () => {
+      const hull = roofHull(camera, building), me = toScreen(camera, pp.x, pp.y, 20);
+      const target = insideBuilding === index + 1 ? 0 : playerDepth < front && pointInPolygon(me.x, me.y, hull) ? 0.22 : 1;
+      const current = roofAlpha.get(index) ?? target, next = scene.reducedMotion ? target : current + (target - current) * Math.min(1, dt * 9);
+      roofAlpha.set(index, next);
+      if (next > 0.02) drawRoof(ctx, camera, building, next, now, scene.reducedMotion);
+    } });
+  });
   drawables.push({ depth: playerDepth + 0.15, draw: () => {
     // Agility: glide from the start to the landing with a hop.
     let at = pp;
@@ -589,10 +677,11 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     const facing: Facing = pose.target ? (pose.side < 0 ? "left" : "right") : playerFacing;
     ellipse(ctx, feet.x, feet.y, 15 * z, 6 * z, "rgba(22,22,22,0.2)", "rgba(255,255,255,0.75)", 1.5);
     const bodyY = s.y - pose.bob * z;
-    drawWardrobe(ctx, player.worn, s.x, bodyY, px, "back", now, facing);
-    if (scene.friend) drawMask(ctx, friendRows(scene.friend, facing, walking, walking ? Math.floor(now / 80) % 8 : 0), s.x, bodyY + 2 * z, px, INK, false, pose.alpha);
+    // Your Friend with its worn pieces composited into the same pixel frame.
+    drawAuras(ctx, player.worn, s.x, bodyY, px, now, scene.reducedMotion, "back");
+    if (scene.friend) drawFigure(ctx, figureArt(friendRows(scene.friend, facing, walking, walking ? Math.floor(now / 80) % 8 : 0), player.worn, facing), s.x, bodyY + 2 * z, px, pose.alpha);
     else ellipse(ctx, s.x, bodyY - 20 * z, 12 * z, 16 * z, INK);
-    drawWardrobe(ctx, player.worn, s.x, bodyY, px, "front", now, facing);
+    drawAuras(ctx, player.worn, s.x, bodyY, px, now, scene.reducedMotion, "front");
     drawHeld(ctx, scene, pose, s.x, bodyY, px, facing, project);
     if (player.hp < maxHpOf(game) || game.monsters.some(monster => monster.target && !monster.dead)) hpBar(ctx, s.x, s.y - 62 * z, player.hp / maxHpOf(game), z);
     for (const hit of scene.hits.filter(entry => entry.on === "player" && now - entry.at < 1100)) splat(ctx, s.x, s.y - 30 * z, hit.damage, z, (now - hit.at) / 1100);

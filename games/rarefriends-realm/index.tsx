@@ -18,10 +18,10 @@ import {
 } from "./panels.tsx";
 import { REGULAR_SPRITES } from "./regulars.ts";
 import { HOST_HELLO, HOST_STATE, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, parseRoster, type ShareAction, type ShareOutcome } from "./roster.ts";
-import { RealmAudio, trackFor, trackById, type TrackId } from "./audio.ts";
+import { RealmAudio, trackFor, trackById, type SfxName, type TrackId } from "./audio.ts";
 import { renderCard, shareText } from "./card.ts";
 import { skillArt } from "./icons.ts";
-import { regionAt } from "./world.ts";
+import { T, isWater, regionAt, terrainAt } from "./world.ts";
 import "@rarefriends/friendsdk/frame.css";
 import "./style.css";
 
@@ -199,6 +199,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
             else if (event.type === "xp") xp.set(event.skill, (xp.get(event.skill) ?? 0) + event.amount);
             else if (event.type === "level") { setLevelUps(list => [...list, { skill: event.skill, level: event.level }]); fireworks.current.push({ at: now, color: "#e2d7ad" }); }
             else if (event.type === "sound") audio.current?.sfx(event.name);
+            else if (event.type === "swing") audio.current?.sfx(event.weapon);
+            else if (event.type === "creature") audio.current?.creature(event.id, event.action, nearness(state, event.x, event.y));
             else if (event.type === "projectile") projectiles.current.push(event.projectile);
             else if (event.type === "death") { setDead(true); setTimeout(() => setDead(false), 2600); }
             else if (event.type === "quest") setQuest(event.quest);
@@ -216,6 +218,12 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
             if (live.current.settings.autoMusic) audio.current?.play(track.id);
             setToast({ title: throne ? "The Throne Room" : here.name, sub: trackById(trackFor(here.id, throne)).name });
           }
+          // Footsteps on whatever is underfoot (two when running).
+          if (state.player.moved === state.tick) {
+            const step = stepSound(state), strides = Math.max(Math.abs(state.player.x - state.player.prev.x), Math.abs(state.player.y - state.player.prev.y));
+            audio.current?.sfx(step, 0.8); if (strides > 1) setTimeout(() => audio.current?.sfx(step, 0.8), TICK_MS / 2);
+          }
+          ambience(state);
           // Held keys walk, turned to match the camera.
           setHeld(state, heldDirection(held.current, camera.current.angle));
           refresh();
@@ -247,7 +255,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         game: state, now, tickAt: tickAt.current, camera: camera.current, friend: friend.current,
         follower: player.follower !== null ? followerSprites.current.get(player.follower) ?? null : null, canonical: CANONICAL,
         hoverTile: current === "playing" ? hoverTile.current : null, marker: marker.current, reducedMotion, hits: hits.current, fireworks: fireworks.current, chat: chat.current,
-        projectiles: projectiles.current,
+        projectiles: projectiles.current, sfx: (name, gain) => audio.current?.sfx(name as SfxName, gain),
       });
       if (mini && current === "playing" && now - lastHud > 90) {
         lastHud = now; const size = mini.canvas.width;
@@ -263,6 +271,43 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   useEffect(() => { if (!toast) return; const timer = setTimeout(() => setToast(null), 3400); return () => clearTimeout(timer); }, [toast]);
   // Level-up messages step aside on their own after a few seconds, so long skilling sessions don't pile them up.
   useEffect(() => { if (!levelUps.length) return; const timer = setTimeout(() => setLevelUps(list => list.slice(1)), 6000); return () => clearTimeout(timer); }, [levelUps]);
+
+  // ---------- Sound: distance, footsteps, the world's ambience ----------
+  const ambientClock = useRef({ fire: 0, forge: 0, water: 0, wild: 4, creature: 5 });
+  /** Called once per tick: crackling fires, the forge, water, regional wildlife and idle monster calls, all by distance. */
+  const ambience = (state: Game) => {
+    const player = audio.current, clock = ambientClock.current, me = state.player;
+    if (!player) return;
+    for (const key of Object.keys(clock) as (keyof typeof clock)[]) clock[key] -= TICK_MS / 1000;
+    const nearest = (points: Iterable<{ x: number; y: number }>) => { let best = Infinity; for (const p of points) best = Math.min(best, Math.hypot(p.x - me.x, p.y - me.y)); return best; };
+    if (clock.fire <= 0) {
+      const fires = [...state.fires, ...state.world.objects.filter(o => o.decor === "torch" && Math.abs(o.x - me.x) < 8 && Math.abs(o.y - me.y) < 8)], d = nearest(fires);
+      if (d < 8) player.sfx("crackle", Math.max(0, 1 - d / 8) * (state.fires.length ? 1 : 0.5));
+      clock.fire = 0.3 + Math.random() * 0.4;
+    }
+    if (clock.forge <= 0) {
+      const d = nearest(state.world.objects.filter(o => (o.kind === "furnace" || o.kind === "range") && Math.abs(o.x - me.x) < 8 && Math.abs(o.y - me.y) < 8));
+      if (d < 7) player.sfx("forge", Math.max(0, 1 - d / 7));
+      clock.forge = 1.2 + Math.random();
+    }
+    if (clock.water <= 0) {
+      let d = Infinity;
+      for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) if (isWater(terrainAt(state.world, me.x + dx, me.y + dy))) d = Math.min(d, Math.hypot(dx, dy));
+      if (d < 5) player.sfx("water", Math.max(0, 1 - d / 5) * 0.9);
+      clock.water = 2.4 + Math.random() * 1.5;
+    }
+    if (clock.wild <= 0) {
+      const region = regionAt(state.world, me.x, me.y).id;
+      const call: SfxName | null = me.y >= 200 ? "drip" : region === "murkmire" ? "frog" : region === "frostpeak" || region === "pale_dunes" ? "wind" : region === "glass_lake" || region === "coast" ? (Math.random() < 0.5 ? "gull" : "bird") : region === "oasis" || region === "ashen_hills" || region === "emberforge" ? null : "bird";
+      if (call) player.sfx(call, 0.5 + Math.random() * 0.4);
+      clock.wild = 3 + Math.random() * 6;
+    }
+    if (clock.creature <= 0) {
+      const near = state.monsters.filter(m => !m.dead && Math.hypot(m.x - me.x, m.y - me.y) < 10);
+      if (near.length) { const m = near[Math.floor(Math.random() * near.length)]; player.creature(m.def.id, "idle", nearness(state, m.x, m.y) * 0.7); }
+      clock.creature = 4 + Math.random() * 5;
+    }
+  };
 
   // ---------- Input ----------
   const logicalPoint = (clientX: number, clientY: number) => {
@@ -427,6 +472,14 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
 
   // ---------- Render ----------
   const state = game.current, player = state?.player;
+  // Speech blips as each dialogue line appears, pitched to the speaker.
+  const line = state?.dialogue ? state.dialogue.lines[Math.min(state.dialogue.index, state.dialogue.lines.length - 1)] : null;
+  const lineKey = state?.dialogue && line && state.dialogue.index < state.dialogue.lines.length ? `${state.dialogue.npc}|${state.dialogue.index}|${line.text.length}` : "";
+  useEffect(() => {
+    if (!lineKey || !line || !state) return;
+    const who = line.who === "player" ? `${state.player.friendId}` : state.dialogue!.npc;
+    audio.current?.speak([...who].reduce((sum, char) => sum + char.charCodeAt(0), 0), Math.ceil(line.text.split(" ").length / 3));
+  }, [lineKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const definition = client.definition, pending = snapshot?.plays.filter(play => play.outcomeId === null).length ?? 0;
   const savedText = hosted === "linked" ? "Your adventure saves automatically for this wallet on this device." : hosted === "waiting" ? "Connecting saves…" : "Saves are off: this host doesn't provide them (use the Realm's own page).";
   return (
@@ -469,7 +522,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           <button type="button" className="realm-side-toggle" aria-expanded={sideOpen} onClick={() => setSideOpen(open => !open)}>{sideOpen ? "▾" : "▴"} Panels</button>
           {sideOpen && <SidePanel game={state} tab={tab} setTab={setTab} selection={selection} setSelection={setSelection} openMenu={(x, y, entries) => setMenu({ x, y, entries })}
             refresh={refresh} roster={roster} rosterState={rosterState} friendSprites={followerSprites.current} loadFriend={loadFriendSprite} settings={settings} setSettings={setSettings}
-            trackName={audio.current?.trackName ?? ""} trackId={audio.current?.trackId ?? ""} playTrack={id => { audio.current?.play(id as TrackId); audio.current?.unlock(); setSettings({ ...settings, autoMusic: false }); }} openCard={openCard} openHelp={() => setModal("help")} paused={paused} saved={savedText}
+            friend={friend.current} trackName={audio.current?.trackName ?? ""} trackId={audio.current?.trackId ?? ""} playTrack={id => { audio.current?.play(id as TrackId); audio.current?.unlock(); setSettings({ ...settings, autoMusic: false }); }} openCard={openCard} openHelp={() => setModal("help")} paused={paused} saved={savedText}
             relicCounts={snapshot?.inventory.map(Number) ?? [0, 0, 0, 0]} openCaskets={() => setModal("caskets")} />}
           {selection && <div className="realm-selection" role="status">{selection.kind === "item" ? `Use ${player.inventory[selection.slot] ? itemName(player.inventory[selection.slot]!.id) : "item"} ->` : `Cast ${SPELLS.find(spell => spell.id === selection.spell)?.name ?? "spell"} ->`} pick a target <button type="button" onClick={() => setSelection(null)}>Cancel</button></div>}
 
@@ -530,7 +583,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           <div className="realm-title">
             <div className="realm-logo"><small>An old-school adventure for your Rare Friend</small><h1>RareFriends<span>Realm</span></h1></div>
             <div className="realm-title-card">
-              <FriendPortrait sprites={friend.current} size={96} />
+              <FriendPortrait sprites={friend.current} size={96} worn={player.worn} />
               <div>
                 <h2>Friend #{player.friendId}</h2>
                 <p><b>{FAMILY_NAMES[player.familyId]}</b>: {FAMILY_PERKS[player.familyId].title}. {FAMILY_PERKS[player.familyId].text}</p>
@@ -561,6 +614,17 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   );
 }
 const itemName = (id: string) => item(id).name;
+/** How loud something at (x, y) is for you (1 beside you, 0 twelve tiles away). */
+function nearness(state: Game, x: number, y: number) { return Math.max(0, 1 - Math.hypot(x - state.player.x, y - state.player.y) / 12); }
+function stepSound(state: Game): SfxName {
+  const terrain = terrainAt(state.world, state.player.x, state.player.y);
+  if (terrain === T.WOOD || terrain === T.BRIDGE || terrain === T.CARPET) return "step_wood";
+  if (terrain === T.COBBLE || terrain === T.STONE || terrain === T.DUNGEON || terrain === T.GRAVEL) return "step_stone";
+  if (terrain === T.SAND) return "step_sand";
+  if (terrain === T.SNOW || terrain === T.ICE) return "step_snow";
+  if (terrain === T.SWAMP) return "step_swamp";
+  return "step_grass";
+}
 const clampPitch = (pitch: number) => Math.max(PITCH.min, Math.min(PITCH.max, pitch));
 /** Held WASD as a world direction: screen up/down/left/right, turned back through the camera's angle. */
 function heldDirection(keys: ReadonlySet<string>, angle: number) {

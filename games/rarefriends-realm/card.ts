@@ -4,6 +4,7 @@ import { FAMILY_NAMES, SKILLS, SKILL_NAMES, WARDROBE, levelForXp, type Skill } f
 import { MAX_QUEST_POINTS, questPoints } from "./content.ts";
 import { combatLevel, totalLevel, type Game } from "./state.ts";
 import { friendRows } from "./render.ts";
+import { figureArt } from "./wardrobe.ts";
 
 export const CARD = { width: 1200, height: 675 } as const;
 const INK = "#161616", PAPER = "#efede7", ROSE = "#d8b6b4", BUTTER = "#e2d7ad", MUTED = "#6d6b67";
@@ -28,11 +29,10 @@ export function renderCard(game: Game, friend: GenerationSprites | null, region:
   const aura = player.worn.map(id => WARDROBE.find(entry => entry.id === id)).find(entry => entry?.kind === "aura");
   if (aura) { ctx.fillStyle = `${aura.color}aa`; ctx.beginPath(); ctx.ellipse(258, 250, 150, 130, 0, 0, Math.PI * 2); ctx.fill(); }
   if (friend) {
-    const rows = friendRows(friend, "down", false, 0), px = 17, w = rows[0].length * px, h = rows.length * px, x0 = 258 - w / 2, y0 = 237 - h / 2;
-    ctx.fillStyle = "#fff";
-    rows.forEach((row, y) => [...row].forEach((pixel, x) => { if (pixel === "#") ctx.fillRect(x0 + (x - 1) * px, y0 + (y - 1) * px, px * 3, px * 3); }));
-    ctx.fillStyle = INK;
-    rows.forEach((row, y) => [...row].forEach((pixel, x) => { if (pixel === "#") ctx.fillRect(x0 + x * px, y0 + y * px, px, px); }));
+    // Your Friend as it looks in the Realm, wardrobe and all.
+    const art = figureArt(friendRows(friend, "down", false, 0), player.worn, "down"), px = Math.floor(Math.min(340 / art.width, 300 / art.height));
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(art, Math.round(258 - art.width * px / 2), Math.round(237 - art.height * px / 2 + px * 2), art.width * px, art.height * px);
   }
   ctx.fillStyle = INK; ctx.font = `bold 34px ${FONT}`; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
   ctx.fillText(`FRIEND #${player.friendId}`, 72, 450);

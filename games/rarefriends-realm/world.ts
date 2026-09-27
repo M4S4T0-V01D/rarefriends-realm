@@ -50,8 +50,13 @@ export const REGIONS: readonly Region[] = [
 ];
 export const regionIndex = (id: RegionId) => REGIONS.findIndex(region => region.id === id);
 
+/** A building's footprint (walls included) and how its roof looks. Inner rooms (inside another building) have no roof. */
+export type Building = { x0: number; y0: number; x1: number; y1: number; roof: "gable" | "flat" | "none"; color: string; chimney: boolean; name: string };
 export type World = {
   tiles: Uint8Array; region: Uint8Array; objects: WorldObject[]; objectAt: Int32Array; spawns: SpawnDef[];
+  buildings: Building[];
+  /** 1 + the index of the (outermost) building covering each tile, or 0. */
+  buildingAt: Uint8Array;
   /** Ground height (world pixels) at every tile corner: (W + 1) × (H + 1), corner (i, j) sits at (i − ½, j − ½). */
   heights: Float32Array;
   places: Record<"spawn" | "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier" | "crypt" | "depths" | "king", { x: number; y: number }>;
@@ -134,7 +139,10 @@ export function createWorld(seed = 20260927): World {
   };
   const free = (x: number, y: number) => WALKABLE.has(get(x, y)) && objectAt[tileIndex(x, y)] < 0 && get(x, y) !== T.BRIDGE && get(x, y) !== T.PATH && get(x, y) !== T.COBBLE;
   /** Four-walled building with a doorway, floored inside. `door` is the side the doorway faces. */
-  const building = (x0: number, y0: number, x1: number, y1: number, door: "n" | "s" | "e" | "w", floor: number = T.WOOD, doorAt?: number) => {
+  const buildings: Building[] = [];
+  const building = (x0: number, y0: number, x1: number, y1: number, door: "n" | "s" | "e" | "w", floor: number = T.WOOD, doorAt?: number, roof: Partial<Building> = {}) => {
+    const inner = buildings.some(b => x0 > b.x0 && y0 > b.y0 && x1 < b.x1 && y1 < b.y1);
+    buildings.push({ x0, y0, x1, y1, roof: inner ? "none" : "gable", color: ROOF_COLORS[buildings.length % ROOF_COLORS.length], chimney: false, name: "", ...roof, ...(inner ? { roof: "none" as const } : {}) });
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
       const edge = x === x0 || x === x1 || y === y0 || y === y1;
       put(x, y, edge ? T.WALL : floor); clearAt(x, y);
@@ -237,12 +245,12 @@ export function createWorld(seed = 20260927): World {
   blob(186, 110, 6, 4, T.COBBLE, 0.2);
 
   // ---------- Friendhollow ----------
-  building(108, 108, 115, 114, "s");                                       // Bank
+  building(108, 108, 115, 114, "s", T.WOOD, undefined, { name: "Bank", color: "#9fabc2" });                              // Bank
   building(125, 108, 131, 113, "s");                                       // General store
-  building(106, 124, 114, 132, "e");                                       // Chapel of the Old Friend
+  building(106, 124, 114, 132, "e", T.WOOD, undefined, { name: "Chapel", color: "#c6bed4" });                            // Chapel of the Old Friend
   building(127, 126, 133, 131, "w");                                       // Tessa's tannery
   building(133, 116, 138, 121, "w");                                       // Runa's Sigils
-  building(113, 92, 129, 103, "s", T.STONE);                               // Hollow Hall (castle)
+  building(113, 92, 129, 103, "s", T.STONE, undefined, { name: "Hollow Hall", roof: "flat", color: "#a39e96" });         // Hollow Hall (castle)
   fillRect(119, 104, 122, 107, T.PATH);
   for (let y = 93; y < 103; y++) { put(121, y, T.CARPET); put(122, y, T.CARPET); }
   building(114, 94, 118, 99, "e", T.STONE);                                // Castle kitchen (inside the hall)
@@ -323,7 +331,7 @@ export function createWorld(seed = 20260927): World {
   npc("miner", 116, 54, 3);
 
   // ---------- Emberforge ----------
-  building(155, 42, 161, 47, "s", T.STONE);                               // Forge hall
+  building(155, 42, 161, 47, "s", T.STONE, undefined, { name: "Forge hall", color: "#8f8a83", chimney: true });           // Forge hall
   add({ kind: "furnace", x: 157, y: 43, blocks: true, name: "Furnace" }); add({ kind: "furnace", x: 158, y: 43, blocks: true, name: "Furnace" });
   add({ kind: "anvil", x: 159, y: 45, blocks: true, name: "Anvil" }); add({ kind: "anvil", x: 156, y: 45, blocks: true, name: "Anvil" });
   npc("smith", 160, 44, 1);
@@ -339,7 +347,7 @@ export function createWorld(seed = 20260927): World {
   scatter(170, 38, 186, 60, 8, (x, y) => rock(x, y, i2(random) ? "inkcoal" : "blackiron"), (x, y) => free(x, y) && (get(x, y) === T.GRASS || get(x, y) === T.DARK_GRASS));
 
   // ---------- Frostpeak ----------
-  building(192, 27, 199, 32, "w", T.WOOD);                                 // Frostpeak lodge
+  building(192, 27, 199, 32, "w", T.WOOD, undefined, { name: "Frostpeak lodge", color: "#f3f2ee", chimney: true });      // Frostpeak lodge
   add({ kind: "bank", x: 197, y: 28, blocks: true, name: "Bank booth" }); npc("banker", 196, 29); npc("outfitter", 194, 30);
   add({ kind: "range", x: 193, y: 28, blocks: true, name: "Cooking range" });
   scatter(172, 6, 236, 44, 60, (x, y) => decor(x, y, random() > 0.3 ? "pine" : "boulder"), (x, y) => free(x, y) && get(x, y) === T.SNOW);
@@ -366,7 +374,7 @@ export function createWorld(seed = 20260927): World {
   spot(177, 158, "cage"); spot(180, 158, "cage"); spot(175, 164, "harpoon"); spot(182, 164, "harpoon"); spot(178, 166, "deep");
   decor(174, 157, "boat", false, "Rowing boat"); decor(181, 152, "barrel"); decor(177, 152, "crate");
   npc("fisher", 179, 153, 2);
-  building(166, 140, 172, 145, "s");                                       // Lakeside cabin with a range
+  building(166, 140, 172, 145, "s", T.WOOD, undefined, { name: "Lakeside cabin", chimney: true });                         // Lakeside cabin with a range
   add({ kind: "range", x: 167, y: 141, blocks: true, name: "Cooking range" }); add({ kind: "bank", x: 171, y: 141, blocks: true, name: "Bank deposit box" });
   scatter(150, 138, 206, 192, 30, (x, y) => decor(x, y, random() > 0.5 ? "reeds" : "flowers", false), (x, y) => free(x, y) && (get(x, y) === T.GRASS || get(x, y) === T.SAND));
   scatter(152, 136, 204, 192, 16, (x, y) => tree(x, y, "willow"), (x, y) => free(x, y) && get(x, y) === T.GRASS && [[1, 0], [-1, 0], [0, 1], [0, -1], [2, 0], [0, 2]].some(([dx, dy]) => isWater(get(x + dx, y + dy))));
@@ -379,7 +387,7 @@ export function createWorld(seed = 20260927): World {
   scatter(132, 80, 156, 106, 14, (x, y) => tree(x, y, "willow"), (x, y) => free(x, y) && [[1, 0], [-1, 0], [2, 0], [-2, 0]].some(([dx]) => isWater(get(x + dx, y))));
 
   // ---------- Pale Dunes and the Oasis ----------
-  building(180, 104, 186, 108, "s", T.WOOD);                               // Oasis bank
+  building(180, 104, 186, 108, "s", T.WOOD, undefined, { name: "Oasis bank", roof: "flat", color: "#e2d7c0" });          // Oasis bank
   add({ kind: "bank", x: 182, y: 105, blocks: true, name: "Bank booth" }); add({ kind: "bank", x: 184, y: 105, blocks: true, name: "Bank booth" }); npc("banker", 183, 106);
   add({ kind: "stall", stall: "bakery", x: 183, y: 112, blocks: true, name: "Bakery stall" });
   add({ kind: "stall", stall: "silk", x: 186, y: 112, blocks: true, name: "Silk stall" });
@@ -396,7 +404,7 @@ export function createWorld(seed = 20260927): World {
   scatter(10, 142, 82, 194, 40, (x, y) => decor(x, y, random() > 0.5 ? "dead_tree" : "reeds", random() > 0.5), (x, y) => free(x, y) && get(x, y) === T.SWAMP);
   scatter(12, 140, 80, 194, 14, (x, y) => tree(x, y, "willow"), (x, y) => free(x, y) && get(x, y) === T.SWAMP);
   monsters("swamp_lurker", 16, 158, 76, 190, 14);
-  building(36, 172, 44, 179, "n", T.STONE);                                // The crypt
+  building(36, 172, 44, 179, "n", T.STONE, undefined, { name: "Crypt", color: "#6d6b67" });                              // The crypt
   add({ kind: "ladder", x: 40, y: 176, blocks: true, name: "Crypt stairs", action: "Climb-down", to: { x: 34, y: 208 } });
   for (let i = 0; i < 8; i++) decor(30 + (i % 4) * 3, 182 + Math.floor(i / 4) * 3, "grave", true, "Grave");
   // Stepping stones over the bog river: an Agility shortcut.
@@ -493,9 +501,13 @@ export function createWorld(seed = 20260927): World {
     spawn: { x: 121, y: 123 }, hollow_square: { x: 121, y: 122 }, emberforge: { x: 162, y: 49 }, oasis: { x: 186, y: 115 },
     frostpeak: { x: 195, y: 34 }, pier: { x: 178, y: 150 }, crypt: { x: 40, y: 180 }, depths: { x: 122, y: 188 }, king: { x: 198, y: 224 },
   };
-  return { tiles, region, objects, objectAt, spawns, places, heights: buildHeights(tiles, seed) };
+  const buildingAt = new Uint8Array(W * H);
+  buildings.forEach((b, index) => { if (b.roof === "none") return; for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) buildingAt[y * W + x] = index + 1; });
+  return { tiles, region, objects, objectAt, spawns, places, heights: buildHeights(tiles, seed), buildings, buildingAt };
 }
 const i2 = (random: () => number) => random() > 0.5;
+/** Faded roof tiles in the Rare Friends accents. */
+const ROOF_COLORS = ["#c99a96", "#9aab92", "#8f9cb2", "#cdb98a", "#a996b5"];
 const TREE_NAMES: Record<TreeKind, string> = { tree: "Tree", oak: "Oak", willow: "Willow", maple: "Maple tree", yew: "Yew", ashwood: "Ashwood" };
 const DECOR_NAMES: Record<DecorKind, string> = {
   flowers: "Flowers", bush: "Bush", boulder: "Boulder", lamp: "Lamp post", bench: "Bench", crate: "Crate", barrel: "Barrel", tent: "Tent",

@@ -438,11 +438,15 @@ export const RELICS = [
 export const WARDROBE = [
   { id: "rose_cape", name: "Rose cape", tier: 0, kind: "cape", color: "#d8b6b4" },
   { id: "sage_scarf", name: "Sage scarf", tier: 0, kind: "scarf", color: "#b4c3ab" },
-  { id: "paper_crown", name: "Paper crown", tier: 0, kind: "hat", color: "#efede7" },
-  { id: "silver_halo", name: "Silver halo", tier: 1, kind: "halo", color: "#c3c6cb" },
+  { id: "paper_crown", name: "Paper crown", tier: 0, kind: "hat", color: "#e6d7b0" },
+  { id: "butter_bow", name: "Butter bow", tier: 0, kind: "bow", color: "#e2d49e" },
+  { id: "silver_halo", name: "Silver halo", tier: 1, kind: "halo", color: "#d6d9dd" },
   { id: "blue_cape", name: "Moonblue cape", tier: 1, kind: "cape", color: "#9fabc2" },
+  { id: "lantern_familiar", name: "Lantern familiar", tier: 1, kind: "lantern", color: "#f2e28f" },
   { id: "moon_wisps", name: "Moon wisps", tier: 2, kind: "aura", color: "#afbccb" },
   { id: "starlit_hood", name: "Starlit hood", tier: 2, kind: "hat", color: "#6f7ea6" },
+  { id: "ink_wings", name: "Ink wings", tier: 2, kind: "wings", color: "#5a5963" },
   { id: "golden_aura", name: "Golden aura", tier: 3, kind: "aura", color: "#e2d49e" },
+  { id: "rarite_crown", name: "Rarite crown", tier: 3, kind: "hat", color: "#d8b6b4" },
 ] as const;
 export type WardrobeId = typeof WARDROBE[number]["id"];

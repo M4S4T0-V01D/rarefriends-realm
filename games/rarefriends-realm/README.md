@@ -116,10 +116,10 @@ Each region has its own music, unlocked the first time you arrive. The music pla
 
 | Relic | Chance | RF value | Kept bonus | Wardrobe pieces |
 | --- | --- | --- | --- | --- |
-| Plain Relic | 60% (6,000 bps) | 0.5 RF | +2% XP in every skill per relic (max 5) | Rose cape, Sage scarf, Paper crown |
-| Silver Relic | 28% (2,800 bps) | 1 RF | +10% coins from drops and pickpockets per relic (max 3) | Silver halo, Moonblue cape |
-| Moonlit Relic | 10% (1,000 bps) | 2 RF | Gather 10% faster per relic (max 3) | Moon wisps, Starlit hood |
-| Golden Relic | 2% (200 bps) | 5 RF | +10% XP and a golden aura while kept | Golden aura |
+| Plain Relic | 60% (6,000 bps) | 0.5 RF | +2% XP in every skill per relic (max 5) | Rose cape, Sage scarf, Paper crown, Butter bow |
+| Silver Relic | 28% (2,800 bps) | 1 RF | +10% coins from drops and pickpockets per relic (max 3) | Silver halo, Moonblue cape, Lantern familiar |
+| Moonlit Relic | 10% (1,000 bps) | 2 RF | Gather 10% faster per relic (max 3) | Moon wisps, Starlit hood, Ink wings |
+| Golden Relic | 2% (200 bps) | 5 RF | +10% XP and a golden aura while kept | Golden aura, Rarite crown |
 
 - **Price** 1 RF (`1000000000000000000` base units); buy ×1 or ×5. **Expected value** 0.88 RF per casket; top prize 5 RF.
 - **Consumable:** one casket opens into exactly one relic; single settlement, no reroll.
@@ -128,6 +128,20 @@ Each region has its own music, unlocked the first time you arrive. The music pla
 
 Caskets use the SDK chance-game client (`buy` / `play` / `settle` / `redeem`) with the runtime's confirmations.
 Coins are an earn-only, in-game currency and never convert to RF.
+
+## Your Friend, dressed and followed
+
+Wardrobe pieces are painted into your Friend's own sprite frame, pixel for pixel: hats and hoods sit on the real top of
+the head, capes hang from the shoulders (and cover your back when you walk away), scarves and bows wrap the neck, wings
+spread from the back, halos float above, and the figure shares one ink edge and white halo. Auras glow and the lantern
+familiar bobs beside you. A follower (one of your other owned Friends) walks the tiles you leave behind, one step back.
+
+## Sound
+
+Every weapon swings with its own sound (slash, stab, crush, punch); every creature has a voice for attacking, being hurt,
+dying, spotting you and idling nearby (clucks, moos, squeaks, grumbles, rattles, gurgles, growls, whispers, clanks, roars,
+and the Hollow King). Axes and pickaxes hit on the beat of the swing, NPCs talk in soft blips, footsteps change with the
+ground, fires crackle, forges roar, water laps, and each region has its own wildlife: birdsong, gulls, frogs, wind, drips.
 
 ## Saves
 

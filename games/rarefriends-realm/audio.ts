@@ -7,6 +7,18 @@ import type { SoundName } from "./state.ts";
 import type { RegionId } from "./world.ts";
 
 export type TrackId = RegionId | "theme" | "boss";
+export type SfxName = SoundName | "slash" | "stab" | "crush" | "punch" | "step_grass" | "step_stone" | "step_wood" | "step_sand" | "step_snow" | "step_swamp"
+  | "crackle" | "forge" | "water" | "bird" | "gull" | "frog" | "wind" | "drip";
+type VoiceKind = "cluck" | "moo" | "squeak" | "grumble" | "growl" | "rattle" | "gurgle" | "whisper" | "clank" | "rumble" | "roar" | "king";
+const VOICES: Record<string, { kind: VoiceKind; f0: number; length: number; bright: number; wobble?: number }> = {
+  chicken: { kind: "cluck", f0: 620, length: 0.08, bright: 3000 }, cow: { kind: "moo", f0: 150, length: 0.9, bright: 900, wobble: 5 },
+  ink_rat: { kind: "squeak", f0: 1800, length: 0.1, bright: 6000 }, grumblin: { kind: "grumble", f0: 170, length: 0.35, bright: 1200, wobble: 11 },
+  grumblin_chief: { kind: "grumble", f0: 120, length: 0.5, bright: 1000, wobble: 8 }, bandit: { kind: "grumble", f0: 140, length: 0.3, bright: 1400, wobble: 4 },
+  swamp_lurker: { kind: "gurgle", f0: 220, length: 0.4, bright: 800 }, skeleton: { kind: "rattle", f0: 900, length: 0.25, bright: 5000 },
+  wolf: { kind: "growl", f0: 180, length: 0.5, bright: 1600, wobble: 18 }, moss_colossus: { kind: "rumble", f0: 70, length: 0.8, bright: 500, wobble: 3 },
+  frost_yeti: { kind: "roar", f0: 110, length: 0.8, bright: 1200, wobble: 6 }, shade: { kind: "whisper", f0: 400, length: 0.6, bright: 3000 },
+  hollow_sentinel: { kind: "clank", f0: 90, length: 0.4, bright: 800 }, hollow_king: { kind: "king", f0: 60, length: 1.1, bright: 700, wobble: 2 },
+};
 type Voice = "lute" | "flute" | "bell" | "harp" | "organ" | "pad" | "bass" | "brass" | "pluck" | "choir";
 type Drum = "kick" | "snare" | "hat" | "shaker" | "tom" | "clank" | "hand" | "rim";
 type Note = { beat: number; voice: Voice; midi: number; length: number; velocity: number };
@@ -336,12 +348,13 @@ export class RealmAudio {
   }
 
   // ---------- Sound effects ----------
-  sfx(name: SoundName) {
-    if (!this.ctx || this.ctx.state !== "running" || !this.sfxOn || this.muted) return;
+  /** A sound effect; `gain` scales it (for distance). */
+  sfx(name: SfxName, gain = 1) {
+    if (!this.ctx || this.ctx.state !== "running" || !this.sfxOn || this.muted || gain <= 0.01) return;
     const now = this.ctx.currentTime, last = this.lastSfx.get(name) ?? 0;
     if (now - last < 0.05) return;
     this.lastSfx.set(name, now);
-    const t = now + 0.005, bus = this.sfxBus;
+    const t = now + 0.005, bus = this.scaled(gain);
     const tone = (type: OscillatorType, midi: number, at: number, length: number, level: number) => { const gain = this.ctx!.createGain(); gain.connect(bus); this.osc(type, hz(midi), at, at + length + 0.05, gain); this.env(gain, at, level, 0.004, 0, length); };
     switch (name) {
       case "chop": this.thump(t, 260, 120, 0.09, 0.4, bus); this.noiseBurst(t, 0.07, 900, 0.18, bus, "bandpass", 2); break;
@@ -371,8 +384,83 @@ export class RealmAudio {
       case "kill": tone("triangle", 60, t, 0.12, 0.12); tone("triangle", 55, t + 0.1, 0.25, 0.12); break;
       case "pray": for (const midi of [72, 76, 79]) tone("sine", midi, t, 0.6, 0.05); break;
       case "death": for (let i = 0; i < 5; i++) tone("triangle", 67 - i * 3, t + i * 0.18, 0.3, 0.12); break;
+      case "fell": this.thump(t, 140, 50, 0.5, 0.45, bus); this.noiseBurst(t + 0.05, 0.6, 600, 0.18, bus, "lowpass"); for (let i = 0; i < 4; i++) this.noiseBurst(t + 0.2 + i * 0.07, 0.06, 2200, 0.08, bus, "bandpass", 2); break;
+      case "slash": this.sweep(t, 3200, 900, 0.16, 0.2, bus); break;
+      case "stab": this.sweep(t, 2400, 1600, 0.08, 0.2, bus); this.thump(t + 0.06, 300, 180, 0.05, 0.12, bus); break;
+      case "crush": this.sweep(t, 900, 300, 0.18, 0.22, bus); break;
+      case "punch": this.thump(t, 200, 90, 0.08, 0.35, bus); this.noiseBurst(t, 0.04, 900, 0.12, bus, "lowpass"); break;
+      case "step_grass": this.noiseBurst(t, 0.07, 1800, 0.045, bus, "bandpass", 0.8); break;
+      case "step_stone": this.thump(t, 380 + Math.random() * 60, 220, 0.04, 0.09, bus); this.noiseBurst(t, 0.02, 3000, 0.03, bus); break;
+      case "step_wood": this.thump(t, 190 + Math.random() * 30, 120, 0.07, 0.14, bus); break;
+      case "step_sand": this.noiseBurst(t, 0.09, 3800, 0.04, bus, "highpass"); break;
+      case "step_snow": this.noiseBurst(t, 0.1, 2400, 0.06, bus, "bandpass", 1.6); this.noiseBurst(t + 0.03, 0.05, 4200, 0.03, bus); break;
+      case "step_swamp": this.noiseBurst(t, 0.12, 500, 0.08, bus, "lowpass"); this.thump(t, 140, 90, 0.08, 0.05, bus); break;
+      case "crackle": for (let i = 0; i < 3; i++) this.noiseBurst(t + Math.random() * 0.25, 0.015 + Math.random() * 0.02, 1800 + Math.random() * 3000, 0.1, bus, "bandpass", 3); this.noiseBurst(t, 0.3, 400, 0.03, bus, "lowpass"); break;
+      case "forge": this.noiseBurst(t, 0.9, 260, 0.08, bus, "lowpass"); break;
+      case "water": this.noiseBurst(t, 1.1, 700, 0.05, bus, "lowpass"); this.noiseBurst(t + 0.4, 0.8, 1200, 0.025, bus, "bandpass", 0.8); break;
+      case "bird": { const base = 84 + Math.floor(Math.random() * 6); for (let i = 0; i < 3 + Math.floor(Math.random() * 3); i++) this.chirp(t + i * 0.09, hz(base + (i % 2 ? 3 : 0)), hz(base + 7), 0.06, 0.05, bus); break; }
+      case "gull": this.chirp(t, hz(86), hz(78), 0.3, 0.06, bus); this.chirp(t + 0.35, hz(86), hz(80), 0.22, 0.05, bus); break;
+      case "frog": for (let i = 0; i < 2; i++) { const gain = this.ctx!.createGain(); gain.connect(bus); const o = this.osc("square", 110, t + i * 0.18, t + i * 0.18 + 0.12, gain); o.frequency.setValueAtTime(140, t + i * 0.18); o.frequency.exponentialRampToValueAtTime(90, t + i * 0.18 + 0.1); this.env(gain, t + i * 0.18, 0.05, 0.005, 0.03, 0.08); } break;
+      case "wind": this.noiseBurst(t, 2.2, 700, 0.07, bus, "bandpass", 0.5); break;
+      case "drip": this.chirp(t, hz(96), hz(90), 0.06, 0.08, bus); this.chirp(t + 0.12, hz(88), hz(84), 0.05, 0.03, bus); break;
       case "level": this.fanfare(t, [72, 76, 79, 84], [0, 0.12, 0.24, 0.42], 0.5); break;
       case "quest": this.fanfare(t, [67, 72, 76, 79, 76, 79, 84], [0, 0.15, 0.3, 0.45, 0.75, 0.9, 1.1], 0.9); break;
+    }
+  }
+  private scaled(gain: number): AudioNode {
+    if (gain >= 0.999) return this.sfxBus;
+    const node = this.ctx!.createGain(); node.gain.value = gain; node.connect(this.sfxBus);
+    setTimeout(() => node.disconnect(), 4000);
+    return node;
+  }
+  /** A filtered noise sweep: whooshes and swings. */
+  private sweep(t: number, from: number, to: number, length: number, level: number, bus: AudioNode) {
+    const ctx = this.ctx!, source = ctx.createBufferSource(), filter = ctx.createBiquadFilter(), gain = ctx.createGain();
+    source.buffer = this.noise; filter.type = "bandpass"; filter.Q.value = 1.5; filter.frequency.setValueAtTime(from, t); filter.frequency.exponentialRampToValueAtTime(to, t + length);
+    source.connect(filter).connect(gain).connect(bus); this.env(gain, t, level, 0.01, length * 0.3, length * 0.7); source.start(t, Math.random() * 0.5); source.stop(t + length + 0.05);
+  }
+  private chirp(t: number, from: number, to: number, length: number, level: number, bus: AudioNode) {
+    const ctx = this.ctx!, osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.frequency.setValueAtTime(from, t); osc.frequency.exponentialRampToValueAtTime(to, t + length); osc.connect(gain).connect(bus);
+    this.env(gain, t, level, 0.005, length * 0.4, length * 0.6); osc.start(t); osc.stop(t + length + 0.05);
+  }
+  /** Monster voices: every creature sounds like itself when it attacks, is hurt, dies, spots you or idles nearby. */
+  creature(id: string, action: "attack" | "hurt" | "death" | "aggro" | "idle", gain = 1) {
+    if (!this.ctx || this.ctx.state !== "running" || !this.sfxOn || this.muted || gain <= 0.01) return;
+    const now = this.ctx.currentTime, key = `creature:${id}:${action}`, last = this.lastSfx.get(key) ?? 0;
+    if (now - last < 0.12) return;
+    this.lastSfx.set(key, now);
+    const voice = VOICES[id] ?? VOICES.grumblin, t = now + 0.005, bus = this.scaled(gain * (action === "hurt" ? 0.55 : 1));
+    const pitch = action === "death" ? 0.75 : action === "hurt" ? 1.15 : action === "aggro" ? 1.05 : 1, length = voice.length * (action === "death" ? 1.6 : action === "hurt" ? 0.6 : 1);
+    const body = (type: OscillatorType, f0: number, f1: number, level: number, at = t, len = length) => {
+      const gainNode = this.ctx!.createGain(), filter = this.ctx!.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.value = voice.bright; filter.connect(gainNode); gainNode.connect(bus);
+      const osc = this.osc(type, f0 * pitch, at, at + len + 0.05, filter); osc.frequency.setValueAtTime(f0 * pitch, at); osc.frequency.exponentialRampToValueAtTime(Math.max(20, f1 * pitch), at + len);
+      if (voice.wobble) { const lfo = this.ctx!.createOscillator(), depth = this.ctx!.createGain(); lfo.frequency.value = voice.wobble; depth.gain.value = f0 * 0.06; lfo.connect(depth).connect(osc.frequency); lfo.start(at); lfo.stop(at + len + 0.05); }
+      this.env(gainNode, at, level, 0.01, len * 0.5, len * 0.5);
+    };
+    switch (voice.kind) {
+      case "cluck": for (let i = 0; i < (action === "idle" ? 3 : 2); i++) body("triangle", voice.f0 * 1.1, voice.f0 * 0.8, 0.12, t + i * 0.11, 0.07); break;
+      case "moo": body("sawtooth", voice.f0, voice.f0 * 0.85, 0.12); break;
+      case "squeak": body("sine", voice.f0 * 1.3, voice.f0, 0.08, t, 0.08); if (action !== "hurt") body("sine", voice.f0 * 1.4, voice.f0 * 1.1, 0.06, t + 0.1, 0.06); break;
+      case "grumble": body("square", voice.f0, voice.f0 * 0.7, 0.07); this.noiseBurst(t, length, 500, 0.04, bus, "lowpass"); break;
+      case "growl": body("sawtooth", voice.f0, voice.f0 * (action === "aggro" ? 1.6 : 0.8), 0.1); this.noiseBurst(t, length, 700, 0.06, bus, "bandpass", 1); break;
+      case "rattle": for (let i = 0; i < 6; i++) this.thump(t + i * 0.035, 1400 + Math.random() * 600, 900, 0.02, 0.1, bus); break;
+      case "gurgle": for (let i = 0; i < 4; i++) this.chirp(t + i * 0.07, voice.f0 * (1 + Math.random() * 0.4), voice.f0 * 0.6, 0.06, 0.07, bus); this.noiseBurst(t, length, 400, 0.05, bus, "lowpass"); break;
+      case "whisper": this.noiseBurst(t, length * 1.2, 1600, 0.07, bus, "bandpass", 4); this.noiseBurst(t + 0.1, length, 2600, 0.04, bus, "bandpass", 6); break;
+      case "clank": this.drum("clank", t, 1, bus); body("square", voice.f0, voice.f0 * 0.9, 0.05); break;
+      case "rumble": body("sawtooth", voice.f0, voice.f0 * 0.6, 0.14); this.thump(t, 70, 35, length, 0.4, bus); break;
+      case "roar": body("sawtooth", voice.f0, voice.f0 * 0.7, 0.14); body("square", voice.f0 * 1.5, voice.f0, 0.05); this.noiseBurst(t, length, 900, 0.1, bus, "bandpass", 0.8); break;
+      case "king": body("sawtooth", voice.f0, voice.f0 * 0.5, 0.14, t, length * 1.3); this.voice("choir", 40, t, length * 1.4, 1.6, bus); this.thump(t, 60, 30, 0.8, 0.5, bus); break;
+    }
+  }
+  /** Talking: a few soft blips pitched to the speaker (like old handheld RPGs). */
+  speak(seed: number, words: number) {
+    if (!this.ctx || this.ctx.state !== "running" || !this.sfxOn || this.muted) return;
+    const t = this.ctx.currentTime + 0.01, base = 62 + (seed % 14), bus = this.scaled(0.8);
+    for (let i = 0; i < Math.min(8, Math.max(2, words)); i++) {
+      const gain = this.ctx.createGain(); gain.connect(bus);
+      this.osc("triangle", hz(base + [0, 2, 4, 2, 5, 0, 3, 7][(i + seed) % 8]), t + i * 0.075, t + i * 0.075 + 0.07, gain);
+      this.env(gain, t + i * 0.075, 0.05, 0.004, 0.02, 0.04);
     }
   }
   /** Old-school jingle: a short brassy fanfare with a harp roll. */

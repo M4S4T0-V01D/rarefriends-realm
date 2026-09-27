@@ -433,8 +433,9 @@ test("Rare Caskets: relic bonuses, wardrobe pieces and duplicates", () => {
   const base = xpMultiplier(g.player);
   setRelics(g, [3, 0, 0, 1]);
   assert(Math.abs(xpMultiplier(g.player) - base * (1 + 0.06 + 0.1)) < 1e-9);
-  const first = collectFromCasket(g, 3);
-  assert.equal(first.wardrobe, "golden_aura");
+  // Tier 3 holds two pieces; after both, duplicates turn into coins.
+  const first = collectFromCasket(g, 3), second = collectFromCasket(g, 3);
+  assert.deepEqual([first.wardrobe, second.wardrobe].sort(), ["golden_aura", "rarite_crown"]);
   const again = collectFromCasket(g, 3);
   assert.equal(again.wardrobe, null); assert(again.coins > 0);
   // Economy table: 1 RF casket, 0.88 RF expected value, 5 RF max prize.
@@ -474,6 +475,20 @@ test("music unlocks the first time you enter an area, and saves", () => {
   const bad = newGame();
   restore(bad, { ...serialize(g), music: ["<script>", 5, "frostpeak"] });
   assert.deepEqual(bad.player.music, ["theme", "frostpeak"]);
+});
+
+test("the follower walks the tiles you leave behind", () => {
+  const g = newGame();
+  setFollower(g, { id: 3412, generation: 1 });
+  assert(g.pet, "a follower appears beside you");
+  const path = [];
+  walkTo(g, g.player.x + 6, g.player.y + 2);
+  for (let i = 0; i < 5; i++) { const before = { x: g.player.x, y: g.player.y }; tick(g); if (g.player.x !== before.x || g.player.y !== before.y) path.push(before); }
+  assert.deepEqual({ x: g.pet.x, y: g.pet.y }, g.trail.at(-1), "it stands on the tile you just left");
+  assert(Math.max(Math.abs(g.pet.x - g.player.x), Math.abs(g.pet.y - g.player.y)) === 1, "directly behind you");
+  castSpell(g, "homeward"); run(g, 12);
+  assert(Math.max(Math.abs(g.pet.x - g.player.x), Math.abs(g.pet.y - g.player.y)) <= 1, "it catches up after a teleport");
+  setFollower(g, null); tick(g); assert.equal(g.pet, null);
 });
 
 test("use item on item: tinderbox on logs lights a fire, chisel cuts gems", () => {

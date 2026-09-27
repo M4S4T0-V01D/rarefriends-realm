@@ -177,11 +177,11 @@
 .realm-followers button[aria-pressed="true"] { background: var(--butter); box-shadow: 0 0 0 2px var(--gold); }
 .realm-followers small { font-size: 9px; }
 .realm-portrait { image-rendering: pixelated; }
-.realm-wardrobe { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
-.realm-wardrobe button { display: flex; align-items: center; gap: 5px; padding: 3px 5px; border: 1.5px solid #000; background: var(--panel-2); color: #e8e5de; font-size: 10px; text-align: left; border-radius: 3px; }
-.realm-wardrobe button[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
-.realm-wardrobe button:disabled { opacity: .45; }
-.realm-wardrobe i { width: 12px; height: 12px; border: 1px solid #000; flex: none; }
+.realm-wardrobe { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.realm-wardrobe button { display: grid; justify-items: center; gap: 1px; padding: 4px 2px 3px; border: 1.5px solid #000; background: radial-gradient(#e9e6df, #cfcbc3); color: var(--ink); font-size: 9px; text-align: center; border-radius: 4px; }
+.realm-wardrobe button[aria-pressed="true"] { background: radial-gradient(#f6ecc4, #e2d49e); box-shadow: 0 0 0 2px var(--gold); }
+.realm-wardrobe button:disabled { background: #2f2d2b; color: #7d7a74; }
+.realm-mystery { width: 40px; height: 40px; display: grid; place-items: center; font-size: 20px; font-weight: 800; color: #5a5753; }
 .realm-relics { list-style: none; padding: 0; margin: 4px 0; display: grid; gap: 4px; }
 .realm-relics li { display: grid; gap: 1px; }
 .realm-relics small { color: #a8a39c; font-size: 10px; }
