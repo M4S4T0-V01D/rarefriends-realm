@@ -37,4 +37,10 @@ export function parseRoster(ids: unknown, friendId: bigint, limit = 60): { self:
 export const SHARE_REQUEST = "rarefriends-realm:share";
 export const SHARE_RESULT = "rarefriends-realm:share-result";
 export type ShareAction = "post" | "copy" | "save";
+/**
+ * Save codes: on a click, the game sends SAVE_EXPORT with the code (copy it, or download it as a text file) and the
+ * host does it, replying with SAVE_EXPORT_RESULT ("copied", "saved" or "failed").
+ */
+export const SAVE_EXPORT = "rarefriends-realm:save-export";
+export const SAVE_EXPORT_RESULT = "rarefriends-realm:save-export-result";
 export type ShareOutcome = "shared" | "copied-and-opened" | "saved-and-opened" | "copied" | "saved" | "cancelled" | "failed";

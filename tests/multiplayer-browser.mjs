@@ -112,6 +112,50 @@ try {
   await b.page.waitForTimeout(600);
   await b.page.locator(".rf-game-frame").screenshot({ path: "./artifacts/multiplayer.png" });
 
+  // An emote: A dances, B sees it.
+  await a.game.getByRole("tab", { name: "Emotes" }).click();
+  await a.game.getByRole("button", { name: "Dance", exact: true }).click();
+  await b.until(() => window.__realm.peers().some(peer => peer.id === 7730 && peer.emote === "dance"), "seeing #7730 dance");
+
+  // A drops a sapphire-ish gem; B sees it on the ground and takes it.
+  await a.frame().evaluate(() => { const g = window.__realm.game(), p = g.player; p.inventory[6] = { id: "rosestone", n: 1 }; window.__realm.refresh(); });
+  await a.game.getByRole("tab", { name: "Inventory" }).click();
+  const gem = a.game.getByRole("button", { name: "Rosestone" });
+  const gemBox = await gem.boundingBox();
+  await a.page.mouse.click(gemBox.x + gemBox.width / 2, gemBox.y + gemBox.height / 2, { button: "right" });
+  await a.game.getByRole("menuitem", { name: /^Drop Rosestone/ }).click();
+  const seen = await (async () => { const end = Date.now() + 15000; while (Date.now() < end) { const n = await b.frame().evaluate(() => window.__realm.drops().length); if (n) return true; await b.page.waitForTimeout(200); } return false; })();
+  assert(seen, "B sees A's drop");
+  await b.frame().evaluate(() => { const drop = window.__realm.drops()[0], p = window.__realm.game().player; p.x = drop.x; p.y = drop.y; p.prev = { x: drop.x, y: drop.y }; window.__realm.takeDrop(0); });
+  await b.until(() => window.__realm.game().player.inventory.some(slot => slot?.id === "rosestone"), "B picking up A's rosestone");
+  await a.until(() => !window.__realm.game().ground.some(entry => entry.id === "rosestone"), "the rosestone leaving A's ground");
+
+  // A trade by real clicks: A offers 250 coins, B offers a yew bow; both accept twice.
+  await b.frame().evaluate(() => { const p = window.__realm.game().player; p.inventory[7] = { id: "yew_bow", n: 1 }; window.__realm.refresh(); });
+  const coinsA = await a.state(() => window.__realm.game().player.inventory.reduce((n, slot) => n + (slot?.id === "coins" ? slot.n : 0), 0));
+  const at2 = await a.frame().evaluate(() => { const peer = window.__realm.peers().find(entry => entry.id === 3412); return window.__realm.screenOf(peer.x, peer.y); });
+  await a.page.mouse.click(box.x + at2.x, box.y + at2.y - 20, { button: "right" });
+  await a.game.getByRole("menuitem", { name: /Trade with .*#3412/ }).click();
+  await b.game.getByRole("button", { name: "Trade", exact: true }).click();
+  await a.game.getByRole("dialog", { name: "Trading with Friend #3412" }).waitFor();
+  await b.game.getByRole("dialog", { name: "Trading with Friend #7730" }).waitFor();
+  const offerCoins = a.game.getByRole("button", { name: "Offer Coins" });
+  const coinBox = await offerCoins.boundingBox();
+  await a.page.mouse.click(coinBox.x + coinBox.width / 2, coinBox.y + coinBox.height / 2, { button: "right" });
+  await a.game.getByRole("menuitem", { name: /^Offer-10 Coins/ }).click();
+  await b.game.getByRole("button", { name: "Offer Yew bow" }).click();
+  await b.game.getByRole("button", { name: /Remove Coins|Coins × 10/ }).waitFor().catch(() => {});
+  await a.game.getByText("Their offer").waitFor();
+  await a.page.waitForTimeout(500);
+  await a.page.locator(".rf-game-frame").screenshot({ path: "./artifacts/trade.png" });
+  await a.game.getByRole("button", { name: "Accept" }).click(); await b.game.getByRole("button", { name: "Accept" }).click();
+  await a.game.getByText("Are you sure you want to make this trade?").waitFor();
+  await b.game.getByText("Are you sure you want to make this trade?").waitFor();
+  await a.game.getByRole("button", { name: "Accept" }).click(); await b.game.getByRole("button", { name: "Accept" }).click();
+  await a.until(() => window.__realm.game().player.inventory.some(slot => slot?.id === "yew_bow"), "A receiving the bow");
+  await b.until(() => !window.__realm.game().player.inventory.some(slot => slot?.id === "yew_bow"), "B giving the bow");
+  assert.equal(await a.state(() => window.__realm.game().player.inventory.reduce((n, slot) => n + (slot?.id === "coins" ? slot.n : 0), 0)), coinsA - 10, "A paid 10 coins");
+
   // A goes offline: B stops seeing #7730.
   await a.game.getByRole("tab", { name: "Settings" }).click();
   await a.game.getByLabel("Online: see and meet other players").click();
@@ -119,7 +163,7 @@ try {
   await b.until(() => !window.__realm.peers().some(peer => peer.id === 7730), "#7730 leaving", 25_000);
 
   assert.deepEqual(errors, [], "browser errors");
-  console.log("PASS multiplayer: two players see each other walk, right-click menu, friends list, party bonus, public chat, whispers (links stripped), going offline");
+  console.log("PASS multiplayer: two players see each other walk, right-click menu, friends list, party bonus, public chat, whispers (links stripped), emotes, shared drops, a trade by clicks, going offline");
 } finally {
   await browser?.close();
   if (server) { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }

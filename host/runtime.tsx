@@ -21,9 +21,9 @@ import { parseChanceGame } from "@rarefriends/friendsdk/game";
 import { readOwnedFriends } from "@rarefriends/friendsdk/owned";
 import { createFriendPublicClient, createFriendWalletSession } from "@rarefriends/friendsdk/wallet";
 import {
-  HOST_HELLO, HOST_STATE, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, type ShareAction, type ShareOutcome,
+  HOST_HELLO, HOST_STATE, SAVE_EXPORT, SAVE_EXPORT_RESULT, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, type ShareAction, type ShareOutcome,
 } from "../games/rarefriends-realm/roster.ts";
-import { NET_CHAT, NET_ONLINE, NET_PRESENCE, NET_SOCIAL } from "../games/rarefriends-realm/net.ts";
+import { NET_ACT, NET_CHAT, NET_ONLINE, NET_PRESENCE, NET_SOCIAL } from "../games/rarefriends-realm/net.ts";
 import { NetHub } from "./net.ts";
 import gameJson from "../games/rarefriends-realm/game.json";
 import "@rarefriends/friendsdk/frame.css";
@@ -98,8 +98,17 @@ function RealmHost() {
       if (event.data?.type === HOST_HELLO) { friend = /^[0-9]{1,15}$/.test(String(event.data.friend)) ? String(event.data.friend) : null; send(event.source as Window); sync(); }
       else if (event.data?.type === NET_PRESENCE) hub.presence(event.data.presence);
       else if (event.data?.type === NET_CHAT) hub.chat(event.data.text, event.data.to);
+      else if (event.data?.type === NET_ACT) hub.act(event.data.act, event.data.to);
       else if (event.data?.type === NET_SOCIAL && typeof event.data.op === "string" && typeof event.data.id === "number") hub.changeSocial(event.data.op, event.data.id);
       else if (event.data?.type === NET_ONLINE) hub.setOnline(event.data.on === true);
+      else if (event.data?.type === SAVE_EXPORT && (event.data.action === "copy" || event.data.action === "download") && typeof event.data.text === "string"
+        && /^RFR1-[0-9]{1,15}-[0-9a-z]{1,8}-[A-Za-z0-9_-]{8,200000}$/.test(event.data.text)) {
+        // Your save code, copied or downloaded on your click (the sandbox can do neither).
+        const source = event.source as Window, text = event.data.text as string, friendId = text.split("-")[1];
+        const done = (result: string) => source.postMessage({ type: SAVE_EXPORT_RESULT, result }, "*");
+        if (event.data.action === "download") { download(new Blob([text], { type: "text/plain" }), `rarefriends-realm-friend-${friendId}-save.txt`); done("saved"); }
+        else void navigator.clipboard.writeText(text).then(() => done("copied"), () => { download(new Blob([text], { type: "text/plain" }), `rarefriends-realm-friend-${friendId}-save.txt`); done("saved"); });
+      }
       else if (event.data?.type === SAVE_WRITE && account && owns(event.data.friend)) writeSave(account, String(event.data.friend), event.data.save);
       else if (event.data?.type === SHARE_REQUEST && ["post", "copy", "save"].includes(event.data.action) && event.data.image instanceof Blob
         && event.data.image.type === "image/png" && event.data.image.size < 5_000_000 && typeof event.data.text === "string" && event.data.text.length <= 1000) {

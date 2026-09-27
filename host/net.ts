@@ -6,10 +6,10 @@
  * Only the game's presence and chat go out, keyed by Friend ID; wallet addresses never do. Everything that comes
  * in is validated (net.ts), rate-limited and stripped of links before the sandboxed game sees it.
  */
-import { cleanChat, cleanId, cleanPresence, type ChatIn, type NetState, type NetStatus, type Presence } from "../games/rarefriends-realm/net.ts";
+import { cleanAct, cleanChat, cleanId, cleanPresence, NET_ACT_IN, type Act, type ChatIn, type NetState, type NetStatus, type Presence } from "../games/rarefriends-realm/net.ts";
 
-type Handlers = { presence: (data: unknown, peer: string) => void; chat: (data: unknown, peer: string) => void; leave: (peer: string) => void; join: (peer: string) => void };
-type Transport = { sendPresence(data: Presence): void; sendChat(data: { text: string; to?: number }, peer?: string): void; leave(): void };
+type Handlers = { presence: (data: unknown, peer: string) => void; chat: (data: unknown, peer: string) => void; act: (data: unknown, peer: string) => void; leave: (peer: string) => void; join: (peer: string) => void };
+type Transport = { sendPresence(data: Presence): void; sendChat(data: { text: string; to?: number }, peer?: string): void; sendAct(data: Act, peer: string): void; leave(): void };
 
 const APP_ID = "rarefriends-realm-v1", ROOM = "friendhollow";
 /** Peers go quiet (closed tab, lost connection) after this long without a presence. */
@@ -18,7 +18,8 @@ const STALE_MS = 12_000;
 async function trysteroTransport(on: Handlers): Promise<Transport> {
   const { joinRoom } = await import("trystero/nostr");
   const room = joinRoom({ appId: APP_ID }, ROOM);
-  const presence = room.makeAction<Presence>("pres"), chat = room.makeAction<{ text: string; to?: number }>("chat");
+  const presence = room.makeAction<Presence>("pres"), chat = room.makeAction<{ text: string; to?: number }>("chat"), act = room.makeAction<Act>("act");
+  act.onMessage = (data, { peerId }) => on.act(data, peerId);
   presence.onMessage = (data, { peerId }) => on.presence(data, peerId);
   chat.onMessage = (data, { peerId }) => on.chat(data, peerId);
   room.onPeerJoin = peer => on.join(peer);
@@ -26,6 +27,7 @@ async function trysteroTransport(on: Handlers): Promise<Transport> {
   return {
     sendPresence: data => { void presence.send(data); },
     sendChat: (data, peer) => { void chat.send(data, peer ? { target: peer } : undefined); },
+    sendAct: (data, peer) => { void act.send(data, { target: peer }); },
     leave: () => { void room.leave(); },
   };
 }
@@ -36,16 +38,18 @@ function localTransport(on: Handlers): Transport {
     if (!message || message.from === self || (message.to && message.to !== self)) return;
     if (message.kind === "pres") on.presence(message.data, message.from);
     else if (message.kind === "chat") on.chat(message.data, message.from);
+    else if (message.kind === "act") on.act(message.data, message.from);
     else if (message.kind === "bye") on.leave(message.from);
   };
   return {
     sendPresence: data => channel.postMessage({ kind: "pres", from: self, data }),
     sendChat: (data, peer) => channel.postMessage({ kind: "chat", from: self, to: peer, data }),
+    sendAct: (data, peer) => channel.postMessage({ kind: "act", from: self, to: peer, data }),
     leave: () => { channel.postMessage({ kind: "bye", from: self }); channel.close(); },
   };
 }
 
-type Peer = { presence: Presence; seen: number; chats: number[] };
+type Peer = { presence: Presence; seen: number; chats: number[]; acts: number[] };
 /** One wallet's social circle, kept in this trusted page. */
 type Social = { friends: number[]; ignored: number[]; online: boolean };
 const socialKey = (account: string) => `rarefriends-realm:social:v1:${account.toLowerCase()}`;
@@ -100,6 +104,12 @@ export class NetHub {
     // A private message goes only to the peer playing that Friend.
     for (const [peer, entry] of this.peers) if (entry.presence.id === target) this.transport.sendChat({ text, to: target }, peer);
   }
+  /** A direct message to the player playing a Friend (trades, taking their drop). */
+  act(raw: unknown, to: unknown) {
+    const act = cleanAct(raw), target = cleanId(to);
+    if (!act || target === null || !this.transport) return;
+    for (const [peer, entry] of this.peers) if (entry.presence.id === target) this.transport.sendAct(act, peer);
+  }
   dispose() { this.disconnect(); }
 
   private async connect() {
@@ -113,7 +123,7 @@ export class NetHub {
         if (entry && now - entry.seen < 200) return; // at most five updates a second
         // One avatar per Friend: a newer connection claiming the same Friend replaces the older.
         for (const [other, value] of this.peers) if (other !== peer && value.presence.id === presence.id) this.peers.delete(other);
-        this.peers.set(peer, { presence, seen: now, chats: entry?.chats ?? [] });
+        this.peers.set(peer, { presence, seen: now, chats: entry?.chats ?? [], acts: entry?.acts ?? [] });
         this.publish();
       },
       chat: (data, peer) => {
@@ -126,6 +136,16 @@ export class NetHub {
         entry.chats.push(now);
         const chat: ChatIn = { from: entry.presence.id, text, private: to !== null };
         this.post({ type: "rarefriends-realm:net-chat-in", ...chat });
+      },
+      act: (data, peer) => {
+        const entry = this.peers.get(peer), now = Date.now();
+        if (!entry || this.social.ignored.includes(entry.presence.id)) return;
+        entry.acts = entry.acts.filter(at => now - at < 1000);
+        if (entry.acts.length >= 12) return; // twelve a second is plenty for a trade
+        const act = cleanAct(data);
+        if (!act) return;
+        entry.acts.push(now);
+        this.post({ type: NET_ACT_IN, from: entry.presence.id, act });
       },
       join: () => this.publish(),
       leave: peer => { this.peers.delete(peer); this.publish(); },

@@ -548,6 +548,17 @@ Object.assign(MONSTERS, {
 } satisfies Record<string, MonsterDef>);
 export function combatLevelOf(monster: MonsterDef) { return monster.level; }
 
+// ---------- Emotes ----------
+/** Emotes: how long they play (ticks), and what unlocks the special ones. */
+export const EMOTES = [
+  { id: "wave", name: "Wave", ticks: 4 }, { id: "bow", name: "Bow", ticks: 4 }, { id: "dance", name: "Dance", ticks: 7 }, { id: "cheer", name: "Cheer", ticks: 5 },
+  { id: "clap", name: "Clap", ticks: 4 }, { id: "laugh", name: "Laugh", ticks: 5 }, { id: "cry", name: "Cry", ticks: 5 }, { id: "think", name: "Think", ticks: 5 },
+  { id: "jump", name: "Jump for joy", ticks: 4 }, { id: "yes", name: "Yes", ticks: 3 }, { id: "no", name: "No", ticks: 3 }, { id: "spin", name: "Spin", ticks: 4 },
+  { id: "flex", name: "Flex", ticks: 4 },
+  { id: "skillcape", name: "Skillcape", ticks: 8, needs: "a mastery cape (wear one)" },
+] as const;
+export type EmoteId = typeof EMOTES[number]["id"];
+
 // ---------- Slayer ----------
 /** Tasks the Warden hands out: the creatures that count, how many, and the combat level you need for them. */
 export const SLAYER_TASKS = [

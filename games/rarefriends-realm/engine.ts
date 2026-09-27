@@ -3,7 +3,7 @@
  * Pure TypeScript over the Game state, so it runs the same in the browser and in node tests.
  */
 import {
-  COOKING, CRAFTING, EQUIP_SLOTS, FLETCH_ARROWS, FLETCH_BOWS, SIGILCRAFT, STAFF_SIGILS, itemCategory, sigilsPerStone, FAMILY_NAMES, FIREMAKING, FISHING_SPOTS, GEM_CUTTING, METALS, MONSTERS, PRAYERS, RELICS, RF_BUNDLES, ROCKS, SHOPS, SHOP_BUY,
+  COOKING, CRAFTING, EMOTES, EQUIP_SLOTS, FLETCH_ARROWS, FLETCH_BOWS, SIGILCRAFT, STAFF_SIGILS, itemCategory, sigilsPerStone, FAMILY_NAMES, FIREMAKING, FISHING_SPOTS, GEM_CUTTING, METALS, MONSTERS, PRAYERS, RELICS, RF_BUNDLES, ROCKS, SHOPS, SHOP_BUY,
   SHOP_SELL, SKILLS, SKILL_NAMES, SMELTING, SMITH_PIECES, SMITH_XP, SPELLS, TREES, WARDROBE, XP_TABLE, isItem, item, levelForXp, smithLevel,
   type EquipSlot, type MetalId, type Skill, type Spell, type SpotKind, type WardrobeId,
 } from "./data.ts";
@@ -156,7 +156,7 @@ function routeToTarget(game: Game) {
 
 // ---------- Menus ----------
 /** Something under the pointer. "peer" is another player (its id is their Friend ID). */
-export type Pick = { kind: "monster" | "npc" | "object" | "ground" | "fire" | "peer"; id: number };
+export type Pick = { kind: "monster" | "npc" | "object" | "ground" | "fire" | "peer" | "pground"; id: number };
 export type MenuOption = { verb: string; noun: string; tone: "object" | "npc" | "monster" | "item" | "plain" | "level"; run: (game: Game) => void };
 export type Selection = { kind: "item"; slot: number } | { kind: "spell"; spell: string } | null;
 const OBJECT_EXAMINE: Partial<Record<string, string>> = {
@@ -305,7 +305,8 @@ export function drop(game: Game, slotIndex: number) {
   const player = game.player, slot = player.inventory[slotIndex];
   if (!slot) return;
   player.inventory[slotIndex] = null;
-  dropItem(game, slot.id, slot.n, player.x, player.y); sound(game, "drop");
+  // Tradeable things you drop are shared: other players see them and can pick them up.
+  dropItem(game, slot.id, slot.n, player.x, player.y, 200, item(slot.id).tradeable !== false); sound(game, "drop");
 }
 export function equip(game: Game, slotIndex: number) {
   const player = game.player, slot = player.inventory[slotIndex];
@@ -682,6 +683,8 @@ export function tick(game: Game) {
   if (player.attackTimer > 0) player.attackTimer--;
   if (player.overhead && player.overhead.until <= game.tick) player.overhead = null;
   movePlayer(game);
+  // An emote ends when it's done, or when you walk off.
+  if (player.emote && (game.tick >= player.emote.until || player.moved === game.tick || player.combat !== null || player.activity)) player.emote = null;
   updatePet(game);
   if (player.target && !player.path.length) {
     const point = targetPoint(game, player.target);
@@ -927,7 +930,7 @@ function playerCombat(game: Game) {
     player.attackTimer = 5;
     const prayers = prayerBoost(player), accuracy = (Math.floor(level(game, "magic") * (1 + prayers.magic)) + 8) * (bonuses(player).magic + 64) * (player.familyId === 8 ? 1.1 : 1) * boost;
     const defence = ((monster.def.magicDef ?? monster.def.defence) * cursed(game, monster, "defence") + 9) * (monster.def.defenceBonus + 64);
-    emit(game, { type: "projectile", projectile: { from: { x: player.x, y: player.y }, to: { x: monster.x, y: monster.y }, start: game.tick, end: game.tick + 1, color: SPELL_COLORS[spell.id] ?? ELEMENT_COLORS[spell.element] ?? "#c7d3dc" } });
+    emit(game, { type: "projectile", projectile: { from: { x: player.x, y: player.y }, to: { x: monster.x, y: monster.y }, start: game.tick, end: game.tick + 1, color: SPELL_COLORS[spell.id] ?? ELEMENT_COLORS[spell.element] ?? "#c7d3dc", style: "magic", element: spell.element } });
     sound(game, "spell");
     if (!spell.maxHit) {
       // Curses and Bind: a magic accuracy roll, then an effect instead of damage.
@@ -989,7 +992,7 @@ function rangedAttack(game: Game, monster: Monster, boost: number) {
     if (player.style === "defensive") { addXp(game, "ranged", damage * 2); addXp(game, "defence", damage * 2); } else addXp(game, "ranged", damage * 4);
     addXp(game, "hitpoints", damage * 1.33);
   }
-  emit(game, { type: "projectile", projectile: { from: { x: player.x, y: player.y }, to: { x: monster.x, y: monster.y }, start: game.tick, end: game.tick + 1, color: item(arrow.id).icon.color } });
+  emit(game, { type: "projectile", projectile: { from: { x: player.x, y: player.y }, to: { x: monster.x, y: monster.y }, start: game.tick, end: game.tick + 1, color: item(arrow.id).icon.color, style: "arrow" } });
   sound(game, "bow");
   // Most arrows can be picked up again where they land.
   if (game.rng() < 0.6) dropItem(game, arrow.id, 1, monster.x, monster.y, 150);
@@ -1064,7 +1067,7 @@ function monsterTick(game: Game, monster: Monster) {
         if (monster.def.breath && game.rng() < 0.33) {
           const shielded = player.equipment.shield === "wyrmward_shield";
           hit = Math.floor(game.rng() * ((shielded ? 4 : monster.def.breath) + 1));
-          emit(game, { type: "projectile", projectile: { from: { x: monster.x, y: monster.y }, to: { x: player.x, y: player.y }, start: game.tick, end: game.tick + 1, color: "#e9733f" } });
+          emit(game, { type: "projectile", projectile: { from: { x: monster.x, y: monster.y }, to: { x: player.x, y: player.y }, start: game.tick, end: game.tick + 1, color: "#e9733f", style: "fire" } });
           sound(game, "fire");
           message(game, shielded ? "Your shield absorbs most of the dragon's breath." : "You're horribly burnt by the dragonfire! A Wyrmward shield would help.", shielded ? "game" : "warn");
         }
@@ -1251,9 +1254,27 @@ function telegrab(game: Game, spellId: string, index: number) {
   if (!canHold(player, ground.id, ground.n)) { message(game, "You don't have enough inventory space to hold that item.", "warn"); return; }
   payRunes(game, spell); give(player, ground.id, ground.n); game.ground.splice(index, 1);
   addXp(game, "magic", spell.xp); sound(game, "spell");
-  emit(game, { type: "projectile", projectile: { from: { x: ground.x, y: ground.y }, to: { x: player.x, y: player.y }, start: game.tick, end: game.tick + 1, color: "#e6ecef" } });
+  emit(game, { type: "projectile", projectile: { from: { x: ground.x, y: ground.y }, to: { x: player.x, y: player.y }, start: game.tick, end: game.tick + 1, color: "#e6ecef", style: "magic", element: "wind" } });
 }
 export function setStyle(game: Game, style: CombatStyle) { game.player.style = style; }
+// ---------- Emotes ----------
+/** Why you can't perform an emote (null if you can). */
+export function emoteProblem(game: Game, id: string) {
+  const emote = EMOTES.find(entry => entry.id === id);
+  if (!emote) return "You don't know that emote.";
+  if (emote.id === "skillcape" && !item(game.player.equipment.cape ?? "coins").mastery) return "You need to be wearing a mastery cape to perform this emote.";
+  return null;
+}
+/** Perform an emote: you stop where you are for its length. */
+export function performEmote(game: Game, id: string) {
+  const player = game.player, problem = emoteProblem(game, id), emote = EMOTES.find(entry => entry.id === id);
+  if (problem || !emote) { message(game, problem ?? "You can't do that.", "warn"); return false; }
+  if (player.combat !== null) { message(game, "You're a bit busy for that.", "warn"); return false; }
+  player.path = []; player.activity = null; player.target = null;
+  player.emote = { id, start: game.tick, until: game.tick + emote.ticks };
+  if (id === "skillcape") sound(game, "quest"); else if (id === "cheer" || id === "jump") sound(game, "level");
+  return true;
+}
 
 // ---------- Dialogue ----------
 /** Click to continue: the next line, then the options (if any), then the end. */

@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import type { GenerationSprites } from "@rarefriends/friendsdk/sprites";
 import {
-  EQUIP_SLOTS, FAMILY_NAMES, FAMILY_PERKS, PRAYERS, RELICS, SHOPS, SKILLS, SKILL_ICONS, SKILL_NAMES, SPELLS, WARDROBE, XP_TABLE, item, levelForXp,
+  EMOTES, EQUIP_SLOTS, FAMILY_NAMES, FAMILY_PERKS, PRAYERS, RELICS, SHOPS, SKILLS, SKILL_ICONS, SKILL_NAMES, SPELLS, WARDROBE, XP_TABLE, item, levelForXp,
   type EquipSlot, type Skill,
 } from "./data.ts";
 import { MAX_QUEST_POINTS, NPCS, QUESTS, finalStage, questPoints } from "./content.ts";
@@ -11,13 +11,14 @@ import {
   weapon, xpMultiplier, type Game, type Message, type Recipe, type Slot,
 } from "./state.ts";
 import {
-  bestArrow, bowRange, shopBuys, buy, buyPrice, canCast, capeProblem, castSpell, rangedMaxHit, rubLamp, chooseOption, continueDialogue, dialogueAtOptions, itemOptions, playerMaxHit, recipeProblem, sell, sellPrice,
+  bestArrow, bowRange, emoteProblem, performEmote, shopBuys, buy, buyPrice, canCast, capeProblem, castSpell, rangedMaxHit, rubLamp, chooseOption, continueDialogue, dialogueAtOptions, itemOptions, playerMaxHit, recipeProblem, sell, sellPrice,
   castOnItem, setFollower, setStyle, startProduction, swapSlots, toggleRun, togglePrayer, toggleWorn, unequip, useItemOnItem, type OwnedFriend, type Selection,
 } from "./engine.ts";
 import { friendRows, renderWorldMap } from "./render.ts";
 import { isUnderground, realPoint } from "./world.ts";
 import type { NetState } from "./net.ts";
-import { artUrl, itemArt, orbArt, prayerArt, skillArt, spellArt, tabArt, type TabIcon } from "./icons.ts";
+import type { TradeView } from "./trade.ts";
+import { artUrl, emoteArt, itemArt, orbArt, prayerArt, skillArt, spellArt, tabArt, type TabIcon } from "./icons.ts";
 import { friendSprite } from "./sprites.ts";
 import { figureArt } from "./wardrobe.ts";
 import { TRACKS } from "./audio.ts";
@@ -95,11 +96,12 @@ export function ContextMenu({ x, y, entries, onClose }: { x: number; y: number; 
 }
 
 // ---------- Side panel ----------
-export type Tab = "combat" | "skills" | "quests" | "inventory" | "equipment" | "prayer" | "magic" | "friends" | "settings";
+export type Tab = "combat" | "skills" | "quests" | "inventory" | "equipment" | "prayer" | "magic" | "friends" | "settings" | "emotes";
 export const TABS: readonly { id: Tab; label: string; glyph: string; key: string }[] = [
   { id: "combat", label: "Combat options", glyph: "⚔", key: "F1" }, { id: "skills", label: "Skills", glyph: "▦", key: "F2" }, { id: "quests", label: "Quest journal", glyph: "✎", key: "F3" },
   { id: "inventory", label: "Inventory", glyph: "▣", key: "F4" }, { id: "equipment", label: "Worn equipment", glyph: "⛨", key: "F5" }, { id: "prayer", label: "Prayer", glyph: "✚", key: "F6" },
   { id: "magic", label: "Magic", glyph: "✦", key: "F7" }, { id: "friends", label: "Friends and wardrobe", glyph: "☺", key: "F8" }, { id: "settings", label: "Settings", glyph: "⚙", key: "F9" },
+  { id: "emotes", label: "Emotes", glyph: "☺", key: "F10" },
 ];
 export type Settings = { music: boolean; sfx: boolean; musicVolume: number; sfxVolume: number; zoom: number; shiftDrop: boolean; autoMusic: boolean; dayNight?: boolean };
 export type PanelProps = {
@@ -108,6 +110,8 @@ export type PanelProps = {
   friendSprites: ReadonlyMap<number, GenerationSprites>; loadFriend: (id: number) => void; settings: Settings; setSettings: (settings: Settings) => void;
   friend: GenerationSprites | null; trackName: string; trackId: string; playTrack: (id: string) => void; openCard: () => void; openHelp: () => void; paused: boolean; saved: string; relicCounts: readonly number[]; openCaskets: () => void;
   /** Playing together: who's around, and the friends list. */
+  /** Save codes: copy or download yours, or restore one (resolves to an error message, or null). */
+  onExportSave?: (action: "copy" | "download") => void; onRestoreSave?: (code: string) => Promise<string | null>; backupStatus?: string;
   net?: NetState; onSocial?: (op: "add" | "remove" | "ignore" | "unignore", id: number) => void; onWhisper?: (id: number) => void; onOnline?: (on: boolean) => void;
 };
 export function SidePanel(props: PanelProps) {
@@ -130,6 +134,7 @@ export function SidePanel(props: PanelProps) {
         {tab === "magic" && <MagicTab {...props} />}
         {tab === "friends" && <FriendsTab {...props} />}
         {tab === "settings" && <SettingsTab {...props} />}
+        {tab === "emotes" && <EmotesTab {...props} />}
       </div>
     </aside>
   );
@@ -335,6 +340,24 @@ function MagicTab({ game, refresh, setSelection, selection, openMenu }: PanelPro
     </div>
   );
 }
+function EmotesTab({ game, refresh, openMenu }: PanelProps) {
+  const player = game.player, [hover, setHover] = useState<string | null>(null), shown = EMOTES.find(entry => entry.id === hover);
+  return (
+    <div>
+      <div className="realm-icon-grid emotes">
+        {EMOTES.map(emote => {
+          const locked = emoteProblem(game, emote.id);
+          return <button key={emote.id} type="button" data-usable={!locked} aria-pressed={player.emote?.id === emote.id} aria-label={`${emote.name}${locked ? ` (${locked})` : ""}`}
+            onMouseEnter={() => setHover(emote.id)} onFocus={() => setHover(emote.id)} onClick={() => { performEmote(game, emote.id); refresh(); }}
+            {...rightClick(openMenu, () => [{ verb: "Perform", noun: emote.name, run: () => { performEmote(game, emote.id); refresh(); } }])}>
+            <PixelIcon art={emoteArt(emote.id)} size={30} /><small>{emote.name}</small>
+          </button>;
+        })}
+      </div>
+      <InfoCard>{shown ? <><b>{shown.name}</b>{"needs" in shown && <p>Needs {shown.needs}.</p>}</> : <p>Other players see your emotes too. Walking ends one.</p>}</InfoCard>
+    </div>
+  );
+}
 function InfoCard({ children }: { children: ReactNode }) { return <div className="realm-info" aria-live="polite">{children}</div>; }
 function FriendsTab({ game, refresh, roster, rosterState, friendSprites, loadFriend, relicCounts, openCaskets, friend, openMenu, net, onSocial, onWhisper, onOnline }: PanelProps) {
   const player = game.player, perk = FAMILY_PERKS[player.familyId], [adding, setAdding] = useState("");
@@ -395,8 +418,9 @@ function FriendsTab({ game, refresh, roster, rosterState, friendSprites, loadFri
     </div>
   );
 }
-function SettingsTab({ game, settings, setSettings, trackName, trackId, playTrack, openHelp, saved, refresh, openMenu, net, onOnline }: PanelProps) {
+function SettingsTab({ game, settings, setSettings, trackName, trackId, playTrack, openHelp, saved, refresh, openMenu, net, onOnline, onExportSave, onRestoreSave, backupStatus }: PanelProps) {
   const set = (patch: Partial<Settings>) => setSettings({ ...settings, ...patch });
+  const [code, setCode] = useState(""), [confirming, setConfirming] = useState(false), [restoreNote, setRestoreNote] = useState("");
   const unlocked = game.player.music;
   return (
     <div className="realm-settings">
@@ -419,6 +443,16 @@ function SettingsTab({ game, settings, setSettings, trackName, trackId, playTrac
       <label className="realm-check"><input type="checkbox" checked={settings.shiftDrop} onChange={event => set({ shiftDrop: event.target.checked })} /> Shift-click to drop</label>
       <label className="realm-check"><input type="checkbox" checked={game.player.run} onChange={() => { toggleRun(game); refresh(); }} /> Run</label>
       <p className="realm-note">{saved}</p>
+      <h3>Back up your adventure</h3>
+      <p className="realm-muted">Browser saves can be cleared. A save code holds your whole adventure: keep it anywhere, and paste it back on any browser.</p>
+      <div className="realm-buttons"><button type="button" onClick={() => onExportSave?.("copy")}>Copy save code</button><button type="button" onClick={() => onExportSave?.("download")}>Download save file</button></div>
+      {backupStatus && <p className="realm-note" role="status">{backupStatus}</p>}
+      <label className="realm-restore">Restore from a code <input value={code} onChange={event => { setCode(event.target.value); setConfirming(false); setRestoreNote(""); }} placeholder="RFR1-…" aria-label="Save code to restore" /></label>
+      {code.trim() && <button type="button" className={confirming ? "realm-primary" : undefined} onClick={() => {
+        if (!confirming) { setConfirming(true); setRestoreNote("This replaces your current progress with the code's. Press again to restore."); return; }
+        void onRestoreSave?.(code).then(error => { setConfirming(false); setRestoreNote(error ?? "Restored! Welcome back."); if (!error) setCode(""); refresh(); });
+      }}>{confirming ? "Yes, restore it" : "Restore"}</button>}
+      {restoreNote && <p className="realm-note" role="status">{restoreNote}</p>}
       <button type="button" className="realm-wide" onClick={openHelp}>Controls and tips</button>
     </div>
   );
@@ -603,6 +637,51 @@ export function LampModal({ game, refresh }: { game: Game; refresh: () => void }
         {SKILLS.map(skill => <button key={skill} type="button" className="realm-skill" aria-label={`${SKILL_NAMES[skill]}: ${(100 * levelForXp(game.player.xp[skill])).toLocaleString()} XP`}
           title={SKILL_NAMES[skill]} onClick={() => { rubLamp(game, slot, skill); refresh(); }}><PixelIcon art={skillArt(skill)} size={27} /><span>{levelForXp(game.player.xp[skill])}</span></button>)}
       </div>
+    </Modal>
+  );
+}
+/** Trading with another player: the offer screen, then the "are you sure?" screen. */
+export function TradeModal({ game, view, onOffer, onAccept, onDecline, openMenu }: { game: Game; view: TradeView; onOffer: (id: string, n: number) => void; onAccept: () => void; onDecline: () => void; openMenu?: OpenMenu }) {
+  const player = game.player, worth = (slots: readonly Slot[]) => slots.reduce((sum, slot) => sum + item(slot.id).value * slot.n, 0);
+  const offered = (id: string) => view.mine.find(slot => slot.id === id)?.n ?? 0;
+  const status = view.myAccept && view.theirAccept ? "" : view.myAccept ? "Waiting for the other player…" : view.theirAccept ? "Other player has accepted." : view.note;
+  const grid = (slots: readonly Slot[], mine: boolean) => (
+    <div className="realm-trade-grid">
+      {slots.map(slot => <button key={slot.id} type="button" className="realm-slot" disabled={!mine || view.stage !== 1} aria-label={`${mine ? "Remove " : ""}${item(slot.id).name} × ${slot.n}`}
+        onClick={() => mine && onOffer(slot.id, -1)}
+        {...rightClick(openMenu, () => [...(mine && view.stage === 1 ? [1, 5, 10, Infinity].map(n => ({ verb: `Remove-${n === Infinity ? "All" : n}`, noun: item(slot.id).name, tone: "item", run: () => onOffer(slot.id, n === Infinity ? -1e9 : -n) })) : []),
+          { verb: "Value", noun: item(slot.id).name, tone: "item", run: () => message(game, `${item(slot.id).name}: worth about ${item(slot.id).value.toLocaleString()} coins each.`) }, examine(game, slot.id, () => {})])}>
+        <ItemIcon slot={slot} size={38} /></button>)}
+      {!slots.length && <p className="realm-muted">Nothing yet.</p>}
+    </div>
+  );
+  return (
+    <Modal title={`Trading with Friend #${view.partner}`} onClose={onDecline} wide>
+      <div className="realm-buttons realm-trade-buttons top"><button type="button" className="realm-primary" disabled={view.myAccept} onClick={onAccept}>Accept</button><button type="button" onClick={onDecline}>Decline</button>
+        {status && <span className="realm-note" role="status">{status}</span>}</div>
+      {view.stage === 1 ? <>
+        <div className="realm-trade">
+          <section><h3>Your offer <small>({worth(view.mine).toLocaleString()} coins)</small></h3>{grid(view.mine, true)}</section>
+          <section><h3>Their offer <small>({worth(view.theirs).toLocaleString()} coins)</small></h3>{grid(view.theirs, false)}</section>
+          <section><h3>Your pack <small>click to offer</small></h3>
+            <div className="realm-inventory small">
+              {player.inventory.map((slot, index) => {
+                const left = slot ? count(player, slot.id) - offered(slot.id) : 0, can = !!slot && item(slot.id).tradeable !== false && left > 0;
+                return <button key={index} type="button" className={`realm-slot${slot && !can ? " locked" : ""}`} aria-label={slot ? `Offer ${item(slot.id).name}` : `Empty slot ${index + 1}`}
+                  onClick={() => { if (slot && can) onOffer(slot.id, 1); }}
+                  {...rightClick(openMenu, () => slot && can ? [...[1, 5, 10, Infinity].map(n => ({ verb: `Offer-${n === Infinity ? "All" : n}`, noun: item(slot.id).name, tone: "item", run: () => onOffer(slot.id, n === Infinity ? 1e9 : n) })), examine(game, slot.id, () => {})] : [])}>
+                  {slot && <ItemIcon slot={slot} size={34} />}</button>;
+              })}
+            </div>
+          </section>
+        </div>
+      </> : <div className="realm-trade-confirm">
+        <p><b>Are you sure you want to make this trade?</b></p>
+        <div className="realm-trade">
+          <section><h3>You are about to give:</h3><ul>{view.mine.map(slot => <li key={slot.id}>{item(slot.id).name} × {slot.n.toLocaleString()}</li>)}{!view.mine.length && <li>Absolutely nothing!</li>}</ul><small>Value: {worth(view.mine).toLocaleString()} coins</small></section>
+          <section><h3>In return you will receive:</h3><ul>{view.theirs.map(slot => <li key={slot.id}>{item(slot.id).name} × {slot.n.toLocaleString()}</li>)}{!view.theirs.length && <li>Absolutely nothing!</li>}</ul><small>Value: {worth(view.theirs).toLocaleString()} coins</small></section>
+        </div>
+      </div>}
     </Modal>
   );
 }

@@ -20,11 +20,12 @@
 - **Friendhollow Castle.** A three-storey keep with four spired towers north of the square. Click the spiral stairs to climb, old-school style: the kitchen and great hall below, King Hollis's throne room, the royal library, his bedchamber and a tower bank on the first floor, and battlements on the roof with a view over the whole town. Each storey is drawn on top of the one below, and the storeys above you lift away.
 - **Sound everywhere.** Weapon swings, a voice for every creature, axes and picks on the beat, NPC speech blips, footsteps by ground, crackling fires, the forge, water, and regional wildlife.
 - **Pixel art in the Rare Friends style.** Trees, rocks, decor, buildings, and every item (shaded on one light, with metal glints and gem facets), weapon, skill, spell and prayer icon are pixel art with an ink edge (and the white halo of the canonical sprites), drawn procedurally. Skills animate: axes swing and chips fly, pickaxes spark, lines are cast, anvils ring, fires crackle, agility hops.
+- **Magic that looks like magic.** Spells fly as glowing comets in their element's colours, trailing sparks and bursting on impact; staffs are held upright and raised as you cast. At night and in dungeons (now truly dark) spells, arrows, dragonfire, torches, fires and your own light all light the ground.
 - **A real spellbook.** Darts, Lances and Bursts in four elements; curses (Muddle, Wilt, Brittle) and Rootsnare; Gilded and Golden Touch, Forgeheart, Far Reach, Bonebloom, two enchantments and six ways to travel, paid in sigils.
 - **Six quests** from baking for the Realm Feast to defeating the Hollow King (level 92) in his throne room.
 - **A soundtrack for every region.** Eighteen procedural tracks in an old-school MIDI style (recorder, oboe, harp, pizzicato strings, glockenspiel, timpani), including a hand-written main theme, plus level-up and quest fanfares, synthesized live in WebAudio. Entering an area unlocks its track ("You have unlocked a new music track"), and the music player replays any you've found.
-- **Play together.** Everyone playing right now shares the Realm: you see other players' Friends walk around in their wardrobes and capes, chat in public (bubbles over their heads) or whisper (`@1234 hello`), and right-click a player to *Follow*, *Add-friend*, *Message*, *Wave*, *Ignore* or *Examine*. A friends list shows who's online and where, and friends near you add +5% XP. Peer to peer, no server: see [Playing together](#playing-together).
-- **Your other Friends follow you**, walking the tiles you leave behind like an old-school pet and adding XP by generation. **Rare Caskets** (simulated $RAREFRIENDS) hold relics and wardrobe pieces, and **Rare Market** traders in seven places sell nine bundles (tablets, food, XP lamps, Slayer points, a bow and arrows, a sigil sack, a fletcher's crate, a dragonslayer's kit, a wardrobe piece of your choice) on top of the caskets. **Progress saves per wallet.** Your **adventurer card** posts to X.
+- **Play together.** Everyone playing right now shares the Realm: you see other players' Friends walk around in their wardrobes and capes, chat in public (bubbles over their heads) or whisper (`@1234 hello`), and right-click a player to *Follow*, *Trade with*, *Add-friend*, *Message*, *Wave*, *Ignore* or *Examine*. **Trade items** old-school style (an offer screen, then an "are you sure?" screen), pick up what other players drop, and perform **14 emotes** they can see (dance, cheer, cry, jump for joy, the Skillcape emote…). A friends list shows who's online and where, and friends near you add +5% XP. Peer to peer, no server: see [Playing together](#playing-together).
+- **Your other Friends follow you**, walking the tiles you leave behind like an old-school pet and adding XP by generation. **Rare Caskets** (simulated $RAREFRIENDS) hold relics and wardrobe pieces, and **Rare Market** traders in seven places sell nine bundles (tablets, food, XP lamps, Slayer points, a bow and arrows, a sigil sack, a fletcher's crate, a dragonslayer's kit, a wardrobe piece of your choice) on top of the caskets. **Progress saves per wallet**, and a **save code** (Settings) keeps your whole adventure in one line of text you can restore on any browser. Your **adventurer card** posts to X.
 
 | | |
 | --- | --- |
@@ -47,8 +48,8 @@
 | ![Market Street](docs/market-street.png) | ![Night](docs/night.png) | ![Mastery cape](docs/mastery-cape.png) |
 | **The Rare Market** | **The Wizards' Tower** | **Wyrmreach and Old Cinder** |
 | ![Rare Market](docs/rare-market.png) | ![Wizards' Tower](docs/wizards-tower.png) | ![Wyrmreach](docs/wyrmreach.png) |
-| **Playing together** | **Right-click another player** | |
-| ![Two players](docs/multiplayer.png) | ![Player menu](docs/multiplayer-menu.png) | |
+| **Playing together** | **Right-click another player** | **Trading** |
+| ![Two players](docs/multiplayer.png) | ![Player menu](docs/multiplayer-menu.png) | ![Trading](docs/trade.png) |
 | **Every item, redrawn** | **Pixel-art buildings** | **Right-click in every interface** |
 | ![Items](docs/items.png) | ![Buildings](docs/buildings.png) | ![Bank menu](docs/bank-menu.png) |
 | **Friendhollow Castle** | **King Hollis's throne room** | **On the castle roof** |
@@ -149,7 +150,8 @@ npm run test:browser   # SDK mock-wallet browser runs of the custom host (a two-
                        #  • save written for the wallet and Friend, reload → "Continue your adventure"
                        #  • a phone in landscape (844 × 390, touch): tap to walk
                        #  • two players in two tabs: they see each other walk, right-click menu, Add-friend, the party bonus,
-                       #    public chat and bubbles, whispers with links stripped, going offline
+                       #    public chat and bubbles, whispers with links stripped, an emote, a dropped item taken,
+                       #    a full trade by clicks (offer, accept, confirm), going offline
                        #  • preview page: the main theme and a jukebox track play audibly on desktop and phone
 ```
 
@@ -183,6 +185,7 @@ over `postMessage`, the same way it relays saves.
   limits each player to five updates a second and three chat lines per five seconds, strips links from chat
   (anti-scam), and drops anyone you ignore. The game validates again.
 - **Your lists:** friends and ignored players are kept per wallet in the host page. Settings → *Online* turns it off.
+- **Trades and drops:** each game keeps its own inventory. A trade swaps only when both games hold both second-screen accepts for the same offers, and an accept is re-sent for a few seconds so a lost message can't leave half a trade. Dropped (tradeable) items are listed in your presence; another player's *Take* asks your game, which hands the item over to the first asker and removes it.
 - **What isn't shared:** each player's world still runs on their own machine. You see each other and talk, but
   monsters, trees and drops are your own. Identities are self-reported Friend IDs (proving them would need a wallet
   signature, which this game never asks for).
@@ -193,7 +196,7 @@ over `postMessage`, the same way it relays saves.
 
 - Saves live in this browser on this device, keyed by wallet address and Friend. They are client-side, so a determined player could edit their own (simulated) progress.
 - Caskets' RF balance and kept relics live in the SDK's session ledger and reset on reload; wardrobe pieces are saved.
-- Multiplayer shares players and chat, not the world simulation: everyone has their own monsters and drops, and there's no trading. Friend IDs are self-reported. Peers behind very strict networks may not connect (no TURN relay).
+- Multiplayer shares players, chat, trades and dropped items, not the world simulation: everyone has their own monsters and monster drops. Trades have no server referee, so a player who edits their own game could cheat a trade; the protocol only guarantees honest games agree. Friend IDs are self-reported. Peers behind very strict networks may not connect (no TURN relay).
 - Audio is synthesized in the browser and starts on your first tap. On iPhones before iOS 17, silent mode may keep it quiet.
 - Wallet support is the SDK's (injected / EIP-6963; no WalletConnect). Phones need a wallet with an in-app browser.
 - The browser tests use the SDK's mocked wallet. A real-wallet playtest on Robinhood mainnet is still needed; the build environment can't reach mainnet.

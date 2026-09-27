@@ -10,10 +10,11 @@ import { npcOverhead, type Pick } from "./engine.ts";
 import { FLOOR_Y, REGIONS, STOREY, T, W, H, complexAt, cornerHeight, floorAt, groundHeight, inBounds, isUnderground, objectAtTile, onLevel, realPoint, type Building, type Floor, type World, type WorldObject } from "./world.ts";
 import { itemArt } from "./icons.ts";
 import type { PeerView } from "./social.ts";
+import { emoteMotion, emoteParticles, type Motion } from "./emotes.ts";
 import { drawPixels, shadeHex } from "./pixel.ts";
 import { TEX_PER_HEIGHT, TEX_PER_TILE, beginTextures, shingleTexture, texturedQuad, texturedTriangle, wallTexture, type WallStyle } from "./textures.ts";
 import { decorArt, rockArt, treeArt } from "./scenery.ts";
-import { drawCloudShadows, drawEffects, playerPose, puff, treeShake, updateEffects, type Pose } from "./effects.ts";
+import { burst, drawCloudShadows, drawEffects, playerPose, puff, treeShake, updateEffects, type Pose } from "./effects.ts";
 import { drawAuras, drawFigure, figureArt } from "./wardrobe.ts";
 import { creatureSprite, friendSprite, type Mask } from "./sprites.ts";
 
@@ -57,6 +58,8 @@ export type Scene = {
   time?: number | null;
   /** Other players, and their Friends' art once it has loaded. */
   peers?: readonly PeerView[]; peerSprites?: (id: number) => GenerationSprites | null;
+  /** Items other players dropped from their packs (anyone may take them). */
+  peerDrops?: readonly { owner: number; u: number; id: string; n: number; x: number; y: number }[];
 };
 /** How dark it is (0 day … 1 deep night) and how warm the light is (dawn and dusk), for a time of day. */
 export function daylight(time: number | null | undefined) {
@@ -64,17 +67,19 @@ export function daylight(time: number | null | undefined) {
   const sun = -Math.cos(time * Math.PI * 2), dark = Math.max(0, Math.min(1, (0.25 - sun) / 0.75)), warm = Math.max(0, 1 - Math.abs(sun - 0.08) / 0.32);
   return { dark, warm, label: sun > 0.3 ? "Day" : sun < -0.3 ? "Night" : time < 0.5 ? "Dawn" : "Dusk" };
 }
-type Light = { x: number; y: number; r: number };
+type Light = { x: number; y: number; r: number; color?: string };
+/** A hex colour at an alpha, for gradients. */
+const hexA = (hex: string, alpha: number) => { const n = parseInt(hex.slice(1, 7), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${Math.max(0, Math.min(1, alpha)).toFixed(3)})`; };
 let nightCanvas: HTMLCanvasElement | null = null;
 /** Night: a blue dark over everything, with holes burnt through it by lamps, torches, fires and your own lantern. */
-function drawNight(ctx: CanvasRenderingContext2D, dark: number, warm: number, lights: readonly Light[]) {
+function drawNight(ctx: CanvasRenderingContext2D, dark: number, warm: number, lights: readonly Light[], tint = "16,20,48") {
   if (warm > 0.01) { ctx.fillStyle = `rgba(232,150,96,${(warm * 0.16).toFixed(3)})`; ctx.fillRect(0, 0, VIEW.width, VIEW.height); }
   if (dark < 0.01) return;
   const canvas = nightCanvas ??= document.createElement("canvas");
   if (canvas.width !== VIEW.width) { canvas.width = VIEW.width; canvas.height = VIEW.height; }
   const n = canvas.getContext("2d")!;
   n.globalCompositeOperation = "source-over"; n.clearRect(0, 0, VIEW.width, VIEW.height);
-  n.fillStyle = `rgba(16,20,48,${(0.64 * dark).toFixed(3)})`; n.fillRect(0, 0, VIEW.width, VIEW.height);
+  n.fillStyle = `rgba(${tint},${(0.64 * dark).toFixed(3)})`; n.fillRect(0, 0, VIEW.width, VIEW.height);
   n.globalCompositeOperation = "destination-out";
   for (const light of lights) {
     const glow = n.createRadialGradient(light.x, light.y, 0, light.x, light.y, light.r);
@@ -86,7 +91,7 @@ function drawNight(ctx: CanvasRenderingContext2D, dark: number, warm: number, li
   ctx.globalCompositeOperation = "lighter";
   for (const light of lights) {
     const glow = ctx.createRadialGradient(light.x, light.y, 0, light.x, light.y, light.r * 0.6);
-    glow.addColorStop(0, `rgba(120,80,30,${(0.35 * dark).toFixed(3)})`); glow.addColorStop(1, "rgba(0,0,0,0)");
+    glow.addColorStop(0, light.color ? hexA(light.color, 0.4 * dark) : `rgba(120,80,30,${(0.35 * dark).toFixed(3)})`); glow.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = glow; ctx.fillRect(light.x - light.r, light.y - light.r, light.r * 2, light.r * 2);
   }
   ctx.globalCompositeOperation = "source-over";
@@ -749,8 +754,8 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   const y0 = Math.max(cy - DRAW_DISTANCE, Math.min(...corners.map(c => c.y)) - 2), y1 = Math.min(cy + DRAW_DISTANCE, Math.max(...corners.map(c => c.y)) + 3);
   drawTerrain(ctx, scene, x0, y0, x1, y1);
   drawCloudShadows(ctx, project, camera, now, z, underground, scene.reducedMotion);
-  const hits: Hit[] = [], drawables: Drawable[] = [], light = daylight(underground ? null : scene.time), lights: Light[] = [];
-  const glow = (x: number, y: number, lift: number, radius: number) => { if (light.dark > 0.01) { const at = toScreen(camera, x, y, lift); if (at.x > -200 && at.x < VIEW.width + 200 && at.y > -200 && at.y < VIEW.height + 200) lights.push({ x: at.x, y: at.y, r: radius * z }); } };
+  const hits: Hit[] = [], drawables: Drawable[] = [], light = underground ? { dark: 0.95, warm: 0, label: "Dark" } : daylight(scene.time), lights: Light[] = [];
+  const glow = (x: number, y: number, lift: number, radius: number, color?: string) => { if (light.dark > 0.01) { const at = toScreen(camera, x, y, lift); if (at.x > -200 && at.x < VIEW.width + 200 && at.y > -200 && at.y < VIEW.height + 200) lights.push({ x: at.x, y: at.y, r: radius * z, color }); } };
   const player = game.player, pp = interpolate(player, game, alpha), playerDepth = depthOf(camera, pp.x, pp.y), depth = (x: number, y: number) => depthOf(camera, x, y);
   const me = toScreen(camera, pp.x, pp.y), meTop = me.y - 60 * z;
   const coversPlayer = (x: number, y: number) => { const at = toScreen(camera, x, y); return Math.abs(at.x - me.x) < 34 * z && at.y > meTop && at.y - 95 * z < me.y; };
@@ -867,6 +872,15 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
       });
     } });
   }
+  // Other players' drops, drawn like your own; "pground" picks index into scene.peerDrops.
+  (scene.peerDrops ?? []).forEach((drop, index) => {
+    if (!shown(drop.x, drop.y) || !isItem(drop.id)) return;
+    drawables.push({ depth: depth(drop.x, drop.y) - 0.29, draw: () => {
+      const s = toScreen(camera, drop.x, drop.y), size = 22 * z, ox = ((index % 3) - 1) * 5 * z;
+      drawIcon(ctx, item(drop.id).icon, s.x + ox, s.y - 3 * z, size);
+      hits.push({ x: s.x + ox - size / 2, y: s.y - 3 * z - size / 2, w: size, h: size, pick: { kind: "pground", id: index } });
+    } });
+  });
   // NPCs.
   for (const npc of game.npcs) {
     if (!shown(npc.x, npc.y)) continue;
@@ -929,11 +943,15 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     // Agility: glide from the start to the landing with a hop.
     let at = pp;
     if (player.activity?.kind === "obstacle") { const a = player.activity, total = world.objects[a.objectId].obstacle?.ticks ?? 3, k = Math.max(0, Math.min(1, 1 - (a.timer - alpha) / total)); at = { x: a.from.x + (a.to.x - a.from.x) * k, y: a.from.y + (a.to.y - a.from.y) * k, moving: true }; }
-    const s = toScreen(camera, at.x, at.y, pose.hop), feet = toScreen(camera, at.x, at.y), px = 3.2 * z, walking = at.moving || (!!player.path.length && alpha < 1);
-    const facing: Facing = pose.target ? (pose.side < 0 ? "left" : "right") : playerFacing;
+    const emote = player.emote && game.tick < player.emote.until ? player.emote : null, emoteT = emote ? (game.tick - emote.start + alpha) * TICK_MS / 1000 : 0;
+    const motion = emote ? emoteMotion(emote.id, emoteT, playerFacing, scene.reducedMotion) : null;
+    const s = toScreen(camera, at.x, at.y, pose.hop + (motion?.hop ?? 0)), feet = toScreen(camera, at.x, at.y), px = 3.2 * z, walking = at.moving || (!!player.path.length && alpha < 1);
+    const facing: Facing = motion?.facing ?? (pose.target ? (pose.side < 0 ? "left" : "right") : playerFacing);
+    if (emote) { const capeColor = player.equipment.cape && isItem(player.equipment.cape) ? item(player.equipment.cape).icon.color : undefined; emoteParticles(emote.id, emoteT, at.x, at.y, scene.reducedMotion, capeColor); if (emote.id === "skillcape") skillcapeRays(ctx, feet.x, feet.y - 30 * z, z, now, capeColor ?? "#e2d49e", scene.reducedMotion); }
     ellipse(ctx, feet.x, feet.y, 15 * z, 6 * z, "rgba(22,22,22,0.2)", "rgba(255,255,255,0.75)", 1.5);
     const bodyY = s.y - pose.bob * z;
-    // Your Friend with its worn pieces composited into the same pixel frame.
+    // Your Friend with its worn pieces composited into the same pixel frame (leaning and squashing for emotes).
+    const restoreMotion = applyMotion(ctx, motion, s.x, s.y);
     drawAuras(ctx, player.worn, s.x, bodyY, px, now, scene.reducedMotion, "back");
     const stride = walking ? Math.floor(now / 80) % 8 : 0, cloth = scene.reducedMotion ? 0 : walking ? stride % 4 : Math.floor(now / 520) % 4;
     const dressed = player.equipment.cape ? [...player.worn, player.equipment.cape] : player.worn;
@@ -941,6 +959,8 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     else ellipse(ctx, s.x, bodyY - 20 * z, 12 * z, 16 * z, INK);
     drawAuras(ctx, player.worn, s.x, bodyY, px, now, scene.reducedMotion, "front");
     drawHeld(ctx, scene, pose, s.x, bodyY, px, facing, project);
+    restoreMotion();
+    if (motion?.text) overheadText(ctx, motion.text, s.x, s.y - 74 * z, "#ffffff");
     if (player.hp < maxHpOf(game) || game.monsters.some(monster => monster.target && !monster.dead)) hpBar(ctx, s.x, s.y - 62 * z, player.hp / maxHpOf(game), z);
     for (const hit of scene.hits.filter(entry => entry.on === "player" && now - entry.at < 1100)) splat(ctx, s.x, s.y - 30 * z, hit.damage, z, (now - hit.at) / 1100);
     if (scene.chat && scene.chat.until > now) overheadText(ctx, scene.chat.text, s.x, s.y - 66 * z);
@@ -953,31 +973,105 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   } });
   drawables.sort((a, b) => a.depth - b.depth);
   for (const drawable of drawables) drawable.draw();
-  // Projectiles.
+  // Projectiles: spells fly as glowing comets with sparks (by element), arrows turn in flight, dragonfire roars; all of
+  // them light the ground in the dark.
   for (const projectile of scene.projectiles) {
-    const progress = (game.tick - projectile.start + alpha) / Math.max(1, projectile.end - projectile.start + 1);
+    // Spells take a little longer in the air than a tick, so the comet is seen crossing.
+    const span = Math.max(projectile.style === "magic" ? 1.5 : 1, projectile.end - projectile.start + 1), progress = (game.tick - projectile.start + alpha) / span;
     if (progress < 0 || progress > 1) continue;
-    const a = toScreen(camera, projectile.from.x, projectile.from.y, 28), b = toScreen(camera, projectile.to.x, projectile.to.y, 24);
-    const px = a.x + (b.x - a.x) * progress, py = a.y + (b.y - a.y) * progress - Math.sin(progress * Math.PI) * 20 * z;
-    ellipse(ctx, px, py, 8 * z, 8 * z, `${projectile.color}88`, null); ellipse(ctx, px, py, 4 * z, 4 * z, projectile.color, INK);
+    const lift0 = projectile.style === "fire" ? 34 : 28, lift1 = 24, arc = projectile.style === "arrow" ? 14 : projectile.style === "fire" ? 6 : 20;
+    const at = (t: number) => { const a = toScreen(camera, projectile.from.x, projectile.from.y, lift0), b = toScreen(camera, projectile.to.x, projectile.to.y, lift1);
+      return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t - Math.sin(t * Math.PI) * arc * z }; };
+    const head = at(progress), wx = projectile.from.x + (projectile.to.x - projectile.from.x) * progress, wy = projectile.from.y + (projectile.to.y - projectile.from.y) * progress;
+    const look = MAGIC_LOOKS[projectile.element ?? ""] ?? { core: "#ffffff", glow: projectile.color, spark: projectile.color };
+    if (!castFlashed.has(projectile) && projectile.style !== "arrow") {
+      castFlashed.add(projectile);
+      if (!scene.reducedMotion) burst("spark", projectile.from.x, projectile.from.y, lift0, 8, projectile.style === "fire" ? "#ffd27a" : look.spark, { speed: 0.6, up: 30, life: 0.5, size: 2 });
+    }
+    if (progress > 0.94 && !impacted.has(projectile)) {
+      impacted.add(projectile);
+      if (!scene.reducedMotion && projectile.style !== "arrow") {
+        burst("spark", projectile.to.x, projectile.to.y, lift1, 16, projectile.style === "fire" ? "#ffb060" : look.spark, { speed: 1.3, up: 50, life: 0.7, size: 2.5 });
+        burst("ring", projectile.to.x, projectile.to.y, 2, 1, projectile.style === "fire" ? "#f08a4b" : look.glow, { speed: 0, up: 0, life: 0.6, size: 2 });
+      }
+    }
+    if (projectile.style === "arrow") {
+      // A shaft pointed along its flight, head first.
+      const next = at(Math.min(1, progress + 0.04)), angle = Math.atan2(next.y - head.y, next.x - head.x), len = 13 * z;
+      ctx.save(); ctx.translate(head.x, head.y); ctx.rotate(angle);
+      ctx.strokeStyle = INK; ctx.lineWidth = 3.4 * Math.max(0.8, z); ctx.beginPath(); ctx.moveTo(-len, 0); ctx.lineTo(len * 0.4, 0); ctx.stroke();
+      ctx.strokeStyle = "#9c7a5c"; ctx.lineWidth = 1.6 * Math.max(0.8, z); ctx.stroke();
+      poly(ctx, [[len * 0.4, -3 * z], [len * 0.9, 0], [len * 0.4, 3 * z]], projectile.color, INK, 1);
+      poly(ctx, [[-len, 0], [-len - 3 * z, -3 * z], [-len + 4 * z, 0], [-len - 3 * z, 3 * z]], "#f7f5f0", INK, 1);
+      ctx.restore();
+      continue;
+    }
+    ctx.globalCompositeOperation = "lighter";
+    if (projectile.style === "fire") {
+      // Dragonfire: a rolling ball of flame with a smoky tail.
+      for (let k = 7; k >= 0; k--) {
+        const t = progress - k * 0.045;
+        if (t < 0) continue;
+        const p = at(t), flick = scene.reducedMotion ? 0 : Math.sin(now / 45 + k * 1.7) * 2 * z, r = (13 - k * 1.2) * z + flick;
+        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 1.6);
+        g.addColorStop(0, `rgba(255,236,160,${0.7 - k * 0.07})`); g.addColorStop(0.45, `rgba(240,130,60,${0.55 - k * 0.06})`); g.addColorStop(1, "rgba(120,40,20,0)");
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, r * 1.6, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.globalCompositeOperation = "source-over";
+      if (!scene.reducedMotion && Math.random() < 0.7) burst("spark", wx, wy, lift0, 1, Math.random() < 0.5 ? "#ffd27a" : "#f08a4b", { speed: 0.25, up: 20, life: 0.5, size: 2 });
+      glow(wx, wy, lift0, 180, "#f08a4b");
+      continue;
+    }
+    // A spell: a comet of light, a bright core, and sparks circling its head.
+    for (let k = 8; k >= 0; k--) {
+      const t = progress - k * 0.032;
+      if (t < 0) continue;
+      const p = at(t), r = (11 - k * 1) * z;
+      const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 2.2);
+      g.addColorStop(0, hexA(look.glow, 0.75 - k * 0.07)); g.addColorStop(1, hexA(look.glow, 0));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, r * 2.2, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalCompositeOperation = "source-over";
+    ellipse(ctx, head.x, head.y, 6.5 * z, 6.5 * z, look.core, INK, 1.4); ellipse(ctx, head.x - 2 * z, head.y - 2 * z, 2 * z, 2 * z, "#ffffff", null);
+    for (let i = 0; i < 4; i++) {
+      const a = (scene.reducedMotion ? 0 : now / 90) + i * Math.PI / 2, sx = head.x + Math.cos(a) * 9 * z, sy = head.y + Math.sin(a) * 5 * z, d = 2.2 * z;
+      poly(ctx, [[sx, sy - d], [sx + d, sy], [sx, sy + d], [sx - d, sy]], look.spark, null);
+    }
+    if (!scene.reducedMotion && Math.random() < 0.8) burst("spark", wx, wy, 26, 1, look.spark, { speed: 0.2, up: 12, life: 0.45, size: 2 });
+    glow(wx, wy, 26, 140, look.glow);
   }
   drawEffects(ctx, project, world, now, z);
   if (!underground) drawHaze(ctx, camera);
   // Night falls over the land (your Friend carries a small light; a lantern familiar a bigger one).
-  if (light.dark > 0.01 || light.warm > 0.01) { glow(pp.x, pp.y, 24, player.worn.includes("lantern_familiar") ? 150 : 90); drawNight(ctx, light.dark, light.warm, lights); }
+  if (light.dark > 0.01 || light.warm > 0.01) { glow(pp.x, pp.y, 24, player.worn.includes("lantern_familiar") ? 170 : underground ? 125 : 90); drawNight(ctx, light.dark, light.warm, lights, underground ? "6,6,10" : undefined); }
   // Click marker: an old-school cross, yellow for walking, red for actions.
   if (scene.marker && now - scene.marker.at < 450) {
     const s = toScreen(camera, scene.marker.x, scene.marker.y), k = 1 - (now - scene.marker.at) / 450, r = 8 * z * (0.6 + k * 0.4);
     ctx.strokeStyle = INK; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(s.x - r, s.y - r / 2); ctx.lineTo(s.x + r, s.y + r / 2); ctx.moveTo(s.x + r, s.y - r / 2); ctx.lineTo(s.x - r, s.y + r / 2); ctx.stroke();
     ctx.strokeStyle = scene.marker.red ? "#e07a7a" : "#f2e28f"; ctx.lineWidth = 2; ctx.stroke();
   }
-  // Underground vignette.
-  if (underground) {
-    const gradient = ctx.createRadialGradient(VIEW.width / 2, VIEW.height / 2, 120, VIEW.width / 2, VIEW.height / 2, 520);
-    gradient.addColorStop(0, "rgba(0,0,0,0)"); gradient.addColorStop(1, "rgba(0,0,0,0.65)"); ctx.fillStyle = gradient; ctx.fillRect(0, 0, VIEW.width, VIEW.height);
-  }
   lastHits = hits;
 }
+/** Items held upright rather than swung: staffs (art drawn on a diagonal) and bows (art already upright). */
+function uprightHold(id: string): "staff" | "bow" | null {
+  const equip = isItem(id) ? item(id).equip : undefined;
+  return equip?.staff ? "staff" : equip?.bow ? "bow" : null;
+}
+/** Draw a staff standing on its foot in the hand, or a bow held up by its grip. */
+function drawUpright(ctx: CanvasRenderingContext2D, art: HTMLCanvasElement, hx: number, hy: number, px: number, side: number, kind: "staff" | "bow", tilt = 0) {
+  const size = (kind === "staff" ? 15 : 12) * px;
+  ctx.save(); ctx.translate(hx, hy); ctx.scale(side, 1); ctx.imageSmoothingEnabled = false;
+  if (kind === "staff") { ctx.rotate(-0.68 + tilt); ctx.drawImage(art, -size * 0.16, -size * 0.94, size, size); }
+  else { ctx.rotate(-0.08 - tilt); ctx.drawImage(art, -size * 0.55, -size * 0.62, size, size); }
+  ctx.restore();
+}
+/** How each element's spells look in flight. */
+const MAGIC_LOOKS: Record<string, { core: string; glow: string; spark: string }> = {
+  wind: { core: "#ffffff", glow: "#bfe4f2", spark: "#ffffff" }, water: { core: "#e6f2ff", glow: "#5f9be0", spark: "#bfe0ff" },
+  earth: { core: "#f0dcae", glow: "#b08850", spark: "#d8c49a" }, fire: { core: "#fff2b0", glow: "#f08a4b", spark: "#ffd27a" },
+  hollow: { core: "#efe2ff", glow: "#8a62c8", spark: "#c7a8f0" }, moon: { core: "#ffffff", glow: "#c6bed4", spark: "#efe2ff" }, gold: { core: "#fff6c8", glow: "#e2c46a", spark: "#fff0a0" },
+};
+const castFlashed = new WeakSet<object>(), impacted = new WeakSet<object>();
 const maxHpOf = (game: Game) => levelForXp(game.player.xp.hitpoints);
 /** What the player holds: a skilling tool mid-swing, a fishing line, or their weapon (swinging when they attack). */
 function drawHeld(ctx: CanvasRenderingContext2D, scene: Scene, pose: Pose, x: number, y: number, px: number, facing: Facing, project: (x: number, y: number, lift?: number) => { x: number; y: number }) {
@@ -990,6 +1084,13 @@ function drawHeld(ctx: CanvasRenderingContext2D, scene: Scene, pose: Pose, x: nu
   }
   if (!id) return;
   const art = itemArt(item(id).icon), size = 12 * px, hx = x + side * (6 + pose.reach * 6) * px, hy = y - 7 * px;
+  const upright = uprightHold(id);
+  if (upright && !pose.tool) {
+    // Staffs stand upright in the hand (raised as a spell leaves them); bows are held up, string towards you.
+    const casting = player.combat !== null && player.attackTimer >= attackSpeed(player) - 1 && !scene.reducedMotion ? Math.sin(Math.min(1, alpha * 1.4) * Math.PI) : 0;
+    drawUpright(ctx, art, x + side * 7 * px, y - 3 * px - casting * 4 * px, px, side, upright, casting * 0.35);
+    return;
+  }
   ctx.save(); ctx.translate(hx, hy); ctx.scale(side, 1); ctx.rotate(angle + 0.5); ctx.imageSmoothingEnabled = false;
   ctx.drawImage(art, -size * 0.25, -size * 0.78, size, size);
   ctx.restore();
@@ -1025,15 +1126,20 @@ function drawNpc(ctx: CanvasRenderingContext2D, scene: Scene, npc: Npc, at: { x:
 const ROYAL_WEAR: Record<string, readonly string[]> = { king: ["paper_crown", "blue_cape"] };
 /** Another player: their Friend (canonical art once loaded, family art until then), wardrobe, cape and weapon, a name tag (green for friends) and their chat. */
 function drawPeer(ctx: CanvasRenderingContext2D, scene: Scene, peer: PeerView, hits: Hit[]) {
-  const { camera, now } = scene, z = camera.zoom, s = toScreen(camera, peer.x, peer.y), facing = screenFacing(camera, { x: peer.p.hx, y: peer.p.hy || 1 });
+  const { camera, now } = scene, z = camera.zoom, turned = screenFacing(camera, { x: peer.p.hx, y: peer.p.hy || 1 });
+  const motion = peer.p.emote ? emoteMotion(peer.p.emote, peer.emoteT, turned, scene.reducedMotion) : null, s = toScreen(camera, peer.x, peer.y, motion?.hop ?? 0), facing = motion?.facing ?? turned;
+  if (peer.p.emote) emoteParticles(peer.p.emote, peer.emoteT, peer.x, peer.y, scene.reducedMotion, peer.p.cape && isItem(peer.p.cape) ? item(peer.p.cape).icon.color : undefined);
   const sprites = scene.peerSprites?.(peer.p.id) ?? null, stride = peer.moving ? Math.floor(now / 80) % 8 : 0;
   const rows = sprites ? friendRows(sprites, facing, peer.moving, stride) : peer.moving && Math.floor(now / 160) % 2 ? friendSprite(peer.p.family, peer.p.id).step : friendSprite(peer.p.family, peer.p.id).idle;
   const px = 3.2 * z, worn = peer.p.cape ? [...peer.p.worn, peer.p.cape] : peer.p.worn, cloth = scene.reducedMotion ? 0 : peer.moving ? stride % 4 : Math.floor(now / 520) % 4;
   ellipse(ctx, s.x, s.y, 15 * z, 6 * z, "rgba(22,22,22,0.18)", peer.friend ? "rgba(159,224,168,0.9)" : "rgba(255,255,255,0.6)", 1.5);
+  const restoreMotion = applyMotion(ctx, motion, s.x, s.y);
   drawAuras(ctx, worn, s.x, s.y, px, now, scene.reducedMotion, "back");
   const rect = drawFigure(ctx, figureArt(rows, worn, facing, cloth), s.x, s.y + 2 * z, px);
   drawAuras(ctx, worn, s.x, s.y, px, now, scene.reducedMotion, "front");
-  if (peer.p.weapon && isItem(peer.p.weapon)) {
+  restoreMotion();
+  if (peer.p.weapon && isItem(peer.p.weapon) && uprightHold(peer.p.weapon)) drawUpright(ctx, itemArt(item(peer.p.weapon).icon), s.x + (facing === "left" ? -1 : 1) * 7 * px, s.y - 3 * px, px, facing === "left" ? -1 : 1, uprightHold(peer.p.weapon)!);
+  else if (peer.p.weapon && isItem(peer.p.weapon)) {
     const art = itemArt(item(peer.p.weapon).icon), size = 12 * px, side = facing === "left" ? -1 : 1, swing = peer.p.activity && !scene.reducedMotion ? Math.sin(now / 180) * 0.6 : 0;
     ctx.save(); ctx.translate(s.x + side * 6 * px, s.y - 7 * px); ctx.scale(side, 1); ctx.rotate(0.75 + swing); ctx.imageSmoothingEnabled = false; ctx.drawImage(art, -size * 0.25, -size * 0.78, size, size); ctx.restore();
   }
@@ -1042,6 +1148,23 @@ function drawPeer(ctx: CanvasRenderingContext2D, scene: Scene, peer: PeerView, h
   const tag = `#${peer.p.id} (level-${peer.p.combat})`, tagY = rect.y - 2;
   ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.strokeText(tag, s.x, tagY); ctx.fillStyle = peer.friend ? "#9fe0a8" : "#ffffff"; ctx.fillText(tag, s.x, tagY);
   if (peer.said) overheadText(ctx, peer.said, s.x, tagY - 14);
+  else if (motion?.text) overheadText(ctx, motion.text, s.x, tagY - 14, "#ffffff");
+}
+/** Lean and squash a figure about its feet for an emote; returns the undo. */
+function applyMotion(ctx: CanvasRenderingContext2D, motion: Motion | null, x: number, feetY: number) {
+  if (!motion || (motion.lean === 0 && motion.squash === 1)) return () => {};
+  ctx.save(); ctx.translate(x, feetY); ctx.rotate(motion.lean); ctx.scale(1 + (1 - motion.squash) * 0.4, motion.squash); ctx.translate(-x, -feetY);
+  return () => ctx.restore();
+}
+/** The skillcape emote: rays of the cape's colour turning behind you. */
+function skillcapeRays(ctx: CanvasRenderingContext2D, x: number, y: number, z: number, now: number, color: string, reduced: boolean) {
+  ctx.save(); ctx.globalCompositeOperation = "lighter";
+  const turn = reduced ? 0 : now / 900;
+  for (let i = 0; i < 10; i++) {
+    const a = turn + i * Math.PI / 5, r = 70 * z;
+    ctx.fillStyle = hexA(color, 0.28); ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a - 0.1) * r, y + Math.sin(a - 0.1) * r * 0.8); ctx.lineTo(x + Math.cos(a + 0.1) * r, y + Math.sin(a + 0.1) * r * 0.8); ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
 }
 function questMarkerFor(game: Game, npcId: string): string | null {
   const q = game.player.quests;

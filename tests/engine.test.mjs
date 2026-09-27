@@ -697,3 +697,57 @@ test("Merchants pay more for their trade; the Archmage starts you in magic", () 
   while (g.dialogue) continueDialogue(g);
   for (const id of ["scholar_hat", "scholar_robe", "staff", "breeze_sigil", "thought_sigil"]) assert(has(p, id), id);
 });
+
+test("Save codes: a whole adventure in one line, for its own Friend only; emotes", async () => {
+  const { makeSaveCode, restoreSaveCode } = await import("../games/rarefriends-realm/savecode.ts");
+  const { performEmote, emoteProblem } = await import("../games/rarefriends-realm/engine.ts");
+  const g = newGame(), p = g.player;
+  p.xp.fishing = 50_000; give(p, "yew_bow"); p.quests.friends_feast = 2; p.wardrobe.push("rose_cape");
+  const code = await makeSaveCode(g);
+  assert.match(code, /^RFR1-7730-[0-9a-z]+-[A-Za-z0-9_-]+$/);
+  assert(code.length < 4000, `compact (${code.length} characters)`);
+  const fresh = newGame();
+  assert.equal(await restoreSaveCode(fresh, code), null);
+  assert.equal(fresh.player.xp.fishing, 50_000); assert(has(fresh.player, "yew_bow")); assert(fresh.player.wardrobe.includes("rose_cape"));
+  assert.match(await restoreSaveCode(fresh, code.slice(0, -3)), /damaged/, "a truncated code is caught");
+  assert.match(await restoreSaveCode(newGame({ friendId: 3412 }), code), /Friend #7730/, "only for its own Friend");
+  // Emotes: performed, ended by walking; the skillcape one needs a mastery cape.
+  assert(performEmote(g, "dance")); assert.equal(p.emote.id, "dance");
+  walkTo(g, p.x + 3, p.y); run(g, 2); assert.equal(p.emote, null, "walking ends an emote");
+  assert(emoteProblem(g, "skillcape")); p.equipment.cape = "attack_cape"; assert.equal(emoteProblem(g, "skillcape"), null);
+});
+
+test("Trading: request, offers (changes clear accepts), a second screen, the swap; a lost message is re-sent", async () => {
+  const { Trades } = await import("../games/rarefriends-realm/trade.ts");
+  const ga = newGame(), gb = newGame({ friendId: 3412 });
+  const queue = [], lose = { next: false };
+  const wire = (from, to) => (target, act) => { if (lose.next && act.kind === "trade-accept" && act.stage === 2 && from === 7730) { lose.next = false; return; } queue.push({ from, to, act }); };
+  const a = new Trades(wire(7730, 3412)), b = new Trades(wire(3412, 7730)), desks = { 7730: [a, ga], 3412: [b, gb] };
+  const flush = () => { while (queue.length) { const { from, to, act } = queue.shift(); const [desk, g] = desks[to]; desk.receive(g, from, act, performance.now()); } };
+  give(ga.player, "coins", 1000); give(gb.player, "yew_bow");
+  a.request(ga, 3412, 0); flush();
+  assert(b.incoming.has(7730), "B sees the request");
+  b.request(gb, 7730, 0); flush();
+  assert(a.view() && b.view(), "both trade windows open");
+  a.offer(ga, "coins", 500); b.offer(gb, "yew_bow", 1); flush();
+  assert.deepEqual(b.view().theirs, [{ id: "coins", n: 500 }]);
+  a.accept(ga); flush();
+  assert(b.view().theirAccept, "B sees A's accept");
+  a.offer(ga, "coins", 100); flush();
+  assert(!a.view().myAccept && !b.view().theirAccept, "a change clears both accepts");
+  a.accept(ga); b.accept(gb); flush();
+  assert.equal(a.view().stage, 2); assert.equal(b.view().stage, 2);
+  const beforeA = count(ga.player, "coins"), beforeB = count(gb.player, "coins");
+  lose.next = true; // A's second accept to B gets lost on the way
+  a.accept(ga); b.accept(gb); flush();
+  assert.equal(a.view(), null, "A swapped (it holds both accepts)");
+  assert(b.view(), "B is still waiting for A's lost accept");
+  a.tick(performance.now() + 2000); flush();
+  assert.equal(b.view(), null, "the re-sent accept completes B's side");
+  assert(has(ga.player, "yew_bow")); assert.equal(count(ga.player, "coins"), beforeA - 600);
+  assert(!has(gb.player, "yew_bow")); assert.equal(count(gb.player, "coins"), beforeB + 600);
+  // Untradeable things can't be offered.
+  a.request(ga, 3412, 0); flush(); b.request(gb, 7730, 0); flush();
+  give(ga.player, "attack_cape"); a.offer(ga, "attack_cape", 1);
+  assert.deepEqual(a.view().mine, []);
+});

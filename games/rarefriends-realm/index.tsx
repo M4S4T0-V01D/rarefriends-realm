@@ -5,21 +5,23 @@ import type { GameComponentProps } from "@rarefriends/friendsdk/runtime";
 import { formatGameAmount } from "@rarefriends/friendsdk/ui";
 import { expectedReward, maximumPrize, type GamePlay, type GameSnapshot } from "@rarefriends/friendsdk/game";
 import { createFriendReader, type GenerationSprites } from "@rarefriends/friendsdk/sprites";
-import { FAMILY_NAMES, FAMILY_PERKS, RELICS, RF_BUNDLES, SKILL_ICONS, SPELLS, WARDROBE, item, type Skill } from "./data.ts";
+import { FAMILY_NAMES, FAMILY_PERKS, RELICS, RF_BUNDLES, SKILL_ICONS, SPELLS, WARDROBE, isItem, item, type Skill } from "./data.ts";
 import { QUESTS, questPoints, MAX_QUEST_POINTS } from "./content.ts";
-import { TICK_MS, combatLevel, createGame, message, totalLevel, type Game, type Projectile } from "./state.ts";
+import { TICK_MS, combatLevel, createGame, giveOrDrop, message, totalLevel, type Game, type Projectile } from "./state.ts";
 import {
-  chooseOption, closeInterfaces, collectFromCasket, continueDialogue, grantBundle, menuFor, tailorChoices, unlockMusic, restore, serialize, setFollower, setHeld, setRelics, tick, toggleRun, walkTo, type OwnedFriend, type Selection,
+  chooseOption, closeInterfaces, collectFromCasket, performEmote, continueDialogue, grantBundle, menuFor, tailorChoices, unlockMusic, restore, serialize, setFollower, setHeld, setRelics, tick, toggleRun, walkTo, type OwnedFriend, type Selection,
 } from "./engine.ts";
 import { PITCH, VIEW, ZOOM, daylight, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
 import {
-  BankModal, ChatBox, ContextMenu, DialogueBox, FriendPortrait, HelpModal, LampModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
+  BankModal, ChatBox, ContextMenu, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
   cancelLongPress, longPress, rightClick, type MenuEntry, type Settings, type Tab,
 } from "./panels.tsx";
 import { REGULAR_SPRITES } from "./regulars.ts";
-import { NET_CHAT, NET_CHAT_IN, NET_ONLINE, NET_PRESENCE, NET_SOCIAL, NET_STATE, cleanChat, cleanId, cleanPresence, type NetState, type Presence } from "./net.ts";
+import { NET_ACT, NET_ACT_IN, NET_CHAT, NET_CHAT_IN, NET_ONLINE, NET_PRESENCE, NET_SOCIAL, NET_STATE, cleanAct, cleanChat, cleanId, cleanPresence, type Act, type NetState, type Presence } from "./net.ts";
 import { Players, presenceOf } from "./social.ts";
-import { HOST_HELLO, HOST_STATE, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, parseRoster, type ShareAction, type ShareOutcome } from "./roster.ts";
+import { Trades } from "./trade.ts";
+import { makeSaveCode, restoreSaveCode } from "./savecode.ts";
+import { HOST_HELLO, HOST_STATE, SAVE_EXPORT, SAVE_EXPORT_RESULT, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, parseRoster, type ShareAction, type ShareOutcome } from "./roster.ts";
 import { RealmAudio, trackFor, trackById, type SfxName, type TrackId } from "./audio.ts";
 import { renderCard, shareText } from "./card.ts";
 import { skillArt } from "./icons.ts";
@@ -61,9 +63,12 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const [levelUps, setLevelUps] = useState<{ skill: Skill; level: number }[]>([]), [quest, setQuest] = useState<string | null>(null), [dead, setDead] = useState(false);
   const [settings, setSettingsState] = useState<Settings>(DEFAULT_SETTINGS), [roster, setRoster] = useState<OwnedFriend[]>([]), [rosterState, setRosterState] = useState<"waiting" | "ready" | "none">("waiting");
   const [hosted, setHosted] = useState<"waiting" | "linked" | "none">("waiting"), [hasSave, setHasSave] = useState<{ total: number; combat: number; qp: number; where: string } | null>(null);
-  const [tailorPick, setTailorPick] = useState("");
+  const [tailorPick, setTailorPick] = useState(""), [backupStatus, setBackupStatus] = useState("");
   // Playing together: other players (from the host), who you're following, and a whisper to start in the chat box.
   const players = useRef(new Players()), following = useRef<number | null>(null);
+  // Trades, and other players' drops we've asked to take (owner:uid) or are walking to.
+  const sendAct = (to: number, act: Act) => window.parent.postMessage({ type: NET_ACT, to, act }, "*");
+  const trades = useRef(new Trades(sendAct)), asked = useRef(new Set<string>()), walkingTo = useRef<{ owner: number; u: number; x: number; y: number } | null>(null);
   const [netState, setNetState] = useState<NetState>(players.current.state), [whisper, setWhisper] = useState<{ text: string; at: number } | null>(null);
   const lastMinimapPoint = useRef<React.MouseEvent<HTMLCanvasElement> | null>(null);
   const [snapshot, setSnapshot] = useState<GameSnapshot | null>(null), [busy, setBusy] = useState(false), [casketError, setCasketError] = useState(""), [reveal, setReveal] = useState<CasketResult[] | null>(null);
@@ -142,6 +147,10 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         };
         setShareStatus(messages[event.data.result as ShareOutcome] ?? messages.failed); return;
       }
+      if (event.data?.type === SAVE_EXPORT_RESULT) {
+        setBackupStatus(event.data.result === "copied" ? "Save code copied. Paste it somewhere safe (a note, an email to yourself)." : event.data.result === "saved" ? "Save file downloaded. Keep it somewhere safe." : "Couldn't copy from this browser. Try Download save file.");
+        return;
+      }
       if (event.data?.type === NET_STATE) {
         // Checked again here (the host already has): only well-formed players, at most 60.
         const d = event.data as Record<string, unknown>, ids = (list: unknown) => Array.isArray(list) ? list.map(cleanId).filter((id): id is number => id !== null) : [];
@@ -152,6 +161,21 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         for (const peer of peers.slice(0, 30)) loadFriendSpriteRef.current?.(peer.id);
         if (game.current && was !== "online" && status === "online") message(game.current, "You're online: other players in the Realm can see your Friend and your public chat.", "info");
         return;
+      }
+      if (event.data?.type === NET_ACT_IN) {
+        const from = cleanId(event.data.from), act = cleanAct(event.data.act), state = game.current;
+        if (from === null || !act || !state) return;
+        if (act.kind.startsWith("trade")) trades.current.receive(state, from, act, performance.now());
+        else if (act.kind === "take" && act.u !== undefined) {
+          // Someone wants something we dropped: first come, first served.
+          const index = state.ground.findIndex(entry => entry.shared && entry.uid === act.u);
+          if (index < 0) sendAct(from, { kind: "gone", u: act.u });
+          else { const [entry] = state.ground.splice(index, 1); sendAct(from, { kind: "give", u: entry.uid, id: entry.id, n: entry.n }); }
+        } else if (act.kind === "give" && act.u !== undefined && act.id && act.n && asked.current.delete(`${from}:${act.u}`) && isItem(act.id) && item(act.id).tradeable !== false) {
+          giveOrDrop(state, act.id, act.n); message(state, `You pick up ${act.n > 1 ? `${act.n.toLocaleString()} × ` : ""}${item(act.id).name.toLowerCase()} (dropped by Friend #${from}).`);
+          audio.current?.sfx("pickup");
+        } else if (act.kind === "gone" && act.u !== undefined && asked.current.delete(`${from}:${act.u}`)) message(state, "Too late: someone else took it.");
+        refresh(); return;
       }
       if (event.data?.type === NET_CHAT_IN) {
         const from = cleanId(event.data.from), text = cleanChat(event.data.text), state = game.current;
@@ -177,7 +201,9 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       if (navigator.webdriver) (window as unknown as { __realm?: unknown }).__realm = {
         game: () => game.current, camera: () => ({ ...camera.current }), refresh: () => refresh(),
         /** Other players as drawn now, and whether we're online. */
-        peers: () => players.current.view(performance.now()).map(peer => ({ id: peer.p.id, x: peer.p.x, y: peer.p.y, friend: peer.friend, said: peer.said })), net: () => players.current.state.status,
+        peers: () => players.current.view(performance.now()).map(peer => ({ id: peer.p.id, x: peer.p.x, y: peer.p.y, friend: peer.friend, said: peer.said, emote: peer.p.emote })), net: () => players.current.state.status,
+        drops: () => players.current.drops(),
+        takeDrop: (index: number) => { const drop = players.current.drops()[index]; if (drop) { walkingTo.current = { owner: drop.owner, u: drop.u, x: drop.x, y: drop.y }; } },
         /** Fix the time of day (0 midnight … 0.5 noon), or null to follow the clock. */
         time: (value: number | null) => { fixedTime = value; },
         view: (zoom: number, pitch: number, angle = 0) => { setSettings({ ...live.current.settings, zoom }); camera.current.pitch = pitch; camera.current.angle = angle; cameraGoal.current = null; },
@@ -235,6 +261,13 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           // Playing together: tell the others where we are, follow whoever we're following, and count friends nearby.
           if (players.current.state.status !== "offline") window.parent.postMessage({ type: NET_PRESENCE, presence: presenceOf(state) }, "*");
           state.player.nearFriends = players.current.nearFriends(state);
+          trades.current.tick(now);
+          const target = walkingTo.current;
+          if (target && Math.max(Math.abs(target.x - state.player.x), Math.abs(target.y - state.player.y)) <= 0) {
+            walkingTo.current = null;
+            if (players.current.drops().some(drop => drop.owner === target.owner && drop.u === target.u)) { asked.current.add(`${target.owner}:${target.u}`); sendAct(target.owner, { kind: "take", u: target.u }); }
+            else message(state, "It's gone.");
+          }
           if (following.current !== null) {
             const them = players.current.get(following.current);
             if (!them) { message(state, "They've gone out of sight."); following.current = null; }
@@ -307,6 +340,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         projectiles: projectiles.current, sfx: (name, gain) => audio.current?.sfx(name as SfxName, gain),
         time: current === "playing" && live.current.settings.dayNight !== false ? timeOfDay() : null,
         peers: current === "playing" ? players.current.view(now) : [], peerSprites: id => followerSprites.current.get(id) ?? null,
+        peerDrops: current === "playing" ? players.current.drops() : [],
       });
       if (mini && current === "playing" && now - lastHud > 90) {
         lastHud = now; const size = mini.canvas.width;
@@ -374,14 +408,19 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       const noun = `${players.current.name(p.id)} (level-${p.combat})`, friend = players.current.isFriend(p.id);
       return [
         { verb: "Follow", noun, tone: "plain" as const, run: () => { following.current = p.id; message(state, `You follow ${players.current.name(p.id)}.`); } },
+        { verb: "Trade with", noun, tone: "plain" as const, run: () => { if (Math.max(Math.abs(p.x - state.player.x), Math.abs(p.y - state.player.y)) > 12) message(state, "You need to be closer to trade.", "warn"); else trades.current.request(state, p.id, performance.now()); refresh(); } },
         { verb: friend ? "Remove-friend" : "Add-friend", noun, tone: "plain" as const, run: () => { window.parent.postMessage({ type: NET_SOCIAL, op: friend ? "remove" : "add", id: p.id }, "*"); message(state, friend ? `${players.current.name(p.id)} removed from your friends list.` : `${players.current.name(p.id)} added to your friends list.`); } },
         { verb: "Message", noun, tone: "plain" as const, run: () => setWhisper({ text: `@${p.id} `, at: performance.now() }) },
-        { verb: "Wave", noun, tone: "plain" as const, run: () => say(`*waves at #${p.id}*`) },
+        { verb: "Wave", noun, tone: "plain" as const, run: () => { state.player.heading = { x: Math.sign(p.x - state.player.x), y: Math.sign(p.y - state.player.y) || 1 }; performEmote(state, "wave"); refresh(); } },
         { verb: "Ignore", noun, tone: "plain" as const, run: () => { window.parent.postMessage({ type: NET_SOCIAL, op: "ignore", id: p.id }, "*"); message(state, `You won't see ${players.current.name(p.id)} or their chat any more.`); } },
         { verb: "Examine", noun, tone: "plain" as const, run: () => message(state, `${players.current.name(p.id)}: combat level ${p.combat}, total level ${p.total}${p.region ? `, in ${p.region}` : ""}.`) },
       ];
     });
-    return options.length ? [options[0], ...social, ...options.slice(1)] : social;
+    // Other players' drops: Take.
+    const dropped = picks.filter(pick => pick.kind === "pground").flatMap(pick => { const drop = players.current.drops()[pick.id]; return drop ? [drop] : []; });
+    const takes = dropped.map(drop => ({ verb: "Take", noun: `${isItem(drop.id) ? item(drop.id).name : drop.id}${drop.n > 1 ? ` (${drop.n.toLocaleString()})` : ""}`, tone: "item" as const,
+      run: () => { walkTo(state, drop.x, drop.y); walkingTo.current = { owner: drop.owner, u: drop.u, x: drop.x, y: drop.y }; } }));
+    return [...takes, ...(options.length ? [options[0], ...social, ...options.slice(1)] : social)];
   };
   const act = (x: number, y: number) => {
     const state = game.current;
@@ -441,7 +480,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       const key = event.key.toLowerCase();
       if (KEY_DIRECTIONS[key]) { held.current.add(key); setHeld(state, heldDirection(held.current, camera.current.angle)); event.preventDefault(); return; }
       if (CAMERA_KEYS.has(key)) { held.current.add(key); event.preventDefault(); return; }
-      const fn = /^f([1-9])$/.exec(key);
+      const fn = /^f(10|[1-9])$/.exec(key);
       if (fn) { setTab(TABS[Number(fn[1]) - 1].id); event.preventDefault(); return; }
       if (key === "escape") { setMenu(null); setModal(null); setSelection(null); closeInterfaces(state); setLevelUps([]); refresh(); return; }
       if (key === " " || key === "spacebar") {
@@ -482,12 +521,15 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     // "@1234 hello" whispers to Friend #1234; anything else is said out loud, to everyone near enough to see you.
     const whispered = /^@(\d{1,15})\s+(.+)$/.exec(text);
     if (whispered) {
-      const to = Number(whispered[1]), words = whispered[2].slice(0, 80);
+      const to = Number(whispered[1]), words = cleanChat(whispered[2]) ?? "";
+      if (!words) return;
       if (!players.current.get(to)) message(state, `${players.current.name(to)} isn't online.`, "warn");
       else { message(state, `To ${players.current.name(to)}: ${words}`, "private"); window.parent.postMessage({ type: NET_CHAT, text: words, to }, "*"); }
       refresh(); return;
     }
-    const words = text.slice(0, 80);
+    // Said as everyone else will see it (links stripped).
+    const words = cleanChat(text) ?? "";
+    if (!words) return;
     message(state, `${FAMILY_NAMES[state.player.familyId]} #${state.player.friendId}: ${words}`, "public");
     if (players.current.state.status === "online") window.parent.postMessage({ type: NET_CHAT, text: words }, "*");
     chat.current = { text: words, until: performance.now() + 3500 }; refresh();
@@ -607,13 +649,23 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           {sideOpen && <SidePanel game={state} tab={tab} setTab={setTab} selection={selection} setSelection={setSelection} openMenu={(x, y, entries) => setMenu({ x, y, entries })}
             refresh={refresh} roster={roster} rosterState={rosterState} friendSprites={followerSprites.current} loadFriend={loadFriendSprite}
             net={netState} onSocial={(op, id) => window.parent.postMessage({ type: NET_SOCIAL, op, id }, "*")} onWhisper={id => setWhisper({ text: `@${id} `, at: performance.now() })}
-            onOnline={on => window.parent.postMessage({ type: NET_ONLINE, on }, "*")} settings={settings} setSettings={setSettings}
+            onOnline={on => window.parent.postMessage({ type: NET_ONLINE, on }, "*")} backupStatus={backupStatus}
+            onExportSave={action => { const state = game.current; if (state) void makeSaveCode(state).then(text => window.parent.postMessage({ type: SAVE_EXPORT, action, text }, "*")); }}
+            onRestoreSave={async code => { const state = game.current; if (!state) return "The game isn't ready."; const error = await restoreSaveCode(state, code);
+              if (!error) { const at = realPoint(state.world, state.player.x, state.player.y); camera.current.x = at.x; camera.current.y = at.y; message(state, "Your adventure has been restored from a save code.", "info"); } return error; }} settings={settings} setSettings={setSettings}
             friend={friend.current} trackName={audio.current?.trackName ?? ""} trackId={audio.current?.trackId ?? ""} playTrack={id => { audio.current?.play(id as TrackId); audio.current?.unlock(); setSettings({ ...settings, autoMusic: false }); }} openCard={openCard} openHelp={() => setModal("help")} paused={paused} saved={savedText}
             relicCounts={snapshot?.inventory.map(Number) ?? [0, 0, 0, 0]} openCaskets={() => setModal("caskets")} />}
           {selection && <div className="realm-selection" role="status">{selection.kind === "item" ? `Use ${player.inventory[selection.slot] ? itemName(player.inventory[selection.slot]!.id) : "item"} ->` : `Cast ${SPELLS.find(spell => spell.id === selection.spell)?.name ?? "spell"} ->`} pick a target <button type="button" onClick={() => setSelection(null)}>Cancel</button></div>}
 
           {state.ui.bank && <BankModal game={state} refresh={refresh} onClose={() => { state.ui.bank = false; refresh(); }} openMenu={(x, y, entries) => setMenu({ x, y, entries })} />}
           <LampModal game={state} refresh={refresh} />
+          {(() => { const view = trades.current.view(); return view ? <TradeModal game={state} view={view} openMenu={(x, y, entries) => setMenu({ x, y, entries })}
+            onOffer={(id, n) => { trades.current.offer(state, id, n); refresh(); }} onAccept={() => { trades.current.accept(state); refresh(); }} onDecline={() => { trades.current.decline(state); refresh(); }} /> : null; })()}
+          {!trades.current.view() && trades.current.incoming.size > 0 && <div className="realm-trade-requests" role="status">
+            {[...trades.current.incoming.keys()].map(from => <div key={from}><span>{players.current.name(from)} wants to trade.</span>
+              <button type="button" className="realm-primary" onClick={() => { trades.current.request(state, from, performance.now()); refresh(); }}>Trade</button>
+              <button type="button" onClick={() => { const entry = trades.current.incoming.get(from); if (entry) sendAct(from, { kind: "trade-decline", trade: entry.trade }); trades.current.incoming.delete(from); refresh(); }}>Decline</button></div>)}
+          </div>}
           {state.ui.shop === "__market" && (
             <Modal title="Rare Market" onClose={() => { state.ui.shop = null; refresh(); }} wide>
               <p className="realm-sim">Simulated $RAREFRIENDS. No real tokens, contracts or transactions. Balance: <b>{snapshot ? rf(snapshot.rfBalance) : "…"}</b></p>

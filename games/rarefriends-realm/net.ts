@@ -16,11 +16,36 @@ export const NET_SOCIAL = "rarefriends-realm:net-social";
 export const NET_ONLINE = "rarefriends-realm:net-online";
 export const NET_STATE = "rarefriends-realm:net-state";
 export const NET_CHAT_IN = "rarefriends-realm:net-chat-in";
+/** A direct message between two players' games (trades, taking a dropped item): NET_ACT out, NET_ACT_IN in. */
+export const NET_ACT = "rarefriends-realm:net-act";
+export const NET_ACT_IN = "rarefriends-realm:net-act-in";
+export const ACT_KINDS = ["trade-request", "trade-open", "trade-offer", "trade-accept", "trade-decline", "trade-done", "take", "give", "gone"] as const;
+export type Act = { kind: typeof ACT_KINDS[number]; trade?: string; rev?: number; stage?: number; items?: { id: string; n: number }[]; u?: number; id?: string; n?: number };
+/** A shared ground item (something a player dropped from their pack). */
+export type Drop = { u: number; id: string; n: number; x: number; y: number };
+/** A direct message from another player, cleaned up; null if it isn't one. */
+export function cleanAct(raw: unknown): Act | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.kind !== "string" || !(ACT_KINDS as readonly string[]).includes(r.kind)) return null;
+  const act: Act = { kind: r.kind as Act["kind"] };
+  if (typeof r.trade === "string" && /^[a-z0-9]{4,24}$/.test(r.trade)) act.trade = r.trade;
+  const small = int(r.rev, 0, 1e6); if (small !== null) act.rev = small;
+  const stage = int(r.stage, 1, 2); if (stage !== null) act.stage = stage;
+  if (Array.isArray(r.items)) act.items = r.items.slice(0, 28).flatMap(entry => { const e = entry as Record<string, unknown>, id = word(e?.id, 40), n = int(e?.n, 1, 2_147_483_647); return id && n ? [{ id, n }] : []; });
+  const u = int(r.u, 0, 1e12); if (u !== null) act.u = u;
+  const itemId = word(r.id, 40); if (itemId) act.id = itemId;
+  const n = int(r.n, 1, 2_147_483_647); if (n !== null) act.n = n;
+  return act;
+}
 
 /** What every player shares about their Friend. */
 export type Presence = {
   id: number; family: number; x: number; y: number; hx: number; hy: number; moving: boolean;
   worn: string[]; cape: string | null; weapon: string | null; activity: string | null; combat: number; total: number; region: string;
+  emote: string | null;
+  /** Items this player dropped from their pack, which anyone may pick up. */
+  drops: Drop[];
 };
 export type NetStatus = "offline" | "connecting" | "online";
 export type NetState = { status: NetStatus; peers: Presence[]; friends: number[]; ignored: number[]; players: number };
@@ -39,12 +64,15 @@ export function cleanPresence(raw: unknown): Presence | null {
     id: who, family: int(r.family, 0, 8) ?? 0, x, y, hx: int(r.hx, -1, 1) ?? 0, hy: int(r.hy, -1, 1) ?? 1, moving: r.moving === true,
     worn, cape: word(r.cape), weapon: word(r.weapon), activity: word(r.activity), combat: int(r.combat, 3, 200) ?? 3, total: int(r.total, 1, 3000) ?? 1,
     region: typeof r.region === "string" ? r.region.slice(0, 32).replace(/[^\w' ]/g, "") : "",
+    emote: word(r.emote),
+    drops: Array.isArray(r.drops) ? r.drops.slice(0, 16).flatMap(entry => { const e = entry as Record<string, unknown>, u = int(e?.u, 0, 1e12), id = word(e?.id, 40), n = int(e?.n, 1, 2_147_483_647), dx = int(e?.x, 0, 239), dy = int(e?.y, 0, 279);
+      return u !== null && id && n && dx !== null && dy !== null ? [{ u, id, n, x: dx, y: dy }] : []; }) : [],
   };
 }
 /** Chat text from another player: one line, no control characters, no links (anti-scam), at most 80 characters. */
 export function cleanChat(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
-  const text = raw.replace(/[\u0000-\u001f\u007f-\u009f​-‏‪-‮]/g, "")
+  const text = raw.replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e]/g, "")
     .replace(/\b(?:https?:\/\/|www\.)\S+/gi, "[link removed]").replace(/\b[a-z0-9-]+\.(?:com|io|xyz|net|org|gg|app|link|co|me|to|ly)\b\S*/gi, "[link removed]")
     .trim().slice(0, 80);
   return text ? text : null;

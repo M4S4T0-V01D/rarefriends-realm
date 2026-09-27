@@ -217,10 +217,20 @@ and the badge by the minimap shows how many are online.
 | Player menu | Right-click a player: *Follow*, *Add-friend* / *Remove-friend*, *Message*, *Wave*, *Ignore*, *Examine* |
 | Friends list | Friends tab: who's online, where and at what level; message or remove; add by Friend # |
 | Party bonus | +5% XP while a friend is within 12 tiles on your storey |
+| Trade | Right-click a player → *Trade with* (they accept from the prompt). Click or right-click items to offer (*Offer-1/5/10/All*), both press Accept, check the second screen, and Accept again. Any change clears both accepts. Untradeable items (quest items, capes) can't be offered |
+| Dropped items | Things you drop from your pack show on other players' screens; *Take* one and it's yours if you're first |
+| Emotes | Emotes tab (F10), or right-click → *Perform*: Wave, Bow, Dance, Cheer, Clap, Laugh, Cry, Think, Jump for joy, Yes, No, Spin, Flex, and Skillcape (wearing a mastery cape). Walking ends one; others see them |
 | Go offline | Settings → *Online* |
 
 Links are stripped from chat, chat is rate-limited, and ignored players disappear. Monsters, trees and drops are
 still your own (each player's world runs on their own machine).
+
+## Save codes
+
+Browser saves can be lost (cleared site data, a new device). Settings → **Copy save code** or **Download save file**
+gives you `RFR1-<Friend #>-<checksum>-<data>`: your whole adventure, deflated into one line. Paste it into **Restore
+from a code** on any browser, connected with the same Friend, to get everything back. A code only restores onto its
+own Friend, a checksum catches a damaged copy, and every field is validated like a browser save.
 
 ## Saves
 

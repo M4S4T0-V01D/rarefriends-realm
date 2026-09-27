@@ -104,7 +104,7 @@
 /* The side panel: an ink-dark case with a paper hairline, pixel tab icons, and roomy slots. */
 .realm-side { position: absolute; right: 6px; bottom: 6px; width: 276px; height: 388px; background: var(--panel); border: 2px solid #000; box-shadow: 3px 3px 0 #000, inset 0 0 0 1px #4a4743; display: flex; flex-direction: column; color: #e8e5de;
   background-image: radial-gradient(rgba(255,255,255,0.035) 1px, transparent 1.2px); background-size: 6px 6px; }
-.realm-tabs { display: grid; grid-template-columns: repeat(9, 1fr); border-bottom: 2px solid #000; background: #1c1b1a; }
+.realm-tabs { display: grid; grid-template-columns: repeat(10, 1fr); border-bottom: 2px solid #000; background: #1c1b1a; }
 .realm-tabs button { height: 36px; display: grid; place-items: center; border: 0; border-right: 1px solid #000; background: linear-gradient(#3a3835, #2a2927); padding: 0; }
 .realm-tabs button:last-child { border-right: 0; }
 .realm-tabs button:hover { background: linear-gradient(#46433f, #33312e); }
@@ -281,6 +281,24 @@
 .realm-social li button { min-height: 20px !important; padding: 0 6px !important; font-size: 11px; }
 .realm-add-friend { display: flex; align-items: center; gap: 6px; font-size: 12px; }
 .realm-add-friend input { width: 90px; font: inherit; padding: 2px 4px; border: 2px solid #161616; background: #fff; color: #161616; }
+.realm-restore { display: grid; gap: 4px; font-size: 12px; margin: 6px 0; }
+.realm-restore input { font: inherit; font-size: 11px; padding: 3px 5px; border: 2px solid #161616; background: #fff; color: #161616; }
 .realm-link { background: none !important; border: none !important; padding: 0 2px !important; min-height: 0 !important; text-decoration: underline; color: inherit; cursor: pointer; font: inherit; }
 .chat-private { color: #d9a6f2; }
 .realm-online { position: absolute; left: -4px; bottom: -4px; padding: 1px 6px; font-size: 10px; font-weight: 700; background: #1c1b1a; color: #9fe0a8; border: 2px solid var(--ink); border-radius: 9px; box-shadow: 2px 2px 0 #000; cursor: pointer; }
+.realm-icon-grid.emotes { grid-template-columns: repeat(4, 1fr); }
+.realm-icon-grid.emotes button { display: grid; justify-items: center; gap: 2px; padding: 4px 2px; }
+.realm-icon-grid.emotes small { font-size: 9px; line-height: 1.1; }
+
+/* Trading */
+.realm-trade { display: grid; grid-template-columns: 1fr 1fr 1.1fr; gap: 10px; align-items: start; }
+.realm-trade .realm-inventory.small { grid-template-columns: repeat(7, 1fr); grid-auto-rows: 38px; gap: 2px; height: auto; max-height: 168px; overflow: auto; }
+.realm-trade .realm-inventory.small .realm-slot { width: auto; height: 38px; }
+.realm-trade h3 { font-size: 12px; margin: 0 0 4px; }
+.realm-trade-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; min-height: 90px; padding: 4px; background: #2b2926; border: 2px solid #000; align-content: start; }
+.realm-trade-confirm .realm-trade { grid-template-columns: 1fr 1fr; }
+.realm-trade-confirm ul { margin: 4px 0; padding-left: 18px; font-size: 12px; }
+.realm-trade-requests { position: absolute; left: 50%; top: 56px; transform: translateX(-50%); display: grid; gap: 4px; z-index: 12; }
+.realm-trade-requests div { display: flex; align-items: center; gap: 6px; padding: 5px 8px; background: var(--paper); border: 2px solid var(--ink); box-shadow: 3px 3px 0 #000; font-size: 12px; }
+.realm-trade-buttons { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.realm-trade-buttons .realm-note { margin: 0; }

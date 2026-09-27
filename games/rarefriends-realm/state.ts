@@ -52,6 +52,8 @@ export type Player = {
   courseStep: number; kills: number; deaths: number; overhead: { text: string; until: number } | null; music: string[];
   familyId: number; friendId: number; relics: number[]; followerGeneration: number | null; tutorial: number;
   lastHitBy: number | null; created: number; queuedSpell: string | null; castTimer: number;
+  /** The emote you're performing, and the tick it ends (not saved). */
+  emote?: { id: string; start: number; until: number } | null;
   /** Friends from your friends list playing near you right now (not saved): +5% XP while any are. */
   nearFriends?: number;
 };
@@ -62,9 +64,11 @@ export type Monster = {
   curses: Partial<Record<"attack" | "strength" | "defence" | "bound", number>>;
 };
 export type Npc = { uid: number; id: string; x: number; y: number; prev: Point; spawn: Point; wander: number; heading: Point; moved: number; busy: number };
-export type GroundItem = { uid: number; id: string; n: number; x: number; y: number; expires: number };
+/** An item on the ground. `shared` ones (dropped from your pack) other players see and may pick up. */
+export type GroundItem = { uid: number; id: string; n: number; x: number; y: number; expires: number; shared?: boolean };
 export type Fire = { uid: number; x: number; y: number; expires: number };
-export type Projectile = { from: Point; to: Point; start: number; end: number; color: string };
+/** Something flying: a spell (glowing, by element), an arrow, or dragonfire. */
+export type Projectile = { from: Point; to: Point; start: number; end: number; color: string; style?: "magic" | "arrow" | "fire"; element?: string };
 export type GameEvent =
   | { type: "hit"; on: "player" | "monster"; uid?: number; damage: number; tick: number }
   | { type: "xp"; skill: Skill; amount: number; tick: number }
@@ -245,11 +249,11 @@ export function take(player: Player, id: string, n = 1): boolean {
   }
   return true;
 }
-export function dropItem(game: Game, id: string, n: number, x: number, y: number, ticks = 200) {
-  const definition = item(id), existing = definition.stackable ? game.ground.find(entry => entry.id === id && entry.x === x && entry.y === y) : undefined;
+export function dropItem(game: Game, id: string, n: number, x: number, y: number, ticks = 200, shared = false) {
+  const definition = item(id), existing = definition.stackable ? game.ground.find(entry => entry.id === id && entry.x === x && entry.y === y && !!entry.shared === shared) : undefined;
   if (existing) { existing.n += n; existing.expires = game.tick + ticks; return; }
-  if (definition.stackable) game.ground.push({ uid: game.nextUid++, id, n, x, y, expires: game.tick + ticks });
-  else for (let i = 0; i < Math.min(n, 28); i++) game.ground.push({ uid: game.nextUid++, id, n: 1, x, y, expires: game.tick + ticks });
+  if (definition.stackable) game.ground.push({ uid: game.nextUid++, id, n, x, y, expires: game.tick + ticks, shared });
+  else for (let i = 0; i < Math.min(n, 28); i++) game.ground.push({ uid: game.nextUid++, id, n: 1, x, y, expires: game.tick + ticks, shared });
   if (game.ground.length > 400) game.ground.splice(0, game.ground.length - 400);
 }
 

@@ -301,7 +301,7 @@ const SKILL_PAINTERS: Record<Skill, Painter> = {
   slayer: p => { p.disc(8.5, 7, 6, 5.5, "#e8e4dc"); p.rect(5, 11, 7, 4, "#e8e4dc"); p.rect(5, 5, 3, 3, INK); p.rect(10, 5, 3, 3, INK); p.rect(8, 9, 1, 2, INK); p.line(6, 14, 11, 14, INK); p.line(1, 16, 16, 1, "#cf6e6e", 1); },
 };
 export const skillArt = (skill: Skill) => icon16(`skill:${skill}`, SKILL_PAINTERS[skill]);
-export type TabIcon = "combat" | "skills" | "quests" | "inventory" | "equipment" | "prayer" | "magic" | "friends" | "settings";
+export type TabIcon = "combat" | "skills" | "quests" | "inventory" | "equipment" | "prayer" | "magic" | "friends" | "settings" | "emotes";
 const TAB_PAINTERS: Record<TabIcon, Painter> = {
   combat: p => { p.line(2, 14, 13, 3, INK, 3); p.line(2, 14, 13, 3, STEEL); p.line(15, 14, 4, 3, INK, 3); p.line(15, 14, 4, 3, STEEL); p.rect(3, 12, 3, 3, GOLD); p.rect(12, 12, 3, 3, GOLD); },
   skills: p => { for (let i = 0; i < 3; i++) p.rect(2 + i * 5, 12 - i * 4, 4, 4 + i * 4, [SAGE, BLUE, GOLD][i]); },
@@ -311,6 +311,7 @@ const TAB_PAINTERS: Record<TabIcon, Painter> = {
   prayer: p => { p.rect(7, 1, 3, 15, PAPER); p.rect(3, 5, 11, 3, PAPER); p.poly([[7, 1], [10, 1], [10, 5], [14, 5], [14, 8], [10, 8], [10, 16], [7, 16], [7, 8], [3, 8], [3, 5], [7, 5]], null); },
   magic: p => { p.line(3, 16, 12, 4, INK, 3); p.line(3, 16, 12, 4, WOOD); p.poly([[12, 0], [13.5, 3.5], [17, 4.5], [13.5, 5.5], [12, 9], [10.5, 5.5], [7, 4.5], [10.5, 3.5]], "#b6c3e0"); },
   friends: p => { p.disc(8.5, 7, 6, 5.5, INK, INK); p.rect(5, 12, 2, 3, INK); p.rect(10, 12, 2, 3, INK); p.rect(6, 6, 2, 2, "#ffffff"); p.rect(10, 6, 2, 2, "#ffffff"); p.rect(4, 3, 2, 2, INK); p.rect(11, 3, 2, 2, INK); },
+  emotes: p => { p.disc(8.5, 8.5, 7, 7, GOLD); p.rect(5, 5, 2, 3, INK); p.rect(10, 5, 2, 3, INK); p.line(5, 11, 8.5, 13, INK); p.line(8.5, 13, 12, 11, INK); },
   settings: p => { p.disc(8.5, 8.5, 6, 6, "#8b8e92"); for (const [x, y] of [[8, 0], [8, 15], [0, 8], [15, 8], [2, 2], [14, 14], [2, 14], [14, 2]] as Pt[]) p.rect(x, y, 2, 2, "#8b8e92"); p.disc(8.5, 8.5, 2.5, 2.5, "#242322"); },
 };
 export const tabArt = (tab: TabIcon) => icon16(`tab:${tab}`, TAB_PAINTERS[tab]);
@@ -360,6 +361,31 @@ export function prayerArt(id: string): HTMLCanvasElement {
     else if (kind === "eye") { p.disc(9, 9, 7, 4, "#ffffff"); p.disc(9, 9, 2.5, 2.5, color); p.set(9, 9, INK); }
     else if (kind === "protect") { p.poly([[3, 3], [15, 3], [15, 9], [9, 16], [3, 9]], color); p.line(5, 12, 13, 4, INK, 2); p.line(5, 4, 13, 12, INK, 2); }
     else p.poly([[9, 1], [11, 7], [17, 9], [11, 11], [9, 17], [7, 11], [1, 9], [7, 7]], color);
+    p.halo();
+  });
+}
+/** Emote icons: a Friend's face with the emote's expression. */
+export function emoteArt(id: string): HTMLCanvasElement {
+  return pixelArt(`emote:${id}`, 20, 20, p => {
+    const face = id === "skillcape" ? "#e2d49e" : id === "cry" ? "#c7d3dc" : id === "flex" ? "#e8c7a8" : "#efe3c4";
+    p.disc(10, 11, 7, 7, face);
+    const eyes = (y = 9) => { p.rect(7, y, 2, 2, INK); p.rect(11, y, 2, 2, INK); };
+    switch (id) {
+      case "wave": eyes(); p.line(7, 14, 12, 14, INK); p.poly([[15, 2], [18, 1], [19, 6], [16, 7]], face); break;
+      case "bow": p.line(6, 10, 9, 10, INK); p.line(11, 10, 14, 10, INK); p.line(8, 14, 12, 14, INK); break;
+      case "dance": eyes(); p.line(7, 13, 10, 15, INK); p.line(10, 15, 13, 13, INK); p.rect(15, 1, 1, 5, INK); p.rect(16, 1, 2, 1, INK); p.rect(14, 5, 2, 2, INK); break;
+      case "cheer": eyes(8); p.disc(10, 14, 2.5, 2, "#8a3a3a", null); p.line(2, 4, 4, 1, "#d8b6b4", 2); p.line(16, 1, 18, 4, "#afbccb", 2); break;
+      case "clap": eyes(); p.line(7, 14, 12, 14, INK); p.poly([[2, 14], [5, 11], [6, 15]], face); p.poly([[18, 14], [15, 11], [14, 15]], face); break;
+      case "laugh": p.line(6, 9, 9, 8, INK); p.line(11, 8, 14, 9, INK); p.disc(10, 13.5, 3, 2.2, "#8a3a3a", null); break;
+      case "cry": eyes(); p.line(7, 15, 10, 13, INK); p.line(10, 13, 13, 15, INK); p.rect(7, 11, 1, 3, "#5f9be0"); p.rect(12, 11, 1, 3, "#5f9be0"); break;
+      case "think": eyes(); p.line(8, 14, 12, 13, INK); p.disc(16, 3, 2.5, 2.5, "#ffffff"); p.rect(15, 2, 2, 1, INK); p.set(16, 4, INK); break;
+      case "jump": eyes(8); p.disc(10, 13, 2, 2, "#8a3a3a", null); p.line(3, 19, 17, 19, INK); break;
+      case "yes": eyes(); p.line(7, 13, 10, 15, INK); p.line(10, 15, 13, 13, INK); p.line(15, 3, 16, 5, "#5a9a5a", 2); p.line(16, 5, 19, 1, "#5a9a5a", 2); break;
+      case "no": eyes(); p.line(7, 14, 12, 14, INK); p.line(15, 1, 19, 5, "#cf6e6e", 2); p.line(19, 1, 15, 5, "#cf6e6e", 2); break;
+      case "spin": eyes(); p.line(7, 14, 12, 14, INK); p.polyline([[2, 6], [4, 2], [8, 1]], INK); p.polyline([[18, 14], [16, 18], [12, 19]], INK); break;
+      case "flex": p.line(6, 9, 9, 10, INK); p.line(11, 10, 14, 9, INK); p.line(7, 14, 13, 14, INK); p.disc(17, 8, 2.5, 2.5, face); break;
+      case "skillcape": eyes(); p.line(7, 13, 10, 15, INK); p.line(10, 15, 13, 13, INK); p.poly([[3, 19], [6, 12], [14, 12], [17, 19]], "#6f7ea6"); break;
+    }
     p.halo();
   });
 }
