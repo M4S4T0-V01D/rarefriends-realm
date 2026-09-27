@@ -13,8 +13,8 @@ import type { PeerView } from "./social.ts";
 import type { Strike, Weather } from "./weather.ts";
 import { emoteMotion, emoteParticles, type Motion } from "./emotes.ts";
 import { drawPixels, shadeHex } from "./pixel.ts";
-import { TEX_PER_HEIGHT, TEX_PER_TILE, beginTextures, shingleTexture, texturedQuad, texturedTriangle, wallTexture, type WallStyle } from "./textures.ts";
-import { decorArt, fireArt, rockArt, treeArt } from "./scenery.ts";
+import { TEX_PER_HEIGHT, TEX_PER_TILE, beginTextures, groundTexture, shingleTexture, texturedQuad, texturedTriangle, wallTexture, type GroundStyle, type WallStyle } from "./textures.ts";
+import { campfireLogs, decorArt, fireArt, rockArt, treeArt } from "./scenery.ts";
 import { burst, drawCloudShadows, drawEffects, playerPose, puff, treeShake, updateEffects, type Pose } from "./effects.ts";
 import { drawAuras, drawFigure, figureArt } from "./wardrobe.ts";
 import { creatureSprite, friendSprite, type Mask } from "./sprites.ts";
@@ -32,6 +32,11 @@ const TERRAIN_COLORS: Record<number, string> = {
   [T.DEEP]: "#95a7bb", [T.SWAMP]: "#adb29c", [T.SNOW]: "#f3f2ee", [T.STONE]: "#c8c5be", [T.WOOD]: "#cdb9a0", [T.GRAVEL]: "#bfb8ad",
   [T.DUNGEON]: "#5d5c63", [T.BRIDGE]: "#ab9278", [T.CLIFF]: "#8f8a83", [T.WALL]: "#a9a59e", [T.FARMLAND]: "#bca787", [T.ICE]: "#dfe7ec", [T.CARPET]: "#c9a3a3",
   [T.ASH]: "#8e8a86", [T.LAVA]: "#d98a5c",
+};
+/** Pixel ground textures by terrain (water and lava keep their animated detail instead). */
+const GROUND_STYLE: Partial<Record<number, GroundStyle>> = {
+  [T.GRASS]: "grass", [T.DARK_GRASS]: "lush", [T.PATH]: "dirt", [T.GRAVEL]: "gravel", [T.COBBLE]: "cobble", [T.STONE]: "flag", [T.SAND]: "sand", [T.SNOW]: "snow",
+  [T.WOOD]: "plank", [T.BRIDGE]: "plank", [T.FARMLAND]: "furrow", [T.DUNGEON]: "dungeon", [T.ICE]: "ice", [T.CARPET]: "carpet", [T.ASH]: "ash", [T.SWAMP]: "swamp",
 };
 /** Terrain classes for inked edges: a line is drawn where the class changes. */
 const EDGE_CLASS: Record<number, number> = {
@@ -271,8 +276,11 @@ function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, x0: number, y0
     ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.lineTo(cx, cy); ctx.lineTo(dx, dy); ctx.closePath();
     ctx.fillStyle = terrainFill(terrain, variation); ctx.fill();
     // Texture details.
-    const h = hash(y, x), detailed = !small && Math.abs(x - camera.x) + Math.abs(y - camera.y) < near;
-    if (detailed) {
+    const h = hash(y, x), detailed = !small && Math.abs(x - camera.x) + Math.abs(y - camera.y) < near, style = GROUND_STYLE[terrain];
+    if (detailed && texturesOn && style) {
+      // Pixel texture mapped onto the tile (corners a, b along x, d along y), in the same style as the buildings.
+      texturedQuad(ctx, groundTexture(style, TERRAIN_COLORS[terrain], Math.floor(h * 4)), { x: ax, y: ay }, { x: bx, y: by }, { x: dx, y: dy }, TEX_PER_TILE, TEX_PER_TILE);
+    } else if (detailed) {
       ctx.strokeStyle = "rgba(22,22,22,0.22)"; ctx.fillStyle = "rgba(22,22,22,0.18)"; ctx.lineWidth = Math.max(0.6, z * 0.8);
       switch (terrain) {
         case T.GRASS: case T.DARK_GRASS:
@@ -366,14 +374,47 @@ function drawSpot(ctx: CanvasRenderingContext2D, camera: Camera, object: WorldOb
   if (!reduced) for (let i = 0; i < 3; i++) { const b = (now / 600 + i / 3) % 1; ellipse(ctx, sx + (i - 1) * 5 * z, sy - b * 10 * z, 1.5 * z, 1.5 * z, "rgba(255,255,255,0.8)", null); }
   return { x: sx - 18 * z, y: sy - 12 * z, w: 36 * z, h: 22 * z };
 }
+/** A brick smelting furnace: a plinth, a squat tapering kiln, a chimney with smoke, and an arched mouth full of fire facing you. */
+function drawFurnace(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObject, flicker: number, hit: (h: number, w?: number) => { x: number; y: number; w: number; h: number }) {
+  const { camera, now } = scene, z = camera.zoom, ox = object.x, oy = object.y, stone = "#8f8a83";
+  box(ctx, camera, ox, oy, 0.96, 0.96, 7, "#6d6b67", "#7a7772", "#65625e", 0, INK, "brick");
+  box(ctx, camera, ox, oy, 0.8, 0.8, 24, stone, shade(stone, 0.06), shade(stone, -0.06), 7, INK, "brick");
+  box(ctx, camera, ox, oy, 0.62, 0.62, 7, "#7a7772", shade(stone, 0.02), shade(stone, -0.1), 31, INK, "brick");
+  // The mouth, on the side facing the camera: a dark arch with fire inside and a glowing sill.
+  let face = [0, 1], best = -Infinity;
+  for (const [nx, ny] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) { const { rx, ry } = rotate(camera, nx, ny); if (rx + ry > best) { best = rx + ry; face = [nx, ny]; } }
+  const [nx, ny] = face, fx = ox + nx * 0.405, fy = oy + ny * 0.405, tx = -ny, ty = nx;
+  const at = (u: number, lift: number) => { const p = toScreen(camera, fx + tx * u, fy + ty * u, lift); return [p.x, p.y] as const; };
+  const arch: (readonly [number, number])[] = [at(-0.22, 8), at(-0.22, 20)];
+  for (let i = 1; i < 6; i++) { const a = Math.PI - i * Math.PI / 6; arch.push(at(Math.cos(a) * 0.22, 20 + Math.sin(a) * 7)); }
+  arch.push(at(0.22, 20), at(0.22, 8));
+  poly(ctx, arch, "#241816", INK, 1.2);
+  const mouth = toScreen(camera, fx, fy, 8), glow = ctx.createRadialGradient(mouth.x, mouth.y, 0, mouth.x, mouth.y, 16 * z);
+  glow.addColorStop(0, `rgba(255,190,110,${0.75 + flicker * 0.25})`); glow.addColorStop(1, "rgba(200,70,40,0)");
+  ctx.save(); ctx.beginPath(); arch.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.clip();
+  ctx.fillStyle = glow; ctx.fillRect(mouth.x - 20 * z, mouth.y - 30 * z, 40 * z, 32 * z);
+  drawPixels(ctx, fireArt(scene.reducedMotion ? 0 : Math.floor(now / 110 + ox * 3) % 8, 9, 11, 3 + (ox % 2)), mouth.x, mouth.y + 1 * z, ART * z * 0.9);
+  ctx.restore();
+  // A stone lintel over the arch, and the glowing sill under it.
+  box(ctx, camera, fx - nx * 0.02, fy - ny * 0.02, Math.abs(tx) * 0.56 + Math.abs(nx) * 0.1, Math.abs(ty) * 0.56 + Math.abs(ny) * 0.1, 3, "#a39e96", "#9a958d", "#86817a", 27);
+  poly(ctx, [at(-0.24, 8), at(0.24, 8), at(0.24, 6.5), at(-0.24, 6.5)], `rgba(240,150,80,${0.55 + flicker * 0.35})`, null);
+  // The chimney, and smoke.
+  const cx = ox - nx * 0.12, cy = oy - ny * 0.12;
+  box(ctx, camera, cx, cy, 0.3, 0.3, 20, "#6d6b67", "#77746f", "#5f5c58", 38, INK, "brick");
+  box(ctx, camera, cx, cy, 0.38, 0.38, 3, "#57555a", "#65625e", "#4f4d4a", 58);
+  if (!scene.reducedMotion) {
+    const top = toScreen(camera, cx, cy, 61);
+    for (let i = 0; i < 4; i++) { const k = ((now / 1800) + i / 4 + hash(ox, oy)) % 1; ellipse(ctx, top.x + Math.sin(k * 5 + i) * 4 * z + k * 8 * z, top.y - k * 34 * z, (3 + k * 7) * z, (2.5 + k * 5) * z, `rgba(120,116,112,${(0.45 * (1 - k)).toFixed(3)})`, null); }
+  }
+  return hit(64, 44);
+}
 function drawStation(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObject): { x: number; y: number; w: number; h: number } {
   const { camera, now, game } = scene, z = camera.zoom, { x: sx, y: sy } = toScreen(camera, object.x, object.y), ox = object.x, oy = object.y;
   const flicker = scene.reducedMotion ? 0.5 : (Math.sin(now / 90 + ox) + 1) / 2;
   const hit = (h: number, w = 40) => ({ x: sx - w / 2 * z, y: sy - h * z, w: w * z, h: (h + 12) * z });
   switch (object.kind) {
     case "range": box(ctx, camera, ox, oy, 0.8, 0.7, 20, "#57555a", "#6d6b67", "#5a5856"); ellipse(ctx, sx, sy - 22 * z, 6 * z, 3 * z, `rgba(227,165,140,${0.6 + flicker * 0.4})`, INK); return hit(30);
-    case "furnace": box(ctx, camera, ox, oy, 0.9, 0.9, 34, "#8f8a83", "#a39e96", "#8a857e");
-      poly(ctx, [[sx - 8 * z, sy - 4 * z], [sx - 8 * z, sy - 16 * z], [sx, sy - 12 * z], [sx, sy]], `rgba(227,150,110,${0.7 + flicker * 0.3})`); return hit(44);
+    case "furnace": return drawFurnace(ctx, scene, object, flicker, hit);
     case "anvil": box(ctx, camera, ox, oy, 0.3, 0.3, 12, "#6d6b67", "#57555a", "#4a4846"); box(ctx, camera, ox, oy, 0.7, 0.35, 6, "#8b8e92", "#6d6b67", "#5a5856", 12); return hit(24);
     case "bank": box(ctx, camera, ox, oy, 0.9, 0.6, 18, "#e2d7ad", "#b89c86", "#a88f74"); box(ctx, camera, ox, oy, 0.9, 0.1, 14, C.rose, shade(C.rose, -0.1), shade(C.rose, -0.15), 18); return hit(36);
     case "altar": box(ctx, camera, ox, oy, 0.9, 0.6, 16, PAPER, "#d6d3cc", "#c8c5be"); box(ctx, camera, ox, oy, 0.4, 0.62, 2, C.rose, C.rose, shade(C.rose, -0.1), 16);
@@ -860,13 +901,14 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   // Fires.
   for (const fire of game.fires) {
     if (!shown(fire.x, fire.y)) continue;
-    glow(fire.x, fire.y, 10, 190, "#f08a3c", 1, true);
+    glow(fire.x, fire.y, 8, 160, "#f08a3c", 1, true);
     drawables.push({ depth: depth(fire.x, fire.y), draw: () => {
       const s = toScreen(camera, fire.x, fire.y), frame = scene.reducedMotion ? 0 : Math.floor(now / 110 + fire.uid * 3) % 8;
-      for (const [dx, dy] of [[-6, 0], [6, 0], [0, 3]]) { ctx.strokeStyle = INK; ctx.lineWidth = 4 * z; ctx.beginPath(); ctx.moveTo(s.x + dx * z - 6 * z, s.y + dy * z); ctx.lineTo(s.x + dx * z + 6 * z, s.y + dy * z - 3 * z); ctx.stroke(); ctx.strokeStyle = "#8a6a50"; ctx.lineWidth = 2 * z; ctx.stroke(); }
-      ellipse(ctx, s.x, s.y - 12 * z, 24 * z, 18 * z, "rgba(240,170,110,0.16)", null);
-      drawPixels(ctx, fireArt(frame, 18, 26, fire.uid % 3 + 1), s.x, s.y + 3 * z, ART * z);
-      hits.push({ x: s.x - 14 * z, y: s.y - 32 * z, w: 28 * z, h: 36 * z, pick: { kind: "fire", id: fire.uid } });
+      // A small fire sitting in a pile of logs.
+      ellipse(ctx, s.x, s.y - 6 * z, 16 * z, 11 * z, "rgba(240,170,110,0.16)", null);
+      drawPixels(ctx, campfireLogs(fire.uid), s.x, s.y + 6 * z, ART * z);
+      drawPixels(ctx, fireArt(frame, 12, 17, fire.uid % 3 + 1), s.x, s.y - 4 * z, ART * z);
+      hits.push({ x: s.x - 30 * z, y: s.y - 38 * z, w: 60 * z, h: 44 * z, pick: { kind: "fire", id: fire.uid } });
     } });
   }
   // Ground items.
@@ -967,7 +1009,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     const restoreMotion = applyMotion(ctx, motion, s.x, s.y);
     drawAuras(ctx, player.worn, s.x, bodyY, px, now, scene.reducedMotion, "back");
     const stride = walking ? Math.floor(now / 80) % 8 : 0, cloth = scene.reducedMotion ? 0 : walking ? stride % 4 : Math.floor(now / 520) % 4;
-    const dressed = [...player.worn, ...(player.equipment.cape ? [player.equipment.cape] : []), ...(player.equipment.head ? [player.equipment.head] : [])];
+    const dressed = [...player.worn, ...(player.equipment.cape ? [player.equipment.cape] : []), ...(player.equipment.head ? [player.equipment.head] : []), ...(player.equipment.shield ? [player.equipment.shield] : [])];
     if (scene.friend) drawFigure(ctx, figureArt(friendRows(scene.friend, facing, walking, stride), dressed, facing, cloth), s.x, bodyY + 2 * z, px, pose.alpha);
     else ellipse(ctx, s.x, bodyY - 20 * z, 12 * z, 16 * z, INK);
     drawAuras(ctx, player.worn, s.x, bodyY, px, now, scene.reducedMotion, "front");
@@ -1228,7 +1270,7 @@ function drawPeer(ctx: CanvasRenderingContext2D, scene: Scene, peer: PeerView, h
   if (peer.p.emote) emoteParticles(peer.p.emote, peer.emoteT, peer.x, peer.y, scene.reducedMotion, peer.p.cape && isItem(peer.p.cape) ? item(peer.p.cape).icon.color : undefined);
   const sprites = scene.peerSprites?.(peer.p.id) ?? null, stride = peer.moving ? Math.floor(now / 80) % 8 : 0;
   const rows = sprites ? friendRows(sprites, facing, peer.moving, stride) : peer.moving && Math.floor(now / 160) % 2 ? friendSprite(peer.p.family, peer.p.id).step : friendSprite(peer.p.family, peer.p.id).idle;
-  const px = 3.2 * z, worn = [...peer.p.worn, ...(peer.p.cape ? [peer.p.cape] : []), ...(peer.p.head ? [peer.p.head] : [])], cloth = scene.reducedMotion ? 0 : peer.moving ? stride % 4 : Math.floor(now / 520) % 4;
+  const px = 3.2 * z, worn = [...peer.p.worn, ...(peer.p.cape ? [peer.p.cape] : []), ...(peer.p.head ? [peer.p.head] : []), ...(peer.p.shield ? [peer.p.shield] : [])], cloth = scene.reducedMotion ? 0 : peer.moving ? stride % 4 : Math.floor(now / 520) % 4;
   ellipse(ctx, s.x, s.y, 15 * z, 6 * z, "rgba(22,22,22,0.18)", peer.friend ? "rgba(159,224,168,0.9)" : "rgba(255,255,255,0.6)", 1.5);
   const restoreMotion = applyMotion(ctx, motion, s.x, s.y);
   drawAuras(ctx, worn, s.x, s.y, px, now, scene.reducedMotion, "back");

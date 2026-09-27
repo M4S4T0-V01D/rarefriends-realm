@@ -93,6 +93,8 @@ export type Message = { text: string; tone: "game" | "info" | "warn" | "quest" |
 
 export type Game = {
   world: World; tick: number; player: Player; monsters: Monster[]; npcs: Npc[]; ground: GroundItem[]; fires: Fire[];
+  /** What you've sold to each shop that it doesn't normally stock (you can buy it back until you leave). */
+  shopStock: Record<string, Slot[]>;
   depleted: Map<number, number>; messages: Message[]; events: GameEvent[]; rng: () => number; nextUid: number;
   dialogue: Dialogue | null; ui: { shop: string | null; bank: boolean; production: ProductionMenu | null; lamp: number | null };
   held: { dx: number; dy: number } | null; autoRetaliate: boolean; playTicks: number;
@@ -142,7 +144,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
 export function createGame(options: { familyId: number; friendId: number; rng?: () => number; world?: World }): Game {
   const world = options.world ?? realmWorld(), rng = options.rng ?? Math.random;
   const game: Game = {
-    world, tick: 0, player: createPlayer(world, options.familyId, options.friendId), monsters: [], npcs: [], ground: [], fires: [],
+    world, tick: 0, player: createPlayer(world, options.familyId, options.friendId), monsters: [], npcs: [], ground: [], fires: [], shopStock: {},
     depleted: new Map(), messages: [], events: [], rng, nextUid: 1, dialogue: null, ui: { shop: null, bank: false, production: null, lamp: null },
     held: null, autoRetaliate: true, playTicks: 0, overheads: new Map(), pet: null, trail: [],
   };

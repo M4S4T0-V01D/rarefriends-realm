@@ -158,3 +158,23 @@ export function fireArt(frame: number, w = 18, h = 26, seed = 1): HTMLCanvasElem
     }
   });
 }
+/** A campfire's log pile: chunky logs criss-crossed, bark with knots, round cut ends with rings, hearth stones and glowing coals. */
+export function campfireLogs(seed = 1): HTMLCanvasElement {
+  return pixelArt(`campfire-logs:${seed % 2}`, 30, 15, p => {
+    const bark = "#7a5a40", barkDark = "#5a4030", barkLight = "#9c7a58";
+    const log = (x0: number, y0: number, x1: number, y1: number, end: boolean) => {
+      p.line(x0, y0, x1, y1, bark, 4); p.line(x0, y0 - 2, x1, y1 - 2, barkLight); p.line(x0, y0 + 1, x1, y1 + 1, barkDark);
+      // A knot or two in the bark.
+      const kx = Math.round(x0 + (x1 - x0) * 0.55), ky = Math.round(y0 + (y1 - y0) * 0.55); p.set(kx, ky, barkDark); p.set(kx + 1, ky, barkDark);
+      if (end) {
+        // The cut end facing you: a pale round face, its ring and heart.
+        p.disc(x0, y0 - 0.5, 2.6, 2.6, "#e8d2a8", null); p.disc(x0, y0 - 0.5, 1.4, 1.4, "#c9a476", null); p.set(x0, y0, "#e8d2a8"); p.set(x0 - 1, y0 - 2, "#f6ead0");
+      }
+    };
+    p.disc(15, 10, 7, 2.6, "#4c1d2d", null); p.disc(15, 10, 5, 1.8, "#7c2435", null); p.set(12, 10, "#df7f3c"); p.set(16, 9, "#e6a24a"); p.set(18, 11, "#cd5836");
+    log(8, 6, 23, 6, false);
+    if (seed % 2) { log(4, 12, 19, 5, true); log(26, 12, 11, 5, true); } else { log(26, 12, 12, 5, true); log(4, 12, 18, 5, true); }
+    p.outline();
+    p.disc(1.5, 12.5, 1.6, 1.3, "#a9a59e"); p.disc(28.5, 12.5, 1.6, 1.3, "#bdb9b0"); p.disc(15, 13.6, 1.8, 1.2, "#b3aea6");
+  });
+}

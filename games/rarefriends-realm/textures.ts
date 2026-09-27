@@ -98,3 +98,85 @@ export function texturedTriangle(ctx: CanvasRenderingContext2D, texture: HTMLCan
   texturedQuad(ctx, texture, { x: a.x + up.x, y: a.y + up.y }, { x: b.x + up.x, y: b.y + up.y }, a, cols, rows);
   ctx.restore();
 }
+
+// ---------- Ground ----------
+export type GroundStyle = "grass" | "lush" | "dirt" | "gravel" | "cobble" | "flag" | "sand" | "snow" | "plank" | "furrow" | "dungeon" | "ice" | "carpet" | "ash" | "swamp";
+/**
+ * A ground tile's detail, 16 × 16, on a transparent background: the tile's own shaded fill shows through, and the
+ * texture adds the pixels (blades, pebbles, setts, planks) in tones of the ground's colour. Each tile draws one of four
+ * variants, so the ground doesn't repeat.
+ */
+export function groundTexture(style: GroundStyle, color: string, variant: number): HTMLCanvasElement {
+  return pixelArt(`ground:${style}:${color}:${variant}`, TEX_PER_TILE, TEX_PER_TILE, p => {
+    const S = TEX_PER_TILE, r = (i: number, salt: number) => noise(i, salt, variant + 11);
+    const tone = (amount: number) => shadeHex(color, amount * 1.4);
+    const speckle = (n: number, amount: number, salt = 0) => { for (let i = 0; i < n; i++) p.set(Math.floor(r(i, 1 + salt) * S), Math.floor(r(i, 2 + salt) * S), tone(amount)); };
+    switch (style) {
+      case "grass": case "lush": {
+        // Tufts of blades, dark at the root and lit at the tip; the odd flower.
+        const tufts = style === "lush" ? 9 : 6;
+        for (let i = 0; i < tufts; i++) {
+          const x = Math.floor(r(i, 3) * (S - 3)) + 1, y = Math.floor(r(i, 4) * (S - 4)) + 3, blades = 2 + Math.floor(r(i, 5) * 2);
+          for (let b = 0; b < blades; b++) { const bx = x + b - 1, tall = 2 + Math.floor(r(i * 3 + b, 6) * 2); const lean = (k: number) => k === tall - 1 ? (b === 0 ? -1 : b === blades - 1 ? 1 : 0) : 0;
+            for (let k = 0; k < tall; k++) p.set(bx + lean(k), y - k, tone(k === tall - 1 ? 0.05 : -0.1 - (style === "lush" ? 0.03 : 0))); }
+        }
+        for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) if (BAYER[y & 3][x & 3] === 0 && noise(x, y, variant + 5) > 0.72) p.set(x, y, tone(-0.05));
+        if (variant === 3 && style === "grass") { const x = 3 + Math.floor(r(0, 9) * 9), y = 4 + Math.floor(r(1, 9) * 8); p.set(x, y, "#f3eee2"); p.set(x + 1, y, "#e7c9c6"); p.set(x, y + 1, "#e2d07a"); }
+        if (variant === 1 && style === "grass") { const x = 4 + Math.floor(r(2, 9) * 8), y = 5 + Math.floor(r(3, 9) * 7); p.set(x, y, "#dfe6f0"); p.set(x + 1, y + 1, "#dfe6f0"); p.set(x + 1, y, "#e2d07a"); }
+        break;
+      }
+      case "dirt": case "gravel": {
+        // Pebbles (lit on top, shadowed beneath) and darker trodden patches.
+        const pebbles = style === "gravel" ? 14 : 6;
+        for (let i = 0; i < pebbles; i++) { const x = Math.floor(r(i, 3) * (S - 2)), y = Math.floor(r(i, 4) * (S - 2)), w = 1 + Math.floor(r(i, 5) * 2);
+          p.rect(x, y, w, 1, tone(0.06)); p.rect(x, y + 1, w, 1, tone(-0.12)); }
+        for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) if (BAYER[y & 3][x & 3] < 2 && noise(x >> 2, y >> 2, variant + 3) > 0.6) p.set(x, y, tone(-0.06));
+        speckle(4, -0.14, 7);
+        break;
+      }
+      case "cobble": {
+        // Rounded setts in staggered courses: a lit top-left, a shadowed bottom-right, dark joints between.
+        for (let row = 0; row < 4; row++) for (let col = -1; col < 4; col++) {
+          const x = col * 4 + (row % 2 ? 2 : 0), y = row * 4, t = (noise(col + 9, row, variant) - 0.5) * 0.08, sett = tone(t);
+          p.rect(x, y, 4, 1, tone(-0.16)); p.rect(x + 3, y, 1, 4, tone(-0.16));
+          p.rect(x, y + 1, 3, 3, sett); p.rect(x, y + 1, 2, 1, shadeHex(sett, 0.07)); p.set(x, y + 2, shadeHex(sett, 0.04)); p.set(x + 2, y + 3, shadeHex(sett, -0.08));
+        }
+        break;
+      }
+      case "flag": case "dungeon": {
+        // Big flagstones, two by two, with joints, cracks and (in dungeons) moss.
+        const joint = tone(style === "dungeon" ? -0.12 : -0.14), off = variant % 2 ? 4 : 0;
+        for (const [x, y, w, h] of [[0, 0, 8, 8], [8, 0, 8, 8], [0, 8, 8, 8], [8, 8, 8, 8]]) {
+          const t = tone((noise(x, y, variant) - 0.5) * 0.06);
+          p.rect(x + (y ? off : 0), y + 1, w - 1, h - 1, t); p.rect(x + (y ? off : 0), y + 1, w - 1, 1, shadeHex(t, 0.05));
+        }
+        p.rect(0, 0, S, 1, joint); p.rect(0, 8, S, 1, joint); p.rect(7, 0, 1, 8, joint); p.rect(15, 0, 1, 8, joint); p.rect((7 + off) % S, 8, 1, 8, joint); p.rect((15 + off) % S, 8, 1, 8, joint);
+        if (variant === 2) p.polyline([[3, 3], [5, 5], [5, 7]], tone(-0.16));
+        if (style === "dungeon") speckle(3, 0, 12), [0, 1, 2].forEach(i => p.set(Math.floor(r(i, 13) * S), Math.floor(r(i, 14) * S), "#6f7a62"));
+        break;
+      }
+      case "sand": case "snow": {
+        // Wind ripples (lit crest, shadowed trough) and grains or glints.
+        const lit = style === "snow" ? "#ffffff" : tone(0.05), shadow = style === "snow" ? "#dde3ea" : tone(-0.07);
+        for (let k = 0; k < 3; k++) { const y0 = 2 + k * 5 + (variant % 2); for (let x = 0; x < S; x++) { const y = y0 + Math.round(Math.sin((x + variant * 3) * 0.5) * 1.2); if (noise(x, k, variant) > 0.25) { p.set(x, y, lit); p.set(x, y + 1, shadow); } } }
+        speckle(style === "snow" ? 3 : 5, style === "snow" ? 0.05 : -0.1, 4);
+        break;
+      }
+      case "plank": {
+        // Boards along the tile, dark seams, grain and nails.
+        for (let y = 0; y < S; y += 4) { p.rect(0, y, S, 1, tone(-0.18)); p.rect(0, y + 1, S, 1, tone(0.05)); const end = Math.floor(noise(y, 1, variant) * S); p.rect(end, y, 1, 4, tone(-0.18)); p.set((end + 2) % S, y + 2, tone(-0.3)); }
+        for (let i = 0; i < 5; i++) { const x = Math.floor(r(i, 3) * 12), y = Math.floor(r(i, 4) * 4) * 4 + 2; p.rect(x, y, 3, 1, tone(-0.07)); }
+        break;
+      }
+      case "furrow": {
+        for (let y = 1; y < S; y += 4) { p.rect(0, y, S, 1, tone(0.06)); p.rect(0, y + 1, S, 1, tone(-0.14)); p.rect(0, y + 2, S, 1, tone(-0.08)); }
+        speckle(4, -0.2, 3);
+        break;
+      }
+      case "ice": for (let i = 0; i < 2; i++) { const x = Math.floor(r(i, 3) * 10) + 2, y = Math.floor(r(i, 4) * 10) + 2; p.polyline([[x, y], [x + 3, y + 1], [x + 4, y + 4]], "#ffffff"); } speckle(3, -0.06, 2); break;
+      case "carpet": p.rect(0, 0, S, 1, tone(-0.14)); p.rect(0, 1, S, 1, "#e2d49e"); p.poly([[8, 4], [12, 8], [8, 12], [4, 8]], tone(0.08), null); p.set(8, 8, "#e2d49e"); break;
+      case "ash": speckle(9, -0.18, 1); speckle(4, 0.08, 5); if (variant === 0) p.set(Math.floor(r(0, 8) * S), Math.floor(r(1, 8) * S), "#e0824f"); break;
+      case "swamp": for (let i = 0; i < 2; i++) { const x = Math.floor(r(i, 3) * 11), y = Math.floor(r(i, 4) * 12); p.disc(x + 2, y + 1, 2.5, 1.2, tone(-0.1), null); p.set(x + 1, y, tone(0.1)); } speckle(5, -0.14, 6); break;
+    }
+  });
+}

@@ -145,7 +145,15 @@ Ysolde, who knows about dragons) at the pass, drakes on the slopes, and Old Cind
 Emberforge Arms (ore, bars, arms, 55%), Runa and the Tower stores (sigils and magic, 60%), Tessa (hides and leather, 60%),
 Mort the bone collector (bones and hides, 65%), the Oasis bazaar (gems, jewellery, food, 70%), Fletch & Feather
 (bows, arrows, logs, 60%), the armoury and the weaponsmith (55%), and the inn (fish and food, 55%). Right-click an item
-in a shop for its *Value*.
+in a shop for its *Value*. Every trader buys back what it sells, and general stores (Friendhollow, and now Emberforge,
+Frostpeak and the Oasis) buy almost anything. What you sell goes on the shop's shelves with its count, so you can buy it
+back. The Rare Market's bundle list scrolls in a compact box.
+
+**The look of the land.** Ground tiles share the buildings' pixel textures: grass tufts with the odd flower, pebbled dirt
+paths, cobbled streets in staggered setts, flagstones, wind-rippled sand and snow, boards, furrows and dungeon flags. Only
+tiles near you and at normal zoom are textured, so it stays quick. Furnaces are brick kilns with a fire in an arched mouth
+and a smoking chimney. Campfires are small pixel flames on a pile of cut logs. Equipped shields show on your Friend's
+off arm, and on other players' Friends.
 
 **Day and night.** A Realm day lasts 24 minutes. Dusk turns the light warm, and at night the land goes blue-dark
 except around lamps, torches, fires, forges, altars and your own small light (a lantern familiar carries a bigger one).

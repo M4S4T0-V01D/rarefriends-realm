@@ -677,6 +677,10 @@ export function createWorld(seed = 20260927): World {
   add({ kind: "sign", ...(([x, y]) => ({ x, y }))(land0(56, 50)), blocks: true, name: "Signpost", text: "Wyrmreach. Dragons. Their breath burns through anything but a Wyrmward shield: King Hollis keeps a few." });
   // The bone collector, by the chapel.
   { const [bx, by] = land0(104, 134); npc("bone_collector", bx, by, 1); }
+  // General stores in the other towns, so there's somewhere to sell anything wherever you are.
+  for (const [id, gx, gy] of [["trader_ember", 170, 45], ["trader_frost", 195, 34], ["trader_oasis", 178, 110]] as const) {
+    const [x, y] = land0(gx, gy); npc(id, x, y); decor(x + 1, y - 1, "crate");
+  }
 
   // ---------- Rare Market branches (a trader and a casket chest in each town) ----------
   /** The nearest open land tile to a point (not water, a bridge or a road). */

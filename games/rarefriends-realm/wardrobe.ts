@@ -42,7 +42,9 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
   const headgear: Piece[] = wardrobeHat ? [] : worn.filter(id => isItem(id) && item(id).equip?.slot === "head").slice(0, 1).map(id => {
     const icon = item(id).icon; return { id, kind: `gear_${icon.shape}`, color: icon.color, trim: icon.accent };
   });
-  const pieces: Piece[] = [...WARDROBE.filter(piece => worn.includes(piece.id) && piece.kind !== "aura" && piece.kind !== "lantern" && !(gear.length && piece.kind === "cape")), ...gear.slice(0, 1), ...headgear];
+  // A shield on the off arm.
+  const shield: Piece | undefined = worn.filter(id => isItem(id) && item(id).equip?.slot === "shield").slice(0, 1).map(id => ({ id, kind: "shield", color: item(id).icon.color, trim: item(id).icon.accent }))[0];
+  const pieces: Piece[] = [...WARDROBE.filter(piece => worn.includes(piece.id) && piece.kind !== "aura" && piece.kind !== "lantern" && !(gear.length && piece.kind === "cape")), ...gear.slice(0, 1), ...headgear, ...(shield ? [shield] : [])];
   const key = `${ink}|${facing}|${phase & 3}|${pieces.map(piece => piece.id).join(",")}|${rows.join("")}`;
   let canvas = cache.get(key);
   if (canvas) return canvas;
@@ -84,6 +86,8 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
     const scarf = pieces.find(piece => piece.kind === "scarf")!, from = side > 0 ? X(bodySpan(m.neck).min) - 1 : X(bodySpan(m.neck).max) + 2;
     for (let i = 0; i < 7; i++) { const x = from - side * i, y = neckY + 1 + Math.round(Math.sin((i + phase) * 1.1) * 1.2) + (i >> 2); p.rect(x, y, 1, 3, i % 3 ? scarf.color : shadeHex(scarf.color, -0.14)); }
   }
+
+  const waist = Math.round((neckY + feet) / 2), waistSpan = bodySpan(Math.round((m.neck + m.bottom) / 2));
 
   // ---------- The Friend ----------
   const inkValue = (() => { const probe = new Pixels(1, 1); probe.set(0, 0, ink); return probe.data[0]; })();
@@ -148,6 +152,10 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
     }
   }
 
+  // The shield on the off arm, its face towards you: across your body facing left, at your back facing right (the
+  // weapon is always in front), at your side facing the camera or away.
+  if (shield) drawShield(p, shield, side < 0 ? Math.round(cx) + 1 : X(waistSpan.min) - 1, waist, back);
+
   // ---------- Equipped headgear ----------
   for (const piece of pieces.filter(entry => entry.kind.startsWith("gear_"))) {
     const color = piece.color, dark = shadeHex(color, -0.18), light = shadeHex(color, 0.16), l = Math.round(cx - headHalf) - 1, r = Math.round(cx + headHalf) + 1, top = headTop;
@@ -195,6 +203,18 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
   if (cache.size > 800) cache.delete(cache.keys().next().value!);
   cache.set(key, canvas);
   return canvas;
+}
+/** A heater shield centred on (x, y) in fine pixels: rim, boss and cross in its accent; from behind, its wooden back and strap. */
+function drawShield(p: Pixels, piece: Piece, x: number, y: number, rear: boolean) {
+  const color = piece.color, dark = shadeHex(color, -0.2), light = shadeHex(color, 0.18), hw = rear ? 3 : 5;
+  const outline: [number, number][] = [[x - hw, y - 6], [x + hw, y - 6], [x + hw, y + 1], [x, y + 7], [x - hw, y + 1]];
+  if (rear) { p.poly(outline, "#7a5b40", null); p.line(x - hw + 1, y - 2, x + hw - 1, y - 2, "#4a3a2e"); p.line(x - hw, y - 6, x + hw, y - 6, dark); return; }
+  p.poly(outline, color, null);
+  p.line(x - hw, y - 6, x + hw, y - 6, light); p.line(x - hw, y - 6, x - hw, y + 1, light);
+  p.line(x + hw, y - 5, x + hw, y + 1, dark); p.line(x + hw, y + 1, x, y + 7, dark);
+  const trim = piece.trim ?? dark;
+  p.line(x, y - 5, x, y + 5, trim); p.line(x - hw + 1, y - 2, x + hw - 1, y - 2, trim);
+  p.rect(x - 1, y - 3, 2, 2, light);
 }
 /** Draw a figure with its feet on (x, y); `px` screen pixels per sprite pixel. Returns the drawn box. */
 export function drawFigure(ctx: CanvasRenderingContext2D, art: HTMLCanvasElement, x: number, y: number, px: number, alpha = 1) {

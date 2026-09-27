@@ -1387,8 +1387,10 @@ export function sellPrice(id: string, shopId?: string) {
 export const shopBuys = (shopId: string, id: string) => { const shop = SHOPS[shopId]; return !!shop && (shop.general || shop.stock.includes(id) || !!shop.buys?.includes(itemCategory(id))); };
 export function buy(game: Game, shopId: string, id: string, n: number) {
   const shop = SHOPS[shopId], player = game.player;
-  if (!shop?.stock.includes(id)) return 0;
+  const sold = game.shopStock[shopId]?.find(slot => slot.id === id);
+  if (!shop || (!shop.stock.includes(id) && !sold)) return 0;
   if (item(id).mastery) return buyCape(game, id);
+  if (!shop.stock.includes(id)) n = Math.min(n, sold!.n);
   const price = buyPrice(game, id), stackable = !!item(id).stackable;
   let bought = 0;
   while (bought < n && count(player, "coins") >= price && canHold(player, id)) {
@@ -1400,6 +1402,7 @@ export function buy(game: Game, shopId: string, id: string, n: number) {
       break;
     }
   }
+  if (sold && !shop.stock.includes(id) && bought) { sold.n -= bought; if (sold.n <= 0) game.shopStock[shopId] = game.shopStock[shopId].filter(slot => slot !== sold); }
   if (!bought) message(game, count(player, "coins") < price ? "You don't have enough coins." : "You don't have enough inventory space.", "warn");
   else sound(game, "coins");
   return bought;
@@ -1412,6 +1415,11 @@ export function sell(game: Game, shopId: string, slotIndex: number, n: number) {
   if (!shopBuys(shopId, slot.id)) { message(game, "You can't sell this item to this shop.", "warn"); return 0; }
   const id = slot.id, selling = Math.min(n, count(player, id)), price = sellPrice(id, shopId);
   take(player, id, selling); if (price * selling > 0) give(player, "coins", price * selling);
+  // It goes on the shop's shelves, where you can buy it back.
+  if (!shop.stock.includes(id) && selling > 0) {
+    const shelf = game.shopStock[shopId] ??= [], entry = shelf.find(slot => slot.id === id);
+    if (entry) entry.n += selling; else if (shelf.length < 40) shelf.push({ id, n: selling });
+  }
   sound(game, "coins");
   return selling;
 }

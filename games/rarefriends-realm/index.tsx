@@ -693,7 +693,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           {state.ui.shop === "__market" && (
             <Modal title="Rare Market" onClose={() => { state.ui.shop = null; refresh(); }} wide>
               <p className="realm-sim">Simulated $RAREFRIENDS. No real tokens, contracts or transactions. Balance: <b>{snapshot ? rf(snapshot.rfBalance) : "…"}</b></p>
-              <p>RF buys one thing, the <b>Rare Casket</b>, so every bundle buys caskets (open them at any casket chest) and adds its goods on top. Traders in Friendhollow, Emberforge, the Oasis, Frostpeak and on Pike's Pier.</p>
+              <p className="realm-market-intro">RF buys one thing, the <b>Rare Casket</b>, so every bundle buys caskets (open them at any casket chest) and adds its goods on top. Traders in Friendhollow, Emberforge, the Oasis, Frostpeak and on Pike's Pier.</p>
               <ul className="realm-market">{RF_BUNDLES.map(bundle => {
                 const choices = bundle.id === "tailor" ? tailorChoices(state) : [], pick = choices.some(piece => piece.id === tailorPick) ? tailorPick : choices[0]?.id ?? "";
                 return <li key={bundle.id}><div><b>{bundle.name}</b><small>{bundle.text} Includes {bundle.caskets} Rare Casket{bundle.caskets > 1 ? "s" : ""}.</small></div>

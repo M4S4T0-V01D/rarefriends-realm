@@ -809,3 +809,23 @@ test("Weather: the same sky for every player at the same moment; storms strike, 
   assert(strikes > 0, "lightning in storms");
   assert(weatherAt(ms, "farmland", false, 0.27).fog > 0.6, "fog at dawn");
 });
+
+test("Shops: general stores in every town buy anything, traders buy what they sell, and what you sell goes on the shelf to buy back", () => {
+  const game = newGame(), player = game.player;
+  for (const [id, shop] of [["trader_ember", "general_ember"], ["trader_frost", "general_frost"], ["trader_oasis", "general_oasis"]]) {
+    assert.equal(NPCS[id].shop, shop); assert(SHOPS[shop].general);
+    assert(game.npcs.some(npc => npc.id === id), `${id} is in the world`);
+  }
+  player.inventory = player.inventory.map(() => null);
+  give(player, "oak_logs", 3); give(player, "fishing_rod");
+  const coins = count(player, "coins");
+  assert.equal(sell(game, "general_ember", player.inventory.findIndex(slot => slot?.id === "oak_logs"), 3), 3, "a general store buys logs");
+  assert.deepEqual(game.shopStock.general_ember, [{ id: "oak_logs", n: 3 }], "and puts them on the shelf");
+  assert(count(player, "coins") > coins);
+  assert.equal(sell(game, "fishing", player.inventory.findIndex(slot => slot?.id === "fishing_rod"), 1), 1, "Pike buys back a rod he sells");
+  assert.equal(game.shopStock.fishing, undefined, "his own stock isn't doubled");
+  give(player, "coins", 1000);
+  assert.equal(buy(game, "general_ember", "oak_logs", 5), 3, "buy back only what's on the shelf");
+  assert.equal(game.shopStock.general_ember.length, 0);
+  assert.equal(buy(game, "general_ember", "oak_logs", 1), 0, "then it's gone");
+});

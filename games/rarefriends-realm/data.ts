@@ -615,6 +615,9 @@ export function itemCategory(id: string): Category {
 export type ShopDef = { id: string; name: string; stock: readonly string[]; general?: boolean; buys?: readonly Category[]; rate?: number };
 export const SHOPS: Record<string, ShopDef> = {
   general: { id: "general", name: "Friendhollow General Store", general: true, stock: ["pot", "bucket", "tinderbox", "hammer", "knife", "chisel", "needle", "thread", "small_net", "pewter_axe", "pewter_pickaxe", "bread", "team_cape"] },
+  general_ember: { id: "general_ember", name: "Emberforge General Store", general: true, stock: ["pot", "bucket", "tinderbox", "hammer", "knife", "chisel", "pewter_pickaxe", "pewter_axe", "bread", "cooked_meat"] },
+  general_frost: { id: "general_frost", name: "Frostpeak Trading Post", general: true, stock: ["pot", "bucket", "tinderbox", "hammer", "knife", "needle", "thread", "pewter_axe", "bread", "cooked_meat", "fishing_bait"] },
+  general_oasis: { id: "general_oasis", name: "Oasis Sundries", general: true, stock: ["pot", "bucket", "tinderbox", "knife", "chisel", "needle", "thread", "small_net", "fishing_bait", "bread"] },
   fishing: { id: "fishing", name: "Pike's Tackle", buys: ["fish"], rate: 0.6, stock: ["small_net", "fishing_rod", "fly_rod", "harpoon", "crab_pot", "fishing_bait", "feather", "raw_minnows"] },
   axes: { id: "axes", name: "Axel's Axes", buys: ["logs"], rate: 0.6, stock: ["pewter_axe", "blackiron_axe", "ashsteel_axe", "moonsilver_axe", "pewter_pickaxe", "blackiron_pickaxe", "ashsteel_pickaxe", "moonsilver_pickaxe"] },
   swords: { id: "swords", name: "Emberforge Arms", buys: ["ore", "bar", "weapon", "armour"], rate: 0.55, stock: ["pewter_sword", "blackiron_sword", "ashsteel_sword", "pewter_sabre", "blackiron_sabre", "ashsteel_sabre", "moonsilver_sabre", "pewter_shield", "blackiron_shield", "blackiron_helm", "ashsteel_helm", "blackiron_cuirass"] },

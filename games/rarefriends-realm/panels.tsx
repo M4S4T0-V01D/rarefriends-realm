@@ -614,12 +614,12 @@ export function ShopModal({ game, shopId, refresh, onClose, openMenu }: { game: 
         <span className="realm-coins">Coins: <b>{count(player, "coins").toLocaleString()}</b></span></div>
       <div className="realm-bank">
         <div className="realm-bank-grid" aria-label="Shop stock">
-          {shop.stock.map(id => { const locked = capeProblem(game, id); return (
-            <button key={id} type="button" className={`realm-slot shop${locked ? " locked" : ""}`} aria-label={`Buy ${item(id).name} for ${buyPrice(game, id)} coins${locked ? ` (${locked})` : ""}`}
+          {[...shop.stock.map(id => ({ id, n: 0 })), ...(game.shopStock[shopId] ?? [])].map(({ id, n: have }) => { const locked = capeProblem(game, id); return (
+            <button key={`${id}${have ? ":sold" : ""}`} type="button" className={`realm-slot shop${locked ? " locked" : ""}`} aria-label={`Buy ${item(id).name} for ${buyPrice(game, id)} coins${have ? ` (${have} in stock, sold by you)` : ""}${locked ? ` (${locked})` : ""}`}
               title={`${item(id).name}: ${buyPrice(game, id).toLocaleString()} coins${locked ? `. ${locked}` : ""}`} onClick={() => { buy(game, shopId, id, amount); refresh(); }}
               {...rightClick(openMenu, () => [{ verb: "Value", noun: item(id).name, tone: "item", run: () => { message(game, `${item(id).name}: currently costs ${buyPrice(game, id).toLocaleString()} coins.`); refresh(); } },
                 ...[1, 5, 10, 50].map(n => ({ verb: `Buy-${n}`, noun: item(id).name, tone: "item", run: () => { buy(game, shopId, id, n); refresh(); } })), examine(game, id, refresh)])}>
-              <ItemIcon slot={{ id, n: 1 }} size={40} /><small>{buyPrice(game, id) >= 10_000 ? `${Math.round(buyPrice(game, id) / 1000)}K` : buyPrice(game, id).toLocaleString()}</small>
+              <ItemIcon slot={{ id, n: have || 1 }} size={40} /><small>{buyPrice(game, id) >= 10_000 ? `${Math.round(buyPrice(game, id) / 1000)}K` : buyPrice(game, id).toLocaleString()}</small>
             </button>
           ); })}
         </div>
@@ -635,7 +635,7 @@ export function ShopModal({ game, shopId, refresh, onClose, openMenu }: { game: 
           ))}
         </div>
       </div>
-      <p className="realm-note">{shopId === "capes" ? "A mastery cape needs level 99 in its skill. Master two skills and every cape comes trimmed." : shop.general ? "The general store buys almost anything." : shop.buys ? `Pays ${Math.round((shop.rate ?? 0.4) * 100)}% of value for ${shop.buys.join(", ")} (other shops pay 40%).` : "This shop only buys what it sells."} {game.player.familyId === 2 && shopId !== "capes" ? "Big family: 10% off." : ""}</p>
+      <p className="realm-note">{shopId === "capes" ? "A mastery cape needs level 99 in its skill. Master two skills and every cape comes trimmed." : `Click the stock to buy; click your pack (right) to sell. ${shop.general ? "A general store buys almost anything." : shop.buys ? `Buys what it sells, and pays ${Math.round((shop.rate ?? 0.4) * 100)}% of value for ${shop.buys.join(", ")} (other shops pay 40%).` : "Buys back anything it sells."} What you sell goes on the shelves, to buy back.`} {game.player.familyId === 2 && shopId !== "capes" ? "Big family: 10% off." : ""}</p>
     </Modal>
   );
 }
