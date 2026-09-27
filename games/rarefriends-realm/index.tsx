@@ -780,7 +780,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           <div className="realm-title">
             <div className="realm-logo"><small>An old-school adventure for your Rare Friend</small><h1>RareFriends<span>Realm</span></h1></div>
             <div className="realm-title-card">
-              <FriendPortrait sprites={friend.current} size={96} worn={player.worn} />
+              <FriendPortrait sprites={friend.current} size={96} worn={[...player.worn, ...(["cape", "head", "shield"] as const).flatMap(slot => player.equipment[slot] ? [player.equipment[slot]!] : [])]} />
               <div>
                 <h2>Friend #{player.friendId}</h2>
                 <p><b>{FAMILY_NAMES[player.familyId]}</b>: {FAMILY_PERKS[player.familyId].title}. {FAMILY_PERKS[player.familyId].text}</p>

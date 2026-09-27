@@ -854,3 +854,20 @@ test("Mounts: bought at the stables, ridden faster without run energy, each with
   player.y = 210; assert(rideProblem(game)); tick(game); assert.equal(player.mount, null, "left to graze outside");
   toggleMount(game); assert.equal(player.mount, null, "can't mount down here");
 });
+
+test("Trading: when both players ask at the same moment, both open the same trade and it goes through", async () => {
+  const { Trades } = await import("../games/rarefriends-realm/trade.ts");
+  const ga = newGame(), gb = newGame({ friendId: 3412 }), queue = [];
+  const wire = (from, to) => (target, act) => queue.push({ from, to, act });
+  const a = new Trades(wire(7730, 3412)), b = new Trades(wire(3412, 7730)), desks = { 7730: [a, ga], 3412: [b, gb] };
+  const flush = () => { while (queue.length) { const { from, to, act } = queue.shift(); const [desk, g] = desks[to]; desk.receive(g, from, act, 0); } };
+  give(ga.player, "coins", 1000); give(gb.player, "yew_bow");
+  a.request(ga, 3412, 0); b.request(gb, 7730, 0); // both requests cross on the wire
+  flush();
+  assert(a.view() && b.view(), "both windows open");
+  assert.equal(a.open.id, b.open.id, "on the same trade");
+  a.offer(ga, "coins", 300); b.offer(gb, "yew_bow", 1); flush();
+  assert.deepEqual(a.view().theirs, [{ id: "yew_bow", n: 1 }]); assert.deepEqual(b.view().theirs, [{ id: "coins", n: 300 }]);
+  a.accept(ga); b.accept(gb); flush(); a.accept(ga); b.accept(gb); flush();
+  assert(has(ga.player, "yew_bow") && !has(gb.player, "yew_bow") && count(gb.player, "coins") >= 300, "swapped");
+});

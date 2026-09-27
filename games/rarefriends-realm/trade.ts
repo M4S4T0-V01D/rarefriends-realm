@@ -77,12 +77,18 @@ export class Trades {
     switch (act.kind) {
       case "trade-request":
         if (!act.trade) return;
-        if (this.outgoing?.to === from) { this.start(act.trade, from); this.send(from, { kind: "trade-open", trade: act.trade }); this.outgoing = null; return; }
+        if (this.outgoing?.to === from && !this.open) {
+          // We both asked at once: both sides settle on the same trade (the lower id), so every later message matches.
+          const id = [this.outgoing.trade, act.trade].sort()[0];
+          this.start(id, from); this.send(from, { kind: "trade-open", trade: id }); this.outgoing = null; return;
+        }
         this.incoming.set(from, { trade: act.trade, at: now });
         message(game, `Friend #${from} wishes to trade with you.`, "private");
         return;
       case "trade-open":
         if (this.outgoing?.to === from && act.trade === this.outgoing.trade && !this.open) { this.start(act.trade, from); this.outgoing = null; }
+        // A crossed request: if they opened the other id before our requests met, follow theirs while nothing's offered yet.
+        else if (t && t.partner === from && act.trade && act.trade !== t.id && t.stage === 1 && !t.mine.length && !t.theirs.length && act.trade < t.id) t.id = act.trade;
         return;
       case "trade-decline":
         if (t && t.partner === from && act.trade === t.id) { this.open = null; message(game, "The other player declined the trade.", "warn"); }
@@ -107,8 +113,9 @@ export class Trades {
   }
   /** Re-send finished trades' accepts for a while, and forget stale requests. */
   tick(now: number) {
-    for (const [from, entry] of this.incoming) if (now - entry.at > 60_000) this.incoming.delete(from);
-    if (this.outgoing && now - this.outgoing.at > 60_000) this.outgoing = null;
+    // A request we sent outlives the prompt it shows the other player, so a late "Trade" click still opens on both sides.
+    for (const [from, entry] of this.incoming) if (now - entry.at > 90_000) this.incoming.delete(from);
+    if (this.outgoing && now - this.outgoing.at > 120_000) this.outgoing = null;
     this.finishing = this.finishing.filter(entry => entry.until > now);
     if (now - this.lastResend > 1000) { this.lastResend = now; for (const entry of this.finishing) this.send(entry.to, entry.act); }
   }

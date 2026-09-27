@@ -49,7 +49,7 @@ function localTransport(on: Handlers): Transport {
   };
 }
 
-type Peer = { presence: Presence; seen: number; chats: number[]; acts: number[] };
+type Peer = { presence: Presence; seen: number; chats: number[] };
 /** One wallet's social circle, kept in this trusted page. */
 type Social = { friends: number[]; ignored: number[]; online: boolean };
 const socialKey = (account: string) => `rarefriends-realm:social:v1:${account.toLowerCase()}`;
@@ -64,7 +64,10 @@ function readSocial(account: string): Social {
 /** Connects this page's player to the others, and keeps the game frame told. */
 export class NetHub {
   private transport: Transport | null = null; private joining = false;
-  private peers = new Map<string, Peer>(); private social: Social = { friends: [], ignored: [], online: true };
+  private peers = new Map<string, Peer>();
+  /** Every live connection and the Friend it plays, including a second tab of the same Friend (direct messages go to all of them). */
+  private claims = new Map<string, { id: number; seen: number; acts: number[] }>();
+  private social: Social = { friends: [], ignored: [], online: true };
   private account: string | null = null; private me: number | null = null; private status: NetStatus = "offline";
   private sweep: ReturnType<typeof setInterval> | null = null; private lastState = "";
   constructor(private readonly post: (message: { type: string } & Record<string, unknown>) => void, private readonly local: boolean) {}
@@ -108,7 +111,8 @@ export class NetHub {
   act(raw: unknown, to: unknown) {
     const act = cleanAct(raw), target = cleanId(to);
     if (!act || target === null || !this.transport) return;
-    for (const [peer, entry] of this.peers) if (entry.presence.id === target) this.transport.sendAct(act, peer);
+    const now = Date.now();
+    for (const [peer, claim] of this.claims) if (claim.id === target && now - claim.seen < STALE_MS) this.transport.sendAct(act, peer);
   }
   dispose() { this.disconnect(); }
 
@@ -120,10 +124,11 @@ export class NetHub {
         const presence = cleanPresence(data);
         if (!presence || presence.id === this.me) return;
         const entry = this.peers.get(peer), now = Date.now();
+        this.claims.set(peer, { id: presence.id, seen: now, acts: this.claims.get(peer)?.acts ?? [] });
         if (entry && now - entry.seen < 200) return; // at most five updates a second
         // One avatar per Friend: a newer connection claiming the same Friend replaces the older.
         for (const [other, value] of this.peers) if (other !== peer && value.presence.id === presence.id) this.peers.delete(other);
-        this.peers.set(peer, { presence, seen: now, chats: entry?.chats ?? [], acts: entry?.acts ?? [] });
+        this.peers.set(peer, { presence, seen: now, chats: entry?.chats ?? [] });
         this.publish();
       },
       chat: (data, peer) => {
@@ -138,17 +143,18 @@ export class NetHub {
         this.post({ type: "rarefriends-realm:net-chat-in", ...chat });
       },
       act: (data, peer) => {
-        const entry = this.peers.get(peer), now = Date.now();
-        if (!entry || this.social.ignored.includes(entry.presence.id)) return;
-        entry.acts = entry.acts.filter(at => now - at < 1000);
-        if (entry.acts.length >= 12) return; // twelve a second is plenty for a trade
+        // From any live connection playing a Friend (its avatar may be drawn from another tab of the same Friend).
+        const claim = this.claims.get(peer), now = Date.now();
+        if (!claim || now - claim.seen > STALE_MS || this.social.ignored.includes(claim.id)) return;
+        claim.acts = claim.acts.filter(at => now - at < 1000);
+        if (claim.acts.length >= 12) return; // twelve a second is plenty for a trade
         const act = cleanAct(data);
         if (!act) return;
-        entry.acts.push(now);
-        this.post({ type: NET_ACT_IN, from: entry.presence.id, act });
+        claim.acts.push(now);
+        this.post({ type: NET_ACT_IN, from: claim.id, act });
       },
       join: () => this.publish(),
-      leave: peer => { this.peers.delete(peer); this.publish(); },
+      leave: peer => { this.peers.delete(peer); this.claims.delete(peer); this.publish(); },
     };
     try {
       this.transport = this.local ? localTransport(handlers) : await trysteroTransport(handlers);
@@ -158,12 +164,13 @@ export class NetHub {
     this.sweep ??= setInterval(() => {
       const now = Date.now(); let changed = false;
       for (const [peer, entry] of this.peers) if (now - entry.seen > STALE_MS) { this.peers.delete(peer); changed = true; }
+      for (const [peer, claim] of this.claims) if (now - claim.seen > STALE_MS) this.claims.delete(peer);
       if (changed) this.publish();
     }, 2000);
     this.publish(true);
   }
   private disconnect() {
-    this.transport?.leave(); this.transport = null; this.peers.clear(); this.status = "offline";
+    this.transport?.leave(); this.transport = null; this.peers.clear(); this.claims.clear(); this.status = "offline";
     if (this.sweep) clearInterval(this.sweep); this.sweep = null;
   }
   private save() { if (this.account) try { localStorage.setItem(socialKey(this.account), JSON.stringify(this.social)); } catch { /* play on without saving */ } }
