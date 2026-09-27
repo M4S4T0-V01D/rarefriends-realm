@@ -44,7 +44,9 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
   });
   // A shield on the off arm.
   const shield: Piece | undefined = worn.filter(id => isItem(id) && item(id).equip?.slot === "shield").slice(0, 1).map(id => ({ id, kind: "shield", color: item(id).icon.color, trim: item(id).icon.accent }))[0];
-  const pieces: Piece[] = [...WARDROBE.filter(piece => worn.includes(piece.id) && piece.kind !== "aura" && piece.kind !== "lantern" && !(gear.length && piece.kind === "cape")), ...gear.slice(0, 1), ...headgear, ...(shield ? [shield] : [])];
+  // A weapon in the hand (swords, daggers, sabres, axes, pickaxes, staffs and bows), when it isn't mid-swing.
+  const weapon: Piece | undefined = worn.filter(id => isItem(id) && item(id).equip?.slot === "weapon").slice(0, 1).map(id => ({ id, kind: `weapon_${item(id).icon.shape}`, color: item(id).icon.color, trim: item(id).icon.accent }))[0];
+  const pieces: Piece[] = [...WARDROBE.filter(piece => worn.includes(piece.id) && piece.kind !== "aura" && piece.kind !== "lantern" && !(gear.length && piece.kind === "cape")), ...gear.slice(0, 1), ...headgear, ...(shield ? [shield] : []), ...(weapon ? [weapon] : [])];
   const key = `${ink}|${facing}|${phase & 3}|${pieces.map(piece => piece.id).join(",")}|${rows.join("")}`;
   let canvas = cache.get(key);
   if (canvas) return canvas;
@@ -88,6 +90,11 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
   }
 
   const waist = Math.round((neckY + feet) / 2), waistSpan = bodySpan(Math.round((m.neck + m.bottom) / 2));
+  // The weapon hand: at your right side facing the camera or away, in front facing right, beyond your chest facing left
+  // (that arm is on the far side, so the weapon is drawn behind you there).
+  const handRow = Math.round(m.neck + (m.bottom - m.neck) * 0.45), handSpan = bodySpan(handRow), dir = side < 0 ? -1 : 1;
+  const hand = { x: side < 0 ? X(handSpan.min) - 1 : X(handSpan.max) + 2, y: Y(handRow) + 1 + ([0, 1, 0, 1][phase & 3]) };
+  if (weapon && side < 0) drawWeapon(p, weapon, hand.x, hand.y, dir, sway);
 
   // ---------- The Friend ----------
   const inkValue = (() => { const probe = new Pixels(1, 1); probe.set(0, 0, ink); return probe.data[0]; })();
@@ -152,6 +159,7 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
     }
   }
 
+  if (weapon && side >= 0) drawWeapon(p, weapon, hand.x, hand.y, dir, sway);
   // The shield on the off arm, its face towards you: across your body facing left, at your back facing right (the
   // weapon is always in front), at your side facing the camera or away.
   if (shield) drawShield(p, shield, side < 0 ? Math.round(cx) + 1 : X(waistSpan.min) - 1, waist, back);
@@ -203,6 +211,57 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
   if (cache.size > 800) cache.delete(cache.keys().next().value!);
   cache.set(key, canvas);
   return canvas;
+}
+/**
+ * A weapon held in the hand at (x, y), fine pixels, `dir` the way it points: blades up and forward in a ready guard, axes and
+ * pickaxes shouldered, staffs upright with their head above you, bows held up by the grip. `sway` rocks it with your step.
+ */
+function drawWeapon(p: Pixels, piece: Piece, x: number, y: number, dir: number, sway: number) {
+  const metal = piece.color, light = shadeHex(metal, 0.22), dark = shadeHex(metal, -0.22), wood = "#7a5a40", woodLight = "#9c7a58", gold = piece.trim ?? "#c9a24a";
+  const shape = piece.kind.slice("weapon_".length), lean = sway * 0.5;
+  const blade = (length: number, curve = 0) => {
+    // Grip and pommel below the hand, a crossguard at it, and the blade rising forward, lit along one edge.
+    p.line(x - dir, y + 1, x - dir * 2, y + 3, "#5a4030", 2); p.set(x - dir * 2, y + 4, gold);
+    const tip = { x: x + dir * (length * 0.42 + lean), y: y - length };
+    const at = (t: number) => ({ x: x + (tip.x - x) * t + dir * curve * Math.sin(t * Math.PI), y: y + (tip.y - y) * t });
+    const points: [number, number][] = []; for (let i = 0; i <= 8; i++) { const q = at(i / 8); points.push([q.x, q.y]); }
+    p.polyline(points, metal, 2);
+    p.polyline(points.map(([px, py]) => [px - dir * 0.6, py] as [number, number]).slice(1, -1), light);
+    p.set(Math.round(tip.x), Math.round(tip.y) - 1, light);
+    p.line(x - 3, y + 1 - dir * 0.5, x + 3, y - 1 + dir * 0.5, gold, 1); p.line(x - 3, y + 2 - dir * 0.5, x + 3, y + dir * 0.5, shadeHex(gold, -0.2), 1);
+    p.set(x, y, dark);
+  };
+  switch (shape) {
+    case "sword": blade(15); break;
+    case "dagger": blade(8); break;
+    case "sabre": blade(14, 2.4); break;
+    case "axe": case "pickaxe": {
+      // A haft over the shoulder, the head at its top.
+      const top = { x: x + dir * (3 + lean), y: y - 13 };
+      p.line(x - dir, y + 4, top.x, top.y, wood, 2); p.line(x - dir, y + 3, top.x - dir, top.y + 1, woodLight);
+      if (shape === "axe") { p.poly([[top.x, top.y - 1], [top.x + dir * 5, top.y - 3], [top.x + dir * 6, top.y + 3], [top.x + dir, top.y + 3]], metal, null); p.line(top.x + dir * 5, top.y - 2, top.x + dir * 6, top.y + 2, light); }
+      else { p.polyline([[top.x - dir * 6, top.y + 3], [top.x - dir * 3, top.y], [top.x, top.y - 1], [top.x + dir * 3, top.y], [top.x + dir * 6, top.y + 3]], metal, 2); p.line(top.x - dir * 2, top.y - 1, top.x + dir * 2, top.y - 1, light); }
+      break;
+    }
+    case "staff": {
+      // Upright in the hand, foot by your feet, the head (a claw holding an orb of its element) above you.
+      const top = { x: x + dir * (1 + lean), y: y - 20 };
+      p.line(x, y + 11, top.x, top.y + 3, wood, 2); p.line(x - 1, y + 10, top.x - 1, top.y + 4, woodLight);
+      const orb = piece.id === "staff" ? "#e2d49e" : metal;
+      p.line(top.x - 2, top.y + 3, top.x - 2, top.y, wood); p.line(top.x + 2, top.y + 3, top.x + 2, top.y, wood);
+      p.disc(top.x, top.y, 2.2, 2.2, orb, null); p.set(top.x - 1, top.y - 1, "#ffffff");
+      break;
+    }
+    case "bow": {
+      // Held up by the grip: limbs bowing forward, the string straight behind them.
+      const limb: [number, number][] = []; for (let i = 0; i <= 10; i++) { const t = i / 10; limb.push([x + dir * (Math.sin(t * Math.PI) * 4 + lean), y - 12 + t * 22]); }
+      p.line(x, y - 12, x, y + 10, "#e8e4da");
+      p.polyline(limb, metal, 2); p.polyline(limb.slice(2, 5).map(([px, py]) => [px + dir * 0.6, py] as [number, number]), shadeHex(metal, 0.18));
+      p.rect(x + dir * 3 + lean - 1, y - 2, 2, 3, "#5a4030");
+      break;
+    }
+    default: blade(10);
+  }
 }
 /** A heater shield centred on (x, y) in fine pixels: rim, boss and cross in its accent; from behind, its wooden back and strap. */
 function drawShield(p: Pixels, piece: Piece, x: number, y: number, rear: boolean) {

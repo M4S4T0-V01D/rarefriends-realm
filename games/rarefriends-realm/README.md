@@ -172,7 +172,9 @@ underground and upstairs. Other players see you riding.
 paths, cobbled streets in staggered setts, flagstones, wind-rippled sand and snow, boards, furrows and dungeon flags. Only
 tiles near you and at normal zoom are textured, so it stays quick. Furnaces are brick kilns with a fire in an arched mouth
 and a smoking chimney. Campfires are small pixel flames on a pile of cut logs. Equipped shields show on your Friend's
-off arm, and on other players' Friends.
+off arm, and weapons are painted into your Friend's own pixels too: swords, daggers and sabres held in a ready guard,
+axes and pickaxes over the shoulder, staffs upright with an orb of their element, bows held up by the grip. They rock with
+your step, sit behind you when that arm is on the far side, and swing free only mid-attack. Other players see them too.
 
 **Day and night.** A Realm day lasts 24 minutes. Dusk turns the light warm, and at night the land goes blue-dark
 except around lamps, torches, fires, forges, altars and your own small light (a lantern familiar carries a bigger one).
