@@ -526,7 +526,8 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
     <Modal title="Controls and tips" onClose={onClose}>
       <ul className="realm-help">
         <li><b>Left-click</b> does the first option (shown top-left). <b>Right-click</b> (or long-press) for every option.</li>
-        <li><b>WASD / arrows</b> walk. <b>R</b> toggles run. <b>Scroll</b> zooms. <b>M</b> opens the world map.</li>
+        <li><b>WASD</b> walks. <b>← →</b> turn the camera, <b>↑ ↓</b> tilt it; or <b>drag with the scroll wheel held</b>. Click the <b>compass</b> to face north.</li>
+        <li><b>R</b> toggles run. <b>Scroll</b> zooms. <b>M</b> opens the world map.</li>
         <li><b>F1–F9</b> or the icons switch tabs. <b>Enter</b> to chat. <b>Space</b> continues dialogue, <b>1–5</b> pick options. <b>Esc</b> closes.</li>
         <li><b>Use</b> an item, then click another item or object: raw fish on a range, tinderbox on logs, needle on leather, chisel on a gem.</li>
         <li>Train <b>15 skills</b> to 99 on the old-school XP curve (Realm rate ×3). Your Friend's family adds a perk.</li>
@@ -537,7 +538,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
     </Modal>
   );
 }
-export function Orbs({ game, onRun, onMap, onZoom }: { game: Game; onRun: () => void; onMap: () => void; onZoom: (delta: number) => void }) {
+export function Orbs({ game, onRun, onMap, onZoom, onRotate }: { game: Game; onRun: () => void; onMap: () => void; onZoom: (delta: number) => void; onRotate: (delta: number) => void }) {
   const player = game.player, hpFraction = player.hp / maxHp(player), prayerFraction = player.prayer / Math.max(1, maxPrayer(player));
   const orb = (label: string, value: number, fraction: number, color: string, onClick?: () => void, pressed?: boolean) => (
     <button type="button" className="realm-orb" onClick={onClick} disabled={!onClick} aria-pressed={pressed} aria-label={`${label}: ${value}`} title={label}>
@@ -551,6 +552,7 @@ export function Orbs({ game, onRun, onMap, onZoom }: { game: Game; onRun: () => 
       {orb(player.run ? "Run: on" : "Run: off", Math.floor(player.energy), player.energy / 100, player.run ? "#e2d7ad" : "#9a968f", onRun, player.run)}
       <button type="button" className="realm-orb map" onClick={onMap} aria-label="World map (M)" title="World map (M)">🗺</button>
       <div className="realm-zoom"><button type="button" onClick={() => onZoom(0.12)} aria-label="Zoom in">+</button><button type="button" onClick={() => onZoom(-0.12)} aria-label="Zoom out">−</button></div>
+      <div className="realm-zoom"><button type="button" onClick={() => onRotate(-Math.PI / 4)} aria-label="Turn the camera left" title="Turn left (←)">⟲</button><button type="button" onClick={() => onRotate(Math.PI / 4)} aria-label="Turn the camera right" title="Turn right (→)">⟳</button></div>
     </div>
   );
 }

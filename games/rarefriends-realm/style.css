@@ -31,7 +31,9 @@
 .realm-topright { position: absolute; right: 8px; top: 8px; display: flex; gap: 4px; align-items: flex-start; pointer-events: none; }
 .realm-minimap { position: relative; width: 160px; height: 160px; border-radius: 50%; padding: 4px; background: var(--panel); border: 2px solid var(--ink); box-shadow: 0 0 0 2px #5a5753 inset, 3px 3px 0 #000; pointer-events: auto; }
 .realm-minimap canvas { width: 152px; height: 152px; border-radius: 50%; display: block; cursor: pointer; }
-.realm-compass { position: absolute; left: 2px; top: 2px; width: 26px; height: 26px; border-radius: 50%; background: var(--paper); border: 2px solid var(--ink); display: grid; place-items: center; font-weight: 800; font-size: 11px; transform: rotate(-45deg); }
+.realm-compass { position: absolute; left: 0; top: 0; width: 30px; height: 30px; padding: 0; border-radius: 50%; background: var(--paper); border: 2px solid var(--ink); display: grid; place-items: center; box-shadow: 2px 2px 0 #000; cursor: pointer; transform: rotate(-63deg); }
+.realm-compass i { position: absolute; top: -1px; font-style: normal; font-size: 9px; color: #c9605f; line-height: 1; }
+.realm-compass b { font-size: 10px; font-weight: 800; }
 .realm-orbs { display: grid; gap: 4px; padding-top: 18px; pointer-events: auto; }
 .realm-orb { position: relative; width: 48px; height: 30px; display: flex; align-items: center; gap: 4px; padding: 2px 6px 2px 2px; border-radius: 16px; background: var(--panel); border: 2px solid var(--ink); color: #fff; box-shadow: 2px 2px 0 #000; }
 .realm-orb i { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid #000; flex: none; }

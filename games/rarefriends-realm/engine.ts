@@ -11,7 +11,7 @@ import { NPCS, examineItem, npcDef, onMonsterKilled, questDone, searchCryptChest
 import {
   BANK_SIZE, INVENTORY_SIZE, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
   level, maxHp, maxPrayer, message, prayerBoost, sound, take, weapon, combatLevel, createGame,
-  type Activity, type CombatStyle, type Dialogue, type Facing, type Game, type Monster, type Npc, type Point, type Recipe, type Slot, type Target,
+  type Activity, type CombatStyle, type Dialogue, type Game, type Monster, type Npc, type Point, type Recipe, type Slot, type Target,
 } from "./state.ts";
 import { T, W, H, inBounds, isWater, objectAtTile, regionAt, terrainAt, tileIndex, walkable, type WorldObject } from "./world.ts";
 
@@ -59,19 +59,17 @@ export function findPath(game: Game, from: Point, goal: (x: number, y: number) =
   for (let index = end; index !== startIndex; index = parents[index]) path.push({ x: (index % SPAN) + ox, y: Math.floor(index / SPAN) + oy });
   return path.reverse();
 }
-function facingFor(dx: number, dy: number, current: Facing): Facing {
-  // Screen directions in the isometric view: +x goes down-right, +y goes down-left.
-  const sx = dx - dy, sy = dx + dy;
-  if (sx === 0 && sy === 0) return current;
-  return Math.abs(sx) >= Math.abs(sy) ? (sx > 0 ? "right" : "left") : (sy > 0 ? "down" : "up");
+/** A world-space heading toward (dx, dy); kept when the step is zero. */
+function headingTo(dx: number, dy: number, current: Point): Point {
+  return dx || dy ? { x: Math.sign(dx), y: Math.sign(dy) } : current;
 }
 function face(game: Game, x: number, y: number) {
   const player = game.player;
-  player.facing = facingFor(Math.sign(x - player.x), Math.sign(y - player.y), player.facing);
+  player.heading = headingTo(x - player.x, y - player.y, player.heading);
 }
 function moveTo(game: Game, x: number, y: number) {
   const player = game.player;
-  player.prev = { x: player.x, y: player.y }; player.facing = facingFor(x - player.x, y - player.y, player.facing);
+  player.prev = { x: player.x, y: player.y }; player.heading = headingTo(x - player.x, y - player.y, player.heading);
   player.x = x; player.y = y; player.moved = game.tick;
 }
 function stopAll(game: Game) {
@@ -87,7 +85,7 @@ export function walkTo(game: Game, x: number, y: number) {
   game.player.path = path;
   return true;
 }
-/** Held WASD/arrow direction, in screen space (up = away from the camera). */
+/** Held movement direction as a world-space vector (the UI converts WASD for the current camera angle). */
 export function setHeld(game: Game, held: { dx: number; dy: number } | null) {
   if (held && (held.dx || held.dy)) {
     if (!game.held) { stopAll(game); closeInterfaces(game); }
@@ -547,7 +545,7 @@ function interactNpc(game: Game, uid: number, option: string, use?: number) {
   const npc = npcByUid(game, uid), player = game.player;
   if (!npc) return;
   const def = npcDef(npc.id);
-  npc.busy = 6; npc.facing = facingFor(player.x - npc.x, player.y - npc.y, npc.facing);
+  npc.busy = 6; npc.heading = headingTo(player.x - npc.x, player.y - npc.y, npc.heading);
   if (use !== undefined) {
     const slot = player.inventory[use];
     if (slot?.id === "cowhide" && npc.id === "tanner") { tanHides(game); return; }
@@ -631,7 +629,8 @@ function movePlayer(game: Game) {
   if (player.stunned > 0) return;
   // Held keys walk one screen direction at a time.
   if (game.held) {
-    const { dx, dy } = game.held, tx = Math.sign(dx + dy), ty = Math.sign(dy - dx);
+    // Held keys give a world-space direction (the UI turns screen keys into it for the camera angle); snap to 8 ways.
+    const octant = Math.round(Math.atan2(game.held.dy, game.held.dx) / (Math.PI / 4)), tx = Math.round(Math.cos(octant * Math.PI / 4)), ty = Math.round(Math.sin(octant * Math.PI / 4));
     const steps = player.run && player.energy >= 1 ? 2 : 1, start = { x: player.x, y: player.y };
     let moved = 0;
     for (let i = 0; i < steps; i++) {
@@ -984,7 +983,7 @@ function stepMonsterToward(game: Game, monster: Monster, target: Point) {
   if (best) moveMonster(game, monster, monster.x + best[0], monster.y + best[1]);
 }
 function moveMonster(game: Game, monster: Monster, x: number, y: number) {
-  monster.prev = { x: monster.x, y: monster.y }; monster.facing = facingFor(x - monster.x, y - monster.y, monster.facing);
+  monster.prev = { x: monster.x, y: monster.y }; monster.heading = headingTo(x - monster.x, y - monster.y, monster.heading);
   monster.x = x; monster.y = y; monster.moved = game.tick;
 }
 function npcTick(game: Game, npc: Npc) {
@@ -993,7 +992,7 @@ function npcTick(game: Game, npc: Npc) {
   const dx = Math.floor(game.rng() * 3) - 1, dy = Math.floor(game.rng() * 3) - 1, nx = npc.x + dx, ny = npc.y + dy;
   if (Math.abs(nx - npc.spawn.x) > npc.wander || Math.abs(ny - npc.spawn.y) > npc.wander || !canStep(game, npc.x, npc.y, dx, dy)) return;
   if (nx === game.player.x && ny === game.player.y) return;
-  npc.prev = { x: npc.x, y: npc.y }; npc.facing = facingFor(dx, dy, npc.facing); npc.x = nx; npc.y = ny; npc.moved = game.tick;
+  npc.prev = { x: npc.x, y: npc.y }; npc.heading = headingTo(dx, dy, npc.heading); npc.x = nx; npc.y = ny; npc.moved = game.tick;
 }
 function upkeep(game: Game) {
   const player = game.player;

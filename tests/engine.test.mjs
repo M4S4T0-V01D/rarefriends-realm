@@ -121,10 +121,13 @@ test("click to walk: pathfinding goes around obstacles and never cuts corners", 
   void start;
 });
 
-test("WASD walks in screen directions", () => {
+test("held movement snaps a world direction to the nearest of 8 ways", () => {
   const g = newGame(), { x, y } = g.player;
-  setHeld(g, { dx: 0, dy: 1 }); tick(g); setHeld(g, null);
+  setHeld(g, { dx: 0.5, dy: 0.45 }); tick(g); setHeld(g, null);
   assert.equal(g.player.x - x, 1); assert.equal(g.player.y - y, 1);
+  const before = { ...g.player };
+  setHeld(g, { dx: -1, dy: 0.1 }); tick(g); setHeld(g, null);
+  assert.equal(g.player.x - before.x, -1); assert.equal(g.player.y - before.y, 0);
 });
 
 test("right-click menus list every option in old-school order", () => {

@@ -8,7 +8,10 @@ An old-school, tick-based RPG in a 2.5D isometric world. Your verified Rare Frie
 | --- | --- |
 | Left-click | The first option, shown in the top-left (walk, chop, attack, talk…) |
 | Right-click / long-press | Every option for what's under the pointer, plus Examine and Cancel |
-| WASD / arrow keys | Walk in screen directions |
+| WASD | Walk in screen directions (at any camera angle) |
+| ← → / ↑ ↓ | Turn / tilt the camera |
+| Hold the scroll wheel and drag | Turn and tilt the camera |
+| Compass (by the minimap) | Face north again |
 | R, or the run orb | Toggle run (two tiles a tick, uses run energy) |
 | Scroll, or + / − | Zoom |
 | M, or the map orb | World map (click a place to walk there) |

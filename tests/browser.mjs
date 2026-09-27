@@ -138,6 +138,27 @@ try {
   const after = await state(() => ({ x: window.__realm.game().player.x, y: window.__realm.game().player.y }));
   assert(after.x + after.y >= before.x + before.y + 2, `S walks down-screen (toward the camera), sliding around obstacles (${JSON.stringify(before)} → ${JSON.stringify(after)})`);
 
+  // ---------- Camera: arrow keys turn and tilt, the scroll wheel drags it round, the compass faces north ----------
+  await page.keyboard.down("ArrowRight"); await page.waitForTimeout(700); await page.keyboard.up("ArrowRight");
+  await page.keyboard.down("ArrowUp"); await page.waitForTimeout(400); await page.keyboard.up("ArrowUp");
+  const turned = await state(() => window.__realm.camera());
+  assert(turned.angle > 0.6, `→ turns the camera (${turned.angle})`); assert(turned.pitch > 0.55, `↑ tilts it (${turned.pitch})`);
+  await shot("camera-turned");
+  const view = await page.locator("iframe").boundingBox();
+  await page.mouse.move(view.x + view.width * 0.4, view.y + view.height * 0.35);
+  await page.mouse.down({ button: "middle" }); await page.mouse.move(view.x + view.width * 0.55, view.y + view.height * 0.35, { steps: 8 }); await page.mouse.up({ button: "middle" });
+  assert((await state(() => window.__realm.camera().angle)) > turned.angle + 0.3, "middle-drag turns the camera");
+  // Walking with S still goes down the screen at this angle.
+  const turnedStart = await state(() => ({ ...window.__realm.game().player }));
+  await page.keyboard.down("s"); await page.waitForTimeout(1300); await page.keyboard.up("s");
+  const turnedEnd = await state(() => ({ ...window.__realm.game().player }));
+  const screenStart = await screenOf(turnedStart.x, turnedStart.y), screenEnd = await screenOf(turnedEnd.x, turnedEnd.y);
+  assert(screenEnd.y > screenStart.y + 10, "S walks down the screen whatever the camera angle");
+  await game.getByRole("button", { name: "Compass: face north" }).click();
+  await page.waitForTimeout(900);
+  const reset = await state(() => window.__realm.camera());
+  assert(Math.abs(reset.angle % (Math.PI * 2)) < 0.01 && Math.abs(reset.pitch - 0.5) < 0.01, "the compass faces north again");
+
   // ---------- Panels ----------
   await state(() => { const g = window.__realm.game(), p = g.player, table = [0, 0, 83, 174, 276, 388, 512, 650, 801, 969, 1154, 1358, 1584, 1833, 2107, 2411, 2746, 3115, 3523, 3973, 4470, 5018, 5624, 6291, 7028, 7842, 8740, 9730, 10824, 12031, 13363];
     Object.assign(p.xp, { attack: table[24], strength: table[26], defence: table[21], hitpoints: table[25], woodcutting: table[18], fishing: table[22], mining: table[16], smithing: table[12], cooking: table[20], firemaking: table[15], magic: table[13], prayer: table[9], crafting: table[7], thieving: table[11], agility: table[10] });

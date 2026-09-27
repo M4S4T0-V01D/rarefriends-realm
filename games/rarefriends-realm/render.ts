@@ -29,7 +29,9 @@ const EDGE_CLASS: Record<number, number> = {
   [T.STONE]: 8, [T.WOOD]: 9, [T.GRAVEL]: 10, [T.DUNGEON]: 11, [T.BRIDGE]: 12, [T.CLIFF]: 13, [T.WALL]: 14, [T.FARMLAND]: 15, [T.ICE]: 16, [T.CARPET]: 17,
 };
 
-export type Camera = { x: number; y: number; zoom: number };
+/** The camera: a point in tiles, zoom, rotation (radians, 0 = the classic view) and pitch (screen squash, 0.5 = classic). */
+export type Camera = { x: number; y: number; zoom: number; angle: number; pitch: number };
+export const PITCH = { min: 0.36, max: 0.74, classic: 0.5 } as const;
 export type ClickMarker = { x: number; y: number; at: number; red: boolean };
 export type Firework = { at: number; color: string };
 export type Scene = {
@@ -41,16 +43,31 @@ export type HitSplat = { on: "player" | "monster"; uid?: number; damage: number;
 type Hit = { x: number; y: number; w: number; h: number; pick: Pick };
 
 // ---------- Projection ----------
+/** Rotate a world offset by the camera angle. */
+function rotate(camera: Camera, dx: number, dy: number) {
+  const c = Math.cos(camera.angle), s = Math.sin(camera.angle);
+  return { rx: dx * c - dy * s, ry: dx * s + dy * c };
+}
+/** Heights shrink as the camera looks more from above. */
+const liftScale = (camera: Camera) => Math.sqrt(1 - camera.pitch * camera.pitch) / Math.sqrt(0.75);
 export function toScreen(camera: Camera, x: number, y: number, lift = 0) {
-  const wx = (x - y) * TILE_W / 2, wy = (x + y) * TILE_H / 2, cx = (camera.x - camera.y) * TILE_W / 2, cy = (camera.x + camera.y) * TILE_H / 2;
-  return { x: (wx - cx) * camera.zoom + VIEW.width / 2, y: (wy - cy - lift) * camera.zoom + VIEW.height / 2 };
+  const { rx, ry } = rotate(camera, x - camera.x, y - camera.y), half = TILE_W / 2;
+  return { x: (rx - ry) * half * camera.zoom + VIEW.width / 2, y: ((rx + ry) * half * camera.pitch - lift * liftScale(camera)) * camera.zoom + VIEW.height / 2 };
 }
 export function toTile(camera: Camera, sx: number, sy: number) {
-  const cx = (camera.x - camera.y) * TILE_W / 2, cy = (camera.x + camera.y) * TILE_H / 2;
-  const wx = (sx - VIEW.width / 2) / camera.zoom + cx, wy = (sy - VIEW.height / 2) / camera.zoom + cy;
-  const a = wx / (TILE_W / 2), b = wy / (TILE_H / 2);
-  return { x: Math.round((a + b) / 2), y: Math.round((b - a) / 2) };
+  const half = TILE_W / 2, a = (sx - VIEW.width / 2) / (camera.zoom * half), b = (sy - VIEW.height / 2) / (camera.zoom * half * camera.pitch);
+  const rx = (a + b) / 2, ry = (b - a) / 2, c = Math.cos(-camera.angle), s = Math.sin(-camera.angle);
+  return { x: Math.round(camera.x + rx * c - ry * s), y: Math.round(camera.y + rx * s + ry * c) };
 }
+/** Draw order: further from the camera first. */
+export function depthOf(camera: Camera, x: number, y: number) { const { rx, ry } = rotate(camera, x, y); return rx + ry; }
+/** The screen facing of a world heading, for sprites. */
+export function screenFacing(camera: Camera, heading: { x: number; y: number }): Facing {
+  const { rx, ry } = rotate(camera, heading.x, heading.y), sx = rx - ry, sy = rx + ry;
+  return Math.abs(sx) >= Math.abs(sy) ? (sx > 0 ? "right" : "left") : (sy > 0 ? "down" : "up");
+}
+/** Screen angle of world north (for the compass). */
+export function northAngle(camera: Camera) { const { rx, ry } = rotate(camera, 0, -1); return Math.atan2((rx + ry) * camera.pitch, rx - ry); }
 const hash = (x: number, y: number) => { let h = Math.imul(x * 374761393 + y * 668265263, 1274126177); h ^= h >>> 13; return ((Math.imul(h, 1103515245) >>> 0) % 10000) / 10000; };
 
 // ---------- Sprites ----------
@@ -108,15 +125,23 @@ function shade(hex: string, amount: number) {
 function box(ctx: CanvasRenderingContext2D, camera: Camera, x: number, y: number, w: number, d: number, h: number, top: string, left: string, right: string, lift = 0, stroke: string | null = INK) {
   const p = (px: number, py: number, z: number) => { const s = toScreen(camera, px, py, z); return [s.x, s.y] as const; };
   const x0 = x - w / 2, x1 = x + w / 2, y0 = y - d / 2, y1 = y + d / 2;
-  poly(ctx, [p(x0, y1, lift), p(x1, y1, lift), p(x1, y1, lift + h), p(x0, y1, lift + h)], left, stroke);
-  poly(ctx, [p(x1, y1, lift), p(x1, y0, lift), p(x1, y0, lift + h), p(x1, y1, lift + h)], right, stroke);
+  // The four sides with their outward normals; draw the ones facing the camera, shaded by which way they face on screen.
+  const sides: [number, number, number, number, number, number][] = [[x0, y1, x1, y1, 0, 1], [x1, y1, x1, y0, 1, 0], [x1, y0, x0, y0, 0, -1], [x0, y0, x0, y1, -1, 0]];
+  for (const [ax, ay, bx, by, nx, ny] of sides) {
+    const { rx, ry } = rotate(camera, nx, ny);
+    if (rx + ry <= 0.001) continue;
+    poly(ctx, [p(ax, ay, lift), p(bx, by, lift), p(bx, by, lift + h), p(ax, ay, lift + h)], rx - ry < 0 ? left : right, stroke);
+  }
   poly(ctx, [p(x0, y0, lift + h), p(x1, y0, lift + h), p(x1, y1, lift + h), p(x0, y1, lift + h)], top, stroke);
 }
 
 // ---------- Terrain ----------
 function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, x0: number, y0: number, x1: number, y1: number) {
-  const { camera, game, now } = scene, world = game.world, z = camera.zoom, hw = TILE_W / 2 * z, hh = TILE_H / 2 * z;
+  const { camera, game, now } = scene, world = game.world, z = camera.zoom, hw = TILE_W / 2 * z, hh = hw * camera.pitch;
   const t = scene.reducedMotion ? 0 : now / 1000;
+  // Screen offsets of half a tile along world x and y: tile corners are centre ± ex ± ey at any camera angle.
+  const o = toScreen(camera, camera.x, camera.y), px = toScreen(camera, camera.x + 0.5, camera.y), py = toScreen(camera, camera.x, camera.y + 0.5);
+  const ex = { x: px.x - o.x, y: px.y - o.y }, ey = { x: py.x - o.x, y: py.y - o.y };
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
     if (!inBounds(x, y)) continue;
     const terrain = world.tiles[y * W + x];
@@ -124,7 +149,8 @@ function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, x0: number, y0
     const { x: sx, y: sy } = toScreen(camera, x, y);
     if (sx < -hw * 2 || sx > VIEW.width + hw * 2 || sy < -hh * 2 || sy > VIEW.height + hh * 4) continue;
     const variation = (hash(x, y) - 0.5) * 0.035;
-    ctx.beginPath(); ctx.moveTo(sx, sy - hh); ctx.lineTo(sx + hw, sy); ctx.lineTo(sx, sy + hh); ctx.lineTo(sx - hw, sy); ctx.closePath();
+    const ax = sx - ex.x - ey.x, ay = sy - ex.y - ey.y, bx = sx + ex.x - ey.x, by = sy + ex.y - ey.y, cx = sx + ex.x + ey.x, cy = sy + ex.y + ey.y, dx = sx - ex.x + ey.x, dy = sy - ex.y + ey.y;
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.lineTo(cx, cy); ctx.lineTo(dx, dy); ctx.closePath();
     ctx.fillStyle = shade(TERRAIN_COLORS[terrain] ?? "#cccccc", variation); ctx.fill();
     // Texture details.
     const h = hash(y, x);
@@ -166,10 +192,10 @@ function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, x0: number, y0
       if (other === T.VOID || EDGE_CLASS[other] === mine || other === T.WALL || other === T.CLIFF) return;
       ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
     };
-    edge(x, y - 1, sx - hw, sy, sx, sy - hh);   // north-west edge (y-1)
-    edge(x + 1, y, sx, sy - hh, sx + hw, sy);   // north-east edge (x+1)
-    edge(x, y + 1, sx + hw, sy, sx, sy + hh);   // south-east edge (y+1)
-    edge(x - 1, y, sx, sy + hh, sx - hw, sy);   // south-west edge (x-1)
+    edge(x, y - 1, ax, ay, bx, by);
+    edge(x + 1, y, bx, by, cx, cy);
+    edge(x, y + 1, cx, cy, dx, dy);
+    edge(x - 1, y, dx, dy, ax, ay);
   }
 }
 
@@ -440,11 +466,16 @@ function interpolate(entity: { x: number; y: number; prev: { x: number; y: numbe
   if (entity.moved !== game.tick) return { x: entity.x, y: entity.y, moving: false };
   return { x: entity.prev.x + (entity.x - entity.prev.x) * alpha, y: entity.prev.y + (entity.y - entity.prev.y) * alpha, moving: alpha < 1 };
 }
-function hpBar(ctx: CanvasRenderingContext2D, x: number, y: number, fraction: number, z: number) {
-  const w = 30 * z, h = 4 * Math.max(0.8, z);
-  ctx.fillStyle = "#c98f95"; ctx.fillRect(x - w / 2, y, w, h);
-  ctx.fillStyle = "#9fbf9a"; ctx.fillRect(x - w / 2, y, w * Math.max(0, fraction), h);
-  ctx.strokeStyle = INK; ctx.lineWidth = 1; ctx.strokeRect(x - w / 2, y, w, h);
+/** A health bar: green over red, ink outline. `label` (a level) sits to its left. */
+function hpBar(ctx: CanvasRenderingContext2D, x: number, y: number, fraction: number, z: number, width = 30, label?: string) {
+  const w = width * z, h = 4.5 * Math.max(0.85, z), left = x - w / 2;
+  ctx.fillStyle = "#cf6e6e"; ctx.fillRect(left, y, w, h);
+  ctx.fillStyle = "#86c47f"; ctx.fillRect(left, y, w * Math.max(0, Math.min(1, fraction)), h);
+  ctx.strokeStyle = INK; ctx.lineWidth = 1; ctx.strokeRect(left, y, w, h);
+  if (label) {
+    ctx.font = `bold ${Math.round(9 * Math.max(0.9, z))}px ui-monospace, Menlo, Consolas, monospace`; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    ctx.strokeStyle = INK; ctx.lineWidth = 2.5; ctx.strokeText(label, left - 3, y + h / 2); ctx.fillStyle = "#f2e28f"; ctx.fillText(label, left - 3, y + h / 2);
+  }
 }
 function splat(ctx: CanvasRenderingContext2D, x: number, y: number, damage: number, z: number, age: number) {
   const r = 9 * Math.max(0.8, z), rise = age * 10 * z;
@@ -495,17 +526,18 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   const x0 = Math.min(...corners.map(c => c.x)) - 2, x1 = Math.max(...corners.map(c => c.x)) + 3, y0 = Math.min(...corners.map(c => c.y)) - 2, y1 = Math.max(...corners.map(c => c.y)) + 3;
   drawTerrain(ctx, scene, x0, y0, x1, y1);
   const hits: Hit[] = [], drawables: Drawable[] = [];
-  const player = game.player, pp = interpolate(player, game, alpha), playerDepth = pp.x + pp.y;
+  const player = game.player, pp = interpolate(player, game, alpha), playerDepth = depthOf(camera, pp.x, pp.y), depth = (x: number, y: number) => depthOf(camera, x, y);
+  const playerFacing = screenFacing(camera, player.heading);
   // Hover highlight and click marker.
-  const tileOutline = (tx: number, ty: number, color: string) => { const s = toScreen(camera, tx, ty), hw = TILE_W / 2 * z, hh = TILE_H / 2 * z; poly(ctx, [[s.x, s.y - hh], [s.x + hw, s.y], [s.x, s.y + hh], [s.x - hw, s.y]], null, color, 1.5); };
+  const tileOutline = (tx: number, ty: number, color: string) => { const c = (dx: number, dy: number) => { const s = toScreen(camera, tx + dx, ty + dy); return [s.x, s.y] as const; }; poly(ctx, [c(-0.5, -0.5), c(0.5, -0.5), c(0.5, 0.5), c(-0.5, 0.5)], null, color, 1.5); };
   if (scene.hoverTile) tileOutline(scene.hoverTile.x, scene.hoverTile.y, "rgba(22,22,22,0.35)");
   // Static objects, walls and cliffs.
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
     if (!inBounds(x, y)) continue;
     const terrain = world.tiles[y * W + x];
     if (terrain === T.WALL || terrain === T.CLIFF) {
-      const depth = x + y, near = Math.abs(x - pp.x) + Math.abs(y - pp.y) < 7 && depth > playerDepth + 0.5;
-      drawables.push({ depth, draw: () => {
+      const d = depth(x, y), near = Math.abs(x - pp.x) + Math.abs(y - pp.y) < 7 && d > playerDepth + 0.5;
+      drawables.push({ depth: d, draw: () => {
         const height = terrain === T.WALL ? (y >= 200 ? 34 : 26) : 22;
         ctx.globalAlpha = near ? 0.28 : 1;
         if (terrain === T.WALL) box(ctx, camera, x, y, 1, 1, height, y >= 200 ? "#4a4950" : "#b9b4ab", y >= 200 ? "#3a3940" : "#a39e95", y >= 200 ? "#2f2e35" : "#8f8a82");
@@ -515,11 +547,11 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     }
     const object = objectAtTile(world, x, y);
     if (!object || object.name === "__removed") continue;
-    const depth = x + y + (object.kind === "wheat" || object.kind === "spot" ? -0.4 : 0);
-    drawables.push({ depth, draw: () => {
+    const d = depth(x, y) + (object.kind === "wheat" || object.kind === "spot" ? -0.4 : 0);
+    drawables.push({ depth: d, draw: () => {
       let rect: { x: number; y: number; w: number; h: number };
       const tall = object.kind === "tree" || (object.kind === "decor" && ["pine", "windmill", "palm", "pillar", "tent"].includes(object.decor!));
-      const fade = tall && depth > playerDepth + 0.5 && Math.abs(x - pp.x) + Math.abs(y - pp.y) < 4 ? 0.4 : 1;
+      const fade = tall && d > playerDepth + 0.5 && Math.abs(x - pp.x) + Math.abs(y - pp.y) < 4 ? 0.4 : 1;
       if (object.kind === "tree") rect = drawTree(ctx, camera, object, game.depleted.has(object.id), fade, scene.reducedMotion ? 0 : now);
       else if (object.kind === "rock") rect = drawRock(ctx, camera, object, game.depleted.has(object.id));
       else if (object.kind === "spot") rect = drawSpot(ctx, camera, object, now, scene.reducedMotion);
@@ -531,7 +563,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   // Fires.
   for (const fire of game.fires) {
     if (fire.x < x0 || fire.x > x1 || fire.y < y0 || fire.y > y1) continue;
-    drawables.push({ depth: fire.x + fire.y, draw: () => {
+    drawables.push({ depth: depth(fire.x, fire.y), draw: () => {
       const s = toScreen(camera, fire.x, fire.y), f = scene.reducedMotion ? 0 : Math.sin(now / 70 + fire.uid) * 3 * z;
       for (const [dx, dy] of [[-6, 0], [6, 0], [0, 3]]) { ctx.strokeStyle = INK; ctx.lineWidth = 4 * z; ctx.beginPath(); ctx.moveTo(s.x + dx * z - 6 * z, s.y + dy * z); ctx.lineTo(s.x + dx * z + 6 * z, s.y + dy * z - 3 * z); ctx.stroke(); }
       ellipse(ctx, s.x, s.y - 10 * z, 22 * z, 16 * z, "rgba(240,190,140,0.18)", null);
@@ -547,7 +579,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     const key = `${entry.x},${entry.y}`; const list = groundTiles.get(key) ?? []; list.push(entry); groundTiles.set(key, list);
   }
   for (const list of groundTiles.values()) {
-    drawables.push({ depth: list[0].x + list[0].y - 0.3, draw: () => {
+    drawables.push({ depth: depth(list[0].x, list[0].y) - 0.3, draw: () => {
       list.slice(0, 4).forEach((entry, index) => {
         const s = toScreen(camera, entry.x, entry.y), ox = (index % 2 ? 7 : -7) * z, oy = (index > 1 ? 4 : -2) * z, size = 22 * z;
         drawIcon(ctx, item(entry.id).icon, s.x + ox, s.y + oy - 4 * z, size);
@@ -559,31 +591,31 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   for (const npc of game.npcs) {
     if (npc.x < x0 || npc.x > x1 || npc.y < y0 || npc.y > y1) continue;
     const at = interpolate(npc, game, alpha);
-    drawables.push({ depth: at.x + at.y + 0.1, draw: () => drawNpc(ctx, scene, npc, at, hits) });
+    drawables.push({ depth: depth(at.x, at.y) + 0.1, draw: () => drawNpc(ctx, scene, npc, at, hits) });
   }
   // Monsters.
   for (const monster of game.monsters) {
     if (monster.dead || monster.x < x0 - 2 || monster.x > x1 || monster.y < y0 - 2 || monster.y > y1) continue;
     const at = interpolate(monster, game, alpha), size = monster.def.size ?? 1;
-    drawables.push({ depth: at.x + at.y + (size - 1) + 0.1, draw: () => drawMonster(ctx, scene, monster, at, hits) });
+    drawables.push({ depth: depth(at.x + (size - 1) / 2, at.y + (size - 1) / 2) + (size - 1) / 2 + 0.1, draw: () => drawMonster(ctx, scene, monster, at, hits) });
   }
   // Follower (owned Friend) trails a tile behind.
   if (scene.follower && player.follower !== null) {
     const fx = pp.x - Math.sign(player.x - player.prev.x || 1) * 0.9, fy = pp.y - Math.sign(player.y - player.prev.y || 1) * 0.9;
-    drawables.push({ depth: fx + fy, draw: () => {
+    drawables.push({ depth: depth(fx, fy), draw: () => {
       const s = toScreen(camera, fx, fy), frame = pp.moving ? Math.floor(now / 90) % 8 : 0;
       ellipse(ctx, s.x, s.y, 10 * z, 4 * z, "rgba(22,22,22,0.15)", null);
-      drawMask(ctx, friendRows(scene.follower!, player.facing, pp.moving, frame), s.x, s.y + 2 * z, 2.2 * z);
+      drawMask(ctx, friendRows(scene.follower!, playerFacing, pp.moving, frame), s.x, s.y + 2 * z, 2.2 * z);
     } });
   }
   // The player.
   drawables.push({ depth: playerDepth + 0.15, draw: () => {
     const s = toScreen(camera, pp.x, pp.y), px = 3.2 * z, walking = pp.moving || (!!player.path.length && alpha < 1);
     ellipse(ctx, s.x, s.y, 15 * z, 6 * z, "rgba(22,22,22,0.2)", "rgba(255,255,255,0.75)", 1.5);
-    drawWardrobe(ctx, player.worn, s.x, s.y, px, "back", now, player.facing);
-    if (scene.friend) drawMask(ctx, friendRows(scene.friend, player.facing, walking, walking ? Math.floor(now / 80) % 8 : 0), s.x, s.y + 2 * z, px);
+    drawWardrobe(ctx, player.worn, s.x, s.y, px, "back", now, playerFacing);
+    if (scene.friend) drawMask(ctx, friendRows(scene.friend, playerFacing, walking, walking ? Math.floor(now / 80) % 8 : 0), s.x, s.y + 2 * z, px);
     else ellipse(ctx, s.x, s.y - 20 * z, 12 * z, 16 * z, INK);
-    drawWardrobe(ctx, player.worn, s.x, s.y, px, "front", now, player.facing);
+    drawWardrobe(ctx, player.worn, s.x, s.y, px, "front", now, playerFacing);
     drawWeapon(ctx, scene, s.x, s.y, px);
     const activityPose = player.activity && ["woodcut", "mine", "fish", "cook", "produce"].includes(player.activity.kind);
     if (activityPose && !scene.reducedMotion) { const bob = Math.sin(now / 120) * 3 * z; ellipse(ctx, s.x + 16 * z, s.y - 30 * z + bob, 2 * z, 2 * z, "rgba(22,22,22,0.4)", null); }
@@ -625,7 +657,7 @@ function drawWeapon(ctx: CanvasRenderingContext2D, scene: Scene, x: number, y: n
   const player = scene.game.player, weaponId = player.equipment.weapon;
   if (!weaponId) return;
   const icon = item(weaponId).icon, attacking = player.combat !== null && player.attackTimer >= 2;
-  const side = player.facing === "left" ? -1 : 1, swing = attacking && !scene.reducedMotion ? Math.sin(scene.now / 60) * 0.6 : 0;
+  const side = screenFacing(scene.camera, player.heading) === "left" ? -1 : 1, swing = attacking && !scene.reducedMotion ? Math.sin(scene.now / 60) * 0.6 : 0;
   ctx.save(); ctx.translate(x + side * 7 * px, y - 7 * px); ctx.rotate(side * (0.5 + swing)); drawItemShape(ctx, icon, -5 * px, -9 * px, 10 * px); ctx.restore();
 }
 function drawNpc(ctx: CanvasRenderingContext2D, scene: Scene, npc: Npc, at: { x: number; y: number; moving: boolean }, hits: Hit[]) {
@@ -634,11 +666,11 @@ function drawNpc(ctx: CanvasRenderingContext2D, scene: Scene, npc: Npc, at: { x:
   let rect;
   if ("canonical" in def.art) {
     const sprites = scene.canonical.get(def.art.canonical);
-    rect = sprites ? drawMask(ctx, friendRows(sprites, npc.facing, at.moving, at.moving ? Math.floor(now / 90) % 8 : 0), s.x, s.y + 2 * z, 2.8 * z) : drawMask(ctx, friendSprite(5, 1).idle, s.x, s.y + 2 * z, 2.8 * z);
+    rect = sprites ? drawMask(ctx, friendRows(sprites, screenFacing(camera, npc.heading), at.moving, at.moving ? Math.floor(now / 90) % 8 : 0), s.x, s.y + 2 * z, 2.8 * z) : drawMask(ctx, friendSprite(5, 1).idle, s.x, s.y + 2 * z, 2.8 * z);
   } else {
     const set = friendSprite(def.art.family, def.art.seed + (npc.id === "villager" || npc.id === "banker" || npc.id === "guard" ? npc.uid : 0));
     const frame = at.moving && Math.floor(now / 160) % 2 ? set.step : set.idle, bob = !scene.reducedMotion && def.art.family === 5 ? Math.sin(now / 400 + npc.uid) * 2 * z : 0;
-    rect = drawMask(ctx, frame, s.x, s.y + 2 * z - bob, 2.6 * z, INK, npc.facing === "left");
+    rect = drawMask(ctx, frame, s.x, s.y + 2 * z - bob, 2.6 * z, INK, screenFacing(camera, npc.heading) === "left");
   }
   hits.push({ ...rect, pick: { kind: "npc", id: npc.uid } });
   const questMarker = questMarkerFor(game, npc.id);
@@ -659,13 +691,14 @@ function drawMonster(ctx: CanvasRenderingContext2D, scene: Scene, monster: Monst
   const s = toScreen(camera, center.x, center.y), px = (size === 1 ? 2.6 : size === 2 ? 4.4 : 6.2) * z * (monster.def.id === "chicken" || monster.def.id === "ink_rat" ? 0.75 : 1);
   ellipse(ctx, s.x, s.y, 12 * z * size, 4.5 * z * size, "rgba(22,22,22,0.18)", null);
   const set = creatureSprite(monster.def.art), frame = at.moving && Math.floor(now / 150) % 2 ? set.step : set.idle;
-  const faceLeft = FACES_LEFT.has(monster.def.art), mirror = faceLeft ? monster.facing === "right" || monster.facing === "down" : monster.facing === "left" || monster.facing === "up";
+  const facing = screenFacing(camera, monster.heading), faceLeft = FACES_LEFT.has(monster.def.art), mirror = faceLeft ? facing === "right" || facing === "down" : facing === "left" || facing === "up";
   if (monster.def.boss && !scene.reducedMotion) { const pulse = 1 + Math.sin(now / 300) * 0.08; ellipse(ctx, s.x, s.y - 40 * z, 48 * z * pulse, 36 * z * pulse, "rgba(20,20,30,0.25)", null); }
   const hover = monster.def.id === "shade" || monster.def.id === "hollow_king" ? Math.sin(now / 350 + monster.uid) * 3 * z : 0;
   const rect = drawMask(ctx, frame, s.x, s.y + 2 * z - hover, px, monster.def.ink ?? INK, mirror);
   hits.push({ ...rect, pick: { kind: "monster", id: monster.uid } });
   const recent = scene.hits.filter(entry => entry.on === "monster" && entry.uid === monster.uid && now - entry.at < 1100);
-  if (monster.target || recent.length || monster.hp < monster.def.hp) hpBar(ctx, s.x, rect.y - 8 * z, monster.hp / monster.def.hp, z);
+  // Every monster shows its health and level, like a nameplate.
+  hpBar(ctx, s.x, rect.y - 8 * z, monster.hp / monster.def.hp, z, 24 + 10 * size, `${monster.def.level}`);
   for (const hit of recent) splat(ctx, s.x, s.y - rect.h / 2, hit.damage, z, (now - hit.at) / 1100);
   void game;
 }
@@ -720,13 +753,14 @@ export function mapIcons(world: World): MapIcon[] {
   }
   return icons;
 }
-/** The minimap: the world turned 45° to match the camera, centred on the player. */
-export function renderMinimap(ctx: CanvasRenderingContext2D, game: Game, size: number, scale: number, now: number) {
+/** The minimap: the world turned to match the camera (45° plus its rotation), centred on the player. */
+export function renderMinimap(ctx: CanvasRenderingContext2D, game: Game, size: number, scale: number, angle: number) {
   const world = game.world, image = worldImage(world), player = game.player;
   ctx.save(); ctx.clearRect(0, 0, size, size);
   ctx.beginPath(); ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2); ctx.clip();
   ctx.fillStyle = "#0e0e10"; ctx.fillRect(0, 0, size, size);
-  ctx.translate(size / 2, size / 2); ctx.rotate(Math.PI / 4); ctx.scale(scale, scale); ctx.translate(-player.x - 0.5, -player.y - 0.5);
+  const turn = Math.PI / 4 + angle, cos = Math.cos(turn), sin = Math.sin(turn);
+  ctx.translate(size / 2, size / 2); ctx.rotate(turn); ctx.scale(scale, scale); ctx.translate(-player.x - 0.5, -player.y - 0.5);
   ctx.imageSmoothingEnabled = false; ctx.drawImage(image, 0, 0);
   const dot = (x: number, y: number, color: string, r = 0.9) => { ctx.fillStyle = color; ctx.fillRect(x + 0.5 - r / 2, y + 0.5 - r / 2, r, r); };
   for (const entry of game.ground) if (Math.abs(entry.x - player.x) < 40 && Math.abs(entry.y - player.y) < 40) dot(entry.x, entry.y, "#d65b5b", 0.8);
@@ -736,7 +770,7 @@ export function renderMinimap(ctx: CanvasRenderingContext2D, game: Game, size: n
   // Map icons, drawn upright.
   ctx.save(); ctx.font = "bold 10px ui-monospace, Menlo, Consolas, monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
   for (const icon of iconsCache ??= mapIcons(world)) {
-    const dx = icon.x - player.x, dy = icon.y - player.y, rx = (dx - dy) * Math.SQRT1_2 * scale, ry = (dx + dy) * Math.SQRT1_2 * scale;
+    const dx = icon.x - player.x, dy = icon.y - player.y, rx = (dx * cos - dy * sin) * scale, ry = (dx * sin + dy * cos) * scale;
     if (Math.hypot(rx, ry) > size / 2 - 8) continue;
     ctx.fillStyle = PAPER; ctx.strokeStyle = INK; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.arc(size / 2 + rx, size / 2 + ry, 5.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
@@ -745,7 +779,11 @@ export function renderMinimap(ctx: CanvasRenderingContext2D, game: Game, size: n
   // You: a white arrow facing your direction.
   ctx.fillStyle = "#fff"; ctx.strokeStyle = INK; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(size / 2, size / 2, 3, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
   ctx.restore();
-  void now;
+}
+/** Minimap click → world tile (the inverse of the minimap's turn). */
+export function minimapTile(game: Game, dx: number, dy: number, scale: number, angle: number) {
+  const turn = -(Math.PI / 4 + angle), cos = Math.cos(turn), sin = Math.sin(turn), x = dx / scale, y = dy / scale;
+  return { x: Math.round(game.player.x + x * cos - y * sin), y: Math.round(game.player.y + x * sin + y * cos) };
 }
 let iconsCache: MapIcon[] | null = null;
 /** The world map: the whole Realm turned to match the camera, with labels. Returns the transform for clicks. */

@@ -11,7 +11,7 @@ import { TICK_MS, combatLevel, createGame, message, totalLevel, type Game, type 
 import {
   chooseOption, closeInterfaces, collectFromCasket, continueDialogue, menuFor, unlockMusic, restore, serialize, setFollower, setHeld, setRelics, tick, toggleRun, walkTo, type OwnedFriend, type Selection,
 } from "./engine.ts";
-import { VIEW, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
+import { PITCH, VIEW, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
 import {
   BankModal, ChatBox, ContextMenu, DialogueBox, FriendPortrait, HelpModal, LevelUpBox, Modal, Orbs, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
   cancelLongPress, longPress, type MenuEntry, type Settings, type Tab,
@@ -30,7 +30,10 @@ type Modal = "caskets" | "map" | "card" | "help" | null;
 type XpDrop = { id: number; skill: Skill; amount: number; at: number };
 type CasketResult = { play: bigint; outcomeId: number; wardrobe: string | null; coins: number; redeemed: boolean };
 const CANONICAL = new Map<number, GenerationSprites>(REGULAR_SPRITES.map(sprites => [Number(sprites.tokenId), sprites]));
-const KEY_DIRECTIONS: Record<string, [number, number]> = { w: [0, -1], arrowup: [0, -1], s: [0, 1], arrowdown: [0, 1], a: [-1, 0], arrowleft: [-1, 0], d: [1, 0], arrowright: [1, 0] };
+/** WASD walks in screen directions; the arrow keys turn and tilt the camera. */
+const KEY_DIRECTIONS: Record<string, [number, number]> = { w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0] };
+const CAMERA_KEYS = new Set(["arrowleft", "arrowright", "arrowup", "arrowdown"]);
+const TURN_SPEED = 1.9, TILT_SPEED = 0.45;
 const DEFAULT_SETTINGS: Settings = { music: true, sfx: true, musicVolume: 0.7, sfxVolume: 0.8, zoom: 0.8, shiftDrop: false, autoMusic: true };
 
 /** RareFriends Realm. The SDK runtime supplies wallet connection, the verified owned Friend and the fixed (simulated) RF client. */
@@ -38,7 +41,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const root = useRef<HTMLDivElement>(null), stage = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null), minimap = useRef<HTMLCanvasElement>(null);
   const game = useRef<Game | null>(null), friend = useRef<GenerationSprites | null>(null), audio = useRef<RealmAudio | null>(null);
   const followerSprites = useRef(new Map<number, GenerationSprites>()), loadingSprites = useRef(new Set<number>());
-  const camera = useRef<Camera>({ x: 121, y: 121, zoom: DEFAULT_SETTINGS.zoom }), tickAt = useRef(0), hits = useRef<HitSplat[]>([]), fireworks = useRef<Firework[]>([]);
+  const camera = useRef<Camera>({ x: 121, y: 121, zoom: DEFAULT_SETTINGS.zoom, angle: 0, pitch: PITCH.classic }), cameraGoal = useRef<{ angle: number; pitch: number } | null>(null),
+    compass = useRef<HTMLButtonElement>(null), orbit = useRef<{ x: number; y: number; angle: number; pitch: number } | null>(null), tickAt = useRef(0), hits = useRef<HitSplat[]>([]), fireworks = useRef<Firework[]>([]);
   const projectiles = useRef<Projectile[]>([]), marker = useRef<ClickMarker | null>(null), hoverTile = useRef<{ x: number; y: number } | null>(null), chat = useRef<{ text: string; until: number } | null>(null);
   const held = useRef(new Set<string>()), linked = useRef(false), lastSave = useRef(""), region = useRef(""), epoch = useRef(0), pointer = useRef<{ x: number; y: number } | null>(null);
   const [phase, setPhase] = useState<Phase>("loading"), [status, setStatus] = useState("Waking your Friend and unfolding the Realm…");
@@ -133,12 +137,12 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       if (version !== epoch.current) return;
       friend.current = sprites;
       const state = createGame({ familyId: sprites.familyId, friendId: Number(friendId) });
-      game.current = state; camera.current = { x: state.world.places.spawn.x, y: state.world.places.spawn.y, zoom: live.current.settings.zoom };
+      game.current = state; camera.current = { x: state.world.places.spawn.x, y: state.world.places.spawn.y, zoom: live.current.settings.zoom, angle: 0, pitch: PITCH.classic };
       setRelics(state, value.inventory.map(amount => Number(amount > 99n ? 99n : amount))); setSnapshot(value);
       setPhase("title");
       // Automated browser tests only (navigator.webdriver): a handle for driving the camera and state.
       if (navigator.webdriver) (window as unknown as { __realm?: unknown }).__realm = {
-        game: () => game.current, refresh: () => refresh(), screenOf: (x: number, y: number) => {
+        game: () => game.current, camera: () => ({ ...camera.current }), refresh: () => refresh(), screenOf: (x: number, y: number) => {
           const view = canvas.current!.getBoundingClientRect(), point = toScreen(camera.current, x, y);
           return { x: view.left + point.x * view.width / VIEW.width, y: view.top + point.y * view.height / VIEW.height };
         },
@@ -176,7 +180,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     if (phase !== "title" && phase !== "playing") return;
     const node = canvas.current, ctx = node?.getContext("2d"), mini = minimap.current?.getContext("2d");
     if (!node || !ctx) return;
-    let frame = 0, lastHud = 0, dropId = 0;
+    let frame = 0, lastHud = 0, dropId = 0, lastFrame = 0;
     tickAt.current = performance.now();
     const loop = (now: number) => {
       frame = requestAnimationFrame(loop);
@@ -211,16 +215,27 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
             if (live.current.settings.autoMusic) audio.current?.play(track.id);
             setToast({ title: throne ? "The Throne Room" : here.name, sub: trackById(trackFor(here.id, throne)).name });
           }
-          // Held keys walk.
-          setHeld(state, heldDirection(held.current));
+          // Held keys walk, turned to match the camera.
+          setHeld(state, heldDirection(held.current, camera.current.angle));
           refresh();
         }
       }
-      // Camera: follow the player, or drift over Friendhollow on the title screen.
-      const player = state.player;
+      // Camera: follow the player, or drift and turn slowly over Friendhollow on the title screen.
+      const player = state.player, dt = Math.min(0.05, (now - (lastFrame || now)) / 1000); lastFrame = now;
       if (current === "title") {
         const t = now / 14000; camera.current.x = 121 + Math.cos(t) * 9; camera.current.y = 118 + Math.sin(t) * 9; camera.current.zoom = 0.85;
+        camera.current.angle = reducedMotion ? 0 : Math.sin(now / 21000) * 0.6; camera.current.pitch = PITCH.classic;
       } else {
+        // Arrow keys turn and tilt; the compass eases back to north.
+        const keys = held.current, cam = camera.current;
+        if (!isPaused) {
+          const turn = (keys.has("arrowright") ? 1 : 0) - (keys.has("arrowleft") ? 1 : 0), tilt = (keys.has("arrowup") ? 1 : 0) - (keys.has("arrowdown") ? 1 : 0);
+          if (turn || tilt) cameraGoal.current = null;
+          cam.angle += turn * TURN_SPEED * dt; cam.pitch = clampPitch(cam.pitch + tilt * TILT_SPEED * dt);
+        }
+        const goal = cameraGoal.current;
+        if (goal) { cam.angle += (goal.angle - cam.angle) * 0.18; cam.pitch += (goal.pitch - cam.pitch) * 0.18; if (Math.abs(goal.angle - cam.angle) < 0.002 && Math.abs(goal.pitch - cam.pitch) < 0.002) { cam.angle = goal.angle; cam.pitch = goal.pitch; cameraGoal.current = null; } }
+        if (compass.current) compass.current.style.transform = `rotate(${northAngle(cam) * 180 / Math.PI + 90}deg)`;
         const alpha = Math.min(1, (now - tickAt.current) / TICK_MS), moved = player.moved === state.tick;
         const tx = moved ? player.prev.x + (player.x - player.prev.x) * alpha : player.x, ty = moved ? player.prev.y + (player.y - player.prev.y) * alpha : player.y;
         camera.current.x += (tx - camera.current.x) * 0.35; camera.current.y += (ty - camera.current.y) * 0.35; camera.current.zoom = live.current.settings.zoom;
@@ -235,7 +250,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       });
       if (mini && current === "playing" && now - lastHud > 90) {
         lastHud = now; const size = mini.canvas.width;
-        renderMinimap(mini, state, size, 3.2 * (size / 152), now);
+        renderMinimap(mini, state, size, 3.2 * (size / 152), camera.current.angle);
       }
     };
     frame = requestAnimationFrame(loop);
@@ -279,6 +294,12 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const onPointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
     if (!game.current || phase !== "playing") return;
     const p = logicalPoint(event.clientX, event.clientY); pointer.current = p;
+    // Middle-button drag turns (left/right) and tilts (up/down) the camera.
+    if (orbit.current && event.buttons & 4) {
+      const start = orbit.current; cameraGoal.current = null;
+      camera.current.angle = start.angle + (p.x - start.x) * 0.009; camera.current.pitch = clampPitch(start.pitch - (p.y - start.y) * 0.0018);
+      return;
+    }
     hoverTile.current = toTile(camera.current, p.x, p.y);
     const options = optionsAt(p.x, p.y), first = options[0], more = options.length - 1;
     const text = first ? `${first.verb}${first.noun ? ` ${first.noun}` : ""}${more > 0 ? ` / ${more} more option${more > 1 ? "s" : ""}` : ""}` : "";
@@ -288,11 +309,13 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     if (phase !== "playing") return;
     canvas.current?.focus({ preventScroll: true });
     const p = logicalPoint(event.clientX, event.clientY);
+    if (event.button === 1) { event.preventDefault(); orbit.current = { x: p.x, y: p.y, angle: camera.current.angle, pitch: camera.current.pitch }; canvas.current?.setPointerCapture(event.pointerId); return; }
     if (event.pointerType === "touch") { longPress(() => openContext(p.x, p.y)); touchStart.current = { ...p, at: performance.now() }; return; }
     if (event.button === 0) { setMenu(null); act(p.x, p.y); }
   };
   const touchStart = useRef<{ x: number; y: number; at: number } | null>(null);
   const onPointerUp = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (event.button === 1) { orbit.current = null; return; }
     if (event.pointerType !== "touch" || !touchStart.current) return;
     const start = touchStart.current; touchStart.current = null; cancelLongPress();
     if (performance.now() - start.at < 450 && !menu) act(start.x, start.y);
@@ -303,7 +326,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       if (!state || live.current.phase !== "playing" || live.current.paused) return;
       if (target?.dataset.chat === "true" || target?.tagName === "INPUT" || target?.tagName === "TEXTAREA") { if (event.key === "Escape") target.blur(); return; }
       const key = event.key.toLowerCase();
-      if (KEY_DIRECTIONS[key]) { held.current.add(key); setHeld(state, heldDirection(held.current)); event.preventDefault(); return; }
+      if (KEY_DIRECTIONS[key]) { held.current.add(key); setHeld(state, heldDirection(held.current, camera.current.angle)); event.preventDefault(); return; }
+      if (CAMERA_KEYS.has(key)) { held.current.add(key); event.preventDefault(); return; }
       const fn = /^f([1-9])$/.exec(key);
       if (fn) { setTab(TABS[Number(fn[1]) - 1].id); event.preventDefault(); return; }
       if (key === "escape") { setMenu(null); setModal(null); setSelection(null); closeInterfaces(state); setLevelUps([]); refresh(); return; }
@@ -325,7 +349,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     const up = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase();
       if (!held.current.delete(key)) return;
-      if (game.current) setHeld(game.current, heldDirection(held.current));
+      if (game.current) setHeld(game.current, heldDirection(held.current, camera.current.angle));
     };
     window.addEventListener("keydown", down); window.addEventListener("keyup", up);
     return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); };
@@ -336,8 +360,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     const state = game.current, node = minimap.current;
     if (!state || !node || paused) return;
     const rect = node.getBoundingClientRect(), size = node.width, scale = 3.2 * (size / 152);
-    const rx = ((event.clientX - rect.left) * size / rect.width - size / 2) / scale, ry = ((event.clientY - rect.top) * size / rect.height - size / 2) / scale;
-    const x = Math.round(state.player.x + (rx + ry) * Math.SQRT1_2), y = Math.round(state.player.y + (ry - rx) * Math.SQRT1_2);
+    const { x, y } = minimapTile(state, (event.clientX - rect.left) * size / rect.width - size / 2, (event.clientY - rect.top) * size / rect.height - size / 2, scale, camera.current.angle);
     walkTo(state, x, y); marker.current = { x, y, at: performance.now(), red: false }; refresh();
   };
   const say = (text: string) => {
@@ -352,7 +375,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     const state = game.current;
     if (!state) return;
     audio.current?.unlock(); setPhase("playing"); region.current = ""; tickAt.current = performance.now();
-    camera.current = { x: state.player.x, y: state.player.y, zoom: settings.zoom };
+    camera.current = { x: state.player.x, y: state.player.y, zoom: settings.zoom, angle: 0, pitch: PITCH.classic };
     if (!hasSave) { state.dialogue = null; message(state, "Tip: talk to the Realm Guide by the fountain, or right-click anything to see what you can do.", "info"); }
     setTimeout(() => canvas.current?.focus({ preventScroll: true }), 50);
   };
@@ -412,7 +435,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       <div ref={stage} className="realm-stage" style={{ width: size.width, height: size.height, transform: `scale(${size.scale})`, "--toolbar": `${Math.ceil(54 / size.scale)}px` } as CSSProperties}>
         <canvas ref={canvas} className="realm-view" tabIndex={0} aria-label="The Realm. Left-click to act, right-click for options, WASD to walk."
           style={{ width: size.width, height: size.height }}
-          onPointerMove={onPointerMove} onPointerDown={onPointerDown} onPointerUp={onPointerUp} onPointerCancel={() => cancelLongPress()}
+          onPointerMove={onPointerMove} onPointerDown={onPointerDown} onPointerUp={onPointerUp} onPointerCancel={() => { cancelLongPress(); orbit.current = null; }}
+          onMouseDown={event => { if (event.button === 1) event.preventDefault(); }} onAuxClick={event => event.preventDefault()}
           onPointerLeave={() => { hoverTile.current = null; setHover(""); }}
           onContextMenu={event => { event.preventDefault(); const p = logicalPoint(event.clientX, event.clientY); openContext(p.x, p.y); }}
           onWheel={event => { if (phase === "playing") setSettings({ ...settings, zoom: Math.max(0.55, Math.min(1.6, settings.zoom * (event.deltaY < 0 ? 1.08 : 0.93))) }); }} />
@@ -420,10 +444,12 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         {phase === "playing" && state && player && <>
           <div className="realm-hover" aria-hidden="true">{hover}</div>
           <div className="realm-topright">
-            <Orbs game={state} onRun={() => { toggleRun(state); refresh(); }} onMap={() => setModal("map")} onZoom={delta => setSettings({ ...settings, zoom: Math.max(0.55, Math.min(1.6, settings.zoom + delta)) })} />
+            <Orbs game={state} onRun={() => { toggleRun(state); refresh(); }} onMap={() => setModal("map")} onZoom={delta => setSettings({ ...settings, zoom: Math.max(0.55, Math.min(1.6, settings.zoom + delta)) })}
+              onRotate={delta => { const from = cameraGoal.current?.angle ?? camera.current.angle; cameraGoal.current = { angle: from + delta, pitch: cameraGoal.current?.pitch ?? camera.current.pitch }; }} />
             <div className="realm-minimap">
               <canvas ref={minimap} width={152} height={152} onClick={onMinimap} aria-label="Minimap: click to walk" />
-              <span className="realm-compass" aria-hidden="true">N</span>
+              <button type="button" ref={compass} className="realm-compass" title="Face north (reset the camera)" aria-label="Compass: face north"
+                onClick={() => { const turns = Math.round(camera.current.angle / (Math.PI * 2)); cameraGoal.current = { angle: turns * Math.PI * 2, pitch: PITCH.classic }; }}><i aria-hidden="true">▲</i><b>N</b></button>
             </div>
           </div>
           <div className="realm-drops" aria-hidden="true">
@@ -533,9 +559,12 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   );
 }
 const itemName = (id: string) => item(id).name;
-function heldDirection(keys: ReadonlySet<string>) {
-  let dx = 0, dy = 0;
-  for (const key of keys) { const direction = KEY_DIRECTIONS[key]; if (direction) { dx += direction[0]; dy += direction[1]; } }
-  dx = Math.sign(dx); dy = Math.sign(dy);
-  return dx || dy ? { dx, dy } : null;
+const clampPitch = (pitch: number) => Math.max(PITCH.min, Math.min(PITCH.max, pitch));
+/** Held WASD as a world direction: screen up/down/left/right, turned back through the camera's angle. */
+function heldDirection(keys: ReadonlySet<string>, angle: number) {
+  let sx = 0, sy = 0;
+  for (const key of keys) { const direction = KEY_DIRECTIONS[key]; if (direction) { sx += direction[0]; sy += direction[1]; } }
+  if (!sx && !sy) return null;
+  const rx = (sx + sy) / 2, ry = (sy - sx) / 2, c = Math.cos(-angle), s = Math.sin(-angle);
+  return { dx: rx * c - ry * s, dy: rx * s + ry * c };
 }

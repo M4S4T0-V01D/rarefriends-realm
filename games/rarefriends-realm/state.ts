@@ -11,6 +11,7 @@ export const TICK_MS = 600;
 export const INVENTORY_SIZE = 28;
 export const BANK_SIZE = 400;
 export type Slot = { id: string; n: number };
+/** Screen facing of a sprite; the renderer derives it from a world heading and the camera angle. */
 export type Facing = "up" | "down" | "left" | "right";
 export type Point = { x: number; y: number };
 export type CombatStyle = "accurate" | "aggressive" | "defensive" | "controlled";
@@ -39,7 +40,7 @@ export type Recipe = {
 };
 
 export type Player = {
-  x: number; y: number; prev: Point; facing: Facing; moved: number;
+  x: number; y: number; prev: Point; heading: Point; moved: number;
   path: Point[]; run: boolean; energy: number;
   xp: Record<Skill, number>; hp: number; prayer: number;
   inventory: (Slot | null)[]; equipment: Partial<Record<EquipSlot, string>>; bank: Slot[];
@@ -53,10 +54,10 @@ export type Player = {
   lastHitBy: number | null; created: number; queuedSpell: string | null;
 };
 export type Monster = {
-  uid: number; def: MonsterDef; x: number; y: number; prev: Point; spawn: Point; hp: number; facing: Facing;
+  uid: number; def: MonsterDef; x: number; y: number; prev: Point; spawn: Point; hp: number; heading: Point;
   target: boolean; attackTimer: number; respawnAt: number; dead: boolean; wander: number; moved: number; retreat: number;
 };
-export type Npc = { uid: number; id: string; x: number; y: number; prev: Point; spawn: Point; wander: number; facing: Facing; moved: number; busy: number };
+export type Npc = { uid: number; id: string; x: number; y: number; prev: Point; spawn: Point; wander: number; heading: Point; moved: number; busy: number };
 export type GroundItem = { uid: number; id: string; n: number; x: number; y: number; expires: number };
 export type Fire = { uid: number; x: number; y: number; expires: number };
 export type Projectile = { from: Point; to: Point; start: number; end: number; color: string };
@@ -108,7 +109,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
   ["bronze_axe", "bronze_pickaxe", "small_net", "tinderbox", "bronze_dagger", "shrimps", "shrimps", "bread"].forEach((id, index) => { inventory[index] = { id, n: 1 }; });
   inventory[8] = { id: "coins", n: 25 };
   return {
-    x: spawn.x, y: spawn.y, prev: { ...spawn }, facing: "down", moved: 0, path: [], run: false, energy: 100,
+    x: spawn.x, y: spawn.y, prev: { ...spawn }, heading: { x: 1, y: 1 }, moved: 0, path: [], run: false, energy: 100,
     xp, hp: 10, prayer: 1, inventory, equipment: {}, bank: [{ id: "coins", n: 50 }],
     style: "accurate", autocast: null, prayers: [], target: null, activity: null, combat: null,
     attackTimer: 0, eatTimer: 0, stunned: 0, regenTimer: 0, quests: {}, questData: {},
@@ -129,8 +130,8 @@ export function createGame(options: { familyId: number; friendId: number; rng?: 
     const uid = game.nextUid++, at = { x: spawn.x, y: spawn.y };
     if (spawn.kind === "monster") {
       const def = MONSTERS[spawn.id];
-      game.monsters.push({ uid, def, x: at.x, y: at.y, prev: { ...at }, spawn: at, hp: def.hp, facing: "down", target: false, attackTimer: 0, respawnAt: 0, dead: false, wander: spawn.wander ?? def.wander, moved: 0, retreat: 0 });
-    } else game.npcs.push({ uid, id: spawn.id, x: at.x, y: at.y, prev: { ...at }, spawn: at, wander: spawn.wander ?? 0, facing: "down", moved: 0, busy: 0 });
+      game.monsters.push({ uid, def, x: at.x, y: at.y, prev: { ...at }, spawn: at, hp: def.hp, heading: { x: 1, y: 1 }, target: false, attackTimer: 0, respawnAt: 0, dead: false, wander: spawn.wander ?? def.wander, moved: 0, retreat: 0 });
+    } else game.npcs.push({ uid, id: spawn.id, x: at.x, y: at.y, prev: { ...at }, spawn: at, wander: spawn.wander ?? 0, heading: { x: 1, y: 1 }, moved: 0, busy: 0 });
   }
   message(game, "Welcome to the Realm. Talk to the Realm Guide by the fountain if you get lost.", "info");
   return game;

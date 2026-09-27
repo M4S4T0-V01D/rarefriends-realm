@@ -9,7 +9,7 @@
 
 - **Your Friend is the hero.** The Friend you select walks the Realm in its canonical on-chain sprite, and its Generations family gives a perk (Hoverers run longer, Skeletons pray better, Colossi hit harder, and so on).
 - **Fifteen skills on the classic curve.** Attack, Strength, Defence, Hitpoints, Magic, Prayer, Woodcutting, Fishing, Cooking, Firemaking, Mining, Smithing, Crafting, Thieving and Agility, from level 1 to 99.
-- **Old-school controls.** Left-click does the first option; right-click lists them all (*Chop down Tree*, *Attack Grumblin (level-5)*, *Talk-to*, *Pickpocket*, *Examine*). WASD walks. Use items on things. Minimap, run orb, world map.
+- **Old-school controls.** Left-click does the first option; right-click lists them all (*Chop down Tree*, *Attack Grumblin (level-5)*, *Talk-to*, *Pickpocket*, *Examine*). WASD walks; the arrow keys (or a scroll-wheel drag) turn and tilt the camera, and the compass faces north again. Use items on things. Minimap, run orb, world map. Every monster shows its health and level.
 - **A large world.** A 240 × 240 tile island with 12 regions and 2 dungeons: towns, farms, forests, a mine, a forge, snowy peaks, a lake with a pier, dunes and an oasis, a swamp, ruins, a crypt and the Hollow Depths.
 - **Six quests** from baking for the Realm Feast to defeating the Hollow King (level 92) in his throne room.
 - **A soundtrack for every region.** Sixteen procedural tracks, including a hand-written main theme, plus level-up and quest fanfares, synthesized live in WebAudio. Entering an area unlocks its track ("You have unlocked a new music track"), and the music player replays any you've found.
@@ -38,8 +38,10 @@
 | ![Bank](docs/bank.png) | ![World map](docs/worldmap.png) | ![Caskets](docs/caskets.png) |
 | **Smelting at Emberforge** | **Level up!** | **Quest complete** |
 | ![Smelting menu](docs/smelting.png) | ![Level-up message](docs/level-up.png) | ![Quest complete](docs/quest-complete.png) |
-| **A shop** | **On a phone (landscape)** | **Music unlocks** |
-| ![Shop](docs/shop.png) | ![Phone layout](docs/phone.png) | ![Music player](docs/music.png) |
+| **Camera turned and tilted** | **Health bars on every monster** | **Music unlocks** |
+| ![Camera turned](docs/camera-turned.png) | ![Grumblins with health bars](docs/combat.png) | ![Music player](docs/music.png) |
+| **A shop** | **On a phone (landscape)** | **Quest journal** |
+| ![Shop](docs/shop.png) | ![Phone layout](docs/phone.png) | ![Quest journal](docs/quests.png) |
 
 **The adventurer card, ready to post on X:**
 
@@ -48,7 +50,7 @@
 ## How it plays
 
 1. **Connect, pick your Friend, press Begin.** The main theme plays over a flight across Friendhollow; your saved adventure is listed if you have one.
-2. **Click to act.** The top-left text shows what a left-click does. Right-click (or long-press) anything for every option. WASD walks; R toggles run; M opens the world map.
+2. **Click to act.** The top-left text shows what a left-click does. Right-click (or long-press) anything for every option. WASD walks; ← → turn the camera and ↑ ↓ tilt it (or hold the scroll wheel and drag); click the compass to face north. R toggles run; M opens the world map.
 3. **Gather and make.** Chop trees and light the logs, fish at Glass Lake and cook on a range or your own fire, mine in the Ashen Hills and smith at Emberforge, tan hides and craft armour, cut gems.
 4. **Fight.** Pick a style (Accurate, Aggressive, Defensive, Controlled), eat when you're hurt, pray at altars. Monsters retaliate, some attack on sight, and all drop loot. Magic uses runes, and staffs autocast.
 5. **Quest.** Yellow markers float over quest givers. The quest journal tracks every step.
@@ -110,6 +112,7 @@ npm test               # engine tests: XP curve, world generation and reachabili
 npm run check          # friendsdk check
 npm run test:browser   # SDK mock-wallet browser runs of the custom host (a two-Friend wallet):
                        #  • title screen, real mouse clicks (chop a tree), right-click menu, dialogue, WASD walking
+                       #  • camera: arrow keys turn and tilt, middle-drag turns, WASD follows the angle, the compass resets
                        #  • a level-up, smelting at the furnace, a shop, finishing A Friend's Feast (quest-complete scroll)
                        #  • combat by right-click, bank deposit/withdraw, world map, 5 caskets via the runtime's confirmations
                        #  • adventurer card → Post to X (prefilled post + picture copied), a follower, a 14-region tour
