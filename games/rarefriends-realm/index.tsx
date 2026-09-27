@@ -14,7 +14,7 @@ import {
 import { PITCH, VIEW, ZOOM, daylight, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
 import {
   BankModal, ChatBox, ContextMenu, DialogueBox, FriendPortrait, HelpModal, LampModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
-  cancelLongPress, longPress, type MenuEntry, type Settings, type Tab,
+  cancelLongPress, longPress, rightClick, type MenuEntry, type Settings, type Tab,
 } from "./panels.tsx";
 import { REGULAR_SPRITES } from "./regulars.ts";
 import { HOST_HELLO, HOST_STATE, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, parseRoster, type ShareAction, type ShareOutcome } from "./roster.ts";
@@ -60,6 +60,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const [settings, setSettingsState] = useState<Settings>(DEFAULT_SETTINGS), [roster, setRoster] = useState<OwnedFriend[]>([]), [rosterState, setRosterState] = useState<"waiting" | "ready" | "none">("waiting");
   const [hosted, setHosted] = useState<"waiting" | "linked" | "none">("waiting"), [hasSave, setHasSave] = useState<{ total: number; combat: number; qp: number; where: string } | null>(null);
   const [tailorPick, setTailorPick] = useState("");
+  const lastMinimapPoint = useRef<React.MouseEvent<HTMLCanvasElement> | null>(null);
   const [snapshot, setSnapshot] = useState<GameSnapshot | null>(null), [busy, setBusy] = useState(false), [casketError, setCasketError] = useState(""), [reveal, setReveal] = useState<CasketResult[] | null>(null);
   const [size, setSize] = useState({ width: 960, height: 640, scale: 1 }), [sideOpen, setSideOpen] = useState(true), [shareStatus, setShareStatus] = useState(""), [cardUrl, setCardUrl] = useState<string | null>(null);
   const pendingSave = useRef<unknown>(null), cardBlob = useRef<Blob | null>(null);
@@ -512,12 +513,16 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         {phase === "playing" && state && player && <>
           <div className="realm-hover" aria-hidden="true">{hover}</div>
           <div className="realm-topright">
-            <Orbs game={state} onRun={() => { toggleRun(state); refresh(); }} onMap={() => setModal("map")} onZoom={delta => setSettings({ ...settings, zoom: Math.max(ZOOM.min, Math.min(ZOOM.max, settings.zoom * (delta > 0 ? 1.15 : 0.87))) })}
+            <Orbs game={state} openMenu={(x, y, entries) => setMenu({ x, y, entries })} onRun={() => { toggleRun(state); refresh(); }} onMap={() => setModal("map")} onZoom={delta => setSettings({ ...settings, zoom: Math.max(ZOOM.min, Math.min(ZOOM.max, settings.zoom * (delta > 0 ? 1.15 : 0.87))) })}
               onRotate={delta => { const from = cameraGoal.current?.angle ?? camera.current.angle; cameraGoal.current = { angle: from + delta, pitch: cameraGoal.current?.pitch ?? camera.current.pitch }; }} />
             <div className="realm-minimap">
-              <canvas ref={minimap} width={180} height={180} onClick={onMinimap} aria-label="Minimap: click to walk, scroll to zoom"
+              <canvas ref={minimap} width={180} height={180} onClick={onMinimap}
+                {...rightClick((x, y, entries) => setMenu({ x, y, entries }), () => [{ verb: "Walk here", noun: "", run: () => { const at = lastMinimapPoint.current; if (at) onMinimap(at); } }])}
+                onMouseDown={event => { lastMinimapPoint.current = { clientX: event.clientX, clientY: event.clientY } as React.MouseEvent<HTMLCanvasElement>; }} aria-label="Minimap: click to walk, scroll to zoom"
                 onWheel={event => { miniZoom.current = Math.max(1.6, Math.min(7, miniZoom.current * (event.deltaY < 0 ? 1.15 : 0.87))); }} />
               <button type="button" ref={compass} className="realm-compass" title="Face north" aria-label="Compass: face north"
+                {...rightClick((x, y, entries) => setMenu({ x, y, entries }), () => ([["North", 0], ["East", -Math.PI / 2], ["South", Math.PI], ["West", Math.PI / 2]] as const).map(([name, turn]) => ({ verb: `Look ${name}`, noun: "", run: () => {
+                  const from = cameraGoal.current?.angle ?? camera.current.angle, goal = NORTH + turn; cameraGoal.current = { angle: goal + Math.round((from - goal) / (Math.PI * 2)) * Math.PI * 2, pitch: cameraGoal.current?.pitch ?? camera.current.pitch }; } })))}
                 onClick={() => { const from = cameraGoal.current?.angle ?? camera.current.angle; cameraGoal.current = { angle: NORTH + Math.round((from - NORTH) / (Math.PI * 2)) * Math.PI * 2, pitch: cameraGoal.current?.pitch ?? camera.current.pitch }; }}><i aria-hidden="true">▲</i><b>N</b></button>
               {settings.dayNight !== false && (() => { const light = daylight(timeOfDay()); return <span className="realm-clock" title="Time of day">{light.label === "Night" ? "☾" : light.label === "Day" ? "☀" : "◐"} {light.label}</span>; })()}
             </div>
@@ -531,7 +536,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           <div className="realm-bottom">
             {state.dialogue ? <DialogueBox game={state} sprites={friend.current} canonical={CANONICAL} refresh={refresh} />
               : levelUps.length ? <LevelUpBox skill={levelUps[0].skill} level={levelUps[0].level} onClose={() => setLevelUps(list => list.slice(1))} />
-              : state.ui.production ? <ProductionBox game={state} refresh={refresh} />
+              : state.ui.production ? <ProductionBox game={state} refresh={refresh} openMenu={(x, y, entries) => setMenu({ x, y, entries })} />
               : <ChatBox messages={state.messages} onSend={say} />}
           </div>
           <button type="button" className="realm-side-toggle" aria-expanded={sideOpen} onClick={() => setSideOpen(open => !open)}>{sideOpen ? "▾" : "▴"} Panels</button>
@@ -552,13 +557,14 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
                 return <li key={bundle.id}><div><b>{bundle.name}</b><small>{bundle.text} Includes {bundle.caskets} Rare Casket{bundle.caskets > 1 ? "s" : ""}.</small></div>
                   {bundle.id === "tailor" && (choices.length ? <select aria-label="Wardrobe piece" value={pick} onChange={event => setTailorPick(event.target.value)}>{choices.map(piece => <option key={piece.id} value={piece.id}>{piece.name}</option>)}</select> : <small>You own them all!</small>)}
                   <button type="button" className="realm-primary" disabled={busy || paused || (bundle.id === "tailor" && !choices.length)}
+                    {...rightClick((x, y, entries) => setMenu({ x, y, entries }), () => [{ verb: "Examine", noun: bundle.name, run: () => { message(state, `${bundle.name}: ${bundle.text}`); refresh(); } }])}
                     onClick={() => void casket(() => client.buy(BigInt(bundle.caskets)), () => { grantBundle(state, bundle.id, pick); audio.current?.sfx("coins"); refresh(); })}>Buy · {rf(definition.price * BigInt(bundle.caskets))}</button></li>;
               })}</ul>
               {casketError && <p className="realm-error" role="alert">{casketError}</p>}
               <div className="realm-buttons"><button type="button" onClick={() => { state.ui.shop = "__caskets"; refresh(); }}>Open your caskets ({(snapshot?.consumables ?? 0n).toString()} waiting)</button></div>
             </Modal>
           )}
-          {state.ui.shop && state.ui.shop !== "__caskets" && state.ui.shop !== "__market" && <ShopModal game={state} shopId={state.ui.shop} refresh={refresh} onClose={() => { state.ui.shop = null; refresh(); }} />}
+          {state.ui.shop && state.ui.shop !== "__caskets" && state.ui.shop !== "__market" && <ShopModal game={state} shopId={state.ui.shop} refresh={refresh} openMenu={(x, y, entries) => setMenu({ x, y, entries })} onClose={() => { state.ui.shop = null; refresh(); }} />}
           {(modal === "caskets" || state.ui.shop === "__caskets") && (
             <Modal title="Rare Caskets" onClose={() => { setModal(null); state.ui.shop = null; setReveal(null); refresh(); }} wide>
               <p className="realm-sim">Simulated $RAREFRIENDS. No real tokens, contracts or transactions. Balance: <b>{snapshot ? rf(snapshot.rfBalance) : "…"}</b></p>

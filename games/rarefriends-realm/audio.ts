@@ -17,6 +17,8 @@ const VOICES: Record<string, { kind: VoiceKind; f0: number; length: number; brig
   swamp_lurker: { kind: "gurgle", f0: 220, length: 0.4, bright: 800 }, skeleton: { kind: "rattle", f0: 900, length: 0.25, bright: 5000 },
   wolf: { kind: "growl", f0: 180, length: 0.5, bright: 1600, wobble: 18 }, moss_colossus: { kind: "rumble", f0: 70, length: 0.8, bright: 500, wobble: 3 },
   frost_yeti: { kind: "roar", f0: 110, length: 0.8, bright: 1200, wobble: 6 }, shade: { kind: "whisper", f0: 400, length: 0.6, bright: 3000 },
+  ash_drake: { kind: "roar", f0: 140, length: 0.7, bright: 1600, wobble: 9 }, cinder_drake: { kind: "roar", f0: 100, length: 0.8, bright: 1300, wobble: 7 },
+  emberwyrm: { kind: "king", f0: 55, length: 1.3, bright: 900, wobble: 4 },
   hollow_sentinel: { kind: "clank", f0: 90, length: 0.4, bright: 800 }, hollow_king: { kind: "king", f0: 60, length: 1.1, bright: 700, wobble: 2 },
   mire_crawler: { kind: "gurgle", f0: 320, length: 0.3, bright: 1400 }, frost_wisp: { kind: "whisper", f0: 900, length: 0.5, bright: 5000 },
   gloom_hound: { kind: "growl", f0: 120, length: 0.6, bright: 1100, wobble: 22 },
@@ -127,6 +129,8 @@ const STYLES: readonly Style[] = [
   { id: "coast", name: "The Pale Coast", bpm: 104, root: 5, mode: "major", progression: [0, 4, 5, 3, 0, 4, 3, 0], meter: 3, lead: "recorder", second: "harp", arp: "harp", bed: null, bass: "pizz", kit: "jig", energy: 0.7, seed: 107 },
   { id: "crypt", name: "Crypt of Friends", bpm: 80, root: 3, mode: "harmonic", progression: [0, 5, 3, 4, 0, 5, 1, 4], meter: 4, lead: "organ", second: "glock", arp: "harp", bed: "choir", bass: "pizz", kit: "heartbeat", energy: 0.5, seed: 113 },
   { id: "hollow_depths", name: "Hollow Depths", bpm: 78, root: 6, mode: "aeolian", progression: [0, 1, 0, 6, 0, 1, 5, 4], meter: 4, lead: "flute", second: "glock", arp: "harp", bed: "strings", bass: "pizz", kit: "heartbeat", energy: 0.45, seed: 127 },
+  { id: "wizards_tower", name: "Arcane Stair", bpm: 96, root: 2, mode: "lydian", progression: [0, 1, 4, 0, 5, 1, 3, 4], meter: 3, lead: "glock", second: "flute", arp: "harp", bed: "strings", bass: "pizz", kit: "calm", energy: 0.6, seed: 137 },
+  { id: "wyrmreach", name: "Wyrmreach", bpm: 112, root: 4, mode: "phrygian", progression: [0, 1, 0, 6, 5, 1, 6, 0], meter: 4, lead: "trumpet", second: "oboe", arp: "pizz", bed: "choir", bass: "bass", kit: "march", energy: 0.8, seed: 149 },
   { id: "boss", name: "The Hollow King", bpm: 144, root: 4, mode: "harmonic", progression: [0, 0, 5, 4, 0, 0, 3, 4], meter: 4, lead: "trumpet", second: "strings", arp: "pizz", bed: "strings", bass: "bass", kit: "boss", energy: 0.9, seed: 131 },
 ];
 /**

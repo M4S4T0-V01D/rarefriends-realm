@@ -7,7 +7,7 @@ An old-school, tick-based RPG in a 2.5D isometric world. Your verified Rare Frie
 | Input | Does |
 | --- | --- |
 | Left-click | The first option, shown in the top-left (walk, chop, attack, talk…) |
-| Right-click / long-press | Every option for what's under the pointer, plus Examine and Cancel |
+| Right-click / long-press | Every option for what's under the pointer, plus Examine and Cancel. Works in every interface too: inventory, bank (Withdraw/Deposit 1, 5, 10, All), shops (Value, Buy/Sell 1–50), equipment (Remove), spells (Cast, Autocast), prayers, production (Make 1–All), skills, quests, followers, wardrobe, music, the orbs, the compass (Look North/East/South/West) and the minimap (Walk here) |
 | WASD | Walk in screen directions (at any camera angle) |
 | ← → / ↑ ↓ | Turn / tilt the camera (from overhead down to almost ground level; you can see about 50 tiles before the land fades into haze) |
 | Hold the scroll wheel and drag | Turn and tilt the camera |
@@ -29,7 +29,7 @@ chisel on an uncut gem, grain on the mill hopper, a bucket on the dairy cow, the
 The Realm runs on a 0.6-second game tick. You walk one tile per tick (two when running); skills roll on their
 own timers (every 4 ticks for woodcutting and mining, 5 for fishing); weapons attack every 4–6 ticks.
 
-## Skills (17)
+## Skills (19)
 
 XP follows the classic curve (83 XP for level 2, 13,034,431 for 99), multiplied by the **Realm rate ×3**,
 +2% per kept Plain Relic (max 5), +10% with a Golden Relic, and +1–5% for a follower (see Friends).
@@ -39,10 +39,12 @@ XP follows the classic curve (83 XP for level 2, 13,034,431 for 99), multiplied 
 | Attack / Strength / Defence | Melee combat (4 XP per damage to your style's skill) | Styles: Accurate, Aggressive, Defensive, Controlled |
 | Ranged | Bows (4 XP per damage; Longrange splits it with Defence) | Bows by wood (Shortbow 1, Oak 5, Willow 20, Maple 30, Yew 40, Ashwood 50, Gloomfang 60) fire the best arrows in your pack (pewter 1 … rarite 40). Styles: Accurate, Rapid (a tick faster), Longrange (+2 tiles). Most arrows can be picked up again |
 | Hitpoints | Any combat (1.33 XP per damage) | Starts at 10; regenerates 1 HP per minute |
-| Magic | Spells paid in sigils (damage spells: base XP + 2 per damage) | Staffs autocast damage spells; the Breeze staff gives unlimited breeze sigils |
+| Magic | Spells paid in sigils (damage spells: base XP + 2 per damage) | Staffs autocast damage spells; breeze, tide, stone and ember staffs give unlimited sigils of their element. Basic sigils cost about 3 coins |
+| Sigilcraft | Press sigil stones at an altar: Breeze 1, Thought 2, Tide 5, Stone 9, Ember 14, Shade 20, Star 27, Storm 35, Bloom 44, Path 54, Hollow 65 | Sigil stones are mined (endlessly) in the Wizards' Tower; one more sigil per stone for every 11 levels past the altar's |
 | Prayer | Burying bones (4.5 / 15 / 50 XP) | Recharge at altars; prayers drain points |
 | Woodcutting | Trees 1, Oak 15, Willow 30, Maple 45, Yew 60, Ashwood 70 | Better axes cut faster |
 | Firemaking | Light logs (same levels as Woodcutting) | Fires last about a minute; cook on them |
+| Fletching | A knife on logs: 15 arrow shafts, or a bow (Shortbow 5, Oak 20, Willow 35, Maple 50, Yew 65, Ashwood 80); feathers on shafts; arrowheads on headless arrows (pewter 1 … rarite 75) | Arrowheads are smithed at the anvil, 15 a bar |
 | Fishing | Net 1 (minnows), Bait 5/10 (perch, carp), Lure 20/30 (char, grayling), Cage 40 (inkcrab), Harpoon 50 (sailfish), Deep 76 (inkshark) | Bait and feathers are used up |
 | Cooking | Ranges and fires | Burn chance falls with level, to zero at the stop-burn level |
 | Mining | Clay/Pewter 1, Blackiron 15, Inkcoal 30, Gems 40, Moonsilver 55, Glimmer 70, Rarite 85 | 1/256 random gem per swing |
@@ -104,6 +106,12 @@ next attack. **Death is safe:** you wake by the Friendhollow fountain with your 
 | Shade, Hollow sentinel | 38, 64 | Hollow Depths |
 | Moss colossus | 42 | Mossy Ruins |
 | Mire crawler (Slayer 10), Frost wisp (Slayer 30), Gloom hound (Slayer 50) | 18, 36, 58 | Murkmire, Frostpeak, Hollow Depths |
+| Ash drake, Cinder drake (dragonfire) | 68, 86 | Wyrmreach |
+| **Old Cinder** (dragonfire) | 148 | Wyrmreach's crater (boss) |
+
+**Dragonfire.** A third of a dragon's attacks are breath (up to 32, 45 or 65 damage), which the Friend's Ward prayer doesn't stop.
+A **Wyrmward shield** (free from King Hollis: "I'm going after dragons") turns it into a few points. Dragons drop drake
+bones (72 Prayer XP), drakehide (Crafting 57–63: bracers, chaps and a vest for archers) and, from Old Cinder, a Wyrm heart.
 | **The Hollow King** | 92 | The throne room (boss) |
 
 ## Quests (9 quest points)
@@ -117,13 +125,26 @@ next attack. **Death is safe:** you wake by the Friendhollow fountain with your 
 
 ## The world
 
-A 240 × 240 tile island with 12 overworld regions (Friendhollow, Hollow Farms, Whisperwood, Ashen Hills, Emberforge,
-Frostpeak, Glass Lake, Pale Dunes, Oasis, Murkmire, Mossy Ruins and the Pale Coast) and two dungeons
+A 240 × 240 tile island with 14 overworld regions (Friendhollow, Hollow Farms, Whisperwood, Ashen Hills, Emberforge,
+Frostpeak, Glass Lake, Pale Dunes, Oasis, Murkmire, Mossy Ruins, the Wizards' Tower, Wyrmreach and the Pale Coast) and two dungeons
 (Murkmire Crypt, Hollow Depths). Banks in Friendhollow (and up in the castle's south-west tower), Emberforge, the Oasis, Frostpeak and a deposit box by Glass Lake.
 
 **Friendhollow** has grown: south of the fountain, **Market Street** has Hollis Armoury (helms to shields, pewter to
 moonsilver), Edge & Hilt (daggers, swords, sabres), Fletch & Feather (bows, arrows, hunter's hides) and the Warden's
 Lodge (Slayer). The Sleepy Friend inn (food, and a range) is east of the square, and the Rare Market is west.
+
+**The Wizards' Tower**, across the river east of town, has three storeys: sigil stones and Apprentice Pell's stores
+(sigils, elemental staffs, robes) on the ground floor, a library with a Rare trader above, and Archmage Solenne at the
+top. Your first visit to her gets you scholar's robes, a staff and 480 sigils.
+
+**Wyrmreach**, north-west past the deep woods, is ash and lava: a hunters' camp (a deposit box, a Rare trader and
+Ysolde, who knows about dragons) at the pass, drakes on the slopes, and Old Cinder's crater.
+
+**Selling.** Merchants pay more for their own trade than the 40% most shops pay: Pike (fish, 60%), Axel (logs, 60%),
+Emberforge Arms (ore, bars, arms, 55%), Runa and the Tower stores (sigils and magic, 60%), Tessa (hides and leather, 60%),
+Mort the bone collector (bones and hides, 65%), the Oasis bazaar (gems, jewellery, food, 70%), Fletch & Feather
+(bows, arrows, logs, 60%), the armoury and the weaponsmith (55%), and the inn (fish and food, 55%). Right-click an item
+in a shop for its *Value*.
 
 **Day and night.** A Realm day lasts 24 minutes. Dusk turns the light warm, and at night the land goes blue-dark
 except around lamps, torches, fires, forges, altars and your own small light (a lantern familiar carries a bigger one).
@@ -151,8 +172,8 @@ Each region has its own music, unlocked the first time you arrive. The music pla
 - **Backing:** each purchased or pending casket reserves 5 RF; kept relics keep their fixed RF backing with no expiry. Redeeming removes that relic's bonus.
 - **Wardrobe:** every casket also grants an uncollected piece of its tier, drawn on your Friend, or coins for duplicates (250 / 600 / 1,500 / 5,000). Wardrobe pieces carry no RF value and are saved with your adventure.
 
-**The Rare Market.** Rare traders in Friendhollow, Emberforge, the Oasis, Frostpeak and on Pike's Pier (each next to a
-casket chest) sell bundles. RF buys one thing in the SDK's simulated economy, the Rare Casket, so every bundle buys
+**The Rare Market.** Rare traders in Friendhollow, Emberforge, the Oasis, Frostpeak, Pike's Pier, the Wizards' Tower
+and the Wyrmreach camp (each next to a casket chest) sell bundles. RF buys one thing in the SDK's simulated economy, the Rare Casket, so every bundle buys
 caskets (opened as usual) and adds guaranteed goods on top:
 
 | Bundle | RF (caskets) | Adds |
@@ -163,6 +184,9 @@ caskets (opened as usual) and adds guaranteed goods on top:
 | Slayer's contract | 2 | 40 Slayer points |
 | Archer's quiver | 2 | A maple bow and 300 moonsilver arrows |
 | Tailor's pick | 3 | Any wardrobe piece up to Moonlit tier, your choice |
+| Sigil sack | 1 | 300 each of breeze, tide, stone, ember and thought sigils, and 30 hollow |
+| Fletcher's crate | 1 | 600 arrow shafts, 600 feathers, 300 ashsteel arrowheads |
+| Dragonslayer's kit | 3 | A Wyrmward shield, a drakehide vest, 20 inksharks, 200 rarite arrows |
 
 Caskets use the SDK chance-game client (`buy` / `play` / `settle` / `redeem`) with the runtime's confirmations.
 Coins are an earn-only, in-game currency and never convert to RF.

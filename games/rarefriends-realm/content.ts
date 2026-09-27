@@ -49,6 +49,10 @@ export const NPCS: Record<string, NpcDef> = {
   slayer_master: { id: "slayer_master", name: "Warden Thistle", examine: "The Realm's Slayer Warden. She knows where everything soft is.", options: ["Talk-to", "Assignment", "Rewards", "Trade"], shop: "slayer", art: art(8, 271) },
   rare_trader: { id: "rare_trader", name: "Rare trader", examine: "Deals in Rare Caskets and the good stuff that comes with them.", options: ["Talk-to", "Rare-market", "Caskets"], art: art(7, 281) },
   innkeeper: { id: "innkeeper", name: "Bram the innkeeper", examine: "Runs the Sleepy Friend. Has never seen it busy before noon.", options: ["Talk-to", "Trade"], shop: "inn", art: art(2, 291) },
+  archmage: { id: "archmage", name: "Archmage Solenne", examine: "Head of the Wizards' Tower. Her hat has its own weather.", options: ["Talk-to"], art: art(1, 311) },
+  apprentice: { id: "apprentice", name: "Apprentice Pell", examine: "Keeps the Tower's stores, and the Archmage's tea.", options: ["Talk-to", "Trade"], shop: "wizards", art: art(5, 321) },
+  drake_hunter: { id: "drake_hunter", name: "Ysolde the drake hunter", examine: "Singed eyebrows. Excellent stories.", options: ["Talk-to"], art: art(6, 331) },
+  bone_collector: { id: "bone_collector", name: "Mort the bone collector", examine: "Buys bones and hides. Doesn't ask where from.", options: ["Talk-to", "Trade"], shop: "bones", art: art(0, 341) },
   cape_keeper: { id: "cape_keeper", name: "Keeper of Capes", examine: "Keeps a cape for every skill, and knows who's earned one.", options: ["Talk-to", "Trade"], shop: "capes", art: art(1, 301) },
 };
 export const npcDef = (id: string) => NPCS[id];
@@ -214,6 +218,27 @@ export function talk(game: Game, npcId: string): Dialogue {
       { label: "Show me the caskets.", then: () => { game.ui.shop = "__caskets"; return null; } },
       { label: "Just looking.", then: () => null },
     ]);
+    case "archmage": {
+      if (!data(game, "archmage_gift")) return chat(name, npcSays(name, "A new face! Every Friend who climbs my stairs deserves a start in magic.",
+        "Robes, a staff, and enough sigils to learn your first spells. The stones downstairs are sigil stones: press them at an altar and you'll never buy a sigil again."), undefined, () => {
+        player.questData.archmage_gift = 1;
+        for (const id of ["scholar_hat", "scholar_robe", "scholar_skirt", "staff"]) giveOrDrop(game, id);
+        for (const [id, n] of [["breeze_sigil", 150], ["thought_sigil", 150], ["tide_sigil", 60], ["stone_sigil", 60], ["ember_sigil", 60], ["path_sigil", 3]] as const) giveOrDrop(game, id, n);
+        message(game, "Archmage Solenne gives you scholar's robes, a staff and a pouch of sigils.", "quest"); sound(game, "quest");
+      });
+      return chat(name, npcSays(name, "How goes the magic?"), [
+        { label: "Tell me about Sigilcraft.", then: () => chat(name, npcSays(name, "Mine sigil stones on the ground floor. Take them to an altar: Breeze by the farms, Thought in Whisperwood, Tide on the lake shore, Stone in the Ashen Hills, Ember at the forge…",
+          "…Shade in the Murkmire, Star on Frostpeak, Storm in the dunes, Bloom in the ruins, Path at the Oasis, and Hollow deep underground. Higher levels press more sigils from each stone.")) },
+        { label: "What should I cast?", then: () => chat(name, npcSays(name, "Darts first, then Lances. A staff of your element saves you those sigils: Pell sells breeze, tide, stone and ember staffs downstairs.")) },
+        { label: "Goodbye.", then: () => null },
+      ]);
+    }
+    case "apprentice": return chat(name, npcSays(name, "Sigils, staffs and robes, cheaper than anywhere in the Realm. The Archmage insists."), [
+      { label: "Let me see.", then: () => { game.ui.shop = "wizards"; return null; } }, { label: "Later.", then: () => null }]);
+    case "drake_hunter": return chat(name, npcSays(name, "Drakes up the pass, and Old Cinder asleep in the crater. Never go without a Wyrmward shield: King Hollis gives them to anyone who asks nicely.",
+      "Drake bones are the best a priest can bury, and Tessa-trained crafters turn drakehide into archer's armour. Bring food. Lots."));
+    case "bone_collector": return chat(name, npcSays(name, "Bones, hides, drakehides. I pay better than the general store. Don't ask what I do with them."), [
+      { label: "Trade.", then: () => { game.ui.shop = "bones"; return null; } }, { label: "I won't ask.", then: () => null }]);
     case "cape_keeper": {
       const mastered = (Object.keys(player.xp) as (keyof typeof player.xp)[]).filter(skill => player.xp[skill] >= 13_034_431);
       if (!mastered.length) return chat(name, npcSays(name, "Every skill has a cape, and every cape has one price: 99,000 coins, and level 99. Come back when you've mastered something.",
@@ -385,6 +410,10 @@ export function talk(game: Game, npcId: string): Dialogue {
           questDone(game, "hollow_king") ? "Nothing, now. You saw to that." : "Something hollow that wants a throne. Old Glimmer, by the fountain, knows more than I do.")) },
         { label: "Can I help the kingdom?", then: () => chat(name, npcSays(name, QUESTS.every(quest => questDone(game, quest.id)) ? "You already have, in every way I can think of. Rest a while." :
           "My cook is always short of something, my captain can't sleep for the Grumblins, and Brother Ossic hears whispers. Start with them.")) },
+        { label: "I'm going after dragons.", then: () => {
+          if (has(player, "wyrmward_shield") || player.equipment.shield === "wyrmward_shield") return chat(name, npcSays(name, "You already carry one of my shields. Keep it between you and the fire."));
+          return chat(name, npcSays(name, "Dragons! Then take this. A Wyrmward shield: it turns their breath to a warm breeze. Mostly."), undefined, () => { giveOrDrop(game, "wyrmward_shield"); message(game, "King Hollis hands you a Wyrmward shield.", "quest"); });
+        } },
         { label: "Goodbye, Your Majesty.", then: () => null },
       ];
       if (!data(game, "royal_audience")) return chat(name, npcSays(name, "A visitor! Welcome to Friendhollow Castle. Here: every Friend on the road should have a little coin."), undefined, () => {

@@ -30,7 +30,7 @@ export function renderCard(game: Game, friend: GenerationSprites | null, region:
   if (aura) { ctx.fillStyle = `${aura.color}aa`; ctx.beginPath(); ctx.ellipse(258, 250, 150, 130, 0, 0, Math.PI * 2); ctx.fill(); }
   if (friend) {
     // Your Friend as it looks in the Realm, wardrobe and all.
-    const art = figureArt(friendRows(friend, "down", false, 0), player.worn, "down"), px = Math.floor(Math.min(340 / art.width, 300 / art.height));
+    const art = figureArt(friendRows(friend, "down", false, 0), player.equipment.cape ? [...player.worn, player.equipment.cape] : player.worn, "down"), px = Math.floor(Math.min(340 / art.width, 300 / art.height));
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(art, Math.round(258 - art.width * px / 2), Math.round(237 - art.height * px / 2 + px * 2), art.width * px, art.height * px);
   }
@@ -42,17 +42,18 @@ export function renderCard(game: Game, friend: GenerationSprites | null, region:
   // Skills grid.
   ctx.font = `bold 40px ${FONT}`; ctx.fillStyle = INK; ctx.fillText("ADVENTURER", 530, 104);
   ctx.fillStyle = BUTTER; ctx.fillRect(530, 120, 620, 8);
-  const cols = 3, cellW = 206, cellH = 58;
+  // Every skill in three columns, sized so the quest line always sits below the last row.
+  const cols = 3, cellW = 206, rows = Math.ceil(SKILLS.length / cols), cellH = Math.min(58, Math.floor(340 / rows)), top = 142;
   SKILLS.forEach((skill: Skill, index) => {
-    const x = 530 + (index % cols) * cellW, y = 150 + Math.floor(index / cols) * cellH, level = levelForXp(player.xp[skill]);
-    ctx.fillStyle = level >= 10 ? "#fff" : "rgba(255,255,255,0.55)"; ctx.fillRect(x, y, cellW - 12, cellH - 10);
-    ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.strokeRect(x, y, cellW - 12, cellH - 10);
-    ctx.fillStyle = INK; ctx.font = `17px ${FONT}`; ctx.fillText(SKILL_NAMES[skill], x + 10, y + 30);
-    ctx.font = `bold 24px ${FONT}`; ctx.textAlign = "right"; ctx.fillText(String(level), x + cellW - 24, y + 32); ctx.textAlign = "left";
+    const x = 530 + (index % cols) * cellW, y = top + Math.floor(index / cols) * cellH, level = levelForXp(player.xp[skill]), box = cellH - 8;
+    ctx.fillStyle = level >= 99 ? BUTTER : level >= 10 ? "#fff" : "rgba(255,255,255,0.55)"; ctx.fillRect(x, y, cellW - 12, box);
+    ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.strokeRect(x, y, cellW - 12, box);
+    ctx.fillStyle = INK; ctx.font = `16px ${FONT}`; ctx.textBaseline = "middle"; ctx.fillText(SKILL_NAMES[skill], x + 10, y + box / 2 + 1);
+    ctx.font = `bold 21px ${FONT}`; ctx.textAlign = "right"; ctx.fillText(String(level), x + cellW - 24, y + box / 2 + 1); ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
   });
-  const qp = questPoints(game);
-  ctx.font = `bold 22px ${FONT}`; ctx.fillStyle = INK; ctx.fillText(`Quest points ${qp}/${MAX_QUEST_POINTS}`, 530, 480);
-  ctx.font = `18px ${FONT}`; ctx.fillStyle = MUTED; ctx.fillText(`${player.kills.toLocaleString()} monster${player.kills === 1 ? "" : "s"} defeated · ${player.wardrobe.length}/${WARDROBE.length} wardrobe pieces`, 530, 510);
+  const qp = questPoints(game), below = top + rows * cellH + 34;
+  ctx.font = `bold 22px ${FONT}`; ctx.fillStyle = INK; ctx.fillText(`Quest points ${qp}/${MAX_QUEST_POINTS}`, 530, below);
+  ctx.font = `18px ${FONT}`; ctx.fillStyle = MUTED; ctx.fillText(`${player.kills.toLocaleString()} monster${player.kills === 1 ? "" : "s"} defeated · ${player.wardrobe.length}/${WARDROBE.length} wardrobe pieces`, 530, below + 30);
   // Footer.
   ctx.fillStyle = INK; ctx.fillRect(0, CARD.height - 72, CARD.width, 72);
   ctx.fillStyle = PAPER; ctx.font = `bold 26px ${FONT}`; ctx.fillText("⚔ RareFriends Realm", 40, CARD.height - 26);

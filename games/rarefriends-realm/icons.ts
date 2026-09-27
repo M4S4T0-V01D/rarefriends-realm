@@ -2,87 +2,275 @@
  * Pixel-art icons for items, skills, tabs, spells, prayers and orbs, in the Rare Friends style:
  * flat colour, a one-pixel ink edge and a white halo, drawn on small grids and scaled up without smoothing.
  */
-import type { Icon, Skill } from "./data.ts";
+import { METALS, type Icon, type Skill } from "./data.ts";
 import { INK, Pixels, pixelArt, shadeHex } from "./pixel.ts";
 
-const G = 26, K = 22 / 32, O = 2;
+// ---------- Item art: shaded pixel art on a 32-pixel grid ----------
+/**
+ * Every item is built from parts. Each part is rasterized as a mask, then shaded as a volume lit from the top left:
+ * a bright rim on its lit edges, darker dithered bands towards the bottom right, a dark rim on its shadowed edges, a glint
+ * on metal and gems, and an ink line where it overlaps an earlier part. The whole item then gets the Rare Friends ink edge
+ * and white halo.
+ */
+const S = 32, MARK = "#ff00ff";
+const BAYER4 = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
+type Material = "metal" | "wood" | "cloth" | "gem" | "stone" | "food" | "flat" | "glow";
 type Pt = [number, number];
-/** Items are designed on a 32-unit square and rasterized onto a 26-pixel grid. */
-export function itemArt(icon: Icon): HTMLCanvasElement {
-  return pixelArt(`item:${icon.shape}:${icon.color}:${icon.accent ?? ""}`, G, G, px => {
-    const m = (v: number) => O + v * K, P = (points: Pt[]) => points.map(([x, y]) => [m(x), m(y)] as const);
-    const color = icon.color, accent = icon.accent ?? INK, light = shadeHex(color, 0.12), dark = shadeHex(color, -0.14);
-    const p = (points: Pt[], fill: string, stroke: string | null = INK) => px.poly(P(points), fill, stroke);
-    const e = (cx: number, cy: number, rx: number, ry: number, fill: string, stroke: string | null = INK) => px.disc(m(cx), m(cy), rx * K, ry * K, fill, stroke);
-    const l = (points: Pt[], stroke = INK, width = 2) => px.polyline(P(points), stroke, Math.max(1, Math.round(width * K)));
-    const blade = (points: Pt[], width: number) => { l(points, INK, width + 1.6); l(points, color, width); l([[points[0][0] + 1, points[0][1] - 1], [points[points.length - 1][0] - 1, points[points.length - 1][1] + 1]], light, 1); };
-    switch (icon.shape) {
-      case "coins": e(11, 22, 8, 4, dark); e(19, 18, 8, 4, color); e(14, 13, 8, 4, light); break;
-      case "axe": l([[9, 28], [21, 7]], INK, 5); l([[9, 28], [21, 7]], "#9c8672", 3); p([[15, 4], [27, 7], [25, 17], [19, 13]], color); break;
-      case "pickaxe": l([[11, 29], [18, 9]], INK, 5); l([[11, 29], [18, 9]], "#9c8672", 3); p([[4, 12], [16, 4], [29, 9], [17, 11]], color); break;
-      case "sword": blade([[9, 25], [26, 6]], 3.4); l([[5, 19], [15, 29]], INK, 4); l([[5, 19], [15, 29]], "#c9b77f", 2); l([[6, 27], [9, 24]], "#8a7563", 3); break;
-      case "dagger": blade([[11, 23], [23, 11]], 3.4); l([[8, 19], [15, 26]], INK, 4); l([[8, 19], [15, 26]], "#c9b77f", 2); l([[7, 26], [10, 23]], "#8a7563", 3); break;
-      case "sabre": l([[9, 25], [13, 15], [19, 9], [27, 6]], INK, 5.6); l([[9, 25], [13, 15], [19, 9], [27, 6]], color, 3.4); l([[5, 20], [13, 28]], INK, 4); l([[5, 20], [13, 28]], "#c9b77f", 2); break;
-      case "helm": p([[7, 24], [7, 12], [16, 5], [25, 12], [25, 24]], color); p([[10, 15], [22, 15], [22, 18], [10, 18]], INK, null); l([[16, 6], [16, 13]], light, 2); break;
-      case "hood": p([[7, 26], [8, 11], [16, 5], [24, 11], [25, 26], [16, 21]], color); p([[11, 14], [21, 14], [20, 20], [12, 20]], "#3b3a38", null); break;
-      case "hat": p([[4, 25], [28, 25], [19, 20], [16, 3], [13, 20]], color); l([[8, 24], [24, 24]], dark, 2); break;
-      case "crown": p([[6, 25], [6, 11], [11, 17], [16, 8], [21, 17], [26, 11], [26, 25]], color); if (icon.accent) e(16, 20, 2.5, 2.5, accent, null); break;
-      case "body": p([[9, 7], [23, 7], [29, 14], [24, 18], [23, 28], [9, 28], [8, 18], [3, 14]], color); l([[16, 9], [16, 26]], dark, 2); break;
-      case "legs": p([[8, 5], [24, 5], [25, 29], [18, 29], [16, 14], [14, 29], [7, 29]], color); l([[8, 8], [24, 8]], dark, 2); break;
-      case "shield": p([[7, 6], [25, 6], [25, 17], [16, 29], [7, 17]], color); l([[16, 8], [16, 25]], dark, 2); l([[9, 13], [23, 13]], dark, 2); break;
-      case "boots": p([[7, 9], [15, 9], [15, 21], [26, 21], [26, 28], [7, 28]], color); break;
-      case "gloves": p([[9, 28], [8, 12], [11, 7], [14, 11], [16, 6], [19, 11], [22, 8], [24, 12], [24, 28]], color); break;
-      case "bracer": p([[8, 7], [24, 9], [23, 27], [9, 25]], color); l([[9, 14], [23, 16]], dark, 2); l([[9, 20], [23, 21]], dark, 2); break;
-      case "cape": p([[10, 5], [22, 5], [28, 28], [4, 28]], color); if (icon.accent) l([[9, 20], [23, 20]], accent, 2); break;
-      case "amulet": l([[8, 6], [8, 13], [16, 20], [24, 13], [24, 6]], "#c9b77f", 2); e(16, 22, 5, 5.5, color); break;
-      case "log": p([[9, 11], [25, 8], [28, 15], [26, 22], [9, 25]], color); e(9, 18, 5, 7, "#e8d9c8"); e(9, 18, 2, 3, dark, null); l([[13, 13], [24, 11]], dark, 1); break;
-      case "fish": p([[3, 16], [11, 9], [22, 11], [27, 16], [22, 21], [11, 23]], color); p([[23, 16], [31, 9], [31, 23]], color); e(9, 14, 1.4, 1.4, INK, null); l([[14, 12], [14, 20]], dark, 1); break;
-      case "ore": p([[5, 23], [8, 11], [17, 5], [26, 11], [28, 23], [17, 29]], "#a39e96"); e(12, 15, 3.5, 3, color); e(20, 21, 3.5, 3, color); e(20, 11, 2.5, 2, color); break;
-      case "bar": p([[4, 17], [11, 11], [28, 11], [21, 17]], light); p([[4, 17], [21, 17], [21, 24], [4, 24]], color); p([[21, 17], [28, 11], [28, 18], [21, 24]], dark); break;
-      case "bones": l([[8, 24], [24, 8]], INK, 6); l([[8, 24], [24, 8]], color, 3.4); e(6, 22, 3.5, 3.5, color); e(10, 26, 3.5, 3.5, color); e(22, 6, 3.5, 3.5, color); e(26, 10, 3.5, 3.5, color); break;
-      case "sigil": p([[7, 9], [16, 4], [25, 9], [25, 23], [16, 28], [7, 23]], "#c8c5be"); e(16, 16, 5.5, 5.5, color); break;
-      case "staff": l([[7, 29], [23, 7]], INK, 5); l([[7, 29], [23, 7]], "#9c8672", 3); e(24, 6, 5, 5, icon.accent ?? color); break;
-      case "net": for (let i = 0; i < 4; i++) { l([[8 + i * 5, 7], [8 + i * 5, 25]], "#6d6b67", 1.4); l([[5, 9 + i * 5], [26, 9 + i * 5]], "#6d6b67", 1.4); } l([[3, 29], [9, 23]], "#8a7563", 4); break;
-      case "rod": l([[5, 29], [27, 3]], INK, 4); l([[5, 29], [27, 3]], color, 2.2); l([[27, 3], [29, 22]], "#6d6b67", 1); e(29, 23, 1.5, 1.5, "#c98f95", null); break;
-      case "harpoon": l([[5, 29], [24, 6]], INK, 4.6); l([[5, 29], [24, 6]], color, 2.6); p([[23, 5], [29, 1], [27, 11]], color); break;
-      case "pot": p([[8, 11], [24, 11], [26, 22], [21, 28], [11, 28], [6, 22]], color); p([[8, 11], [24, 11], [22, 13], [10, 13]], dark, null); break;
-      case "bucket": p([[7, 12], [25, 12], [22, 28], [10, 28]], color); l([[7, 12], [9, 5], [23, 5], [25, 12]], INK, 1.5); l([[8, 17], [24, 17]], dark, 1.5); break;
-      case "milk": p([[7, 12], [25, 12], [22, 28], [10, 28]], "#9c8672"); p([[8, 12], [24, 12], [23, 15], [9, 15]], color, null); l([[7, 12], [9, 5], [23, 5], [25, 12]], INK, 1.5); break;
-      case "flour": p([[8, 12], [24, 12], [26, 22], [21, 28], [11, 28], [6, 22]], "#b89c86"); e(16, 11, 8, 3.5, color); break;
-      case "egg": e(16, 17, 8, 10, color); e(13, 13, 2, 3, "#ffffff", null); break;
-      case "wheat": for (let i = -1; i <= 1; i++) { l([[16 + i * 4, 29], [16 + i * 6, 8]], "#8a7563", 1.4); e(16 + i * 6, 9, 3, 6, color); } break;
-      case "tinderbox": p([[6, 12], [26, 12], [26, 25], [6, 25]], color); e(21, 18, 3, 3, "#e3a58c"); l([[9, 15], [15, 15]], dark, 1); break;
-      case "hammer": l([[9, 29], [18, 10]], INK, 5); l([[9, 29], [18, 10]], "#9c8672", 3); p([[10, 5], [26, 9], [24, 17], [8, 13]], color); break;
-      case "knife": l([[7, 27], [14, 20]], INK, 5); l([[7, 27], [14, 20]], "#8a7563", 3); p([[14, 19], [27, 5], [19, 23]], color); break;
-      case "needle": l([[7, 27], [25, 7]], INK, 3); l([[7, 27], [25, 7]], color, 1.4); e(24, 8, 2, 2, "#ffffff"); break;
-      case "thread": e(16, 16, 9, 9, color); l([[9, 12], [23, 20]], "#6d6b67", 1.4); l([[9, 19], [23, 13]], "#6d6b67", 1.4); break;
-      case "chisel": l([[7, 27], [18, 16]], INK, 5); l([[7, 27], [18, 16]], "#8a7563", 3); p([[17, 15], [27, 5], [22, 19]], color); break;
-      case "gem": p([[7, 13], [12, 7], [20, 7], [25, 13], [16, 27]], color); l([[7, 13], [25, 13]], INK, 1); l([[12, 8], [14, 12]], "#ffffff", 1); break;
-      case "hide": p([[5, 9], [14, 6], [23, 7], [28, 14], [25, 26], [12, 28], [4, 20]], color); e(12, 15, 3.5, 3, accent, null); e(20, 21, 3, 2.5, accent, null); break;
-      case "leather": p([[6, 9], [26, 7], [27, 25], [7, 27]], color); l([[9, 12], [23, 11]], dark, 1); break;
-      case "meat": e(15, 17, 11, 8, color); l([[23, 11], [29, 5]], INK, 4); l([[23, 11], [29, 5]], "#f2efe8", 2.4); break;
-      case "feather": l([[7, 28], [25, 5]], "#8a7563", 1.4); p([[9, 23], [13, 11], [24, 4], [21, 17]], color); break;
-      case "bait": for (const [bx, by] of [[10, 13], [19, 11], [14, 21], [23, 20]] as Pt[]) e(bx, by, 4, 2.6, color); break;
-      case "cake": p([[5, 18], [16, 11], [27, 18], [27, 25], [16, 31], [5, 25]], color); p([[5, 18], [16, 11], [27, 18], [16, 24]], accent); break;
-      case "berries": for (const [bx, by] of [[11, 18], [18, 16], [14, 11], [21, 22], [10, 24], [17, 23]] as Pt[]) e(bx, by, 3.6, 3.6, color); l([[15, 9], [15, 4], [20, 3]], "#8e9887", 1.4); break;
-    case "bread": e(16, 18, 12, 8, color); l([[10, 15], [13, 20]], dark, 1.4); l([[16, 14], [19, 19]], dark, 1.4); l([[22, 15], [24, 19]], dark, 1.4); break;
-      case "key": e(10, 11, 5.5, 5.5, color); e(10, 11, 2, 2, "#ffffff00", null); l([[13, 15], [26, 28]], INK, 4.6); l([[13, 15], [26, 28]], color, 2.6); l([[21, 23], [25, 19]], color, 2.6); break;
-      case "lamp": p([[7, 22], [25, 22], [21, 13], [11, 13]], color); e(16, 10, 3.5, 3.5, "#ffffff"); break;
-      case "scroll": p([[8, 7], [24, 7], [24, 26], [8, 26]], color); l([[11, 12], [21, 12]], INK, 1); l([[11, 17], [21, 17]], INK, 1); l([[11, 22], [18, 22]], INK, 1); break;
-      case "silk": p([[5, 11], [27, 7], [27, 22], [5, 26]], color); l([[8, 15], [25, 12]], "#ffffff", 1.4); break;
-      case "burnt": e(16, 18, 11, 7, color); e(12, 15, 2, 1.5, "#6d6b67", null); break;
-      case "orb": e(16, 16, 10, 10, color); e(12, 12, 3.5, 3.5, "#ffffff", null); break;
-      case "bow":
-        // A recurve limb with its string, and a nocked arrow.
-        l([[8, 4], [15, 8], [20, 16], [15, 24], [8, 28]], INK, 5); l([[8, 4], [15, 8], [20, 16], [15, 24], [8, 28]], color, 3);
-        l([[8, 4], [8, 28]], "#efede7", 1); if (icon.accent) { e(20, 16, 2.5, 2.5, accent); } else l([[18, 15], [20, 17]], "#c9b77f", 2); break;
-      case "arrow":
-        for (const dy of [-5, 0, 5]) { l([[5, 27 + dy], [23, 9 + dy]], "#9c8672", 1.6); p([[23, 5 + dy], [28, 4 + dy], [27, 9 + dy]], color); p([[5, 27 + dy], [4, 22 + dy], [8, 25 + dy]], "#efede7", null); }
-        break;
-      case "tablet": p([[7, 5], [25, 5], [27, 27], [5, 27]], "#c8c5be"); e(16, 16, 6, 6, color); l([[16, 11], [16, 21]], INK, 1); l([[11, 16], [21, 16]], INK, 1); break;
-      case "trophy": p([[9, 5], [23, 5], [21, 16], [11, 16]], color); l([[16, 16], [16, 24]], INK, 2.5); p([[9, 24], [23, 24], [23, 29], [9, 29]], color); break;
+const METAL_COLORS = new Set<string>(METALS.map(metal => metal.color));
+const WOOD_C = "#9c7a5c", DARK_WOOD = "#6f5440", GOLD_C = "#d9b866", STEEL_C = "#b9bfc6", PARCH = "#efe3c4", WHITE = "#f7f5f0";
+/** Rasterize one part and shade it into the picture. */
+function part(p: Pixels, draw: (q: Pixels) => void, color: string, material: Material = "flat", ink = true) {
+  const q = new Pixels(S, S); draw(q);
+  let x0 = S, y0 = S, x1 = -1, y1 = -1;
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) if (q.get(x, y)) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+  if (x1 < 0) return;
+  const before = p.data.slice(), w = Math.max(1, x1 - x0), h = Math.max(1, y1 - y0), inQ = (x: number, y: number) => q.inside(x, y) && q.get(x, y) !== 0;
+  const flat = material === "flat" || material === "glow", shiny = material === "metal" || material === "gem";
+  const light = shadeHex(color, shiny ? 0.16 : 0.1), lighter = shadeHex(color, shiny ? 0.3 : 0.2), dark = shadeHex(color, -0.12), darker = shadeHex(color, material === "cloth" ? -0.2 : -0.25);
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    if (!inQ(x, y)) continue;
+    const u = (x - x0) / w, v = (y - y0) / h, l = u * 0.45 + v * 0.75, t = BAYER4[y & 3][x & 3] / 16;
+    let c = color;
+    if (!flat) { if (l > 0.95 + t * 0.2) c = darker; else if (l > 0.64 + t * 0.2) c = dark; else if (l < 0.2 + t * 0.14) c = light; }
+    const litEdge = !inQ(x - 1, y) || !inQ(x, y - 1), shadowEdge = !inQ(x + 1, y) || !inQ(x, y + 1);
+    if (litEdge && !shadowEdge) c = material === "glow" ? lighter : shiny ? lighter : light;
+    else if (shadowEdge && !litEdge && !flat) c = darker;
+    if (shiny && !litEdge && !shadowEdge && l > 0.16 && l < 0.3 && t < 0.19) c = "#ffffff";
+    p.set(x, y, c);
+  }
+  if (!ink) return;
+  // An ink line where this part overlaps something drawn before it, so the parts read separately.
+  const inkValue = (() => { const probe = new Pixels(1, 1); probe.set(0, 0, INK); return probe.data[0]; })();
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    if (!inQ(x, y)) continue;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy;
+      if (!inQ(nx, ny) && p.inside(nx, ny) && before[ny * S + nx] && before[ny * S + nx] !== inkValue) { p.data[y * S + x] = inkValue; break; }
     }
-    px.halo();
+  }
+}
+const poly = (points: Pt[]) => (q: Pixels) => q.poly(points, MARK, null);
+const disc = (cx: number, cy: number, rx: number, ry = rx) => (q: Pixels) => q.disc(cx, cy, rx, ry, MARK, null);
+const stroke = (points: Pt[], width: number) => (q: Pixels) => q.polyline(points, MARK, width);
+const box = (x: number, y: number, w: number, h: number) => (q: Pixels) => q.rect(x, y, w, h, MARK);
+const all = (...draws: ((q: Pixels) => void)[]) => (q: Pixels) => draws.forEach(draw => draw(q));
+const line = (p: Pixels, points: Pt[], color: string, width = 1) => p.polyline(points, color, width);
+const dot = (p: Pixels, x: number, y: number, color: string) => p.set(x, y, color);
+
+export function itemArt(icon: Icon): HTMLCanvasElement {
+  return pixelArt(`item2:${icon.shape}:${icon.color}:${icon.accent ?? ""}`, S, S, p => {
+    const color = icon.color, accent = icon.accent, metal = METAL_COLORS.has(color) || color === STEEL_C;
+    const armour: Material = metal ? "metal" : "cloth", dark = shadeHex(color, -0.28), light = shadeHex(color, 0.22);
+    switch (icon.shape) {
+      case "coins":
+        for (const [cx, cy] of [[11, 23], [21, 20], [15, 14]] as Pt[]) { part(p, disc(cx, cy, 8, 4.5), color, "metal"); line(p, [[cx - 4, cy], [cx + 4, cy]], shadeHex(color, -0.2)); }
+        break;
+      case "axe":
+        part(p, stroke([[8, 29], [21, 5]], 3), WOOD_C, "wood"); line(p, [[10, 25], [12, 22]], DARK_WOOD);
+        part(p, poly([[14, 5], [23, 2], [29, 7], [28, 18], [22, 15], [17, 11]]), color, "metal");
+        line(p, [[28, 7], [27, 16]], shadeHex(color, 0.32)); break;
+      case "pickaxe":
+        part(p, stroke([[9, 30], [19, 8]], 3), WOOD_C, "wood");
+        part(p, poly([[2, 13], [8, 7], [17, 4], [26, 6], [31, 12], [24, 9], [17, 8], [9, 10]]), color, "metal"); break;
+      case "sword":
+        part(p, all(stroke([[9, 23], [26, 6]], 4), poly([[25, 3], [29, 3], [29, 7]])), color, "metal");
+        line(p, [[11, 21], [25, 7]], shadeHex(color, -0.18));
+        part(p, stroke([[5, 18], [14, 27]], 3), GOLD_C, "metal");
+        part(p, stroke([[4, 28], [8, 24]], 3), DARK_WOOD, "wood"); part(p, disc(3.5, 29.5, 2), GOLD_C, "metal"); break;
+      case "dagger":
+        part(p, all(stroke([[12, 21], [23, 10]], 4), poly([[22, 7], [26, 6], [25, 10]])), color, "metal");
+        line(p, [[14, 19], [22, 11]], shadeHex(color, -0.18));
+        part(p, stroke([[8, 17], [15, 24]], 3), GOLD_C, "metal"); part(p, stroke([[6, 27], [10, 23]], 3), DARK_WOOD, "wood"); break;
+      case "sabre":
+        part(p, all(stroke([[9, 24], [13, 15], [19, 9], [28, 5]], 4), poly([[27, 3], [30, 4], [28, 7]])), color, "metal");
+        line(p, [[11, 21], [14, 15], [20, 10], [26, 7]], shadeHex(color, 0.28));
+        part(p, all(stroke([[5, 20], [9, 26]], 3), stroke([[9, 26], [13, 26]], 2)), GOLD_C, "metal"); part(p, stroke([[4, 29], [8, 25]], 3), DARK_WOOD, "wood"); break;
+      case "helm":
+        part(p, poly([[6, 27], [6, 14], [9, 8], [16, 4], [23, 8], [26, 14], [26, 27], [20, 27], [20, 21], [12, 21], [12, 27]]), color, armour);
+        part(p, box(9, 15, 14, 3), INK, "flat", false);
+        if (accent) part(p, stroke([[16, 2], [16, 9]], 3), accent, "cloth"); else line(p, [[16, 5], [16, 13]], light);
+        if (metal) { dot(p, 8, 23, light); dot(p, 24, 23, light); }
+        break;
+      case "hood":
+        part(p, poly([[5, 29], [6, 13], [10, 7], [16, 3], [22, 7], [26, 13], [27, 29], [16, 25]]), color, "cloth");
+        part(p, disc(16, 17, 5.5, 6), "#2e2c2a", "flat");
+        line(p, [[9, 27], [14, 24]], dark); line(p, [[23, 27], [18, 24]], dark); break;
+      case "hat":
+        part(p, disc(16, 25, 13, 4), color, "cloth");
+        part(p, poly([[8, 25], [24, 25], [20, 14], [22, 4], [16, 8], [13, 14]]), color, "cloth");
+        line(p, [[9, 23], [23, 23]], accent ?? GOLD_C, 2); dot(p, 15, 16, GOLD_C); dot(p, 18, 12, GOLD_C); break;
+      case "crown":
+        part(p, all(box(5, 18, 22, 9), poly([[5, 19], [5, 8], [10, 14]]), poly([[10, 18], [16, 5], [22, 18]]), poly([[22, 14], [27, 8], [27, 19]])), color, "metal");
+        part(p, disc(16, 22, 2.5), accent ?? "#cf6e6e", "gem"); part(p, disc(9, 22, 1.8), "#8fa3c9", "gem"); part(p, disc(23, 22, 1.8), "#8fbf9a", "gem"); break;
+      case "body":
+        part(p, poly([[9, 5], [23, 5], [29, 11], [27, 18], [23, 16], [23, 29], [9, 29], [9, 16], [5, 18], [3, 11]]), color, armour);
+        part(p, poly([[12, 5], [20, 5], [16, 10]]), "#2e2c2a", "flat", false);
+        line(p, [[16, 11], [16, 27]], dark); line(p, [[9, 16], [23, 16]], dark);
+        if (metal) { for (const [x, y] of [[11, 13], [21, 13], [11, 25], [21, 25]] as Pt[]) dot(p, x, y, light); }
+        else line(p, [[10, 20], [22, 20]], dark);
+        if (accent) line(p, [[10, 28], [22, 28]], accent, 2);
+        break;
+      case "legs":
+        part(p, poly([[8, 4], [24, 4], [26, 29], [18, 29], [16, 13], [14, 29], [6, 29]]), color, armour);
+        part(p, box(8, 4, 16, 3), shadeHex(color, -0.2), "flat"); line(p, [[16, 8], [16, 13]], dark);
+        if (metal) { part(p, disc(10, 18, 2.5), color, "metal"); part(p, disc(22, 18, 2.5), color, "metal"); } break;
+      case "shield":
+        part(p, poly([[5, 4], [27, 4], [27, 16], [16, 30], [5, 16]]), color, metal ? "metal" : "wood");
+        part(p, all(box(14, 5, 4, 22), box(6, 11, 20, 4)), accent ?? shadeHex(color, -0.22), "flat");
+        part(p, disc(16, 13, 3), metal ? shadeHex(color, 0.2) : STEEL_C, "metal"); break;
+      case "boots":
+        part(p, poly([[7, 7], [16, 7], [16, 19], [27, 20], [28, 27], [7, 27]]), color, armour);
+        part(p, box(6, 26, 23, 3), shadeHex(color, -0.35), "flat"); line(p, [[7, 11], [16, 11]], dark); break;
+      case "gloves":
+        part(p, poly([[8, 29], [7, 14], [9, 9], [12, 12], [13, 5], [16, 5], [17, 11], [19, 5], [22, 6], [22, 12], [25, 9], [27, 11], [25, 20], [24, 29]]), color, armour);
+        part(p, box(8, 24, 16, 5), shadeHex(color, -0.15), armour); break;
+      case "bracer":
+        part(p, poly([[8, 6], [24, 8], [23, 28], [9, 26]]), color, armour);
+        for (const y of [12, 18, 23]) line(p, [[9, y], [23, y + 1]], shadeHex(color, -0.3), 2); break;
+      case "cape":
+        part(p, poly([[10, 3], [22, 3], [29, 28], [22, 26], [16, 29], [10, 26], [3, 28]]), color, "cloth");
+        line(p, [[13, 6], [9, 25]], dark); line(p, [[19, 6], [23, 25]], dark); line(p, [[16, 6], [16, 27]], dark);
+        part(p, box(9, 3, 14, 3), shadeHex(color, 0.12), "cloth");
+        if (accent) { line(p, [[4, 27], [10, 25], [16, 28], [22, 25], [28, 27]], accent, 2); part(p, disc(16, 15, 3), accent, "metal"); }
+        break;
+      case "amulet":
+        line(p, [[8, 4], [8, 11], [12, 16], [16, 18], [20, 16], [24, 11], [24, 4]], GOLD_C, 1);
+        part(p, disc(16, 23, 6, 6.5), GOLD_C, "metal"); part(p, disc(16, 23, 4, 4.5), color, "gem"); break;
+      case "log":
+        part(p, poly([[7, 11], [24, 5], [30, 11], [28, 20], [9, 26]]), color, "wood");
+        for (const [a, b] of [[[12, 13], [25, 9]], [[13, 18], [27, 14]], [[14, 22], [26, 19]]] as [Pt, Pt][]) line(p, [a, b], shadeHex(color, -0.22));
+        part(p, disc(8.5, 18.5, 5.5, 8), "#e8d4b8", "wood"); part(p, disc(8.5, 18.5, 3, 4.5), "#d4b890", "flat", false); dot(p, 8, 18, "#9c7a5c"); break;
+      case "fish":
+        part(p, poly([[2, 16], [7, 10], [15, 8], [23, 11], [26, 16], [23, 21], [15, 24], [7, 22]]), color, "food");
+        part(p, poly([[23, 16], [31, 9], [29, 16], [31, 23]]), shadeHex(color, -0.08), "food");
+        part(p, poly([[12, 9], [16, 4], [19, 9]]), shadeHex(color, -0.12), "food");
+        dot(p, 7, 14, INK); dot(p, 6, 14, "#ffffff"); line(p, [[10, 12], [10, 20]], dark);
+        for (const [x, y] of [[14, 14], [18, 14], [16, 18], [20, 18]] as Pt[]) dot(p, x, y, shadeHex(color, 0.18)); break;
+      case "ore":
+        part(p, poly([[4, 23], [6, 12], [14, 5], [24, 7], [29, 17], [25, 27], [12, 29]]), "#8f8a84", "stone");
+        for (const [cx, cy, r] of [[12, 15, 3.5], [20, 21, 3.8], [21, 11, 2.6], [11, 23, 2.2]] as [number, number, number][]) part(p, disc(cx, cy, r), color, "metal"); break;
+      case "bar":
+        part(p, poly([[3, 17], [10, 10], [29, 10], [22, 17]]), shadeHex(color, 0.14), "metal");
+        part(p, poly([[3, 17], [22, 17], [22, 25], [3, 25]]), color, "metal");
+        part(p, poly([[22, 17], [29, 10], [29, 18], [22, 25]]), shadeHex(color, -0.14), "metal");
+        line(p, [[7, 21], [18, 21]], shadeHex(color, -0.25)); break;
+      case "bones":
+        part(p, all(stroke([[8, 24], [24, 8]], 4), disc(6, 22, 3.5), disc(10, 26, 3.5), disc(22, 6, 3.5), disc(26, 10, 3.5)), color, "stone");
+        if (accent) line(p, [[12, 20], [20, 12]], accent); break;
+      case "sigil":
+        part(p, poly([[7, 7], [16, 3], [25, 7], [26, 23], [16, 29], [6, 23]]), "#c8c5be", "stone");
+        part(p, disc(16, 16, 6), color, "glow"); part(p, disc(16, 16, 2.5), shadeHex(color, 0.3), "flat", false);
+        line(p, [[9, 9], [12, 8]], "#e8e6e0"); break;
+      case "staff":
+        part(p, stroke([[5, 30], [22, 9]], 3), WOOD_C, "wood"); line(p, [[9, 25], [11, 23]], DARK_WOOD); line(p, [[14, 19], [16, 17]], DARK_WOOD);
+        part(p, all(stroke([[20, 10], [19, 5]], 2), stroke([[21, 9], [27, 7]], 2)), DARK_WOOD, "wood");
+        part(p, disc(24, 6, 4.5), accent ?? color, "gem"); break;
+      case "net":
+        for (let i = 0; i < 5; i++) { line(p, [[7 + i * 4, 5], [7 + i * 4, 24]], "#6d6b67"); line(p, [[5, 7 + i * 4], [25, 7 + i * 4]], "#6d6b67"); }
+        part(p, stroke([[2, 30], [8, 24]], 3), WOOD_C, "wood"); part(p, stroke([[5, 5], [25, 5], [25, 25], [5, 25], [5, 5]], 2), "#8a7563", "wood"); break;
+      case "rod":
+        part(p, stroke([[4, 30], [27, 3]], 3), color, "wood"); part(p, disc(9, 24, 3), STEEL_C, "metal");
+        line(p, [[27, 3], [29, 21]], "#4a4846"); part(p, disc(29, 23, 1.8), "#cf6e6e", "flat"); break;
+      case "harpoon":
+        part(p, stroke([[4, 30], [22, 9]], 3), WOOD_C, "wood");
+        part(p, all(poly([[20, 8], [29, 2], [25, 12]]), stroke([[21, 11], [18, 7]], 2)), color, "metal"); break;
+      case "pot":
+        part(p, poly([[7, 12], [25, 12], [28, 20], [23, 28], [9, 28], [4, 20]]), color, "stone");
+        part(p, disc(16, 12, 9.5, 3), shadeHex(color, 0.1), "stone"); part(p, disc(16, 12, 7, 1.8), "#3b3a38", "flat", false); break;
+      case "bucket": case "milk":
+        part(p, poly([[6, 12], [26, 12], [23, 28], [9, 28]]), icon.shape === "milk" ? WOOD_C : color, "wood");
+        line(p, [[7, 17], [25, 17]], DARK_WOOD, 2); line(p, [[8, 24], [24, 24]], DARK_WOOD, 2);
+        line(p, [[6, 12], [9, 4], [23, 4], [26, 12]], "#6d6b67");
+        if (icon.shape === "milk") part(p, disc(16, 12, 9.5, 2.5), WHITE, "flat"); break;
+      case "flour":
+        part(p, poly([[7, 13], [25, 13], [28, 21], [23, 29], [9, 29], [4, 21]]), "#b89c86", "stone");
+        part(p, disc(16, 12, 9, 4.5), color, "food"); break;
+      case "egg": part(p, disc(16, 17, 8, 10.5), color, "food"); dot(p, 13, 11, "#ffffff"); dot(p, 12, 12, "#ffffff"); break;
+      case "wheat":
+        for (let i = -1; i <= 1; i++) { line(p, [[16 + i * 3, 30], [16 + i * 6, 9]], "#9c8a5c"); part(p, disc(16 + i * 6, 9, 3, 6.5), color, "food"); }
+        break;
+      case "tinderbox":
+        part(p, box(5, 11, 22, 15), color, "wood"); part(p, box(5, 9, 22, 4), shadeHex(color, 0.12), "wood");
+        part(p, disc(21, 18, 3), "#e3a58c", "glow"); part(p, box(9, 16, 6, 5), "#6d6b67", "stone"); break;
+      case "hammer":
+        part(p, stroke([[8, 30], [18, 11]], 3), WOOD_C, "wood");
+        part(p, poly([[9, 5], [26, 9], [24, 17], [7, 13]]), color, "metal"); break;
+      case "knife":
+        part(p, stroke([[5, 28], [13, 20]], 4), DARK_WOOD, "wood");
+        part(p, poly([[13, 18], [28, 4], [26, 11], [17, 23]]), color, "metal"); line(p, [[16, 20], [27, 6]], shadeHex(color, 0.3)); break;
+      case "needle": line(p, [[6, 27], [25, 6]], "#6d6b67", 2); line(p, [[7, 26], [25, 7]], color); part(p, disc(24, 7, 2), WHITE, "flat"); break;
+      case "thread":
+        part(p, box(8, 7, 16, 3), WOOD_C, "wood"); part(p, box(8, 23, 16, 3), WOOD_C, "wood"); part(p, box(10, 10, 12, 13), color, "cloth");
+        for (const y of [13, 16, 19]) line(p, [[10, y], [21, y + 1]], shadeHex(color, -0.15)); break;
+      case "chisel":
+        part(p, stroke([[6, 28], [16, 18]], 4), WOOD_C, "wood"); part(p, poly([[15, 16], [26, 5], [29, 8], [18, 19]]), color, "metal"); break;
+      case "gem":
+        part(p, poly([[6, 12], [11, 6], [21, 6], [26, 12], [16, 28]]), color, "gem");
+        line(p, [[6, 12], [26, 12]], shadeHex(color, -0.25)); line(p, [[11, 7], [14, 12], [16, 27]], shadeHex(color, 0.25)); line(p, [[21, 7], [18, 12], [16, 27]], shadeHex(color, -0.18));
+        if (accent) { for (const [x, y] of [[9, 20], [23, 19], [16, 4]] as Pt[]) dot(p, x, y, accent); }
+        break;
+      case "hide":
+        part(p, poly([[4, 9], [12, 5], [22, 6], [28, 13], [26, 26], [13, 29], [4, 21]]), color, "cloth");
+        part(p, disc(12, 15, 3.5, 3), accent ?? dark, "flat", false); part(p, disc(20, 21, 3, 2.5), accent ?? dark, "flat", false); break;
+      case "leather":
+        part(p, poly([[5, 9], [26, 6], [27, 25], [6, 27]]), color, "cloth"); line(p, [[8, 12], [24, 9]], dark);
+        for (let x = 8; x < 25; x += 3) dot(p, x, 23 - Math.round((x - 8) * 0.1), light); break;
+      case "meat":
+        part(p, stroke([[20, 12], [28, 4]], 3), WHITE, "stone"); part(p, disc(28, 4, 2), WHITE, "stone");
+        part(p, disc(14, 18, 11, 9), color, "food"); break;
+      case "feather":
+        line(p, [[5, 29], [24, 5]], "#8a7563");
+        part(p, poly([[8, 25], [11, 13], [22, 4], [24, 8], [18, 19]]), color, "cloth");
+        for (let i = 0; i < 4; i++) line(p, [[10 + i * 3, 22 - i * 4], [13 + i * 3, 18 - i * 4]], shadeHex(color, -0.12)); break;
+      case "bait": for (const [cx, cy] of [[10, 13], [20, 11], [14, 21], [23, 21]] as Pt[]) part(p, disc(cx, cy, 4.5, 2.6), color, "food"); break;
+      case "cake":
+        part(p, poly([[4, 18], [16, 11], [28, 18], [28, 26], [16, 31], [4, 26]]), color, "food");
+        part(p, poly([[4, 18], [16, 11], [28, 18], [16, 24]]), accent ?? "#d8b6b4", "food");
+        line(p, [[4, 22], [16, 28], [28, 22]], shadeHex(color, -0.18)); part(p, disc(16, 15, 2), "#cf6e6e", "gem"); break;
+      case "berries":
+        for (const [cx, cy] of [[11, 19], [18, 17], [14, 12], [21, 23], [10, 25], [17, 24]] as Pt[]) part(p, disc(cx, cy, 3.8), color, "gem");
+        part(p, poly([[14, 8], [19, 3], [22, 7]]), "#8e9887", "cloth"); break;
+      case "bread":
+        part(p, disc(16, 19, 13, 8.5), color, "food");
+        for (const x of [10, 15, 20]) line(p, [[x, 15], [x + 3, 21]], shadeHex(color, -0.22)); break;
+      case "key":
+        part(p, all(disc(10, 10, 6), stroke([[13, 14], [26, 27]], 3), stroke([[20, 23], [24, 19]], 3), stroke([[24, 27], [27, 24]], 2)), color, "metal");
+        part(p, disc(10, 10, 2.5), "#ffffff", "flat", false); break;
+      case "lamp":
+        part(p, all(disc(15, 21, 10, 5), poly([[22, 19], [31, 14], [30, 17], [24, 23]])), color, "metal");
+        part(p, stroke([[6, 18], [3, 14], [6, 12]], 2), color, "metal"); part(p, box(12, 26, 7, 3), shadeHex(color, -0.2), "metal");
+        part(p, poly([[29, 13], [31, 6], [27, 10]]), "#f2d58a", "glow"); break;
+      case "scroll":
+        part(p, box(7, 7, 18, 19), color, "cloth"); part(p, disc(16, 7, 10, 2.5), shadeHex(color, -0.1), "cloth"); part(p, disc(16, 26, 10, 2.5), shadeHex(color, -0.1), "cloth");
+        for (const y of [11, 15, 19]) line(p, [[10, y], [22, y]], "#8a7563"); line(p, [[10, 22], [17, 22]], "#8a7563"); break;
+      case "silk":
+        part(p, poly([[4, 11], [28, 6], [28, 21], [4, 26]]), color, "cloth"); line(p, [[7, 14], [26, 10]], "#ffffff"); line(p, [[6, 20], [26, 16]], shadeHex(color, -0.12)); break;
+      case "burnt": part(p, disc(16, 19, 11, 7.5), color, "stone"); for (const [x, y] of [[11, 16], [19, 18], [15, 22]] as Pt[]) dot(p, x, y, "#6d6b67"); break;
+      case "orb": part(p, disc(16, 16, 10.5), color, "gem"); if (accent) part(p, disc(16, 16, 4), accent, "glow"); break;
+      case "trophy":
+        part(p, poly([[8, 4], [24, 4], [22, 15], [16, 18], [10, 15]]), color, "metal"); part(p, stroke([[16, 18], [16, 24]], 3), color, "metal");
+        part(p, box(9, 24, 14, 5), shadeHex(color, -0.12), "metal"); break;
+      case "bow":
+        part(p, stroke([[8, 3], [15, 7], [20, 16], [15, 25], [8, 29]], 3), color, "wood");
+        line(p, [[8, 3], [8, 29]], "#efede7"); part(p, box(17, 13, 5, 6), accent ?? "#8a5a4a", "cloth");
+        if (accent) part(p, disc(20, 16, 2), accent, "gem"); break;
+      case "arrow": {
+        const variant = accent;
+        for (const off of [-5, 0, 5]) {
+          line(p, [[4, 28 + off], [24, 8 + off]], "#9c7a5c", 2);
+          if (variant !== "shaft") { line(p, [[4, 28 + off], [9, 23 + off]], "#efede7", 3); line(p, [[5, 25 + off], [7, 23 + off]], "#cf6e6e"); }
+          if (!variant) part(p, poly([[22, 6 + off], [28, 4 + off], [26, 10 + off]]), color, "metal");
+        }
+        break;
+      }
+      case "arrowheads":
+        for (const [x, y] of [[9, 12], [20, 9], [14, 22], [24, 22]] as Pt[]) part(p, poly([[x, y - 6], [x + 5, y + 3], [x, y + 1], [x - 5, y + 3]]), color, "metal");
+        break;
+      case "tablet":
+        part(p, poly([[6, 5], [26, 5], [28, 27], [4, 27]]), "#c8c5be", "stone");
+        part(p, disc(16, 16, 6), color, "glow"); line(p, [[16, 11], [16, 21]], INK); line(p, [[11, 16], [21, 16]], INK); break;
+    }
+    p.outline(); p.halo();
   });
 }
 
@@ -108,6 +296,8 @@ const SKILL_PAINTERS: Record<Skill, Painter> = {
   thieving: p => { p.poly([[4, 16], [3, 8], [5, 7], [6, 11], [6, 4], [8, 4], [8, 10], [9, 3], [11, 3], [11, 10], [12, 5], [14, 6], [13, 16]], "#e8d4c0"); },
   agility: p => { p.poly([[2, 11], [10, 11], [11, 7], [13, 7], [15, 14], [2, 14]], "#b89c86"); p.line(3, 9, 7, 5, SAGE, 2); p.line(6, 5, 9, 3, SAGE, 2); },
   ranged: p => { p.polyline([[5, 1], [10, 4], [12, 9], [10, 14], [5, 16]], INK, 3); p.polyline([[5, 1], [10, 4], [12, 9], [10, 14], [5, 16]], WOOD); p.line(5, 2, 5, 15, PAPER); p.line(2, 12, 15, 5, INK, 2); p.line(2, 12, 15, 5, "#c8c5be"); p.poly([[14, 3], [17, 3], [16, 7]], STEEL); },
+  sigilcraft: p => { p.poly([[8.5, 1], [15, 6], [13, 15], [4, 15], [2, 6]], "#d9d4e6"); p.disc(8.5, 9, 3, 3, "#6f7ea6"); p.set(8, 8, "#ffffff"); },
+  fletching: p => { p.line(2, 15, 14, 3, INK, 2); p.line(2, 15, 14, 3, WOOD); p.poly([[12, 1], [16, 1], [16, 5]], STEEL); p.poly([[1, 12], [5, 16], [2, 16]], PAPER); p.poly([[3, 10], [7, 14], [4, 14]], "#d8b6b4"); },
   slayer: p => { p.disc(8.5, 7, 6, 5.5, "#e8e4dc"); p.rect(5, 11, 7, 4, "#e8e4dc"); p.rect(5, 5, 3, 3, INK); p.rect(10, 5, 3, 3, INK); p.rect(8, 9, 1, 2, INK); p.line(6, 14, 11, 14, INK); p.line(1, 16, 16, 1, "#cf6e6e", 1); },
 };
 export const skillArt = (skill: Skill) => icon16(`skill:${skill}`, SKILL_PAINTERS[skill]);

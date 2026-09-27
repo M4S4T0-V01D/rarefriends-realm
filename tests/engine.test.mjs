@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   buy, canWalk, castSpell, chooseOption, collectFromCasket, continueDialogue, createGame, equip, findPath, itemOptions, menuFor, restore, sell,
   serialize, setFollower, setRelics, setTarget, smeltingRecipes, smithingRecipes, startProduction, tick, togglePrayer, useItemOnItem, walkTo, setHeld,
-  successChance, hitChance, unlockMusic, castOnItem, isBound, grantBundle, rubLamp, breakTablet, capeProblem,
+  successChance, hitChance, unlockMusic, castOnItem, isBound, grantBundle, rubLamp, breakTablet, capeProblem, sellPrice, craftSigils,
 } from "../games/rarefriends-realm/engine.ts";
 import { currentTask, slayerPoints } from "../games/rarefriends-realm/slayer.ts";
 import { ITEM_LIST, MONSTERS, SHOPS, SKILLS, SPELLS, TREES, XP_RATE, XP_TABLE, item, levelForXp } from "../games/rarefriends-realm/data.ts";
@@ -68,7 +68,7 @@ test("a fresh adventurer: level 3, 10 hitpoints, a starter kit", () => {
   assert.equal(level(g, "hitpoints"), 10);
   assert.equal(g.player.hp, 10);
   for (const id of ["pewter_axe", "pewter_pickaxe", "small_net", "tinderbox"]) assert(has(g.player, id), id);
-  assert.equal(SKILLS.length, 17);
+  assert.equal(SKILLS.length, 19);
 });
 
 test("the world is large, deterministic and every landmark is reachable on foot", () => {
@@ -111,7 +111,7 @@ test("the world is large, deterministic and every landmark is reachable on foot"
 
 test("Friendhollow Castle: spiral stairs up to the King, on to the roof, and back down", () => {
   const g = newGame(), world = g.world, levelOf = () => realPoint(world, g.player.x, g.player.y).level;
-  const stairs = (level, action) => world.objects.filter(object => object.look === "stairs" && object.action === action && realPoint(world, object.x, object.y).level === level);
+  const stairs = (level, action) => world.objects.filter(object => object.look === "stairs" && object.action === action && realPoint(world, object.x, object.y).level === level && realPoint(world, object.x, object.y).x < 140);
   const climb = (object, level) => { standBy(g, object); menuFor(g, [{ kind: "object", id: object.id }], null)[0].run(g); until(g, () => levelOf() === level, 30); };
   // Up the north-east tower to the King's floor.
   const up = stairs(0, "Climb-up").sort((a, b) => b.x - a.x)[0];
@@ -617,4 +617,83 @@ test("Rare Market bundles: goods on top of the caskets; tablets travel, lamps gi
   grantBundle(g, "contract"); assert.equal(slayerPoints(g), 40);
   grantBundle(g, "tailor", "starlit_hood");
   assert(p.wardrobe.includes("starlit_hood") && p.worn.includes("starlit_hood"));
+});
+
+test("Fletching: shafts from logs, feathers, arrowheads from the anvil, and arrows", () => {
+  const g = newGame(), p = g.player;
+  p.inventory = p.inventory.map(() => null);
+  give(p, "knife"); give(p, "logs", 2); give(p, "feather", 30); give(p, "hammer"); give(p, "pewter_bar", 1); p.xp.smithing = 1154;
+  const knife = () => p.inventory.findIndex(slot => slot?.id === "knife"), logs = () => p.inventory.findIndex(slot => slot?.id === "logs");
+  useItemOnItem(g, knife(), logs());
+  assert(g.ui.production, "a knife on logs opens the fletching menu");
+  startProduction(g, g.ui.production.recipes[0], 2); g.ui.production = null;
+  until(g, () => count(p, "arrow_shaft") === 30, 60);
+  assert(p.xp.fletching > 0);
+  useItemOnItem(g, p.inventory.findIndex(slot => slot?.id === "feather"), p.inventory.findIndex(slot => slot?.id === "arrow_shaft"));
+  until(g, () => count(p, "headless_arrow") === 30, 60);
+  const heads = smithingRecipes("pewter").find(recipe => recipe.outputs.pewter_arrowheads);
+  assert(heads, "arrowheads at the anvil");
+  startProduction(g, heads, 1);
+  until(g, () => count(p, "pewter_arrowheads") === 15, 30);
+  useItemOnItem(g, p.inventory.findIndex(slot => slot?.id === "pewter_arrowheads"), p.inventory.findIndex(slot => slot?.id === "headless_arrow"));
+  until(g, () => count(p, "pewter_arrow") === 15, 30);
+});
+
+test("Sigilcraft: mine sigil stones in the Wizards' Tower, press them at an altar", () => {
+  const g = newGame(), p = g.player, world = g.world;
+  const rock = world.objects.find(object => object.kind === "rock" && object.rock === "sigil");
+  assert(rock && realPoint(world, rock.x, rock.y).x > 150, "sigil stone in the Wizards' Tower");
+  standBy(g, rock);
+  menuFor(g, [{ kind: "object", id: rock.id }], null)[0].run(g);
+  until(g, () => count(p, "sigil_stone") >= 3, 400);
+  assert(!g.depleted.has(rock.id), "the stone never runs out");
+  const altar = world.objects.find(object => object.kind === "sigil_altar" && object.sigil === "breeze_sigil");
+  const before = count(p, "breeze_sigil"), stones = count(p, "sigil_stone");
+  assert.equal(craftSigils(g, altar), stones);
+  assert.equal(count(p, "breeze_sigil") - before, stones); assert(p.xp.sigilcraft > 0);
+  const hollow = world.objects.find(object => object.kind === "sigil_altar" && object.sigil === "hollow_sigil");
+  give(p, "sigil_stone"); assert.equal(craftSigils(g, hollow), 0, "Hollow needs Sigilcraft 65");
+  assert.equal(world.objects.filter(object => object.kind === "sigil_altar").length, 11);
+});
+
+test("Dragons breathe fire; the King's Wyrmward shield turns it aside", () => {
+  const g = newGame(), p = g.player;
+  const drake = g.monsters.find(monster => monster.def.id === "ash_drake");
+  assert(drake && drake.def.breath, "ash drakes live in Wyrmreach");
+  for (const skill of ["attack", "strength", "defence", "hitpoints"]) p.xp[skill] = 13_034_431;
+  for (const other of g.monsters) if (other !== drake) other.dead = true, other.respawnAt = Infinity;
+  const worst = shielded => {
+    let max = 0; p.equipment.shield = shielded ? "wyrmward_shield" : undefined; if (!shielded) delete p.equipment.shield;
+    for (let i = 0; i < 400; i++) { p.hp = 99; drake.dead = false; drake.hp = drake.def.hp; drake.target = true; drake.attackTimer = 0; standNear(g, drake.x, drake.y, 1); p.combat = null;
+      const hp = p.hp; tick(g); max = Math.max(max, hp - p.hp); }
+    return max;
+  };
+  assert(worst(false) > 15, "unshielded breath hits hard");
+  assert(worst(true) <= drake.def.maxHit, "the shield keeps it to melee-sized hits");
+  // King Hollis hands out the shield.
+  const g2 = newGame(), king = g2.npcs.find(npc => npc.id === "king");
+  g2.player.questData.royal_audience = 1;
+  standNear(g2, king.x, king.y, 1);
+  setTarget(g2, { kind: "npc", uid: king.uid, option: "Talk-to" });
+  until(g2, () => g2.dialogue !== null, 30);
+  continueDialogue(g2); chooseOption(g2, 3);
+  while (g2.dialogue) continueDialogue(g2);
+  assert(has(g2.player, "wyrmward_shield"));
+});
+
+test("Merchants pay more for their trade; the Archmage starts you in magic", () => {
+  const g = newGame(), p = g.player;
+  assert(sellPrice("inkshark", "fishing") > sellPrice("inkshark", "general"), "Pike pays more for fish");
+  give(p, "yew_logs", 1);
+  const coins = count(p, "coins");
+  sell(g, "axes", p.inventory.findIndex(slot => slot?.id === "yew_logs"), 1);
+  assert.equal(count(p, "coins") - coins, Math.floor(180 * 0.6));
+  const archmage = g.npcs.find(npc => npc.id === "archmage");
+  assert(realPoint(g.world, archmage.x, archmage.y).level === 2, "at the top of the tower");
+  p.inventory = p.inventory.map(() => null);
+  standNear(g, archmage.x, archmage.y, 1);
+  setTarget(g, { kind: "npc", uid: archmage.uid, option: "Talk-to" });
+  until(g, () => g.dialogue !== null, 30);
+  while (g.dialogue) continueDialogue(g);
+  for (const id of ["scholar_hat", "scholar_robe", "staff", "breeze_sigil", "thought_sigil"]) assert(has(p, id), id);
 });

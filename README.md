@@ -1,6 +1,6 @@
 # ⚔ RareFriends Realm
 
-*An old-school adventure starring the Rare Friend you own: seventeen skills, six quests, a large 2.5D world and a Hollow King to end.*
+*An old-school adventure starring the Rare Friend you own: nineteen skills, six quests, a large 2.5D world and a Hollow King to end.*
 
 **▶ Play: https://m4s4t0-v01d.github.io/rarefriends-realm/** · **Preview page: https://m4s4t0-v01d.github.io/rarefriends-realm/preview/**
 *(You need a browser wallet on Robinhood mainnet holding a hardwired Rare Friends Generations NFT.)*
@@ -8,19 +8,22 @@
 ![RareFriends Realm: Friendhollow square in greyscale isometric, with Rare Friends, a fountain and the minimap](docs/town.png)
 
 - **Your Friend is the hero.** The Friend you select walks the Realm in its canonical on-chain sprite, and its Generations family gives a perk (Hoverers run longer, Skeletons pray better, Colossi hit harder, and so on).
-- **Seventeen skills on the classic curve.** Attack, Strength, Defence, Ranged, Hitpoints, Magic, Prayer, Woodcutting, Fishing, Cooking, Firemaking, Mining, Smithing, Crafting, Thieving, Agility and Slayer, from level 1 to 99. Bows fire the arrows in your pack; the Slayer Warden hands out tasks and some creatures only a Slayer can wound. **Reach 99 and buy that skill's mastery cape** from the Keeper of Capes (trimmed once you've mastered two), worn on your Friend.
-- **Old-school controls.** Left-click does the first option; right-click lists them all (*Chop down Tree*, *Attack Grumblin (level-5)*, *Talk-to*, *Pickpocket*, *Examine*). WASD walks; the arrow keys (or a scroll-wheel drag) turn the camera and tilt it from overhead down to almost ground level, scroll zooms in close to your Friend, and the compass turns north to the top of the screen. Use items on things. Minimap, run orb, world map. Every monster shows its health and level.
-- **A large, living world.** A 240 × 240 tile island with 12 regions and 2 dungeons: towns, farms, forests, a mine, a forge, snowy peaks, a lake with a pier, dunes and an oasis, a swamp, ruins, a crypt and the Hollow Depths. The land rolls in walkable hills (lit by slope, with ink contour lines) and you can see a long way across it before the haze, and it's alive: cloud shadows, birds, butterflies, falling leaves, snow, blowing dust, fireflies, jumping fish and forge smoke.
-- **Real buildings.** Brick walls with windows and pitched roofs in faded accent colours (chimneys smoke). Roofs lift away as you walk in, walls in front of you drop to a cutaway, and a roof fades whenever it would hide you.
+- **Nineteen skills on the classic curve.** Attack, Strength, Defence, Ranged, Hitpoints, Magic, Prayer, Sigilcraft, Woodcutting, Fletching, Fishing, Cooking, Firemaking, Mining, Smithing, Crafting, Thieving, Agility and Slayer, from level 1 to 99. Bows fire the arrows in your pack; Fletching makes shafts and bows from logs and finishes arrows with heads smithed at the anvil; Sigilcraft presses sigil stones into the sigils magic runs on, at eleven altars across the Realm; the Slayer Warden hands out tasks and some creatures only a Slayer can wound. **Reach 99 and buy that skill's mastery cape** from the Keeper of Capes (trimmed once you've mastered two), worn on your Friend.
+- **Old-school controls.** Left-click does the first option; right-click lists them all (*Chop down Tree*, *Attack Grumblin (level-5)*, *Talk-to*, *Pickpocket*, *Examine*), in the world and in every interface: inventory, bank (*Withdraw-1/5/10/All*), shops (*Value*, *Buy-50*, *Sell-10*), equipment, spells (*Cast*, *Autocast*), prayers, production (*Make-All*), the compass (*Look North/East/South/West*) and the minimap. WASD walks; the arrow keys (or a scroll-wheel drag) turn the camera and tilt it from overhead down to almost ground level, scroll zooms in close to your Friend, and the compass turns north to the top of the screen. Use items on things. Minimap, run orb, world map. Every monster shows its health and level.
+- **A large, living world.** A 240 × 240 tile island with 14 regions and 2 dungeons: towns, farms, forests, a mine, a forge, snowy peaks, a lake with a pier, dunes and an oasis, a swamp, ruins, the Wizards' Tower, the ash fields and lava of Wyrmreach, a crypt and the Hollow Depths. The land rolls in walkable hills (lit by slope, with ink contour lines) and you can see a long way across it before the haze, and it's alive: cloud shadows, birds, butterflies, falling leaves, snow, blowing dust, fireflies, jumping fish and forge smoke.
+- **Real buildings, in pixel art.** Walls and roofs are textured in the same chunky pixels as the trees and rocks: half-timbered plaster houses with oak beams, stone keeps in brick courses, leaded windows, scalloped shingle roofs and smoking chimneys. Roofs lift away as you walk in, walls in front of you drop to a cutaway, and a roof fades whenever it would hide you.
 - **A bigger Friendhollow.** Market Street with an armoury, a weaponsmith, a bowyer and the Slayer lodge, an inn, and the Rare Market.
 - **Day and night.** A 24-minute day: warm dusks, blue nights lit by lamps, torches, fires and your own small light. A clearer minimap in stronger colours.
+- **The Wizards' Tower.** East of the river: mine sigil stones on the ground floor, a Rare trader in the library, and Archmage Solenne at the top, who starts every new Friend in magic with robes, a staff and a pouch of sigils. Sigils are cheap now, and elemental staffs stand in for them.
+- **Dragons.** Wyrmreach, north-west past the deep woods: ash drakes, cinder drakes and Old Cinder (level 148) asleep in a lava crater. A third of a dragon's attacks are fire; ask King Hollis for a Wyrmward shield. Drake bones are the best to bury, and drakehide makes archer's armour.
+- **Gold to be made.** Merchants pay well for their trade: Pike for fish, Axel for logs, Emberforge for ore, bars and arms, Runa and the Tower for sigils, Tessa and the bone collector for hides and bones, the Oasis for gems, and Wren for bows and arrows.
 - **Friendhollow Castle.** A three-storey keep with four spired towers north of the square. Click the spiral stairs to climb, old-school style: the kitchen and great hall below, King Hollis's throne room, the royal library, his bedchamber and a tower bank on the first floor, and battlements on the roof with a view over the whole town. Each storey is drawn on top of the one below, and the storeys above you lift away.
 - **Sound everywhere.** Weapon swings, a voice for every creature, axes and picks on the beat, NPC speech blips, footsteps by ground, crackling fires, the forge, water, and regional wildlife.
-- **Pixel art in the Rare Friends style.** Trees, rocks, decor, every item, weapon, skill, spell and prayer icon are pixel art with an ink edge (and the white halo of the canonical sprites), drawn procedurally. Walls are bricked, and skills animate: axes swing and chips fly, pickaxes spark, lines are cast, anvils ring, fires crackle, agility hops.
+- **Pixel art in the Rare Friends style.** Trees, rocks, decor, buildings, and every item (shaded on one light, with metal glints and gem facets), weapon, skill, spell and prayer icon are pixel art with an ink edge (and the white halo of the canonical sprites), drawn procedurally. Skills animate: axes swing and chips fly, pickaxes spark, lines are cast, anvils ring, fires crackle, agility hops.
 - **A real spellbook.** Darts, Lances and Bursts in four elements; curses (Muddle, Wilt, Brittle) and Rootsnare; Gilded and Golden Touch, Forgeheart, Far Reach, Bonebloom, two enchantments and six ways to travel, paid in sigils.
 - **Six quests** from baking for the Realm Feast to defeating the Hollow King (level 92) in his throne room.
-- **A soundtrack for every region.** Sixteen procedural tracks in an old-school MIDI style (recorder, oboe, harp, pizzicato strings, glockenspiel, timpani), including a hand-written main theme, plus level-up and quest fanfares, synthesized live in WebAudio. Entering an area unlocks its track ("You have unlocked a new music track"), and the music player replays any you've found.
-- **Your other Friends follow you**, walking the tiles you leave behind like an old-school pet and adding XP by generation. **Rare Caskets** (simulated $RAREFRIENDS) hold relics and wardrobe pieces, and **Rare Market** traders in five towns sell bundles (tablets, food, XP lamps, Slayer points, a bow and arrows, a wardrobe piece of your choice) on top of the caskets. **Progress saves per wallet.** Your **adventurer card** posts to X.
+- **A soundtrack for every region.** Eighteen procedural tracks in an old-school MIDI style (recorder, oboe, harp, pizzicato strings, glockenspiel, timpani), including a hand-written main theme, plus level-up and quest fanfares, synthesized live in WebAudio. Entering an area unlocks its track ("You have unlocked a new music track"), and the music player replays any you've found.
+- **Your other Friends follow you**, walking the tiles you leave behind like an old-school pet and adding XP by generation. **Rare Caskets** (simulated $RAREFRIENDS) hold relics and wardrobe pieces, and **Rare Market** traders in seven places sell nine bundles (tablets, food, XP lamps, Slayer points, a bow and arrows, a sigil sack, a fletcher's crate, a dragonslayer's kit, a wardrobe piece of your choice) on top of the caskets. **Progress saves per wallet.** Your **adventurer card** posts to X.
 
 | | |
 | --- | --- |
@@ -41,8 +44,10 @@
 | ![Emberforge](docs/region-emberforge.png) | ![Frostpeak](docs/region-frostpeak.png) | ![Glass Lake](docs/region-glass-lake.png) |
 | **Market Street** | **Night in Friendhollow** | **A mastery cape (and a bow)** |
 | ![Market Street](docs/market-street.png) | ![Night](docs/night.png) | ![Mastery cape](docs/mastery-cape.png) |
-| **The Rare Market** | | |
-| ![Rare Market](docs/rare-market.png) | | |
+| **The Rare Market** | **The Wizards' Tower** | **Wyrmreach and Old Cinder** |
+| ![Rare Market](docs/rare-market.png) | ![Wizards' Tower](docs/wizards-tower.png) | ![Wyrmreach](docs/wyrmreach.png) |
+| **Every item, redrawn** | **Pixel-art buildings** | **Right-click in every interface** |
+| ![Items](docs/items.png) | ![Buildings](docs/buildings.png) | ![Bank menu](docs/bank-menu.png) |
 | **Friendhollow Castle** | **King Hollis's throne room** | **On the castle roof** |
 | ![Friendhollow Castle](docs/castle.png) | ![Throne room](docs/castle-throne.png) | ![Castle roof](docs/castle-roof.png) |
 | **The Oasis** | **Murkmire Crypt** | **The Hollow King** |
@@ -126,7 +131,9 @@ npm test               # engine tests: XP curve, world generation and reachabili
                        # magic (combat, curses, Rootsnare, Gilded Touch, Forgeheart, enchanting, Far Reach, Bonebloom, glides),
                        # prayer, shops and the bank, saves (round trip, tampering, pre-rename ids), caskets, a follower walking your trail,
                        # music unlocks, the castle stairs up to King Hollis and the roof, Ranged (bows, arrows, range), Slayer
-                       # (tasks, XP, points, Slayer-only creatures), mastery capes (99s, trims), Rare Market bundles, tablets and lamps
+                       # (tasks, XP, points, Slayer-only creatures), mastery capes (99s, trims), Rare Market bundles, tablets and lamps,
+                       # Fletching (shafts, headless arrows, arrowheads from the anvil, arrows), Sigilcraft (endless sigil stone,
+                       # altars, levels), dragonfire and the Wyrmward shield, merchants' prices, the Archmage's starter kit
 npm run check          # friendsdk check
 npm run test:browser   # SDK mock-wallet browser runs of the custom host (a two-Friend wallet):
                        #  • title screen, real mouse clicks (chop a tree), right-click menu, dialogue, WASD walking, chat over your head

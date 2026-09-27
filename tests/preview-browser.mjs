@@ -13,8 +13,9 @@ execFileSync("node", ["scripts/build-preview.mjs", "--outdir", dir], { stdio: "i
 const types = { ".html": "text/html", ".js": "text/javascript", ".png": "image/png" };
 const server = createServer(async (request, response) => {
   const file = path.join(dir, request.url.split("?")[0].replace(/^\/preview\/?/, "/").replace(/\/$/, "/index.html"));
-  try { response.writeHead(200, { "content-type": types[path.extname(file)] ?? "application/octet-stream" }); response.end(await readFile(file)); }
-  catch { response.writeHead(404); response.end(); }
+  const body = await readFile(file).catch(() => null);
+  if (!body) { response.writeHead(404); response.end(); return; }
+  response.writeHead(200, { "content-type": types[path.extname(file)] ?? "application/octet-stream" }); response.end(body);
 });
 await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
 const browser = await chromium.launch({ args: ["--autoplay-policy=document-user-activation-required"] });
@@ -50,7 +51,7 @@ try {
     const playing = await level();
     assert.ok(playing > 0.03, `${name}: main theme too quiet (${playing})`);
     // The jukebox has every track; switching plays the new one.
-    assert.equal(await page.locator("#jukebox button").count(), 16);
+    assert.equal(await page.locator("#jukebox button").count(), 18);
     const forge = page.locator('#jukebox button[data-track="emberforge"]');
     await forge.scrollIntoViewIfNeeded(); await (touch ? forge.tap() : forge.click());
     await page.waitForTimeout(2500); await level(); await page.waitForTimeout(2000);

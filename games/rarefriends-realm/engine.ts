@@ -3,7 +3,7 @@
  * Pure TypeScript over the Game state, so it runs the same in the browser and in node tests.
  */
 import {
-  COOKING, CRAFTING, EQUIP_SLOTS, FAMILY_NAMES, FIREMAKING, FISHING_SPOTS, GEM_CUTTING, METALS, MONSTERS, PRAYERS, RELICS, RF_BUNDLES, ROCKS, SHOPS, SHOP_BUY,
+  COOKING, CRAFTING, EQUIP_SLOTS, FLETCH_ARROWS, FLETCH_BOWS, SIGILCRAFT, STAFF_SIGILS, itemCategory, sigilsPerStone, FAMILY_NAMES, FIREMAKING, FISHING_SPOTS, GEM_CUTTING, METALS, MONSTERS, PRAYERS, RELICS, RF_BUNDLES, ROCKS, SHOPS, SHOP_BUY,
   SHOP_SELL, SKILLS, SKILL_NAMES, SMELTING, SMITH_PIECES, SMITH_XP, SPELLS, TREES, WARDROBE, XP_TABLE, isItem, item, levelForXp, smithLevel,
   type EquipSlot, type MetalId, type Skill, type Spell, type SpotKind, type WardrobeId,
 } from "./data.ts";
@@ -162,7 +162,7 @@ const OBJECT_EXAMINE: Partial<Record<string, string>> = {
   range: "A hot range. Good for cooking.", furnace: "A red hot furnace.", anvil: "Used for smithing.", bank: "A place to keep your things safe.",
   altar: "An altar to the Old Friend.", fountain: "The water sparkles.", mill: "Grain goes in, flour comes out.", dairy_cow: "Fat and full of milk.",
   wheat: "Some ripe wheat.", coop: "Feathers everywhere.", casket: "A chest of Rare Caskets, sold for simulated $RAREFRIENDS.", tanning: "Hides stretched out to dry.",
-  well: "A deep stone well.", sign: "A signpost.", stump: "This tree has been cut down.", spot: "Ripples on the water.", gate: "An old gate, sealed with shadow.",
+  well: "A deep stone well.", sign: "A signpost.", sigil_altar: "An old altar. Press sigil stones into it to make sigils.", stump: "This tree has been cut down.", spot: "Ripples on the water.", gate: "An old gate, sealed with shadow.",
 };
 function objectOptions(game: Game, object: WorldObject): string[] {
   if (game.depleted.has(object.id) && (object.kind === "tree" || object.kind === "rock" || object.kind === "stall" || object.kind === "wheat")) return [];
@@ -185,6 +185,7 @@ function objectOptions(game: Game, object: WorldObject): string[] {
     case "sign": return ["Read"];
     case "tanning": return ["Tan"];
     case "well": return ["Search"];
+    case "sigil_altar": return ["Craft-sigil"];
     case "decor": return object.decor === "chest" ? ["Search"] : [];
     default: return [];
   }
@@ -349,8 +350,16 @@ export function useItemOnItem(game: Game, a: number, b: number) {
     if (FIREMAKING[player.inventory[logs]!.id]) { lightFire(game, logs); return; }
   }
   if (first.id === "needle" || second.id === "needle") {
-    if (other("needle").id === "leather") { openCrafting(game); return; }
+    if (other("needle").id === "leather" || other("needle").id === "drakehide") { openCrafting(game); return; }
   }
+  // Fletching: a knife on logs, feathers on shafts, heads on headless arrows.
+  if (first.id === "knife" || second.id === "knife") {
+    const log = other("knife").id, bow = FLETCH_BOWS.find(entry => entry.log === log);
+    if (bow) { game.ui.production = { title: "What would you like to fletch?", recipes: fletchingRecipes(log) }; return; }
+  }
+  if (pair("feather", "arrow_shaft")) { startProduction(game, headlessRecipe(), 100); return; }
+  const heads = [first.id, second.id].find(id => id.endsWith("_arrowheads"));
+  if (heads && (first.id === "headless_arrow" || second.id === "headless_arrow")) { startProduction(game, arrowRecipe(heads.replace("_arrowheads", "") as MetalId), 100); return; }
   if (first.id === "chisel" || second.id === "chisel") {
     const gem = other("chisel").id;
     if (GEM_CUTTING[gem]) { const cut = GEM_CUTTING[gem]; startProduction(game, { skill: "crafting", label: item(cut.cut).name, level: cut.level, xp: cut.xp, ticks: 2, inputs: { [gem]: 1 }, outputs: { [cut.cut]: 1 }, tools: ["chisel"] }, 28); return; }
@@ -395,13 +404,46 @@ export function smeltingRecipes(): Recipe[] {
   });
 }
 export function smithingRecipes(metal: MetalId): Recipe[] {
-  return SMITH_PIECES.map(piece => ({
-    skill: "smithing" as const, label: `${METALS.find(entry => entry.id === metal)!.name} ${piece.name}`, level: smithLevel(metal, piece.piece), xp: SMITH_XP[metal] * piece.bars,
+  const name = METALS.find(entry => entry.id === metal)!.name;
+  return [...SMITH_PIECES.map(piece => ({
+    skill: "smithing" as const, label: `${name} ${piece.name}`, level: smithLevel(metal, piece.piece), xp: SMITH_XP[metal] * piece.bars,
     ticks: 5, station: "anvil" as const, inputs: { [`${metal}_bar`]: piece.bars }, outputs: { [`${metal}_${piece.piece}`]: 1 }, tools: ["hammer"],
-  }));
+  })),
+  // Arrowheads for Fletching: fifteen from a bar.
+  { skill: "smithing" as const, label: `15 ${name.toLowerCase()} arrowheads`, level: Math.min(99, SMITHING_BASE_OF(metal) + 5), xp: SMITH_XP[metal], ticks: 4, station: "anvil" as const,
+    inputs: { [`${metal}_bar`]: 1 }, outputs: { [`${metal}_arrowheads`]: 15 }, tools: ["hammer"] }];
+}
+const SMITHING_BASE_OF = (metal: MetalId) => smithLevel(metal, "dagger");
+// ---------- Sigilcraft ----------
+/** Press every sigil stone you carry into this altar's sigil. */
+export function craftSigils(game: Game, object: WorldObject) {
+  const player = game.player, entry = SIGILCRAFT.find(row => row.sigil === object.sigil);
+  if (!entry) return 0;
+  if (level(game, "sigilcraft") < entry.level) { message(game, `You need a Sigilcraft level of ${entry.level} to press ${item(entry.sigil).name.toLowerCase()}s.`, "warn"); return 0; }
+  const stones = count(player, "sigil_stone");
+  if (!stones) { message(game, "You need sigil stones. Mine them in the Wizards' Tower.", "warn"); return 0; }
+  const each = sigilsPerStone(level(game, "sigilcraft"), entry.level), made = stones * each;
+  take(player, "sigil_stone", stones); give(player, entry.sigil, made);
+  addXp(game, "sigilcraft", entry.xp * stones); sound(game, "spell");
+  emit(game, { type: "cast", spell: "sigilcraft", tick: game.tick });
+  message(game, `You press ${made} ${item(entry.sigil).name.toLowerCase()}s${each > 1 ? ` (${each} per stone)` : ""}.`);
+  return made;
+}
+/** Fletching: arrow shafts (15 a log) or a bow from one kind of log. */
+export function fletchingRecipes(log: string): Recipe[] {
+  const bow = FLETCH_BOWS.find(entry => entry.log === log)!;
+  return [
+    { skill: "fletching", label: "15 arrow shafts", level: 1, xp: 5, ticks: 3, inputs: { [log]: 1 }, outputs: { arrow_shaft: 15 }, tools: ["knife"] },
+    { skill: "fletching", label: item(bow.bow).name, level: bow.level, xp: bow.xp, ticks: 3, inputs: { [log]: 1 }, outputs: { [bow.bow]: 1 }, tools: ["knife"] },
+  ];
+}
+export const headlessRecipe = (): Recipe => ({ skill: "fletching", label: "15 headless arrows", level: 1, xp: 15, ticks: 2, inputs: { arrow_shaft: 15, feather: 15 }, outputs: { headless_arrow: 15 } });
+export function arrowRecipe(metal: MetalId): Recipe {
+  const tier = FLETCH_ARROWS[metal], name = METALS.find(entry => entry.id === metal)!.name;
+  return { skill: "fletching", label: `15 ${name.toLowerCase()} arrows`, level: tier.level, xp: tier.xp * 15, ticks: 2, inputs: { headless_arrow: 15, [`${metal}_arrowheads`]: 15 }, outputs: { [`${metal}_arrow`]: 15 } };
 }
 export function craftingRecipes(): Recipe[] {
-  return CRAFTING.map(entry => ({ skill: "crafting" as const, label: item(entry.product).name, level: entry.level, xp: entry.xp, ticks: 3, inputs: { leather: entry.leather, thread: 1 }, outputs: { [entry.product]: 1 }, tools: ["needle"] }));
+  return CRAFTING.map(entry => ({ skill: "crafting" as const, label: item(entry.product).name, level: entry.level, xp: entry.xp, ticks: 3, inputs: { [entry.hide ?? "leather"]: entry.leather, thread: 1 }, outputs: { [entry.product]: 1 }, tools: ["needle"] }));
 }
 function openCrafting(game: Game) { game.ui.production = { title: "What would you like to make?", recipes: craftingRecipes() }; }
 function openSmithing(game: Game) {
@@ -463,6 +505,7 @@ function interactObject(game: Game, object: WorldObject, option: string, use?: n
   const player = game.player;
   if (use !== undefined) { useItemOnObject(game, object, use); return; }
   switch (object.kind) {
+    case "sigil_altar": craftSigils(game, object); return;
     case "tree": {
       const tree = TREES[object.tree!], axe = bestTool(game, "axe");
       if (level(game, "woodcutting") < tree.level) { message(game, `You need a Woodcutting level of ${tree.level} to chop down this tree.`, "warn"); return; }
@@ -550,6 +593,7 @@ function useItemOnObject(game: Game, object: WorldObject, slotIndex: number) {
   if (object.kind === "dairy_cow" && slot.id === "bucket") { interactObject(game, object, "Milk"); return; }
   if (object.kind === "altar" && object.text === "crypt" && slot.id === "crypt_key") { useCryptAltar(game); return; }
   if (object.kind === "bank") { bankDepositSlot(game, slotIndex); return; }
+  if (object.kind === "sigil_altar" && slot.id === "sigil_stone") { craftSigils(game, object); return; }
   if (object.kind === "well" && slot.id === "bucket") { message(game, "You fill the bucket… then think better of drinking from it, and pour it back."); return; }
   message(game, "Nothing interesting happens.");
 }
@@ -742,6 +786,7 @@ function mineTick(game: Game, activity: Extract<Activity, { kind: "mine" }>) {
   const ore = object.rock === "gem" ? ["rough_moonstone", "rough_moonstone", "rough_sagestone", "rough_rosestone"][Math.floor(game.rng() * 4)] : rock.ore;
   give(player, ore); addXp(game, "mining", rock.xp);
   if (player.familyId === 4 && game.rng() < 0.08 && freeSlots(player)) { give(player, ore); message(game, "Lopsided luck! You mine a second piece."); }
+  if (object.rock === "sigil") { if (!freeSlots(player)) { message(game, "Your inventory is too full to hold any more sigil stones.", "warn"); player.activity = null; } return; }
   message(game, `You manage to mine some ${item(ore).name.toLowerCase().replace(" ore", "")}.`);
   game.depleted.set(object.id, game.tick + rock.respawn + Math.floor(game.rng() * rock.respawn * 0.5));
   player.activity = null;
@@ -844,7 +889,8 @@ export function playerAccuracy(game: Game, monster: Monster, factor = 1) {
 }
 function spellCost(game: Game, spell: Spell) {
   const sigils = { ...spell.sigils } as Record<string, number>;
-  if (game.player.equipment.weapon === "breeze_staff") delete sigils.breeze_sigil;
+  const staff = STAFF_SIGILS[game.player.equipment.weapon ?? ""];
+  if (staff) delete sigils[staff];
   return sigils;
 }
 export function canCast(game: Game, spell: Spell) {
@@ -1013,6 +1059,14 @@ function monsterTick(game: Game, monster: Monster) {
         const defence = (Math.floor(level(game, "defence") * (1 + boost.defence)) + style.defence + 8) * (bonuses(player).defence + 64);
         let hit = game.rng() < hitChance(attack, defence) ? Math.floor(game.rng() * (Math.floor(monster.def.maxHit * cursed(game, monster, "strength")) + 1)) : 0;
         if (boost.protect) hit = Math.floor(hit * (monster.def.boss ? 0.4 : 0));
+        // Dragonfire: a third of a dragon's attacks are breath, which only a Wyrmward shield turns aside.
+        if (monster.def.breath && game.rng() < 0.33) {
+          const shielded = player.equipment.shield === "wyrmward_shield";
+          hit = Math.floor(game.rng() * ((shielded ? 4 : monster.def.breath) + 1));
+          emit(game, { type: "projectile", projectile: { from: { x: monster.x, y: monster.y }, to: { x: player.x, y: player.y }, start: game.tick, end: game.tick + 1, color: "#e9733f" } });
+          sound(game, "fire");
+          message(game, shielded ? "Your shield absorbs most of the dragon's breath." : "You're horribly burnt by the dragonfire! A Wyrmward shield would help.", shielded ? "game" : "warn");
+        }
         creature(game, monster, "attack");
         damagePlayer(game, hit, monster);
       }
@@ -1241,7 +1295,13 @@ function buyCape(game: Game, id: string) {
   message(game, `The Keeper of Capes hands you the ${item(given).name}. Wear it with pride.`, "quest"); sound(game, "quest");
   return 1;
 }
-export function sellPrice(id: string) { return Math.floor(item(id).value * SHOP_SELL); }
+/** What a shop pays: merchants pay more for the goods they deal in. */
+export function sellPrice(id: string, shopId?: string) {
+  const shop = shopId ? SHOPS[shopId] : undefined, special = shop?.buys?.includes(itemCategory(id));
+  return Math.floor(item(id).value * (special ? shop!.rate ?? SHOP_SELL : SHOP_SELL));
+}
+/** Whether a shop will buy an item. */
+export const shopBuys = (shopId: string, id: string) => { const shop = SHOPS[shopId]; return !!shop && (shop.general || shop.stock.includes(id) || !!shop.buys?.includes(itemCategory(id))); };
 export function buy(game: Game, shopId: string, id: string, n: number) {
   const shop = SHOPS[shopId], player = game.player;
   if (!shop?.stock.includes(id)) return 0;
@@ -1266,8 +1326,8 @@ export function sell(game: Game, shopId: string, slotIndex: number, n: number) {
   if (!shop || !slot) return 0;
   const definition = item(slot.id);
   if (slot.id === "coins" || definition.tradeable === false) { message(game, "You can't sell this item.", "warn"); return 0; }
-  if (!shop.general && !shop.stock.includes(slot.id)) { message(game, "You can't sell this item to this shop.", "warn"); return 0; }
-  const id = slot.id, selling = Math.min(n, count(player, id)), price = sellPrice(id);
+  if (!shopBuys(shopId, slot.id)) { message(game, "You can't sell this item to this shop.", "warn"); return 0; }
+  const id = slot.id, selling = Math.min(n, count(player, id)), price = sellPrice(id, shopId);
   take(player, id, selling); if (price * selling > 0) give(player, "coins", price * selling);
   sound(game, "coins");
   return selling;
@@ -1307,6 +1367,9 @@ export function grantBundle(game: Game, id: string, pick?: string) {
     case "insight": giveOrDrop(game, "insight_lamp"); break;
     case "contract": addSlayerPoints(game, 40); break;
     case "archer": giveOrDrop(game, "maple_bow"); giveOrDrop(game, "moonsilver_arrow", 300); break;
+    case "sigils": for (const sigil of ["breeze_sigil", "tide_sigil", "stone_sigil", "ember_sigil", "thought_sigil"]) giveOrDrop(game, sigil, 300); giveOrDrop(game, "hollow_sigil", 30); break;
+    case "fletcher": giveOrDrop(game, "arrow_shaft", 600); giveOrDrop(game, "feather", 600); giveOrDrop(game, "ashsteel_arrowheads", 300); break;
+    case "dragonslayer": giveOrDrop(game, "wyrmward_shield"); giveOrDrop(game, "drakehide_vest"); giveOrDrop(game, "inkshark", 20); giveOrDrop(game, "rarite_arrow", 200); break;
     case "tailor": {
       const piece = tailorChoices(game).find(entry => entry.id === pick) ?? tailorChoices(game)[0];
       if (piece) { player.wardrobe.push(piece.id); toggleWorn(game, piece.id); message(game, `Wardrobe unlocked: ${piece.name}!`, "level"); }

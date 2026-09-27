@@ -228,9 +228,15 @@ try {
   const cook = await state(() => window.__realm.game().npcs.find(npc => npc.id === "cook"));
   await state(() => { const p = window.__realm.game().player; p.quests.friends_feast = 1; for (const id of ["egg", "pot_of_flour", "bucket_of_milk"]) p.inventory[p.inventory.indexOf(null)] = { id, n: 1 }; window.__realm.refresh(); });
   await teleport(cook.x + 1, cook.y);
-  point = await screenOf(cook.x, cook.y);
-  await page.mouse.click(point.x, point.y - 18, { button: "right" });
-  await game.getByRole("menuitem", { name: /Talk-to Cook Mabel/ }).click();
+  // She wanders: find her again and right-click her where she stands now (a second try if she stepped away).
+  for (let attempt = 0; ; attempt++) {
+    const now = await state(() => window.__realm.game().npcs.find(npc => npc.id === "cook"));
+    point = await screenOf(now.x, now.y);
+    await page.mouse.click(point.x, point.y - 18, { button: "right" });
+    const talk = game.getByRole("menuitem", { name: /Talk-to Cook Mabel/ });
+    if (await talk.isVisible({ timeout: 1500 }).catch(() => false) || attempt >= 3) { await talk.click(); break; }
+    await page.keyboard.press("Escape"); await page.waitForTimeout(700);
+  }
   await game.getByText(/I have everything!/).waitFor();
   for (let i = 0; i < 3 && !(await game.getByRole("dialog", { name: "Quest complete!" }).isVisible()); i++) { await page.keyboard.press("Space"); await page.waitForTimeout(700); }
   await game.getByRole("dialog", { name: "Quest complete!" }).waitFor();
@@ -332,7 +338,8 @@ try {
   const clickStairs = async (level, action) => {
     const { stairs, stand } = await frame().evaluate(([level, action]) => {
       const g = window.__realm.game(), w = g.world, storey = o => w.floors.find(f => o.x >= f.x0 + f.dx && o.x <= f.x1 + f.dx && o.y >= f.y0 + f.dy && o.y <= f.y1 + f.dy && o.y >= 240)?.level ?? 0;
-      const stairs = w.objects.filter(o => o.look === "stairs" && o.action === action && storey(o) === level).sort((a, b) => b.x - a.x)[0];
+      const castle = o => storey(o) ? w.floors.some(f => f.complex === "castle" && o.x >= f.x0 + f.dx && o.x <= f.x1 + f.dx && o.y >= f.y0 + f.dy && o.y <= f.y1 + f.dy) : o.x < 140;
+      const stairs = w.objects.filter(o => o.look === "stairs" && o.action === action && storey(o) === level && castle(o)).sort((a, b) => b.x - a.x)[0];
       const open = (x, y) => { const t = w.tiles[y * 240 + x], id = w.objectAt[y * 240 + x]; return t !== 0 && t !== 16 && (id < 0 || !w.objects[id].blocks); };
       const [dx, dy] = [[0, 1], [1, 0], [-1, 0], [0, -1]].find(([dx, dy]) => open(stairs.x + dx, stairs.y + dy));
       return { stairs, stand: { x: stairs.x + dx, y: stairs.y + dy } };
@@ -377,7 +384,32 @@ try {
   await page.waitForTimeout(1500); await shot("night");
   assert.equal(await game.locator(".realm-clock").textContent(), "☾ Night", "the clock shows night");
   await state(() => window.__realm.time(0.5));
+
+  // ---------- The Wizards' Tower, Wyrmreach's dragons, pixel-art buildings ----------
+  await teleport(160, 139); await state(() => window.__realm.view(0.9, 0.45, -Math.PI / 4));
+  await page.waitForTimeout(1500); await shot("wizards-tower");
+  await state(() => { const p = window.__realm.game().player; p.xp.hitpoints = 13_034_431; p.hp = 99; p.xp.defence = 13_034_431; p.equipment.shield = "wyrmward_shield"; window.__realm.refresh(); });
+  await teleport(29, 21); await state(() => window.__realm.view(1.05, 0.4, 0.3));
+  await page.waitForTimeout(1800); await shot("wyrmreach");
+  await state(() => { const p = window.__realm.game().player; delete p.equipment.shield; p.hp = 99; for (const m of window.__realm.game().monsters) m.target = false; });
+  await teleport(121, 141); await state(() => window.__realm.view(1.8, 0.45, 0.5));
+  await page.waitForTimeout(1500); await shot("buildings");
+  await state(() => window.__realm.view(0.8, 0.5, 0));
   await state(() => document.querySelector(".realm-side-toggle").click());
+
+  // ---------- Every item, redrawn; and right-click inside an interface ----------
+  await state(() => { const g = window.__realm.game(); g.player.bank = ["rarite_sabre", "glimmer_sword", "moonsilver_cuirass", "ashsteel_helm", "blackiron_shield", "yew_bow", "rarite_arrow", "ashsteel_arrowheads",
+    "breeze_staff", "ember_staff", "scholar_hat", "drakehide_vest", "attack_cape_t", "grandmaster_cape", "wyrmward_shield", "rosestone_pendant", "rosestone", "sagestone", "moonstone", "rarite_bar", "glimmer_ore",
+    "yew_logs", "maple_logs", "inkshark", "sailfish", "cake", "bread", "drake_bones", "drakehide", "wyrm_heart", "sigil_stone", "hollow_sigil", "star_sigil", "tablet_oasis", "insight_lamp", "coins"]
+    .map(id => ({ id, n: id === "coins" ? 125000 : 1 })); g.ui.bank = true; window.__realm.refresh(); });
+  await game.getByRole("dialog", { name: "Bank of the Realm" }).waitFor();
+  await page.waitForTimeout(400); await shot("items");
+  const sabre = await game.getByRole("button", { name: /Withdraw Rarite sabre/ }).boundingBox();
+  await page.mouse.click(sabre.x + sabre.width / 2, sabre.y + sabre.height / 2, { button: "right" });
+  await game.getByRole("menuitem", { name: /Withdraw-All Rarite sabre/ }).waitFor();
+  await page.waitForTimeout(200); await shot("bank-menu");
+  await game.getByRole("menuitem", { name: /Examine Rarite sabre/ }).click();
+  await game.getByRole("button", { name: "Close" }).click();
 
   // ---------- A tour of the Realm ----------
   await state(() => { const p = window.__realm.game().player; p.xp.hitpoints = 13_034_431; p.hp = 99; p.xp.defence = 13_034_431; window.__realm.game().autoRetaliate = false; });

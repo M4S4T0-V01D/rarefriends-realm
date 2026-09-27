@@ -13,15 +13,15 @@ export const FLOOR_Y = 240;
 export const STOREY = 42;
 export const T = {
   VOID: 0, GRASS: 1, DARK_GRASS: 2, PATH: 3, COBBLE: 4, SAND: 5, WATER: 6, DEEP: 7, SWAMP: 8, SNOW: 9,
-  STONE: 10, WOOD: 11, GRAVEL: 12, DUNGEON: 13, BRIDGE: 14, CLIFF: 15, WALL: 16, FARMLAND: 17, ICE: 18, CARPET: 19,
+  STONE: 10, WOOD: 11, GRAVEL: 12, DUNGEON: 13, BRIDGE: 14, CLIFF: 15, WALL: 16, FARMLAND: 17, ICE: 18, CARPET: 19, ASH: 20, LAVA: 21,
 } as const;
 export type Terrain = typeof T[keyof typeof T];
-const WALKABLE = new Set<number>([T.GRASS, T.DARK_GRASS, T.PATH, T.COBBLE, T.SAND, T.SWAMP, T.SNOW, T.STONE, T.WOOD, T.GRAVEL, T.DUNGEON, T.BRIDGE, T.FARMLAND, T.ICE, T.CARPET]);
+const WALKABLE = new Set<number>([T.GRASS, T.DARK_GRASS, T.PATH, T.COBBLE, T.SAND, T.SWAMP, T.SNOW, T.STONE, T.WOOD, T.GRAVEL, T.DUNGEON, T.BRIDGE, T.FARMLAND, T.ICE, T.CARPET, T.ASH]);
 export const isWater = (terrain: number) => terrain === T.WATER || terrain === T.DEEP;
 
 export type ObjectKind =
   | "tree" | "stump" | "rock" | "spot" | "range" | "furnace" | "anvil" | "bank" | "altar" | "ladder" | "stall" | "obstacle"
-  | "fountain" | "mill" | "dairy_cow" | "wheat" | "coop" | "gate" | "casket" | "decor" | "sign" | "tanning" | "well";
+  | "fountain" | "mill" | "dairy_cow" | "wheat" | "coop" | "gate" | "casket" | "decor" | "sign" | "tanning" | "well" | "sigil_altar";
 export type DecorKind =
   | "flowers" | "bush" | "boulder" | "lamp" | "bench" | "crate" | "barrel" | "tent" | "cactus" | "pine" | "dead_tree" | "statue"
   | "grave" | "fence" | "reeds" | "table" | "bed" | "shelf" | "pillar" | "rubble" | "snowman" | "lily" | "banner" | "torch" | "palm" | "hay" | "windmill" | "boat" | "chest"
@@ -32,12 +32,14 @@ export type WorldObject = {
   to?: { x: number; y: number }; action?: string; requires?: { quest?: string; item?: string; level?: number };
   obstacle?: { course: string; step: number; level: number; xp: number; ticks: number; lapXp?: number; last?: boolean };
   text?: string; big?: boolean; look?: "stairs";
+  /** A sigil altar: the sigil it presses. */
+  sigil?: string;
 };
 export type StallKind = "bakery" | "silk" | "gem" | "fish";
 export type SpawnDef = { kind: "npc" | "monster"; id: string; x: number; y: number; wander?: number };
 export type RegionId =
   | "friendhollow" | "farmland" | "whisperwood" | "ashen_hills" | "emberforge" | "frostpeak" | "glass_lake" | "pale_dunes"
-  | "oasis" | "murkmire" | "mossy_ruins" | "crypt" | "hollow_depths" | "coast";
+  | "oasis" | "murkmire" | "mossy_ruins" | "crypt" | "hollow_depths" | "coast" | "wizards_tower" | "wyrmreach";
 export type Region = { id: RegionId; name: string; label: { x: number; y: number }; danger: number; underground?: boolean };
 export const REGIONS: readonly Region[] = [
   { id: "coast", name: "The Pale Coast", label: { x: 10, y: 10 }, danger: 0 },
@@ -52,6 +54,8 @@ export const REGIONS: readonly Region[] = [
   { id: "oasis", name: "Oasis", label: { x: 190, y: 116 }, danger: 0 },
   { id: "murkmire", name: "Murkmire", label: { x: 44, y: 166 }, danger: 2 },
   { id: "mossy_ruins", name: "Mossy Ruins", label: { x: 120, y: 172 }, danger: 2 },
+  { id: "wizards_tower", name: "Wizards' Tower", label: { x: 160, y: 124 }, danger: 0 },
+  { id: "wyrmreach", name: "Wyrmreach", label: { x: 36, y: 20 }, danger: 5 },
   { id: "crypt", name: "Murkmire Crypt", label: { x: 34, y: 220 }, danger: 3, underground: true },
   { id: "hollow_depths", name: "Hollow Depths", label: { x: 150, y: 220 }, danger: 4, underground: true },
 ];
@@ -66,6 +70,8 @@ export const isUnderground = (y: number) => y >= 200 && y < FLOOR_Y;
 export type Building = {
   x0: number; y0: number; x1: number; y1: number; roof: "gable" | "flat" | "cone" | "none"; color: string; chimney: boolean; name: string;
   storeys?: number; complex?: string;
+  /** What the walls are made of: stone brick, half-timbered plaster, or planks. */
+  walls?: "stone" | "timber" | "plank";
 };
 /** An upper storey: the real rectangle it covers and where its tiles are stored (real + (dx, dy)). */
 export type Floor = { complex: string; level: number; x0: number; y0: number; x1: number; y1: number; dx: number; dy: number };
@@ -160,7 +166,8 @@ export function createWorld(seed = 20260927): World {
   const buildings: Building[] = [], doorways: [number, number][] = [];
   const building = (x0: number, y0: number, x1: number, y1: number, door: "n" | "s" | "e" | "w", floor: number = T.WOOD, doorAt?: number, roof: Partial<Building> = {}) => {
     const inner = buildings.some(b => x0 > b.x0 && y0 > b.y0 && x1 < b.x1 && y1 < b.y1);
-    buildings.push({ x0, y0, x1, y1, roof: inner ? "none" : "gable", color: ROOF_COLORS[buildings.length % ROOF_COLORS.length], chimney: false, name: "", ...roof, ...(inner ? { roof: "none" as const } : {}) });
+    buildings.push({ x0, y0, x1, y1, roof: inner ? "none" : "gable", color: ROOF_COLORS[buildings.length % ROOF_COLORS.length], chimney: false, name: "",
+      walls: floor === T.STONE ? "stone" : floor === T.WOOD && x1 - x0 <= 7 && y1 - y0 <= 6 && buildings.length % 3 === 2 ? "plank" : "timber", ...roof, ...(inner ? { roof: "none" as const } : {}) });
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
       const edge = x === x0 || x === x1 || y === y0 || y === y1;
       put(x, y, edge ? T.WALL : floor); clearAt(x, y);
@@ -208,7 +215,7 @@ export function createWorld(seed = 20260927): World {
   const REGION_BLOBS: readonly [RegionId, number, number, number, number][] = [
     ["whisperwood", 44, 82, 40, 44], ["ashen_hills", 114, 48, 30, 26], ["emberforge", 162, 48, 18, 14], ["frostpeak", 206, 22, 36, 22],
     ["pale_dunes", 204, 102, 36, 36], ["glass_lake", 178, 166, 34, 26], ["murkmire", 44, 166, 38, 28], ["mossy_ruins", 122, 172, 26, 20],
-    ["farmland", 88, 124, 16, 16], ["oasis", 190, 116, 11, 10], ["friendhollow", 121, 124, 26, 28],
+    ["farmland", 88, 124, 16, 16], ["oasis", 190, 116, 11, 10], ["friendhollow", 121, 124, 26, 28], ["wizards_tower", 160, 130, 8, 8], ["wyrmreach", 36, 23, 32, 19],
   ];
   for (const [id, cx, cy, rx, ry] of REGION_BLOBS) regionBlob(cx, cy, rx, ry, id);
 
@@ -228,6 +235,15 @@ export function createWorld(seed = 20260927): World {
     const d = ((x - 206) / 38) ** 2 + ((y - 22) / 24) ** 2;
     if (d > 0.86 && d < 1.0 && noise2(x, y) > 0.3) put(x, y, T.CLIFF);
   }
+  // Wyrmreach: ash fields, lava pools and a crater where the oldest dragon sleeps.
+  blob(36, 23, 31, 18, T.ASH, 0.3, onLand);
+  for (let y = 4; y < 44; y++) for (let x = 4; x < 70; x++) if (get(x, y) === T.ASH && noise(x * 1.4 + 90, y * 1.4) > 0.7 && Math.hypot(x - 50, y - 38) > 7) put(x, y, T.LAVA);
+  for (let y = 6; y < 28; y++) for (let x = 10; x < 36; x++) {
+    const d = ((x - 22) / 10) ** 2 + ((y - 16) / 8) ** 2;
+    if (d <= 0.78) put(x, y, T.ASH);
+    else if (d < 1.02 && !(x > 28 && y >= 15 && y <= 18)) put(x, y, T.CLIFF);
+  }
+  blob(18, 18, 2.5, 2, T.LAVA, 0.2);
   // Swamp pools and bog channels.
   for (let y = 142; y < 196; y++) for (let x = 8; x < 84; x++) if (get(x, y) === T.SWAMP && noise(x * 1.7, y * 1.7) > 0.7) put(x, y, T.WATER);
   // Frozen tarn in Frostpeak.
@@ -255,6 +271,7 @@ export function createWorld(seed = 20260927): World {
   road([[TOWN.x, TOWN.y], [121, 140], [120, 156], [120, 166]]);                                  // south → Mossy Ruins
   road([[104, 121], [96, 136], [86, 146], [78, 152], [62, 164], [48, 172], [42, 176]]);        // south-west → Murkmire crypt
   road([[114, 58], [100, 58], [84, 70], [68, 76]]);                                              // mine → deep woods
+  road([[68, 76], [62, 62], [56, 50], [52, 42]], 2.6, T.GRAVEL);                                  // deep woods → Wyrmreach camp
   // Friendhollow's cobbled square and streets.
   blob(TOWN.x, TOWN.y, 17, 15, T.COBBLE, 0.12);
   // Market Street runs south from the square; lanes lead to the inn and the Rare Market.
@@ -393,9 +410,9 @@ export function createWorld(seed = 20260927): World {
     put(x, y, PLAN_TERRAIN[ch]); clearAt(x, y);
     if (level) setRegion(x, y, "friendhollow");
   })));
-  buildings.push({ x0: 113, y0: 87, x1: 130, y1: 104, roof: "flat", color: "#b9b4ab", chimney: false, name: "Friendhollow Castle", storeys: 2, complex });
+  buildings.push({ x0: 113, y0: 87, x1: 130, y1: 104, roof: "flat", color: "#b9b4ab", chimney: false, name: "Friendhollow Castle", storeys: 2, complex, walls: "stone" });
   for (const [col, row, color] of [[0, 0, "#c99a96"], [15, 0, "#8f9cb2"], [0, 15, "#a996b5"], [15, 15, "#9aab92"]] as const) {
-    buildings.push({ x0: CASTLE.x + col, y0: CASTLE.y + row, x1: CASTLE.x + col + 4, y1: CASTLE.y + row + 4, roof: "cone", color, chimney: false, name: "Castle tower", storeys: 3, complex });
+    buildings.push({ x0: CASTLE.x + col, y0: CASTLE.y + row, x1: CASTLE.x + col + 4, y1: CASTLE.y + row + 4, roof: "cone", color, chimney: false, name: "Castle tower", storeys: 3, complex, walls: "stone" });
   }
   // The road runs through the gates.
   fillRect(120, 105, 123, 107, T.PATH);
@@ -605,6 +622,62 @@ export function createWorld(seed = 20260927): World {
   }
   monsters("cow", 60, 128, 76, 138, 3);
 
+  // ---------- The Wizards' Tower (east of the river): three storeys, sigil stones below, the Archmage at the top ----------
+  const TOWER = { x: 156, y: 126 }, TOWER_FLOORS: Floor[] = [1, 2].map(level => ({ complex: "wizards", level, x0: TOWER.x, y0: TOWER.y, x1: TOWER.x + 8, y1: TOWER.y + 8, dx: (level - 1) * 12, dy: FLOOR_Y + 25 - TOWER.y }));
+  floors.push(...TOWER_FLOORS);
+  const towerRows = (door: boolean) => ["  #####  ", " ##...## ", "##.....##", "#.......#", "#.......#", "#.......#", "##.....##", " ##...## ", door ? "  ##+##  " : "  #####  "];
+  const tAt = (level: number, col: number, row: number) => ({ x: TOWER.x + col + (level ? TOWER_FLOORS[level - 1].dx : 0), y: TOWER.y + row + (level ? TOWER_FLOORS[level - 1].dy : 0) });
+  [0, 1, 2].forEach(level => towerRows(level === 0).forEach((line, row) => [...line].forEach((ch, col) => {
+    if (ch === " ") return;
+    const { x, y } = tAt(level, col, row);
+    put(x, y, ch === "#" ? T.WALL : level === 1 ? T.CARPET : T.STONE); clearAt(x, y);
+    if (level) setRegion(x, y, "wizards_tower");
+  })));
+  buildings.push({ x0: TOWER.x, y0: TOWER.y, x1: TOWER.x + 8, y1: TOWER.y + 8, roof: "cone", color: "#6f7ea6", chimney: false, name: "Wizards' Tower", storeys: 3, complex: "wizards", walls: "stone" });
+  const towerStairs = (level: number, col: number, up: boolean, toLevel: number) =>
+    add({ kind: "ladder", look: "stairs", ...tAt(level, col, 1), blocks: true, name: "Staircase", action: up ? "Climb-up" : "Climb-down", to: tAt(toLevel, 4, 2) });
+  towerStairs(0, 5, true, 1); towerStairs(1, 5, false, 0); towerStairs(1, 3, true, 2); towerStairs(2, 3, false, 1);
+  for (const [col, row] of [[1, 3], [1, 5], [7, 3], [7, 5]]) add({ kind: "rock", rock: "sigil", ...tAt(0, col, row), blocks: true, name: "Sigil stone" });
+  { const p = tAt(0, 4, 4); npc("apprentice", p.x, p.y, 1); const d = tAt(0, 3, 1); decor(d.x, d.y, "shelf", true, "Spellbooks"); }
+  { const t = tAt(1, 2, 4); npc("rare_trader", t.x, t.y); const c = tAt(1, 1, 4); add({ kind: "casket", x: c.x, y: c.y, blocks: true, name: "Rare Casket chest" });
+    for (const [col, row] of [[7, 3], [7, 5], [6, 2]]) { const b = tAt(1, col, row); decor(b.x, b.y, "shelf", true, "Bookcase"); }
+    const tb = tAt(1, 5, 5); decor(tb.x, tb.y, "table"); }
+  { const a = tAt(2, 4, 4); npc("archmage", a.x, a.y, 1);
+    for (const [col, row, kind] of [[7, 4, "shelf"], [1, 4, "torch"], [6, 6, "table"], [2, 6, "banner"]] as const) { const d = tAt(2, col, row); decor(d.x, d.y, kind); } }
+  road([[150, 131], [160, 135.5]]);
+  decor(157, 136, "lamp"); decor(163, 136, "lamp");
+
+  // ---------- Sigil altars, one per sigil, spread across the Realm ----------
+  const land0 = (x: number, y: number) => {
+    for (let r = 0; r < 8; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      const nx = x + dx, ny = y + dy;
+      if (Math.max(Math.abs(dx), Math.abs(dy)) === r && WALKABLE.has(get(nx, ny)) && get(nx, ny) !== T.BRIDGE && get(nx, ny) !== T.PATH && objectAt[tileIndex(nx, ny)] < 0
+        && [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([ex, ey]) => WALKABLE.has(get(nx + ex, ny + ey)))) return [nx, ny] as const;
+    }
+    return [x, y] as const;
+  };
+  const ALTARS: readonly [string, string, number, number][] = [
+    ["breeze_sigil", "Breeze altar", 72, 126], ["thought_sigil", "Thought altar", 40, 70], ["tide_sigil", "Tide altar", 160, 148], ["stone_sigil", "Stone altar", 100, 62],
+    ["ember_sigil", "Ember altar", 173, 57], ["shade_sigil", "Shade altar", 30, 146], ["star_sigil", "Star altar", 206, 40], ["storm_sigil", "Storm altar", 212, 88],
+    ["bloom_sigil", "Bloom altar", 106, 164], ["path_sigil", "Path altar", 197, 124], ["hollow_sigil", "Hollow altar", 140, 230],
+  ];
+  for (const [sigil, name, ax, ay] of ALTARS) {
+    const [x, y] = land0(ax, ay);
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) clearAt(x + dx, y + dy);
+    add({ kind: "sigil_altar", sigil, x, y, blocks: true, name });
+  }
+
+  // ---------- Wyrmreach: the dragons, and the hunters' camp at the pass ----------
+  monsters("ash_drake", 30, 20, 64, 38, 8);
+  monsters("cinder_drake", 8, 26, 34, 40, 5);
+  monster("emberwyrm", 20, 15, 2);
+  { const [cx, cy] = land0(54, 44); decor(cx, cy, "tent"); const [tx, ty] = land0(51, 45); decor(tx, ty, "torch");
+    const [hx, hy] = land0(56, 46); npc("drake_hunter", hx, hy, 1);
+    const [bx, by] = land0(53, 48); add({ kind: "bank", x: bx, y: by, blocks: true, name: "Bank deposit box" }); }
+  add({ kind: "sign", ...(([x, y]) => ({ x, y }))(land0(56, 50)), blocks: true, name: "Signpost", text: "Wyrmreach. Dragons. Their breath burns through anything but a Wyrmward shield: King Hollis keeps a few." });
+  // The bone collector, by the chapel.
+  { const [bx, by] = land0(104, 134); npc("bone_collector", bx, by, 1); }
+
   // ---------- Rare Market branches (a trader and a casket chest in each town) ----------
   /** The nearest open land tile to a point (not water, a bridge or a road). */
   const land = (x: number, y: number) => {
@@ -614,7 +687,7 @@ export function createWorld(seed = 20260927): World {
     }
     return [x, y] as const;
   };
-  for (const [tx, ty] of [[166, 49], [178, 114], [197, 31], [175, 148]] as const) {
+  for (const [tx, ty] of [[166, 49], [178, 114], [197, 31], [175, 148], [58, 44]] as const) {
     const [cx, cy] = land(tx + 1, ty); add({ kind: "casket", x: cx, y: cy, blocks: true, name: "Rare Casket chest" });
     const [nx, ny] = land(tx, ty); npc("rare_trader", nx, ny);
   }
@@ -656,7 +729,7 @@ export function createWorld(seed = 20260927): World {
   for (const [x, y] of doorways) for (const [dx, dy] of [[0, 0], ...SIDES]) { const o = objectAt[tileIndex(x + dx, y + dy)]; if (o >= 0 && (objects[o].kind === "tree" || (objects[o].kind === "decor" && get(x + dx, y + dy) !== T.WOOD && get(x + dx, y + dy) !== T.STONE && get(x + dx, y + dy) !== T.CARPET))) clearAt(x + dx, y + dy); }
   // Clean-up: removed markers stop blocking, and every station, rock or spot keeps a side you can stand on.
   for (const object of objects) if (object.name === "__removed") object.blocks = false;
-  const NEEDS_ACCESS = new Set<ObjectKind>(["spot", "bank", "range", "furnace", "anvil", "altar", "stall", "ladder", "well", "mill", "coop", "dairy_cow", "casket", "tanning", "sign", "rock", "gate"]);
+  const NEEDS_ACCESS = new Set<ObjectKind>(["sigil_altar", "spot", "bank", "range", "furnace", "anvil", "altar", "stall", "ladder", "well", "mill", "coop", "dairy_cow", "casket", "tanning", "sign", "rock", "gate"]);
   const standable = (x: number, y: number) => WALKABLE.has(get(x, y)) && (objectAt[tileIndex(x, y)] < 0 || !objects[objectAt[tileIndex(x, y)]].blocks);
   for (const object of objects) {
     if (!NEEDS_ACCESS.has(object.kind)) continue;
@@ -736,9 +809,9 @@ export function walkable(world: World, x: number, y: number) {
 // ---------- Topology ----------
 /** How hilly each terrain is (peak height in world pixels). Flat ground (towns, floors, water) is 0. */
 const RELIEF: Record<number, number> = {
-  [T.GRASS]: 46, [T.DARK_GRASS]: 58, [T.PATH]: 26, [T.SAND]: 38, [T.SWAMP]: 10, [T.SNOW]: 84, [T.GRAVEL]: 60, [T.CLIFF]: 90, [T.FARMLAND]: 6,
+  [T.ASH]: 62, [T.GRASS]: 46, [T.DARK_GRASS]: 58, [T.PATH]: 26, [T.SAND]: 38, [T.SWAMP]: 10, [T.SNOW]: 84, [T.GRAVEL]: 60, [T.CLIFF]: 90, [T.FARMLAND]: 6,
 };
-const FLAT = new Set<number>([T.VOID, T.WATER, T.DEEP, T.BRIDGE, T.COBBLE, T.WOOD, T.STONE, T.CARPET, T.WALL, T.DUNGEON, T.ICE]);
+const FLAT = new Set<number>([T.LAVA, T.VOID, T.WATER, T.DEEP, T.BRIDGE, T.COBBLE, T.WOOD, T.STONE, T.CARPET, T.WALL, T.DUNGEON, T.ICE]);
 /**
  * Rolling hills from two noise octaves, scaled by each terrain's relief, eased to flat ground near water, towns,
  * buildings and bridges (so shores and streets stay level), then blurred once for gentle slopes.
@@ -790,6 +863,9 @@ export function cornerHeight(world: World, i: number, j: number) { return world.
 /** The upper storey a stored tile belongs to (null on the ground, underground, or off any floor). */
 export function floorAt(world: World, x: number, y: number): Floor | null {
   if (y < FLOOR_Y - 0.5) return null;
+  // The tile a point rounds to decides first (so a corner shared by two storeys belongs to the right one), then edges.
+  const rx = Math.round(x), ry = Math.round(y);
+  for (const floor of world.floors) if (rx >= floor.x0 + floor.dx && rx <= floor.x1 + floor.dx && ry >= floor.y0 + floor.dy && ry <= floor.y1 + floor.dy) return floor;
   for (const floor of world.floors) if (x >= floor.x0 + floor.dx - 0.5 && x <= floor.x1 + floor.dx + 0.5 && y >= floor.y0 + floor.dy - 0.5 && y <= floor.y1 + floor.dy + 0.5) return floor;
   return null;
 }
