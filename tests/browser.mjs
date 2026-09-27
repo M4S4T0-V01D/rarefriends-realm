@@ -253,7 +253,7 @@ try {
     const target = await state(() => { const g = window.__realm.game(), p = g.player; return g.monsters.filter(m => m.def.id === "grumblin" && !m.dead).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0]; });
     point = await screenOf(target.x, target.y);
     await page.mouse.click(point.x, point.y - 16, { button: "right" });
-    const attack = game.getByRole("menuitem", { name: /Attack Grumblin/ });
+    const attack = game.getByRole("menuitem", { name: /Attack Grumblin/ }).first();
     if (await attack.isVisible()) { await attack.click(); break; }
     await page.keyboard.press("Escape"); await page.mouse.move(10, 10);
     assert(attempt < 5, "could not target a Grumblin");
