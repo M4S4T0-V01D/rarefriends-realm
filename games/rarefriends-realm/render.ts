@@ -50,7 +50,42 @@ export type Scene = {
   reducedMotion: boolean; hits: HitSplat[]; fireworks: Firework[]; chat: { text: string; until: number } | null; projectiles: readonly Projectile[];
   /** Plays a sound effect (swing impacts are timed by the animation). */
   sfx?: (name: string, gain?: number) => void;
+  /** Time of day, 0–1 (0 midnight, 0.5 noon), or null for always day. */
+  time?: number | null;
 };
+/** How dark it is (0 day … 1 deep night) and how warm the light is (dawn and dusk), for a time of day. */
+export function daylight(time: number | null | undefined) {
+  if (time === null || time === undefined) return { dark: 0, warm: 0, label: "Day" };
+  const sun = -Math.cos(time * Math.PI * 2), dark = Math.max(0, Math.min(1, (0.25 - sun) / 0.75)), warm = Math.max(0, 1 - Math.abs(sun - 0.08) / 0.32);
+  return { dark, warm, label: sun > 0.3 ? "Day" : sun < -0.3 ? "Night" : time < 0.5 ? "Dawn" : "Dusk" };
+}
+type Light = { x: number; y: number; r: number };
+let nightCanvas: HTMLCanvasElement | null = null;
+/** Night: a blue dark over everything, with holes burnt through it by lamps, torches, fires and your own lantern. */
+function drawNight(ctx: CanvasRenderingContext2D, dark: number, warm: number, lights: readonly Light[]) {
+  if (warm > 0.01) { ctx.fillStyle = `rgba(232,150,96,${(warm * 0.16).toFixed(3)})`; ctx.fillRect(0, 0, VIEW.width, VIEW.height); }
+  if (dark < 0.01) return;
+  const canvas = nightCanvas ??= document.createElement("canvas");
+  if (canvas.width !== VIEW.width) { canvas.width = VIEW.width; canvas.height = VIEW.height; }
+  const n = canvas.getContext("2d")!;
+  n.globalCompositeOperation = "source-over"; n.clearRect(0, 0, VIEW.width, VIEW.height);
+  n.fillStyle = `rgba(16,20,48,${(0.64 * dark).toFixed(3)})`; n.fillRect(0, 0, VIEW.width, VIEW.height);
+  n.globalCompositeOperation = "destination-out";
+  for (const light of lights) {
+    const glow = n.createRadialGradient(light.x, light.y, 0, light.x, light.y, light.r);
+    glow.addColorStop(0, "rgba(0,0,0,0.92)"); glow.addColorStop(0.55, "rgba(0,0,0,0.5)"); glow.addColorStop(1, "rgba(0,0,0,0)");
+    n.fillStyle = glow; n.fillRect(light.x - light.r, light.y - light.r, light.r * 2, light.r * 2);
+  }
+  ctx.drawImage(canvas, 0, 0, VIEW.width, VIEW.height);
+  // A warm glow around each flame.
+  ctx.globalCompositeOperation = "lighter";
+  for (const light of lights) {
+    const glow = ctx.createRadialGradient(light.x, light.y, 0, light.x, light.y, light.r * 0.6);
+    glow.addColorStop(0, `rgba(120,80,30,${(0.35 * dark).toFixed(3)})`); glow.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = glow; ctx.fillRect(light.x - light.r, light.y - light.r, light.r * 2, light.r * 2);
+  }
+  ctx.globalCompositeOperation = "source-over";
+}
 export type HitSplat = { on: "player" | "monster"; uid?: number; damage: number; at: number };
 type Hit = { x: number; y: number; w: number; h: number; pick: Pick };
 
@@ -680,7 +715,8 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   const y0 = Math.max(cy - DRAW_DISTANCE, Math.min(...corners.map(c => c.y)) - 2), y1 = Math.min(cy + DRAW_DISTANCE, Math.max(...corners.map(c => c.y)) + 3);
   drawTerrain(ctx, scene, x0, y0, x1, y1);
   drawCloudShadows(ctx, project, camera, now, z, underground, scene.reducedMotion);
-  const hits: Hit[] = [], drawables: Drawable[] = [];
+  const hits: Hit[] = [], drawables: Drawable[] = [], light = daylight(underground ? null : scene.time), lights: Light[] = [];
+  const glow = (x: number, y: number, lift: number, radius: number) => { if (light.dark > 0.01) { const at = toScreen(camera, x, y, lift); if (at.x > -200 && at.x < VIEW.width + 200 && at.y > -200 && at.y < VIEW.height + 200) lights.push({ x: at.x, y: at.y, r: radius * z }); } };
   const player = game.player, pp = interpolate(player, game, alpha), playerDepth = depthOf(camera, pp.x, pp.y), depth = (x: number, y: number) => depthOf(camera, x, y);
   const me = toScreen(camera, pp.x, pp.y), meTop = me.y - 60 * z;
   const coversPlayer = (x: number, y: number) => { const at = toScreen(camera, x, y); return Math.abs(at.x - me.x) < 34 * z && at.y > meTop && at.y - 95 * z < me.y; };
@@ -715,6 +751,8 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     const object = objectAtTile(world, x, y);
     if (!object || object.name === "__removed") return;
     if (object.kind === "decor" && SMALL_DECOR.has(object.decor!) && Math.abs(x - camera.x) + Math.abs(y - camera.y) > HAZE_START) return;
+    if (object.decor === "lamp") glow(x, y, 48, 150); else if (object.decor === "torch") glow(x, y, 32, 120);
+    else if (object.kind === "furnace" || object.kind === "range") glow(x, y, 16, 110); else if (object.kind === "altar") glow(x, y, 26, 70);
     const d = depth(x, y) + (object.kind === "wheat" || object.kind === "spot" ? -0.4 : 0);
     drawables.push({ depth: d, draw: () => {
       let rect: { x: number; y: number; w: number; h: number };
@@ -766,6 +804,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   // Fires.
   for (const fire of game.fires) {
     if (!shown(fire.x, fire.y)) continue;
+    glow(fire.x, fire.y, 10, 170);
     drawables.push({ depth: depth(fire.x, fire.y), draw: () => {
       const s = toScreen(camera, fire.x, fire.y), f = scene.reducedMotion ? 0 : Math.sin(now / 70 + fire.uid) * 3 * z;
       for (const [dx, dy] of [[-6, 0], [6, 0], [0, 3]]) { ctx.strokeStyle = INK; ctx.lineWidth = 4 * z; ctx.beginPath(); ctx.moveTo(s.x + dx * z - 6 * z, s.y + dy * z); ctx.lineTo(s.x + dx * z + 6 * z, s.y + dy * z - 3 * z); ctx.stroke(); }
@@ -840,7 +879,8 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     // Your Friend with its worn pieces composited into the same pixel frame.
     drawAuras(ctx, player.worn, s.x, bodyY, px, now, scene.reducedMotion, "back");
     const stride = walking ? Math.floor(now / 80) % 8 : 0, cloth = scene.reducedMotion ? 0 : walking ? stride % 4 : Math.floor(now / 520) % 4;
-    if (scene.friend) drawFigure(ctx, figureArt(friendRows(scene.friend, facing, walking, stride), player.worn, facing, cloth), s.x, bodyY + 2 * z, px, pose.alpha);
+    const dressed = player.equipment.cape ? [...player.worn, player.equipment.cape] : player.worn;
+    if (scene.friend) drawFigure(ctx, figureArt(friendRows(scene.friend, facing, walking, stride), dressed, facing, cloth), s.x, bodyY + 2 * z, px, pose.alpha);
     else ellipse(ctx, s.x, bodyY - 20 * z, 12 * z, 16 * z, INK);
     drawAuras(ctx, player.worn, s.x, bodyY, px, now, scene.reducedMotion, "front");
     drawHeld(ctx, scene, pose, s.x, bodyY, px, facing, project);
@@ -866,6 +906,8 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   }
   drawEffects(ctx, project, world, now, z);
   if (!underground) drawHaze(ctx, camera);
+  // Night falls over the land (your Friend carries a small light; a lantern familiar a bigger one).
+  if (light.dark > 0.01 || light.warm > 0.01) { glow(pp.x, pp.y, 24, player.worn.includes("lantern_familiar") ? 150 : 90); drawNight(ctx, light.dark, light.warm, lights); }
   // Click marker: an old-school cross, yellow for walking, red for actions.
   if (scene.marker && now - scene.marker.at < 450) {
     const s = toScreen(camera, scene.marker.x, scene.marker.y), k = 1 - (now - scene.marker.at) / 450, r = 8 * z * (0.6 + k * 0.4);
@@ -950,11 +992,12 @@ function drawMonster(ctx: CanvasRenderingContext2D, scene: Scene, monster: Monst
 }
 
 // ---------- Minimap and world map ----------
+/** Map colours: clearer than the land's pastels, so roads, water, walls and floors read at a glance. */
 const MAP_COLORS: Record<number, [number, number, number]> = {
-  [T.VOID]: [14, 14, 16], [T.GRASS]: [200, 208, 190], [T.DARK_GRASS]: [180, 190, 170], [T.PATH]: [222, 208, 180], [T.COBBLE]: [214, 211, 204], [T.SAND]: [232, 223, 198],
-  [T.WATER]: [160, 180, 200], [T.DEEP]: [130, 150, 175], [T.SWAMP]: [165, 170, 150], [T.SNOW]: [246, 245, 241], [T.STONE]: [196, 193, 186], [T.WOOD]: [205, 185, 160],
-  [T.GRAVEL]: [190, 183, 172], [T.DUNGEON]: [90, 89, 96], [T.BRIDGE]: [170, 145, 120], [T.CLIFF]: [120, 115, 108], [T.WALL]: [70, 68, 66], [T.FARMLAND]: [188, 167, 135],
-  [T.ICE]: [222, 231, 236], [T.CARPET]: [201, 163, 163],
+  [T.VOID]: [14, 14, 16], [T.GRASS]: [150, 178, 122], [T.DARK_GRASS]: [118, 150, 98], [T.PATH]: [214, 186, 136], [T.COBBLE]: [196, 190, 178], [T.SAND]: [232, 212, 158],
+  [T.WATER]: [96, 142, 196], [T.DEEP]: [66, 108, 170], [T.SWAMP]: [118, 130, 94], [T.SNOW]: [246, 246, 242], [T.STONE]: [176, 172, 164], [T.WOOD]: [184, 146, 104],
+  [T.GRAVEL]: [168, 158, 142], [T.DUNGEON]: [84, 82, 92], [T.BRIDGE]: [150, 108, 70], [T.CLIFF]: [96, 90, 82], [T.WALL]: [34, 32, 30], [T.FARMLAND]: [176, 142, 90],
+  [T.ICE]: [204, 224, 238], [T.CARPET]: [196, 118, 118],
 };
 let mapImage: HTMLCanvasElement | null = null;
 /** The whole world, one pixel per tile (built once). */
@@ -967,8 +1010,8 @@ export function worldImage(world: World): HTMLCanvasElement {
     if (i >= W * FLOOR_Y) { image.data.set([...MAP_COLORS[T.VOID], 255], i * 4); continue; }
     let [r, g, b] = MAP_COLORS[world.tiles[i]] ?? [128, 128, 128];
     const object = world.objects[world.objectAt[i]];
-    if (object?.kind === "tree") [r, g, b] = [150, 165, 140];
-    else if (object?.kind === "rock") [r, g, b] = [150, 140, 130];
+    if (object?.kind === "tree") [r, g, b] = [78, 116, 70];
+    else if (object?.kind === "rock") [r, g, b] = [128, 112, 98];
     image.data.set([r, g, b, 255], i * 4);
   }
   ctx.putImageData(image, 0, 0);
@@ -1017,19 +1060,21 @@ export function renderMinimap(ctx: CanvasRenderingContext2D, game: Game, size: n
   const dot = (sx: number, sy: number, color: string, r = 0.9) => {
     const { x, y, level } = realPoint(world, sx, sy);
     if (level !== player.level || Math.abs(x - player.x) >= 40 || Math.abs(y - player.y) >= 40) return;
+    ctx.fillStyle = "#161616"; ctx.fillRect(x + 0.5 - r / 2 - 0.25, y + 0.5 - r / 2 - 0.25, r + 0.5, r + 0.5);
     ctx.fillStyle = color; ctx.fillRect(x + 0.5 - r / 2, y + 0.5 - r / 2, r, r);
   };
-  for (const entry of game.ground) dot(entry.x, entry.y, "#d65b5b", 0.8);
-  for (const npc of game.npcs) dot(npc.x, npc.y, "#e8d57a");
-  for (const monster of game.monsters) if (!monster.dead) dot(monster.x, monster.y, "#e8d57a");
+  for (const entry of game.ground) dot(entry.x, entry.y, "#e0463c", 1);
+  for (const npc of game.npcs) dot(npc.x, npc.y, "#f5e04a", 1.3);
+  for (const monster of game.monsters) if (!monster.dead) dot(monster.x, monster.y, "#f5e04a", 1.3);
+  if (game.pet) dot(game.pet.x, game.pet.y, "#ffffff", 1.3);
   ctx.restore();
   // Map icons, drawn upright.
-  ctx.save(); ctx.font = "bold 10px ui-monospace, Menlo, Consolas, monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.save(); ctx.font = "bold 11px ui-monospace, Menlo, Consolas, monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
   for (const icon of iconsCache ??= mapIcons(world)) {
     const dx = icon.x - player.x, dy = icon.y - player.y, rx = (dx * cos - dy * sin) * scale, ry = (dx * sin + dy * cos) * scale;
-    if (Math.hypot(rx, ry) > size / 2 - 8) continue;
-    ctx.fillStyle = PAPER; ctx.strokeStyle = INK; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(size / 2 + rx, size / 2 + ry, 5.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    if (Math.hypot(rx, ry) > size / 2 - 9) continue;
+    ctx.fillStyle = ICON_FILLS[icon.glyph] ?? PAPER; ctx.strokeStyle = INK; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(size / 2 + rx, size / 2 + ry, 7, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.fillStyle = INK; ctx.fillText(icon.glyph, size / 2 + rx, size / 2 + ry + 0.5);
   }
   // You: a white arrow facing your direction.
@@ -1042,6 +1087,8 @@ export function minimapTile(game: Game, dx: number, dy: number, scale: number, a
   return onLevel(game.world, Math.round(here.x + x * cos - y * sin), Math.round(here.y + x * sin + y * cos), here.level);
 }
 let iconsCache: MapIcon[] | null = null;
+/** Icon backgrounds by kind, so a bank or a quest stands out from a shop. */
+const ICON_FILLS: Record<string, string> = { "$": "#f2d56b", "!": "#f5e04a", "¤": "#ffffff", "◆": "#e7a9b0", "♜": "#c6bed4", "▼": "#b7b2aa", "⛏": "#d8c4a8", "≈": "#9fc1e6", "♨": "#f0b48a", "▲": "#f0b48a", "⚒": "#c8c5be", "✚": "#ffffff", "✋": "#e8d4c0", "➶": "#b4d3a0" };
 /** The world map: the whole Realm turned to match the camera, with labels. Returns the transform for clicks. */
 export function renderWorldMap(ctx: CanvasRenderingContext2D, game: Game, width: number, height: number, focus: { x: number; y: number; zoom: number }, underground: boolean) {
   const world = game.world, image = worldImage(world), player = realPoint(world, game.player.x, game.player.y);

@@ -4,7 +4,7 @@
  * animated: capes and scarves sway as you walk, wings flap, halos bob. The figure then gets one ink edge around the
  * worn pieces and the canonical white halo around everything.
  */
-import { WARDROBE, type WardrobeId } from "./data.ts";
+import { WARDROBE, isItem, item, type WardrobeId } from "./data.ts";
 import { Pixels, shadeHex } from "./pixel.ts";
 import type { Facing } from "./state.ts";
 
@@ -33,8 +33,11 @@ function measure(rows: Mask) {
  * Your Friend's frame with its worn pieces, as a pixel canvas twice the sprite's resolution.
  * `phase` (0–3) animates cloth and wings; pass the walk frame so they sway with the stride.
  */
+type Piece = { id: string; kind: string; color: string; trim?: string };
 export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, phase = 0, ink = INK): HTMLCanvasElement {
-  const pieces = WARDROBE.filter(piece => worn.includes(piece.id) && piece.kind !== "aura" && piece.kind !== "lantern");
+  // An equipped cape (a mastery cape, the Cape of the Hollow…) is worn over any wardrobe cape, with its trim.
+  const gear: Piece[] = worn.filter(id => isItem(id) && item(id).equip?.slot === "cape").map(id => ({ id, kind: "cape", color: item(id).icon.color, trim: item(id).icon.accent }));
+  const pieces: Piece[] = [...WARDROBE.filter(piece => worn.includes(piece.id) && piece.kind !== "aura" && piece.kind !== "lantern" && !(gear.length && piece.kind === "cape")), ...gear.slice(0, 1)];
   const key = `${ink}|${facing}|${phase & 3}|${pieces.map(piece => piece.id).join(",")}|${rows.join("")}`;
   let canvas = cache.get(key);
   if (canvas) return canvas;
@@ -68,7 +71,8 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
     const hemL = X(m.left) - 3 + trail + sway, hemR = X(m.right) + 4 + trail + sway;
     p.poly([[shoulders[0], neckY], [shoulders[1], neckY], [hemR, feet - 1], [hemL, feet - 1]], cape.color, null);
     for (let fold = 1; fold < 4; fold++) { const t = fold / 4; p.line(shoulders[0] + (shoulders[1] - shoulders[0]) * t, neckY + 2, hemL + (hemR - hemL) * t, feet - 2, dark); }
-    p.line(hemL, feet - 1, hemR, feet - 1, dark);
+    p.line(hemL, feet - 1, hemR, feet - 1, cape.trim ?? dark);
+    if (cape.trim) p.line(hemL, feet - 2, hemR, feet - 2, cape.trim);
   }
   if (pieces.some(piece => piece.kind === "scarf") && side) {
     // The scarf's long tail streams out behind you.
@@ -87,6 +91,13 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
     p.poly([[shoulders[0], neckY - 1], [shoulders[1], neckY - 1], [hemR, feet - 1], [hemL, feet - 1]], cape.color, null);
     for (let fold = 1; fold < 5; fold++) { const t = fold / 5; p.line(shoulders[0] + (shoulders[1] - shoulders[0]) * t, neckY + 1, hemL + (hemR - hemL) * t, feet - 2, dark); }
     p.rect(shoulders[0], neckY - 1, shoulders[1] - shoulders[0], 2, shadeHex(cape.color, 0.08));
+    if (cape.trim) {
+      // Trimmed edges, and the emblem on the back.
+      p.line(hemL, feet - 1, hemR, feet - 1, cape.trim); p.line(hemL, feet - 2, hemR, feet - 2, cape.trim);
+      p.line(shoulders[0], neckY - 1, hemL, feet - 1, cape.trim); p.line(shoulders[1] - 1, neckY - 1, hemR - 1, feet - 1, cape.trim);
+      const ex = Math.round((hemL + hemR) / 2), ey = Math.round((neckY + feet) / 2) - 1;
+      p.disc(ex, ey, 2.4, 2.4, cape.trim, null); p.set(ex, ey, cape.color);
+    }
   }
   for (const piece of pieces) {
     const color = piece.color, dark = shadeHex(color, -0.15), light = shadeHex(color, 0.14);

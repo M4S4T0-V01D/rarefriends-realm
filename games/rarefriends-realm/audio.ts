@@ -18,6 +18,8 @@ const VOICES: Record<string, { kind: VoiceKind; f0: number; length: number; brig
   wolf: { kind: "growl", f0: 180, length: 0.5, bright: 1600, wobble: 18 }, moss_colossus: { kind: "rumble", f0: 70, length: 0.8, bright: 500, wobble: 3 },
   frost_yeti: { kind: "roar", f0: 110, length: 0.8, bright: 1200, wobble: 6 }, shade: { kind: "whisper", f0: 400, length: 0.6, bright: 3000 },
   hollow_sentinel: { kind: "clank", f0: 90, length: 0.4, bright: 800 }, hollow_king: { kind: "king", f0: 60, length: 1.1, bright: 700, wobble: 2 },
+  mire_crawler: { kind: "gurgle", f0: 320, length: 0.3, bright: 1400 }, frost_wisp: { kind: "whisper", f0: 900, length: 0.5, bright: 5000 },
+  gloom_hound: { kind: "growl", f0: 120, length: 0.6, bright: 1100, wobble: 22 },
 };
 /** General-MIDI-style instruments, like an old-school RPG soundtrack: bright leads up high, plucked strings, light drums. */
 type Voice = "lute" | "flute" | "recorder" | "oboe" | "trumpet" | "bell" | "glock" | "harp" | "pizz" | "strings" | "organ" | "pad" | "bass" | "brass" | "pluck" | "choir";
@@ -444,6 +446,7 @@ export class RealmAudio {
       case "death": for (let i = 0; i < 5; i++) tone("triangle", 67 - i * 3, t + i * 0.18, 0.3, 0.12); break;
       case "fell": this.thump(t, 140, 50, 0.5, 0.45, bus); this.noiseBurst(t + 0.05, 0.6, 600, 0.18, bus, "lowpass"); for (let i = 0; i < 4; i++) this.noiseBurst(t + 0.2 + i * 0.07, 0.06, 2200, 0.08, bus, "bandpass", 2); break;
       case "slash": this.sweep(t, 3200, 900, 0.16, 0.2, bus); break;
+      case "bow": tone("triangle", 45, t, 0.18, 0.18); this.thump(t, 520, 180, 0.12, 0.2, bus); this.sweep(t + 0.02, 4200, 2600, 0.12, 0.08, bus); break;
       case "stab": this.sweep(t, 2400, 1600, 0.08, 0.2, bus); this.thump(t + 0.06, 300, 180, 0.05, 0.12, bus); break;
       case "crush": this.sweep(t, 900, 300, 0.18, 0.22, bus); break;
       case "punch": this.thump(t, 200, 90, 0.08, 0.35, bus); this.noiseBurst(t, 0.04, 900, 0.12, bus, "lowpass"); break;

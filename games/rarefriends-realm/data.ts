@@ -5,19 +5,27 @@
 
 // ---------- Skills and experience ----------
 export const SKILLS = [
-  "attack", "strength", "defence", "hitpoints", "magic", "prayer", "woodcutting", "fishing",
-  "cooking", "firemaking", "mining", "smithing", "crafting", "thieving", "agility",
+  "attack", "strength", "defence", "ranged", "hitpoints", "magic", "prayer", "woodcutting", "fishing",
+  "cooking", "firemaking", "mining", "smithing", "crafting", "thieving", "agility", "slayer",
 ] as const;
 export type Skill = typeof SKILLS[number];
 export const SKILL_NAMES: Record<Skill, string> = {
-  attack: "Attack", strength: "Strength", defence: "Defence", hitpoints: "Hitpoints", magic: "Magic", prayer: "Prayer",
+  attack: "Attack", strength: "Strength", defence: "Defence", ranged: "Ranged", hitpoints: "Hitpoints", magic: "Magic", prayer: "Prayer",
   woodcutting: "Woodcutting", fishing: "Fishing", cooking: "Cooking", firemaking: "Firemaking", mining: "Mining",
-  smithing: "Smithing", crafting: "Crafting", thieving: "Thieving", agility: "Agility",
+  smithing: "Smithing", crafting: "Crafting", thieving: "Thieving", agility: "Agility", slayer: "Slayer",
+};
+/** Each skill's colour: its mastery cape, and its trim. */
+export const SKILL_COLORS: Record<Skill, [string, string]> = {
+  attack: ["#c98f95", "#e2d49e"], strength: ["#8fbf9a", "#e2d49e"], defence: ["#8fa3c9", "#efede7"], ranged: ["#a5a67d", "#efede7"],
+  hitpoints: ["#e8e4dc", "#cf6e6e"], magic: ["#6f7ea6", "#e2d49e"], prayer: ["#efede7", "#e2d49e"], woodcutting: ["#8e9f7a", "#c49a74"],
+  fishing: ["#8fb3c9", "#efede7"], cooking: ["#9c7aa6", "#e8d4c0"], firemaking: ["#e9a07a", "#e2d49e"], mining: ["#8b8e92", "#c9c2b6"],
+  smithing: ["#6d6b67", "#e3a58c"], crafting: ["#b89c86", "#efede7"], thieving: ["#6d6b8a", "#c6bed4"], agility: ["#8f9cb2", "#efede7"],
+  slayer: ["#3b3a38", "#cf6e6e"],
 };
 /** Small glyphs for XP drops and the skills tab (drawn as text). */
 export const SKILL_ICONS: Record<Skill, string> = {
   attack: "⚔", strength: "✊", defence: "⛨", hitpoints: "♥", magic: "✦", prayer: "✚", woodcutting: "🪓", fishing: "🐟",
-  cooking: "🍳", firemaking: "🔥", mining: "⛏", smithing: "⚒", crafting: "✂", thieving: "✋", agility: "➶",
+  cooking: "🍳", firemaking: "🔥", mining: "⛏", smithing: "⚒", crafting: "✂", thieving: "✋", agility: "➶", ranged: "➹", slayer: "☠",
 };
 export const MAX_LEVEL = 99;
 /** The classic old-school curve: XP needed for each level, index = level. */
@@ -57,18 +65,27 @@ export const FAMILY_PERKS: readonly FamilyPerk[] = [
 // ---------- Items ----------
 export type EquipSlot = "head" | "cape" | "neck" | "weapon" | "body" | "shield" | "legs" | "hands" | "feet";
 export const EQUIP_SLOTS: readonly EquipSlot[] = ["head", "cape", "neck", "weapon", "body", "shield", "legs", "hands", "feet"];
-export type Bonuses = { attack: number; strength: number; defence: number; magic: number; prayer: number };
+export type Bonuses = { attack: number; strength: number; defence: number; ranged: number; magic: number; prayer: number };
 export type Icon = { shape: IconShape; color: string; accent?: string };
 export type IconShape =
   | "coins" | "axe" | "pickaxe" | "sword" | "dagger" | "sabre" | "helm" | "body" | "legs" | "shield" | "boots" | "gloves" | "cape"
   | "amulet" | "log" | "fish" | "ore" | "bar" | "bones" | "sigil" | "staff" | "net" | "rod" | "harpoon" | "pot" | "bucket" | "egg" | "flour"
   | "milk" | "tinderbox" | "hammer" | "knife" | "needle" | "thread" | "chisel" | "gem" | "hide" | "leather" | "meat" | "feather" | "bait"
-  | "cake" | "bread" | "berries" | "key" | "wheat" | "lamp" | "scroll" | "silk" | "hood" | "bracer" | "burnt" | "hat" | "crown" | "orb" | "trophy";
+  | "cake" | "bread" | "berries" | "key" | "wheat" | "lamp" | "scroll" | "silk" | "hood" | "bracer" | "burnt" | "hat" | "crown" | "orb" | "trophy"
+  | "bow" | "arrow" | "tablet";
 export type Item = {
   id: string; name: string; examine: string; value: number; icon: Icon;
   stackable?: boolean; tradeable?: boolean;
-  equip?: { slot: EquipSlot; bonuses: Partial<Bonuses>; requires?: Partial<Record<Skill, number>>; speed?: number; twoHanded?: boolean; staff?: boolean };
+  equip?: { slot: EquipSlot; bonuses: Partial<Bonuses>; requires?: Partial<Record<Skill, number>>; speed?: number; twoHanded?: boolean; staff?: boolean; bow?: { range: number } };
   heal?: number; bones?: number; tool?: { kind: "axe" | "pickaxe"; tier: number; level: number };
+  /** Arrows: fired from your pack by any bow. */
+  ammo?: { strength: number; level: number };
+  /** A fixed shop price (instead of value × markup). */
+  price?: number;
+  /** A mastery cape: the skill it's for (all skills for the Grandmaster's), and whether it's trimmed. */
+  mastery?: { skill: Skill | "all"; trimmed: boolean };
+  /** Break to teleport (a Realm tablet). */
+  tablet?: "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier";
 };
 
 export const METALS = [
@@ -229,7 +246,60 @@ const OTHER_GEAR: Item[] = [
   { id: "realm_crown", name: "Crown of the Realm", examine: "Worn by the Friend who ended the Hollow King's reign.", value: 0, tradeable: false, icon: { shape: "crown", color: "#e2d49e" }, equip: { slot: "head", bonuses: { defence: 6, prayer: 4 } } },
 ];
 
-export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...metalGear(), ...OTHER_GEAR]);
+// ---------- Ranged: bows by wood, arrows by metal, hunter's hides ----------
+export const BOWS = [
+  { id: "shortbow", name: "Shortbow", level: 1, ranged: 8, value: 50, color: "#9c8672" },
+  { id: "oak_bow", name: "Oak bow", level: 5, ranged: 14, value: 160, color: "#b59c7d" },
+  { id: "willow_bow", name: "Willow bow", level: 20, ranged: 20, value: 320, color: "#a5a67d" },
+  { id: "maple_bow", name: "Maple bow", level: 30, ranged: 29, value: 640, color: "#c49a74" },
+  { id: "yew_bow", name: "Yew bow", level: 40, ranged: 47, value: 1600, color: "#7d6b5c" },
+  { id: "ashwood_bow", name: "Ashwood bow", level: 50, ranged: 69, value: 3200, color: "#d6d3cc" },
+  { id: "gloomfang_bow", name: "Gloomfang bow", level: 60, ranged: 88, value: 40000, color: "#4a4458" },
+] as const;
+const ARROW_STRENGTH = [7, 10, 16, 22, 31, 49];
+const RANGED_GEAR: Item[] = [
+  ...BOWS.map(bow => ({
+    id: bow.id, name: bow.name, value: bow.value, icon: { shape: "bow" as const, color: bow.color, accent: bow.id === "gloomfang_bow" ? "#cf6e6e" : undefined },
+    examine: bow.id === "gloomfang_bow" ? "Strung with something that howls when you draw it." : `A bow of ${bow.id === "shortbow" ? "plain" : bow.name.split(" ")[0].toLowerCase()} wood.`,
+    equip: { slot: "weapon" as const, bonuses: { ranged: bow.ranged }, requires: bow.level > 1 ? { ranged: bow.level } : undefined, speed: 4, twoHanded: true, bow: { range: 7 } },
+  })),
+  ...METALS.map((metal, index) => ({
+    id: `${metal.id}_arrow`, name: `${metal.name} arrows`, examine: `Arrows with ${metal.id} heads.`, value: [1, 3, 6, 12, 25, 60][index], stackable: true,
+    icon: { shape: "arrow" as const, color: metal.color }, ammo: { strength: ARROW_STRENGTH[index], level: metal.level },
+  })),
+  { id: "hunter_coif", name: "Hunter's coif", examine: "A soft leather coif. Keeps the hair out of your eyes.", value: 40, icon: { shape: "hood", color: "#a5a67d" }, equip: { slot: "head", bonuses: { ranged: 3, defence: 2 } } },
+  { id: "hunter_vest", name: "Hunter's vest", examine: "Stitched for drawing a bow all day.", value: 90, icon: { shape: "body", color: "#a5a67d" }, equip: { slot: "body", bonuses: { ranged: 8, defence: 6 } } },
+  { id: "hunter_chaps", name: "Hunter's chaps", examine: "Hard-wearing leather chaps.", value: 70, icon: { shape: "legs", color: "#8e8f6a" }, equip: { slot: "legs", bonuses: { ranged: 5, defence: 4 } } },
+  { id: "hunter_bracers", name: "Hunter's bracers", examine: "They take the sting out of a bowstring.", value: 45, icon: { shape: "bracer", color: "#8e8f6a" }, equip: { slot: "hands", bonuses: { ranged: 4, defence: 2 } } },
+  { id: "frosthide_coif", name: "Frosthide coif", examine: "Frost-wolf hide, still cold.", value: 900, icon: { shape: "hood", color: "#c7d3dc" }, equip: { slot: "head", bonuses: { ranged: 6, defence: 8 }, requires: { ranged: 30 } } },
+  { id: "frosthide_vest", name: "Frosthide vest", examine: "Frost-wolf hide, laced tight.", value: 2400, icon: { shape: "body", color: "#c7d3dc" }, equip: { slot: "body", bonuses: { ranged: 15, defence: 22 }, requires: { ranged: 30 } } },
+  { id: "frosthide_chaps", name: "Frosthide chaps", examine: "Frost-wolf hide chaps.", value: 1600, icon: { shape: "legs", color: "#afbccb" }, equip: { slot: "legs", bonuses: { ranged: 10, defence: 14 }, requires: { ranged: 30 } } },
+  { id: "frosthide_bracers", name: "Frosthide bracers", examine: "Frost-wolf hide bracers.", value: 800, icon: { shape: "bracer", color: "#afbccb" }, equip: { slot: "hands", bonuses: { ranged: 7, defence: 5 }, requires: { ranged: 30 } } },
+];
+
+// ---------- Slayer, mastery capes, tablets and lamps ----------
+const MASTERY_BONUS: Partial<Bonuses> = { attack: 4, strength: 4, defence: 9, ranged: 4, magic: 4, prayer: 4 };
+const OTHER_ITEMS: Item[] = [
+  { id: "slayer_gem", name: "Warden's gem", examine: "Tells you your Slayer task when you look into it.", value: 1, icon: { shape: "gem", color: "#6d8a8f", accent: "#161616" } },
+  { id: "slayer_helm", name: "Warden's helm", examine: "A dark helm that knows your task. +15% accuracy and damage on it.", value: 12000, tradeable: false,
+    icon: { shape: "helm", color: "#3b3a38", accent: "#cf6e6e" }, equip: { slot: "head", bonuses: { defence: 12, ranged: 3, magic: 3 }, requires: { defence: 10, slayer: 20 } } },
+  ...SKILLS.flatMap(skill => [false, true].map(trimmed => ({
+    id: `${skill}_cape${trimmed ? "_t" : ""}`, name: `${SKILL_NAMES[skill]} mastery cape${trimmed ? " (t)" : ""}`, value: 0, price: 99_000, tradeable: false,
+    examine: `The cape of a true master of ${SKILL_NAMES[skill]}.${trimmed ? " Trimmed: this Friend has mastered more than one skill." : ""}`,
+    icon: { shape: "cape" as const, color: SKILL_COLORS[skill][0], accent: trimmed ? SKILL_COLORS[skill][1] : undefined },
+    mastery: { skill, trimmed }, equip: { slot: "cape" as const, bonuses: MASTERY_BONUS, requires: { [skill]: 99 } },
+  }))),
+  { id: "grandmaster_cape", name: "Grandmaster's cape", examine: "Every skill, mastered. The Realm has run out of things to teach you.", value: 0, price: 1_700_000, tradeable: false,
+    icon: { shape: "cape", color: "#e2d49e", accent: "#d8b6b4" }, mastery: { skill: "all", trimmed: true },
+    equip: { slot: "cape", bonuses: { attack: 8, strength: 8, defence: 14, ranged: 8, magic: 8, prayer: 8 } } },
+  ...([["hollow_square", "Friendhollow"], ["emberforge", "Emberforge"], ["oasis", "Oasis"], ["frostpeak", "Frostpeak"], ["pier", "Pier"]] as const).map(([place, name]) => ({
+    id: `tablet_${place}`, name: `${name} tablet`, examine: `Break it to travel to ${name === "Pier" ? "Pike's Pier" : name}.`, value: 120, stackable: true, tablet: place,
+    icon: { shape: "tablet" as const, color: { hollow_square: "#e8d4c0", emberforge: "#e9a07a", oasis: "#e2d49e", frostpeak: "#c7d3dc", pier: "#8fa3c9" }[place] },
+  })),
+  { id: "insight_lamp", name: "Lamp of insight", examine: "Rub it to gain experience in a skill of your choice.", value: 0, tradeable: false, icon: { shape: "lamp", color: "#e2d49e" } },
+];
+
+export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS]);
 const ITEM_MAP = new Map(ITEM_LIST.map(item => [item.id, item]));
 export function item(id: string): Item {
   const found = ITEM_MAP.get(id);
@@ -376,6 +446,8 @@ export type MonsterDef = {
   attackBonus: number; defenceBonus: number; maxHit: number; speed: number; aggressive?: boolean; size?: number;
   respawn: number; wander: number; examine: string; always?: readonly Drop[]; drops: readonly Drop[]; art: number; ink?: string;
   attackStyle?: "melee" | "magic"; boss?: boolean; slayerXp?: number;
+  /** The Slayer level needed to wound it. */
+  slayer?: number;
 };
 const coins = (min: number, max: number, chance: number): Drop => ({ item: "coins", min, max, chance });
 const one = (id: string, chance: number, min = 1, max = min): Drop => ({ item: id, min, max, chance });
@@ -387,17 +459,17 @@ export const MONSTERS: Record<string, MonsterDef> = {
   ink_rat: { id: "ink_rat", name: "Ink rat", level: 1, hp: 2, attack: 1, strength: 1, defence: 1, attackBonus: 0, defenceBonus: 0, maxHit: 1, speed: 4, respawn: 15, wander: 6, examine: "A rat made of spilled ink. It squeaks in monochrome.",
     always: [one("bones", 1)], drops: [coins(1, 4, 0.3)], art: 102 },
   grumblin: { id: "grumblin", name: "Grumblin", level: 5, hp: 7, attack: 4, strength: 4, defence: 1, attackBonus: 2, defenceBonus: 0, maxHit: 2, speed: 4, respawn: 25, wander: 6, examine: "An ugly, grumbling green-grey creature.", aggressive: true,
-    always: [one("bones", 1)], drops: [coins(2, 25, 0.45), one("breeze_sigil", 0.1, 3, 8), one("thought_sigil", 0.08, 2, 6), one("pewter_dagger", 0.04), one("pewter_helm", 0.03), one("fishing_bait", 0.08, 5, 15), one("tide_sigil", 0.05, 2, 6)], art: 103 },
+    always: [one("bones", 1)], drops: [coins(2, 25, 0.45), one("breeze_sigil", 0.1, 3, 8), one("thought_sigil", 0.08, 2, 6), one("pewter_dagger", 0.04), one("pewter_helm", 0.03), one("fishing_bait", 0.08, 5, 15), one("tide_sigil", 0.05, 2, 6), one("pewter_arrow", 0.12, 4, 12), one("shortbow", 0.02)], art: 103 },
   grumblin_chief: { id: "grumblin_chief", name: "Grumblin chief", level: 13, hp: 20, attack: 10, strength: 11, defence: 8, attackBonus: 6, defenceBonus: 5, maxHit: 3, speed: 4, respawn: 50, wander: 3, examine: "The loudest Grumblin. That's how they choose.", aggressive: true,
     always: [one("bones", 1)], drops: [coins(20, 80, 0.6), one("blackiron_sabre", 0.05), one("stone_sigil", 0.1, 5, 12), one("blackiron_helm", 0.05), one("rough_moonstone", 0.03)], art: 104 },
   bandit: { id: "bandit", name: "Dune bandit", level: 22, hp: 28, attack: 20, strength: 20, defence: 16, attackBonus: 12, defenceBonus: 12, maxHit: 4, speed: 4, respawn: 40, wander: 5, examine: "A Friend who took a wrong turn in life.", aggressive: true,
-    always: [one("bones", 1)], drops: [coins(20, 120, 0.7), one("ashsteel_dagger", 0.05), one("storm_sigil", 0.08, 2, 6), one("rough_sagestone", 0.02), one("path_sigil", 0.02, 1, 2)], art: 105 },
+    always: [one("bones", 1)], drops: [coins(20, 120, 0.7), one("ashsteel_dagger", 0.05), one("storm_sigil", 0.08, 2, 6), one("rough_sagestone", 0.02), one("path_sigil", 0.02, 1, 2), one("ashsteel_arrow", 0.1, 5, 15), one("willow_bow", 0.02)], art: 105 },
   swamp_lurker: { id: "swamp_lurker", name: "Swamp lurker", level: 16, hp: 22, attack: 14, strength: 14, defence: 12, attackBonus: 8, defenceBonus: 8, maxHit: 3, speed: 5, respawn: 35, wander: 4, examine: "Mostly mouth, partly mud.", aggressive: true,
     always: [one("bones", 1)], drops: [coins(5, 50, 0.5), one("tide_sigil", 0.12, 6, 18), one("raw_char", 0.1), one("rough_moonstone", 0.02)], art: 106 },
   skeleton: { id: "skeleton", name: "Crypt skeleton", level: 25, hp: 29, attack: 22, strength: 22, defence: 20, attackBonus: 14, defenceBonus: 16, maxHit: 4, speed: 4, respawn: 40, wander: 4, examine: "It rattles when it walks. It used to be a Friend.", aggressive: true,
     always: [one("bones", 1)], drops: [coins(10, 90, 0.6), one("blackiron_greaves", 0.03), one("storm_sigil", 0.06, 3, 7), one("hollow_sigil", 0.02, 1, 3), one("ashsteel_helm", 0.03)], art: 107 },
   wolf: { id: "wolf", name: "Frost wolf", level: 32, hp: 40, attack: 30, strength: 28, defence: 26, attackBonus: 18, defenceBonus: 18, maxHit: 5, speed: 4, respawn: 40, wander: 6, examine: "Its breath freezes as it growls.", aggressive: true,
-    always: [one("large_bones", 1)], drops: [coins(20, 110, 0.4), one("rough_rosestone", 0.02), one("moonsilver_ore", 0.05)], art: 108 },
+    always: [one("large_bones", 1)], drops: [coins(20, 110, 0.4), one("rough_rosestone", 0.02), one("moonsilver_ore", 0.05), one("frosthide_bracers", 0.02), one("moonsilver_arrow", 0.06, 5, 12)], art: 108 },
   moss_colossus: { id: "moss_colossus", name: "Moss colossus", level: 42, hp: 60, attack: 32, strength: 34, defence: 30, attackBonus: 20, defenceBonus: 22, maxHit: 7, speed: 6, respawn: 60, wander: 3, examine: "A Colossus-family giant, grown over with moss.", size: 2,
     always: [one("large_bones", 1)], drops: [coins(30, 250, 0.6), one("moonsilver_sword", 0.03), one("path_sigil", 0.06, 1, 3), one("rough_sagestone", 0.04), one("ashsteel_cuirass", 0.02)], art: 109 },
   frost_yeti: { id: "frost_yeti", name: "Frost yeti", level: 55, hp: 85, attack: 50, strength: 52, defence: 45, attackBonus: 30, defenceBonus: 32, maxHit: 10, speed: 5, respawn: 60, wander: 4, examine: "Every footstep is an avalanche.", aggressive: true, size: 2,
@@ -409,7 +481,45 @@ export const MONSTERS: Record<string, MonsterDef> = {
   hollow_king: { id: "hollow_king", name: "The Hollow King", level: 92, hp: 250, attack: 80, strength: 82, defence: 70, magicDef: 50, attackBonus: 60, defenceBonus: 70, maxHit: 18, speed: 5, respawn: 100, wander: 2, examine: "A crown floating over an empty ring of shadow.", aggressive: true, size: 3, boss: true,
     always: [one("ink_bones", 1), coins(1000, 3000, 1)], drops: [one("rarite_sabre", 0.12), one("rarite_helm", 0.1), one("moonlit_staff", 0.08), one("rarite_bar", 0.3, 1, 3), one("rosestone_pendant", 0.1)], art: 113, ink: "#111" },
 };
+Object.assign(MONSTERS, {
+  mire_crawler: { id: "mire_crawler", name: "Mire crawler", level: 18, hp: 26, attack: 16, strength: 15, defence: 14, attackBonus: 10, defenceBonus: 10, maxHit: 3, speed: 4, respawn: 30, wander: 4, slayer: 10,
+    examine: "Something with too many legs, living under the Murkmire mud. Only a Slayer knows where to hit it.", aggressive: true,
+    always: [one("bones", 1)], drops: [coins(10, 60, 0.5), one("bloom_sigil", 0.1, 2, 5), one("blackiron_arrow", 0.15, 8, 20), one("rough_sagestone", 0.03), one("oak_bow", 0.03)], art: 106, ink: "#3d4a36" },
+  frost_wisp: { id: "frost_wisp", name: "Frost wisp", level: 36, hp: 44, attack: 30, strength: 28, defence: 30, magicDef: 18, attackBonus: 18, defenceBonus: 22, maxHit: 5, speed: 4, respawn: 35, wander: 5, slayer: 30,
+    examine: "A shiver with a face. Blows straight through anyone who hasn't learnt the trick of it.", aggressive: true,
+    always: [one("ink_bones", 1)], drops: [coins(30, 180, 0.6), one("star_sigil", 0.12, 4, 10), one("glimmer_arrow", 0.1, 5, 12), one("frosthide_coif", 0.03), one("frosthide_chaps", 0.02), one("rough_rosestone", 0.03)], art: 111, ink: "#5c7f9e" },
+  gloom_hound: { id: "gloom_hound", name: "Gloom hound", level: 58, hp: 80, attack: 52, strength: 54, defence: 46, attackBonus: 32, defenceBonus: 34, maxHit: 9, speed: 4, respawn: 45, wander: 5, slayer: 50,
+    examine: "A hound made of the dark between two torches.", aggressive: true,
+    always: [one("ink_bones", 1)], drops: [coins(100, 500, 0.7), one("gloomfang_bow", 0.012), one("rarite_arrow", 0.08, 5, 15), one("frosthide_vest", 0.02), one("hollow_sigil", 0.1, 3, 8), one("rarite_ore", 0.03)], art: 108, ink: "#2e2440" },
+} satisfies Record<string, MonsterDef>);
 export function combatLevelOf(monster: MonsterDef) { return monster.level; }
+
+// ---------- Slayer ----------
+/** Tasks the Warden hands out: the creatures that count, how many, and the combat level you need for them. */
+export const SLAYER_TASKS = [
+  { id: "rats", name: "ink rats", monsters: ["ink_rat"], min: 1, amount: [12, 20] },
+  { id: "cows", name: "cows", monsters: ["cow"], min: 1, amount: [10, 18] },
+  { id: "grumblins", name: "Grumblins", monsters: ["grumblin", "grumblin_chief"], min: 3, amount: [15, 30] },
+  { id: "lurkers", name: "swamp lurkers", monsters: ["swamp_lurker"], min: 12, amount: [15, 30] },
+  { id: "crawlers", name: "mire crawlers", monsters: ["mire_crawler"], min: 15, amount: [15, 30], slayer: 10 },
+  { id: "bandits", name: "dune bandits", monsters: ["bandit"], min: 20, amount: [20, 40] },
+  { id: "skeletons", name: "crypt skeletons", monsters: ["skeleton"], min: 22, amount: [20, 40] },
+  { id: "wolves", name: "frost wolves", monsters: ["wolf"], min: 28, amount: [20, 40] },
+  { id: "wisps", name: "frost wisps", monsters: ["frost_wisp"], min: 30, amount: [20, 40], slayer: 30 },
+  { id: "colossi", name: "moss colossi", monsters: ["moss_colossus"], min: 38, amount: [15, 35] },
+  { id: "shades", name: "shades", monsters: ["shade"], min: 40, amount: [20, 40] },
+  { id: "yetis", name: "frost yetis", monsters: ["frost_yeti"], min: 50, amount: [15, 30] },
+  { id: "hounds", name: "gloom hounds", monsters: ["gloom_hound"], min: 55, amount: [20, 40], slayer: 50 },
+  { id: "sentinels", name: "hollow sentinels", monsters: ["hollow_sentinel"], min: 60, amount: [20, 40] },
+] as const;
+export type SlayerTask = typeof SLAYER_TASKS[number];
+/** What Slayer points buy from the Warden. */
+export const SLAYER_REWARDS = [
+  { id: "skip", name: "Cancel my task", cost: 30, text: "A new task, and your streak stays." },
+  { id: "slayer_helm", name: "Warden's helm", cost: 150, text: "+15% accuracy and damage on task (Slayer 20, Defence 10)." },
+  { id: "gloomfang_bow", name: "Gloomfang bow", cost: 600, text: "The Warden's own bow (Ranged 60)." },
+  { id: "insight_lamp", name: "Lamp of insight", cost: 100, text: "Experience in a skill of your choice." },
+] as const;
 
 // ---------- NPCs, shops ----------
 export type ShopDef = { id: string; name: string; stock: readonly string[]; general?: boolean };
@@ -421,7 +531,16 @@ export const SHOPS: Record<string, ShopDef> = {
   sigils: { id: "sigils", name: "Runa's Sigils", stock: ["breeze_sigil", "tide_sigil", "stone_sigil", "ember_sigil", "thought_sigil", "shade_sigil", "storm_sigil", "bloom_sigil", "star_sigil", "path_sigil", "hollow_sigil", "staff", "breeze_staff", "scholar_hat", "scholar_robe"] },
   crafting: { id: "crafting", name: "Tessa's Tannery", stock: ["needle", "thread", "chisel", "leather", "leather_gloves", "leather_boots"] },
   oasis: { id: "oasis", name: "Oasis Bazaar", stock: ["cake", "bread", "inkshark", "sailfish", "silk", "rough_moonstone", "friends_charm", "moonstone_pendant"] },
-  frost: { id: "frost", name: "Frostpeak Outfitters", stock: ["inkcrab", "sailfish", "glimmer_pickaxe", "glimmer_axe", "glimmer_sabre", "glimmer_helm", "glimmer_shield", "hollow_sigil", "path_sigil"] },
+  frost: { id: "frost", name: "Frostpeak Outfitters", stock: ["inkcrab", "sailfish", "glimmer_pickaxe", "glimmer_axe", "glimmer_sabre", "glimmer_helm", "glimmer_shield", "hollow_sigil", "path_sigil", "frosthide_coif", "frosthide_bracers", "glimmer_arrow"] },
+  armour: { id: "armour", name: "Hollis Armoury", stock: ["pewter_helm", "pewter_cuirass", "pewter_greaves", "pewter_shield", "blackiron_helm", "blackiron_cuirass", "blackiron_greaves", "blackiron_shield",
+    "ashsteel_helm", "ashsteel_cuirass", "ashsteel_greaves", "ashsteel_shield", "moonsilver_helm", "moonsilver_shield", "leather_gloves", "leather_boots"] },
+  weapons: { id: "weapons", name: "Edge & Hilt", stock: ["pewter_dagger", "pewter_sword", "pewter_sabre", "blackiron_dagger", "blackiron_sword", "blackiron_sabre", "ashsteel_dagger", "ashsteel_sword", "ashsteel_sabre",
+    "moonsilver_dagger", "moonsilver_sword", "moonsilver_sabre", "glimmer_sword"] },
+  archery: { id: "archery", name: "Fletch & Feather", stock: ["shortbow", "oak_bow", "willow_bow", "maple_bow", "yew_bow", "pewter_arrow", "blackiron_arrow", "ashsteel_arrow", "moonsilver_arrow",
+    "hunter_coif", "hunter_vest", "hunter_chaps", "hunter_bracers", "feather"] },
+  slayer: { id: "slayer", name: "The Warden's Lodge", stock: ["slayer_gem", "inkcrab", "sailfish", "tablet_hollow_square", "blackiron_arrow", "ashsteel_arrow", "leather_boots"] },
+  inn: { id: "inn", name: "The Sleepy Friend", stock: ["bread", "cake", "cooked_meat", "cooked_chicken", "carp", "grayling"] },
+  capes: { id: "capes", name: "The Keeper of Capes", stock: [...SKILLS.map(skill => `${skill}_cape`), "grandmaster_cape"] },
 };
 /** Buy price multipliers. */
 export const SHOP_BUY = 1.3, SHOP_SELL = 0.4;
@@ -434,6 +553,19 @@ export const RELICS = [
   { name: "Moonlit Relic", text: "Gather 10% faster per relic (max 3)", gatherPer: 0.1, max: 3 },
   { name: "Golden Relic", text: "+10% XP and a golden aura while kept", xpPer: 0.1, max: 1 },
 ] as const;
+/**
+ * Rare Market bundles. The simulated economy has one thing RF can buy (the Rare Casket), so every bundle buys caskets
+ * (open them any time at a casket chest) and adds guaranteed goods on top.
+ */
+export const RF_BUNDLES = [
+  { id: "traveller", name: "Traveller's satchel", caskets: 1, text: "Two of every Realm tablet: break one to travel to Friendhollow, Emberforge, the Oasis, Frostpeak or the Pier." },
+  { id: "hamper", name: "Hero's hamper", caskets: 1, text: "Ten inksharks and five cakes, for the Hollow Depths." },
+  { id: "insight", name: "Lamp of insight", caskets: 2, text: "Rub it for experience in a skill of your choice (100 × your level)." },
+  { id: "contract", name: "Slayer's contract", caskets: 2, text: "40 Slayer points from the Warden." },
+  { id: "archer", name: "Archer's quiver", caskets: 2, text: "A maple bow and 300 moonsilver arrows." },
+  { id: "tailor", name: "Tailor's pick", caskets: 3, text: "Choose any wardrobe piece up to Moonlit tier, straight onto your Friend." },
+] as const;
+export type RfBundle = typeof RF_BUNDLES[number];
 /** RF-exclusive wardrobe: every casket grants one of these, drawn on your Friend. */
 export const WARDROBE = [
   { id: "rose_cape", name: "Rose cape", tier: 0, kind: "cape", color: "#d8b6b4" },

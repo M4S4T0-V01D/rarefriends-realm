@@ -1,6 +1,6 @@
 # ⚔ RareFriends Realm
 
-*An old-school adventure starring the Rare Friend you own: fifteen skills, six quests, a large 2.5D world and a Hollow King to end.*
+*An old-school adventure starring the Rare Friend you own: seventeen skills, six quests, a large 2.5D world and a Hollow King to end.*
 
 **▶ Play: https://m4s4t0-v01d.github.io/rarefriends-realm/** · **Preview page: https://m4s4t0-v01d.github.io/rarefriends-realm/preview/**
 *(You need a browser wallet on Robinhood mainnet holding a hardwired Rare Friends Generations NFT.)*
@@ -8,17 +8,19 @@
 ![RareFriends Realm: Friendhollow square in greyscale isometric, with Rare Friends, a fountain and the minimap](docs/town.png)
 
 - **Your Friend is the hero.** The Friend you select walks the Realm in its canonical on-chain sprite, and its Generations family gives a perk (Hoverers run longer, Skeletons pray better, Colossi hit harder, and so on).
-- **Fifteen skills on the classic curve.** Attack, Strength, Defence, Hitpoints, Magic, Prayer, Woodcutting, Fishing, Cooking, Firemaking, Mining, Smithing, Crafting, Thieving and Agility, from level 1 to 99.
+- **Seventeen skills on the classic curve.** Attack, Strength, Defence, Ranged, Hitpoints, Magic, Prayer, Woodcutting, Fishing, Cooking, Firemaking, Mining, Smithing, Crafting, Thieving, Agility and Slayer, from level 1 to 99. Bows fire the arrows in your pack; the Slayer Warden hands out tasks and some creatures only a Slayer can wound. **Reach 99 and buy that skill's mastery cape** from the Keeper of Capes (trimmed once you've mastered two), worn on your Friend.
 - **Old-school controls.** Left-click does the first option; right-click lists them all (*Chop down Tree*, *Attack Grumblin (level-5)*, *Talk-to*, *Pickpocket*, *Examine*). WASD walks; the arrow keys (or a scroll-wheel drag) turn the camera and tilt it from overhead down to almost ground level, scroll zooms in close to your Friend, and the compass turns north to the top of the screen. Use items on things. Minimap, run orb, world map. Every monster shows its health and level.
 - **A large, living world.** A 240 × 240 tile island with 12 regions and 2 dungeons: towns, farms, forests, a mine, a forge, snowy peaks, a lake with a pier, dunes and an oasis, a swamp, ruins, a crypt and the Hollow Depths. The land rolls in walkable hills (lit by slope, with ink contour lines) and you can see a long way across it before the haze, and it's alive: cloud shadows, birds, butterflies, falling leaves, snow, blowing dust, fireflies, jumping fish and forge smoke.
 - **Real buildings.** Brick walls with windows and pitched roofs in faded accent colours (chimneys smoke). Roofs lift away as you walk in, walls in front of you drop to a cutaway, and a roof fades whenever it would hide you.
+- **A bigger Friendhollow.** Market Street with an armoury, a weaponsmith, a bowyer and the Slayer lodge, an inn, and the Rare Market.
+- **Day and night.** A 24-minute day: warm dusks, blue nights lit by lamps, torches, fires and your own small light. A clearer minimap in stronger colours.
 - **Friendhollow Castle.** A three-storey keep with four spired towers north of the square. Click the spiral stairs to climb, old-school style: the kitchen and great hall below, King Hollis's throne room, the royal library, his bedchamber and a tower bank on the first floor, and battlements on the roof with a view over the whole town. Each storey is drawn on top of the one below, and the storeys above you lift away.
 - **Sound everywhere.** Weapon swings, a voice for every creature, axes and picks on the beat, NPC speech blips, footsteps by ground, crackling fires, the forge, water, and regional wildlife.
 - **Pixel art in the Rare Friends style.** Trees, rocks, decor, every item, weapon, skill, spell and prayer icon are pixel art with an ink edge (and the white halo of the canonical sprites), drawn procedurally. Walls are bricked, and skills animate: axes swing and chips fly, pickaxes spark, lines are cast, anvils ring, fires crackle, agility hops.
 - **A real spellbook.** Darts, Lances and Bursts in four elements; curses (Muddle, Wilt, Brittle) and Rootsnare; Gilded and Golden Touch, Forgeheart, Far Reach, Bonebloom, two enchantments and six ways to travel, paid in sigils.
 - **Six quests** from baking for the Realm Feast to defeating the Hollow King (level 92) in his throne room.
 - **A soundtrack for every region.** Sixteen procedural tracks in an old-school MIDI style (recorder, oboe, harp, pizzicato strings, glockenspiel, timpani), including a hand-written main theme, plus level-up and quest fanfares, synthesized live in WebAudio. Entering an area unlocks its track ("You have unlocked a new music track"), and the music player replays any you've found.
-- **Your other Friends follow you**, walking the tiles you leave behind like an old-school pet and adding XP by generation. **Rare Caskets** (simulated $RAREFRIENDS) hold relics and wardrobe pieces. **Progress saves per wallet.** Your **adventurer card** posts to X.
+- **Your other Friends follow you**, walking the tiles you leave behind like an old-school pet and adding XP by generation. **Rare Caskets** (simulated $RAREFRIENDS) hold relics and wardrobe pieces, and **Rare Market** traders in five towns sell bundles (tablets, food, XP lamps, Slayer points, a bow and arrows, a wardrobe piece of your choice) on top of the caskets. **Progress saves per wallet.** Your **adventurer card** posts to X.
 
 | | |
 | --- | --- |
@@ -37,6 +39,10 @@
 | ![Woodcutting](docs/woodcutting.png) | ![Combat](docs/combat.png) | ![Skills tab](docs/skills.png) |
 | **Emberforge** | **Frostpeak** | **Glass Lake** |
 | ![Emberforge](docs/region-emberforge.png) | ![Frostpeak](docs/region-frostpeak.png) | ![Glass Lake](docs/region-glass-lake.png) |
+| **Market Street** | **Night in Friendhollow** | **A mastery cape (and a bow)** |
+| ![Market Street](docs/market-street.png) | ![Night](docs/night.png) | ![Mastery cape](docs/mastery-cape.png) |
+| **The Rare Market** | | |
+| ![Rare Market](docs/rare-market.png) | | |
 | **Friendhollow Castle** | **King Hollis's throne room** | **On the castle roof** |
 | ![Friendhollow Castle](docs/castle.png) | ![Throne room](docs/castle-throne.png) | ![Castle roof](docs/castle-roof.png) |
 | **The Oasis** | **Murkmire Crypt** | **The Hollow King** |
@@ -119,7 +125,8 @@ npm test               # engine tests: XP curve, world generation and reachabili
                        # combat and loot, aggression and safe death, two quests end to end, thieving, an agility lap,
                        # magic (combat, curses, Rootsnare, Gilded Touch, Forgeheart, enchanting, Far Reach, Bonebloom, glides),
                        # prayer, shops and the bank, saves (round trip, tampering, pre-rename ids), caskets, a follower walking your trail,
-                       # music unlocks, the castle stairs up to King Hollis and the roof
+                       # music unlocks, the castle stairs up to King Hollis and the roof, Ranged (bows, arrows, range), Slayer
+                       # (tasks, XP, points, Slayer-only creatures), mastery capes (99s, trims), Rare Market bundles, tablets and lamps
 npm run check          # friendsdk check
 npm run test:browser   # SDK mock-wallet browser runs of the custom host (a two-Friend wallet):
                        #  • title screen, real mouse clicks (chop a tree), right-click menu, dialogue, WASD walking, chat over your head
@@ -127,6 +134,7 @@ npm run test:browser   # SDK mock-wallet browser runs of the custom host (a two-
                        #  • a level-up, smelting at the furnace, a shop, finishing A Friend's Feast (quest-complete scroll)
                        #  • combat by right-click, bank deposit/withdraw, world map, 5 caskets via the runtime's confirmations
                        #  • real clicks up the castle's spiral stairs to the throne room and the roof
+                       #  • a Rare Market bundle bought from a trader through the runtime's confirmation; Market Street, a mastery cape, nightfall
                        #  • adventurer card → Post to X (prefilled post + picture copied), a follower, a 14-region tour
                        #  • save written for the wallet and Friend, reload → "Continue your adventure"
                        #  • a phone in landscape (844 × 390, touch): tap to walk

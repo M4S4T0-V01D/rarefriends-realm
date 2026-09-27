@@ -294,6 +294,19 @@ try {
   assert((await state(() => window.__realm.game().player.wardrobe.length)) >= 2, "caskets add wardrobe pieces");
   await game.getByRole("button", { name: "Close" }).click();
 
+  // ---------- The Rare Market: a trader in Friendhollow, a bundle bought through the runtime's confirmation ----------
+  const trader = await state(() => window.__realm.game().npcs.find(npc => npc.id === "rare_trader"));
+  await teleport(trader.x, trader.y + 2);
+  const traderAt = await screenOf(trader.x, trader.y);
+  await page.mouse.click(traderAt.x, traderAt.y - 18, { button: "right" });
+  await game.getByRole("menuitem", { name: /Rare-market Rare trader/ }).click();
+  await game.getByRole("dialog", { name: "Rare Market" }).waitFor();
+  await page.waitForTimeout(300); await shot("rare-market");
+  await game.locator(".realm-market li").first().getByRole("button", { name: /^Buy/ }).click();
+  await page.getByRole("button", { name: "Confirm preview", exact: true }).click();
+  await until(() => window.__realm.game().player.inventory.some(slot => slot?.id === "tablet_oasis"), 15_000);
+  await game.getByRole("button", { name: "Close" }).click();
+
   // ---------- Adventurer card: Post to X through the host ----------
   await game.getByRole("tab", { name: "Worn equipment" }).click();
   await game.getByRole("button", { name: /Adventurer card/ }).click();
@@ -349,6 +362,22 @@ try {
   await page.waitForTimeout(1500); await shot("castle-roof");
   await state(() => window.__realm.view(0.8, 0.5, 0));
   await state(() => document.querySelector(".realm-side-toggle").click()); // tuck the side panels away for the pictures
+
+  // ---------- Market Street, a mastery cape and a bow, and nightfall ----------
+  await state(() => document.querySelector(".realm-side-toggle").click());
+  await teleport(121, 141);
+  await state(() => window.__realm.view(1, 0.45, -Math.PI / 4));
+  await page.waitForTimeout(1500); await shot("market-street");
+  await state(() => { const p = window.__realm.game().player; p.equipment.weapon = "yew_bow"; p.equipment.cape = "ranged_cape_t"; p.heading = { x: 0, y: -1 }; window.__realm.refresh(); });
+  await state(() => window.__realm.view(2.4, 0.45, -Math.PI / 4));
+  await page.waitForTimeout(1200); await shot("mastery-cape");
+  await state(() => { const p = window.__realm.game().player; delete p.equipment.cape; delete p.equipment.weapon; window.__realm.refresh(); });
+  await teleport(121, 124);
+  await state(() => { window.__realm.time(0.02); window.__realm.view(0.8, 0.5, 0); });
+  await page.waitForTimeout(1500); await shot("night");
+  assert.equal(await game.locator(".realm-clock").textContent(), "☾ Night", "the clock shows night");
+  await state(() => window.__realm.time(0.5));
+  await state(() => document.querySelector(".realm-side-toggle").click());
 
   // ---------- A tour of the Realm ----------
   await state(() => { const p = window.__realm.game().player; p.xp.hitpoints = 13_034_431; p.hp = 99; p.xp.defence = 13_034_431; window.__realm.game().autoRetaliate = false; });

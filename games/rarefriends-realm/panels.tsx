@@ -11,7 +11,7 @@ import {
   weapon, xpMultiplier, type Game, type Message, type Recipe, type Slot,
 } from "./state.ts";
 import {
-  buy, buyPrice, canCast, castSpell, chooseOption, continueDialogue, dialogueAtOptions, itemOptions, playerMaxHit, recipeProblem, sell, sellPrice,
+  bestArrow, bowRange, buy, buyPrice, canCast, capeProblem, castSpell, rangedMaxHit, rubLamp, chooseOption, continueDialogue, dialogueAtOptions, itemOptions, playerMaxHit, recipeProblem, sell, sellPrice,
   castOnItem, setFollower, setStyle, startProduction, swapSlots, toggleRun, togglePrayer, toggleWorn, unequip, useItemOnItem, type OwnedFriend, type Selection,
 } from "./engine.ts";
 import { friendRows, renderWorldMap } from "./render.ts";
@@ -85,7 +85,7 @@ export const TABS: readonly { id: Tab; label: string; glyph: string; key: string
   { id: "inventory", label: "Inventory", glyph: "▣", key: "F4" }, { id: "equipment", label: "Worn equipment", glyph: "⛨", key: "F5" }, { id: "prayer", label: "Prayer", glyph: "✚", key: "F6" },
   { id: "magic", label: "Magic", glyph: "✦", key: "F7" }, { id: "friends", label: "Friends and wardrobe", glyph: "☺", key: "F8" }, { id: "settings", label: "Settings", glyph: "⚙", key: "F9" },
 ];
-export type Settings = { music: boolean; sfx: boolean; musicVolume: number; sfxVolume: number; zoom: number; shiftDrop: boolean; autoMusic: boolean };
+export type Settings = { music: boolean; sfx: boolean; musicVolume: number; sfxVolume: number; zoom: number; shiftDrop: boolean; autoMusic: boolean; dayNight?: boolean };
 export type PanelProps = {
   game: Game; tab: Tab; setTab: (tab: Tab) => void; selection: Selection; setSelection: (selection: Selection) => void;
   openMenu: (x: number, y: number, entries: MenuEntry[]) => void; refresh: () => void; roster: readonly OwnedFriend[]; rosterState: "waiting" | "ready" | "none";
@@ -116,12 +116,17 @@ export function SidePanel(props: PanelProps) {
   );
 }
 function CombatTab({ game, refresh }: PanelProps) {
-  const player = game.player, held = weapon(player);
-  const styles = [["accurate", "Accurate", "Attack XP"], ["aggressive", "Aggressive", "Strength XP"], ["defensive", "Defensive", "Defence XP"], ["controlled", "Controlled", "Shared XP"]] as const;
+  const player = game.player, held = weapon(player), bow = !!held?.equip?.bow;
+  // With a bow the same four buttons are the archer's styles (Longrange reaches two tiles further).
+  const styles = bow
+    ? [["accurate", "Accurate", "Ranged XP"], ["aggressive", "Rapid", "Ranged XP, faster"], ["defensive", "Longrange", "Ranged + Defence XP"]] as const
+    : [["accurate", "Accurate", "Attack XP"], ["aggressive", "Aggressive", "Strength XP"], ["defensive", "Defensive", "Defence XP"], ["controlled", "Controlled", "Shared XP"]] as const;
+  const arrow = bestArrow(game);
   return (
     <div className="realm-combat">
       <h3>{held?.name ?? "Unarmed"}</h3>
-      <p className="realm-muted">Combat level: <b>{combatLevel(player)}</b> · Max hit: <b>{playerMaxHit(game)}</b></p>
+      <p className="realm-muted">Combat level: <b>{combatLevel(player)}</b> · Max hit: <b>{bow ? rangedMaxHit(game) : playerMaxHit(game)}</b>{bow && <> · Range: <b>{bowRange(game)}</b></>}</p>
+      {bow && <p className="realm-note">{arrow ? `Firing ${item(arrow.id).name.toLowerCase()} (${count(player, arrow.id)} left).` : "No arrows you can use in your pack!"}</p>}
       <div className="realm-styles">
         {styles.map(([id, name, xp]) => <button key={id} type="button" aria-pressed={player.style === id} onClick={() => { setStyle(game, id); refresh(); }}><b>{name}</b><small>{xp}</small></button>)}
       </div>
@@ -246,7 +251,8 @@ function EquipmentTab({ game, refresh, openCard }: PanelProps) {
       </div>
       <dl className="realm-bonuses">
         <div><dt>Attack</dt><dd>{signed(total.attack)}</dd></div><div><dt>Strength</dt><dd>{signed(total.strength)}</dd></div>
-        <div><dt>Defence</dt><dd>{signed(total.defence)}</dd></div><div><dt>Magic</dt><dd>{signed(total.magic)}</dd></div><div><dt>Prayer</dt><dd>{signed(total.prayer)}</dd></div>
+        <div><dt>Defence</dt><dd>{signed(total.defence)}</dd></div><div><dt>Ranged</dt><dd>{signed(total.ranged)}</dd></div>
+        <div><dt>Magic</dt><dd>{signed(total.magic)}</dd></div><div><dt>Prayer</dt><dd>{signed(total.prayer)}</dd></div>
       </dl>
       <button type="button" className="realm-wide" onClick={openCard}>Adventurer card · Share on X</button>
     </div>
@@ -355,6 +361,7 @@ function SettingsTab({ game, settings, setSettings, trackName, trackId, playTrac
       <label className="realm-check"><input type="checkbox" checked={settings.sfx} onChange={event => set({ sfx: event.target.checked })} /> Sound effects</label>
       <label className="realm-range">Effects volume <input type="range" min={0} max={100} value={Math.round(settings.sfxVolume * 100)} onChange={event => set({ sfxVolume: Number(event.target.value) / 100 })} /></label>
       <label className="realm-range">Zoom <input type="range" min={55} max={300} value={Math.round(settings.zoom * 100)} onChange={event => set({ zoom: Number(event.target.value) / 100 })} /></label>
+      <label className="realm-check"><input type="checkbox" checked={settings.dayNight !== false} onChange={event => set({ dayNight: event.target.checked })} /> Day and night</label>
       <label className="realm-check"><input type="checkbox" checked={settings.shiftDrop} onChange={event => set({ shiftDrop: event.target.checked })} /> Shift-click to drop</label>
       <label className="realm-check"><input type="checkbox" checked={game.player.run} onChange={() => { toggleRun(game); refresh(); }} /> Run</label>
       <p className="realm-note">{saved}</p>
@@ -500,11 +507,12 @@ export function ShopModal({ game, shopId, refresh, onClose }: { game: Game; shop
         <span className="realm-coins">Coins: <b>{count(player, "coins").toLocaleString()}</b></span></div>
       <div className="realm-bank">
         <div className="realm-bank-grid" aria-label="Shop stock">
-          {shop.stock.map(id => (
-            <button key={id} type="button" className="realm-slot shop" aria-label={`Buy ${item(id).name} for ${buyPrice(game, id)} coins`} title={`${item(id).name}: ${buyPrice(game, id)} coins`} onClick={() => { buy(game, shopId, id, amount); refresh(); }}>
-              <ItemIcon slot={{ id, n: 1 }} size={40} /><small>{buyPrice(game, id).toLocaleString()}</small>
+          {shop.stock.map(id => { const locked = capeProblem(game, id); return (
+            <button key={id} type="button" className={`realm-slot shop${locked ? " locked" : ""}`} aria-label={`Buy ${item(id).name} for ${buyPrice(game, id)} coins${locked ? ` (${locked})` : ""}`}
+              title={`${item(id).name}: ${buyPrice(game, id).toLocaleString()} coins${locked ? `. ${locked}` : ""}`} onClick={() => { buy(game, shopId, id, amount); refresh(); }}>
+              <ItemIcon slot={{ id, n: 1 }} size={40} /><small>{buyPrice(game, id) >= 10_000 ? `${Math.round(buyPrice(game, id) / 1000)}K` : buyPrice(game, id).toLocaleString()}</small>
             </button>
-          ))}
+          ); })}
         </div>
         <div className="realm-inventory small" aria-label="Inventory (click to sell)">
           {player.inventory.map((slot, index) => (
@@ -515,7 +523,22 @@ export function ShopModal({ game, shopId, refresh, onClose }: { game: Game; shop
           ))}
         </div>
       </div>
-      <p className="realm-note">{shop.general ? "The general store buys almost anything." : "This shop only buys what it sells."} {game.player.familyId === 2 ? "Big family: 10% off." : ""}</p>
+      <p className="realm-note">{shopId === "capes" ? "A mastery cape needs level 99 in its skill. Master two skills and every cape comes trimmed." : shop.general ? "The general store buys almost anything." : "This shop only buys what it sells."} {game.player.familyId === 2 && shopId !== "capes" ? "Big family: 10% off." : ""}</p>
+    </Modal>
+  );
+}
+/** Rubbing a lamp of insight: pick the skill. */
+export function LampModal({ game, refresh }: { game: Game; refresh: () => void }) {
+  const slot = game.ui.lamp;
+  if (slot === null) return null;
+  const close = () => { game.ui.lamp = null; refresh(); };
+  return (
+    <Modal title="Lamp of insight" onClose={close}>
+      <p>Choose a skill: you'll gain 100 × its level in experience.</p>
+      <div className="realm-skills lamp">
+        {SKILLS.map(skill => <button key={skill} type="button" className="realm-skill" aria-label={`${SKILL_NAMES[skill]}: ${(100 * levelForXp(game.player.xp[skill])).toLocaleString()} XP`}
+          title={SKILL_NAMES[skill]} onClick={() => { rubLamp(game, slot, skill); refresh(); }}><PixelIcon art={skillArt(skill)} size={27} /><span>{levelForXp(game.player.xp[skill])}</span></button>)}
+      </div>
     </Modal>
   );
 }

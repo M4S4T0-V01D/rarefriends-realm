@@ -5,15 +5,15 @@ import type { GameComponentProps } from "@rarefriends/friendsdk/runtime";
 import { formatGameAmount } from "@rarefriends/friendsdk/ui";
 import { expectedReward, maximumPrize, type GamePlay, type GameSnapshot } from "@rarefriends/friendsdk/game";
 import { createFriendReader, type GenerationSprites } from "@rarefriends/friendsdk/sprites";
-import { FAMILY_NAMES, FAMILY_PERKS, RELICS, SKILL_ICONS, SPELLS, WARDROBE, item, type Skill } from "./data.ts";
+import { FAMILY_NAMES, FAMILY_PERKS, RELICS, RF_BUNDLES, SKILL_ICONS, SPELLS, WARDROBE, item, type Skill } from "./data.ts";
 import { QUESTS, questPoints, MAX_QUEST_POINTS } from "./content.ts";
 import { TICK_MS, combatLevel, createGame, message, totalLevel, type Game, type Projectile } from "./state.ts";
 import {
-  chooseOption, closeInterfaces, collectFromCasket, continueDialogue, menuFor, unlockMusic, restore, serialize, setFollower, setHeld, setRelics, tick, toggleRun, walkTo, type OwnedFriend, type Selection,
+  chooseOption, closeInterfaces, collectFromCasket, continueDialogue, grantBundle, menuFor, tailorChoices, unlockMusic, restore, serialize, setFollower, setHeld, setRelics, tick, toggleRun, walkTo, type OwnedFriend, type Selection,
 } from "./engine.ts";
-import { PITCH, VIEW, ZOOM, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
+import { PITCH, VIEW, ZOOM, daylight, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
 import {
-  BankModal, ChatBox, ContextMenu, DialogueBox, FriendPortrait, HelpModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
+  BankModal, ChatBox, ContextMenu, DialogueBox, FriendPortrait, HelpModal, LampModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
   cancelLongPress, longPress, type MenuEntry, type Settings, type Tab,
 } from "./panels.tsx";
 import { REGULAR_SPRITES } from "./regulars.ts";
@@ -37,7 +37,11 @@ const CAMERA_KEYS = new Set(["arrowleft", "arrowright", "arrowup", "arrowdown"])
 const TURN_SPEED = 1.9, TILT_SPEED = 0.45;
 /** The camera angle that puts world north at the top of the screen (the compass). */
 const NORTH = -Math.PI / 4;
-const DEFAULT_SETTINGS: Settings = { music: true, sfx: true, musicVolume: 0.7, sfxVolume: 0.8, zoom: 0.8, shiftDrop: false, autoMusic: true };
+/** A Realm day lasts 24 minutes. Automated test runs stay at noon unless they set the time. */
+const DAY_MS = 24 * 60_000;
+let fixedTime: number | null = typeof navigator !== "undefined" && navigator.webdriver ? 0.5 : null;
+const timeOfDay = () => fixedTime ?? ((Date.now() / DAY_MS + 0.3) % 1);
+const DEFAULT_SETTINGS: Settings = { music: true, sfx: true, musicVolume: 0.7, sfxVolume: 0.8, zoom: 0.8, shiftDrop: false, autoMusic: true, dayNight: true };
 
 /** RareFriends Realm. The SDK runtime supplies wallet connection, the verified owned Friend and the fixed (simulated) RF client. */
 export default function RareFriendsRealm({ friendId, client, paused }: GameComponentProps) {
@@ -55,6 +59,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const [levelUps, setLevelUps] = useState<{ skill: Skill; level: number }[]>([]), [quest, setQuest] = useState<string | null>(null), [dead, setDead] = useState(false);
   const [settings, setSettingsState] = useState<Settings>(DEFAULT_SETTINGS), [roster, setRoster] = useState<OwnedFriend[]>([]), [rosterState, setRosterState] = useState<"waiting" | "ready" | "none">("waiting");
   const [hosted, setHosted] = useState<"waiting" | "linked" | "none">("waiting"), [hasSave, setHasSave] = useState<{ total: number; combat: number; qp: number; where: string } | null>(null);
+  const [tailorPick, setTailorPick] = useState("");
   const [snapshot, setSnapshot] = useState<GameSnapshot | null>(null), [busy, setBusy] = useState(false), [casketError, setCasketError] = useState(""), [reveal, setReveal] = useState<CasketResult[] | null>(null);
   const [size, setSize] = useState({ width: 960, height: 640, scale: 1 }), [sideOpen, setSideOpen] = useState(true), [shareStatus, setShareStatus] = useState(""), [cardUrl, setCardUrl] = useState<string | null>(null);
   const pendingSave = useRef<unknown>(null), cardBlob = useRef<Blob | null>(null);
@@ -146,6 +151,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       // Automated browser tests only (navigator.webdriver): a handle for driving the camera and state.
       if (navigator.webdriver) (window as unknown as { __realm?: unknown }).__realm = {
         game: () => game.current, camera: () => ({ ...camera.current }), refresh: () => refresh(),
+        /** Fix the time of day (0 midnight … 0.5 noon), or null to follow the clock. */
+        time: (value: number | null) => { fixedTime = value; },
         view: (zoom: number, pitch: number, angle = 0) => { setSettings({ ...live.current.settings, zoom }); camera.current.pitch = pitch; camera.current.angle = angle; cameraGoal.current = null; },
         screenOf: (x: number, y: number) => {
           const view = canvas.current!.getBoundingClientRect(), point = toScreen(camera.current, x, y);
@@ -261,6 +268,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         follower: player.follower !== null ? followerSprites.current.get(player.follower) ?? null : null, canonical: CANONICAL,
         hoverTile: current === "playing" ? hoverTile.current : null, marker: marker.current, reducedMotion, hits: hits.current, fireworks: fireworks.current, chat: chat.current,
         projectiles: projectiles.current, sfx: (name, gain) => audio.current?.sfx(name as SfxName, gain),
+        time: current === "playing" && live.current.settings.dayNight !== false ? timeOfDay() : null,
       });
       if (mini && current === "playing" && now - lastHud > 90) {
         lastHud = now; const size = mini.canvas.width;
@@ -507,10 +515,11 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
             <Orbs game={state} onRun={() => { toggleRun(state); refresh(); }} onMap={() => setModal("map")} onZoom={delta => setSettings({ ...settings, zoom: Math.max(ZOOM.min, Math.min(ZOOM.max, settings.zoom * (delta > 0 ? 1.15 : 0.87))) })}
               onRotate={delta => { const from = cameraGoal.current?.angle ?? camera.current.angle; cameraGoal.current = { angle: from + delta, pitch: cameraGoal.current?.pitch ?? camera.current.pitch }; }} />
             <div className="realm-minimap">
-              <canvas ref={minimap} width={152} height={152} onClick={onMinimap} aria-label="Minimap: click to walk, scroll to zoom"
+              <canvas ref={minimap} width={180} height={180} onClick={onMinimap} aria-label="Minimap: click to walk, scroll to zoom"
                 onWheel={event => { miniZoom.current = Math.max(1.6, Math.min(7, miniZoom.current * (event.deltaY < 0 ? 1.15 : 0.87))); }} />
               <button type="button" ref={compass} className="realm-compass" title="Face north" aria-label="Compass: face north"
                 onClick={() => { const from = cameraGoal.current?.angle ?? camera.current.angle; cameraGoal.current = { angle: NORTH + Math.round((from - NORTH) / (Math.PI * 2)) * Math.PI * 2, pitch: cameraGoal.current?.pitch ?? camera.current.pitch }; }}><i aria-hidden="true">▲</i><b>N</b></button>
+              {settings.dayNight !== false && (() => { const light = daylight(timeOfDay()); return <span className="realm-clock" title="Time of day">{light.label === "Night" ? "☾" : light.label === "Day" ? "☀" : "◐"} {light.label}</span>; })()}
             </div>
           </div>
           <div className="realm-drops" aria-hidden="true">
@@ -533,7 +542,23 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           {selection && <div className="realm-selection" role="status">{selection.kind === "item" ? `Use ${player.inventory[selection.slot] ? itemName(player.inventory[selection.slot]!.id) : "item"} ->` : `Cast ${SPELLS.find(spell => spell.id === selection.spell)?.name ?? "spell"} ->`} pick a target <button type="button" onClick={() => setSelection(null)}>Cancel</button></div>}
 
           {state.ui.bank && <BankModal game={state} refresh={refresh} onClose={() => { state.ui.bank = false; refresh(); }} openMenu={(x, y, entries) => setMenu({ x, y, entries })} />}
-          {state.ui.shop && state.ui.shop !== "__caskets" && <ShopModal game={state} shopId={state.ui.shop} refresh={refresh} onClose={() => { state.ui.shop = null; refresh(); }} />}
+          <LampModal game={state} refresh={refresh} />
+          {state.ui.shop === "__market" && (
+            <Modal title="Rare Market" onClose={() => { state.ui.shop = null; refresh(); }} wide>
+              <p className="realm-sim">Simulated $RAREFRIENDS. No real tokens, contracts or transactions. Balance: <b>{snapshot ? rf(snapshot.rfBalance) : "…"}</b></p>
+              <p>RF buys one thing, the <b>Rare Casket</b>, so every bundle buys caskets (open them at any casket chest) and adds its goods on top. Traders in Friendhollow, Emberforge, the Oasis, Frostpeak and on Pike's Pier.</p>
+              <ul className="realm-market">{RF_BUNDLES.map(bundle => {
+                const choices = bundle.id === "tailor" ? tailorChoices(state) : [], pick = choices.some(piece => piece.id === tailorPick) ? tailorPick : choices[0]?.id ?? "";
+                return <li key={bundle.id}><div><b>{bundle.name}</b><small>{bundle.text} Includes {bundle.caskets} Rare Casket{bundle.caskets > 1 ? "s" : ""}.</small></div>
+                  {bundle.id === "tailor" && (choices.length ? <select aria-label="Wardrobe piece" value={pick} onChange={event => setTailorPick(event.target.value)}>{choices.map(piece => <option key={piece.id} value={piece.id}>{piece.name}</option>)}</select> : <small>You own them all!</small>)}
+                  <button type="button" className="realm-primary" disabled={busy || paused || (bundle.id === "tailor" && !choices.length)}
+                    onClick={() => void casket(() => client.buy(BigInt(bundle.caskets)), () => { grantBundle(state, bundle.id, pick); audio.current?.sfx("coins"); refresh(); })}>Buy · {rf(definition.price * BigInt(bundle.caskets))}</button></li>;
+              })}</ul>
+              {casketError && <p className="realm-error" role="alert">{casketError}</p>}
+              <div className="realm-buttons"><button type="button" onClick={() => { state.ui.shop = "__caskets"; refresh(); }}>Open your caskets ({(snapshot?.consumables ?? 0n).toString()} waiting)</button></div>
+            </Modal>
+          )}
+          {state.ui.shop && state.ui.shop !== "__caskets" && state.ui.shop !== "__market" && <ShopModal game={state} shopId={state.ui.shop} refresh={refresh} onClose={() => { state.ui.shop = null; refresh(); }} />}
           {(modal === "caskets" || state.ui.shop === "__caskets") && (
             <Modal title="Rare Caskets" onClose={() => { setModal(null); state.ui.shop = null; setReveal(null); refresh(); }} wide>
               <p className="realm-sim">Simulated $RAREFRIENDS. No real tokens, contracts or transactions. Balance: <b>{snapshot ? rf(snapshot.rfBalance) : "…"}</b></p>

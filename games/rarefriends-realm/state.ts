@@ -76,13 +76,13 @@ export type GameEvent =
   | { type: "swing"; weapon: "slash" | "stab" | "crush" | "punch"; tick: number };
 export type SoundName =
   | "chop" | "mine" | "splash" | "catch" | "fire" | "sizzle" | "burn" | "smelt" | "anvil" | "hit" | "miss" | "hurt" | "eat" | "bury" | "coins"
-  | "pickup" | "drop" | "door" | "level" | "quest" | "spell" | "teleport" | "death" | "stun" | "jump" | "click" | "equip" | "kill" | "pray" | "fell";
+  | "pickup" | "drop" | "door" | "level" | "quest" | "spell" | "teleport" | "death" | "stun" | "jump" | "click" | "equip" | "kill" | "pray" | "fell" | "bow";
 export type Message = { text: string; tone: "game" | "info" | "warn" | "quest" | "level" | "npc" | "public"; tick: number };
 
 export type Game = {
   world: World; tick: number; player: Player; monsters: Monster[]; npcs: Npc[]; ground: GroundItem[]; fires: Fire[];
   depleted: Map<number, number>; messages: Message[]; events: GameEvent[]; rng: () => number; nextUid: number;
-  dialogue: Dialogue | null; ui: { shop: string | null; bank: boolean; production: ProductionMenu | null };
+  dialogue: Dialogue | null; ui: { shop: string | null; bank: boolean; production: ProductionMenu | null; lamp: number | null };
   held: { dx: number; dy: number } | null; autoRetaliate: boolean; playTicks: number;
   overheads: Map<number, { text: string; until: number }>;
   /** Your owned-Friend follower, walking the tiles you leave behind. */
@@ -131,7 +131,7 @@ export function createGame(options: { familyId: number; friendId: number; rng?: 
   const world = options.world ?? realmWorld(), rng = options.rng ?? Math.random;
   const game: Game = {
     world, tick: 0, player: createPlayer(world, options.familyId, options.friendId), monsters: [], npcs: [], ground: [], fires: [],
-    depleted: new Map(), messages: [], events: [], rng, nextUid: 1, dialogue: null, ui: { shop: null, bank: false, production: null },
+    depleted: new Map(), messages: [], events: [], rng, nextUid: 1, dialogue: null, ui: { shop: null, bank: false, production: null, lamp: null },
     held: null, autoRetaliate: true, playTicks: 0, overheads: new Map(), pet: null, trail: [],
   };
   for (const spawn of world.spawns) {
@@ -163,8 +163,8 @@ export function totalXp(player: Player) { return SKILLS.reduce((sum, skill) => s
 export function combatLevel(player: Player) {
   const L = (skill: Skill) => levelForXp(player.xp[skill]);
   const base = 0.25 * (L("defence") + L("hitpoints") + Math.floor(L("prayer") / 2));
-  const melee = 0.325 * (L("attack") + L("strength")), magic = 0.325 * Math.floor(1.5 * L("magic"));
-  return Math.floor(base + Math.max(melee, magic));
+  const melee = 0.325 * (L("attack") + L("strength")), magic = 0.325 * Math.floor(1.5 * L("magic")), ranged = 0.325 * Math.floor(1.5 * L("ranged"));
+  return Math.floor(base + Math.max(melee, magic, ranged));
 }
 /** XP multiplier from the realm rate, kept Rare Relics and your follower's generation. */
 export function xpMultiplier(player: Player) {
@@ -189,6 +189,7 @@ export function addXp(game: Game, skill: Skill, base: number, options: { raw?: b
     if (skill === "hitpoints") player.hp += after - before;
     if (skill === "prayer") player.prayer += after - before;
     message(game, `Congratulations, you've just advanced your ${SKILL_NAMES[skill]} level. You are now level ${after}.`, "level");
+    if (after === 99) message(game, `You've mastered ${SKILL_NAMES[skill]}! The Keeper of Capes in Friendhollow Castle has a cape with your name on it.`, "quest");
     emit(game, { type: "level", skill, level: after, tick: game.tick });
     sound(game, "level");
   }
@@ -287,7 +288,7 @@ export function bankWithdraw(player: Player, id: string, n: number) {
 
 // ---------- Equipment ----------
 export function bonuses(player: Player): Bonuses {
-  const total: Bonuses = { attack: 0, strength: 0, defence: 0, magic: 0, prayer: 0 };
+  const total: Bonuses = { attack: 0, strength: 0, defence: 0, ranged: 0, magic: 0, prayer: 0 };
   for (const id of Object.values(player.equipment)) {
     const equip = id ? item(id).equip : undefined;
     if (!equip) continue;

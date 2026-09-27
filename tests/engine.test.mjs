@@ -3,8 +3,9 @@ import assert from "node:assert/strict";
 import {
   buy, canWalk, castSpell, chooseOption, collectFromCasket, continueDialogue, createGame, equip, findPath, itemOptions, menuFor, restore, sell,
   serialize, setFollower, setRelics, setTarget, smeltingRecipes, smithingRecipes, startProduction, tick, togglePrayer, useItemOnItem, walkTo, setHeld,
-  successChance, hitChance, unlockMusic, castOnItem, isBound,
+  successChance, hitChance, unlockMusic, castOnItem, isBound, grantBundle, rubLamp, breakTablet, capeProblem,
 } from "../games/rarefriends-realm/engine.ts";
+import { currentTask, slayerPoints } from "../games/rarefriends-realm/slayer.ts";
 import { ITEM_LIST, MONSTERS, SHOPS, SKILLS, SPELLS, TREES, XP_RATE, XP_TABLE, item, levelForXp } from "../games/rarefriends-realm/data.ts";
 import { NPCS, QUESTS, MAX_QUEST_POINTS, questPoints } from "../games/rarefriends-realm/content.ts";
 import { FLOOR_Y, H, REGIONS, T, W, createWorld, floorAt, objectAtTile, onLevel, realPoint, regionAt, terrainAt } from "../games/rarefriends-realm/world.ts";
@@ -67,7 +68,7 @@ test("a fresh adventurer: level 3, 10 hitpoints, a starter kit", () => {
   assert.equal(level(g, "hitpoints"), 10);
   assert.equal(g.player.hp, 10);
   for (const id of ["pewter_axe", "pewter_pickaxe", "small_net", "tinderbox"]) assert(has(g.player, id), id);
-  assert.equal(SKILLS.length, 15);
+  assert.equal(SKILLS.length, 17);
 });
 
 test("the world is large, deterministic and every landmark is reachable on foot", () => {
@@ -535,4 +536,85 @@ test("use item on item: tinderbox on logs lights a fire, chisel cuts gems", () =
   g.player.xp.crafting = XP_TABLE[20]; give(g.player, "chisel"); give(g.player, "rough_moonstone");
   useItemOnItem(g, g.player.inventory.findIndex(slot => slot?.id === "chisel"), g.player.inventory.findIndex(slot => slot?.id === "rough_moonstone"));
   until(g, () => has(g.player, "moonstone"), 20);
+});
+
+test("Ranged: a bow fires your best arrows from a distance, and trains Ranged", () => {
+  const g = newGame(), p = g.player;
+  give(p, "pewter_shield"); equip(g, p.inventory.findIndex(slot => slot?.id === "pewter_shield"));
+  give(p, "shortbow"); equip(g, p.inventory.findIndex(slot => slot?.id === "shortbow"));
+  assert.equal(p.equipment.weapon, "shortbow"); assert.equal(p.equipment.shield, undefined, "a bow takes both hands");
+  assert(has(p, "pewter_shield"), "…so the shield goes back in the pack");
+  give(p, "pewter_arrow", 60); give(p, "ashsteel_arrow", 5);
+  const cow = g.monsters.find(monster => monster.def.id === "cow");
+  standNear(g, cow.x, cow.y, 5);
+  setTarget(g, { kind: "monster", uid: cow.uid, option: "Attack" });
+  let closest = Infinity;
+  until(g, () => { closest = Math.min(closest, Math.max(Math.abs(p.x - cow.x), Math.abs(p.y - cow.y))); return p.xp.ranged > 0 || cow.dead; }, 200);
+  assert(closest > 1, "shot from range, never walked up to it");
+  assert(count(p, "ashsteel_arrow") === 5, "ashsteel arrows need Ranged 10: pewter first");
+  assert(count(p, "pewter_arrow") < 60, "arrows are used up");
+});
+
+test("Slayer: a task from the Warden, XP per kill, points when it's done, and creatures only a Slayer can wound", () => {
+  const g = newGame(), p = g.player;
+  const warden = g.npcs.find(npc => npc.id === "slayer_master");
+  assert(warden, "the Warden is in Friendhollow");
+  standNear(g, warden.x, warden.y, 1);
+  setTarget(g, { kind: "npc", uid: warden.uid, option: "Assignment" });
+  until(g, () => g.dialogue !== null, 30);
+  while (g.dialogue) continueDialogue(g);
+  const task = currentTask(g);
+  assert(task, "a task is given");
+  // Take the rats task and finish it with a big hitter.
+  p.questData.slayer_task = 1; p.questData.slayer_left = 2;
+  for (const skill of ["attack", "strength", "defence", "hitpoints"]) p.xp[skill] = 1_000_000;
+  p.hp = 99;
+  for (let kill = 0; kill < 2; kill++) {
+    const rat = g.monsters.filter(monster => monster.def.id === "ink_rat" && !monster.dead).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0];
+    standNear(g, rat.x, rat.y, 1);
+    setTarget(g, { kind: "monster", uid: rat.uid, option: "Attack" });
+    until(g, () => rat.dead, 200);
+  }
+  assert(p.xp.slayer > 0, "Slayer XP on task");
+  assert.equal(currentTask(g), null); assert.equal(slayerPoints(g), 10, "10 points for a finished task");
+  // A mire crawler can't be hurt below Slayer 10.
+  const crawler = g.monsters.find(monster => monster.def.id === "mire_crawler");
+  standNear(g, crawler.x, crawler.y, 1);
+  setTarget(g, { kind: "monster", uid: crawler.uid, option: "Attack" });
+  run(g, 8);
+  assert.equal(crawler.hp, crawler.def.hp, "no damage without the Slayer level");
+  assert(g.messages.some(entry => entry.text.includes("Slayer level of 10")));
+});
+
+test("Mastery capes: 99 in a skill and 99,000 coins, trimmed once you've mastered two", () => {
+  const g = newGame(), p = g.player;
+  give(p, "coins", 200_000);
+  assert(capeProblem(g, "attack_cape"), "no cape without 99");
+  assert.equal(buy(g, "capes", "attack_cape", 1), 0);
+  p.xp.attack = 13_034_431;
+  const coins = count(p, "coins");
+  assert.equal(buy(g, "capes", "attack_cape", 1), 1);
+  assert(has(p, "attack_cape")); assert.equal(count(p, "coins"), coins - 99_000);
+  p.xp.strength = 13_034_431;
+  buy(g, "capes", "strength_cape", 1);
+  assert(has(p, "strength_cape_t"), "two 99s: trimmed");
+  equip(g, p.inventory.findIndex(slot => slot?.id === "attack_cape"));
+  assert.equal(p.equipment.cape, "attack_cape");
+  assert(capeProblem(g, "grandmaster_cape"), "the Grandmaster's cape needs every skill");
+});
+
+test("Rare Market bundles: goods on top of the caskets; tablets travel, lamps give XP", () => {
+  const g = newGame(), p = g.player;
+  grantBundle(g, "traveller");
+  for (const place of ["hollow_square", "emberforge", "oasis", "frostpeak", "pier"]) assert.equal(count(p, `tablet_${place}`), 2, place);
+  breakTablet(g, p.inventory.findIndex(slot => slot?.id === "tablet_emberforge"));
+  run(g, 4);
+  assert(Math.hypot(p.x - g.world.places.emberforge.x, p.y - g.world.places.emberforge.y) < 2, "the tablet takes you to Emberforge");
+  grantBundle(g, "insight");
+  const before = p.xp.cooking;
+  rubLamp(g, p.inventory.findIndex(slot => slot?.id === "insight_lamp"), "cooking");
+  assert.equal(p.xp.cooking - before, 100, "100 × level 1");
+  grantBundle(g, "contract"); assert.equal(slayerPoints(g), 40);
+  grantBundle(g, "tailor", "starlit_hood");
+  assert(p.wardrobe.includes("starlit_hood") && p.worn.includes("starlit_hood"));
 });

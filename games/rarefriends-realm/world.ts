@@ -157,7 +157,7 @@ export function createWorld(seed = 20260927): World {
   };
   const free = (x: number, y: number) => WALKABLE.has(get(x, y)) && objectAt[tileIndex(x, y)] < 0 && get(x, y) !== T.BRIDGE && get(x, y) !== T.PATH && get(x, y) !== T.COBBLE;
   /** Four-walled building with a doorway, floored inside. `door` is the side the doorway faces. */
-  const buildings: Building[] = [];
+  const buildings: Building[] = [], doorways: [number, number][] = [];
   const building = (x0: number, y0: number, x1: number, y1: number, door: "n" | "s" | "e" | "w", floor: number = T.WOOD, doorAt?: number, roof: Partial<Building> = {}) => {
     const inner = buildings.some(b => x0 > b.x0 && y0 > b.y0 && x1 < b.x1 && y1 < b.y1);
     buildings.push({ x0, y0, x1, y1, roof: inner ? "none" : "gable", color: ROOF_COLORS[buildings.length % ROOF_COLORS.length], chimney: false, name: "", ...roof, ...(inner ? { roof: "none" as const } : {}) });
@@ -166,7 +166,7 @@ export function createWorld(seed = 20260927): World {
       put(x, y, edge ? T.WALL : floor); clearAt(x, y);
     }
     const mx = doorAt ?? Math.floor((x0 + x1) / 2), my = doorAt ?? Math.floor((y0 + y1) / 2);
-    const gap = (x: number, y: number) => put(x, y, floor);
+    const gap = (x: number, y: number) => { put(x, y, floor); doorways.push([x, y]); };
     if (door === "s") { gap(mx, y1); gap(mx + 1, y1); }
     if (door === "n") { gap(mx, y0); gap(mx + 1, y0); }
     if (door === "e") { gap(x1, my); gap(x1, my + 1); }
@@ -208,7 +208,7 @@ export function createWorld(seed = 20260927): World {
   const REGION_BLOBS: readonly [RegionId, number, number, number, number][] = [
     ["whisperwood", 44, 82, 40, 44], ["ashen_hills", 114, 48, 30, 26], ["emberforge", 162, 48, 18, 14], ["frostpeak", 206, 22, 36, 22],
     ["pale_dunes", 204, 102, 36, 36], ["glass_lake", 178, 166, 34, 26], ["murkmire", 44, 166, 38, 28], ["mossy_ruins", 122, 172, 26, 20],
-    ["farmland", 88, 124, 16, 16], ["oasis", 190, 116, 11, 10], ["friendhollow", 121, 118, 20, 20],
+    ["farmland", 88, 124, 16, 16], ["oasis", 190, 116, 11, 10], ["friendhollow", 121, 124, 26, 28],
   ];
   for (const [id, cx, cy, rx, ry] of REGION_BLOBS) regionBlob(cx, cy, rx, ry, id);
 
@@ -256,7 +256,9 @@ export function createWorld(seed = 20260927): World {
   road([[104, 121], [96, 136], [86, 146], [78, 152], [62, 164], [48, 172], [42, 176]]);        // south-west → Murkmire crypt
   road([[114, 58], [100, 58], [84, 70], [68, 76]]);                                              // mine → deep woods
   // Friendhollow's cobbled square and streets.
-  blob(TOWN.x, TOWN.y, 14, 13, T.COBBLE, 0.12);
+  blob(TOWN.x, TOWN.y, 17, 15, T.COBBLE, 0.12);
+  // Market Street runs south from the square; lanes lead to the inn and the Rare Market.
+  fillRect(116, 133, 126, 151, T.COBBLE); fillRect(134, 122, 134, 133, T.COBBLE); fillRect(101, 114, 104, 120, T.COBBLE);
   // Emberforge, Frostpeak camp and Oasis grounds.
   blob(162, 48, 9, 7, T.COBBLE, 0.15);
   blob(196, 30, 6, 4, T.STONE, 0.15);
@@ -290,8 +292,26 @@ export function createWorld(seed = 20260927): World {
   decor(116, 121, "bench"); decor(127, 121, "bench");
   add({ kind: "sign", x: 124, y: 124, blocks: true, name: "Signpost", text: "North: Friendhollow Castle, Ashen Hills. East: Oasis, Glass Lake. South: Mossy Ruins. West: Hollow Farms, Whisperwood." });
   npc("guide", 123, 123); npc("glimmer", 118, 116); // #7730, the Old Glimmer
-  for (let i = 0; i < 6; i++) npc("villager", 112 + Math.floor(random() * 20), 115 + Math.floor(random() * 12), 5);
   add({ kind: "well", x: 131, y: 122, blocks: true, name: "Well" });
+  // ---------- Market Street and the new quarter ----------
+  building(108, 135, 115, 141, "e", T.WOOD, undefined, { name: "Hollis Armoury", color: "#8f9cb2", chimney: true });
+  npc("armourer", 110, 138); decor(109, 136, "shelf"); decor(112, 136, "shelf"); decor(109, 140, "armour"); decor(111, 140, "armour");
+  building(108, 144, 115, 150, "e", T.WOOD, undefined, { name: "Edge & Hilt", color: "#c99a96", chimney: true });
+  npc("weaponsmith", 110, 147); decor(109, 145, "shelf"); decor(112, 145, "shelf"); add({ kind: "anvil", x: 110, y: 149, blocks: true, name: "Anvil" });
+  building(127, 135, 134, 141, "w", T.WOOD, undefined, { name: "Fletch & Feather", color: "#9aab92" });
+  npc("bowyer", 131, 138); decor(133, 136, "shelf"); decor(133, 140, "shelf"); decor(130, 136, "crate"); decor(132, 140, "hay", true, "Straw target");
+  building(127, 144, 134, 150, "w", T.STONE, undefined, { name: "The Warden's Lodge", color: "#6d6b67" });
+  npc("slayer_master", 131, 147); decor(133, 145, "banner"); decor(133, 149, "torch"); decor(130, 149, "chest", true, "Trophy chest"); decor(129, 145, "shelf", true, "Trophy shelf");
+  building(135, 124, 141, 131, "w", T.WOOD, undefined, { name: "The Sleepy Friend", color: "#cdb98a", chimney: true });
+  npc("innkeeper", 138, 126); add({ kind: "range", x: 140, y: 125, blocks: true, name: "Cooking range" }); decor(137, 129, "table"); decor(139, 129, "table"); decor(138, 128, "bench", false); decor(140, 130, "barrel");
+  building(136, 135, 141, 140, "w", T.WOOD, undefined, { name: "House", color: "#a996b5", chimney: true });
+  decor(138, 136, "bed"); decor(140, 139, "table");
+  building(99, 107, 106, 113, "s", T.CARPET, undefined, { name: "Rare Market", color: "#d8b6b4" });
+  npc("rare_trader", 102, 109); add({ kind: "casket", x: 104, y: 109, blocks: true, name: "Rare Casket chest" }); decor(100, 108, "shelf"); decor(105, 108, "banner");
+  for (const [x, y] of [[117, 136], [125, 136], [117, 143], [125, 143], [117, 150], [125, 150]]) decor(x, y, "lamp");
+  add({ kind: "sign", x: 124, y: 133, blocks: true, name: "Signpost", text: "Market Street. West: Hollis Armoury, Edge & Hilt. East: Fletch & Feather, the Warden's Lodge. The Sleepy Friend inn is east of the square; the Rare Market west." });
+  decor(119, 139, "bench"); decor(123, 146, "bench"); decor(118, 147, "barrel"); decor(124, 140, "crate");
+  scatter(106, 114, 138, 151, 10, (x, y) => npc("villager", x, y, 5), (x, y) => get(x, y) === T.COBBLE && objectAt[tileIndex(x, y)] < 0);
   // Riverside house: Pike's Tackle.
   npc("pike", 152, 106); decor(154, 105, "barrel"); decor(154, 108, "crate");
   // ---------- Friendhollow Castle ----------
@@ -394,6 +414,7 @@ export function createWorld(seed = 20260927): World {
   person(0, 13, 7, "captain", 2); person(0, 7, 13, "guard", 3); person(0, 12, 13, "guard", 3);
   add({ kind: "casket", ...at(0, 16, 5), blocks: true, name: "Rare Casket chest" }); person(0, 15, 6, "emporium");
   place(0, 8, 2, "banner"); place(0, 11, 2, "banner");
+  person(0, 16, 12, "cape_keeper"); place(0, 17, 12, "shelf", "Cape rack");
   for (const [col, row] of [[8, 11], [11, 11], [8, 14], [11, 14]]) place(0, col, row, "pillar");
   for (const [col, row] of [[2, 10], [17, 10], [2, 14], [17, 14], [5, 17], [14, 17]]) place(0, col, row, "torch");
   place(0, 1, 16, "armour"); place(0, 1, 18, "armour"); place(0, 3, 18, "crate");
@@ -417,7 +438,7 @@ export function createWorld(seed = 20260927): World {
   // Trees and flowers around town.
   scatter(98, 100, 146, 142, 26, (x, y) => tree(x, y, "tree"), (x, y) => free(x, y) && get(x, y) === T.GRASS);
   scatter(104, 104, 140, 140, 30, (x, y) => decor(x, y, random() > 0.5 ? "flowers" : "bush", false), (x, y) => free(x, y) && get(x, y) === T.GRASS);
-  monsters("ink_rat", 130, 132, 140, 140, 4);
+  monsters("ink_rat", 136, 142, 146, 152, 4);
 
   // ---------- Hollow Farms ----------
   // Cow pen (fenced) with a dairy cow; chicken coop; wheat field; windmill.
@@ -584,6 +605,23 @@ export function createWorld(seed = 20260927): World {
   }
   monsters("cow", 60, 128, 76, 138, 3);
 
+  // ---------- Rare Market branches (a trader and a casket chest in each town) ----------
+  /** The nearest open land tile to a point (not water, a bridge or a road). */
+  const land = (x: number, y: number) => {
+    for (let r = 0; r < 8; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      const nx = x + dx, ny = y + dy;
+      if (Math.max(Math.abs(dx), Math.abs(dy)) === r && WALKABLE.has(get(nx, ny)) && get(nx, ny) !== T.BRIDGE && objectAt[tileIndex(nx, ny)] < 0) return [nx, ny] as const;
+    }
+    return [x, y] as const;
+  };
+  for (const [tx, ty] of [[166, 49], [178, 114], [197, 31], [175, 148]] as const) {
+    const [cx, cy] = land(tx + 1, ty); add({ kind: "casket", x: cx, y: cy, blocks: true, name: "Rare Casket chest" });
+    const [nx, ny] = land(tx, ty); npc("rare_trader", nx, ny);
+  }
+  // Slayer creatures: only a Slayer of the right level can wound them.
+  monsters("mire_crawler", 18, 168, 62, 194, 8);
+  monsters("frost_wisp", 210, 28, 236, 42, 6);
+
   // ---------- Dungeons ----------
   for (let y = 200; y < FLOOR_Y; y++) for (let x = 0; x < W; x++) { put(x, y, T.VOID); setRegion(x, y, "crypt"); }
   // Murkmire Crypt (x 20..70): corridors of skeletons, and the crypt key on the altar.
@@ -602,6 +640,7 @@ export function createWorld(seed = 20260927): World {
 
   // Hollow Depths (x 80..230): shades, hollow sentinels and the king's throne room behind a gate.
   add({ kind: "ladder", x: 90, y: 208, blocks: true, name: "Rope", action: "Climb-up", to: { x: 122, y: 188 } });
+  monsters("gloom_hound", 150, 222, 175, 226, 5);
   monsters("shade", 86, 208, 100, 218, 5); monsters("shade", 104, 210, 148, 214, 6); monsters("hollow_sentinel", 122, 216, 148, 233, 8);
   add({ kind: "gate", x: 176, y: 224, blocks: true, name: "Hollow gate", action: "Open", to: { x: 177, y: 224 }, requires: { quest: "hollow_king" } });
   for (let y = 221; y <= 227; y++) if (y !== 224) put(176, y, T.WALL);
@@ -613,6 +652,8 @@ export function createWorld(seed = 20260927): World {
   decor(206, 224, "statue", true, "The empty throne");
   for (let x = 124; x <= 148; x += 8) decor(x, 234, "torch");
 
+  // Nothing grows in a doorway.
+  for (const [x, y] of doorways) for (const [dx, dy] of [[0, 0], ...SIDES]) { const o = objectAt[tileIndex(x + dx, y + dy)]; if (o >= 0 && (objects[o].kind === "tree" || (objects[o].kind === "decor" && get(x + dx, y + dy) !== T.WOOD && get(x + dx, y + dy) !== T.STONE && get(x + dx, y + dy) !== T.CARPET))) clearAt(x + dx, y + dy); }
   // Clean-up: removed markers stop blocking, and every station, rock or spot keeps a side you can stand on.
   for (const object of objects) if (object.name === "__removed") object.blocks = false;
   const NEEDS_ACCESS = new Set<ObjectKind>(["spot", "bank", "range", "furnace", "anvil", "altar", "stall", "ladder", "well", "mill", "coop", "dairy_cow", "casket", "tanning", "sign", "rock", "gate"]);

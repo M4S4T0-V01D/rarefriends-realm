@@ -3,10 +3,11 @@
  * Pure TypeScript over the Game state, so it runs the same in the browser and in node tests.
  */
 import {
-  COOKING, CRAFTING, EQUIP_SLOTS, FAMILY_NAMES, FIREMAKING, FISHING_SPOTS, GEM_CUTTING, METALS, MONSTERS, PRAYERS, RELICS, ROCKS, SHOPS, SHOP_BUY,
+  COOKING, CRAFTING, EQUIP_SLOTS, FAMILY_NAMES, FIREMAKING, FISHING_SPOTS, GEM_CUTTING, METALS, MONSTERS, PRAYERS, RELICS, RF_BUNDLES, ROCKS, SHOPS, SHOP_BUY,
   SHOP_SELL, SKILLS, SKILL_NAMES, SMELTING, SMITH_PIECES, SMITH_XP, SPELLS, TREES, WARDROBE, XP_TABLE, isItem, item, levelForXp, smithLevel,
   type EquipSlot, type MetalId, type Skill, type Spell, type SpotKind, type WardrobeId,
 } from "./data.ts";
+import { addSlayerPoints, slayerBoost, slayerKill, slayerProblem, taskText } from "./slayer.ts";
 import { NPCS, examineItem, npcDef, onMonsterKilled, questDone, searchCryptChest, searchWell, talk, tanHides, useCryptAltar } from "./content.ts";
 import {
   BANK_SIZE, INVENTORY_SIZE, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
@@ -117,8 +118,13 @@ function targetPoint(game: Game, target: Target): (Point & { size?: number; obje
   }
 }
 function magicRange(target: Target) { return target.kind === "monster" && (target.spell || target.option === "Attack") ? 8 : 0; }
+/** A bow's reach (Longrange adds two), or 0 for melee. */
+export function bowRange(game: Game) { const bow = weapon(game.player)?.equip?.bow; return bow ? bow.range + (game.player.style === "defensive" ? 2 : 0) : 0; }
+/** Tiles between a point and the nearest tile of a size × size footprint (0 inside it). */
+function reachGap(at: Point, x: number, y: number, size = 1) { const { gx, gy } = gapTo(at, x, y, size); return Math.max(gx, gy); }
 function inReach(game: Game, target: Target, at: Point, point: Point & { size?: number; object?: WorldObject }) {
   if (target.kind === "monster" && castingSpell(game, target)) return chebyshev(at, point) <= magicRange(target) && chebyshev(at, point) >= 1;
+  if (target.kind === "monster" && target.option === "Attack" && bowRange(game)) { const gap = reachGap(at, point.x, point.y, point.size ?? 1); return gap >= 1 && gap <= bowRange(game); }
   if (target.kind === "ground" && target.spell) return chebyshev(at, point) <= 8;
   if (target.kind === "ground") return at.x === point.x && at.y === point.y || (!canWalk(game, point.x, point.y) && adjacentTo(at.x, at.y, point.x, point.y));
   if (target.kind === "object" && point.object && !point.object.blocks) return chebyshev(at, point) <= 1;
@@ -267,6 +273,9 @@ export function itemOptions(game: Game, slotIndex: number): ItemOption[] {
   if (definition.equip) out.push({ verb: definition.equip.slot === "weapon" || definition.equip.slot === "shield" ? "Wield" : "Wear", run: g => equip(g, slotIndex) });
   if (FIREMAKING[slot.id]) out.push({ verb: "Light", run: g => lightFire(g, slotIndex) });
   if (slot.id === "glimmer_shard") out.push({ verb: "Look-at", run: g => message(g, "The shard hums. Old Glimmer will want it back.") });
+  if (definition.tablet) out.push({ verb: "Break", run: g => breakTablet(g, slotIndex) });
+  if (slot.id === "insight_lamp") out.push({ verb: "Rub", run: g => { g.ui.lamp = slotIndex; } });
+  if (slot.id === "slayer_gem") out.push({ verb: "Check", run: g => message(g, taskText(g)) });
   out.push({ verb: "Use", run: () => ({ kind: "item", slot: slotIndex }) });
   out.push({ verb: "Drop", run: g => drop(g, slotIndex) });
   out.push({ verb: "Examine", run: g => message(g, slot.n >= 100_000 ? `${slot.n.toLocaleString()} x ${definition.name}` : definition.examine) });
@@ -305,8 +314,14 @@ export function equip(game: Game, slotIndex: number) {
     if (level(game, skill) < needed) { message(game, `You need a ${SKILL_NAMES[skill]} level of ${needed} to ${equip.slot === "weapon" ? "wield" : "wear"} this.`, "warn"); return; }
   }
   const previous = player.equipment[equip.slot];
+  // Bows take both hands: wielding one takes off your shield, and a shield takes off a bow.
+  const shieldOff = equip.slot === "weapon" && equip.twoHanded ? player.equipment.shield : undefined;
+  const weaponOff = equip.slot === "shield" && player.equipment.weapon && item(player.equipment.weapon).equip?.twoHanded ? player.equipment.weapon : undefined;
+  if ((shieldOff || weaponOff) && previous && freeSlots(player) === 0) { message(game, "You need a free inventory space to do that.", "warn"); return; }
   player.inventory[slotIndex] = previous ? { id: previous, n: 1 } : null;
   player.equipment[equip.slot] = slot.id;
+  if (shieldOff) { delete player.equipment.shield; give(player, shieldOff); }
+  if (weaponOff) { delete player.equipment.weapon; give(player, weaponOff); }
   if (equip.slot === "weapon" && player.autocast && !equip.staff) player.autocast = null;
   sound(game, "equip");
 }
@@ -561,6 +576,8 @@ function interactNpc(game: Game, uid: number, option: string, use?: number) {
   if (option === "Trade" && def.shop) { game.ui.shop = def.shop; sound(game, "click"); return; }
   if (option === "Bank") { game.ui.bank = true; sound(game, "click"); return; }
   if (option === "Caskets") { game.ui.shop = "__caskets"; sound(game, "click"); return; }
+  if (option === "Rare-market") { game.ui.shop = "__market"; sound(game, "click"); return; }
+  if (option === "Assignment" || option === "Rewards") { game.dialogue = talk(game, `${npc.id}:${option.toLowerCase()}`); sound(game, "click"); return; }
   if (option === "Tan-hides") { tanHides(game); return; }
   if (option === "Pickpocket" && def.pickpocket) { pickpocket(game, npc, def.pickpocket); return; }
 }
@@ -693,7 +710,8 @@ function runActivity(game: Game) {
     case "obstacle": return obstacleTick(game, activity);
     case "teleport": {
       player.activity = null;
-      travel(game, activity.to, `You teleport to ${TELEPORT_NAMES[SPELLS.find(spell => spell.id === activity.spell)?.teleport ?? "hollow_square"]}.`); sound(game, "teleport");
+      const place = activity.spell.startsWith("tablet:") ? activity.spell.slice(7) : SPELLS.find(spell => spell.id === activity.spell)?.teleport ?? "hollow_square";
+      travel(game, activity.to, `You teleport to ${TELEPORT_NAMES[place] ?? "Friendhollow"}.`); sound(game, "teleport");
     }
   }
 }
@@ -818,9 +836,9 @@ export function playerMaxHit(game: Game) {
   const effective = Math.floor(level(game, "strength") * (1 + boost.strength)) + style.strength + 8;
   return Math.floor(0.5 + effective * (bonuses(player).strength + 64) / 640) + (player.familyId === 6 ? 1 : 0);
 }
-export function playerAccuracy(game: Game, monster: Monster) {
+export function playerAccuracy(game: Game, monster: Monster, factor = 1) {
   const player = game.player, boost = prayerBoost(player), style = STYLE_BONUS[player.style];
-  const attack = (Math.floor(level(game, "attack") * (1 + boost.attack)) + style.attack + 8) * (bonuses(player).attack + 64);
+  const attack = (Math.floor(level(game, "attack") * (1 + boost.attack)) + style.attack + 8) * (bonuses(player).attack + 64) * factor;
   const defence = (monster.def.defence * cursed(game, monster, "defence") + 9) * (monster.def.defenceBonus + 64);
   return hitChance(attack, defence);
 }
@@ -840,24 +858,27 @@ function playerCombat(game: Game) {
   const monster = monsterByUid(game, player.combat);
   if (!monster) { player.combat = null; player.queuedSpell = null; return; }
   const spellId = player.queuedSpell ?? player.autocast, spell = spellId ? SPELLS.find(entry => entry.id === spellId && entry.target === "monster") ?? null : null;
-  const inRange = spell ? chebyshev(player, monster) <= 8 && chebyshev(player, monster) >= 1 : adjacentTo(player.x, player.y, monster.x, monster.y, footprint(monster));
-  if (!inRange) {
-    if (!player.path.length || player.path.length > 20) {
-      const path = findPath(game, player, (x, y) => spell ? chebyshev({ x, y }, monster) <= 8 && chebyshev({ x, y }, monster) >= 1 : adjacentTo(x, y, monster.x, monster.y, footprint(monster)), monster);
-      player.path = path ?? [];
-    }
+  const range = spell ? 0 : bowRange(game), boost = slayerBoost(game, monster.def.id);
+  const within = (x: number, y: number) => spell ? chebyshev({ x, y }, monster) <= 8 && chebyshev({ x, y }, monster) >= 1
+    : range ? reachGap({ x, y }, monster.x, monster.y, footprint(monster)) >= 1 && reachGap({ x, y }, monster.x, monster.y, footprint(monster)) <= range
+    : adjacentTo(x, y, monster.x, monster.y, footprint(monster));
+  if (!within(player.x, player.y)) {
+    if (!player.path.length || player.path.length > 20) player.path = findPath(game, player, within, monster) ?? [];
     return;
   }
   player.path = []; face(game, monster.x, monster.y);
   if (player.attackTimer > 0) return;
+  const unwoundable = slayerProblem(game, monster.def.id);
+  if (unwoundable) { message(game, unwoundable, "warn"); player.combat = null; player.queuedSpell = null; return; }
   monster.target = true;
+  if (!spell && range) { rangedAttack(game, monster, boost); return; }
   if (spell) {
     const problem = canCast(game, spell);
     if (problem) { message(game, problem, "warn"); player.combat = null; player.queuedSpell = null; player.autocast = null; return; }
     const echo = player.familyId === 8 && game.rng() < 0.2;
     if (!echo) for (const [sigil, n] of Object.entries(spellCost(game, spell))) take(player, sigil, n);
     player.attackTimer = 5;
-    const boost = prayerBoost(player), accuracy = (Math.floor(level(game, "magic") * (1 + boost.magic)) + 8) * (bonuses(player).magic + 64) * (player.familyId === 8 ? 1.1 : 1);
+    const prayers = prayerBoost(player), accuracy = (Math.floor(level(game, "magic") * (1 + prayers.magic)) + 8) * (bonuses(player).magic + 64) * (player.familyId === 8 ? 1.1 : 1) * boost;
     const defence = ((monster.def.magicDef ?? monster.def.defence) * cursed(game, monster, "defence") + 9) * (monster.def.defenceBonus + 64);
     emit(game, { type: "projectile", projectile: { from: { x: player.x, y: player.y }, to: { x: monster.x, y: monster.y }, start: game.tick, end: game.tick + 1, color: SPELL_COLORS[spell.id] ?? ELEMENT_COLORS[spell.element] ?? "#c7d3dc" } });
     sound(game, "spell");
@@ -870,7 +891,7 @@ function playerCombat(game: Game) {
       else if (spell.curse) { monster.curses[spell.curse.stat] = game.tick + 100; message(game, `You ${spell.name.toLowerCase()} the ${monster.def.name.toLowerCase()}.`); }
       return;
     }
-    const hit = game.rng() < hitChance(accuracy, defence) ? Math.floor(game.rng() * (spell.maxHit! + 1)) : -1;
+    const hit = game.rng() < hitChance(accuracy, defence) ? Math.floor(game.rng() * (Math.floor(spell.maxHit! * boost) + 1)) : -1;
     addXp(game, "magic", spell.xp);
     if (hit > 0) { addXp(game, "magic", hit * 2); addXp(game, "hitpoints", hit * 1.33); }
     damageMonster(game, monster, Math.max(0, hit), hit < 0);
@@ -879,7 +900,7 @@ function playerCombat(game: Game) {
     return;
   }
   player.attackTimer = attackSpeed(player);
-  const hit = game.rng() < playerAccuracy(game, monster) ? Math.floor(game.rng() * (playerMaxHit(game) + 1)) : -1;
+  const hit = game.rng() < playerAccuracy(game, monster, boost) ? Math.floor(game.rng() * (Math.floor(playerMaxHit(game) * boost) + 1)) : -1;
   const damage = Math.max(0, Math.min(hit, monster.hp));
   if (damage > 0) {
     const xp = damage * 4;
@@ -891,6 +912,40 @@ function playerCombat(game: Game) {
   }
   emit(game, { type: "swing", weapon: weaponSound(player.equipment.weapon), tick: game.tick });
   sound(game, hit > 0 ? "hit" : "miss");
+  damageMonster(game, monster, Math.max(0, hit), hit < 0);
+}
+// ---------- Ranged ----------
+/** The best arrows in your pack that your Ranged level can use. */
+export function bestArrow(game: Game) {
+  let best: { id: string; strength: number } | null = null;
+  for (const slot of game.player.inventory) {
+    const ammo = slot ? item(slot.id).ammo : undefined;
+    if (ammo && ammo.level <= level(game, "ranged") && (!best || ammo.strength > best.strength)) best = { id: slot!.id, strength: ammo.strength };
+  }
+  return best;
+}
+/** Styles with a bow: Accurate (+3 accuracy), Rapid (a tick faster), Longrange (+2 reach, Defence XP). */
+export function rangedMaxHit(game: Game, arrowStrength = bestArrow(game)?.strength ?? 0) {
+  const effective = level(game, "ranged") + (game.player.style === "accurate" ? 3 : 0) + 8;
+  return Math.floor(0.5 + effective * (arrowStrength + 64) / 640);
+}
+function rangedAttack(game: Game, monster: Monster, boost: number) {
+  const player = game.player, arrow = bestArrow(game);
+  if (!arrow) { message(game, "You have no arrows you can use. Fletch & Feather in Friendhollow sells them.", "warn"); player.combat = null; return; }
+  take(player, arrow.id, 1);
+  player.attackTimer = Math.max(2, attackSpeed(player) - (player.style === "aggressive" ? 1 : 0));
+  const accuracy = (level(game, "ranged") + (player.style === "accurate" ? 3 : 0) + 8) * (bonuses(player).ranged + 64) * boost;
+  const defence = (monster.def.defence * cursed(game, monster, "defence") + 9) * (monster.def.defenceBonus + 64);
+  const hit = game.rng() < hitChance(accuracy, defence) ? Math.floor(game.rng() * (Math.floor(rangedMaxHit(game, arrow.strength) * boost) + 1)) : -1;
+  const damage = Math.max(0, Math.min(hit, monster.hp));
+  if (damage > 0) {
+    if (player.style === "defensive") { addXp(game, "ranged", damage * 2); addXp(game, "defence", damage * 2); } else addXp(game, "ranged", damage * 4);
+    addXp(game, "hitpoints", damage * 1.33);
+  }
+  emit(game, { type: "projectile", projectile: { from: { x: player.x, y: player.y }, to: { x: monster.x, y: monster.y }, start: game.tick, end: game.tick + 1, color: item(arrow.id).icon.color } });
+  sound(game, "bow");
+  // Most arrows can be picked up again where they land.
+  if (game.rng() < 0.6) dropItem(game, arrow.id, 1, monster.x, monster.y, 150);
   damageMonster(game, monster, Math.max(0, hit), hit < 0);
 }
 const SPELL_COLORS: Record<string, string> = { breeze_dart: "#dfe6ea", tide_dart: "#9fb4d0", stone_dart: "#a89479", ember_dart: "#e3a58c", breeze_lance: "#eef2f4", tide_lance: "#8fa3c9", ember_lance: "#e39a7c", breeze_burst: "#ffffff", ember_burst: "#f0a080" };
@@ -915,6 +970,7 @@ function killMonster(game: Game, monster: Monster) {
   for (const drop of monster.def.always ?? []) roll(drop);
   for (const drop of monster.def.drops) if (game.rng() < drop.chance) roll(drop);
   onMonsterKilled(game, monster.def.id, at.x, at.y);
+  slayerKill(game, monster.def.id);
 }
 function damagePlayer(game: Game, damage: number, from: Monster | null) {
   const player = game.player;
@@ -1164,11 +1220,32 @@ export function chooseOption(game: Game, index: number) {
 export const dialogueAtOptions = (dialogue: Dialogue) => dialogue.index >= dialogue.lines.length && !!dialogue.options?.length;
 
 // ---------- Shops ----------
-export function buyPrice(game: Game, id: string) { return Math.max(1, Math.ceil(item(id).value * SHOP_BUY * (game.player.familyId === 2 ? 0.9 : 1))); }
+export function buyPrice(game: Game, id: string) { const fixed = item(id).price; return fixed ?? Math.max(1, Math.ceil(item(id).value * SHOP_BUY * (game.player.familyId === 2 ? 0.9 : 1))); }
+/** Skills at 99. */
+export const masteredSkills = (game: Game) => SKILLS.filter(skill => level(game, skill) >= 99);
+/** Why you can't buy a mastery cape yet (null if you can). */
+export function capeProblem(game: Game, id: string) {
+  const mastery = item(id).mastery;
+  if (!mastery) return null;
+  if (mastery.skill === "all") return masteredSkills(game).length === SKILLS.length ? null : "The Grandmaster's cape is for Friends who've mastered every skill.";
+  return level(game, mastery.skill) >= 99 ? null : `You need level 99 ${SKILL_NAMES[mastery.skill]} for this cape.`;
+}
+function buyCape(game: Game, id: string) {
+  const player = game.player, mastery = item(id).mastery!, problem = capeProblem(game, id), price = buyPrice(game, id);
+  if (problem) { message(game, problem, "warn"); return 0; }
+  if (count(player, "coins") < price) { message(game, `A mastery cape costs ${price.toLocaleString()} coins.`, "warn"); return 0; }
+  if (freeSlots(player) === 0) { message(game, "You don't have enough inventory space.", "warn"); return 0; }
+  // Master more than one skill and your capes come trimmed.
+  const given = mastery.skill !== "all" && masteredSkills(game).length > 1 ? `${mastery.skill}_cape_t` : id;
+  take(player, "coins", price); give(player, given);
+  message(game, `The Keeper of Capes hands you the ${item(given).name}. Wear it with pride.`, "quest"); sound(game, "quest");
+  return 1;
+}
 export function sellPrice(id: string) { return Math.floor(item(id).value * SHOP_SELL); }
 export function buy(game: Game, shopId: string, id: string, n: number) {
   const shop = SHOPS[shopId], player = game.player;
   if (!shop?.stock.includes(id)) return 0;
+  if (item(id).mastery) return buyCape(game, id);
   const price = buyPrice(game, id), stackable = !!item(id).stackable;
   let bought = 0;
   while (bought < n && count(player, "coins") >= price && canHold(player, id)) {
@@ -1194,6 +1271,52 @@ export function sell(game: Game, shopId: string, slotIndex: number, n: number) {
   take(player, id, selling); if (price * selling > 0) give(player, "coins", price * selling);
   sound(game, "coins");
   return selling;
+}
+
+// ---------- Tablets and lamps ----------
+const TABLET_PLACES = { hollow_square: "hollow_square", emberforge: "emberforge", oasis: "oasis", frostpeak: "frostpeak", pier: "pier" } as const;
+export function breakTablet(game: Game, slotIndex: number) {
+  const player = game.player, slot = player.inventory[slotIndex], place = slot ? item(slot.id).tablet : undefined;
+  if (!slot || !place) return;
+  if (isUnderground(player.y)) { message(game, "A dark force stops you from teleporting underground.", "warn"); return; }
+  stopAll(game); closeInterfaces(game); take(player, slot.id, 1);
+  player.activity = { kind: "teleport", to: game.world.places[TABLET_PLACES[place]], timer: 2, spell: `tablet:${place}` };
+  message(game, "You break the tablet. The Realm folds around you…"); sound(game, "spell");
+}
+/** Rub a lamp of insight: 100 × your level in a skill of your choice. */
+export function rubLamp(game: Game, slotIndex: number, skill: Skill) {
+  const player = game.player;
+  game.ui.lamp = null;
+  if (player.inventory[slotIndex]?.id !== "insight_lamp") return 0;
+  const xp = 100 * level(game, skill);
+  take(player, "insight_lamp", 1); addXp(game, skill, xp, { raw: true });
+  message(game, `The lamp glows. You gain ${xp.toLocaleString()} ${SKILL_NAMES[skill]} XP.`, "level");
+  return xp;
+}
+
+// ---------- Rare Market (RF bundles, simulated) ----------
+/** Wardrobe pieces the Tailor's pick can give: up to Moonlit tier, ones you don't have yet. */
+export const tailorChoices = (game: Game) => WARDROBE.filter(piece => piece.tier <= 2 && !game.player.wardrobe.includes(piece.id));
+/** Hand over a bundle's goods (its caskets were already bought through the simulated ledger). */
+export function grantBundle(game: Game, id: string, pick?: string) {
+  const player = game.player, bundle = RF_BUNDLES.find(entry => entry.id === id);
+  if (!bundle) return false;
+  switch (bundle.id) {
+    case "traveller": for (const place of Object.keys(TABLET_PLACES)) giveOrDrop(game, `tablet_${place}`, 2); break;
+    case "hamper": giveOrDrop(game, "inkshark", 10); giveOrDrop(game, "cake", 5); break;
+    case "insight": giveOrDrop(game, "insight_lamp"); break;
+    case "contract": addSlayerPoints(game, 40); break;
+    case "archer": giveOrDrop(game, "maple_bow"); giveOrDrop(game, "moonsilver_arrow", 300); break;
+    case "tailor": {
+      const piece = tailorChoices(game).find(entry => entry.id === pick) ?? tailorChoices(game)[0];
+      if (piece) { player.wardrobe.push(piece.id); toggleWorn(game, piece.id); message(game, `Wardrobe unlocked: ${piece.name}!`, "level"); }
+      else giveOrDrop(game, "coins", 5000);
+      break;
+    }
+  }
+  player.questData.rf_bundles = (player.questData.rf_bundles ?? 0) + 1;
+  message(game, `Rare Market: ${bundle.name} delivered, with ${bundle.caskets} Rare Casket${bundle.caskets > 1 ? "s" : ""} to open.`, "quest"); sound(game, "coins");
+  return true;
 }
 
 // ---------- Rare Caskets (RF chance game, simulated) ----------

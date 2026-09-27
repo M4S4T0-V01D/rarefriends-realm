@@ -29,7 +29,7 @@ chisel on an uncut gem, grain on the mill hopper, a bucket on the dairy cow, the
 The Realm runs on a 0.6-second game tick. You walk one tile per tick (two when running); skills roll on their
 own timers (every 4 ticks for woodcutting and mining, 5 for fishing); weapons attack every 4–6 ticks.
 
-## Skills (15)
+## Skills (17)
 
 XP follows the classic curve (83 XP for level 2, 13,034,431 for 99), multiplied by the **Realm rate ×3**,
 +2% per kept Plain Relic (max 5), +10% with a Golden Relic, and +1–5% for a follower (see Friends).
@@ -37,6 +37,7 @@ XP follows the classic curve (83 XP for level 2, 13,034,431 for 99), multiplied 
 | Skill | Train by | Notes |
 | --- | --- | --- |
 | Attack / Strength / Defence | Melee combat (4 XP per damage to your style's skill) | Styles: Accurate, Aggressive, Defensive, Controlled |
+| Ranged | Bows (4 XP per damage; Longrange splits it with Defence) | Bows by wood (Shortbow 1, Oak 5, Willow 20, Maple 30, Yew 40, Ashwood 50, Gloomfang 60) fire the best arrows in your pack (pewter 1 … rarite 40). Styles: Accurate, Rapid (a tick faster), Longrange (+2 tiles). Most arrows can be picked up again |
 | Hitpoints | Any combat (1.33 XP per damage) | Starts at 10; regenerates 1 HP per minute |
 | Magic | Spells paid in sigils (damage spells: base XP + 2 per damage) | Staffs autocast damage spells; the Breeze staff gives unlimited breeze sigils |
 | Prayer | Burying bones (4.5 / 15 / 50 XP) | Recharge at altars; prayers drain points |
@@ -49,6 +50,14 @@ XP follows the classic curve (83 XP for level 2, 13,034,431 for 99), multiplied 
 | Crafting | Leather (gloves 1 … leggings 18), gems (moonstone 20, sagestone 27, rosestone 34) | Tessa tans hides for 2 coins each |
 | Thieving | Villagers 1, merchant 25, guards 40; stalls 5 / 20 / 42 / 75 | Failing a pickpocket stuns you |
 | Agility | Friendhollow course (5 obstacles, +40 XP a lap), stepping stones (20) | Agility restores run energy faster |
+| Slayer | Tasks from Warden Thistle (Market Street): XP equal to each creature's hitpoints | 10 points a task (50 every tenth). Mire crawlers need Slayer 10, frost wisps 30, gloom hounds 50 |
+
+**Mastery capes.** Reach 99 in a skill and the Keeper of Capes (Friendhollow Castle's great hall) sells its cape for
+99,000 coins. Master two skills and every cape you buy comes trimmed; master all seventeen for the Grandmaster's cape.
+Capes are worn on your Friend's sprite, trim and emblem included.
+
+**Slayer rewards** (points): cancel a task (30), a Lamp of insight (100), the Warden's helm (150: +15% accuracy and
+damage on task), the Gloomfang bow (600).
 
 ## The spellbook
 
@@ -94,6 +103,7 @@ next attack. **Death is safe:** you wake by the Friendhollow fountain with your 
 | Frost wolf, Frost yeti | 32, 55 | Frostpeak |
 | Shade, Hollow sentinel | 38, 64 | Hollow Depths |
 | Moss colossus | 42 | Mossy Ruins |
+| Mire crawler (Slayer 10), Frost wisp (Slayer 30), Gloom hound (Slayer 50) | 18, 36, 58 | Murkmire, Frostpeak, Hollow Depths |
 | **The Hollow King** | 92 | The throne room (boss) |
 
 ## Quests (9 quest points)
@@ -110,6 +120,15 @@ next attack. **Death is safe:** you wake by the Friendhollow fountain with your 
 A 240 × 240 tile island with 12 overworld regions (Friendhollow, Hollow Farms, Whisperwood, Ashen Hills, Emberforge,
 Frostpeak, Glass Lake, Pale Dunes, Oasis, Murkmire, Mossy Ruins and the Pale Coast) and two dungeons
 (Murkmire Crypt, Hollow Depths). Banks in Friendhollow (and up in the castle's south-west tower), Emberforge, the Oasis, Frostpeak and a deposit box by Glass Lake.
+
+**Friendhollow** has grown: south of the fountain, **Market Street** has Hollis Armoury (helms to shields, pewter to
+moonsilver), Edge & Hilt (daggers, swords, sabres), Fletch & Feather (bows, arrows, hunter's hides) and the Warden's
+Lodge (Slayer). The Sleepy Friend inn (food, and a range) is east of the square, and the Rare Market is west.
+
+**Day and night.** A Realm day lasts 24 minutes. Dusk turns the light warm, and at night the land goes blue-dark
+except around lamps, torches, fires, forges, altars and your own small light (a lantern familiar carries a bigger one).
+The badge under the minimap shows the time of day; Settings can turn the cycle off. The minimap uses clearer colours:
+green land, blue water, black walls, yellow dots for NPCs and monsters, red for items, white for your follower.
 
 **Friendhollow Castle**, north of the fountain, has three storeys. Spiral staircases in the north-west and north-east towers
 (click them: *Climb-up*, *Climb-down*) lead from the ground floor (kitchen, great hall, the Relic keeper, guard towers) to
@@ -131,6 +150,19 @@ Each region has its own music, unlocked the first time you arrive. The music pla
 - **Consumable:** one casket opens into exactly one relic; single settlement, no reroll.
 - **Backing:** each purchased or pending casket reserves 5 RF; kept relics keep their fixed RF backing with no expiry. Redeeming removes that relic's bonus.
 - **Wardrobe:** every casket also grants an uncollected piece of its tier, drawn on your Friend, or coins for duplicates (250 / 600 / 1,500 / 5,000). Wardrobe pieces carry no RF value and are saved with your adventure.
+
+**The Rare Market.** Rare traders in Friendhollow, Emberforge, the Oasis, Frostpeak and on Pike's Pier (each next to a
+casket chest) sell bundles. RF buys one thing in the SDK's simulated economy, the Rare Casket, so every bundle buys
+caskets (opened as usual) and adds guaranteed goods on top:
+
+| Bundle | RF (caskets) | Adds |
+| --- | --- | --- |
+| Traveller's satchel | 1 | Two of each Realm tablet (break to travel to Friendhollow, Emberforge, the Oasis, Frostpeak, the Pier) |
+| Hero's hamper | 1 | 10 inksharks, 5 cakes |
+| Lamp of insight | 2 | Rub for 100 × your level in XP, in a skill you choose |
+| Slayer's contract | 2 | 40 Slayer points |
+| Archer's quiver | 2 | A maple bow and 300 moonsilver arrows |
+| Tailor's pick | 3 | Any wardrobe piece up to Moonlit tier, your choice |
 
 Caskets use the SDK chance-game client (`buy` / `play` / `settle` / `redeem`) with the runtime's confirmations.
 Coins are an earn-only, in-game currency and never convert to RF.

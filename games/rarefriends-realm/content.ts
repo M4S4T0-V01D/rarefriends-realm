@@ -1,7 +1,8 @@
 /**
  * NPCs, their dialogue and the Realm's quests. Dialogue is built on demand from the player's quest state.
  */
-import { FAMILY_NAMES, FAMILY_PERKS, item } from "./data.ts";
+import { FAMILY_NAMES, FAMILY_PERKS, SLAYER_REWARDS, item } from "./data.ts";
+import { assignTask, buySlayerReward, currentTask, eligibleTasks, slayerPoints, slayerStreak, taskText } from "./slayer.ts";
 import {
   addXp, count, give, giveOrDrop, has, message, sound, take, emit, type Dialogue, type DialogueLine, type Game,
 } from "./state.ts";
@@ -42,6 +43,13 @@ export const NPCS: Record<string, NpcDef> = {
     pickpocket: { level: 25, xp: 26, coins: [10, 30], stun: 5, damage: 2, extra: [["silk", 0.1], ["cake", 0.15]] } },
   witch: { id: "witch", name: "Bog witch", examine: "She's stirring something that stirs back.", options: ["Talk-to"], art: art(8, 201) },
   agility: { id: "agility", name: "Coach Skip", examine: "Never stops stretching.", options: ["Talk-to"], art: art(5, 211) },
+  armourer: { id: "armourer", name: "Dora Plate", examine: "She's knocked the dents out of half the Realm's helms.", options: ["Talk-to", "Trade"], shop: "armour", art: art(6, 241) },
+  weaponsmith: { id: "weaponsmith", name: "Hilt", examine: "Tests every edge on his thumb. Has a lot of plasters.", options: ["Talk-to", "Trade"], shop: "weapons", art: art(0, 251) },
+  bowyer: { id: "bowyer", name: "Wren the bowyer", examine: "Smells of beeswax and pine shavings.", options: ["Talk-to", "Trade"], shop: "archery", art: art(3, 261) },
+  slayer_master: { id: "slayer_master", name: "Warden Thistle", examine: "The Realm's Slayer Warden. She knows where everything soft is.", options: ["Talk-to", "Assignment", "Rewards", "Trade"], shop: "slayer", art: art(8, 271) },
+  rare_trader: { id: "rare_trader", name: "Rare trader", examine: "Deals in Rare Caskets and the good stuff that comes with them.", options: ["Talk-to", "Rare-market", "Caskets"], art: art(7, 281) },
+  innkeeper: { id: "innkeeper", name: "Bram the innkeeper", examine: "Runs the Sleepy Friend. Has never seen it busy before noon.", options: ["Talk-to", "Trade"], shop: "inn", art: art(2, 291) },
+  cape_keeper: { id: "cape_keeper", name: "Keeper of Capes", examine: "Keeps a cape for every skill, and knows who's earned one.", options: ["Talk-to", "Trade"], shop: "capes", art: art(1, 301) },
 };
 export const npcDef = (id: string) => NPCS[id];
 
@@ -179,8 +187,51 @@ export function useCryptAltar(game: Game) {
 
 // ---------- Dialogue ----------
 export function talk(game: Game, npcId: string): Dialogue {
-  const player = game.player, def = NPCS[npcId], name = def.name;
+  const player = game.player, def = NPCS[npcId.split(":")[0]], name = def.name;
   switch (npcId) {
+    case "slayer_master:assignment": case "slayer_master": {
+      const task = currentTask(game);
+      if (task) return chat(name, npcSays(name, `${taskText(game)} Come back when they're done.`, `Points: ${slayerPoints(game)}. Tasks in a row: ${slayerStreak(game)}. Every tenth task pays five times over.`));
+      if (npcId === "slayer_master") return chat(name, npcSays(name, "Slayer is simple. I tell you what to kill, you kill that many, I pay you in points. Some things only a Slayer knows how to hurt."), [
+        { label: "Give me a task.", then: () => talk(game, "slayer_master:assignment") },
+        { label: "What can points buy?", then: () => talk(game, "slayer_master:rewards") },
+        { label: "Maybe later.", then: () => null },
+      ]);
+      if (!eligibleTasks(game).length) return chat(name, npcSays(name, "Come back when you can hold a sword the right way round."));
+      assignTask(game);
+      return chat(name, npcSays(name, `${taskText(game)} Take a Warden's gem from my shop if you want to check on it.`));
+    }
+    case "slayer_master:rewards": {
+      const points = slayerPoints(game);
+      return chat(name, npcSays(name, `You have ${points} Slayer points.`), [
+        ...SLAYER_REWARDS.map(reward => ({ label: `${reward.name} (${reward.cost} points)`, then: () => { buySlayerReward(game, reward.id); return null; } })),
+        { label: "Nothing for now.", then: () => null },
+      ]);
+    }
+    case "rare_trader": return chat(name, npcSays(name, "Rare Caskets, and bundles to go with them. Every bundle buys caskets with simulated $RAREFRIENDS, and I add something useful on top.",
+      "There's one of me in Friendhollow, Emberforge, the Oasis, Frostpeak and on Pike's Pier."), [
+      { label: "Show me the Rare Market.", then: () => { game.ui.shop = "__market"; return null; } },
+      { label: "Show me the caskets.", then: () => { game.ui.shop = "__caskets"; return null; } },
+      { label: "Just looking.", then: () => null },
+    ]);
+    case "cape_keeper": {
+      const mastered = (Object.keys(player.xp) as (keyof typeof player.xp)[]).filter(skill => player.xp[skill] >= 13_034_431);
+      if (!mastered.length) return chat(name, npcSays(name, "Every skill has a cape, and every cape has one price: 99,000 coins, and level 99. Come back when you've mastered something.",
+        "Master two skills and I'll trim every cape you buy. Master them all and there's something special."));
+      return chat(name, npcSays(name, `A master of ${mastered.length === 1 ? "a skill" : `${mastered.length} skills`}! Pick your cape: 99,000 coins each${mastered.length > 1 ? ", trimmed" : ""}.`), [
+        { label: "Let me see the capes.", then: () => { game.ui.shop = "capes"; return null; } },
+        { label: "Not today.", then: () => null },
+      ]);
+    }
+    case "bowyer": return chat(name, npcSays(name, "Any bow fires any arrow, but you need the Ranged level for the arrowheads. Arrows come from your pack, and most can be picked up again.",
+      "Rapid shoots faster, Longrange reaches further and trains Defence too. Hides for archers are on the shelf."), [
+      { label: "Let me trade.", then: () => { game.ui.shop = "archery"; return null; } },
+      { label: "Thanks.", then: () => null },
+    ]);
+    case "innkeeper": return chat(name, npcSays(name, (["Welcome to the Sleepy Friend! Bread, cake and a hot meal.", "The King eats here, you know. Once. He liked the cake.", "Night's coming. Best be indoors or by a lamp."] as const)[Math.floor(game.rng() * 3)]), [
+      { label: "What's on the menu?", then: () => { game.ui.shop = "inn"; return null; } },
+      { label: "Just passing through.", then: () => null },
+    ]);
     case "guide": {
       const family = FAMILY_NAMES[player.familyId], perk = FAMILY_PERKS[player.familyId];
       const tips = (): Dialogue => chat(name, npcSays(name,
@@ -324,7 +375,7 @@ export function talk(game: Game, npcId: string): Dialogue {
       { label: "Trade.", then: () => { game.ui.shop = "crafting"; return null; } },
       { label: "Bye.", then: () => null },
     ]);
-    case "villager": return chat(name, npcSays(name, (["Nice day for it.", "Have you been up the castle stairs? The King receives visitors.", "They say there's a king under the ruins. A hollow one.", "I'd buy a Rare Casket if I had any RF."] as const)[Math.floor(game.rng() * 4)]));
+    case "villager": return chat(name, npcSays(name, (["Nice day for it.", "Have you been up the castle stairs? The King receives visitors.", "They say there's a king under the ruins. A hollow one.", "I'd buy a Rare Casket if I had any RF.", "Warden Thistle's always looking for Slayers. Market Street, south of the fountain.", "Wren's bows are the best in the Realm. Ask anyone. Ask Wren."] as const)[Math.floor(game.rng() * 6)]));
     case "guard": return chat(name, npcSays(name, "Move along."));
     case "royal_guard": return chat(name, npcSays(name, (["The King is receiving visitors. Mind your manners.", "The view from the roof? Best in the Realm. Stairs in the north-east tower.", "No running in the throne room."] as const)[Math.floor(game.rng() * 3)]));
     case "king": {

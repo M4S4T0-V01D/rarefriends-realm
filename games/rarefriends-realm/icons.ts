@@ -72,6 +72,14 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
       case "silk": p([[5, 11], [27, 7], [27, 22], [5, 26]], color); l([[8, 15], [25, 12]], "#ffffff", 1.4); break;
       case "burnt": e(16, 18, 11, 7, color); e(12, 15, 2, 1.5, "#6d6b67", null); break;
       case "orb": e(16, 16, 10, 10, color); e(12, 12, 3.5, 3.5, "#ffffff", null); break;
+      case "bow":
+        // A recurve limb with its string, and a nocked arrow.
+        l([[8, 4], [15, 8], [20, 16], [15, 24], [8, 28]], INK, 5); l([[8, 4], [15, 8], [20, 16], [15, 24], [8, 28]], color, 3);
+        l([[8, 4], [8, 28]], "#efede7", 1); if (icon.accent) { e(20, 16, 2.5, 2.5, accent); } else l([[18, 15], [20, 17]], "#c9b77f", 2); break;
+      case "arrow":
+        for (const dy of [-5, 0, 5]) { l([[5, 27 + dy], [23, 9 + dy]], "#9c8672", 1.6); p([[23, 5 + dy], [28, 4 + dy], [27, 9 + dy]], color); p([[5, 27 + dy], [4, 22 + dy], [8, 25 + dy]], "#efede7", null); }
+        break;
+      case "tablet": p([[7, 5], [25, 5], [27, 27], [5, 27]], "#c8c5be"); e(16, 16, 6, 6, color); l([[16, 11], [16, 21]], INK, 1); l([[11, 16], [21, 16]], INK, 1); break;
       case "trophy": p([[9, 5], [23, 5], [21, 16], [11, 16]], color); l([[16, 16], [16, 24]], INK, 2.5); p([[9, 24], [23, 24], [23, 29], [9, 29]], color); break;
     }
     px.halo();
@@ -99,6 +107,8 @@ const SKILL_PAINTERS: Record<Skill, Painter> = {
   crafting: p => { p.line(3, 15, 14, 3, INK, 2); p.line(3, 15, 14, 3, STEEL); p.disc(13, 4, 1.5, 1.5, PAPER); p.line(6, 5, 10, 13, ROSE, 2); },
   thieving: p => { p.poly([[4, 16], [3, 8], [5, 7], [6, 11], [6, 4], [8, 4], [8, 10], [9, 3], [11, 3], [11, 10], [12, 5], [14, 6], [13, 16]], "#e8d4c0"); },
   agility: p => { p.poly([[2, 11], [10, 11], [11, 7], [13, 7], [15, 14], [2, 14]], "#b89c86"); p.line(3, 9, 7, 5, SAGE, 2); p.line(6, 5, 9, 3, SAGE, 2); },
+  ranged: p => { p.polyline([[5, 1], [10, 4], [12, 9], [10, 14], [5, 16]], INK, 3); p.polyline([[5, 1], [10, 4], [12, 9], [10, 14], [5, 16]], WOOD); p.line(5, 2, 5, 15, PAPER); p.line(2, 12, 15, 5, INK, 2); p.line(2, 12, 15, 5, "#c8c5be"); p.poly([[14, 3], [17, 3], [16, 7]], STEEL); },
+  slayer: p => { p.disc(8.5, 7, 6, 5.5, "#e8e4dc"); p.rect(5, 11, 7, 4, "#e8e4dc"); p.rect(5, 5, 3, 3, INK); p.rect(10, 5, 3, 3, INK); p.rect(8, 9, 1, 2, INK); p.line(6, 14, 11, 14, INK); p.line(1, 16, 16, 1, "#cf6e6e", 1); },
 };
 export const skillArt = (skill: Skill) => icon16(`skill:${skill}`, SKILL_PAINTERS[skill]);
 export type TabIcon = "combat" | "skills" | "quests" | "inventory" | "equipment" | "prayer" | "magic" | "friends" | "settings";
