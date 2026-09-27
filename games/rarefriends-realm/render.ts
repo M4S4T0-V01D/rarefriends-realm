@@ -1017,6 +1017,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     if (scene.friend) drawFigure(ctx, figureArt(friendRows(scene.friend, facing, walking && !mount, mount ? 0 : stride), dressed, facing, cloth), s.x, bodyY + 2 * z, px, pose.alpha);
     else ellipse(ctx, s.x, bodyY - 20 * z, 12 * z, 16 * z, INK);
     drawAuras(ctx, player.worn, s.x, bodyY, px, now, scene.reducedMotion, "front");
+    if (mount) drawMountHead(ctx, mount.coat, facing, walking, now, feet.x, feet.y, z, scene.reducedMotion);
     drawHeld(ctx, scene, pose, s.x, bodyY, px, facing, project);
     restoreMotion();
     if (motion?.text) overheadText(ctx, motion.text, s.x, s.y - 74 * z, "#ffffff");
@@ -1223,7 +1224,8 @@ const riderLift = (camera: Camera) => (SADDLE - 4) * ART * MOUNT_SCALE / liftSca
 /** A mount standing or walking with its hooves on (x, y), turned to a screen facing. */
 function drawMount(ctx: CanvasRenderingContext2D, coat: Coat, facing: Facing, moving: boolean, now: number, x: number, y: number, z: number, saddle: boolean, reduced: boolean) {
   const view: MountView = facing === "down" ? "front" : facing === "up" ? "back" : "side", frame = moving && !reduced ? Math.floor(now / 110) % 4 : -1;
-  const art = mountArt(coat, view, frame, saddle);
+  // Ridden towards you, the head is drawn after the rider (see drawMountHead); otherwise the whole mount at once.
+  const art = mountArt(coat, view, frame, saddle, saddle && view === "front" ? "body" : "all");
   if (facing === "left") { ctx.save(); ctx.translate(x, 0); ctx.scale(-1, 1); drawPixels(ctx, art, 0, y + 2 * z, ART * z * MOUNT_SCALE); ctx.restore(); }
   else drawPixels(ctx, art, x, y + 2 * z, ART * z * MOUNT_SCALE);
 }
@@ -1231,6 +1233,11 @@ function drawMount(ctx: CanvasRenderingContext2D, coat: Coat, facing: Facing, mo
 function weaponSwinging(scene: Scene) {
   const player = scene.game.player;
   return player.combat !== null && player.attackTimer >= attackSpeed(player) - (uprightHold(player.equipment.weapon ?? "") === "staff" ? 1 : 0);
+}
+/** A ridden mount's head and neck, over its rider, when it faces you. */
+function drawMountHead(ctx: CanvasRenderingContext2D, coat: Coat, facing: Facing, moving: boolean, now: number, x: number, y: number, z: number, reduced: boolean) {
+  if (facing !== "down") return;
+  drawPixels(ctx, mountArt(coat, "front", moving && !reduced ? Math.floor(now / 110) % 4 : -1, true, "head"), x, y + 2 * z, ART * z * MOUNT_SCALE);
 }
 /** What the player holds: a skilling tool mid-swing, a fishing line, or their weapon (swinging when they attack). */
 function drawHeld(ctx: CanvasRenderingContext2D, scene: Scene, pose: Pose, x: number, y: number, px: number, facing: Facing, project: (x: number, y: number, lift?: number) => { x: number; y: number }) {
@@ -1309,6 +1316,7 @@ function drawPeer(ctx: CanvasRenderingContext2D, scene: Scene, peer: PeerView, h
   drawAuras(ctx, worn, s.x, s.y, px, now, scene.reducedMotion, "back");
   const rect = drawFigure(ctx, figureArt(rows, worn, facing, cloth), s.x, s.y + 2 * z, px);
   drawAuras(ctx, worn, s.x, s.y, px, now, scene.reducedMotion, "front");
+  if (mount) drawMountHead(ctx, mount.coat, facing, peer.moving, now, feet.x, feet.y, z, scene.reducedMotion);
   restoreMotion();
   if (!swinging) { /* the weapon is in the figure */ }
   else if (peer.p.weapon && isItem(peer.p.weapon) && uprightHold(peer.p.weapon)) drawUpright(ctx, itemArt(item(peer.p.weapon).icon), s.x + (facing === "left" ? -1 : 1) * 7 * px, s.y - 3 * px, px, facing === "left" ? -1 : 1, uprightHold(peer.p.weapon)!);

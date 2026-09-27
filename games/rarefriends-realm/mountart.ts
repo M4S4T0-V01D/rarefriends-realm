@@ -14,11 +14,15 @@ const RAINBOW = ["#e7a9b0", "#ebc26b", "#b4d4a0", "#9fc6f0", "#c6bed4"];
 const SADDLE_LEATHER = "#7a3b2e", BLANKET = "#9fb4d0";
 const hash = (a: number, b: number) => { let h = Math.imul(a * 374761393 + b * 668265263, 1274126177); h ^= h >>> 13; return ((Math.imul(h, 1103515245) >>> 0) % 1000) / 1000; };
 
-/** A mount, `frame` 0–3 of its walk (or −1 standing), with a saddle when ridden or for sale. */
-export function mountArt(coat: Coat, view: MountView, frame: number, saddle: boolean): HTMLCanvasElement {
+/**
+ * A mount, `frame` 0–3 of its walk (or −1 standing), with a saddle when ridden or for sale. Facing you, a ridden mount is
+ * drawn in two layers around its rider: the `body` under them and the `head` (and neck) over them.
+ */
+export type MountLayer = "all" | "body" | "head";
+export function mountArt(coat: Coat, view: MountView, frame: number, saddle: boolean, layer: MountLayer = "all"): HTMLCanvasElement {
   const { w, h } = MOUNT_SIZE[view];
-  return pixelArt(`mount:${JSON.stringify(coat)}:${view}:${frame}:${saddle}`, w, h, p => {
-    if (view === "side") side(p, coat, frame, saddle); else if (view === "front") front(p, coat, frame, saddle); else back(p, coat, frame, saddle);
+  return pixelArt(`mount:${JSON.stringify(coat)}:${view}:${frame}:${saddle}:${layer}`, w, h, p => {
+    if (view === "side") side(p, coat, frame, saddle); else if (view === "front") front(p, coat, frame, saddle, layer); else back(p, coat, frame, saddle);
     markings(p, coat, view);
     p.outline();
   });
@@ -67,13 +71,19 @@ function side(p: Pixels, coat: Coat, frame: number, saddle: boolean) {
     p.rect(15, 12 + oy + bob, 1, 4, SADDLE_LEATHER); p.rect(14, 15 + oy + bob, 3, 1, "#c9c2b6");
   }
 }
-function front(p: Pixels, coat: Coat, frame: number, saddle: boolean) {
-  const body = coat.body, dark = shadeHex(body, -0.12), oy = 4, lift = frame < 0 ? [0, 0] : [[1, 0], [0, 0], [0, 1], [0, 0]][frame & 3];
-  // Hind legs peeking out behind, then the chest.
-  leg(p, coat, 5, 16 + oy, 27 - 1, 0, true); leg(p, coat, 14, 16 + oy, 27 - 1, 0, true);
-  p.disc(10, 13 + oy, 6.5, 5.5, body, null);
-  if (saddle) { p.rect(3, 11 + oy, 2, 4, BLANKET); p.rect(15, 11 + oy, 2, 4, BLANKET); p.rect(3, 9 + oy, 14, 2, SADDLE_LEATHER); }
-  leg(p, coat, 7, 16 + oy, 27 - lift[0], 0, false); leg(p, coat, 12, 16 + oy, 27 - lift[1], 0, false);
+function front(p: Pixels, coat: Coat, frame: number, saddle: boolean, layer: MountLayer) {
+  const body = coat.body, dark = shadeHex(body, -0.12), lift = frame < 0 ? [0, 0] : [[1, 0], [0, 0], [0, 1], [0, 0]][frame & 3];
+  let oy = 4;
+  if (layer !== "head") {
+    // Hind legs peeking out behind, then the chest.
+    leg(p, coat, 5, 16 + oy, 27 - 1, 0, true); leg(p, coat, 14, 16 + oy, 27 - 1, 0, true);
+    p.disc(10, 13 + oy, 6.5, 5.5, body, null);
+    if (saddle) { p.rect(3, 11 + oy, 2, 4, BLANKET); p.rect(15, 11 + oy, 2, 4, BLANKET); p.rect(3, 9 + oy, 14, 2, SADDLE_LEATHER); }
+    leg(p, coat, 7, 16 + oy, 27 - lift[0], 0, false); leg(p, coat, 12, 16 + oy, 27 - lift[1], 0, false);
+  }
+  if (layer === "body") return;
+  // Ridden, the head carries a little lower and forward (over the chest), so the rider's face shows above it.
+  if (layer === "head") oy = 8;
   // The head, facing you: long, a darker muzzle with nostrils, eyes on either side, ears up, a forelock.
   p.poly([[7, 1 + oy], [13, 1 + oy], [14, 6 + oy], [12.5, 13 + oy], [7.5, 13 + oy], [6, 6 + oy]], body, null);
   p.rect(8, 10 + oy, 4, 3, shadeHex(body, -0.18)); p.set(8, 11 + oy, "#161616"); p.set(11, 11 + oy, "#161616");
