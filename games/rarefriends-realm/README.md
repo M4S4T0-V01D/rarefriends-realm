@@ -9,9 +9,9 @@ An old-school, tick-based RPG in a 2.5D isometric world. Your verified Rare Frie
 | Left-click | The first option, shown in the top-left (walk, chop, attack, talk…) |
 | Right-click / long-press | Every option for what's under the pointer, plus Examine and Cancel |
 | WASD | Walk in screen directions (at any camera angle) |
-| ← → / ↑ ↓ | Turn / tilt the camera (from overhead down to almost ground level; far land fades into haze) |
+| ← → / ↑ ↓ | Turn / tilt the camera (from overhead down to almost ground level; you can see about 50 tiles before the land fades into haze) |
 | Hold the scroll wheel and drag | Turn and tilt the camera |
-| Compass (by the minimap) | Face north again |
+| Compass (by the minimap) | Turn so north is at the top of the screen (the tilt and zoom stay as they are) |
 | R, or the run orb | Toggle run (two tiles a tick, uses run energy) |
 | Scroll, or + / − | Zoom (0.55× to 3×, close enough to watch every axe swing) |
 | M, or the map orb | World map (click a place to walk there) |
@@ -98,8 +98,8 @@ next attack. **Death is safe:** you wake by the Friendhollow fountain with your 
 
 ## Quests (9 quest points)
 
-1. **A Friend's Feast** (Cook Mabel, Hollow Hall kitchen): an egg, a pot of flour and a bucket of milk.
-2. **Grumblin Trouble** (Captain Rook, Hollow Hall): defeat six Grumblins.
+1. **A Friend's Feast** (Cook Mabel, the castle kitchen): an egg, a pot of flour and a bucket of milk.
+2. **Grumblin Trouble** (Captain Rook, the castle's great hall): defeat six Grumblins.
 3. **The Cold Forge** (Brann, Emberforge): three pewter bars and two blackiron bars.
 4. **Hollow Whispers** (Brother Ossic, the chapel): find the crypt key and lock the crypt altar.
 5. **The Lost Glimmer** (Old Glimmer, by the fountain): three shards: the Grumblin chief, a swamp lurker, the town well.
@@ -109,7 +109,13 @@ next attack. **Death is safe:** you wake by the Friendhollow fountain with your 
 
 A 240 × 240 tile island with 12 overworld regions (Friendhollow, Hollow Farms, Whisperwood, Ashen Hills, Emberforge,
 Frostpeak, Glass Lake, Pale Dunes, Oasis, Murkmire, Mossy Ruins and the Pale Coast) and two dungeons
-(Murkmire Crypt, Hollow Depths). Banks in Friendhollow, Emberforge, the Oasis, Frostpeak and a deposit box by Glass Lake.
+(Murkmire Crypt, Hollow Depths). Banks in Friendhollow (and up in the castle's south-west tower), Emberforge, the Oasis, Frostpeak and a deposit box by Glass Lake.
+
+**Friendhollow Castle**, north of the fountain, has three storeys. Spiral staircases in the north-west and north-east towers
+(click them: *Climb-up*, *Climb-down*) lead from the ground floor (kitchen, great hall, the Relic keeper, guard towers) to
+King Hollis's floor (throne room, royal library, bedchamber, banquet gallery, the tower bank), and the north-east stair
+carries on to the battlements. Upstairs, the storey you're on is drawn over the one below it, the rooms above you and
+the roofs lift away, and the minimap keeps showing the ground. King Hollis has a welcome gift for first-time visitors.
 Each region has its own music, unlocked the first time you arrive. The music player in Settings replays any track you've unlocked (turn Auto back on to follow the areas again).
 
 ## Rare Caskets: RF costs, odds and rules (simulated)

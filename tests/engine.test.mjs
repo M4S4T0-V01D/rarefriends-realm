@@ -7,7 +7,7 @@ import {
 } from "../games/rarefriends-realm/engine.ts";
 import { ITEM_LIST, MONSTERS, SHOPS, SKILLS, SPELLS, TREES, XP_RATE, XP_TABLE, item, levelForXp } from "../games/rarefriends-realm/data.ts";
 import { NPCS, QUESTS, MAX_QUEST_POINTS, questPoints } from "../games/rarefriends-realm/content.ts";
-import { H, REGIONS, T, W, createWorld, objectAtTile, regionAt, terrainAt } from "../games/rarefriends-realm/world.ts";
+import { FLOOR_Y, H, REGIONS, T, W, createWorld, floorAt, objectAtTile, onLevel, realPoint, regionAt, terrainAt } from "../games/rarefriends-realm/world.ts";
 import { combatLevel, count, give, has, level, xpMultiplier } from "../games/rarefriends-realm/state.ts";
 import game from "../games/rarefriends-realm/game.json" with { type: "json" };
 
@@ -76,10 +76,17 @@ test("the world is large, deterministic and every landmark is reachable on foot"
   assert(world.objects.filter(object => object.kind === "tree").length > 400, "Plenty of trees");
   assert(world.objects.filter(object => object.kind === "rock").length > 60, "Plenty of rocks");
   assert(world.objects.filter(object => object.kind === "spot").length >= 15, "Fishing spots");
-  const overworld = reachable(g, world.places.spawn);
-  const crypt = reachable(g, world.objects.find(object => object.name === "Crypt stairs").to);
-  const depths = reachable(g, world.objects.find(object => object.name === "Hollow Rift").to);
-  const ok = (x, y) => overworld[y * W + x] || crypt[y * W + x] || depths[y * W + x];
+  // Walk from the spawn, and take every ladder and staircase you can reach (dungeons, the castle's storeys).
+  const areas = [reachable(g, world.places.spawn)], taken = new Set();
+  const ok = (x, y) => areas.some(seen => seen[y * W + x]);
+  const beside = object => [[0, 1], [1, 0], [0, -1], [-1, 0]].some(([dx, dy]) => ok(object.x + dx, object.y + dy));
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const ladder of world.objects.filter(object => object.kind === "ladder" && !taken.has(object.id) && beside(object))) {
+      taken.add(ladder.id); grew = true;
+      if (!ok(ladder.to.x, ladder.to.y)) areas.push(reachable(g, ladder.to));
+    }
+  }
   const reach = object => object.blocks ? [[0, 1], [1, 0], [0, -1], [-1, 0]].some(([dx, dy]) => ok(object.x + dx, object.y + dy)) : ok(object.x, object.y) || [[0, 1], [1, 0], [0, -1], [-1, 0]].some(([dx, dy]) => ok(object.x + dx, object.y + dy));
   const interactive = world.objects.filter(object => object.kind !== "decor" && object.kind !== "stump" && object.name !== "__removed");
   const stuck = interactive.filter(object => !reach(object)).map(object => `${object.name}@${object.x},${object.y}`);
@@ -98,7 +105,34 @@ test("the world is large, deterministic and every landmark is reachable on foot"
   // The throne room lies behind the Hollow gate: the king is reachable from its far side.
   const king = world.places.king, throne = reachable(g, { x: 177, y: 224 });
   assert(throne[king.y * W + king.x - 1] || throne[(king.y + 3) * W + king.x], "The Hollow King can be reached past the gate");
-  assert(!overworld[224 * W + 177] && !depths[224 * W + 177], "…and only through the gate");
+  assert(!ok(177, 224), "…and only through the gate");
+});
+
+test("Friendhollow Castle: spiral stairs up to the King, on to the roof, and back down", () => {
+  const g = newGame(), world = g.world, levelOf = () => realPoint(world, g.player.x, g.player.y).level;
+  const stairs = (level, action) => world.objects.filter(object => object.look === "stairs" && object.action === action && realPoint(world, object.x, object.y).level === level);
+  const climb = (object, level) => { standBy(g, object); menuFor(g, [{ kind: "object", id: object.id }], null)[0].run(g); until(g, () => levelOf() === level, 30); };
+  // Up the north-east tower to the King's floor.
+  const up = stairs(0, "Climb-up").sort((a, b) => b.x - a.x)[0];
+  assert.equal(menuFor(g, [{ kind: "object", id: up.id }], null)[0].verb, "Climb-up");
+  climb(up, 1);
+  assert(g.player.y >= FLOOR_Y && floorAt(world, g.player.x, g.player.y).complex === "castle", "Stored on the castle's first floor");
+  const real = realPoint(world, g.player.x, g.player.y);
+  assert(real.x >= 112 && real.x <= 131 && real.y >= 86 && real.y <= 105, "Standing over the castle");
+  assert.deepEqual(onLevel(world, real.x, real.y, 1), { x: g.player.x, y: g.player.y }, "Clicks on this storey land on its floor");
+  // King Hollis receives you in the throne room (and welcomes you with coins, once).
+  const king = g.npcs.find(npc => npc.id === "king"), coins = count(g.player, "coins");
+  assert.equal(realPoint(world, king.x, king.y).level, 1);
+  walkTo(g, king.x, king.y + 1); until(g, () => g.player.x === king.x && g.player.y === king.y + 1, 80);
+  setTarget(g, { kind: "npc", uid: king.uid, option: "Talk-to" });
+  until(g, () => g.dialogue !== null, 30);
+  while (g.dialogue) continueDialogue(g);
+  assert.equal(count(g.player, "coins"), coins + 250);
+  // The roof: up again from the north-east tower, then all the way back to the ground.
+  climb(stairs(1, "Climb-up")[0], 2);
+  climb(stairs(2, "Climb-down")[0], 1);
+  climb(stairs(1, "Climb-down").sort((a, b) => a.x - b.x)[0], 0);
+  assert(g.player.y < 200, "Back on the ground");
 });
 
 test("click to walk: pathfinding goes around obstacles and never cuts corners", () => {
@@ -164,11 +198,11 @@ test("woodcutting, firemaking and cooking: the classic loop", () => {
   until(g, () => g.fires.length === 1, 60);
   assert(g.player.xp.firemaking > 0);
   // Cook raw minnows on it.
-  give(g.player, "raw_minnows", 3);
+  give(g.player, "raw_minnows", 8);
   const fire = g.fires[0];
   setTarget(g, { kind: "fire", uid: fire.uid, option: "Cook" });
   until(g, () => !has(g.player, "raw_minnows"), 200);
-  assert(count(g.player, "minnows") + count(g.player, "burnt_food") >= 5, "Cooked (or burnt) all three");
+  assert(count(g.player, "minnows") + count(g.player, "burnt_food") >= 8, "Cooked (or burnt) them all");
   assert(g.player.xp.cooking > 0);
 });
 

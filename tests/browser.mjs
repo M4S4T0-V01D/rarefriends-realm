@@ -163,8 +163,11 @@ try {
   assert(screenEnd.y > screenStart.y + 10, "S walks down the screen whatever the camera angle");
   await game.getByRole("button", { name: "Compass: face north" }).click();
   await page.waitForTimeout(900);
-  const reset = await state(() => window.__realm.camera());
-  assert(Math.abs(reset.angle % (Math.PI * 2)) < 0.01 && Math.abs(reset.pitch - 0.5) < 0.01, "the compass faces north again");
+  const here = await state(() => ({ x: window.__realm.game().player.x, y: window.__realm.game().player.y }));
+  const centre = await screenOf(here.x, here.y), northward = await screenOf(here.x, here.y - 3);
+  assert(Math.abs(northward.x - centre.x) < 3 && northward.y < centre.y - 20, `the compass turns north to the top of the screen (${northward.x - centre.x}, ${northward.y - centre.y})`);
+  assert(Math.abs((await state(() => window.__realm.camera().pitch)) - turned.pitch) < 0.01, "…and leaves the tilt alone");
+  await state(() => window.__realm.view(0.8, 0.5, 0));
 
   // ---------- Panels ----------
   await state(() => { const g = window.__realm.game(), p = g.player, table = [0, 0, 83, 174, 276, 388, 512, 650, 801, 969, 1154, 1358, 1584, 1833, 2107, 2411, 2746, 3115, 3523, 3973, 4470, 5018, 5624, 6291, 7028, 7842, 8740, 9730, 10824, 12031, 13363];
@@ -309,6 +312,43 @@ try {
   assert.deepEqual([card.width, card.height], [1200, 675]);
   (await import("node:fs")).writeFileSync("./artifacts/adventurer-card.png", Buffer.from(card.data, "base64"));
   await game.getByRole("button", { name: "Close" }).click();
+
+  // ---------- Friendhollow Castle: real clicks up the spiral stairs to the King's floor and the roof ----------
+  const levelNow = () => state(() => { const g = window.__realm.game(), p = g.player; return g.world.floors.find(f => p.y >= 240 && p.x >= f.x0 + f.dx && p.x <= f.x1 + f.dx && p.y >= f.y0 + f.dy && p.y <= f.y1 + f.dy)?.level ?? 0; });
+  /** Stand beside a staircase on a storey, then click it (its first option climbs). */
+  const clickStairs = async (level, action) => {
+    const { stairs, stand } = await frame().evaluate(([level, action]) => {
+      const g = window.__realm.game(), w = g.world, storey = o => w.floors.find(f => o.x >= f.x0 + f.dx && o.x <= f.x1 + f.dx && o.y >= f.y0 + f.dy && o.y <= f.y1 + f.dy && o.y >= 240)?.level ?? 0;
+      const stairs = w.objects.filter(o => o.look === "stairs" && o.action === action && storey(o) === level).sort((a, b) => b.x - a.x)[0];
+      const open = (x, y) => { const t = w.tiles[y * 240 + x], id = w.objectAt[y * 240 + x]; return t !== 0 && t !== 16 && (id < 0 || !w.objects[id].blocks); };
+      const [dx, dy] = [[0, 1], [1, 0], [-1, 0], [0, -1]].find(([dx, dy]) => open(stairs.x + dx, stairs.y + dy));
+      return { stairs, stand: { x: stairs.x + dx, y: stairs.y + dy } };
+    }, [level, action]);
+    await teleport(stand.x, stand.y);
+    const at = await screenOf(stairs.x, stairs.y);
+    await page.mouse.click(at.x, at.y - 12);
+  };
+  await state(() => document.querySelector(".realm-side-toggle").click()); // tuck the side panels away for the pictures
+  await teleport(121, 110);
+  await state(() => window.__realm.view(0.8, 0.5, -Math.PI / 4));
+  await page.waitForTimeout(1500); await shot("castle");
+  await state(() => window.__realm.view(0.8, 0.5, 0));
+  await clickStairs(0, "Climb-up");
+  await until(() => window.__realm.game().player.y >= 240, 15_000);
+  assert.equal(await levelNow(), 1, "the stairs climb to the King's floor");
+  const king = await state(() => window.__realm.game().npcs.find(npc => npc.id === "king"));
+  await teleport(king.x + 1, king.y + 3);
+  await state(() => window.__realm.view(1.3, 0.42, 0.35));
+  await page.waitForTimeout(1500); await shot("castle-throne");
+  await state(() => window.__realm.view(0.8, 0.5, 0));
+  await clickStairs(1, "Climb-up");
+  await until(() => window.__realm.game().player.x >= 142, 15_000);
+  assert.equal(await levelNow(), 2, "…and on up to the roof");
+  await teleport(151, 253);
+  await state(() => window.__realm.view(0.7, 0.24, 0.2));
+  await page.waitForTimeout(1500); await shot("castle-roof");
+  await state(() => window.__realm.view(0.8, 0.5, 0));
+  await state(() => document.querySelector(".realm-side-toggle").click()); // tuck the side panels away for the pictures
 
   // ---------- A tour of the Realm ----------
   await state(() => { const p = window.__realm.game().player; p.xp.hitpoints = 13_034_431; p.hp = 99; p.xp.defence = 13_034_431; window.__realm.game().autoRetaliate = false; });

@@ -15,6 +15,7 @@ import {
   castOnItem, setFollower, setStyle, startProduction, swapSlots, toggleRun, togglePrayer, toggleWorn, unequip, useItemOnItem, type OwnedFriend, type Selection,
 } from "./engine.ts";
 import { friendRows, renderWorldMap } from "./render.ts";
+import { isUnderground, realPoint } from "./world.ts";
 import { artUrl, itemArt, orbArt, prayerArt, skillArt, spellArt, tabArt, type TabIcon } from "./icons.ts";
 import { friendSprite } from "./sprites.ts";
 import { figureArt } from "./wardrobe.ts";
@@ -519,7 +520,7 @@ export function ShopModal({ game, shopId, refresh, onClose }: { game: Game; shop
   );
 }
 export function WorldMapModal({ game, onClose, onTravel }: { game: Game; onClose: () => void; onTravel: (x: number, y: number) => void }) {
-  const canvas = useRef<HTMLCanvasElement>(null), underground = game.player.y >= 200;
+  const canvas = useRef<HTMLCanvasElement>(null), underground = isUnderground(game.player.y), me = realPoint(game.world, game.player.x, game.player.y);
   const [focus, setFocus] = useState(() => ({ x: underground ? 130 : 120, y: underground ? 220 : 100, zoom: underground ? 3.2 : 2.3 }));
   const toTile = useRef<((x: number, y: number) => { x: number; y: number }) | null>(null), drag = useRef<{ x: number; y: number; fx: number; fy: number; moved: boolean } | null>(null);
   useEffect(() => {
@@ -530,7 +531,7 @@ export function WorldMapModal({ game, onClose, onTravel }: { game: Game; onClose
   }, [focus, game, underground]);
   const point = (event: ReactMouseEvent<HTMLCanvasElement>) => { const rect = event.currentTarget.getBoundingClientRect(); return { x: (event.clientX - rect.left) * 760 / rect.width, y: (event.clientY - rect.top) * 470 / rect.height }; };
   const zoomBy = (factor: number) => setFocus(current => ({ ...current, zoom: Math.max(1.2, Math.min(10, current.zoom * factor)) }));
-  const centre = () => setFocus(current => ({ ...current, x: game.player.x, y: game.player.y, zoom: Math.max(current.zoom, 4) }));
+  const centre = () => setFocus(current => ({ ...current, x: me.x, y: me.y, zoom: Math.max(current.zoom, 4) }));
   useEffect(() => {
     const keys = (event: KeyboardEvent) => { if (event.key === "+" || event.key === "=") zoomBy(1.25); else if (event.key === "-" || event.key === "_") zoomBy(0.8); else if (event.key.toLowerCase() === "c") centre(); };
     window.addEventListener("keydown", keys); return () => window.removeEventListener("keydown", keys);

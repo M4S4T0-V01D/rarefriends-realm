@@ -24,10 +24,12 @@ export const NPCS: Record<string, NpcDef> = {
   armsmaster: { id: "armsmaster", name: "Armsmaster Vey", examine: "Sells swords, shields and the odd cuirass.", options: ["Talk-to", "Trade"], shop: "swords", art: art(4, 61) },
   runa: { id: "runa", name: "Runa", examine: "Her shop hums.", options: ["Talk-to", "Trade"], shop: "sigils", art: art(8, 71) },
   tanner: { id: "tanner", name: "Tessa", examine: "The tanner. Her hands are stained brown.", options: ["Talk-to", "Trade", "Tan-hides"], shop: "crafting", art: art(2, 81) },
-  captain: { id: "captain", name: "Captain Rook", examine: "Captain of the Hollow Hall guard.", options: ["Talk-to"], art: art(6, 91) },
+  king: { id: "king", name: "King Hollis", examine: "King of Friendhollow. His crown is a little too big for him.", options: ["Talk-to"], art: art(1, 7) },
+  royal_guard: { id: "royal_guard", name: "Royal guard", examine: "Guards the King. Takes it very seriously.", options: ["Talk-to"], art: art(0, 223) },
+  captain: { id: "captain", name: "Captain Rook", examine: "Captain of the castle guard.", options: ["Talk-to"], art: art(6, 91) },
   guard: { id: "guard", name: "Hall guard", examine: "He looks bored.", options: ["Talk-to", "Pickpocket"], art: art(0, 101),
     pickpocket: { level: 40, xp: 46.8, coins: [20, 40], stun: 5, damage: 2 } },
-  cook: { id: "cook", name: "Cook Mabel", examine: "The Hollow Hall cook. She looks worried.", options: ["Talk-to"], art: art(3, 111) },
+  cook: { id: "cook", name: "Cook Mabel", examine: "The castle cook. She looks worried.", options: ["Talk-to"], art: art(3, 111) },
   emporium: { id: "emporium", name: "Relic keeper", examine: "Keeper of the Rare Casket chest.", options: ["Talk-to", "Caskets"], art: art(7, 121) },
   villager: { id: "villager", name: "Villager", examine: "One of the Realm's many Friends.", options: ["Talk-to", "Pickpocket"], art: art(4, 131),
     pickpocket: { level: 1, xp: 8, coins: [3, 12], stun: 4, damage: 1 } },
@@ -49,10 +51,10 @@ const stage = (game: Game, quest: string) => game.player.quests[quest] ?? 0;
 const data = (game: Game, key: string) => game.player.questData[key] ?? 0;
 export const QUESTS: readonly QuestDef[] = [
   {
-    id: "friends_feast", name: "A Friend's Feast", points: 1, difficulty: "Novice", start: "Talk to Cook Mabel in the Hollow Hall kitchen.", requirements: [],
+    id: "friends_feast", name: "A Friend's Feast", points: 1, difficulty: "Novice", start: "Talk to Cook Mabel in the castle kitchen.", requirements: [],
     journal: game => {
       const s = stage(game, "friends_feast");
-      if (s === 0) return ["I can start this quest by talking to Cook Mabel in the Hollow Hall kitchen, north of the fountain."];
+      if (s === 0) return ["I can start this quest by talking to Cook Mabel in the castle kitchen, north of the fountain."];
       if (s === 1) return ["Cook Mabel needs ingredients for the Realm Feast:",
         `${has(game.player, "egg") ? "✓" : "•"} An egg (the chicken coop at Hollow Farms)`,
         `${has(game.player, "pot_of_flour") ? "✓" : "•"} A pot of flour (grain from the wheat field, milled at the windmill, into a pot)`,
@@ -61,10 +63,10 @@ export const QUESTS: readonly QuestDef[] = [
     },
   },
   {
-    id: "grumblin_trouble", name: "Grumblin Trouble", points: 1, difficulty: "Novice", start: "Talk to Captain Rook in the Hollow Hall.", requirements: [],
+    id: "grumblin_trouble", name: "Grumblin Trouble", points: 1, difficulty: "Novice", start: "Talk to Captain Rook in the castle.", requirements: [],
     journal: game => {
       const s = stage(game, "grumblin_trouble");
-      if (s === 0) return ["Captain Rook in the Hollow Hall might need a hand."];
+      if (s === 0) return ["Captain Rook in the castle might need a hand."];
       if (s === 1) return [`Captain Rook asked me to thin out the Grumblins in Whisperwood, west of the farms. Grumblins defeated: ${Math.min(6, data(game, "grumblins"))}/6.`];
       return ["The Grumblins are quieter now. QUEST COMPLETE!"];
     },
@@ -185,7 +187,7 @@ export function talk(game: Game, npcId: string): Dialogue {
         "Left-click does the first option. Right-click anything for every option, like Examine.",
         "Hold WASD or the arrows to walk. Toggle Run by the minimap. Scroll to zoom. Press M for the world map.",
         "Chop trees, fish at the lake, mine in the Ashen Hills north of here. Cook your catch on a range or a fire.",
-        "Quests are in the quest tab. Cook Mabel and Captain Rook in the Hollow Hall always need help.",
+        "Quests are in the quest tab. Cook Mabel and Captain Rook in the castle always need help.",
       ));
       return chat(name, npcSays(name, `Welcome to the Realm, ${family}. Your Friend's family gives you a perk: ${perk.title}. ${perk.text}`), [
         { label: "How do I play?", then: tips },
@@ -194,7 +196,7 @@ export function talk(game: Game, npcId: string): Dialogue {
           "Hollow Farms to the west has cows and chickens. Grumblins in Whisperwood are good practice, if you're brave.",
           "The bank is north-west of the fountain. Deposit what you don't need.")) },
         { label: "What are Rare Caskets?", then: () => chat(name, npcSays(name,
-          "The Relic keeper in the Hollow Hall sells Rare Caskets for simulated $RAREFRIENDS.",
+          "The Relic keeper in the castle sells Rare Caskets for simulated $RAREFRIENDS.",
           "Each holds a Rare Relic you keep for a bonus or redeem for RF, plus a wardrobe piece for your Friend.")) },
         { label: "Can I get a new starter kit?", then: () => {
           if (has(player, "pewter_axe") || has(player, "tinderbox")) return chat(name, npcSays(name, "You still have your tools. Check your inventory!"));
@@ -322,8 +324,24 @@ export function talk(game: Game, npcId: string): Dialogue {
       { label: "Trade.", then: () => { game.ui.shop = "crafting"; return null; } },
       { label: "Bye.", then: () => null },
     ]);
-    case "villager": return chat(name, npcSays(name, (["Nice day for it.", "Have you seen the Hollow Hall? Big, isn't it.", "They say there's a king under the ruins. A hollow one.", "I'd buy a Rare Casket if I had any RF."] as const)[Math.floor(game.rng() * 4)]));
+    case "villager": return chat(name, npcSays(name, (["Nice day for it.", "Have you been up the castle stairs? The King receives visitors.", "They say there's a king under the ruins. A hollow one.", "I'd buy a Rare Casket if I had any RF."] as const)[Math.floor(game.rng() * 4)]));
     case "guard": return chat(name, npcSays(name, "Move along."));
+    case "royal_guard": return chat(name, npcSays(name, (["The King is receiving visitors. Mind your manners.", "The view from the roof? Best in the Realm. Stairs in the north-east tower.", "No running in the throne room."] as const)[Math.floor(game.rng() * 3)]));
+    case "king": {
+      const talk: Dialogue["options"] = [
+        { label: "Who are you?", then: () => chat(name, npcSays(name, "Hollis, King of Friendhollow, by the grace of the First Friend and a very close vote.", "This was a hall, once. Then it grew towers. Then it grew me.")) },
+        { label: "Tell me about the Realm.", then: () => chat(name, npcSays(name, "North: the Ashen Hills and the Emberforge. East: the Oasis and Glass Lake. South: the Mossy Ruins, and under them...",
+          questDone(game, "hollow_king") ? "Nothing, now. You saw to that." : "Something hollow that wants a throne. Old Glimmer, by the fountain, knows more than I do.")) },
+        { label: "Can I help the kingdom?", then: () => chat(name, npcSays(name, QUESTS.every(quest => questDone(game, quest.id)) ? "You already have, in every way I can think of. Rest a while." :
+          "My cook is always short of something, my captain can't sleep for the Grumblins, and Brother Ossic hears whispers. Start with them.")) },
+        { label: "Goodbye, Your Majesty.", then: () => null },
+      ];
+      if (!data(game, "royal_audience")) return chat(name, npcSays(name, "A visitor! Welcome to Friendhollow Castle. Here: every Friend on the road should have a little coin."), undefined, () => {
+        player.questData.royal_audience = 1; giveOrDrop(game, "coins", 250); message(game, "King Hollis gives you 250 coins.");
+      });
+      if (questDone(game, "hollow_king")) return chat(name, npcSays(name, "The hero of the Hollow Depths, in my throne room! Sit anywhere. Not there, that's the Queen's."), talk);
+      return chat(name, npcSays(name, "Welcome back, friend. What can the crown do for you?"), talk);
+    }
     default:
       if (def.shop) return chat(name, npcSays(name, "Hello! Care to see my wares?"), [
         { label: "Yes please.", then: () => { game.ui.shop = def.shop!; return null; } },

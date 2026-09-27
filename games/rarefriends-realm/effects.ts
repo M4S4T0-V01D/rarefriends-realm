@@ -5,7 +5,7 @@
  */
 import type { Game } from "./state.ts";
 import { item } from "./data.ts";
-import { T, W, groundHeight, inBounds, isWater, regionAt, type World } from "./world.ts";
+import { T, W, groundHeight, inBounds, isUnderground, isWater, regionAt, type World } from "./world.ts";
 
 export type Project = (x: number, y: number, lift?: number) => { x: number; y: number };
 type Particle = {
@@ -126,7 +126,7 @@ export function updateEffects(game: Game, camera: { x: number; y: number }, dt: 
   for (const bird of birds) { bird.x += bird.vx * dt; bird.y += bird.vy * dt; bird.age += dt; }
   for (let i = birds.length - 1; i >= 0; i--) if (birds[i].age > 14) birds.splice(i, 1);
   if (reduced) return;
-  const world = game.world, region = regionAt(world, Math.round(camera.x), Math.round(camera.y)).id, underground = camera.y >= 200;
+  const world = game.world, region = regionAt(world, Math.round(camera.x), Math.round(camera.y)).id, underground = isUnderground(camera.y);
   spawnClock += dt;
   const around = () => ({ x: camera.x + (Math.random() - 0.5) * view, y: camera.y + (Math.random() - 0.5) * view });
   while (spawnClock > 0.12) {

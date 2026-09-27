@@ -365,9 +365,6 @@ export class RealmAudio {
         this.osc("square", f, t, t + 0.5, filter); this.env(gain, t, 0.045 * v, 0.003, 0, 0.35); break; }
       case "organ": for (const [ratio, level] of [[1, 1], [2, 0.6], [4, 0.3], [6, 0.12]] as const) { const g = ctx.createGain(); g.gain.value = level; g.connect(gain); this.osc("sine", f * ratio, t, t + length + 0.4, g); }
         this.env(gain, t, 0.06 * v, 0.04, Math.max(0, length - 0.05), 0.3); break;
-      case "pad": { const filter = ctx.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.value = 1100; filter.connect(gain);
-        this.osc("sawtooth", f, t, t + length + 1, filter, -8); this.osc("sawtooth", f, t, t + length + 1, filter, 8);
-        this.env(gain, t, 0.022 * v, Math.min(0.8, length / 3), Math.max(0, length - 0.8), 0.9); break; }
       case "choir": { const filter = ctx.createBiquadFilter(); filter.type = "bandpass"; filter.frequency.value = 1500; filter.Q.value = 1.1; filter.connect(gain);
         for (const detune of [-10, 0, 10]) this.osc("sawtooth", f, t, t + length + 1.2, filter, detune);
         this.env(gain, t, 0.05 * v, Math.min(0.9, length / 2), Math.max(0, length - 0.9), 1.0); break; }

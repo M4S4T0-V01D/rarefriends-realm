@@ -21,7 +21,7 @@ import { HOST_HELLO, HOST_STATE, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, parseR
 import { RealmAudio, trackFor, trackById, type SfxName, type TrackId } from "./audio.ts";
 import { renderCard, shareText } from "./card.ts";
 import { skillArt } from "./icons.ts";
-import { T, isWater, regionAt, terrainAt } from "./world.ts";
+import { T, isUnderground, isWater, realPoint, regionAt, terrainAt } from "./world.ts";
 import "@rarefriends/friendsdk/frame.css";
 import "./style.css";
 
@@ -35,6 +35,8 @@ const CANONICAL = new Map<number, GenerationSprites>(REGULAR_SPRITES.map(sprites
 const KEY_DIRECTIONS: Record<string, [number, number]> = { w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0] };
 const CAMERA_KEYS = new Set(["arrowleft", "arrowright", "arrowup", "arrowdown"]);
 const TURN_SPEED = 1.9, TILT_SPEED = 0.45;
+/** The camera angle that puts world north at the top of the screen (the compass). */
+const NORTH = -Math.PI / 4;
 const DEFAULT_SETTINGS: Settings = { music: true, sfx: true, musicVolume: 0.7, sfxVolume: 0.8, zoom: 0.8, shiftDrop: false, autoMusic: true };
 
 /** RareFriends Realm. The SDK runtime supplies wallet connection, the verified owned Friend and the fixed (simulated) RF client. */
@@ -113,7 +115,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           if (restore(probe, data.save)) {
             restore(state, data.save);
             setHasSave({ total: totalLevel(state.player), combat: combatLevel(state.player), qp: questPoints(state), where: regionAt(state.world, state.player.x, state.player.y).name });
-            if (live.current.phase === "playing") { message(state, "Welcome back! This wallet's adventure has been restored.", "info"); camera.current.x = state.player.x; camera.current.y = state.player.y; }
+            if (live.current.phase === "playing") { message(state, "Welcome back! This wallet's adventure has been restored.", "info"); const at = realPoint(state.world, state.player.x, state.player.y); camera.current.x = at.x; camera.current.y = at.y; }
           }
         }
       }
@@ -248,7 +250,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         if (goal) { cam.angle += (goal.angle - cam.angle) * 0.18; cam.pitch += (goal.pitch - cam.pitch) * 0.18; if (Math.abs(goal.angle - cam.angle) < 0.002 && Math.abs(goal.pitch - cam.pitch) < 0.002) { cam.angle = goal.angle; cam.pitch = goal.pitch; cameraGoal.current = null; } }
         if (compass.current) compass.current.style.transform = `rotate(${northAngle(cam) * 180 / Math.PI + 90}deg)`;
         const alpha = Math.min(1, (now - tickAt.current) / TICK_MS), moved = player.moved === state.tick;
-        const tx = moved ? player.prev.x + (player.x - player.prev.x) * alpha : player.x, ty = moved ? player.prev.y + (player.y - player.prev.y) * alpha : player.y;
+        // Follow where you really are (upstairs, the storey's tiles stand over the building).
+        const { x: tx, y: ty } = realPoint(state.world, moved ? player.prev.x + (player.x - player.prev.x) * alpha : player.x, moved ? player.prev.y + (player.y - player.prev.y) * alpha : player.y);
         camera.current.x += (tx - camera.current.x) * 0.35; camera.current.y += (ty - camera.current.y) * 0.35; camera.current.zoom = live.current.settings.zoom;
       }
       const ratio = node.width / VIEW.width;
@@ -300,7 +303,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     }
     if (clock.wild <= 0) {
       const region = regionAt(state.world, me.x, me.y).id;
-      const call: SfxName | null = me.y >= 200 ? "drip" : region === "murkmire" ? "frog" : region === "frostpeak" || region === "pale_dunes" ? "wind" : region === "glass_lake" || region === "coast" ? (Math.random() < 0.5 ? "gull" : "bird") : region === "oasis" || region === "ashen_hills" || region === "emberforge" ? null : "bird";
+      const call: SfxName | null = isUnderground(me.y) ? "drip" : region === "murkmire" ? "frog" : region === "frostpeak" || region === "pale_dunes" ? "wind" : region === "glass_lake" || region === "coast" ? (Math.random() < 0.5 ? "gull" : "bird") : region === "oasis" || region === "ashen_hills" || region === "emberforge" ? null : "bird";
       if (call) player.sfx(call, 0.5 + Math.random() * 0.4);
       clock.wild = 3 + Math.random() * 6;
     }
@@ -423,7 +426,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     const state = game.current;
     if (!state) return;
     audio.current?.unlock(); setPhase("playing"); region.current = ""; tickAt.current = performance.now();
-    camera.current = { x: state.player.x, y: state.player.y, zoom: settings.zoom, angle: 0, pitch: PITCH.classic };
+    const at = realPoint(state.world, state.player.x, state.player.y);
+    camera.current = { x: at.x, y: at.y, zoom: settings.zoom, angle: 0, pitch: PITCH.classic };
     if (!hasSave) { state.dialogue = null; message(state, "Tip: talk to the Realm Guide by the fountain, or right-click anything to see what you can do.", "info"); }
     setTimeout(() => canvas.current?.focus({ preventScroll: true }), 50);
   };
@@ -505,8 +509,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
             <div className="realm-minimap">
               <canvas ref={minimap} width={152} height={152} onClick={onMinimap} aria-label="Minimap: click to walk, scroll to zoom"
                 onWheel={event => { miniZoom.current = Math.max(1.6, Math.min(7, miniZoom.current * (event.deltaY < 0 ? 1.15 : 0.87))); }} />
-              <button type="button" ref={compass} className="realm-compass" title="Face north (reset the camera)" aria-label="Compass: face north"
-                onClick={() => { const turns = Math.round(camera.current.angle / (Math.PI * 2)); cameraGoal.current = { angle: turns * Math.PI * 2, pitch: PITCH.classic }; }}><i aria-hidden="true">▲</i><b>N</b></button>
+              <button type="button" ref={compass} className="realm-compass" title="Face north" aria-label="Compass: face north"
+                onClick={() => { const from = cameraGoal.current?.angle ?? camera.current.angle; cameraGoal.current = { angle: NORTH + Math.round((from - NORTH) / (Math.PI * 2)) * Math.PI * 2, pitch: cameraGoal.current?.pitch ?? camera.current.pitch }; }}><i aria-hidden="true">▲</i><b>N</b></button>
             </div>
           </div>
           <div className="realm-drops" aria-hidden="true">

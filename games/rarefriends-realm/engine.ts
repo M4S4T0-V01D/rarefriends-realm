@@ -13,7 +13,7 @@ import {
   level, maxHp, maxPrayer, message, prayerBoost, sound, take, weapon, combatLevel, createGame,
   type Activity, type CombatStyle, type Dialogue, type Game, type Monster, type Npc, type Point, type Recipe, type Slot, type Target,
 } from "./state.ts";
-import { T, W, H, inBounds, isWater, objectAtTile, regionAt, terrainAt, tileIndex, walkable, type WorldObject } from "./world.ts";
+import { T, W, H, inBounds, isUnderground, isWater, objectAtTile, realPoint, regionAt, terrainAt, tileIndex, walkable, type WorldObject } from "./world.ts";
 
 export { createGame };
 
@@ -252,7 +252,8 @@ function examineObject(game: Game, object: WorldObject): string {
 const DECOR_EXAMINE: Partial<Record<string, string>> = {
   statue: "A statue of the First Friend. It looks a lot like yours.", windmill: "Its sails creak in the wind.", snowman: "A Friend made of snow. Its carrot is a pinecone.",
   tent: "Smells of Grumblin.", grave: "Here lies a Friend.", chest: "An old chest.", boat: "It's seen better days.", pillar: "Old stone. Older than the Realm.",
-  fence: "A wooden fence.", pine: "A snowy pine.", cactus: "Don't hug it.", palm: "Coconuts, out of reach.", torch: "It flickers.", banner: "The banner of Hollow Hall.",
+  fence: "A wooden fence.", pine: "A snowy pine.", cactus: "Don't hug it.", palm: "Coconuts, out of reach.", torch: "It flickers.", banner: "The banner of Friendhollow Castle.",
+  throne: "Carved oak, gilded, and a cushion somebody sat on too long.", armour: "An empty suit of ashsteel armour. Probably empty.", bed: "Very soft. No time for naps.",
 };
 
 // ---------- Inventory actions ----------
@@ -942,7 +943,7 @@ function monsterTick(game: Game, monster: Monster) {
     return;
   }
   if (monster.attackTimer > 0) monster.attackTimer--;
-  const sameLayer = (monster.spawn.y >= 200) === (player.y >= 200);
+  const sameLayer = isUnderground(monster.spawn.y) === isUnderground(player.y) && realPoint(game.world, monster.spawn.x, monster.spawn.y).level === realPoint(game.world, player.x, player.y).level;
   // Aggression: attack players whose combat level is at most twice the monster's.
   if (!monster.target && monster.def.aggressive && sameLayer && chebyshev(monster, player) <= 4 && combatLevel(player) <= monster.def.level * 2) { monster.target = true; creature(game, monster, "aggro"); }
   if (monster.target) {
@@ -1074,7 +1075,7 @@ export function castSpell(game: Game, id: string): Selection {
   if (problem && spell.id !== "home") { message(game, problem, "warn"); return null; }
   if (spell.target === "self") {
     if (spell.kind === "bloom") { bonebloom(game, spell); return null; }
-    if (player.y >= 200 && spell.id !== "home") { message(game, "A dark force stops you from teleporting underground.", "warn"); return null; }
+    if (isUnderground(player.y) && spell.id !== "home") { message(game, "A dark force stops you from teleporting underground.", "warn"); return null; }
     if (player.combat !== null && spell.id === "home") { message(game, "You can't use Homeward during combat.", "warn"); return null; }
     stopAll(game); closeInterfaces(game);
     for (const [sigil, n] of Object.entries(spellCost(game, spell))) take(player, sigil, n);

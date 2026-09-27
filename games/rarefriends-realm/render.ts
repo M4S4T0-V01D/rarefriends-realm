@@ -7,7 +7,7 @@ import { ROCKS, item, levelForXp, type Icon } from "./data.ts";
 import { NPCS } from "./content.ts";
 import { TICK_MS, attackSpeed, type Facing, type Game, type Monster, type Npc, type Projectile } from "./state.ts";
 import { npcOverhead, type Pick } from "./engine.ts";
-import { REGIONS, T, W, H, cornerHeight, groundHeight, inBounds, objectAtTile, type Building, type World, type WorldObject } from "./world.ts";
+import { FLOOR_Y, REGIONS, STOREY, T, W, H, complexAt, cornerHeight, floorAt, groundHeight, inBounds, isUnderground, objectAtTile, onLevel, realPoint, type Building, type Floor, type World, type WorldObject } from "./world.ts";
 import { itemArt } from "./icons.ts";
 import { drawPixels } from "./pixel.ts";
 import { decorArt, rockArt, treeArt } from "./scenery.ts";
@@ -39,7 +39,9 @@ export type Camera = { x: number; y: number; zoom: number; angle: number; pitch:
 export const PITCH = { min: 0.13, max: 0.74, classic: 0.5 } as const;
 export const ZOOM = { min: 0.55, max: 3, classic: 0.8 } as const;
 /** How far the land is drawn, and where the haze begins (tiles from the camera). */
-const DRAW_DISTANCE = 44, HAZE_START = 24;
+const DRAW_DISTANCE = 72, HAZE_START = 48;
+/** Decorations too small to matter in the far distance. */
+const SMALL_DECOR = new Set(["flowers", "reeds", "lily", "rubble", "bush", "hay", "crate", "barrel"]);
 export type ClickMarker = { x: number; y: number; at: number; red: boolean };
 export type Firework = { at: number; color: string };
 export type Scene = {
@@ -64,25 +66,39 @@ const liftScale = (camera: Camera) => Math.sqrt(1 - camera.pitch * camera.pitch)
 let ground: World | null = null;
 export function setGround(world: World | null) { ground = world; }
 const groundAt = (x: number, y: number) => ground ? groundHeight(ground, x, y) : 0;
-/** World point → screen, standing on the ground (`lift` is extra height above it). */
+/** The storey you're on (set each frame): clicks land on its floor. */
+let viewFloor: Floor | null = null;
+/** World point → screen, standing on the ground (`lift` is extra height above it). Stored upper-storey tiles are drawn on their building, a storey up per level. */
 export function toScreen(camera: Camera, x: number, y: number, lift = 0) {
+  if (y >= FLOOR_Y - 0.5 && ground) { const floor = floorAt(ground, x, y); if (floor) { x -= floor.dx; y -= floor.dy; lift += floor.level * STOREY; } }
   const { rx, ry } = rotate(camera, x - camera.x, y - camera.y), half = TILE_W / 2, height = lift + groundAt(x, y) - (camera.base ?? 0);
   return { x: (rx - ry) * half * camera.zoom + VIEW.width / 2, y: ((rx + ry) * half * camera.pitch - height * liftScale(camera)) * camera.zoom + VIEW.height / 2 };
 }
-/** Screen → the tile under it, allowing for hills (a few refinement steps). */
-export function toTile(camera: Camera, sx: number, sy: number) {
+/** Screen → the tile under it, allowing for hills (a few refinement steps). Upstairs, it's the floor you're on where it covers. */
+export function toTile(camera: Camera, sx: number, sy: number, floors = true) {
   const half = TILE_W / 2, c = Math.cos(-camera.angle), s = Math.sin(-camera.angle);
-  let x = camera.x, y = camera.y;
-  for (let step = 0; step < 4; step++) {
-    const height = step ? groundAt(x, y) - (camera.base ?? 0) : 0;
-    const a = (sx - VIEW.width / 2) / (camera.zoom * half), b = (sy - VIEW.height / 2 + height * liftScale(camera) * camera.zoom) / (camera.zoom * half * camera.pitch);
-    const rx = (a + b) / 2, ry = (b - a) / 2;
-    x = camera.x + rx * c - ry * s; y = camera.y + rx * s + ry * c;
+  const solve = (lift: number) => {
+    let x = camera.x, y = camera.y;
+    for (let step = 0; step < 4; step++) {
+      const height = step ? groundAt(x, y) + lift - (camera.base ?? 0) : 0;
+      const a = (sx - VIEW.width / 2) / (camera.zoom * half), b = (sy - VIEW.height / 2 + height * liftScale(camera) * camera.zoom) / (camera.zoom * half * camera.pitch);
+      const rx = (a + b) / 2, ry = (b - a) / 2;
+      x = camera.x + rx * c - ry * s; y = camera.y + rx * s + ry * c;
+    }
+    return { x: Math.round(x), y: Math.round(y) };
+  };
+  if (floors && viewFloor && ground) {
+    const up = solve(viewFloor.level * STOREY), stored = onLevel(ground, up.x, up.y, viewFloor.level, viewFloor.complex);
+    if (stored.x !== up.x || stored.y !== up.y) return stored;
   }
-  return { x: Math.round(x), y: Math.round(y) };
+  return solve(0);
 }
 /** Draw order: further from the camera first. */
-export function depthOf(camera: Camera, x: number, y: number) { const { rx, ry } = rotate(camera, x, y); return rx + ry; }
+export function depthOf(camera: Camera, x: number, y: number) {
+  let level = 0;
+  if (y >= FLOOR_Y - 0.5 && ground) { const floor = floorAt(ground, x, y); if (floor) { x -= floor.dx; y -= floor.dy; level = floor.level; } }
+  const { rx, ry } = rotate(camera, x, y); return rx + ry + level * 0.002;
+}
 /** The screen facing of a world heading, for sprites. */
 export function screenFacing(camera: Camera, heading: { x: number; y: number }): Facing {
   const { rx, ry } = rotate(camera, heading.x, heading.y), sx = rx - ry, sy = rx + ry;
@@ -177,6 +193,14 @@ function box(ctx: CanvasRenderingContext2D, camera: Camera, x: number, y: number
 
 // ---------- Terrain ----------
 const CONTOUR = 10;
+/** Shaded terrain fills, cached (the same few hundred colours every frame). */
+const fillCache = new Map<number, string>();
+const terrainFill = (terrain: number, variation: number) => {
+  const key = terrain * 1000 + Math.round((variation + 0.5) * 400);
+  let fill = fillCache.get(key);
+  if (!fill) { fill = shade(TERRAIN_COLORS[terrain] ?? "#cccccc", variation); fillCache.set(key, fill); }
+  return fill;
+};
 const isWaterTerrain = (terrain: number) => terrain === T.WATER || terrain === T.DEEP;
 function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, x0: number, y0: number, x1: number, y1: number) {
   const { camera, game, now } = scene, world = game.world, z = camera.zoom, hw = TILE_W / 2 * z, hh = hw * camera.pitch;
@@ -185,6 +209,8 @@ function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, x0: number, y0
   const flat = (dx: number, dy: number) => { const { rx, ry } = rotate(camera, dx, dy); return { x: (rx - ry) * TILE_W / 2 * z, y: (rx + ry) * TILE_W / 2 * camera.pitch * z }; };
   const o = { x: 0, y: 0 }, px = flat(0.5, 0), py = flat(0, 0.5);
   const ex = { x: px.x - o.x, y: px.y - o.y }, ey = { x: py.x - o.x, y: py.y - o.y }, ls = liftScale(camera);
+  // Inked edges and contour lines go into two paths, stroked once. Texture is left off tiles too small or far to show it.
+  const edges = new Path2D(), contours = new Path2D(), small = hh < 5, near = 34;
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
     if (!inBounds(x, y)) continue;
     const terrain = world.tiles[y * W + x];
@@ -198,69 +224,70 @@ function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, x0: number, y0
     const ax = sx - ex.x - ey.x, ay = sy - ex.y - ey.y - (hA - hMid) * lifted, bx = sx + ex.x - ey.x, by = sy + ex.y - ey.y - (hB - hMid) * lifted;
     const cx = sx + ex.x + ey.x, cy = sy + ex.y + ey.y - (hC - hMid) * lifted, dx = sx - ex.x + ey.x, dy = sy - ex.y + ey.y - (hD - hMid) * lifted;
     ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.lineTo(cx, cy); ctx.lineTo(dx, dy); ctx.closePath();
-    ctx.fillStyle = shade(TERRAIN_COLORS[terrain] ?? "#cccccc", variation); ctx.fill();
+    ctx.fillStyle = terrainFill(terrain, variation); ctx.fill();
     // Texture details.
-    const h = hash(y, x);
-    ctx.strokeStyle = "rgba(22,22,22,0.22)"; ctx.fillStyle = "rgba(22,22,22,0.18)"; ctx.lineWidth = Math.max(0.6, z * 0.8);
-    switch (terrain) {
-      case T.GRASS: case T.DARK_GRASS:
-        if (h < (terrain === T.DARK_GRASS ? 0.55 : 0.3)) {
-          const ox = (h - 0.25) * hw * 1.4, oy = (hash(x + 3, y) - 0.5) * hh;
-          ctx.beginPath(); ctx.moveTo(sx + ox - 2 * z, sy + oy); ctx.lineTo(sx + ox - 1 * z, sy + oy - 4 * z); ctx.moveTo(sx + ox + 1 * z, sy + oy); ctx.lineTo(sx + ox + 2 * z, sy + oy - 5 * z); ctx.stroke();
+    const h = hash(y, x), detailed = !small && Math.abs(x - camera.x) + Math.abs(y - camera.y) < near;
+    if (detailed) {
+      ctx.strokeStyle = "rgba(22,22,22,0.22)"; ctx.fillStyle = "rgba(22,22,22,0.18)"; ctx.lineWidth = Math.max(0.6, z * 0.8);
+      switch (terrain) {
+        case T.GRASS: case T.DARK_GRASS:
+          if (h < (terrain === T.DARK_GRASS ? 0.55 : 0.3)) {
+            const ox = (h - 0.25) * hw * 1.4, oy = (hash(x + 3, y) - 0.5) * hh;
+            ctx.beginPath(); ctx.moveTo(sx + ox - 2 * z, sy + oy); ctx.lineTo(sx + ox - 1 * z, sy + oy - 4 * z); ctx.moveTo(sx + ox + 1 * z, sy + oy); ctx.lineTo(sx + ox + 2 * z, sy + oy - 5 * z); ctx.stroke();
+          }
+          break;
+        case T.PATH: case T.SAND: case T.GRAVEL: case T.SNOW:
+          if (h < 0.6) { ctx.fillRect(sx + (h - 0.3) * hw, sy + (hash(x, y + 5) - 0.5) * hh, 1.5 * z, 1.5 * z); ctx.fillRect(sx - (h - 0.2) * hw * 0.8, sy - (hash(x + 9, y) - 0.5) * hh * 0.8, 1.2 * z, 1.2 * z); }
+          break;
+        case T.COBBLE: case T.STONE:
+          ctx.beginPath(); ctx.moveTo(sx - hw / 2, sy - hh / 2); ctx.lineTo(sx + hw / 2, sy + hh / 2); ctx.moveTo(sx + hw / 2, sy - hh / 2); ctx.lineTo(sx - hw / 2, sy + hh / 2); ctx.stroke();
+          break;
+        case T.WOOD: case T.BRIDGE:
+          ctx.beginPath(); for (let i = -1; i <= 1; i++) { ctx.moveTo(sx - hw / 2 + i * hw / 3, sy - hh / 2 - i * hh / 3 + hh / 6); ctx.lineTo(sx + hw / 2 + i * hw / 3, sy + hh / 2 - i * hh / 3 - hh / 6); } ctx.stroke();
+          break;
+        case T.FARMLAND:
+          ctx.beginPath(); for (let i = -1; i <= 1; i++) { ctx.moveTo(sx - hw * 0.6 + i * hw * 0.35, sy + i * hh * 0.35 - hh * 0.3); ctx.lineTo(sx + hw * 0.1 + i * hw * 0.35, sy + i * hh * 0.35 + hh * 0.3); } ctx.stroke();
+          break;
+        case T.WATER: case T.DEEP: {
+          ctx.strokeStyle = terrain === T.DEEP ? "rgba(255,255,255,0.28)" : "rgba(255,255,255,0.45)";
+          const phase = Math.sin(t * 1.6 + x * 0.9 + y * 0.6) * 3 * z;
+          if (h < 0.5) { ctx.beginPath(); ctx.moveTo(sx - 8 * z + phase, sy - 2 * z); ctx.quadraticCurveTo(sx + phase, sy - 5 * z, sx + 8 * z + phase, sy - 2 * z); ctx.stroke(); }
+          break;
         }
-        break;
-      case T.PATH: case T.SAND: case T.GRAVEL: case T.SNOW:
-        if (h < 0.6) { ctx.fillRect(sx + (h - 0.3) * hw, sy + (hash(x, y + 5) - 0.5) * hh, 1.5 * z, 1.5 * z); ctx.fillRect(sx - (h - 0.2) * hw * 0.8, sy - (hash(x + 9, y) - 0.5) * hh * 0.8, 1.2 * z, 1.2 * z); }
-        break;
-      case T.COBBLE: case T.STONE:
-        ctx.beginPath(); ctx.moveTo(sx - hw / 2, sy - hh / 2); ctx.lineTo(sx + hw / 2, sy + hh / 2); ctx.moveTo(sx + hw / 2, sy - hh / 2); ctx.lineTo(sx - hw / 2, sy + hh / 2); ctx.stroke();
-        break;
-      case T.WOOD: case T.BRIDGE:
-        ctx.beginPath(); for (let i = -1; i <= 1; i++) { ctx.moveTo(sx - hw / 2 + i * hw / 3, sy - hh / 2 - i * hh / 3 + hh / 6); ctx.lineTo(sx + hw / 2 + i * hw / 3, sy + hh / 2 - i * hh / 3 - hh / 6); } ctx.stroke();
-        break;
-      case T.FARMLAND:
-        ctx.beginPath(); for (let i = -1; i <= 1; i++) { ctx.moveTo(sx - hw * 0.6 + i * hw * 0.35, sy + i * hh * 0.35 - hh * 0.3); ctx.lineTo(sx + hw * 0.1 + i * hw * 0.35, sy + i * hh * 0.35 + hh * 0.3); } ctx.stroke();
-        break;
-      case T.WATER: case T.DEEP: {
-        ctx.strokeStyle = terrain === T.DEEP ? "rgba(255,255,255,0.28)" : "rgba(255,255,255,0.45)";
-        const phase = Math.sin(t * 1.6 + x * 0.9 + y * 0.6) * 3 * z;
-        if (h < 0.5) { ctx.beginPath(); ctx.moveTo(sx - 8 * z + phase, sy - 2 * z); ctx.quadraticCurveTo(sx + phase, sy - 5 * z, sx + 8 * z + phase, sy - 2 * z); ctx.stroke(); }
-        break;
+        case T.SWAMP: if (h < 0.35) ellipse(ctx, sx + (h - 0.2) * hw, sy, 5 * z, 2.5 * z, "rgba(60,70,50,0.18)", null); break;
+        case T.DUNGEON: if (h < 0.25) { ctx.strokeStyle = "rgba(0,0,0,0.35)"; ctx.beginPath(); ctx.moveTo(sx - 6 * z, sy); ctx.lineTo(sx, sy + 2 * z); ctx.lineTo(sx + 4 * z, sy - 1 * z); ctx.stroke(); } break;
+        case T.CARPET: ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.beginPath(); ctx.moveTo(sx, sy - hh * 0.6); ctx.lineTo(sx + hw * 0.6, sy); ctx.lineTo(sx, sy + hh * 0.6); ctx.lineTo(sx - hw * 0.6, sy); ctx.closePath(); ctx.stroke(); break;
       }
-      case T.SWAMP: if (h < 0.35) ellipse(ctx, sx + (h - 0.2) * hw, sy, 5 * z, 2.5 * z, "rgba(60,70,50,0.18)", null); break;
-      case T.DUNGEON: if (h < 0.25) { ctx.strokeStyle = "rgba(0,0,0,0.35)"; ctx.beginPath(); ctx.moveTo(sx - 6 * z, sy); ctx.lineTo(sx, sy + 2 * z); ctx.lineTo(sx + 4 * z, sy - 1 * z); ctx.stroke(); } break;
-      case T.CARPET: ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.beginPath(); ctx.moveTo(sx, sy - hh * 0.6); ctx.lineTo(sx + hw * 0.6, sy); ctx.lineTo(sx, sy + hh * 0.6); ctx.lineTo(sx - hw * 0.6, sy); ctx.closePath(); ctx.stroke(); break;
     }
     // Inked edges where the terrain class changes.
     const mine = EDGE_CLASS[terrain];
-    ctx.strokeStyle = "rgba(22,22,22,0.55)"; ctx.lineWidth = Math.max(0.8, z);
     const edge = (nx: number, ny: number, ax: number, ay: number, bx: number, by: number) => {
       const other = inBounds(nx, ny) ? world.tiles[ny * W + nx] : T.VOID;
       if (other === T.VOID || EDGE_CLASS[other] === mine || other === T.WALL || other === T.CLIFF) return;
-      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+      edges.moveTo(ax, ay); edges.lineTo(bx, by);
     };
     edge(x, y - 1, ax, ay, bx, by);
     edge(x + 1, y, bx, by, cx, cy);
     edge(x, y + 1, cx, cy, dx, dy);
     edge(x - 1, y, dx, dy, ax, ay);
     // Contour lines every CONTOUR pixels of height (marching squares on the tile), like a topographic map.
-    if (!isWaterTerrain(terrain)) {
-      const levels = [hA, hB, hC, hD].map(h => Math.floor(h / CONTOUR)), lo = Math.min(...levels), hi = Math.max(...levels);
+    if (!isWaterTerrain(terrain) && !small) {
+      const lo = Math.floor(Math.min(hA, hB, hC, hD) / CONTOUR), hi = Math.floor(Math.max(hA, hB, hC, hD) / CONTOUR);
       if (hi > lo) {
         const pts: [number, number][] = [[ax, ay], [bx, by], [cx, cy], [dx, dy]], hs = [hA, hB, hC, hD];
-        ctx.strokeStyle = "rgba(22,22,22,0.16)"; ctx.lineWidth = 1; ctx.beginPath();
         for (let level = lo + 1; level <= hi; level++) {
           const at = level * CONTOUR, cross: [number, number][] = [];
           for (let e = 0; e < 4; e++) {
             const h0 = hs[e], h1 = hs[(e + 1) % 4];
             if ((h0 < at) !== (h1 < at)) { const t = (at - h0) / (h1 - h0), [x0, y0] = pts[e], [x1, y1] = pts[(e + 1) % 4]; cross.push([x0 + (x1 - x0) * t, y0 + (y1 - y0) * t]); }
           }
-          for (let k = 0; k + 1 < cross.length; k += 2) { ctx.moveTo(cross[k][0], cross[k][1]); ctx.lineTo(cross[k + 1][0], cross[k + 1][1]); }
+          for (let k = 0; k + 1 < cross.length; k += 2) { contours.moveTo(cross[k][0], cross[k][1]); contours.lineTo(cross[k + 1][0], cross[k + 1][1]); }
         }
-        ctx.stroke();
       }
     }
   }
+  ctx.strokeStyle = "rgba(22,22,22,0.16)"; ctx.lineWidth = 1; ctx.stroke(contours);
+  ctx.strokeStyle = "rgba(22,22,22,0.55)"; ctx.lineWidth = Math.max(0.8, z); ctx.stroke(edges);
 }
 
 // ---------- Objects ----------
@@ -268,7 +295,7 @@ function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, x0: number, y0
 const ART = 2;
 function drawTree(ctx: CanvasRenderingContext2D, camera: Camera, object: WorldObject, depleted: boolean, alpha: number, shake: number) {
   const z = camera.zoom, { x: sx, y: sy } = toScreen(camera, object.x, object.y), variant = Math.floor(hash(object.x, object.y) * 4);
-  ellipse(ctx, sx, sy + 1 * z, (depleted ? 9 : 17) * z, (depleted ? 4 : 7) * z, "rgba(22,22,22,0.14)", null);
+  if (Math.abs(object.x - camera.x) + Math.abs(object.y - camera.y) < HAZE_START) ellipse(ctx, sx, sy + 1 * z, (depleted ? 9 : 17) * z, (depleted ? 4 : 7) * z, "rgba(22,22,22,0.14)", null);
   return drawPixels(ctx, treeArt(object.tree!, variant, depleted), sx + shake * z, sy + 3 * z, ART * z, alpha);
 }
 function drawRock(ctx: CanvasRenderingContext2D, camera: Camera, object: WorldObject, depleted: boolean) {
@@ -302,6 +329,21 @@ function drawStation(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldO
       ellipse(ctx, sx, sy - 26 * z, 3 * z, 3 * z, `rgba(226,215,173,${0.5 + flicker * 0.5})`, null); return hit(30);
     case "ladder": {
       const down = object.action?.includes("down");
+      if (object.look === "stairs") {
+        // A spiral stair round a newel post: steps rising, or a stairwell going down.
+        const c = (dx: number, dy: number, lift = 0) => { const p = toScreen(camera, ox + dx, oy + dy, lift); return [p.x, p.y] as const; };
+        if (down) poly(ctx, [c(-0.42, -0.42), c(0.42, -0.42), c(0.42, 0.42), c(-0.42, 0.42)], "#2b2a2e", INK, 1.2);
+        const steps = Array.from({ length: down ? 3 : 7 }, (_, i) => { const a = (down ? Math.PI : 0) + i * 0.8, r = 0.24; return { i, x: ox + Math.cos(a) * r, y: oy + Math.sin(a) * r }; });
+        steps.sort((a, b) => depthOf(camera, a.x, a.y) - depthOf(camera, b.x, b.y));
+        const post = () => box(ctx, camera, ox, oy, 0.14, 0.14, down ? 14 : 52, "#b89c86", "#9c8672", "#8a7563");
+        let posted = false;
+        for (const step of steps) {
+          if (!posted && depthOf(camera, step.x, step.y) > depthOf(camera, ox, oy)) { post(); posted = true; }
+          box(ctx, camera, step.x, step.y, 0.4, 0.4, down ? 3 : 6, "#d7d4cd", "#c8c5be", "#b3aea6", down ? 0 : step.i * 6);
+        }
+        if (!posted) post();
+        return hit(down ? 22 : 54, 46);
+      }
       if (down) { ellipse(ctx, sx, sy, 20 * z, 10 * z, "#161616", INK); ctx.strokeStyle = "#9c8672"; ctx.lineWidth = 2 * z; ctx.beginPath(); ctx.moveTo(sx - 5 * z, sy + 2 * z); ctx.lineTo(sx - 5 * z, sy - 14 * z); ctx.moveTo(sx + 5 * z, sy + 2 * z); ctx.lineTo(sx + 5 * z, sy - 14 * z); for (let i = 0; i < 4; i++) { ctx.moveTo(sx - 5 * z, sy - i * 4 * z); ctx.lineTo(sx + 5 * z, sy - i * 4 * z); } ctx.stroke(); return hit(20, 44); }
       ctx.strokeStyle = "#8a7563"; ctx.lineWidth = 2.5 * z; ctx.beginPath(); ctx.moveTo(sx - 7 * z, sy); ctx.lineTo(sx - 5 * z, sy - 50 * z); ctx.moveTo(sx + 7 * z, sy); ctx.lineTo(sx + 5 * z, sy - 50 * z);
       for (let i = 1; i < 7; i++) { ctx.moveTo(sx - 7 * z, sy - i * 7 * z); ctx.lineTo(sx + 7 * z, sy - i * 7 * z); } ctx.stroke(); return hit(54, 24);
@@ -431,7 +473,21 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
       }
       case "boat": poly(ctx, [[sx - 22 * z, sy - 4 * z], [sx + 22 * z, sy - 4 * z], [sx + 14 * z, sy + 6 * z], [sx - 14 * z, sy + 6 * z]], "#9c8672"); return hit(12, 44);
       case "chest": box(ctx, camera, ox, oy, 0.6, 0.45, 14, "#9c8672", "#8a7563", "#7a6553"); return hit(20);
-      case "bed": box(ctx, camera, ox, oy, 0.6, 1, 8, PAPER, "#d6d3cc", "#c8c5be"); return hit(14);
+      case "bed": box(ctx, camera, ox, oy, 0.7, 0.9, 10, "#9c8672", "#8a7563", "#7a6553"); box(ctx, camera, ox, oy + 0.08, 0.64, 0.66, 3, C.lavender, shade(C.lavender, -0.08), shade(C.lavender, -0.14), 10);
+        box(ctx, camera, ox, oy - 0.3, 0.5, 0.2, 3, PAPER, "#d6d3cc", "#c8c5be", 10); box(ctx, camera, ox, oy - 0.42, 0.7, 0.08, 26, "#9c8672", "#8a7563", "#7a6553"); return hit(26);
+      case "throne": {
+        // Carved and gilded, with a tall rose back on the north side of its tile.
+        const parts = [{ x: ox, y: oy - 0.3, draw: () => { box(ctx, camera, ox, oy - 0.3, 0.72, 0.14, 50, C.rose, shade(C.rose, -0.08), shade(C.rose, -0.14)); box(ctx, camera, ox, oy - 0.3, 0.8, 0.18, 5, C.butter, shade(C.butter, -0.1), shade(C.butter, -0.16), 50); } },
+          { x: ox, y: oy + 0.05, draw: () => { box(ctx, camera, ox, oy + 0.05, 0.72, 0.6, 14, "#b8964f", "#a3843f", "#8f7334"); box(ctx, camera, ox, oy + 0.05, 0.62, 0.52, 4, C.rose, shade(C.rose, -0.08), shade(C.rose, -0.14), 14); } }];
+        parts.sort((a, b) => depthOf(camera, a.x, a.y) - depthOf(camera, b.x, b.y)).forEach(part => part.draw());
+        const top = toScreen(camera, ox, oy - 0.3, 58); poly(ctx, [[top.x - 6 * z, top.y + 4 * z], [top.x - 6 * z, top.y - 3 * z], [top.x - 3 * z, top.y], [top.x, top.y - 5 * z], [top.x + 3 * z, top.y], [top.x + 6 * z, top.y - 3 * z], [top.x + 6 * z, top.y + 4 * z]], C.butter, INK, 1);
+        return hit(64, 40);
+      }
+      case "armour":
+        box(ctx, camera, ox, oy, 0.4, 0.4, 3, "#8a7563", "#7a6553", "#6a5543");
+        box(ctx, camera, ox, oy, 0.3, 0.16, 18, "#9fa2a6", "#8b8e92", "#76797d", 3); box(ctx, camera, ox, oy, 0.42, 0.24, 18, "#c9c2b6", "#b3ac9f", "#9d968a", 21);
+        ellipse(ctx, sx, sy - 46 * z, 7 * z, 7.5 * z, "#c9c2b6"); ctx.fillStyle = INK; ctx.fillRect(sx - 4 * z, sy - 47 * z, 8 * z, 1.8 * z);
+        poly(ctx, [[sx, sy - 54 * z], [sx + 3 * z, sy - 62 * z], [sx + 5 * z, sy - 53 * z]], C.rose, INK, 0.8); return hit(62, 26);
       default: return hit(10);
     }
   } finally { ctx.globalAlpha = 1; }
@@ -459,14 +515,16 @@ type RoofVertex = [number, number, number];
 /** The roof's corners (with an overhang) and its ridge, in world coordinates and height. */
 function roofGeometry(building: Building) {
   const o = 0.3, X0 = building.x0 - 0.5 - o, X1 = building.x1 + 0.5 + o, Y0 = building.y0 - 0.5 - o, Y1 = building.y1 + 0.5 + o;
-  const alongX = X1 - X0 >= Y1 - Y0, half = (alongX ? Y1 - Y0 : X1 - X0) / 2, rise = Math.max(20, Math.min(48, half * 11));
-  const base = WALL_H, top = base + rise, mid = alongX ? (Y0 + Y1) / 2 : (X0 + X1) / 2;
+  const alongX = X1 - X0 >= Y1 - Y0, half = (alongX ? Y1 - Y0 : X1 - X0) / 2, rise = building.roof === "cone" ? 118 : Math.max(20, Math.min(48, half * 11));
+  const base = WALL_H * (building.storeys ?? 1), top = base + rise, mid = alongX ? (Y0 + Y1) / 2 : (X0 + X1) / 2;
   const A: RoofVertex = [X0, Y0, base], B: RoofVertex = [X1, Y0, base], C: RoofVertex = [X1, Y1, base], D: RoofVertex = [X0, Y1, base];
   const R0: RoofVertex = alongX ? [X0, mid, top] : [mid, Y0, top], R1: RoofVertex = alongX ? [X1, mid, top] : [mid, Y1, top];
-  return { A, B, C, D, R0, R1, alongX, base, top, X0, X1, Y0, Y1 };
+  const apex: RoofVertex = [(X0 + X1) / 2, (Y0 + Y1) / 2, top];
+  return { A, B, C, D, R0, R1, apex, alongX, base, top, X0, X1, Y0, Y1 };
 }
 function roofHull(camera: Camera, building: Building) {
-  const g = roofGeometry(building), points = building.roof === "flat" ? [g.A, g.B, g.C, g.D].map(([x, y]) => [x, y, g.base + 12] as RoofVertex).concat([g.A, g.B, g.C, g.D]) : [g.A, g.B, g.C, g.D, g.R0, g.R1];
+  const g = roofGeometry(building), points = building.roof === "flat" ? [g.A, g.B, g.C, g.D].map(([x, y]) => [x, y, g.base + 12] as RoofVertex).concat([g.A, g.B, g.C, g.D])
+    : building.roof === "cone" ? [g.A, g.B, g.C, g.D, [g.apex[0], g.apex[1], g.top + 22] as RoofVertex] : [g.A, g.B, g.C, g.D, g.R0, g.R1];
   const screen = points.map(([x, y, h]) => { const s = toScreen(camera, x, y, h); return [s.x, s.y] as [number, number]; });
   // Convex hull (monotone chain).
   screen.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
@@ -499,6 +557,24 @@ function drawRoof(ctx: CanvasRenderingContext2D, camera: Camera, building: Build
     ctx.globalAlpha = 1;
     return;
   }
+  if (building.roof === "cone") {
+    // A pointed tower roof: four slates to a peak, with a pennant.
+    const faces = [[g.A, g.B], [g.B, g.C], [g.C, g.D], [g.D, g.A]].map(([a, b], i) => ({ points: [a, b, g.apex], fill: shade(building.color, [0.08, -0.04, -0.1, 0.02][i]) }));
+    const centre = (points: RoofVertex[]) => depthOf(camera, (points[0][0] + points[1][0]) / 2, (points[0][1] + points[1][1]) / 2);
+    faces.sort((a, b) => centre(a.points) - centre(b.points));
+    for (const face of faces) {
+      poly(ctx, face.points.map(P), face.fill, INK, 1.2);
+      const [a, b] = face.points;
+      ctx.strokeStyle = "rgba(22,22,22,0.2)"; ctx.lineWidth = 1; ctx.beginPath();
+      for (let k = 1; k < 4; k++) { const t = k / 4, [x0, y0] = P([a[0] + (g.apex[0] - a[0]) * t, a[1] + (g.apex[1] - a[1]) * t, a[2] + (g.apex[2] - a[2]) * t]), [x1, y1] = P([b[0] + (g.apex[0] - b[0]) * t, b[1] + (g.apex[1] - b[1]) * t, b[2] + (g.apex[2] - b[2]) * t]); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); }
+      ctx.stroke();
+    }
+    const [px, py] = P(g.apex), [qx, qy] = P([g.apex[0], g.apex[1], g.top + 20]), wave = reduced ? 0 : Math.sin(now / 260 + g.X0) * 2;
+    ctx.strokeStyle = INK; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(qx, qy); ctx.stroke();
+    poly(ctx, [[qx, qy], [qx + 14 * camera.zoom, qy + 3 * camera.zoom + wave], [qx, qy + 7 * camera.zoom]], C.butter, INK, 1);
+    ctx.globalAlpha = 1;
+    return;
+  }
   const color = building.color, gable = "#cdb9a0";
   const faces: { points: RoofVertex[]; fill: string; slope?: [RoofVertex, RoofVertex, RoofVertex, RoofVertex] }[] = g.alongX
     ? [{ points: [g.A, g.B, g.R1, g.R0], fill: shade(color, 0.07), slope: [g.A, g.B, g.R1, g.R0] }, { points: [g.D, g.C, g.R1, g.R0], fill: shade(color, -0.07), slope: [g.D, g.C, g.R1, g.R0] },
@@ -528,7 +604,6 @@ function drawRoof(ctx: CanvasRenderingContext2D, camera: Camera, building: Build
     if (!reduced && Math.random() < 0.06) puff(cx, cy, g.top + 8);
   }
   ctx.globalAlpha = 1;
-  void now;
 }
 
 // ---------- Characters ----------
@@ -570,18 +645,35 @@ export function pickAt(x: number, y: number): Pick[] {
   return out;
 }
 let lastFrame = 0;
+/** A tile of an upper floor: flagstones, boards or carpet, lifted to its storey. */
+function floorTile(ctx: CanvasRenderingContext2D, camera: Camera, x: number, y: number, terrain: number) {
+  const c = (dx: number, dy: number) => { const s = toScreen(camera, x + dx, y + dy); return [s.x, s.y] as const; };
+  const color = shade(TERRAIN_COLORS[terrain] ?? "#c4c1ba", (hash(x, y) - 0.5) * 0.035);
+  poly(ctx, [c(-0.5, -0.5), c(0.5, -0.5), c(0.5, 0.5), c(-0.5, 0.5)], color, "rgba(22,22,22,0.16)", 1);
+  ctx.strokeStyle = terrain === T.CARPET ? "rgba(255,255,255,0.35)" : "rgba(22,22,22,0.14)"; ctx.lineWidth = 1; ctx.beginPath();
+  if (terrain === T.WOOD) for (const t of [-0.17, 0.17]) { const [ax, ay] = c(-0.5, t), [bx, by] = c(0.5, t); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); }
+  else if (terrain === T.CARPET) { const [ax, ay] = c(0, -0.32), [bx, by] = c(0.32, 0), [cx, cy] = c(0, 0.32), [dx, dy] = c(-0.32, 0); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.lineTo(cx, cy); ctx.lineTo(dx, dy); ctx.closePath(); }
+  else { const [ax, ay] = c(-0.5, 0), [bx, by] = c(0.5, 0); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); }
+  ctx.stroke();
+}
+/** Eased height of the storey you're on, so the camera rises with you up the stairs. */
+let liftNow = 0;
 export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   const { game, camera, now } = scene, world = game.world, z = camera.zoom;
   const alpha = Math.max(0, Math.min(1, (now - scene.tickAt) / TICK_MS));
-  const underground = game.player.y >= 200;
-  setGround(world); camera.base = groundHeight(world, camera.x, camera.y);
+  const underground = isUnderground(game.player.y);
   const dt = Math.min(0.05, Math.max(0, (now - (lastFrame || now)) / 1000)); lastFrame = now;
+  // Where you really are: the storey (level) and the building complex you're in, if any.
+  const here = realPoint(world, game.player.x, game.player.y), floor = floorAt(world, game.player.x, game.player.y), level = here.level;
+  const inside = floor ? floor.complex : complexAt(world, here.x, here.y);
+  const liftGoal = level * STOREY; liftNow = scene.reducedMotion || Math.abs(liftGoal - liftNow) > STOREY * 2 ? liftGoal : liftNow + (liftGoal - liftNow) * Math.min(1, dt * 8);
+  setGround(world); viewFloor = floor; camera.base = groundHeight(world, camera.x, camera.y) + liftNow;
   const project = (x: number, y: number, lift = 0) => toScreen(camera, x, y, lift);
   updateEffects(game, camera, dt, scene.reducedMotion, 34 / Math.max(0.5, z));
   if (underground) { ctx.fillStyle = "#0e0e10"; ctx.fillRect(0, 0, VIEW.width, VIEW.height); }
   else { const sky = ctx.createLinearGradient(0, 0, 0, VIEW.height); sky.addColorStop(0, "#b9c7d6"); sky.addColorStop(1, "#dcdfda"); ctx.fillStyle = sky; ctx.fillRect(0, 0, VIEW.width, VIEW.height); }
   // Visible tile bounds.
-  const corners = [toTile(camera, 0, 0), toTile(camera, VIEW.width, 0), toTile(camera, 0, VIEW.height), toTile(camera, VIEW.width, VIEW.height)];
+  const corners = [toTile(camera, 0, 0, false), toTile(camera, VIEW.width, 0, false), toTile(camera, 0, VIEW.height, false), toTile(camera, VIEW.width, VIEW.height, false)];
   // Low camera angles see a long way: draw out to DRAW_DISTANCE and let the haze take the rest.
   const cx = Math.round(camera.x), cy = Math.round(camera.y);
   const x0 = Math.max(cx - DRAW_DISTANCE, Math.min(...corners.map(c => c.x)) - 2), x1 = Math.min(cx + DRAW_DISTANCE, Math.max(...corners.map(c => c.x)) + 3);
@@ -590,31 +682,39 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   drawCloudShadows(ctx, project, camera, now, z, underground, scene.reducedMotion);
   const hits: Hit[] = [], drawables: Drawable[] = [];
   const player = game.player, pp = interpolate(player, game, alpha), playerDepth = depthOf(camera, pp.x, pp.y), depth = (x: number, y: number) => depthOf(camera, x, y);
-  const insideBuilding = inBounds(player.x, player.y) ? world.buildingAt[player.y * W + player.x] : 0;
   const me = toScreen(camera, pp.x, pp.y), meTop = me.y - 60 * z;
   const coversPlayer = (x: number, y: number) => { const at = toScreen(camera, x, y); return Math.abs(at.x - me.x) < 34 * z && at.y > meTop && at.y - 95 * z < me.y; };
   const playerFacing = screenFacing(camera, player.heading);
+  /** Ground tiles under the storey you stand on are covered: nothing there is drawn but the outer walls. */
+  const covered = (x: number, y: number) => level > 0 && inside !== null && complexAt(world, x, y) === inside;
+  /** An outer wall of your building (it shows on every storey below you). */
+  const outerWall = (x: number, y: number) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => complexAt(world, x + dx, y + dy) !== inside);
+  /** Whether something standing on a tile is drawn: your storey only, and nothing under it. */
+  const shown = (x: number, y: number, margin = 0) => {
+    if (y >= FLOOR_Y - 0.5) { const on = floorAt(world, x, y); return !!on && !!floor && on.complex === floor.complex && on.level === level; }
+    return x >= x0 - margin && x <= x1 && y >= y0 - margin && y <= y1 && !covered(Math.round(x), Math.round(y));
+  };
   // Hover highlight and click marker.
   const tileOutline = (tx: number, ty: number, color: string) => { const c = (dx: number, dy: number) => { const s = toScreen(camera, tx + dx, ty + dy); return [s.x, s.y] as const; }; poly(ctx, [c(-0.5, -0.5), c(0.5, -0.5), c(0.5, 0.5), c(-0.5, 0.5)], null, color, 1.5); };
-  if (scene.hoverTile) tileOutline(scene.hoverTile.x, scene.hoverTile.y, "rgba(22,22,22,0.35)");
-  // Static objects, walls and cliffs.
-  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
-    if (!inBounds(x, y)) continue;
-    const terrain = world.tiles[y * W + x];
-    if (terrain === T.WALL || terrain === T.CLIFF) {
-      const d = depth(x, y), owner = world.buildingAt[y * W + x], cut = owner !== 0 && owner === insideBuilding && d > playerDepth - 0.5;
-      const near = !cut && Math.abs(x - pp.x) + Math.abs(y - pp.y) < 7 && d > playerDepth + 0.5;
-      drawables.push({ depth: d, draw: () => {
-        // Inside a building, the walls between you and the camera drop to a low cutaway.
-        const height = terrain === T.WALL ? (y >= 200 ? 34 : cut ? 9 : WALL_H) : 22;
-        ctx.globalAlpha = near ? 0.3 : 1;
-        if (terrain === T.WALL) box(ctx, camera, x, y, 1, 1, height, y >= 200 ? "#4a4950" : "#b9b4ab", y >= 200 ? "#3a3940" : "#a39e95", y >= 200 ? "#2f2e35" : "#8f8a82", 0, INK, owner && !cut && hash(x, y) < 0.34 ? "window" : "brick");
-        else box(ctx, camera, x, y, 1, 1, height + hash(x, y) * 10, "#a39e96", "#8f8a83", "#7c7771");
-        ctx.globalAlpha = 1;
-      } });
-    }
+  if (scene.hoverTile && !floor) tileOutline(scene.hoverTile.x, scene.hoverTile.y, "rgba(22,22,22,0.35)");
+  /** A wall tile: storeys of brick (with windows on buildings), cut low when it stands between you and the camera inside. */
+  const wall = (x: number, y: number, storeys: number, cut: boolean, near: boolean, windows: boolean, battlement = false) => {
+    const d = depth(x, y), dungeon = isUnderground(y);
+    drawables.push({ depth: d, draw: () => {
+      ctx.globalAlpha = near ? 0.3 : 1;
+      const [top, left, right] = dungeon ? ["#4a4950", "#3a3940", "#2f2e35"] : ["#b9b4ab", "#a39e95", "#8f8a82"];
+      if (dungeon) box(ctx, camera, x, y, 1, 1, 34, top, left, right, 0, INK, "brick");
+      else if (cut) box(ctx, camera, x, y, 1, 1, 9, top, left, right, 0, INK, "brick");
+      else if (battlement) { box(ctx, camera, x, y, 1, 1, 12, top, left, right, 0, INK, "brick"); if ((Math.round(x) + Math.round(y)) % 2 === 0) box(ctx, camera, x, y, 0.62, 0.62, 10, top, left, right, 12, INK); }
+      else for (let k = 0; k < storeys; k++) box(ctx, camera, x, y, 1, 1, WALL_H, top, left, right, k * WALL_H, INK, windows && hash(x, y + k * 7) < 0.34 ? "window" : "brick");
+      ctx.globalAlpha = 1;
+    } });
+  };
+  /** A world object on a tile (trees, rocks, stations, decor). Out in the haze, the smallest decorations are left off. */
+  const object = (x: number, y: number) => {
     const object = objectAtTile(world, x, y);
-    if (!object || object.name === "__removed") continue;
+    if (!object || object.name === "__removed") return;
+    if (object.kind === "decor" && SMALL_DECOR.has(object.decor!) && Math.abs(x - camera.x) + Math.abs(y - camera.y) > HAZE_START) return;
     const d = depth(x, y) + (object.kind === "wheat" || object.kind === "spot" ? -0.4 : 0);
     drawables.push({ depth: d, draw: () => {
       let rect: { x: number; y: number; w: number; h: number };
@@ -628,10 +728,44 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
       else rect = drawStation(ctx, scene, object);
       if (object.kind !== "decor" || object.decor === "chest") hits.push({ ...rect, pick: { kind: "object", id: object.id } });
     } });
+  };
+  // Static objects, walls and cliffs on the ground.
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    if (!inBounds(x, y)) continue;
+    const terrain = world.tiles[y * W + x];
+    if (terrain === T.WALL) {
+      const owner = world.buildingAt[y * W + x], building = owner ? world.buildings[owner - 1] : null, mine = inside !== null && complexAt(world, x, y) === inside;
+      if (mine && level > 0 && !outerWall(x, y)) continue;
+      const d = depth(x, y), cut = mine && level === 0 && d > playerDepth - 0.5;
+      const near = !mine && Math.abs(x - pp.x) + Math.abs(y - pp.y) < 7 && d > playerDepth + 0.5 && !floor;
+      // Tall buildings show every storey from outside; inside, only the storey you're on (and the ones below).
+      wall(x, y, mine ? 1 : building?.storeys ?? 1, cut, near, !!owner && !cut);
+    } else if (terrain === T.CLIFF) drawables.push({ depth: depth(x, y), draw: () => box(ctx, camera, x, y, 1, 1, 22 + hash(x, y) * 10, "#a39e96", "#8f8a83", "#7c7771") });
+    if (!covered(x, y)) object(x, y);
+  }
+  // The storeys you've climbed: outer walls of the ones below, and the floor you stand on with its walls and furniture.
+  if (floor) for (const storey of world.floors) {
+    if (storey.complex !== floor.complex || storey.level > level) continue;
+    for (let ry = storey.y0; ry <= storey.y1; ry++) for (let rx = storey.x0; rx <= storey.x1; rx++) {
+      const x = rx + storey.dx, y = ry + storey.dy, terrain = world.tiles[y * W + x];
+      if (terrain === T.VOID) continue;
+      const owner = world.buildingAt[ry * W + rx], building = owner ? world.buildings[owner - 1] : null;
+      if (terrain === T.WALL) {
+        if (storey.level < level && !outerWall(rx, ry)) continue;
+        // On the roof, the keep's walls are battlements; the towers carry on up. Walls of the part you're in (the keep, or a
+        // tower you've stepped into) drop to a cutaway between you and the camera.
+        const battlement = (building?.storeys ?? 1) <= storey.level, yours = !!building && here.x >= building.x0 && here.x <= building.x1 && here.y >= building.y0 && here.y <= building.y1;
+        wall(x, y, 1, storey.level === level && !battlement && yours && depth(x, y) > playerDepth - 0.5, false, !!owner, battlement);
+        continue;
+      }
+      if (storey.level !== level) continue;
+      drawables.push({ depth: depth(x, y) - 0.45, draw: () => floorTile(ctx, camera, x, y, terrain) });
+      object(x, y);
+    }
   }
   // Fires.
   for (const fire of game.fires) {
-    if (fire.x < x0 || fire.x > x1 || fire.y < y0 || fire.y > y1) continue;
+    if (!shown(fire.x, fire.y)) continue;
     drawables.push({ depth: depth(fire.x, fire.y), draw: () => {
       const s = toScreen(camera, fire.x, fire.y), f = scene.reducedMotion ? 0 : Math.sin(now / 70 + fire.uid) * 3 * z;
       for (const [dx, dy] of [[-6, 0], [6, 0], [0, 3]]) { ctx.strokeStyle = INK; ctx.lineWidth = 4 * z; ctx.beginPath(); ctx.moveTo(s.x + dx * z - 6 * z, s.y + dy * z); ctx.lineTo(s.x + dx * z + 6 * z, s.y + dy * z - 3 * z); ctx.stroke(); }
@@ -644,7 +778,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   // Ground items.
   const groundTiles = new Map<string, typeof game.ground>();
   for (const entry of game.ground) {
-    if (entry.x < x0 || entry.x > x1 || entry.y < y0 || entry.y > y1) continue;
+    if (!shown(entry.x, entry.y)) continue;
     const key = `${entry.x},${entry.y}`; const list = groundTiles.get(key) ?? []; list.push(entry); groundTiles.set(key, list);
   }
   for (const list of groundTiles.values()) {
@@ -658,18 +792,18 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   }
   // NPCs.
   for (const npc of game.npcs) {
-    if (npc.x < x0 || npc.x > x1 || npc.y < y0 || npc.y > y1) continue;
+    if (!shown(npc.x, npc.y)) continue;
     const at = interpolate(npc, game, alpha);
     drawables.push({ depth: depth(at.x, at.y) + 0.1, draw: () => drawNpc(ctx, scene, npc, at, hits) });
   }
   // Monsters.
   for (const monster of game.monsters) {
-    if (monster.dead || monster.x < x0 - 2 || monster.x > x1 || monster.y < y0 - 2 || monster.y > y1) continue;
+    if (monster.dead || !shown(monster.x, monster.y, 2)) continue;
     const at = interpolate(monster, game, alpha), size = monster.def.size ?? 1;
     drawables.push({ depth: depth(at.x + (size - 1) / 2, at.y + (size - 1) / 2) + (size - 1) / 2 + 0.1, draw: () => drawMonster(ctx, scene, monster, at, hits) });
   }
   // Your follower: an owned Friend walking the tiles you leave behind, animated like any NPC.
-  if (scene.follower && game.pet) {
+  if (scene.follower && game.pet && (shown(game.pet.x, game.pet.y) || realPoint(world, game.pet.x, game.pet.y).level === level)) {
     const pet = game.pet, at = interpolate(pet, game, alpha);
     drawables.push({ depth: depth(at.x, at.y) + 0.05, draw: () => {
       const s = toScreen(camera, at.x, at.y), facing = screenFacing(camera, pet.heading);
@@ -677,15 +811,19 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
       drawMask(ctx, friendRows(scene.follower!, facing, at.moving, at.moving ? Math.floor(now / 90) % 8 : 0), s.x, s.y + 2 * z, 2.6 * z);
     } });
   }
+  if (scene.hoverTile && floor) { const hover = scene.hoverTile; drawables.push({ depth: depth(hover.x, hover.y) - 0.4, draw: () => tileOutline(hover.x, hover.y, "rgba(22,22,22,0.35)") }); }
   // The player.
   const pose = playerPose(game, now, project, scene.reducedMotion, scene.sfx);
-  // Roofs: every building's roof, fading out when you walk in or when it would hide you.
+  // Roofs: every building's roof, fading out when you walk in or when it would hide you. In a castle, the only roofs
+  // left are the towers' above the storey you stand on, from outside them.
   if (!underground) world.buildings.forEach((building, index) => {
     if (building.roof === "none" || building.x1 < x0 - 4 || building.x0 > x1 + 4 || building.y1 < y0 - 4 || building.y0 > y1 + 4) return;
     const front = Math.max(depth(building.x0, building.y0), depth(building.x1, building.y0), depth(building.x0, building.y1), depth(building.x1, building.y1)) + 0.5;
+    const complex = building.complex ?? `#${index + 1}`, within = here.x >= building.x0 && here.x <= building.x1 && here.y >= building.y0 && here.y <= building.y1;
     drawables.push({ depth: front, draw: () => {
       const hull = roofHull(camera, building), me = toScreen(camera, pp.x, pp.y, 20);
-      const target = insideBuilding === index + 1 ? 0 : playerDepth < front && pointInPolygon(me.x, me.y, hull) ? 0.22 : 1;
+      const shows = complex !== inside || (level > 0 && level === (building.storeys ?? 1) - 1 && !within);
+      const target = !shows ? 0 : playerDepth < front && pointInPolygon(me.x, me.y, hull) ? 0.22 : 1;
       const current = roofAlpha.get(index) ?? target, next = scene.reducedMotion ? target : current + (target - current) * Math.min(1, dt * 9);
       roofAlpha.set(index, next);
       if (next > 0.02) drawRoof(ctx, camera, building, next, now, scene.reducedMotion);
@@ -774,7 +912,10 @@ function drawNpc(ctx: CanvasRenderingContext2D, scene: Scene, npc: Npc, at: { x:
   } else {
     const set = friendSprite(def.art.family, def.art.seed + (npc.id === "villager" || npc.id === "banker" || npc.id === "guard" ? npc.uid : 0));
     const frame = at.moving && Math.floor(now / 160) % 2 ? set.step : set.idle, bob = !scene.reducedMotion && def.art.family === 5 ? Math.sin(now / 400 + npc.uid) * 2 * z : 0;
-    rect = drawMask(ctx, frame, s.x, s.y + 2 * z - bob, 2.6 * z, INK, screenFacing(camera, npc.heading) === "left");
+    const regalia = ROYAL_WEAR[npc.id];
+    // The King wears his crown and cape, composited into the sprite like your own wardrobe.
+    if (regalia) rect = drawFigure(ctx, figureArt(frame, regalia, screenFacing(camera, npc.heading), scene.reducedMotion ? 0 : Math.floor(now / 520) % 4), s.x, s.y + 2 * z - bob, 2.6 * z);
+    else rect = drawMask(ctx, frame, s.x, s.y + 2 * z - bob, 2.6 * z, INK, screenFacing(camera, npc.heading) === "left");
   }
   hits.push({ ...rect, pick: { kind: "npc", id: npc.uid } });
   const questMarker = questMarkerFor(game, npc.id);
@@ -782,6 +923,7 @@ function drawNpc(ctx: CanvasRenderingContext2D, scene: Scene, npc: Npc, at: { x:
   const said = npcOverhead(game, npc.uid);
   if (said) overheadText(ctx, said, s.x, s.y - 50 * z, "#f2e28f");
 }
+const ROYAL_WEAR: Record<string, readonly string[]> = { king: ["paper_crown", "blue_cape"] };
 function questMarkerFor(game: Game, npcId: string): string | null {
   const q = game.player.quests;
   const starts: Record<string, string> = { cook: "friends_feast", captain: "grumblin_trouble", smith: "cold_forge", priest: "hollow_whispers", glimmer: "lost_glimmer" };
@@ -820,7 +962,9 @@ export function worldImage(world: World): HTMLCanvasElement {
   if (mapImage) return mapImage;
   const canvas = document.createElement("canvas"); canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext("2d")!, image = ctx.createImageData(W, H);
+  // Upper storeys aren't on the map: it shows the ground.
   for (let i = 0; i < W * H; i++) {
+    if (i >= W * FLOOR_Y) { image.data.set([...MAP_COLORS[T.VOID], 255], i * 4); continue; }
     let [r, g, b] = MAP_COLORS[world.tiles[i]] ?? [128, 128, 128];
     const object = world.objects[world.objectAt[i]];
     if (object?.kind === "tree") [r, g, b] = [150, 165, 140];
@@ -845,12 +989,15 @@ export function mapIcons(world: World): MapIcon[] {
     else if (object.kind === "altar") add(object.x, object.y, "✚", "Altar");
     else if (object.kind === "spot") add(object.x, object.y, "≈", "Fishing", 10);
     else if (object.kind === "rock") add(object.x, object.y, "⛏", "Mining", 14);
+    else if (object.y >= FLOOR_Y) continue;
+    else if (object.look === "stairs") add(object.x, object.y, "♜", "Friendhollow Castle", 12);
     else if (object.kind === "ladder" || object.kind === "gate") add(object.x, object.y, "▼", object.name);
     else if (object.kind === "stall") add(object.x, object.y, "✋", "Market stalls");
     else if (object.kind === "obstacle" && object.obstacle?.course === "friendhollow") add(object.x, object.y, "➶", "Agility course", 30);
     else if (object.kind === "casket") add(object.x, object.y, "◆", "Rare Caskets");
   }
   for (const spawn of world.spawns) {
+    if (spawn.y >= FLOOR_Y) continue;
     const def = spawn.kind === "npc" ? NPCS[spawn.id] : null;
     if (def?.shop) add(spawn.x, spawn.y, "¤", def.name);
     if (spawn.kind === "npc" && ["cook", "captain", "smith", "priest", "glimmer"].includes(spawn.id)) add(spawn.x, spawn.y, "!", `Quest: ${def!.name}`);
@@ -859,17 +1006,22 @@ export function mapIcons(world: World): MapIcon[] {
 }
 /** The minimap: the world turned to match the camera (45° plus its rotation), centred on the player. */
 export function renderMinimap(ctx: CanvasRenderingContext2D, game: Game, size: number, scale: number, angle: number) {
-  const world = game.world, image = worldImage(world), player = game.player;
+  const world = game.world, image = worldImage(world), player = realPoint(world, game.player.x, game.player.y);
   ctx.save(); ctx.clearRect(0, 0, size, size);
   ctx.beginPath(); ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2); ctx.clip();
   ctx.fillStyle = "#0e0e10"; ctx.fillRect(0, 0, size, size);
   const turn = Math.PI / 4 + angle, cos = Math.cos(turn), sin = Math.sin(turn);
   ctx.translate(size / 2, size / 2); ctx.rotate(turn); ctx.scale(scale, scale); ctx.translate(-player.x - 0.5, -player.y - 0.5);
   ctx.imageSmoothingEnabled = false; ctx.drawImage(image, 0, 0);
-  const dot = (x: number, y: number, color: string, r = 0.9) => { ctx.fillStyle = color; ctx.fillRect(x + 0.5 - r / 2, y + 0.5 - r / 2, r, r); };
-  for (const entry of game.ground) if (Math.abs(entry.x - player.x) < 40 && Math.abs(entry.y - player.y) < 40) dot(entry.x, entry.y, "#d65b5b", 0.8);
-  for (const npc of game.npcs) if (Math.abs(npc.x - player.x) < 40 && Math.abs(npc.y - player.y) < 40) dot(npc.x, npc.y, "#e8d57a");
-  for (const monster of game.monsters) if (!monster.dead && Math.abs(monster.x - player.x) < 40 && Math.abs(monster.y - player.y) < 40) dot(monster.x, monster.y, "#e8d57a");
+  // Dots for what's on your storey.
+  const dot = (sx: number, sy: number, color: string, r = 0.9) => {
+    const { x, y, level } = realPoint(world, sx, sy);
+    if (level !== player.level || Math.abs(x - player.x) >= 40 || Math.abs(y - player.y) >= 40) return;
+    ctx.fillStyle = color; ctx.fillRect(x + 0.5 - r / 2, y + 0.5 - r / 2, r, r);
+  };
+  for (const entry of game.ground) dot(entry.x, entry.y, "#d65b5b", 0.8);
+  for (const npc of game.npcs) dot(npc.x, npc.y, "#e8d57a");
+  for (const monster of game.monsters) if (!monster.dead) dot(monster.x, monster.y, "#e8d57a");
   ctx.restore();
   // Map icons, drawn upright.
   ctx.save(); ctx.font = "bold 10px ui-monospace, Menlo, Consolas, monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
@@ -886,13 +1038,13 @@ export function renderMinimap(ctx: CanvasRenderingContext2D, game: Game, size: n
 }
 /** Minimap click → world tile (the inverse of the minimap's turn). */
 export function minimapTile(game: Game, dx: number, dy: number, scale: number, angle: number) {
-  const turn = -(Math.PI / 4 + angle), cos = Math.cos(turn), sin = Math.sin(turn), x = dx / scale, y = dy / scale;
-  return { x: Math.round(game.player.x + x * cos - y * sin), y: Math.round(game.player.y + x * sin + y * cos) };
+  const turn = -(Math.PI / 4 + angle), cos = Math.cos(turn), sin = Math.sin(turn), x = dx / scale, y = dy / scale, here = realPoint(game.world, game.player.x, game.player.y);
+  return onLevel(game.world, Math.round(here.x + x * cos - y * sin), Math.round(here.y + x * sin + y * cos), here.level);
 }
 let iconsCache: MapIcon[] | null = null;
 /** The world map: the whole Realm turned to match the camera, with labels. Returns the transform for clicks. */
 export function renderWorldMap(ctx: CanvasRenderingContext2D, game: Game, width: number, height: number, focus: { x: number; y: number; zoom: number }, underground: boolean) {
-  const world = game.world, image = worldImage(world), player = game.player;
+  const world = game.world, image = worldImage(world), player = realPoint(world, game.player.x, game.player.y);
   ctx.save(); ctx.fillStyle = "#1a1a1d"; ctx.fillRect(0, 0, width, height);
   ctx.translate(width / 2, height / 2); ctx.rotate(Math.PI / 4); ctx.scale(focus.zoom, focus.zoom); ctx.translate(-focus.x, -focus.y);
   ctx.imageSmoothingEnabled = false;
@@ -921,6 +1073,6 @@ export function renderWorldMap(ctx: CanvasRenderingContext2D, game: Game, width:
   ctx.restore();
   return (sx: number, sy: number) => {
     const rx = (sx - width / 2) / focus.zoom, ry = (sy - height / 2) / focus.zoom;
-    return { x: Math.round(focus.x + (rx + ry) * Math.SQRT1_2 - 0.5), y: Math.round(focus.y + (ry - rx) * Math.SQRT1_2 - 0.5) };
+    return onLevel(world, Math.round(focus.x + (rx + ry) * Math.SQRT1_2 - 0.5), Math.round(focus.y + (ry - rx) * Math.SQRT1_2 - 0.5), player.level);
   };
 }

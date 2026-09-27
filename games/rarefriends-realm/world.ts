@@ -1,10 +1,16 @@
 /**
  * The Realm: a 240 × 240 tile world, built deterministically from a seed and hand-placed landmarks.
  * Overworld in y < 200; the two dungeons (Murkmire Crypt, Hollow Depths) live in the strip below, reached by ladders.
+ * Upper storeys of buildings (the castle's floors) are stored in the rows from FLOOR_Y down, and drawn stacked on the
+ * building they belong to: a tile there stands for the real tile (x − dx, y − dy), `level` storeys up.
  */
 import type { RockKind, SpotKind, TreeKind } from "./data.ts";
 
-export const W = 240, H = 240;
+export const W = 240, H = 280;
+/** Rows 200–239 are the dungeons; rows from FLOOR_Y hold upper storeys. */
+export const FLOOR_Y = 240;
+/** One storey, in world pixels (the height of a wall). */
+export const STOREY = 42;
 export const T = {
   VOID: 0, GRASS: 1, DARK_GRASS: 2, PATH: 3, COBBLE: 4, SAND: 5, WATER: 6, DEEP: 7, SWAMP: 8, SNOW: 9,
   STONE: 10, WOOD: 11, GRAVEL: 12, DUNGEON: 13, BRIDGE: 14, CLIFF: 15, WALL: 16, FARMLAND: 17, ICE: 18, CARPET: 19,
@@ -18,13 +24,14 @@ export type ObjectKind =
   | "fountain" | "mill" | "dairy_cow" | "wheat" | "coop" | "gate" | "casket" | "decor" | "sign" | "tanning" | "well";
 export type DecorKind =
   | "flowers" | "bush" | "boulder" | "lamp" | "bench" | "crate" | "barrel" | "tent" | "cactus" | "pine" | "dead_tree" | "statue"
-  | "grave" | "fence" | "reeds" | "table" | "bed" | "shelf" | "pillar" | "rubble" | "snowman" | "lily" | "banner" | "torch" | "palm" | "hay" | "windmill" | "boat" | "chest";
+  | "grave" | "fence" | "reeds" | "table" | "bed" | "shelf" | "pillar" | "rubble" | "snowman" | "lily" | "banner" | "torch" | "palm" | "hay" | "windmill" | "boat" | "chest"
+  | "throne" | "armour";
 export type WorldObject = {
   id: number; kind: ObjectKind; x: number; y: number; name: string; blocks: boolean;
   tree?: TreeKind; rock?: RockKind; spot?: SpotKind; decor?: DecorKind; stall?: StallKind;
   to?: { x: number; y: number }; action?: string; requires?: { quest?: string; item?: string; level?: number };
   obstacle?: { course: string; step: number; level: number; xp: number; ticks: number; lapXp?: number; last?: boolean };
-  text?: string; big?: boolean;
+  text?: string; big?: boolean; look?: "stairs";
 };
 export type StallKind = "bakery" | "silk" | "gem" | "fish";
 export type SpawnDef = { kind: "npc" | "monster"; id: string; x: number; y: number; wander?: number };
@@ -49,12 +56,23 @@ export const REGIONS: readonly Region[] = [
   { id: "hollow_depths", name: "Hollow Depths", label: { x: 150, y: 220 }, danger: 4, underground: true },
 ];
 export const regionIndex = (id: RegionId) => REGIONS.findIndex(region => region.id === id);
+export const isUnderground = (y: number) => y >= 200 && y < FLOOR_Y;
 
-/** A building's footprint (walls included) and how its roof looks. Inner rooms (inside another building) have no roof. */
-export type Building = { x0: number; y0: number; x1: number; y1: number; roof: "gable" | "flat" | "none"; color: string; chimney: boolean; name: string };
+/**
+ * A building's footprint (walls included) and how its roof looks. Inner rooms (inside another building) have no roof.
+ * `storeys` tall buildings show that many storeys of wall from outside; buildings sharing a `complex` (the castle's
+ * keep and towers) count as one when you walk in.
+ */
+export type Building = {
+  x0: number; y0: number; x1: number; y1: number; roof: "gable" | "flat" | "cone" | "none"; color: string; chimney: boolean; name: string;
+  storeys?: number; complex?: string;
+};
+/** An upper storey: the real rectangle it covers and where its tiles are stored (real + (dx, dy)). */
+export type Floor = { complex: string; level: number; x0: number; y0: number; x1: number; y1: number; dx: number; dy: number };
 export type World = {
   tiles: Uint8Array; region: Uint8Array; objects: WorldObject[]; objectAt: Int32Array; spawns: SpawnDef[];
   buildings: Building[];
+  floors: Floor[];
   /** 1 + the index of the (outermost) building covering each tile, or 0. */
   buildingAt: Uint8Array;
   /** Ground height (world pixels) at every tile corner: (W + 1) × (H + 1), corner (i, j) sits at (i − ½, j − ½). */
@@ -250,10 +268,6 @@ export function createWorld(seed = 20260927): World {
   building(106, 124, 114, 132, "e", T.WOOD, undefined, { name: "Chapel", color: "#c6bed4" });                            // Chapel of the Old Friend
   building(127, 126, 133, 131, "w");                                       // Tessa's tannery
   building(133, 116, 138, 121, "w");                                       // Runa's Sigils
-  building(113, 92, 129, 103, "s", T.STONE, undefined, { name: "Hollow Hall", roof: "flat", color: "#a39e96" });         // Hollow Hall (castle)
-  fillRect(119, 104, 122, 107, T.PATH);
-  for (let y = 93; y < 103; y++) { put(121, y, T.CARPET); put(122, y, T.CARPET); }
-  building(114, 94, 118, 99, "e", T.STONE);                                // Castle kitchen (inside the hall)
   building(148, 104, 155, 109, "w", T.WOOD);                               // Riverside house (fishing), east bank
   // Bank interior.
   for (let x = 109; x <= 114; x++) if (x !== 111 && x !== 112) add({ kind: "bank", x, y: 110, blocks: true, name: "Bank booth" });
@@ -268,23 +282,138 @@ export function createWorld(seed = 20260927): World {
   npc("tanner", 131, 128); add({ kind: "tanning", x: 132, y: 129, blocks: true, name: "Tanning rack" }); decor(128, 127, "barrel");
   // Sigil shop.
   npc("runa", 136, 118); decor(137, 117, "shelf"); decor(137, 120, "shelf");
-  // Castle.
-  npc("captain", 124, 97, 2); npc("guard", 120, 100, 3); npc("guard", 126, 100, 3);
-  add({ kind: "range", x: 115, y: 95, blocks: true, name: "Cooking range" }); npc("cook", 116, 97, 1); decor(117, 95, "table");
-  decor(125, 94, "banner"); decor(118, 94, "banner", true); decor(128, 94, "pillar"); decor(120, 94, "torch"); decor(123, 94, "torch");
-  add({ kind: "casket", x: 127, y: 95, blocks: true, name: "Rare Casket chest" }); npc("emporium", 127, 97);
   // The square.
   add({ kind: "fountain", x: 121, y: 119, blocks: true, name: "Fountain" }); add({ kind: "fountain", x: 122, y: 119, blocks: true, name: "Fountain" });
   add({ kind: "fountain", x: 121, y: 120, blocks: true, name: "Fountain" }); add({ kind: "fountain", x: 122, y: 120, blocks: true, name: "Fountain" });
   decor(117, 117, "lamp"); decor(126, 117, "lamp"); decor(117, 124, "lamp"); decor(126, 124, "lamp");
   decor(119, 125, "statue", true, "Statue of the First Friend");
   decor(116, 121, "bench"); decor(127, 121, "bench");
-  add({ kind: "sign", x: 124, y: 124, blocks: true, name: "Signpost", text: "North: Hollow Hall, Ashen Hills. East: Oasis, Glass Lake. South: Mossy Ruins. West: Hollow Farms, Whisperwood." });
+  add({ kind: "sign", x: 124, y: 124, blocks: true, name: "Signpost", text: "North: Friendhollow Castle, Ashen Hills. East: Oasis, Glass Lake. South: Mossy Ruins. West: Hollow Farms, Whisperwood." });
   npc("guide", 123, 123); npc("glimmer", 118, 116); // #7730, the Old Glimmer
   for (let i = 0; i < 6; i++) npc("villager", 112 + Math.floor(random() * 20), 115 + Math.floor(random() * 12), 5);
   add({ kind: "well", x: 131, y: 122, blocks: true, name: "Well" });
   // Riverside house: Pike's Tackle.
   npc("pike", 152, 106); decor(154, 105, "barrel"); decor(154, 108, "crate");
+  // ---------- Friendhollow Castle ----------
+  // A keep with four towers, north of the square. The ground floor has the kitchen and the great hall; spiral stairs in
+  // the north towers climb to the King's floor (throne room, library, bedchamber, the tower bank), and on up to the roof.
+  // Plans are 20 × 20 from (112, 86): # wall, . stone, c carpet, w wood, + doorway, space = outside.
+  const CASTLE = { x: 112, y: 86 }, complex = "castle";
+  const PLANS: readonly (readonly string[])[] = [[
+    "#####          #####",
+    "#...#####++#####...#",
+    "#...#....cc....#...#",
+    "#...+....cc....+...#",
+    "#####....cc....#####",
+    " #wwwww#.cc.......# ",
+    " #wwwww#.cc.......# ",
+    " #wwwww+.cc.......# ",
+    " #wwwww#.cc.......# ",
+    " #######.cc.......# ",
+    " #.......cc.......# ",
+    " #.......cc.......# ",
+    " #.......cc.......# ",
+    " #.......cc.......# ",
+    " #.......cc.......# ",
+    "#####....cc....#####",
+    "#...+....cc....+...#",
+    "#...#....cc....#...#",
+    "#...#####cc#####...#",
+    "#####          #####",
+  ], [
+    "#####          #####",
+    "#...############...#",
+    "#...#....cc....#...#",
+    "#...+....cc....+...#",
+    "#####....cc....#####",
+    " #wwwww#.cc.#wwwww# ",
+    " #wwwww+.cc.+wwwww# ",
+    " #wwwww#.cc.#wwwww# ",
+    " #wwwww#.cc.#wwwww# ",
+    " #######.cc.####### ",
+    " #.......cc.......# ",
+    " #.......cc.......# ",
+    " #.......cc.......# ",
+    " #.......cc.......# ",
+    " #.......cc.......# ",
+    "#####....cc....#####",
+    "#...+....cc....+...#",
+    "#...#....cc....#...#",
+    "#...############...#",
+    "#####          #####",
+  ], [
+    "#####          #####",
+    "#...############...#",
+    "#...#..........#...#",
+    "#...+..........+...#",
+    "#####..........#####",
+    " #................# ",
+    " #................# ",
+    " #................# ",
+    " #................# ",
+    " #................# ",
+    " #................# ",
+    " #................# ",
+    " #................# ",
+    " #................# ",
+    " #................# ",
+    "#####..........#####",
+    "#...+..........+...#",
+    "#...#..........#...#",
+    "#...############...#",
+    "#####          #####",
+  ]];
+  const floors: Floor[] = [1, 2].map(level => ({ complex, level, x0: CASTLE.x, y0: CASTLE.y, x1: CASTLE.x + 19, y1: CASTLE.y + 19, dx: (level - 1) * 30, dy: FLOOR_Y + 2 - CASTLE.y }));
+  /** A tile of the castle plan on a level (upper levels in their storage rows). */
+  const at = (level: number, col: number, row: number) => ({ x: CASTLE.x + col + (level ? floors[level - 1].dx : 0), y: CASTLE.y + row + (level ? floors[level - 1].dy : 0) });
+  const PLAN_TERRAIN: Record<string, number> = { "#": T.WALL, ".": T.STONE, "+": T.STONE, c: T.CARPET, w: T.WOOD };
+  PLANS.forEach((plan, level) => plan.forEach((line, row) => [...line].forEach((ch, col) => {
+    if (ch === " ") return;
+    const { x, y } = at(level, col, row);
+    put(x, y, PLAN_TERRAIN[ch]); clearAt(x, y);
+    if (level) setRegion(x, y, "friendhollow");
+  })));
+  buildings.push({ x0: 113, y0: 87, x1: 130, y1: 104, roof: "flat", color: "#b9b4ab", chimney: false, name: "Friendhollow Castle", storeys: 2, complex });
+  for (const [col, row, color] of [[0, 0, "#c99a96"], [15, 0, "#8f9cb2"], [0, 15, "#a996b5"], [15, 15, "#9aab92"]] as const) {
+    buildings.push({ x0: CASTLE.x + col, y0: CASTLE.y + row, x1: CASTLE.x + col + 4, y1: CASTLE.y + row + 4, roof: "cone", color, chimney: false, name: "Castle tower", storeys: 3, complex });
+  }
+  // The road runs through the gates.
+  fillRect(120, 105, 123, 107, T.PATH);
+  road([[121.5, 85], [120, 78], [117, 72]]);
+  // Spiral stairs: north-west (ground ↔ King's floor) and north-east (ground ↔ King's floor ↔ roof).
+  const stairs = (level: number, col: number, row: number, up: boolean, toLevel: number, toCol: number, toRow: number) =>
+    add({ kind: "ladder", look: "stairs", ...at(level, col, row), blocks: true, name: "Staircase", action: up ? "Climb-up" : "Climb-down", to: at(toLevel, toCol, toRow) });
+  stairs(0, 1, 1, true, 1, 2, 2); stairs(1, 1, 1, false, 0, 2, 2);
+  stairs(0, 18, 1, true, 1, 17, 2); stairs(1, 18, 1, false, 0, 17, 2);
+  stairs(1, 16, 1, true, 2, 17, 2); stairs(2, 16, 1, false, 1, 17, 2);
+  const place = (level: number, col: number, row: number, kind: DecorKind, name?: string, blocks = true) => { const p = at(level, col, row); decor(p.x, p.y, kind, blocks, name); };
+  const person = (level: number, col: number, row: number, id: string, wander = 0) => { const p = at(level, col, row); npc(id, p.x, p.y, wander); };
+  // Ground floor: the kitchen, the great hall, the Relic keeper, and two guard towers.
+  add({ kind: "range", ...at(0, 2, 5), blocks: true, name: "Cooking range" }); person(0, 4, 7, "cook", 1);
+  place(0, 5, 5, "table"); place(0, 2, 8, "barrel"); place(0, 6, 8, "crate");
+  person(0, 13, 7, "captain", 2); person(0, 7, 13, "guard", 3); person(0, 12, 13, "guard", 3);
+  add({ kind: "casket", ...at(0, 16, 5), blocks: true, name: "Rare Casket chest" }); person(0, 15, 6, "emporium");
+  place(0, 8, 2, "banner"); place(0, 11, 2, "banner");
+  for (const [col, row] of [[8, 11], [11, 11], [8, 14], [11, 14]]) place(0, col, row, "pillar");
+  for (const [col, row] of [[2, 10], [17, 10], [2, 14], [17, 14], [5, 17], [14, 17]]) place(0, col, row, "torch");
+  place(0, 1, 16, "armour"); place(0, 1, 18, "armour"); place(0, 3, 18, "crate");
+  place(0, 18, 16, "barrel"); place(0, 18, 18, "crate"); place(0, 17, 18, "barrel");
+  // The King's floor: the throne room, the royal library, the bedchamber, a long gallery and the tower bank.
+  place(1, 9, 2, "throne", "Throne of Friendhollow"); place(1, 10, 2, "throne", "The Queen's throne");
+  person(1, 9, 3, "king"); person(1, 6, 3, "royal_guard", 1); person(1, 13, 3, "royal_guard", 1);
+  place(1, 5, 2, "banner"); place(1, 14, 2, "banner"); place(1, 7, 2, "torch"); place(1, 12, 2, "torch");
+  for (let col = 2; col <= 5; col++) place(1, col, 5, "shelf", "Bookcase");
+  place(1, 4, 7, "table"); place(1, 2, 8, "shelf", "Bookcase"); place(1, 3, 8, "shelf", "Bookcase");
+  place(1, 16, 5, "bed", "Royal bed"); place(1, 13, 5, "shelf"); place(1, 17, 8, "chest", "Royal chest"); place(1, 14, 8, "table");
+  for (const col of [4, 5, 6, 13, 14, 15]) place(1, col, 12, "table", "Banquet table");
+  for (const col of [4, 5, 6, 13, 14, 15]) { place(1, col, 11, "bench", undefined, false); place(1, col, 13, "bench", undefined, false); }
+  for (const [col, row] of [[8, 11], [11, 11], [8, 14], [11, 14]]) place(1, col, row, "pillar");
+  for (const [col, row] of [[2, 10], [17, 10], [2, 14], [17, 14]]) place(1, col, row, "torch");
+  add({ kind: "bank", ...at(1, 2, 17), blocks: true, name: "Bank booth" }); person(1, 2, 18, "banker");
+  place(1, 18, 18, "bed", "Guest bed"); place(1, 16, 18, "table");
+  // The roof: battlements, banners and a lookout.
+  for (const [col, row] of [[6, 5], [13, 5], [2, 9], [17, 9], [6, 14], [13, 14]]) place(2, col, row, "banner");
+  person(2, 9, 10, "royal_guard", 4);
   // Trees and flowers around town.
   scatter(98, 100, 146, 142, 26, (x, y) => tree(x, y, "tree"), (x, y) => free(x, y) && get(x, y) === T.GRASS);
   scatter(104, 104, 140, 140, 30, (x, y) => decor(x, y, random() > 0.5 ? "flowers" : "bush", false), (x, y) => free(x, y) && get(x, y) === T.GRASS);
@@ -422,15 +551,15 @@ export function createWorld(seed = 20260927): World {
   add({ kind: "ladder", x: 122, y: 186, blocks: true, name: "Hollow Rift", action: "Climb-down", to: { x: 92, y: 212 } });
   decor(120, 184, "pillar"); decor(124, 184, "pillar"); decor(119, 188, "torch"); decor(125, 188, "torch");
 
-  // ---------- Friendhollow Agility Course (the meadow west of Hollow Hall) ----------
+  // ---------- Friendhollow Agility Course (the meadow west of the castle) ----------
   // Each obstacle crosses a gap you can't walk; you land on the far side and face the next one.
   const COURSE: readonly [string, string, number, number][] = [
     ["Log balance", "Walk-across", 4, 7], ["Obstacle net", "Climb-over", 1, 7], ["Balance beam", "Walk-across", 4, 8],
     ["Rope swing", "Swing-on", 2, 9], ["Low wall", "Climb-over", 1, 7],
   ];
   const courseY = 99;
-  fillRect(86, courseY - 2, 112, courseY + 2, T.GRASS);
-  for (let x = 86; x <= 112; x++) for (let y = courseY - 2; y <= courseY + 2; y++) clearAt(x, y);
+  fillRect(86, courseY - 2, 111, courseY + 2, T.GRASS);
+  for (let x = 86; x <= 111; x++) for (let y = courseY - 2; y <= courseY + 2; y++) clearAt(x, y);
   let cx = 88;
   COURSE.forEach(([name, action, gap, xp], step) => {
     for (let x = cx + 1; x <= cx + gap; x++) put(x, courseY, step === 1 || step === 4 ? T.CLIFF : T.WATER);
@@ -456,7 +585,7 @@ export function createWorld(seed = 20260927): World {
   monsters("cow", 60, 128, 76, 138, 3);
 
   // ---------- Dungeons ----------
-  for (let y = 200; y < H; y++) for (let x = 0; x < W; x++) { put(x, y, T.VOID); setRegion(x, y, "crypt"); }
+  for (let y = 200; y < FLOOR_Y; y++) for (let x = 0; x < W; x++) { put(x, y, T.VOID); setRegion(x, y, "crypt"); }
   // Murkmire Crypt (x 20..70): corridors of skeletons, and the crypt key on the altar.
   const rooms: [number, number, number, number, RegionId, number][] = [
     [28, 205, 42, 214, "crypt", T.DUNGEON], [42, 208, 60, 211, "crypt", T.DUNGEON], [52, 211, 68, 230, "crypt", T.DUNGEON], [24, 218, 52, 232, "crypt", T.DUNGEON],
@@ -496,6 +625,40 @@ export function createWorld(seed = 20260927): World {
     if (clearable) clearAt(clearable[0], clearable[1]);
   }
   for (const object of objects) if (object.name === "__removed") object.blocks = false;
+  // And every one can be walked to from the spawn (taking ladders and stairs): where a grove walls one in, clear a way.
+  const passable = (x: number, y: number) => WALKABLE.has(get(x, y)) && (objectAt[tileIndex(x, y)] < 0 || !objects[objectAt[tileIndex(x, y)]].blocks);
+  const flood = () => {
+    const seen = new Uint8Array(W * H), queue: number[] = [], taken = new Set<number>();
+    const start = (x: number, y: number) => { if (inBounds(x, y) && !seen[tileIndex(x, y)] && passable(x, y)) { seen[tileIndex(x, y)] = 1; queue.push(tileIndex(x, y)); } };
+    start(121, 123);
+    for (let grew = true; grew;) {
+      while (queue.length) { const index = queue.pop()!, x = index % W, y = (index - x) / W; for (const [dx, dy] of SIDES) start(x + dx, y + dy); }
+      grew = false;
+      for (const ladder of objects) if (ladder.kind === "ladder" && ladder.to && !taken.has(ladder.id) && SIDES.some(([dx, dy]) => inBounds(ladder.x + dx, ladder.y + dy) && seen[tileIndex(ladder.x + dx, ladder.y + dy)])) { taken.add(ladder.id); start(ladder.to.x, ladder.to.y); grew = true; }
+    }
+    return seen;
+  };
+  let seen = flood();
+  for (const object of objects) {
+    if (!NEEDS_ACCESS.has(object.kind) || object.name === "__removed" || SIDES.some(([dx, dy]) => inBounds(object.x + dx, object.y + dy) && seen[tileIndex(object.x + dx, object.y + dy)])) continue;
+    // Search out from the object through trees and bushes to the walkable world, then fell what's in the way.
+    const from = new Int32Array(W * H).fill(-2), queue: number[] = [];
+    for (const [dx, dy] of SIDES) { const x = object.x + dx, y = object.y + dy; if (inBounds(x, y) && WALKABLE.has(get(x, y)) && get(x, y) !== T.BRIDGE) { from[tileIndex(x, y)] = -1; queue.push(tileIndex(x, y)); } }
+    let found = -1;
+    for (let head = 0; head < queue.length && found < 0; head++) {
+      const index = queue[head], x = index % W, y = (index - x) / W;
+      if (seen[index]) { found = index; break; }
+      for (const [dx, dy] of SIDES) {
+        const nx = x + dx, ny = y + dy, next = tileIndex(nx, ny);
+        if (!inBounds(nx, ny) || from[next] !== -2 || !WALKABLE.has(get(nx, ny))) continue;
+        const blocker = objectAt[next] >= 0 ? objects[objectAt[next]] : null;
+        if (blocker && blocker.blocks && blocker.kind !== "tree" && blocker.kind !== "decor") continue;
+        from[next] = index; queue.push(next);
+      }
+    }
+    for (let index = found; index >= 0; index = from[index]) { const x = index % W, y = (index - x) / W; const blocker = objectAt[index] >= 0 ? objects[objectAt[index]] : null; if (blocker && (blocker.kind === "tree" || blocker.kind === "decor")) clearAt(x, y); }
+    if (found >= 0) { for (const o of objects) if (o.name === "__removed") o.blocks = false; seen = flood(); }
+  }
 
   const places: World["places"] = {
     spawn: { x: 121, y: 123 }, hollow_square: { x: 121, y: 122 }, emberforge: { x: 162, y: 49 }, oasis: { x: 186, y: 115 },
@@ -503,9 +666,10 @@ export function createWorld(seed = 20260927): World {
   };
   const buildingAt = new Uint8Array(W * H);
   buildings.forEach((b, index) => { if (b.roof === "none") return; for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) buildingAt[y * W + x] = index + 1; });
-  return { tiles, region, objects, objectAt, spawns, places, heights: buildHeights(tiles, seed), buildings, buildingAt };
+  return { tiles, region, objects, objectAt, spawns, places, heights: buildHeights(tiles, seed), buildings, buildingAt, floors };
 }
 const i2 = (random: () => number) => random() > 0.5;
+const SIDES = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
 /** Faded roof tiles in the Rare Friends accents. */
 const ROOF_COLORS = ["#c99a96", "#9aab92", "#8f9cb2", "#cdb98a", "#a996b5"];
 const TREE_NAMES: Record<TreeKind, string> = { tree: "Tree", oak: "Oak", willow: "Willow", maple: "Maple tree", yew: "Yew", ashwood: "Ashwood" };
@@ -513,7 +677,7 @@ const DECOR_NAMES: Record<DecorKind, string> = {
   flowers: "Flowers", bush: "Bush", boulder: "Boulder", lamp: "Lamp post", bench: "Bench", crate: "Crate", barrel: "Barrel", tent: "Tent",
   cactus: "Cactus", pine: "Pine tree", dead_tree: "Dead tree", statue: "Statue", grave: "Grave", fence: "Fence", reeds: "Reeds", table: "Table",
   bed: "Bed", shelf: "Shelves", pillar: "Pillar", rubble: "Rubble", snowman: "Snow Friend", lily: "Lily pad", banner: "Banner", torch: "Torch",
-  palm: "Palm tree", hay: "Hay bales", windmill: "Windmill", boat: "Boat", chest: "Chest",
+  palm: "Palm tree", hay: "Hay bales", windmill: "Windmill", boat: "Boat", chest: "Chest", throne: "Throne", armour: "Suit of armour",
 };
 
 export function terrainAt(world: World, x: number, y: number) { return inBounds(x, y) ? world.tiles[tileIndex(x, y)] : T.VOID; }
@@ -580,6 +744,32 @@ export function groundHeight(world: World, x: number, y: number): number {
   return (a * (1 - fu) + b * fu) * (1 - fv) + (c * (1 - fu) + d * fu) * fv;
 }
 export function cornerHeight(world: World, i: number, j: number) { return world.heights[Math.max(0, Math.min(H, j)) * (W + 1) + Math.max(0, Math.min(W, i))]; }
+
+// ---------- Storeys ----------
+/** The upper storey a stored tile belongs to (null on the ground, underground, or off any floor). */
+export function floorAt(world: World, x: number, y: number): Floor | null {
+  if (y < FLOOR_Y - 0.5) return null;
+  for (const floor of world.floors) if (x >= floor.x0 + floor.dx - 0.5 && x <= floor.x1 + floor.dx + 0.5 && y >= floor.y0 + floor.dy - 0.5 && y <= floor.y1 + floor.dy + 0.5) return floor;
+  return null;
+}
+/** Where a tile really is: its ground position and how many storeys up. */
+export function realPoint(world: World, x: number, y: number) {
+  const floor = floorAt(world, x, y);
+  return floor ? { x: x - floor.dx, y: y - floor.dy, level: floor.level } : { x, y, level: 0 };
+}
+/** A ground position seen from a storey: the stored tile on `level` of that complex if it covers (x, y), else the ground. */
+export function onLevel(world: World, x: number, y: number, level: number, complex?: string) {
+  if (level > 0) for (const floor of world.floors) {
+    if (floor.level !== level || (complex && floor.complex !== complex) || x < floor.x0 || x > floor.x1 || y < floor.y0 || y > floor.y1) continue;
+    if (world.tiles[tileIndex(x + floor.dx, y + floor.dy)] !== T.VOID) return { x: x + floor.dx, y: y + floor.dy };
+  }
+  return { x, y };
+}
+/** The building (index + 1) whose footprint covers a ground tile, and its complex. */
+export function complexAt(world: World, x: number, y: number) {
+  const index = inBounds(x, y) ? world.buildingAt[tileIndex(x, y)] : 0, building = index ? world.buildings[index - 1] : null;
+  return building ? building.complex ?? `#${index}` : null;
+}
 
 export function regionAt(world: World, x: number, y: number): Region {
   return REGIONS[inBounds(x, y) ? world.region[tileIndex(x, y)] : 0] ?? REGIONS[0];
