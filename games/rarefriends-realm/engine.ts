@@ -3,7 +3,7 @@
  * Pure TypeScript over the Game state, so it runs the same in the browser and in node tests.
  */
 import {
-  COOKING, CRAFTING, EMOTES, EQUIP_SLOTS, FLETCH_ARROWS, FLETCH_BOWS, SIGILCRAFT, STAFF_SIGILS, itemCategory, sigilsPerStone, FAMILY_NAMES, FIREMAKING, FISHING_SPOTS, GEM_CUTTING, METALS, MONSTERS, PRAYERS, RELICS, RF_BUNDLES, ROCKS, SHOPS, SHOP_BUY,
+  COOKING, CRAFTING, EMOTES, EQUIP_SLOTS, MOUNTS, mountDef, FLETCH_ARROWS, FLETCH_BOWS, SIGILCRAFT, STAFF_SIGILS, itemCategory, sigilsPerStone, FAMILY_NAMES, FIREMAKING, FISHING_SPOTS, GEM_CUTTING, METALS, MONSTERS, PRAYERS, RELICS, RF_BUNDLES, ROCKS, SHOPS, SHOP_BUY,
   SHOP_SELL, SKILLS, SKILL_NAMES, SMELTING, SMITH_PIECES, SMITH_XP, SPELLS, TREES, WARDROBE, XP_TABLE, isItem, item, levelForXp, smithLevel,
   type EquipSlot, type MetalId, type Skill, type Spell, type SpotKind, type WardrobeId,
 } from "./data.ts";
@@ -11,10 +11,10 @@ import { addSlayerPoints, slayerBoost, slayerKill, slayerProblem, taskText } fro
 import { NPCS, examineItem, npcDef, onMonsterKilled, questDone, searchCryptChest, searchWell, talk, tanHides, useCryptAltar } from "./content.ts";
 import {
   BANK_SIZE, INVENTORY_SIZE, REFERRAL_COINS, REFERRAL_TICKS, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
-  level, maxHp, maxPrayer, message, prayerBoost, sound, take, weapon, combatLevel, createGame,
+  level, maxHp, maxPrayer, message, prayerBoost, riding, sound, take, weapon, combatLevel, createGame,
   type Activity, type CombatStyle, type Dialogue, type Game, type Monster, type Npc, type Point, type Recipe, type Slot, type Target,
 } from "./state.ts";
-import { T, W, H, inBounds, isUnderground, isWater, objectAtTile, realPoint, regionAt, terrainAt, tileIndex, walkable, type WorldObject } from "./world.ts";
+import { FLOOR_Y, T, W, H, inBounds, isUnderground, isWater, objectAtTile, realPoint, regionAt, terrainAt, tileIndex, walkable, type WorldObject } from "./world.ts";
 
 export { createGame };
 
@@ -623,6 +623,8 @@ function interactNpc(game: Game, uid: number, option: string, use?: number) {
   if (option === "Bank") { game.ui.bank = true; sound(game, "click"); return; }
   if (option === "Caskets") { game.ui.shop = "__caskets"; sound(game, "click"); return; }
   if (option === "Rare-market") { game.ui.shop = "__market"; sound(game, "click"); return; }
+  if (option === "Stables") { game.ui.shop = "__stable"; sound(game, "click"); return; }
+  if (option === "Stroke") { message(game, npc.id === "paddock_unicorn" ? "The unicorn lowers its horn and lets you stroke its mane. It's very soft." : "The horse nuzzles your pockets for an apple."); sound(game, "click"); return; }
   if (option === "Assignment" || option === "Rewards") { game.dialogue = talk(game, `${npc.id}:${option.toLowerCase()}`); sound(game, "click"); return; }
   if (option === "Tan-hides") { tanHides(game); return; }
   if (option === "Pickpocket" && def.pickpocket) { pickpocket(game, npc, def.pickpocket); return; }
@@ -634,7 +636,7 @@ function pickpocket(game: Game, npc: Npc, pick: NonNullable<ReturnType<typeof np
   const mask = player.familyId === 1 ? 0.1 : 0, chance = Math.min(0.95, 0.55 + (thieving - pick.level) * 0.02 + mask);
   message(game, `You attempt to pick the ${npcDef(npc.id).name.toLowerCase()}'s pocket.`);
   if (game.rng() < chance) {
-    const silver = Math.min(RELICS[1].max, player.relics[1] ?? 0) * RELICS[1].coinsPer;
+    const silver = Math.min(RELICS[1].max, player.relics[1] ?? 0) * RELICS[1].coinsPer + (riding(player)?.coins ?? 0);
     const coins = Math.round((pick.coins[0] + Math.floor(game.rng() * (pick.coins[1] - pick.coins[0] + 1))) * (1 + silver));
     give(player, "coins", coins); addXp(game, "thieving", pick.xp); sound(game, "coins");
     for (const [id, p] of pick.extra ?? []) if (game.rng() < p && freeSlots(player)) give(player, id);
@@ -683,6 +685,7 @@ export function tick(game: Game) {
   if (player.attackTimer > 0) player.attackTimer--;
   if (player.overhead && player.overhead.until <= game.tick) player.overhead = null;
   movePlayer(game);
+  rideUpkeep(game);
   if (player.boostTicks > 0) { player.boostTicks--; if (player.boostTicks === 0) message(game, "Your referral XP boost has run out. Refer another friend for more!"); }
   // An emote ends when it's done, or when you walk off.
   if (player.emote && (game.tick >= player.emote.until || player.moved === game.tick || player.combat !== null || player.activity)) player.emote = null;
@@ -706,7 +709,7 @@ function movePlayer(game: Game) {
   if (game.held) {
     // Held keys give a world-space direction (the UI turns screen keys into it for the camera angle); snap to 8 ways.
     const octant = Math.round(Math.atan2(game.held.dy, game.held.dx) / (Math.PI / 4)), tx = Math.round(Math.cos(octant * Math.PI / 4)), ty = Math.round(Math.sin(octant * Math.PI / 4));
-    const steps = player.run && player.energy >= 1 ? 2 : 1, start = { x: player.x, y: player.y };
+    const mount = riding(player), steps = mount ? mount.speed : player.run && player.energy >= 1 ? 2 : 1, start = { x: player.x, y: player.y };
     let moved = 0;
     for (let i = 0; i < steps; i++) {
       const options: [number, number][] = [[tx, ty], [tx, 0], [0, ty]];
@@ -715,11 +718,11 @@ function movePlayer(game: Game) {
       moveTo(game, player.x + step[0], player.y + step[1]); moved++;
     }
     if (moved) player.prev = start;
-    if (moved === 2) drainRun(game);
+    if (moved >= 2 && !mount) drainRun(game);
     return;
   }
   if (!player.path.length) return;
-  const steps = player.run && player.energy >= 1 && player.path.length > 1 ? 2 : 1, start = { x: player.x, y: player.y };
+  const mount = riding(player), steps = mount ? mount.speed : player.run && player.energy >= 1 && player.path.length > 1 ? 2 : 1, start = { x: player.x, y: player.y };
   for (let i = 0; i < steps && player.path.length; i++) {
     const next = player.path[0];
     if (!canStep(game, player.x, player.y, next.x - player.x, next.y - player.y)) {
@@ -731,7 +734,7 @@ function movePlayer(game: Game) {
     player.path.shift(); moveTo(game, next.x, next.y);
   }
   if (player.x !== start.x || player.y !== start.y) player.prev = start;
-  if (Math.max(Math.abs(player.x - start.x), Math.abs(player.y - start.y)) >= 2) drainRun(game);
+  if (!mount && Math.max(Math.abs(player.x - start.x), Math.abs(player.y - start.y)) >= 2) drainRun(game);
 }
 function drainRun(game: Game) {
   const player = game.player, drain = player.familyId === 5 ? 0.36 : 0.6;
@@ -764,7 +767,7 @@ function runActivity(game: Game) {
     }
   }
 }
-function gatherBonus(game: Game) { return 1 + Math.min(RELICS[2].max, game.player.relics[2] ?? 0) * RELICS[2].gatherPer; }
+function gatherBonus(game: Game) { return 1 + Math.min(RELICS[2].max, game.player.relics[2] ?? 0) * RELICS[2].gatherPer + (riding(game.player)?.gather ?? 0); }
 function woodcutTick(game: Game, activity: Extract<Activity, { kind: "woodcut" }>) {
   const player = game.player, object = game.world.objects[activity.objectId], tree = TREES[object.tree!], axe = bestTool(game, "axe");
   if (game.depleted.has(object.id) || !axe) { player.activity = null; return; }
@@ -1013,7 +1016,7 @@ function killMonster(game: Game, monster: Monster) {
   monster.dead = true; monster.target = false; monster.respawnAt = game.tick + monster.def.respawn;
   if (player.combat === monster.uid) player.combat = null;
   player.kills++; sound(game, "kill"); creature(game, monster, "death");
-  const at = { x: monster.x, y: monster.y }, silver = Math.min(RELICS[1].max, player.relics[1] ?? 0) * RELICS[1].coinsPer;
+  const at = { x: monster.x, y: monster.y }, silver = Math.min(RELICS[1].max, player.relics[1] ?? 0) * RELICS[1].coinsPer + (riding(player)?.coins ?? 0);
   const roll = (drop: { item: string; min: number; max: number }) => {
     const n = drop.min + Math.floor(game.rng() * (drop.max - drop.min + 1));
     dropItem(game, drop.item, drop.item === "coins" ? Math.round(n * (1 + silver)) : n, at.x, at.y);
@@ -1163,7 +1166,7 @@ function upkeep(game: Game) {
     if (player.prayer <= 0) { player.prayers = []; message(game, "You have run out of prayer points, you can recharge at an altar.", "warn"); }
   }
   const moving = player.path.length > 0 || !!game.held;
-  if (!(player.run && moving)) player.energy = Math.min(100, player.energy + 0.25 + level(game, "agility") / 110);
+  if (!(player.run && moving) || player.mount) player.energy = Math.min(100, player.energy + 0.25 + level(game, "agility") / 110);
 }
 
 // ---------- Prayer, magic, style ----------
@@ -1503,6 +1506,41 @@ export function setFollower(game: Game, friend: OwnedFriend | null) {
   if (friend) message(game, `Friend #${friend.id} follows you now.`, "info");
 }
 
+// ---------- Mounts ----------
+/** Why you can't ride here (null if you can): not underground, and not upstairs. */
+export function rideProblem(game: Game) {
+  const player = game.player;
+  if (isUnderground(player.y)) return "There's no room to ride down here.";
+  if (player.y >= FLOOR_Y) return "You can't ride a horse up the stairs.";
+  return null;
+}
+/** Get on a mount you own (the last one you rode, or `id`), or off the one you're on. */
+export function toggleMount(game: Game, id?: string) {
+  const player = game.player;
+  if (player.mount && (!id || id === player.mount)) { message(game, `You climb down from your ${mountDef(player.mount)!.name.toLowerCase()}.`); player.mount = null; sound(game, "click"); return; }
+  const choice = id ?? player.lastMount ?? player.mounts[0];
+  if (!choice || !player.mounts.includes(choice)) { message(game, "You don't own a mount. The Friendhollow stables sell them.", "warn"); return; }
+  const problem = rideProblem(game);
+  if (problem) { message(game, problem, "warn"); return; }
+  player.mount = choice; player.lastMount = choice; player.emote = null;
+  message(game, `You mount your ${mountDef(choice)!.name.toLowerCase()}.`); sound(game, "click");
+}
+/** A new mount from the stables (bought with RF); you ride it straight away where you can. */
+export function grantMount(game: Game, id: string) {
+  const player = game.player, mount = mountDef(id);
+  if (!mount) return;
+  if (!player.mounts.includes(id)) player.mounts.push(id);
+  message(game, `The stablemaster leads out your ${mount.name.toLowerCase()}. ${mount.text}`, "quest"); sound(game, "level");
+  if (!rideProblem(game)) { player.mount = id; player.lastMount = id; }
+}
+/** While riding: climb down where a horse can't go, and a gentle mount's healing. */
+function rideUpkeep(game: Game) {
+  const player = game.player, mount = riding(player);
+  if (!mount) return;
+  if (rideProblem(game)) { player.mount = null; message(game, `You leave your ${mount.name.toLowerCase()} to graze and go on foot.`); return; }
+  if (mount.heal && game.tick % mount.heal === 0 && player.hp > 0 && player.hp < maxHp(player)) player.hp++;
+}
+
 /**
  * The follower walks like an old-school pet: it steps onto the tile you just left (two when you run),
  * waits beside you when you stop, and finds its way back to your side after a teleport.
@@ -1538,7 +1576,7 @@ export type SaveData = {
   inventory: (Slot | null)[]; equipment: Record<string, string>; bank: Slot[]; style: CombatStyle; autocast: string | null;
   quests: Record<string, number>; questData: Record<string, number>; wardrobe: string[]; worn: string[]; follower: number | null; followerGeneration: number | null;
   kills: number; deaths: number; tutorial: number; created: number; playTicks: number; retaliate: boolean; music: string[];
-  referredBy?: number | null; referrals?: number[]; boostTicks?: number;
+  referredBy?: number | null; referrals?: number[]; boostTicks?: number; mounts?: string[]; mount?: string | null;
 };
 export function serialize(game: Game): SaveData {
   const player = game.player;
@@ -1548,7 +1586,7 @@ export function serialize(game: Game): SaveData {
     style: player.style, autocast: player.autocast, quests: { ...player.quests }, questData: { ...player.questData }, wardrobe: [...player.wardrobe], worn: [...player.worn],
     follower: player.follower, followerGeneration: player.followerGeneration, kills: player.kills, deaths: player.deaths, tutorial: player.tutorial, created: player.created,
     playTicks: game.playTicks, retaliate: game.autoRetaliate, music: [...player.music],
-    referredBy: player.referredBy, referrals: [...player.referrals], boostTicks: player.boostTicks,
+    referredBy: player.referredBy, referrals: [...player.referrals], boostTicks: player.boostTicks, mounts: [...player.mounts], mount: player.mount,
   };
 }
 const QUEST_IDS = ["friends_feast", "grumblin_trouble", "cold_forge", "hollow_whispers", "lost_glimmer", "hollow_king"];
@@ -1630,6 +1668,8 @@ export function restore(game: Game, raw: unknown): boolean {
   player.referredBy = friendNumber(save.referredBy);
   player.referrals = [...new Set((Array.isArray(save.referrals) ? save.referrals : []).map(friendNumber).filter((id): id is number => id !== null))].slice(0, 500);
   player.boostTicks = int(save.boostTicks, 0, REFERRAL_TICKS * 50, 0);
+  player.mounts = MOUNTS.filter(mount => Array.isArray(save.mounts) && save.mounts.includes(mount.id)).map(mount => mount.id);
+  player.mount = typeof save.mount === "string" && player.mounts.includes(save.mount) ? save.mount : null;
   return true;
 }
 

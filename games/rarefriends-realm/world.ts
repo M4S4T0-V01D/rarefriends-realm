@@ -677,6 +677,13 @@ export function createWorld(seed = 20260927): World {
   add({ kind: "sign", ...(([x, y]) => ({ x, y }))(land0(56, 50)), blocks: true, name: "Signpost", text: "Wyrmreach. Dragons. Their breath burns through anything but a Wyrmward shield: King Hollis keeps a few." });
   // The bone collector, by the chapel.
   { const [bx, by] = land0(104, 134); npc("bone_collector", bx, by, 1); }
+  // The Friendhollow stables: a timber stable with a stablemaster, hay and a trough, and a paddock beside it.
+  building(103, 101, 110, 105, "s", T.WOOD, undefined, { name: "Friendhollow stables", color: "#b0673e" });
+  npc("stablemaster", 106, 103); decor(104, 102, "hay"); decor(109, 102, "hay"); decor(104, 104, "barrel"); decor(109, 104, "hay");
+  for (let x = 89; x <= 101; x++) decor(x, 105, "fence");
+  for (let y = 101; y <= 104; y++) { decor(89, y, "fence"); if (y !== 103) decor(101, y, "fence"); }
+  npc("paddock_horse", 93, 102, 2); npc("paddock_grey", 97, 103, 2); npc("paddock_unicorn", 95, 102, 2);
+  decor(91, 104, "hay");
   // General stores in the other towns, so there's somewhere to sell anything wherever you are.
   for (const [id, gx, gy] of [["trader_ember", 170, 45], ["trader_frost", 195, 34], ["trader_oasis", 178, 110]] as const) {
     const [x, y] = land0(gx, gy); npc(id, x, y); decor(x + 1, y - 1, "crate");

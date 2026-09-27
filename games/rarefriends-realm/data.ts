@@ -638,6 +638,37 @@ export const SHOPS: Record<string, ShopDef> = {
   bones: { id: "bones", name: "Bone Collector", buys: ["bones", "hide"], rate: 0.65, stock: ["bones", "large_bones"] },
   capes: { id: "capes", name: "The Keeper of Capes", stock: [...SKILLS.map(skill => `${skill}_cape`), "grandmaster_cape"] },
 };
+// ---------- Mounts (the Friendhollow stables) ----------
+/** A horse's coat: body, mane and tail, hooves, and markings. */
+export type Coat = { body: string; mane: string; hoof: string; socks?: string; blaze?: string; pattern?: "dapple" | "piebald" | "stars"; horn?: string; rainbow?: boolean };
+/**
+ * Mounts, bought from the stablemaster with simulated RF (each buys Rare Caskets, like the Rare Market's bundles, and the
+ * mount comes with them). Riding carries you `speed` tiles a tick without run energy, and each mount has its own gifts.
+ */
+export type MountDef = {
+  id: string; name: string; caskets: number; speed: 2 | 3; coat: Coat; text: string;
+  xp?: number; gather?: number; coins?: number; defence?: number; heal?: number; light?: boolean;
+};
+export const MOUNTS: readonly MountDef[] = [
+  { id: "chestnut_horse", name: "Chestnut horse", caskets: 2, speed: 2, coat: { body: "#b0673e", mane: "#6f3a24", hoof: "#3b2a22", blaze: "#f3ece0" },
+    text: "A steady gallop: two tiles a tick without tiring." },
+  { id: "piebald_pony", name: "Piebald pony", caskets: 2, speed: 2, coat: { body: "#f3efe6", mane: "#3b3a38", hoof: "#3b3a38", pattern: "piebald" }, heal: 20,
+    text: "Gallops without tiring, and a cuddle mends you: 1 HP every 12 seconds." },
+  { id: "bay_horse", name: "Bay horse", caskets: 3, speed: 2, coat: { body: "#8a4f33", mane: "#2e2522", hoof: "#2e2522", socks: "#2e2522" }, gather: 0.05,
+    text: "Gallops without tiring, and carries your tools: gather 5% faster." },
+  { id: "grey_horse", name: "Dapple grey", caskets: 3, speed: 2, coat: { body: "#c9c7c2", mane: "#8a8782", hoof: "#57555a", pattern: "dapple" }, coins: 0.1,
+    text: "Gallops without tiring, and has a nose for loot: +10% coins from drops and pickpocketing." },
+  { id: "palomino", name: "Palomino", caskets: 4, speed: 2, coat: { body: "#e2b56a", mane: "#f6ecd6", hoof: "#6f5440", socks: "#f6ecd6" }, xp: 0.05,
+    text: "Gallops without tiring, and everyone learns a little faster in golden company: +5% XP." },
+  { id: "black_warhorse", name: "Black warhorse", caskets: 4, speed: 2, coat: { body: "#3a3638", mane: "#1d1b1c", hoof: "#1d1b1c", blaze: "#e8e4da" }, defence: 8,
+    text: "Gallops without tiring, and never flinches: +8 Defence bonus while you ride." },
+  { id: "unicorn", name: "Unicorn", caskets: 6, speed: 3, coat: { body: "#f7f5f0", mane: "#e7a9b0", hoof: "#c9c2b6", horn: "#ebc26b", rainbow: true }, xp: 0.1, heal: 10,
+    text: "Canters three tiles a tick, +10% XP, and its horn mends you: 1 HP every 6 seconds." },
+  { id: "moon_unicorn", name: "Moonlit unicorn", caskets: 8, speed: 3, coat: { body: "#3d4263", mane: "#c6d4f0", hoof: "#23263a", horn: "#dfe7f5", pattern: "stars" }, xp: 0.1, gather: 0.1, light: true,
+    text: "Canters three tiles a tick, +10% XP, gathers 10% faster, and lights the dark around you." },
+];
+export const mountDef = (id: string | null | undefined) => MOUNTS.find(mount => mount.id === id);
+
 /** Buy price multipliers. */
 export const SHOP_BUY = 1.3, SHOP_SELL = 0.4;
 

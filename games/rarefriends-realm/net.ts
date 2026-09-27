@@ -51,6 +51,8 @@ export type Presence = {
   head: string | null;
   /** Their equipped shield. */
   shield: string | null;
+  /** The mount they're riding. */
+  mount: string | null;
   /** The Friend whose referral code this player used (so that Friend's game can reward them). */
   referredBy: number | null;
   hp: number; maxHp: number; fight: { u: number; id: string; hp: number; x: number; y: number } | null;
@@ -73,7 +75,7 @@ export function cleanPresence(raw: unknown): Presence | null {
     worn, cape: word(r.cape), weapon: word(r.weapon), activity: word(r.activity), combat: int(r.combat, 3, 200) ?? 3, total: int(r.total, 1, 3000) ?? 1,
     region: typeof r.region === "string" ? r.region.slice(0, 32).replace(/[^\w' ]/g, "") : "",
     emote: word(r.emote),
-    head: word(r.head, 40), shield: word(r.shield, 40), referredBy: id(r.referredBy),
+    head: word(r.head, 40), shield: word(r.shield, 40), mount: word(r.mount, 40), referredBy: id(r.referredBy),
     hp: int(r.hp, 0, 99) ?? 10, maxHp: int(r.maxHp, 1, 99) ?? 10,
     fight: (() => { const f = r.fight as Record<string, unknown> | null; if (!f || typeof f !== "object") return null; const u = int(f.u, 0, 1e9), fid = word(f.id, 40), fhp = int(f.hp, 0, 10_000), fx = int(f.x, 0, 239), fy = int(f.y, 0, 279);
       return u !== null && fid && fhp !== null && fx !== null && fy !== null ? { u, id: fid, hp: fhp, x: fx, y: fy } : null; })(),

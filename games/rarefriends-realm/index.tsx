@@ -5,11 +5,12 @@ import type { GameComponentProps } from "@rarefriends/friendsdk/runtime";
 import { formatGameAmount } from "@rarefriends/friendsdk/ui";
 import { expectedReward, maximumPrize, type GamePlay, type GameSnapshot } from "@rarefriends/friendsdk/game";
 import { createFriendReader, type GenerationSprites } from "@rarefriends/friendsdk/sprites";
-import { FAMILY_NAMES, FAMILY_PERKS, RELICS, RF_BUNDLES, SKILL_ICONS, SPELLS, WARDROBE, isItem, item, type Skill } from "./data.ts";
+import { mountArt } from "./mountart.ts";
+import { FAMILY_NAMES, FAMILY_PERKS, MOUNTS, RELICS, RF_BUNDLES, SKILL_ICONS, SPELLS, WARDROBE, isItem, item, type Skill } from "./data.ts";
 import { QUESTS, questPoints, MAX_QUEST_POINTS } from "./content.ts";
 import { TICK_MS, combatLevel, createGame, giveOrDrop, message, totalLevel, type Game, type Projectile } from "./state.ts";
 import {
-  chooseOption, closeInterfaces, collectFromCasket, creditReferral, performEmote, syncMonster, continueDialogue, grantBundle, menuFor, tailorChoices, unlockMusic, restore, serialize, setFollower, setHeld, setRelics, tick, toggleRun, walkTo, type OwnedFriend, type Selection,
+  chooseOption, closeInterfaces, collectFromCasket, creditReferral, performEmote, syncMonster, continueDialogue, grantBundle, menuFor, tailorChoices, unlockMusic, restore, serialize, setFollower, setHeld, setRelics, tick, toggleRun, toggleMount, grantMount, walkTo, type OwnedFriend, type Selection,
 } from "./engine.ts";
 import { PITCH, VIEW, ZOOM, daylight, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
 import {
@@ -516,6 +517,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       }
       if (/^[1-5]$/.test(key) && state.dialogue) { chooseOption(state, Number(key) - 1); refresh(); return; }
       if (key === "r") { toggleRun(state); refresh(); return; }
+      if (key === "h") { toggleMount(state); refresh(); return; }
       if (key === "m") { setModal(modal => modal === "map" ? null : "map"); return; }
       if (key === "enter") { (root.current?.querySelector("[data-chat]") as HTMLInputElement | null)?.focus(); event.preventDefault(); return; }
       if (key === "i") setTab("inventory"); else if (key === "k") setTab("skills"); else if (key === "l") setTab("quests");
@@ -641,7 +643,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         {phase === "playing" && state && player && <>
           <div className="realm-hover" aria-hidden="true">{hover}</div>
           <div className="realm-topright">
-            <Orbs game={state} openMenu={(x, y, entries) => setMenu({ x, y, entries })} onRun={() => { toggleRun(state); refresh(); }} onMap={() => setModal("map")} onZoom={delta => setSettings({ ...settings, zoom: Math.max(ZOOM.min, Math.min(ZOOM.max, settings.zoom * (delta > 0 ? 1.15 : 0.87))) })}
+            <Orbs game={state} openMenu={(x, y, entries) => setMenu({ x, y, entries })} onRun={() => { toggleRun(state); refresh(); }} onRide={id => { toggleMount(state, id); refresh(); }} onMap={() => setModal("map")} onZoom={delta => setSettings({ ...settings, zoom: Math.max(ZOOM.min, Math.min(ZOOM.max, settings.zoom * (delta > 0 ? 1.15 : 0.87))) })}
               onRotate={delta => { const from = cameraGoal.current?.angle ?? camera.current.angle; cameraGoal.current = { angle: from + delta, pitch: cameraGoal.current?.pitch ?? camera.current.pitch }; }} />
             <div className="realm-minimap">
               <canvas ref={minimap} width={180} height={180} onClick={onMinimap}
@@ -706,7 +708,23 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
               <div className="realm-buttons"><button type="button" onClick={() => { state.ui.shop = "__caskets"; refresh(); }}>Open your caskets ({(snapshot?.consumables ?? 0n).toString()} waiting)</button></div>
             </Modal>
           )}
-          {state.ui.shop && state.ui.shop !== "__caskets" && state.ui.shop !== "__market" && <ShopModal game={state} shopId={state.ui.shop} refresh={refresh} openMenu={(x, y, entries) => setMenu({ x, y, entries })} onClose={() => { state.ui.shop = null; refresh(); }} />}
+          {state.ui.shop === "__stable" && (
+            <Modal title="Friendhollow Stables" onClose={() => { state.ui.shop = null; refresh(); }} wide>
+              <p className="realm-sim">Simulated $RAREFRIENDS. No real tokens, contracts or transactions. Balance: <b>{snapshot ? rf(snapshot.rfBalance) : "…"}</b></p>
+              <p className="realm-market-intro">Every mount gallops without using run energy (unicorns go faster still) and has a gift of its own. Like the Rare Market, RF buys Rare Caskets and the mount comes with them. Ride or dismount with the saddle button by your run orb, or <b>H</b>.</p>
+              <ul className="realm-market stable">{MOUNTS.map(mount => {
+                const owned = state.player.mounts.includes(mount.id), ridingNow = state.player.mount === mount.id;
+                return <li key={mount.id}><PixelIcon art={mountArt(mount.coat, "side", -1, true)} size={58} label={mount.name} />
+                  <div><b>{mount.name}</b><small>{mount.text} {owned ? "Yours." : `Includes ${mount.caskets} Rare Caskets.`}</small></div>
+                  {owned ? <button type="button" aria-pressed={ridingNow} onClick={() => { toggleMount(state, mount.id); refresh(); }}>{ridingNow ? "Dismount" : "Ride"}</button>
+                    : <button type="button" className="realm-primary" disabled={busy || paused}
+                      {...rightClick((x, y, entries) => setMenu({ x, y, entries }), () => [{ verb: "Examine", noun: mount.name, run: () => { message(state, `${mount.name}: ${mount.text}`); refresh(); } }])}
+                      onClick={() => void casket(() => client.buy(BigInt(mount.caskets)), () => { grantMount(state, mount.id); audio.current?.sfx("coins"); refresh(); })}>Buy · {rf(definition.price * BigInt(mount.caskets))}</button>}</li>;
+              })}</ul>
+              {casketError && <p className="realm-error" role="alert">{casketError}</p>}
+            </Modal>
+          )}
+          {state.ui.shop && state.ui.shop !== "__caskets" && state.ui.shop !== "__market" && state.ui.shop !== "__stable" && <ShopModal game={state} shopId={state.ui.shop} refresh={refresh} openMenu={(x, y, entries) => setMenu({ x, y, entries })} onClose={() => { state.ui.shop = null; refresh(); }} />}
           {(modal === "caskets" || state.ui.shop === "__caskets") && (
             <Modal title="Rare Caskets" onClose={() => { setModal(null); state.ui.shop = null; setReveal(null); refresh(); }} wide>
               <p className="realm-sim">Simulated $RAREFRIENDS. No real tokens, contracts or transactions. Balance: <b>{snapshot ? rf(snapshot.rfBalance) : "…"}</b></p>

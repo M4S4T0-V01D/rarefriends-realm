@@ -3,10 +3,10 @@ import assert from "node:assert/strict";
 import {
   buy, canWalk, castSpell, chooseOption, collectFromCasket, continueDialogue, createGame, equip, findPath, itemOptions, menuFor, restore, sell,
   serialize, setFollower, setRelics, setTarget, smeltingRecipes, smithingRecipes, startProduction, tick, togglePrayer, useItemOnItem, walkTo, setHeld,
-  successChance, hitChance, unlockMusic, castOnItem, isBound, grantBundle, rubLamp, breakTablet, capeProblem, sellPrice, craftSigils,
+  successChance, hitChance, unlockMusic, toggleMount, grantMount, rideProblem, castOnItem, isBound, grantBundle, rubLamp, breakTablet, capeProblem, sellPrice, craftSigils,
 } from "../games/rarefriends-realm/engine.ts";
 import { currentTask, slayerPoints } from "../games/rarefriends-realm/slayer.ts";
-import { ITEM_LIST, MONSTERS, SHOPS, SKILLS, SPELLS, TREES, XP_RATE, XP_TABLE, item, levelForXp } from "../games/rarefriends-realm/data.ts";
+import { ITEM_LIST, MONSTERS, MOUNTS, SHOPS, SKILLS, SPELLS, TREES, XP_RATE, XP_TABLE, item, levelForXp } from "../games/rarefriends-realm/data.ts";
 import { NPCS, QUESTS, MAX_QUEST_POINTS, questPoints } from "../games/rarefriends-realm/content.ts";
 import { FLOOR_Y, H, REGIONS, T, W, createWorld, floorAt, objectAtTile, onLevel, realPoint, regionAt, terrainAt } from "../games/rarefriends-realm/world.ts";
 import { combatLevel, count, give, has, level, xpMultiplier } from "../games/rarefriends-realm/state.ts";
@@ -828,4 +828,29 @@ test("Shops: general stores in every town buy anything, traders buy what they se
   assert.equal(buy(game, "general_ember", "oak_logs", 5), 3, "buy back only what's on the shelf");
   assert.equal(game.shopStock.general_ember.length, 0);
   assert.equal(buy(game, "general_ember", "oak_logs", 1), 0, "then it's gone");
+});
+
+test("Mounts: bought at the stables, ridden faster without run energy, each with its gift, saved, and left outside dungeons", () => {
+  const game = newGame(), player = game.player;
+  assert(game.npcs.some(npc => npc.id === "stablemaster") && game.npcs.some(npc => npc.id === "paddock_unicorn"), "the stables are staffed");
+  assert.equal(NPCS.stablemaster.options.includes("Stables"), true);
+  assert(MOUNTS.length >= 8 && MOUNTS.some(mount => mount.coat.horn) && new Set(MOUNTS.map(mount => mount.coat.body)).size === MOUNTS.length, "horses of every colour, and unicorns");
+  toggleMount(game);
+  assert.equal(player.mount, null, "no mount to ride yet");
+  grantMount(game, "unicorn");
+  assert.deepEqual(player.mounts, ["unicorn"]); assert.equal(player.mount, "unicorn", "you ride it away");
+  const before = xpMultiplier(player); player.mount = null; assert(before > xpMultiplier(player), "a unicorn's +10% XP"); player.mount = "unicorn";
+  // Riding covers three tiles a tick, and doesn't touch run energy.
+  player.run = false; player.energy = 50;
+  const start = { x: player.x, y: player.y };
+  walkTo(game, start.x + 6, start.y);
+  tick(game); tick(game);
+  assert(Math.abs(player.x - start.x) + Math.abs(player.y - start.y) >= 5, `galloped (${player.x - start.x}, ${player.y - start.y})`);
+  assert(player.energy >= 50, "no run energy used");
+  const save = JSON.parse(JSON.stringify(serialize(game))), fresh = newGame();
+  assert(restore(fresh, save)); assert.deepEqual(fresh.player.mounts, ["unicorn"]); assert.equal(fresh.player.mount, "unicorn");
+  save.mounts = ["dragon_bus"]; save.mount = "dragon_bus"; const bad = newGame(); restore(bad, save); assert.deepEqual(bad.player.mounts, []); assert.equal(bad.player.mount, null, "unknown mounts are dropped");
+  // Underground you go on foot.
+  player.y = 210; assert(rideProblem(game)); tick(game); assert.equal(player.mount, null, "left to graze outside");
+  toggleMount(game); assert.equal(player.mount, null, "can't mount down here");
 });

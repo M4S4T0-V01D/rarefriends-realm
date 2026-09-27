@@ -149,6 +149,25 @@ in a shop for its *Value*. Every trader buys back what it sells, and general sto
 Frostpeak and the Oasis) buy almost anything. What you sell goes on the shop's shelves with its count, so you can buy it
 back. The Rare Market's bundle list scrolls in a compact box.
 
+**Mounts.** Marigold runs the Friendhollow stables, west of the castle, with a paddock where a chestnut, a dapple grey
+and a unicorn graze (right-click to *Stroke* them). She sells eight mounts for simulated RF. Like the Rare Market, RF
+buys Rare Caskets and the mount comes with them. Every mount gallops two tiles a tick without using run energy, and
+unicorns go three. Each also has a gift:
+
+| Mount | Caskets | Gift |
+|---|---|---|
+| Chestnut horse | 2 | none |
+| Piebald pony | 2 | heals 1 HP every 12 s |
+| Bay horse | 3 | gather 5% faster |
+| Dapple grey | 3 | +10% coins from drops and pickpockets |
+| Palomino | 4 | +5% XP |
+| Black warhorse | 4 | +8 Defence |
+| Unicorn | 6 | +10% XP, heals 1 HP every 6 s |
+| Moonlit unicorn | 8 | +10% XP, gather 10% faster, lights the dark |
+
+Ride or dismount with the saddle button by the run orb (right-click it to pick a mount) or **H**. You go on foot
+underground and upstairs. Other players see you riding.
+
 **The look of the land.** Ground tiles share the buildings' pixel textures: grass tufts with the odd flower, pebbled dirt
 paths, cobbled streets in staggered setts, flagstones, wind-rippled sand and snow, boards, furrows and dungeon flags. Only
 tiles near you and at normal zoom are textured, so it stays quick. Furnaces are brick kilns with a fire in an arched mouth

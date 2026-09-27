@@ -3,8 +3,9 @@ import React, { useEffect, useRef, useState, type CSSProperties, type MouseEvent
 import type { GenerationSprites } from "@rarefriends/friendsdk/sprites";
 import {
   EMOTES, EQUIP_SLOTS, FAMILY_NAMES, FAMILY_PERKS, PRAYERS, RELICS, SHOPS, SKILLS, SKILL_ICONS, SKILL_NAMES, SPELLS, WARDROBE, XP_TABLE, item, levelForXp,
-  type EquipSlot, type Skill,
+  type EquipSlot, type Skill, mountDef,
 } from "./data.ts";
+import { mountArt } from "./mountart.ts";
 import { MAX_QUEST_POINTS, NPCS, QUESTS, finalStage, questPoints } from "./content.ts";
 import {
   bankDeposit, bankDepositAll, bankDepositWorn, bankWithdraw, bonuses, combatLevel, count, isStaffEquipped, maxHp, maxPrayer, message, totalLevel, totalXp,
@@ -809,7 +810,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
     </Modal>
   );
 }
-export function Orbs({ game, onRun, onMap, onZoom, onRotate, openMenu }: { game: Game; onRun: () => void; onMap: () => void; onZoom: (delta: number) => void; onRotate: (delta: number) => void; openMenu?: OpenMenu }) {
+export function Orbs({ game, onRun, onRide, onMap, onZoom, onRotate, openMenu }: { game: Game; onRun: () => void; onRide?: (id?: string) => void; onMap: () => void; onZoom: (delta: number) => void; onRotate: (delta: number) => void; openMenu?: OpenMenu }) {
   const player = game.player, hpFraction = player.hp / maxHp(player), prayerFraction = player.prayer / Math.max(1, maxPrayer(player));
   const orbMenu = (label: string): MenuEntry[] => label === "Hitpoints" ? [{ verb: "Check", noun: "Hitpoints", run: () => message(game, `Hitpoints: ${player.hp} / ${maxHp(player)}.`) }]
     : label === "Prayer" ? [{ verb: "Deactivate", noun: "Prayers", run: () => { player.prayers = []; } }, { verb: "Check", noun: "Prayer", run: () => message(game, `Prayer points: ${Math.ceil(player.prayer)} / ${maxPrayer(player)}.`) }]
@@ -824,6 +825,9 @@ export function Orbs({ game, onRun, onMap, onZoom, onRotate, openMenu }: { game:
       {orb("Hitpoints", player.hp, hpFraction, "#cf6e6e", orbArt("hitpoints"))}
       {orb("Prayer", Math.ceil(player.prayer), prayerFraction, "#9fb4d0", orbArt("prayer"))}
       {orb(player.run ? "Run: on" : "Run: off", Math.floor(player.energy), player.energy / 100, player.run ? "#e2c46a" : "#9a968f", orbArt(player.run ? "run" : "walk"), onRun, player.run)}
+      {onRide && player.mounts.length > 0 && (() => { const shown = mountDef(player.mount ?? player.lastMount ?? player.mounts[0])!;
+        return <button type="button" className="realm-orb map ride" onClick={() => onRide()} aria-pressed={!!player.mount} aria-label={player.mount ? `Dismount (H)` : `Ride your ${shown.name.toLowerCase()} (H)`} title={player.mount ? "Dismount (H)" : "Ride (H)"}
+          {...rightClick(openMenu, () => [...player.mounts.map(id => ({ verb: player.mount === id ? "Dismount" : "Ride", noun: mountDef(id)!.name, run: () => onRide(id) }))])}><PixelIcon art={mountArt(shown.coat, "side", -1, true)} size={26} /></button>; })()}
       <button type="button" className="realm-orb map" onClick={onMap} aria-label="World map (M)" title="World map (M)" {...rightClick(openMenu, () => [{ verb: "Open", noun: "World map", run: onMap }])}><PixelIcon art={orbArt("map")} size={22} /></button>
       <div className="realm-zoom"><button type="button" onClick={() => onZoom(0.12)} aria-label="Zoom in">+</button><button type="button" onClick={() => onZoom(-0.12)} aria-label="Zoom out">−</button></div>
       <div className="realm-zoom"><button type="button" onClick={() => onRotate(-Math.PI / 4)} aria-label="Turn the camera left" title="Turn left (←)">⟲</button><button type="button" onClick={() => onRotate(Math.PI / 4)} aria-label="Turn the camera right" title="Turn right (→)">⟳</button></div>

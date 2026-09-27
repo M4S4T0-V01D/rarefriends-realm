@@ -3,9 +3,9 @@
  * Draws in a 960 × 640 logical view; the caller scales the canvas for the device.
  */
 import type { GenerationSprites } from "@rarefriends/friendsdk/sprites";
-import { ROCKS, isItem, item, levelForXp, type Icon } from "./data.ts";
+import { ROCKS, isItem, item, levelForXp, mountDef, type Coat, type Icon } from "./data.ts";
 import { NPCS } from "./content.ts";
-import { TICK_MS, attackSpeed, type Facing, type Game, type Monster, type Npc, type Projectile } from "./state.ts";
+import { TICK_MS, attackSpeed, riding, type Facing, type Game, type Monster, type Npc, type Projectile } from "./state.ts";
 import { npcOverhead, type Pick } from "./engine.ts";
 import { FLOOR_Y, REGIONS, STOREY, T, W, H, complexAt, cornerHeight, floorAt, groundHeight, inBounds, isUnderground, objectAtTile, onLevel, realPoint, type Building, type Floor, type World, type WorldObject } from "./world.ts";
 import { itemArt } from "./icons.ts";
@@ -15,6 +15,7 @@ import { emoteMotion, emoteParticles, type Motion } from "./emotes.ts";
 import { drawPixels, shadeHex } from "./pixel.ts";
 import { TEX_PER_HEIGHT, TEX_PER_TILE, beginTextures, groundTexture, shingleTexture, texturedQuad, texturedTriangle, wallTexture, type GroundStyle, type WallStyle } from "./textures.ts";
 import { campfireLogs, decorArt, fireArt, rockArt, treeArt } from "./scenery.ts";
+import { SADDLE, mountArt, type MountView } from "./mountart.ts";
 import { burst, drawCloudShadows, drawEffects, playerPose, puff, treeShake, updateEffects, type Pose } from "./effects.ts";
 import { drawAuras, drawFigure, figureArt } from "./wardrobe.ts";
 import { creatureSprite, friendSprite, type Mask } from "./sprites.ts";
@@ -999,18 +1000,20 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     if (player.activity?.kind === "obstacle") { const a = player.activity, total = world.objects[a.objectId].obstacle?.ticks ?? 3, k = Math.max(0, Math.min(1, 1 - (a.timer - alpha) / total)); at = { x: a.from.x + (a.to.x - a.from.x) * k, y: a.from.y + (a.to.y - a.from.y) * k, moving: true }; }
     const emote = player.emote && game.tick < player.emote.until ? player.emote : null, emoteT = emote ? (game.tick - emote.start + alpha) * TICK_MS / 1000 : 0;
     const motion = emote ? emoteMotion(emote.id, emoteT, playerFacing, scene.reducedMotion) : null;
-    const s = toScreen(camera, at.x, at.y, pose.hop + (motion?.hop ?? 0)), feet = toScreen(camera, at.x, at.y), px = 3.2 * z, walking = at.moving || (!!player.path.length && alpha < 1);
+    const mount = riding(player), walking = at.moving || (!!player.path.length && alpha < 1);
+    const s = toScreen(camera, at.x, at.y, pose.hop + (motion?.hop ?? 0) + (mount ? riderLift(camera) : 0)), feet = toScreen(camera, at.x, at.y), px = 3.2 * z;
     const facing: Facing = motion?.facing ?? (pose.target ? (pose.side < 0 ? "left" : "right") : playerFacing);
     if (emote) { const capeColor = player.equipment.cape && isItem(player.equipment.cape) ? item(player.equipment.cape).icon.color : undefined; emoteParticles(emote.id, emoteT, at.x, at.y, scene.reducedMotion, capeColor); if (emote.id === "skillcape" || emote.id === "friendship") skillcapeRays(ctx, feet.x, feet.y - 30 * z, z, now, capeColor ?? "#e2d49e", scene.reducedMotion);
       if (emote.id === "friendship" && !scene.reducedMotion) for (let i = 0; i < 3; i++) { const a = now / 500 + i * 2.1, hx = feet.x + Math.cos(a) * 26 * z, hy = feet.y - 44 * z + Math.sin(a) * 10 * z; heart(ctx, hx, hy, 5 * z); } }
-    ellipse(ctx, feet.x, feet.y, 15 * z, 6 * z, "rgba(22,22,22,0.2)", "rgba(255,255,255,0.75)", 1.5);
+    ellipse(ctx, feet.x, feet.y, (mount ? 32 : 15) * z, (mount ? 10 : 6) * z, "rgba(22,22,22,0.2)", "rgba(255,255,255,0.75)", 1.5);
+    if (mount) drawMount(ctx, mount.coat, facing, walking, now + 0, feet.x, feet.y, z, true, scene.reducedMotion);
     const bodyY = s.y - pose.bob * z;
     // Your Friend with its worn pieces composited into the same pixel frame (leaning and squashing for emotes).
     const restoreMotion = applyMotion(ctx, motion, s.x, s.y);
     drawAuras(ctx, player.worn, s.x, bodyY, px, now, scene.reducedMotion, "back");
     const stride = walking ? Math.floor(now / 80) % 8 : 0, cloth = scene.reducedMotion ? 0 : walking ? stride % 4 : Math.floor(now / 520) % 4;
     const dressed = [...player.worn, ...(player.equipment.cape ? [player.equipment.cape] : []), ...(player.equipment.head ? [player.equipment.head] : []), ...(player.equipment.shield ? [player.equipment.shield] : [])];
-    if (scene.friend) drawFigure(ctx, figureArt(friendRows(scene.friend, facing, walking, stride), dressed, facing, cloth), s.x, bodyY + 2 * z, px, pose.alpha);
+    if (scene.friend) drawFigure(ctx, figureArt(friendRows(scene.friend, facing, walking && !mount, mount ? 0 : stride), dressed, facing, cloth), s.x, bodyY + 2 * z, px, pose.alpha);
     else ellipse(ctx, s.x, bodyY - 20 * z, 12 * z, 16 * z, INK);
     drawAuras(ctx, player.worn, s.x, bodyY, px, now, scene.reducedMotion, "front");
     drawHeld(ctx, scene, pose, s.x, bodyY, px, facing, project);
@@ -1094,7 +1097,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   else if (weather && weather.fog > 0.02) { ctx.fillStyle = `rgba(232,235,238,${(weather.fog * 0.25).toFixed(3)})`; ctx.fillRect(0, 0, VIEW.width, VIEW.height); }
   // Night falls over the land (your Friend carries a small light; a lantern familiar a bigger one).
   // Your own light is faint: enough to see your feet by (a lantern familiar does better).
-  if (light.dark > 0.01 || light.warm > 0.01) { const lantern = player.worn.includes("lantern_familiar"); glow(pp.x, pp.y, 24, lantern ? 120 : underground ? 70 : 55, undefined, lantern ? 0.6 : 0.3); drawNight(ctx, light.dark, light.warm, lights, underground ? "5,5,9" : undefined, 0.45 + camera.pitch * 0.7, scene.reducedMotion ? 0 : now); }
+  if (light.dark > 0.01 || light.warm > 0.01) { const lantern = player.worn.includes("lantern_familiar") || !!riding(player)?.light; glow(pp.x, pp.y, 24, lantern ? 120 : underground ? 70 : 55, undefined, lantern ? 0.6 : 0.3); drawNight(ctx, light.dark, light.warm, lights, underground ? "5,5,9" : undefined, 0.45 + camera.pitch * 0.7, scene.reducedMotion ? 0 : now); }
   // Rain over everything, and lightning on top of that.
   if (weather && weather.rain > 0.02) drawRain(ctx, weather.rain, scene.reducedMotion ? 0 : now, light.dark);
   if (scene.strike && scene.wallMs !== undefined && !underground && weather?.storm) drawLightning(ctx, scene.strike, scene.wallMs, scene.reducedMotion);
@@ -1212,6 +1215,17 @@ function drawSpell(ctx: CanvasRenderingContext2D, element: string, look: { core:
   void at; void progress;
 }
 const maxHpOf = (game: Game) => levelForXp(game.player.xp.hitpoints);
+/** How far a rider sits above the ground (world pixels, for toScreen's lift): on the saddle, legs astride. */
+/** Mounts are drawn a little larger than the scenery's pixel scale, so a Friend on top doesn't hide its horse. */
+const MOUNT_SCALE = 1.35;
+const riderLift = (camera: Camera) => (SADDLE - 4) * ART * MOUNT_SCALE / liftScale(camera);
+/** A mount standing or walking with its hooves on (x, y), turned to a screen facing. */
+function drawMount(ctx: CanvasRenderingContext2D, coat: Coat, facing: Facing, moving: boolean, now: number, x: number, y: number, z: number, saddle: boolean, reduced: boolean) {
+  const view: MountView = facing === "down" ? "front" : facing === "up" ? "back" : "side", frame = moving && !reduced ? Math.floor(now / 110) % 4 : -1;
+  const art = mountArt(coat, view, frame, saddle);
+  if (facing === "left") { ctx.save(); ctx.translate(x, 0); ctx.scale(-1, 1); drawPixels(ctx, art, 0, y + 2 * z, ART * z * MOUNT_SCALE); ctx.restore(); }
+  else drawPixels(ctx, art, x, y + 2 * z, ART * z * MOUNT_SCALE);
+}
 /** What the player holds: a skilling tool mid-swing, a fishing line, or their weapon (swinging when they attack). */
 function drawHeld(ctx: CanvasRenderingContext2D, scene: Scene, pose: Pose, x: number, y: number, px: number, facing: Facing, project: (x: number, y: number, lift?: number) => { x: number; y: number }) {
   const player = scene.game.player, side = facing === "left" ? -1 : 1, alpha = Math.max(0, Math.min(1, (scene.now - scene.tickAt) / TICK_MS));
@@ -1245,6 +1259,15 @@ function drawNpc(ctx: CanvasRenderingContext2D, scene: Scene, npc: Npc, at: { x:
   const { camera, now, game } = scene, z = camera.zoom, s = toScreen(camera, at.x, at.y), def = NPCS[npc.id];
   ellipse(ctx, s.x, s.y, 12 * z, 4.5 * z, "rgba(22,22,22,0.16)", null);
   let rect;
+  const horse = mountDef(def.mount);
+  if (horse) {
+    // A paddock horse: its coat, no saddle, walking when it wanders.
+    const facing = screenFacing(camera, npc.heading), view = facing === "down" ? "front" : facing === "up" ? "back" : "side";
+    drawMount(ctx, horse.coat, facing, at.moving, now + npc.uid * 37, s.x, s.y, z, false, scene.reducedMotion);
+    const size = ART * z * MOUNT_SCALE; rect = { x: s.x - (view === "side" ? 17 : 10) * size, y: s.y - 28 * size, w: (view === "side" ? 34 : 20) * size, h: 28 * size };
+    hits.push({ ...rect, pick: { kind: "npc", id: npc.uid } });
+    return;
+  }
   if ("canonical" in def.art) {
     const sprites = scene.canonical.get(def.art.canonical);
     rect = sprites ? drawMask(ctx, friendRows(sprites, screenFacing(camera, npc.heading), at.moving, at.moving ? Math.floor(now / 90) % 8 : 0), s.x, s.y + 2 * z, 2.8 * z) : drawMask(ctx, friendSprite(5, 1).idle, s.x, s.y + 2 * z, 2.8 * z);
@@ -1266,12 +1289,14 @@ const ROYAL_WEAR: Record<string, readonly string[]> = { king: ["paper_crown", "b
 /** Another player: their Friend (canonical art once loaded, family art until then), wardrobe, cape and weapon, a name tag (green for friends) and their chat. */
 function drawPeer(ctx: CanvasRenderingContext2D, scene: Scene, peer: PeerView, hits: Hit[]) {
   const { camera, now } = scene, z = camera.zoom, turned = screenFacing(camera, { x: peer.p.hx, y: peer.p.hy || 1 });
-  const motion = peer.p.emote ? emoteMotion(peer.p.emote, peer.emoteT, turned, scene.reducedMotion) : null, s = toScreen(camera, peer.x, peer.y, motion?.hop ?? 0), facing = motion?.facing ?? turned;
+  const mount = mountDef(peer.p.mount), motion = peer.p.emote ? emoteMotion(peer.p.emote, peer.emoteT, turned, scene.reducedMotion) : null;
+  const s = toScreen(camera, peer.x, peer.y, (motion?.hop ?? 0) + (mount ? riderLift(camera) : 0)), feet = toScreen(camera, peer.x, peer.y), facing = motion?.facing ?? turned;
   if (peer.p.emote) emoteParticles(peer.p.emote, peer.emoteT, peer.x, peer.y, scene.reducedMotion, peer.p.cape && isItem(peer.p.cape) ? item(peer.p.cape).icon.color : undefined);
   const sprites = scene.peerSprites?.(peer.p.id) ?? null, stride = peer.moving ? Math.floor(now / 80) % 8 : 0;
-  const rows = sprites ? friendRows(sprites, facing, peer.moving, stride) : peer.moving && Math.floor(now / 160) % 2 ? friendSprite(peer.p.family, peer.p.id).step : friendSprite(peer.p.family, peer.p.id).idle;
+  const rows = sprites ? friendRows(sprites, facing, peer.moving && !mount, mount ? 0 : stride) : peer.moving && Math.floor(now / 160) % 2 ? friendSprite(peer.p.family, peer.p.id).step : friendSprite(peer.p.family, peer.p.id).idle;
   const px = 3.2 * z, worn = [...peer.p.worn, ...(peer.p.cape ? [peer.p.cape] : []), ...(peer.p.head ? [peer.p.head] : []), ...(peer.p.shield ? [peer.p.shield] : [])], cloth = scene.reducedMotion ? 0 : peer.moving ? stride % 4 : Math.floor(now / 520) % 4;
-  ellipse(ctx, s.x, s.y, 15 * z, 6 * z, "rgba(22,22,22,0.18)", peer.friend ? "rgba(159,224,168,0.9)" : "rgba(255,255,255,0.6)", 1.5);
+  ellipse(ctx, feet.x, feet.y, (mount ? 32 : 15) * z, (mount ? 10 : 6) * z, "rgba(22,22,22,0.18)", peer.friend ? "rgba(159,224,168,0.9)" : "rgba(255,255,255,0.6)", 1.5);
+  if (mount) drawMount(ctx, mount.coat, facing, peer.moving, now, feet.x, feet.y, z, true, scene.reducedMotion);
   const restoreMotion = applyMotion(ctx, motion, s.x, s.y);
   drawAuras(ctx, worn, s.x, s.y, px, now, scene.reducedMotion, "back");
   const rect = drawFigure(ctx, figureArt(rows, worn, facing, cloth), s.x, s.y + 2 * z, px);
@@ -1447,6 +1472,7 @@ export function mapIcons(world: World): MapIcon[] {
     if (spawn.y >= FLOOR_Y) continue;
     const def = spawn.kind === "npc" ? NPCS[spawn.id] : null;
     if (def?.shop) add(spawn.x, spawn.y, "¤", def.name);
+    if (spawn.kind === "npc" && spawn.id === "stablemaster") add(spawn.x, spawn.y, "♞", "Stables");
     if (spawn.kind === "npc" && ["cook", "captain", "smith", "priest", "glimmer"].includes(spawn.id)) add(spawn.x, spawn.y, "!", `Quest: ${def!.name}`);
   }
   return icons;
@@ -1494,7 +1520,7 @@ export function minimapTile(game: Game, dx: number, dy: number, scale: number, a
 }
 let iconsCache: MapIcon[] | null = null;
 /** Icon backgrounds by kind, so a bank or a quest stands out from a shop. */
-const ICON_FILLS: Record<string, string> = { "◈": "#c6bed4", "$": "#f2d56b", "!": "#f5e04a", "¤": "#ffffff", "◆": "#e7a9b0", "♜": "#c6bed4", "▼": "#b7b2aa", "⛏": "#d8c4a8", "≈": "#9fc1e6", "♨": "#f0b48a", "▲": "#f0b48a", "⚒": "#c8c5be", "✚": "#ffffff", "✋": "#e8d4c0", "➶": "#b4d3a0" };
+const ICON_FILLS: Record<string, string> = { "◈": "#c6bed4", "$": "#f2d56b", "!": "#f5e04a", "¤": "#ffffff", "◆": "#e7a9b0", "♜": "#c6bed4", "▼": "#b7b2aa", "⛏": "#d8c4a8", "≈": "#9fc1e6", "♨": "#f0b48a", "▲": "#f0b48a", "⚒": "#c8c5be", "✚": "#ffffff", "✋": "#e8d4c0", "➶": "#b4d3a0", "♞": "#e2b56a" };
 /** The world map: the whole Realm turned to match the camera, with labels. Returns the transform for clicks. */
 export function renderWorldMap(ctx: CanvasRenderingContext2D, game: Game, width: number, height: number, focus: { x: number; y: number; zoom: number }, underground: boolean) {
   const world = game.world, image = worldImage(world), player = realPoint(world, game.player.x, game.player.y);

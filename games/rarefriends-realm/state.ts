@@ -2,7 +2,7 @@
  * Game state and the small helpers every system shares: inventory, bank, equipment, experience and messages.
  */
 import {
-  EQUIP_SLOTS, FAMILY_NAMES, MAX_XP, MONSTERS, PRAYERS, RELICS, SKILLS, SKILL_NAMES, XP_RATE, XP_TABLE, item, levelForXp,
+  EQUIP_SLOTS, FAMILY_NAMES, MAX_XP, MONSTERS, mountDef, PRAYERS, RELICS, SKILLS, SKILL_NAMES, XP_RATE, XP_TABLE, item, levelForXp,
   type Bonuses, type EquipSlot, type MonsterDef, type Skill, type SpotKind, type WardrobeId,
 } from "./data.ts";
 import { createWorld, type World } from "./world.ts";
@@ -56,6 +56,10 @@ export type Player = {
   lastHitBy: number | null; created: number; queuedSpell: string | null; castTimer: number;
   /** Referrals: the Friend whose code you used, the Friends who used yours, and ticks of referral XP boost left. */
   referredBy: number | null; referrals: number[]; boostTicks: number;
+  /** Mounts you own from the stables, and the one you're riding. */
+  mounts: string[]; mount: string | null;
+  /** The mount you rode last (not saved), for the ride button. */
+  lastMount?: string;
   /** The emote you're performing, and the tick it ends (not saved). */
   emote?: { id: string; start: number; until: number } | null;
   /** Friends from your friends list playing near you right now (not saved): +5% XP while any are. */
@@ -136,7 +140,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
     style: "accurate", autocast: null, prayers: [], target: null, activity: null, combat: null,
     attackTimer: 0, eatTimer: 0, stunned: 0, regenTimer: 0, quests: {}, questData: {},
     wardrobe: [], worn: [], follower: null, courseStep: -1, kills: 0, deaths: 0, overhead: null, music: ["theme"],
-    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, referredBy: null, referrals: [], boostTicks: 0,
+    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, referredBy: null, referrals: [], boostTicks: 0, mounts: [], mount: null,
     lastHitBy: null, created: Date.now(), queuedSpell: null, castTimer: 0,
   };
 }
@@ -183,8 +187,10 @@ export function combatLevel(player: Player) {
 /** XP multiplier from the realm rate, kept Rare Relics and your follower's generation. */
 export function xpMultiplier(player: Player) {
   const plain = Math.min(RELICS[0].max, player.relics[0] ?? 0) * RELICS[0].xpPer, golden = (player.relics[3] ?? 0) > 0 ? RELICS[3].xpPer : 0;
-  return XP_RATE * (1 + plain + golden + followerBonus(player) + ((player.nearFriends ?? 0) > 0 ? 0.05 : 0) + (player.boostTicks > 0 ? REFERRAL_BOOST : 0));
+  return XP_RATE * (1 + plain + golden + followerBonus(player) + ((player.nearFriends ?? 0) > 0 ? 0.05 : 0) + (player.boostTicks > 0 ? REFERRAL_BOOST : 0) + (riding(player)?.xp ?? 0));
 }
+/** The mount you're riding, if any. */
+export function riding(player: Player) { return mountDef(player.mount); }
 /** Owned-Friend followers: Gen 1 +5% XP … Gen 5 and later +1%. */
 export function followerBonus(player: Player) {
   if (player.follower === null) return 0;
@@ -308,6 +314,7 @@ export function bonuses(player: Player): Bonuses {
     if (!equip) continue;
     for (const key of Object.keys(total) as (keyof Bonuses)[]) total[key] += equip.bonuses[key] ?? 0;
   }
+  total.defence += riding(player)?.defence ?? 0;
   return total;
 }
 export const weapon = (player: Player) => player.equipment.weapon ? item(player.equipment.weapon) : null;

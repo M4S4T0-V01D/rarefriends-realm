@@ -11,7 +11,10 @@ import {
 export type NpcDef = {
   id: string; name: string; examine: string; options: readonly string[];
   art: { canonical: 7730 | 3412 } | { family: number; seed: number };
-  shop?: string; pickpocket?: { level: number; xp: number; coins: readonly [number, number]; stun: number; damage: number; extra?: readonly [string, number][] };
+  shop?: string;
+  /** Drawn as this mount instead of a Friend (the paddock horses). */
+  mount?: string;
+  pickpocket?: { level: number; xp: number; coins: readonly [number, number]; stun: number; damage: number; extra?: readonly [string, number][] };
 };
 const art = (family: number, seed: number) => ({ family, seed });
 export const NPCS: Record<string, NpcDef> = {
@@ -23,6 +26,10 @@ export const NPCS: Record<string, NpcDef> = {
   trader_ember: { id: "trader_ember", name: "Cinder the trader", examine: "Runs Emberforge's general store. Buys anything that isn't on fire.", options: ["Talk-to", "Trade"], shop: "general_ember", art: art(4, 351) },
   trader_frost: { id: "trader_frost", name: "Tundra Tam", examine: "Keeps the trading post, and the only warm stove on the peak.", options: ["Talk-to", "Trade"], shop: "general_frost", art: art(7, 361) },
   trader_oasis: { id: "trader_oasis", name: "Saffi the trader", examine: "Buys and sells a bit of everything, under a very large parasol.", options: ["Talk-to", "Trade"], shop: "general_oasis", art: art(1, 371) },
+  stablemaster: { id: "stablemaster", name: "Marigold the stablemaster", examine: "Smells of hay and saddle soap. Knows every horse in the Realm by name.", options: ["Talk-to", "Stables"], art: art(3, 381) },
+  paddock_horse: { id: "paddock_horse", name: "Horse", examine: "A chestnut horse, grazing. It has an eye on your pockets.", options: ["Stroke"], art: art(0, 1), mount: "chestnut_horse" },
+  paddock_grey: { id: "paddock_grey", name: "Horse", examine: "A dapple grey, dozing in the sun.", options: ["Stroke"], art: art(0, 1), mount: "grey_horse" },
+  paddock_unicorn: { id: "paddock_unicorn", name: "Unicorn", examine: "A real unicorn. It's pretending not to notice you.", options: ["Stroke"], art: art(0, 1), mount: "unicorn" },
   pike: { id: "pike", name: "Pike", examine: "Smells faintly of bait.", options: ["Talk-to", "Trade"], shop: "fishing", art: art(3, 41) },
   axel: { id: "axel", name: "Axel", examine: "Sells axes. And pickaxes, grudgingly.", options: ["Talk-to", "Trade"], shop: "axes", art: art(6, 51) },
   armsmaster: { id: "armsmaster", name: "Armsmaster Vey", examine: "Sells swords, shields and the odd cuirass.", options: ["Talk-to", "Trade"], shop: "swords", art: art(4, 61) },
@@ -215,6 +222,11 @@ export function talk(game: Game, npcId: string): Dialogue {
         { label: "Nothing for now.", then: () => null },
       ]);
     }
+    case "stablemaster": return chat(name, npcSays(name, "Welcome to the Friendhollow stables! Every horse here is fed, groomed and ready to ride. Pay in RF and one's yours: it'll carry you faster than you can run, and never tire."), [
+      { label: "Show me the horses.", then: () => { game.ui.shop = "__stable"; return null; } },
+      { label: "What does riding do?", then: () => chat(name, npcSays(name, "A horse gallops two tiles for every one you'd walk, and doesn't use your run energy. Unicorns go faster still. And each has a gift: a warhorse keeps you steady, a palomino helps you learn. Ride from the saddle button by your run orb.")) },
+      { label: "Just looking.", then: () => null },
+    ]);
     case "rare_trader": return chat(name, npcSays(name, "Rare Caskets, and bundles to go with them. Every bundle buys caskets with simulated $RAREFRIENDS, and I add something useful on top.",
       "There's one of me in Friendhollow, Emberforge, the Oasis, Frostpeak and on Pike's Pier."), [
       { label: "Show me the Rare Market.", then: () => { game.ui.shop = "__market"; return null; } },
