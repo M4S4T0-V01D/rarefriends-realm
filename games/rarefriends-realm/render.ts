@@ -907,9 +907,9 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
       const s = toScreen(camera, fire.x, fire.y), frame = scene.reducedMotion ? 0 : Math.floor(now / 110 + fire.uid * 3) % 8;
       // A small fire sitting in a pile of logs.
       ellipse(ctx, s.x, s.y - 6 * z, 16 * z, 11 * z, "rgba(240,170,110,0.16)", null);
-      drawPixels(ctx, campfireLogs(fire.uid), s.x, s.y + 6 * z, ART * z);
-      drawPixels(ctx, fireArt(frame, 12, 17, fire.uid % 3 + 1), s.x, s.y - 4 * z, ART * z);
-      hits.push({ x: s.x - 30 * z, y: s.y - 38 * z, w: 60 * z, h: 44 * z, pick: { kind: "fire", id: fire.uid } });
+      drawPixels(ctx, campfireLogs(fire.uid), s.x, s.y + 5 * z, ART * z * 0.78);
+      drawPixels(ctx, fireArt(frame, 12, 17, fire.uid % 3 + 1), s.x, s.y - 2 * z, ART * z);
+      hits.push({ x: s.x - 24 * z, y: s.y - 36 * z, w: 48 * z, h: 42 * z, pick: { kind: "fire", id: fire.uid } });
     } });
   }
   // Ground items.
