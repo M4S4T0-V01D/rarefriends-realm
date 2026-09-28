@@ -149,6 +149,42 @@ in a shop for its *Value*. Every trader buys back what it sells, and general sto
 Frostpeak and the Oasis) buy almost anything. What you sell goes on the shop's shelves with its count, so you can buy it
 back. The Rare Market's bundle list scrolls in a compact box.
 
+**The world boss.** The Ashen Colossus (level 210, 1,500 HP) rises in Wyrmreach every two hours, on the even UTC
+hours, and stays twenty minutes. Everyone's game raises it at the same tile with the same id, and its HP is shared
+through the shared-fight reports. When it falls, **everyone who wounded it** gets the kill and the loot: 4,000–12,000
+coins, rarite bars and a rare table, plus a 1 in 6 chance of the Cinderkin pet. The Realm Daily shows when it's next
+due, and a chat line announces it.
+
+**The Sparring Ring.** A fenced sand ring east of Market Street. Inside it, right-click another player (also inside)
+and choose *Fight*. Your game rolls your hits and sends them; theirs applies them only while both of you stand in the
+ring, at most one every two ticks, capped at 40. At 0 HP the loser is back at full health straight away, nothing is
+lost, and the win and loss are recorded (shown on the adventurer card). Players retaliate when auto-retaliate is on.
+
+**Pets.** Six companions, found by chance on a successful action. You're up to three times luckier at level 99.
+
+| Pet | Found by | Base odds |
+|---|---|---|
+| Stumpy | Woodcutting | 1 in 700 |
+| Pebble | Mining | 1 in 700 |
+| Bubbles | Fishing | 1 in 700 |
+| Mote | Sigilcraft | 1 in 250 |
+| Emberling | Dragons | 1 in 60 |
+| Cinderkin | The Ashen Colossus | 1 in 6 |
+
+A pet follows you instead of a Friend follower (call or send it home from the Friends tab). Other players see it
+trotting behind you.
+
+**Achievements and hiscores.** 32 achievements (skills, combat, quests, collecting, together, daily) are checked
+against your adventure every few seconds; older saves earn the ones they already deserve in one quiet catch-up. Each
+unlock gets a chime and golden fireworks. They're on the Achievements tab of the Realm Daily and counted on the
+adventurer card. The Friends tab's hiscores rank you against every player you've met online (up to 150, with the levels
+they last showed).
+
+**Little things.** Level-ups set off fireworks in the skill's colours, which players near you see too. Riding clip-clops
+(three times a tick on a unicorn) and kicks up dust, and mounting gets a whinny. Snow and sand keep footprints (hoofprints
+when riding) for a while, and the bog splashes. Rare or valuable drops stand in a pulsing beam of gold light with a
+chime and a chat line. When a friend near you emotes while you're idle, your Friend joins in.
+
 **The Realm Daily.** A popup greets you when you enter the Realm. The Daily streak tab pays a reward for every
 day you log in, on a seven-day cycle: 500 coins, 5 cakes, 1,000 coins, 10 inksharks, 2,000 coins, 100 each of four
 elemental sigils, then a Lamp of insight and 5,000 coins. Each full week you keep up adds 25% to the coins, up to +100%.
