@@ -52,6 +52,15 @@ try {
     page.on("pageerror", error => errors.push(`#${friendId}: ${error.message}`));
     await installFixture(page, origin, { artworkCall });
     if (process.env.REAL_RELAYS) await page.addInitScript(() => { if (window === window.top) Object.defineProperty(navigator, "webdriver", { get: () => false }); });
+    // NO_DIRECT=1: networks that can't open a direct WebRTC link (remote candidates are dropped), so only the relays work.
+    if (process.env.NO_DIRECT) await page.addInitScript(() => {
+      const setRemote = RTCPeerConnection.prototype.setRemoteDescription;
+      RTCPeerConnection.prototype.addIceCandidate = async () => {};
+      RTCPeerConnection.prototype.setRemoteDescription = function (description) {
+        const sdp = description?.sdp?.split("\r\n").filter(line => !line.startsWith("a=candidate")).join("\r\n");
+        return setRemote.call(this, description && sdp !== undefined ? { type: description.type, sdp } : description);
+      };
+    });
     await page.route("https://rpc.mainnet.chain.robinhood.com/**", async route => {
       const request = route.request().method() === "POST" ? route.request().postDataJSON() : null;
       const reply = result => route.fulfill({ json: { jsonrpc: "2.0", id: request.id, result }, headers: { "access-control-allow-origin": "*" } });
@@ -86,7 +95,14 @@ try {
   await a.teleport(121, 123); await b.teleport(123, 124);
   await a.until(() => window.__realm.peers().some(peer => peer.id === 3412 && peer.x === 123), "seeing #3412", process.env.REAL_RELAYS ? 90_000 : 20_000);
   await b.until(() => window.__realm.peers().some(peer => peer.id === 7730 && peer.x === 121), "seeing #7730");
-  if (process.env.REAL_RELAYS) { console.log("PASS real relays: both players met over Trystero/Nostr"); process.exit(0); }
+  if (process.env.REAL_RELAYS) {
+    // And they can talk: a public line from A reaches B.
+    const input = a.game.getByRole("textbox", { name: "Say something" }); await input.click(); await input.fill("hello over the relays"); await input.press("Enter");
+    await b.until(() => window.__realm.game().messages.some(m => m.tone === "public" && m.text.includes("hello over the relays")), "public chat over real relays", 60_000);
+    await b.page.waitForTimeout(4000);
+    assert.equal(await b.state(() => window.__realm.game().messages.filter(m => m.tone === "public" && m.text.includes("hello over the relays")).length), 1, "each line arrives once, whichever path it takes");
+    console.log(`PASS real relays${process.env.NO_DIRECT ? " (no direct links: the relay path alone)" : ""}: both players met and chatted`); process.exit(0);
+  }
   // B walks; A sees it move.
   await b.frame().evaluate(() => { const g = window.__realm.game(); g.player.path = [{ x: 124, y: 124 }, { x: 125, y: 124 }, { x: 126, y: 124 }]; });
   await a.until(() => window.__realm.peers().some(peer => peer.id === 3412 && peer.x === 126), "#3412 walking");

@@ -4,6 +4,10 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 17, date: "2026-09-28", title: "Multiplayer that gets through", items: [
+    "Players on networks that block direct browser-to-browser links can now see each other: the game falls back to passing messages through public relays, so nobody is stuck at 1 online.",
+    "Direct links are still used when they work (faster, and private messages stay off the relays). Hover the online badge to see how you're connected.",
+  ] },
   { id: 16, date: "2026-09-28", title: "First steps, graphics settings and the farm", items: [
     "New Friends get a guided start: seven quick steps (a tree, a fire, a fish, cooking, the horses, King Hollis, the Realm Daily) with a gold arrow showing the way, and 500 coins and a Lamp of insight at the end. Skippable any time.",
     "Settings → Graphics: Auto, High or Low. Low draws plain ground and walls, skips ambient life and fog, and runs several times faster on older devices. Auto switches to Low by itself if the game runs slowly.",

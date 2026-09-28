@@ -191,7 +191,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         const d = event.data as Record<string, unknown>, ids = (list: unknown) => Array.isArray(list) ? list.map(cleanId).filter((id): id is number => id !== null) : [];
         const peers = (Array.isArray(d.peers) ? d.peers : []).map(cleanPresence).filter((p): p is Presence => !!p).slice(0, 60);
         const status = d.status === "online" || d.status === "connecting" ? d.status : "offline", was = players.current.state.status;
-        const next: NetState = { status, peers, friends: ids(d.friends), ignored: ids(d.ignored), players: typeof d.players === "number" ? Math.max(0, Math.min(999, Math.floor(d.players))) : peers.length };
+        const next: NetState = { status, peers, friends: ids(d.friends), ignored: ids(d.ignored), players: typeof d.players === "number" ? Math.max(0, Math.min(999, Math.floor(d.players))) : peers.length,
+          paths: (() => { const p = d.paths as { relays?: unknown; direct?: unknown } | undefined, n = (v: unknown) => typeof v === "number" && Number.isFinite(v) ? Math.max(0, Math.min(99, Math.floor(v))) : 0; return p && typeof p === "object" ? { relays: n(p.relays), direct: n(p.direct) } : undefined; })() };
         players.current.update(next, performance.now()); setNetState(next);
         // Other players' steps leave prints in snow and sand too.
         for (const peer of peers) {
@@ -784,7 +785,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
                 onClick={() => setDailyTab(dailyWaiting(state, Date.now()) || state.player.seenUpdate >= LATEST_UPDATE ? "daily" : "updates")}
                 {...rightClick((x, y, entries) => setMenu({ x, y, entries }), () => [{ verb: "Open", noun: "Daily streak", run: () => setDailyTab("daily") }, { verb: "Open", noun: "Updates", run: () => setDailyTab("updates") }])}>
                 🔥{(dailyWaiting(state, Date.now()) || state.player.seenUpdate < LATEST_UPDATE) && <i className="realm-dot" />}</button>
-              {netState.status !== "offline" && <span className="realm-online" title="Players in the Realm right now" onClick={() => setTab("friends")}>{netState.status === "online" ? `● ${netState.players} online` : "○ connecting"}</span>}
+              {netState.status !== "offline" && <span className="realm-online" title={`Players in the Realm right now${netState.paths ? ` · ${netState.paths.relays} relay${netState.paths.relays === 1 ? "" : "s"} connected, ${netState.paths.direct} on a direct link` : ""}`} onClick={() => setTab("friends")}>{netState.status === "online" ? `● ${netState.players} online` : "○ connecting"}</span>}
               {settings.dayNight !== false && (() => { const light = daylight(timeOfDay()); return <span className="realm-clock" title="Time of day">{light.label === "Night" ? "☾" : light.label === "Day" ? "☀" : "◐"} {light.label}</span>; })()}
             </div>
           </div>

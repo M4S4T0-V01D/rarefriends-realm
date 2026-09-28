@@ -154,6 +154,14 @@ horses at the stables, climb the castle to meet King Hollis, and open the Realm 
 step, a gold arrow (and a star on the minimap) points the way, and each step completes itself from what you do. The last
 one pays 500 coins and a Lamp of insight. Skip it any time; older saves never see it.
 
+**Getting through to other players.** Direct WebRTC links need both networks to allow them, and there's no TURN server,
+so strict networks (some routers, mobile data, office Wi-Fi) used to leave players unable to see each other. Every
+message now also goes out as a signed, short-lived (ephemeral) Nostr event through public relays, which any network can
+reach. Each player sees one copy of every message, whichever path it took. Presence goes over the relays every two seconds
+(and over direct links every tick). Whispers and trades use the direct link when there is one, and the relays only when
+there isn't. Hovering the online badge shows how many relays are connected and how many players are on a direct link.
+`NO_DIRECT=1 REAL_RELAYS=1 node tests/multiplayer-browser.mjs` checks two players meet and chat with direct links blocked.
+
 **The viewport.** The game plays on a fixed 960 × 640 stage inside the SDK's own frame (its default 3:2 viewport),
 scaled to fit the page and centred. The world is far larger and scrolls under a camera, and every menu, panel and HUD
 element stays inside the stage.

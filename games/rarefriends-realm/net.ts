@@ -62,7 +62,9 @@ export type Presence = {
   hp: number; maxHp: number; fight: { u: number; id: string; hp: number; x: number; y: number } | null;
 };
 export type NetStatus = "offline" | "connecting" | "online";
-export type NetState = { status: NetStatus; peers: Presence[]; friends: number[]; ignored: number[]; players: number };
+export type NetState = { status: NetStatus; peers: Presence[]; friends: number[]; ignored: number[]; players: number;
+  /** How we're connected: relays open, and players on a direct link (the rest reach us through the relays). */
+  paths?: { relays: number; direct: number } };
 export type ChatIn = { from: number; text: string; private: boolean };
 
 const id = (value: unknown) => typeof value === "number" && Number.isSafeInteger(value) && value >= 1 && value < 1e15 ? value : null;
