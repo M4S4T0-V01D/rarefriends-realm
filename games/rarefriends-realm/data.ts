@@ -67,9 +67,10 @@ export const FAMILY_PERKS: readonly FamilyPerk[] = [
 export type EquipSlot = "head" | "cape" | "neck" | "weapon" | "body" | "shield" | "legs" | "hands" | "feet";
 export const EQUIP_SLOTS: readonly EquipSlot[] = ["head", "cape", "neck", "weapon", "body", "shield", "legs", "hands", "feet"];
 export type Bonuses = { attack: number; strength: number; defence: number; ranged: number; magic: number; prayer: number };
-export type Icon = { shape: IconShape; color: string; accent?: string };
+/** An item's picture: a shape in a colour; `kind` picks a variant of the shape (a fish's species, an ore's veins…). */
+export type Icon = { shape: IconShape; color: string; accent?: string; kind?: string };
 export type IconShape =
-  | "coins" | "axe" | "pickaxe" | "sword" | "dagger" | "sabre" | "helm" | "body" | "legs" | "shield" | "boots" | "gloves" | "cape"
+  | "drumstick" | "steak" | "coins" | "axe" | "pickaxe" | "sword" | "dagger" | "sabre" | "helm" | "body" | "legs" | "shield" | "boots" | "gloves" | "cape"
   | "amulet" | "log" | "fish" | "ore" | "bar" | "bones" | "sigil" | "staff" | "net" | "rod" | "harpoon" | "pot" | "bucket" | "egg" | "flour"
   | "milk" | "tinderbox" | "hammer" | "knife" | "needle" | "thread" | "chisel" | "gem" | "hide" | "leather" | "meat" | "feather" | "bait"
   | "cake" | "bread" | "berries" | "key" | "wheat" | "lamp" | "scroll" | "silk" | "hood" | "bracer" | "burnt" | "hat" | "crown" | "orb" | "trophy"
@@ -113,6 +114,11 @@ export const SMITH_PIECES = [
 export type SmithPiece = typeof SMITH_PIECES[number]["piece"];
 export const SMITHING_BASE: Record<MetalId, number> = { pewter: 1, blackiron: 15, ashsteel: 30, moonsilver: 50, glimmer: 70, rarite: 85 };
 
+/** Each fish's colours: raw (its own) and cooked (browned). */
+const FISH_COLORS: Record<string, [string, string]> = {
+  minnows: ["#b9c4cc", "#d2a36c"], perch: ["#9fb07a", "#c99a5a"], carp: ["#d9a441", "#c98b45"], char: ["#b98f86", "#c7875a"],
+  grayling: ["#9aa3b5", "#c49a6c"], inkcrab: ["#4f6680", "#d9774a"], sailfish: ["#5f86b4", "#c2915c"], inkshark: ["#7d8894", "#b89068"],
+};
 const ITEMS: Item[] = [
   { id: "coins", name: "Coins", examine: "Lovely money!", value: 1, stackable: true, icon: { shape: "coins", color: "#d9c27a" } },
   // Tools
@@ -144,13 +150,13 @@ const ITEMS: Item[] = [
   { id: "yew_logs", name: "Yew logs", examine: "Logs cut from a yew tree.", value: 180, icon: { shape: "log", color: "#7d6b5c" } },
   { id: "ash_logs", name: "Ashwood logs", examine: "Pale logs that hum faintly. From the Frostpeak ashwoods.", value: 400, icon: { shape: "log", color: "#d6d3cc" } },
   // Ores and bars
-  { id: "pewter_ore", name: "Pewter ore", examine: "Soft grey ore. Smelts straight into pewter.", value: 3, icon: { shape: "ore", color: "#a4a7aa" } },
-  { id: "blackiron_ore", name: "Blackiron ore", examine: "This needs refining.", value: 17, icon: { shape: "ore", color: "#8c6f62" } },
-  { id: "inkcoal", name: "Inkcoal", examine: "Hmm, a non-renewable energy source!", value: 45, icon: { shape: "ore", color: "#3b3a38" } },
-  { id: "moonsilver_ore", name: "Moonsilver ore", examine: "This needs refining.", value: 160, icon: { shape: "ore", color: "#7d8fb8" } },
-  { id: "glimmer_ore", name: "Glimmer ore", examine: "This needs refining.", value: 400, icon: { shape: "ore", color: "#86a98b" } },
-  { id: "rarite_ore", name: "Rarite ore", examine: "Pale rose ore that only forms where Friends dream.", value: 1100, icon: { shape: "ore", color: "#d8b6b4" } },
-  { id: "clay", name: "Clay", examine: "Some hard dry clay.", value: 2, icon: { shape: "ore", color: "#d7c3a5" } },
+  { id: "pewter_ore", name: "Pewter ore", examine: "Soft grey ore. Smelts straight into pewter.", value: 3, icon: { shape: "ore", kind: "pewter", color: "#a4a7aa" } },
+  { id: "blackiron_ore", name: "Blackiron ore", examine: "This needs refining.", value: 17, icon: { shape: "ore", kind: "blackiron", color: "#8c6f62" } },
+  { id: "inkcoal", name: "Inkcoal", examine: "Hmm, a non-renewable energy source!", value: 45, icon: { shape: "ore", kind: "inkcoal", color: "#3b3a38" } },
+  { id: "moonsilver_ore", name: "Moonsilver ore", examine: "This needs refining.", value: 160, icon: { shape: "ore", kind: "moonsilver", color: "#7d8fb8" } },
+  { id: "glimmer_ore", name: "Glimmer ore", examine: "This needs refining.", value: 400, icon: { shape: "ore", kind: "glimmer", color: "#86a98b" } },
+  { id: "rarite_ore", name: "Rarite ore", examine: "Pale rose ore that only forms where Friends dream.", value: 1100, icon: { shape: "ore", kind: "rarite", color: "#d8b6b4" } },
+  { id: "clay", name: "Clay", examine: "Some hard dry clay.", value: 2, icon: { shape: "ore", kind: "clay", color: "#d7c3a5" } },
   ...METALS.map(metal => ({ id: `${metal.id}_bar`, name: `${metal.name} bar`, examine: `It's a bar of ${metal.id === "rarite" ? "rarite" : metal.id}.`, value: metal.value, icon: { shape: "bar" as const, color: metal.color } })),
   // Gems
   { id: "rough_moonstone", name: "Rough moonstone", examine: "A rough moonstone.", value: 50, icon: { shape: "gem", color: "#8fa3c9", accent: "#6d6b67" } },
@@ -164,20 +170,20 @@ const ITEMS: Item[] = [
     ["minnows", "Minnows", 3, 5], ["perch", "Perch", 4, 8], ["carp", "Carp", 5, 15], ["char", "Char", 7, 25],
     ["grayling", "Grayling", 9, 50], ["inkcrab", "Inkcrab", 12, 150], ["sailfish", "Sailfish", 14, 250], ["inkshark", "Inkshark", 20, 600],
   ] as const).flatMap(([id, name, heal, value]) => [
-    { id: `raw_${id}`, name: `Raw ${name.toLowerCase()}`, examine: `I should try cooking this.`, value: Math.round(value * 0.6), icon: { shape: "fish" as const, color: "#b9bfc6" } },
-    { id, name, examine: `Some nicely cooked ${name.toLowerCase()}.`, value, heal, icon: { shape: "fish" as const, color: "#d7a883" } },
+    { id: `raw_${id}`, name: `Raw ${name.toLowerCase()}`, examine: `I should try cooking this.`, value: Math.round(value * 0.6), icon: { shape: "fish" as const, kind: id, color: FISH_COLORS[id][0] } },
+    { id, name, examine: `Some nicely cooked ${name.toLowerCase()}.`, value, heal, icon: { shape: "fish" as const, kind: id, color: FISH_COLORS[id][1], accent: id === "inkcrab" ? undefined : "#5a3520" } },
   ]),
-  { id: "raw_chicken", name: "Raw chicken", examine: "I need to cook this first.", value: 2, icon: { shape: "meat", color: "#e8c7c0" } },
-  { id: "cooked_chicken", name: "Cooked chicken", examine: "Mmm, this looks tasty.", value: 5, heal: 3, icon: { shape: "meat", color: "#c79a6f" } },
-  { id: "raw_beef", name: "Raw beef", examine: "I need to cook this first.", value: 2, icon: { shape: "meat", color: "#c98f95" } },
-  { id: "cooked_meat", name: "Cooked meat", examine: "Mmm, this looks tasty.", value: 5, heal: 3, icon: { shape: "meat", color: "#8f6a55" } },
+  { id: "raw_chicken", name: "Raw chicken", examine: "I need to cook this first.", value: 2, icon: { shape: "drumstick", color: "#efc4b8" } },
+  { id: "cooked_chicken", name: "Cooked chicken", examine: "Mmm, this looks tasty.", value: 5, heal: 3, icon: { shape: "drumstick", color: "#c7843f", accent: "#6a3a1c" } },
+  { id: "raw_beef", name: "Raw beef", examine: "I need to cook this first.", value: 2, icon: { shape: "steak", color: "#c9606a" } },
+  { id: "cooked_meat", name: "Cooked meat", examine: "Mmm, this looks tasty.", value: 5, heal: 3, icon: { shape: "steak", color: "#8a5634", accent: "#3e2416" } },
   { id: "bread", name: "Bread", examine: "Nice crispy bread.", value: 12, heal: 5, icon: { shape: "bread", color: "#d9b584" } },
   { id: "cake", name: "Cake", examine: "A plain sponge cake.", value: 50, heal: 12, icon: { shape: "cake", color: "#f1e2c8", accent: "#d8b6b4" } },
   { id: "burnt_food", name: "Burnt food", examine: "Oops!", value: 1, icon: { shape: "burnt", color: "#3b3a38" } },
   // Bones and drops
-  { id: "bones", name: "Bones", examine: "Bones are for burying!", value: 5, bones: 4.5, icon: { shape: "bones", color: "#f2efe8" } },
-  { id: "large_bones", name: "Large bones", examine: "Ew, it's a pile of bones.", value: 60, bones: 15, icon: { shape: "bones", color: "#e7e1d3" } },
-  { id: "drake_bones", name: "Drake bones", examine: "Heavy, and still warm.", value: 900, bones: 72, icon: { shape: "bones", color: "#d9c9a8", accent: "#8a4a3a" } },
+  { id: "bones", name: "Bones", examine: "Bones are for burying!", value: 5, bones: 4.5, icon: { shape: "bones", kind: "small", color: "#f2efe8" } },
+  { id: "large_bones", name: "Large bones", examine: "Ew, it's a pile of bones.", value: 60, bones: 15, icon: { shape: "bones", kind: "large", color: "#e7e1d3" } },
+  { id: "drake_bones", name: "Drake bones", examine: "Heavy, and still warm.", value: 900, bones: 72, icon: { shape: "bones", kind: "dragon", color: "#d9c9a8", accent: "#8a4a3a" } },
   { id: "drakehide", name: "Drakehide", examine: "A scaled hide from an ash drake. A crafter could stitch it.", value: 700, icon: { shape: "hide", color: "#6f8a5c", accent: "#3b3a38" } },
   { id: "wyrm_heart", name: "Wyrm heart", examine: "It still glows. Collectors in the Oasis pay a fortune for these.", value: 60_000, icon: { shape: "orb", color: "#e3734f", accent: "#f2e28f" } },
   { id: "sigil_stone", name: "Sigil stone", examine: "A pale, blank stone. An altar can press a sigil into it.", value: 6, icon: { shape: "ore", color: "#d9d4e6" } },
@@ -186,7 +192,7 @@ const ITEMS: Item[] = [
   { id: "headless_arrow", name: "Headless arrows", examine: "Fletched shafts. They need arrowheads.", value: 2, stackable: true, icon: { shape: "arrow", color: "#efede7", accent: "headless" } },
   ...METALS.map((metal, index) => ({ id: `${metal.id}_arrowheads`, name: `${metal.name} arrowheads`, examine: `Arrowheads smithed from ${metal.id}.`, value: [1, 3, 6, 12, 24, 55][index], stackable: true,
     icon: { shape: "arrowheads" as const, color: metal.color } })),
-  { id: "ink_bones", name: "Ink bones", examine: "Bones stained black. They feel lighter than they should.", value: 250, bones: 50, icon: { shape: "bones", color: "#6d6b67" } },
+  { id: "ink_bones", name: "Ink bones", examine: "Bones stained black. They feel lighter than they should.", value: 250, bones: 50, icon: { shape: "bones", kind: "ink", color: "#4a4644", accent: "#8a62c8" } },
   { id: "cowhide", name: "Cowhide", examine: "I should take this to the tanner.", value: 8, icon: { shape: "hide", color: "#efede7", accent: "#3b3a38" } },
   { id: "leather", name: "Leather", examine: "It's a piece of leather.", value: 15, icon: { shape: "leather", color: "#b58b6b" } },
   // Sigils

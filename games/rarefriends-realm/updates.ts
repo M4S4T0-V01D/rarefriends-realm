@@ -4,6 +4,11 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 20, date: "2026-09-28", title: "Redrawn food, bones and ores", items: [
+    "Every fish has its own look: minnows swim in a little school, perch are striped, carp are golden and scaly, char have red bellies, grayling and sailfish raise their tall fins, the inkshark is a shark and the inkcrab is a crab.",
+    "Chicken is a drumstick and beef is a steak with a rim of fat. Cooked food is browned with grill marks, and burnt food is a charred lump with a wisp of smoke.",
+    "Bones, large bones, ink bones and drake bones each look different, and every ore shows its own metal: dull pewter, rusty blackiron, glossy inkcoal, silver-veined moonsilver, glimmer and rarite crystals, and soft clay.",
+  ] },
   { id: 19, date: "2026-09-28", title: "Signs, banners and a log out button", items: [
     "Every shop and bank has a hanging sign outside its door, painted with what's sold inside (an axe for Axel's, a bow for Fletch & Feather, coins for the banks, a horse for the stables).",
     "Banners of your own Rare Friend fly around the fountain square and at the castle gate.",

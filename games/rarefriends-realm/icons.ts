@@ -57,8 +57,126 @@ const all = (...draws: ((q: Pixels) => void)[]) => (q: Pixels) => draws.forEach(
 const line = (p: Pixels, points: Pt[], color: string, width = 1) => p.polyline(points, color, width);
 const dot = (p: Pixels, x: number, y: number, color: string) => p.set(x, y, color);
 
+/** A fish's body facing left: head at (x, y), `len` long and `ht` tall, with a tail; returns where its eye is. */
+function fishShape(p: Pixels, x: number, y: number, len: number, ht: number, color: string, tail: "fork" | "round" | "crescent" = "fork", snout = 0) {
+  part(p, poly([[x - snout, y], [x + len * 0.18, y - ht * 0.5], [x + len * 0.58, y - ht * 0.56], [x + len * 0.84, y - ht * 0.24], [x + len * 0.84, y + ht * 0.24], [x + len * 0.58, y + ht * 0.5], [x + len * 0.2, y + ht * 0.44]]), color, "food");
+  const tx = x + len * 0.8, tailPts: Pt[] = tail === "round" ? [[tx, y], [x + len, y - ht * 0.42], [x + len + 1, y], [x + len, y + ht * 0.42]]
+    : tail === "crescent" ? [[tx, y], [x + len + 2, y - ht * 0.8], [x + len - 1, y], [x + len + 2, y + ht * 0.6]] : [[tx, y], [x + len, y - ht * 0.56], [x + len - 2, y], [x + len, y + ht * 0.56]];
+  part(p, poly(tailPts), shadeHex(color, -0.08), "food");
+  const eye: Pt = [Math.round(x + len * 0.12), Math.round(y - ht * 0.14)];
+  dot(p, eye[0], eye[1], INK); dot(p, eye[0] - 1, eye[1], "#ffffff");
+  return eye;
+}
+/** Grill marks across a cooked fish. */
+const grill = (p: Pixels, x: number, y: number, len: number, ht: number, accent?: string) => { if (accent) for (let i = 0; i < 3; i++) line(p, [[x + len * (0.28 + i * 0.18), y - ht * 0.4], [x + len * (0.2 + i * 0.18), y + ht * 0.4]], accent); };
+/** Each fish its own: minnows in a little school, striped perch, golden scaly carp, red-bellied char, grayling with its tall fin,
+ * sailfish with a bill and a sail, a shark's fin and gills for the inkshark, and the inkcrab as a crab. */
+function drawFish(p: Pixels, kind: string, color: string, accent?: string) {
+  const dark = shadeHex(color, -0.22), light = shadeHex(color, 0.2);
+  switch (kind) {
+    case "minnows":
+      for (const [x, y] of [[3, 12], [14, 21], [16, 8]] as Pt[]) { fishShape(p, x, y, 13, 5, color); line(p, [[x + 3, y], [x + 9, y]], accent ?? dark); }
+      break;
+    case "perch": {
+      part(p, poly([[9, 11], [10, 4], [12, 9], [14, 3], [16, 9], [18, 4], [20, 10]]), accent ? shadeHex(color, -0.1) : "#d9774a", "food");
+      fishShape(p, 3, 17, 26, 12, color);
+      if (!accent) for (const x of [10, 14, 18, 22]) line(p, [[x, 12], [x - 1, 18]], dark);
+      part(p, poly([[12, 22], [15, 27], [17, 22]]), accent ? dark : "#d9774a", "food"); grill(p, 3, 17, 26, 12, accent); break;
+    }
+    case "carp": {
+      fishShape(p, 3, 17, 26, 15, color, "round");
+      for (let row = 0; row < 3; row++) for (let i = 0; i < 4; i++) { const x = 9 + i * 4 + (row % 2) * 2, y = 13 + row * 4; dot(p, x, y, light); dot(p, x + 1, y + 1, dark); }
+      line(p, [[3, 18], [1, 21]], dark); part(p, poly([[13, 10], [17, 5], [21, 10]]), accent ? dark : "#c9773a", "food"); grill(p, 3, 17, 26, 15, accent); break;
+    }
+    case "char": {
+      fishShape(p, 2, 16, 28, 11, color);
+      if (!accent) { part(p, poly([[4, 17], [24, 17], [22, 21], [8, 21]]), "#d9533f", "flat", false); line(p, [[5, 17], [23, 17]], "#e8836a"); for (const [x, y] of [[9, 13], [13, 12], [17, 13], [21, 14], [15, 15], [11, 15]] as Pt[]) dot(p, x, y, "#f3e6d0"); }
+      grill(p, 2, 16, 28, 11, accent); break;
+    }
+    case "grayling": {
+      part(p, poly([[8, 15], [9, 5], [14, 2], [20, 3], [22, 14]]), accent ? shadeHex(color, -0.12) : "#8a86b8", "cloth");
+      for (const x of [11, 14, 17, 20]) line(p, [[x, 14], [x - 1, 4 + Math.abs(x - 15) * 0.3]], shadeHex(accent ? color : "#8a86b8", -0.22));
+      if (!accent) for (const [x, y] of [[12, 7], [16, 6], [15, 10], [19, 9]] as Pt[]) dot(p, x, y, "#c98f95");
+      fishShape(p, 3, 19, 27, 10, color); if (!accent) line(p, [[8, 20], [24, 20]], light); grill(p, 3, 19, 27, 10, accent); break;
+    }
+    case "sailfish": {
+      part(p, poly([[9, 16], [11, 3], [19, 2], [26, 8], [27, 15]]), accent ? shadeHex(color, -0.12) : "#3d5a8a", "cloth");
+      for (const x of [12, 15, 18, 21, 24]) line(p, [[x, 15], [x - 1, 3 + Math.max(0, x - 18) * 0.9]], shadeHex(accent ? color : "#3d5a8a", -0.2));
+      if (!accent) for (const [x, y] of [[13, 7], [17, 6], [21, 9], [16, 11]] as Pt[]) dot(p, x, y, "#9fc6f0");
+      fishShape(p, 6, 20, 24, 9, color); part(p, stroke([[6, 20], [0, 19]], 2), shadeHex(color, -0.15), "food");
+      if (!accent) line(p, [[10, 22], [24, 22]], light); grill(p, 6, 20, 24, 9, accent); break;
+    }
+    case "inkshark": {
+      part(p, poly([[13, 12], [17, 2], [21, 12]]), shadeHex(color, -0.1), "stone");
+      fishShape(p, 2, 17, 27, 12, color, "crescent", 1);
+      if (!accent) part(p, poly([[4, 19], [22, 19], [18, 22], [8, 22]]), "#e8e4da", "flat", false);
+      for (const x of [9, 11, 13]) line(p, [[x, 14], [x - 1, 18]], dark);
+      part(p, poly([[12, 21], [16, 28], [19, 21]]), shadeHex(color, -0.12), "stone"); grill(p, 2, 17, 27, 12, accent); break;
+    }
+    case "inkcrab": {
+      for (const side of [-1, 1]) {
+        for (let i = 0; i < 3; i++) line(p, [[16 + side * (6 + i * 2), 21 + i], [16 + side * (11 + i * 2), 24 + i * 2]], dark, 2);
+        part(p, stroke([[16 + side * 6, 16], [16 + side * 10, 11]], 2), color, "stone");
+        part(p, all(disc(16 + side * 11, 8, 4, 3.2)), color, "stone"); line(p, [[16 + side * 10, 6], [16 + side * 12, 9]], dark);
+      }
+      part(p, disc(16, 19, 9, 6.5), color, "stone");
+      for (const side of [-1, 1]) { line(p, [[16 + side * 2, 14], [16 + side * 3, 10]], dark); dot(p, 16 + side * 3, 9, INK); }
+      line(p, [[11, 18], [21, 18]], light); if (!accent) dot(p, 14, 21, "#c6bed4"); break;
+    }
+    default: fishShape(p, 3, 16, 26, 12, color); grill(p, 3, 16, 26, 12, accent);
+  }
+}
+/** Bones: a big knobbly thigh bone crossed with a smaller one, ink-stained bones with violet drips, a curved dragon rib. */
+function drawBones(p: Pixels, kind: string, color: string, accent?: string) {
+  if (kind === "large") {
+    part(p, all(stroke([[9, 8], [23, 22]], 3), disc(7, 7, 2.6), disc(10, 5, 2.6), disc(25, 21, 2.6), disc(22, 24, 2.6)), shadeHex(color, -0.08), "stone");
+    part(p, all(stroke([[7, 25], [25, 8]], 6), disc(4, 23, 4.6), disc(9, 29, 4.6), disc(23, 4, 4.6), disc(28, 10, 4.6)), color, "stone");
+    line(p, [[11, 20], [19, 12]], shadeHex(color, 0.12)); return;
+  }
+  if (kind === "dragon") {
+    part(p, stroke([[5, 28], [8, 20], [13, 13], [20, 8], [28, 5]], 6), color, "stone");
+    part(p, stroke([[20, 8], [28, 5]], 3), accent ?? shadeHex(color, -0.3), "stone");
+    for (const [a, b] of [[[8, 21], [11, 23]], [[12, 15], [15, 17]], [[17, 10], [19, 13]]] as [Pt, Pt][]) line(p, [a, b], shadeHex(color, -0.25));
+    part(p, disc(5, 28, 3.5), shadeHex(color, 0.05), "stone"); return;
+  }
+  // Ink bones.
+  part(p, all(stroke([[8, 24], [24, 8]], 4), disc(6, 22, 3.5), disc(10, 26, 3.5), disc(22, 6, 3.5), disc(26, 10, 3.5)), color, "stone");
+  for (const [x, y] of [[13, 21], [18, 16], [21, 12]] as Pt[]) { dot(p, x, y, accent ?? "#8a62c8"); dot(p, x, y + 1, accent ?? "#8a62c8"); }
+  dot(p, 17, 22, accent ?? "#8a62c8"); dot(p, 17, 23, shadeHex(accent ?? "#8a62c8", -0.2));
+}
+/** Ore: a chunk of rock with that metal's own look: dull pewter blobs, dark blackiron with rust, glossy inkcoal lumps, silver
+ * moonsilver veins, glimmer crystals, rose rarite crystals, soft clay. */
+function drawOre(p: Pixels, kind: string, color: string) {
+  const rock = (c: string) => part(p, poly([[4, 23], [6, 12], [14, 5], [24, 7], [29, 17], [25, 27], [12, 29]]), c, "stone");
+  switch (kind) {
+    case "pewter": rock("#8f8a84"); for (const [cx, cy, r] of [[12, 15, 3.5], [20, 21, 3.8], [21, 11, 2.6], [11, 23, 2.2]] as [number, number, number][]) part(p, disc(cx, cy, r), color, "metal"); break;
+    case "blackiron":
+      rock("#6d6b67");
+      for (const pts of [[[9, 12], [14, 9], [16, 15], [11, 17]], [[17, 18], [23, 16], [24, 22], [18, 24]], [[18, 9], [22, 10], [21, 13]]] as Pt[][]) part(p, poly(pts), "#3b3a38", "metal");
+      line(p, [[8, 20], [12, 22]], color); line(p, [[20, 13], [25, 14]], color); dot(p, 15, 25, color); break;
+    case "inkcoal":
+      for (const [cx, cy, rx, ry] of [[11, 20, 7, 6], [21, 21, 7, 5.5], [16, 12, 6.5, 5.5]] as [number, number, number, number][]) part(p, disc(cx, cy, rx, ry), "#2e2d2c", "metal");
+      for (const [x, y] of [[9, 18], [19, 19], [14, 10]] as Pt[]) dot(p, x, y, "#7d8894"); break;
+    case "moonsilver":
+      rock("#a9a59e");
+      part(p, all(stroke([[7, 21], [12, 16], [17, 17], [24, 11]], 2), stroke([[13, 24], [18, 21], [25, 22]], 2), stroke([[12, 9], [16, 12]], 2)), color, "metal");
+      for (const [x, y] of [[12, 16], [24, 11], [18, 21]] as Pt[]) dot(p, x, y, "#ffffff"); break;
+    case "glimmer":
+      rock("#8f8a84");
+      for (const pts of [[[10, 20], [12, 8], [15, 19]], [[15, 20], [19, 5], [22, 18]], [[20, 22], [26, 13], [25, 23]]] as Pt[][]) part(p, poly(pts), color, "glow");
+      for (const [x, y] of [[12, 10], [19, 7], [25, 14]] as Pt[]) dot(p, x, y, "#ffffff"); break;
+    case "rarite":
+      rock("#8f8a84");
+      for (const pts of [[[8, 22], [9, 12], [13, 9], [15, 20]], [[14, 22], [16, 7], [21, 5], [22, 20]], [[21, 24], [24, 14], [27, 16], [26, 24]]] as Pt[][]) part(p, poly(pts), color, "gem");
+      break;
+    case "clay":
+      part(p, poly([[5, 22], [7, 14], [14, 9], [23, 10], [28, 17], [25, 25], [13, 27]]), color, "food");
+      for (let i = 0; i < 3; i++) line(p, [[10 + i * 4, 14 + i], [16 + i * 4, 18 + i]], shadeHex(color, -0.12)); break;
+    default: rock("#8f8a84"); part(p, disc(16, 17, 4), color, "metal");
+  }
+}
 export function itemArt(icon: Icon): HTMLCanvasElement {
-  return pixelArt(`item2:${icon.shape}:${icon.color}:${icon.accent ?? ""}`, S, S, p => {
+  return pixelArt(`item3:${icon.shape}:${icon.kind ?? ""}:${icon.color}:${icon.accent ?? ""}`, S, S, p => {
     const color = icon.color, accent = icon.accent, metal = METAL_COLORS.has(color) || color === STEEL_C;
     const armour: Material = metal ? "metal" : "cloth", dark = shadeHex(color, -0.28), light = shadeHex(color, 0.22);
     switch (icon.shape) {
@@ -141,12 +259,14 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
         for (const [a, b] of [[[12, 13], [25, 9]], [[13, 18], [27, 14]], [[14, 22], [26, 19]]] as [Pt, Pt][]) line(p, [a, b], shadeHex(color, -0.22));
         part(p, disc(8.5, 18.5, 5.5, 8), "#e8d4b8", "wood"); part(p, disc(8.5, 18.5, 3, 4.5), "#d4b890", "flat", false); dot(p, 8, 18, "#9c7a5c"); break;
       case "fish":
+        if (icon.kind) { drawFish(p, icon.kind, color, accent); break; }
         part(p, poly([[2, 16], [7, 10], [15, 8], [23, 11], [26, 16], [23, 21], [15, 24], [7, 22]]), color, "food");
         part(p, poly([[23, 16], [31, 9], [29, 16], [31, 23]]), shadeHex(color, -0.08), "food");
         part(p, poly([[12, 9], [16, 4], [19, 9]]), shadeHex(color, -0.12), "food");
         dot(p, 7, 14, INK); dot(p, 6, 14, "#ffffff"); line(p, [[10, 12], [10, 20]], dark);
         for (const [x, y] of [[14, 14], [18, 14], [16, 18], [20, 18]] as Pt[]) dot(p, x, y, shadeHex(color, 0.18)); break;
       case "ore":
+        if (icon.kind) { drawOre(p, icon.kind, color); break; }
         part(p, poly([[4, 23], [6, 12], [14, 5], [24, 7], [29, 17], [25, 27], [12, 29]]), "#8f8a84", "stone");
         for (const [cx, cy, r] of [[12, 15, 3.5], [20, 21, 3.8], [21, 11, 2.6], [11, 23, 2.2]] as [number, number, number][]) part(p, disc(cx, cy, r), color, "metal"); break;
       case "bar":
@@ -155,6 +275,7 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
         part(p, poly([[22, 17], [29, 10], [29, 18], [22, 25]]), shadeHex(color, -0.14), "metal");
         line(p, [[7, 21], [18, 21]], shadeHex(color, -0.25)); break;
       case "bones":
+        if (icon.kind && icon.kind !== "small") { drawBones(p, icon.kind, color, accent); break; }
         part(p, all(stroke([[8, 24], [24, 8]], 4), disc(6, 22, 3.5), disc(10, 26, 3.5), disc(22, 6, 3.5), disc(26, 10, 3.5)), color, "stone");
         if (accent) line(p, [[12, 20], [20, 12]], accent); break;
       case "sigil":
@@ -215,6 +336,22 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
       case "leather":
         part(p, poly([[5, 9], [26, 6], [27, 25], [6, 27]]), color, "cloth"); line(p, [[8, 12], [24, 9]], dark);
         for (let x = 8; x < 25; x += 3) dot(p, x, 23 - Math.round((x - 8) * 0.1), light); break;
+      case "drumstick": {
+        // A drumstick: a meaty teardrop on a bone with a two-knob end; cooked, it's golden with a crispy skin and grill marks.
+        part(p, stroke([[6, 27], [13, 20]], 3), WHITE, "stone"); part(p, all(disc(4, 27, 2.4), disc(7, 30, 2.4)), WHITE, "stone");
+        part(p, poly([[11, 22], [11, 13], [16, 6], [24, 3], [29, 8], [28, 16], [22, 22], [15, 24]]), color, "food");
+        if (accent) { for (const [a, b] of [[[14, 11], [24, 21]], [[18, 7], [27, 16]]] as [Pt, Pt][]) line(p, [a, b], accent); for (const [x, y] of [[21, 9], [15, 17], [25, 12]] as Pt[]) dot(p, x, y, shadeHex(color, 0.25)); }
+        else for (const [x, y] of [[19, 8], [23, 11], [16, 15], [21, 16], [25, 7]] as Pt[]) dot(p, x, y, shadeHex(color, 0.12));
+        break;
+      }
+      case "steak": {
+        // A steak: a thick slab with a rim of fat along its edge and marbling; cooked, it's browned with a grill cross-hatch.
+        part(p, poly([[4, 13], [10, 6], [20, 4], [28, 9], [29, 18], [24, 25], [13, 27], [5, 22]]), color, "food");
+        line(p, [[5, 14], [10, 7], [20, 5], [27, 10]], accent ? "#e2c48a" : "#f3e6d0", 3);
+        if (accent) { for (let i = 0; i < 3; i++) line(p, [[9 + i * 6, 12], [15 + i * 6, 24]], accent); for (let i = 0; i < 2; i++) line(p, [[8, 16 + i * 5], [26, 13 + i * 5]], accent); }
+        else { line(p, [[11, 14], [15, 16], [19, 15]], "#f0d0c8"); line(p, [[14, 21], [19, 20], [23, 22]], "#f0d0c8"); dot(p, 22, 13, "#f0d0c8"); }
+        break;
+      }
       case "meat":
         part(p, stroke([[20, 12], [28, 4]], 3), WHITE, "stone"); part(p, disc(28, 4, 2), WHITE, "stone");
         part(p, disc(14, 18, 11, 9), color, "food"); break;
@@ -245,7 +382,12 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
         for (const y of [11, 15, 19]) line(p, [[10, y], [22, y]], "#8a7563"); line(p, [[10, 22], [17, 22]], "#8a7563"); break;
       case "silk":
         part(p, poly([[4, 11], [28, 6], [28, 21], [4, 26]]), color, "cloth"); line(p, [[7, 14], [26, 10]], "#ffffff"); line(p, [[6, 20], [26, 16]], shadeHex(color, -0.12)); break;
-      case "burnt": part(p, disc(16, 19, 11, 7.5), color, "stone"); for (const [x, y] of [[11, 16], [19, 18], [15, 22]] as Pt[]) dot(p, x, y, "#6d6b67"); break;
+      case "burnt":
+        // Charred to a black lump, glowing cracks, and a last wisp of smoke.
+        part(p, poly([[4, 22], [7, 15], [13, 12], [21, 13], [27, 17], [28, 24], [20, 28], [9, 28]]), "#2e2a28", "stone");
+        line(p, [[9, 20], [13, 22], [16, 19]], "#d9774a"); line(p, [[19, 22], [23, 20], [25, 23]], "#cd5836"); dot(p, 14, 25, "#e6a24a");
+        line(p, [[15, 10], [13, 7], [16, 4], [14, 1]], "#b3aea6"); line(p, [[20, 10], [22, 7], [20, 5]], "#c8c5be");
+        break;
       case "orb": part(p, disc(16, 16, 10.5), color, "gem"); if (accent) part(p, disc(16, 16, 4), accent, "glow"); break;
       case "trophy":
         part(p, poly([[8, 4], [24, 4], [22, 15], [16, 18], [10, 15]]), color, "metal"); part(p, stroke([[16, 18], [16, 24]], 3), color, "metal");
