@@ -249,7 +249,9 @@ tiles near you and at normal zoom are textured, so it stays quick. Furnaces are 
 and a smoking chimney. Campfires are small pixel flames on a pile of cut logs. Equipped shields show on your Friend's
 off arm, and weapons are painted into your Friend's own pixels too: swords, daggers and sabres held in a ready guard,
 axes and pickaxes over the shoulder, staffs upright with an orb of their element, bows held up by the grip. They rock with
-your step, sit behind you when that arm is on the far side, and swing free only mid-attack. Other players see them too.
+your step and sit behind you when that arm is on the far side. They animate in the same pixels too: swords wind up,
+strike and follow through, staffs thrust as a spell leaves, bows flex, axes chop, pickaxes strike, hammers ring on the
+anvil, rods cast (the line runs from the rod's tip) and food is held over the fire. Other players see all of it.
 
 **Day and night.** A Realm day lasts 24 minutes. Dusk turns the light warm, and at night the land goes blue-dark
 except around lamps, torches, fires, forges, altars and your own small light (a lantern familiar carries a bigger one).

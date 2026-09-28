@@ -19,7 +19,7 @@ import { campfireLogs, decorArt, fireArt, rockArt, treeArt } from "./scenery.ts"
 import { SADDLE, mountArt, type MountView } from "./mountart.ts";
 import { petArt } from "./petart.ts";
 import { burst, drawCloudShadows, drawEffects, playerPose, puff, treeShake, updateEffects, type Pose } from "./effects.ts";
-import { drawAuras, drawFigure, figureArt } from "./wardrobe.ts";
+import { FIGURE_K, drawAuras, drawFigure, figureArt, heldTip, type Held } from "./wardrobe.ts";
 import { creatureSprite, friendSprite, type Mask } from "./sprites.ts";
 
 /** The logical view size; the game sets it to match the frame (960 × 640 is the reference). */
@@ -1147,13 +1147,16 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     const restoreMotion = applyMotion(ctx, motion, s.x, s.y);
     drawAuras(ctx, player.worn, s.x, bodyY, px, now, scene.reducedMotion, "back");
     const stride = walking ? Math.floor(now / 80) % 8 : 0, cloth = scene.reducedMotion ? 0 : walking ? stride % 4 : Math.floor(now / 520) % 4;
-    const held = player.equipment.weapon && !pose.tool && !weaponSwinging(scene) ? [player.equipment.weapon] : [];
-    const dressed = [...player.worn, ...(player.equipment.cape ? [player.equipment.cape] : []), ...(player.equipment.head ? [player.equipment.head] : []), ...(player.equipment.shield ? [player.equipment.shield] : []), ...held];
-    if (scene.friend) drawFigure(ctx, figureArt(friendRows(scene.friend, facing, walking && !mount, mount ? 0 : stride), dressed, facing, cloth), s.x, bodyY + 2 * z, px, pose.alpha);
+    // What's in the hand, and how it moves: a tool at work, a weapon mid-swing, or the weapon at rest (all in the figure).
+    const holding = heldPose(scene, pose);
+    const dressed = [...player.worn, ...(player.equipment.cape ? [player.equipment.cape] : []), ...(player.equipment.head ? [player.equipment.head] : []), ...(player.equipment.shield ? [player.equipment.shield] : []), ...(player.equipment.weapon ? [player.equipment.weapon] : [])];
+    if (scene.friend) {
+      const art = figureArt(friendRows(scene.friend, facing, walking && !mount, mount ? 0 : stride), dressed, facing, cloth, INK, holding), rect = drawFigure(ctx, art, s.x, bodyY + 2 * z, px, pose.alpha), tip = heldTip(art);
+      if (pose.line && pose.target && tip) fishingLine(ctx, scene, rect.x + tip.x * px / FIGURE_K, rect.y + tip.y * px / FIGURE_K, project(pose.target.x, pose.target.y));
+    }
     else ellipse(ctx, s.x, bodyY - 20 * z, 12 * z, 16 * z, INK);
     drawAuras(ctx, player.worn, s.x, bodyY, px, now, scene.reducedMotion, "front");
     if (mount) drawMountHead(ctx, mount.coat, facing, walking, now, feet.x, feet.y, z, scene.reducedMotion);
-    drawHeld(ctx, scene, pose, s.x, bodyY, px, facing, project);
     restoreMotion();
     if (motion?.text) overheadText(ctx, motion.text, s.x, s.y - 74 * z, "#ffffff");
     if (player.hp < maxHpOf(game) || game.monsters.some(monster => monster.target && !monster.dead)) hpBar(ctx, s.x, s.y - 62 * z, player.hp / maxHpOf(game), z);
@@ -1273,19 +1276,6 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   }
   lastHits = hits;
 }
-/** Items held upright rather than swung: staffs (art drawn on a diagonal) and bows (art already upright). */
-function uprightHold(id: string): "staff" | "bow" | null {
-  const equip = isItem(id) ? item(id).equip : undefined;
-  return equip?.staff ? "staff" : equip?.bow ? "bow" : null;
-}
-/** Draw a staff standing on its foot in the hand, or a bow held up by its grip. */
-function drawUpright(ctx: CanvasRenderingContext2D, art: HTMLCanvasElement, hx: number, hy: number, px: number, side: number, kind: "staff" | "bow", tilt = 0) {
-  const size = (kind === "staff" ? 15 : 12) * px;
-  ctx.save(); ctx.translate(hx, hy); ctx.scale(side, 1); ctx.imageSmoothingEnabled = false;
-  if (kind === "staff") { ctx.rotate(-0.68 + tilt); ctx.drawImage(art, -size * 0.16, -size * 0.72, size, size); }
-  else { ctx.rotate(-0.08 - tilt); ctx.drawImage(art, -size * 0.55, -size * 0.62, size, size); }
-  ctx.restore();
-}
 /** How each element's spells look in flight. */
 const MAGIC_LOOKS: Record<string, { core: string; glow: string; spark: string }> = {
   wind: { core: "#ffffff", glow: "#bfe4f2", spark: "#ffffff" }, water: { core: "#e6f2ff", glow: "#5f9be0", spark: "#bfe0ff" },
@@ -1396,46 +1386,53 @@ function drawMount(ctx: CanvasRenderingContext2D, coat: Coat, facing: Facing, mo
   if (facing === "left") { ctx.save(); ctx.translate(x, 0); ctx.scale(-1, 1); drawPixels(ctx, art, 0, y + 2 * z, ART * z * MOUNT_SCALE); ctx.restore(); }
   else drawPixels(ctx, art, x, y + 2 * z, ART * z * MOUNT_SCALE);
 }
-/** Whether your weapon is mid-swing (or mid-cast) this tick, so it's drawn swinging instead of held in the figure. */
-function weaponSwinging(scene: Scene) {
-  const player = scene.game.player;
-  return player.combat !== null && player.attackTimer >= attackSpeed(player) - (uprightHold(player.equipment.weapon ?? "") === "staff" ? 1 : 0);
-}
 /** A ridden mount's head and neck, over its rider, when it faces you. */
 function drawMountHead(ctx: CanvasRenderingContext2D, coat: Coat, facing: Facing, moving: boolean, now: number, x: number, y: number, z: number, reduced: boolean) {
   if (facing !== "down") return;
   drawPixels(ctx, mountArt(coat, "front", moving && !reduced ? Math.floor(now / 110) % 4 : -1, true, "head"), x, y + 2 * z, ART * z * MOUNT_SCALE);
 }
-/** What the player holds: a skilling tool mid-swing, a fishing line, or their weapon (swinging when they attack). */
-function drawHeld(ctx: CanvasRenderingContext2D, scene: Scene, pose: Pose, x: number, y: number, px: number, facing: Facing, project: (x: number, y: number, lift?: number) => { x: number; y: number }) {
-  const player = scene.game.player, side = facing === "left" ? -1 : 1, alpha = Math.max(0, Math.min(1, (scene.now - scene.tickAt) / TICK_MS));
-  let id = pose.tool, angle = pose.angle;
-  // Between swings the weapon is part of your Friend's figure; it's drawn here only mid-swing (or a spell leaving a staff).
-  if (!id && player.equipment.weapon && !weaponSwinging(scene)) return;
-  if (!id && player.equipment.weapon) {
-    id = player.equipment.weapon;
-    const attacking = player.combat !== null && player.attackTimer === attackSpeed(player);
-    angle = attacking && !scene.reducedMotion ? -1.4 + Math.min(1, alpha * 1.6) * 2.3 : 0.25;
+/**
+ * What your Friend holds this frame and at what angle (radians forward from the resting pose), or null for the weapon at
+ * rest: a tool at work (chopping, mining, hammering, a rod cast out, food over the fire), or the weapon swinging on the tick
+ * an attack lands: a wind-up, a strike and a follow-through; a staff lifts as a spell leaves it; a bow flexes.
+ */
+function heldPose(scene: Scene, pose: Pose): Held | null {
+  const player = scene.game.player, alpha = Math.max(0, Math.min(1, (scene.now - scene.tickAt) / TICK_MS)), still = scene.reducedMotion;
+  if (pose.tool && isItem(pose.tool)) {
+    const shape = item(pose.tool).icon.shape;
+    if (shape === "axe" || shape === "pickaxe" || shape === "hammer") return { id: pose.tool, angle: still ? 0.4 : (pose.angle + 0.4) * 1.15 };
+    if (shape === "rod" || shape === "harpoon" || shape === "net") return { id: pose.tool, angle: 0.55 + (still ? 0 : (pose.angle + 0.9) * 0.8) };
+    return { id: pose.tool, angle: 0.5 + (still ? 0 : pose.angle * 0.4) };
   }
-  if (!id) return;
-  const art = itemArt(item(id).icon), size = 12 * px, hx = x + side * (6 + pose.reach * 6) * px, hy = y - 7 * px;
-  const upright = uprightHold(id);
-  if (upright && !pose.tool) {
-    // Staffs stand upright in the hand (raised as a spell leaves them); bows are held up, string towards you.
-    const casting = player.combat !== null && player.attackTimer >= attackSpeed(player) - 1 && !scene.reducedMotion ? Math.sin(Math.min(1, alpha * 1.4) * Math.PI) : 0;
-    drawUpright(ctx, art, x + side * 7 * px, y - 3 * px - casting * 4 * px, px, side, upright, casting * 0.35);
-    return;
+  const weaponId = player.equipment.weapon;
+  if (!weaponId || !isItem(weaponId) || player.combat === null || still || player.attackTimer !== attackSpeed(player)) return null;
+  const equip = item(weaponId).equip;
+  if (equip?.staff) return { id: weaponId, angle: Math.sin(Math.min(1, alpha * 1.4) * Math.PI) * 0.7 };
+  if (equip?.bow) return { id: weaponId, angle: -Math.sin(alpha * Math.PI) * 0.3 };
+  const a = alpha, angle = a < 0.28 ? -a / 0.28 * 1.0 : a < 0.62 ? -1.0 + (a - 0.28) / 0.34 * 2.7 : 1.7 - (a - 0.62) / 0.38 * 1.7;
+  return { id: weaponId, angle };
+}
+/** A fishing line from the rod's tip (screen) to a bobber on the spot. */
+function fishingLine(ctx: CanvasRenderingContext2D, scene: Scene, tipX: number, tipY: number, spot: { x: number; y: number }) {
+  const bob = scene.reducedMotion ? 0 : Math.sin(scene.now / 300) * 1.5;
+  ctx.strokeStyle = "rgba(22,22,22,0.7)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(tipX, tipY); ctx.quadraticCurveTo((tipX + spot.x) / 2, Math.max(tipY, spot.y) + 10, spot.x, spot.y - 2 + bob); ctx.stroke();
+  ctx.fillStyle = "#cf6e6e"; ctx.fillRect(spot.x - 1.5, spot.y - 4 + bob, 3, 3); ctx.fillStyle = "#ffffff"; ctx.fillRect(spot.x - 1.5, spot.y - 5 + bob, 3, 1);
+}
+/** Another player's hands: a tool for what they're doing (their game only says what, not with which tool), or their weapon swinging. */
+const PEER_TOOLS: Record<string, string> = { woodcut: "pewter_axe", mine: "pewter_pickaxe", fish: "fishing_rod", produce: "hammer", firemake: "tinderbox", cook: "raw_minnows" };
+function peerHeld(scene: Scene, peer: PeerView): Held | null {
+  if (scene.reducedMotion || !peer.p.activity) return null;
+  const t = (scene.now + peer.p.id * 97) / 1000, tool = PEER_TOOLS[peer.p.activity];
+  if (tool && isItem(tool)) {
+    const shape = item(tool).icon.shape, phase = (t / 0.78) % 1, chop = phase < 0.65 ? -1.1 + phase / 0.65 * 0.3 : -0.8 + (phase - 0.65) / 0.35 * 1.9;
+    return { id: tool, angle: shape === "rod" ? 0.55 + Math.sin(t * 2) * 0.1 : shape === "axe" || shape === "pickaxe" || shape === "hammer" ? (chop + 0.4) * 1.15 : 0.5 + Math.sin(t * 5) * 0.15 };
   }
-  ctx.save(); ctx.translate(hx, hy); ctx.scale(side, 1); ctx.rotate(angle + 0.5); ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(art, -size * 0.25, -size * 0.78, size, size);
-  ctx.restore();
-  if (pose.line && pose.target) {
-    // Rod tip (the art's top-right, rotated with the rod) to a bobber on the spot.
-    const turn = angle + 0.5, tipX = hx + side * (Math.cos(turn) * size * 0.55 + Math.sin(turn) * size * 0.55), tipY = hy + (Math.sin(turn) * size * 0.55 - Math.cos(turn) * size * 0.55);
-    const spot = project(pose.target.x, pose.target.y), bob = scene.reducedMotion ? 0 : Math.sin(scene.now / 300) * 1.5;
-    ctx.strokeStyle = "rgba(22,22,22,0.7)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(tipX, tipY); ctx.quadraticCurveTo((tipX + spot.x) / 2, Math.max(tipY, spot.y) + 10, spot.x, spot.y - 2 + bob); ctx.stroke();
-    ctx.fillStyle = "#cf6e6e"; ctx.fillRect(spot.x - 1.5, spot.y - 4 + bob, 3, 3); ctx.fillStyle = "#ffffff"; ctx.fillRect(spot.x - 1.5, spot.y - 5 + bob, 3, 1);
+  if (peer.p.activity === "combat" && peer.p.weapon && isItem(peer.p.weapon)) {
+    const a = (t / 2.4) % 1, equip = item(peer.p.weapon).equip;
+    if (equip?.staff || equip?.bow) return { id: peer.p.weapon, angle: Math.max(0, Math.sin(a * Math.PI * 2)) * (equip.staff ? 0.7 : -0.3) };
+    return { id: peer.p.weapon, angle: a < 0.12 ? -a / 0.12 : a < 0.26 ? -1 + (a - 0.12) / 0.14 * 2.7 : a < 0.42 ? 1.7 - (a - 0.26) / 0.16 * 1.7 : 0 };
   }
+  return null;
 }
 function drawNpc(ctx: CanvasRenderingContext2D, scene: Scene, npc: Npc, at: { x: number; y: number; moving: boolean }, hits: Hit[]) {
   const { camera, now, game } = scene, z = camera.zoom, s = toScreen(camera, at.x, at.y), def = NPCS[npc.id];
@@ -1476,22 +1473,16 @@ function drawPeer(ctx: CanvasRenderingContext2D, scene: Scene, peer: PeerView, h
   if (peer.p.emote) emoteParticles(peer.p.emote, peer.emoteT, peer.x, peer.y, scene.reducedMotion, peer.p.cape && isItem(peer.p.cape) ? item(peer.p.cape).icon.color : undefined);
   const sprites = scene.peerSprites?.(peer.p.id) ?? null, stride = peer.moving ? Math.floor(now / 80) % 8 : 0;
   const rows = sprites ? friendRows(sprites, facing, peer.moving && !mount, mount ? 0 : stride) : peer.moving && Math.floor(now / 160) % 2 ? friendSprite(peer.p.family, peer.p.id).step : friendSprite(peer.p.family, peer.p.id).idle;
-  const px = 3.2 * z, swinging = !!peer.p.activity && peer.p.activity !== "combat" || (peer.p.activity === "combat" && !scene.reducedMotion && Math.floor(now / 1200) % 2 === 0), worn = [...peer.p.worn, ...(peer.p.cape ? [peer.p.cape] : []), ...(peer.p.head ? [peer.p.head] : []), ...(peer.p.shield ? [peer.p.shield] : []), ...(peer.p.weapon && !swinging ? [peer.p.weapon] : [])], cloth = scene.reducedMotion ? 0 : peer.moving ? stride % 4 : Math.floor(now / 520) % 4;
+  const px = 3.2 * z, worn = [...peer.p.worn, ...(peer.p.cape ? [peer.p.cape] : []), ...(peer.p.head ? [peer.p.head] : []), ...(peer.p.shield ? [peer.p.shield] : []), ...(peer.p.weapon ? [peer.p.weapon] : [])], cloth = scene.reducedMotion ? 0 : peer.moving ? stride % 4 : Math.floor(now / 520) % 4;
   ellipse(ctx, feet.x, feet.y, (mount ? 32 : 15) * z, (mount ? 10 : 6) * z, "rgba(22,22,22,0.18)", peer.friend ? "rgba(159,224,168,0.9)" : "rgba(255,255,255,0.6)", 1.5);
   if (peer.p.pet && isPet(peer.p.pet)) { const behind = toScreen(camera, peer.x - (peer.p.hx || 0) * 0.9, peer.y - (peer.p.hy || 1) * 0.9); drawPet(ctx, peer.p.pet, behind.x, behind.y, facing, peer.moving, now + peer.p.id * 71, z, scene.reducedMotion); }
   if (mount) drawMount(ctx, mount.coat, facing, peer.moving, now, feet.x, feet.y, z, true, scene.reducedMotion);
   const restoreMotion = applyMotion(ctx, motion, s.x, s.y);
   drawAuras(ctx, worn, s.x, s.y, px, now, scene.reducedMotion, "back");
-  const rect = drawFigure(ctx, figureArt(rows, worn, facing, cloth), s.x, s.y + 2 * z, px);
+  const rect = drawFigure(ctx, figureArt(rows, worn, facing, cloth, INK, peerHeld(scene, peer)), s.x, s.y + 2 * z, px);
   drawAuras(ctx, worn, s.x, s.y, px, now, scene.reducedMotion, "front");
   if (mount) drawMountHead(ctx, mount.coat, facing, peer.moving, now, feet.x, feet.y, z, scene.reducedMotion);
   restoreMotion();
-  if (!swinging) { /* the weapon is in the figure */ }
-  else if (peer.p.weapon && isItem(peer.p.weapon) && uprightHold(peer.p.weapon)) drawUpright(ctx, itemArt(item(peer.p.weapon).icon), s.x + (facing === "left" ? -1 : 1) * 7 * px, s.y - 3 * px, px, facing === "left" ? -1 : 1, uprightHold(peer.p.weapon)!);
-  else if (peer.p.weapon && isItem(peer.p.weapon)) {
-    const art = itemArt(item(peer.p.weapon).icon), size = 12 * px, side = facing === "left" ? -1 : 1, swing = peer.p.activity && !scene.reducedMotion ? Math.sin(now / 180) * 0.6 : 0;
-    ctx.save(); ctx.translate(s.x + side * 6 * px, s.y - 7 * px); ctx.scale(side, 1); ctx.rotate(0.75 + swing); ctx.imageSmoothingEnabled = false; ctx.drawImage(art, -size * 0.25, -size * 0.78, size, size); ctx.restore();
-  }
   hits.push({ ...rect, pick: { kind: "peer", id: peer.p.id } });
   if (peer.p.hp < peer.p.maxHp || peer.p.fight) hpBar(ctx, s.x, rect.y - 22, peer.p.hp / Math.max(1, peer.p.maxHp), z);
   ctx.font = `bold ${Math.round(11 * Math.max(0.9, Math.min(1.4, z)))}px ui-monospace, Menlo, Consolas, monospace`; ctx.textAlign = "center"; ctx.textBaseline = "bottom";

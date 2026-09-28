@@ -4,6 +4,11 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 18, date: "2026-09-28", title: "Animations in your Friend's hands", items: [
+    "Weapons and tools now move in your Friend's own pixels instead of floating beside it: swords wind up, strike and follow through, staffs thrust forward as a spell leaves, and bows flex.",
+    "Axes chop, pickaxes strike the rock, hammers ring on the anvil, rods cast with the line running from the rod's tip, and food is held out over the fire, all drawn in the same pixel style as your gear.",
+    "Other players' Friends animate the same way.",
+  ] },
   { id: 17, date: "2026-09-28", title: "Multiplayer that gets through", items: [
     "Players on networks that block direct browser-to-browser links can now see each other: the game falls back to passing messages through public relays, so nobody is stuck at 1 online.",
     "Direct links are still used when they work (faster, and private messages stay off the relays). Hover the online badge to see how you're connected.",
