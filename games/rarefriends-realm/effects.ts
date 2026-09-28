@@ -14,13 +14,39 @@ type Particle = {
   seed: number;
 };
 const particles: Particle[] = [];
-const MAX = 220;
+const MAX = 320;
 function add(particle: Omit<Particle, "age" | "seed">) {
   if (particles.length >= MAX) particles.shift();
   particles.push({ ...particle, age: 0, seed: Math.random() * 1000 });
 }
 /** A slow grey puff of chimney or forge smoke. */
 export function puff(x: number, y: number, h: number) { add({ x, y, h, vx: 0.18, vy: -0.08, vh: 16, gravity: -3, life: 3.2, color: "#9a968f", size: 5, kind: "puff" }); }
+/** Effects waiting their moment (a firework's burst after its rocket climbs), on the effects clock. */
+const pending: { at: number; run: () => void }[] = [];
+let effectsClock = 0;
+/**
+ * Level-up fireworks over a world point: three rockets climb and burst into confetti in the colours given (a skill's),
+ * with white sparkles. Returns the seconds after now at which each burst pops, for their sounds.
+ */
+export function fireworks(world: World, x: number, y: number, colors: readonly string[]) {
+  const ground = groundHeight(world, x, y), pops: number[] = [];
+  for (let r = 0; r < 3; r++) {
+    const ox = (r - 1) * 0.8, oy = (1 - r) * 0.35, delay = r * 0.24, climb = 0.55 + r * 0.06, rise = 150, drag = 60;
+    const apex = ground + 30 + rise * climb - drag * climb * climb / 2;
+    pending.push({ at: effectsClock + delay, run: () => {
+      add({ x: x + ox, y: y + oy, h: ground + 30, vx: 0, vy: 0, vh: rise, gravity: drag, life: climb, color: "#fff4c0", size: 2.4, kind: "spark" });
+      for (let k = 1; k < 4; k++) add({ x: x + ox, y: y + oy, h: ground + 30, vx: 0, vy: 0, vh: rise - k * 12, gravity: drag, life: climb, color: "#e6a24a", size: 1.4, kind: "spark" });
+    } });
+    pending.push({ at: effectsClock + delay + climb, run: () => {
+      const color = colors[r % colors.length];
+      burst("chip", x + ox, y + oy, apex, 24, color, { speed: 2.6, up: 34, gravity: 46, life: 1.4, size: 3 });
+      burst("chip", x + ox, y + oy, apex, 10, colors[(r + 1) % colors.length], { speed: 1.8, up: 26, gravity: 46, life: 1.2, size: 2.5 });
+      burst("spark", x + ox, y + oy, apex, 12, "#ffffff", { speed: 2, up: 20, gravity: 20, life: 0.9, size: 2 });
+    } });
+    pops.push(delay + climb);
+  }
+  return pops;
+}
 /** A burst of `n` particles from a world point. */
 export function burst(kind: Particle["kind"], x: number, y: number, h: number, n: number, color: string, options: { speed?: number; up?: number; life?: number; size?: number; gravity?: number } = {}) {
   for (let i = 0; i < n; i++) {
@@ -114,6 +140,8 @@ type Bird = { x: number; y: number; vx: number; vy: number; age: number; count: 
 const birds: Bird[] = [];
 /** Advance particles and spawn the region's ambient life around the camera. */
 export function updateEffects(game: Game, camera: { x: number; y: number }, dt: number, reduced: boolean, view: number) {
+  effectsClock += dt;
+  for (let i = pending.length - 1; i >= 0; i--) if (pending[i].at <= effectsClock) { const [due] = pending.splice(i, 1); due.run(); }
   for (const particle of particles) {
     particle.age += dt; particle.x += particle.vx * dt; particle.y += particle.vy * dt; particle.h += particle.vh * dt; particle.vh -= particle.gravity * dt;
     if (particle.kind === "leaf" || particle.kind === "flake") { particle.x += Math.sin(particle.age * 2 + particle.seed) * dt * 0.4; }

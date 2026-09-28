@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   buy, canWalk, castSpell, chooseOption, collectFromCasket, continueDialogue, createGame, equip, findPath, itemOptions, menuFor, restore, sell,
   serialize, setFollower, setRelics, setTarget, smeltingRecipes, smithingRecipes, startProduction, tick, togglePrayer, useItemOnItem, walkTo, setHeld,
-  successChance, hitChance, unlockMusic, toggleMount, grantMount, rideProblem, castOnItem, isBound, grantBundle, rubLamp, breakTablet, capeProblem, sellPrice, craftSigils,
+  successChance, hitChance, unlockMusic, syncMonster, toggleMount, grantMount, rideProblem, castOnItem, isBound, grantBundle, rubLamp, breakTablet, capeProblem, sellPrice, craftSigils,
 } from "../games/rarefriends-realm/engine.ts";
 import { currentTask, slayerPoints } from "../games/rarefriends-realm/slayer.ts";
 import { ITEM_LIST, MONSTERS, MOUNTS, SHOPS, SKILLS, SPELLS, TREES, XP_RATE, XP_TABLE, item, levelForXp } from "../games/rarefriends-realm/data.ts";
@@ -100,7 +100,7 @@ test("the world is large, deterministic and every landmark is reachable on foot"
     assert(ok(spawn.x, spawn.y) || [[0, 1], [1, 0], [0, -1], [-1, 0]].some(([dx, dy]) => ok(spawn.x + dx, spawn.y + dy)), `NPC ${spawn.id} at ${spawn.x},${spawn.y}`);
   }
   for (const id of Object.keys(NPCS)) assert(world.spawns.some(spawn => spawn.kind === "npc" && spawn.id === id), `NPC ${id} is placed`);
-  for (const id of Object.keys(MONSTERS)) assert(world.spawns.some(spawn => spawn.kind === "monster" && spawn.id === id), `Monster ${id} is placed`);
+  for (const id of Object.keys(MONSTERS).filter(id => !MONSTERS[id].worldBoss)) assert(world.spawns.some(spawn => spawn.kind === "monster" && spawn.id === id), `Monster ${id} is placed`);
   for (const region of REGIONS) if (region.id !== "coast") assert(world.region.includes(REGIONS.indexOf(region)), `${region.name} exists`);
   assert.equal(regionAt(world, world.places.spawn.x, world.places.spawn.y).id, "friendhollow");
   // The throne room lies behind the Hollow gate: the king is reachable from its far side.
@@ -922,4 +922,70 @@ test("Updates: new players have seen the log; saves from before it see it once",
   const game = newGame(); assert.equal(game.player.seenUpdate, LATEST_UPDATE);
   const save = JSON.parse(JSON.stringify(serialize(game))); delete save.seenUpdate; const old = newGame(); restore(old, save);
   assert.equal(old.player.seenUpdate, 0);
+});
+
+test("World boss: the Ashen Colossus rises for everyone on the even hours, pays everyone who wounded it, and leaves after twenty minutes", async () => {
+  const { updateWorldBoss, bossWindow, BOSS_EVERY, BOSS_LASTS } = await import("../games/rarefriends-realm/worldboss.ts");
+  const a = newGame(), b = newGame({ friendId: 3412 }), t = 20_000 * BOSS_EVERY + 60_000;
+  assert.equal(updateWorldBoss(a, t), "risen"); updateWorldBoss(b, t);
+  const bossA = a.monsters.find(m => m.def.worldBoss), bossB = b.monsters.find(m => m.def.worldBoss);
+  assert(bossA && bossB); assert.equal(bossA.uid, bossB.uid, "the same boss in every game"); assert.deepEqual([bossA.x, bossA.y], [bossB.x, bossB.y]);
+  assert.equal(updateWorldBoss(a, t + 1000), null, "only once per window");
+  assert(bossWindow(t).active && !bossWindow(t + BOSS_LASTS).active);
+  // A wounds it; B lands the final blow and shares it: A gets the kill and the loot.
+  bossA.mine = true; bossA.hp -= 100;
+  const coins = count(a.player, "coins"), ground = a.ground.length;
+  for (let i = 0; i < 9; i++) tick(a);
+  syncMonster(a, { u: bossA.uid, id: "ashen_colossus", hp: 0, x: bossA.x, y: bossA.y }, 3412);
+  assert(bossA.dead); assert.equal(a.player.killLog.ashen_colossus, 1, "A's kill counts");
+  assert(a.ground.length > ground || count(a.player, "coins") > coins, "and A gets the loot");
+  assert.equal(updateWorldBoss(a, t + BOSS_LASTS + 1), null, "a fallen boss just clears away");
+  assert(!a.monsters.some(m => m.def.worldBoss));
+  updateWorldBoss(b, t + BOSS_LASTS + 1); assert(!b.monsters.some(m => m.def.worldBoss), "and leaves when its time is up");
+});
+
+test("Pets: found by chance while training, follow you instead of a Friend, and are saved", async () => {
+  const { rollPet, setPet } = await import("../games/rarefriends-realm/engine.ts");
+  const game = newGame(); let found = false;
+  game.rng = () => 0; // the luckiest roll
+  found = rollPet(game, "stumpy", 50);
+  assert(found && game.player.pets.includes("stumpy") && game.player.petOut === "stumpy", "a pet, and it follows you");
+  assert(!rollPet(game, "stumpy", 50), "only one of each");
+  game.rng = () => 0.99; assert(!rollPet(game, "pebble", 99), "rare");
+  setFollower(game, { id: 3412, generation: 2 }); assert.equal(game.player.petOut, null, "a Friend follower sends the pet home");
+  setPet(game, "stumpy"); assert.equal(game.player.follower, null, "and a pet sends the Friend home");
+  const save = JSON.parse(JSON.stringify(serialize(game))), fresh = newGame(); restore(fresh, save);
+  assert.deepEqual(fresh.player.pets, ["stumpy"]); assert.equal(fresh.player.petOut, "stumpy");
+});
+
+test("Duels: hits only count inside the ring, are capped, and a loss restores you at once", async () => {
+  const { duelAllowed, takeDuelHit, wonDuel, duelStrike, DUEL_MAX_HIT } = await import("../games/rarefriends-realm/duel.ts");
+  const { RING } = await import("../games/rarefriends-realm/world.ts");
+  const game = newGame(), p = game.player;
+  assert(!duelAllowed(game, { x: RING.x0, y: RING.y0 }), "not while you're outside");
+  p.x = RING.x0 + 1; p.y = RING.y0 + 1;
+  assert(duelAllowed(game, { x: RING.x0 + 2, y: RING.y0 + 1 })); assert(!duelAllowed(game, { x: RING.x1 + 3, y: RING.y0 }), "nor with them outside");
+  p.hp = 10; assert.equal(takeDuelHit(game, 3412, 3), "hit"); assert.equal(p.hp, 7);
+  const items = JSON.stringify(p.inventory);
+  assert.equal(takeDuelHit(game, 3412, 999), "lost"); assert.equal(p.hp, 10, "back to full"); assert.equal(JSON.stringify(p.inventory), items, "nothing lost");
+  assert.equal(p.stats.duelsLost, 1);
+  wonDuel(game, 3412); assert.equal(p.stats.duelsWon, 1);
+  for (let i = 0; i < 50; i++) assert(duelStrike(game, 3) <= DUEL_MAX_HIT);
+});
+
+test("Achievements and hiscores: earned from your adventure, saved, and the players you meet ranked with you", async () => {
+  const { checkAchievements, achieved, ACHIEVEMENTS } = await import("../games/rarefriends-realm/achievements.ts");
+  const { notePlayers, hiscores } = await import("../games/rarefriends-realm/hiscores.ts");
+  const game = newGame(), p = game.player, now = 20_000 * 86_400_000;
+  assert.equal(achieved(game), 0);
+  p.xp.woodcutting = 2000; p.kills = 1; p.mounts = ["unicorn"];
+  const earned = checkAchievements(game, now).map(entry => entry.id);
+  for (const id of ["first_steps", "first_blood", "saddle_up", "unicorn"]) assert(earned.includes(id), id);
+  assert.equal(checkAchievements(game, now).length, 0, "once each");
+  assert(ACHIEVEMENTS.length >= 30);
+  notePlayers(game, [{ id: 3412, total: 900, combat: 80 }, { id: 5, total: 20, combat: 3 }, { id: p.friendId, total: 1, combat: 3 }], now);
+  const table = hiscores(game);
+  assert.deepEqual(table.map(row => row.you ? "you" : row.id), [3412, "you", 5]); assert.equal(table[0].rank, 1);
+  const save = JSON.parse(JSON.stringify(serialize(game))), fresh = newGame(); restore(fresh, save);
+  assert.equal(achieved(fresh), achieved(game)); assert.equal(Object.keys(fresh.player.met).length, 2);
 });

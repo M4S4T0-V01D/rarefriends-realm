@@ -18,6 +18,9 @@ export const T = {
 export type Terrain = typeof T[keyof typeof T];
 const WALKABLE = new Set<number>([T.GRASS, T.DARK_GRASS, T.PATH, T.COBBLE, T.SAND, T.SWAMP, T.SNOW, T.STONE, T.WOOD, T.GRAVEL, T.DUNGEON, T.BRIDGE, T.FARMLAND, T.ICE, T.CARPET, T.ASH]);
 export const isWater = (terrain: number) => terrain === T.WATER || terrain === T.DEEP;
+/** The sparring ring east of Market Street: inside it, players may duel each other (safely: nobody dies or loses items). */
+export const RING = { x0: 138, y0: 144, x1: 144, y1: 149 };
+export const inRing = (x: number, y: number) => x >= RING.x0 && x <= RING.x1 && y >= RING.y0 && y <= RING.y1;
 
 export type ObjectKind =
   | "tree" | "stump" | "rock" | "spot" | "range" | "furnace" | "anvil" | "bank" | "altar" | "ladder" | "stall" | "obstacle"
@@ -684,6 +687,12 @@ export function createWorld(seed = 20260927): World {
   for (let y = 101; y <= 104; y++) { decor(89, y, "fence"); if (y !== 103) decor(101, y, "fence"); }
   npc("paddock_horse", 93, 102, 2); npc("paddock_grey", 97, 103, 2); npc("paddock_unicorn", 95, 102, 2);
   decor(91, 104, "hay");
+  // The sparring ring: a sand floor inside a fence, a gate on the west side, and a sign.
+  for (let y = RING.y0 - 1; y <= RING.y1 + 1; y++) for (let x = RING.x0 - 1; x <= RING.x1 + 1; x++) { clearAt(x, y); put(x, y, inRing(x, y) ? T.SAND : T.GRASS); }
+  for (let x = RING.x0 - 1; x <= RING.x1 + 1; x++) { decor(x, RING.y0 - 1, "fence"); decor(x, RING.y1 + 1, "fence"); }
+  for (let y = RING.y0; y <= RING.y1; y++) { decor(RING.x1 + 1, y, "fence"); if (y !== 146 && y !== 147) decor(RING.x0 - 1, y, "fence"); }
+  decor(RING.x0 - 2, RING.y0 - 1, "torch"); decor(RING.x0 - 2, RING.y1 + 1, "torch");
+  add({ kind: "sign", x: RING.x0 - 2, y: 145, blocks: true, name: "Signpost", text: "The Sparring Ring. Step inside and right-click another player to Fight. Duels here are safe: nobody dies or loses items." });
   // General stores in the other towns, so there's somewhere to sell anything wherever you are.
   for (const [id, gx, gy] of [["trader_ember", 170, 45], ["trader_frost", 195, 34], ["trader_oasis", 178, 110]] as const) {
     const [x, y] = land0(gx, gy); npc(id, x, y); decor(x + 1, y - 1, "crate");

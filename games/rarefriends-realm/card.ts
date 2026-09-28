@@ -3,6 +3,7 @@ import type { GenerationSprites } from "@rarefriends/friendsdk/sprites";
 import { FAMILY_NAMES, SKILLS, SKILL_NAMES, WARDROBE, levelForXp, mountDef, type Skill } from "./data.ts";
 import { SADDLE, mountArt } from "./mountart.ts";
 import { MAX_QUEST_POINTS, questPoints } from "./content.ts";
+import { ACHIEVEMENTS, achieved } from "./achievements.ts";
 import { combatLevel, totalLevel, type Game } from "./state.ts";
 import { friendRows } from "./render.ts";
 import { figureArt } from "./wardrobe.ts";
@@ -66,6 +67,7 @@ export function renderCard(game: Game, friend: GenerationSprites | null, region:
   const qp = questPoints(game), below = top + rows * cellH + 34;
   ctx.font = `bold 22px ${FONT}`; ctx.fillStyle = INK; ctx.fillText(`Quest points ${qp}/${MAX_QUEST_POINTS}`, 530, below);
   ctx.font = `18px ${FONT}`; ctx.fillStyle = MUTED; ctx.fillText(`${player.kills.toLocaleString()} monster${player.kills === 1 ? "" : "s"} defeated · ${player.wardrobe.length}/${WARDROBE.length} wardrobe pieces`, 530, below + 30);
+  ctx.fillText(`🏆 ${achieved(game)}/${ACHIEVEMENTS.length} achievements · ${player.pets.length} pet${player.pets.length === 1 ? "" : "s"} · ${player.stats.duelsWon ?? 0} duel win${(player.stats.duelsWon ?? 0) === 1 ? "" : "s"}`, 530, below + 56);
   // Footer.
   ctx.fillStyle = INK; ctx.fillRect(0, CARD.height - 72, CARD.width, 72);
   ctx.fillStyle = PAPER; ctx.font = `bold 26px ${FONT}`; ctx.fillText("⚔ RareFriends Realm", 40, CARD.height - 26);

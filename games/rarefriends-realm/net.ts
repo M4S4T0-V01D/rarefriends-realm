@@ -19,7 +19,7 @@ export const NET_CHAT_IN = "rarefriends-realm:net-chat-in";
 /** A direct message between two players' games (trades, taking a dropped item): NET_ACT out, NET_ACT_IN in. */
 export const NET_ACT = "rarefriends-realm:net-act";
 export const NET_ACT_IN = "rarefriends-realm:net-act-in";
-export const ACT_KINDS = ["trade-request", "trade-open", "trade-offer", "trade-accept", "trade-decline", "trade-done", "take", "give", "gone"] as const;
+export const ACT_KINDS = ["trade-request", "trade-open", "trade-offer", "trade-accept", "trade-decline", "trade-done", "take", "give", "gone", "duel-hit", "duel-won"] as const;
 export type Act = { kind: typeof ACT_KINDS[number]; trade?: string; rev?: number; stage?: number; items?: { id: string; n: number }[]; u?: number; id?: string; n?: number };
 /** A shared ground item (something a player dropped from their pack). */
 export type Drop = { u: number; id: string; n: number; x: number; y: number };
@@ -53,6 +53,10 @@ export type Presence = {
   shield: string | null;
   /** The mount they're riding. */
   mount: string | null;
+  /** A level-up they're celebrating (`skill_level`), for its fireworks. */
+  celebrate: string | null;
+  /** The pet following them. */
+  pet: string | null;
   /** The Friend whose referral code this player used (so that Friend's game can reward them). */
   referredBy: number | null;
   hp: number; maxHp: number; fight: { u: number; id: string; hp: number; x: number; y: number } | null;
@@ -75,7 +79,7 @@ export function cleanPresence(raw: unknown): Presence | null {
     worn, cape: word(r.cape), weapon: word(r.weapon), activity: word(r.activity), combat: int(r.combat, 3, 200) ?? 3, total: int(r.total, 1, 3000) ?? 1,
     region: typeof r.region === "string" ? r.region.slice(0, 32).replace(/[^\w' ]/g, "") : "",
     emote: word(r.emote),
-    head: word(r.head, 40), shield: word(r.shield, 40), mount: word(r.mount, 40), referredBy: id(r.referredBy),
+    head: word(r.head, 40), shield: word(r.shield, 40), mount: word(r.mount, 40), celebrate: word(r.celebrate, 24), pet: word(r.pet, 24), referredBy: id(r.referredBy),
     hp: int(r.hp, 0, 99) ?? 10, maxHp: int(r.maxHp, 1, 99) ?? 10,
     fight: (() => { const f = r.fight as Record<string, unknown> | null; if (!f || typeof f !== "object") return null; const u = int(f.u, 0, 1e9), fid = word(f.id, 40), fhp = int(f.hp, 0, 10_000), fx = int(f.x, 0, 239), fy = int(f.y, 0, 279);
       return u !== null && fid && fhp !== null && fx !== null && fy !== null ? { u, id: fid, hp: fhp, x: fx, y: fy } : null; })(),

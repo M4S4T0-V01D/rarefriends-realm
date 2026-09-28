@@ -66,8 +66,18 @@ export type Player = {
   referralCapNoted?: boolean;
   /** Mounts you own from the stables, and the one you're riding. */
   mounts: string[]; mount: string | null;
+  /** Players you've met online, for the hiscores; and your achievements (id → the UTC day you earned it). */
+  met: Record<number, { total: number; combat: number; seen: number }>; achievements: Record<string, number>;
+  /** Pets you've found, and the one following you. */
+  pets: string[]; petOut: string | null;
+  /** Kills by monster, for achievements. */
+  killLog: Record<string, number>;
+  /** Counts for achievements and bragging: duels won and lost, trades made, daily chests opened. */
+  stats: Record<string, number>;
   /** The daily streak and challenges, and the newest update you've seen in the log. */
   daily: Daily; seenUpdate: number;
+  /** A level-up to celebrate (not saved): other players see its fireworks while it lasts. */
+  celebrate?: { skill: Skill; level: number; until: number };
   /** The mount you rode last (not saved), for the ride button. */
   lastMount?: string;
   /** The emote you're performing, and the tick it ends (not saved). */
@@ -79,13 +89,15 @@ export type Monster = {
   uid: number; def: MonsterDef; x: number; y: number; prev: Point; spawn: Point; hp: number; heading: Point;
   target: boolean; attackTimer: number; respawnAt: number; dead: boolean; wander: number; moved: number; retreat: number;
   /** The tick it last came back to life (shared fights ignore reports from its previous life for a moment). */
+  /** You've wounded it (a world boss you helped fight pays you loot, whoever lands the last blow). */
+  mine?: boolean;
   bornAt?: number;
   /** Curses and Bind: the tick each wears off. */
   curses: Partial<Record<"attack" | "strength" | "defence" | "bound", number>>;
 };
 export type Npc = { uid: number; id: string; x: number; y: number; prev: Point; spawn: Point; wander: number; heading: Point; moved: number; busy: number };
 /** An item on the ground. `shared` ones (dropped from your pack) other players see and may pick up. */
-export type GroundItem = { uid: number; id: string; n: number; x: number; y: number; expires: number; shared?: boolean };
+export type GroundItem = { uid: number; id: string; n: number; x: number; y: number; expires: number; shared?: boolean; rare?: boolean };
 export type Fire = { uid: number; x: number; y: number; expires: number };
 /** Something flying: a spell (glowing, by element), an arrow, or dragonfire. */
 export type Projectile = { from: Point; to: Point; start: number; end: number; color: string; style?: "magic" | "arrow" | "fire"; element?: string };
@@ -102,7 +114,8 @@ export type GameEvent =
   | { type: "swing"; weapon: "slash" | "stab" | "crush" | "punch"; tick: number };
 export type SoundName =
   | "chop" | "mine" | "splash" | "catch" | "fire" | "sizzle" | "burn" | "smelt" | "anvil" | "hit" | "miss" | "hurt" | "eat" | "bury" | "coins"
-  | "pickup" | "drop" | "door" | "level" | "quest" | "spell" | "teleport" | "death" | "stun" | "jump" | "click" | "equip" | "kill" | "pray" | "fell" | "bow";
+  | "pickup" | "drop" | "door" | "level" | "quest" | "spell" | "teleport" | "death" | "stun" | "jump" | "click" | "equip" | "kill" | "pray" | "fell" | "bow"
+  | "whinny" | "hoof" | "rare" | "duel";
 export type Message = { text: string; tone: "game" | "info" | "warn" | "quest" | "level" | "npc" | "public" | "private"; tick: number };
 
 export type Game = {
@@ -150,7 +163,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
     style: "accurate", autocast: null, prayers: [], target: null, activity: null, combat: null,
     attackTimer: 0, eatTimer: 0, stunned: 0, regenTimer: 0, quests: {}, questData: {},
     wardrobe: [], worn: [], follower: null, courseStep: -1, kills: 0, deaths: 0, overhead: null, music: ["theme"],
-    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, referredBy: null, referrals: [], boostTicks: 0, referralTimes: [], mounts: [], mount: null, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false }, seenUpdate: LATEST_UPDATE,
+    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, referredBy: null, referrals: [], boostTicks: 0, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false }, seenUpdate: LATEST_UPDATE,
     lastHitBy: null, created: Date.now(), queuedSpell: null, castTimer: 0,
   };
 }
@@ -221,6 +234,7 @@ export function addXp(game: Game, skill: Skill, base: number, options: { raw?: b
     message(game, `Congratulations, you've just advanced your ${SKILL_NAMES[skill]} level. You are now level ${after}.`, "level");
     if (after === 99) message(game, `You've mastered ${SKILL_NAMES[skill]}! The Keeper of Capes in Friendhollow Castle has a cape with your name on it.`, "quest");
     emit(game, { type: "level", skill, level: after, tick: game.tick });
+    player.celebrate = { skill, level: after, until: game.tick + 6 };
     sound(game, "level");
   }
 }

@@ -116,6 +116,10 @@ try {
   await a.game.getByRole("tab", { name: "Emotes" }).click();
   await a.game.getByRole("button", { name: "Dance", exact: true }).click();
   await b.until(() => window.__realm.peers().some(peer => peer.id === 7730 && peer.emote === "dance"), "seeing #7730 dance");
+  // Emote sync: B waves near A, and A (who has B as a friend, standing idle) joins in.
+  await a.until(() => { const g = window.__realm.game(); return !g.player.emote || g.tick >= g.player.emote.until; }, "A's dance ending", 20_000);
+  await b.frame().evaluate(() => { const g = window.__realm.game(); g.player.emote = { id: "wave", start: g.tick, until: g.tick + 8 }; });
+  await a.until(() => { const g = window.__realm.game(); return g.player.emote?.id === "wave" && g.messages.some(m => m.text.includes("You join in")); }, "A joining B's wave");
 
   // A drops a sapphire-ish gem; B sees it on the ground and takes it.
   await a.frame().evaluate(() => { const g = window.__realm.game(), p = g.player; p.inventory[6] = { id: "rosestone", n: 1 }; window.__realm.refresh(); });
@@ -156,6 +160,18 @@ try {
   await b.until(() => !window.__realm.game().player.inventory.some(slot => slot?.id === "yew_bow"), "B giving the bow");
   assert.equal(await a.state(() => window.__realm.game().player.inventory.reduce((n, slot) => n + (slot?.id === "coins" ? slot.n : 0), 0)), coinsA - 10, "A paid 10 coins");
 
+  // A duel in the sparring ring: A picks Fight on B; B (weakened) goes down, is restored at once, and A takes the win.
+  await a.teleport(139, 146); await b.teleport(141, 146);
+  await b.frame().evaluate(() => { const p = window.__realm.game().player; p.hp = 2; p.inventory = p.inventory.map(slot => slot?.id === "coins" ? slot : null); window.__realm.refresh(); });
+  await a.frame().evaluate(() => { const p = window.__realm.game().player; for (const s of ["attack", "strength"]) p.xp[s] = 200_000; });
+  await a.until(() => window.__realm.peers().some(peer => peer.id === 3412 && peer.x === 141 && peer.y === 146), "B in the ring");
+  const ringAt = await a.frame().evaluate(() => window.__realm.screenOf(141, 146)), ringBox = await a.page.locator("iframe").boundingBox();
+  await a.page.mouse.click(ringBox.x + ringAt.x, ringBox.y + ringAt.y - 20, { button: "right" });
+  await a.game.getByRole("menuitem", { name: /^Fight .*#3412/ }).click();
+  await a.until(() => (window.__realm.game().player.stats.duelsWon ?? 0) >= 1, "A winning the duel", 40_000);
+  await b.until(() => (window.__realm.game().player.stats.duelsLost ?? 0) >= 1 && window.__realm.game().player.hp > 2, "B losing, and back on its feet");
+  await a.page.locator(".rf-game-frame").screenshot({ path: "./artifacts/duel.png" });
+
   // A shared fight: B attacks a cow, and A's copy of the same cow loses HP too; A sees B's health bar data.
   await a.teleport(90, 111); await b.teleport(91, 112);
   const cowUid = await b.frame().evaluate(() => { const g = window.__realm.game(), p = g.player; for (const s of ["attack", "strength"]) p.xp[s] = 30_000;
@@ -179,7 +195,7 @@ try {
   await b.until(() => !window.__realm.peers().some(peer => peer.id === 7730), "#7730 leaving", 25_000);
 
   assert.deepEqual(errors, [], "browser errors");
-  console.log("PASS multiplayer: two players see each other walk, right-click menu, friends list, party bonus, public chat, whispers (links stripped), emotes, shared drops, a trade by clicks, a shared fight, a referral, going offline");
+  console.log("PASS multiplayer: two players see each other walk, right-click menu, friends list, party bonus, public chat, whispers (links stripped), emotes, shared drops, a trade by clicks, emote sync, a duel in the ring, a shared fight, a referral, going offline");
 } finally {
   await browser?.close();
   if (server) { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }

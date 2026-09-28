@@ -134,6 +134,7 @@ export class Trades {
     this.finishing.push({ to: t.partner, act: { kind: "trade-accept", trade: t.id, stage: 2, rev: t.myRev, u: t.theirRev, items: t.mine }, until: performanceNow() + 10_000 });
     this.send(t.partner, { kind: "trade-done", trade: t.id });
     message(game, `Accepted trade with Friend #${t.partner}.`, "info"); sound(game, "coins");
+    game.player.stats.trades = (game.player.stats.trades ?? 0) + 1;
     this.open = null;
   }
   /** Room in your pack for what you'd receive, after what you'd give away. */

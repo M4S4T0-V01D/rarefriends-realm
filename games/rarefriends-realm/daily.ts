@@ -100,7 +100,7 @@ export function claimChallenge(game: Game, index: number) {
 export function claimChest(game: Game) {
   const daily = game.player.daily;
   if (daily.chest || daily.claimed.length === 0 || !daily.claimed.every(Boolean)) return false;
-  daily.chest = true; grant(game, CHEST_REWARD);
+  daily.chest = true; grant(game, CHEST_REWARD); game.player.stats.chests = (game.player.stats.chests ?? 0) + 1;
   message(game, `You open the daily chest: ${rewardText(CHEST_REWARD)}.`, "quest"); sound(game, "level");
   return true;
 }

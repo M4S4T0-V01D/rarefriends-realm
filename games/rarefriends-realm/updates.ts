@@ -4,6 +4,15 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 15, date: "2026-09-28", title: "World boss, duels, pets and achievements", items: [
+    "The Ashen Colossus rises in Wyrmreach every two hours (on the even UTC hours) for twenty minutes. It takes a crowd, and everyone who wounds it shares the loot.",
+    "The Sparring Ring, east of Market Street: step inside and right-click another player to Fight. Duels are safe: nobody dies or loses items, and wins are counted.",
+    "Six pets to find while you train: Stumpy (woodcutting), Pebble (mining), Bubbles (fishing), Mote (Sigilcraft), Emberling (dragons) and Cinderkin (the Colossus). Call them from the Friends tab.",
+    "Achievements: 32 to earn, on a new tab of this popup, and counted on your adventurer card.",
+    "Hiscores in the Friends tab: you ranked with every player you've met.",
+    "Level-up fireworks that everyone nearby sees. Hoofbeats, dust and a whinny when you ride. Footprints in snow and sand, splashes in the bog. Rare drops shine with a beam of light and a chime.",
+    "When a friend near you emotes, your Friend joins in.",
+  ] },
   { id: 14, date: "2026-09-28", title: "Daily streaks and this log", items: [
     "Log in every day for a streak reward on a seven-day cycle, up to a Lamp of insight and 5,000 coins on day 7. Each full week adds 25% to the coins.",
     "Three daily challenges, the same for everyone: gain XP in two skills and defeat some monsters. Finish all three to open the daily chest.",

@@ -8,7 +8,7 @@ import type { RegionId } from "./world.ts";
 
 export type TrackId = RegionId | "theme" | "boss";
 export type SfxName = SoundName | "slash" | "stab" | "crush" | "punch" | "step_grass" | "step_stone" | "step_wood" | "step_sand" | "step_snow" | "step_swamp"
-  | "crackle" | "forge" | "water" | "bird" | "gull" | "frog" | "wind" | "drip" | "rain" | "thunder";
+  | "crackle" | "forge" | "water" | "bird" | "gull" | "frog" | "wind" | "drip" | "rain" | "thunder" | "pop" | "hoof" | "whinny" | "rare" | "duel";
 type VoiceKind = "cluck" | "moo" | "squeak" | "grumble" | "growl" | "rattle" | "gurgle" | "whisper" | "clank" | "rumble" | "roar" | "king";
 const VOICES: Record<string, { kind: VoiceKind; f0: number; length: number; bright: number; wobble?: number }> = {
   chicken: { kind: "cluck", f0: 620, length: 0.08, bright: 3000 }, cow: { kind: "moo", f0: 150, length: 0.9, bright: 900, wobble: 5 },
@@ -457,6 +457,26 @@ export class RealmAudio {
         for (let i = 0; i < 6; i++) this.noiseBurst(t + 0.15 + i * 0.35 + Math.random() * 0.15, 0.9, 140 + Math.random() * 120, 0.45 - i * 0.06, bus, "lowpass", 0.9);
         break;
       }
+      case "pop": {
+        // A firework: a low boom, then a shower of crackles.
+        this.thump(t, 200, 55, 0.35, 0.3, bus); this.noiseBurst(t, 0.22, 1500, 0.2, bus, "lowpass");
+        for (let i = 0; i < 9; i++) this.noiseBurst(t + 0.12 + i * 0.045 + Math.random() * 0.04, 0.02, 5200 + Math.random() * 2000, 0.06, bus);
+        break;
+      }
+      case "hoof": this.thump(t, 520, 260, 0.05, 0.22, bus); this.noiseBurst(t, 0.025, 2400, 0.07, bus, "bandpass", 2.5); this.thump(t + 0.11, 460, 240, 0.05, 0.18, bus); break;
+      case "whinny": {
+        // A horse's call: a bright buzzy voice that leaps up and shakes its way down.
+        const ctx = this.ctx!, osc = ctx.createOscillator(), lfo = ctx.createOscillator(), depth = ctx.createGain(), filter = ctx.createBiquadFilter(), gain = ctx.createGain();
+        osc.type = "sawtooth"; osc.frequency.setValueAtTime(620, t); osc.frequency.linearRampToValueAtTime(1150, t + 0.14); osc.frequency.exponentialRampToValueAtTime(480, t + 1.0);
+        lfo.frequency.value = 24; depth.gain.setValueAtTime(20, t); depth.gain.linearRampToValueAtTime(90, t + 0.9); lfo.connect(depth).connect(osc.frequency);
+        filter.type = "bandpass"; filter.frequency.value = 1500; filter.Q.value = 1.6; osc.connect(filter).connect(gain).connect(bus);
+        gain.gain.setValueAtTime(0.0001, t); gain.gain.exponentialRampToValueAtTime(0.16, t + 0.05); gain.gain.setValueAtTime(0.14, t + 0.6); gain.gain.exponentialRampToValueAtTime(0.0001, t + 1.05);
+        osc.start(t); lfo.start(t); osc.stop(t + 1.1); lfo.stop(t + 1.1);
+        this.noiseBurst(t + 0.95, 0.25, 700, 0.08, bus, "lowpass");
+        break;
+      }
+      case "rare": for (const [i, midi] of [84, 88, 91, 96, 100].entries()) tone("triangle", midi, t + i * 0.07, 0.35, 0.07); tone("sine", 108, t + 0.36, 0.5, 0.04); break;
+      case "duel": tone("square", 60, t, 0.12, 0.06); tone("square", 67, t + 0.12, 0.12, 0.06); tone("square", 72, t + 0.24, 0.3, 0.07); this.drum("clank", t + 0.24, 0.8, bus); break;
       case "bow": tone("triangle", 45, t, 0.18, 0.18); this.thump(t, 520, 180, 0.12, 0.2, bus); this.sweep(t + 0.02, 4200, 2600, 0.12, 0.08, bus); break;
       case "stab": this.sweep(t, 2400, 1600, 0.08, 0.2, bus); this.thump(t + 0.06, 300, 180, 0.05, 0.12, bus); break;
       case "crush": this.sweep(t, 900, 300, 0.18, 0.22, bus); break;

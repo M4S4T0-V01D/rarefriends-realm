@@ -6,13 +6,14 @@ import { formatGameAmount } from "@rarefriends/friendsdk/ui";
 import { expectedReward, maximumPrize, type GamePlay, type GameSnapshot } from "@rarefriends/friendsdk/game";
 import { createFriendReader, type GenerationSprites } from "@rarefriends/friendsdk/sprites";
 import { mountArt } from "./mountart.ts";
-import { FAMILY_NAMES, FAMILY_PERKS, MOUNTS, RELICS, RF_BUNDLES, SKILL_ICONS, SPELLS, WARDROBE, isItem, item, type Skill } from "./data.ts";
+import { fireworks as launchFireworks } from "./effects.ts";
+import { FAMILY_NAMES, FAMILY_PERKS, MOUNTS, RELICS, RF_BUNDLES, SKILL_COLORS, SKILL_ICONS, SPELLS, WARDROBE, isItem, item, type Skill } from "./data.ts";
 import { QUESTS, questPoints, MAX_QUEST_POINTS } from "./content.ts";
-import { TICK_MS, combatLevel, createGame, giveOrDrop, message, totalLevel, type Game, type Projectile } from "./state.ts";
+import { TICK_MS, attackSpeed, combatLevel, createGame, giveOrDrop, message, totalLevel, type Game, type Projectile } from "./state.ts";
 import {
-  chooseOption, closeInterfaces, collectFromCasket, creditReferral, performEmote, syncMonster, continueDialogue, grantBundle, menuFor, tailorChoices, unlockMusic, restore, serialize, setFollower, setHeld, setRelics, tick, toggleRun, toggleMount, grantMount, walkTo, type OwnedFriend, type Selection,
+  chooseOption, closeInterfaces, collectFromCasket, creditReferral, emoteProblem, performEmote, syncMonster, continueDialogue, grantBundle, menuFor, tailorChoices, unlockMusic, restore, serialize, setFollower, setHeld, setRelics, tick, toggleRun, toggleMount, grantMount, walkTo, type OwnedFriend, type Selection,
 } from "./engine.ts";
-import { PITCH, VIEW, ZOOM, daylight, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
+import { PITCH, VIEW, ZOOM, addPrint, daylight, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
 import {
   BankModal, ChatBox, ContextMenu, DailyModal, GuideModal, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
   cancelLongPress, longPress, rightClick, type MenuEntry, type Settings, type Tab,
@@ -27,10 +28,15 @@ import { HOST_HELLO, HOST_STATE, SAVE_EXPORT, SAVE_EXPORT_RESULT, SAVE_WRITE, SH
 import { RealmAudio, trackFor, trackById, type SfxName, type TrackId } from "./audio.ts";
 import { renderCard, shareText } from "./card.ts";
 import { dailyWaiting, rollDaily, streakStatus } from "./daily.ts";
+import { updateWorldBoss } from "./worldboss.ts";
+import { checkAchievements } from "./achievements.ts";
+import { notePlayers } from "./hiscores.ts";
+import { duelAllowed, duelReach, duelStrike, takeDuelHit, wonDuel } from "./duel.ts";
 import { LATEST_UPDATE } from "./updates.ts";
 import type { DailyTab } from "./panels.tsx";
 import { skillArt } from "./icons.ts";
-import { T, isUnderground, isWater, realPoint, regionAt, terrainAt } from "./world.ts";
+import { T, groundHeight, isUnderground, isWater, realPoint, regionAt, terrainAt, type World } from "./world.ts";
+import { burst } from "./effects.ts";
 import "@rarefriends/friendsdk/frame.css";
 import "./style.css";
 
@@ -50,6 +56,8 @@ const NORTH = -Math.PI / 4;
 const DAY_MS = 24 * 60_000;
 let fixedTime: number | null = typeof navigator !== "undefined" && navigator.webdriver ? 0.5 : null;
 /** Weather from the real clock (tests stay clear unless they set one). */
+/** The world boss's clock: the real one, except in automated runs, where a test sets it (null: no boss). */
+let bossClock: (() => number) | null = typeof navigator !== "undefined" && navigator.webdriver ? null : () => Date.now();
 let fixedWeather: Weather | null = typeof navigator !== "undefined" && navigator.webdriver ? { rain: 0, storm: false, fog: 0 } : null;
 let lastThunder = -1;
 const timeOfDay = () => fixedTime ?? ((Date.now() / DAY_MS + 0.3) % 1);
@@ -87,6 +95,16 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const live = useRef({ paused, phase, modal, menu, selection, settings }); live.current = { paused, phase, modal, menu, selection, settings };
   const refresh = useCallback(() => setVersion(value => value + 1), []);
   const reducedMotion = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  /** Fireworks over a point (a level-up), with a pop for each burst; and the peers' level-ups already celebrated. */
+  /** A duel in the sparring ring: who you're fighting and when you swing next; who you last dueled; their last hit on you. */
+  const duel = useRef<{ target: number; nextSwing: number } | null>(null), lastDuel = useRef<{ with: number; at: number } | null>(null), duelHits = useRef(new Map<number, number>());
+  const peerEmotes = useRef(new Map<number, string | null>()), achievementsChecked = useRef(false);
+  const celebrated = useRef(new Set<string>()), peerSpots = useRef(new Map<number, { x: number; y: number }>());
+  const celebrate = (x: number, y: number, colors: readonly string[]) => {
+    const world = game.current?.world;
+    if (!world) return;
+    for (const delay of launchFireworks(world, x, y, colors)) window.setTimeout(() => audio.current?.sfx("pop", 0.8), delay * 1000);
+  };
 
   // ---------- Layout: a logical stage scaled to fit the frame ----------
   useEffect(() => {
@@ -168,6 +186,25 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         const status = d.status === "online" || d.status === "connecting" ? d.status : "offline", was = players.current.state.status;
         const next: NetState = { status, peers, friends: ids(d.friends), ignored: ids(d.ignored), players: typeof d.players === "number" ? Math.max(0, Math.min(999, Math.floor(d.players))) : peers.length };
         players.current.update(next, performance.now()); setNetState(next);
+        // Other players' steps leave prints in snow and sand too.
+        for (const peer of peers) {
+          const last = peerSpots.current.get(peer.id);
+          if (last && (last.x !== peer.x || last.y !== peer.y) && game.current && Math.abs(peer.x - game.current.player.x) + Math.abs(peer.y - game.current.player.y) < 30) stepMarks(game.current.world, last, peer, !!peer.mount, reducedMotion);
+          peerSpots.current.set(peer.id, { x: peer.x, y: peer.y });
+        }
+        // A friend near you starts an emote: if you're standing idle, your Friend joins in.
+        for (const peer of peers) {
+          const before = peerEmotes.current.get(peer.id) ?? null, state = game.current;
+          peerEmotes.current.set(peer.id, peer.emote);
+          if (!peer.emote || peer.emote === before || !state || !next.friends.includes(peer.id)) continue;
+          const me = state.player, idle = !me.path.length && !me.activity && me.combat === null && !(me.emote && state.tick < me.emote.until) && !duel.current;
+          if (idle && Math.max(Math.abs(peer.x - me.x), Math.abs(peer.y - me.y)) <= 6 && !emoteProblem(state, peer.emote)) { performEmote(state, peer.emote); message(state, `You join in with ${players.current.name(peer.id)}!`); }
+        }
+        // Other players' level-ups: their fireworks go up over them, once each.
+        for (const peer of peers) if (peer.celebrate && !celebrated.current.has(`${peer.id}:${peer.celebrate}`)) {
+          celebrated.current.add(`${peer.id}:${peer.celebrate}`);
+          if (game.current && Math.max(Math.abs(peer.x - game.current.player.x), Math.abs(peer.y - game.current.player.y)) <= 20 && !reducedMotion) celebrate(peer.x, peer.y, SKILL_COLORS[peer.celebrate.replace(/_\d+$/, "") as Skill] ?? ["#e2d7ad", "#d8b6b4"]);
+        }
         for (const peer of peers.slice(0, 30)) loadFriendSpriteRef.current?.(peer.id);
         if (game.current && was !== "online" && status === "online") message(game.current, "You're online: other players in the Realm can see your Friend and your public chat.", "info");
         return;
@@ -184,6 +221,21 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         } else if (act.kind === "give" && act.u !== undefined && act.id && act.n && asked.current.delete(`${from}:${act.u}`) && isItem(act.id) && item(act.id).tradeable !== false) {
           giveOrDrop(state, act.id, act.n); message(state, `You pick up ${act.n > 1 ? `${act.n.toLocaleString()} × ` : ""}${item(act.id).name.toLowerCase()} (dropped by Friend #${from}).`);
           audio.current?.sfx("pickup");
+        } else if (act.kind === "duel-hit" && act.n !== undefined) {
+          // A duel hit: only inside the ring, at most one every two ticks from each player, and capped.
+          const them = players.current.state.peers.find(peer => peer.id === from), last = duelHits.current.get(from) ?? -99;
+          if (!them || !duelAllowed(state, them) || state.tick - last < 2) return;
+          duelHits.current.set(from, state.tick); lastDuel.current = { with: from, at: performance.now() };
+          const result = takeDuelHit(state, from, act.n);
+          if (result === "lost") { sendAct(from, { kind: "duel-won", u: state.tick }); duel.current = null; }
+          else if (!duel.current && state.autoRetaliate) duel.current = { target: from, nextSwing: state.tick + 1 };
+          refresh();
+        } else if (act.kind === "duel-won") {
+          if (lastDuel.current?.with === from && performance.now() - lastDuel.current.at < 30_000) {
+            wonDuel(state, from); duel.current = null; lastDuel.current = null;
+            if (!reducedMotion) celebrate(state.player.x, state.player.y, ["#e2c46a", "#cf6e6e", "#ffffff"]);
+          }
+          refresh();
         } else if (act.kind === "gone" && act.u !== undefined && asked.current.delete(`${from}:${act.u}`)) message(state, "Too late: someone else took it.");
         refresh(); return;
       }
@@ -218,6 +270,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         time: (value: number | null) => { fixedTime = value; },
         /** Fix the weather ({ rain, storm, fog }), or null to follow the clock. */
         weather: (value: Weather | null) => { fixedWeather = value; },
+        fireworks: () => { const state = game.current; if (state) celebrate(state.player.x, state.player.y, SKILL_COLORS.magic); },
+        boss: (ms: number | null) => { bossClock = ms === null ? null : () => ms; const state = game.current; if (state && ms !== null) { updateWorldBoss(state, ms); refresh(); } },
         view: (zoom: number, pitch: number, angle = 0) => { setSettings({ ...live.current.settings, zoom }); camera.current.pitch = pitch; camera.current.angle = angle; cameraGoal.current = null; },
         screenOf: (x: number, y: number) => {
           const view = canvas.current!.getBoundingClientRect(), point = toScreen(camera.current, x, y);
@@ -271,6 +325,32 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         while (now - tickAt.current >= TICK_MS) {
           tick(state); tickAt.current += TICK_MS;
           if (state.tick % 50 === 0) rollDaily(state, Date.now()); // a new UTC day brings new challenges
+          if (state.tick % 10 === 0 && bossClock) updateWorldBoss(state, bossClock());
+          if (state.tick % 10 === 5) {
+            // Achievements: the first check after you arrive catches up quietly; later ones celebrate.
+            const earned = checkAchievements(state, Date.now(), !achievementsChecked.current); achievementsChecked.current = true;
+            if (earned.length && !reducedMotion && earned.length < 4) celebrate(state.player.x, state.player.y, ["#f2d56b", "#e2c46a", "#ffffff"]);
+          }
+          if (state.tick % 25 === 0 && players.current.state.peers.length) notePlayers(state, players.current.state.peers, Date.now());
+          // A duel: close in, then swing on your weapon's speed; the other game applies the hit.
+          if (duel.current) {
+            const them = players.current.state.peers.find(peer => peer.id === duel.current!.target), me = state.player;
+            if (!them || !duelAllowed(state, them)) { if (them) message(state, "The duel is off: you both need to be inside the ring."); duel.current = null; }
+            else {
+              const far = Math.max(Math.abs(them.x - me.x), Math.abs(them.y - me.y)), reach = duelReach(state);
+              if (far === 0) { if (!me.path.length) walkTo(state, them.x + 1, them.y); }
+              else if (far > reach) { if (!me.path.length) walkTo(state, them.x, them.y); }
+              else {
+                me.path = []; me.heading = { x: Math.sign(them.x - me.x), y: Math.sign(them.y - me.y) };
+                if (state.tick >= duel.current.nextSwing) {
+                  const damage = duelStrike(state, them.combat);
+                  sendAct(them.id, { kind: "duel-hit", n: damage, u: state.tick }); lastDuel.current = { with: them.id, at: performance.now() };
+                  hits.current.push({ on: "peer", uid: them.id, damage: damage || -1, at: performance.now() });
+                  audio.current?.sfx(damage ? "hit" : "miss"); duel.current.nextSwing = state.tick + attackSpeed(me);
+                }
+              }
+            }
+          }
           // Playing together: tell the others where we are, follow whoever we're following, and count friends nearby.
           if (players.current.state.status !== "offline") window.parent.postMessage({ type: NET_PRESENCE, presence: presenceOf(state) }, "*");
           state.player.nearFriends = players.current.nearFriends(state);
@@ -295,7 +375,10 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           for (const event of fresh) {
             if (event.type === "hit") hits.current.push({ on: event.on, uid: event.uid, damage: event.damage, at: now });
             else if (event.type === "xp") xp.set(event.skill, (xp.get(event.skill) ?? 0) + event.amount);
-            else if (event.type === "level") { setLevelUps(list => [...list, { skill: event.skill, level: event.level }]); fireworks.current.push({ at: now, color: "#e2d7ad" }); }
+            else if (event.type === "level") {
+              setLevelUps(list => [...list, { skill: event.skill, level: event.level }]); fireworks.current.push({ at: now, color: "#e2d7ad" });
+              if (!reducedMotion) celebrate(state.player.x, state.player.y, SKILL_COLORS[event.skill]);
+            }
             else if (event.type === "sound") audio.current?.sfx(event.name);
             else if (event.type === "swing") audio.current?.sfx(event.weapon);
             else if (event.type === "creature") audio.current?.creature(event.id, event.action, nearness(state, event.x, event.y));
@@ -319,7 +402,10 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           // Footsteps on whatever is underfoot (two when running).
           if (state.player.moved === state.tick) {
             const step = stepSound(state), strides = Math.max(Math.abs(state.player.x - state.player.prev.x), Math.abs(state.player.y - state.player.prev.y));
-            audio.current?.sfx(step, 0.8); if (strides > 1) setTimeout(() => audio.current?.sfx(step, 0.8), TICK_MS / 2);
+            // Riding: a clip-clop for every tile the mount covers (three a tick at a unicorn's canter).
+            if (state.player.mount) for (let i = 0; i < strides; i++) setTimeout(() => audio.current?.sfx("hoof", 0.9), (TICK_MS / strides) * i);
+            else { audio.current?.sfx(step, 0.8); if (strides > 1) setTimeout(() => audio.current?.sfx(step, 0.8), TICK_MS / 2); }
+            stepMarks(state.world, state.player.prev, state.player, !!state.player.mount, reducedMotion);
           }
           ambience(state);
           // Held keys walk, turned to match the camera.
@@ -438,6 +524,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       const noun = `${players.current.name(p.id)} (level-${p.combat})`, friend = players.current.isFriend(p.id);
       return [
         { verb: "Follow", noun, tone: "plain" as const, run: () => { following.current = p.id; message(state, `You follow ${players.current.name(p.id)}.`); } },
+        ...(duelAllowed(state, p) ? [{ verb: "Fight", noun, tone: "monster" as const, run: () => { duel.current = { target: p.id, nextSwing: state.tick }; lastDuel.current = { with: p.id, at: performance.now() }; message(state, `You square up to Friend #${p.id}. May the best Friend win!`); audio.current?.sfx("duel"); refresh(); } }] : []),
         { verb: "Trade with", noun, tone: "plain" as const, run: () => { if (Math.max(Math.abs(p.x - state.player.x), Math.abs(p.y - state.player.y)) > 12) message(state, "You need to be closer to trade.", "warn"); else trades.current.request(state, p.id, performance.now()); refresh(); } },
         { verb: friend ? "Remove-friend" : "Add-friend", noun, tone: "plain" as const, run: () => { window.parent.postMessage({ type: NET_SOCIAL, op: friend ? "remove" : "add", id: p.id }, "*"); message(state, friend ? `${players.current.name(p.id)} removed from your friends list.` : `${players.current.name(p.id)} added to your friends list.`); } },
         { verb: "Message", noun, tone: "plain" as const, run: () => setWhisper({ text: `@${p.id} `, at: performance.now() }) },
@@ -458,6 +545,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     const options = optionsAt(x, y), first = options[0], tile = toTile(camera.current, x, y);
     if (!first) return;
     if (first.verb !== "Follow") following.current = null;
+    if (first.verb !== "Fight") duel.current = null;
     first.run(state);
     marker.current = { x: tile.x, y: tile.y, at: performance.now(), red: first.verb !== "Walk here" };
     if (live.current.selection) setSelection(null);
@@ -469,6 +557,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     const tile = toTile(camera.current, x, y);
     setMenu({ x, y, entries: optionsAt(x, y).map(option => ({ verb: option.verb, noun: option.noun, tone: option.tone, run: () => {
       if (option.verb !== "Follow" && option.verb !== "Examine") following.current = null;
+      if (option.verb !== "Fight" && option.verb !== "Examine") duel.current = null;
       option.run(state); marker.current = { x: tile.x, y: tile.y, at: performance.now(), red: option.verb !== "Walk here" };
       if (live.current.selection) setSelection(null); refresh();
     } })) });
@@ -831,6 +920,23 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
 const itemName = (id: string) => item(id).name;
 /** How loud something at (x, y) is for you (1 beside you, 0 twelve tiles away). */
 function nearness(state: Game, x: number, y: number) { return Math.max(0, 1 - Math.hypot(x - state.player.x, y - state.player.y) / 12); }
+/**
+ * Marks a step leaves on each tile it crosses: prints in snow and sand (hoofprints when riding), a splash in the bog,
+ * and a puff of dust from a mount's hooves.
+ */
+function stepMarks(world: World, from: { x: number; y: number }, to: { x: number; y: number }, hoof: boolean, reduced: boolean) {
+  const steps = Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y));
+  if (!steps || steps > 4) return;
+  const hx = Math.sign(to.x - from.x), hy = Math.sign(to.y - from.y);
+  for (let i = 1; i <= steps; i++) {
+    const x = Math.round(from.x + (to.x - from.x) * i / steps), y = Math.round(from.y + (to.y - from.y) * i / steps), terrain = terrainAt(world, x, y), ground = groundHeight(world, x, y);
+    if (terrain === T.SNOW || terrain === T.SAND) addPrint(x, y, hx, hy, hoof, terrain === T.SNOW);
+    if (reduced) continue;
+    if (terrain === T.SWAMP) { burst("drop", x, y, ground + 2, 5, "#bcd0c4", { speed: 0.6, up: 34, life: 0.6, size: 1.6 }); burst("ring", x, y, ground, 1, "#ffffff", { speed: 0, up: 0, gravity: 0, life: 1 }); }
+    else if (terrain === T.SNOW) burst("flake", x, y, ground + 2, hoof ? 4 : 2, "#ffffff", { speed: 0.5, up: 18, life: 0.6, size: 1.6, gravity: 60 });
+    else if (hoof || terrain === T.SAND) burst("dust", x, y, ground + 1, hoof ? 3 : 1, terrain === T.SAND ? "#d9c9a3" : "#c8c1b4", { speed: 0.5, up: 10, life: 0.8, size: hoof ? 3 : 2, gravity: 10 });
+  }
+}
 function stepSound(state: Game): SfxName {
   const terrain = terrainAt(state.world, state.player.x, state.player.y);
   if (terrain === T.WOOD || terrain === T.BRIDGE || terrain === T.CARPET) return "step_wood";

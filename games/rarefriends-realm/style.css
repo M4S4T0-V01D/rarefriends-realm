@@ -358,3 +358,19 @@
 .realm-daily-btn { position: absolute; right: -4px; top: -4px; z-index: 3; width: 34px; height: 34px; padding: 0 !important; display: grid; place-items: center; font-size: 17px; border-radius: 50%; background: var(--paper); border: 2px solid var(--ink); box-shadow: 2px 2px 0 #000; }
 .realm-daily-btn .realm-dot { top: -3px; right: -3px; }
 @media (max-width: 700px) { .realm-streak { gap: 3px; } .realm-streak li small { font-size: 8px; } }
+.realm-boss-line { margin: 8px 0 0; padding: 5px 8px; font-size: 12px; background: #f3ece2; border: 1.5px dashed var(--ink); }
+.realm-boss-line.up { background: #f6d9c9; border-style: solid; }
+
+.realm-achievements section h3 { margin: 8px 0 4px; }
+.realm-achievements ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 5px; }
+.realm-achievements li { display: flex; gap: 8px; align-items: center; padding: 5px 7px; background: #efede7; border: 2px solid #b7b2aa; color: var(--muted); }
+.realm-achievements li.done { background: #fffbe6; border-color: var(--ink); color: var(--ink); box-shadow: 2px 2px 0 var(--gold); }
+.realm-achievements li div { display: grid; } .realm-achievements li small { font-size: 11px; } .realm-achievements li em { font-size: 10px; color: #3d7a3f; font-style: normal; }
+.realm-badge { flex: none; width: 30px; height: 30px; display: grid; place-items: center; font-size: 16px; border-radius: 50%; background: #d6d3cc; border: 2px solid currentColor; }
+.realm-achievements li.done .realm-badge { background: var(--butter); }
+.realm-pets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.realm-pets button { display: grid; justify-items: center; gap: 1px; padding: 4px 2px !important; min-height: 0 !important; }
+.realm-pets button small { font-size: 10px; color: var(--ink); font-weight: 700; } .realm-pets button:disabled small { color: #cfcac2; font-weight: 400; } .realm-pets button[aria-pressed="true"] { background: var(--butter) !important; }
+.realm-hiscores { width: 100%; border-collapse: collapse; font-size: 11px; }
+.realm-hiscores th, .realm-hiscores td { padding: 2px 4px; text-align: left; border-bottom: 1px solid #0003; }
+.realm-hiscores tr.you td { font-weight: 700; background: #e2d7ad55; } .realm-hiscores tr.friend td { color: #2f6b3a; }

@@ -491,6 +491,8 @@ export type MonsterDef = {
   attackBonus: number; defenceBonus: number; maxHit: number; speed: number; aggressive?: boolean; size?: number;
   respawn: number; wander: number; examine: string; always?: readonly Drop[]; drops: readonly Drop[]; art: number; ink?: string;
   attackStyle?: "melee" | "magic"; boss?: boolean; slayerXp?: number;
+  /** A world boss: it rises on a schedule for everyone at once, and everyone who wounds it gets loot. */
+  worldBoss?: boolean;
   /** The Slayer level needed to wound it. */
   slayer?: number;
   /** Dragonfire: its top hit when it breathes (a Wyrmward shield turns it to a few points). */
@@ -547,6 +549,10 @@ Object.assign(MONSTERS, {
   emberwyrm: { id: "emberwyrm", name: "Old Cinder", level: 148, hp: 340, attack: 110, strength: 112, defence: 96, magicDef: 70, attackBonus: 70, defenceBonus: 80, maxHit: 20, speed: 5, respawn: 120, wander: 2, breath: 65, size: 3, boss: true,
     examine: "The oldest dragon in the Realm. The mountain is warm because she sleeps in it.", aggressive: true,
     always: [one("drake_bones", 1, 3, 3), coins(3000, 9000, 1)], drops: [one("wyrm_heart", 0.25), one("drakehide_vest", 0.08), one("drakehide_chaps", 0.1), one("rarite_helm", 0.1), one("rarite_bar", 0.4, 2, 5), one("gloomfang_bow", 0.02)], art: 114, ink: "#161616" },
+  ashen_colossus: { id: "ashen_colossus", name: "The Ashen Colossus", level: 210, hp: 1500, attack: 120, strength: 118, defence: 110, magicDef: 90, attackBonus: 70, defenceBonus: 70, maxHit: 18, speed: 6, respawn: 99_999, wander: 1,
+    size: 3, boss: true, worldBoss: true, aggressive: true, examine: "A Colossus-family giant of cinder and ash. It wakes every two hours, and it takes a crowd to put it back to sleep.",
+    always: [one("large_bones", 1, 2, 4), coins(4000, 12_000, 1), one("rarite_bar", 1, 1, 3)], drops: [one("wyrm_heart", 0.3), one("rarite_helm", 0.12), one("drakehide_vest", 0.1), one("gloomfang_bow", 0.04), one("rough_rosestone", 0.25, 1, 3), one("insight_lamp", 0.2)],
+    art: 109, ink: "#5a1f14" },
 } satisfies Record<string, MonsterDef>);
 export function combatLevelOf(monster: MonsterDef) { return monster.level; }
 
@@ -638,6 +644,19 @@ export const SHOPS: Record<string, ShopDef> = {
   bones: { id: "bones", name: "Bone Collector", buys: ["bones", "hide"], rate: 0.65, stock: ["bones", "large_bones"] },
   capes: { id: "capes", name: "The Keeper of Capes", stock: [...SKILLS.map(skill => `${skill}_cape`), "grandmaster_cape"] },
 };
+// ---------- Pets ----------
+/** Little companions found by chance while you train (1 in `odds` per action, luckier at higher levels). */
+export type PetDef = { id: string; name: string; from: string; odds: number; text: string };
+export const PETS: readonly PetDef[] = [
+  { id: "stumpy", name: "Stumpy", from: "Woodcutting", odds: 700, text: "A tree stump with ideas above its station, and a leaf on top." },
+  { id: "pebble", name: "Pebble", from: "Mining", odds: 700, text: "A rock that followed you home. It sparkles when it's happy." },
+  { id: "bubbles", name: "Bubbles", from: "Fishing", odds: 700, text: "A tiny fish in its own floating bubble." },
+  { id: "mote", name: "Mote", from: "Sigilcraft", odds: 250, text: "A speck of sigil light that likes your company." },
+  { id: "emberling", name: "Emberling", from: "Dragons", odds: 60, text: "A baby drake. Mostly harmless. Mostly." },
+  { id: "cinderkin", name: "Cinderkin", from: "The Ashen Colossus", odds: 6, text: "A chip off the old Colossus, still warm." },
+];
+export const petDef = (id: string | null | undefined) => PETS.find(pet => pet.id === id);
+
 // ---------- Mounts (the Friendhollow stables) ----------
 /** A horse's coat: body, mane and tail, hooves, and markings. */
 export type Coat = { body: string; mane: string; hoof: string; socks?: string; blaze?: string; pattern?: "dapple" | "piebald" | "stars"; horn?: string; rainbow?: boolean };

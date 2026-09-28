@@ -3,11 +3,12 @@
  * Pure TypeScript over the Game state, so it runs the same in the browser and in node tests.
  */
 import {
-  COOKING, CRAFTING, EMOTES, EQUIP_SLOTS, MOUNTS, mountDef, FLETCH_ARROWS, FLETCH_BOWS, SIGILCRAFT, STAFF_SIGILS, itemCategory, sigilsPerStone, FAMILY_NAMES, FIREMAKING, FISHING_SPOTS, GEM_CUTTING, METALS, MONSTERS, PRAYERS, RELICS, RF_BUNDLES, ROCKS, SHOPS, SHOP_BUY,
+  COOKING, CRAFTING, EMOTES, EQUIP_SLOTS, MOUNTS, PETS, mountDef, FLETCH_ARROWS, FLETCH_BOWS, SIGILCRAFT, STAFF_SIGILS, itemCategory, sigilsPerStone, FAMILY_NAMES, FIREMAKING, FISHING_SPOTS, GEM_CUTTING, METALS, MONSTERS, PRAYERS, RELICS, RF_BUNDLES, ROCKS, SHOPS, SHOP_BUY,
   SHOP_SELL, SKILLS, SKILL_NAMES, SMELTING, SMITH_PIECES, SMITH_XP, SPELLS, TREES, WARDROBE, XP_TABLE, isItem, item, levelForXp, smithLevel,
   type EquipSlot, type MetalId, type Skill, type Spell, type SpotKind, type WardrobeId,
 } from "./data.ts";
 import { cleanDaily } from "./daily.ts";
+import { cleanMet } from "./hiscores.ts";
 import { addSlayerPoints, slayerBoost, slayerKill, slayerProblem, taskText } from "./slayer.ts";
 import { NPCS, examineItem, npcDef, onMonsterKilled, questDone, searchCryptChest, searchWell, talk, tanHides, useCryptAltar } from "./content.ts";
 import {
@@ -430,6 +431,7 @@ export function craftSigils(game: Game, object: WorldObject) {
   addXp(game, "sigilcraft", entry.xp * stones); sound(game, "spell");
   emit(game, { type: "cast", spell: "sigilcraft", tick: game.tick });
   message(game, `You press ${made} ${item(entry.sigil).name.toLowerCase()}s${each > 1 ? ` (${each} per stone)` : ""}.`);
+  rollPet(game, "mote", level(game, "sigilcraft"));
   return made;
 }
 /** Fletching: arrow shafts (15 a log) or a bow from one kind of log. */
@@ -778,6 +780,7 @@ function woodcutTick(game: Game, activity: Extract<Activity, { kind: "woodcut" }
   give(player, tree.log); addXp(game, "woodcutting", tree.xp);
   if (player.familyId === 4 && game.rng() < 0.08 && freeSlots(player)) { give(player, tree.log); message(game, "Lopsided luck! You get an extra log."); }
   message(game, `You get some ${item(tree.log).name.toLowerCase()}.`);
+  rollPet(game, "stumpy", level(game, "woodcutting"));
   if (game.rng() < tree.deplete) { game.depleted.set(object.id, game.tick + tree.respawn + Math.floor(game.rng() * tree.respawn)); player.activity = null; sound(game, "fell"); return; }
   if (!freeSlots(player)) { message(game, "Your inventory is too full to hold any more logs.", "warn"); player.activity = null; }
 }
@@ -797,6 +800,7 @@ function mineTick(game: Game, activity: Extract<Activity, { kind: "mine" }>) {
   if (player.familyId === 4 && game.rng() < 0.08 && freeSlots(player)) { give(player, ore); message(game, "Lopsided luck! You mine a second piece."); }
   if (object.rock === "sigil") { if (!freeSlots(player)) { message(game, "Your inventory is too full to hold any more sigil stones.", "warn"); player.activity = null; } return; }
   message(game, `You manage to mine some ${item(ore).name.toLowerCase().replace(" ore", "")}.`);
+  rollPet(game, "pebble", level(game, "mining"));
   game.depleted.set(object.id, game.tick + rock.respawn + Math.floor(game.rng() * rock.respawn * 0.5));
   player.activity = null;
 }
@@ -813,6 +817,7 @@ function fishTick(game: Game, activity: Extract<Activity, { kind: "fish" }>) {
     give(player, entry.fish); addXp(game, "fishing", entry.xp); sound(game, "catch");
     if (player.familyId === 4 && game.rng() < 0.08 && freeSlots(player)) give(player, entry.fish);
     message(game, `You catch ${entry.fish === "raw_minnows" ? "some minnows" : `a ${item(entry.fish).name.replace("Raw ", "").toLowerCase()}`}.`);
+    rollPet(game, "bubbles", level(game, "fishing"));
     return;
   }
 }
@@ -1007,6 +1012,7 @@ const SPELL_COLORS: Record<string, string> = { breeze_dart: "#dfe6ea", tide_dart
 function damageMonster(game: Game, monster: Monster, damage: number, missed: boolean) {
   const dealt = Math.min(damage, monster.hp);
   monster.hp -= dealt;
+  if (dealt > 0) monster.mine = true;
   emit(game, { type: "hit", on: "monster", uid: monster.uid, damage: missed ? -1 : dealt, tick: game.tick });
   if (monster.attackTimer <= 0) monster.attackTimer = 1;
   if (monster.hp <= 0) killMonster(game, monster);
@@ -1016,14 +1022,25 @@ function killMonster(game: Game, monster: Monster) {
   const player = game.player;
   monster.dead = true; monster.target = false; monster.respawnAt = game.tick + monster.def.respawn;
   if (player.combat === monster.uid) player.combat = null;
-  player.kills++; sound(game, "kill"); creature(game, monster, "death");
+  player.kills++; player.killLog[monster.def.id] = (player.killLog[monster.def.id] ?? 0) + 1; sound(game, "kill"); creature(game, monster, "death");
   const at = { x: monster.x, y: monster.y }, silver = Math.min(RELICS[1].max, player.relics[1] ?? 0) * RELICS[1].coinsPer + (riding(player)?.coins ?? 0);
   const roll = (drop: { item: string; min: number; max: number }) => {
     const n = drop.min + Math.floor(game.rng() * (drop.max - drop.min + 1));
     dropItem(game, drop.item, drop.item === "coins" ? Math.round(n * (1 + silver)) : n, at.x, at.y);
   };
   for (const drop of monster.def.always ?? []) roll(drop);
-  for (const drop of monster.def.drops) if (game.rng() < drop.chance) roll(drop);
+  for (const drop of monster.def.drops) if (game.rng() < drop.chance) {
+    const before = game.ground.length;
+    roll(drop);
+    // A rare or valuable drop: a beam of light over it, a chime, and a line in the chat.
+    if (drop.item !== "coins" && (drop.chance <= 0.05 || item(drop.item).value >= 1500)) {
+      for (const entry of game.ground.slice(before)) entry.rare = true;
+      const found = game.ground.find(entry => entry.id === drop.item && entry.x === at.x && entry.y === at.y); if (found) found.rare = true;
+      message(game, `Valuable drop: ${item(drop.item).name}!`, "quest"); sound(game, "rare");
+    }
+  }
+  if (monster.def.breath) rollPet(game, "emberling", monster.def.id === "emberwyrm" ? 400 : 99);
+  if (monster.def.worldBoss) rollPet(game, "cinderkin", 99);
   onMonsterKilled(game, monster.def.id, at.x, at.y);
   slayerKill(game, monster.def.id);
 }
@@ -1324,6 +1341,8 @@ export function syncMonster(game: Game, fight: { u: number; id: string; hp: numb
   emit(game, { type: "hit", on: "monster", uid: monster.uid, damage: monster.hp - hp, tick: game.tick });
   monster.hp = hp;
   if (hp > 0) return;
+  // A world boss pays everyone who wounded it.
+  if (monster.def.worldBoss && monster.mine) { message(game, `Friend #${by} lands the final blow, and the ${monster.def.name.replace(/^The /, "")} falls!`, "quest"); killMonster(game, monster); return; }
   monster.dead = true; monster.target = false; monster.respawnAt = game.tick + monster.def.respawn;
   if (game.player.combat === monster.uid) { game.player.combat = null; game.player.queuedSpell = null; }
   creature(game, monster, "death");
@@ -1512,8 +1531,27 @@ export type OwnedFriend = { id: number; generation: number | null };
 export function setFollower(game: Game, friend: OwnedFriend | null) {
   const player = game.player;
   player.follower = friend?.id ?? null; player.followerGeneration = friend?.generation ?? null; game.pet = null;
+  if (friend) player.petOut = null;
   if (friend) updatePet(game);
   if (friend) message(game, `Friend #${friend.id} follows you now.`, "info");
+}
+
+// ---------- Pets ----------
+/** A chance at a pet on a successful action (luckier at higher levels: up to three times the odds at 99). */
+export function rollPet(game: Game, id: string, skillLevel: number) {
+  const pet = PETS.find(entry => entry.id === id), player = game.player;
+  if (!pet || player.pets.includes(id) || game.rng() >= (1 + Math.min(99, skillLevel) / 50) / pet.odds) return false;
+  player.pets.push(id);
+  message(game, `You have a funny feeling like you're being followed... ${pet.name} has joined you!`, "quest"); sound(game, "rare");
+  if (player.follower === null && !player.petOut) { player.petOut = id; game.pet = null; updatePet(game); }
+  return true;
+}
+/** Call a pet you've found to follow you (instead of a Friend), or send it home. */
+export function setPet(game: Game, id: string | null) {
+  const player = game.player;
+  if (id && !player.pets.includes(id)) return;
+  player.petOut = id; game.pet = null;
+  if (id) { player.follower = null; player.followerGeneration = null; updatePet(game); message(game, `${PETS.find(pet => pet.id === id)!.name} follows you now.`, "info"); }
 }
 
 // ---------- Mounts ----------
@@ -1533,7 +1571,7 @@ export function toggleMount(game: Game, id?: string) {
   const problem = rideProblem(game);
   if (problem) { message(game, problem, "warn"); return; }
   player.mount = choice; player.lastMount = choice; player.emote = null;
-  message(game, `You mount your ${mountDef(choice)!.name.toLowerCase()}.`); sound(game, "click");
+  message(game, `You mount your ${mountDef(choice)!.name.toLowerCase()}.`); sound(game, "whinny");
 }
 /** A new mount from the stables (bought with RF); you ride it straight away where you can. */
 export function grantMount(game: Game, id: string) {
@@ -1557,7 +1595,7 @@ function rideUpkeep(game: Game) {
  */
 function updatePet(game: Game) {
   const player = game.player;
-  if (player.follower === null) { game.pet = null; return; }
+  if (player.follower === null && !player.petOut) { game.pet = null; return; }
   const pet = game.pet;
   const beside = () => {
     const behind = game.trail[game.trail.length - 1];
@@ -1586,7 +1624,7 @@ export type SaveData = {
   inventory: (Slot | null)[]; equipment: Record<string, string>; bank: Slot[]; style: CombatStyle; autocast: string | null;
   quests: Record<string, number>; questData: Record<string, number>; wardrobe: string[]; worn: string[]; follower: number | null; followerGeneration: number | null;
   kills: number; deaths: number; tutorial: number; created: number; playTicks: number; retaliate: boolean; music: string[];
-  referredBy?: number | null; referrals?: number[]; referralTimes?: number[]; boostTicks?: number; mounts?: string[]; mount?: string | null; daily?: unknown; seenUpdate?: number;
+  met?: unknown; achievements?: Record<string, number>; pets?: string[]; petOut?: string | null; killLog?: Record<string, number>; stats?: Record<string, number>; referredBy?: number | null; referrals?: number[]; referralTimes?: number[]; boostTicks?: number; mounts?: string[]; mount?: string | null; daily?: unknown; seenUpdate?: number;
 };
 export function serialize(game: Game): SaveData {
   const player = game.player;
@@ -1596,7 +1634,7 @@ export function serialize(game: Game): SaveData {
     style: player.style, autocast: player.autocast, quests: { ...player.quests }, questData: { ...player.questData }, wardrobe: [...player.wardrobe], worn: [...player.worn],
     follower: player.follower, followerGeneration: player.followerGeneration, kills: player.kills, deaths: player.deaths, tutorial: player.tutorial, created: player.created,
     playTicks: game.playTicks, retaliate: game.autoRetaliate, music: [...player.music],
-    referredBy: player.referredBy, referrals: [...player.referrals], referralTimes: [...player.referralTimes], boostTicks: player.boostTicks, mounts: [...player.mounts], mount: player.mount, daily: JSON.parse(JSON.stringify(player.daily)), seenUpdate: player.seenUpdate,
+    referredBy: player.referredBy, referrals: [...player.referrals], referralTimes: [...player.referralTimes], boostTicks: player.boostTicks, mounts: [...player.mounts], mount: player.mount, met: JSON.parse(JSON.stringify(player.met)), achievements: { ...player.achievements }, pets: [...player.pets], petOut: player.petOut, killLog: { ...player.killLog }, stats: { ...player.stats }, daily: JSON.parse(JSON.stringify(player.daily)), seenUpdate: player.seenUpdate,
   };
 }
 const QUEST_IDS = ["friends_feast", "grumblin_trouble", "cold_forge", "hollow_whispers", "lost_glimmer", "hollow_king"];
@@ -1682,6 +1720,12 @@ export function restore(game: Game, raw: unknown): boolean {
   player.mounts = MOUNTS.filter(mount => Array.isArray(save.mounts) && save.mounts.includes(mount.id)).map(mount => mount.id);
   player.mount = typeof save.mount === "string" && player.mounts.includes(save.mount) ? save.mount : null;
   player.daily = cleanDaily(save.daily, SKILLS);
+  player.met = cleanMet(save.met);
+  player.achievements = Object.fromEntries(Object.entries(save.achievements && typeof save.achievements === "object" ? save.achievements : {}).filter(([id, day]) => /^[a-z0-9_]{1,32}$/.test(id) && typeof day === "number" && Number.isFinite(day)).slice(0, 100).map(([id, day]) => [id, Math.floor(day as number)]));
+  player.pets = PETS.filter(pet => Array.isArray(save.pets) && save.pets.includes(pet.id)).map(pet => pet.id);
+  player.petOut = typeof save.petOut === "string" && player.pets.includes(save.petOut) && player.follower === null ? save.petOut : null;
+  player.stats = Object.fromEntries(Object.entries(save.stats && typeof save.stats === "object" ? save.stats : {}).filter(([key, n]) => /^[a-zA-Z]{1,24}$/.test(key) && typeof n === "number" && Number.isFinite(n)).slice(0, 40).map(([key, n]) => [key, Math.max(0, Math.min(1e9, Math.floor(n as number)))]));
+  player.killLog = Object.fromEntries(Object.entries(save.killLog && typeof save.killLog === "object" ? save.killLog : {}).filter(([id, n]) => id in MONSTERS && typeof n === "number" && Number.isFinite(n)).map(([id, n]) => [id, Math.max(0, Math.min(1e7, Math.floor(n as number)))]));
   // Saves from before the update log see it from the start.
   player.seenUpdate = int(save.seenUpdate, 0, 1e6, 0);
   return true;

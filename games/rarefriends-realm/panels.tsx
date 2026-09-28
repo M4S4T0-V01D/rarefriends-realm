@@ -3,11 +3,15 @@ import React, { useEffect, useRef, useState, type CSSProperties, type MouseEvent
 import type { GenerationSprites } from "@rarefriends/friendsdk/sprites";
 import {
   EMOTES, EQUIP_SLOTS, FAMILY_NAMES, FAMILY_PERKS, PRAYERS, RELICS, SHOPS, SKILLS, SKILL_ICONS, SKILL_NAMES, SPELLS, WARDROBE, XP_TABLE, item, levelForXp,
-  type EquipSlot, type Skill, mountDef,
+  type EquipSlot, type Skill, mountDef, PETS,
 } from "./data.ts";
 import { mountArt } from "./mountart.ts";
 import { CHEST_REWARD, DAY_MS, challengeProgress, challengeReward, challengeText, claimChallenge, claimChest, claimStreak, dailyWaiting, rewardText, rollDaily, streakReward, streakStatus } from "./daily.ts";
 import { LATEST_UPDATE, UPDATES } from "./updates.ts";
+import { bossWindow } from "./worldboss.ts";
+import { ACHIEVEMENTS, achieved } from "./achievements.ts";
+import { hiscores } from "./hiscores.ts";
+import { petArt } from "./petart.ts";
 import { MAX_QUEST_POINTS, NPCS, QUESTS, finalStage, questPoints } from "./content.ts";
 import {
   bankDeposit, bankDepositAll, bankDepositWorn, bankWithdraw, bonuses, combatLevel, count, isStaffEquipped, maxHp, maxPrayer, message, totalLevel, totalXp,
@@ -15,7 +19,7 @@ import {
 } from "./state.ts";
 import {
   bestArrow, bowRange, emoteProblem, performEmote, applyReferral, shopBuys, buy, buyPrice, canCast, capeProblem, castSpell, rangedMaxHit, rubLamp, chooseOption, continueDialogue, dialogueAtOptions, itemOptions, playerMaxHit, recipeProblem, sell, sellPrice,
-  castOnItem, setFollower, setStyle, startProduction, swapSlots, toggleRun, togglePrayer, toggleWorn, unequip, useItemOnItem, type OwnedFriend, type Selection,
+  castOnItem, setFollower, setPet, setStyle, startProduction, swapSlots, toggleRun, togglePrayer, toggleWorn, unequip, useItemOnItem, type OwnedFriend, type Selection,
 } from "./engine.ts";
 import { friendRows, renderWorldMap } from "./render.ts";
 import { isUnderground, realPoint } from "./world.ts";
@@ -415,6 +419,21 @@ function FriendsTab({ game, refresh, roster, rosterState, friendSprites, loadFri
           </button>
         ))}
       </div>
+      <h3>Pets <small>({player.pets.length}/{PETS.length})</small></h3>
+      <div className="realm-pets">
+        {PETS.map(pet => { const owned = player.pets.includes(pet.id), out = player.petOut === pet.id;
+          return <button key={pet.id} type="button" disabled={!owned} aria-pressed={out} title={owned ? `${pet.name}: ${pet.text} Click to ${out ? "send home" : "call"}.` : `Undiscovered: found while ${pet.from === "Dragons" || pet.from.startsWith("The ") ? `fighting ${pet.from === "Dragons" ? "dragons" : pet.from}` : `training ${pet.from}`}`}
+            aria-label={owned ? `${pet.name}${out ? " (following you)" : ""}` : `Undiscovered pet (${pet.from})`} onClick={() => { setPet(game, out ? null : pet.id); refresh(); }}
+            {...rightClick(openMenu, () => owned ? [out ? { verb: "Send-home", noun: pet.name, tone: "npc", run: () => { setPet(game, null); refresh(); } } : { verb: "Call", noun: pet.name, tone: "npc", run: () => { setPet(game, pet.id); refresh(); } },
+              { verb: "Examine", noun: pet.name, run: () => { message(game, pet.text); refresh(); } }] : [{ verb: "Examine", noun: "Undiscovered pet", run: () => { message(game, `A pet found by chance: ${pet.from}.`); refresh(); } }])}>
+            {owned ? <PixelIcon art={petArt(pet.id, 0)} size={34} /> : <span className="realm-mystery">?</span>}<small>{owned ? pet.name : pet.from}</small>
+          </button>; })}
+      </div>
+      <h3>Hiscores <small>(you and the players you've met)</small></h3>
+      {(() => { const rows = hiscores(game), me = rows.find(row => row.you)!, shown = rows.slice(0, 10), friends = new Set(net?.friends ?? []);
+        return <><table className="realm-hiscores"><thead><tr><th>#</th><th>Friend</th><th>Total</th><th>Combat</th></tr></thead><tbody>
+          {(shown.includes(me) ? shown : [...shown, me]).map(row => <tr key={row.id} className={row.you ? "you" : friends.has(row.id) ? "friend" : ""}><td>{row.rank}</td><td>{row.you ? "You" : `#${row.id}`}{friends.has(row.id) ? " ♥" : ""}</td><td>{row.total}</td><td>{row.combat}</td></tr>)}
+        </tbody></table>{rows.length === 1 && <p className="realm-muted">Play online to meet other players: they'll show up here.</p>}</>; })()}
       <h3>Wardrobe <small>({player.wardrobe.length}/{WARDROBE.length})</small></h3>
       <div className="realm-wardrobe">
         {WARDROBE.map(piece => {
@@ -838,7 +857,7 @@ export function Orbs({ game, onRun, onRide, onMap, onZoom, onRotate, openMenu }:
 }
 
 // ---------- The daily popup: the streak and challenges, and the update log ----------
-export type DailyTab = "daily" | "updates";
+export type DailyTab = "daily" | "updates" | "achievements";
 export function DailyModal({ game, tab, onTab, onClose, refresh, openMenu }: { game: Game; tab: DailyTab; onTab: (tab: DailyTab) => void; onClose: () => void; refresh: () => void; openMenu?: OpenMenu }) {
   const now = Date.now(), player = game.player;
   rollDaily(game, now);
@@ -857,13 +876,26 @@ export function DailyModal({ game, tab, onTab, onClose, refresh, openMenu }: { g
       <div className="realm-daily-tabs" role="tablist">
         <button type="button" role="tab" aria-selected={tab === "daily"} onClick={() => onTab("daily")}>🔥 Daily streak{dailyWaiting(game, now) && <i className="realm-dot" aria-label="(something to claim)" />}</button>
         <button type="button" role="tab" aria-selected={tab === "updates"} onClick={() => onTab("updates")}>📜 Updates{unseen && <i className="realm-dot" aria-label="(new)" />}</button>
+        <button type="button" role="tab" aria-selected={tab === "achievements"} onClick={() => onTab("achievements")}>🏆 Achievements <small>{achieved(game)}/{ACHIEVEMENTS.length}</small></button>
       </div>
-      {tab === "daily" ? (
+      {tab === "achievements" ? (
+        <div className="realm-achievements">
+          {[...new Set(ACHIEVEMENTS.map(entry => entry.group))].map(group => <section key={group}><h3>{group}</h3><ul>
+            {ACHIEVEMENTS.filter(entry => entry.group === group).map(entry => { const day = player.achievements[entry.id];
+              return <li key={entry.id} className={day !== undefined ? "done" : ""} title={entry.text}
+                {...rightClick(openMenu, () => [{ verb: "Examine", noun: entry.name, run: () => { message(game, `${entry.name}: ${entry.text}${day !== undefined ? ` Earned ${new Date(day * DAY_MS).toISOString().slice(0, 10)}.` : ""}`); refresh(); } }])}>
+                <b className="realm-badge">{day !== undefined ? entry.icon : "?"}</b><div><b>{entry.name}</b><small>{entry.text}</small>{day !== undefined && <em>Earned {new Date(day * DAY_MS).toISOString().slice(0, 10)}</em>}</div>
+              </li>; })}
+          </ul></section>)}
+        </div>
+      ) : tab === "daily" ? (
         <div className="realm-daily">
           <div className="realm-streak-head">
             <b>{status.canClaim ? (status.reset ? "Your streak ended. Start a new one today!" : status.streak ? `Day ${status.streak} streak. Keep it going!` : "Start your streak today!") : `🔥 Day ${daily.streak} streak`}</b>
             <small>Best {Math.max(daily.best, daily.streak)} days · a new day in {resetText} (midnight UTC)</small>
           </div>
+          {(() => { const boss = bossWindow(now), left = boss.active ? boss.end - now : boss.next - now, h = Math.floor(left / 3_600_000), m = Math.floor(left / 60_000) % 60;
+            return <p className={`realm-boss-line${boss.active ? " up" : ""}`}>☠ <b>World boss:</b> {boss.active ? `the Ashen Colossus is up in Wyrmreach for ${m} more minute${m === 1 ? "" : "s"}. Everyone who wounds it shares the loot!` : `the Ashen Colossus rises in Wyrmreach in ${h ? `${h}h ` : ""}${m}m.`}</p>; })()}
           <ol className="realm-streak">
             {Array.from({ length: 7 }, (_, i) => cycleStart + i).map(day => {
               const claimed = status.canClaim ? day < status.next : day <= daily.streak, today = day === status.next, icon = iconOf(day);

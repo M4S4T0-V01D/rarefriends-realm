@@ -3,7 +3,8 @@
  * Draws in a 960 × 640 logical view; the caller scales the canvas for the device.
  */
 import type { GenerationSprites } from "@rarefriends/friendsdk/sprites";
-import { ROCKS, isItem, item, levelForXp, mountDef, type Coat, type Icon } from "./data.ts";
+import { ROCKS, isItem, item, levelForXp, mountDef, petDef, type Coat, type Icon } from "./data.ts";
+const isPet = (id: string) => !!petDef(id);
 import { NPCS } from "./content.ts";
 import { TICK_MS, attackSpeed, riding, type Facing, type Game, type Monster, type Npc, type Projectile } from "./state.ts";
 import { npcOverhead, type Pick } from "./engine.ts";
@@ -16,6 +17,7 @@ import { drawPixels, shadeHex } from "./pixel.ts";
 import { TEX_PER_HEIGHT, TEX_PER_TILE, beginTextures, groundTexture, shingleTexture, texturedQuad, texturedTriangle, wallTexture, type GroundStyle, type WallStyle } from "./textures.ts";
 import { campfireLogs, decorArt, fireArt, rockArt, treeArt } from "./scenery.ts";
 import { SADDLE, mountArt, type MountView } from "./mountart.ts";
+import { petArt } from "./petart.ts";
 import { burst, drawCloudShadows, drawEffects, playerPose, puff, treeShake, updateEffects, type Pose } from "./effects.ts";
 import { drawAuras, drawFigure, figureArt } from "./wardrobe.ts";
 import { creatureSprite, friendSprite, type Mask } from "./sprites.ts";
@@ -110,7 +112,7 @@ function drawNight(ctx: CanvasRenderingContext2D, dark: number, warm: number, li
     pool(ctx, light, i, [[0, hexA(c, 0.5 * k)], [0.45, hexA(c, 0.2 * k)], [1, hexA(c, 0)]], 0.75); });
   ctx.globalCompositeOperation = "source-over";
 }
-export type HitSplat = { on: "player" | "monster"; uid?: number; damage: number; at: number };
+export type HitSplat = { on: "player" | "monster" | "peer"; uid?: number; damage: number; at: number };
 type Hit = { x: number; y: number; w: number; h: number; pick: Pick };
 
 // ---------- Projection ----------
@@ -348,6 +350,32 @@ function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, x0: number, y0
   }
   ctx.strokeStyle = "rgba(22,22,22,0.16)"; ctx.lineWidth = 1; ctx.stroke(contours);
   ctx.strokeStyle = "rgba(22,22,22,0.55)"; ctx.lineWidth = Math.max(0.8, z); ctx.stroke(edges);
+}
+
+// ---------- Footprints ----------
+/** Prints left in snow and sand (a pair of paw prints, or a mount's hoofprints), fading over a while. */
+type Print = { x: number; y: number; hx: number; hy: number; at: number; hoof: boolean; snow: boolean };
+const prints: Print[] = [];
+const PRINT_MS = 14_000;
+export function addPrint(x: number, y: number, hx: number, hy: number, hoof: boolean, snow: boolean) {
+  if (prints.length > 160) prints.shift();
+  prints.push({ x, y, hx, hy, at: performance.now(), hoof, snow });
+}
+function drawPrints(ctx: CanvasRenderingContext2D, camera: Camera, now: number) {
+  while (prints.length && now - prints[0].at > PRINT_MS) prints.shift();
+  const z = camera.zoom;
+  for (const print of prints) {
+    if (Math.abs(print.x - camera.x) + Math.abs(print.y - camera.y) > 40) continue;
+    const fade = 1 - (now - print.at) / PRINT_MS, length = Math.hypot(print.hx, print.hy) || 1, fx = print.hx / length, fy = print.hy / length, sx = -fy, sy = fx;
+    const color = print.snow ? `rgba(104,120,150,${(0.6 * fade).toFixed(3)})` : `rgba(112,86,52,${(0.55 * fade).toFixed(3)})`;
+    // Two marks side by side, one a little ahead of the other (or a mount's four hooves).
+    const marks: [number, number][] = print.hoof ? [[0.14, 0.18], [-0.14, 0.02], [0.14, -0.14], [-0.14, -0.3]] : [[0.12, 0.1], [-0.12, -0.12]];
+    for (const [side, ahead] of marks) {
+      const p = toScreen(camera, print.x + sx * side + fx * ahead, print.y + sy * side + fy * ahead);
+      if (print.hoof) { ctx.strokeStyle = color; ctx.lineWidth = 1.6 * z; ctx.beginPath(); ctx.ellipse(p.x, p.y, 3.2 * z, 1.8 * z, 0, Math.PI * 0.1, Math.PI * 0.9, true); ctx.stroke(); }
+      else { ctx.fillStyle = color; ctx.beginPath(); ctx.ellipse(p.x, p.y, 3.4 * z, 1.9 * z, 0, 0, Math.PI * 2); ctx.fill(); for (const toe of [-2.6, 0, 2.6]) ctx.fillRect(p.x + toe * z - 0.8 * z, p.y - 3.4 * z, 1.6 * z, 1.4 * z); }
+    }
+  }
 }
 
 // ---------- Objects ----------
@@ -807,6 +835,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   const y0 = Math.max(cy - DRAW_DISTANCE, Math.min(...corners.map(c => c.y)) - 2), y1 = Math.min(cy + DRAW_DISTANCE, Math.max(...corners.map(c => c.y)) + 3);
   drawTerrain(ctx, scene, x0, y0, x1, y1);
   drawCloudShadows(ctx, project, camera, now, z, underground, scene.reducedMotion);
+  drawPrints(ctx, camera, now);
   const sky = daylight(scene.time), weather = scene.weather ?? null, overcast = weather ? weather.rain * (weather.storm ? 0.45 : 0.28) : 0;
   const hits: Hit[] = [], drawables: Drawable[] = [], light = underground ? { dark: 0.95, warm: 0, label: "Dark" } : { ...sky, dark: Math.min(1, sky.dark + overcast * (1 - sky.dark)), warm: sky.warm * (1 - (weather?.rain ?? 0)) }, lights: Light[] = [];
   // Lights pool on the ground beneath their source (the lift only decides where the pool sits on screen, a little below).
@@ -919,7 +948,20 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     const key = `${entry.x},${entry.y}`; const list = groundTiles.get(key) ?? []; list.push(entry); groundTiles.set(key, list);
   }
   for (const list of groundTiles.values()) {
+    const rare = list.some(entry => entry.rare);
+    if (rare) glow(list[0].x, list[0].y, 20, 90, "#f2d56b", 0.9, true);
     drawables.push({ depth: depth(list[0].x, list[0].y) - 0.3, draw: () => {
+      if (rare) {
+        // A rare drop: a pulsing golden beam rising from it, with motes drifting up.
+        const s = toScreen(camera, list[0].x, list[0].y), pulse = scene.reducedMotion ? 0.8 : 0.7 + Math.sin(now / 260) * 0.3, height = 170 * z, width = 16 * z;
+        const beam = ctx.createLinearGradient(0, s.y, 0, s.y - height);
+        beam.addColorStop(0, `rgba(255,214,90,${(0.85 * pulse).toFixed(3)})`); beam.addColorStop(0.5, `rgba(255,214,90,${(0.45 * pulse).toFixed(3)})`); beam.addColorStop(1, "rgba(255,226,120,0)");
+        ctx.fillStyle = beam; ctx.fillRect(s.x - width / 2, s.y - height, width, height);
+        ctx.fillStyle = `rgba(255,252,230,${(0.8 * pulse).toFixed(3)})`; ctx.fillRect(s.x - width / 6, s.y - height * 0.8, width / 3, height * 0.8);
+        ctx.strokeStyle = `rgba(200,150,40,${(0.5 * pulse).toFixed(3)})`; ctx.lineWidth = 1; ctx.strokeRect(s.x - width / 2, s.y - height * 0.7, width, height * 0.7);
+        ellipse(ctx, s.x, s.y, 18 * z, 7 * z, `rgba(255,226,120,${(0.35 * pulse).toFixed(3)})`, null);
+        if (!scene.reducedMotion) for (let i = 0; i < 5; i++) { const k = ((now / 1600) + i / 5) % 1; ctx.fillStyle = `rgba(255,255,255,${(1 - k).toFixed(3)})`; ctx.fillRect(s.x + Math.sin(i * 2.3 + now / 400) * width * 0.6, s.y - k * height, 2 * z, 2 * z); }
+      }
       list.slice(0, 4).forEach((entry, index) => {
         const s = toScreen(camera, entry.x, entry.y), ox = (index % 2 ? 7 : -7) * z, oy = (index > 1 ? 4 : -2) * z, size = 22 * z;
         drawIcon(ctx, item(entry.id).icon, s.x + ox, s.y + oy - 4 * z, size);
@@ -954,12 +996,14 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     drawables.push({ depth: depth(peer.x, peer.y) + 0.12, draw: () => drawPeer(ctx, scene, peer, hits) });
   }
   // Your follower: an owned Friend walking the tiles you leave behind, animated like any NPC.
-  if (scene.follower && game.pet && (shown(game.pet.x, game.pet.y) || realPoint(world, game.pet.x, game.pet.y).level === level)) {
+  const petOut = game.player.petOut;
+  if ((scene.follower || petOut) && game.pet && (shown(game.pet.x, game.pet.y) || realPoint(world, game.pet.x, game.pet.y).level === level)) {
     const pet = game.pet, at = interpolate(pet, game, alpha);
     drawables.push({ depth: depth(at.x, at.y) + 0.05, draw: () => {
       const s = toScreen(camera, at.x, at.y), facing = screenFacing(camera, pet.heading);
       ellipse(ctx, s.x, s.y, 11 * z, 4.5 * z, "rgba(22,22,22,0.16)", null);
-      drawMask(ctx, friendRows(scene.follower!, facing, at.moving, at.moving ? Math.floor(now / 90) % 8 : 0), s.x, s.y + 2 * z, 2.6 * z);
+      if (petOut) drawPet(ctx, petOut, s.x, s.y, facing, at.moving, now, z, scene.reducedMotion);
+      else drawMask(ctx, friendRows(scene.follower!, facing, at.moving, at.moving ? Math.floor(now / 90) % 8 : 0), s.x, s.y + 2 * z, 2.6 * z);
     } });
   }
   if (scene.hoverTile && floor) { const hover = scene.hoverTile; drawables.push({ depth: depth(hover.x, hover.y) - 0.4, draw: () => tileOutline(hover.x, hover.y, "rgba(22,22,22,0.35)") }); }
@@ -1217,6 +1261,13 @@ function drawSpell(ctx: CanvasRenderingContext2D, element: string, look: { core:
   void at; void progress;
 }
 const maxHpOf = (game: Game) => levelForXp(game.player.xp.hitpoints);
+/** A pet with its feet on (x, y): hopping as it walks, bobbing (or flickering) when it waits. */
+function drawPet(ctx: CanvasRenderingContext2D, id: string, x: number, y: number, facing: Facing, moving: boolean, now: number, z: number, reduced: boolean) {
+  const frame = reduced ? 0 : Math.floor(now / (moving ? 140 : 480)) % 2, hop = moving && !reduced ? Math.abs(Math.sin(now / 140)) * 4 * z : 0, float = id === "mote" || id === "bubbles" ? 10 * z : 0;
+  const art = petArt(id, frame);
+  if (facing === "left") { ctx.save(); ctx.translate(x, 0); ctx.scale(-1, 1); drawPixels(ctx, art, 0, y + 2 * z - hop - float, ART * z * 1.5); ctx.restore(); }
+  else drawPixels(ctx, art, x, y + 2 * z - hop - float, ART * z * 1.5);
+}
 /** How far a rider sits above the ground (world pixels, for toScreen's lift): on the saddle, legs astride. */
 /** Mounts are drawn a little larger than the scenery's pixel scale, so a Friend on top doesn't hide its horse. */
 const MOUNT_SCALE = 1.35;
@@ -1311,6 +1362,7 @@ function drawPeer(ctx: CanvasRenderingContext2D, scene: Scene, peer: PeerView, h
   const rows = sprites ? friendRows(sprites, facing, peer.moving && !mount, mount ? 0 : stride) : peer.moving && Math.floor(now / 160) % 2 ? friendSprite(peer.p.family, peer.p.id).step : friendSprite(peer.p.family, peer.p.id).idle;
   const px = 3.2 * z, swinging = !!peer.p.activity && peer.p.activity !== "combat" || (peer.p.activity === "combat" && !scene.reducedMotion && Math.floor(now / 1200) % 2 === 0), worn = [...peer.p.worn, ...(peer.p.cape ? [peer.p.cape] : []), ...(peer.p.head ? [peer.p.head] : []), ...(peer.p.shield ? [peer.p.shield] : []), ...(peer.p.weapon && !swinging ? [peer.p.weapon] : [])], cloth = scene.reducedMotion ? 0 : peer.moving ? stride % 4 : Math.floor(now / 520) % 4;
   ellipse(ctx, feet.x, feet.y, (mount ? 32 : 15) * z, (mount ? 10 : 6) * z, "rgba(22,22,22,0.18)", peer.friend ? "rgba(159,224,168,0.9)" : "rgba(255,255,255,0.6)", 1.5);
+  if (peer.p.pet && isPet(peer.p.pet)) { const behind = toScreen(camera, peer.x - (peer.p.hx || 0) * 0.9, peer.y - (peer.p.hy || 1) * 0.9); drawPet(ctx, peer.p.pet, behind.x, behind.y, facing, peer.moving, now + peer.p.id * 71, z, scene.reducedMotion); }
   if (mount) drawMount(ctx, mount.coat, facing, peer.moving, now, feet.x, feet.y, z, true, scene.reducedMotion);
   const restoreMotion = applyMotion(ctx, motion, s.x, s.y);
   drawAuras(ctx, worn, s.x, s.y, px, now, scene.reducedMotion, "back");
