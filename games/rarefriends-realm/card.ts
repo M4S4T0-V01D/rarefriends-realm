@@ -1,6 +1,7 @@
 /** The shareable adventurer card: your Friend, levels and quests on a 1200 × 675 picture (the X card size). */
 import type { GenerationSprites } from "@rarefriends/friendsdk/sprites";
-import { FAMILY_NAMES, SKILLS, SKILL_NAMES, WARDROBE, levelForXp, type Skill } from "./data.ts";
+import { FAMILY_NAMES, SKILLS, SKILL_NAMES, WARDROBE, levelForXp, mountDef, type Skill } from "./data.ts";
+import { SADDLE, mountArt } from "./mountart.ts";
 import { MAX_QUEST_POINTS, questPoints } from "./content.ts";
 import { combatLevel, totalLevel, type Game } from "./state.ts";
 import { friendRows } from "./render.ts";
@@ -29,10 +30,21 @@ export function renderCard(game: Game, friend: GenerationSprites | null, region:
   const aura = player.worn.map(id => WARDROBE.find(entry => entry.id === id)).find(entry => entry?.kind === "aura");
   if (aura) { ctx.fillStyle = `${aura.color}aa`; ctx.beginPath(); ctx.ellipse(258, 250, 150, 130, 0, 0, Math.PI * 2); ctx.fill(); }
   if (friend) {
-    // Your Friend as it looks in the Realm, wardrobe and all.
-    const art = figureArt(friendRows(friend, "down", false, 0), [...player.worn, ...(player.equipment.cape ? [player.equipment.cape] : []), ...(player.equipment.head ? [player.equipment.head] : []), ...(player.equipment.shield ? [player.equipment.shield] : []), ...(player.equipment.weapon ? [player.equipment.weapon] : [])], "down"), px = Math.floor(Math.min(340 / art.width, 300 / art.height));
+    // Your Friend as it looks in the Realm: wardrobe, helm, cape, shield and weapon, and on its mount if it's riding one
+    // (the mount's body behind, its head in front, as when you ride towards the camera).
+    const dressed = [...player.worn, ...(["cape", "head", "shield", "weapon"] as const).flatMap(slot => player.equipment[slot] ? [player.equipment[slot]!] : [])];
+    const art = figureArt(friendRows(friend, "down", false, 0), dressed, "down"), mount = mountDef(player.mount);
+    // Mount art pixels are this many figure pixels (the in-game scales: 2 × 1.35 world pixels against 3.2 / 2).
+    const ratio = 2 * 1.35 / 1.6, lift = mount ? (SADDLE - 4) * ratio : 0;
+    const px = Math.max(1, Math.floor(Math.min(340 / art.width, 310 / (art.height + lift + (mount ? 4 : 0))) * (mount ? 2 : 1)) / (mount ? 2 : 1)), ground = mount ? 392 : 237 + art.height * px / 2 + px * 2;
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(art, Math.round(258 - art.width * px / 2), Math.round(237 - art.height * px / 2 + px * 2), art.width * px, art.height * px);
+    const drawMountLayer = (layer: "body" | "head") => {
+      const horse = mountArt(mount!.coat, "front", -1, true, layer), m = px * ratio;
+      ctx.drawImage(horse, Math.round(258 - horse.width * m / 2), Math.round(ground + 2 * px - horse.height * m), Math.round(horse.width * m), Math.round(horse.height * m));
+    };
+    if (mount) drawMountLayer("body");
+    ctx.drawImage(art, Math.round(258 - art.width * px / 2), Math.round(ground - lift * px - art.height * px + px * 2), art.width * px, art.height * px);
+    if (mount) drawMountLayer("head");
   }
   ctx.fillStyle = INK; ctx.font = `bold 34px ${FONT}`; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
   ctx.fillText(`FRIEND #${player.friendId}`, 72, 450);
