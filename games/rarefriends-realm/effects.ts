@@ -12,6 +12,8 @@ type Particle = {
   x: number; y: number; h: number; vx: number; vy: number; vh: number; gravity: number; age: number; life: number;
   color: string; size: number; kind: "chip" | "spark" | "drop" | "puff" | "leaf" | "flake" | "dust" | "glow" | "butterfly" | "ring";
   seed: number;
+  /** Firework sparks: drawn glowing, over the night. */
+  bright?: boolean;
 };
 const particles: Particle[] = [];
 const MAX = 320;
@@ -34,25 +36,26 @@ export function fireworks(world: World, x: number, y: number, colors: readonly s
     const ox = (r - 1) * 0.8, oy = (1 - r) * 0.35, delay = r * 0.24, climb = 0.55 + r * 0.06, rise = 150, drag = 60;
     const apex = ground + 30 + rise * climb - drag * climb * climb / 2;
     pending.push({ at: effectsClock + delay, run: () => {
-      add({ x: x + ox, y: y + oy, h: ground + 30, vx: 0, vy: 0, vh: rise, gravity: drag, life: climb, color: "#fff4c0", size: 2.4, kind: "spark" });
-      for (let k = 1; k < 4; k++) add({ x: x + ox, y: y + oy, h: ground + 30, vx: 0, vy: 0, vh: rise - k * 12, gravity: drag, life: climb, color: "#e6a24a", size: 1.4, kind: "spark" });
+      add({ x: x + ox, y: y + oy, h: ground + 30, vx: 0, vy: 0, vh: rise, gravity: drag, life: climb, color: "#fff4c0", size: 3, kind: "spark", bright: true });
+      for (let k = 1; k < 4; k++) add({ x: x + ox, y: y + oy, h: ground + 30, vx: 0, vy: 0, vh: rise - k * 12, gravity: drag, life: climb, color: "#e6a24a", size: 1.8, kind: "spark", bright: true });
     } });
     pending.push({ at: effectsClock + delay + climb, run: () => {
       const color = colors[r % colors.length];
-      burst("chip", x + ox, y + oy, apex, 24, color, { speed: 2.6, up: 34, gravity: 46, life: 1.4, size: 3 });
-      burst("chip", x + ox, y + oy, apex, 10, colors[(r + 1) % colors.length], { speed: 1.8, up: 26, gravity: 46, life: 1.2, size: 2.5 });
-      burst("spark", x + ox, y + oy, apex, 12, "#ffffff", { speed: 2, up: 20, gravity: 20, life: 0.9, size: 2 });
+      burst("spark", x + ox, y + oy, apex, 30, color, { speed: 5.2, up: 34, gravity: 40, life: 1.5, size: 3.6, bright: true });
+      burst("spark", x + ox, y + oy, apex, 14, colors[(r + 1) % colors.length], { speed: 3.8, up: 26, gravity: 40, life: 1.3, size: 3, bright: true });
+      burst("spark", x + ox, y + oy, apex, 14, "#ffffff", { speed: 4.2, up: 20, gravity: 20, life: 1, size: 2.4, bright: true });
+      burst("chip", x + ox, y + oy, apex, 10, color, { speed: 1.4, up: 20, gravity: 50, life: 1.8, size: 2.5 });
     } });
     pops.push(delay + climb);
   }
   return pops;
 }
 /** A burst of `n` particles from a world point. */
-export function burst(kind: Particle["kind"], x: number, y: number, h: number, n: number, color: string, options: { speed?: number; up?: number; life?: number; size?: number; gravity?: number } = {}) {
+export function burst(kind: Particle["kind"], x: number, y: number, h: number, n: number, color: string, options: { speed?: number; up?: number; life?: number; size?: number; gravity?: number; bright?: boolean } = {}) {
   for (let i = 0; i < n; i++) {
     const a = Math.random() * Math.PI * 2, speed = (options.speed ?? 1.2) * (0.5 + Math.random());
     add({ x, y, h, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, vh: (options.up ?? 40) * (0.6 + Math.random() * 0.6), gravity: options.gravity ?? 160,
-      life: (options.life ?? 0.7) * (0.7 + Math.random() * 0.6), color, size: options.size ?? 2, kind });
+      life: (options.life ?? 0.7) * (0.7 + Math.random() * 0.6), color, size: options.size ?? 2, kind, bright: options.bright });
   }
 }
 
@@ -194,8 +197,21 @@ export function drawCloudShadows(ctx: CanvasRenderingContext2D, project: Project
   }
 }
 /** Particles and birds, on top of the scene. */
-export function drawEffects(ctx: CanvasRenderingContext2D, project: Project, world: World, now: number, zoom: number) {
+export function drawEffects(ctx: CanvasRenderingContext2D, project: Project, world: World, now: number, zoom: number, pass: "normal" | "bright" = "normal") {
+  if (pass === "bright") {
+    // Firework sparks: a soft glow and a bright core, added over the night so they light up the dark.
+    ctx.globalCompositeOperation = "lighter";
+    for (const particle of particles) {
+      if (!particle.bright) continue;
+      const p = project(particle.x, particle.y, particle.h - groundHeight(world, particle.x, particle.y)), k = Math.max(0, 1 - particle.age / particle.life), s = particle.size * zoom * 1.5;
+      ctx.globalAlpha = k * 0.16; ctx.fillStyle = particle.color; ctx.fillRect(p.x - s * 1.5, p.y - s * 1.5, s * 3, s * 3);
+      ctx.globalAlpha = Math.min(0.9, k * 1.2); ctx.fillRect(Math.round(p.x - s / 2), Math.round(p.y - s / 2), Math.max(1, Math.round(s)), Math.max(1, Math.round(s)));
+    }
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+    return;
+  }
   for (const particle of particles) {
+    if (particle.bright) continue;
     const floor = particle.kind === "leaf" || particle.kind === "flake" ? Math.max(particle.h, groundHeight(world, particle.x, particle.y)) : particle.h;
     const p = project(particle.x, particle.y, floor - groundHeight(world, particle.x, particle.y)), k = 1 - particle.age / particle.life, s = particle.size * zoom * 1.5;
     ctx.globalAlpha = Math.max(0, Math.min(1, particle.kind === "puff" ? k * 0.45 : particle.kind === "glow" ? (0.5 + Math.sin(now / 200 + particle.seed) * 0.5) * k : k * 1.4));

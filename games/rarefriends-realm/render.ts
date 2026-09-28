@@ -1148,6 +1148,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   if (weather && weather.rain > 0.02) drawRain(ctx, weather.rain, scene.reducedMotion ? 0 : now, light.dark);
   if (scene.strike && scene.wallMs !== undefined && !underground && weather?.storm) drawLightning(ctx, scene.strike, scene.wallMs, scene.reducedMotion);
   // A soft vignette outdoors, for depth.
+  drawEffects(ctx, project, world, now, z, "bright");
   if (!underground) { const v = ctx.createRadialGradient(VIEW.width / 2, VIEW.height / 2, VIEW.height * 0.45, VIEW.width / 2, VIEW.height / 2, VIEW.width * 0.72); v.addColorStop(0, "rgba(14,16,28,0)"); v.addColorStop(1, `rgba(14,16,28,${(0.16 + light.dark * 0.2).toFixed(3)})`); ctx.fillStyle = v; ctx.fillRect(0, 0, VIEW.width, VIEW.height); }
   // Click marker: an old-school cross, yellow for walking, red for actions.
   if (scene.marker && now - scene.marker.at < 450) {

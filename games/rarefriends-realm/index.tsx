@@ -270,7 +270,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         time: (value: number | null) => { fixedTime = value; },
         /** Fix the weather ({ rain, storm, fog }), or null to follow the clock. */
         weather: (value: Weather | null) => { fixedWeather = value; },
-        fireworks: () => { const state = game.current; if (state) celebrate(state.player.x, state.player.y, SKILL_COLORS.magic); },
+        fireworks: () => { const state = game.current; if (state) celebrate(state.player.x, state.player.y, ["#e7a9b0", "#ebc26b", "#9fc6f0", "#b4d4a0"]); },
         boss: (ms: number | null) => { bossClock = ms === null ? null : () => ms; const state = game.current; if (state && ms !== null) { updateWorldBoss(state, ms); refresh(); } },
         view: (zoom: number, pitch: number, angle = 0) => { setSettings({ ...live.current.settings, zoom }); camera.current.pitch = pitch; camera.current.angle = angle; cameraGoal.current = null; },
         screenOf: (x: number, y: number) => {
