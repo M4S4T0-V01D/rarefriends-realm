@@ -4,6 +4,12 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 16, date: "2026-09-28", title: "First steps, graphics settings and the farm", items: [
+    "New Friends get a guided start: seven quick steps (a tree, a fire, a fish, cooking, the horses, King Hollis, the Realm Daily) with a gold arrow showing the way, and 500 coins and a Lamp of insight at the end. Skippable any time.",
+    "Settings → Graphics: Auto, High or Low. Low draws plain ground and walls, skips ambient life and fog, and runs several times faster on older devices. Auto switches to Low by itself if the game runs slowly.",
+    "The stables have moved beside the Rare Market, facing the path, with the paddock next door.",
+    "Hollow Farms: the cows have a new pen out by the windmill, the windmill is rebuilt in stone with lattice sails, there's a new chicken coop, and the miller has a farmhouse.",
+  ] },
   { id: 15, date: "2026-09-28", title: "World boss, duels, pets and achievements", items: [
     "The Ashen Colossus rises in Wyrmreach every two hours (on the even UTC hours) for twenty minutes. It takes a crowd, and everyone who wounds it shares the loot.",
     "The Sparring Ring, east of Market Street: step inside and right-click another player to Fight. Duels are safe: nobody dies or loses items, and wins are counted.",

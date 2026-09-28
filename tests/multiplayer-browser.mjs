@@ -173,7 +173,7 @@ try {
   await a.page.locator(".rf-game-frame").screenshot({ path: "./artifacts/duel.png" });
 
   // A shared fight: B attacks a cow, and A's copy of the same cow loses HP too; A sees B's health bar data.
-  await a.teleport(90, 111); await b.teleport(91, 112);
+  await a.teleport(62, 128); await b.teleport(63, 129);
   const cowUid = await b.frame().evaluate(() => { const g = window.__realm.game(), p = g.player; for (const s of ["attack", "strength"]) p.xp[s] = 30_000;
     const cow = g.monsters.filter(m => m.def.id === "cow" && !m.dead).sort((m1, m2) => Math.hypot(m1.x - p.x, m1.y - p.y) - Math.hypot(m2.x - p.x, m2.y - p.y))[0]; cow.hp = cow.def.hp; p.combat = cow.uid; return cow.uid; });
   await a.until(new Function(`const cow = window.__realm.game().monsters.find(m => m.uid === ${cowUid}); return cow.dead || cow.hp < cow.def.hp;`), "A seeing B's hits on the shared cow", 30_000);

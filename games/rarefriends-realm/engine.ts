@@ -8,6 +8,7 @@ import {
   type EquipSlot, type MetalId, type Skill, type Spell, type SpotKind, type WardrobeId,
 } from "./data.ts";
 import { cleanDaily } from "./daily.ts";
+import { FIRST_STEPS, updateFirstSteps } from "./firststeps.ts";
 import { cleanMet } from "./hiscores.ts";
 import { addSlayerPoints, slayerBoost, slayerKill, slayerProblem, taskText } from "./slayer.ts";
 import { NPCS, examineItem, npcDef, onMonsterKilled, questDone, searchCryptChest, searchWell, talk, tanHides, useCryptAltar } from "./content.ts";
@@ -627,7 +628,7 @@ function interactNpc(game: Game, uid: number, option: string, use?: number) {
   if (option === "Caskets") { game.ui.shop = "__caskets"; sound(game, "click"); return; }
   if (option === "Rare-market") { game.ui.shop = "__market"; sound(game, "click"); return; }
   if (option === "Stables") { game.ui.shop = "__stable"; sound(game, "click"); return; }
-  if (option === "Stroke") { message(game, npc.id === "paddock_unicorn" ? "The unicorn lowers its horn and lets you stroke its mane. It's very soft." : "The horse nuzzles your pockets for an apple."); sound(game, "click"); return; }
+  if (option === "Stroke") { player.stats.strokes = (player.stats.strokes ?? 0) + 1; message(game, npc.id === "paddock_unicorn" ? "The unicorn lowers its horn and lets you stroke its mane. It's very soft." : "The horse nuzzles your pockets for an apple."); sound(game, "click"); return; }
   if (option === "Assignment" || option === "Rewards") { game.dialogue = talk(game, `${npc.id}:${option.toLowerCase()}`); sound(game, "click"); return; }
   if (option === "Tan-hides") { tanHides(game); return; }
   if (option === "Pickpocket" && def.pickpocket) { pickpocket(game, npc, def.pickpocket); return; }
@@ -680,6 +681,7 @@ export function successChance(skillLevel: number, low: number, high: number) {
 
 // ---------- Tick ----------
 export function tick(game: Game) {
+  updateFirstSteps(game);
   game.tick++; game.playTicks++;
   const player = game.player;
   if (player.stunned > 0) player.stunned--;
@@ -1623,7 +1625,7 @@ export type SaveData = {
   v: 1; friendId: number; x: number; y: number; run: boolean; energy: number; xp: Record<string, number>; hp: number; prayer: number;
   inventory: (Slot | null)[]; equipment: Record<string, string>; bank: Slot[]; style: CombatStyle; autocast: string | null;
   quests: Record<string, number>; questData: Record<string, number>; wardrobe: string[]; worn: string[]; follower: number | null; followerGeneration: number | null;
-  kills: number; deaths: number; tutorial: number; created: number; playTicks: number; retaliate: boolean; music: string[];
+  kills: number; deaths: number; tutorial: number; guide?: number; created: number; playTicks: number; retaliate: boolean; music: string[];
   met?: unknown; achievements?: Record<string, number>; pets?: string[]; petOut?: string | null; killLog?: Record<string, number>; stats?: Record<string, number>; referredBy?: number | null; referrals?: number[]; referralTimes?: number[]; boostTicks?: number; mounts?: string[]; mount?: string | null; daily?: unknown; seenUpdate?: number;
 };
 export function serialize(game: Game): SaveData {
@@ -1632,7 +1634,7 @@ export function serialize(game: Game): SaveData {
     v: 1, friendId: player.friendId, x: player.x, y: player.y, run: player.run, energy: Math.round(player.energy), xp: { ...player.xp }, hp: player.hp, prayer: Math.round(player.prayer * 10) / 10,
     inventory: player.inventory.map(slot => slot ? { ...slot } : null), equipment: { ...player.equipment } as Record<string, string>, bank: player.bank.map(slot => ({ ...slot })),
     style: player.style, autocast: player.autocast, quests: { ...player.quests }, questData: { ...player.questData }, wardrobe: [...player.wardrobe], worn: [...player.worn],
-    follower: player.follower, followerGeneration: player.followerGeneration, kills: player.kills, deaths: player.deaths, tutorial: player.tutorial, created: player.created,
+    follower: player.follower, followerGeneration: player.followerGeneration, kills: player.kills, deaths: player.deaths, tutorial: player.tutorial, guide: player.guide, created: player.created,
     playTicks: game.playTicks, retaliate: game.autoRetaliate, music: [...player.music],
     referredBy: player.referredBy, referrals: [...player.referrals], referralTimes: [...player.referralTimes], boostTicks: player.boostTicks, mounts: [...player.mounts], mount: player.mount, met: JSON.parse(JSON.stringify(player.met)), achievements: { ...player.achievements }, pets: [...player.pets], petOut: player.petOut, killLog: { ...player.killLog }, stats: { ...player.stats }, daily: JSON.parse(JSON.stringify(player.daily)), seenUpdate: player.seenUpdate,
   };
@@ -1709,6 +1711,8 @@ export function restore(game: Game, raw: unknown): boolean {
   player.follower = typeof save.follower === "number" && Number.isSafeInteger(save.follower) && save.follower > 0 ? save.follower : null;
   player.followerGeneration = player.follower !== null ? int(save.followerGeneration, 1, 255, 6) : null;
   player.kills = int(save.kills, 0, 1e9, 0); player.deaths = int(save.deaths, 0, 1e9, 0); player.tutorial = int(save.tutorial, 0, 100, 0);
+  // Saves from before the guided start have played already: it counts as done.
+  player.guide = save.guide === undefined ? FIRST_STEPS.length : int(save.guide, -1, FIRST_STEPS.length, FIRST_STEPS.length);
   player.created = int(save.created, 0, 1e15, Date.now());
   game.playTicks = int(save.playTicks, 0, 1e10, 0); game.autoRetaliate = save.retaliate !== false;
   player.music = ["theme", ...(Array.isArray(save.music) ? save.music : []).filter((id): id is string => typeof id === "string" && /^[a-z_]{1,24}$/.test(id) && id !== "theme")].slice(0, 32);

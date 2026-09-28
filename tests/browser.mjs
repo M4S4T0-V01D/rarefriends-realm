@@ -112,6 +112,9 @@ try {
   await page.waitForTimeout(1500);
   await shot("woodcutting");
   await until(() => window.__realm.game().player.inventory.some(slot => slot?.id === "logs"), 40_000);
+  // First steps: the guide card moved on from "Chop a tree" by itself.
+  await game.getByRole("complementary", { name: "First steps" }).getByRole("heading", { name: "Light a fire" }).waitFor();
+  assert.equal(await state(() => window.__realm.game().player.guide), 1);
 
   // ---------- Right-click menu and dialogue with the Realm Guide ----------
   const guide = await state(() => window.__realm.game().npcs.find(npc => npc.id === "guide"));

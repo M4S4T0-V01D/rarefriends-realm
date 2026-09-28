@@ -149,6 +149,24 @@ in a shop for its *Value*. Every trader buys back what it sells, and general sto
 Frostpeak and the Oasis) buy almost anything. What you sell goes on the shop's shelves with its count, so you can buy it
 back. The Rare Market's bundle list scrolls in a compact box.
 
+**First steps.** A new Friend gets a short guided start: chop a tree, light a fire, catch and cook a fish, stroke the
+horses at the stables, climb the castle to meet King Hollis, and open the Realm Daily. A card in the corner shows the
+step, a gold arrow (and a star on the minimap) points the way, and each step completes itself from what you do. The last
+one pays 500 coins and a Lamp of insight. Skip it any time; older saves never see it.
+
+**Graphics and performance.** Settings → Graphics offers Auto, High and Low. Low turns off the pixel textures, ambient
+life, cloud shadows, footprints and fog, lightens the rain, shortens the view and draws at 1× on high-DPI screens. Auto
+starts on High and drops to Low (saying so, once) if the frame rate stays under about 36 fps for five seconds. The browser
+test measures frame cost at three busy scenes on every run. Headless, without a GPU:
+
+| Scene | High | Low |
+|---|---|---|
+| Friendhollow (castle and Market Street) | 41 ms | 7 ms |
+| Whisperwood (dense forest) | 35 ms | 8 ms |
+| A stormy night in town | 18 ms | 8 ms |
+
+On a desktop GPU (an RTX 2060), High takes about 22 ms in the busiest view.
+
 **The world boss.** The Ashen Colossus (level 210, 1,500 HP) rises in Wyrmreach every two hours, on the even UTC
 hours, and stays twenty minutes. Everyone's game raises it at the same tile with the same id, and its HP is shared
 through the shared-fight reports. When it falls, **everyone who wounded it** gets the kill and the loot: 4,000–12,000
@@ -194,7 +212,7 @@ open the daily chest (1,500 coins and a Lamp of insight). The Updates tab lists 
 by itself after an update (or right after you claim your daily), and the 🔥 button on the minimap reopens the
 popup, with a red dot when something's waiting.
 
-**Mounts.** Marigold runs the Friendhollow stables, west of the castle, with a paddock where a chestnut, a dapple grey
+**Mounts.** Marigold runs the Friendhollow stables, beside the Rare Market on the path west of the square, with a paddock where a chestnut, a dapple grey
 and a unicorn graze (right-click to *Stroke* them). She sells eight mounts for simulated RF. Like the Rare Market, RF
 buys Rare Caskets and the mount comes with them. Every mount gallops two tiles a tick without using run energy, and
 unicorns go three. Each also has a gift:

@@ -60,6 +60,8 @@ export type Firework = { at: number; color: string };
 export type Scene = {
   game: Game; now: number; tickAt: number; camera: Camera; friend: GenerationSprites | null; follower: GenerationSprites | null;
   canonical: ReadonlyMap<number, GenerationSprites>; hoverTile: { x: number; y: number } | null; marker: ClickMarker | null;
+  /** First steps: where the guide's arrow points. */
+  guideTarget?: { x: number; y: number; lift?: number } | null;
   /** Low graphics: no pixel textures, ambient life, cloud shadows, footprints or fog, lighter rain, a shorter view. */
   low?: boolean;
   reducedMotion: boolean; hits: HitSplat[]; fireworks: Firework[]; chat: { text: string; until: number } | null; projectiles: readonly Projectile[];
@@ -409,6 +411,89 @@ function drawSpot(ctx: CanvasRenderingContext2D, camera: Camera, object: WorldOb
   if (!reduced) for (let i = 0; i < 3; i++) { const b = (now / 600 + i / 3) % 1; ellipse(ctx, sx + (i - 1) * 5 * z, sy - b * 10 * z, 1.5 * z, 1.5 * z, "rgba(255,255,255,0.8)", null); }
   return { x: sx - 18 * z, y: sy - 12 * z, w: 36 * z, h: 22 * z };
 }
+/**
+ * A small roof for a structure smaller than a building (a coop, a windmill's cap): a gable prism with its ridge along x,
+ * or a four-sided cone, its faces drawn back to front, shingled like the buildings' roofs.
+ */
+function miniRoof(ctx: CanvasRenderingContext2D, camera: Camera, cx: number, cy: number, w: number, d: number, base: number, rise: number, color: string, kind: "gable" | "cone", gable = "#b88a5e") {
+  type V = readonly [number, number, number];
+  const X0 = cx - w / 2, X1 = cx + w / 2, Y0 = cy - d / 2, Y1 = cy + d / 2, top = base + rise;
+  const A: V = [X0, Y0, base], B: V = [X1, Y0, base], C: V = [X1, Y1, base], D: V = [X0, Y1, base];
+  const at = ([x, y, h]: V) => toScreen(camera, x, y, h), P = (v: V) => { const s = at(v); return [s.x, s.y] as const; };
+  const centre = (points: V[]) => depthOf(camera, points.reduce((sum, v) => sum + v[0], 0) / points.length, points.reduce((sum, v) => sum + v[1], 0) / points.length) + points.reduce((sum, v) => sum + v[2], 0) / points.length * 0.0001;
+  const lit = (nx: number, ny: number) => { const { rx, ry } = rotate(camera, nx, ny); return rx - ry < 0; };
+  type Face = { points: V[]; draw: () => void };
+  const faces: Face[] = [];
+  if (kind === "gable") {
+    const R0: V = [X0, cy, top], R1: V = [X1, cy, top], rows = Math.hypot(d / 2 * TEX_PER_TILE, rise * TEX_PER_HEIGHT), cols = w * TEX_PER_TILE;
+    const slope = (e0: V, e1: V, r0: V, r1: V, ny: number) => ({ points: [e0, e1, r1, r0], draw: () => {
+      const fill = shadeHex(color, lit(0, ny) ? 0.06 : -0.08);
+      if (texturesOn) texturedQuad(ctx, shingleTexture(fill, Math.max(1, Math.round(cols)), Math.max(1, Math.round(rows))), at(r0), at(r1), at(e0), cols, rows);
+      poly(ctx, [e0, e1, r1, r0].map(P), texturesOn ? null : fill, INK, 1.1);
+    } });
+    faces.push(slope(A, B, R0, R1, -1), slope(D, C, R0, R1, 1));
+    faces.push({ points: [A, D, R0], draw: () => poly(ctx, [A, D, R0].map(P), shadeHex(gable, lit(-1, 0) ? 0.05 : -0.1), INK, 1.1) });
+    faces.push({ points: [B, C, R1], draw: () => poly(ctx, [B, C, R1].map(P), shadeHex(gable, lit(1, 0) ? 0.05 : -0.1), INK, 1.1) });
+  } else {
+    const apex: V = [cx, cy, top], slant = Math.hypot(w / 2 * TEX_PER_TILE, rise * TEX_PER_HEIGHT);
+    for (const [a, b, nx, ny] of [[A, B, 0, -1], [B, C, 1, 0], [C, D, 0, 1], [D, A, -1, 0]] as const) faces.push({ points: [a, b, apex], draw: () => {
+      const fill = shadeHex(color, lit(nx, ny) ? 0.06 : -0.08), [pa, pb, pc] = [a, b, apex].map(at);
+      if (texturesOn) texturedTriangle(ctx, shingleTexture(fill, Math.max(1, Math.round(w * TEX_PER_TILE)), Math.max(1, Math.round(slant))), pa, pb, pc, w * TEX_PER_TILE, slant);
+      poly(ctx, [a, b, apex].map(P), texturesOn ? null : fill, INK, 1.1);
+    } });
+  }
+  faces.sort((a, b) => centre(a.points) - centre(b.points)).forEach(face => face.draw());
+}
+/** The side of a small structure that faces the camera most (its outward normal on the ground). */
+function frontSide(camera: Camera) {
+  let face = [0, 1], best = -Infinity;
+  for (const [nx, ny] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) { const { rx, ry } = rotate(camera, nx, ny); if (rx + ry > best) { best = rx + ry; face = [nx, ny]; } }
+  return face as [number, number];
+}
+/** A henhouse on stilts: plank walls, a shingled gable roof, a pop-hole on the front with a ramp down, straw and an egg. */
+function drawCoop(ctx: CanvasRenderingContext2D, camera: Camera, ox: number, oy: number, hit: (h: number, w?: number) => { x: number; y: number; w: number; h: number }) {
+  const legs: [number, number][] = [[-0.3, -0.24], [0.3, -0.24], [-0.3, 0.24], [0.3, 0.24]];
+  legs.sort((a, b) => depthOf(camera, ox + a[0], oy + a[1]) - depthOf(camera, ox + b[0], oy + b[1]));
+  for (const [dx, dy] of legs) box(ctx, camera, ox + dx, oy + dy, 0.08, 0.08, 9, "#6f5440", "#7a5b40", "#5a4030");
+  box(ctx, camera, ox, oy, 0.74, 0.58, 17, "#c9a47a", "#b88a5e", "#9c7650", 9, INK, "plank");
+  miniRoof(ctx, camera, ox, oy, 0.9, 0.76, 26, 13, "#b0673e", "gable", "#c9a47a");
+  // The pop-hole on the side facing you, and a slatted ramp down to the ground.
+  const [nx, ny] = frontSide(camera), fx = ox + nx * (nx ? 0.37 : 0.29), fy = oy + ny * (ny ? 0.29 : 0.37), tx = -ny, ty = nx;
+  const at = (u: number, out: number, lift: number) => { const p = toScreen(camera, fx + tx * u + nx * out, fy + ty * u + ny * out, lift); return [p.x, p.y] as const; };
+  poly(ctx, [at(-0.08, 0, 10), at(0.08, 0, 10), at(0.08, 0, 19), at(0, 0, 21), at(-0.08, 0, 19)], "#2c2420", INK, 1);
+  poly(ctx, [at(-0.07, 0, 10), at(0.07, 0, 10), at(0.07, 0.42, 0), at(-0.07, 0.42, 0)], "#a88562", INK, 1);
+  for (let k = 1; k < 5; k++) { const a = at(-0.07, k * 0.085, 10 - k * 2.4), b = at(0.07, k * 0.085, 10 - k * 2.4); ctx.strokeStyle = "#6f5440"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
+  const straw = toScreen(camera, fx + nx * 0.5 + tx * 0.28, fy + ny * 0.5 + ty * 0.28, 0), z = camera.zoom;
+  ellipse(ctx, straw.x, straw.y, 7 * z, 3 * z, "#e2d7ad", null); ellipse(ctx, straw.x + 2 * z, straw.y - 1.5 * z, 2 * z, 2.6 * z, "#f7f3ea", INK, 0.8);
+  return hit(46);
+}
+/** A tower windmill: a tapering stone tower with a door, a shingled cap, and four lattice sails turning on the side facing you. */
+function drawWindmill(ctx: CanvasRenderingContext2D, scene: Scene, ox: number, oy: number) {
+  const { camera, now } = scene, z = camera.zoom, stone = "#d7d4cd";
+  box(ctx, camera, ox, oy, 1.5, 1.5, 34, stone, "#c8c5be", "#b3aea6", 0, INK, "brick");
+  box(ctx, camera, ox, oy, 1.25, 1.25, 30, "#dcd9d2", "#cdc9c1", "#b9b4ac", 34, INK, "brick");
+  box(ctx, camera, ox, oy, 1.05, 1.05, 18, "#e6dccb", "#d9ccb4", "#c6b89e", 64, INK, "plank");
+  miniRoof(ctx, camera, ox, oy, 1.25, 1.25, 82, 30, "#7a5b40", "cone");
+  const [nx, ny] = frontSide(camera), tx = -ny, ty = nx;
+  // The door at the foot, and a window up the tower.
+  const face = (reach: number, u: number, lift: number) => { const p = toScreen(camera, ox + nx * reach + tx * u, oy + ny * reach + ty * u, lift); return [p.x, p.y] as const; };
+  poly(ctx, [face(0.76, -0.16, 0), face(0.76, 0.16, 0), face(0.76, 0.16, 18), face(0.76, 0, 23), face(0.76, -0.16, 18)], "#6f5440", INK, 1.1);
+  poly(ctx, [face(0.64, -0.1, 44), face(0.64, 0.1, 44), face(0.64, 0.1, 54), face(0.64, -0.1, 54)], "#5d6f84", INK, 1);
+  // Sails: four lattice frames of canvas on long spars, turning slowly.
+  const hub = toScreen(camera, ox + nx * 0.62, oy + ny * 0.62, 74), spin = scene.reducedMotion ? 0.35 : now / 1900, L = 62 * z, W = 11 * z;
+  const lean = rotate(camera, nx, ny), squash = Math.max(0.35, Math.min(1, Math.abs(lean.rx - lean.ry) / 1.42 + 0.35));
+  for (let i = 0; i < 4; i++) {
+    const a = spin + i * Math.PI / 2, ux = Math.cos(a) * squash, uy = Math.sin(a), px = -Math.sin(a) * squash, py = Math.cos(a);
+    const pt = (along: number, across: number) => [hub.x + ux * along + px * across, hub.y + uy * along + py * across] as const;
+    poly(ctx, [pt(L * 0.2, 0), pt(L, 0), pt(L, W), pt(L * 0.2, W)], "#f3eee3", INK, 1);
+    ctx.strokeStyle = "#8a7563"; ctx.lineWidth = Math.max(0.8, z * 0.8); ctx.beginPath();
+    for (let k = 1; k < 5; k++) { const [a1, b1] = pt(L * (0.2 + k * 0.16), 0), [a2, b2] = pt(L * (0.2 + k * 0.16), W); ctx.moveTo(a1, b1); ctx.lineTo(a2, b2); }
+    const [m1, m2] = pt(L * 0.2, W / 2), [m3, m4] = pt(L, W / 2); ctx.moveTo(m1, m2); ctx.lineTo(m3, m4); ctx.stroke();
+    ctx.strokeStyle = "#5a4030"; ctx.lineWidth = 2.4 * z; ctx.beginPath(); ctx.moveTo(hub.x, hub.y); const [e1, e2] = pt(L * 1.04, 0); ctx.lineTo(e1, e2); ctx.stroke();
+  }
+  ellipse(ctx, hub.x, hub.y, 4.5 * z, 4.5 * z, "#5a4030", INK, 1.2);
+  return { x: hub.x - L - 10 * z, y: hub.y - L - 50 * z, w: (L + 10 * z) * 2, h: L * 2 + 130 * z };
+}
 /** A brick smelting furnace: a plinth, a squat tapering kiln, a chimney with smoke, and an arched mouth full of fire facing you. */
 function drawFurnace(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObject, flicker: number, hit: (h: number, w?: number) => { x: number; y: number; w: number; h: number }) {
   const { camera, now } = scene, z = camera.zoom, ox = object.x, oy = object.y, stone = "#8f8a83";
@@ -523,7 +608,7 @@ function drawStation(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldO
       for (let i = -2; i <= 2; i++) { const sway = Math.sin(now / 700 + i + ox) * 2 * z; ctx.strokeStyle = "#b89c6a"; ctx.lineWidth = 1.2 * z; ctx.beginPath(); ctx.moveTo(sx + i * 4 * z, sy + (i % 2) * 2 * z); ctx.lineTo(sx + i * 4 * z + sway, sy - 18 * z); ctx.stroke(); ellipse(ctx, sx + i * 4 * z + sway, sy - 20 * z, 1.8 * z, 4 * z, C.butter, INK, 0.6); }
       return hit(26, 26);
     }
-    case "coop": box(ctx, camera, ox, oy, 0.8, 0.8, 16, "#cdb9a0", "#b89c86", "#a88f74"); poly(ctx, [[sx - 26 * z, sy - 16 * z], [sx, sy - 34 * z], [sx + 26 * z, sy - 16 * z], [sx, sy - 4 * z]], C.rose); return hit(36);
+    case "coop": return drawCoop(ctx, camera, ox, oy, hit);
     case "gate": {
       box(ctx, camera, ox, oy, 0.25, 1, 50, "#3b3a38", "#2c2b2a", "#222");
       ctx.fillStyle = `rgba(20,20,30,${0.4 + flicker * 0.25})`; const g = toScreen(camera, ox, oy); ctx.fillRect(g.x - 4 * z, g.y - 50 * z, 8 * z, 50 * z);
@@ -606,12 +691,7 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
         }
         return hit(56, 40);
       case "hay": box(ctx, camera, ox, oy, 0.7, 0.5, 14, "#e2d7ad", "#d6c58f", "#c9b77f"); return hit(20);
-      case "windmill": {
-        box(ctx, camera, ox, oy, 1.4, 1.4, 70, "#d7d4cd", "#c8c5be", "#b9b5ae"); poly(ctx, [[sx - 34 * z, sy - 68 * z], [sx, sy - 110 * z], [sx + 34 * z, sy - 68 * z], [sx, sy - 52 * z]], "#9c8672");
-        const hub = toScreen(camera, ox + 0.7, oy + 0.7, 64), spin = scene.reducedMotion ? 0.3 : now / 1800;
-        for (let i = 0; i < 4; i++) { const a = spin + i * Math.PI / 2; poly(ctx, [[hub.x, hub.y], [hub.x + Math.cos(a) * 56 * z, hub.y + Math.sin(a) * 56 * z], [hub.x + Math.cos(a + 0.18) * 56 * z, hub.y + Math.sin(a + 0.18) * 56 * z]], PAPER); }
-        ellipse(ctx, hub.x, hub.y, 4 * z, 4 * z, INK, null); return { x: sx - 60 * z, y: sy - 130 * z, w: 120 * z, h: 140 * z };
-      }
+      case "windmill": return drawWindmill(ctx, scene, ox, oy);
       case "boat": poly(ctx, [[sx - 22 * z, sy - 4 * z], [sx + 22 * z, sy - 4 * z], [sx + 14 * z, sy + 6 * z], [sx - 14 * z, sy + 6 * z]], "#9c8672"); return hit(12, 44);
       case "chest": box(ctx, camera, ox, oy, 0.6, 0.45, 14, "#9c8672", "#8a7563", "#7a6553"); return hit(20);
       case "bed": box(ctx, camera, ox, oy, 0.7, 0.9, 10, "#9c8672", "#8a7563", "#7a6553"); box(ctx, camera, ox, oy + 0.08, 0.64, 0.66, 3, C.lavender, shade(C.lavender, -0.08), shade(C.lavender, -0.14), 10);
@@ -1166,6 +1246,25 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   drawEffects(ctx, project, world, now, z, "bright");
   if (!underground) { const v = ctx.createRadialGradient(VIEW.width / 2, VIEW.height / 2, VIEW.height * 0.45, VIEW.width / 2, VIEW.height / 2, VIEW.width * 0.72); v.addColorStop(0, "rgba(14,16,28,0)"); v.addColorStop(1, `rgba(14,16,28,${(0.16 + light.dark * 0.2).toFixed(3)})`); ctx.fillStyle = v; ctx.fillRect(0, 0, VIEW.width, VIEW.height); }
   lap("vignette");
+  // First steps: a golden arrow bobbing over where to go, or at the screen's edge pointing towards it.
+  if (scene.guideTarget) {
+    const target = scene.guideTarget, at = toScreen(camera, target.x, target.y, 58 + (target.lift ?? 0)), bob = scene.reducedMotion ? 0 : Math.sin(now / 220) * 5 * Math.max(0.8, z), m = 34;
+    const inside = at.x > m && at.x < VIEW.width - m && at.y > m && at.y < VIEW.height - m;
+    // The guide's card covers the top-left corner: an arrow that would land under it drops just below it.
+    const clear = (y: number, x: number) => x < 300 && y < 170 ? 178 : y;
+    ctx.save(); ctx.lineJoin = "round";
+    if (inside) {
+      ctx.translate(at.x, clear(at.y, at.x) + bob);
+      ctx.beginPath(); ctx.moveTo(-11, -18); ctx.lineTo(11, -18); ctx.lineTo(11, -2); ctx.lineTo(19, -2); ctx.lineTo(0, 16); ctx.lineTo(-19, -2); ctx.lineTo(-11, -2); ctx.closePath();
+    } else {
+      const cx = VIEW.width / 2, cy = VIEW.height / 2, a = Math.atan2(at.y - cy, at.x - cx), t = Math.min((cx - m) / Math.abs(Math.cos(a) || 1e-6), (cy - m) / Math.abs(Math.sin(a) || 1e-6));
+      const ex = cx + Math.cos(a) * t, ey = cy + Math.sin(a) * t;
+      ctx.translate(ex, clear(ey, ex)); ctx.rotate(a - Math.PI / 2); ctx.translate(0, bob * 0.6);
+      ctx.beginPath(); ctx.moveTo(-9, -14); ctx.lineTo(9, -14); ctx.lineTo(9, 0); ctx.lineTo(16, 0); ctx.lineTo(0, 15); ctx.lineTo(-16, 0); ctx.lineTo(-9, 0); ctx.closePath();
+    }
+    ctx.fillStyle = "#f2d56b"; ctx.fill(); ctx.strokeStyle = "#161616"; ctx.lineWidth = 3; ctx.stroke(); ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.fillRect(-7, -15, 3, 12);
+    ctx.restore();
+  }
   // Click marker: an old-school cross, yellow for walking, red for actions.
   if (scene.marker && now - scene.marker.at < 450) {
     const s = toScreen(camera, scene.marker.x, scene.marker.y), k = 1 - (now - scene.marker.at) / 450, r = 8 * z * (0.6 + k * 0.4);
@@ -1564,7 +1663,7 @@ export function mapIcons(world: World): MapIcon[] {
   return icons;
 }
 /** The minimap: the world turned to match the camera (45° plus its rotation), centred on the player. */
-export function renderMinimap(ctx: CanvasRenderingContext2D, game: Game, size: number, scale: number, angle: number, peers: readonly PeerView[] = []) {
+export function renderMinimap(ctx: CanvasRenderingContext2D, game: Game, size: number, scale: number, angle: number, peers: readonly PeerView[] = [], guideTarget: { x: number; y: number } | null = null) {
   const world = game.world, image = worldImage(world), player = realPoint(world, game.player.x, game.player.y);
   ctx.save(); ctx.clearRect(0, 0, size, size);
   ctx.beginPath(); ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2); ctx.clip();
@@ -1583,6 +1682,7 @@ export function renderMinimap(ctx: CanvasRenderingContext2D, game: Game, size: n
   for (const npc of game.npcs) dot(npc.x, npc.y, "#f5e04a", 1.3);
   for (const monster of game.monsters) if (!monster.dead) dot(monster.x, monster.y, "#f5e04a", 1.3);
   if (game.pet) dot(game.pet.x, game.pet.y, "#ffffff", 1.3);
+  if (guideTarget) dot(guideTarget.x, guideTarget.y, "#f2d56b", 2.2);
   // Other players: white, friends green.
   for (const peer of peers) dot(Math.round(peer.x), Math.round(peer.y), peer.friend ? "#7fe08f" : "#ffffff", 1.6);
   ctx.restore();

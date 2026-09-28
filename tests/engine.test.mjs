@@ -662,9 +662,11 @@ test("Dragons breathe fire; the King's Wyrmward shield turns it aside", () => {
   assert(drake && drake.def.breath, "ash drakes live in Wyrmreach");
   for (const skill of ["attack", "strength", "defence", "hitpoints"]) p.xp[skill] = 13_034_431;
   for (const other of g.monsters) if (other !== drake) other.dead = true, other.respawnAt = Infinity;
+  // Stand next to the drake's footprint (it's two tiles wide), square on, where it can reach you.
+  const size = drake.def.size ?? 1, besideFootprint = m => { for (const [x, y] of [[m.x - 1, m.y], [m.x, m.y - 1], [m.x + size, m.y], [m.x, m.y + size]]) if (canWalk(g, x, y)) { teleport(g, x, y); return; } assert.fail("nowhere beside the drake"); };
   const worst = shielded => {
     let max = 0; p.equipment.shield = shielded ? "wyrmward_shield" : undefined; if (!shielded) delete p.equipment.shield;
-    for (let i = 0; i < 400; i++) { p.hp = 99; drake.dead = false; drake.hp = drake.def.hp; drake.target = true; drake.attackTimer = 0; standNear(g, drake.x, drake.y, 1); p.combat = null;
+    for (let i = 0; i < 400; i++) { p.hp = 99; drake.dead = false; drake.hp = drake.def.hp; drake.target = true; drake.attackTimer = 0; besideFootprint(drake); p.combat = null;
       const hp = p.hp; tick(g); max = Math.max(max, hp - p.hp); }
     return max;
   };
@@ -988,4 +990,21 @@ test("Achievements and hiscores: earned from your adventure, saved, and the play
   assert.deepEqual(table.map(row => row.you ? "you" : row.id), [3412, "you", 5]); assert.equal(table[0].rank, 1);
   const save = JSON.parse(JSON.stringify(serialize(game))), fresh = newGame(); restore(fresh, save);
   assert.equal(achieved(fresh), achieved(game)); assert.equal(Object.keys(fresh.player.met).length, 2);
+});
+
+test("First steps: a new Friend is guided through seven steps, each completing from what they do, then rewarded; old saves skip it", async () => {
+  const { FIRST_STEPS, currentStep, skipFirstSteps } = await import("../games/rarefriends-realm/firststeps.ts");
+  const game = newGame(), p = game.player;
+  assert.equal(currentStep(game).id, "chop");
+  assert(currentStep(game).target(game), "the arrow points at a tree");
+  const lamps = count(p, "insight_lamp"), coins = count(p, "coins");
+  const doStep = { chop: () => { p.xp.woodcutting = 25; }, fire: () => { p.xp.firemaking = 40; }, fish: () => { p.xp.fishing = 10; }, cook: () => { p.xp.cooking = 30; },
+    horses: () => { p.stats.strokes = 1; }, king: () => { p.questData.royal_audience = 1; }, daily: () => { p.stats.dailyOpened = 1; } };
+  for (const step of FIRST_STEPS) { assert.equal(currentStep(game).id, step.id); doStep[step.id](); tick(game); }
+  assert.equal(currentStep(game), null); assert.equal(p.guide, FIRST_STEPS.length);
+  assert.equal(count(p, "insight_lamp"), lamps + 1); assert.equal(count(p, "coins"), coins + 500, "rewarded once");
+  tick(game); assert.equal(count(p, "coins"), coins + 500);
+  const fresh = newGame(); skipFirstSteps(fresh); assert.equal(currentStep(fresh), null, "skippable");
+  const save = JSON.parse(JSON.stringify(serialize(newGame()))); delete save.guide; const old = newGame(); restore(old, save);
+  assert.equal(currentStep(old), null, "saves from before the guide don't see it");
 });

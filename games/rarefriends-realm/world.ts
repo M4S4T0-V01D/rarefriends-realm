@@ -462,15 +462,16 @@ export function createWorld(seed = 20260927): World {
 
   // ---------- Hollow Farms ----------
   // Cow pen (fenced) with a dairy cow; chicken coop; wheat field; windmill.
-  for (let x = 82; x <= 98; x++) { decor(x, 108, "fence"); if (x < 88 || x > 90) decor(x, 116, "fence"); }
-  for (let y = 108; y <= 116; y++) { decor(82, y, "fence"); decor(98, y, "fence"); }
-  monsters("cow", 84, 109, 96, 115, 5);
-  add({ kind: "dairy_cow", x: 92, y: 112, blocks: true, name: "Dairy cow" });
+  // (The cow pen is out on the farm by the windmill, built last so nothing grows in it: see the end of this function.)
   for (let x = 84; x <= 92; x++) { decor(x, 126, "fence"); decor(x, 134, "fence"); }
   for (let y = 126; y <= 134; y++) { decor(84, y, "fence"); if (y !== 130) decor(92, y, "fence"); }
   monsters("chicken", 85, 127, 91, 133, 5);
   add({ kind: "coop", x: 86, y: 128, blocks: true, name: "Chicken coop" });
   for (let y = 124; y <= 136; y++) for (let x = 96; x <= 102; x++) { put(x, y, T.FARMLAND); if ((x + y) % 2 === 0) add({ kind: "wheat", x, y, blocks: false, name: "Wheat" }); }
+  // The miller's farmhouse, beside the windmill: a timber cottage with a chimney, its door facing the mill.
+  building(71, 118, 76, 122, "e", T.WOOD, undefined, { name: "Farmhouse", color: "#c98b86", chimney: true, walls: "timber" });
+  decor(72, 119, "bed"); decor(74, 119, "shelf"); decor(72, 121, "table"); decor(75, 121, "barrel");
+  decor(77, 118, "hay"); decor(70, 123, "barrel", true); decor(77, 123, "crate");
   decor(78, 122, "windmill", true, "Windmill"); add({ kind: "mill", x: 79, y: 124, blocks: true, name: "Mill hopper" }); npc("miller", 80, 125, 1);
   decor(87, 120, "hay"); decor(94, 120, "hay"); decor(80, 118, "crate");
 
@@ -680,19 +681,16 @@ export function createWorld(seed = 20260927): World {
   add({ kind: "sign", ...(([x, y]) => ({ x, y }))(land0(56, 50)), blocks: true, name: "Signpost", text: "Wyrmreach. Dragons. Their breath burns through anything but a Wyrmward shield: King Hollis keeps a few." });
   // The bone collector, by the chapel.
   { const [bx, by] = land0(104, 134); npc("bone_collector", bx, by, 1); }
-  // The Friendhollow stables: a timber stable with a stablemaster, hay and a trough, and a paddock beside it.
-  building(103, 101, 110, 105, "s", T.WOOD, undefined, { name: "Friendhollow stables", color: "#b0673e" });
-  npc("stablemaster", 106, 103); decor(104, 102, "hay"); decor(109, 102, "hay"); decor(104, 104, "barrel"); decor(109, 104, "hay");
-  for (let x = 89; x <= 101; x++) decor(x, 105, "fence");
-  for (let y = 101; y <= 104; y++) { decor(89, y, "fence"); if (y !== 103) decor(101, y, "fence"); }
-  npc("paddock_horse", 93, 102, 2); npc("paddock_grey", 97, 103, 2); npc("paddock_unicorn", 95, 102, 2);
-  decor(91, 104, "hay");
-  // The sparring ring: a sand floor inside a fence, a gate on the west side, and a sign.
-  for (let y = RING.y0 - 1; y <= RING.y1 + 1; y++) for (let x = RING.x0 - 1; x <= RING.x1 + 1; x++) { clearAt(x, y); put(x, y, inRing(x, y) ? T.SAND : T.GRASS); }
-  for (let x = RING.x0 - 1; x <= RING.x1 + 1; x++) { decor(x, RING.y0 - 1, "fence"); decor(x, RING.y1 + 1, "fence"); }
-  for (let y = RING.y0; y <= RING.y1; y++) { decor(RING.x1 + 1, y, "fence"); if (y !== 146 && y !== 147) decor(RING.x0 - 1, y, "fence"); }
-  decor(RING.x0 - 2, RING.y0 - 1, "torch"); decor(RING.x0 - 2, RING.y1 + 1, "torch");
-  add({ kind: "sign", x: RING.x0 - 2, y: 145, blocks: true, name: "Signpost", text: "The Sparring Ring. Step inside and right-click another player to Fight. Duels here are safe: nobody dies or loses items." });
+  // The Friendhollow stables, beside the Rare Market with the door on the path: a timber stable with the stablemaster,
+  // hay and a trough, and a fenced paddock to its west where a chestnut, a grey and a unicorn graze.
+  for (let y = 107; y <= 116; y++) for (let x = 81; x <= 98; x++) clearAt(x, y);
+  building(90, 108, 97, 112, "s", T.WOOD, undefined, { name: "Friendhollow stables", color: "#b0673e" });
+  npc("stablemaster", 93, 110); decor(91, 109, "hay"); decor(96, 109, "hay"); decor(91, 111, "barrel"); decor(96, 111, "hay");
+  add({ kind: "sign", x: 95, y: 114, blocks: true, name: "Signpost", text: "The Friendhollow stables. Horses and unicorns for sale: ask Marigold inside. Stroke the horses in the paddock!" });
+  for (let x = 81; x <= 88; x++) { decor(x, 108, "fence"); decor(x, 116, "fence"); }
+  for (let y = 108; y <= 116; y++) { decor(81, y, "fence"); if (y < 112 || y > 113) decor(88, y, "fence"); }
+  npc("paddock_horse", 83, 110, 2); npc("paddock_grey", 86, 113, 2); npc("paddock_unicorn", 84, 114, 2);
+  decor(82, 115, "hay"); decor(89, 114, "barrel");
   // General stores in the other towns, so there's somewhere to sell anything wherever you are.
   for (const [id, gx, gy] of [["trader_ember", 170, 45], ["trader_frost", 195, 34], ["trader_oasis", 178, 110]] as const) {
     const [x, y] = land0(gx, gy); npc(id, x, y); decor(x + 1, y - 1, "crate");
@@ -800,6 +798,13 @@ export function createWorld(seed = 20260927): World {
   };
   const buildingAt = new Uint8Array(W * H);
   buildings.forEach((b, index) => { if (b.roof === "none") return; for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) buildingAt[y * W + x] = index + 1; });
+  // The cow pen, out on the farm by the windmill (built last, so no tree or bush lands inside it), its gate facing the coop.
+  for (let y = 126; y <= 134; y++) for (let x = 59; x <= 70; x++) { clearAt(x, y); put(x, y, T.GRASS); }
+  for (let x = 59; x <= 70; x++) { decor(x, 126, "fence"); decor(x, 134, "fence"); }
+  for (let y = 126; y <= 134; y++) { decor(59, y, "fence"); if (y < 129 || y > 131) decor(70, y, "fence"); }
+  monsters("cow", 61, 127, 68, 133, 5);
+  add({ kind: "dairy_cow", x: 64, y: 130, blocks: true, name: "Dairy cow" });
+  decor(71, 128, "hay"); decor(71, 133, "hay");
   return { tiles, region, objects, objectAt, spawns, places, heights: buildHeights(tiles, seed), buildings, buildingAt, floors };
 }
 const i2 = (random: () => number) => random() > 0.5;

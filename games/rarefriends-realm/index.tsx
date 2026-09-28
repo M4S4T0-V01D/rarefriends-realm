@@ -15,7 +15,7 @@ import {
 } from "./engine.ts";
 import { PITCH, RENDER_PROFILE, VIEW, ZOOM, addPrint, daylight, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
 import {
-  BankModal, ChatBox, ContextMenu, DailyModal, GuideModal, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
+  BankModal, ChatBox, ContextMenu, DailyModal, FirstStepsCard, GuideModal, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
   cancelLongPress, longPress, rightClick, type MenuEntry, type Settings, type Tab,
 } from "./panels.tsx";
 import { REGULAR_SPRITES } from "./regulars.ts";
@@ -28,6 +28,7 @@ import { HOST_HELLO, HOST_STATE, SAVE_EXPORT, SAVE_EXPORT_RESULT, SAVE_WRITE, SH
 import { RealmAudio, trackFor, trackById, type SfxName, type TrackId } from "./audio.ts";
 import { renderCard, shareText } from "./card.ts";
 import { dailyWaiting, rollDaily, streakStatus } from "./daily.ts";
+import { FIRST_STEPS, currentStep, skipFirstSteps } from "./firststeps.ts";
 import { updateWorldBoss } from "./worldboss.ts";
 import { checkAchievements } from "./achievements.ts";
 import { notePlayers } from "./hiscores.ts";
@@ -330,7 +331,9 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       if (current === "playing" && !isPaused) {
         if (now - tickAt.current > TICK_MS * 6) tickAt.current = now - TICK_MS;
         while (now - tickAt.current >= TICK_MS) {
+          const guideBefore = state.player.guide;
           tick(state); tickAt.current += TICK_MS;
+          if (state.player.guide !== guideBefore) { refresh(); if (state.player.guide === FIRST_STEPS.length && !reducedMotion) celebrate(state.player.x, state.player.y, ["#f2d56b", "#e7a9b0", "#9fc6f0", "#b4d4a0"]); }
           if (state.tick % 50 === 0) rollDaily(state, Date.now()); // a new UTC day brings new challenges
           if (state.tick % 10 === 0 && bossClock) updateWorldBoss(state, bossClock());
           if (state.tick % 10 === 5) {
@@ -444,7 +447,9 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       const ratio = node.width / VIEW.width;
       ctx.setTransform(ratio, 0, 0, ratio, 0, 0); ctx.imageSmoothingEnabled = false;
       const drawStart = performance.now(), graphics = live.current.settings.graphics ?? "auto";
+      const step = current === "playing" ? currentStep(state) : null, guideTarget = step?.target?.(state) ?? null;
       renderScene(ctx, {
+        guideTarget,
         low: graphics === "low" || (graphics === "auto" && perf.autoLow),
         game: state, now, tickAt: tickAt.current, camera: camera.current, friend: friend.current,
         follower: player.follower !== null ? followerSprites.current.get(player.follower) ?? null : null, canonical: CANONICAL,
@@ -473,7 +478,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       }
       if (mini && current === "playing" && now - lastHud > 90) {
         lastHud = now; const size = mini.canvas.width;
-        renderMinimap(mini, state, size, miniZoom.current * (size / 152), camera.current.angle, players.current.view(now));
+        renderMinimap(mini, state, size, miniZoom.current * (size / 152), camera.current.angle, players.current.view(now), guideTarget);
       }
     };
     frame = requestAnimationFrame(loop);
@@ -785,6 +790,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           <div className="realm-drops" aria-hidden="true">
             {drops.map(drop => <span key={drop.id} style={{ animationDuration: reducedMotion ? "0s" : undefined }}><PixelIcon art={skillArt(drop.skill)} size={20} /> +{Math.round(drop.amount).toLocaleString()}</span>)}
           </div>
+          {phase === "playing" && currentStep(state) && <FirstStepsCard game={state} onSkip={() => { skipFirstSteps(state); refresh(); }} openMenu={(x, y, entries) => setMenu({ x, y, entries })} />}
           {toast && <div className="realm-toast" role="status"><b>{toast.title}</b>{toast.sub && <small>♪ {toast.sub}</small>}</div>}
           {dead && <div className="realm-dead" role="alert">Oh dear, you are dead!</div>}
 

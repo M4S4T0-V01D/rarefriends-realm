@@ -8,6 +8,7 @@ import {
 import { mountArt } from "./mountart.ts";
 import { CHEST_REWARD, DAY_MS, challengeProgress, challengeReward, challengeText, claimChallenge, claimChest, claimStreak, dailyWaiting, rewardText, rollDaily, streakReward, streakStatus } from "./daily.ts";
 import { LATEST_UPDATE, UPDATES } from "./updates.ts";
+import { FIRST_STEPS, currentStep } from "./firststeps.ts";
 import { bossWindow } from "./worldboss.ts";
 import { ACHIEVEMENTS, achieved } from "./achievements.ts";
 import { hiscores } from "./hiscores.ts";
@@ -866,6 +867,7 @@ export function Orbs({ game, onRun, onRide, onMap, onZoom, onRotate, openMenu }:
 export type DailyTab = "daily" | "updates" | "achievements";
 export function DailyModal({ game, tab, onTab, onClose, refresh, openMenu }: { game: Game; tab: DailyTab; onTab: (tab: DailyTab) => void; onClose: () => void; refresh: () => void; openMenu?: OpenMenu }) {
   const now = Date.now(), player = game.player;
+  player.stats.dailyOpened = 1; // first steps: you've found the Realm Daily
   rollDaily(game, now);
   const status = streakStatus(game, now), daily = player.daily;
   // Updates newer than the last one you'd seen when this opened stay marked New while it's open.
@@ -944,5 +946,21 @@ export function DailyModal({ game, tab, onTab, onClose, refresh, openMenu }: { g
         </div>
       )}
     </Modal>
+  );
+}
+
+// ---------- First steps: the guided start's card ----------
+export function FirstStepsCard({ game, onSkip, openMenu }: { game: Game; onSkip: () => void; openMenu?: OpenMenu }) {
+  const step = currentStep(game), [open, setOpen] = useState(true);
+  if (!step) return null;
+  const index = game.player.guide;
+  return (
+    <aside className={`realm-steps${open ? "" : " closed"}`} aria-label="First steps" {...rightClick(openMenu, () => [{ verb: open ? "Hide" : "Show", noun: "First steps", run: () => setOpen(!open) }, { verb: "Skip", noun: "First steps", run: onSkip }])}>
+      <header><b>📜 First steps</b><small>{index + 1} / {FIRST_STEPS.length}</small>
+        <button type="button" aria-label={open ? "Hide the guide" : "Show the guide"} onClick={() => setOpen(!open)}>{open ? "–" : "+"}</button></header>
+      {open && <><h4>{step.title}</h4><p>{step.text}</p>
+        <div className="realm-steps-bar" aria-hidden="true">{FIRST_STEPS.map((entry, i) => <i key={entry.id} className={i < index ? "done" : i === index ? "now" : ""} />)}</div>
+        <p className="realm-steps-foot">{step.target ? "Follow the gold arrow. " : ""}Finish for 500 coins and a Lamp of insight. <button type="button" className="realm-link" onClick={onSkip}>Skip guide</button></p></>}
+    </aside>
   );
 }
