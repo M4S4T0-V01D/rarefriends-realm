@@ -43,7 +43,7 @@
 | --- | --- |
 | **Builder** | M4S4T0 · [@M4S4T0-V01D](https://github.com/M4S4T0-V01D) |
 | **Category** | Character Spotlight (primary) · Economy Potential · Token Activity |
-| **Stack** | [FriendSDK v0.1.2](https://github.com/spokesz/friendsdk/tree/v0.1.2) · React 19 · Canvas 2D · WebAudio · TypeScript |
+| **Stack** | [FriendSDK v0.1.3](https://github.com/spokesz/friendsdk/tree/v0.1.3) · React 19 · Canvas 2D · WebAudio · TypeScript |
 | **Economy** | Simulated. Caskets use the SDK's preview RF ledger; no contracts or transactions. |
 | **Wallet / network** | Browser wallet on **Robinhood mainnet (chain 4663)** holding a hardwired Generations NFT (generation ≥ 1) |
 
@@ -112,7 +112,7 @@ drawn with its own canonical art, and adds XP by generation (Gen 1 +5% … Gen 5
 - **Wardrobe:** each casket also grants one of 12 RF-exclusive pieces (capes, crowns, a hood, a halo, a bow, wings, auras and a lantern familiar), painted into your Friend's own sprite so they sit exactly on its head, shoulders and neck. They carry no RF value, so they need no prize reserve. Duplicates become coins.
 - **Two currencies:** coins are earned in the world and never convert to RF, so the game is complete without spending. RF gives bonuses and looks. It's a boost, not a paywall.
 
-**Future integrations** (not in the SDK v0.1.2 API):
+**Future integrations** (not in the SDK v0.1.3 API):
 
 | Idea | Needs |
 | --- | --- |
@@ -135,8 +135,8 @@ npm run build          # static site → games/rarefriends-realm/.friendsdk/
 ```
 
 On a phone, open the Pages link in a wallet app's in-app browser (for example MetaMask Mobile) and play in landscape:
-tap to act, long-press for the options menu. FriendSDK is vendored as `vendor/rarefriends-friendsdk-0.1.2.tgz`, packed
-from the official `v0.1.2` tag (see [NOTICE.md](NOTICE.md)). `.github/workflows/pages.yml` runs every check below and
+tap to act, long-press for the options menu. FriendSDK is vendored as `vendor/rarefriends-friendsdk-0.1.3.tgz`, packed
+from the official `v0.1.3` tag (see [NOTICE.md](NOTICE.md)). `.github/workflows/pages.yml` runs every check below and
 deploys to GitHub Pages on each push to `main`.
 
 ## Checks
