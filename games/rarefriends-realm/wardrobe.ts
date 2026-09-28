@@ -107,6 +107,8 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
   const handRow = Math.round(m.neck + (m.bottom - m.neck) * 0.45), handSpan = bodySpan(handRow), dir = side < 0 ? -1 : 1;
   const hand = { x: side < 0 ? X(handSpan.min) - 1 : X(handSpan.max) + 2, y: Y(handRow) + 1 + ([0, 1, 0, 1][phase & 3]) };
   let tip: { x: number; y: number } | null = null;
+  // Facing right, the shield arm is the far one: the shield hangs behind you (just its rim and wooden back peek out).
+  if (shield && side > 0) drawShield(p, shield, X(waistSpan.min) + 3, waist, true);
   // (Facing left the weapon hand is on the far side, behind you; but a tool at work or a weapon mid-swing comes round in front.)
   if (weapon && side < 0 && !held) tip = drawHeld(p, weapon, hand.x, hand.y, dir, sway, turn);
 
@@ -174,9 +176,9 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
   }
 
   if (weapon && side >= 0 && !held) tip = drawHeld(p, weapon, hand.x, hand.y, dir, sway, turn);
-  // The shield on the off arm, its face towards you: across your body facing left, at your back facing right (the
-  // weapon is always in front), at your side facing the camera or away.
-  if (shield) drawShield(p, shield, side < 0 ? Math.round(cx) + 1 : X(waistSpan.min) - 1, waist, back);
+  // The shield on the off arm: across your body facing left (that arm is towards you), at your side facing the camera
+  // or away. (Facing right it's behind you, drawn before your Friend above.)
+  if (shield && side <= 0) drawShield(p, shield, side < 0 ? Math.round(cx) + 1 : X(waistSpan.min) - 1, waist, back);
   // A tool at work or a weapon mid-swing goes over everything, so the motion reads.
   if (weapon && held) tip = drawHeld(p, weapon, hand.x, hand.y, dir, sway, turn);
 

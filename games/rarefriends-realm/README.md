@@ -166,6 +166,14 @@ there isn't. Hovering the online badge shows how many relays are connected and h
 scaled to fit the page and centred. The world is far larger and scrolls under a camera, and every menu, panel and HUD
 element stays inside the stage.
 
+**Signs, banners and logging out.** Every shop and bank has a hanging sign outside its door, painted with what's sold
+inside (coins for banks, a horse for the stables). Banners of your own Friend, in the scenery's pixel style, fly around the
+fountain square and at the castle gate. The ⏻ button by the minimap (or Settings → Save and log out) saves at once and
+returns to the title screen with a confirmation that the adventure is safe in this browser.
+
+**Early levels.** XP in a skill is scaled by your level in it: about half speed at level 1, three-quarters at 15, and the
+full Realm rate from level 30 up, so the first levels mean something. Fixed rewards (lamps, challenges) pay in full.
+
 **Graphics and performance.** Settings → Graphics offers Auto, High and Low. Low turns off the pixel textures, ambient
 life, cloud shadows, footprints and fog, lightens the rain, shortens the view and draws at 1× on high-DPI screens. Auto
 starts on High and drops to Low (saying so, once) if the frame rate stays under about 36 fps for five seconds. The browser

@@ -387,6 +387,13 @@ try {
   await page.keyboard.press("Escape");
   await game.getByRole("dialog", { name: "The Realm Daily" }).waitFor({ state: "detached" });
 
+  // ---------- Save and log out: back to the title screen, saved; then continue ----------
+  await game.getByRole("button", { name: "Save and log out", exact: true }).click();
+  await game.getByText("Saved and logged out.").waitFor();
+  await shot("logged-out");
+  await game.getByRole("button", { name: "Continue your adventure" }).click();
+  await game.locator('.realm-game[data-phase="playing"]').waitFor();
+
   // ---------- Friendhollow Castle: real clicks up the spiral stairs to the King's floor and the roof ----------
   const levelNow = () => state(() => { const g = window.__realm.game(), p = g.player; return g.world.floors.find(f => p.y >= 240 && p.x >= f.x0 + f.dx && p.x <= f.x1 + f.dx && p.y >= f.y0 + f.dy && p.y <= f.y1 + f.dy)?.level ?? 0; });
   /** Stand beside a staircase on a storey, then click it (its first option climbs). */

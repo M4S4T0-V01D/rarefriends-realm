@@ -392,3 +392,7 @@
 .realm-steps-bar i.done { background: #9fc48f; } .realm-steps-bar i.now { background: var(--gold); }
 .realm-steps-foot { color: var(--muted); font-size: 10.5px !important; }
 .realm-steps.closed { width: auto; }
+/* The pack: 28 squares, 4 × 7, sized to fit the side panel without scrolling. */
+.realm-inventory.pack { grid-template-columns: repeat(4, 44px); gap: 3px 12px; justify-content: center; }
+.realm-logout-btn { position: absolute; right: -4px; top: 36px; z-index: 3; width: 28px; height: 28px; padding: 0 !important; display: grid; place-items: center; font-size: 14px; font-weight: 700; border-radius: 50%; background: var(--paper); border: 2px solid var(--ink); box-shadow: 2px 2px 0 #000; }
+.realm-logged-out { margin: 0 0 6px; padding: 6px 8px; background: #e3f0dc; border: 1.5px solid #3d7a3f; color: #1f4a22; }

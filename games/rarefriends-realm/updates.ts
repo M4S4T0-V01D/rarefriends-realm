@@ -4,6 +4,14 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 19, date: "2026-09-28", title: "Signs, banners and a log out button", items: [
+    "Every shop and bank has a hanging sign outside its door, painted with what's sold inside (an axe for Axel's, a bow for Fletch & Feather, coins for the banks, a horse for the stables).",
+    "Banners of your own Rare Friend fly around the fountain square and at the castle gate.",
+    "Save and log out: the ⏻ button by the minimap (or Settings) saves your adventure at once and returns to the title screen, confirming it's safe in this browser.",
+    "The early levels are a little slower (about half speed at level 1, full speed from level 30), so each level-up means more. Higher levels are unchanged.",
+    "Shields show only on the arm they're worn on: across your body facing one way, tucked behind you facing the other.",
+    "The inventory squares are a touch smaller, so all 28 fit without scrolling.",
+  ] },
   { id: 18, date: "2026-09-28", title: "Animations in your Friend's hands", items: [
     "Weapons and tools now move in your Friend's own pixels instead of floating beside it: swords wind up, strike and follow through, staffs thrust forward as a spell leaves, and bows flex.",
     "Axes chop, pickaxes strike the rock, hammers ring on the anvil, rods cast with the line running from the rod's tip, and food is held out over the fire, all drawn in the same pixel style as your gear.",

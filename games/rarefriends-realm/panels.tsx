@@ -124,6 +124,7 @@ export type PanelProps = {
   /** The skill guide (a skill) or the recipe book (null). */
   openGuide?: (skill: Skill | null) => void;
   /** Save codes: copy or download yours, or restore one (resolves to an error message, or null). */
+  onLogout?: () => void;
   onExportSave?: (action: "copy" | "download") => void; onRestoreSave?: (code: string) => Promise<string | null>; backupStatus?: string;
   net?: NetState; onSocial?: (op: "add" | "remove" | "ignore" | "unignore", id: number) => void; onWhisper?: (id: number) => void; onOnline?: (on: boolean) => void;
 };
@@ -254,7 +255,7 @@ function InventoryTab({ game, selection, setSelection, openMenu, refresh, settin
     })));
   };
   return (
-    <div className="realm-inventory" onContextMenu={event => event.preventDefault()}>
+    <div className="realm-inventory pack" onContextMenu={event => event.preventDefault()}>
       {player.inventory.map((slot, index) => (
         <button key={index} type="button" className="realm-slot" data-selected={selection?.kind === "item" && selection.slot === index}
           aria-label={slot ? `${item(slot.id).name}${slot.n > 1 ? ` × ${slot.n}` : ""}` : `Empty slot ${index + 1}`}
@@ -262,7 +263,7 @@ function InventoryTab({ game, selection, setSelection, openMenu, refresh, settin
           onDrop={() => { if (drag.current !== null) { swapSlots(game, drag.current, index); drag.current = null; refresh(); } }}
           onClick={event => click(index, event.shiftKey)} onContextMenu={event => { event.preventDefault(); context(event.currentTarget, event.clientX, event.clientY, index); }}
           onTouchStart={event => { const touch = event.touches[0], target = event.currentTarget; longPress(() => context(target, touch.clientX, touch.clientY, index)); }} onTouchEnd={cancelLongPress} onTouchMove={cancelLongPress}>
-          {slot && <ItemIcon slot={slot} />}
+          {slot && <ItemIcon slot={slot} size={40} />}
         </button>
       ))}
     </div>
@@ -456,7 +457,7 @@ function FriendsTab({ game, refresh, roster, rosterState, friendSprites, loadFri
     </div>
   );
 }
-function SettingsTab({ game, settings, setSettings, trackName, trackId, playTrack, openHelp, saved, refresh, openMenu, net, onOnline, onExportSave, onRestoreSave, backupStatus }: PanelProps) {
+function SettingsTab({ game, settings, setSettings, trackName, trackId, playTrack, openHelp, saved, refresh, openMenu, net, onOnline, onExportSave, onRestoreSave, backupStatus, onLogout }: PanelProps) {
   const set = (patch: Partial<Settings>) => setSettings({ ...settings, ...patch });
   const [code, setCode] = useState(""), [confirming, setConfirming] = useState(false), [restoreNote, setRestoreNote] = useState("");
   const unlocked = game.player.music;
@@ -486,6 +487,7 @@ function SettingsTab({ game, settings, setSettings, trackName, trackId, playTrac
       <label className="realm-check"><input type="checkbox" checked={settings.shiftDrop} onChange={event => set({ shiftDrop: event.target.checked })} /> Shift-click to drop</label>
       <label className="realm-check"><input type="checkbox" checked={game.player.run} onChange={() => { toggleRun(game); refresh(); }} /> Run</label>
       <p className="realm-note">{saved}</p>
+      {onLogout && <button type="button" className="realm-primary realm-wide" onClick={onLogout}>⏻ Save and log out</button>}
       <h3>Back up your adventure</h3>
       <p className="realm-muted">Browser saves can be cleared. A save code holds your whole adventure: keep it anywhere, and paste it back on any browser.</p>
       <div className="realm-buttons"><button type="button" onClick={() => onExportSave?.("copy")}>Copy save code</button><button type="button" onClick={() => onExportSave?.("download")}>Download save file</button></div>

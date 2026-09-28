@@ -95,7 +95,9 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const lastMinimapPoint = useRef<React.MouseEvent<HTMLCanvasElement> | null>(null);
   const [snapshot, setSnapshot] = useState<GameSnapshot | null>(null), [busy, setBusy] = useState(false), [casketError, setCasketError] = useState(""), [reveal, setReveal] = useState<CasketResult[] | null>(null);
   const [size, setSize] = useState({ width: 960, height: 640, scale: 1 }), [sideOpen, setSideOpen] = useState(true), [shareStatus, setShareStatus] = useState(""), [cardUrl, setCardUrl] = useState<string | null>(null);
-  const pendingSave = useRef<unknown>(null), cardBlob = useRef<Blob | null>(null), resizeRef = useRef<() => void>(() => {});
+  const pendingSave = useRef<unknown>(null), cardBlob = useRef<Blob | null>(null), resizeRef = useRef<() => void>(() => {}), saveNow = useRef<() => void>(() => {});
+  /** Logged out: back on the title screen with the adventure saved. */
+  const [loggedOut, setLoggedOut] = useState(false);
   const live = useRef({ paused, phase, modal, menu, selection, settings }); live.current = { paused, phase, modal, menu, selection, settings };
   const refresh = useCallback(() => setVersion(value => value + 1), []);
   const reducedMotion = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -313,6 +315,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       if (raw === lastSave.current) return;
       lastSave.current = raw; window.parent.postMessage({ type: SAVE_WRITE, friend: friendId.toString(), save: data }, "*");
     };
+    saveNow.current = save;
     const timer = setInterval(save, 5000);
     window.addEventListener("pagehide", save);
     return () => { clearInterval(timer); window.removeEventListener("pagehide", save); save(); };
@@ -680,8 +683,19 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     chat.current = { text: words, until: performance.now() + 3500 }; refresh();
   };
 
+  // ---------- Log out: save now and step back to the title screen ----------
+  const logOut = () => {
+    const state = game.current;
+    if (!state) return;
+    saveNow.current(); held.current.clear(); setHeld(state, null);
+    const player = state.player;
+    setHasSave({ total: totalLevel(player), combat: combatLevel(player), qp: questPoints(state), where: regionAt(state.world, player.x, player.y).name });
+    setMenu(null); setModal(null); setDailyTab(null); setSelection(null); setLoggedOut(true); setPhase("title");
+    audio.current?.play("theme");
+  };
   // ---------- Title ----------
   const begin = () => {
+    setLoggedOut(false);
     const state = game.current;
     if (!state) return;
     audio.current?.unlock(); setPhase("playing"); region.current = ""; tickAt.current = performance.now();
@@ -781,6 +795,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
                 {...rightClick((x, y, entries) => setMenu({ x, y, entries }), () => ([["North", 0], ["East", -Math.PI / 2], ["South", Math.PI], ["West", Math.PI / 2]] as const).map(([name, turn]) => ({ verb: `Look ${name}`, noun: "", run: () => {
                   const from = cameraGoal.current?.angle ?? camera.current.angle, goal = NORTH + turn; cameraGoal.current = { angle: goal + Math.round((from - goal) / (Math.PI * 2)) * Math.PI * 2, pitch: cameraGoal.current?.pitch ?? camera.current.pitch }; } })))}
                 onClick={() => { const from = cameraGoal.current?.angle ?? camera.current.angle; cameraGoal.current = { angle: NORTH + Math.round((from - NORTH) / (Math.PI * 2)) * Math.PI * 2, pitch: cameraGoal.current?.pitch ?? camera.current.pitch }; }}><i aria-hidden="true">▲</i><b>N</b></button>
+              <button type="button" className="realm-logout-btn" aria-label="Save and log out" title="Save and log out" onClick={logOut}
+                {...rightClick((x, y, entries) => setMenu({ x, y, entries }), () => [{ verb: "Save-and-log-out", noun: "", run: logOut }])}>⏻</button>
               <button type="button" className="realm-daily-btn" aria-label={`Daily streak and updates${dailyWaiting(state, Date.now()) || state.player.seenUpdate < LATEST_UPDATE ? " (something new)" : ""}`} title="Daily streak and updates"
                 onClick={() => setDailyTab(dailyWaiting(state, Date.now()) || state.player.seenUpdate >= LATEST_UPDATE ? "daily" : "updates")}
                 {...rightClick((x, y, entries) => setMenu({ x, y, entries }), () => [{ verb: "Open", noun: "Daily streak", run: () => setDailyTab("daily") }, { verb: "Open", noun: "Updates", run: () => setDailyTab("updates") }])}>
@@ -807,6 +823,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
             refresh={refresh} roster={roster} rosterState={rosterState} friendSprites={followerSprites.current} loadFriend={loadFriendSprite}
             net={netState} onSocial={(op, id) => window.parent.postMessage({ type: NET_SOCIAL, op, id }, "*")} onWhisper={id => setWhisper({ text: `@${id} `, at: performance.now() })}
             onOnline={on => window.parent.postMessage({ type: NET_ONLINE, on }, "*")} backupStatus={backupStatus} openGuide={skill => setGuide({ skill })}
+            onLogout={logOut}
             onExportSave={action => { const state = game.current; if (state) void makeSaveCode(state).then(text => window.parent.postMessage({ type: SAVE_EXPORT, action, text }, "*")); }}
             onRestoreSave={async code => { const state = game.current; if (!state) return "The game isn't ready."; const error = await restoreSaveCode(state, code);
               if (!error) { const at = realPoint(state.world, state.player.x, state.player.y); camera.current.x = at.x; camera.current.y = at.y; message(state, "Your adventure has been restored from a save code.", "info"); } return error; }} settings={settings} setSettings={setSettings}
@@ -917,6 +934,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
               <div>
                 <h2>Friend #{player.friendId}</h2>
                 <p><b>{FAMILY_NAMES[player.familyId]}</b>: {FAMILY_PERKS[player.familyId].title}. {FAMILY_PERKS[player.familyId].text}</p>
+                {loggedOut && <p className="realm-logged-out" role="status">✓ <b>Saved and logged out.</b> {hosted === "linked" ? "Your adventure is safe in this browser for this wallet and Friend. Continue any time." : "This host can't keep saves: copy a save code from Settings next time to keep your progress."} For an extra copy on any device, use Settings → Copy save code.</p>}
                 {hasSave ? <p className="realm-save">Saved adventure: total level <b>{hasSave.total}</b> · combat <b>{hasSave.combat}</b> · <b>{hasSave.qp}</b> quest points · in {hasSave.where}</p>
                   : hosted === "waiting" ? <p className="realm-muted">Looking for this wallet's saved adventure…</p> : <p className="realm-muted">A new adventure: 15 skills, 6 quests, one large world.</p>}
               </div>

@@ -35,6 +35,8 @@ export type WorldObject = {
   to?: { x: number; y: number }; action?: string; requires?: { quest?: string; item?: string; level?: number };
   obstacle?: { course: string; step: number; level: number; xp: number; ticks: number; lapXp?: number; last?: boolean };
   text?: string; big?: boolean; look?: "stairs";
+  /** A shop sign: the item painted on its board ("__horse" for the stables). */
+  icon?: string;
   /** A sigil altar: the sigil it presses. */
   sigil?: string;
 };
@@ -798,6 +800,33 @@ export function createWorld(seed = 20260927): World {
   };
   const buildingAt = new Uint8Array(W * H);
   buildings.forEach((b, index) => { if (b.roof === "none") return; for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) buildingAt[y * W + x] = index + 1; });
+  // Shop and bank signs: a hanging board outside each door, painted with what's sold inside, so they're easy to tell apart.
+  const SIGNS: Record<string, [string, string]> = {
+    shop_general: ["pot", "Friendhollow General Store"], pike: ["fishing_rod", "Pike's Tackle"], axel: ["pewter_axe", "Axel's Axes"], armsmaster: ["ashsteel_sword", "Emberforge Arms"],
+    runa: ["breeze_sigil", "Runa's Sigils"], tanner: ["leather", "Tessa's Tannery"], outfitter: ["glimmer_helm", "Frostpeak Outfitters"], armourer: ["pewter_helm", "Hollis Armoury"],
+    weaponsmith: ["pewter_sword", "Edge & Hilt"], bowyer: ["shortbow", "Fletch & Feather"], slayer_master: ["slayer_gem", "The Warden's Lodge"], innkeeper: ["cake", "The Sleepy Friend inn"],
+    rare_trader: ["rough_moonstone", "The Rare Market"], stablemaster: ["__horse", "Friendhollow Stables"],
+  };
+  const signed = new Set<Building>();
+  const signFor = (x: number, y: number, icon: string, label: string) => {
+    const home = buildings.find(b => x > b.x0 && x < b.x1 && y > b.y0 && y < b.y1 && b.roof !== "none");
+    if (!home || signed.has(home)) return;
+    const door = doorways.find(([dx, dy]) => (dx === home.x0 || dx === home.x1 || dy === home.y0 || dy === home.y1) && dx >= home.x0 && dx <= home.x1 && dy >= home.y0 && dy <= home.y1);
+    if (!door) return;
+    const [dx, dy] = door, nx = dx === home.x0 ? -1 : dx === home.x1 ? 1 : 0, ny = dy === home.y0 ? -1 : dy === home.y1 ? 1 : 0, tx = ny ? 1 : 0, ty = nx ? 1 : 0;
+    // Beside the doorway (doors are two tiles wide), one tile out from the wall.
+    for (const along of [-1, 2, -2, 3]) {
+      const sx = dx + nx + tx * along, sy = dy + ny + ty * along;
+      if (free(sx, sy) || (WALKABLE.has(get(sx, sy)) && objectAt[tileIndex(sx, sy)] < 0 && get(sx, sy) !== T.BRIDGE)) {
+        add({ kind: "sign", x: sx, y: sy, blocks: true, name: label, text: `${label}.`, icon }); signed.add(home); return;
+      }
+    }
+  };
+  for (const spawn of spawns) if (spawn.kind === "npc" && SIGNS[spawn.id]) signFor(spawn.x, spawn.y, ...SIGNS[spawn.id]);
+  for (const object of [...objects]) if (object.kind === "bank" && object.name === "Bank booth") signFor(object.x, object.y, "coins", "Bank");
+  // Banners of your Friend around the fountain square and at the castle gate.
+  for (const [bx, by] of [[113, 117], [131, 117], [113, 131], [131, 131], [119, 106], [124, 106]] as const) if (WALKABLE.has(get(bx, by)) && objectAt[tileIndex(bx, by)] < 0) decor(bx, by, "banner");
+
   // The cow pen, out on the farm by the windmill (built last, so no tree or bush lands inside it), its gate facing the coop.
   for (let y = 126; y <= 134; y++) for (let x = 59; x <= 70; x++) { clearAt(x, y); put(x, y, T.GRASS); }
   for (let x = 59; x <= 70; x++) { decor(x, 126, "fence"); decor(x, 134, "fence"); }

@@ -13,7 +13,7 @@ import { itemArt } from "./icons.ts";
 import type { PeerView } from "./social.ts";
 import type { Strike, Weather } from "./weather.ts";
 import { emoteMotion, emoteParticles, type Motion } from "./emotes.ts";
-import { drawPixels, shadeHex } from "./pixel.ts";
+import { drawPixels, pixelArt, shadeHex } from "./pixel.ts";
 import { TEX_PER_HEIGHT, TEX_PER_TILE, beginTextures, groundTexture, textureStats, shingleTexture, texturedQuad, texturedTriangle, wallTexture, type GroundStyle, type WallStyle } from "./textures.ts";
 import { campfireLogs, decorArt, fireArt, rockArt, treeArt } from "./scenery.ts";
 import { SADDLE, mountArt, type MountView } from "./mountart.ts";
@@ -616,7 +616,8 @@ function drawStation(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldO
     }
     case "casket": box(ctx, camera, ox, oy, 0.8, 0.5, 14, C.rose, shade(C.rose, -0.08), shade(C.rose, -0.14)); box(ctx, camera, ox, oy, 0.8, 0.5, 6, C.butter, shade(C.butter, -0.1), shade(C.butter, -0.15), 14);
       ellipse(ctx, sx, sy - 30 * z - flicker * 3 * z, 2.5 * z, 2.5 * z, "#fff", null); return hit(30);
-    case "sign": ctx.strokeStyle = INK; ctx.lineWidth = 2 * z; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx, sy - 28 * z); ctx.stroke();
+    case "sign": if (object.icon) return drawShopSign(ctx, scene, object, sx, sy, hit);
+      ctx.strokeStyle = INK; ctx.lineWidth = 2 * z; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx, sy - 28 * z); ctx.stroke();
       poly(ctx, [[sx - 14 * z, sy - 30 * z], [sx + 14 * z, sy - 26 * z], [sx + 14 * z, sy - 16 * z], [sx - 14 * z, sy - 20 * z]], "#e2d7ad"); return hit(34, 30);
     case "tanning": ctx.strokeStyle = "#8a7563"; ctx.lineWidth = 2 * z; ctx.strokeRect(sx - 12 * z, sy - 30 * z, 24 * z, 26 * z); poly(ctx, [[sx - 9 * z, sy - 27 * z], [sx + 9 * z, sy - 27 * z], [sx + 7 * z, sy - 8 * z], [sx - 7 * z, sy - 8 * z]], "#e8d9c8"); return hit(32, 30);
     case "sigil_altar": {
@@ -640,6 +641,7 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
   const { camera, now } = scene, z = camera.zoom, { x: sx, y: sy } = toScreen(camera, object.x, object.y), ox = object.x, oy = object.y, h = hash(ox, oy);
   const hit = (height: number, w = 36) => ({ x: sx - w / 2 * z, y: sy - height * z, w: w * z, h: (height + 10) * z });
   const frame = object.decor === "torch" ? Math.floor(now / 160 + ox) % 2 : object.decor === "reeds" ? Math.floor(now / 900 + ox) % 2 : 0;
+  if (object.decor === "banner") return drawFriendBanner(ctx, scene, object, sx, sy, hit, alpha);
   const art = scene.reducedMotion || object.decor !== "torch" ? decorArt(object.decor!, Math.floor(h * 3), frame) : decorArt("torch", 0, frame);
   if (art) {
     if (object.decor === "torch" || object.decor === "lamp") ellipse(ctx, sx, sy - (object.decor === "lamp" ? 54 : 36) * z, 16 * z, 11 * z, `rgba(242,220,160,${0.16 + Math.sin(now / 300 + ox) * 0.04})`, null);
@@ -680,7 +682,6 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
       case "rubble": for (let i = 0; i < 3; i++) box(ctx, camera, ox + (hash(ox + i, oy) - 0.5) * 0.5, oy + (hash(ox, oy + i) - 0.5) * 0.5, 0.25, 0.25, 6, "#c8c5be", "#a9a59e", "#9a968f"); return hit(12);
       case "snowman": ellipse(ctx, sx, sy - 9 * z, 11 * z, 9 * z, "#fff"); ellipse(ctx, sx, sy - 24 * z, 8 * z, 7 * z, "#fff"); ellipse(ctx, sx - 3 * z, sy - 25 * z, 1.2 * z, 1.2 * z, INK, null); ellipse(ctx, sx + 3 * z, sy - 25 * z, 1.2 * z, 1.2 * z, INK, null); return hit(34, 26);
       case "lily": ellipse(ctx, sx, sy, 7 * z, 3.5 * z, "#a9b59c"); ellipse(ctx, sx + 2 * z, sy - 1 * z, 2 * z, 1.5 * z, C.rose, null); return hit(6, 16);
-      case "banner": ctx.strokeStyle = INK; ctx.lineWidth = 2 * z; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx, sy - 50 * z); ctx.stroke(); poly(ctx, [[sx, sy - 50 * z], [sx + 16 * z, sy - 46 * z], [sx + 16 * z, sy - 24 * z], [sx + 8 * z, sy - 30 * z], [sx, sy - 26 * z]], C.rose); return hit(54, 30);
       case "torch": { ctx.strokeStyle = "#8a7563"; ctx.lineWidth = 2.5 * z; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx, sy - 22 * z); ctx.stroke(); const f = scene.reducedMotion ? 0 : Math.sin(now / 80 + ox * 3) * 2 * z;
         ellipse(ctx, sx, sy - 34 * z, 18 * z, 12 * z, "rgba(240,200,150,0.15)", null); void f; drawPixels(ctx, fireArt(scene.reducedMotion ? 0 : Math.floor(now / 110 + ox * 5) % 8, 9, 13, 5), sx, sy - 20 * z, ART * z); return hit(38, 20); }
       case "palm": ctx.strokeStyle = "#9c8672"; ctx.lineWidth = 4 * z; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.quadraticCurveTo(sx + 6 * z, sy - 24 * z, sx + 2 * z, sy - 46 * z); ctx.stroke();
@@ -712,6 +713,52 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
       default: return hit(10);
     }
   } finally { ctx.globalAlpha = 1; }
+}
+/** A shop sign: a post with an arm, and a board on two chains painted with what's sold inside (swaying a little). */
+function drawShopSign(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObject, sx: number, sy: number, hit: (h: number, w?: number) => { x: number; y: number; w: number; h: number }) {
+  const z = scene.camera.zoom, swing = scene.reducedMotion ? 0 : Math.sin(scene.now / 900 + object.x * 1.7) * 0.05;
+  box(ctx, scene.camera, object.x, object.y, 0.12, 0.12, 50, "#8a6a50", "#7a5b40", "#6a4d35");
+  const top = sy - 48 * z;
+  ctx.strokeStyle = INK; ctx.lineWidth = 3.2 * z; ctx.beginPath(); ctx.moveTo(sx, top); ctx.lineTo(sx + 22 * z, top); ctx.stroke();
+  ctx.strokeStyle = "#8a6a50"; ctx.lineWidth = 1.6 * z; ctx.beginPath(); ctx.moveTo(sx, top); ctx.lineTo(sx + 22 * z, top); ctx.stroke();
+  ctx.save(); ctx.translate(sx + 12 * z, top); ctx.rotate(swing);
+  ctx.strokeStyle = "#3b3a38"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-8 * z, 0); ctx.lineTo(-8 * z, 5 * z); ctx.moveTo(8 * z, 0); ctx.lineTo(8 * z, 5 * z); ctx.stroke();
+  const w = 26 * z, h = 22 * z;
+  ctx.fillStyle = INK; ctx.fillRect(-w / 2 - 1.5 * z, 4 * z, w + 3 * z, h + 3 * z);
+  ctx.fillStyle = "#c9a47a"; ctx.fillRect(-w / 2, 5.5 * z, w, h);
+  ctx.fillStyle = "#b88a5e"; for (let i = 1; i < 4; i++) ctx.fillRect(-w / 2, 5.5 * z + i * h / 4, w, 1);
+  ctx.strokeStyle = "#7a5b40"; ctx.lineWidth = 1.2 * z; ctx.strokeRect(-w / 2 + 2 * z, 7.5 * z, w - 4 * z, h - 4 * z);
+  if (object.icon === "__horse") { const art = mountArt(mountDef("chestnut_horse")!.coat, "side", -1, false); drawPixels(ctx, art, 0, 5.5 * z + h - 3 * z, (h - 6 * z) / art.height); }
+  else if (object.icon && isItem(object.icon)) drawIcon(ctx, item(object.icon).icon, 0, 5.5 * z + h / 2, 18 * z);
+  ctx.restore();
+  return hit(60, 44);
+}
+/** A banner of your own Friend, in the scenery's pixel style: a pole with a gold finial, a deep red cloth with gold trim and
+ * a notched hem that sways, and your Friend's own sprite in a pale roundel. */
+function friendBannerArt(rows: readonly string[] | null, frame: number) {
+  return pixelArt(`friend-banner:${frame}:${rows ? rows.join("") : "none"}`, 26, 46, p => {
+    p.rect(3, 2, 2, 44, "#4a3526"); p.rect(3, 2, 1, 44, "#6f5440"); p.disc(4, 1.5, 2, 1.5, "#e2c46a", null);
+    p.rect(3, 4, 21, 2, "#3b2a22");
+    const sway = frame ? 1 : 0, cloth = "#b84f55", dark = "#8e3a40", gold = "#e2c46a";
+    p.poly([[5, 6], [23 + sway, 6], [23 + sway, 36], [14 + sway, 31], [5, 36]], cloth, null);
+    p.line(22 + sway, 6, 22 + sway, 35, dark); for (let y = 10; y < 32; y += 7) p.line(6, y + sway, 7, y + sway, dark);
+    p.line(6, 7, 6, 34, gold); p.line(21 + sway, 7, 21 + sway, 34, gold); p.line(6, 7, 21 + sway, 7, gold);
+    // The roundel, and your Friend in it (its sprite, pixel for pixel, shrunk to fit if it's big).
+    const cx = 14 + sway / 2, cy = 19;
+    p.disc(cx, cy, 8.5, 8.5, gold, null); p.disc(cx, cy, 7.5, 7.5, "#f3e6d8", null);
+    if (rows?.length) {
+      const h = rows.length, w = rows[0].length, scale = Math.max(1, Math.ceil(Math.max(w, h) / 13));
+      for (let y = 0; y < h; y += scale) for (let x = 0; x < w; x += scale) if (rows[y][x] === "#") p.set(Math.round(cx - w / scale / 2 + x / scale), Math.round(cy - h / scale / 2 + y / scale + 1), "#161616");
+    } else p.disc(cx, cy, 3, 4, "#161616", null);
+    p.outline();
+  });
+}
+function drawFriendBanner(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObject, sx: number, sy: number, hit: (h: number, w?: number) => { x: number; y: number; w: number; h: number }, alpha = 1) {
+  const z = scene.camera.zoom, frame = scene.reducedMotion ? 0 : Math.floor(scene.now / 700 + object.x) % 2;
+  const rows = scene.friend ? friendRows(scene.friend, "down", false, 0) : null;
+  ellipse(ctx, sx, sy + 1 * z, 10 * z, 4 * z, "rgba(22,22,22,0.12)", null);
+  drawPixels(ctx, friendBannerArt(rows, frame), sx + 9 * z, sy + 2 * z, ART * z, alpha);
+  return hit(96, 40);
 }
 function drawIcon(ctx: CanvasRenderingContext2D, icon: Icon, x: number, y: number, size: number) {
   const art = itemArt(icon); drawPixels(ctx, art, x, y + size / 2, size / art.width);

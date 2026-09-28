@@ -9,7 +9,7 @@ import { currentTask, slayerPoints } from "../games/rarefriends-realm/slayer.ts"
 import { ITEM_LIST, MONSTERS, MOUNTS, SHOPS, SKILLS, SPELLS, TREES, XP_RATE, XP_TABLE, item, levelForXp } from "../games/rarefriends-realm/data.ts";
 import { NPCS, QUESTS, MAX_QUEST_POINTS, questPoints } from "../games/rarefriends-realm/content.ts";
 import { FLOOR_Y, H, REGIONS, T, W, createWorld, floorAt, objectAtTile, onLevel, realPoint, regionAt, terrainAt } from "../games/rarefriends-realm/world.ts";
-import { combatLevel, count, give, has, level, xpMultiplier } from "../games/rarefriends-realm/state.ts";
+import { addXp, combatLevel, count, earlyXp, give, has, level, xpMultiplier } from "../games/rarefriends-realm/state.ts";
 import game from "../games/rarefriends-realm/game.json" with { type: "json" };
 
 function seeded(seed = 42) { return () => ((seed = (seed * 16807) % 2147483647) / 2147483647); }
@@ -189,7 +189,7 @@ test("woodcutting, firemaking and cooking: the classic loop", () => {
   standBy(g, tree);
   menuFor(g, [{ kind: "object", id: tree.id }], null)[0].run(g);
   until(g, () => has(g.player, "logs"), 300);
-  assert(g.player.xp.woodcutting >= TREES.tree.xp * XP_RATE);
+  assert(g.player.xp.woodcutting >= TREES.tree.xp * XP_RATE * earlyXp(1));
   assert(g.depleted.has(tree.id) || g.player.activity?.kind === "woodcut");
   // Light the logs where we stand (walk to open grass first).
   teleport(g, 100, 132);
@@ -213,7 +213,7 @@ test("fishing minnows at Glass Lake", () => {
   standBy(g, spot);
   menuFor(g, [{ kind: "object", id: spot.id }], null)[0].run(g);
   until(g, () => has(g.player, "raw_minnows"), 400);
-  assert(g.player.xp.fishing >= 10 * XP_RATE);
+  assert(g.player.xp.fishing >= 10 * XP_RATE * earlyXp(1));
 });
 
 test("mining, smelting and smithing a pewter dagger", () => {
@@ -225,7 +225,7 @@ test("mining, smelting and smithing a pewter dagger", () => {
     setTarget(g, { kind: "object", id: rock.id, option: "Mine" });
     until(g, () => has(g.player, `${kind}_ore`), 600);
   }
-  assert(g.player.xp.mining >= 17.5 * XP_RATE);
+  assert(g.player.xp.mining >= 17.5 * XP_RATE * earlyXp(1));
   const furnace = g.world.objects.find(object => object.kind === "furnace");
   standBy(g, furnace);
   setTarget(g, { kind: "object", id: furnace.id, option: "Smelt" });
@@ -238,7 +238,7 @@ test("mining, smelting and smithing a pewter dagger", () => {
   until(g, () => g.ui.production !== null, 50);
   startProduction(g, smithingRecipes("pewter").find(recipe => recipe.label === "Pewter dagger"), 1);
   until(g, () => count(g.player, "pewter_dagger") === 2, 50);
-  assert(g.player.xp.smithing >= (8 + 12.5) * XP_RATE);
+  assert(g.player.xp.smithing >= (8 + 12.5) * XP_RATE * earlyXp(1));
 });
 
 test("combat: equip a sword, kill a chicken, loot and bury its bones", () => {
@@ -256,7 +256,7 @@ test("combat: equip a sword, kill a chicken, loot and bury its bones", () => {
   setTarget(g, { kind: "ground", uid: bones.uid, option: "Take" });
   until(g, () => has(g.player, "bones"), 30);
   itemOptions(g, g.player.inventory.findIndex(slot => slot?.id === "bones"))[0].run(g);
-  assert(g.player.xp.prayer >= 4.5 * XP_RATE * 1.5, "Skeleton family buries for +50%");
+  assert(g.player.xp.prayer >= 4.5 * XP_RATE * 1.5 * earlyXp(1), "Skeleton family buries for +50%");
   run(g, 25);
   assert(!chicken.dead, "Monsters respawn");
 });
@@ -346,7 +346,7 @@ test("agility: a full lap of the Friendhollow course", () => {
     until(g, () => g.player.x === obstacle.to.x && g.player.y === obstacle.to.y, 60);
   }
   const perObstacle = obstacles.reduce((sum, obstacle) => sum + obstacle.obstacle.xp, 0);
-  assert(g.player.xp.agility >= (perObstacle + 40) * XP_RATE, "Lap bonus paid");
+  assert(g.player.xp.agility >= (perObstacle + 40) * XP_RATE * earlyXp(1), "Lap bonus paid");
 });
 
 test("magic: Breeze Dart uses sigils and trains Magic", () => {
@@ -359,7 +359,7 @@ test("magic: Breeze Dart uses sigils and trains Magic", () => {
   if (!canWalk(g, rat.x + 3, rat.y)) teleport(g, rat.x, rat.y + 3);
   menuFor(g, [{ kind: "monster", id: rat.uid }], null, selection)[0].run(g);
   until(g, () => count(g.player, "breeze_sigil") < 20, 40);
-  assert(g.player.xp.magic >= 5.5 * XP_RATE);
+  assert(g.player.xp.magic >= 5.5 * XP_RATE * earlyXp(1));
   assert(SPELLS.length >= 10);
 });
 
@@ -1007,4 +1007,14 @@ test("First steps: a new Friend is guided through seven steps, each completing f
   const fresh = newGame(); skipFirstSteps(fresh); assert.equal(currentStep(fresh), null, "skippable");
   const save = JSON.parse(JSON.stringify(serialize(newGame()))); delete save.guide; const old = newGame(); restore(old, save);
   assert.equal(currentStep(old), null, "saves from before the guide don't see it");
+});
+
+test("XP: the early levels go slower (about half speed at level 1), the full rate from level 30, and fixed rewards are unaffected", () => {
+  assert(Math.abs(earlyXp(1) - 0.5167) < 0.01); assert.equal(earlyXp(30), 1); assert.equal(earlyXp(80), 1);
+  const g = newGame(), p = g.player;
+  addXp(g, "woodcutting", 25); assert(Math.abs(p.xp.woodcutting - 25 * xpMultiplier(p) * earlyXp(1)) < 1e-6, "a level-1 log pays about half");
+  let logs = 0; p.xp.woodcutting = 0; while (level(g, "woodcutting") < 10) { addXp(g, "woodcutting", 25); logs++; }
+  assert(logs >= 20, `level 10 takes a while now (${logs} logs)`);
+  p.xp.mining = 13_363; const before = p.xp.mining; addXp(g, "mining", 35); assert(Math.abs(p.xp.mining - before - 35 * xpMultiplier(p)) < 1e-6, "full rate at level 30+");
+  p.xp.fishing = 0; addXp(g, "fishing", 300, { raw: true }); assert.equal(p.xp.fishing, 300, "fixed rewards pay in full");
 });

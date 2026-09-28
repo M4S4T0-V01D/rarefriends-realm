@@ -216,6 +216,11 @@ export function xpMultiplier(player: Player) {
 }
 /** The mount you're riding, if any. */
 export function riding(player: Player) { return mountDef(player.mount); }
+/**
+ * The early levels go a little slower, so levelling up means something from the start: about half speed at level 1,
+ * three-quarters at 15, and the full Realm rate from level 30 up (fixed rewards such as lamps are unaffected).
+ */
+export const earlyXp = (skillLevel: number) => skillLevel >= 30 ? 1 : 0.5 + skillLevel / 60;
 /** Owned-Friend followers: Gen 1 +5% XP … Gen 5 and later +1%. */
 export function followerBonus(player: Player) {
   if (player.follower === null) return 0;
@@ -225,7 +230,7 @@ export function followerBonus(player: Player) {
 /** Award XP (already scaled by the caller with `scaled`) and announce level-ups. */
 export function addXp(game: Game, skill: Skill, base: number, options: { raw?: boolean } = {}) {
   const player = game.player, before = levelForXp(player.xp[skill]);
-  const amount = options.raw ? base : base * xpMultiplier(player);
+  const amount = options.raw ? base : base * xpMultiplier(player) * earlyXp(before);
   if (amount <= 0) return;
   player.xp[skill] = Math.min(MAX_XP, player.xp[skill] + amount);
   emit(game, { type: "xp", skill, amount, tick: game.tick });
