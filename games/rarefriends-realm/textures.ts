@@ -77,9 +77,12 @@ export function shingleTexture(color: string, cols: number, rows: number): HTMLC
 }
 /** The canvas's base transform for this frame (set once per frame, so each face costs one setTransform, not a save/restore). */
 let base: DOMMatrix | null = null;
-export function beginTextures(ctx: CanvasRenderingContext2D) { base = ctx.getTransform(); ctx.imageSmoothingEnabled = false; }
+/** Textured draws in the last frame (for the performance check). */
+export const textureStats = { frame: 0, last: 0 };
+export function beginTextures(ctx: CanvasRenderingContext2D) { base = ctx.getTransform(); ctx.imageSmoothingEnabled = false; textureStats.last = textureStats.frame; textureStats.frame = 0; }
 /** Draw `rows` × `cols` of a texture onto the parallelogram with top-left `o`, top-right `x`, bottom-left `y` (screen). */
 export function texturedQuad(ctx: CanvasRenderingContext2D, texture: HTMLCanvasElement, o: { x: number; y: number }, x: { x: number; y: number }, y: { x: number; y: number }, cols: number, rows: number, alpha = 1) {
+  textureStats.frame++;
   cols = Math.max(1, Math.min(texture.width, Math.round(cols))); rows = Math.max(1, Math.min(texture.height, Math.round(rows)));
   const m = base ?? ctx.getTransform(), a = (x.x - o.x) / cols, b = (x.y - o.y) / cols, c = (y.x - o.x) / rows, d = (y.y - o.y) / rows;
   // base × local, written out (the base is a scale plus translation).

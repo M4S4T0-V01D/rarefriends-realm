@@ -342,6 +342,32 @@ try {
   (await import("node:fs")).writeFileSync("./artifacts/adventurer-card.png", Buffer.from(card.data, "base64"));
   await game.getByRole("button", { name: "Close" }).click();
 
+  // ---------- Performance: frame cost at busy scenes, High against Low (Settings → Graphics) ----------
+  {
+    const rows = [];
+    for (const [name, at, view] of [["Friendhollow (castle and Market Street)", [121, 124], [0.8, 0.4, 0.3]], ["Whisperwood (dense forest)", [76, 88], [0.7, 0.3, 0.6]], ["Stormy night in town", [121, 124], [0.9, 0.42, -0.3]]]) {
+      await teleport(...at);
+      const row = { name };
+      for (const level of ["high", "low"]) {
+        await frame().evaluate(level => window.__realm.graphics(level), level); await page.waitForTimeout(150);
+        await frame().evaluate(([name, view]) => { window.__realm.view(...view); if (name.startsWith("Stormy")) { window.__realm.time(0.02); window.__realm.weather({ rain: 1, storm: true, fog: 0.3 }); } else { window.__realm.time(0.5); window.__realm.weather({ rain: 0, storm: false, fog: 0 }); } }, [name, view]);
+        await page.waitForTimeout(3000);
+        row[level] = (await frame().evaluate(() => window.__realm.perf())).ms;
+      }
+      rows.push(row);
+    }
+    await frame().evaluate(() => { window.__realm.graphics("auto"); window.__realm.time(0.5); window.__realm.weather({ rain: 0, storm: false, fog: 0 }); });
+    console.log("Frame cost (ms to draw a frame, headless software rendering):\n" + rows.map(row => `  ${row.name}: High ${row.high.toFixed(1)} · Low ${row.low.toFixed(1)}`).join("\n"));
+    for (const row of rows) {
+      assert.ok(row.low < row.high * 0.75, `${row.name}: Low is clearly cheaper than High`);
+      assert.ok(row.low < 16, `${row.name}: Low draws inside a 60 fps budget even without a GPU (${row.low.toFixed(1)} ms)`);
+    }
+    await game.getByRole("tab", { name: "Settings" }).click();
+    await game.getByRole("radio", { name: "Low" }).click();
+    assert.equal(await state(() => window.__realm.perf().low), true, "Settings → Graphics → Low");
+    await game.getByRole("radio", { name: "Auto" }).click();
+  }
+
   // ---------- The daily popup: claim the streak, see the challenges, read the update log ----------
   await game.getByRole("button", { name: /Daily streak and updates/ }).click();
   await game.getByRole("dialog", { name: "The Realm Daily" }).waitFor();

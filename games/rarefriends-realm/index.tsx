@@ -13,7 +13,7 @@ import { TICK_MS, attackSpeed, combatLevel, createGame, giveOrDrop, message, tot
 import {
   chooseOption, closeInterfaces, collectFromCasket, creditReferral, emoteProblem, performEmote, syncMonster, continueDialogue, grantBundle, menuFor, tailorChoices, unlockMusic, restore, serialize, setFollower, setHeld, setRelics, tick, toggleRun, toggleMount, grantMount, walkTo, type OwnedFriend, type Selection,
 } from "./engine.ts";
-import { PITCH, VIEW, ZOOM, addPrint, daylight, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
+import { PITCH, RENDER_PROFILE, VIEW, ZOOM, addPrint, daylight, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
 import {
   BankModal, ChatBox, ContextMenu, DailyModal, GuideModal, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
   cancelLongPress, longPress, rightClick, type MenuEntry, type Settings, type Tab,
@@ -37,6 +37,7 @@ import type { DailyTab } from "./panels.tsx";
 import { skillArt } from "./icons.ts";
 import { T, groundHeight, isUnderground, isWater, realPoint, regionAt, terrainAt, type World } from "./world.ts";
 import { burst } from "./effects.ts";
+import { textureStats } from "./textures.ts";
 import "@rarefriends/friendsdk/frame.css";
 import "./style.css";
 
@@ -58,6 +59,8 @@ let fixedTime: number | null = typeof navigator !== "undefined" && navigator.web
 /** Weather from the real clock (tests stay clear unless they set one). */
 /** The world boss's clock: the real one, except in automated runs, where a test sets it (null: no boss). */
 let bossClock: (() => number) | null = typeof navigator !== "undefined" && navigator.webdriver ? null : () => Date.now();
+/** How long drawing a frame takes (a rolling average, ms), and whether auto graphics has dropped to low. */
+const perf = { ms: 0, frames: 0, autoLow: false, slowSince: 0, interval: 16.7, lastFrame: 0 };
 let fixedWeather: Weather | null = typeof navigator !== "undefined" && navigator.webdriver ? { rain: 0, storm: false, fog: 0 } : null;
 let lastThunder = -1;
 const timeOfDay = () => fixedTime ?? ((Date.now() / DAY_MS + 0.3) % 1);
@@ -91,7 +94,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const lastMinimapPoint = useRef<React.MouseEvent<HTMLCanvasElement> | null>(null);
   const [snapshot, setSnapshot] = useState<GameSnapshot | null>(null), [busy, setBusy] = useState(false), [casketError, setCasketError] = useState(""), [reveal, setReveal] = useState<CasketResult[] | null>(null);
   const [size, setSize] = useState({ width: 960, height: 640, scale: 1 }), [sideOpen, setSideOpen] = useState(true), [shareStatus, setShareStatus] = useState(""), [cardUrl, setCardUrl] = useState<string | null>(null);
-  const pendingSave = useRef<unknown>(null), cardBlob = useRef<Blob | null>(null);
+  const pendingSave = useRef<unknown>(null), cardBlob = useRef<Blob | null>(null), resizeRef = useRef<() => void>(() => {});
   const live = useRef({ paused, phase, modal, menu, selection, settings }); live.current = { paused, phase, modal, menu, selection, settings };
   const refresh = useCallback(() => setVersion(value => value + 1), []);
   const reducedMotion = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -116,11 +119,13 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       const logical = { width: Math.round(width / scale), height: Math.round(height / scale), scale };
       VIEW.width = logical.width; VIEW.height = logical.height; setSize(logical); setSideOpen(logical.width >= 900 || logical.height >= 560);
       const view = canvas.current;
-      if (view) { const ratio = Math.min(window.devicePixelRatio || 1, 2); view.width = Math.round(logical.width * scale * ratio); view.height = Math.round(logical.height * scale * ratio); }
+      // Low graphics draws at one pixel per CSS pixel (a sharp screen at 2× costs four times the pixels).
+      const graphics = live.current.settings.graphics ?? "auto", low = graphics === "low" || (graphics === "auto" && perf.autoLow);
+      if (view) { const ratio = low ? 1 : Math.min(window.devicePixelRatio || 1, 2); view.width = Math.round(logical.width * scale * ratio); view.height = Math.round(logical.height * scale * ratio); }
     };
-    const observer = new ResizeObserver(measure); observer.observe(node); measure();
+    const observer = new ResizeObserver(measure); observer.observe(node); measure(); resizeRef.current = measure;
     return () => observer.disconnect();
-  }, [phase]);
+  }, [phase, settings.graphics]);
 
   // ---------- Audio ----------
   const setSettings = useCallback((next: Settings) => {
@@ -271,6 +276,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         /** Fix the weather ({ rain, storm, fog }), or null to follow the clock. */
         weather: (value: Weather | null) => { fixedWeather = value; },
         fireworks: () => { const state = game.current; if (state) celebrate(state.player.x, state.player.y, ["#e7a9b0", "#ebc26b", "#9fc6f0", "#b4d4a0"]); },
+        graphics: (level: "auto" | "high" | "low") => setSettings({ ...live.current.settings, graphics: level }),
+        perf: () => ({ ms: Math.round(perf.ms * 100) / 100, fps: Math.round(1000 / perf.interval), quads: textureStats.last, parts: Object.fromEntries(Object.entries(RENDER_PROFILE).map(([k, v]) => [k, Math.round(v * 10) / 10])), low: (live.current.settings.graphics ?? "auto") === "low" || perf.autoLow }),
         boss: (ms: number | null) => { bossClock = ms === null ? null : () => ms; const state = game.current; if (state && ms !== null) { updateWorldBoss(state, ms); refresh(); } },
         view: (zoom: number, pitch: number, angle = 0) => { setSettings({ ...live.current.settings, zoom }); camera.current.pitch = pitch; camera.current.angle = angle; cameraGoal.current = null; },
         screenOf: (x: number, y: number) => {
@@ -436,7 +443,9 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       }
       const ratio = node.width / VIEW.width;
       ctx.setTransform(ratio, 0, 0, ratio, 0, 0); ctx.imageSmoothingEnabled = false;
+      const drawStart = performance.now(), graphics = live.current.settings.graphics ?? "auto";
       renderScene(ctx, {
+        low: graphics === "low" || (graphics === "auto" && perf.autoLow),
         game: state, now, tickAt: tickAt.current, camera: camera.current, friend: friend.current,
         follower: player.follower !== null ? followerSprites.current.get(player.follower) ?? null : null, canonical: CANONICAL,
         hoverTile: current === "playing" ? hoverTile.current : null, marker: marker.current, reducedMotion, hits: hits.current, fireworks: fireworks.current, chat: chat.current,
@@ -453,6 +462,15 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         peers: current === "playing" ? players.current.view(now) : [], peerSprites: id => followerSprites.current.get(id) ?? null,
         peerDrops: current === "playing" ? players.current.drops() : [],
       });
+      // Frame cost: auto graphics drops to low when drawing stays slow for a few seconds (and says so, once).
+      const cost = performance.now() - drawStart; perf.ms = perf.frames++ ? perf.ms * 0.95 + cost * 0.05 : cost;
+      // The real frame rate (it counts the GPU's work too); hitches and hidden tabs are left out.
+      const gap = now - perf.lastFrame; perf.lastFrame = now;
+      if (gap > 0 && gap < 250 && document.visibilityState === "visible") perf.interval = perf.interval * 0.97 + gap * 0.03;
+      if (current === "playing" && graphics === "auto" && !perf.autoLow && perf.frames > 180 && !navigator.webdriver) {
+        if (perf.interval > 28) { perf.slowSince ||= now; if (now - perf.slowSince > 5000) { perf.autoLow = true; message(state, "Graphics set to Low to keep things smooth on this device. Change it in Settings.", "info"); resizeRef.current(); } }
+        else perf.slowSince = 0;
+      }
       if (mini && current === "playing" && now - lastHud > 90) {
         lastHud = now; const size = mini.canvas.width;
         renderMinimap(mini, state, size, miniZoom.current * (size / 152), camera.current.angle, players.current.view(now));

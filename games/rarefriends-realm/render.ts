@@ -14,7 +14,7 @@ import type { PeerView } from "./social.ts";
 import type { Strike, Weather } from "./weather.ts";
 import { emoteMotion, emoteParticles, type Motion } from "./emotes.ts";
 import { drawPixels, shadeHex } from "./pixel.ts";
-import { TEX_PER_HEIGHT, TEX_PER_TILE, beginTextures, groundTexture, shingleTexture, texturedQuad, texturedTriangle, wallTexture, type GroundStyle, type WallStyle } from "./textures.ts";
+import { TEX_PER_HEIGHT, TEX_PER_TILE, beginTextures, groundTexture, textureStats, shingleTexture, texturedQuad, texturedTriangle, wallTexture, type GroundStyle, type WallStyle } from "./textures.ts";
 import { campfireLogs, decorArt, fireArt, rockArt, treeArt } from "./scenery.ts";
 import { SADDLE, mountArt, type MountView } from "./mountart.ts";
 import { petArt } from "./petart.ts";
@@ -60,6 +60,8 @@ export type Firework = { at: number; color: string };
 export type Scene = {
   game: Game; now: number; tickAt: number; camera: Camera; friend: GenerationSprites | null; follower: GenerationSprites | null;
   canonical: ReadonlyMap<number, GenerationSprites>; hoverTile: { x: number; y: number } | null; marker: ClickMarker | null;
+  /** Low graphics: no pixel textures, ambient life, cloud shadows, footprints or fog, lighter rain, a shorter view. */
+  low?: boolean;
   reducedMotion: boolean; hits: HitSplat[]; fireworks: Firework[]; chat: { text: string; until: number } | null; projectiles: readonly Projectile[];
   /** Plays a sound effect (swing impacts are timed by the animation). */
   sfx?: (name: string, gain?: number) => void;
@@ -227,6 +229,7 @@ function box(ctx: CanvasRenderingContext2D, camera: Camera, x: number, y: number
   const p = (px: number, py: number, z: number) => { const s = toScreen(camera, px, py, z); return [s.x, s.y] as const; };
   const q = (px: number, py: number, z: number) => toScreen(camera, px, py, z);
   const x0 = x - w / 2, x1 = x + w / 2, y0 = y - d / 2, y1 = y + d / 2, variant = Math.abs(Math.floor(x * 7 + y * 13)) % 4;
+  const edges = new Path2D(), outline = (points: readonly (readonly [number, number])[]) => { points.forEach(([px, py], i) => i ? edges.lineTo(px, py) : edges.moveTo(px, py)); edges.closePath(); };
   // The four sides with their outward normals; draw the ones facing the camera, shaded by which way they face on screen.
   const sides: [number, number, number, number, number, number][] = [[x0, y1, x1, y1, 0, 1], [x1, y1, x1, y0, 1, 0], [x1, y0, x0, y0, 0, -1], [x0, y0, x0, y1, -1, 0]];
   for (const [ax, ay, bx, by, nx, ny] of sides) {
@@ -236,12 +239,15 @@ function box(ctx: CanvasRenderingContext2D, camera: Camera, x: number, y: number
     if (pattern && texturesOn && fill.startsWith("#") && Math.abs(corners[1][0] - corners[0][0]) + Math.abs(corners[3][1] - corners[0][1]) > 10) {
       const length = Math.hypot(bx - ax, by - ay);
       texturedQuad(ctx, wallTexture(pattern, fill, variant), q(ax, ay, lift + h), q(bx, by, lift + h), q(ax, ay, lift), length * TEX_PER_TILE, h * TEX_PER_HEIGHT);
-      poly(ctx, corners, null, stroke);
-    } else poly(ctx, corners, fill, stroke);
+    } else poly(ctx, corners, fill, null);
+    outline(corners);
   }
   const lid = [p(x0, y0, lift + h), p(x1, y0, lift + h), p(x1, y1, lift + h), p(x0, y1, lift + h)] as const;
-  if (pattern && texturesOn && pattern === "cap" && top.startsWith("#")) { texturedQuad(ctx, wallTexture("cap", top, variant), q(x0, y0, lift + h), q(x1, y0, lift + h), q(x0, y1, lift + h), w * TEX_PER_TILE, d * TEX_PER_TILE); poly(ctx, lid, null, stroke); }
-  else poly(ctx, lid, top, stroke);
+  if (pattern && texturesOn && pattern === "cap" && top.startsWith("#")) texturedQuad(ctx, wallTexture("cap", top, variant), q(x0, y0, lift + h), q(x1, y0, lift + h), q(x0, y1, lift + h), w * TEX_PER_TILE, d * TEX_PER_TILE);
+  else poly(ctx, lid, top, null);
+  outline(lid);
+  // Every face's ink edge in one stroke (shared edges would otherwise be drawn twice, and each stroke is a draw call).
+  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(edges); }
 }
 
 // ---------- Terrain ----------
@@ -263,7 +269,7 @@ function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, x0: number, y0
   const o = { x: 0, y: 0 }, px = flat(0.5, 0), py = flat(0, 0.5);
   const ex = { x: px.x - o.x, y: px.y - o.y }, ey = { x: py.x - o.x, y: py.y - o.y }, ls = liftScale(camera);
   // Inked edges and contour lines go into two paths, stroked once. Texture is left off tiles too small or far to show it.
-  const edges = new Path2D(), contours = new Path2D(), small = hh < 5, near = 34;
+  const edges = new Path2D(), contours = new Path2D(), small = hh < 5, near = scene.low ? 14 : 34;
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
     if (!inBounds(x, y)) continue;
     const terrain = world.tiles[y * W + x];
@@ -812,7 +818,12 @@ function floorTile(ctx: CanvasRenderingContext2D, camera: Camera, x: number, y: 
 }
 /** Eased height of the storey you're on, so the camera rises with you up the stairs. */
 let liftNow = 0;
+/** Where each frame's drawing time goes (rolling averages, ms), for the performance check. */
+export const RENDER_PROFILE: Record<string, number> = {};
+let profileAt = 0;
+const lap = (name: string) => { const t = performance.now(); RENDER_PROFILE[name] = (RENDER_PROFILE[name] ?? 0) * 0.95 + (t - profileAt) * 0.05; profileAt = t; };
 export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
+  profileAt = performance.now();
   const { game, camera, now } = scene, world = game.world, z = camera.zoom;
   const alpha = Math.max(0, Math.min(1, (now - scene.tickAt) / TICK_MS));
   const underground = isUnderground(game.player.y);
@@ -822,20 +833,20 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   const inside = floor ? floor.complex : complexAt(world, here.x, here.y);
   const liftGoal = level * STOREY; liftNow = scene.reducedMotion || Math.abs(liftGoal - liftNow) > STOREY * 2 ? liftGoal : liftNow + (liftGoal - liftNow) * Math.min(1, dt * 8);
   setGround(world); viewFloor = floor; camera.base = groundHeight(world, camera.x, camera.y) + liftNow;
-  texturesOn = z >= 0.7; beginTextures(ctx);
+  const low = !!scene.low, reach = low ? 44 : DRAW_DISTANCE;
+  texturesOn = z >= 0.7 && !low; beginTextures(ctx);
   const project = (x: number, y: number, lift = 0) => toScreen(camera, x, y, lift);
-  updateEffects(game, camera, dt, scene.reducedMotion, 34 / Math.max(0.5, z));
+  updateEffects(game, camera, dt, scene.reducedMotion || low, 34 / Math.max(0.5, z));
   if (underground) { ctx.fillStyle = "#0e0e10"; ctx.fillRect(0, 0, VIEW.width, VIEW.height); }
   else { const sky = ctx.createLinearGradient(0, 0, 0, VIEW.height); sky.addColorStop(0, "#b9c7d6"); sky.addColorStop(1, "#dcdfda"); ctx.fillStyle = sky; ctx.fillRect(0, 0, VIEW.width, VIEW.height); }
   // Visible tile bounds.
   const corners = [toTile(camera, 0, 0, false), toTile(camera, VIEW.width, 0, false), toTile(camera, 0, VIEW.height, false), toTile(camera, VIEW.width, VIEW.height, false)];
   // Low camera angles see a long way: draw out to DRAW_DISTANCE and let the haze take the rest.
   const cx = Math.round(camera.x), cy = Math.round(camera.y);
-  const x0 = Math.max(cx - DRAW_DISTANCE, Math.min(...corners.map(c => c.x)) - 2), x1 = Math.min(cx + DRAW_DISTANCE, Math.max(...corners.map(c => c.x)) + 3);
-  const y0 = Math.max(cy - DRAW_DISTANCE, Math.min(...corners.map(c => c.y)) - 2), y1 = Math.min(cy + DRAW_DISTANCE, Math.max(...corners.map(c => c.y)) + 3);
-  drawTerrain(ctx, scene, x0, y0, x1, y1);
-  drawCloudShadows(ctx, project, camera, now, z, underground, scene.reducedMotion);
-  drawPrints(ctx, camera, now);
+  const x0 = Math.max(cx - reach, Math.min(...corners.map(c => c.x)) - 2), x1 = Math.min(cx + reach, Math.max(...corners.map(c => c.x)) + 3);
+  const y0 = Math.max(cy - reach, Math.min(...corners.map(c => c.y)) - 2), y1 = Math.min(cy + reach, Math.max(...corners.map(c => c.y)) + 3);
+  lap("setup"); drawTerrain(ctx, scene, x0, y0, x1, y1); lap("terrain"); RENDER_PROFILE.groundQuads = textureStats.frame;
+  if (!low) { drawCloudShadows(ctx, project, camera, now, z, underground, scene.reducedMotion); drawPrints(ctx, camera, now); }
   const sky = daylight(scene.time), weather = scene.weather ?? null, overcast = weather ? weather.rain * (weather.storm ? 0.45 : 0.28) : 0;
   const hits: Hit[] = [], drawables: Drawable[] = [], light = underground ? { dark: 0.95, warm: 0, label: "Dark" } : { ...sky, dark: Math.min(1, sky.dark + overcast * (1 - sky.dark)), warm: sky.warm * (1 - (weather?.rain ?? 0)) }, lights: Light[] = [];
   // Lights pool on the ground beneath their source (the lift only decides where the pool sits on screen, a little below).
@@ -1075,8 +1086,9 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
       for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2, r = age * 60 * z; ellipse(ctx, s.x + Math.cos(a) * r, s.y - 40 * z + Math.sin(a) * r * 0.7 - age * 20 * z, 2.5 * z * (1 - age), 2.5 * z * (1 - age), [C.rose, C.butter, C.blue, C.sage][i % 4], null); }
     }
   } });
-  drawables.sort((a, b) => a.depth - b.depth);
+  lap("gather"); drawables.sort((a, b) => a.depth - b.depth);
   for (const drawable of drawables) drawable.draw();
+  lap("objects");
   // Projectiles: spells fly as glowing comets with sparks (by element), arrows turn in flight, dragonfire roars; all of
   // them light the ground in the dark.
   for (const projectile of scene.projectiles) {
@@ -1136,20 +1148,24 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     }
     glow(wx, wy, 26, 140, look.glow);
   }
-  drawEffects(ctx, project, world, now, z);
+  lap("projectiles"); drawEffects(ctx, project, world, now, z); lap("effects");
   if (!underground) drawHaze(ctx, camera);
+  lap("haze");
   // Ground fog (dawn, the swamp, rain) drifting low over the land, under the night.
-  if (weather && weather.fog > 0.02 && !scene.reducedMotion) drawFog(ctx, camera, weather.fog, now);
+  if (weather && weather.fog > 0.02 && !scene.reducedMotion && !low) drawFog(ctx, camera, weather.fog, now);
   else if (weather && weather.fog > 0.02) { ctx.fillStyle = `rgba(232,235,238,${(weather.fog * 0.25).toFixed(3)})`; ctx.fillRect(0, 0, VIEW.width, VIEW.height); }
   // Night falls over the land (your Friend carries a small light; a lantern familiar a bigger one).
   // Your own light is faint: enough to see your feet by (a lantern familiar does better).
   if (light.dark > 0.01 || light.warm > 0.01) { const lantern = player.worn.includes("lantern_familiar") || !!riding(player)?.light; glow(pp.x, pp.y, 24, lantern ? 120 : underground ? 70 : 55, undefined, lantern ? 0.6 : 0.3); drawNight(ctx, light.dark, light.warm, lights, underground ? "5,5,9" : undefined, 0.45 + camera.pitch * 0.7, scene.reducedMotion ? 0 : now); }
+  lap("fog+night");
   // Rain over everything, and lightning on top of that.
-  if (weather && weather.rain > 0.02) drawRain(ctx, weather.rain, scene.reducedMotion ? 0 : now, light.dark);
+  if (weather && weather.rain > 0.02) drawRain(ctx, weather.rain * (low ? 0.35 : 1), scene.reducedMotion ? 0 : now, light.dark);
   if (scene.strike && scene.wallMs !== undefined && !underground && weather?.storm) drawLightning(ctx, scene.strike, scene.wallMs, scene.reducedMotion);
+  lap("rain+lightning");
   // A soft vignette outdoors, for depth.
   drawEffects(ctx, project, world, now, z, "bright");
   if (!underground) { const v = ctx.createRadialGradient(VIEW.width / 2, VIEW.height / 2, VIEW.height * 0.45, VIEW.width / 2, VIEW.height / 2, VIEW.width * 0.72); v.addColorStop(0, "rgba(14,16,28,0)"); v.addColorStop(1, `rgba(14,16,28,${(0.16 + light.dark * 0.2).toFixed(3)})`); ctx.fillStyle = v; ctx.fillRect(0, 0, VIEW.width, VIEW.height); }
+  lap("vignette");
   // Click marker: an old-school cross, yellow for walking, red for actions.
   if (scene.marker && now - scene.marker.at < 450) {
     const s = toScreen(camera, scene.marker.x, scene.marker.y), k = 1 - (now - scene.marker.at) / 450, r = 8 * z * (0.6 + k * 0.4);

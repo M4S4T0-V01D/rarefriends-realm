@@ -381,3 +381,4 @@
 .realm-daily::-webkit-scrollbar, .realm-updates::-webkit-scrollbar, .realm-achievements::-webkit-scrollbar { width: 10px; }
 .realm-daily::-webkit-scrollbar-track, .realm-updates::-webkit-scrollbar-track, .realm-achievements::-webkit-scrollbar-track { background: #e8e4da; }
 .realm-daily::-webkit-scrollbar-thumb, .realm-updates::-webkit-scrollbar-thumb, .realm-achievements::-webkit-scrollbar-thumb { background: var(--ink); border: 2px solid #e8e4da; }
+.realm-graphics { display: flex; align-items: center; gap: 5px; margin: 6px 0; } .realm-graphics button { min-height: 26px !important; padding: 2px 10px !important; } .realm-graphics button[aria-checked="true"] { background: var(--ink) !important; color: var(--paper) !important; }
