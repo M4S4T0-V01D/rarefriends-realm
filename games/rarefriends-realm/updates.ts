@@ -4,6 +4,13 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 22, date: "2026-09-28", title: "Fernwick, crossbows, war bows and Hazel's quiver", items: [
+    "Fernwick, a woodcutters' village in the heart of Whisperwood (take the woods road west from the Ashen mine): Hazel's War Bows, the Timber Yard (the best price for logs, and axes), a bank, cottages, a willow pond and archery butts.",
+    "Crossbows in six tiers: metal limbs from the anvil (two bars) on a stock carved from logs, fitted together with Crafting. Pewter on a wooden stock, blackiron and ashsteel on oak, moonsilver on willow, glimmer on maple, rarite on yew. Or buy the first few at Fletch & Feather.",
+    "Crossbows fire bolts (a dozen unfeathered bolts from a bar, then feathers), shoot slower than bows and hit harder, and they're one-handed, so you can carry a shield.",
+    "War bows: a heavier bow for every wood, from two logs. Slower to draw, harder hitting, and a tile more reach. The plain war bow needs Ranged 5, and only Hazel sells them.",
+    "New quest, Hazel's Quiver: win her grandmother's quiver back from the Grumblin chief and she'll mend it for you. Worn on your back, it calls four in five arrows and bolts straight back to your pack.",
+  ] },
   { id: 21, date: "2026-09-28", title: "Softer rain, clearer settings", items: [
     "Rain is now a soft, steady wash of sound that swells and fades with the weather, instead of a ticking hiss that sounded like footsteps.",
     "Settings has pixel sliders for music, effects and zoom (with their values shown), and the Graphics choice (Auto, High, Low) is easy to read.",

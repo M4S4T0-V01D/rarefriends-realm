@@ -936,7 +936,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
                 <p><b>{FAMILY_NAMES[player.familyId]}</b>: {FAMILY_PERKS[player.familyId].title}. {FAMILY_PERKS[player.familyId].text}</p>
                 {loggedOut && <p className="realm-logged-out" role="status">✓ <b>Saved and logged out.</b> {hosted === "linked" ? "Your adventure is safe in this browser for this wallet and Friend. Continue any time." : "This host can't keep saves: copy a save code from Settings next time to keep your progress."} For an extra copy on any device, use Settings → Copy save code.</p>}
                 {hasSave ? <p className="realm-save">Saved adventure: total level <b>{hasSave.total}</b> · combat <b>{hasSave.combat}</b> · <b>{hasSave.qp}</b> quest points · in {hasSave.where}</p>
-                  : hosted === "waiting" ? <p className="realm-muted">Looking for this wallet's saved adventure…</p> : <p className="realm-muted">A new adventure: 15 skills, 6 quests, one large world.</p>}
+                  : hosted === "waiting" ? <p className="realm-muted">Looking for this wallet's saved adventure…</p> : <p className="realm-muted">A new adventure: 19 skills, 7 quests, one large world.</p>}
               </div>
             </div>
             <div className="realm-buttons center">

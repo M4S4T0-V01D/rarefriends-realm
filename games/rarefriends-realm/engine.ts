@@ -3,7 +3,7 @@
  * Pure TypeScript over the Game state, so it runs the same in the browser and in node tests.
  */
 import {
-  COOKING, CRAFTING, EMOTES, EQUIP_SLOTS, MOUNTS, PETS, mountDef, FLETCH_ARROWS, FLETCH_BOWS, SIGILCRAFT, STAFF_SIGILS, itemCategory, sigilsPerStone, FAMILY_NAMES, FIREMAKING, FISHING_SPOTS, GEM_CUTTING, METALS, MONSTERS, PRAYERS, RELICS, RF_BUNDLES, ROCKS, SHOPS, SHOP_BUY,
+  COOKING, CRAFTING, CROSSBOWS, LIMBS_OFFSET, STOCKS, WAR_BOWS, EMOTES, EQUIP_SLOTS, MOUNTS, PETS, mountDef, FLETCH_ARROWS, FLETCH_BOWS, SIGILCRAFT, STAFF_SIGILS, itemCategory, sigilsPerStone, FAMILY_NAMES, FIREMAKING, FISHING_SPOTS, GEM_CUTTING, METALS, MONSTERS, PRAYERS, RELICS, RF_BUNDLES, ROCKS, SHOPS, SHOP_BUY,
   SHOP_SELL, SKILLS, SKILL_NAMES, SMELTING, SMITH_PIECES, SMITH_XP, SPELLS, TREES, WARDROBE, XP_TABLE, isItem, item, levelForXp, smithLevel,
   type EquipSlot, type MetalId, type Skill, type Spell, type SpotKind, type WardrobeId,
 } from "./data.ts";
@@ -363,6 +363,17 @@ export function useItemOnItem(game: Game, a: number, b: number) {
     if (bow) { game.ui.production = { title: "What would you like to fletch?", recipes: fletchingRecipes(log) }; return; }
   }
   if (pair("feather", "arrow_shaft")) { startProduction(game, headlessRecipe(), 100); return; }
+  // Crossbows: feathers on unfeathered bolts, and metal limbs on a stock.
+  const blanks = [first.id, second.id].find(id => id.endsWith("_bolts_unf"));
+  if (blanks && (first.id === "feather" || second.id === "feather")) { startProduction(game, boltRecipe(blanks.replace("_bolts_unf", "") as MetalId), 100); return; }
+  const limbs = [first.id, second.id].find(id => id.endsWith("_limbs")), stock = [first.id, second.id].find(id => id.endsWith("_stock"));
+  if (limbs && stock) {
+    const metal = limbs.replace("_limbs", ""), bow = CROSSBOWS.find(entry => entry.metal === metal);
+    if (!bow || bow.stock !== stock) {
+      message(game, bow ? `${item(limbs).name} need ${/^[aeiou]/i.test(item(bow.stock).name) ? "an" : "a"} ${item(bow.stock).name.toLowerCase()}.` : "Those don't fit together.", "warn"); return;
+    }
+    startProduction(game, crossbowRecipe(bow.metal), 28); return;
+  }
   const heads = [first.id, second.id].find(id => id.endsWith("_arrowheads"));
   if (heads && (first.id === "headless_arrow" || second.id === "headless_arrow")) { startProduction(game, arrowRecipe(heads.replace("_arrowheads", "") as MetalId), 100); return; }
   if (first.id === "chisel" || second.id === "chisel") {
@@ -416,7 +427,12 @@ export function smithingRecipes(metal: MetalId): Recipe[] {
   })),
   // Arrowheads for Fletching: fifteen from a bar.
   { skill: "smithing" as const, label: `15 ${name.toLowerCase()} arrowheads`, level: Math.min(99, SMITHING_BASE_OF(metal) + 5), xp: SMITH_XP[metal], ticks: 4, station: "anvil" as const,
-    inputs: { [`${metal}_bar`]: 1 }, outputs: { [`${metal}_arrowheads`]: 15 }, tools: ["hammer"] }];
+    inputs: { [`${metal}_bar`]: 1 }, outputs: { [`${metal}_arrowheads`]: 15 }, tools: ["hammer"] },
+  // Crossbow parts: twelve unfeathered bolts from a bar, and limbs from two.
+  { skill: "smithing" as const, label: `12 unfeathered ${name.toLowerCase()} bolts`, level: Math.min(99, SMITHING_BASE_OF(metal) + 3), xp: SMITH_XP[metal], ticks: 4, station: "anvil" as const,
+    inputs: { [`${metal}_bar`]: 1 }, outputs: { [`${metal}_bolts_unf`]: 12 }, tools: ["hammer"] },
+  { skill: "smithing" as const, label: `${name} limbs`, level: Math.min(99, SMITHING_BASE_OF(metal) + LIMBS_OFFSET), xp: SMITH_XP[metal] * 2, ticks: 5, station: "anvil" as const,
+    inputs: { [`${metal}_bar`]: 2 }, outputs: { [`${metal}_limbs`]: 1 }, tools: ["hammer"] }];
 }
 const SMITHING_BASE_OF = (metal: MetalId) => smithLevel(metal, "dagger");
 // ---------- Sigilcraft ----------
@@ -441,7 +457,19 @@ export function fletchingRecipes(log: string): Recipe[] {
   return [
     { skill: "fletching", label: "15 arrow shafts", level: 1, xp: 5, ticks: 3, inputs: { [log]: 1 }, outputs: { arrow_shaft: 15 }, tools: ["knife"] },
     { skill: "fletching", label: item(bow.bow).name, level: bow.level, xp: bow.xp, ticks: 3, inputs: { [log]: 1 }, outputs: { [bow.bow]: 1 }, tools: ["knife"] },
+    ...WAR_BOWS.filter(war => war.log === log).map(war => ({ skill: "fletching" as const, label: `${war.name} (2 logs)`, level: war.fletch, xp: war.xp, ticks: 4, inputs: { [log]: 2 }, outputs: { [war.id]: 1 }, tools: ["knife"] })),
+    ...STOCKS.filter(stock => stock.log === log).map(stock => ({ skill: "fletching" as const, label: stock.name, level: stock.level, xp: stock.xp, ticks: 3, inputs: { [log]: 1 }, outputs: { [stock.id]: 1 }, tools: ["knife"] })),
   ];
+}
+/** Fletching: feathers on a dozen unfeathered bolts. */
+export function boltRecipe(metal: MetalId): Recipe {
+  const tier = FLETCH_ARROWS[metal], name = METALS.find(entry => entry.id === metal)!.name;
+  return { skill: "fletching", label: `12 ${name.toLowerCase()} bolts`, level: Math.min(99, tier.level + 4), xp: tier.xp * 12, ticks: 2, inputs: { [`${metal}_bolts_unf`]: 12, feather: 12 }, outputs: { [`${metal}_bolts`]: 12 } };
+}
+/** Crafting: metal limbs fixed to their stock make a crossbow. */
+export function crossbowRecipe(metal: MetalId): Recipe {
+  const bow = CROSSBOWS.find(entry => entry.metal === metal)!;
+  return { skill: "crafting", label: item(`${metal}_crossbow`).name, level: bow.craft, xp: bow.xp, ticks: 3, inputs: { [`${metal}_limbs`]: 1, [bow.stock]: 1 }, outputs: { [`${metal}_crossbow`]: 1 } };
 }
 export const headlessRecipe = (): Recipe => ({ skill: "fletching", label: "15 headless arrows", level: 1, xp: 15, ticks: 2, inputs: { arrow_shaft: 15, feather: 15 }, outputs: { headless_arrow: 15 } });
 export function arrowRecipe(metal: MetalId): Recipe {
@@ -978,22 +1006,25 @@ function playerCombat(game: Game) {
 }
 // ---------- Ranged ----------
 /** The best arrows in your pack that your Ranged level can use. */
+/** The strongest ammunition in your pack that your weapon fires (arrows for bows, bolts for crossbows) and your Ranged level allows. */
 export function bestArrow(game: Game) {
   let best: { id: string; strength: number } | null = null;
+  const bolts = !!weapon(game.player)?.equip?.bow?.bolts;
   for (const slot of game.player.inventory) {
     const ammo = slot ? item(slot.id).ammo : undefined;
-    if (ammo && ammo.level <= level(game, "ranged") && (!best || ammo.strength > best.strength)) best = { id: slot!.id, strength: ammo.strength };
+    if (ammo && !!ammo.bolt === bolts && ammo.level <= level(game, "ranged") && (!best || ammo.strength > best.strength)) best = { id: slot!.id, strength: ammo.strength };
   }
   return best;
 }
 /** Styles with a bow: Accurate (+3 accuracy), Rapid (a tick faster), Longrange (+2 reach, Defence XP). */
 export function rangedMaxHit(game: Game, arrowStrength = bestArrow(game)?.strength ?? 0) {
-  const effective = level(game, "ranged") + (game.player.style === "accurate" ? 3 : 0) + 8;
-  return Math.floor(0.5 + effective * (arrowStrength + 64) / 640);
+  const effective = level(game, "ranged") + (game.player.style === "accurate" ? 3 : 0) + 8, punch = weapon(game.player)?.equip?.bow?.strength ?? 0;
+  return Math.floor(0.5 + effective * (arrowStrength + punch + 64) / 640);
 }
 function rangedAttack(game: Game, monster: Monster, boost: number) {
   const player = game.player, arrow = bestArrow(game);
-  if (!arrow) { message(game, "You have no arrows you can use. Fletch & Feather in Friendhollow sells them.", "warn"); player.combat = null; return; }
+  const bolts = !!weapon(player)?.equip?.bow?.bolts;
+  if (!arrow) { message(game, bolts ? "You have no bolts you can use. Fletch & Feather in Friendhollow and Hazel in Fernwick sell them." : "You have no arrows you can use. Fletch & Feather in Friendhollow sells them.", "warn"); player.combat = null; return; }
   take(player, arrow.id, 1);
   player.attackTimer = Math.max(2, attackSpeed(player) - (player.style === "aggressive" ? 1 : 0));
   const accuracy = (level(game, "ranged") + (player.style === "accurate" ? 3 : 0) + 8) * (bonuses(player).ranged + 64) * boost;
@@ -1004,10 +1035,11 @@ function rangedAttack(game: Game, monster: Monster, boost: number) {
     if (player.style === "defensive") { addXp(game, "ranged", damage * 2); addXp(game, "defence", damage * 2); } else addXp(game, "ranged", damage * 4);
     addXp(game, "hitpoints", damage * 1.33);
   }
-  emit(game, { type: "projectile", projectile: { from: { x: player.x, y: player.y }, to: { x: monster.x, y: monster.y }, start: game.tick, end: game.tick + 1, color: item(arrow.id).icon.color, style: "arrow" } });
+  emit(game, { type: "projectile", projectile: { from: { x: player.x, y: player.y }, to: { x: monster.x, y: monster.y }, start: game.tick, end: game.tick + 1, color: item(arrow.id).icon.color, style: bolts ? "bolt" : "arrow" } });
   sound(game, "bow");
-  // Most arrows can be picked up again where they land.
-  if (game.rng() < 0.6) dropItem(game, arrow.id, 1, monster.x, monster.y, 150);
+  // Hazel's quiver calls most shots home; otherwise most arrows can be picked up again where they land.
+  if (player.equipment.cape === "hazels_quiver" && game.rng() < 0.8) give(player, arrow.id, 1);
+  else if (game.rng() < 0.6) dropItem(game, arrow.id, 1, monster.x, monster.y, 150);
   damageMonster(game, monster, Math.max(0, hit), hit < 0);
 }
 const SPELL_COLORS: Record<string, string> = { breeze_dart: "#dfe6ea", tide_dart: "#9fb4d0", stone_dart: "#a89479", ember_dart: "#e3a58c", breeze_lance: "#eef2f4", tide_lance: "#8fa3c9", ember_lance: "#e39a7c", breeze_burst: "#ffffff", ember_burst: "#f0a080" };
@@ -1639,7 +1671,7 @@ export function serialize(game: Game): SaveData {
     referredBy: player.referredBy, referrals: [...player.referrals], referralTimes: [...player.referralTimes], boostTicks: player.boostTicks, mounts: [...player.mounts], mount: player.mount, met: JSON.parse(JSON.stringify(player.met)), achievements: { ...player.achievements }, pets: [...player.pets], petOut: player.petOut, killLog: { ...player.killLog }, stats: { ...player.stats }, daily: JSON.parse(JSON.stringify(player.daily)), seenUpdate: player.seenUpdate,
   };
 }
-const QUEST_IDS = ["friends_feast", "grumblin_trouble", "cold_forge", "hollow_whispers", "lost_glimmer", "hollow_king"];
+const QUEST_IDS = ["friends_feast", "grumblin_trouble", "cold_forge", "hollow_whispers", "lost_glimmer", "hollow_king", "hazels_quiver"];
 const int = (value: unknown, min: number, max: number, fallback: number) => typeof value === "number" && Number.isFinite(value) ? Math.max(min, Math.min(max, Math.floor(value))) : fallback;
 /** Item and spell ids from saves made before the Realm's own names (old id → new id). */
 const RENAMED: Record<string, string> = {

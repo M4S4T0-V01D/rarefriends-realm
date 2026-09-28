@@ -74,14 +74,16 @@ export type IconShape =
   | "amulet" | "log" | "fish" | "ore" | "bar" | "bones" | "sigil" | "staff" | "net" | "rod" | "harpoon" | "pot" | "bucket" | "egg" | "flour"
   | "milk" | "tinderbox" | "hammer" | "knife" | "needle" | "thread" | "chisel" | "gem" | "hide" | "leather" | "meat" | "feather" | "bait"
   | "cake" | "bread" | "berries" | "key" | "wheat" | "lamp" | "scroll" | "silk" | "hood" | "bracer" | "burnt" | "hat" | "crown" | "orb" | "trophy"
-  | "bow" | "arrow" | "tablet" | "arrowheads";
+  | "bow" | "arrow" | "tablet" | "arrowheads" | "quiver" | "warbow" | "crossbow" | "bolts" | "limbs" | "stock";
 export type Item = {
   id: string; name: string; examine: string; value: number; icon: Icon;
   stackable?: boolean; tradeable?: boolean;
-  equip?: { slot: EquipSlot; bonuses: Partial<Bonuses>; requires?: Partial<Record<Skill, number>>; speed?: number; twoHanded?: boolean; staff?: boolean; bow?: { range: number } };
+  equip?: { slot: EquipSlot; bonuses: Partial<Bonuses>; requires?: Partial<Record<Skill, number>>; speed?: number; twoHanded?: boolean; staff?: boolean;
+    /** A bow or crossbow: its reach, the extra punch it gives each shot, and whether it fires bolts (crossbows) or arrows. */
+    bow?: { range: number; strength?: number; bolts?: boolean } };
   heal?: number; bones?: number; tool?: { kind: "axe" | "pickaxe"; tier: number; level: number };
-  /** Arrows: fired from your pack by any bow. */
-  ammo?: { strength: number; level: number };
+  /** Arrows (fired by any bow) or bolts (by any crossbow), from your pack. */
+  ammo?: { strength: number; level: number; bolt?: boolean };
   /** A fixed shop price (instead of value × markup). */
   price?: number;
   /** A mastery cape: the skill it's for (all skills for the Grandmaster's), and whether it's trimmed. */
@@ -280,17 +282,78 @@ export const BOWS = [
   { id: "ashwood_bow", name: "Ashwood bow", level: 50, ranged: 69, value: 3200, color: "#d6d3cc" },
   { id: "gloomfang_bow", name: "Gloomfang bow", level: 60, ranged: 88, value: 40000, color: "#4a4458" },
 ] as const;
-const ARROW_STRENGTH = [7, 10, 16, 22, 31, 49];
+/** War bows: a heavier bow from two logs of each wood. Slower to draw than the plain bow, but every arrow lands harder, and it reaches a tile further. */
+export const WAR_BOWS = [
+  { id: "war_bow", name: "War bow", log: "logs", level: 5, ranged: 12, strength: 16, fletch: 10, xp: 12, value: 140, color: "#9c8672" },
+  { id: "oak_war_bow", name: "Oak war bow", log: "oak_logs", level: 10, ranged: 18, strength: 18, fletch: 25, xp: 36, value: 420, color: "#b59c7d" },
+  { id: "willow_war_bow", name: "Willow war bow", log: "willow_logs", level: 25, ranged: 26, strength: 22, fletch: 40, xp: 70, value: 850, color: "#a5a67d" },
+  { id: "maple_war_bow", name: "Maple war bow", log: "maple_logs", level: 35, ranged: 36, strength: 26, fletch: 55, xp: 105, value: 1700, color: "#c49a74" },
+  { id: "yew_war_bow", name: "Yew war bow", log: "yew_logs", level: 45, ranged: 56, strength: 32, fletch: 70, xp: 140, value: 4200, color: "#7d6b5c" },
+  { id: "ashwood_war_bow", name: "Ashwood war bow", log: "ash_logs", level: 55, ranged: 80, strength: 38, fletch: 85, xp: 175, value: 8400, color: "#d6d3cc" },
+] as const;
+/** Crossbow stocks, carved from logs with a knife (Fletching). */
+export const STOCKS = [
+  { id: "wooden_stock", name: "Wooden stock", value: 12, log: "logs", level: 9, xp: 6, color: "#9c8672" },
+  { id: "oak_stock", name: "Oak stock", value: 40, log: "oak_logs", level: 24, xp: 16, color: "#b59c7d" },
+  { id: "willow_stock", name: "Willow stock", value: 64, log: "willow_logs", level: 39, xp: 22, color: "#a5a67d" },
+  { id: "maple_stock", name: "Maple stock", value: 130, log: "maple_logs", level: 54, xp: 32, color: "#c49a74" },
+  { id: "yew_stock", name: "Yew stock", value: 320, log: "yew_logs", level: 69, xp: 50, color: "#7d6b5c" },
+] as const;
+/**
+ * Crossbows: metal limbs (two bars at the anvil) fixed to a wooden stock with Crafting. One-handed, so a shield fits;
+ * slower than a bow, and each bolt hits harder. They fire bolts, never arrows.
+ */
+export const CROSSBOWS: readonly { metal: MetalId; stock: string; level: number; ranged: number; strength: number; craft: number; xp: number; value: number }[] = [
+  { metal: "pewter", stock: "wooden_stock", level: 1, ranged: 12, strength: 10, craft: 8, xp: 12, value: 140 },
+  { metal: "blackiron", stock: "oak_stock", level: 10, ranged: 20, strength: 12, craft: 18, xp: 22, value: 380 },
+  { metal: "ashsteel", stock: "oak_stock", level: 20, ranged: 28, strength: 14, craft: 28, xp: 34, value: 900 },
+  { metal: "moonsilver", stock: "willow_stock", level: 30, ranged: 38, strength: 18, craft: 42, xp: 50, value: 2000 },
+  { metal: "glimmer", stock: "maple_stock", level: 40, ranged: 54, strength: 22, craft: 56, xp: 70, value: 4600 },
+  { metal: "rarite", stock: "yew_stock", level: 55, ranged: 76, strength: 26, craft: 70, xp: 95, value: 11000 },
+];
+/** Crossbow limbs: two bars each, a few Smithing levels over the metal's dagger. */
+export const LIMBS_OFFSET = 6;
+const ARROW_STRENGTH = [7, 10, 16, 22, 31, 49], BOLT_STRENGTH = [9, 13, 20, 28, 39, 61];
 const RANGED_GEAR: Item[] = [
   ...BOWS.map(bow => ({
     id: bow.id, name: bow.name, value: bow.value, icon: { shape: "bow" as const, color: bow.color, accent: bow.id === "gloomfang_bow" ? "#cf6e6e" : undefined },
     examine: bow.id === "gloomfang_bow" ? "Strung with something that howls when you draw it." : `A bow of ${bow.id === "shortbow" ? "plain" : bow.name.split(" ")[0].toLowerCase()} wood.`,
     equip: { slot: "weapon" as const, bonuses: { ranged: bow.ranged }, requires: bow.level > 1 ? { ranged: bow.level } : undefined, speed: 4, twoHanded: true, bow: { range: 7 } },
   })),
+  ...WAR_BOWS.map(bow => ({
+    id: bow.id, name: bow.name, value: bow.value, icon: { shape: "warbow" as const, color: bow.color },
+    examine: `A tall ${bow.id === "war_bow" ? "" : `${bow.name.split(" ")[0].toLowerCase()} `}bow, hard to draw. Slower than a plain bow, but every arrow lands harder.`,
+    equip: { slot: "weapon" as const, bonuses: { ranged: bow.ranged }, requires: { ranged: bow.level }, speed: 5, twoHanded: true, bow: { range: 8, strength: bow.strength } },
+  })),
+  ...STOCKS.map(stock => ({ id: stock.id, name: stock.name, value: stock.value, icon: { shape: "stock" as const, color: stock.color },
+    examine: "A carved crossbow stock. It needs metal limbs." })),
+  ...METALS.map(metal => ({ id: `${metal.id}_limbs`, name: `${metal.name} limbs`, value: Math.round(metal.value * 3.2 + 10), icon: { shape: "limbs" as const, color: metal.color },
+    examine: `Crossbow limbs of ${metal.id}. Fix them to the right stock.` })),
+  ...CROSSBOWS.map(bow => {
+    const metal = METALS.find(entry => entry.id === bow.metal)!, stock = STOCKS.find(entry => entry.id === bow.stock)!;
+    return {
+      id: `${bow.metal}_crossbow`, name: `${metal.name} crossbow`, value: bow.value, icon: { shape: "crossbow" as const, color: metal.color, accent: stock.color },
+      examine: `${metal.name} limbs on ${stock.name.toLowerCase().replace(" stock", "")} stock. Fires bolts: slower than a bow, harder hitting, and one-handed, so a shield fits.`,
+      equip: { slot: "weapon" as const, bonuses: { ranged: bow.ranged }, requires: bow.level > 1 ? { ranged: bow.level } : undefined, speed: 5, bow: { range: 7, strength: bow.strength, bolts: true } },
+    };
+  }),
+  ...METALS.map((metal, index) => ({
+    id: `${metal.id}_bolts`, name: `${metal.name} bolts`, examine: `Stubby bolts with ${metal.id} tips. Any crossbow fires them.`, value: [4, 8, 16, 32, 64, 140][index], stackable: true,
+    icon: { shape: "bolts" as const, color: metal.color }, ammo: { strength: BOLT_STRENGTH[index], level: metal.level, bolt: true },
+  })),
+  ...METALS.map((metal, index) => ({
+    id: `${metal.id}_bolts_unf`, name: `Unfeathered ${metal.id} bolts`, examine: "Bolts straight off the anvil. Feathers will fly them true.", value: [1, 3, 6, 12, 24, 55][index], stackable: true,
+    icon: { shape: "bolts" as const, color: metal.color, accent: "unf" },
+  })),
   ...METALS.map((metal, index) => ({
     id: `${metal.id}_arrow`, name: `${metal.name} arrows`, examine: `Arrows with ${metal.id} heads.`, value: [3, 6, 12, 24, 48, 110][index], stackable: true,
     icon: { shape: "arrow" as const, color: metal.color }, ammo: { strength: ARROW_STRENGTH[index], level: metal.level },
   })),
+  // Hazel's quiver (the Fernwick quest's reward): worn on your back, and most shots fly home to it.
+  { id: "hazels_quiver", name: "Hazel's quiver", examine: "Hazel's grandmother's quiver, restitched. Four arrows or bolts in five fly home to it after the shot.", value: 1200, tradeable: false,
+    icon: { shape: "quiver", color: "#8a5a3a", accent: "#c9a24a" }, equip: { slot: "cape", bonuses: { ranged: 4, defence: 1 } } },
+  { id: "torn_quiver", name: "Torn quiver", examine: "Hazel's family quiver, ripped and muddy, with Grumblin teeth marks. Hazel will want this back.", value: 0, tradeable: false,
+    icon: { shape: "quiver", color: "#6d5a48", accent: "torn" } },
   { id: "hunter_coif", name: "Hunter's coif", examine: "A soft leather coif. Keeps the hair out of your eyes.", value: 40, icon: { shape: "hood", color: "#a5a67d" }, equip: { slot: "head", bonuses: { ranged: 3, defence: 2 } } },
   { id: "hunter_vest", name: "Hunter's vest", examine: "Stitched for drawing a bow all day.", value: 90, icon: { shape: "body", color: "#a5a67d" }, equip: { slot: "body", bonuses: { ranged: 8, defence: 6 } } },
   { id: "hunter_chaps", name: "Hunter's chaps", examine: "Hard-wearing leather chaps.", value: 70, icon: { shape: "legs", color: "#8e8f6a" }, equip: { slot: "legs", bonuses: { ranged: 5, defence: 4 } } },
@@ -614,8 +677,8 @@ export function itemCategory(id: string): Category {
   if (shape === "bar") return "bar";
   if (shape === "gem" && id !== "slayer_gem") return "gem";
   if (shape === "hide" || shape === "leather" || id.startsWith("drakehide") || id.startsWith("leather_") || id.startsWith("hunter_") || id.startsWith("frosthide")) return "hide";
-  if (shape === "bow") return "bow";
-  if (shape === "arrow" || shape === "arrowheads") return "arrow";
+  if (shape === "bow" || shape === "warbow" || shape === "crossbow" || shape === "limbs" || shape === "stock") return "bow";
+  if (shape === "arrow" || shape === "arrowheads" || shape === "bolts") return "arrow";
   if (it.equip?.staff || id.startsWith("scholar")) return "magic";
   if (shape === "amulet" || id === "wyrm_heart") return "jewellery";
   if (slot === "weapon") return "weapon";
@@ -642,7 +705,12 @@ export const SHOPS: Record<string, ShopDef> = {
   weapons: { id: "weapons", name: "Edge & Hilt", buys: ["weapon"], rate: 0.55, stock: ["pewter_dagger", "pewter_sword", "pewter_sabre", "blackiron_dagger", "blackiron_sword", "blackiron_sabre", "ashsteel_dagger", "ashsteel_sword", "ashsteel_sabre",
     "moonsilver_dagger", "moonsilver_sword", "moonsilver_sabre", "glimmer_sword"] },
   archery: { id: "archery", name: "Fletch & Feather", buys: ["bow", "arrow", "logs"], rate: 0.6, stock: ["knife", "arrow_shaft", "headless_arrow", "shortbow", "oak_bow", "willow_bow", "maple_bow", "yew_bow", "pewter_arrow", "blackiron_arrow", "ashsteel_arrow", "moonsilver_arrow",
+    "pewter_crossbow", "blackiron_crossbow", "ashsteel_crossbow", "pewter_bolts", "blackiron_bolts", "ashsteel_bolts",
     "hunter_coif", "hunter_vest", "hunter_chaps", "hunter_bracers", "feather"] },
+  // Fernwick, the woodcutters' village: the only place that sells war bows, and the best price for logs.
+  war_bows: { id: "war_bows", name: "Hazel's War Bows", buys: ["bow", "arrow"], rate: 0.6, stock: ["war_bow", "oak_war_bow", "willow_war_bow", "maple_war_bow", "yew_war_bow",
+    "moonsilver_crossbow", "wooden_stock", "oak_stock", "willow_stock", "pewter_bolts", "blackiron_bolts", "ashsteel_bolts", "moonsilver_bolts", "pewter_arrow", "blackiron_arrow", "ashsteel_arrow", "feather", "knife"] },
+  timber: { id: "timber", name: "Fernwick Timber Yard", buys: ["logs"], rate: 0.75, stock: ["pewter_axe", "blackiron_axe", "ashsteel_axe", "moonsilver_axe", "knife", "tinderbox", "logs", "oak_logs", "willow_logs", "bread", "cooked_meat"] },
   slayer: { id: "slayer", name: "The Warden's Lodge", stock: ["slayer_gem", "inkcrab", "sailfish", "tablet_hollow_square", "blackiron_arrow", "ashsteel_arrow", "leather_boots"] },
   inn: { id: "inn", name: "The Sleepy Friend", buys: ["fish", "food"], rate: 0.55, stock: ["bread", "cake", "cooked_meat", "cooked_chicken", "carp", "grayling"] },
   wizards: { id: "wizards", name: "The Tower Stores", buys: ["sigil", "magic"], rate: 0.6, stock: ["breeze_sigil", "tide_sigil", "stone_sigil", "ember_sigil", "thought_sigil", "shade_sigil", "star_sigil",

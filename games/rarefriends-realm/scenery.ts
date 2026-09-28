@@ -109,6 +109,28 @@ export function decorArt(kind: string, variant: number, frame = 0): HTMLCanvasEl
     case "lily": return pixelArt(key, 16, 8, p => { p.disc(8, 4, 6.5, 3, "#a9b59c", null); p.line(8, 4, 13, 2, "#8e9887"); p.rect(6, 2, 3, 2, COLORS.rose); p.outline(); });
     case "hay": return pixelArt(key, 22, 14, p => { p.poly([[1, 5], [7, 1], [21, 1], [21, 9], [15, 13], [1, 13]], "#e2d7ad", null); p.line(7, 1, 7, 13, "#c9b77f"); p.line(1, 5, 15, 5, "#c9b77f"); p.line(15, 5, 21, 1, "#c9b77f"); p.line(15, 5, 15, 13, "#c9b77f"); p.dither("#d6c58f", (x) => x > 15 ? 0.5 : 0.1); p.outline(); });
     case "barrel": return pixelArt(key, 14, 18, p => { p.poly([[2, 3], [12, 3], [13, 9], [12, 16], [2, 16], [1, 9]], COLORS.woodLight, null); p.disc(7, 3, 5, 1.6, COLORS.wood, null); for (const y of [6, 12]) p.line(1, y, 13, y, "#6d6b67"); p.line(9, 4, 9, 15, "#a88f74"); p.outline(); });
+    case "logpile": return pixelArt(key, 30, 20, p => {
+      // Split logs stacked in a pyramid, their cut ends facing you: pale rings and dark hearts.
+      const bark = "#7a5a40", ends: [number, number][] = [[5, 16], [11, 16], [17, 16], [23, 16], [8, 11], [14, 11], [20, 11], [11, 6], [17, 6]];
+      p.rect(3, 4, 23, 15, bark); p.line(3, 18, 26, 18, "#5a4030");
+      for (const [x, y] of ends) { p.disc(x, y, 2.8, 2.6, "#e8d2a8", null); p.disc(x, y, 1.4, 1.2, "#c9a476", null); p.set(x, y, "#9c7a58"); p.set(x - 1, y - 2, "#f6ead0"); }
+      p.outline();
+    });
+    case "stump": return pixelArt(key, 22, 18, p => {
+      // A chopping block: a wide stump with an axe bitten into it and a few chips of wood around.
+      p.poly([[3, 8], [19, 8], [20, 16], [2, 16]], "#7a5a40", null); p.line(6, 10, 6, 15, "#5a4030"); p.line(14, 9, 15, 15, "#5a4030");
+      p.disc(11, 7, 8.4, 3, "#e8d2a8", null); p.disc(11, 7, 5, 1.8, "#d9bd8c", null); p.disc(11, 7, 2, 0.8, "#c9a476", null);
+      p.line(12, 6, 17, 0, "#8a6a50", 2); p.poly([[8, 4], [12, 2], [13, 7], [9, 8]], "#b9bfc6", null); p.line(9, 7, 12, 6, "#e8e4da");
+      p.set(1, 16, "#e8d2a8"); p.set(20, 17, "#e8d2a8"); p.set(18, 17, "#d9bd8c");
+      p.outline();
+    });
+    case "target": return pixelArt(key, 20, 28, p => {
+      // An archery butt: a straw boss on a wooden stand, painted rings, a couple of arrows home.
+      p.line(4, 27, 8, 14, "#7a5a40", 2); p.line(16, 27, 12, 14, "#7a5a40", 2); p.line(10, 27, 10, 18, "#5a4030");
+      p.disc(10, 11, 8.5, 8.5, "#e2d7ad", null); p.disc(10, 11, 6.5, 6.5, "#8fa3c9", null); p.disc(10, 11, 4.5, 4.5, "#cf6e6e", null); p.disc(10, 11, 2.3, 2.3, "#f2e28f", null);
+      p.line(11, 10, 16, 6, "#8a6a50"); p.rect(15, 5, 2, 2, "#efede7"); p.line(7, 13, 3, 9, "#8a6a50"); p.rect(2, 8, 2, 2, "#efede7");
+      p.outline();
+    });
     case "crate": return pixelArt(key, 16, 16, p => { p.rect(1, 3, 14, 12, "#cdb9a0"); p.line(1, 3, 14, 14, COLORS.wood); p.line(1, 14, 14, 3, COLORS.wood); p.rect(1, 3, 14, 2, COLORS.woodLight); p.outline(); });
     case "tent": return pixelArt(key, 34, 22, p => { p.poly([[1, 21], [17, 1], [33, 21]], "#bfb49c", null); p.poly([[17, 1], [33, 21], [22, 21]], "#a99e86", null); p.poly([[14, 21], [17, 12], [20, 21]], "#3b3a38", null); p.line(17, 1, 17, 12, "#8a7563"); p.outline(); });
     case "lamp": return pixelArt(key, 10, 30, p => { p.rect(4, 8, 2, 21, "#3b3a38"); p.rect(2, 28, 6, 2, "#3b3a38"); p.rect(1, 1, 8, 7, "#f4ecc8"); p.rect(1, 1, 8, 1, "#3b3a38"); p.rect(4, 3, 2, 3, "#ffffff"); p.outline(); });

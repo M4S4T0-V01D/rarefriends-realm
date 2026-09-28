@@ -51,7 +51,7 @@ try {
     const playing = await level();
     assert.ok(playing > 0.03, `${name}: main theme too quiet (${playing})`);
     // The jukebox has every track; switching plays the new one.
-    assert.equal(await page.locator("#jukebox button").count(), 18);
+    assert.equal(await page.locator("#jukebox button").count(), 19);
     const forge = page.locator('#jukebox button[data-track="emberforge"]');
     await forge.scrollIntoViewIfNeeded(); await (touch ? forge.tap() : forge.click());
     await page.waitForTimeout(2500); await level(); await page.waitForTimeout(2000);
@@ -81,7 +81,8 @@ try {
     await page.getByRole("heading", { name: "Recipe book" }).waitFor();
     assert.ok(await page.locator("#guide tbody tr").count() > 80, `${name}: the recipe book`);
     await page.getByRole("searchbox", { name: "Search recipes" }).fill("yew");
-    assert.ok(await page.locator("#guide tbody tr").count() <= 3, `${name}: recipe search`);
+    const found = await page.locator("#guide tbody tr").count();
+    assert.ok(found >= 1 && found <= 6, `${name}: recipe search (${found})`);
     if (name === "desktop") { await page.getByRole("button", { name: /Magic/ }).click(); await page.screenshot({ path: "./artifacts/site-guides.png" }); }
     assert.deepEqual(errors, []);
     await context.close();

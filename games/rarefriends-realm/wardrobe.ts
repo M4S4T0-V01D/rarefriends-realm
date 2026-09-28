@@ -46,7 +46,8 @@ export const heldTip = (art: HTMLCanvasElement) => (art as HTMLCanvasElement & {
 export const FIGURE_K = K;
 export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, phase = 0, ink = INK, held: Held | null = null): HTMLCanvasElement {
   // An equipped cape (a mastery cape, the Cape of the Hollow…) is worn over any wardrobe cape, with its trim.
-  const gear: Piece[] = worn.filter(id => isItem(id) && item(id).equip?.slot === "cape").map(id => ({ id, kind: "cape", color: item(id).icon.color, trim: item(id).icon.accent }));
+  // A quiver is worn on the back the same way, over a wardrobe cape.
+  const gear: Piece[] = worn.filter(id => isItem(id) && item(id).equip?.slot === "cape").map(id => ({ id, kind: item(id).icon.shape === "quiver" ? "quiver" : "cape", color: item(id).icon.color, trim: item(id).icon.accent }));
   // Headgear you wear (a helm, hood, hat or crown) shows too, unless a wardrobe hat is on top.
   const wardrobeHat = WARDROBE.some(piece => worn.includes(piece.id) && piece.kind === "hat");
   const headgear: Piece[] = wardrobeHat ? [] : worn.filter(id => isItem(id) && item(id).equip?.slot === "head").slice(0, 1).map(id => {
@@ -58,7 +59,7 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
   const weapon: Piece | undefined = (held && isItem(held.id) ? [held.id] : worn.filter(id => isItem(id) && item(id).equip?.slot === "weapon")).slice(0, 1).map(id => ({ id, kind: `weapon_${item(id).icon.shape}`, color: item(id).icon.color, trim: item(id).icon.accent }))[0];
   // Angles snap to steps (pixel art turns in steps anyway, and it keeps the cache small).
   const turn = held ? Math.round(held.angle / 0.14) * 0.14 : 0;
-  const pieces: Piece[] = [...WARDROBE.filter(piece => worn.includes(piece.id) && piece.kind !== "aura" && piece.kind !== "lantern" && !(gear.length && piece.kind === "cape")), ...gear.slice(0, 1), ...headgear, ...(shield ? [shield] : []), ...(weapon ? [weapon] : [])];
+  const pieces: Piece[] = [...WARDROBE.filter(piece => worn.includes(piece.id) && piece.kind !== "aura" && piece.kind !== "lantern" && !(gear.some(entry => entry.kind === "cape") && piece.kind === "cape")), ...gear.slice(0, 1), ...headgear, ...(shield ? [shield] : []), ...(weapon ? [weapon] : [])];
   const key = `${ink}|${facing}|${phase & 3}|${pieces.map(piece => piece.id).join(",")}|${turn.toFixed(2)}|${rows.join("")}`;
   let canvas = cache.get(key);
   if (canvas) return canvas;
@@ -69,7 +70,11 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
   const cx = X(m.centre) - 0.5, headTop = Y(m.top), neckY = Y(m.neck) + 1, feet = Y(m.bottom) + 1;
   const headHalf = Math.max(4, Math.min(7, m.crownWidth * K / 2 + 1));
   const bodySpan = (y: number) => m.spans[y] ?? { min: m.left, max: m.right };
-  const cape = pieces.find(piece => piece.kind === "cape"), wings = pieces.find(piece => piece.kind === "wings");
+  const cape = pieces.find(piece => piece.kind === "cape"), wings = pieces.find(piece => piece.kind === "wings"), quiver = pieces.find(piece => piece.kind === "quiver");
+  // The quiver across your back: from the shoulder its fletchings peek over down to the opposite hip.
+  const shoulderSpan = bodySpan(m.neck + 1), backWaist = Y(Math.round(m.neck + (m.bottom - m.neck) * 0.55));
+  const quiverAt = side ? { top: { x: cx - side * 4, y: neckY - 4 }, bottom: { x: cx - side * 7, y: backWaist } }
+    : { top: { x: X(shoulderSpan.max) - 2, y: neckY - 4 }, bottom: { x: X(shoulderSpan.min) + 3, y: backWaist } };
 
   // ---------- Behind the body ----------
   if (wings) {
@@ -86,6 +91,7 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
     if (side <= 0) wing(-1, shoulderL);
     if (side >= 0) wing(1, shoulderR);
   }
+  if (quiver && !back) drawQuiver(p, quiver, quiverAt.top, quiverAt.bottom);
   if (cape && !back) {
     const dark = shadeHex(cape.color, -0.12), trail = side ? -side * 5 : 0;
     const top = bodySpan(m.neck + 1), shoulders = [X(top.min) - 1, X(top.max) + 2] as const;
@@ -117,6 +123,12 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
   rows.forEach((row, y) => [...row].forEach((pixel, x) => { if (pixel === "#") p.rect(X(x), Y(y), K, K, ink); }));
 
   // ---------- In front ----------
+  if (quiver && back) drawQuiver(p, quiver, quiverAt.top, quiverAt.bottom);
+  if (quiver && !back && !side) {
+    // Facing you, just the strap across the chest.
+    const strapX0 = X(shoulderSpan.max) - 1, strapX1 = X(bodySpan(Math.round(m.neck + (m.bottom - m.neck) * 0.6)).min) + 2;
+    p.line(strapX0, neckY + 1, strapX1, backWaist + 1, shadeHex(quiver.color, -0.2), 2); p.set(Math.round((strapX0 + strapX1) / 2), Math.round((neckY + backWaist) / 2) + 1, quiver.trim ?? "#c9a24a");
+  }
   if (cape && back) {
     const dark = shadeHex(cape.color, -0.12), top = bodySpan(m.neck), shoulders = [X(top.min) - 1, X(top.max) + 2] as const;
     const hemL = X(m.left) - 3 + sway, hemR = X(m.right) + 4 + sway;
@@ -305,6 +317,29 @@ function drawWeapon(p: Pixels, piece: Piece, x: number, y: number, dir: number, 
       p.rect(x + dir * 3 + lean - 1, y - 2, 2, 3, "#5a4030");
       break;
     }
+    case "warbow": {
+      // A war bow: taller than you, recurved tips, a leather-wrapped grip, the string drawn tight.
+      const limb: [number, number][] = [];
+      for (let i = 0; i <= 14; i++) { const t = i / 14, bend = Math.sin(t * Math.PI) * 5 - (t < 0.12 || t > 0.88 ? 1.6 : 0); limb.push([x + dir * (bend + lean), y - 16 + t * 30]); }
+      p.line(x + dir * (lean - 1), y - 15, x + dir * (lean - 1), y + 13, "#e8e4da");
+      p.polyline(limb, metal, 2); p.polyline(limb.slice(2, 6).map(([px, py]) => [px + dir * 0.6, py] as [number, number]), shadeHex(metal, 0.18));
+      p.polyline(limb.slice(9, 13).map(([px, py]) => [px - dir * 0.4, py] as [number, number]), shadeHex(metal, -0.2));
+      p.rect(x + dir * 4 + lean - 1, y - 3, 2, 5, "#8a4a3a"); p.set(x + dir * 4 + lean, y - 2, "#b3664f");
+      tip = { x: x + dir * lean, y: y - 16 };
+      break;
+    }
+    case "crossbow": {
+      // Held forward on its stock: limbs across the front, the string drawn back to the nut, a bolt laid ready.
+      const wood2 = piece.trim ?? wood, front = { x: x + dir * (9 + lean), y: y - 3 };
+      p.line(x - dir * 3, y + 1, front.x, front.y, wood2, 2); p.line(x - dir * 2, y, front.x - dir, front.y - 1, shadeHex(wood2, 0.16));
+      p.line(x, y + 1, x - dir, y + 3, "#3b2a22");
+      p.polyline([[front.x - dir * 2, front.y - 6], [front.x, front.y - 3], [front.x + dir * 0.5, front.y], [front.x, front.y + 3], [front.x - dir * 2, front.y + 6]], metal, 2);
+      p.line(front.x - dir, front.y - 5, front.x, front.y - 2, light);
+      p.line(front.x - dir * 2, front.y - 6, x + dir * 3, y - 1, "#e8e4da"); p.line(front.x - dir * 2, front.y + 6, x + dir * 3, y - 1, "#e8e4da");
+      p.line(x + dir * 3, y - 2, front.x + dir * 2, front.y - 1, "#9c7a5c"); p.set(front.x + dir * 3, front.y - 1, metal);
+      tip = { x: front.x + dir * 3, y: front.y - 1 };
+      break;
+    }
     case "hammer": {
       // A short haft and a block head.
       const top = { x: x + dir * (2 + lean), y: y - 9 }; tip = top;
@@ -341,6 +376,18 @@ function drawWeapon(p: Pixels, piece: Piece, x: number, y: number, dir: number, 
   else if (shape === "staff") tip = { x: x + dir * (1 + lean), y: y - 20 };
   else if (shape === "bow") tip = { x: x + dir * lean, y: y - 12 };
   return tip;
+}
+/** A quiver from `top` (its mouth, fletchings standing out) to `bottom`, fine pixels. */
+function drawQuiver(p: Pixels, piece: Piece, top: { x: number; y: number }, bottom: { x: number; y: number }) {
+  const color = piece.color, dark = shadeHex(color, -0.2), trim = piece.trim ?? "#c9a24a", dx = top.x - bottom.x, dy = top.y - bottom.y, len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len, uy = dy / len;
+  for (const [off, fletch] of [[-1.5, "#efede7"], [0, "#cf6e6e"], [1.5, "#efede7"]] as [number, string][]) {
+    const bx = top.x - uy * off, by = top.y + ux * off, fx = bx + ux * 4, fy = by + uy * 4;
+    p.line(bx, by, fx, fy, "#8a6a50"); p.set(Math.round(fx), Math.round(fy), fletch); p.set(Math.round(fx - ux), Math.round(fy - uy), fletch);
+  }
+  p.line(top.x, top.y, bottom.x, bottom.y, color, 4); p.line(top.x - uy * 1.5, top.y + ux * 1.5, bottom.x - uy * 1.5, bottom.y + ux * 1.5, dark);
+  p.line(top.x - uy * 2, top.y + ux * 2, top.x + uy * 2, top.y - ux * 2, trim, 2);
+  const bx = bottom.x + ux * 3, by = bottom.y + uy * 3; p.line(bx - uy * 2, by + ux * 2, bx + uy * 2, by - ux * 2, trim);
 }
 /** A heater shield centred on (x, y) in fine pixels: rim, boss and cross in its accent; from behind, its wooden back and strap. */
 function drawShield(p: Pixels, piece: Piece, x: number, y: number, rear: boolean) {

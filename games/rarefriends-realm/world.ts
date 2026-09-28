@@ -28,7 +28,7 @@ export type ObjectKind =
 export type DecorKind =
   | "flowers" | "bush" | "boulder" | "lamp" | "bench" | "crate" | "barrel" | "tent" | "cactus" | "pine" | "dead_tree" | "statue"
   | "grave" | "fence" | "reeds" | "table" | "bed" | "shelf" | "pillar" | "rubble" | "snowman" | "lily" | "banner" | "torch" | "palm" | "hay" | "windmill" | "boat" | "chest"
-  | "throne" | "armour";
+  | "throne" | "armour" | "logpile" | "stump" | "target";
 export type WorldObject = {
   id: number; kind: ObjectKind; x: number; y: number; name: string; blocks: boolean;
   tree?: TreeKind; rock?: RockKind; spot?: SpotKind; decor?: DecorKind; stall?: StallKind;
@@ -44,7 +44,7 @@ export type StallKind = "bakery" | "silk" | "gem" | "fish";
 export type SpawnDef = { kind: "npc" | "monster"; id: string; x: number; y: number; wander?: number };
 export type RegionId =
   | "friendhollow" | "farmland" | "whisperwood" | "ashen_hills" | "emberforge" | "frostpeak" | "glass_lake" | "pale_dunes"
-  | "oasis" | "murkmire" | "mossy_ruins" | "crypt" | "hollow_depths" | "coast" | "wizards_tower" | "wyrmreach";
+  | "oasis" | "murkmire" | "mossy_ruins" | "crypt" | "hollow_depths" | "coast" | "wizards_tower" | "wyrmreach" | "fernwick";
 export type Region = { id: RegionId; name: string; label: { x: number; y: number }; danger: number; underground?: boolean };
 export const REGIONS: readonly Region[] = [
   { id: "coast", name: "The Pale Coast", label: { x: 10, y: 10 }, danger: 0 },
@@ -61,6 +61,7 @@ export const REGIONS: readonly Region[] = [
   { id: "mossy_ruins", name: "Mossy Ruins", label: { x: 120, y: 172 }, danger: 2 },
   { id: "wizards_tower", name: "Wizards' Tower", label: { x: 160, y: 124 }, danger: 0 },
   { id: "wyrmreach", name: "Wyrmreach", label: { x: 36, y: 20 }, danger: 5 },
+  { id: "fernwick", name: "Fernwick", label: { x: 34, y: 60 }, danger: 0 },
   { id: "crypt", name: "Murkmire Crypt", label: { x: 34, y: 220 }, danger: 3, underground: true },
   { id: "hollow_depths", name: "Hollow Depths", label: { x: 150, y: 220 }, danger: 4, underground: true },
 ];
@@ -218,7 +219,7 @@ export function createWorld(seed = 20260927): World {
   }
   // Region footprints (music, labels, minimap). Order matters: later regions paint over earlier ones.
   const REGION_BLOBS: readonly [RegionId, number, number, number, number][] = [
-    ["whisperwood", 44, 82, 40, 44], ["ashen_hills", 114, 48, 30, 26], ["emberforge", 162, 48, 18, 14], ["frostpeak", 206, 22, 36, 22],
+    ["whisperwood", 44, 82, 40, 44], ["fernwick", 34, 70, 14, 10], ["ashen_hills", 114, 48, 30, 26], ["emberforge", 162, 48, 18, 14], ["frostpeak", 206, 22, 36, 22],
     ["pale_dunes", 204, 102, 36, 36], ["glass_lake", 178, 166, 34, 26], ["murkmire", 44, 166, 38, 28], ["mossy_ruins", 122, 172, 26, 20],
     ["farmland", 88, 124, 16, 16], ["oasis", 190, 116, 11, 10], ["friendhollow", 121, 124, 26, 28], ["wizards_tower", 160, 130, 8, 8], ["wyrmreach", 36, 23, 32, 19],
   ];
@@ -490,6 +491,32 @@ export function createWorld(seed = 20260927): World {
   monsters("grumblin", 38, 84, 58, 100, 12); monster("grumblin_chief", 49, 94, 3);
   monsters("grumblin", 60, 104, 74, 114, 4);
 
+  // ---------- Fernwick: the woodcutters' village in the heart of Whisperwood ----------
+  // A clearing with a street running east to the woods road, Hazel's War Bows (the only place selling war bows) and the
+  // lodge (timber yard and bank) on its north side, cottages and a willow pond to the south, oaks and maples all round.
+  for (let y = 59; y <= 81; y++) for (let x = 19; x <= 49; x++) if (((x - 34) / 13) ** 2 + ((y - 70) / 9.5) ** 2 <= 1) { clearAt(x, y); if (get(x, y) === T.DARK_GRASS) put(x, y, T.GRASS); }
+  road([[68, 76], [58, 75], [49, 72], [40, 71], [24, 71]]);
+  for (let y = 66; y <= 80; y++) for (let x = 22; x <= 68; x++) if (get(x, y) === T.PATH) clearAt(x, y);
+  building(23, 62, 30, 68, "s", T.WOOD, undefined, { name: "Hazel's War Bows" });
+  npc("hazel", 26, 65); decor(24, 63, "shelf"); decor(29, 63, "shelf"); decor(24, 66, "crate"); decor(29, 66, "barrel");
+  building(33, 62, 42, 68, "s", T.WOOD, undefined, { name: "Fernwick lodge", chimney: true });
+  add({ kind: "bank", x: 34, y: 65, blocks: true, name: "Bank booth" }); add({ kind: "bank", x: 35, y: 65, blocks: true, name: "Bank booth" }); npc("banker", 34, 64);
+  npc("rowan", 40, 65); decor(41, 63, "logpile", true, "Stacked timber"); decor(41, 66, "crate"); decor(39, 63, "table");
+  building(22, 74, 27, 78, "n");                                                                  // Old Birch's cottage
+  decor(23, 77, "bed"); decor(26, 75, "table");
+  building(42, 74, 47, 78, "n");                                                                  // a woodcutter's cottage
+  decor(46, 77, "bed"); decor(43, 75, "chest");
+  // The archery butts west of Hazel's, and the woodpile, chopping blocks and torches along the street.
+  decor(20, 64, "target"); decor(20, 67, "target"); decor(31, 64, "logpile"); decor(44, 67, "logpile"); decor(45, 69, "stump"); decor(30, 74, "stump");
+  decor(32, 69, "torch"); decor(43, 70, "torch"); decor(29, 73, "torch");
+  npc("birch", 33, 74, 3);
+  // The willow pond.
+  blob(35, 77.5, 3.2, 1.8, T.WATER, 0.15);
+  for (const [wx, wy] of [[31, 77], [39, 78], [35, 80], [38, 75]] as const) if (free(wx, wy)) tree(wx, wy, "willow");
+  decor(33, 79, "reeds", false); decor(37, 76, "lily", false); decor(36, 79, "lily", false);
+  for (const [tx, ty, kind] of [[46, 63, "oak"], [48, 66, "oak"], [21, 72, "tree"], [20, 75, "oak"], [30, 60, "maple"], [37, 60, "oak"], [44, 61, "maple"], [49, 77, "tree"]] as const) if (free(tx, ty)) tree(tx, ty, kind);
+  add({ kind: "sign", x: 50, y: 71, blocks: true, name: "Signpost", text: "Fernwick, the woodcutters' village. War bows at Hazel's, logs sold and a bank at the lodge. East: the woods road to the Ashen mine and Friendhollow." });
+
   // ---------- Ashen Hills: the mine ----------
   const mine = (x: number, y: number, kind: RockKind) => { if (get(x, y) === T.GRAVEL && objectAt[tileIndex(x, y)] < 0) rock(x, y, kind); };
   for (let i = 0; i < 9; i++) { mine(104 + i * 2, 50 + (i % 3), "pewter"); mine(105 + i * 2, 55 + (i % 2), "pewter"); }
@@ -621,6 +648,7 @@ export function createWorld(seed = 20260927): World {
     const terrain = get(x, y);
     if ((terrain !== T.GRASS && terrain !== T.DARK_GRASS) || !free(x, y) || townDistance(x, y) < 17) continue;
     if (x >= 84 && x <= 114 && y >= 95 && y <= 104) continue; // agility meadow
+    if (((x - 34) / 13) ** 2 + ((y - 70) / 9.5) ** 2 <= 1 || (x >= 44 && x <= 68 && y >= 69 && y <= 78 && get(x, y) === T.PATH)) continue; // Fernwick and its road
     const g = grove(x, y), roll = random();
     if (g > 0.66 && roll < 0.3) tree(x, y, townDistance(x, y) > 55 && roll < 0.08 ? "oak" : "tree");
     else if (g > 0.5 && roll < 0.025) decor(x, y, "boulder");
@@ -806,6 +834,7 @@ export function createWorld(seed = 20260927): World {
     runa: ["breeze_sigil", "Runa's Sigils"], tanner: ["leather", "Tessa's Tannery"], outfitter: ["glimmer_helm", "Frostpeak Outfitters"], armourer: ["pewter_helm", "Hollis Armoury"],
     weaponsmith: ["pewter_sword", "Edge & Hilt"], bowyer: ["shortbow", "Fletch & Feather"], slayer_master: ["slayer_gem", "The Warden's Lodge"], innkeeper: ["cake", "The Sleepy Friend inn"],
     rare_trader: ["rough_moonstone", "The Rare Market"], stablemaster: ["__horse", "Friendhollow Stables"],
+    hazel: ["war_bow", "Hazel's War Bows"], rowan: ["pewter_axe", "Fernwick Timber Yard"],
   };
   const signed = new Set<Building>();
   const signFor = (x: number, y: number, icon: string, label: string) => {
@@ -846,6 +875,7 @@ const DECOR_NAMES: Record<DecorKind, string> = {
   cactus: "Cactus", pine: "Pine tree", dead_tree: "Dead tree", statue: "Statue", grave: "Grave", fence: "Fence", reeds: "Reeds", table: "Table",
   bed: "Bed", shelf: "Shelves", pillar: "Pillar", rubble: "Rubble", snowman: "Snow Friend", lily: "Lily pad", banner: "Banner", torch: "Torch",
   palm: "Palm tree", hay: "Hay bales", windmill: "Windmill", boat: "Boat", chest: "Chest", throne: "Throne", armour: "Suit of armour",
+  logpile: "Log pile", stump: "Chopping block", target: "Archery target",
 };
 
 export function terrainAt(world: World, x: number, y: number) { return inBounds(x, y) ? world.tiles[tileIndex(x, y)] : T.VOID; }

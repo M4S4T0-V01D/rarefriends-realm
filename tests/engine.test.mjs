@@ -3,15 +3,16 @@ import assert from "node:assert/strict";
 import {
   buy, canWalk, castSpell, chooseOption, collectFromCasket, continueDialogue, createGame, equip, findPath, itemOptions, menuFor, restore, sell,
   serialize, setFollower, setRelics, setTarget, smeltingRecipes, smithingRecipes, startProduction, tick, togglePrayer, useItemOnItem, walkTo, setHeld,
-  successChance, hitChance, unlockMusic, syncMonster, toggleMount, grantMount, rideProblem, castOnItem, isBound, grantBundle, rubLamp, breakTablet, capeProblem, sellPrice, craftSigils,
+  successChance, hitChance, unlockMusic, bestArrow, rangedMaxHit, bowRange, syncMonster, toggleMount, grantMount, rideProblem, castOnItem, isBound, grantBundle, rubLamp, breakTablet, capeProblem, sellPrice, craftSigils,
 } from "../games/rarefriends-realm/engine.ts";
 import { currentTask, slayerPoints } from "../games/rarefriends-realm/slayer.ts";
 import { ITEM_LIST, MONSTERS, MOUNTS, SHOPS, SKILLS, SPELLS, TREES, XP_RATE, XP_TABLE, item, levelForXp } from "../games/rarefriends-realm/data.ts";
-import { NPCS, QUESTS, MAX_QUEST_POINTS, questPoints } from "../games/rarefriends-realm/content.ts";
+import { NPCS, QUESTS, MAX_QUEST_POINTS, questPoints, onMonsterKilled } from "../games/rarefriends-realm/content.ts";
 import { FLOOR_Y, H, REGIONS, T, W, createWorld, floorAt, objectAtTile, onLevel, realPoint, regionAt, terrainAt } from "../games/rarefriends-realm/world.ts";
 import { addXp, combatLevel, count, earlyXp, give, has, level, xpMultiplier } from "../games/rarefriends-realm/state.ts";
 import game from "../games/rarefriends-realm/game.json" with { type: "json" };
 
+const fletchingRecipesFor = (g, log) => { const knife = g.player.inventory.findIndex(slot => slot?.id === "knife"), logs = g.player.inventory.findIndex(slot => slot?.id === log); useItemOnItem(g, knife, logs); const recipes = g.ui.production.recipes; g.ui.production = null; return recipes; };
 function seeded(seed = 42) { return () => ((seed = (seed * 16807) % 2147483647) / 2147483647); }
 const newGame = (options = {}) => createGame({ familyId: 0, friendId: 7730, rng: seeded(), ...options });
 const run = (g, ticks) => { for (let i = 0; i < ticks; i++) tick(g); };
@@ -304,7 +305,7 @@ test("A Friend's Feast from start to finish", () => {
   assert.equal(g.player.quests.friends_feast, 2);
   assert.equal(questPoints(g), 1);
   assert(level(g, "cooking") >= 10, "Quest XP");
-  assert.equal(QUESTS.length, 6); assert.equal(MAX_QUEST_POINTS, 9);
+  assert.equal(QUESTS.length, 7); assert.equal(MAX_QUEST_POINTS, 10);
 });
 
 test("Grumblin Trouble counts kills and pays out", () => {
@@ -553,6 +554,82 @@ test("Ranged: a bow fires your best arrows from a distance, and trains Ranged", 
   assert(closest > 1, "shot from range, never walked up to it");
   assert(count(p, "ashsteel_arrow") === 5, "ashsteel arrows need Ranged 10: pewter first");
   assert(count(p, "pewter_arrow") < 60, "arrows are used up");
+});
+
+test("Crossbows and war bows: parts from the anvil and the knife, fitted with Crafting; bolts only for crossbows; slower, harder shots", () => {
+  const g = newGame(), p = g.player;
+  for (const skill of ["fletching", "crafting", "smithing", "ranged"]) p.xp[skill] = XP_TABLE[30];
+  // The anvil makes limbs (two bars) and a dozen unfeathered bolts (one bar).
+  const pewter = smithingRecipes("pewter");
+  assert.deepEqual(pewter.find(recipe => recipe.outputs.pewter_limbs)?.inputs, { pewter_bar: 2 });
+  assert.equal(pewter.find(recipe => recipe.outputs.pewter_bolts_unf)?.outputs.pewter_bolts_unf, 12);
+  // A knife on logs offers the war bow (two logs) and a crossbow stock.
+  give(p, "knife"); give(p, "logs", 4);
+  useItemOnItem(g, p.inventory.findIndex(slot => slot?.id === "knife"), p.inventory.findIndex(slot => slot?.id === "logs"));
+  const labels = g.ui.production.recipes.map(recipe => recipe.label);
+  assert(labels.includes("War bow (2 logs)") && labels.includes("Wooden stock"), labels.join(", "));
+  startProduction(g, g.ui.production.recipes.find(recipe => recipe.label === "War bow (2 logs)"), 1); run(g, 10);
+  assert(has(p, "war_bow") && count(p, "logs") === 2, "a war bow takes two logs");
+  startProduction(g, fletchingRecipesFor(g, "logs").find(recipe => recipe.label === "Wooden stock"), 1); run(g, 10);
+  assert(has(p, "wooden_stock"));
+  // Limbs only fit their own stock.
+  give(p, "blackiron_limbs"); useItemOnItem(g, p.inventory.findIndex(slot => slot?.id === "blackiron_limbs"), p.inventory.findIndex(slot => slot?.id === "wooden_stock"));
+  run(g, 6); assert(!has(p, "blackiron_crossbow"), "blackiron limbs need an oak stock");
+  give(p, "pewter_limbs"); useItemOnItem(g, p.inventory.findIndex(slot => slot?.id === "pewter_limbs"), p.inventory.findIndex(slot => slot?.id === "wooden_stock"));
+  run(g, 6); assert(has(p, "pewter_crossbow") && !has(p, "pewter_limbs") && !has(p, "wooden_stock"), "pewter limbs on a wooden stock");
+  assert(p.xp.crafting > XP_TABLE[30], "fitting trains Crafting");
+  // Feathers on unfeathered bolts.
+  give(p, "pewter_bolts_unf", 12); give(p, "feather", 12);
+  useItemOnItem(g, p.inventory.findIndex(slot => slot?.id === "pewter_bolts_unf"), p.inventory.findIndex(slot => slot?.id === "feather")); run(g, 6);
+  assert.equal(count(p, "pewter_bolts"), 12);
+  // A crossbow is one-handed (the shield stays), fires bolts and never arrows, and hits harder than a plain bow.
+  give(p, "pewter_shield"); equip(g, p.inventory.findIndex(slot => slot?.id === "pewter_shield"));
+  give(p, "pewter_arrow", 50);
+  equip(g, p.inventory.findIndex(slot => slot?.id === "pewter_crossbow"));
+  assert.equal(p.equipment.shield, "pewter_shield", "a crossbow leaves a hand for a shield");
+  p.xp.ranged = XP_TABLE[60];
+  assert.equal(bestArrow(g)?.id, "pewter_bolts");
+  const crossbowHit = rangedMaxHit(g);
+  give(p, "shortbow"); equip(g, p.inventory.findIndex(slot => slot?.id === "shortbow"));
+  assert.equal(bestArrow(g)?.id, "pewter_arrow", "bows fire arrows, not bolts");
+  const bowHit = rangedMaxHit(g);
+  equip(g, p.inventory.findIndex(slot => slot?.id === "war_bow"));
+  const warHit = rangedMaxHit(g);
+  assert(crossbowHit > bowHit && warHit > bowHit, `harder hits: crossbow ${crossbowHit}, war bow ${warHit}, bow ${bowHit}`);
+  assert(item("war_bow").equip.speed > item("shortbow").equip.speed && item("pewter_crossbow").equip.speed > item("shortbow").equip.speed, "and slower");
+  assert.equal(item("war_bow").equip.requires.ranged, 5, "the plain war bow needs Ranged 5");
+  assert.equal(bowRange(g), 8, "a war bow reaches a tile further");
+  // War bows are sold only in Fernwick.
+  const sellers = Object.values(SHOPS).filter(shop => shop.stock.some(id => id.endsWith("war_bow"))).map(shop => shop.id);
+  assert.deepEqual(sellers, ["war_bows"]);
+});
+
+test("Hazel's Quiver: the Grumblin chief has it, Hazel mends it, and it calls shots home", () => {
+  const g = newGame(), p = g.player;
+  const hazel = g.npcs.find(npc => npc.id === "hazel");
+  assert(hazel, "Hazel is in Fernwick"); assert.equal(regionAt(g.world, hazel.x, hazel.y).id, "fernwick");
+  const talk = () => { standNear(g, hazel.x, hazel.y, 1); setTarget(g, { kind: "npc", uid: hazel.uid, option: "Talk-to" }); until(g, () => g.dialogue !== null, 30); };
+  const say = label => { while (g.dialogue && g.dialogue.index < g.dialogue.lines.length) continueDialogue(g); const index = g.dialogue.options.findIndex(option => option.label.startsWith(label)); assert(index >= 0, label); chooseOption(g, index); };
+  talk(); say("You look troubled."); say("I'll get it back.");
+  while (g.dialogue) continueDialogue(g);
+  assert.equal(p.quests.hazels_quiver, 1);
+  onMonsterKilled(g, "grumblin_chief", 0, 0);
+  assert(has(p, "torn_quiver"), "the chief drops the torn quiver");
+  give(p, "leather", 2); give(p, "feather", 15); give(p, "oak_logs", 5);
+  talk(); say("I have everything"); while (g.dialogue) continueDialogue(g);
+  assert.equal(p.quests.hazels_quiver, 2); assert(has(p, "hazels_quiver") && !has(p, "torn_quiver") && !has(p, "leather"));
+  equip(g, p.inventory.findIndex(slot => slot?.id === "hazels_quiver"));
+  assert.equal(p.equipment.cape, "hazels_quiver", "worn on the back");
+  // Shoot a cow with the quiver on: most bolts come home.
+  p.xp.ranged = XP_TABLE[20]; give(p, "pewter_crossbow"); equip(g, p.inventory.findIndex(slot => slot?.id === "pewter_crossbow")); give(p, "pewter_bolts", 100);
+  let shots = 0, before = 100;
+  for (const cow of g.monsters.filter(monster => monster.def.id === "cow").slice(0, 3)) {
+    standNear(g, cow.x, cow.y, 4); setTarget(g, { kind: "monster", uid: cow.uid, option: "Attack" });
+    for (let i = 0; i < 60 && !cow.dead; i++) { const n = count(p, "pewter_bolts"); tick(g); if (count(p, "pewter_bolts") !== n || g.events?.some?.(event => event.type === "projectile")) shots++; }
+  }
+  const spent = before - count(p, "pewter_bolts");
+  assert(p.xp.ranged > XP_TABLE[20], "shots were fired");
+  assert(spent < 12, `most bolts fly home (${spent} lost)`);
 });
 
 test("Slayer: a task from the Warden, XP per kill, points when it's done, and creatures only a Slayer can wound", () => {

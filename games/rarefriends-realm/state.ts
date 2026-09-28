@@ -102,7 +102,7 @@ export type Npc = { uid: number; id: string; x: number; y: number; prev: Point; 
 export type GroundItem = { uid: number; id: string; n: number; x: number; y: number; expires: number; shared?: boolean; rare?: boolean };
 export type Fire = { uid: number; x: number; y: number; expires: number };
 /** Something flying: a spell (glowing, by element), an arrow, or dragonfire. */
-export type Projectile = { from: Point; to: Point; start: number; end: number; color: string; style?: "magic" | "arrow" | "fire"; element?: string };
+export type Projectile = { from: Point; to: Point; start: number; end: number; color: string; style?: "magic" | "arrow" | "bolt" | "fire"; element?: string };
 export type GameEvent =
   | { type: "hit"; on: "player" | "monster"; uid?: number; damage: number; tick: number }
   | { type: "xp"; skill: Skill; amount: number; tick: number }

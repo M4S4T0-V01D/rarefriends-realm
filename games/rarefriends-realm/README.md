@@ -38,14 +38,14 @@ XP follows the classic curve (83 XP for level 2, 13,034,431 for 99), multiplied 
 | Skill | Train by | Notes |
 | --- | --- | --- |
 | Attack / Strength / Defence | Melee combat (4 XP per damage to your style's skill) | Styles: Accurate, Aggressive, Defensive, Controlled |
-| Ranged | Bows (4 XP per damage; Longrange splits it with Defence) | Bows by wood (Shortbow 1, Oak 5, Willow 20, Maple 30, Yew 40, Ashwood 50, Gloomfang 60) fire the best arrows in your pack (pewter 1 … rarite 40). Styles: Accurate, Rapid (a tick faster), Longrange (+2 tiles). Most arrows can be picked up again |
+| Ranged | Bows and crossbows (4 XP per damage; Longrange splits it with Defence) | Bows by wood (Shortbow 1, Oak 5, Willow 20, Maple 30, Yew 40, Ashwood 50, Gloomfang 60) fire the best arrows in your pack (pewter 1 … rarite 40). War bows (War bow 5, Oak 10, Willow 25, Maple 35, Yew 45, Ashwood 55) draw a tick slower, add strength to every arrow and reach 8 tiles. Crossbows (pewter 1, blackiron 10, ashsteel 20, moonsilver 30, glimmer 40, rarite 55) fire bolts only, a tick slower and harder hitting, and are one-handed, so a shield fits. Hazel's quiver (worn on the back) returns four in five shots to your pack. Styles: Accurate, Rapid (a tick faster), Longrange (+2 tiles). Most arrows can be picked up again |
 | Hitpoints | Any combat (1.33 XP per damage) | Starts at 10; regenerates 1 HP per minute |
 | Magic | Spells paid in sigils (damage spells: base XP + 2 per damage) | Staffs autocast damage spells; breeze, tide, stone and ember staffs give unlimited sigils of their element. Basic sigils cost about 3 coins |
 | Sigilcraft | Press sigil stones at an altar: Breeze 1, Thought 2, Tide 5, Stone 9, Ember 14, Shade 20, Star 27, Storm 35, Bloom 44, Path 54, Hollow 65 | Sigil stones are mined (endlessly) in the Wizards' Tower; one more sigil per stone for every 11 levels past the altar's |
 | Prayer | Burying bones (4.5 / 15 / 50 XP) | Recharge at altars; prayers drain points |
 | Woodcutting | Trees 1, Oak 15, Willow 30, Maple 45, Yew 60, Ashwood 70 | Better axes cut faster |
 | Firemaking | Light logs (same levels as Woodcutting) | Fires last about a minute; cook on them |
-| Fletching | A knife on logs: 15 arrow shafts, or a bow (Shortbow 5, Oak 20, Willow 35, Maple 50, Yew 65, Ashwood 80); feathers on shafts; arrowheads on headless arrows (pewter 1 … rarite 75) | Arrowheads are smithed at the anvil, 15 a bar |
+| Fletching | A knife on logs: 15 arrow shafts, a bow (Shortbow 5, Oak 20, Willow 35, Maple 50, Yew 65, Ashwood 80), a war bow from two logs (10, 25, 40, 55, 70, 85) or a crossbow stock (wooden 9, oak 24, willow 39, maple 54, yew 69); feathers on shafts; arrowheads on headless arrows (pewter 1 … rarite 75); feathers on unfeathered bolts (pewter 5 … rarite 79) | Arrowheads (15 a bar), unfeathered bolts (12 a bar) and crossbow limbs (2 bars) are smithed at the anvil. Limbs on their stock make a crossbow with Crafting (pewter 8, blackiron 18, ashsteel 28, moonsilver 42, glimmer 56, rarite 70) |
 | Fishing | Net 1 (minnows), Bait 5/10 (perch, carp), Lure 20/30 (char, grayling), Cage 40 (inkcrab), Harpoon 50 (sailfish), Deep 76 (inkshark) | Bait and feathers are used up |
 | Cooking | Ranges and fires | Burn chance falls with level, to zero at the stop-burn level |
 | Mining | Clay/Pewter 1, Blackiron 15, Inkcoal 30, Gems 40, Moonsilver 55, Glimmer 70, Rarite 85 | 1/256 random gem per swing |
@@ -115,7 +115,7 @@ A **Wyrmward shield** (free from King Hollis: "I'm going after dragons") turns i
 bones (72 Prayer XP), drakehide (Crafting 57–63: bracers, chaps and a vest for archers) and, from Old Cinder, a Wyrm heart.
 | **The Hollow King** | 92 | The throne room (boss) |
 
-## Quests (9 quest points)
+## Quests (10 quest points)
 
 1. **A Friend's Feast** (Cook Mabel, the castle kitchen): an egg, a pot of flour and a bucket of milk.
 2. **Grumblin Trouble** (Captain Rook, the castle's great hall): defeat six Grumblins.
@@ -123,15 +123,21 @@ bones (72 Prayer XP), drakehide (Crafting 57–63: bracers, chaps and a vest for
 4. **Hollow Whispers** (Brother Ossic, the chapel): find the crypt key and lock the crypt altar.
 5. **The Lost Glimmer** (Old Glimmer, by the fountain): three shards: the Grumblin chief, a swamp lurker, the town well.
 6. **The Hollow King** (Old Glimmer, after 4 and 5): pass the Hollow gate and defeat the Hollow King.
+7. **Hazel's Quiver** (Hazel, Fernwick): win her grandmother's quiver back from the Grumblin chief, and bring 2 leather, 15 feathers and 5 oak logs to mend it. The reward, worn on your back, returns four in five arrows and bolts to your pack.
 
 ## The world
 
-A 240 × 240 tile island with 14 overworld regions (Friendhollow, Hollow Farms, Whisperwood, Ashen Hills, Emberforge,
+A 240 × 240 tile island with 15 overworld regions (Friendhollow, Hollow Farms, Whisperwood, Fernwick, Ashen Hills, Emberforge,
 Frostpeak, Glass Lake, Pale Dunes, Oasis, Murkmire, Mossy Ruins, the Wizards' Tower, Wyrmreach and the Pale Coast) and two dungeons
-(Murkmire Crypt, Hollow Depths). Banks in Friendhollow (and up in the castle's south-west tower), Emberforge, the Oasis, Frostpeak and a deposit box by Glass Lake.
+(Murkmire Crypt, Hollow Depths). Banks in Friendhollow (and up in the castle's south-west tower), Emberforge, the Oasis, Frostpeak, Fernwick and a deposit box by Glass Lake.
+
+**Fernwick**, a woodcutters' village in the heart of Whisperwood (the woods road west from the Ashen mine, or north from
+the Grumblin camp), has Hazel's War Bows (the only shop selling war bows; also bolts, stocks and a moonsilver crossbow),
+Rowan's Timber Yard (axes, and the best price for logs, 75%) and a bank in the lodge, with oaks and maples all round,
+willows by the pond and archery butts behind Hazel's.
 
 **Friendhollow** has grown: south of the fountain, **Market Street** has Hollis Armoury (helms to shields, pewter to
-moonsilver), Edge & Hilt (daggers, swords, sabres), Fletch & Feather (bows, arrows, hunter's hides) and the Warden's
+moonsilver), Edge & Hilt (daggers, swords, sabres), Fletch & Feather (bows, arrows, the first three crossbows and their bolts, hunter's hides) and the Warden's
 Lodge (Slayer). The Sleepy Friend inn (food, and a range) is east of the square, and the Rare Market is west.
 
 **The Wizards' Tower**, across the river east of town, has three storeys: sigil stones and Apprentice Pell's stores
@@ -143,7 +149,7 @@ Ysolde, who knows about dragons) at the pass, drakes on the slopes, and Old Cind
 
 **Selling.** Merchants pay more for their own trade than the 40% most shops pay: Pike (fish, 60%), Axel (logs, 60%),
 Emberforge Arms (ore, bars, arms, 55%), Runa and the Tower stores (sigils and magic, 60%), Tessa (hides and leather, 60%),
-Mort the bone collector (bones and hides, 65%), the Oasis bazaar (gems, jewellery, food, 70%), Fletch & Feather
+Mort the bone collector (bones and hides, 65%), Rowan's Timber Yard in Fernwick (logs, 75%), the Oasis bazaar (gems, jewellery, food, 70%), Fletch & Feather
 (bows, arrows, logs, 60%), the armoury and the weaponsmith (55%), and the inn (fish and food, 55%). Right-click an item
 in a shop for its *Value*. Every trader buys back what it sells, and general stores (Friendhollow, and now Emberforge,
 Frostpeak and the Oasis) buy almost anything. What you sell goes on the shop's shelves with its count, so you can buy it

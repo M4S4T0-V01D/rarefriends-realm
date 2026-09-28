@@ -1225,25 +1225,26 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     // Spells take a little longer in the air than a tick, so the comet is seen crossing.
     const span = Math.max(projectile.style === "magic" ? 1.5 : 1, projectile.end - projectile.start + 1), progress = (game.tick - projectile.start + alpha) / span;
     if (progress < 0 || progress > 1) continue;
-    const lift0 = projectile.style === "fire" ? 34 : 28, lift1 = 24, arc = projectile.style === "arrow" ? 14 : projectile.style === "fire" ? 6 : 20;
+    const shot = projectile.style === "arrow" || projectile.style === "bolt";
+    const lift0 = projectile.style === "fire" ? 34 : 28, lift1 = 24, arc = projectile.style === "bolt" ? 5 : projectile.style === "arrow" ? 14 : projectile.style === "fire" ? 6 : 20;
     const at = (t: number) => { const a = toScreen(camera, projectile.from.x, projectile.from.y, lift0), b = toScreen(camera, projectile.to.x, projectile.to.y, lift1);
       return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t - Math.sin(t * Math.PI) * arc * z }; };
     const head = at(progress), wx = projectile.from.x + (projectile.to.x - projectile.from.x) * progress, wy = projectile.from.y + (projectile.to.y - projectile.from.y) * progress;
     const look = MAGIC_LOOKS[projectile.element ?? ""] ?? { core: "#ffffff", glow: projectile.color, spark: projectile.color };
-    if (!castFlashed.has(projectile) && projectile.style !== "arrow") {
+    if (!castFlashed.has(projectile) && !shot) {
       castFlashed.add(projectile);
       if (!scene.reducedMotion) burst("spark", projectile.from.x, projectile.from.y, lift0, 8, projectile.style === "fire" ? "#ffd27a" : look.spark, { speed: 0.6, up: 30, life: 0.5, size: 2 });
     }
     if (progress > 0.94 && !impacted.has(projectile)) {
       impacted.add(projectile);
-      if (!scene.reducedMotion && projectile.style !== "arrow") {
+      if (!scene.reducedMotion && !shot) {
         burst("spark", projectile.to.x, projectile.to.y, lift1, 16, projectile.style === "fire" ? "#ffb060" : look.spark, { speed: 1.3, up: 50, life: 0.7, size: 2.5 });
         burst("ring", projectile.to.x, projectile.to.y, 2, 1, projectile.style === "fire" ? "#f08a4b" : look.glow, { speed: 0, up: 0, life: 0.6, size: 2 });
       }
     }
-    if (projectile.style === "arrow") {
-      // A shaft pointed along its flight, head first.
-      const next = at(Math.min(1, progress + 0.04)), angle = Math.atan2(next.y - head.y, next.x - head.x), len = 13 * z;
+    if (shot) {
+      // A shaft pointed along its flight, head first (a bolt is short, stubby and flies flatter).
+      const next = at(Math.min(1, progress + 0.04)), angle = Math.atan2(next.y - head.y, next.x - head.x), len = (projectile.style === "bolt" ? 8 : 13) * z;
       ctx.save(); ctx.translate(head.x, head.y); ctx.rotate(angle);
       ctx.strokeStyle = INK; ctx.lineWidth = 3.4 * Math.max(0.8, z); ctx.beginPath(); ctx.moveTo(-len, 0); ctx.lineTo(len * 0.4, 0); ctx.stroke();
       ctx.strokeStyle = "#9c7a5c"; ctx.lineWidth = 1.6 * Math.max(0.8, z); ctx.stroke();
@@ -1619,7 +1620,7 @@ function skillcapeRays(ctx: CanvasRenderingContext2D, x: number, y: number, z: n
 }
 function questMarkerFor(game: Game, npcId: string): string | null {
   const q = game.player.quests;
-  const starts: Record<string, string> = { cook: "friends_feast", captain: "grumblin_trouble", smith: "cold_forge", priest: "hollow_whispers", glimmer: "lost_glimmer" };
+  const starts: Record<string, string> = { cook: "friends_feast", captain: "grumblin_trouble", smith: "cold_forge", priest: "hollow_whispers", glimmer: "lost_glimmer", hazel: "hazels_quiver" };
   const quest = starts[npcId];
   if (quest && !q[quest]) return C.butter;
   if (npcId === "glimmer" && (q.lost_glimmer ?? 0) >= 2 && (q.hollow_whispers ?? 0) >= 4 && !q.hollow_king) return C.rose;
@@ -1696,7 +1697,7 @@ export function mapIcons(world: World): MapIcon[] {
     const def = spawn.kind === "npc" ? NPCS[spawn.id] : null;
     if (def?.shop) add(spawn.x, spawn.y, "¤", def.name);
     if (spawn.kind === "npc" && spawn.id === "stablemaster") add(spawn.x, spawn.y, "♞", "Stables");
-    if (spawn.kind === "npc" && ["cook", "captain", "smith", "priest", "glimmer"].includes(spawn.id)) add(spawn.x, spawn.y, "!", `Quest: ${def!.name}`);
+    if (spawn.kind === "npc" && ["cook", "captain", "smith", "priest", "glimmer", "hazel"].includes(spawn.id)) add(spawn.x, spawn.y, "!", `Quest: ${def!.name}`);
   }
   return icons;
 }

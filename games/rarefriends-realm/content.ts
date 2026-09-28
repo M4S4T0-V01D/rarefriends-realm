@@ -55,6 +55,9 @@ export const NPCS: Record<string, NpcDef> = {
   agility: { id: "agility", name: "Coach Skip", examine: "Never stops stretching.", options: ["Talk-to"], art: art(5, 211) },
   armourer: { id: "armourer", name: "Dora Plate", examine: "She's knocked the dents out of half the Realm's helms.", options: ["Talk-to", "Trade"], shop: "armour", art: art(6, 241) },
   weaponsmith: { id: "weaponsmith", name: "Hilt", examine: "Tests every edge on his thumb. Has a lot of plasters.", options: ["Talk-to", "Trade"], shop: "weapons", art: art(0, 251) },
+  hazel: { id: "hazel", name: "Hazel the war-bowyer", examine: "Her arms could bend an oak. She says she has.", options: ["Talk-to", "Trade"], shop: "war_bows", art: art(3, 412) },
+  rowan: { id: "rowan", name: "Rowan the forester", examine: "Sawdust in the beard, a pencil behind the ear.", options: ["Talk-to", "Trade"], shop: "timber", art: art(2, 377) },
+  birch: { id: "birch", name: "Old Birch", examine: "Has felled more trees than you've seen.", options: ["Talk-to"], art: art(4, 509) },
   bowyer: { id: "bowyer", name: "Wren the bowyer", examine: "Smells of beeswax and pine shavings.", options: ["Talk-to", "Trade"], shop: "archery", art: art(3, 261) },
   slayer_master: { id: "slayer_master", name: "Warden Thistle", examine: "The Realm's Slayer Warden. She knows where everything soft is.", options: ["Talk-to", "Assignment", "Rewards", "Trade"], shop: "slayer", art: art(8, 271) },
   rare_trader: { id: "rare_trader", name: "Rare trader", examine: "Deals in Rare Caskets and the good stuff that comes with them.", options: ["Talk-to", "Rare-market", "Caskets"], art: art(7, 281) },
@@ -129,6 +132,19 @@ export const QUESTS: readonly QuestDef[] = [
     },
   },
   {
+    id: "hazels_quiver", name: "Hazel's Quiver", points: 1, difficulty: "Novice", start: "Talk to Hazel the war-bowyer in Fernwick, in the heart of Whisperwood.", requirements: ["Woodcutting 15 (oak logs)", "Able to defeat the Grumblin chief"],
+    journal: game => {
+      const s = stage(game, "hazels_quiver"), p = game.player;
+      if (s === 0) return ["Hazel, the war-bowyer in the woodcutters' village of Fernwick, looks like she's lost something."];
+      if (s === 1) return ["The Grumblins raided Fernwick and tore up Hazel's family quiver, the one that calls arrows home. To restitch it she needs:",
+        `${has(p, "torn_quiver") ? "✓" : "•"} The torn quiver (the Grumblin chief took it, at the camp south of Fernwick)`,
+        `${count(p, "leather") >= 2 ? "✓" : "•"} 2 leather (cowhides tanned by Tessa in Friendhollow)`,
+        `${count(p, "feather") >= 15 ? "✓" : "•"} 15 feathers (chickens, or Fletch & Feather)`,
+        `${count(p, "oak_logs") >= 5 ? "✓" : "•"} 5 oak logs (the oaks around Fernwick, Woodcutting 15)`];
+      return ["Hazel restitched her grandmother's quiver and gave it to me: arrows and bolts fly home to it. QUEST COMPLETE!"];
+    },
+  },
+  {
     id: "hollow_king", name: "The Hollow King", points: 3, difficulty: "Grandmaster", start: "Talk to Old Glimmer after The Lost Glimmer and Hollow Whispers.", requirements: ["The Lost Glimmer", "Hollow Whispers", "Combat 60+ strongly recommended"],
     journal: game => {
       const s = stage(game, "hollow_king");
@@ -171,6 +187,9 @@ export function onMonsterKilled(game: Game, monsterId: string, x: number, y: num
     message(game, `A Glimmer shard ${where}!`, "quest"); sound(game, "quest");
   };
   if (monsterId === "grumblin_chief") shard("shard_chief", "falls from the chief's pocket");
+  if (monsterId === "grumblin_chief" && stage(game, "hazels_quiver") === 1 && !has(player, "torn_quiver")) {
+    giveOrDrop(game, "torn_quiver"); message(game, "The chief was wearing Hazel's quiver as a hat. You take it back: it's torn, but it's all there.", "quest"); sound(game, "quest");
+  }
   if (monsterId === "swamp_lurker") shard("shard_swamp", "glints in the lurker's mud");
   if (monsterId === "hollow_king" && stage(game, "hollow_king") === 1) {
     player.quests.hollow_king = 2; giveOrDrop(game, "hollow_crown");
@@ -264,7 +283,7 @@ export function talk(game: Game, npcId: string): Dialogue {
       ]);
     }
     case "bowyer": return chat(name, npcSays(name, "Any bow fires any arrow, but you need the Ranged level for the arrowheads. Arrows come from your pack, and most can be picked up again.",
-      "Rapid shoots faster, Longrange reaches further and trains Defence too. Hides for archers are on the shelf."), [
+      "Rapid shoots faster, Longrange reaches further and trains Defence too. Crossbows fire bolts instead, and leave a hand free for a shield. Hides for archers are on the shelf.", "War bows? Only Hazel strings those, out in Fernwick, west through Whisperwood."), [
       { label: "Let me trade.", then: () => { game.ui.shop = "archery"; return null; } },
       { label: "Thanks.", then: () => null },
     ]);
@@ -398,6 +417,37 @@ export function talk(game: Game, npcId: string): Dialogue {
       return chat(name, npcSays(name, "Hover well, hero."));
     }
     case "miller": return chat(name, npcSays(name, "Pick grain from the wheat field, then use it on the hopper. Bring a pot to catch the flour. Easy!"));
+    case "hazel": {
+      const s = stage(game, "hazels_quiver"), ready = has(player, "torn_quiver") && count(player, "leather") >= 2 && count(player, "feather") >= 15 && count(player, "oak_logs") >= 5;
+      const owned = has(player, "hazels_quiver") || player.equipment.cape === "hazels_quiver" || player.bank.some(slot => slot.id === "hazels_quiver");
+      const quest = s === 0 ? [{ label: "You look troubled.", then: () => chat(name, npcSays(name, "The Grumblins came up from their camp last night and took my grandmother's quiver. It's no ordinary quiver: shoot from it and the arrows fly home.",
+        "Their chief will have it. Bring it back, with 2 leather, 15 feathers and 5 oak logs for a new frame, and I'll stitch it whole and it's yours. I've a war bow to string."), [
+        { label: "I'll get it back.", then: () => { player.quests.hazels_quiver = 1; message(game, "Quest started: Hazel's Quiver.", "quest"); return chat(name, npcSays(name, "The camp's just south of the village. Mind the chief: he bites.")); } },
+        { label: "Not right now.", then: () => null }]) }]
+        : s === 1 ? [{ label: ready ? "I have everything for the quiver." : "About your quiver…", then: () => {
+          if (!ready) return chat(name, npcSays(name, has(player, "torn_quiver") ? "You found it! I still need 2 leather, 15 feathers and 5 oak logs to mend it." : "The Grumblin chief has it, down at the camp south of here. Then 2 leather, 15 feathers and 5 oak logs."));
+          return chat(name, npcSays(name, "My grandmother's quiver! Give me a moment…", "There. New oak frame, fresh leather, and the fletching charm stitched back in. Shoot from it and watch."), undefined, () => {
+            take(player, "torn_quiver", 1); take(player, "leather", 2); take(player, "feather", 15); take(player, "oak_logs", 5); giveOrDrop(game, "hazels_quiver");
+            addXp(game, "ranged", 1500, { raw: true }); addXp(game, "fletching", 1000, { raw: true }); addXp(game, "crafting", 500, { raw: true });
+            completeQuest(game, "hazels_quiver", ["1 Quest Point", "Hazel's quiver (wear it on your back)", "1,500 Ranged XP", "1,000 Fletching XP", "500 Crafting XP"]);
+          });
+        } }]
+        : owned ? [] : [{ label: "I lost the quiver.", then: () => chat(name, npcSays(name, "Lost it? Lucky for you I kept the pattern. Here, and try to keep this one."), undefined, () => giveOrDrop(game, "hazels_quiver")) }];
+      return chat(name, npcSays(name, "War bows! Nobody else strings them: they take two logs and arms like mine. Slower than a plain bow, but every arrow lands like a hammer, and they reach a tile further.",
+      "Crossbows are the other road: limbs from the anvil, a stock from your knife, and a steady hand (Crafting) to fit them. They fire bolts, not arrows, and leave a hand free for a shield."), [
+      ...quest,
+      { label: "Show me the war bows.", then: () => { game.ui.shop = "war_bows"; return null; } },
+      { label: "Which limbs fit which stock?", then: () => chat(name, npcSays(name, "Pewter on a plain wooden stock. Blackiron and ashsteel on oak. Moonsilver on willow, glimmer on maple, rarite on yew. Carve the stock with a knife on the logs, then use the limbs on it.")) },
+      { label: "Thanks.", then: () => null },
+    ]);
+    }
+    case "rowan": return chat(name, npcSays(name, "Welcome to Fernwick, the woodcutters' village. I buy logs for more than anyone in Friendhollow, and sell axes to cut them with.",
+      "Oaks and maples all round us, willows by the pond. Bank's in the lodge, so you needn't walk back to town."), [
+      { label: "Let's trade.", then: () => { game.ui.shop = "timber"; return null; } },
+      { label: "Goodbye.", then: () => null },
+    ]);
+    case "birch": return chat(name, npcSays(name, (["Swing from the hips, not the shoulders. Trees respect that.", "Plain trees for learning, oaks at fifteen, willows at thirty, maples at forty-five. Yews grow south of the camp, and ashwood only up in Frostpeak.",
+      "Grumblins come up from the camp some nights. We keep the fires lit.", "Fletch as you go: a knife on your logs makes shafts, bows, war bows and crossbow stocks."] as const)[Math.floor(game.rng() * 4)]));
     case "miner": return chat(name, npcSays(name, "Pewter anyone can mine. Blackiron's further in. Inkcoal at the south end. There's moonsilver and a gem rock at the north edge, if you're good."));
     case "banker": return chat(name, npcSays(name, "Good day. Would you like to access your bank account?"), [
       { label: "Yes please.", then: () => { game.ui.bank = true; return null; } },

@@ -164,7 +164,7 @@ function CombatTab({ game, refresh, openMenu }: PanelProps) {
     <div className="realm-combat">
       <h3>{held?.name ?? "Unarmed"}</h3>
       <p className="realm-muted">Combat level: <b>{combatLevel(player)}</b> · Max hit: <b>{bow ? rangedMaxHit(game) : playerMaxHit(game)}</b>{bow && <> · Range: <b>{bowRange(game)}</b></>}</p>
-      {bow && <p className="realm-note">{arrow ? `Firing ${item(arrow.id).name.toLowerCase()} (${count(player, arrow.id)} left).` : "No arrows you can use in your pack!"}</p>}
+      {bow && <p className="realm-note">{arrow ? `Firing ${item(arrow.id).name.toLowerCase()} (${count(player, arrow.id)} left).` : `No ${held?.equip?.bow?.bolts ? "bolts" : "arrows"} you can use in your pack!`}</p>}
       <div className="realm-styles">
         {styles.map(([id, name, xp]) => <button key={id} type="button" aria-pressed={player.style === id} onClick={() => { setStyle(game, id); refresh(); }}
           {...rightClick(openMenu, () => [{ verb: "Select", noun: name, run: () => { setStyle(game, id); refresh(); } }])}><b>{name}</b><small>{xp}</small></button>)}
@@ -842,7 +842,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
         <li><b>F1–F9</b> or the icons switch tabs. <b>Enter</b> to chat. <b>Space</b> continues dialogue, <b>1–5</b> pick options. <b>Esc</b> closes.</li>
         <li><b>Use</b> an item, then click another item or object: raw fish on a range, tinderbox on logs, needle on leather, chisel on a gem.</li>
         <li>Train <b>15 skills</b> to 99 on the old-school XP curve (Realm rate ×3). Your Friend's family adds a perk.</li>
-        <li><b>Six quests</b>, from A Friend's Feast to The Hollow King. Look for yellow markers over quest givers.</li>
+        <li><b>Seven quests</b>, from A Friend's Feast to The Hollow King. Look for yellow markers over quest givers.</li>
         <li><b>Rare Caskets</b> use simulated $RAREFRIENDS: relics give bonuses while kept, and the wardrobe dresses your Friend.</li>
         <li>Your adventure saves automatically for this wallet on this device.</li>
       </ul>

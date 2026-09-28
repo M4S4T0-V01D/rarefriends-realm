@@ -405,6 +405,57 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
         }
         break;
       }
+      case "quiver": {
+        // A leather quiver with a brass rim and band, three fletched shafts standing out of it (a torn one is empty and ripped).
+        const torn = accent === "torn", trim = torn ? shadeHex(color, -0.25) : accent ?? "#c9a24a";
+        if (!torn) for (const [x, c] of [[12, "#efede7"], [16, "#cf6e6e"], [20, "#efede7"]] as [number, string][]) {
+          line(p, [[x, 10], [x + 1, 4]], "#8a6a50", 2); part(p, poly([[x - 1, 5], [x + 1, 1], [x + 3, 5], [x + 1, 7]]), c, "cloth");
+        }
+        part(p, poly([[9, 9], [23, 9], [21, 30], [11, 30]]), color, "cloth");
+        part(p, box(8, 8, 16, 3), trim, torn ? "cloth" : "metal"); line(p, [[11, 24], [21, 24]], trim, 2);
+        if (torn) { line(p, [[13, 13], [16, 17], [14, 20], [17, 23]], INK); line(p, [[19, 12], [18, 16]], INK); dot(p, 20, 27, INK); }
+        else line(p, [[12, 12], [12, 22]], shadeHex(color, 0.25));
+        break;
+      }
+      case "warbow": {
+        // A recurve war bow, taller than a bow: limbs sweeping forward, the tips flicking back, horn nocks, a red leather grip.
+        const limb: Pt[] = [[16, 1], [11, 3], [12, 8], [18, 11], [23, 16], [18, 21], [12, 24], [11, 29], [16, 31]];
+        line(p, [[11, 4], [11, 28]], "#efede7");
+        part(p, stroke(limb, 4), color, "wood");
+        line(p, [[13, 7], [18, 10], [22, 14]], shadeHex(color, 0.25)); line(p, [[22, 18], [18, 22], [13, 25]], shadeHex(color, -0.2));
+        for (const [x, y] of [[15, 1], [15, 31]] as Pt[]) part(p, disc(x, y, 1.6), "#3b3a38", "stone");
+        part(p, box(21, 13, 5, 7), "#8a4a3a", "cloth"); line(p, [[21, 15], [25, 15]], "#b3664f"); line(p, [[21, 17], [25, 17]], "#b3664f");
+        break;
+      }
+      case "crossbow": {
+        // A wooden stock (its accent) from butt to tip, big metal limbs across the front (the metal is the tier), the string drawn back.
+        const wood = accent ?? "#9c8672";
+        part(p, poly([[2, 26], [6, 30], [10, 26], [6, 22]]), shadeHex(wood, -0.15), "wood");
+        part(p, stroke([[6, 26], [22, 10]], 4), wood, "wood");
+        line(p, [[11, 23], [13, 27]], INK, 2);
+        line(p, [[12, 3], [17, 16]], "#efede7"); line(p, [[29, 20], [17, 16]], "#efede7");
+        part(p, stroke([[12, 3], [18, 4], [23, 8], [27, 13], [29, 20]], 4), color, "metal");
+        line(p, [[14, 4], [19, 5], [23, 9]], shadeHex(color, 0.3));
+        part(p, box(20, 8, 4, 4), shadeHex(color, -0.25), "metal");
+        line(p, [[17, 16], [25, 8]], "#8a6a50", 2); part(p, poly([[24, 6], [28, 4], [26, 9]]), color, "metal");
+        break;
+      }
+      case "bolts":
+        // Short, stubby bolts with big metal tips; unfeathered ones have bare tails.
+        for (const off of [-7, 0, 7]) {
+          line(p, [[9, 23 + off], [20, 12 + off]], "#8a6a50", 2);
+          if (accent !== "unf") { line(p, [[9, 23 + off], [11, 21 + off]], "#efede7", 2); dot(p, 8, 22 + off, "#cf6e6e"); }
+          part(p, poly([[18, 10 + off], [26, 6 + off], [22, 14 + off]]), color, "metal");
+        }
+        break;
+      case "limbs":
+        // A pair of crossbow limbs on their centre block.
+        part(p, stroke([[3, 22], [8, 15], [16, 12], [24, 15], [29, 22]], 3), color, "metal");
+        part(p, box(13, 10, 7, 6), shadeHex(color, -0.2), "metal"); dot(p, 16, 12, shadeHex(color, 0.3)); break;
+      case "stock":
+        // A carved crossbow stock: butt, grip and trigger, with the groove for a bolt along the top.
+        part(p, poly([[3, 26], [7, 21], [25, 7], [29, 10], [12, 26], [7, 30]]), color, "wood");
+        line(p, [[10, 22], [26, 9]], shadeHex(color, -0.25)); line(p, [[14, 24], [16, 28]], INK, 2); break;
       case "arrowheads":
         for (const [x, y] of [[9, 12], [20, 9], [14, 22], [24, 22]] as Pt[]) part(p, poly([[x, y - 6], [x + 5, y + 3], [x, y + 1], [x - 5, y + 3]]), color, "metal");
         break;

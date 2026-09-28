@@ -3,11 +3,11 @@
  * in-game guide (click a skill) and by the preview site's guide pages.
  */
 import {
-  BOWS, COOKING, CRAFTING, FIREMAKING, FISHING_SPOTS, FLETCH_ARROWS, FLETCH_BOWS, GEM_CUTTING, ITEM_LIST, METALS, MONSTERS, PRAYERS, ROCKS, SIGILCRAFT,
+  BOWS, COOKING, CRAFTING, CROSSBOWS, STOCKS, WAR_BOWS, FIREMAKING, FISHING_SPOTS, FLETCH_ARROWS, FLETCH_BOWS, GEM_CUTTING, ITEM_LIST, METALS, MONSTERS, PRAYERS, ROCKS, SIGILCRAFT,
   SKILL_NAMES, SLAYER_TASKS, SMELTING, SPELLS, TREES, sigilsPerStone, item, type Skill,
 } from "./data.ts";
 import { NPCS } from "./content.ts";
-import { STALLS, arrowRecipe, craftingRecipes, fletchingRecipes, headlessRecipe, smeltingRecipes, smithingRecipes } from "./engine.ts";
+import { STALLS, arrowRecipe, boltRecipe, craftingRecipes, crossbowRecipe, fletchingRecipes, headlessRecipe, smeltingRecipes, smithingRecipes } from "./engine.ts";
 import type { Recipe } from "./state.ts";
 
 export type GuideEntry = { level: number; name: string; detail: string; icon?: string; spell?: string };
@@ -26,7 +26,11 @@ export function skillGuide(skill: Skill): GuideEntry[] {
   const out: GuideEntry[] = [];
   const add = (level: number, name: string, detail: string, icon?: string) => out.push({ level, name, detail, icon });
   switch (skill) {
-    case "attack": case "defence": case "ranged": out.push(...gear(skill)); break;
+    case "attack": case "defence": out.push(...gear(skill)); break;
+    case "ranged":
+      out.push(...gear(skill));
+      for (const ammo of ITEM_LIST.filter(entry => entry.ammo)) add(ammo.ammo!.level, ammo.name, `${ammo.ammo!.bolt ? "Fired by any crossbow" : "Fired by any bow"} · +${ammo.ammo!.strength} strength`, ammo.id);
+      break;
     case "strength": add(1, "Aggressive style", "Train Strength by fighting in the Aggressive style. Every level raises your max hit."); break;
     case "hitpoints": add(10, "Hitpoints", "Every combat level-up you train raises your hitpoints. You regenerate 1 HP a minute; eat food to heal.");
       for (const food of ITEM_LIST.filter(entry => entry.heal).sort((a, b) => (a.heal ?? 0) - (b.heal ?? 0))) add(1, food.name, `Heals ${food.heal}`, food.id);
@@ -62,11 +66,15 @@ export function skillGuide(skill: Skill): GuideEntry[] {
     case "crafting":
       for (const entry of CRAFTING) add(entry.level, item(entry.product).name, `${entry.xp} XP · ${entry.leather} ${entry.hide ? item(entry.hide).name.toLowerCase() : "leather"}`, entry.product);
       for (const [rough, cut] of Object.entries(GEM_CUTTING)) add(cut.level, item(cut.cut).name, `${cut.xp} XP · cut with a chisel`, rough);
+      for (const bow of CROSSBOWS) add(bow.craft, item(`${bow.metal}_crossbow`).name, `${bow.xp} XP · ${item(`${bow.metal}_limbs`).name.toLowerCase()} on ${/^[aeiou]/i.test(item(bow.stock).name) ? "an" : "a"} ${item(bow.stock).name.toLowerCase()}`, `${bow.metal}_crossbow`);
       break;
     case "fletching":
       add(1, "Arrow shafts", "5 XP · a knife on any logs makes 15", "arrow_shaft"); add(1, "Headless arrows", "15 XP for 15 · feathers on shafts", "headless_arrow");
       for (const bow of FLETCH_BOWS) add(bow.level, item(bow.bow).name, `${bow.xp} XP · a knife on ${item(bow.log).name.toLowerCase()}`, bow.bow);
       for (const metal of METALS) add(FLETCH_ARROWS[metal.id].level, `${metal.name} arrows`, `${FLETCH_ARROWS[metal.id].xp} XP each · heads from the anvil`, `${metal.id}_arrow`);
+      for (const bow of WAR_BOWS) add(bow.fletch, bow.name, `${bow.xp} XP · a knife on 2 ${item(bow.log).name.toLowerCase()}`, bow.id);
+      for (const stock of STOCKS) add(stock.level, stock.name, `${stock.xp} XP · a knife on ${item(stock.log).name.toLowerCase()} (for a crossbow)`, stock.id);
+      for (const metal of METALS) { const recipe = boltRecipe(metal.id); add(recipe.level, `${metal.name} bolts`, `${recipe.xp / 12} XP each · feathers on unfeathered bolts from the anvil`, `${metal.id}_bolts`); }
       break;
     case "thieving":
       for (const npc of Object.values(NPCS)) if (npc.pickpocket) add(npc.pickpocket.level, `Pickpocket ${npc.name.toLowerCase()}`, `${npc.pickpocket.xp} XP · ${npc.pickpocket.coins[0]}–${npc.pickpocket.coins[1]} coins`);
@@ -98,6 +106,9 @@ export function recipeBook(): BookRecipe[] {
     ...FLETCH_BOWS.map(bow => fletchingRecipes(bow.log)[1]).map(at("Anywhere (knife on logs)")),
     at("Anywhere")(headlessRecipe()),
     ...METALS.map(metal => arrowRecipe(metal.id)).map(at("Anywhere")),
+    ...FLETCH_BOWS.flatMap(bow => fletchingRecipes(bow.log).slice(2)).map(at("Anywhere (knife on logs)")),
+    ...METALS.map(metal => boltRecipe(metal.id)).map(at("Anywhere (feathers on bolts)")),
+    ...CROSSBOWS.map(bow => crossbowRecipe(bow.metal)).map(at("Anywhere (limbs on a stock)")),
     ...SIGILCRAFT.map((altar): BookRecipe => ({ skill: "sigilcraft", label: item(altar.sigil).name, level: altar.level, xp: altar.xp, ticks: 1, inputs: { sigil_stone: 1 }, outputs: { [altar.sigil]: 1 }, where: `${item(altar.sigil).name.replace(" sigil", "")} altar` })),
   ];
 }
