@@ -6,6 +6,8 @@ import {
   type Bonuses, type EquipSlot, type MonsterDef, type Skill, type SpotKind, type WardrobeId,
 } from "./data.ts";
 import { createWorld, type World } from "./world.ts";
+import type { Daily } from "./daily.ts";
+import { LATEST_UPDATE } from "./updates.ts";
 
 export const TICK_MS = 600;
 /** Referrals: +15% XP for an hour of play, for both Friends, and 250 coins each. */
@@ -64,6 +66,8 @@ export type Player = {
   referralCapNoted?: boolean;
   /** Mounts you own from the stables, and the one you're riding. */
   mounts: string[]; mount: string | null;
+  /** The daily streak and challenges, and the newest update you've seen in the log. */
+  daily: Daily; seenUpdate: number;
   /** The mount you rode last (not saved), for the ride button. */
   lastMount?: string;
   /** The emote you're performing, and the tick it ends (not saved). */
@@ -146,7 +150,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
     style: "accurate", autocast: null, prayers: [], target: null, activity: null, combat: null,
     attackTimer: 0, eatTimer: 0, stunned: 0, regenTimer: 0, quests: {}, questData: {},
     wardrobe: [], worn: [], follower: null, courseStep: -1, kills: 0, deaths: 0, overhead: null, music: ["theme"],
-    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, referredBy: null, referrals: [], boostTicks: 0, referralTimes: [], mounts: [], mount: null,
+    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, referredBy: null, referrals: [], boostTicks: 0, referralTimes: [], mounts: [], mount: null, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false }, seenUpdate: LATEST_UPDATE,
     lastHitBy: null, created: Date.now(), queuedSpell: null, castTimer: 0,
   };
 }

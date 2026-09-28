@@ -6,6 +6,8 @@ import {
   type EquipSlot, type Skill, mountDef,
 } from "./data.ts";
 import { mountArt } from "./mountart.ts";
+import { CHEST_REWARD, DAY_MS, challengeProgress, challengeReward, challengeText, claimChallenge, claimChest, claimStreak, dailyWaiting, rewardText, rollDaily, streakReward, streakStatus } from "./daily.ts";
+import { LATEST_UPDATE, UPDATES } from "./updates.ts";
 import { MAX_QUEST_POINTS, NPCS, QUESTS, finalStage, questPoints } from "./content.ts";
 import {
   bankDeposit, bankDepositAll, bankDepositWorn, bankWithdraw, bonuses, combatLevel, count, isStaffEquipped, maxHp, maxPrayer, message, totalLevel, totalXp,
@@ -832,5 +834,77 @@ export function Orbs({ game, onRun, onRide, onMap, onZoom, onRotate, openMenu }:
       <div className="realm-zoom"><button type="button" onClick={() => onZoom(0.12)} aria-label="Zoom in">+</button><button type="button" onClick={() => onZoom(-0.12)} aria-label="Zoom out">−</button></div>
       <div className="realm-zoom"><button type="button" onClick={() => onRotate(-Math.PI / 4)} aria-label="Turn the camera left" title="Turn left (←)">⟲</button><button type="button" onClick={() => onRotate(Math.PI / 4)} aria-label="Turn the camera right" title="Turn right (→)">⟳</button></div>
     </div>
+  );
+}
+
+// ---------- The daily popup: the streak and challenges, and the update log ----------
+export type DailyTab = "daily" | "updates";
+export function DailyModal({ game, tab, onTab, onClose, refresh, openMenu }: { game: Game; tab: DailyTab; onTab: (tab: DailyTab) => void; onClose: () => void; refresh: () => void; openMenu?: OpenMenu }) {
+  const now = Date.now(), player = game.player;
+  rollDaily(game, now);
+  const status = streakStatus(game, now), daily = player.daily;
+  // Updates newer than the last one you'd seen when this opened stay marked New while it's open.
+  const [newSince] = useState(player.seenUpdate), unseen = LATEST_UPDATE > player.seenUpdate;
+  useEffect(() => { if (tab === "updates" && player.seenUpdate < LATEST_UPDATE) { player.seenUpdate = LATEST_UPDATE; refresh(); } }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  const untilReset = (Math.floor(now / DAY_MS) + 1) * DAY_MS - now, resetText = `${Math.floor(untilReset / 3_600_000)}h ${Math.floor(untilReset / 60_000) % 60}m`;
+  // The week of the cycle you're on: days already claimed, today's (to claim or claimed), and the days ahead.
+  const cycleStart = Math.floor((status.next - 1) / 7) * 7 + 1;
+  const iconOf = (day: number) => { const reward = streakReward(day), [id, n] = reward.items?.[reward.items.length - 1] ?? ["coins", reward.coins ?? 0]; return { id, n }; };
+  const claim = () => { claimStreak(game, now); refresh(); if (unseen) window.setTimeout(() => onTab("updates"), 900); };
+  const done = daily.claimed.length > 0 && daily.claimed.every(Boolean);
+  return (
+    <Modal title="The Realm Daily" onClose={onClose} wide>
+      <div className="realm-daily-tabs" role="tablist">
+        <button type="button" role="tab" aria-selected={tab === "daily"} onClick={() => onTab("daily")}>🔥 Daily streak{dailyWaiting(game, now) && <i className="realm-dot" aria-label="(something to claim)" />}</button>
+        <button type="button" role="tab" aria-selected={tab === "updates"} onClick={() => onTab("updates")}>📜 Updates{unseen && <i className="realm-dot" aria-label="(new)" />}</button>
+      </div>
+      {tab === "daily" ? (
+        <div className="realm-daily">
+          <div className="realm-streak-head">
+            <b>{status.canClaim ? (status.reset ? "Your streak ended. Start a new one today!" : status.streak ? `Day ${status.streak} streak. Keep it going!` : "Start your streak today!") : `🔥 Day ${daily.streak} streak`}</b>
+            <small>Best {Math.max(daily.best, daily.streak)} days · a new day in {resetText} (midnight UTC)</small>
+          </div>
+          <ol className="realm-streak">
+            {Array.from({ length: 7 }, (_, i) => cycleStart + i).map(day => {
+              const claimed = status.canClaim ? day < status.next : day <= daily.streak, today = day === status.next, icon = iconOf(day);
+              return <li key={day} className={`${claimed ? "claimed" : ""}${today ? " today" : ""}${day % 7 === 0 ? " big" : ""}`} title={`Day ${day}: ${rewardText(streakReward(day))}`}
+                {...rightClick(openMenu, () => [{ verb: "Examine", noun: `Day ${day}`, run: () => { message(game, `Day ${day} of your streak: ${rewardText(streakReward(day))}.`); refresh(); } }])}>
+                <small>Day {day}</small><ItemIcon slot={{ id: icon.id, n: icon.n }} size={40} bare />{claimed && <em aria-label="claimed">✓</em>}
+              </li>;
+            })}
+          </ol>
+          <div className="realm-buttons">
+            {status.canClaim ? <button type="button" className="realm-primary big" onClick={claim}>Claim day {status.next}: {rewardText(status.reward)}</button>
+              : <span className="realm-muted">Today's reward is claimed. Come back tomorrow for day {daily.streak + 1}: {rewardText(streakReward(daily.streak + 1))}.</span>}
+          </div>
+          <h3>Today's challenges <small>(the same for everyone)</small></h3>
+          <ul className="realm-challenges">
+            {daily.challenges.map((challenge, i) => {
+              const progress = challengeProgress(game, i), complete = progress >= challenge.target, reward = challengeReward(game, challenge);
+              return <li key={i} className={daily.claimed[i] ? "claimed" : complete ? "complete" : ""}>
+                <div><b>{challengeText(challenge)}</b><small>{rewardText(reward)}{challenge.kind === "xp" ? ` + ${Math.round(challenge.target * 0.1).toLocaleString()} XP` : ""}</small>
+                  <span className="realm-bar" role="progressbar" aria-valuemin={0} aria-valuemax={challenge.target} aria-valuenow={progress}><i style={{ width: `${(progress / challenge.target) * 100}%` }} /><em>{progress.toLocaleString()} / {challenge.target.toLocaleString()}</em></span></div>
+                {daily.claimed[i] ? <span className="realm-done">✓ Done</span> : <button type="button" className={complete ? "realm-primary" : ""} disabled={!complete}
+                  {...rightClick(openMenu, () => [...(complete ? [{ verb: "Claim", noun: challengeText(challenge), run: () => { claimChallenge(game, i); refresh(); } }] : []), { verb: "Examine", noun: challengeText(challenge), run: () => { message(game, `${challengeText(challenge)}: ${progress.toLocaleString()} of ${challenge.target.toLocaleString()} so far today.`); refresh(); } }])}
+                  onClick={() => { claimChallenge(game, i); refresh(); }}>Claim</button>}
+              </li>;
+            })}
+            <li className={daily.chest ? "claimed" : done ? "complete" : ""}>
+              <div><b>🎁 Daily chest</b><small>Finish all three challenges: {rewardText(CHEST_REWARD)}</small></div>
+              {daily.chest ? <span className="realm-done">✓ Opened</span> : <button type="button" className={done ? "realm-primary" : ""} disabled={!done} onClick={() => { claimChest(game); refresh(); }}>Open</button>}
+            </li>
+          </ul>
+        </div>
+      ) : (
+        <div className="realm-updates">
+          {UPDATES.map(update => (
+            <article key={update.id} className={update.id > newSince ? "new" : ""}>
+              <div className="realm-update-head"><b>{update.title}</b>{update.id > newSince && <span className="realm-new">New</span>}<small>{update.date}</small></div>
+              <ul>{update.items.map((line, i) => <li key={i}>{line}</li>)}</ul>
+            </article>
+          ))}
+        </div>
+      )}
+    </Modal>
   );
 }

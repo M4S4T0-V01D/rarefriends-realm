@@ -149,6 +149,15 @@ in a shop for its *Value*. Every trader buys back what it sells, and general sto
 Frostpeak and the Oasis) buy almost anything. What you sell goes on the shop's shelves with its count, so you can buy it
 back. The Rare Market's bundle list scrolls in a compact box.
 
+**The Realm Daily.** A popup greets you when you enter the Realm. The Daily streak tab pays a reward for every
+day you log in, on a seven-day cycle: 500 coins, 5 cakes, 1,000 coins, 10 inksharks, 2,000 coins, 100 each of four
+elemental sigils, then a Lamp of insight and 5,000 coins. Each full week you keep up adds 25% to the coins, up to +100%.
+Miss a day and it starts again at day 1. It also lists three challenges, the same for everyone that day (UTC):
+gain XP in two skills (scaled to your level) and defeat some monsters. Each pays coins and bonus XP, and all three
+open the daily chest (1,500 coins and a Lamp of insight). The Updates tab lists what's new in every update. It opens
+by itself after an update (or right after you claim your daily), and the 🔥 button on the minimap reopens the
+popup, with a red dot when something's waiting.
+
 **Mounts.** Marigold runs the Friendhollow stables, west of the castle, with a paddock where a chestnut, a dapple grey
 and a unicorn graze (right-click to *Stroke* them). She sells eight mounts for simulated RF. Like the Rare Market, RF
 buys Rare Caskets and the mount comes with them. Every mount gallops two tiles a tick without using run energy, and

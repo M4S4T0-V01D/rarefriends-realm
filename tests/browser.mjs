@@ -342,6 +342,22 @@ try {
   (await import("node:fs")).writeFileSync("./artifacts/adventurer-card.png", Buffer.from(card.data, "base64"));
   await game.getByRole("button", { name: "Close" }).click();
 
+  // ---------- The daily popup: claim the streak, see the challenges, read the update log ----------
+  await game.getByRole("button", { name: /Daily streak and updates/ }).click();
+  await game.getByRole("dialog", { name: "The Realm Daily" }).waitFor();
+  const coinsBefore = await state(() => window.__realm.game().player.inventory.reduce((n, slot) => n + (slot?.id === "coins" ? slot.n : 0), 0));
+  await game.getByRole("button", { name: /^Claim day 1/ }).click();
+  await game.getByText(/Day 1 streak|Day 1 of your streak/).first().waitFor();
+  assert.equal(await state(() => window.__realm.game().player.daily.streak), 1);
+  assert.equal(await state(() => window.__realm.game().player.inventory.reduce((n, slot) => n + (slot?.id === "coins" ? slot.n : 0), 0)), coinsBefore + 500, "day 1 pays 500 coins");
+  assert.equal(await game.locator(".realm-challenges li").count(), 4, "three challenges and the chest");
+  await shot("daily");
+  await game.getByRole("tab", { name: /Updates/ }).click();
+  await game.getByText("Daily streaks and this log").waitFor();
+  await shot("updates");
+  await page.keyboard.press("Escape");
+  await game.getByRole("dialog", { name: "The Realm Daily" }).waitFor({ state: "detached" });
+
   // ---------- Friendhollow Castle: real clicks up the spiral stairs to the King's floor and the roof ----------
   const levelNow = () => state(() => { const g = window.__realm.game(), p = g.player; return g.world.floors.find(f => p.y >= 240 && p.x >= f.x0 + f.dx && p.x <= f.x1 + f.dx && p.y >= f.y0 + f.dy && p.y <= f.y1 + f.dy)?.level ?? 0; });
   /** Stand beside a staircase on a storey, then click it (its first option climbs). */

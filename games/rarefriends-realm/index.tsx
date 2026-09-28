@@ -14,7 +14,7 @@ import {
 } from "./engine.ts";
 import { PITCH, VIEW, ZOOM, daylight, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
 import {
-  BankModal, ChatBox, ContextMenu, GuideModal, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
+  BankModal, ChatBox, ContextMenu, DailyModal, GuideModal, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
   cancelLongPress, longPress, rightClick, type MenuEntry, type Settings, type Tab,
 } from "./panels.tsx";
 import { REGULAR_SPRITES } from "./regulars.ts";
@@ -26,6 +26,9 @@ import { strikeAt, weatherAt, type Weather } from "./weather.ts";
 import { HOST_HELLO, HOST_STATE, SAVE_EXPORT, SAVE_EXPORT_RESULT, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, parseRoster, type ShareAction, type ShareOutcome } from "./roster.ts";
 import { RealmAudio, trackFor, trackById, type SfxName, type TrackId } from "./audio.ts";
 import { renderCard, shareText } from "./card.ts";
+import { dailyWaiting, rollDaily, streakStatus } from "./daily.ts";
+import { LATEST_UPDATE } from "./updates.ts";
+import type { DailyTab } from "./panels.tsx";
 import { skillArt } from "./icons.ts";
 import { T, isUnderground, isWater, realPoint, regionAt, terrainAt } from "./world.ts";
 import "@rarefriends/friendsdk/frame.css";
@@ -64,6 +67,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const [phase, setPhase] = useState<Phase>("loading"), [status, setStatus] = useState("Waking your Friend and unfolding the Realm…");
   const [, setVersion] = useState(0), [tab, setTab] = useState<Tab>("inventory"), [selection, setSelection] = useState<Selection>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; entries: MenuEntry[] } | null>(null), [modal, setModal] = useState<Modal>(null);
+  /** The daily popup's open tab (null when closed). */
+  const [dailyTab, setDailyTab] = useState<DailyTab | null>(null);
   const [hover, setHover] = useState(""), [toast, setToast] = useState<{ title: string; sub?: string } | null>(null), [drops, setDrops] = useState<XpDrop[]>([]);
   const [levelUps, setLevelUps] = useState<{ skill: Skill; level: number }[]>([]), [quest, setQuest] = useState<string | null>(null), [dead, setDead] = useState(false);
   const [settings, setSettingsState] = useState<Settings>(DEFAULT_SETTINGS), [roster, setRoster] = useState<OwnedFriend[]>([]), [rosterState, setRosterState] = useState<"waiting" | "ready" | "none">("waiting");
@@ -265,6 +270,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         if (now - tickAt.current > TICK_MS * 6) tickAt.current = now - TICK_MS;
         while (now - tickAt.current >= TICK_MS) {
           tick(state); tickAt.current += TICK_MS;
+          if (state.tick % 50 === 0) rollDaily(state, Date.now()); // a new UTC day brings new challenges
           // Playing together: tell the others where we are, follow whoever we're following, and count friends nearby.
           if (players.current.state.status !== "offline") window.parent.postMessage({ type: NET_PRESENCE, presence: presenceOf(state) }, "*");
           state.player.nearFriends = players.current.nearFriends(state);
@@ -506,7 +512,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       if (CAMERA_KEYS.has(key)) { held.current.add(key); event.preventDefault(); return; }
       const fn = /^f(10|[1-9])$/.exec(key);
       if (fn) { setTab(TABS[Number(fn[1]) - 1].id); event.preventDefault(); return; }
-      if (key === "escape") { setMenu(null); setModal(null); setGuide(null); setSelection(null); closeInterfaces(state); setLevelUps([]); refresh(); return; }
+      if (key === "escape") { setMenu(null); setModal(null); setDailyTab(null); setGuide(null); setSelection(null); closeInterfaces(state); setLevelUps([]); refresh(); return; }
       if (key === " " || key === "spacebar") {
         if (live.current.phase === "playing") {
           if (levelUpsRef.current.length && !state.dialogue) setLevelUps(list => list.slice(1));
@@ -568,6 +574,13 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     const at = realPoint(state.world, state.player.x, state.player.y);
     camera.current = { x: at.x, y: at.y, zoom: settings.zoom, angle: 0, pitch: PITCH.classic };
     if (!hasSave) { state.dialogue = null; message(state, "Tip: talk to the Realm Guide by the fountain, or right-click anything to see what you can do.", "info"); }
+    // The daily popup greets you: today's streak reward if it's waiting, otherwise what's new since you last played.
+    // (Automated runs open it from its button instead, so it never covers the world they click on.)
+    rollDaily(state, Date.now());
+    if (!navigator.webdriver) {
+      if (streakStatus(state, Date.now()).canClaim) setDailyTab("daily");
+      else if (state.player.seenUpdate < LATEST_UPDATE) setDailyTab("updates");
+    }
     setTimeout(() => canvas.current?.focus({ preventScroll: true }), 50);
   };
 
@@ -654,6 +667,10 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
                 {...rightClick((x, y, entries) => setMenu({ x, y, entries }), () => ([["North", 0], ["East", -Math.PI / 2], ["South", Math.PI], ["West", Math.PI / 2]] as const).map(([name, turn]) => ({ verb: `Look ${name}`, noun: "", run: () => {
                   const from = cameraGoal.current?.angle ?? camera.current.angle, goal = NORTH + turn; cameraGoal.current = { angle: goal + Math.round((from - goal) / (Math.PI * 2)) * Math.PI * 2, pitch: cameraGoal.current?.pitch ?? camera.current.pitch }; } })))}
                 onClick={() => { const from = cameraGoal.current?.angle ?? camera.current.angle; cameraGoal.current = { angle: NORTH + Math.round((from - NORTH) / (Math.PI * 2)) * Math.PI * 2, pitch: cameraGoal.current?.pitch ?? camera.current.pitch }; }}><i aria-hidden="true">▲</i><b>N</b></button>
+              <button type="button" className="realm-daily-btn" aria-label={`Daily streak and updates${dailyWaiting(state, Date.now()) || state.player.seenUpdate < LATEST_UPDATE ? " (something new)" : ""}`} title="Daily streak and updates"
+                onClick={() => setDailyTab(dailyWaiting(state, Date.now()) || state.player.seenUpdate >= LATEST_UPDATE ? "daily" : "updates")}
+                {...rightClick((x, y, entries) => setMenu({ x, y, entries }), () => [{ verb: "Open", noun: "Daily streak", run: () => setDailyTab("daily") }, { verb: "Open", noun: "Updates", run: () => setDailyTab("updates") }])}>
+                🔥{(dailyWaiting(state, Date.now()) || state.player.seenUpdate < LATEST_UPDATE) && <i className="realm-dot" />}</button>
               {netState.status !== "offline" && <span className="realm-online" title="Players in the Realm right now" onClick={() => setTab("friends")}>{netState.status === "online" ? `● ${netState.players} online` : "○ connecting"}</span>}
               {settings.dayNight !== false && (() => { const light = daylight(timeOfDay()); return <span className="realm-clock" title="Time of day">{light.label === "Night" ? "☾" : light.label === "Day" ? "☀" : "◐"} {light.label}</span>; })()}
             </div>
@@ -753,6 +770,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           )}
           {modal === "map" && <WorldMapModal game={state} onClose={() => setModal(null)} onTravel={(x, y) => { setModal(null); walkTo(state, x, y); marker.current = { x, y, at: performance.now(), red: false }; refresh(); }} />}
           {modal === "help" && <HelpModal onClose={() => setModal(null)} />}
+          {dailyTab && <DailyModal game={state} tab={dailyTab} onTab={setDailyTab} onClose={() => setDailyTab(null)} refresh={refresh} openMenu={(x, y, entries) => setMenu({ x, y, entries })} />}
           {modal === "card" && (
             <Modal title="Adventurer card" onClose={() => setModal(null)} wide>
               {cardUrl && <img className="realm-card" src={cardUrl} alt={`Adventurer card: Friend #${player.friendId}, total level ${totalLevel(player)}, combat ${combatLevel(player)}`} />}

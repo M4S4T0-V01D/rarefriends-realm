@@ -883,3 +883,43 @@ test("Referrals: at most five rewarded in any 24 hours; the rest wait for anothe
   assert(creditReferral(fresh, 6000, t0 + day + 5000), "credited the next day");
   assert(!creditReferral(game, 5000, t0 + 2 * day), "each Friend only once");
 });
+
+test("Daily: a streak that grows day by day and resets after a missed day, three shared challenges, the chest, and saves", async () => {
+  const { claimStreak, streakStatus, streakReward, rollDaily, challengeProgress, claimChallenge, claimChest, DAY_MS } = await import("../games/rarefriends-realm/daily.ts");
+  const game = newGame(), p = game.player, t0 = 20_000 * DAY_MS + 3_600_000;
+  p.inventory = p.inventory.map(() => null);
+  assert(streakStatus(game, t0).canClaim);
+  const coins = count(p, "coins");
+  assert(claimStreak(game, t0)); assert.equal(p.daily.streak, 1); assert.equal(count(p, "coins"), coins + 500, "day 1: 500 coins");
+  assert(!claimStreak(game, t0 + 60_000), "once a day");
+  for (let d = 1; d < 7; d++) assert(claimStreak(game, t0 + d * DAY_MS));
+  assert.equal(p.daily.streak, 7); assert(has(p, "insight_lamp"), "day 7: a lamp");
+  assert.equal(streakReward(8).coins, 625, "the second week pays 25% more");
+  assert(claimStreak(game, t0 + 9 * DAY_MS)); assert.equal(p.daily.streak, 1, "a missed day starts again"); assert.equal(p.daily.best, 7);
+  // Challenges: the same three for everyone on a day; progress from XP and kills gained since the day began.
+  const other = newGame({ friendId: 3412 }), day = t0 + 9 * DAY_MS;
+  rollDaily(game, day); rollDaily(other, day);
+  assert.deepEqual(game.player.daily.challenges.map(c => c.kind === "xp" ? c.skill : "kills"), other.player.daily.challenges.map(c => c.kind === "xp" ? c.skill : "kills"));
+  assert.equal(p.daily.challenges.length, 3);
+  assert(!claimChallenge(game, 0), "not done yet");
+  for (const [i, c] of p.daily.challenges.entries()) { if (c.kind === "xp") p.xp[c.skill] += c.target; else p.kills += c.target; assert.equal(challengeProgress(game, i), c.target); }
+  assert(!claimChest(game), "the chest waits for all three");
+  for (let i = 0; i < 3; i++) assert(claimChallenge(game, i));
+  assert(!claimChallenge(game, 0), "each once");
+  assert(claimChest(game)); assert(!claimChest(game));
+  assert(!rollDaily(game, day + 1000), "same day, same challenges");
+  const save = JSON.parse(JSON.stringify(serialize(game))), fresh = newGame(); assert(restore(fresh, save));
+  assert.deepEqual(fresh.player.daily, p.daily, "saved");
+  assert(rollDaily(fresh, day + DAY_MS) && fresh.player.daily.claimed.every(c => !c) && !fresh.player.daily.chest, "a new day, new challenges");
+  save.daily = { day: "x", challenges: [{ kind: "xp", skill: "hacking", target: 5 }] }; const bad = newGame(); restore(bad, save);
+  assert.equal(bad.player.daily.challenges.length, 0, "odd saves start fresh");
+});
+
+test("Updates: new players have seen the log; saves from before it see it once", async () => {
+  const { LATEST_UPDATE, UPDATES } = await import("../games/rarefriends-realm/updates.ts");
+  assert.equal(new Set(UPDATES.map(u => u.id)).size, UPDATES.length, "unique ids");
+  assert.deepEqual(UPDATES.map(u => u.id), [...UPDATES.map(u => u.id)].sort((a, b) => b - a), "newest first");
+  const game = newGame(); assert.equal(game.player.seenUpdate, LATEST_UPDATE);
+  const save = JSON.parse(JSON.stringify(serialize(game))); delete save.seenUpdate; const old = newGame(); restore(old, save);
+  assert.equal(old.player.seenUpdate, 0);
+});

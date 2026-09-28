@@ -328,3 +328,33 @@
 .realm-guide-inputs span { display: flex !important; align-items: center; font-size: 11px; font-weight: 700; }
 .realm-guide-inputs span[data-have="false"] { color: #b04a4a; }
 .realm-code { font-size: 14px; background: #f2e28f; color: #161616; padding: 1px 6px; border: 2px solid #161616; user-select: all; }
+
+/* The daily popup. */
+.realm-daily-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+.realm-daily-tabs button { position: relative; flex: 1; padding: 7px 10px !important; font-weight: 700; }
+.realm-daily-tabs button[aria-selected="true"] { background: var(--ink) !important; color: var(--gold) !important; }
+.realm-dot { position: absolute; top: -5px; right: -5px; width: 12px; height: 12px; border-radius: 50%; background: #e0463c; border: 2px solid var(--ink); }
+.realm-streak-head b { display: block; font-size: 15px; } .realm-streak-head small { color: var(--muted); }
+.realm-streak { list-style: none; display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin: 10px 0; padding: 0; }
+.realm-streak li { position: relative; display: grid; justify-items: center; gap: 2px; padding: 6px 2px 4px; background: #fbfaf6; border: 2px solid var(--ink); }
+.realm-streak li small { font-size: 10px; font-weight: 700; }
+.realm-streak li.big { background: var(--butter); }
+.realm-streak li.claimed { opacity: .55; } .realm-streak li.claimed em { position: absolute; right: 4px; top: 2px; font-style: normal; font-weight: 700; color: #3d7a3f; }
+.realm-streak li.today { outline: 3px solid var(--gold); box-shadow: 0 0 0 5px var(--ink); opacity: 1; }
+.realm-daily h3 small { font-weight: 400; color: var(--muted); }
+.realm-challenges { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+.realm-challenges li { display: flex; align-items: center; gap: 10px; padding: 6px 8px; background: #fbfaf6; border: 2px solid var(--ink); }
+.realm-challenges li > div { flex: 1; display: grid; gap: 3px; } .realm-challenges small { color: var(--muted); }
+.realm-challenges li.complete { background: #eef5e6; } .realm-challenges li.claimed { opacity: .6; }
+.realm-bar { position: relative; display: block; height: 14px; background: #e3e0d8; border: 1.5px solid var(--ink); }
+.realm-bar i { position: absolute; inset: 0 auto 0 0; background: #9fc48f; } .realm-bar em { position: relative; display: block; text-align: center; font-size: 10px; line-height: 11px; font-style: normal; font-weight: 700; }
+.realm-done { font-weight: 700; color: #3d7a3f; white-space: nowrap; }
+.realm-updates { display: grid; gap: 8px; }
+.realm-updates article { padding: 8px 10px; background: #fbfaf6; border: 2px solid var(--ink); }
+.realm-updates article.new { background: #fffbe6; box-shadow: 3px 3px 0 var(--gold); }
+.realm-update-head { display: flex; align-items: baseline; gap: 8px; font-size: 13px; } .realm-update-head small { margin-left: auto; color: var(--muted); }
+.realm-updates ul { margin: 5px 0 0; padding-left: 18px; } .realm-updates li { margin: 2px 0; }
+.realm-new { padding: 0 6px; font-size: 10px; font-weight: 700; background: #e0463c; color: #fff; border: 1.5px solid var(--ink); }
+.realm-daily-btn { position: absolute; right: -4px; top: -4px; z-index: 3; width: 34px; height: 34px; padding: 0 !important; display: grid; place-items: center; font-size: 17px; border-radius: 50%; background: var(--paper); border: 2px solid var(--ink); box-shadow: 2px 2px 0 #000; }
+.realm-daily-btn .realm-dot { top: -3px; right: -3px; }
+@media (max-width: 700px) { .realm-streak { gap: 3px; } .realm-streak li small { font-size: 8px; } }
