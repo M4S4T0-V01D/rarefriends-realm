@@ -457,6 +457,15 @@ function FriendsTab({ game, refresh, roster, rosterState, friendSprites, loadFri
     </div>
   );
 }
+/** A slider in the Realm's style: a chunky groove filled in gold up to the value, a pixel knob, and the value shown. */
+function Slider({ label, min, max, value, unit = "", onChange }: { label: string; min: number; max: number; value: number; unit?: string; onChange: (value: number) => void }) {
+  const fill = `${((value - min) / Math.max(1, max - min)) * 100}%`;
+  return (
+    <label className="realm-range"><span>{label}<b>{value}{unit}</b></span>
+      <input className="realm-slider" type="range" min={min} max={max} value={value} style={{ "--fill": fill } as React.CSSProperties} onChange={event => onChange(Number(event.target.value))} />
+    </label>
+  );
+}
 function SettingsTab({ game, settings, setSettings, trackName, trackId, playTrack, openHelp, saved, refresh, openMenu, net, onOnline, onExportSave, onRestoreSave, backupStatus, onLogout }: PanelProps) {
   const set = (patch: Partial<Settings>) => setSettings({ ...settings, ...patch });
   const [code, setCode] = useState(""), [confirming, setConfirming] = useState(false), [restoreNote, setRestoreNote] = useState("");
@@ -473,10 +482,10 @@ function SettingsTab({ game, settings, setSettings, trackName, trackId, playTrac
         })}
       </ul>
       <label className="realm-check"><input type="checkbox" checked={settings.music} onChange={event => set({ music: event.target.checked })} /> Music <small>({trackName})</small></label>
-      <label className="realm-range">Music volume <input type="range" min={0} max={100} value={Math.round(settings.musicVolume * 100)} onChange={event => set({ musicVolume: Number(event.target.value) / 100 })} /></label>
+      <Slider label="Music volume" min={0} max={100} value={Math.round(settings.musicVolume * 100)} unit="%" onChange={value => set({ musicVolume: value / 100 })} />
       <label className="realm-check"><input type="checkbox" checked={settings.sfx} onChange={event => set({ sfx: event.target.checked })} /> Sound effects</label>
-      <label className="realm-range">Effects volume <input type="range" min={0} max={100} value={Math.round(settings.sfxVolume * 100)} onChange={event => set({ sfxVolume: Number(event.target.value) / 100 })} /></label>
-      <label className="realm-range">Zoom <input type="range" min={55} max={300} value={Math.round(settings.zoom * 100)} onChange={event => set({ zoom: Number(event.target.value) / 100 })} /></label>
+      <Slider label="Effects volume" min={0} max={100} value={Math.round(settings.sfxVolume * 100)} unit="%" onChange={value => set({ sfxVolume: value / 100 })} />
+      <Slider label="Zoom" min={55} max={300} value={Math.round(settings.zoom * 100)} unit="%" onChange={value => set({ zoom: value / 100 })} />
       <label className="realm-check"><input type="checkbox" checked={net?.status !== "offline"} onChange={event => onOnline?.(event.target.checked)} /> Online: see and meet other players</label>
       <label className="realm-check"><input type="checkbox" checked={settings.weather !== false} onChange={event => set({ weather: event.target.checked })} /> Weather (rain, storms, fog)</label>
       <div className="realm-graphics" role="radiogroup" aria-label="Graphics">

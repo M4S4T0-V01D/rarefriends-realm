@@ -506,8 +506,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     const nearest = (points: Iterable<{ x: number; y: number }>) => { let best = Infinity; for (const p of points) best = Math.min(best, Math.hypot(p.x - me.x, p.y - me.y)); return best; };
     if (clock.rain <= 0) {
       const wall = Date.now(), weather = live.current.settings.weather === false ? null : fixedWeather ?? weatherAt(wall, regionAt(state.world, me.x, me.y).id, isUnderground(me.y), null);
-      if (weather && weather.rain > 0.05) player.sfx("rain", weather.rain * 0.8);
-      clock.rain = 0.8;
+      player.setRain(weather ? weather.rain : 0);
+      clock.rain = 0.6;
     }
     if (clock.fire <= 0) {
       const fires = [...state.fires, ...state.world.objects.filter(o => o.decor === "torch" && Math.abs(o.x - me.x) < 8 && Math.abs(o.y - me.y) < 8)], d = nearest(fires);

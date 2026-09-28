@@ -411,9 +411,30 @@ export class RealmAudio {
     }
   }
 
+  // ---------- Rain: a continuous bed of soft noise that swells and fades with the weather (no rhythm) ----------
+  private rainGain: GainNode | null = null;
+  setRain(level: number) {
+    const ctx = this.ctx;
+    if (!ctx || ctx.state !== "running") return;
+    if (!this.rainGain) {
+      // Four seconds of its own noise, so the loop never pulses audibly.
+      const buffer = ctx.createBuffer(1, ctx.sampleRate * 4, ctx.sampleRate), data = buffer.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      const source = ctx.createBufferSource(); source.buffer = buffer; source.loop = true;
+      const band = ctx.createBiquadFilter(); band.type = "bandpass"; band.frequency.value = 2200; band.Q.value = 0.4;
+      const soft = ctx.createBiquadFilter(); soft.type = "lowpass"; soft.frequency.value = 5200;
+      this.rainGain = ctx.createGain(); this.rainGain.gain.value = 0;
+      source.connect(band).connect(soft).connect(this.rainGain).connect(this.sfxBus); source.start();
+    }
+    const target = this.sfxOn && !this.muted ? Math.max(0, Math.min(1, level)) * 0.05 : 0;
+    this.rainGain.gain.setTargetAtTime(target, ctx.currentTime, 1.2);
+  }
+
   // ---------- Sound effects ----------
   /** A sound effect; `gain` scales it (for distance). */
   sfx(name: SfxName, gain = 1) {
+    // Automated runs keep a log of every sound asked for (to track down noises).
+    if (typeof navigator !== "undefined" && navigator.webdriver) { const log = ((globalThis as unknown as { __sfxLog?: string[] }).__sfxLog ??= []); log.push(name); if (log.length > 500) log.shift(); }
     if (!this.ctx || this.ctx.state !== "running" || !this.sfxOn || this.muted || gain <= 0.01) return;
     const now = this.ctx.currentTime, last = this.lastSfx.get(name) ?? 0;
     if (now - last < 0.05) return;

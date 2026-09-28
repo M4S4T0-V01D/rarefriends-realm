@@ -4,6 +4,10 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 21, date: "2026-09-28", title: "Softer rain, clearer settings", items: [
+    "Rain is now a soft, steady wash of sound that swells and fades with the weather, instead of a ticking hiss that sounded like footsteps.",
+    "Settings has pixel sliders for music, effects and zoom (with their values shown), and the Graphics choice (Auto, High, Low) is easy to read.",
+  ] },
   { id: 20, date: "2026-09-28", title: "Redrawn food, bones and ores", items: [
     "Every fish has its own look: minnows swim in a little school, perch are striped, carp are golden and scaly, char have red bellies, grayling and sailfish raise their tall fins, the inkshark is a shark and the inkcrab is a crab.",
     "Chicken is a drumstick and beef is a steak with a rim of fat. Cooked food is browned with grill marks, and burnt food is a charred lump with a wisp of smoke.",
