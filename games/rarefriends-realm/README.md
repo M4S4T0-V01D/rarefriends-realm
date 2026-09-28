@@ -154,6 +154,10 @@ horses at the stables, climb the castle to meet King Hollis, and open the Realm 
 step, a gold arrow (and a star on the minimap) points the way, and each step completes itself from what you do. The last
 one pays 500 coins and a Lamp of insight. Skip it any time; older saves never see it.
 
+**The viewport.** The game plays on a fixed 960 × 640 stage inside the SDK's own frame (its default 3:2 viewport),
+scaled to fit the page and centred. The world is far larger and scrolls under a camera, and every menu, panel and HUD
+element stays inside the stage.
+
 **Graphics and performance.** Settings → Graphics offers Auto, High and Low. Low turns off the pixel textures, ambient
 life, cloud shadows, footprints and fog, lightens the rain, shortens the view and draws at 1× on high-DPI screens. Auto
 starts on High and drops to Low (saying so, once) if the frame rate stays under about 36 fps for five seconds. The browser

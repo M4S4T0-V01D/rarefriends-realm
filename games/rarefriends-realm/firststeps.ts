@@ -25,7 +25,7 @@ export const FIRST_STEPS: readonly FirstStep[] = [
     done: game => game.player.xp.fishing > 0, target: game => nearest(game, objects(game, object => object.kind === "spot" && object.spot === "net")) },
   { id: "cook", title: "Cook your catch", text: "Use the raw fish on a fire, or on the cooking range in the Sleepy Friend inn.",
     done: game => game.player.xp.cooking > 0, target: game => nearest(game, [...game.fires, ...objects(game, object => object.kind === "range")]) },
-  { id: "horses", title: "Meet the horses", text: "Visit the stables west of the castle and right-click a horse in the paddock to Stroke it. Mounts are sold here, and carry you faster than you can run.",
+  { id: "horses", title: "Meet the horses", text: "Visit the stables beside the Rare Market (west of the fountain) and right-click a horse in the paddock to Stroke it. Mounts are sold here, and carry you faster than you can run.",
     done: game => (game.player.stats.strokes ?? 0) > 0, target: game => npc(game, "paddock_unicorn") ?? npc(game, "paddock_horse") },
   { id: "king", title: "Meet King Hollis", text: "Climb the castle's spiral stairs (click them) to the King's hall on the first floor, and talk to him.",
     done: game => !!game.player.questData.royal_audience, target: game => { const king = npc(game, "king"); return king && { x: king.x, y: king.y, lift: 20 }; } },

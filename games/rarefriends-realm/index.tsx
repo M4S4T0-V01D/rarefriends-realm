@@ -116,8 +116,9 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     if (!node) return;
     const measure = () => {
       const width = node.clientWidth || 960, height = node.clientHeight || 640;
-      const scale = Math.max(0.7, Math.min(1.35, Math.min(width / 960, height / 640)));
-      const logical = { width: Math.round(width / scale), height: Math.round(height / scale), scale };
+      // A fixed 960 × 640 stage (the SDK's viewport), scaled to fit the frame and centred in it.
+      const scale = Math.min(width / 960, height / 640);
+      const logical = { width: 960, height: 640, scale };
       VIEW.width = logical.width; VIEW.height = logical.height; setSize(logical); setSideOpen(logical.width >= 900 || logical.height >= 560);
       const view = canvas.current;
       // Low graphics draws at one pixel per CSS pixel (a sharp screen at 2× costs four times the pixels).
@@ -756,7 +757,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     <div ref={root} className="realm-game" data-phase={phase} data-tick={state?.tick ?? 0} data-region={state ? regionAt(state.world, state.player.x, state.player.y).id : ""}
       data-total={player ? totalLevel(player) : 0} data-hp={player?.hp ?? 0} data-quests={state ? questPoints(state) : 0} data-hosted={hosted}
       onContextMenu={event => event.preventDefault()}>
-      <div ref={stage} className="realm-stage" style={{ width: size.width, height: size.height, transform: `scale(${size.scale})`, "--toolbar": `${Math.ceil(54 / size.scale)}px` } as CSSProperties}>
+      <div ref={stage} className="realm-stage" style={{ width: size.width, height: size.height, left: `calc(50% - ${size.width * size.scale / 2}px)`, top: `calc(50% - ${size.height * size.scale / 2}px)`, transform: `scale(${size.scale})`, "--toolbar": `${Math.ceil(54 / size.scale)}px` } as CSSProperties}>
         <canvas ref={canvas} className="realm-view" tabIndex={0} aria-label="The Realm. Left-click to act, right-click for options, WASD to walk."
           style={{ width: size.width, height: size.height }}
           onPointerMove={onPointerMove} onPointerDown={onPointerDown} onPointerUp={onPointerUp} onPointerCancel={() => { cancelLongPress(); orbit.current = null; }}

@@ -14,7 +14,7 @@
  * All of them reach the sandboxed game only over postMessage, when it asks. The watcher session only uses
  * `eth_accounts`: no signing and no extra prompts. GameHost still owns connection and selection.
  */
-import { useEffect, type CSSProperties } from "react";
+import { useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { GameHost } from "@rarefriends/friendsdk/runtime";
 import { parseChanceGame } from "@rarefriends/friendsdk/game";
@@ -128,7 +128,8 @@ function RealmHost() {
   }, []);
   // The same wide layout as games/rarefriends-realm/host.css, set on the wrapper as HOST_INTEGRATION.md describes.
   return (
-    <div style={{ "--rf-game-max-width": "1280px", "--rf-game-aspect-ratio": "16 / 9" } as CSSProperties}>
+    // The SDK's own frame: a 960 × 640 viewport (3:2), which the game's stage fills exactly.
+    <div>
       <GameHost definition={definition} frameUrl="./game.html" />
       <p style={{ margin: "10px auto 0", maxWidth: 1280, textAlign: "center", font: "13px ui-monospace, Menlo, Consolas, monospace" }}>
         <a href="./preview/#trailer">▶ Watch the trailer</a> · <a href="./preview/">About the game</a> · <a href="./preview/guides.html">Skill guides</a>
