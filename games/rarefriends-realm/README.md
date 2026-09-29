@@ -47,7 +47,7 @@ XP follows the classic curve (83 XP for level 2, 13,034,431 for 99), multiplied 
 | Firemaking | Light logs (same levels as Woodcutting) | Fires last about a minute; cook on them |
 | Fletching | A knife on logs: 15 arrow shafts, a bow (Shortbow 5, Oak 20, Willow 35, Maple 50, Yew 65, Ashwood 80), a war bow from two logs (10, 25, 40, 55, 70, 85) or a crossbow stock (wooden 9, oak 24, willow 39, maple 54, yew 69, ashwood 84); feathers on shafts; arrowheads on headless arrows (pewter 1 … rarite 75); feathers on unfeathered bolts (pewter 5 … rarite 79) | Arrowheads (15 a bar), unfeathered bolts (12 a bar) and crossbow limbs (2 bars) are smithed at the anvil. Limbs on their stock make a crossbow with Crafting (pewter 8, blackiron 18, ashsteel 28, moonsilver 42, glimmer 56, rarite 70) |
 | Fishing | Net 1 (minnows), Bait 5/10 (perch, carp), Lure 20/30 (char, grayling), Cage 40 (inkcrab), Harpoon 50 (sailfish), Deep 76 (inkshark) | Bait and feathers are used up |
-| Cooking | Ranges and fires | Burn chance falls with level, to zero at the stop-burn level |
+| Cooking | Ranges and fires | About a third burn at the food's own level (a little more on a fire), falling to none at its stop-burn level (minnows 18, chicken and beef 20) |
 | Mining | Clay/Pewter 1, Blackiron 15, Inkcoal 30, Gems 40, Moonsilver 55, Glimmer 70, Rarite 85 | 1/256 random gem per swing |
 | Smithing | Furnace (pewter 1, blackiron 15 at 60%, ashsteel 30, moonsilver 50, glimmer 70, rarite 85; the higher metals add 1–4 inkcoal), then the forged metals from monster materials (frostsilver 86, gloomsteel 88, wyrmscale 90, hollowsteel 92, cindersteel 94, ashenheart 96, with 4–6 inkcoal); and the anvil | Dagger, axe, sword, pickaxe, helm, sabre, greaves, shield, cuirass in twelve metals; the forged metals also make a staff |
 | Crafting | Leather (gloves 1 … leggings 18), gems (moonstone 20, sagestone 27, rosestone 34) | Tessa tans hides for 2 coins each |
@@ -190,6 +190,18 @@ there isn't. Hovering the online badge shows how many relays are connected and h
 **The viewport.** The game plays on a fixed 960 × 640 stage inside the SDK's own frame (its default 3:2 viewport),
 scaled to fit the page and centred. The world is far larger and scrolls under a camera, and every menu, panel and HUD
 element stays inside the stage.
+
+**The bank.** Click to withdraw or deposit (right-click for amounts). Drag an item onto another to move it, onto a tab
+to file it there, or onto + to open a new tab (up to nine; each shows its first item). The ∞ tab shows everything, deposits
+go into the tab you're looking at, and a tab closes when it's emptied. Right-click an item to move it between tabs without
+dragging.
+
+**The inkcoal satchel.** Worn on your back (or carried), it holds 120 inkcoal: inkcoal you mine goes into it while there's
+room, and the furnace and Forgeheart take from it first. Right-click it to check, fill or empty it; use inkcoal on it to fill
+it. The Old miner at the Ashen mine sells them, or stitch one from 3 leather and thread at Crafting 28.
+
+**The Millpond**, south of the Hollow Farms windmill, has two net spots (minnows) and a bait spot (perch, carp) for new
+Friends. **The Grumblin head** is a very rare drop (1 in 500 from Grumblins, 1 in 50 from the chief), worn on your head.
 
 **Signs, banners and logging out.** Every shop and bank has a hanging sign outside its door, painted with what's sold
 inside (coins for banks, a horse for the stables). Banners of your own Friend, in the scenery's pixel style, fly around the

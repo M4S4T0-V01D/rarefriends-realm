@@ -17,6 +17,10 @@ export const REFERRALS_PER_DAY = 5, DAY_MS = 86_400_000;
 export const INVENTORY_SIZE = 28;
 export const BANK_SIZE = 400;
 export type Slot = { id: string; n: number };
+/** A bank slot: an item, how many, and the bank tab it's filed in (0 or missing: the main tab). */
+export type BankSlot = Slot & { tab?: number };
+/** Bank tabs besides the main one. */
+export const BANK_TABS = 9;
 /** Screen facing of a sprite; the renderer derives it from a world heading and the camera angle. */
 export type Facing = "up" | "down" | "left" | "right";
 export type Point = { x: number; y: number };
@@ -49,7 +53,7 @@ export type Player = {
   x: number; y: number; prev: Point; heading: Point; moved: number;
   path: Point[]; run: boolean; energy: number;
   xp: Record<Skill, number>; hp: number; prayer: number;
-  inventory: (Slot | null)[]; equipment: Partial<Record<EquipSlot, string>>; bank: Slot[];
+  inventory: (Slot | null)[]; equipment: Partial<Record<EquipSlot, string>>; bank: BankSlot[];
   style: CombatStyle; autocast: string | null; prayers: string[];
   target: Target | null; activity: Activity | null; combat: number | null;
   attackTimer: number; eatTimer: number; stunned: number; regenTimer: number;
@@ -62,6 +66,8 @@ export type Player = {
   lastHitBy: number | null; created: number; queuedSpell: string | null; castTimer: number;
   /** Referrals: the Friend whose code you used, the Friends who used yours, and ticks of referral XP boost left. */
   referredBy: number | null; referrals: number[]; boostTicks: number;
+  /** Inkcoal kept in the inkcoal satchel. */
+  coalBag: number;
   /** When (wall-clock ms) your recent referrals were credited: at most REFERRALS_PER_DAY in any 24 hours. */
   referralTimes: number[];
   /** You've been told today's referral limit is reached (not saved). */
@@ -165,7 +171,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
     style: "accurate", autocast: null, prayers: [], target: null, activity: null, combat: null,
     attackTimer: 0, eatTimer: 0, stunned: 0, regenTimer: 0, quests: {}, questData: {},
     wardrobe: [], worn: [], follower: null, courseStep: -1, kills: 0, deaths: 0, overhead: null, music: ["theme"],
-    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false }, seenUpdate: LATEST_UPDATE,
+    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false }, seenUpdate: LATEST_UPDATE,
     lastHitBy: null, created: Date.now(), queuedSpell: null, castTimer: 0,
   };
 }
@@ -302,26 +308,43 @@ export function dropItem(game: Game, id: string, n: number, x: number, y: number
   if (game.ground.length > 400) game.ground.splice(0, game.ground.length - 400);
 }
 
+// ---------- The inkcoal satchel ----------
+export const SATCHEL = "inkcoal_satchel", SATCHEL_SIZE = 120;
+/** Worn on your back or carried, the satchel catches the inkcoal you mine and feeds the furnace. */
+export const hasSatchel = (player: Player) => player.equipment.cape === SATCHEL || has(player, SATCHEL);
+/** How many of an item you can use in a recipe: your pack, plus the satchel's inkcoal. */
+export const stock = (player: Player, id: string) => count(player, id) + (id === "inkcoal" && hasSatchel(player) ? player.coalBag : 0);
+/** Use up items for a recipe, taking inkcoal from the satchel first. */
+export function useUp(player: Player, id: string, n: number) {
+  if (id === "inkcoal" && hasSatchel(player)) { const fromBag = Math.min(n, player.coalBag); player.coalBag -= fromBag; n -= fromBag; }
+  if (n > 0) take(player, id, n);
+}
+
 // ---------- Bank ----------
-export function bankDeposit(player: Player, slotIndex: number, n = Infinity) {
+/** Add to the bank: onto the item's existing stack, or as a new slot at the end of `tab`. */
+function bankAdd(player: Player, id: string, n: number, tab = 0) {
+  const entry = player.bank.find(bank => bank.id === id);
+  if (entry) { entry.n += n; return; }
+  const slot: BankSlot = tab ? { id, n, tab } : { id, n }, last = player.bank.map(bank => bank.tab ?? 0).lastIndexOf(tab);
+  if (tab && last >= 0) player.bank.splice(last + 1, 0, slot); else player.bank.push(slot);
+}
+export function bankDeposit(player: Player, slotIndex: number, n = Infinity, tab = 0) {
   const slot = player.inventory[slotIndex];
   if (!slot) return false;
   const moving = Math.min(n, count(player, slot.id)), id = slot.id;
   if (!player.bank.some(entry => entry.id === id) && player.bank.length >= BANK_SIZE) return false;
   take(player, id, moving);
-  const entry = player.bank.find(bank => bank.id === id);
-  if (entry) entry.n += moving; else player.bank.push({ id, n: moving });
+  bankAdd(player, id, moving, tab);
   return true;
 }
-export function bankDepositAll(player: Player) {
-  for (let index = 0; index < player.inventory.length; index++) if (player.inventory[index]) bankDeposit(player, index);
+export function bankDepositAll(player: Player, tab = 0) {
+  for (let index = 0; index < player.inventory.length; index++) if (player.inventory[index]) bankDeposit(player, index, Infinity, tab);
 }
-export function bankDepositWorn(player: Player) {
+export function bankDepositWorn(player: Player, tab = 0) {
   for (const slot of EQUIP_SLOTS) {
     const id = player.equipment[slot];
     if (!id) continue;
-    const entry = player.bank.find(bank => bank.id === id);
-    if (entry) entry.n++; else player.bank.push({ id, n: 1 });
+    bankAdd(player, id, 1, tab);
     delete player.equipment[slot];
   }
   if (player.autocast && !isStaffEquipped(player)) player.autocast = null;
@@ -333,8 +356,31 @@ export function bankWithdraw(player: Player, id: string, n: number) {
   const moving = Math.max(0, Math.min(n, entry.n, room));
   if (!moving) return 0;
   give(player, id, moving); entry.n -= moving;
-  if (entry.n <= 0) player.bank.splice(player.bank.indexOf(entry), 1);
+  if (entry.n <= 0) { player.bank.splice(player.bank.indexOf(entry), 1); compactBankTabs(player); }
   return moving;
+}
+/** The bank tabs in use besides the main one, in order (1, 2, 3…). */
+export const bankTabs = (player: Player) => [...new Set(player.bank.map(slot => slot.tab ?? 0).filter(tab => tab > 0))].sort((a, b) => a - b);
+/** Renumber tabs so they run 1, 2, 3… with no gaps (a tab disappears when it's emptied). */
+export function compactBankTabs(player: Player) {
+  const tabs = bankTabs(player);
+  for (const slot of player.bank) { const tab = slot.tab ?? 0; if (tab) slot.tab = tabs.indexOf(tab) + 1; else delete slot.tab; }
+}
+/** The bank in display order: the main tab first, then each tab in turn, each in its own order. */
+export const bankInOrder = (player: Player) => [...player.bank].sort((a, b) => (a.tab ?? 0) - (b.tab ?? 0));
+/** Move a bank item to just before another (taking that item's tab), or to the end of `tab` when `before` is null. Tab "new" opens a new tab. */
+export function bankMove(player: Player, id: string, before: string | null, tab?: number | "new") {
+  const from = player.bank.findIndex(slot => slot.id === id);
+  if (from < 0 || id === before) return false;
+  const [moving] = player.bank.splice(from, 1);
+  const target = before ? player.bank.find(slot => slot.id === before) : undefined;
+  let newTab = target ? target.tab ?? 0 : tab === "new" ? Math.min(BANK_TABS, (bankTabs(player).at(-1) ?? 0) + 1) : tab ?? moving.tab ?? 0;
+  if (tab === "new" && bankTabs(player).length >= BANK_TABS) newTab = BANK_TABS;
+  if (newTab) moving.tab = newTab; else delete moving.tab;
+  if (target) player.bank.splice(player.bank.indexOf(target), 0, moving);
+  else { const last = player.bank.map(slot => slot.tab ?? 0).lastIndexOf(newTab); player.bank.splice(last + 1, 0, moving); }
+  compactBankTabs(player);
+  return true;
 }
 
 // ---------- Equipment ----------

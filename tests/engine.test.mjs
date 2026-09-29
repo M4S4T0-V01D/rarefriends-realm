@@ -9,7 +9,7 @@ import { currentTask, slayerPoints } from "../games/rarefriends-realm/slayer.ts"
 import { ITEM_LIST, MONSTERS, MOUNTS, SHOPS, SKILLS, SPELLS, TREES, XP_RATE, XP_TABLE, item, levelForXp } from "../games/rarefriends-realm/data.ts";
 import { NPCS, QUESTS, MAX_QUEST_POINTS, questPoints, onMonsterKilled } from "../games/rarefriends-realm/content.ts";
 import { FLOOR_Y, H, REGIONS, T, W, createWorld, floorAt, objectAtTile, onLevel, realPoint, regionAt, terrainAt } from "../games/rarefriends-realm/world.ts";
-import { addXp, combatLevel, count, earlyXp, give, has, level, xpMultiplier } from "../games/rarefriends-realm/state.ts";
+import { addXp, bankDeposit, bankInOrder, bankMove, bankTabs, bankWithdraw, combatLevel, count, earlyXp, give, has, level, xpMultiplier } from "../games/rarefriends-realm/state.ts";
 import game from "../games/rarefriends-realm/game.json" with { type: "json" };
 
 const fletchingRecipesFor = (g, log) => { const knife = g.player.inventory.findIndex(slot => slot?.id === "knife"), logs = g.player.inventory.findIndex(slot => slot?.id === log); useItemOnItem(g, knife, logs); const recipes = g.ui.production.recipes; g.ui.production = null; return recipes; };
@@ -268,6 +268,53 @@ test("Forged tiers (50–90): materials from strong monsters, smelted and smithe
   assert(has(p, "frostsilver_staff") && has(p, "frostsilver_pickaxe"));
   // Frostsilver is on sale in Frostpeak, for those with the coin.
   assert(SHOPS.frost.stock.includes("frostsilver_sword"));
+});
+
+test("Bank tabs: deposit into a tab, drag to reorder and between tabs, empty tabs close up, and tabs survive a save", () => {
+  const g = newGame(), p = g.player;
+  p.inventory.fill(null); p.bank = [];
+  for (const id of ["logs", "oak_logs", "pewter_bar", "raw_minnows"]) give(p, id, 2);
+  bankDeposit(p, p.inventory.findIndex(slot => slot?.id === "logs"));
+  bankDeposit(p, p.inventory.findIndex(slot => slot?.id === "oak_logs"));
+  bankDeposit(p, p.inventory.findIndex(slot => slot?.id === "pewter_bar"), Infinity, 1);
+  bankDeposit(p, p.inventory.findIndex(slot => slot?.id === "raw_minnows"), Infinity, 1);
+  assert.deepEqual(bankTabs(p), [1]);
+  assert.deepEqual(bankInOrder(p).map(slot => `${slot.id}:${slot.tab ?? 0}`), ["logs:0", "oak_logs:0", "pewter_bar:1", "raw_minnows:1"]);
+  // Drag oak logs before the logs (reorder), then minnows onto a new tab, then the bar onto the logs (the main tab).
+  bankMove(p, "oak_logs", "logs"); assert.deepEqual(p.bank.filter(slot => !slot.tab).map(slot => slot.id), ["oak_logs", "logs"]);
+  bankMove(p, "raw_minnows", null, "new"); assert.deepEqual(bankTabs(p), [1, 2]);
+  bankMove(p, "pewter_bar", "logs");
+  assert.deepEqual(bankTabs(p), [1], "tab 1 emptied, so tab 2 became tab 1");
+  assert.equal(p.bank.find(slot => slot.id === "raw_minnows").tab, 1);
+  const fresh = newGame(); restore(fresh, serialize(g));
+  assert.deepEqual(bankInOrder(fresh.player).map(slot => `${slot.id}:${slot.tab ?? 0}`), bankInOrder(p).map(slot => `${slot.id}:${slot.tab ?? 0}`));
+  bankWithdraw(p, "raw_minnows", 2); assert.deepEqual(bankTabs(p), []);
+});
+
+test("Inkcoal satchel: mined inkcoal goes in, the furnace takes from it, and it's saved", () => {
+  const g = newGame(), p = g.player;
+  p.inventory.fill(null); give(p, "inkcoal_satchel"); give(p, "pewter_pickaxe"); p.xp.mining = XP_TABLE[40]; p.xp.smithing = XP_TABLE[40];
+  const rock = objectNear(g, "rock", object => object.rock === "inkcoal");
+  standBy(g, rock); setTarget(g, { kind: "object", id: rock.id, option: "Mine" });
+  until(g, () => p.coalBag > 0, 800);
+  assert.equal(count(p, "inkcoal"), 0, "into the satchel, not the pack");
+  p.coalBag = 10; give(p, "blackiron_ore", 2);
+  const furnace = g.world.objects.find(object => object.kind === "furnace");
+  standBy(g, furnace);
+  startProduction(g, smeltingRecipes().find(recipe => recipe.outputs.ashsteel_bar), 2); until(g, () => count(p, "ashsteel_bar") === 2, 60);
+  assert.equal(p.coalBag, 8, "ashsteel takes one inkcoal a bar from the satchel");
+  const fresh = newGame(); restore(fresh, serialize(g)); assert.equal(fresh.player.coalBag, 8);
+  assert(item("grumblin_head").equip.slot === "head" && MONSTERS.grumblin.drops.some(drop => drop.item === "grumblin_head" && drop.chance < 0.01), "a very rare Grumblin head");
+});
+
+test("Beginner fishing by the farm, and a new cook burns far less", () => {
+  const g = newGame();
+  const pond = g.world.objects.filter(object => object.kind === "spot" && Math.abs(object.x - 76) <= 6 && Math.abs(object.y - 139) <= 4);
+  assert(pond.filter(object => object.spot === "net").length >= 2 && pond.some(object => object.spot === "bait"), "the millpond has net and bait spots");
+  const p = g.player; p.inventory.fill(null); give(p, "raw_minnows", 27);
+  const range = objectNear(g, "range"); standBy(g, range); setTarget(g, { kind: "object", id: range.id, option: "Cook" });
+  until(g, () => !has(p, "raw_minnows"), 400);
+  assert(count(p, "minnows") >= 18, `most cook at level 1 (${count(p, "minnows")}/27)`);
 });
 
 test("combat: equip a sword, kill a chicken, loot and bury its bones", () => {

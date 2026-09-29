@@ -16,6 +16,7 @@ import { emoteMotion, emoteParticles, type Motion } from "./emotes.ts";
 import { drawPixels, pixelArt, shadeHex } from "./pixel.ts";
 import { TEX_PER_HEIGHT, TEX_PER_TILE, beginTextures, groundTexture, textureStats, shingleTexture, texturedQuad, texturedTriangle, wallTexture, type GroundStyle, type WallStyle } from "./textures.ts";
 import { campfireLogs, decorArt, fireArt, rockArt, treeArt } from "./scenery.ts";
+import { spellArt } from "./spellart.ts";
 import { SADDLE, mountArt, type MountView } from "./mountart.ts";
 import { petArt } from "./petart.ts";
 import { burst, drawCloudShadows, drawEffects, playerPose, puff, treeShake, updateEffects, type Pose } from "./effects.ts";
@@ -528,6 +529,24 @@ function drawFurnace(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldO
   }
   return hit(64, 44);
 }
+/** A bank booth: a planked counter with an overhanging top, a glass screen with brass bars between carved posts, a rose lintel with a gold coin, and a ledger and coins on the counter. */
+function drawBankBooth(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObject, hit: (h: number, w?: number) => { x: number; y: number; w: number; h: number }) {
+  const { camera } = scene, z = camera.zoom, ox = object.x, oy = object.y, wood = "#9c7a58", woodDark = "#7a5a40", brass = "#c9a24a";
+  box(ctx, camera, ox, oy, 0.88, 0.58, 16, "#b89c86", wood, woodDark, 0, INK, "plank");
+  box(ctx, camera, ox, oy, 0.98, 0.68, 3, "#e8dcc0", "#cdb9a0", "#b89c86", 16);
+  for (const px of [-0.44, 0.44]) box(ctx, camera, ox + px, oy, 0.08, 0.08, 20, woodDark, wood, woodDark, 19);
+  box(ctx, camera, ox, oy, 0.8, 0.04, 17, "rgba(214,230,240,0.55)", "rgba(200,220,235,0.45)", "rgba(185,205,222,0.45)", 19, null);
+  for (const px of [-0.2, 0, 0.2]) box(ctx, camera, ox + px, oy, 0.025, 0.05, 17, brass, brass, shade(brass, -0.2), 19, null);
+  box(ctx, camera, ox, oy, 0.98, 0.14, 6, shade(C.rose, 0.08), C.rose, shade(C.rose, -0.12), 38);
+  box(ctx, camera, ox, oy, 1.0, 0.16, 1.5, brass, brass, shade(brass, -0.2), 44);
+  const emblem = toScreen(camera, ox, oy, 41);
+  ellipse(ctx, emblem.x, emblem.y, 3.2 * z, 2.4 * z, brass, INK, 1);
+  // A ledger and a little stack of coins on the counter.
+  box(ctx, camera, ox - 0.2, oy + 0.14, 0.22, 0.16, 2, "#f4efe2", "#8a4a3a", "#7a3a2a", 19);
+  const coins = toScreen(camera, ox + 0.22, oy + 0.16, 19);
+  for (let i = 0; i < 3; i++) ellipse(ctx, coins.x, coins.y - i * 1.4 * z, 3 * z, 1.5 * z, i === 2 ? "#f2e28f" : brass, INK, 0.8);
+  return hit(50);
+}
 function drawStation(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObject): { x: number; y: number; w: number; h: number } {
   const { camera, now, game } = scene, z = camera.zoom, { x: sx, y: sy } = toScreen(camera, object.x, object.y), ox = object.x, oy = object.y;
   const flicker = scene.reducedMotion ? 0.5 : (Math.sin(now / 90 + ox) + 1) / 2;
@@ -536,7 +555,7 @@ function drawStation(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldO
     case "range": box(ctx, camera, ox, oy, 0.8, 0.7, 20, "#57555a", "#6d6b67", "#5a5856"); ellipse(ctx, sx, sy - 22 * z, 6 * z, 3 * z, `rgba(227,165,140,${0.6 + flicker * 0.4})`, INK); return hit(30);
     case "furnace": return drawFurnace(ctx, scene, object, flicker, hit);
     case "anvil": box(ctx, camera, ox, oy, 0.3, 0.3, 12, "#6d6b67", "#57555a", "#4a4846"); box(ctx, camera, ox, oy, 0.7, 0.35, 6, "#8b8e92", "#6d6b67", "#5a5856", 12); return hit(24);
-    case "bank": box(ctx, camera, ox, oy, 0.9, 0.6, 18, "#e2d7ad", "#b89c86", "#a88f74"); box(ctx, camera, ox, oy, 0.9, 0.1, 14, C.rose, shade(C.rose, -0.1), shade(C.rose, -0.15), 18); return hit(36);
+    case "bank": return drawBankBooth(ctx, scene, object, hit);
     case "altar": box(ctx, camera, ox, oy, 0.9, 0.6, 16, PAPER, "#d6d3cc", "#c8c5be"); box(ctx, camera, ox, oy, 0.4, 0.62, 2, C.rose, C.rose, shade(C.rose, -0.1), 16);
       ellipse(ctx, sx, sy - 26 * z, 3 * z, 3 * z, `rgba(226,215,173,${0.5 + flicker * 0.5})`, null); return hit(30);
     case "ladder": {
@@ -1338,81 +1357,19 @@ const SPELL_TRAILS: Record<string, { kind: "spark" | "puff" | "drop" | "dust" | 
   hollow: { kind: "puff", chance: 0.5, speed: 0.1, up: 8, life: 0.6, size: 3 }, moon: { kind: "spark", chance: 0.7, speed: 0.3, up: 10, life: 0.5, size: 2 },
 };
 type Screen = { x: number; y: number };
-/** Draw a spell's body at `head`, flying along `angle` (radians on screen). `now` is 0 with reduced motion. */
-function drawSpell(ctx: CanvasRenderingContext2D, element: string, look: { core: string; glow: string; spark: string }, head: Screen, angle: number, at: (t: number) => Screen, progress: number, z: number, now: number) {
-  const aura = (radius: number, alpha: number) => { const r = radius * 1.4, g = ctx.createRadialGradient(head.x, head.y, 0, head.x, head.y, r); g.addColorStop(0, hexA(look.glow, alpha)); g.addColorStop(1, hexA(look.glow, 0));
-    ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(head.x, head.y, r, 0, Math.PI * 2); ctx.fill(); ctx.restore(); };
-  const local = (draw: () => void, rotate = angle) => { ctx.save(); ctx.translate(head.x, head.y); ctx.rotate(rotate); ctx.scale(z * 1.5, z * 1.5); draw(); ctx.restore(); };
-  const shape = (points: [number, number][], fill: string, stroke: string | null = INK, width = 1.2) => { ctx.beginPath(); points.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = width / (z * 1.5) * 1.4; ctx.stroke(); } };
-  const flick = (k: number) => Math.sin(now / 55 + k * 2.1);
-  switch (element) {
-    case "fire": {
-      // A flame bolt: a tongue of fire streaming back from a white-hot tip, flickering.
-      aura(26 * z, 0.5);
-      local(() => {
-        shape([[9, 0], [2, -7 - flick(1) * 2], [-6, -9 + flick(2) * 2], [-4, -4], [-16 - flick(3) * 3, -6], [-10, -1], [-22 - flick(4) * 4, 1], [-10, 3], [-15 - flick(5) * 3, 8], [-4, 5], [2, 7 + flick(6) * 2]], "#e8662f");
-        shape([[8, 0], [1, -4], [-8, -3 + flick(7)], [-13 - flick(8) * 2, 0], [-8, 3], [1, 4]], "#f4a64a", null);
-        shape([[7, 0], [2, -2], [-4, -1], [-7, 0], [-4, 1.5], [2, 2]], "#fff2b0", null);
-      });
-      break;
-    }
-    case "water": {
-      // A curling wave: a blue body, a white foam crest breaking forward, and bubbles.
-      aura(22 * z, 0.45);
-      local(() => {
-        shape([[9, 2], [6, -5], [0, -8], [-7, -7], [-14, -3], [-18, 2 + flick(1)], [-12, 5], [-4, 6], [4, 6]], "#4f8fd8");
-        shape([[9, 2], [7, -4], [2, -7], [-2, -6], [3, -4], [5, -1], [4, 2]], "#e8f4ff", null);
-        ctx.strokeStyle = "#bfe0ff"; ctx.lineWidth = 1.2 / z; ctx.beginPath(); ctx.moveTo(-15, 1); ctx.quadraticCurveTo(-8, -2, -1, 1); ctx.stroke();
-        for (const [bx, by, r] of [[-20, -2, 1.6], [-24, 3, 1.2], [-17, 6, 1]] as const) { ctx.fillStyle = "#e8f4ff"; ctx.beginPath(); ctx.arc(bx + flick(bx) , by, r, 0, Math.PI * 2); ctx.fill(); }
-      });
-      break;
-    }
-    case "wind": {
-      // A whirlwind: three spinning gusts around a pale eye, with streaks behind.
-      aura(20 * z, 0.35);
-      const spin = now / 70;
-      local(() => {
-        ctx.lineCap = "round";
-        for (let i = 0; i < 3; i++) {
-          const a = spin + i * Math.PI * 2 / 3;
-          ctx.strokeStyle = INK; ctx.lineWidth = 3.4 / z * z; ctx.beginPath(); ctx.arc(0, 0, 7, a, a + 2.1); ctx.stroke();
-          ctx.strokeStyle = i ? "#e6f4fa" : "#ffffff"; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.arc(0, 0, 7, a, a + 2.1); ctx.stroke();
-        }
-        ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(0, 0, 2.2, 0, Math.PI * 2); ctx.fill();
-        ctx.lineCap = "butt";
-      }, 0);
-      local(() => { ctx.strokeStyle = "rgba(255,255,255,0.85)"; ctx.lineWidth = 1.2; ctx.lineCap = "round"; ctx.beginPath();
-        for (const [y, l] of [[-4, 14], [0, 20], [4, 12]] as const) { ctx.moveTo(-9, y); ctx.lineTo(-9 - l, y + flick(y) * 0.8); } ctx.stroke(); ctx.lineCap = "butt"; });
-      break;
-    }
-    case "earth": {
-      // A boulder tumbling end over end, cracked, shedding grit.
-      aura(16 * z, 0.25);
-      local(() => {
-        shape([[-7, -5], [-1, -8], [6, -6], [8, 1], [4, 7], [-4, 7], [-8, 2]], "#a07a4a", INK, 1.5);
-        shape([[-5, -4], [-1, -6], [3, -5], [0, -2], [-4, -1]], "#c8a26e", null);
-        ctx.strokeStyle = "#5e4428"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-2, -1); ctx.lineTo(2, 2); ctx.lineTo(1, 6); ctx.moveTo(2, 2); ctx.lineTo(6, 1); ctx.stroke();
-      }, now / 110);
-      break;
-    }
-    case "hollow": {
-      // A curse: a knot of dark smoke with two pale eyes, trailing wisps.
-      aura(22 * z, 0.4);
-      local(() => {
-        for (let i = 0; i < 4; i++) { const a = now / 120 + i * 1.6; ctx.fillStyle = hexA(i % 2 ? "#2a1f3d" : "#4a3570", 0.85); ctx.beginPath(); ctx.arc(Math.cos(a) * 3 - i * 3, Math.sin(a) * 3, 7 - i, 0, Math.PI * 2); ctx.fill(); }
-        ctx.strokeStyle = INK; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(0, 0, 7, 0, Math.PI * 2); ctx.stroke();
-        ctx.fillStyle = "#e9d8ff"; ctx.fillRect(-1, -3, 2.2, 2.2); ctx.fillRect(3, -3, 2.2, 2.2);
-        ctx.strokeStyle = hexA("#8a62c8", 0.8); ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(-8, 3); ctx.quadraticCurveTo(-14, 7 + flick(1) * 2, -20, 3); ctx.moveTo(-8, -3); ctx.quadraticCurveTo(-15, -7 + flick(2) * 2, -19, -2); ctx.stroke();
-      });
-      break;
-    }
-    default: {
-      // Anything else: a turning four-point star.
-      aura(20 * z, 0.45);
-      local(() => { shape([[0, -9], [2, -2], [9, 0], [2, 2], [0, 9], [-2, 2], [-9, 0], [-2, -2]], look.core); shape([[0, -4], [1, -1], [4, 0], [1, 1], [0, 4], [-1, 1], [-4, 0], [-1, -1]], "#ffffff", null); }, now / 200);
-    }
-  }
-  void at; void progress;
+/** Draw a spell's body at `head`, flying along `angle` (radians on screen): its pixel sprite (a small torch flame for fire, a droplet, a whirl, a boulder, a curse, a star), turned to its flight, in a soft glow. `now` is 0 with reduced motion. */
+function drawSpell(ctx: CanvasRenderingContext2D, element: string, look: { core: string; glow: string; spark: string }, head: Screen, angle: number, _at: (t: number) => Screen, _progress: number, z: number, now: number) {
+  const radius = (element === "earth" ? 14 : element === "wind" ? 18 : 22) * z * 1.4, g = ctx.createRadialGradient(head.x, head.y, 0, head.x, head.y, radius);
+  g.addColorStop(0, hexA(look.glow, element === "earth" ? 0.25 : 0.45)); g.addColorStop(1, hexA(look.glow, 0));
+  ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(head.x, head.y, radius, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  const art = spellArt(element, now ? Math.floor(now / 85) : 0, look.core), k = ART * z * (element === "fire" ? 1.15 : 1);
+  ctx.save(); ctx.translate(head.x, head.y);
+  // Sprites point down (front at the bottom): turn them to the flight. The whirl and the star spin in place.
+  if (element === "fire" || element === "water" || element === "hollow" || element === "earth") ctx.rotate(angle - Math.PI / 2);
+  ctx.imageSmoothingEnabled = false;
+  const front = element === "fire" || element === "water" || element === "hollow" ? 0.72 : 0.5;
+  ctx.drawImage(art, -art.width * k / 2, -art.height * k * front, art.width * k, art.height * k);
+  ctx.restore();
 }
 const maxHpOf = (game: Game) => levelForXp(game.player.xp.hitpoints);
 /** A pet with its feet on (x, y): hopping as it walks, bobbing (or flickering) when it waits. */

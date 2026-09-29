@@ -47,7 +47,7 @@ export const FIGURE_K = K;
 export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, phase = 0, ink = INK, held: Held | null = null): HTMLCanvasElement {
   // An equipped cape (a mastery cape, the Cape of the Hollow…) is worn over any wardrobe cape, with its trim.
   // A quiver is worn on the back the same way, over a wardrobe cape.
-  const gear: Piece[] = worn.filter(id => isItem(id) && item(id).equip?.slot === "cape").map(id => ({ id, kind: item(id).icon.shape === "quiver" ? "quiver" : "cape", color: item(id).icon.color, trim: item(id).icon.accent }));
+  const gear: Piece[] = worn.filter(id => isItem(id) && item(id).equip?.slot === "cape").map(id => ({ id, kind: item(id).icon.shape === "quiver" ? "quiver" : item(id).icon.shape === "satchel" ? "satchel" : "cape", color: item(id).icon.color, trim: item(id).icon.accent }));
   // Headgear you wear (a helm, hood, hat or crown) shows too, unless a wardrobe hat is on top.
   const wardrobeHat = WARDROBE.some(piece => worn.includes(piece.id) && piece.kind === "hat");
   const headgear: Piece[] = wardrobeHat ? [] : worn.filter(id => isItem(id) && item(id).equip?.slot === "head").slice(0, 1).map(id => {
@@ -70,7 +70,7 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
   const cx = X(m.centre) - 0.5, headTop = Y(m.top), neckY = Y(m.neck) + 1, feet = Y(m.bottom) + 1;
   const headHalf = Math.max(4, Math.min(7, m.crownWidth * K / 2 + 1));
   const bodySpan = (y: number) => m.spans[y] ?? { min: m.left, max: m.right };
-  const cape = pieces.find(piece => piece.kind === "cape"), wings = pieces.find(piece => piece.kind === "wings"), quiver = pieces.find(piece => piece.kind === "quiver");
+  const cape = pieces.find(piece => piece.kind === "cape"), wings = pieces.find(piece => piece.kind === "wings"), quiver = pieces.find(piece => piece.kind === "quiver"), satchel = pieces.find(piece => piece.kind === "satchel");
   // The quiver across your back: from the shoulder its fletchings peek over down to the opposite hip.
   const shoulderSpan = bodySpan(m.neck + 1), backWaist = Y(Math.round(m.neck + (m.bottom - m.neck) * 0.55));
   const quiverAt = side ? { top: { x: cx - side * 4, y: neckY - 4 }, bottom: { x: cx - side * 7, y: backWaist } }
@@ -92,6 +92,9 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
     if (side >= 0) wing(1, shoulderR);
   }
   if (quiver && !back) drawQuiver(p, quiver, quiverAt.top, quiverAt.bottom);
+  // The satchel sits high on the back: seen from the side it sticks out behind you; from the front it's hidden but for its straps.
+  const packTop = neckY, packBottom = backWaist + 2, packHalf = Math.max(4, Math.round((X(shoulderSpan.max) - X(shoulderSpan.min)) / 2) - 1);
+  if (satchel && side) drawSatchel(p, satchel, cx - side * 6, packTop + 1, 3, packBottom - packTop - 1, false);
   if (cape && !back) {
     const dark = shadeHex(cape.color, -0.12), trail = side ? -side * 5 : 0;
     const top = bodySpan(m.neck + 1), shoulders = [X(top.min) - 1, X(top.max) + 2] as const;
@@ -124,6 +127,12 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
 
   // ---------- In front ----------
   if (quiver && back) drawQuiver(p, quiver, quiverAt.top, quiverAt.bottom);
+  if (satchel && back) drawSatchel(p, satchel, Math.round(cx), packTop, packHalf, packBottom - packTop, true);
+  if (satchel && !back) {
+    // Shoulder straps (both from the front, the near one from the side).
+    const strap = shadeHex(satchel.color, -0.25), sx = side ? [Math.round(cx) + side] : [X(shoulderSpan.min) + 2, X(shoulderSpan.max) - 1];
+    for (const x of sx) p.line(x, neckY + 1, x, backWaist - 1, strap, 2);
+  }
   if (quiver && !back && !side) {
     // Facing you, just the strap across the chest.
     const strapX0 = X(shoulderSpan.max) - 1, strapX1 = X(bodySpan(Math.round(m.neck + (m.bottom - m.neck) * 0.6)).min) + 2;
@@ -187,14 +196,7 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
     }
   }
 
-  if (weapon && side >= 0 && !held) tip = drawHeld(p, weapon, hand.x, hand.y, dir, sway, turn);
-  // The shield on the off arm: across your body facing left (that arm is towards you), at your side facing the camera
-  // or away. (Facing right it's behind you, drawn before your Friend above.)
-  if (shield && side <= 0) drawShield(p, shield, side < 0 ? Math.round(cx) + 1 : X(waistSpan.min) - 1, waist, back);
-  // A tool at work or a weapon mid-swing goes over everything, so the motion reads.
-  if (weapon && held) tip = drawHeld(p, weapon, hand.x, hand.y, dir, sway, turn);
-
-  // ---------- Equipped headgear ----------
+  // ---------- Equipped headgear (under anything held, so a swinging axe or a shouldered sword stays outside the helm) ----------
   for (const piece of pieces.filter(entry => entry.kind.startsWith("gear_"))) {
     const color = piece.color, dark = shadeHex(color, -0.18), light = shadeHex(color, 0.16), l = Math.round(cx - headHalf) - 1, r = Math.round(cx + headHalf) + 1, top = headTop;
     switch (piece.kind) {
@@ -220,6 +222,21 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
         p.line(cx - headHalf + 2, brimY - 1, cx + headHalf - 2, brimY - 1, piece.trim ?? "#e2d49e");
         break;
       }
+      case "gear_mask": {
+        // A Grumblin's head worn over your own: grey-green, pointed ears out to the sides, yellow eyes and a toothy grin (just the back of it from behind).
+        const eye = piece.trim ?? "#e2c46a", face = top + 1;
+        p.poly([[l - 1, top + 7], [l - 1, top], [l + 2, top - 4], [r - 2, top - 4], [r + 1, top], [r + 1, top + 7]], color, null);
+        p.line(l, top - 2, r - 1, top - 2, light);
+        if (side >= 0) p.poly([[r + 1, top], [r + 6, top - 3], [r + 1, top + 4]], dark, null);
+        if (side <= 0) p.poly([[l - 1, top], [l - 6, top - 3], [l - 1, top + 4]], dark, null);
+        if (!back) {
+          const eyes = side ? [Math.round(cx) + side * 2] : [Math.round(cx) - 3, Math.round(cx) + 2];
+          for (const x of eyes) { p.rect(x, face, 2, 2, eye); p.set(x + (side > 0 ? 1 : 0), face + 1, "#222"); p.line(x - 1, face - 1, x + 2, face - 1, shadeHex(color, -0.4)); }
+          const mouthL = side ? Math.round(cx) + (side > 0 ? 0 : -4) : Math.round(cx) - 3, mouthY = face + 4;
+          p.line(mouthL, mouthY, mouthL + 5, mouthY, "#2e2a28"); p.set(mouthL + 1, mouthY, "#f4efe2"); p.set(mouthL + 4, mouthY, "#f4efe2");
+        }
+        break;
+      }
       case "gear_crown": {
         const band = top, points = 3, step = (r - l - 2) / points;
         p.rect(l + 1, band - 2, r - l - 2, 3, color); p.line(l + 1, band, r - 2, band, dark);
@@ -229,6 +246,13 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
       }
     }
   }
+
+  if (weapon && side >= 0 && !held) tip = drawHeld(p, weapon, hand.x, hand.y, dir, sway, turn);
+  // The shield on the off arm: across your body facing left (that arm is towards you), at your side facing the camera
+  // or away. (Facing right it's behind you, drawn before your Friend above.)
+  if (shield && side <= 0) drawShield(p, shield, side < 0 ? Math.round(cx) + 1 : X(waistSpan.min) - 1, waist, back);
+  // A tool at work or a weapon mid-swing goes over everything, so the motion reads.
+  if (weapon && held) tip = drawHeld(p, weapon, hand.x, hand.y, dir, sway, turn);
 
   // ---------- Edges: ink around the worn colours, then the white halo around everything (one sprite pixel) ----------
   const data = p.data, filled = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && data[y * W + x] !== 0;
@@ -390,6 +414,14 @@ function drawQuiver(p: Pixels, piece: Piece, top: { x: number; y: number }, bott
   p.line(top.x, top.y, bottom.x, bottom.y, color, 4); p.line(top.x - uy * 1.5, top.y + ux * 1.5, bottom.x - uy * 1.5, bottom.y + ux * 1.5, dark);
   p.line(top.x - uy * 2, top.y + ux * 2, top.x + uy * 2, top.y - ux * 2, trim, 2);
   const bx = bottom.x + ux * 3, by = bottom.y + uy * 3; p.line(bx - uy * 2, by + ux * 2, bx + uy * 2, by - ux * 2, trim);
+}
+/** The inkcoal satchel from behind (`full`: flap, buckle and coal peeking out) or from the side (a slim pack), fine pixels. */
+function drawSatchel(p: Pixels, piece: Piece, x: number, y: number, half: number, h: number, full: boolean) {
+  const color = piece.color, dark = shadeHex(color, -0.2), coal = piece.trim ?? "#3b3a38";
+  if (full) for (const dx of [-half + 2, 0, half - 2]) p.disc(x + dx, y, 1.8, 1.4, coal, null);
+  p.rect(x - half, y, half * 2, h, color); p.line(x - half, y + h - 1, x + half - 1, y + h - 1, dark);
+  if (full) { p.rect(x - half, y, half * 2, Math.round(h * 0.45), dark); p.rect(x - 1, y + Math.round(h * 0.45) - 1, 2, 2, "#c9a24a"); }
+  else { p.disc(x, y - 1, 1.5, 1.2, coal, null); p.line(x - half, y + 2, x + half - 1, y + 2, dark); }
 }
 /** A heater shield centred on (x, y) in fine pixels: rim, boss and cross in its accent; from behind, its wooden back and strap. */
 function drawShield(p: Pixels, piece: Piece, x: number, y: number, rear: boolean) {

@@ -13,9 +13,9 @@ import { cleanMet } from "./hiscores.ts";
 import { addSlayerPoints, slayerBoost, slayerKill, slayerProblem, taskText } from "./slayer.ts";
 import { NPCS, examineItem, npcDef, onMonsterKilled, questDone, searchCryptChest, searchWell, talk, tanHides, useCryptAltar } from "./content.ts";
 import {
-  BANK_SIZE, DAY_MS, INVENTORY_SIZE, REFERRAL_COINS, REFERRALS_PER_DAY, REFERRAL_TICKS, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
+  BANK_SIZE, BANK_TABS, DAY_MS, SATCHEL, SATCHEL_SIZE, compactBankTabs, hasSatchel, stock, useUp, INVENTORY_SIZE, REFERRAL_COINS, REFERRALS_PER_DAY, REFERRAL_TICKS, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
   level, maxHp, maxPrayer, message, prayerBoost, riding, sound, take, weapon, combatLevel, createGame,
-  type Activity, type CombatStyle, type Dialogue, type Game, type Monster, type Npc, type Point, type Recipe, type Slot, type Target,
+  type Activity, type CombatStyle, type Dialogue, type Game, type Monster, type Npc, type Point, type Recipe, type Slot, type BankSlot, type Target,
 } from "./state.ts";
 import { FLOOR_Y, T, W, H, inBounds, isUnderground, isWater, objectAtTile, realPoint, regionAt, terrainAt, tileIndex, walkable, type WorldObject } from "./world.ts";
 
@@ -281,10 +281,25 @@ export function itemOptions(game: Game, slotIndex: number): ItemOption[] {
   if (definition.tablet) out.push({ verb: "Break", run: g => breakTablet(g, slotIndex) });
   if (slot.id === "insight_lamp") out.push({ verb: "Rub", run: g => { g.ui.lamp = slotIndex; } });
   if (slot.id === "slayer_gem") out.push({ verb: "Check", run: g => message(g, taskText(g)) });
+  if (slot.id === SATCHEL) out.push({ verb: "Check", run: satchelCheck }, { verb: "Fill", run: satchelFill }, { verb: "Empty", run: satchelEmpty });
   out.push({ verb: "Use", run: () => ({ kind: "item", slot: slotIndex }) });
   out.push({ verb: "Drop", run: g => drop(g, slotIndex) });
   out.push({ verb: "Examine", run: g => message(g, slot.n >= 100_000 ? `${slot.n.toLocaleString()} x ${definition.name}` : definition.examine) });
   return out;
+}
+export function satchelCheck(game: Game) { message(game, `Your inkcoal satchel holds ${game.player.coalBag} of ${SATCHEL_SIZE} inkcoal.`); }
+/** Put all the inkcoal in your pack into the satchel. */
+export function satchelFill(game: Game) {
+  const player = game.player, n = Math.min(count(player, "inkcoal"), SATCHEL_SIZE - player.coalBag);
+  if (!n) { message(game, count(player, "inkcoal") ? "Your satchel is full." : "You have no inkcoal to put in the satchel."); return; }
+  take(player, "inkcoal", n); player.coalBag += n; message(game, `You fill the satchel with ${n} inkcoal (${player.coalBag}/${SATCHEL_SIZE}).`); sound(game, "pickup");
+}
+/** Tip as much inkcoal as fits back into your pack. */
+export function satchelEmpty(game: Game) {
+  const player = game.player, n = Math.min(player.coalBag, freeSlots(player));
+  if (!player.coalBag) { message(game, "Your satchel is empty."); return; }
+  if (!n) { message(game, "You have no room in your pack.", "warn"); return; }
+  player.coalBag -= n; give(player, "inkcoal", n); message(game, `You take ${n} inkcoal out of the satchel (${player.coalBag} left).`); sound(game, "pickup");
 }
 export function eat(game: Game, slotIndex: number) {
   const player = game.player, slot = player.inventory[slotIndex];
@@ -362,6 +377,7 @@ export function useItemOnItem(game: Game, a: number, b: number) {
     const log = other("knife").id, bow = FLETCH_BOWS.find(entry => entry.log === log);
     if (bow) { game.ui.production = { title: "What would you like to fletch?", recipes: fletchingRecipes(log) }; return; }
   }
+  if (pair("inkcoal", SATCHEL)) { satchelFill(game); return; }
   if (pair("feather", "arrow_shaft")) { startProduction(game, headlessRecipe(), 100); return; }
   // Crossbows: feathers on unfeathered bolts, and metal limbs on a stock.
   const blanks = [first.id, second.id].find(id => id.endsWith("_bolts_unf"));
@@ -403,7 +419,7 @@ export function recipeProblem(game: Game, recipe: Recipe): string | null {
   const player = game.player;
   if (level(game, recipe.skill) < recipe.level) return `You need a ${SKILL_NAMES[recipe.skill]} level of ${recipe.level} to make that.`;
   for (const tool of recipe.tools ?? []) if (!hasTool(player, tool)) return `You need a ${item(tool).name.toLowerCase()} to do that.`;
-  for (const [id, n] of Object.entries(recipe.inputs)) if (count(player, id) < n) return `You don't have enough ${item(id).name.toLowerCase()} to make that.`;
+  for (const [id, n] of Object.entries(recipe.inputs)) if (stock(player, id) < n) return `You don't have enough ${item(id).name.toLowerCase()} to make that.`;
   if (recipe.coins && count(player, "coins") < recipe.coins) return "You don't have enough coins.";
   return null;
 }
@@ -828,10 +844,13 @@ function mineTick(game: Game, activity: Extract<Activity, { kind: "mine" }>) {
   const chance = Math.min(0.95, successChance(level(game, "mining"), rock.low, rock.high) * (1 + 0.2 * (pick.tier - 1)) * gatherBonus(game));
   if (game.rng() >= chance) return;
   const ore = object.rock === "gem" ? ["rough_moonstone", "rough_moonstone", "rough_sagestone", "rough_rosestone"][Math.floor(game.rng() * 4)] : rock.ore;
-  give(player, ore); addXp(game, "mining", rock.xp);
+  // Inkcoal goes into the satchel while there's room.
+  const bagged = ore === "inkcoal" && hasSatchel(player) && player.coalBag < SATCHEL_SIZE;
+  if (bagged) player.coalBag++; else give(player, ore);
+  addXp(game, "mining", rock.xp);
   if (player.familyId === 4 && game.rng() < 0.08 && freeSlots(player)) { give(player, ore); message(game, "Lopsided luck! You mine a second piece."); }
   if (object.rock === "sigil") { if (!freeSlots(player)) { message(game, "Your inventory is too full to hold any more sigil stones.", "warn"); player.activity = null; } return; }
-  message(game, `You manage to mine some ${item(ore).name.toLowerCase().replace(" ore", "")}.`);
+  message(game, bagged ? `You put the inkcoal in your satchel (${player.coalBag}/${SATCHEL_SIZE}).` : `You manage to mine some ${item(ore).name.toLowerCase().replace(" ore", "")}.`);
   rollPet(game, "pebble", level(game, "mining"));
   game.depleted.set(object.id, game.tick + rock.respawn + Math.floor(game.rng() * rock.respawn * 0.5));
   player.activity = null;
@@ -860,7 +879,8 @@ function cookTick(game: Game, activity: Extract<Activity, { kind: "cook" }>) {
   activity.timer = 4; activity.left--;
   take(player, activity.raw);
   const cooking = level(game, "cooking"), span = Math.max(1, recipe.stopBurn - recipe.level);
-  const burn = cooking >= recipe.stopBurn ? 0 : Math.max(0, 0.55 - (cooking - recipe.level) * (0.55 / span)) + (activity.source === "fire" ? 0.08 : 0);
+  // About a third burn at the recipe's own level (a little more on an open fire), falling to none at its stop-burn level.
+  const burn = cooking >= recipe.stopBurn ? 0 : Math.max(0, 0.32 - (cooking - recipe.level) * (0.32 / span)) + (activity.source === "fire" ? 0.05 : 0);
   if (game.rng() < burn) { give(player, "burnt_food"); message(game, `You accidentally burn the ${item(recipe.cooked).name.toLowerCase()}.`); sound(game, "burn"); }
   else { give(player, recipe.cooked); addXp(game, "cooking", recipe.xp); message(game, `You successfully cook ${item(recipe.cooked).name.toLowerCase()}.`); sound(game, "sizzle"); }
   if (!has(player, activity.raw)) player.activity = null;
@@ -871,7 +891,7 @@ function produceTick(game: Game, activity: Extract<Activity, { kind: "produce" }
   const problem = recipeProblem(game, recipe);
   if (problem) { if (activity.left > 0 && activity.timer <= 0) message(game, problem, "warn"); player.activity = null; return; }
   activity.timer = recipe.ticks; activity.left--;
-  for (const [id, n] of Object.entries(recipe.inputs)) take(player, id, n);
+  for (const [id, n] of Object.entries(recipe.inputs)) useUp(player, id, n);
   if (recipe.coins) take(player, "coins", recipe.coins);
   sound(game, recipe.station === "anvil" ? "anvil" : recipe.station === "furnace" ? "smelt" : "click");
   if (recipe.chance !== undefined && game.rng() >= recipe.chance + level(game, recipe.skill) * 0.004) { message(game, "The ore is too impure and you fail to refine it."); return; }
@@ -1289,10 +1309,10 @@ export function castOnItem(game: Game, spellId: string, slotIndex: number) {
     payRunes(game, spell); take(player, slot.id, 1); give(player, "coins", coins);
     message(game, `The ${definition.name.toLowerCase()} turns into ${coins} coins.`); sound(game, "coins");
   } else if (spell.kind === "superheat") {
-    const metal = METALS.slice().reverse().find(entry => SMELTING[entry.id].ores[slot.id] !== undefined && Object.entries(SMELTING[entry.id].ores).every(([id, n]) => count(player, id) >= n) && level(game, "smithing") >= SMELTING[entry.id].level);
+    const metal = METALS.slice().reverse().find(entry => SMELTING[entry.id].ores[slot.id] !== undefined && Object.entries(SMELTING[entry.id].ores).every(([id, n]) => stock(player, id) >= n) && level(game, "smithing") >= SMELTING[entry.id].level);
     if (!metal) { message(game, slot.id.endsWith("_ore") || slot.id === "inkcoal" ? "You need the right ores (and Smithing level) for Forgeheart to work." : "Forgeheart only works on ore.", "warn"); return false; }
     payRunes(game, spell);
-    for (const [id, n] of Object.entries(SMELTING[metal.id].ores)) take(player, id, n);
+    for (const [id, n] of Object.entries(SMELTING[metal.id].ores)) useUp(player, id, n);
     give(player, `${metal.id}_bar`); addXp(game, "smithing", SMELTING[metal.id].xp);
     message(game, `The ore melts into a ${metal.name.toLowerCase()} bar.`); sound(game, "smelt");
   } else if (spell.kind === "enchant") {
@@ -1657,10 +1677,10 @@ function updatePet(game: Game) {
 export const SAVE_VERSION = 1;
 export type SaveData = {
   v: 1; friendId: number; x: number; y: number; run: boolean; energy: number; xp: Record<string, number>; hp: number; prayer: number;
-  inventory: (Slot | null)[]; equipment: Record<string, string>; bank: Slot[]; style: CombatStyle; autocast: string | null;
+  inventory: (Slot | null)[]; equipment: Record<string, string>; bank: BankSlot[]; style: CombatStyle; autocast: string | null;
   quests: Record<string, number>; questData: Record<string, number>; wardrobe: string[]; worn: string[]; follower: number | null; followerGeneration: number | null;
   kills: number; deaths: number; tutorial: number; guide?: number; created: number; playTicks: number; retaliate: boolean; music: string[];
-  met?: unknown; achievements?: Record<string, number>; pets?: string[]; petOut?: string | null; killLog?: Record<string, number>; stats?: Record<string, number>; referredBy?: number | null; referrals?: number[]; referralTimes?: number[]; boostTicks?: number; mounts?: string[]; mount?: string | null; daily?: unknown; seenUpdate?: number;
+  met?: unknown; achievements?: Record<string, number>; pets?: string[]; petOut?: string | null; killLog?: Record<string, number>; stats?: Record<string, number>; referredBy?: number | null; referrals?: number[]; referralTimes?: number[]; boostTicks?: number; coalBag?: number; mounts?: string[]; mount?: string | null; daily?: unknown; seenUpdate?: number;
 };
 export function serialize(game: Game): SaveData {
   const player = game.player;
@@ -1670,7 +1690,7 @@ export function serialize(game: Game): SaveData {
     style: player.style, autocast: player.autocast, quests: { ...player.quests }, questData: { ...player.questData }, wardrobe: [...player.wardrobe], worn: [...player.worn],
     follower: player.follower, followerGeneration: player.followerGeneration, kills: player.kills, deaths: player.deaths, tutorial: player.tutorial, guide: player.guide, created: player.created,
     playTicks: game.playTicks, retaliate: game.autoRetaliate, music: [...player.music],
-    referredBy: player.referredBy, referrals: [...player.referrals], referralTimes: [...player.referralTimes], boostTicks: player.boostTicks, mounts: [...player.mounts], mount: player.mount, met: JSON.parse(JSON.stringify(player.met)), achievements: { ...player.achievements }, pets: [...player.pets], petOut: player.petOut, killLog: { ...player.killLog }, stats: { ...player.stats }, daily: JSON.parse(JSON.stringify(player.daily)), seenUpdate: player.seenUpdate,
+    referredBy: player.referredBy, referrals: [...player.referrals], referralTimes: [...player.referralTimes], boostTicks: player.boostTicks, coalBag: player.coalBag, mounts: [...player.mounts], mount: player.mount, met: JSON.parse(JSON.stringify(player.met)), achievements: { ...player.achievements }, pets: [...player.pets], petOut: player.petOut, killLog: { ...player.killLog }, stats: { ...player.stats }, daily: JSON.parse(JSON.stringify(player.daily)), seenUpdate: player.seenUpdate,
   };
 }
 const QUEST_IDS = ["friends_feast", "grumblin_trouble", "cold_forge", "hollow_whispers", "lost_glimmer", "hollow_king", "hazels_quiver"];
@@ -1723,14 +1743,14 @@ export function restore(game: Game, raw: unknown): boolean {
     const saved = save.equipment?.[slot], id = typeof saved === "string" ? migrateId(saved) : saved;
     if (isItem(id) && item(id).equip?.slot === slot) player.equipment[slot] = id;
   }
-  const bank: Slot[] = [];
+  const bank: BankSlot[] = [];
   for (const entry of Array.isArray(save.bank) ? save.bank.slice(0, BANK_SIZE) : []) {
     const slot = slotOf(entry);
     if (!slot) continue;
-    const existing = bank.find(other => other.id === slot.id);
-    if (existing) existing.n += slot.n; else bank.push({ id: slot.id, n: int((entry as Slot).n, 1, 2_147_483_647, 1) });
+    const existing = bank.find(other => other.id === slot.id), tab = int((entry as BankSlot).tab, 0, BANK_TABS, 0);
+    if (existing) existing.n += slot.n; else bank.push({ id: slot.id, n: int((entry as Slot).n, 1, 2_147_483_647, 1), ...(tab ? { tab } : {}) });
   }
-  player.bank = bank;
+  player.bank = bank; compactBankTabs(player);
   const x = int(save.x, 0, W - 1, -1), y = int(save.y, 0, H - 1, -1);
   if (inBounds(x, y) && walkable(game.world, x, y)) { player.x = x; player.y = y; player.prev = { x, y }; }
   player.run = !!save.run; player.energy = int(save.energy, 0, 100, 100);
@@ -1754,6 +1774,7 @@ export function restore(game: Game, raw: unknown): boolean {
   player.referredBy = friendNumber(save.referredBy);
   player.referrals = [...new Set((Array.isArray(save.referrals) ? save.referrals : []).map(friendNumber).filter((id): id is number => id !== null))].slice(0, 500);
   player.boostTicks = int(save.boostTicks, 0, REFERRAL_TICKS * 50, 0);
+  player.coalBag = int(save.coalBag, 0, SATCHEL_SIZE, 0);
   player.referralTimes = (Array.isArray(save.referralTimes) ? save.referralTimes : []).filter((at): at is number => typeof at === "number" && Number.isFinite(at) && at > 0).slice(-REFERRALS_PER_DAY);
   player.mounts = MOUNTS.filter(mount => Array.isArray(save.mounts) && save.mounts.includes(mount.id)).map(mount => mount.id);
   player.mount = typeof save.mount === "string" && player.mounts.includes(save.mount) ? save.mount : null;

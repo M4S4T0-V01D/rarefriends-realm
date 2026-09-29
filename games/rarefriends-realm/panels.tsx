@@ -15,12 +15,12 @@ import { hiscores } from "./hiscores.ts";
 import { petArt } from "./petart.ts";
 import { MAX_QUEST_POINTS, NPCS, QUESTS, finalStage, questPoints } from "./content.ts";
 import {
-  bankDeposit, bankDepositAll, bankDepositWorn, bankWithdraw, bonuses, combatLevel, count, isStaffEquipped, maxHp, maxPrayer, message, totalLevel, totalXp,
+  BANK_TABS, SATCHEL, bankDeposit, bankDepositAll, bankDepositWorn, bankInOrder, bankMove, bankTabs, bankWithdraw, bonuses, combatLevel, count, isStaffEquipped, maxHp, maxPrayer, message, totalLevel, totalXp,
   weapon, xpMultiplier, type Game, type Message, type Recipe, type Slot,
 } from "./state.ts";
 import {
   bestArrow, bowRange, emoteProblem, performEmote, applyReferral, shopBuys, buy, buyPrice, canCast, capeProblem, castSpell, rangedMaxHit, rubLamp, chooseOption, continueDialogue, dialogueAtOptions, itemOptions, playerMaxHit, recipeProblem, sell, sellPrice,
-  castOnItem, setFollower, setPet, setStyle, startProduction, swapSlots, toggleRun, togglePrayer, toggleWorn, unequip, useItemOnItem, type OwnedFriend, type Selection,
+  castOnItem, satchelCheck, satchelEmpty, satchelFill, setFollower, setPet, setStyle, startProduction, swapSlots, toggleRun, togglePrayer, toggleWorn, unequip, useItemOnItem, type OwnedFriend, type Selection,
 } from "./engine.ts";
 import { friendRows, renderWorldMap } from "./render.ts";
 import { isUnderground, realPoint } from "./world.ts";
@@ -288,7 +288,9 @@ function EquipmentTab({ game, refresh, openCard, openMenu }: PanelProps) {
         {layout.map((slot, index) => slot ? (
           <button key={index} type="button" className="realm-slot" aria-label={player.equipment[slot] ? `Remove ${item(player.equipment[slot]!).name}` : `${SLOT_NAMES[slot]}: empty`}
             title={player.equipment[slot] ? `Remove ${item(player.equipment[slot]!).name}` : SLOT_NAMES[slot]} onClick={() => { unequip(game, slot); refresh(); }}
-            {...rightClick(openMenu, () => { const id = player.equipment[slot]; return id ? [{ verb: "Remove", noun: item(id).name, tone: "item", run: () => { unequip(game, slot); refresh(); } }, examine(game, id, refresh)] : []; })}>
+            {...rightClick(openMenu, () => { const id = player.equipment[slot]; return id ? [{ verb: "Remove", noun: item(id).name, tone: "item", run: () => { unequip(game, slot); refresh(); } },
+              ...(id === SATCHEL ? [{ verb: "Check", noun: item(id).name, tone: "item" as const, run: () => { satchelCheck(game); refresh(); } }, { verb: "Fill", noun: item(id).name, tone: "item" as const, run: () => { satchelFill(game); refresh(); } },
+                { verb: "Empty", noun: item(id).name, tone: "item" as const, run: () => { satchelEmpty(game); refresh(); } }] : []), examine(game, id, refresh)] : []; })}>
             {player.equipment[slot] ? <ItemIcon slot={{ id: player.equipment[slot]!, n: 1 }} /> : <span className="realm-slot-label">{SLOT_NAMES[slot]}</span>}
           </button>
         ) : <span key={index} />)}
@@ -611,38 +613,72 @@ export function Modal({ title, onClose, children, wide }: { title: string; onClo
     </div>
   );
 }
+/** The bank tab last looked at, kept while the game is open. */
+let lastBankTab = 0;
 export function BankModal({ game, refresh, onClose, openMenu }: { game: Game; refresh: () => void; onClose: () => void; openMenu: PanelProps["openMenu"] }) {
-  const player = game.player, [search, setSearch] = useState(""), [amount, setAmount] = useState<number>(1);
-  const shown = player.bank.filter(slot => !search || item(slot.id).name.toLowerCase().includes(search.toLowerCase()));
+  const player = game.player, [search, setSearch] = useState(""), [amount, setAmount] = useState<number>(1), drag = useRef<string | null>(null);
+  const tabs = bankTabs(player), [tab, setTabState] = useState(() => Math.min(lastBankTab, tabs.length)), [over, setOver] = useState<string | null>(null);
+  const setTab = (next: number) => { lastBankTab = next; setTabState(next); };
+  const current = tabs.includes(tab) ? tab : 0;
+  // Tab 0 shows everything (the main tab's items first, then each tab's); tabs 1+ show only their own.
+  const shown = bankInOrder(player).filter(slot => (current === 0 || (slot.tab ?? 0) === current) && (!search || item(slot.id).name.toLowerCase().includes(search.toLowerCase())));
+  const move = (before: string | null, to?: number | "new") => { const id = drag.current; drag.current = null; setOver(null); if (id && bankMove(player, id, before, to)) refresh(); };
+  const dropTarget = (key: string, onDrop: () => void) => ({
+    onDragOver: (event: React.DragEvent) => { if (drag.current) { event.preventDefault(); setOver(key); } }, onDragLeave: () => setOver(entry => entry === key ? null : entry),
+    onDrop: (event: React.DragEvent) => { event.preventDefault(); onDrop(); }, "data-over": over === key || undefined,
+  });
+  const moveMenu = (id: string) => [
+    ...((player.bank.find(slot => slot.id === id)?.tab ?? 0) ? [{ verb: "Move to", noun: "main tab", tone: "item" as const, run: () => { drag.current = id; move(null, 0); } }] : []),
+    ...tabs.filter(t => t !== (player.bank.find(slot => slot.id === id)?.tab ?? 0)).map(t => ({ verb: "Move to", noun: `tab ${t}`, tone: "item" as const, run: () => { drag.current = id; move(null, t); } })),
+    ...(tabs.length < BANK_TABS ? [{ verb: "Move to", noun: "a new tab", tone: "item" as const, run: () => { drag.current = id; move(null, "new"); } }] : []),
+  ];
+  let lastTab = -1;
   return (
     <Modal title="Bank of the Realm" onClose={onClose} wide>
+      <div className="realm-bank-tabs" role="tablist" aria-label="Bank tabs">
+        <button type="button" role="tab" aria-selected={current === 0} aria-label="All items" title="All items (drop here for the main tab)" onClick={() => setTab(0)} {...dropTarget("tab0", () => move(null, 0))}>∞</button>
+        {tabs.map(t => { const first = player.bank.find(slot => (slot.tab ?? 0) === t)!; return (
+          <button key={t} type="button" role="tab" aria-selected={current === t} aria-label={`Bank tab ${t}`} title={`Tab ${t} (drop items here)`} onClick={() => setTab(t)} {...dropTarget(`tab${t}`, () => move(null, t))}>
+            <img src={itemIconUrl(first.id)} alt="" width={26} height={26} draggable={false} className="pixel" />
+          </button>
+        ); })}
+        {tabs.length < BANK_TABS && <button type="button" className="new" aria-label="New tab (drop an item here)" title="New tab: drag an item here" {...dropTarget("new", () => move(null, "new"))}>+</button>}
+      </div>
       <div className="realm-bank-bar">
         <input type="search" placeholder="Search" value={search} onChange={event => setSearch(event.target.value)} aria-label="Search the bank" />
         <span>Withdraw/deposit:</span>{[1, 5, 10, Infinity].map(n => <button key={n} type="button" aria-pressed={amount === n} onClick={() => setAmount(n)}>{n === Infinity ? "All" : n}</button>)}
-        <button type="button" onClick={() => { bankDepositAll(player); refresh(); }}>Deposit inventory</button>
-        <button type="button" onClick={() => { bankDepositWorn(player); refresh(); }}>Deposit worn</button>
+        <button type="button" onClick={() => { bankDepositAll(player, current); refresh(); }}>Deposit inventory</button>
+        <button type="button" onClick={() => { bankDepositWorn(player, current); refresh(); }}>Deposit worn</button>
       </div>
       <div className="realm-bank">
         <div className="realm-bank-grid" aria-label="Bank">
-          {shown.map(slot => (
-            <button key={slot.id} type="button" className="realm-slot" aria-label={`Withdraw ${item(slot.id).name} (${slot.n})`}
-              onClick={() => { bankWithdraw(player, slot.id, amount); refresh(); }}
-              {...rightClick(openMenu, () => [...[1, 5, 10, Infinity].map(n => ({ verb: `Withdraw-${n === Infinity ? "All" : n}`, noun: item(slot.id).name, tone: "item", run: () => { bankWithdraw(player, slot.id, n); refresh(); } })), examine(game, slot.id, refresh)])}>
-              <ItemIcon slot={slot} />
-            </button>
-          ))}
-          {!shown.length && <p className="realm-muted">{search ? "Nothing matches." : "Your bank is empty."}</p>}
+          {shown.map(slot => {
+            const slotTab = slot.tab ?? 0, divider = current === 0 && !search && slotTab !== lastTab && slotTab > 0;
+            lastTab = slotTab;
+            return (
+              <React.Fragment key={slot.id}>
+                {divider && <span className="realm-bank-divider">Tab {slotTab}</span>}
+                <button type="button" className="realm-slot" aria-label={`Withdraw ${item(slot.id).name} (${slot.n})`} draggable
+                  onDragStart={() => { drag.current = slot.id; }} onDragEnd={() => { drag.current = null; setOver(null); }} {...dropTarget(slot.id, () => move(slot.id))}
+                  onClick={() => { bankWithdraw(player, slot.id, amount); refresh(); }}
+                  {...rightClick(openMenu, () => [...[1, 5, 10, Infinity].map(n => ({ verb: `Withdraw-${n === Infinity ? "All" : n}`, noun: item(slot.id).name, tone: "item", run: () => { bankWithdraw(player, slot.id, n); refresh(); } })), ...moveMenu(slot.id), examine(game, slot.id, refresh)])}>
+                  <ItemIcon slot={slot} />
+                </button>
+              </React.Fragment>
+            );
+          })}
+          {!shown.length && <p className="realm-muted">{search ? "Nothing matches." : current ? "This tab is empty." : "Your bank is empty."}</p>}
         </div>
         <div className="realm-inventory small" aria-label="Inventory (click to deposit)">
           {player.inventory.map((slot, index) => (
-            <button key={index} type="button" className="realm-slot" aria-label={slot ? `Deposit ${item(slot.id).name}` : `Empty slot ${index + 1}`} onClick={() => { if (slot) { bankDeposit(player, index, amount); refresh(); } }}
-              {...rightClick(openMenu, () => slot ? [...[1, 5, 10, Infinity].map(n => ({ verb: `Deposit-${n === Infinity ? "All" : n}`, noun: item(slot.id).name, tone: "item", run: () => { bankDeposit(player, index, n); refresh(); } })), examine(game, slot.id, refresh)] : [])}>
+            <button key={index} type="button" className="realm-slot" aria-label={slot ? `Deposit ${item(slot.id).name}` : `Empty slot ${index + 1}`} onClick={() => { if (slot) { bankDeposit(player, index, amount, current); refresh(); } }}
+              {...rightClick(openMenu, () => slot ? [...[1, 5, 10, Infinity].map(n => ({ verb: `Deposit-${n === Infinity ? "All" : n}`, noun: item(slot.id).name, tone: "item", run: () => { bankDeposit(player, index, n, current); refresh(); } })), examine(game, slot.id, refresh)] : [])}>
               {slot && <ItemIcon slot={slot} size={38} />}
             </button>
           ))}
         </div>
       </div>
-      <p className="realm-note">{player.bank.length} / 400 slots · Click to withdraw or deposit; right-click for amounts.</p>
+      <p className="realm-note">{player.bank.length} / 400 slots · Click to withdraw or deposit; right-click for amounts. Drag items to rearrange them, onto a tab to file them there, or onto + for a new tab.{current ? ` Deposits go into tab ${current}.` : ""}</p>
     </Modal>
   );
 }

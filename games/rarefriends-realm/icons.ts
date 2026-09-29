@@ -419,6 +419,24 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
         }
         break;
       }
+      case "mask": {
+        // A Grumblin's head: grey-green, big pointed ears, yellow eyes under a heavy brow, a toothy grin.
+        part(p, all(poly([[3, 9], [10, 13], [8, 18]]), poly([[29, 9], [22, 13], [24, 18]])), shadeHex(color, -0.1), "food");
+        part(p, poly([[8, 27], [7, 13], [11, 6], [16, 4], [21, 6], [25, 13], [24, 27], [16, 30]]), color, "food");
+        line(p, [[10, 13], [14, 15]], shadeHex(color, -0.4), 2); line(p, [[22, 13], [18, 15]], shadeHex(color, -0.4), 2);
+        for (const x of [12, 20]) { part(p, disc(x, 17, 2), accent ?? "#e2c46a", "gem"); dot(p, x, 17, INK); }
+        line(p, [[10, 23], [13, 25], [19, 25], [22, 23]], INK, 2);
+        for (const x of [12, 15, 18]) dot(p, x, 24, "#f4efe2");
+        dot(p, 16, 20, shadeHex(color, -0.35)); break;
+      }
+      case "satchel": {
+        // A leather pack with a flap and buckle, lumps of inkcoal peeking out of the top.
+        for (const [x, y] of [[11, 7], [16, 5], [21, 7]] as Pt[]) part(p, disc(x, y, 3), accent ?? "#3b3a38", "stone");
+        part(p, poly([[6, 9], [26, 9], [27, 28], [5, 28]]), color, "cloth");
+        part(p, poly([[5, 9], [27, 9], [26, 18], [16, 20], [6, 18]]), shadeHex(color, -0.15), "cloth");
+        part(p, box(14, 16, 4, 5), "#c9a24a", "metal"); dot(p, 16, 18, INK);
+        line(p, [[9, 5], [8, 10]], shadeHex(color, -0.3), 2); line(p, [[23, 5], [24, 10]], shadeHex(color, -0.3), 2); break;
+      }
       case "quiver": {
         // A leather quiver with a brass rim and band, three fletched shafts standing out of it (a torn one is empty and ripped).
         const torn = accent === "torn", trim = torn ? shadeHex(color, -0.25) : accent ?? "#c9a24a";

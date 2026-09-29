@@ -74,7 +74,7 @@ export type IconShape =
   | "amulet" | "log" | "fish" | "ore" | "bar" | "bones" | "sigil" | "staff" | "net" | "rod" | "harpoon" | "pot" | "bucket" | "egg" | "flour"
   | "milk" | "tinderbox" | "hammer" | "knife" | "needle" | "thread" | "chisel" | "gem" | "hide" | "leather" | "meat" | "feather" | "bait"
   | "cake" | "bread" | "berries" | "key" | "wheat" | "lamp" | "scroll" | "silk" | "hood" | "bracer" | "burnt" | "hat" | "crown" | "orb" | "trophy"
-  | "bow" | "arrow" | "tablet" | "arrowheads" | "material" | "quiver" | "warbow" | "crossbow" | "bolts" | "limbs" | "stock";
+  | "bow" | "arrow" | "tablet" | "arrowheads" | "material" | "quiver" | "satchel" | "mask" | "warbow" | "crossbow" | "bolts" | "limbs" | "stock";
 export type Item = {
   id: string; name: string; examine: string; value: number; icon: Icon;
   stackable?: boolean; tradeable?: boolean;
@@ -385,6 +385,12 @@ const RANGED_GEAR: Item[] = [
     id: `${metal.id}_arrow`, name: `${metal.name} arrows`, examine: `Arrows with ${metal.id} heads.`, value: [3, 6, 12, 24, 48, 110, 180, 260, 380, 480, 600, 900][index], stackable: true,
     icon: { shape: "arrow" as const, color: metal.color }, ammo: { strength: ARROW_STRENGTH[index], level: metal.level },
   })),
+  // A very rare Grumblin drop, worn over your Friend's head.
+  { id: "grumblin_head", name: "Grumblin head", examine: "A Grumblin's head, hollowed out and surprisingly comfy. It still grumbles a little.", value: 5000,
+    icon: { shape: "mask", color: "#8e9a7a", accent: "#e2c46a" }, equip: { slot: "head", bonuses: { defence: 3, attack: 1 } } },
+  // The inkcoal satchel: worn on your back (or carried), it catches mined inkcoal and feeds the furnace.
+  { id: "inkcoal_satchel", name: "Inkcoal satchel", examine: "A stout leather pack for your back. It holds 120 inkcoal, fills itself as you mine, and the furnace reaches into it.", value: 2500,
+    icon: { shape: "satchel", color: "#8a6446", accent: "#3b3a38" }, equip: { slot: "cape", bonuses: { defence: 1 } } },
   // Hazel's quiver (the Fernwick quest's reward): worn on your back, and most shots fly home to it.
   { id: "hazels_quiver", name: "Hazel's quiver", examine: "Hazel's grandmother's quiver, restitched. Four arrows or bolts in five fly home to it after the shot.", value: 1200, tradeable: false,
     icon: { shape: "quiver", color: "#8a5a3a", accent: "#c9a24a" }, equip: { slot: "cape", bonuses: { ranged: 4, defence: 1 } } },
@@ -469,10 +475,10 @@ export const FISHING_SPOTS: Record<SpotKind, { name: string; action: string; too
 };
 /** Cooking: level, XP and the level at which you stop burning (on a range). */
 export const COOKING: Record<string, { cooked: string; level: number; xp: number; stopBurn: number }> = {
-  raw_minnows: { cooked: "minnows", level: 1, xp: 30, stopBurn: 34 },
-  raw_chicken: { cooked: "cooked_chicken", level: 1, xp: 30, stopBurn: 34 },
-  raw_beef: { cooked: "cooked_meat", level: 1, xp: 30, stopBurn: 34 },
-  raw_perch: { cooked: "perch", level: 1, xp: 40, stopBurn: 38 },
+  raw_minnows: { cooked: "minnows", level: 1, xp: 30, stopBurn: 18 },
+  raw_chicken: { cooked: "cooked_chicken", level: 1, xp: 30, stopBurn: 20 },
+  raw_beef: { cooked: "cooked_meat", level: 1, xp: 30, stopBurn: 20 },
+  raw_perch: { cooked: "perch", level: 1, xp: 40, stopBurn: 30 },
   raw_carp: { cooked: "carp", level: 5, xp: 50, stopBurn: 41 },
   raw_char: { cooked: "char", level: 15, xp: 70, stopBurn: 50 },
   raw_grayling: { cooked: "grayling", level: 25, xp: 90, stopBurn: 58 },
@@ -516,6 +522,7 @@ export const CRAFTING = [
   { product: "leather_bracers", level: 11, xp: 22, leather: 1 },
   { product: "leather_jerkin", level: 14, xp: 25, leather: 1 },
   { product: "leather_leggings", level: 18, xp: 27, leather: 1 },
+  { product: "inkcoal_satchel", level: 28, xp: 65, leather: 3 },
   { product: "drakehide_bracers", level: 57, xp: 62, leather: 1, hide: "drakehide" },
   { product: "drakehide_chaps", level: 60, xp: 124, leather: 2, hide: "drakehide" },
   { product: "drakehide_vest", level: 63, xp: 186, leather: 3, hide: "drakehide" },
@@ -625,9 +632,9 @@ export const MONSTERS: Record<string, MonsterDef> = {
   ink_rat: { id: "ink_rat", name: "Ink rat", level: 1, hp: 2, attack: 1, strength: 1, defence: 1, attackBonus: 0, defenceBonus: 0, maxHit: 1, speed: 4, respawn: 15, wander: 6, examine: "A rat made of spilled ink. It squeaks in monochrome.",
     always: [one("bones", 1)], drops: [coins(1, 4, 0.3)], art: 102 },
   grumblin: { id: "grumblin", name: "Grumblin", level: 5, hp: 7, attack: 4, strength: 4, defence: 1, attackBonus: 2, defenceBonus: 0, maxHit: 2, speed: 4, respawn: 25, wander: 6, examine: "An ugly, grumbling green-grey creature.", aggressive: true,
-    always: [one("bones", 1)], drops: [coins(2, 25, 0.45), one("breeze_sigil", 0.1, 3, 8), one("thought_sigil", 0.08, 2, 6), one("pewter_dagger", 0.04), one("pewter_helm", 0.03), one("fishing_bait", 0.08, 5, 15), one("tide_sigil", 0.05, 2, 6), one("pewter_arrow", 0.12, 4, 12), one("shortbow", 0.02)], art: 103 },
+    always: [one("bones", 1)], drops: [one("grumblin_head", 0.002), coins(2, 25, 0.45), one("breeze_sigil", 0.1, 3, 8), one("thought_sigil", 0.08, 2, 6), one("pewter_dagger", 0.04), one("pewter_helm", 0.03), one("fishing_bait", 0.08, 5, 15), one("tide_sigil", 0.05, 2, 6), one("pewter_arrow", 0.12, 4, 12), one("shortbow", 0.02)], art: 103 },
   grumblin_chief: { id: "grumblin_chief", name: "Grumblin chief", level: 13, hp: 20, attack: 10, strength: 11, defence: 8, attackBonus: 6, defenceBonus: 5, maxHit: 3, speed: 4, respawn: 50, wander: 3, examine: "The loudest Grumblin. That's how they choose.", aggressive: true,
-    always: [one("bones", 1)], drops: [coins(20, 80, 0.6), one("blackiron_sabre", 0.05), one("stone_sigil", 0.1, 5, 12), one("blackiron_helm", 0.05), one("rough_moonstone", 0.03)], art: 104 },
+    always: [one("bones", 1)], drops: [one("grumblin_head", 0.02), coins(20, 80, 0.6), one("blackiron_sabre", 0.05), one("stone_sigil", 0.1, 5, 12), one("blackiron_helm", 0.05), one("rough_moonstone", 0.03)], art: 104 },
   bandit: { id: "bandit", name: "Dune bandit", level: 22, hp: 28, attack: 20, strength: 20, defence: 16, attackBonus: 12, defenceBonus: 12, maxHit: 4, speed: 4, respawn: 40, wander: 5, examine: "A Friend who took a wrong turn in life.", aggressive: true,
     always: [one("bones", 1)], drops: [coins(20, 120, 0.7), one("ashsteel_dagger", 0.05), one("storm_sigil", 0.08, 2, 6), one("rough_sagestone", 0.02), one("path_sigil", 0.02, 1, 2), one("ashsteel_arrow", 0.1, 5, 15), one("willow_bow", 0.02)], art: 105 },
   swamp_lurker: { id: "swamp_lurker", name: "Swamp lurker", level: 16, hp: 22, attack: 14, strength: 14, defence: 12, attackBonus: 8, defenceBonus: 8, maxHit: 3, speed: 5, respawn: 35, wander: 4, examine: "Mostly mouth, partly mud.", aggressive: true,
@@ -756,6 +763,7 @@ export const SHOPS: Record<string, ShopDef> = {
   archery: { id: "archery", name: "Fletch & Feather", buys: ["bow", "arrow", "logs"], rate: 0.6, stock: ["knife", "arrow_shaft", "headless_arrow", "shortbow", "oak_bow", "willow_bow", "maple_bow", "yew_bow", "pewter_arrow", "blackiron_arrow", "ashsteel_arrow", "moonsilver_arrow",
     "pewter_crossbow", "blackiron_crossbow", "ashsteel_crossbow", "pewter_bolts", "blackiron_bolts", "ashsteel_bolts",
     "hunter_coif", "hunter_vest", "hunter_chaps", "hunter_bracers", "feather"] },
+  mine_supplies: { id: "mine_supplies", name: "Old miner's supplies", buys: ["ore"], rate: 0.5, stock: ["pewter_pickaxe", "blackiron_pickaxe", "ashsteel_pickaxe", "moonsilver_pickaxe", "inkcoal_satchel", "hammer", "bread"] },
   // Fernwick, the woodcutters' village: the only place that sells war bows, and the best price for logs.
   war_bows: { id: "war_bows", name: "Hazel's War Bows", buys: ["bow", "arrow"], rate: 0.6, stock: ["war_bow", "oak_war_bow", "willow_war_bow", "maple_war_bow", "yew_war_bow",
     "moonsilver_crossbow", "wooden_stock", "oak_stock", "willow_stock", "pewter_bolts", "blackiron_bolts", "ashsteel_bolts", "moonsilver_bolts", "pewter_arrow", "blackiron_arrow", "ashsteel_arrow", "feather", "knife"] },

@@ -220,6 +220,14 @@
 .realm-bank-grid .realm-slot.shop { display: grid; gap: 0; }
 .realm-bank-grid .realm-slot.shop small { color: var(--gold); font-size: 9px; }
 .realm-bank-grid .realm-muted { grid-column: 1 / -1; }
+.realm-bank-grid .realm-slot[data-over] { border-color: var(--gold); background: rgba(226, 212, 158, 0.25); }
+.realm-bank-divider { grid-column: 1 / -1; font-size: 11px; font-weight: 700; color: #e2d49e; border-top: 1.5px dashed #6d6b67; padding: 3px 2px 0; margin-top: 2px; line-height: 1.1; }
+.realm-bank-tabs { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 6px; }
+.realm-bank-tabs button { width: 38px; height: 34px; min-height: 0 !important; padding: 0 !important; display: grid; place-items: center; font-size: 17px; font-weight: 700;
+  background: #d6d3cc !important; color: var(--ink) !important; border: 2px solid var(--ink); border-bottom-width: 4px; }
+.realm-bank-tabs button[aria-selected="true"] { background: #fbf8f0 !important; border-bottom-color: #c9a24a; }
+.realm-bank-tabs button.new { border-style: dashed; background: transparent !important; }
+.realm-bank-tabs button[data-over] { background: rgba(226, 212, 158, 0.6); border-color: var(--gold); }
 .realm-inventory.small { padding: 6px; background: var(--panel); border: 2px solid var(--ink); align-content: start; }
 .realm-inventory.small .realm-slot { box-shadow: none; border: 1px solid transparent; background: transparent; min-height: 0; padding: 0; }
 .realm-odds { width: 100%; border-collapse: collapse; font-size: 11px; margin: 8px 0; }

@@ -856,6 +856,22 @@ export function createWorld(seed = 20260927): World {
   // Banners of your Friend around the fountain square and at the castle gate.
   for (const [bx, by] of [[113, 117], [131, 117], [113, 131], [131, 131], [119, 106], [124, 106]] as const) if (WALKABLE.has(get(bx, by)) && objectAt[tileIndex(bx, by)] < 0) decor(bx, by, "banner");
 
+  // Millpond: a little pond south of the windmill for beginner fishing (minnows in a net, perch and carp with bait), close to town.
+  blob(76, 139, 3.8, 2.4, T.WATER, 0.15, t => t === T.GRASS || t === T.DARK_GRASS);
+  for (let y = 134; y <= 144; y++) for (let x = 69; x <= 84; x++) if (isWater(get(x, y))) clearAt(x, y);
+  {
+    const kinds: SpotKind[] = ["net", "net", "bait"], shore = (x: number, y: number) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => WALKABLE.has(get(x + dx, y + dy)));
+    const edge: [number, number][] = [];
+    for (let y = 134; y <= 144; y++) for (let x = 69; x <= 84; x++) if (((x - 76) / 5.5) ** 2 + ((y - 139) / 3.6) ** 2 <= 1 && isWater(get(x, y)) && shore(x, y) && objectAt[tileIndex(x, y)] < 0) edge.push([x, y]);
+    // Spread the spots round the shore: west, east and north edges.
+    const pick = (score: (x: number, y: number) => number) => edge.filter(([x, y]) => objectAt[tileIndex(x, y)] < 0).sort((a, b) => score(...a) - score(...b))[0];
+    for (const [kind, score] of [[kinds[0], (x: number) => x], [kinds[1], (x: number) => -x], [kinds[2], (x: number, y: number) => -y * 4 + Math.abs(x - 77)]] as const) {
+      const at = pick(score); if (at) spot(at[0], at[1], kind);
+    }
+    decor(71, 137, "reeds", false); decor(81, 141, "reeds", false); decor(77, 139, "lily", false); decor(74, 142, "bench", true, "Bench");
+    add({ kind: "sign", x: 76, y: 135, blocks: true, name: "Signpost", text: "Millpond. Minnows for a small net, perch and carp with a rod and bait. Cook them on a fire or the farmhouse range." });
+  }
+
   // The cow pen, out on the farm by the windmill (built last, so no tree or bush lands inside it), its gate facing the coop.
   for (let y = 126; y <= 134; y++) for (let x = 59; x <= 70; x++) { clearAt(x, y); put(x, y, T.GRASS); }
   for (let x = 59; x <= 70; x++) { decor(x, 126, "fence"); decor(x, 134, "fence"); }

@@ -4,6 +4,15 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 24, date: "2026-09-29", title: "Bank tabs, a coal satchel and a Grumblin head", items: [
+    "Bank tabs: drag an item onto + to start a tab, onto a tab to file it there, or onto another item to move it. Each tab shows its first item, the ∞ tab shows everything, and deposits go into the tab you're looking at. Right-click an item to move it without dragging.",
+    "The inkcoal satchel: worn on your back (or carried), it holds 120 inkcoal, fills itself as you mine, and the furnace (and Forgeheart) take from it. Right-click it to check, fill or empty it. The Old miner at the Ashen mine sells them, or stitch one from 3 leather at Crafting 28.",
+    "Grumblins very rarely drop a Grumblin head (the chief a little more often). Wear it. Everyone will know.",
+    "The Millpond, south of the windmill: net fishing for minnows and a bait spot for perch and carp, close to town for new Friends.",
+    "Cooking burns much less while you're learning: minnows, chicken and beef stop burning at level 18–20.",
+    "Spells fly as pixel sprites: fire is a little torch flame, water a teardrop, wind a spinning whirl, earth a tumbling boulder, and curses a knot of smoke with eyes.",
+    "Bank booths are proper counters now, with a glass screen, brass bars, a ledger and a stack of coins. Tools and weapons stay outside your helm or hood as you swing them.",
+  ] },
   { id: 23, date: "2026-09-29", title: "Forged gear: six new tiers, levels 50 to 90", items: [
     "Six forged metals above rarite: Frostsilver (50), Gloomsteel (60), Wyrmscale (70), Hollowsteel (75), Cindersteel (80) and Ashenheart (90). Each makes a full set: dagger, sword, sabre, helm, shield, cuirass, greaves, an axe and a pickaxe, plus a staff, crossbow limbs, arrowheads and bolts.",
     "They're smelted from what the Realm's strongest creatures drop: frost shards (Frost yetis), gloom shards (gloom hounds), wyrm scales (drakes), Hollow essence (sentinels and the Hollow King), cinder cores (cinder drakes and Old Cinder) and Colossus embers (the Ashen Colossus). Smelting and smithing them takes Smithing 86 to 99.",

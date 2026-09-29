@@ -45,7 +45,7 @@ export const NPCS: Record<string, NpcDef> = {
   villager: { id: "villager", name: "Villager", examine: "One of the Realm's many Friends.", options: ["Talk-to", "Pickpocket"], art: art(4, 131),
     pickpocket: { level: 1, xp: 8, coins: [3, 12], stun: 4, damage: 1 } },
   miller: { id: "miller", name: "Miller Dunn", examine: "Flour on every surface.", options: ["Talk-to"], art: art(2, 141) },
-  miner: { id: "miner", name: "Old miner", examine: "Coughs a lot.", options: ["Talk-to"], art: art(6, 151) },
+  miner: { id: "miner", name: "Old miner", examine: "Coughs a lot.", options: ["Talk-to", "Trade"], shop: "mine_supplies", art: art(6, 151) },
   smith: { id: "smith", name: "Brann the smith", examine: "The Emberforge smith. His forge is cold.", options: ["Talk-to"], art: art(6, 161) },
   outfitter: { id: "outfitter", name: "Frostpeak outfitter", examine: "Wrapped in six scarves.", options: ["Talk-to", "Trade"], shop: "frost", art: art(3, 171) },
   fisher: { id: "fisher", name: "Old fisher", examine: "Hasn't moved from the pier in years.", options: ["Talk-to"], art: art(5, 181) },
@@ -448,7 +448,11 @@ export function talk(game: Game, npcId: string): Dialogue {
     ]);
     case "birch": return chat(name, npcSays(name, (["Swing from the hips, not the shoulders. Trees respect that.", "Plain trees for learning, oaks at fifteen, willows at thirty, maples at forty-five. Yews grow south of the camp, and ashwood only up in Frostpeak.",
       "Grumblins come up from the camp some nights. We keep the fires lit.", "Fletch as you go: a knife on your logs makes shafts, bows, war bows and crossbow stocks."] as const)[Math.floor(game.rng() * 4)]));
-    case "miner": return chat(name, npcSays(name, "Pewter anyone can mine. Blackiron's further in. Inkcoal at the south end. There's moonsilver and a gem rock at the north edge, if you're good."));
+    case "miner": return chat(name, npcSays(name, "Pewter anyone can mine. Blackiron's further in. Inkcoal at the south end. There's moonsilver and a gem rock at the north edge, if you're good.",
+      "Hauling inkcoal? Get yourself a satchel for your back. Holds a hundred and twenty, fills as you swing, and the furnace takes from it. I sell 'em, or stitch your own from three leather."), [
+      { label: "Let's trade.", then: () => { game.ui.shop = "mine_supplies"; return null; } },
+      { label: "Thanks.", then: () => null },
+    ]);
     case "banker": return chat(name, npcSays(name, "Good day. Would you like to access your bank account?"), [
       { label: "Yes please.", then: () => { game.ui.bank = true; return null; } },
       { label: "No thanks.", then: () => null },
