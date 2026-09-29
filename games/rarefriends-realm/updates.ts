@@ -4,6 +4,13 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 31, date: "2026-09-29", title: "New lighting: real shadows, sunlight and lamplight", items: [
+    "The sun moves across the sky: it rises in the east, crosses the south and sets in the west. Buildings, walls, trees, rocks, characters and mounts cast shadows that follow it, long and golden at dawn and dusk, short at noon, and faint in the moonlight.",
+    "Lamps, torches, fires, forges and spells light the ground and everything standing near them instead of glowing over it, and walls, rocks and trees block their light.",
+    "Light bounces: a fire's glow spills softly round corners in the colour of the ground, lava lights up everything around it, and dungeons are truly dark away from the flames.",
+    "Softer ambient light: corners, alleys, forest floors and the spaces under roofs are darker, and the sky's colour changes through the day. At night the haze and fog turn a dim blue.",
+    "On Low graphics a clear day is drawn as before, and nights stay lit, without the shadows.",
+  ] },
   { id: 30, date: "2026-09-29", title: "Two-handed weapons, new creatures and sharper skill icons", items: [
     "Two-handed greatswords, battleaxes and war hammers in every metal: a tick slower than a sword and much harder hitting, with no room for a shield. Smith them at an anvil (3 bars), or buy them at Heft & Haft, the new shop at the south end of Market Street.",
     "New creatures: forest spiders in Whisperwood, wild boars in the southern woods, sand scorpions in the Pale Dunes, highland goats on the Greyhorn slopes and stone golems in the Greyhorn mine.",

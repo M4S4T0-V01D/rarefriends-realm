@@ -17,7 +17,10 @@ type Particle = {
 };
 const particles: Particle[] = [];
 const MAX = 320;
+/** While the renderer redraws things for their shadows, nothing they draw may spawn particles. */
+export const hush = { on: false };
 function add(particle: Omit<Particle, "age" | "seed">) {
+  if (hush.on) return;
   if (particles.length >= MAX) particles.shift();
   particles.push({ ...particle, age: 0, seed: Math.random() * 1000 });
 }
@@ -197,7 +200,11 @@ export function drawCloudShadows(ctx: CanvasRenderingContext2D, project: Project
   }
 }
 /** Particles and birds, on top of the scene. */
-export function drawEffects(ctx: CanvasRenderingContext2D, project: Project, world: World, now: number, zoom: number, pass: "normal" | "bright" = "normal") {
+/**
+ * Draw the particles and birds. Passes: "bright" is firework sparks (added over everything); "lit" is what the light falls
+ * on (chips, leaves, smoke, birds…) and "glowing" what gives its own light (sparks and fireflies); "normal" is both.
+ */
+export function drawEffects(ctx: CanvasRenderingContext2D, project: Project, world: World, now: number, zoom: number, pass: "normal" | "bright" | "lit" | "glowing" = "normal") {
   if (pass === "bright") {
     // Firework sparks: a soft glow and a bright core, added over the night so they light up the dark.
     ctx.globalCompositeOperation = "lighter";
@@ -210,8 +217,9 @@ export function drawEffects(ctx: CanvasRenderingContext2D, project: Project, wor
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
     return;
   }
+  const glowing = (particle: Particle) => particle.kind === "glow" || particle.kind === "spark";
   for (const particle of particles) {
-    if (particle.bright) continue;
+    if (particle.bright || (pass === "lit" && glowing(particle)) || (pass === "glowing" && !glowing(particle))) continue;
     const floor = particle.kind === "leaf" || particle.kind === "flake" ? Math.max(particle.h, groundHeight(world, particle.x, particle.y)) : particle.h;
     const p = project(particle.x, particle.y, floor - groundHeight(world, particle.x, particle.y)), k = 1 - particle.age / particle.life, s = particle.size * zoom * 1.5;
     ctx.globalAlpha = Math.max(0, Math.min(1, particle.kind === "puff" ? k * 0.45 : particle.kind === "glow" ? (0.5 + Math.sin(now / 200 + particle.seed) * 0.5) * k : k * 1.4));
@@ -223,6 +231,7 @@ export function drawEffects(ctx: CanvasRenderingContext2D, project: Project, wor
     else { ctx.fillRect(Math.round(p.x - s / 2), Math.round(p.y - s / 2), Math.max(1, Math.round(s)), Math.max(1, Math.round(s))); if (particle.kind === "chip" || particle.kind === "flake") { ctx.strokeStyle = "#161616"; ctx.lineWidth = 0.6; ctx.strokeRect(Math.round(p.x - s / 2), Math.round(p.y - s / 2), Math.round(s), Math.round(s)); } }
   }
   ctx.globalAlpha = 1;
+  if (pass === "glowing") return;
   ctx.strokeStyle = "#161616"; ctx.lineWidth = 1.4;
   for (const bird of birds) for (let i = 0; i < bird.count; i++) {
     const offset = (i % 2 ? 1 : -1) * Math.ceil(i / 2) * 0.8, back = Math.ceil(i / 2) * 0.9, bx = bird.x - bird.vx / 2.4 * back - bird.vy / 2.4 * offset, by = bird.y - bird.vy / 2.4 * back + bird.vx / 2.4 * offset;

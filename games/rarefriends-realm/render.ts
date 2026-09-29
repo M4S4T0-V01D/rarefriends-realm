@@ -19,7 +19,8 @@ import { campfireLogs, decorArt, fireArt, rockArt, treeArt } from "./scenery.ts"
 import { spellArt } from "./spellart.ts";
 import { SADDLE, mountArt, type MountView } from "./mountart.ts";
 import { petArt } from "./petart.ts";
-import { burst, drawCloudShadows, drawEffects, playerPose, puff, treeShake, updateEffects, type Pose } from "./effects.ts";
+import { burst, drawCloudShadows, drawEffects, hush, playerPose, puff, treeShake, updateEffects, type Pose } from "./effects.ts";
+import { LightField, hexRgb, rgbCss, skyFor, type PointLight, type RGB } from "./lighting.ts";
 import { FIGURE_K, drawAuras, drawFigure, figureArt, heldTip, type Held } from "./wardrobe.ts";
 import { creatureSprite, friendSprite, type Mask } from "./sprites.ts";
 
@@ -83,39 +84,32 @@ export function daylight(time: number | null | undefined) {
   const sun = -Math.cos(time * Math.PI * 2), dark = Math.max(0, Math.min(1, (0.25 - sun) / 0.75)), warm = Math.max(0, 1 - Math.abs(sun - 0.08) / 0.32);
   return { dark, warm, label: sun > 0.3 ? "Day" : sun < -0.3 ? "Night" : time < 0.5 ? "Dawn" : "Dusk" };
 }
-type Light = { x: number; y: number; r: number; color?: string; strength?: number; flicker?: boolean };
 /** A hex colour at an alpha, for gradients. */
 const hexA = (hex: string, alpha: number) => { const n = parseInt(hex.slice(1, 7), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${Math.max(0, Math.min(1, alpha)).toFixed(3)})`; };
-let nightCanvas: HTMLCanvasElement | null = null;
-/** Night: a blue dark over everything, with holes burnt through it by lamps, torches, fires and your own lantern. */
+
+// ---------- Lighting passes ----------
 /**
- * Night: a blue dark over everything, with light pooling on the ground around every lamp, torch, fire, spell and your
- * own small light (ellipses flattened by the camera's pitch, soft falloff, flames flickering), and warm light added on top.
+ * The light on screen: a half-resolution buffer (light changes slowly, and every sprite has an ink edge) holding the
+ * ground's light with the sun's shadows in it. As each object is drawn, back to front, it cuts its exact silhouette out
+ * of the buffer and fills the hole with the light where it stands; the buffer is then multiplied over the frame once.
  */
-function drawNight(ctx: CanvasRenderingContext2D, dark: number, warm: number, lights: readonly Light[], tint = "10,13,38", squash = 0.6, now = 0) {
-  if (warm > 0.01) { ctx.fillStyle = `rgba(232,140,86,${(warm * 0.18).toFixed(3)})`; ctx.fillRect(0, 0, VIEW.width, VIEW.height); }
-  if (dark < 0.01) return;
-  const canvas = nightCanvas ??= document.createElement("canvas");
-  if (canvas.width !== VIEW.width) { canvas.width = VIEW.width; canvas.height = VIEW.height; }
-  const n = canvas.getContext("2d")!;
-  n.globalCompositeOperation = "source-over"; n.clearRect(0, 0, VIEW.width, VIEW.height);
-  n.fillStyle = `rgba(${tint},${(0.74 * dark).toFixed(3)})`; n.fillRect(0, 0, VIEW.width, VIEW.height);
-  const flicker = (light: Light, i: number) => light.flicker && now ? 1 + Math.sin(now / 90 + i * 1.7) * 0.05 + Math.sin(now / 37 + i) * 0.03 : 1;
-  const pool = (target: CanvasRenderingContext2D, light: Light, i: number, stops: [number, string][], scale = 1) => {
-    const r = light.r * scale * flicker(light, i);
-    target.save(); target.translate(light.x, light.y); target.scale(1, squash);
-    const g = target.createRadialGradient(0, 0, 0, 0, 0, r); for (const [at, color] of stops) g.addColorStop(at, color);
-    target.fillStyle = g; target.fillRect(-r, -r, r * 2, r * 2); target.restore();
-  };
-  n.globalCompositeOperation = "destination-out";
-  lights.forEach((light, i) => { const k = light.strength ?? 1;
-    pool(n, light, i, [[0, `rgba(0,0,0,${(0.96 * k).toFixed(3)})`], [0.3, `rgba(0,0,0,${(0.78 * k).toFixed(3)})`], [0.62, `rgba(0,0,0,${(0.34 * k).toFixed(3)})`], [1, "rgba(0,0,0,0)"]]); });
-  ctx.drawImage(canvas, 0, 0, VIEW.width, VIEW.height);
-  // Light adds colour: a warm (or the spell's) glow pooled around each source, brightest at its heart.
-  ctx.globalCompositeOperation = "lighter";
-  lights.forEach((light, i) => { const k = (light.strength ?? 1) * dark, c = light.color ?? "#e89a4f";
-    pool(ctx, light, i, [[0, hexA(c, 0.5 * k)], [0.45, hexA(c, 0.2 * k)], [1, hexA(c, 0)]], 0.75); });
-  ctx.globalCompositeOperation = "source-over";
+const field = new LightField();
+let lightBuffer: HTMLCanvasElement | null = null, shadowBuffer: HTMLCanvasElement | null = null;
+
+function buffers(target: CanvasRenderingContext2D) {
+  const make = (canvas: HTMLCanvasElement | null, w: number, h: number) => { canvas ??= document.createElement("canvas"); if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; } return canvas; };
+  lightBuffer = make(lightBuffer, Math.ceil(VIEW.width / 2), Math.ceil(VIEW.height / 2));
+  shadowBuffer = make(shadowBuffer, lightBuffer.width, lightBuffer.height);
+  return { light: lightBuffer.getContext("2d")!, shadow: shadowBuffer.getContext("2d")! };
+}
+/**
+ * Overlays (health bars, names, speech, hit splats, quest markers) are UI, not things in the world: while objects are
+ * drawn they're queued and drawn afterwards straight onto the frame, unlit. While shadows are drawn they're dropped.
+ */
+let uiQueue: (() => void)[] | null = null, uiTarget: CanvasRenderingContext2D | null = null, uiMuted = false;
+function ui(ctx: CanvasRenderingContext2D, draw: (ctx: CanvasRenderingContext2D) => void) {
+  if (uiMuted) return;
+  if (uiQueue && uiTarget) { const target = uiTarget; uiQueue.push(() => draw(target)); } else draw(ctx);
 }
 export type HitSplat = { on: "player" | "monster" | "peer"; uid?: number; damage: number; at: number };
 type Hit = { x: number; y: number; w: number; h: number; pick: Pick };
@@ -388,6 +382,10 @@ function drawPrints(ctx: CanvasRenderingContext2D, camera: Camera, now: number) 
 }
 
 // ---------- Objects ----------
+/** How far from the camera (tiles) sprites cast their own shadows; beyond it the haze hides them. */
+const SHADOW_REACH = 30;
+/** Decorations lying flat on the ground: they cast no shadow. */
+const FLAT_DECOR = new Set(["flowers", "lily", "rubble", "reeds", "grave"]);
 /** Pixel art scale: two world pixels per art pixel. */
 const ART = 2;
 function drawTree(ctx: CanvasRenderingContext2D, camera: Camera, object: WorldObject, depleted: boolean, alpha: number, shake: number) {
@@ -961,7 +959,7 @@ function interpolate(entity: { x: number; y: number; prev: { x: number; y: numbe
   return { x: entity.prev.x + (entity.x - entity.prev.x) * alpha, y: entity.prev.y + (entity.y - entity.prev.y) * alpha, moving: alpha < 1 };
 }
 /** A health bar: green over red, ink outline. `label` (a level) sits to its left. */
-function hpBar(ctx: CanvasRenderingContext2D, x: number, y: number, fraction: number, z: number, width = 30, label?: string) {
+function hpBar(ctx: CanvasRenderingContext2D, x: number, y: number, fraction: number, z: number, width = 30, label?: string) { ui(ctx, ctx => {
   const w = width * z, h = 4.5 * Math.max(0.85, z), left = x - w / 2;
   ctx.fillStyle = "#cf6e6e"; ctx.fillRect(left, y, w, h);
   ctx.fillStyle = "#86c47f"; ctx.fillRect(left, y, w * Math.max(0, Math.min(1, fraction)), h);
@@ -970,19 +968,30 @@ function hpBar(ctx: CanvasRenderingContext2D, x: number, y: number, fraction: nu
     ctx.font = `bold ${Math.round(9 * Math.max(0.9, z))}px ui-monospace, Menlo, Consolas, monospace`; ctx.textAlign = "right"; ctx.textBaseline = "middle";
     ctx.strokeStyle = INK; ctx.lineWidth = 2.5; ctx.strokeText(label, left - 3, y + h / 2); ctx.fillStyle = "#f2e28f"; ctx.fillText(label, left - 3, y + h / 2);
   }
-}
-function splat(ctx: CanvasRenderingContext2D, x: number, y: number, damage: number, z: number, age: number) {
+}); }
+function splat(ctx: CanvasRenderingContext2D, x: number, y: number, damage: number, z: number, age: number) { ui(ctx, ctx => {
   const r = 9 * Math.max(0.8, z), rise = age * 10 * z;
   ellipse(ctx, x, y - rise, r, r * 0.9, damage > 0 ? "#c98f95" : "#9fb4d0", INK, 1.4);
   ctx.fillStyle = "#fff"; ctx.font = `bold ${Math.round(11 * Math.max(0.85, z))}px ui-monospace, Menlo, Consolas, monospace`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
   ctx.strokeStyle = INK; ctx.lineWidth = 2.5; ctx.strokeText(String(Math.max(0, damage)), x, y - rise + 0.5); ctx.fillText(String(Math.max(0, damage)), x, y - rise + 0.5);
-}
-function overheadText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color = "#f2e28f") {
+}); }
+function overheadText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color = "#f2e28f") { ui(ctx, ctx => {
   ctx.font = "bold 13px ui-monospace, Menlo, Consolas, monospace"; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
   ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.strokeText(text, x, y); ctx.fillStyle = color; ctx.fillText(text, x, y);
-}
+}); }
 // ---------- Scene ----------
-type Drawable = { depth: number; draw: () => void };
+/**
+ * Something in the world, drawn back to front. `at` is where it stands (tiles) and how high up it's lit (world px): it's
+ * tinted by the light there. Without `at` it's drawn as it is (fires, beams: things that give light). `size` bounds it
+ * on screen (world px up, to the side and down from its feet; `rect` for odd shapes), `cast` makes it throw a shadow in
+ * the sun, and `min` keeps it readable in the dark.
+ */
+type Drawable = {
+  depth: number; draw: () => void;
+  at?: { x: number; y: number; h?: number }; size?: readonly [number, number, number]; rect?: () => [number, number, number, number]; cast?: boolean; min?: number;
+  /** A light of its own choosing (the haze takes the sky's). */
+  light?: RGB;
+};
 let lastHits: Hit[] = [];
 /** Picks under a point, topmost first, from the last frame. */
 export function pickAt(x: number, y: number): Pick[] {
@@ -1011,8 +1020,10 @@ let liftNow = 0;
 export const RENDER_PROFILE: Record<string, number> = {};
 let profileAt = 0;
 const lap = (name: string) => { const t = performance.now(); RENDER_PROFILE[name] = (RENDER_PROFILE[name] ?? 0) * 0.95 + (t - profileAt) * 0.05; profileAt = t; };
-export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
+export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   profileAt = performance.now();
+  // What everything draws on: the frame, or (while objects cut their light, or cast their shadows) a light buffer.
+  let ctx = target;
   const { game, camera, now } = scene, world = game.world, z = camera.zoom;
   const alpha = Math.max(0, Math.min(1, (now - scene.tickAt) / TICK_MS));
   const underground = isUnderground(game.player.y);
@@ -1035,11 +1046,20 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   const x0 = Math.max(cx - reach, Math.min(...corners.map(c => c.x)) - 2), x1 = Math.min(cx + reach, Math.max(...corners.map(c => c.x)) + 3);
   const y0 = Math.max(cy - reach, Math.min(...corners.map(c => c.y)) - 2), y1 = Math.min(cy + reach, Math.max(...corners.map(c => c.y)) + 3);
   lap("setup"); drawTerrain(ctx, scene, x0, y0, x1, y1); lap("terrain"); RENDER_PROFILE.groundQuads = textureStats.frame;
-  if (!low) { drawCloudShadows(ctx, project, camera, now, z, underground, scene.reducedMotion); drawPrints(ctx, camera, now); }
-  const sky = daylight(scene.time), weather = scene.weather ?? null, overcast = weather ? weather.rain * (weather.storm ? 0.45 : 0.28) : 0;
-  const hits: Hit[] = [], drawables: Drawable[] = [], light = underground ? { dark: 0.95, warm: 0, label: "Dark" } : { ...sky, dark: Math.min(1, sky.dark + overcast * (1 - sky.dark)), warm: sky.warm * (1 - (weather?.rain ?? 0)) }, lights: Light[] = [];
-  // Lights pool on the ground beneath their source (the lift only decides where the pool sits on screen, a little below).
-  const glow = (x: number, y: number, lift: number, radius: number, color?: string, strength = 1, flicker = false) => { if (light.dark > 0.01) { const at = toScreen(camera, x, y, lift * 0.3); if (at.x > -250 && at.x < VIEW.width + 250 && at.y > -250 && at.y < VIEW.height + 250) lights.push({ x: at.x, y: at.y, r: radius * z, color, strength, flicker }); } };
+  // The sky's light for the time of day and the weather; the sun's share of it decides how dark shadows are.
+  const weather = scene.weather ?? null, sky = skyFor(scene.time, weather, underground), lit = !low;
+  const sunShare = (sky.sun[0] + sky.sun[1] + sky.sun[2]) / Math.max(0.01, sky.sun[0] + sky.sun[1] + sky.sun[2] + sky.ambient[0] + sky.ambient[1] + sky.ambient[2]);
+  if (!low) { ctx.globalAlpha = Math.min(1, sunShare * 2.2); drawCloudShadows(ctx, project, camera, now, z, underground, scene.reducedMotion); ctx.globalAlpha = 1; drawPrints(ctx, camera, now); }
+  const hits: Hit[] = [], drawables: Drawable[] = [], lights: PointLight[] = [], blockers: [number, number, number][] = [];
+  // Lamps, torches, fires and spells are point lights in the world (upstairs, at the real place): `lift` is the flame's
+  // height, `radius` its reach (screen px at zoom 1). By day they hardly show.
+  const lightK = 0.18 + 0.82 * sky.night;
+  const glow = (x: number, y: number, lift: number, radius: number, color?: string, strength = 1, flicker = false) => {
+    if (y >= FLOOR_Y - 0.5) ({ x, y } = realPoint(world, x, y));
+    if (x < x0 - 10 || x > x1 + 10 || y < y0 - 10 || y > y1 + 10) return;
+    const wobble = flicker && !scene.reducedMotion ? 1 + Math.sin(now / 90 + x * 1.7 + y) * 0.07 + Math.sin(now / 37 + x * 3.1) * 0.04 : 1;
+    lights.push({ x, y, h: lift, r: radius / 32 * 1.15, rgb: hexRgb(color ?? "#e89a4f"), k: strength * wobble * lightK });
+  };
   const player = game.player, pp = interpolate(player, game, alpha), playerDepth = depthOf(camera, pp.x, pp.y), depth = (x: number, y: number) => depthOf(camera, x, y);
   const me = toScreen(camera, pp.x, pp.y), meTop = me.y - 60 * z;
   const coversPlayer = (x: number, y: number) => { const at = toScreen(camera, x, y); return Math.abs(at.x - me.x) < 34 * z && at.y > meTop && at.y - 95 * z < me.y; };
@@ -1055,7 +1075,6 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   };
   // Hover highlight and click marker.
   const tileOutline = (tx: number, ty: number, color: string) => { const c = (dx: number, dy: number) => { const s = toScreen(camera, tx + dx, ty + dy); return [s.x, s.y] as const; }; poly(ctx, [c(-0.5, -0.5), c(0.5, -0.5), c(0.5, 0.5), c(-0.5, 0.5)], null, color, 1.5); };
-  if (scene.hoverTile && !floor) tileOutline(scene.hoverTile.x, scene.hoverTile.y, "rgba(22,22,22,0.35)");
   /** A wall tile: storeys of brick (with windows on buildings), cut low when it stands between you and the camera inside. */
   const wall = (x: number, y: number, storeys: number, cut: boolean, near: boolean, windows: boolean, battlement = false, style: Building["walls"] = "stone", tall = 0) => {
     const d = depth(x, y), dungeon = isUnderground(y), timber = style === "timber";
@@ -1063,7 +1082,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     const owner = !dungeon && inBounds(x, y) ? world.buildingAt[y * W + x] : 0, roofed = owner > 0 && (roofAlpha.get(owner - 1) ?? 0) > 0.95 && !cut;
     // (Only faces onto a real floor inside: a round tower's footprint square has open ground in its corners.)
     const hidden = roofed ? (nx: number, ny: number) => { const tx = x + nx, ty = y + ny; return inBounds(tx, ty) && world.buildingAt[ty * W + tx] === owner && INDOOR_FLOORS.has(world.tiles[ty * W + tx]); } : undefined;
-    drawables.push({ depth: d, draw: () => {
+    drawables.push({ depth: d, at: { x, y, h: 20 }, size: [(cut ? 9 : dungeon ? 34 : storeys * WALL_H + tall) + 24, 52, 30], draw: () => {
       ctx.globalAlpha = near ? 0.3 : 1;
       const [top, left, right] = dungeon ? ["#4a4950", "#3a3940", "#2f2e35"] : timber ? ["#8a6a50", "#e6dcc6", "#cfc4ab"] : style === "plank" ? ["#8a6a50", "#b89c7e", "#9c8266"] : ["#b9b4ab", "#a39e95", "#8f8a82"];
       const plain: WallStyle = dungeon ? "dungeon" : timber ? "timber" : style === "plank" ? "plank" : "brick", glazed: WallStyle = timber ? "timber_window" : "window";
@@ -1086,7 +1105,8 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     if (object.decor === "lamp") glow(x, y, 48, 150, "#f2b261", 0.9); else if (object.decor === "torch") glow(x, y, 32, 130, "#ef9a4c", 1, true);
     else if (object.kind === "furnace" || object.kind === "range") glow(x, y, 16, 110); else if (object.kind === "altar") glow(x, y, 26, 70); else if (object.kind === "sigil_altar") glow(x, y, 30, 90);
     const d = depth(x, y) + (object.kind === "wheat" || object.kind === "spot" ? -0.4 : 0);
-    drawables.push({ depth: d, draw: () => {
+    const flat = object.kind === "spot" || (object.kind === "decor" && FLAT_DECOR.has(object.decor!));
+    drawables.push({ depth: d, at: { x, y }, cast: !flat, size: object.decor === "windmill" ? [320, 140, 40] : object.kind === "tree" ? [260, 110, 40] : [200, 110, 40], draw: () => {
       let rect: { x: number; y: number; w: number; h: number };
       const tall = object.kind === "tree" || (object.kind === "decor" && (["pine", "windmill", "palm", "pillar", "tent"].includes(object.decor!) || (object.decor === "ruin_wall" && (object.height ?? 0) > 34)));
       // Anything tall in front of your Friend that covers it on screen turns see-through (works at any angle and zoom).
@@ -1110,7 +1130,9 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
       const near = !mine && Math.abs(x - pp.x) + Math.abs(y - pp.y) < 7 && d > playerDepth + 0.5 && !floor;
       // Tall buildings show every storey from outside; inside, only the storey you're on (and the ones below).
       wall(x, y, mine ? 1 : building?.storeys ?? 1, cut, near, !!owner && !cut, false, building?.walls ?? "stone", mine ? 0 : building?.tall ?? 0);
-    } else if (terrain === T.CLIFF) drawables.push({ depth: depth(x, y), draw: () => box(ctx, camera, x, y, 1, 1, 22 + hash(x, y) * 10, "#a39e96", "#8f8a83", "#7c7771") });
+      // Walls not under a roof cast their own shadows (a building's are cast whole).
+      if (!building || building.roof === "none") blockers.push([x, y, (building?.storeys ?? 1) * WALL_H]);
+    } else if (terrain === T.CLIFF) { drawables.push({ depth: depth(x, y), at: { x, y }, size: [60, 52, 30], draw: () => box(ctx, camera, x, y, 1, 1, 22 + hash(x, y) * 10, "#a39e96", "#8f8a83", "#7c7771") }); blockers.push([x, y, 28]); }
     if (!covered(x, y)) object(x, y);
   }
   // The storeys you've climbed: outer walls of the ones below, and the floor you stand on with its walls and furniture.
@@ -1129,7 +1151,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
         continue;
       }
       if (storey.level !== level) continue;
-      drawables.push({ depth: depth(x, y) - 0.45, draw: () => floorTile(ctx, camera, x, y, terrain) });
+      drawables.push({ depth: depth(x, y) - 0.45, at: { x, y, h: 4 }, size: [20, 52, 30], draw: () => floorTile(ctx, camera, x, y, terrain) });
       object(x, y);
     }
   }
@@ -1155,8 +1177,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   for (const list of groundTiles.values()) {
     const rare = list.some(entry => entry.rare);
     if (rare) glow(list[0].x, list[0].y, 20, 90, "#f2d56b", 0.9, true);
-    drawables.push({ depth: depth(list[0].x, list[0].y) - 0.3, draw: () => {
-      if (rare) {
+    if (rare) drawables.push({ depth: depth(list[0].x, list[0].y) - 0.31, draw: () => {
         // A rare drop: a pulsing golden beam rising from it, with motes drifting up.
         const s = toScreen(camera, list[0].x, list[0].y), pulse = scene.reducedMotion ? 0.8 : 0.7 + Math.sin(now / 260) * 0.3, height = 170 * z, width = 16 * z;
         const beam = ctx.createLinearGradient(0, s.y, 0, s.y - height);
@@ -1166,7 +1187,8 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
         ctx.strokeStyle = `rgba(200,150,40,${(0.5 * pulse).toFixed(3)})`; ctx.lineWidth = 1; ctx.strokeRect(s.x - width / 2, s.y - height * 0.7, width, height * 0.7);
         ellipse(ctx, s.x, s.y, 18 * z, 7 * z, `rgba(255,226,120,${(0.35 * pulse).toFixed(3)})`, null);
         if (!scene.reducedMotion) for (let i = 0; i < 5; i++) { const k = ((now / 1600) + i / 5) % 1; ctx.fillStyle = `rgba(255,255,255,${(1 - k).toFixed(3)})`; ctx.fillRect(s.x + Math.sin(i * 2.3 + now / 400) * width * 0.6, s.y - k * height, 2 * z, 2 * z); }
-      }
+    } });
+    drawables.push({ depth: depth(list[0].x, list[0].y) - 0.3, at: { x: list[0].x, y: list[0].y, h: 4 }, size: [40, 50, 20], min: 0.6, draw: () => {
       list.slice(0, 4).forEach((entry, index) => {
         const s = toScreen(camera, entry.x, entry.y), ox = (index % 2 ? 7 : -7) * z, oy = (index > 1 ? 4 : -2) * z, size = 22 * z;
         drawIcon(ctx, item(entry.id).icon, s.x + ox, s.y + oy - 4 * z, size);
@@ -1177,7 +1199,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   // Other players' drops, drawn like your own; "pground" picks index into scene.peerDrops.
   (scene.peerDrops ?? []).forEach((drop, index) => {
     if (!shown(drop.x, drop.y) || !isItem(drop.id)) return;
-    drawables.push({ depth: depth(drop.x, drop.y) - 0.29, draw: () => {
+    drawables.push({ depth: depth(drop.x, drop.y) - 0.29, at: { x: drop.x, y: drop.y, h: 4 }, size: [40, 50, 20], min: 0.6, draw: () => {
       const s = toScreen(camera, drop.x, drop.y), size = 22 * z, ox = ((index % 3) - 1) * 5 * z;
       drawIcon(ctx, item(drop.id).icon, s.x + ox, s.y - 3 * z, size);
       hits.push({ x: s.x + ox - size / 2, y: s.y - 3 * z - size / 2, w: size, h: size, pick: { kind: "pground", id: index } });
@@ -1187,24 +1209,25 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   for (const npc of game.npcs) {
     if (!shown(npc.x, npc.y)) continue;
     const at = interpolate(npc, game, alpha);
-    drawables.push({ depth: depth(at.x, at.y) + 0.1, draw: () => drawNpc(ctx, scene, npc, at, hits) });
+    drawables.push({ depth: depth(at.x, at.y) + 0.1, at, cast: true, size: [170, 90, 30], draw: () => drawNpc(ctx, scene, npc, at, hits) });
   }
   // Monsters.
   for (const monster of game.monsters) {
     if (monster.dead || !shown(monster.x, monster.y, 2)) continue;
     const at = interpolate(monster, game, alpha), size = monster.def.size ?? 1;
-    drawables.push({ depth: depth(at.x + (size - 1) / 2, at.y + (size - 1) / 2) + (size - 1) / 2 + 0.1, draw: () => drawMonster(ctx, scene, monster, at, hits) });
+    const center = { x: at.x + (size - 1) / 2, y: at.y + (size - 1) / 2 };
+    drawables.push({ depth: depth(center.x, center.y) + (size - 1) / 2 + 0.1, at: center, cast: true, size: [80 + 90 * size, 40 + 50 * size, 20 + 10 * size], draw: () => drawMonster(ctx, scene, monster, at, hits) });
   }
   // Other players, walking their own adventures through yours.
   for (const peer of scene.peers ?? []) {
     if (!shown(peer.x, peer.y)) continue;
-    drawables.push({ depth: depth(peer.x, peer.y) + 0.12, draw: () => drawPeer(ctx, scene, peer, hits) });
+    drawables.push({ depth: depth(peer.x, peer.y) + 0.12, at: { x: peer.x, y: peer.y }, cast: true, size: [190, 100, 30], draw: () => drawPeer(ctx, scene, peer, hits) });
   }
   // Your follower: an owned Friend walking the tiles you leave behind, animated like any NPC.
   const petOut = game.player.petOut;
   if ((scene.follower || petOut) && game.pet && (shown(game.pet.x, game.pet.y) || realPoint(world, game.pet.x, game.pet.y).level === level)) {
     const pet = game.pet, at = interpolate(pet, game, alpha);
-    drawables.push({ depth: depth(at.x, at.y) + 0.05, draw: () => {
+    drawables.push({ depth: depth(at.x, at.y) + 0.05, at, cast: true, size: [90, 60, 20], draw: () => {
       const s = toScreen(camera, at.x, at.y), facing = screenFacing(camera, pet.heading);
       ellipse(ctx, s.x, s.y, 11 * z, 4.5 * z, "rgba(22,22,22,0.16)", null);
       if (petOut) drawPet(ctx, petOut, s.x, s.y, facing, at.moving, now, z, scene.reducedMotion);
@@ -1212,6 +1235,11 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     } });
   }
   if (scene.hoverTile && floor) { const hover = scene.hoverTile; drawables.push({ depth: depth(hover.x, hover.y) - 0.4, draw: () => tileOutline(hover.x, hover.y, "rgba(22,22,22,0.35)") }); }
+  // Roofs are lit from the open sky above, whatever is at their foot.
+  const roofRect = (building: Building): [number, number, number, number] => {
+    const hull = roofHull(camera, building), xs = hull.map(p => p[0]), ys = hull.map(p => p[1]);
+    return [Math.min(...xs) - 12 * z, Math.min(...ys) - ((building.spire ?? 0) + 60) * z, Math.max(...xs) + 12 * z, Math.max(...ys) + 8 * z];
+  };
   // The player.
   const pose = playerPose(game, now, project, scene.reducedMotion, scene.sfx);
   // Roofs: every building's roof, fading out when you walk in or when it would hide you. In a castle, the only roofs
@@ -1237,13 +1265,14 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
       for (let y = building.y0; y <= building.y1; y++) for (let x = building.x0; x <= building.x1; x++) {
         if (!own(x, y)) continue;
         const edge = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => !own(x + dx, y + dy) && complexAt(world, x + dx, y + dy) !== complex);
-        drawables.push({ depth: depth(x, y) + 0.45, draw: () => flatRoofTile(ctx, camera, building, x, y, edge, alphaNow) });
+        drawables.push({ depth: depth(x, y) + 0.45, at: { x, y, h: (building.storeys ?? 1) * WALL_H + 8 }, size: [(building.storeys ?? 1) * WALL_H + 40, 52, 30], draw: () => flatRoofTile(ctx, camera, building, x, y, edge, alphaNow) });
       }
       return;
     }
-    drawables.push({ depth: front, draw: () => { const next = fade(); if (next > 0.02) drawRoof(ctx, camera, building, next, now, scene.reducedMotion); } });
+    drawables.push({ depth: front, at: { x: (building.x0 + building.x1) / 2, y: (building.y0 + building.y1) / 2, h: (building.storeys ?? 1) * WALL_H + 24 }, rect: () => roofRect(building),
+      draw: () => { const next = fade(); if (next > 0.02) drawRoof(ctx, camera, building, next, now, scene.reducedMotion); } });
   });
-  drawables.push({ depth: playerDepth + 0.15, draw: () => {
+  drawables.push({ depth: playerDepth + 0.15, at: pp, cast: true, size: [200, 120, 40], draw: () => {
     // Agility: glide from the start to the landing with a hop.
     let at = pp;
     if (player.activity?.kind === "obstacle") { const a = player.activity, total = world.objects[a.objectId].obstacle?.ticks ?? 3, k = Math.max(0, Math.min(1, 1 - (a.timer - alpha) / total)); at = { x: a.from.x + (a.to.x - a.from.x) * k, y: a.from.y + (a.to.y - a.from.y) * k, moving: true }; }
@@ -1276,27 +1305,142 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     if (player.hp < maxHpOf(game) || game.monsters.some(monster => monster.target && !monster.dead)) hpBar(ctx, s.x, s.y - 62 * z, player.hp / maxHpOf(game), z);
     for (const hit of scene.hits.filter(entry => entry.on === "player" && now - entry.at < 1100)) splat(ctx, s.x, s.y - 30 * z, hit.damage, z, (now - hit.at) / 1100);
     if (scene.chat && scene.chat.until > now) overheadText(ctx, scene.chat.text, s.x, s.y - 66 * z);
-    if (player.stunned > 0) for (let i = 0; i < 3; i++) { const a = now / 200 + i * 2.1; ellipse(ctx, s.x + Math.cos(a) * 12 * z, s.y - 56 * z + Math.sin(a) * 3 * z, 2 * z, 2 * z, C.butter); }
-    for (const firework of scene.fireworks) {
+    if (player.stunned > 0) ui(ctx, ctx => { for (let i = 0; i < 3; i++) { const a = now / 200 + i * 2.1; ellipse(ctx, s.x + Math.cos(a) * 12 * z, s.y - 56 * z + Math.sin(a) * 3 * z, 2 * z, 2 * z, C.butter); } });
+    ui(ctx, ctx => { for (const firework of scene.fireworks) {
       const age = (now - firework.at) / 2200;
       if (age < 0 || age > 1) continue;
       for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2, r = age * 60 * z; ellipse(ctx, s.x + Math.cos(a) * r, s.y - 40 * z + Math.sin(a) * r * 0.7 - age * 20 * z, 2.5 * z * (1 - age), 2.5 * z * (1 - age), [C.rose, C.butter, C.blue, C.sage][i % 4], null); }
-    }
+    } });
   } });
-  lap("gather"); drawables.sort((a, b) => a.depth - b.depth);
-  for (const drawable of drawables) drawable.draw();
+  // Your own small light (a lantern familiar or a lantern-bearing mount carries a bigger one), and spells in flight.
+  const lantern = player.worn.includes("lantern_familiar") || !!riding(player)?.light;
+  glow(pp.x, pp.y, 26, lantern ? 130 : underground ? 80 : 64, "#f2c690", lantern ? 0.8 : 0.5);
+  for (const projectile of scene.projectiles) {
+    const flight = projectileFlight(projectile, game.tick, alpha);
+    if (!flight || projectile.style === "arrow" || projectile.style === "bolt") continue;
+    if (projectile.style === "fire") glow(flight.x, flight.y, 34, 190, "#f08a4b", 1.2);
+    else glow(flight.x, flight.y, 26, 150, (MAGIC_LOOKS[projectile.element ?? ""] ?? { glow: projectile.color }).glow, 1.1);
+  }
+  lap("gather");
+  drawables.sort((a, b) => a.depth - b.depth);
+
+  // ---------- Light ----------
+  const bufs = buffers(target), ls = liftScale(camera);
+  // On Low, a clear day is left as it is drawn (no light map, no shadows): the light only matters in the dark.
+  const plain = low && !underground && sky.night < 0.08 && (weather?.rain ?? 0) < 0.3;
+  if (!plain) field.build(world, TERRAIN_COLORS, sky, lights, x0, y0, x1, Math.min(y1, FLOOR_Y - 1), low ? 1 : 2);
+  lap("light field");
+  // The ground's light: the sky where there's no ground, the light map laid on the land, then the sun's shadows.
+  const lb = bufs.light;
+  lb.setTransform(0.5, 0, 0, 0.5, 0, 0); lb.globalCompositeOperation = "source-over";
+  if (!plain) lb.fillStyle = rgbCss(field.skyLight()), lb.fillRect(0, 0, VIEW.width, VIEW.height);
+  if (!plain) field.drawGround(lb, (x, y) => toScreen(camera, x, y), (i, j) => cornerHeight(world, i, j), low);
+  lap("light map");
+  const sunPower = (sky.sun[0] + sky.sun[1] + sky.sun[2]) / 3;
+  if (sunPower > 0.02 && !floor && !low) {
+    const sb = bufs.shadow, reach = Math.min(4, 1 / sky.tanE) / 32;
+    sb.setTransform(1, 0, 0, 1, 0, 0); sb.globalCompositeOperation = "source-over"; sb.clearRect(0, 0, sb.canvas.width, sb.canvas.height);
+    sb.setTransform(0.5, 0, 0, 0.5, 0, 0); sb.fillStyle = "#000";
+    // Boxes (buildings, walls, cliffs): the footprint swept along the sun to where its top's shadow lands.
+    const shadowBox = (ax: number, ay: number, bx: number, by: number, height: number) => {
+      const ox = sky.dirX * height * reach, oy = sky.dirY * height * reach, points: [number, number][] = [];
+      for (const [px, py] of [[ax, ay], [bx, ay], [bx, by], [ax, by]]) { const g = toScreen(camera, px, py), t = toScreen(camera, px + ox, py + oy); points.push([g.x, g.y], [t.x, t.y]); }
+      const hull = convexHull(points);
+      sb.beginPath(); hull.forEach(([px, py], i) => i ? sb.lineTo(px, py) : sb.moveTo(px, py)); sb.closePath(); sb.fill();
+    };
+    if (!underground) for (const building of world.buildings) {
+      if (building.roof === "none" || building.x1 < x0 - 12 || building.x0 > x1 + 12 || building.y1 < y0 - 12 || building.y0 > y1 + 12) continue;
+      shadowBox(building.x0 - 0.5, building.y0 - 0.5, building.x1 + 0.5, building.y1 + 0.5, (building.storeys ?? 1) * WALL_H + (building.tall ?? 0) + (building.roof === "flat" ? 0 : 26) + (building.spire ?? 0) * 0.35);
+    }
+    for (const [bx, by, height] of blockers) shadowBox(bx - 0.5, by - 0.5, bx + 0.5, by + 0.5, height);
+    // Everything else throws its own silhouette: drawn again, squashed flat onto the ground and slanted away from the sun.
+    if (!low) {
+      // A sprite is flat, so its height is laid along the sun's direction and its width across it (as if it had depth).
+      const along = rotate(camera, sky.dirX, sky.dirY), across = rotate(camera, -sky.dirY, sky.dirX), perPx = reach / (ls * z), perW = 1 / (TILE_W / 2 * z);
+      const kx = (along.rx - along.ry) * TILE_W / 2 * z * perPx, ky = (along.rx + along.ry) * TILE_W / 2 * camera.pitch * z * perPx;
+      let px = (across.rx - across.ry) * TILE_W / 2 * z * perW, py = (across.rx + across.ry) * TILE_W / 2 * camera.pitch * z * perW;
+      if (px < 0) { px = -px; py = -py; }
+      const saved = texturesOn; texturesOn = false; hush.on = true; uiMuted = true; ctx = sb;
+      for (const drawable of drawables) {
+        if (!drawable.cast || !drawable.at || Math.abs(drawable.at.x - camera.x) + Math.abs(drawable.at.y - camera.y) > SHADOW_REACH) continue;
+        const foot = toScreen(camera, drawable.at.x, drawable.at.y), count = hits.length;
+        sb.setTransform(0.5 * px, 0.5 * py, -0.5 * kx, -0.5 * ky, 0.5 * (foot.x - foot.x * px + foot.y * kx), 0.5 * (foot.y - foot.x * py + foot.y * ky));
+        drawable.draw();
+        hits.length = count;
+      }
+      ctx = target; texturesOn = saved; hush.on = false; uiMuted = false;
+    }
+    // The shadows keep the sky's light and lose the sun's.
+    sb.setTransform(1, 0, 0, 1, 0, 0); sb.globalAlpha = 1; sb.globalCompositeOperation = "source-in";
+    const skyLit = field.skyLight(), share = (c: number) => Math.min(1, (sky.ambient[c] * 0.92 + sky.sun[c] * 0.12) / Math.min(1, skyLit[c]));
+    sb.fillStyle = rgbCss([share(0), share(1), share(2)]); sb.fillRect(0, 0, sb.canvas.width, sb.canvas.height);
+    lb.setTransform(1, 0, 0, 1, 0, 0); lb.globalCompositeOperation = "multiply"; lb.drawImage(sb.canvas, 0, 0); lb.globalCompositeOperation = "source-over";
+  }
+  lap("shadows");
+  const applyLight = () => {
+    if (plain) return;
+    target.save(); target.globalCompositeOperation = "multiply"; target.imageSmoothingEnabled = !low;
+    target.drawImage(lb.canvas, 0, 0, VIEW.width, VIEW.height); target.restore();
+  };
+  lb.setTransform(0.5, 0, 0, 0.5, 0, 0); lb.imageSmoothingEnabled = false;
+  // The hover outline is UI: never dimmed.
+  if (scene.hoverTile && !floor) { const hover = scene.hoverTile, s = toScreen(camera, hover.x, hover.y);
+    drawables.unshift({ depth: -Infinity, light: [1, 1, 1], rect: () => [s.x - 50 * z, s.y - 30 * z, s.x + 50 * z, s.y + 30 * z], draw: () => tileOutline(hover.x, hover.y, "rgba(22,22,22,0.35)") }); }
+
+  // ---------- Objects, each in the light where it stands ----------
+  const lightOn = (drawable: Drawable): RGB | null => {
+    const at = drawable.at;
+    if (lit && drawable.light) return drawable.light.map(v => Math.min(1, v)) as RGB;
+    if (!lit || !at) return null;
+    const real = at.y >= FLOOR_Y - 0.5 ? realPoint(world, at.x, at.y) : at, light = field.at(real.x, real.y, at.h ?? 16), min = drawable.min ?? 0;
+    return [Math.min(1, Math.max(min, light[0])), Math.min(1, Math.max(min, light[1])), Math.min(1, Math.max(min, light[2]))];
+  };
+  const rectOf = (drawable: Drawable): [number, number, number, number] => {
+    if (drawable.rect) return drawable.rect();
+    const at = drawable.at!, s = toScreen(camera, at.x, at.y), [up, side, down] = drawable.size ?? [240, 120, 40];
+    return [s.x - side * z, s.y - up * z * Math.max(1, ls), s.x + side * z, s.y + down * z];
+  };
+  uiQueue = []; uiTarget = target;
+  // Last of all, over the land: particles and birds in the light where you are, then the haze and the ground fog in the
+  // sky's (a fog bank at night is a dim blue, not a white glow). Sparks and fireflies give their own light, later.
+  const screen = (): [number, number, number, number] => [0, 0, VIEW.width, VIEW.height];
+  drawables.push({ depth: Infinity, at: { x: here.x, y: here.y, h: 40 }, rect: screen, draw: () => drawEffects(ctx, project, world, now, z, "lit") });
+  if (!underground || (weather && weather.fog > 0.02)) drawables.push({ depth: Infinity, light: field.skyLight().map(v => v * 1.08) as RGB, rect: screen, draw: () => {
+    if (!underground) drawHaze(ctx, camera);
+    if (weather && weather.fog > 0.02 && !scene.reducedMotion && !low) drawFog(ctx, camera, weather.fog, now);
+    else if (weather && weather.fog > 0.02) { ctx.fillStyle = `rgba(232,235,238,${(weather.fog * 0.25).toFixed(3)})`; ctx.fillRect(0, 0, VIEW.width, VIEW.height); }
+  } });
+  lap("ground light");
+  const litBy = drawables.map(lightOn);
+  lap("light samples");
+  drawables.forEach((drawable, index) => {
+    drawable.draw();
+    if (!lit) return;
+    // The same drawing again, as a hole in the light buffer, filled with this thing's light.
+    const light = litBy[index] ?? [1, 1, 1] as RGB, rect = drawable.rect || drawable.at ? rectOf(drawable) : screen();
+    const count = hits.length, saved = texturesOn;
+    ctx = lb; lb.globalCompositeOperation = "destination-out"; texturesOn = false; hush.on = true; uiMuted = true;
+    drawable.draw();
+    hits.length = count; texturesOn = saved; hush.on = false; uiMuted = false; ctx = target;
+    lb.globalAlpha = 1; lb.globalCompositeOperation = "destination-over"; lb.fillStyle = rgbCss(light); lb.fillRect(rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1]);
+    lb.globalCompositeOperation = "source-over";
+  });
+  // Anything that strayed outside its bounds is left as it is; then the light goes over the frame.
+  if (lit) { lb.globalCompositeOperation = "destination-over"; lb.fillStyle = "#fff"; lb.fillRect(0, 0, VIEW.width, VIEW.height); lb.globalCompositeOperation = "source-over"; }
+  applyLight();
+  const overlays = uiQueue; uiQueue = null; uiTarget = null;
   lap("objects");
   // Projectiles: spells fly as glowing comets with sparks (by element), arrows turn in flight, dragonfire roars; all of
   // them light the ground in the dark.
   for (const projectile of scene.projectiles) {
-    // Spells take a little longer in the air than a tick, so the comet is seen crossing.
-    const span = Math.max(projectile.style === "magic" ? 1.5 : 1, projectile.end - projectile.start + 1), progress = (game.tick - projectile.start + alpha) / span;
-    if (progress < 0 || progress > 1) continue;
+    const flight = projectileFlight(projectile, game.tick, alpha);
+    if (!flight) continue;
+    const progress = flight.progress;
     const shot = projectile.style === "arrow" || projectile.style === "bolt";
     const lift0 = projectile.style === "fire" ? 34 : 28, lift1 = 24, arc = projectile.style === "bolt" ? 5 : projectile.style === "arrow" ? 14 : projectile.style === "fire" ? 6 : 20;
     const at = (t: number) => { const a = toScreen(camera, projectile.from.x, projectile.from.y, lift0), b = toScreen(camera, projectile.to.x, projectile.to.y, lift1);
       return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t - Math.sin(t * Math.PI) * arc * z }; };
-    const head = at(progress), wx = projectile.from.x + (projectile.to.x - projectile.from.x) * progress, wy = projectile.from.y + (projectile.to.y - projectile.from.y) * progress;
+    const head = at(progress), wx = flight.x, wy = flight.y;
     const look = MAGIC_LOOKS[projectile.element ?? ""] ?? { core: "#ffffff", glow: projectile.color, spark: projectile.color };
     if (!castFlashed.has(projectile) && !shot) {
       castFlashed.add(projectile);
@@ -1333,7 +1477,6 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
       }
       ctx.globalCompositeOperation = "source-over";
       if (!scene.reducedMotion && Math.random() < 0.7) burst("spark", wx, wy, lift0, 1, Math.random() < 0.5 ? "#ffd27a" : "#f08a4b", { speed: 0.25, up: 20, life: 0.5, size: 2 });
-      glow(wx, wy, lift0, 180, "#f08a4b");
       continue;
     }
     // A spell, shaped by its element: a flame, a wave, a whirlwind, a boulder, a curse's smoke, or a star.
@@ -1344,25 +1487,18 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
       const trail = SPELL_TRAILS[projectile.element ?? ""] ?? SPELL_TRAILS.moon;
       if (Math.random() < trail.chance) burst(trail.kind, wx, wy, 24 + Math.random() * 6, 1, Math.random() < 0.5 ? look.spark : look.glow, { speed: trail.speed, up: trail.up, life: trail.life, size: trail.size, gravity: trail.gravity });
     }
-    glow(wx, wy, 26, 140, look.glow);
   }
-  lap("projectiles"); drawEffects(ctx, project, world, now, z); lap("effects");
-  if (!underground) drawHaze(ctx, camera);
-  lap("haze");
-  // Ground fog (dawn, the swamp, rain) drifting low over the land, under the night.
-  if (weather && weather.fog > 0.02 && !scene.reducedMotion && !low) drawFog(ctx, camera, weather.fog, now);
-  else if (weather && weather.fog > 0.02) { ctx.fillStyle = `rgba(232,235,238,${(weather.fog * 0.25).toFixed(3)})`; ctx.fillRect(0, 0, VIEW.width, VIEW.height); }
-  // Night falls over the land (your Friend carries a small light; a lantern familiar a bigger one).
-  // Your own light is faint: enough to see your feet by (a lantern familiar does better).
-  if (light.dark > 0.01 || light.warm > 0.01) { const lantern = player.worn.includes("lantern_familiar") || !!riding(player)?.light; glow(pp.x, pp.y, 24, lantern ? 120 : underground ? 70 : 55, undefined, lantern ? 0.6 : 0.3); drawNight(ctx, light.dark, light.warm, lights, underground ? "5,5,9" : undefined, 0.45 + camera.pitch * 0.7, scene.reducedMotion ? 0 : now); }
-  lap("fog+night");
+  drawEffects(ctx, project, world, now, z, "glowing");
+  lap("projectiles");
+  // UI over the world: health bars, names, speech, hit splats.
+  for (const draw of overlays) draw();
   // Rain over everything, and lightning on top of that.
-  if (weather && weather.rain > 0.02) drawRain(ctx, weather.rain * (low ? 0.35 : 1), scene.reducedMotion ? 0 : now, light.dark);
+  if (weather && weather.rain > 0.02) drawRain(ctx, weather.rain * (low ? 0.35 : 1), scene.reducedMotion ? 0 : now, sky.night);
   if (scene.strike && scene.wallMs !== undefined && !underground && weather?.storm) drawLightning(ctx, scene.strike, scene.wallMs, scene.reducedMotion);
   lap("rain+lightning");
   // A soft vignette outdoors, for depth.
   drawEffects(ctx, project, world, now, z, "bright");
-  if (!underground) { const v = ctx.createRadialGradient(VIEW.width / 2, VIEW.height / 2, VIEW.height * 0.45, VIEW.width / 2, VIEW.height / 2, VIEW.width * 0.72); v.addColorStop(0, "rgba(14,16,28,0)"); v.addColorStop(1, `rgba(14,16,28,${(0.16 + light.dark * 0.2).toFixed(3)})`); ctx.fillStyle = v; ctx.fillRect(0, 0, VIEW.width, VIEW.height); }
+  if (!underground) { const v = ctx.createRadialGradient(VIEW.width / 2, VIEW.height / 2, VIEW.height * 0.45, VIEW.width / 2, VIEW.height / 2, VIEW.width * 0.72); v.addColorStop(0, "rgba(14,16,28,0)"); v.addColorStop(1, `rgba(14,16,28,${(0.16 + sky.night * 0.2).toFixed(3)})`); ctx.fillStyle = v; ctx.fillRect(0, 0, VIEW.width, VIEW.height); }
   lap("vignette");
   // First steps: a golden arrow bobbing over where to go, or at the screen's edge pointing towards it.
   if (scene.guideTarget) {
@@ -1390,6 +1526,21 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     ctx.strokeStyle = scene.marker.red ? "#e07a7a" : "#f2e28f"; ctx.lineWidth = 2; ctx.stroke();
   }
   lastHits = hits;
+}
+/** Where a projectile is in its flight (0–1) and over which point of the world, or null when it isn't in the air. */
+function projectileFlight(projectile: Projectile, tick: number, alpha: number) {
+  // Spells take a little longer in the air than a tick, so the comet is seen crossing.
+  const span = Math.max(projectile.style === "magic" ? 1.5 : 1, projectile.end - projectile.start + 1), progress = (tick - projectile.start + alpha) / span;
+  if (progress < 0 || progress > 1) return null;
+  return { progress, x: projectile.from.x + (projectile.to.x - projectile.from.x) * progress, y: projectile.from.y + (projectile.to.y - projectile.from.y) * progress };
+}
+/** The convex hull of some points (monotone chain), for shadows of boxes. */
+function convexHull(points: [number, number][]) {
+  const sorted = [...points].sort((a, b) => a[0] - b[0] || a[1] - b[1]), cross = (o: [number, number], a: [number, number], b: [number, number]) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lower: [number, number][] = [], upper: [number, number][] = [];
+  for (const p of sorted) { while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop(); lower.push(p); }
+  for (let i = sorted.length - 1; i >= 0; i--) { const p = sorted[i]; while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop(); upper.push(p); }
+  return [...lower.slice(0, -1), ...upper.slice(0, -1)];
 }
 /** How each element's spells look in flight. */
 const MAGIC_LOOKS: Record<string, { core: string; glow: string; spark: string }> = {
@@ -1513,7 +1664,7 @@ function drawNpc(ctx: CanvasRenderingContext2D, scene: Scene, npc: Npc, at: { x:
   }
   hits.push({ ...rect, pick: { kind: "npc", id: npc.uid } });
   const questMarker = questMarkerFor(game, npc.id);
-  if (questMarker) { const bob = scene.reducedMotion ? 0 : Math.sin(now / 300) * 2 * z; poly(ctx, [[s.x - 5 * z, s.y - 58 * z + bob], [s.x + 5 * z, s.y - 58 * z + bob], [s.x, s.y - 50 * z + bob]], questMarker); }
+  if (questMarker) { const bob = scene.reducedMotion ? 0 : Math.sin(now / 300) * 2 * z; ui(ctx, ctx => poly(ctx, [[s.x - 5 * z, s.y - 58 * z + bob], [s.x + 5 * z, s.y - 58 * z + bob], [s.x, s.y - 50 * z + bob]], questMarker)); }
   const said = npcOverhead(game, npc.uid);
   if (said) overheadText(ctx, said, s.x, s.y - 50 * z, "#f2e28f");
 }
@@ -1538,9 +1689,11 @@ function drawPeer(ctx: CanvasRenderingContext2D, scene: Scene, peer: PeerView, h
   restoreMotion();
   hits.push({ ...rect, pick: { kind: "peer", id: peer.p.id } });
   if (peer.p.hp < peer.p.maxHp || peer.p.fight) hpBar(ctx, s.x, rect.y - 22, peer.p.hp / Math.max(1, peer.p.maxHp), z);
-  ctx.font = `bold ${Math.round(11 * Math.max(0.9, Math.min(1.4, z)))}px ui-monospace, Menlo, Consolas, monospace`; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
   const tag = `#${peer.p.id} (level-${peer.p.combat})`, tagY = rect.y - (peer.p.hp < peer.p.maxHp || peer.p.fight ? 26 : 2);
-  ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.strokeText(tag, s.x, tagY); ctx.fillStyle = peer.friend ? "#9fe0a8" : "#ffffff"; ctx.fillText(tag, s.x, tagY);
+  ui(ctx, ctx => {
+    ctx.font = `bold ${Math.round(11 * Math.max(0.9, Math.min(1.4, z)))}px ui-monospace, Menlo, Consolas, monospace`; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+    ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.strokeText(tag, s.x, tagY); ctx.fillStyle = peer.friend ? "#9fe0a8" : "#ffffff"; ctx.fillText(tag, s.x, tagY);
+  });
   if (peer.said) overheadText(ctx, peer.said, s.x, tagY - 14);
   else if (motion?.text) overheadText(ctx, motion.text, s.x, tagY - 14, "#ffffff");
 }

@@ -243,9 +243,11 @@ returns to the title screen with a confirmation that the adventure is safe in th
 full Realm rate from level 30 up, so the first levels mean something. Fixed rewards (lamps, challenges) pay in full.
 
 **Graphics and performance.** Settings → Graphics offers Auto, High and Low. Low turns off the pixel textures, ambient
-life, cloud shadows, footprints and fog, lightens the rain, shortens the view and draws at 1× on high-DPI screens. Auto
+life, cloud shadows, cast shadows, footprints and fog, leaves a clear day unlit, lightens the rain, shortens the view and
+draws at 1× on high-DPI screens. Auto
 starts on High and drops to Low (saying so, once) if the frame rate stays under about 36 fps for five seconds. The browser
-test measures frame cost at three busy scenes on every run. Headless, without a GPU:
+test measures frame cost at three busy scenes on every run. Headless, without a GPU (measured before the new lighting,
+which adds its shadows and light passes to High):
 
 | Scene | High | Low |
 |---|---|---|
@@ -337,8 +339,17 @@ except around lamps, torches, fires, forges, altars and your own small light (a 
 The badge under the minimap shows the time of day; Settings can turn the cycle off. The minimap uses clearer colours:
 green land, blue water, black walls, yellow dots for NPCs and monsters, red for items, white for your follower.
 
-**Weather.** Light pools on the ground around each lamp, torch and fire, torches and fires flicker, and nights and
-dungeons are darker than before. The sky comes from the real clock in four-minute spells, so every player sees the
+**Lighting.** A light field is rebuilt every frame for the land on screen (lighting.ts). Each point of the ground gets the
+sky's ambient colour for the time of day (darker where walls, trees and rocks crowd it, and under roofs), sunlight or
+moonlight, point lights (lamps, torches, fires, forges, altars, spells and your own light) with physical falloff and
+shadows marched through a height map of what's in the way, one bounce of each light off the ground in the ground's
+colour, and lava's glow. The sun rises in the east, crosses the south and sets in the west: buildings, walls and cliffs
+cast projected shadows, and trees, rocks, characters and decor cast sheared silhouettes of their own sprites. The ground
+is lit before anything stands on it, and every object takes the light at its own feet, cut to its exact outline, so light
+lands on things instead of glowing over them. Health bars, names and speech are never dimmed. On Low, a clear day is
+drawn unlit and nights get the light without the shadows.
+
+**Weather.** Torches and fires flicker. The sky comes from the real clock in four-minute spells, so every player sees the
 same weather at the same moment: clear, rain, or a storm with lightning (thunder follows the flash) and a darker sky.
 Deserts and the frozen peaks stay dry, dawn brings ground fog, and the Murkmire is always misty. Settings can turn
 weather off.

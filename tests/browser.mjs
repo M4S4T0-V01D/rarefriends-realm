@@ -76,7 +76,10 @@ try {
   const shot = name => page.locator(".rf-game-frame").screenshot({ path: `./artifacts/${name}.png` });
   const state = fn => frame().evaluate(fn);
   const until = async (fn, timeout = 30_000) => { const end = Date.now() + timeout; while (Date.now() < end) { if (await state(fn)) return; await page.waitForTimeout(150); } assert.fail(`Timed out waiting for ${fn}`); };
-  const teleport = async (x, y) => { await frame().evaluate(([x, y]) => { const g = window.__realm.game(), p = g.player; p.x = x; p.y = y; p.prev = { x, y }; p.path = []; p.target = null; p.activity = null; p.combat = null; window.__realm.refresh(); }, [x, y]); await page.waitForTimeout(900); };
+  /** Wait until the camera stops moving (it eases after you, and slow software rendering takes longer). */
+  const settle = async () => { for (let last = "", end = Date.now() + 10_000; Date.now() < end;) { await page.waitForTimeout(250); const now = await state(() => { const c = window.__realm.camera(); return `${c.x.toFixed(3)},${c.y.toFixed(3)},${c.angle.toFixed(3)}`; }); if (now === last) return; last = now; } };
+  const teleport = async (x, y) => { await frame().evaluate(([x, y]) => { const g = window.__realm.game(), p = g.player; p.x = x; p.y = y; p.prev = { x, y }; p.path = []; p.target = null; p.activity = null; p.combat = null; window.__realm.refresh(); }, [x, y]); await page.waitForTimeout(900);
+    await settle(); };
   /** Page coordinates of a world tile (the hook reports frame coordinates; add the iframe's offset). */
   const screenOf = async (x, y) => {
     const inner = await frame().evaluate(([x, y]) => window.__realm.screenOf(x, y), [x, y]), box = await page.locator("iframe").boundingBox();
@@ -164,8 +167,10 @@ try {
   }
 
   // ---------- Camera: arrow keys turn and tilt, the scroll wheel drags it round, the compass faces north ----------
-  await page.keyboard.down("ArrowRight"); await page.waitForTimeout(700); await page.keyboard.up("ArrowRight");
-  await page.keyboard.down("ArrowUp"); await page.waitForTimeout(400); await page.keyboard.up("ArrowUp");
+  // Held keys turn at a steady speed per frame: hold them until they've turned (slow software rendering takes longer).
+  const hold = async (key, done) => { await page.keyboard.down(key); const end = Date.now() + 6000; do await page.waitForTimeout(100); while (Date.now() < end && !(await state(done))); await page.keyboard.up(key); };
+  await hold("ArrowRight", () => window.__realm.camera().angle > 0.7);
+  await hold("ArrowUp", () => window.__realm.camera().pitch > 0.6);
   const turned = await state(() => window.__realm.camera());
   assert(turned.angle > 0.6, `→ turns the camera (${turned.angle})`); assert(turned.pitch > 0.55, `↑ tilts it (${turned.pitch})`);
   await shot("camera-turned");
@@ -180,7 +185,7 @@ try {
   const screenStart = await screenOf(turnedStart.x, turnedStart.y), screenEnd = await screenOf(turnedEnd.x, turnedEnd.y);
   assert(screenEnd.y > screenStart.y + 10, "S walks down the screen whatever the camera angle");
   await game.getByRole("button", { name: "Compass: face north" }).click();
-  await page.waitForTimeout(900);
+  await settle();
   const here = await state(() => ({ x: window.__realm.game().player.x, y: window.__realm.game().player.y }));
   const centre = await screenOf(here.x, here.y), northward = await screenOf(here.x, here.y - 3);
   assert(Math.abs(northward.x - centre.x) < 3 && northward.y < centre.y - 20, `the compass turns north to the top of the screen (${northward.x - centre.x}, ${northward.y - centre.y})`);
