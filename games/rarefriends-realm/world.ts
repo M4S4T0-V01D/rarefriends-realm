@@ -691,7 +691,7 @@ export function createWorld(seed = 20260927): World {
     return [x, y] as const;
   };
   const ALTARS: readonly [string, string, number, number][] = [
-    ["breeze_sigil", "Breeze altar", 72, 126], ["thought_sigil", "Thought altar", 40, 70], ["tide_sigil", "Tide altar", 160, 148], ["stone_sigil", "Stone altar", 100, 62],
+    ["breeze_sigil", "Breeze altar", 72, 126], ["thought_sigil", "Thought altar", 54, 62], ["tide_sigil", "Tide altar", 160, 148], ["stone_sigil", "Stone altar", 100, 62],
     ["ember_sigil", "Ember altar", 173, 57], ["shade_sigil", "Shade altar", 30, 146], ["star_sigil", "Star altar", 206, 40], ["storm_sigil", "Storm altar", 212, 88],
     ["bloom_sigil", "Bloom altar", 106, 164], ["path_sigil", "Path altar", 197, 124], ["hollow_sigil", "Hollow altar", 140, 230],
   ];

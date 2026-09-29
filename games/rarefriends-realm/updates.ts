@@ -10,6 +10,7 @@ export const UPDATES: readonly Update[] = [
     "Crossbows fire bolts (a dozen unfeathered bolts from a bar, then feathers), shoot slower than bows and hit harder, and they're one-handed, so you can carry a shield.",
     "War bows: a heavier bow for every wood, from two logs. Slower to draw, harder hitting, and a tile more reach. The plain war bow needs Ranged 5, and only Hazel sells them.",
     "New quest, Hazel's Quiver: win her grandmother's quiver back from the Grumblin chief and she'll mend it for you. Worn on your back, it calls four in five arrows and bolts straight back to your pack.",
+    "The Thought altar has moved out of Fernwick's street to a quiet glade north-east of the village, beside the road to Wyrmreach.",
   ] },
   { id: 21, date: "2026-09-28", title: "Softer rain, clearer settings", items: [
     "Rain is now a soft, steady wash of sound that swells and fades with the weather, instead of a ticking hiss that sounded like footsteps.",
