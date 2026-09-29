@@ -15,7 +15,7 @@ import { hiscores } from "./hiscores.ts";
 import { petArt } from "./petart.ts";
 import { MAX_QUEST_POINTS, NPCS, QUESTS, finalStage, questPoints } from "./content.ts";
 import {
-  BANK_TABS, SATCHEL, bankDeposit, bankDepositAll, bankDepositWorn, bankInOrder, bankMove, bankTabs, bankWithdraw, bonuses, combatLevel, count, isStaffEquipped, maxHp, maxPrayer, message, totalLevel, totalXp,
+  BANK_TABS, CONTAINERS, SATCHEL, bankDeposit, emptyToBank, fillFromBank, bankDepositAll, bankDepositWorn, bankInOrder, bankMove, bankTabs, bankWithdraw, bonuses, combatLevel, count, isStaffEquipped, maxHp, maxPrayer, message, totalLevel, totalXp,
   weapon, xpMultiplier, type Game, type Message, type Recipe, type Slot,
 } from "./state.ts";
 import {
@@ -671,6 +671,11 @@ export function BankModal({ game, refresh, onClose, openMenu }: { game: Game; re
   // Tab 0 shows everything (the main tab's items first, then each tab's); tabs 1+ show only their own.
   const shown = bankInOrder(player).filter(slot => (current === 0 || (slot.tab ?? 0) === current) && (!search || item(slot.id).name.toLowerCase().includes(search.toLowerCase())));
   const dropTarget = (key: string) => ({ "data-drop": key, "data-over": drag.over === key || undefined });
+  const carriedBoxes = CONTAINERS.filter(box => box.carried(player));
+  const fillBox = (id: string) => {
+    const box = CONTAINERS.find(entry => entry.item === id)!, n = fillFromBank(player, id), what = item(box.holds).name.toLowerCase();
+    message(game, n ? `You fill your ${item(id).name.toLowerCase()} with ${n} ${what} from the bank (${player[box.key]}/${box.size}).` : player[box.key] >= box.size ? `Your ${item(id).name.toLowerCase()} is already full.` : `You have no ${what} in the bank.`);
+  };
   const move = (id: string, to: number | "new") => { if (bankMove(player, id, null, to)) refresh(); };
   const moveMenu = (id: string) => [
     ...((player.bank.find(slot => slot.id === id)?.tab ?? 0) ? [{ verb: "Move to", noun: "main tab", tone: "item" as const, run: () => move(id, 0) }] : []),
@@ -694,6 +699,7 @@ export function BankModal({ game, refresh, onClose, openMenu }: { game: Game; re
         <span>Withdraw/deposit:</span>{[1, 5, 10, Infinity].map(n => <button key={n} type="button" aria-pressed={amount === n} onClick={() => setAmount(n)}>{n === Infinity ? "All" : n}</button>)}
         <button type="button" onClick={() => { bankDepositAll(player, current); refresh(); }}>Deposit inventory</button>
         <button type="button" onClick={() => { bankDepositWorn(player, current); refresh(); }}>Deposit worn</button>
+        {carriedBoxes.length > 0 && <button type="button" onClick={() => { for (const box of carriedBoxes) fillBox(box.item); refresh(); }}>Fill {carriedBoxes.length > 1 ? "boxes" : carriedBoxes[0].item === SATCHEL ? "satchel" : "box"}</button>}
       </div>
       <div className="realm-bank">
         <div className="realm-bank-grid" aria-label="Bank">
@@ -718,7 +724,13 @@ export function BankModal({ game, refresh, onClose, openMenu }: { game: Game; re
         <div className="realm-inventory small" aria-label="Inventory (click to deposit)">
           {player.inventory.map((slot, index) => (
             <button key={index} type="button" className="realm-slot" aria-label={slot ? `Deposit ${item(slot.id).name}` : `Empty slot ${index + 1}`} onClick={() => { if (slot) { bankDeposit(player, index, amount, current); refresh(); } }}
-              {...rightClick(openMenu, () => slot ? [...[1, 5, 10, Infinity].map(n => ({ verb: `Deposit-${n === Infinity ? "All" : n}`, noun: item(slot.id).name, tone: "item", run: () => { bankDeposit(player, index, n, current); refresh(); } })), examine(game, slot.id, refresh)] : [])}>
+              {...rightClick(openMenu, () => slot ? [
+                // A satchel or sigil stone box you carry fills straight from the bank (or tips its contents in).
+                ...(CONTAINERS.some(box => box.item === slot.id) ? [
+                  { verb: "Fill", noun: item(slot.id).name, tone: "item" as const, run: () => { fillBox(slot.id); refresh(); } },
+                  { verb: "Empty-into-bank", noun: item(slot.id).name, tone: "item" as const, run: () => { const n = emptyToBank(player, slot.id); message(game, n ? `You empty ${n} ${item(CONTAINERS.find(box => box.item === slot.id)!.holds).name.toLowerCase()} into the bank.` : "It's empty."); refresh(); } },
+                ] : []),
+                ...[1, 5, 10, Infinity].map(n => ({ verb: `Deposit-${n === Infinity ? "All" : n}`, noun: item(slot.id).name, tone: "item", run: () => { bankDeposit(player, index, n, current); refresh(); } })), examine(game, slot.id, refresh)] : [])}>
               {slot && <ItemIcon slot={slot} size={38} />}
             </button>
           ))}

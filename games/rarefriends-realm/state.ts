@@ -66,8 +66,8 @@ export type Player = {
   lastHitBy: number | null; created: number; queuedSpell: string | null; castTimer: number;
   /** Referrals: the Friend whose code you used, the Friends who used yours, and ticks of referral XP boost left. */
   referredBy: number | null; referrals: number[]; boostTicks: number;
-  /** Inkcoal kept in the inkcoal satchel. */
-  coalBag: number;
+  /** Inkcoal kept in the inkcoal satchel, and sigil stones in the sigil stone box. */
+  coalBag: number; stoneBox: number;
   /** When (wall-clock ms) your recent referrals were credited: at most REFERRALS_PER_DAY in any 24 hours. */
   referralTimes: number[];
   /** You've been told today's referral limit is reached (not saved). */
@@ -171,7 +171,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
     style: "accurate", autocast: null, prayers: [], target: null, activity: null, combat: null,
     attackTimer: 0, eatTimer: 0, stunned: 0, regenTimer: 0, quests: {}, questData: {},
     wardrobe: [], worn: [], follower: null, courseStep: -1, kills: 0, deaths: 0, overhead: null, music: ["theme"],
-    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false }, seenUpdate: LATEST_UPDATE,
+    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false }, seenUpdate: LATEST_UPDATE,
     lastHitBy: null, created: Date.now(), queuedSpell: null, castTimer: 0,
   };
 }
@@ -226,7 +226,17 @@ export function riding(player: Player) { return mountDef(player.mount); }
  * The early levels go a little slower, so levelling up means something from the start: about half speed at level 1,
  * three-quarters at 15, and the full Realm rate from level 30 up (fixed rewards such as lamps are unaffected).
  */
-export const earlyXp = (skillLevel: number) => skillLevel >= 30 ? 1 : 0.5 + skillLevel / 60;
+/** Combat skills: the rest (gathering and making) start slower still below level 10. */
+const COMBAT_XP = new Set<string>(["attack", "strength", "defence", "hitpoints", "ranged", "magic"]);
+/**
+ * The early levels are slower: about half speed at level 1, full speed from 30. Gathering and making skills (fishing,
+ * cooking, woodcutting…) start slower still, at under a third, catching up with the rest by level 10.
+ */
+export const earlyXp = (skillLevel: number, skill?: string) => {
+  if (skillLevel >= 30) return 1;
+  if (skill && !COMBAT_XP.has(skill) && skillLevel < 10) return 0.3 + (Math.max(1, skillLevel) - 1) * ((0.5 + 10 / 60) - 0.3) / 9;
+  return 0.5 + skillLevel / 60;
+};
 /** Owned-Friend followers: Gen 1 +5% XP … Gen 5 and later +1%. */
 export function followerBonus(player: Player) {
   if (player.follower === null) return 0;
@@ -236,7 +246,7 @@ export function followerBonus(player: Player) {
 /** Award XP (already scaled by the caller with `scaled`) and announce level-ups. */
 export function addXp(game: Game, skill: Skill, base: number, options: { raw?: boolean } = {}) {
   const player = game.player, before = levelForXp(player.xp[skill]);
-  const amount = options.raw ? base : base * xpMultiplier(player) * earlyXp(before);
+  const amount = options.raw ? base : base * xpMultiplier(player) * earlyXp(before, skill);
   if (amount <= 0) return;
   player.xp[skill] = Math.min(MAX_XP, player.xp[skill] + amount);
   emit(game, { type: "xp", skill, amount, tick: game.tick });
@@ -309,14 +319,42 @@ export function dropItem(game: Game, id: string, n: number, x: number, y: number
 }
 
 // ---------- The inkcoal satchel ----------
-export const SATCHEL = "inkcoal_satchel", SATCHEL_SIZE = 120;
+export const SATCHEL = "inkcoal_satchel", SATCHEL_SIZE = 120, STONE_BOX = "sigil_box", STONE_BOX_SIZE = 120;
 /** Worn on your back or carried, the satchel catches the inkcoal you mine and feeds the furnace. */
 export const hasSatchel = (player: Player) => player.equipment.cape === SATCHEL || has(player, SATCHEL);
+/** Carried in your pack, the sigil stone box catches the stones you mine and empties itself into the altar. */
+export const hasStoneBox = (player: Player) => has(player, STONE_BOX);
+/** The containers you can carry: what each holds, where its count lives, and how many fit. */
+export const CONTAINERS = [
+  { item: SATCHEL, holds: "inkcoal", size: SATCHEL_SIZE, key: "coalBag" as const, carried: hasSatchel },
+  { item: STONE_BOX, holds: "sigil_stone", size: STONE_BOX_SIZE, key: "stoneBox" as const, carried: hasStoneBox },
+];
+/** Fill a carried container from the bank; returns how many moved. */
+export function fillFromBank(player: Player, containerItem: string) {
+  const box = CONTAINERS.find(entry => entry.item === containerItem), entry = box && player.bank.find(slot => slot.id === box.holds);
+  if (!box || !entry) return 0;
+  const n = Math.min(entry.n, box.size - player[box.key]);
+  if (n <= 0) return 0;
+  player[box.key] += n; entry.n -= n;
+  if (entry.n <= 0) { player.bank.splice(player.bank.indexOf(entry), 1); compactBankTabs(player); }
+  return n;
+}
+/** Tip a container's contents into the bank; returns how many moved. */
+export function emptyToBank(player: Player, containerItem: string) {
+  const box = CONTAINERS.find(entry => entry.item === containerItem), n = box ? player[box.key] : 0;
+  if (!box || n <= 0) return 0;
+  const entry = player.bank.find(slot => slot.id === box.holds);
+  if (!entry && player.bank.length >= BANK_SIZE) return 0;
+  if (entry) entry.n += n; else player.bank.push({ id: box.holds, n });
+  player[box.key] = 0;
+  return n;
+}
 /** How many of an item you can use in a recipe: your pack, plus the satchel's inkcoal. */
-export const stock = (player: Player, id: string) => count(player, id) + (id === "inkcoal" && hasSatchel(player) ? player.coalBag : 0);
+export const stock = (player: Player, id: string) => count(player, id) + (id === "inkcoal" && hasSatchel(player) ? player.coalBag : 0) + (id === "sigil_stone" && hasStoneBox(player) ? player.stoneBox : 0);
 /** Use up items for a recipe, taking inkcoal from the satchel first. */
 export function useUp(player: Player, id: string, n: number) {
   if (id === "inkcoal" && hasSatchel(player)) { const fromBag = Math.min(n, player.coalBag); player.coalBag -= fromBag; n -= fromBag; }
+  if (id === "sigil_stone" && hasStoneBox(player)) { const fromBox = Math.min(n, player.stoneBox); player.stoneBox -= fromBox; n -= fromBox; }
   if (n > 0) take(player, id, n);
 }
 

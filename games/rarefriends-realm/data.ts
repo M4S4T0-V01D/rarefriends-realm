@@ -74,7 +74,7 @@ export type IconShape =
   | "amulet" | "log" | "fish" | "ore" | "bar" | "bones" | "sigil" | "staff" | "net" | "rod" | "harpoon" | "pot" | "bucket" | "egg" | "flour"
   | "milk" | "tinderbox" | "hammer" | "knife" | "needle" | "thread" | "chisel" | "gem" | "hide" | "leather" | "meat" | "feather" | "bait"
   | "cake" | "bread" | "berries" | "key" | "wheat" | "lamp" | "scroll" | "silk" | "hood" | "bracer" | "burnt" | "hat" | "crown" | "orb" | "trophy"
-  | "bow" | "arrow" | "tablet" | "arrowheads" | "material" | "quiver" | "satchel" | "mask" | "warbow" | "crossbow" | "bolts" | "limbs" | "stock";
+  | "bow" | "arrow" | "tablet" | "arrowheads" | "material" | "quiver" | "satchel" | "mask" | "stonebox" | "warbow" | "crossbow" | "bolts" | "limbs" | "stock";
 export type Item = {
   id: string; name: string; examine: string; value: number; icon: Icon;
   stackable?: boolean; tradeable?: boolean;
@@ -388,6 +388,9 @@ const RANGED_GEAR: Item[] = [
   // A very rare Grumblin drop, worn over your Friend's head.
   { id: "grumblin_head", name: "Grumblin head", examine: "A Grumblin's head, hollowed out and surprisingly comfy. It still grumbles a little.", value: 5000,
     icon: { shape: "mask", color: "#8e9a7a", accent: "#e2c46a" }, equip: { slot: "head", bonuses: { defence: 3, attack: 1 } } },
+  // The sigil stone box: carried in your pack, it holds 120 sigil stones and the altar takes them all.
+  { id: "sigil_box", name: "Sigil stone box", examine: "A carved box that holds 120 sigil stones. Carry it to an altar and every stone inside is pressed.", value: 1500,
+    icon: { shape: "stonebox", color: "#9c7a58", accent: "#b49ae0" } },
   // The inkcoal satchel: worn on your back (or carried), it catches mined inkcoal and feeds the furnace.
   { id: "inkcoal_satchel", name: "Inkcoal satchel", examine: "A stout leather pack for your back. It holds 120 inkcoal, fills itself as you mine, and the furnace reaches into it.", value: 2500,
     icon: { shape: "satchel", color: "#8a6446", accent: "#3b3a38" }, equip: { slot: "cape", bonuses: { defence: 1 } } },
@@ -751,7 +754,7 @@ export const SHOPS: Record<string, ShopDef> = {
   fishing: { id: "fishing", name: "Pike's Tackle", buys: ["fish"], rate: 0.6, stock: ["small_net", "fishing_rod", "fly_rod", "harpoon", "crab_pot", "fishing_bait", "feather", "raw_minnows"] },
   axes: { id: "axes", name: "Axel's Axes", buys: ["logs"], rate: 0.6, stock: ["pewter_axe", "blackiron_axe", "ashsteel_axe", "moonsilver_axe", "pewter_pickaxe", "blackiron_pickaxe", "ashsteel_pickaxe", "moonsilver_pickaxe"] },
   swords: { id: "swords", name: "Emberforge Arms", buys: ["ore", "bar", "weapon", "armour"], rate: 0.55, stock: ["pewter_sword", "blackiron_sword", "ashsteel_sword", "pewter_sabre", "blackiron_sabre", "ashsteel_sabre", "moonsilver_sabre", "pewter_shield", "blackiron_shield", "blackiron_helm", "ashsteel_helm", "blackiron_cuirass"] },
-  sigils: { id: "sigils", name: "Runa's Sigils", buys: ["sigil", "magic"], rate: 0.6, stock: ["breeze_sigil", "tide_sigil", "stone_sigil", "ember_sigil", "thought_sigil", "shade_sigil", "storm_sigil", "bloom_sigil", "star_sigil", "path_sigil", "hollow_sigil", "staff", "breeze_staff", "scholar_hat", "scholar_robe"] },
+  sigils: { id: "sigils", name: "Runa's Sigils", buys: ["sigil", "magic"], rate: 0.6, stock: ["sigil_box", "breeze_sigil", "tide_sigil", "stone_sigil", "ember_sigil", "thought_sigil", "shade_sigil", "storm_sigil", "bloom_sigil", "star_sigil", "path_sigil", "hollow_sigil", "staff", "breeze_staff", "scholar_hat", "scholar_robe"] },
   crafting: { id: "crafting", name: "Tessa's Tannery", buys: ["hide"], rate: 0.6, stock: ["needle", "thread", "chisel", "leather", "leather_gloves", "leather_boots"] },
   oasis: { id: "oasis", name: "Oasis Bazaar", buys: ["gem", "jewellery", "food"], rate: 0.7, stock: ["cake", "bread", "inkshark", "sailfish", "silk", "rough_moonstone", "friends_charm", "moonstone_pendant"] },
   frost: { id: "frost", name: "Frostpeak Outfitters", stock: ["inkcrab", "sailfish", "glimmer_pickaxe", "glimmer_axe", "glimmer_sabre", "glimmer_helm", "glimmer_shield", "hollow_sigil", "path_sigil", "frosthide_coif", "frosthide_bracers", "glimmer_arrow",
@@ -770,7 +773,7 @@ export const SHOPS: Record<string, ShopDef> = {
   timber: { id: "timber", name: "Fernwick Timber Yard", buys: ["logs"], rate: 0.75, stock: ["pewter_axe", "blackiron_axe", "ashsteel_axe", "moonsilver_axe", "knife", "tinderbox", "logs", "oak_logs", "willow_logs", "bread", "cooked_meat"] },
   slayer: { id: "slayer", name: "The Warden's Lodge", stock: ["slayer_gem", "inkcrab", "sailfish", "tablet_hollow_square", "blackiron_arrow", "ashsteel_arrow", "leather_boots"] },
   inn: { id: "inn", name: "The Sleepy Friend", buys: ["fish", "food"], rate: 0.55, stock: ["bread", "cake", "cooked_meat", "cooked_chicken", "carp", "grayling"] },
-  wizards: { id: "wizards", name: "The Tower Stores", buys: ["sigil", "magic"], rate: 0.6, stock: ["breeze_sigil", "tide_sigil", "stone_sigil", "ember_sigil", "thought_sigil", "shade_sigil", "star_sigil",
+  wizards: { id: "wizards", name: "The Tower Stores", buys: ["sigil", "magic"], rate: 0.6, stock: ["sigil_box", "breeze_sigil", "tide_sigil", "stone_sigil", "ember_sigil", "thought_sigil", "shade_sigil", "star_sigil",
     "staff", "breeze_staff", "tide_staff", "stone_staff", "ember_staff", "scholar_hat", "scholar_robe", "scholar_skirt", "tablet_hollow_square"] },
   bones: { id: "bones", name: "Bone Collector", buys: ["bones", "hide"], rate: 0.65, stock: ["bones", "large_bones"] },
   capes: { id: "capes", name: "The Keeper of Capes", stock: [...SKILLS.map(skill => `${skill}_cape`), "grandmaster_cape"] },

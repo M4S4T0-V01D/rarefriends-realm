@@ -267,7 +267,8 @@ export function talk(game: Game, npcId: string): Dialogue {
         { label: "Goodbye.", then: () => null },
       ]);
     }
-    case "apprentice": return chat(name, npcSays(name, "Sigils, staffs and robes, cheaper than anywhere in the Realm. The Archmage insists."), [
+    case "apprentice": return chat(name, npcSays(name, "Sigils, staffs and robes, cheaper than anywhere in the Realm. The Archmage insists.",
+      "Carrying stones to the altars? Take a sigil stone box: it holds a hundred and twenty, and the altar empties it for you."), [
       { label: "Let me see.", then: () => { game.ui.shop = "wizards"; return null; } }, { label: "Later.", then: () => null }]);
     case "drake_hunter": return chat(name, npcSays(name, "Drakes up the pass, and Old Cinder asleep in the crater. Never go without a Wyrmward shield: King Hollis gives them to anyone who asks nicely.",
       "Drake bones are the best a priest can bury, and Tessa-trained crafters turn drakehide into archer's armour. Bring food. Lots."));

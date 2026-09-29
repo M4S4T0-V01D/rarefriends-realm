@@ -429,6 +429,14 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
         for (const x of [12, 15, 18]) dot(p, x, 24, "#f4efe2");
         dot(p, 16, 20, shadeHex(color, -0.35)); break;
       }
+      case "stonebox": {
+        // A carved wooden box, lid propped open, pale sigil stones heaped inside, a glowing sigil on its front.
+        part(p, poly([[5, 9], [22, 3], [27, 6], [10, 12]]), shadeHex(color, 0.12), "wood");
+        for (const [x, y] of [[11, 13], [16, 12], [21, 13], [13, 15], [19, 15]] as Pt[]) part(p, disc(x, y, 2.6), "#d9d4e6", "stone");
+        part(p, poly([[4, 15], [28, 15], [27, 29], [5, 29]]), color, "wood");
+        line(p, [[5, 19], [27, 19]], shadeHex(color, -0.25)); line(p, [[4, 15], [28, 15]], shadeHex(color, 0.2));
+        part(p, disc(16, 24, 3), accent ?? "#b49ae0", "glow"); dot(p, 16, 24, "#ffffff"); break;
+      }
       case "satchel": {
         // A leather pack with a flap and buckle, lumps of inkcoal peeking out of the top.
         for (const [x, y] of [[11, 7], [16, 5], [21, 7]] as Pt[]) part(p, disc(x, y, 3), accent ?? "#3b3a38", "stone");

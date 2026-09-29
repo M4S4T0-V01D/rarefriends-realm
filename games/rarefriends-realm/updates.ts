@@ -4,6 +4,11 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 27, date: "2026-09-29", title: "The sigil stone box, and steadier early levels", items: [
+    "The sigil stone box: carry it and the sigil stones you mine go into it (up to 120), and an altar presses every stone inside. Right-click to check, fill or empty it. The Tower Stores and Runa's Sigils sell them.",
+    "At the bank, right-click a sigil stone box or inkcoal satchel in your pack to Fill it straight from the bank (or empty it in), or use the Fill button.",
+    "The first levels of gathering and making skills (fishing, cooking, woodcutting, mining and the rest) come a little slower, starting at under a third of the XP and catching up by level 10. Combat is unchanged.",
+  ] },
   { id: 26, date: "2026-09-29", title: "Real hoods, kinder cooking and a new trailer", items: [
     "Hoods (hunter's, frosthide and leather) are proper hoods now: closed all round, with your face looking out of the front, a cowl point behind, and a short capelet over your shoulders.",
     "Cooking burns less while you learn: about one in five at a food's own level, easing off fast. Minnows stop burning at 12, chicken and beef at 14, perch at 22 and carp at 32.",

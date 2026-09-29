@@ -204,6 +204,11 @@ dragging.
 room, and the furnace and Forgeheart take from it first. Right-click it to check, fill or empty it; use inkcoal on it to fill
 it. The Old miner at the Ashen mine sells them, or stitch one from 3 leather and thread at Crafting 28.
 
+**The sigil stone box.** Carried in your pack, it holds 120 sigil stones: stones you mine go into it while there's room,
+and an altar presses everything in it along with your pack. Right-click it to check, fill or empty it; use stones on it to
+fill it. The Tower Stores and Runa's Sigils sell it. At the bank, right-click the box (or the inkcoal satchel) in your pack
+to Fill it straight from the bank or empty it back in, or press the Fill button.
+
 **The Millpond**, south of the Hollow Farms windmill, has two net spots (minnows) and a bait spot (perch, carp) for new
 Friends. **The Grumblin head** is a very rare drop (1 in 500 from Grumblins, 1 in 50 from the chief), worn on your head.
 
@@ -252,6 +257,9 @@ lost, and the win and loss are recorded (shown on the adventurer card). Players 
 
 A pet follows you instead of a Friend follower (call or send it home from the Friends tab). Other players see it
 trotting behind you.
+
+**Early levels.** Below level 30 every skill pays a little less XP (about half at level 1, full from 30). Gathering and
+making skills start lower still, at 30% at level 1, catching up with combat by level 10.
 
 **Achievements and hiscores.** 32 achievements (skills, combat, quests, collecting, together, daily) are checked
 against your adventure every few seconds; older saves earn the ones they already deserve in one quiet catch-up. Each

@@ -13,7 +13,7 @@ import { cleanMet } from "./hiscores.ts";
 import { addSlayerPoints, slayerBoost, slayerKill, slayerProblem, taskText } from "./slayer.ts";
 import { NPCS, examineItem, npcDef, onMonsterKilled, questDone, searchCryptChest, searchWell, talk, tanHides, useCryptAltar } from "./content.ts";
 import {
-  BANK_SIZE, BANK_TABS, DAY_MS, SATCHEL, SATCHEL_SIZE, compactBankTabs, hasSatchel, stock, useUp, INVENTORY_SIZE, REFERRAL_COINS, REFERRALS_PER_DAY, REFERRAL_TICKS, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
+  BANK_SIZE, BANK_TABS, DAY_MS, SATCHEL, SATCHEL_SIZE, STONE_BOX, STONE_BOX_SIZE, compactBankTabs, hasSatchel, hasStoneBox, stock, useUp, INVENTORY_SIZE, REFERRAL_COINS, REFERRALS_PER_DAY, REFERRAL_TICKS, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
   level, maxHp, maxPrayer, message, prayerBoost, riding, sound, take, weapon, combatLevel, createGame,
   type Activity, type CombatStyle, type Dialogue, type Game, type Monster, type Npc, type Point, type Recipe, type Slot, type BankSlot, type Target,
 } from "./state.ts";
@@ -282,6 +282,7 @@ export function itemOptions(game: Game, slotIndex: number): ItemOption[] {
   if (slot.id === "insight_lamp") out.push({ verb: "Rub", run: g => { g.ui.lamp = slotIndex; } });
   if (slot.id === "slayer_gem") out.push({ verb: "Check", run: g => message(g, taskText(g)) });
   if (slot.id === SATCHEL) out.push({ verb: "Check", run: satchelCheck }, { verb: "Fill", run: satchelFill }, { verb: "Empty", run: satchelEmpty });
+  if (slot.id === STONE_BOX) out.push({ verb: "Check", run: boxCheck }, { verb: "Fill", run: boxFill }, { verb: "Empty", run: boxEmpty });
   out.push({ verb: "Use", run: () => ({ kind: "item", slot: slotIndex }) });
   out.push({ verb: "Drop", run: g => drop(g, slotIndex) });
   out.push({ verb: "Examine", run: g => message(g, slot.n >= 100_000 ? `${slot.n.toLocaleString()} x ${definition.name}` : definition.examine) });
@@ -300,6 +301,20 @@ export function satchelEmpty(game: Game) {
   if (!player.coalBag) { message(game, "Your satchel is empty."); return; }
   if (!n) { message(game, "You have no room in your pack.", "warn"); return; }
   player.coalBag -= n; give(player, "inkcoal", n); message(game, `You take ${n} inkcoal out of the satchel (${player.coalBag} left).`); sound(game, "pickup");
+}
+export function boxCheck(game: Game) { message(game, `Your sigil stone box holds ${game.player.stoneBox} of ${STONE_BOX_SIZE} sigil stones.`); }
+/** Put all the sigil stones in your pack into the box. */
+export function boxFill(game: Game) {
+  const player = game.player, n = Math.min(count(player, "sigil_stone"), STONE_BOX_SIZE - player.stoneBox);
+  if (!n) { message(game, count(player, "sigil_stone") ? "Your sigil stone box is full." : "You have no sigil stones to put in the box."); return; }
+  take(player, "sigil_stone", n); player.stoneBox += n; message(game, `You fill the box with ${n} sigil stones (${player.stoneBox}/${STONE_BOX_SIZE}).`); sound(game, "pickup");
+}
+/** Take as many stones out as your pack has room for. */
+export function boxEmpty(game: Game) {
+  const player = game.player, n = Math.min(player.stoneBox, freeSlots(player));
+  if (!player.stoneBox) { message(game, "Your sigil stone box is empty."); return; }
+  if (!n) { message(game, "You have no room in your pack.", "warn"); return; }
+  player.stoneBox -= n; give(player, "sigil_stone", n); message(game, `You take ${n} sigil stones out of the box (${player.stoneBox} left).`); sound(game, "pickup");
 }
 export function eat(game: Game, slotIndex: number) {
   const player = game.player, slot = player.inventory[slotIndex];
@@ -378,6 +393,7 @@ export function useItemOnItem(game: Game, a: number, b: number) {
     if (bow) { game.ui.production = { title: "What would you like to fletch?", recipes: fletchingRecipes(log) }; return; }
   }
   if (pair("inkcoal", SATCHEL)) { satchelFill(game); return; }
+  if (pair("sigil_stone", STONE_BOX)) { boxFill(game); return; }
   if (pair("feather", "arrow_shaft")) { startProduction(game, headlessRecipe(), 100); return; }
   // Crossbows: feathers on unfeathered bolts, and metal limbs on a stock.
   const blanks = [first.id, second.id].find(id => id.endsWith("_bolts_unf"));
@@ -459,10 +475,10 @@ export function craftSigils(game: Game, object: WorldObject) {
   const player = game.player, entry = SIGILCRAFT.find(row => row.sigil === object.sigil);
   if (!entry) return 0;
   if (level(game, "sigilcraft") < entry.level) { message(game, `You need a Sigilcraft level of ${entry.level} to press ${item(entry.sigil).name.toLowerCase()}s.`, "warn"); return 0; }
-  const stones = count(player, "sigil_stone");
+  const stones = stock(player, "sigil_stone");
   if (!stones) { message(game, "You need sigil stones. Mine them in the Wizards' Tower.", "warn"); return 0; }
   const each = sigilsPerStone(level(game, "sigilcraft"), entry.level), made = stones * each;
-  take(player, "sigil_stone", stones); give(player, entry.sigil, made);
+  useUp(player, "sigil_stone", stones); give(player, entry.sigil, made);
   addXp(game, "sigilcraft", entry.xp * stones); sound(game, "spell");
   emit(game, { type: "cast", spell: "sigilcraft", tick: game.tick });
   message(game, `You press ${made} ${item(entry.sigil).name.toLowerCase()}s${each > 1 ? ` (${each} per stone)` : ""}.`);
@@ -845,11 +861,16 @@ function mineTick(game: Game, activity: Extract<Activity, { kind: "mine" }>) {
   if (game.rng() >= chance) return;
   const ore = object.rock === "gem" ? ["rough_moonstone", "rough_moonstone", "rough_sagestone", "rough_rosestone"][Math.floor(game.rng() * 4)] : rock.ore;
   // Inkcoal goes into the satchel while there's room.
-  const bagged = ore === "inkcoal" && hasSatchel(player) && player.coalBag < SATCHEL_SIZE;
-  if (bagged) player.coalBag++; else give(player, ore);
+  // Inkcoal goes into the satchel, and sigil stones into their box, while there's room.
+  const bagged = ore === "inkcoal" && hasSatchel(player) && player.coalBag < SATCHEL_SIZE, boxed = ore === "sigil_stone" && hasStoneBox(player) && player.stoneBox < STONE_BOX_SIZE;
+  if (bagged) player.coalBag++; else if (boxed) player.stoneBox++; else give(player, ore);
   addXp(game, "mining", rock.xp);
   if (player.familyId === 4 && game.rng() < 0.08 && freeSlots(player)) { give(player, ore); message(game, "Lopsided luck! You mine a second piece."); }
-  if (object.rock === "sigil") { if (!freeSlots(player)) { message(game, "Your inventory is too full to hold any more sigil stones.", "warn"); player.activity = null; } return; }
+  if (object.rock === "sigil") {
+    if (boxed && player.stoneBox === STONE_BOX_SIZE) message(game, `Your sigil stone box is full (${STONE_BOX_SIZE}).`);
+    if (!freeSlots(player) && !(hasStoneBox(player) && player.stoneBox < STONE_BOX_SIZE)) { message(game, "Your inventory is too full to hold any more sigil stones.", "warn"); player.activity = null; }
+    return;
+  }
   message(game, bagged ? `You put the inkcoal in your satchel (${player.coalBag}/${SATCHEL_SIZE}).` : `You manage to mine some ${item(ore).name.toLowerCase().replace(" ore", "")}.`);
   rollPet(game, "pebble", level(game, "mining"));
   game.depleted.set(object.id, game.tick + rock.respawn + Math.floor(game.rng() * rock.respawn * 0.5));
@@ -1680,7 +1701,7 @@ export type SaveData = {
   inventory: (Slot | null)[]; equipment: Record<string, string>; bank: BankSlot[]; style: CombatStyle; autocast: string | null;
   quests: Record<string, number>; questData: Record<string, number>; wardrobe: string[]; worn: string[]; follower: number | null; followerGeneration: number | null;
   kills: number; deaths: number; tutorial: number; guide?: number; created: number; playTicks: number; retaliate: boolean; music: string[];
-  met?: unknown; achievements?: Record<string, number>; pets?: string[]; petOut?: string | null; killLog?: Record<string, number>; stats?: Record<string, number>; referredBy?: number | null; referrals?: number[]; referralTimes?: number[]; boostTicks?: number; coalBag?: number; mounts?: string[]; mount?: string | null; daily?: unknown; seenUpdate?: number;
+  met?: unknown; achievements?: Record<string, number>; pets?: string[]; petOut?: string | null; killLog?: Record<string, number>; stats?: Record<string, number>; referredBy?: number | null; referrals?: number[]; referralTimes?: number[]; boostTicks?: number; coalBag?: number; stoneBox?: number; mounts?: string[]; mount?: string | null; daily?: unknown; seenUpdate?: number;
 };
 export function serialize(game: Game): SaveData {
   const player = game.player;
@@ -1690,7 +1711,7 @@ export function serialize(game: Game): SaveData {
     style: player.style, autocast: player.autocast, quests: { ...player.quests }, questData: { ...player.questData }, wardrobe: [...player.wardrobe], worn: [...player.worn],
     follower: player.follower, followerGeneration: player.followerGeneration, kills: player.kills, deaths: player.deaths, tutorial: player.tutorial, guide: player.guide, created: player.created,
     playTicks: game.playTicks, retaliate: game.autoRetaliate, music: [...player.music],
-    referredBy: player.referredBy, referrals: [...player.referrals], referralTimes: [...player.referralTimes], boostTicks: player.boostTicks, coalBag: player.coalBag, mounts: [...player.mounts], mount: player.mount, met: JSON.parse(JSON.stringify(player.met)), achievements: { ...player.achievements }, pets: [...player.pets], petOut: player.petOut, killLog: { ...player.killLog }, stats: { ...player.stats }, daily: JSON.parse(JSON.stringify(player.daily)), seenUpdate: player.seenUpdate,
+    referredBy: player.referredBy, referrals: [...player.referrals], referralTimes: [...player.referralTimes], boostTicks: player.boostTicks, coalBag: player.coalBag, stoneBox: player.stoneBox, mounts: [...player.mounts], mount: player.mount, met: JSON.parse(JSON.stringify(player.met)), achievements: { ...player.achievements }, pets: [...player.pets], petOut: player.petOut, killLog: { ...player.killLog }, stats: { ...player.stats }, daily: JSON.parse(JSON.stringify(player.daily)), seenUpdate: player.seenUpdate,
   };
 }
 const QUEST_IDS = ["friends_feast", "grumblin_trouble", "cold_forge", "hollow_whispers", "lost_glimmer", "hollow_king", "hazels_quiver"];
@@ -1775,6 +1796,7 @@ export function restore(game: Game, raw: unknown): boolean {
   player.referrals = [...new Set((Array.isArray(save.referrals) ? save.referrals : []).map(friendNumber).filter((id): id is number => id !== null))].slice(0, 500);
   player.boostTicks = int(save.boostTicks, 0, REFERRAL_TICKS * 50, 0);
   player.coalBag = int(save.coalBag, 0, SATCHEL_SIZE, 0);
+  player.stoneBox = int(save.stoneBox, 0, STONE_BOX_SIZE, 0);
   player.referralTimes = (Array.isArray(save.referralTimes) ? save.referralTimes : []).filter((at): at is number => typeof at === "number" && Number.isFinite(at) && at > 0).slice(-REFERRALS_PER_DAY);
   player.mounts = MOUNTS.filter(mount => Array.isArray(save.mounts) && save.mounts.includes(mount.id)).map(mount => mount.id);
   player.mount = typeof save.mount === "string" && player.mounts.includes(save.mount) ? save.mount : null;
