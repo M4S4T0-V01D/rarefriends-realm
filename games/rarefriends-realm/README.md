@@ -38,18 +38,18 @@ XP follows the classic curve (83 XP for level 2, 13,034,431 for 99), multiplied 
 | Skill | Train by | Notes |
 | --- | --- | --- |
 | Attack / Strength / Defence | Melee combat (4 XP per damage to your style's skill) | Styles: Accurate, Aggressive, Defensive, Controlled |
-| Ranged | Bows and crossbows (4 XP per damage; Longrange splits it with Defence) | Bows by wood (Shortbow 1, Oak 5, Willow 20, Maple 30, Yew 40, Ashwood 50, Gloomfang 60) fire the best arrows in your pack (pewter 1 … rarite 40). War bows (War bow 5, Oak 10, Willow 25, Maple 35, Yew 45, Ashwood 55) draw a tick slower, add strength to every arrow and reach 8 tiles. Crossbows (pewter 1, blackiron 10, ashsteel 20, moonsilver 30, glimmer 40, rarite 55) fire bolts only, a tick slower and harder hitting, and are one-handed, so a shield fits. Hazel's quiver (worn on the back) returns four in five shots to your pack. Styles: Accurate, Rapid (a tick faster), Longrange (+2 tiles). Most arrows can be picked up again |
+| Ranged | Bows and crossbows (4 XP per damage; Longrange splits it with Defence) | Bows by wood (Shortbow 1, Oak 5, Willow 20, Maple 30, Yew 40, Ashwood 50, Gloomfang 60) fire the best arrows in your pack (pewter 1 … rarite 40, frostsilver 50 … ashenheart 90). War bows (War bow 5, Oak 10, Willow 25, Maple 35, Yew 45, Ashwood 55) draw a tick slower, add strength to every arrow and reach 8 tiles. Crossbows (pewter 1, blackiron 10, ashsteel 20, moonsilver 30, glimmer 40, rarite 45, then frostsilver 50 … ashenheart 90) fire bolts only, a tick slower and harder hitting, and are one-handed, so a shield fits. Hazel's quiver (worn on the back) returns four in five shots to your pack. Styles: Accurate, Rapid (a tick faster), Longrange (+2 tiles). Most arrows can be picked up again |
 | Hitpoints | Any combat (1.33 XP per damage) | Starts at 10; regenerates 1 HP per minute |
 | Magic | Spells paid in sigils (damage spells: base XP + 2 per damage) | Staffs autocast damage spells; breeze, tide, stone and ember staffs give unlimited sigils of their element. Basic sigils cost about 3 coins |
 | Sigilcraft | Press sigil stones at an altar: Breeze 1, Thought 2, Tide 5, Stone 9, Ember 14, Shade 20, Star 27, Storm 35, Bloom 44, Path 54, Hollow 65 | Sigil stones are mined (endlessly) in the Wizards' Tower; one more sigil per stone for every 11 levels past the altar's |
 | Prayer | Burying bones (4.5 / 15 / 50 XP) | Recharge at altars; prayers drain points |
 | Woodcutting | Trees 1, Oak 15, Willow 30, Maple 45, Yew 60, Ashwood 70 | Better axes cut faster |
 | Firemaking | Light logs (same levels as Woodcutting) | Fires last about a minute; cook on them |
-| Fletching | A knife on logs: 15 arrow shafts, a bow (Shortbow 5, Oak 20, Willow 35, Maple 50, Yew 65, Ashwood 80), a war bow from two logs (10, 25, 40, 55, 70, 85) or a crossbow stock (wooden 9, oak 24, willow 39, maple 54, yew 69); feathers on shafts; arrowheads on headless arrows (pewter 1 … rarite 75); feathers on unfeathered bolts (pewter 5 … rarite 79) | Arrowheads (15 a bar), unfeathered bolts (12 a bar) and crossbow limbs (2 bars) are smithed at the anvil. Limbs on their stock make a crossbow with Crafting (pewter 8, blackiron 18, ashsteel 28, moonsilver 42, glimmer 56, rarite 70) |
+| Fletching | A knife on logs: 15 arrow shafts, a bow (Shortbow 5, Oak 20, Willow 35, Maple 50, Yew 65, Ashwood 80), a war bow from two logs (10, 25, 40, 55, 70, 85) or a crossbow stock (wooden 9, oak 24, willow 39, maple 54, yew 69, ashwood 84); feathers on shafts; arrowheads on headless arrows (pewter 1 … rarite 75); feathers on unfeathered bolts (pewter 5 … rarite 79) | Arrowheads (15 a bar), unfeathered bolts (12 a bar) and crossbow limbs (2 bars) are smithed at the anvil. Limbs on their stock make a crossbow with Crafting (pewter 8, blackiron 18, ashsteel 28, moonsilver 42, glimmer 56, rarite 70) |
 | Fishing | Net 1 (minnows), Bait 5/10 (perch, carp), Lure 20/30 (char, grayling), Cage 40 (inkcrab), Harpoon 50 (sailfish), Deep 76 (inkshark) | Bait and feathers are used up |
 | Cooking | Ranges and fires | Burn chance falls with level, to zero at the stop-burn level |
 | Mining | Clay/Pewter 1, Blackiron 15, Inkcoal 30, Gems 40, Moonsilver 55, Glimmer 70, Rarite 85 | 1/256 random gem per swing |
-| Smithing | Furnace (pewter 1, blackiron 15 at 60%, ashsteel 30, moonsilver 50, glimmer 70, rarite 85; the higher metals add 1–4 inkcoal) and anvil | Dagger, axe, sword, pickaxe, helm, sabre, greaves, shield, cuirass in six metals |
+| Smithing | Furnace (pewter 1, blackiron 15 at 60%, ashsteel 30, moonsilver 50, glimmer 70, rarite 85; the higher metals add 1–4 inkcoal), then the forged metals from monster materials (frostsilver 86, gloomsteel 88, wyrmscale 90, hollowsteel 92, cindersteel 94, ashenheart 96, with 4–6 inkcoal); and the anvil | Dagger, axe, sword, pickaxe, helm, sabre, greaves, shield, cuirass in twelve metals; the forged metals also make a staff |
 | Crafting | Leather (gloves 1 … leggings 18), gems (moonstone 20, sagestone 27, rosestone 34) | Tessa tans hides for 2 coins each |
 | Thieving | Villagers 1, merchant 25, guards 40; stalls 5 / 20 / 42 / 75 | Failing a pickpocket stuns you |
 | Agility | Friendhollow course (5 obstacles, +40 XP a lap), stepping stones (20) | Agility restores run energy faster |
@@ -114,6 +114,25 @@ next attack. **Death is safe:** you wake by the Friendhollow fountain with your 
 A **Wyrmward shield** (free from King Hollis: "I'm going after dragons") turns it into a few points. Dragons drop drake
 bones (72 Prayer XP), drakehide (Crafting 57–63: bracers, chaps and a vest for archers) and, from Old Cinder, a Wyrm heart.
 | **The Hollow King** | 92 | The throne room (boss) |
+
+## Forged gear (levels 50–90)
+
+Above rarite (level 40) are six forged metals. They aren't mined: each is smelted, one bar per material plus inkcoal,
+from what the strongest creatures drop, then smithed at any anvil at Smithing 86–99 into the full set (dagger, sword,
+sabre, helm, shield, cuirass, greaves, axe, pickaxe), a staff, crossbow limbs, arrowheads and bolts. Finished pieces
+also drop now and then, and Frostpeak Outfitters sells frostsilver.
+
+| Metal | Level | Material | Dropped by |
+| --- | --- | --- | --- |
+| Frostsilver | 50 | Frost shard | Frost yetis (30%), frost wisps, frost wolves |
+| Gloomsteel | 60 | Gloom shard | Gloom hounds (30%), Hollow sentinels, shades |
+| Wyrmscale | 70 | Wyrm scale | Ash drakes (30%), cinder drakes (35%) |
+| Hollowsteel | 75 | Hollow essence | Hollow sentinels (20%), the Hollow King (3–5, always) |
+| Cindersteel | 80 | Cinder core | Old Cinder (1–3, always), cinder drakes (8%) |
+| Ashenheart | 90 | Colossus ember | The Ashen Colossus (2–4 for everyone who wounds it), Old Cinder (10%) |
+
+Weapons need that Attack level, armour that Defence level, staffs that Magic level, crossbows that Ranged level, and
+axes and pickaxes that Woodcutting or Mining level to cut and mine (faster at every tier).
 
 ## Quests (10 quest points)
 

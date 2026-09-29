@@ -242,6 +242,34 @@ test("mining, smelting and smithing a pewter dagger", () => {
   assert(g.player.xp.smithing >= (8 + 12.5) * XP_RATE * earlyXp(1));
 });
 
+test("Forged tiers (50–90): materials from strong monsters, smelted and smithed at Smithing 86+, into weapons, armour, tools, staffs and crossbows", () => {
+  const forged = [["frostsilver", 50, "frost_shard", "frost_yeti"], ["gloomsteel", 60, "gloom_shard", "gloom_hound"], ["wyrmscale", 70, "wyrm_scale", "ash_drake"],
+    ["hollowsteel", 75, "hollow_essence", "hollow_king"], ["cindersteel", 80, "cinder_core", "emberwyrm"], ["ashenheart", 90, "colossus_ember", "ashen_colossus"]];
+  for (const [metal, lvl, material, source] of forged) {
+    assert.equal(item(`${metal}_sabre`).equip.requires.attack, lvl); assert.equal(item(`${metal}_cuirass`).equip.requires.defence, lvl);
+    assert.equal(item(`${metal}_staff`).equip.requires.magic, lvl); assert.equal(item(`${metal}_pickaxe`).tool.level, lvl);
+    assert(MONSTERS[source].always?.some(drop => drop.item === material) || MONSTERS[source].drops.some(drop => drop.item === material), `${source} drops ${material}`);
+    for (const recipe of smithingRecipes(metal)) assert(recipe.level >= 86 && recipe.level <= 99, `${recipe.label} at Smithing ${recipe.level}`);
+  }
+  // Each tier outclasses the last.
+  const sabres = ["rarite", ...forged.map(([metal]) => metal)].map(metal => item(`${metal}_sabre`).equip.bonuses.strength);
+  assert.deepEqual([...sabres].sort((a, b) => a - b), sabres);
+  // Smelt a frost shard and forge a staff and a pickaxe from it.
+  const g = newGame(), p = g.player;
+  p.inventory.fill(null); p.xp.smithing = XP_TABLE[99]; give(p, "frost_shard", 4); give(p, "inkcoal", 16); give(p, "hammer");
+  const furnace = g.world.objects.find(object => object.kind === "furnace");
+  standBy(g, furnace);
+  startProduction(g, smeltingRecipes().find(recipe => recipe.outputs.frostsilver_bar), 4); until(g, () => count(p, "frostsilver_bar") === 4, 120);
+  assert.equal(count(p, "frostsilver_bar"), 4);
+  const anvil = g.world.objects.find(object => object.kind === "anvil");
+  standBy(g, anvil);
+  startProduction(g, smithingRecipes("frostsilver").find(recipe => recipe.outputs.frostsilver_staff), 1); run(g, 12);
+  startProduction(g, smithingRecipes("frostsilver").find(recipe => recipe.outputs.frostsilver_pickaxe), 1); run(g, 12);
+  assert(has(p, "frostsilver_staff") && has(p, "frostsilver_pickaxe"));
+  // Frostsilver is on sale in Frostpeak, for those with the coin.
+  assert(SHOPS.frost.stock.includes("frostsilver_sword"));
+});
+
 test("combat: equip a sword, kill a chicken, loot and bury its bones", () => {
   const g = newGame();
   give(g.player, "pewter_sword");

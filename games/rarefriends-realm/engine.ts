@@ -3,7 +3,7 @@
  * Pure TypeScript over the Game state, so it runs the same in the browser and in node tests.
  */
 import {
-  COOKING, CRAFTING, CROSSBOWS, LIMBS_OFFSET, STOCKS, WAR_BOWS, EMOTES, EQUIP_SLOTS, MOUNTS, PETS, mountDef, FLETCH_ARROWS, FLETCH_BOWS, SIGILCRAFT, STAFF_SIGILS, itemCategory, sigilsPerStone, FAMILY_NAMES, FIREMAKING, FISHING_SPOTS, GEM_CUTTING, METALS, MONSTERS, PRAYERS, RELICS, RF_BUNDLES, ROCKS, SHOPS, SHOP_BUY,
+  COOKING, CRAFTING, CROSSBOWS, FORGED_STAFF_MAGIC, LIMBS_OFFSET, metalLevel, STOCKS, WAR_BOWS, EMOTES, EQUIP_SLOTS, MOUNTS, PETS, mountDef, FLETCH_ARROWS, FLETCH_BOWS, SIGILCRAFT, STAFF_SIGILS, itemCategory, sigilsPerStone, FAMILY_NAMES, FIREMAKING, FISHING_SPOTS, GEM_CUTTING, METALS, MONSTERS, PRAYERS, RELICS, RF_BUNDLES, ROCKS, SHOPS, SHOP_BUY,
   SHOP_SELL, SKILLS, SKILL_NAMES, SMELTING, SMITH_PIECES, SMITH_XP, SPELLS, TREES, WARDROBE, XP_TABLE, isItem, item, levelForXp, smithLevel,
   type EquipSlot, type MetalId, type Skill, type Spell, type SpotKind, type WardrobeId,
 } from "./data.ts";
@@ -426,15 +426,17 @@ export function smithingRecipes(metal: MetalId): Recipe[] {
     ticks: 5, station: "anvil" as const, inputs: { [`${metal}_bar`]: piece.bars }, outputs: { [`${metal}_${piece.piece}`]: 1 }, tools: ["hammer"],
   })),
   // Arrowheads for Fletching: fifteen from a bar.
-  { skill: "smithing" as const, label: `15 ${name.toLowerCase()} arrowheads`, level: Math.min(99, SMITHING_BASE_OF(metal) + 5), xp: SMITH_XP[metal], ticks: 4, station: "anvil" as const,
+  { skill: "smithing" as const, label: `15 ${name.toLowerCase()} arrowheads`, level: metalLevel(metal, 5), xp: SMITH_XP[metal], ticks: 4, station: "anvil" as const,
     inputs: { [`${metal}_bar`]: 1 }, outputs: { [`${metal}_arrowheads`]: 15 }, tools: ["hammer"] },
   // Crossbow parts: twelve unfeathered bolts from a bar, and limbs from two.
-  { skill: "smithing" as const, label: `12 unfeathered ${name.toLowerCase()} bolts`, level: Math.min(99, SMITHING_BASE_OF(metal) + 3), xp: SMITH_XP[metal], ticks: 4, station: "anvil" as const,
+  { skill: "smithing" as const, label: `12 unfeathered ${name.toLowerCase()} bolts`, level: metalLevel(metal, 3), xp: SMITH_XP[metal], ticks: 4, station: "anvil" as const,
     inputs: { [`${metal}_bar`]: 1 }, outputs: { [`${metal}_bolts_unf`]: 12 }, tools: ["hammer"] },
-  { skill: "smithing" as const, label: `${name} limbs`, level: Math.min(99, SMITHING_BASE_OF(metal) + LIMBS_OFFSET), xp: SMITH_XP[metal] * 2, ticks: 5, station: "anvil" as const,
-    inputs: { [`${metal}_bar`]: 2 }, outputs: { [`${metal}_limbs`]: 1 }, tools: ["hammer"] }];
+  { skill: "smithing" as const, label: `${name} limbs`, level: metalLevel(metal, LIMBS_OFFSET), xp: SMITH_XP[metal] * 2, ticks: 5, station: "anvil" as const,
+    inputs: { [`${metal}_bar`]: 2 }, outputs: { [`${metal}_limbs`]: 1 }, tools: ["hammer"] },
+  // Forged metals also make a staff.
+  ...(FORGED_STAFF_MAGIC[metal] ? [{ skill: "smithing" as const, label: `${name} staff`, level: metalLevel(metal, 10), xp: SMITH_XP[metal] * 2, ticks: 5, station: "anvil" as const,
+    inputs: { [`${metal}_bar`]: 2 }, outputs: { [`${metal}_staff`]: 1 }, tools: ["hammer"] }] : [])];
 }
-const SMITHING_BASE_OF = (metal: MetalId) => smithLevel(metal, "dagger");
 // ---------- Sigilcraft ----------
 /** Press every sigil stone you carry into this altar's sigil. */
 export function craftSigils(game: Game, object: WorldObject) {

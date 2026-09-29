@@ -303,9 +303,11 @@ function drawWeapon(p: Pixels, piece: Piece, x: number, y: number, dir: number, 
     case "staff": {
       // Upright in the hand, foot by your feet, the head (a claw holding an orb of its element) above you.
       const top = { x: x + dir * (1 + lean), y: y - 20 };
-      p.line(x, y + 11, top.x, top.y + 3, wood, 2); p.line(x - 1, y + 10, top.x - 1, top.y + 4, woodLight);
-      const orb = piece.id === "staff" ? "#e2d49e" : metal;
-      p.line(top.x - 2, top.y + 3, top.x - 2, top.y, wood); p.line(top.x + 2, top.y + 3, top.x + 2, top.y, wood);
+      // Forged staffs are metal all the way up, their orb glowing in the metal's light.
+      const forged = isItem(piece.id) && item(piece.id).icon.kind === "forged", shaft = forged ? metal : wood, shaftLight = forged ? light : woodLight;
+      p.line(x, y + 11, top.x, top.y + 3, shaft, 2); p.line(x - 1, y + 10, top.x - 1, top.y + 4, shaftLight);
+      const orb = piece.id === "staff" ? "#e2d49e" : forged ? piece.trim ?? metal : metal;
+      p.line(top.x - 2, top.y + 3, top.x - 2, top.y, forged ? dark : wood); p.line(top.x + 2, top.y + 3, top.x + 2, top.y, forged ? dark : wood);
       p.disc(top.x, top.y, 2.2, 2.2, orb, null); p.set(top.x - 1, top.y - 1, "#ffffff");
       break;
     }

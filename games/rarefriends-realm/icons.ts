@@ -186,23 +186,27 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
       case "axe":
         part(p, stroke([[8, 29], [21, 5]], 3), WOOD_C, "wood"); line(p, [[10, 25], [12, 22]], DARK_WOOD);
         part(p, poly([[14, 5], [23, 2], [29, 7], [28, 18], [22, 15], [17, 11]]), color, "metal");
-        line(p, [[28, 7], [27, 16]], shadeHex(color, 0.32)); break;
+        line(p, [[28, 7], [27, 16]], accent ?? shadeHex(color, 0.32)); if (accent) dot(p, 22, 8, accent); break;
       case "pickaxe":
         part(p, stroke([[9, 30], [19, 8]], 3), WOOD_C, "wood");
-        part(p, poly([[2, 13], [8, 7], [17, 4], [26, 6], [31, 12], [24, 9], [17, 8], [9, 10]]), color, "metal"); break;
+        part(p, poly([[2, 13], [8, 7], [17, 4], [26, 6], [31, 12], [24, 9], [17, 8], [9, 10]]), color, "metal");
+        if (accent) { line(p, [[9, 8], [17, 5], [25, 7]], accent); dot(p, 18, 6, accent); } break;
       case "sword":
         part(p, all(stroke([[9, 23], [26, 6]], 4), poly([[25, 3], [29, 3], [29, 7]])), color, "metal");
         line(p, [[11, 21], [25, 7]], shadeHex(color, -0.18));
-        part(p, stroke([[5, 18], [14, 27]], 3), GOLD_C, "metal");
-        part(p, stroke([[4, 28], [8, 24]], 3), DARK_WOOD, "wood"); part(p, disc(3.5, 29.5, 2), GOLD_C, "metal"); break;
+        if (accent) for (const [x, y] of [[14, 17], [18, 13], [22, 9]] as Pt[]) dot(p, x, y, accent);
+        part(p, stroke([[5, 18], [14, 27]], 3), accent ? shadeHex(color, -0.3) : GOLD_C, "metal");
+        part(p, stroke([[4, 28], [8, 24]], 3), DARK_WOOD, "wood"); part(p, disc(3.5, 29.5, 2), accent ?? GOLD_C, accent ? "gem" : "metal"); break;
       case "dagger":
         part(p, all(stroke([[12, 21], [23, 10]], 4), poly([[22, 7], [26, 6], [25, 10]])), color, "metal");
         line(p, [[14, 19], [22, 11]], shadeHex(color, -0.18));
-        part(p, stroke([[8, 17], [15, 24]], 3), GOLD_C, "metal"); part(p, stroke([[6, 27], [10, 23]], 3), DARK_WOOD, "wood"); break;
+        if (accent) dot(p, 18, 15, accent);
+        part(p, stroke([[8, 17], [15, 24]], 3), accent ? shadeHex(color, -0.3) : GOLD_C, "metal"); part(p, stroke([[6, 27], [10, 23]], 3), DARK_WOOD, "wood"); break;
       case "sabre":
         part(p, all(stroke([[9, 24], [13, 15], [19, 9], [28, 5]], 4), poly([[27, 3], [30, 4], [28, 7]])), color, "metal");
-        line(p, [[11, 21], [14, 15], [20, 10], [26, 7]], shadeHex(color, 0.28));
-        part(p, all(stroke([[5, 20], [9, 26]], 3), stroke([[9, 26], [13, 26]], 2)), GOLD_C, "metal"); part(p, stroke([[4, 29], [8, 25]], 3), DARK_WOOD, "wood"); break;
+        line(p, [[11, 21], [14, 15], [20, 10], [26, 7]], accent ?? shadeHex(color, 0.28));
+        part(p, all(stroke([[5, 20], [9, 26]], 3), stroke([[9, 26], [13, 26]], 2)), accent ? shadeHex(color, -0.3) : GOLD_C, "metal");
+        if (accent) part(p, disc(8, 23, 1.6), accent, "gem"); part(p, stroke([[4, 29], [8, 25]], 3), DARK_WOOD, "wood"); break;
       case "helm":
         part(p, poly([[6, 27], [6, 14], [9, 8], [16, 4], [23, 8], [26, 14], [26, 27], [20, 27], [20, 21], [12, 21], [12, 27]]), color, armour);
         part(p, box(9, 15, 14, 3), INK, "flat", false);
@@ -231,7 +235,8 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
       case "legs":
         part(p, poly([[8, 4], [24, 4], [26, 29], [18, 29], [16, 13], [14, 29], [6, 29]]), color, armour);
         part(p, box(8, 4, 16, 3), shadeHex(color, -0.2), "flat"); line(p, [[16, 8], [16, 13]], dark);
-        if (metal) { part(p, disc(10, 18, 2.5), color, "metal"); part(p, disc(22, 18, 2.5), color, "metal"); } break;
+        if (metal) { part(p, disc(10, 18, 2.5), color, "metal"); part(p, disc(22, 18, 2.5), color, "metal"); }
+        if (accent) { line(p, [[8, 7], [24, 7]], accent, 2); dot(p, 10, 18, accent); dot(p, 22, 18, accent); } break;
       case "shield":
         part(p, poly([[5, 4], [27, 4], [27, 16], [16, 30], [5, 16]]), color, metal ? "metal" : "wood");
         part(p, all(box(14, 5, 4, 22), box(6, 11, 20, 4)), accent ?? shadeHex(color, -0.22), "flat");
@@ -265,6 +270,7 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
         part(p, poly([[12, 9], [16, 4], [19, 9]]), shadeHex(color, -0.12), "food");
         dot(p, 7, 14, INK); dot(p, 6, 14, "#ffffff"); line(p, [[10, 12], [10, 20]], dark);
         for (const [x, y] of [[14, 14], [18, 14], [16, 18], [20, 18]] as Pt[]) dot(p, x, y, shadeHex(color, 0.18)); break;
+      case "material": drawMaterial(p, icon.kind ?? "crystal", color); break;
       case "ore":
         if (icon.kind) { drawOre(p, icon.kind, color); break; }
         part(p, poly([[4, 23], [6, 12], [14, 5], [24, 7], [29, 17], [25, 27], [12, 29]]), "#8f8a84", "stone");
@@ -273,7 +279,8 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
         part(p, poly([[3, 17], [10, 10], [29, 10], [22, 17]]), shadeHex(color, 0.14), "metal");
         part(p, poly([[3, 17], [22, 17], [22, 25], [3, 25]]), color, "metal");
         part(p, poly([[22, 17], [29, 10], [29, 18], [22, 25]]), shadeHex(color, -0.14), "metal");
-        line(p, [[7, 21], [18, 21]], shadeHex(color, -0.25)); break;
+        line(p, [[7, 21], [18, 21]], shadeHex(color, -0.25));
+        if (accent) { line(p, [[8, 14], [20, 14]], accent); dot(p, 12, 23, accent); dot(p, 25, 15, accent); } break;
       case "bones":
         if (icon.kind && icon.kind !== "small") { drawBones(p, icon.kind, color, accent); break; }
         part(p, all(stroke([[8, 24], [24, 8]], 4), disc(6, 22, 3.5), disc(10, 26, 3.5), disc(22, 6, 3.5), disc(26, 10, 3.5)), color, "stone");
@@ -283,6 +290,13 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
         part(p, disc(16, 16, 6), color, "glow"); part(p, disc(16, 16, 2.5), shadeHex(color, 0.3), "flat", false);
         line(p, [[9, 9], [12, 8]], "#e8e6e0"); break;
       case "staff":
+        if (icon.kind === "forged") {
+          // A forged staff: a metal shaft with bands, claws of the metal holding a glowing orb.
+          part(p, stroke([[5, 30], [22, 9]], 3), color, "metal"); line(p, [[7, 27], [20, 11]], shadeHex(color, 0.3));
+          for (const [x, y] of [[9, 25], [15, 18]] as Pt[]) part(p, disc(x, y, 1.8), dark, "metal");
+          part(p, all(stroke([[20, 11], [18, 4]], 2), stroke([[21, 10], [28, 8]], 2)), dark, "metal");
+          part(p, disc(24, 6, 4.8), accent ?? color, "glow"); dot(p, 23, 5, "#ffffff"); break;
+        }
         part(p, stroke([[5, 30], [22, 9]], 3), WOOD_C, "wood"); line(p, [[9, 25], [11, 23]], DARK_WOOD); line(p, [[14, 19], [16, 17]], DARK_WOOD);
         part(p, all(stroke([[20, 10], [19, 5]], 2), stroke([[21, 9], [27, 7]], 2)), DARK_WOOD, "wood");
         part(p, disc(24, 6, 4.5), accent ?? color, "gem"); break;
@@ -465,6 +479,44 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
     }
     p.outline(); p.halo();
   });
+}
+
+/** The monster-dropped materials forged metals are smelted from. */
+function drawMaterial(p: Pixels, kind: string, color: string) {
+  const light = shadeHex(color, 0.3), dark = shadeHex(color, -0.3);
+  switch (kind) {
+    case "crystal":
+      // A cluster of icy prisms.
+      part(p, poly([[6, 28], [8, 12], [12, 6], [15, 12], [14, 28]]), color, "gem");
+      part(p, poly([[13, 29], [15, 9], [20, 2], [24, 9], [22, 29]]), shadeHex(color, 0.1), "gem");
+      part(p, poly([[21, 29], [23, 17], [27, 13], [29, 18], [28, 29]]), color, "gem");
+      line(p, [[18, 8], [17, 24]], "#ffffff"); line(p, [[10, 12], [10, 22]], light); break;
+    case "dark":
+      // A jagged splinter of shadow with a violet edge.
+      part(p, poly([[5, 27], [10, 16], [9, 9], [16, 3], [20, 10], [27, 12], [22, 19], [25, 28], [15, 24]]), "#2e2a38", "stone");
+      line(p, [[10, 16], [16, 4], [20, 10], [26, 12]], color, 2); line(p, [[14, 14], [18, 20]], light); dot(p, 16, 12, "#e8def8"); break;
+    case "scale":
+      // One big overlapping scale with ridges.
+      part(p, poly([[16, 3], [27, 9], [28, 20], [16, 30], [4, 20], [5, 9]]), color, "metal");
+      for (const y of [11, 17, 23]) line(p, [[16 - (30 - y) / 3, y], [16, y + 4], [16 + (30 - y) / 3, y]], dark);
+      line(p, [[16, 5], [16, 26]], light); break;
+    case "wisp":
+      // A cold swirl of pale light.
+      part(p, disc(16, 17, 11), shadeHex(color, -0.1), "glow");
+      line(p, [[9, 19], [11, 12], [17, 9], [23, 13], [21, 20], [15, 21], [13, 16], [17, 14]], "#ffffff", 2);
+      dot(p, 25, 7, light); dot(p, 7, 9, light); break;
+    case "core":
+      // A molten sphere, cracked and glowing.
+      part(p, disc(16, 16, 11), "#5a2a22", "stone");
+      part(p, disc(16, 16, 7.5), color, "glow"); part(p, disc(15, 15, 3.5), "#ffcf6a", "glow");
+      line(p, [[6, 12], [11, 14]], color); line(p, [[26, 21], [21, 19]], color); line(p, [[18, 5], [17, 9]], color); break;
+    case "ember":
+    default:
+      // A lump of ash with ember cracks that never go out.
+      part(p, poly([[4, 24], [7, 13], [14, 6], [23, 7], [29, 15], [26, 26], [15, 29]]), color, "stone");
+      line(p, [[9, 15], [14, 18], [12, 23]], "#f08a4b", 2); line(p, [[19, 10], [21, 16], [26, 18]], "#f08a4b", 2);
+      dot(p, 16, 18, "#ffcf6a"); dot(p, 21, 15, "#ffcf6a"); line(p, [[16, 4], [15, 1]], "#b3aea6"); break;
+  }
 }
 
 // ---------- 16-pixel UI icons: skills, tabs, orbs ----------

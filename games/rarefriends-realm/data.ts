@@ -74,7 +74,7 @@ export type IconShape =
   | "amulet" | "log" | "fish" | "ore" | "bar" | "bones" | "sigil" | "staff" | "net" | "rod" | "harpoon" | "pot" | "bucket" | "egg" | "flour"
   | "milk" | "tinderbox" | "hammer" | "knife" | "needle" | "thread" | "chisel" | "gem" | "hide" | "leather" | "meat" | "feather" | "bait"
   | "cake" | "bread" | "berries" | "key" | "wheat" | "lamp" | "scroll" | "silk" | "hood" | "bracer" | "burnt" | "hat" | "crown" | "orb" | "trophy"
-  | "bow" | "arrow" | "tablet" | "arrowheads" | "quiver" | "warbow" | "crossbow" | "bolts" | "limbs" | "stock";
+  | "bow" | "arrow" | "tablet" | "arrowheads" | "material" | "quiver" | "warbow" | "crossbow" | "bolts" | "limbs" | "stock";
 export type Item = {
   id: string; name: string; examine: string; value: number; icon: Icon;
   stackable?: boolean; tradeable?: boolean;
@@ -99,7 +99,27 @@ export const METALS = [
   { id: "moonsilver", name: "Moonsilver", level: 20, tier: 4, color: "#9fabc2", value: 380 },
   { id: "glimmer", name: "Glimmer", level: 30, tier: 5, color: "#d9cf9a", value: 900 },
   { id: "rarite", name: "Rarite", level: 40, tier: 6, color: "#d8b6b4", value: 2400 },
+  // Forged metals (levels 50–90): smelted from what the Realm's strongest creatures drop, not from ore, at Smithing 86 and up.
+  { id: "frostsilver", name: "Frostsilver", level: 50, tier: 7, color: "#bcd8e8", value: 4200 },
+  { id: "gloomsteel", name: "Gloomsteel", level: 60, tier: 8, color: "#6d5f8c", value: 6500 },
+  { id: "wyrmscale", name: "Wyrmscale", level: 70, tier: 9, color: "#6f9468", value: 9500 },
+  { id: "hollowsteel", name: "Hollowsteel", level: 75, tier: 10, color: "#d6cff0", value: 12000 },
+  { id: "cindersteel", name: "Cindersteel", level: 80, tier: 11, color: "#d0643f", value: 15000 },
+  { id: "ashenheart", name: "Ashenheart", level: 90, tier: 12, color: "#8a817c", value: 22000 },
 ] as const;
+/** The monster-dropped material each forged metal is smelted from (one per bar, with inkcoal). */
+export const FORGE_MATERIALS: Partial<Record<MetalId, { id: string; name: string; kind: string; examine: string; value: number }>> = {
+  frostsilver: { id: "frost_shard", name: "Frost shard", kind: "crystal", examine: "A shard of never-melting ice from a Frost yeti. Smelted, it makes frostsilver.", value: 1800 },
+  gloomsteel: { id: "gloom_shard", name: "Gloom shard", kind: "dark", examine: "A splinter of solid shadow from a gloom hound. Smelted, it makes gloomsteel.", value: 2800 },
+  wyrmscale: { id: "wyrm_scale", name: "Wyrm scale", kind: "scale", examine: "A drake's scale, harder than rarite. Smelted, it makes wyrmscale.", value: 4200 },
+  hollowsteel: { id: "hollow_essence", name: "Hollow essence", kind: "wisp", examine: "Something the Hollow left behind, cold and weightless. Smelted, it makes hollowsteel.", value: 5400 },
+  cindersteel: { id: "cinder_core", name: "Cinder core", kind: "core", examine: "The still-burning heart of a cinder drake. Smelted, it makes cindersteel.", value: 6800 },
+  ashenheart: { id: "colossus_ember", name: "Colossus ember", kind: "ember", examine: "An ember from the Ashen Colossus. It never goes out. Smelted, it makes ashenheart.", value: 10000 },
+};
+/** Each forged metal's glow: the accent on its weapons, armour and bars. */
+export const FORGE_GLOW: Partial<Record<MetalId, string>> = { frostsilver: "#eef9ff", gloomsteel: "#b49ae0", wyrmscale: "#c9e07a", hollowsteel: "#ffffff", cindersteel: "#ffcf6a", ashenheart: "#f08a4b" };
+/** Forged metals' staffs (smithed, two bars): magic weapons for the high tiers. */
+export const FORGED_STAFF_MAGIC: Partial<Record<MetalId, number>> = { frostsilver: 26, gloomsteel: 32, wyrmscale: 38, hollowsteel: 42, cindersteel: 46, ashenheart: 54 };
 export type MetalId = typeof METALS[number]["id"];
 /** Smithable pieces: bars used, smithing level offset over the metal's base, and relative strength. */
 export const SMITH_PIECES = [
@@ -114,7 +134,8 @@ export const SMITH_PIECES = [
   { piece: "cuirass", name: "cuirass", bars: 5, offset: 18, shape: "body", slot: "body", att: 0, str: 0, def: 20, speed: 0 },
 ] as const;
 export type SmithPiece = typeof SMITH_PIECES[number]["piece"];
-export const SMITHING_BASE: Record<MetalId, number> = { pewter: 1, blackiron: 15, ashsteel: 30, moonsilver: 50, glimmer: 70, rarite: 85 };
+export const SMITHING_BASE: Record<MetalId, number> = { pewter: 1, blackiron: 15, ashsteel: 30, moonsilver: 50, glimmer: 70, rarite: 85,
+  frostsilver: 86, gloomsteel: 88, wyrmscale: 90, hollowsteel: 92, cindersteel: 94, ashenheart: 96 };
 
 /** Each fish's colours: raw (its own) and cooked (browned). */
 const FISH_COLORS: Record<string, [string, string]> = {
@@ -159,7 +180,9 @@ const ITEMS: Item[] = [
   { id: "glimmer_ore", name: "Glimmer ore", examine: "This needs refining.", value: 400, icon: { shape: "ore", kind: "glimmer", color: "#86a98b" } },
   { id: "rarite_ore", name: "Rarite ore", examine: "Pale rose ore that only forms where Friends dream.", value: 1100, icon: { shape: "ore", kind: "rarite", color: "#d8b6b4" } },
   { id: "clay", name: "Clay", examine: "Some hard dry clay.", value: 2, icon: { shape: "ore", kind: "clay", color: "#d7c3a5" } },
-  ...METALS.map(metal => ({ id: `${metal.id}_bar`, name: `${metal.name} bar`, examine: `It's a bar of ${metal.id === "rarite" ? "rarite" : metal.id}.`, value: metal.value, icon: { shape: "bar" as const, color: metal.color } })),
+  ...Object.values(FORGE_MATERIALS).map(material => ({ id: material!.id, name: material!.name, examine: material!.examine, value: material!.value,
+    icon: { shape: "material" as const, color: METALS.find(metal => FORGE_MATERIALS[metal.id]?.id === material!.id)!.color, kind: material!.kind } })),
+  ...METALS.map(metal => ({ id: `${metal.id}_bar`, name: `${metal.name} bar`, examine: `It's a bar of ${metal.id === "rarite" ? "rarite" : metal.id}.`, value: metal.value, icon: { accent: FORGE_GLOW[metal.id], shape: "bar" as const, color: metal.color } })),
   // Gems
   { id: "rough_moonstone", name: "Rough moonstone", examine: "A rough moonstone.", value: 50, icon: { shape: "gem", color: "#8fa3c9", accent: "#6d6b67" } },
   { id: "rough_sagestone", name: "Rough sagestone", examine: "A rough sagestone.", value: 100, icon: { shape: "gem", color: "#8fbf9a", accent: "#6d6b67" } },
@@ -192,7 +215,7 @@ const ITEMS: Item[] = [
   // Fletching
   { id: "arrow_shaft", name: "Arrow shafts", examine: "Wooden shafts, ready for feathers.", value: 1, stackable: true, icon: { shape: "arrow", color: "#9c8672", accent: "shaft" } },
   { id: "headless_arrow", name: "Headless arrows", examine: "Fletched shafts. They need arrowheads.", value: 2, stackable: true, icon: { shape: "arrow", color: "#efede7", accent: "headless" } },
-  ...METALS.map((metal, index) => ({ id: `${metal.id}_arrowheads`, name: `${metal.name} arrowheads`, examine: `Arrowheads smithed from ${metal.id}.`, value: [1, 3, 6, 12, 24, 55][index], stackable: true,
+  ...METALS.map((metal, index) => ({ id: `${metal.id}_arrowheads`, name: `${metal.name} arrowheads`, examine: `Arrowheads smithed from ${metal.id}.`, value: [1, 3, 6, 12, 24, 55, 80, 120, 180, 230, 290, 420][index], stackable: true,
     icon: { shape: "arrowheads" as const, color: metal.color } })),
   { id: "ink_bones", name: "Ink bones", examine: "Bones stained black. They feel lighter than they should.", value: 250, bones: 50, icon: { shape: "bones", kind: "ink", color: "#4a4644", accent: "#8a62c8" } },
   { id: "cowhide", name: "Cowhide", examine: "I should take this to the tanner.", value: 8, icon: { shape: "hide", color: "#efede7", accent: "#3b3a38" } },
@@ -219,7 +242,7 @@ const ITEMS: Item[] = [
 function metalGear(): Item[] {
   const out: Item[] = [];
   for (const metal of METALS) {
-    const tier = metal.tier, scale = [1, 1.5, 2.2, 3.1, 4.3, 5.8][tier - 1];
+    const tier = metal.tier, scale = [1, 1.5, 2.2, 3.1, 4.3, 5.8, 6.8, 7.8, 8.9, 9.5, 10.2, 11.6][tier - 1];
     for (const piece of SMITH_PIECES) {
       const id = `${metal.id}_${piece.piece}`, name = `${metal.name} ${piece.name}`;
       const bonuses: Partial<Bonuses> = {};
@@ -232,7 +255,7 @@ function metalGear(): Item[] {
       out.push({
         id, name, examine: isTool ? `A ${piece.name} made of ${metal.id}.` : `A ${metal.id} ${piece.name}.`,
         value: Math.round(metal.value * piece.bars * 1.6 + 10),
-        icon: { shape: piece.shape as IconShape, color: metal.color },
+        icon: { shape: piece.shape as IconShape, color: metal.color, accent: FORGE_GLOW[metal.id] },
         equip: {
           slot: piece.slot as EquipSlot, bonuses,
           requires: metal.level > 1 ? { [requireSkill]: metal.level } : undefined,
@@ -241,6 +264,12 @@ function metalGear(): Item[] {
         tool: isTool ? { kind: piece.piece as "axe" | "pickaxe", tier, level: metal.level } : undefined,
       });
     }
+    const magic = FORGED_STAFF_MAGIC[metal.id];
+    if (magic) out.push({
+      id: `${metal.id}_staff`, name: `${metal.name} staff`, examine: `A staff forged of ${metal.id}, humming with power.`, value: Math.round(metal.value * 2 * 1.6 + 10),
+      icon: { shape: "staff", color: metal.color, accent: FORGE_GLOW[metal.id], kind: "forged" },
+      equip: { slot: "weapon", bonuses: { attack: tier, strength: tier + 2, magic }, requires: { magic: metal.level }, speed: 5, staff: true },
+    });
   }
   return out;
 }
@@ -298,6 +327,7 @@ export const STOCKS = [
   { id: "willow_stock", name: "Willow stock", value: 64, log: "willow_logs", level: 39, xp: 22, color: "#a5a67d" },
   { id: "maple_stock", name: "Maple stock", value: 130, log: "maple_logs", level: 54, xp: 32, color: "#c49a74" },
   { id: "yew_stock", name: "Yew stock", value: 320, log: "yew_logs", level: 69, xp: 50, color: "#7d6b5c" },
+  { id: "ashwood_stock", name: "Ashwood stock", value: 700, log: "ash_logs", level: 84, xp: 70, color: "#d6d3cc" },
 ] as const;
 /**
  * Crossbows: metal limbs (two bars at the anvil) fixed to a wooden stock with Crafting. One-handed, so a shield fits;
@@ -309,11 +339,17 @@ export const CROSSBOWS: readonly { metal: MetalId; stock: string; level: number;
   { metal: "ashsteel", stock: "oak_stock", level: 20, ranged: 28, strength: 14, craft: 28, xp: 34, value: 900 },
   { metal: "moonsilver", stock: "willow_stock", level: 30, ranged: 38, strength: 18, craft: 42, xp: 50, value: 2000 },
   { metal: "glimmer", stock: "maple_stock", level: 40, ranged: 54, strength: 22, craft: 56, xp: 70, value: 4600 },
-  { metal: "rarite", stock: "yew_stock", level: 55, ranged: 76, strength: 26, craft: 70, xp: 95, value: 11000 },
+  { metal: "rarite", stock: "yew_stock", level: 45, ranged: 70, strength: 26, craft: 70, xp: 95, value: 11000 },
+  { metal: "frostsilver", stock: "yew_stock", level: 50, ranged: 80, strength: 28, craft: 76, xp: 120, value: 22000 },
+  { metal: "gloomsteel", stock: "yew_stock", level: 60, ranged: 90, strength: 30, craft: 80, xp: 140, value: 34000 },
+  { metal: "wyrmscale", stock: "ashwood_stock", level: 70, ranged: 102, strength: 33, craft: 84, xp: 165, value: 50000 },
+  { metal: "hollowsteel", stock: "ashwood_stock", level: 75, ranged: 110, strength: 35, craft: 88, xp: 185, value: 64000 },
+  { metal: "cindersteel", stock: "ashwood_stock", level: 80, ranged: 118, strength: 38, craft: 92, xp: 205, value: 80000 },
+  { metal: "ashenheart", stock: "ashwood_stock", level: 90, ranged: 134, strength: 42, craft: 96, xp: 240, value: 120000 },
 ];
 /** Crossbow limbs: two bars each, a few Smithing levels over the metal's dagger. */
 export const LIMBS_OFFSET = 6;
-const ARROW_STRENGTH = [7, 10, 16, 22, 31, 49], BOLT_STRENGTH = [9, 13, 20, 28, 39, 61];
+const ARROW_STRENGTH = [7, 10, 16, 22, 31, 49, 56, 64, 72, 78, 84, 96], BOLT_STRENGTH = [9, 13, 20, 28, 39, 61, 68, 76, 86, 92, 100, 114];
 const RANGED_GEAR: Item[] = [
   ...BOWS.map(bow => ({
     id: bow.id, name: bow.name, value: bow.value, icon: { shape: "bow" as const, color: bow.color, accent: bow.id === "gloomfang_bow" ? "#cf6e6e" : undefined },
@@ -338,15 +374,15 @@ const RANGED_GEAR: Item[] = [
     };
   }),
   ...METALS.map((metal, index) => ({
-    id: `${metal.id}_bolts`, name: `${metal.name} bolts`, examine: `Stubby bolts with ${metal.id} tips. Any crossbow fires them.`, value: [4, 8, 16, 32, 64, 140][index], stackable: true,
+    id: `${metal.id}_bolts`, name: `${metal.name} bolts`, examine: `Stubby bolts with ${metal.id} tips. Any crossbow fires them.`, value: [4, 8, 16, 32, 64, 140, 220, 320, 460, 580, 720, 1100][index], stackable: true,
     icon: { shape: "bolts" as const, color: metal.color }, ammo: { strength: BOLT_STRENGTH[index], level: metal.level, bolt: true },
   })),
   ...METALS.map((metal, index) => ({
-    id: `${metal.id}_bolts_unf`, name: `Unfeathered ${metal.id} bolts`, examine: "Bolts straight off the anvil. Feathers will fly them true.", value: [1, 3, 6, 12, 24, 55][index], stackable: true,
+    id: `${metal.id}_bolts_unf`, name: `Unfeathered ${metal.id} bolts`, examine: "Bolts straight off the anvil. Feathers will fly them true.", value: [1, 3, 6, 12, 24, 55, 90, 130, 190, 240, 300, 440][index], stackable: true,
     icon: { shape: "bolts" as const, color: metal.color, accent: "unf" },
   })),
   ...METALS.map((metal, index) => ({
-    id: `${metal.id}_arrow`, name: `${metal.name} arrows`, examine: `Arrows with ${metal.id} heads.`, value: [3, 6, 12, 24, 48, 110][index], stackable: true,
+    id: `${metal.id}_arrow`, name: `${metal.name} arrows`, examine: `Arrows with ${metal.id} heads.`, value: [3, 6, 12, 24, 48, 110, 180, 260, 380, 480, 600, 900][index], stackable: true,
     icon: { shape: "arrow" as const, color: metal.color }, ammo: { strength: ARROW_STRENGTH[index], level: metal.level },
   })),
   // Hazel's quiver (the Fernwick quest's reward): worn on your back, and most shots fly home to it.
@@ -456,11 +492,22 @@ export const SMELTING: Record<MetalId, { level: number; xp: number; ores: Readon
   moonsilver: { level: 50, xp: 30, ores: { moonsilver_ore: 1, inkcoal: 2 } },
   glimmer: { level: 70, xp: 38, ores: { glimmer_ore: 1, inkcoal: 3 } },
   rarite: { level: 85, xp: 50, ores: { rarite_ore: 1, inkcoal: 4 } },
+  frostsilver: { level: 86, xp: 60, ores: { frost_shard: 1, inkcoal: 4 } },
+  gloomsteel: { level: 88, xp: 70, ores: { gloom_shard: 1, inkcoal: 4 } },
+  wyrmscale: { level: 90, xp: 80, ores: { wyrm_scale: 1, inkcoal: 5 } },
+  hollowsteel: { level: 92, xp: 88, ores: { hollow_essence: 1, inkcoal: 5 } },
+  cindersteel: { level: 94, xp: 96, ores: { cinder_core: 1, inkcoal: 6 } },
+  ashenheart: { level: 96, xp: 110, ores: { colossus_ember: 1, inkcoal: 6 } },
 };
-export const SMITH_XP: Record<MetalId, number> = { pewter: 12.5, blackiron: 25, ashsteel: 37.5, moonsilver: 50, glimmer: 62.5, rarite: 75 };
+export const SMITH_XP: Record<MetalId, number> = { pewter: 12.5, blackiron: 25, ashsteel: 37.5, moonsilver: 50, glimmer: 62.5, rarite: 75,
+  frostsilver: 85, gloomsteel: 95, wyrmscale: 105, hollowsteel: 115, cindersteel: 125, ashenheart: 140 };
+/** The Smithing level for something `offset` levels over a metal's base (forged metals squeeze their pieces into the last few levels). */
+export function metalLevel(metal: MetalId, offset: number) {
+  const forged = METALS.find(entry => entry.id === metal)!.tier > 6;
+  return Math.min(99, SMITHING_BASE[metal] + Math.round(offset * (forged ? 0.25 : 1)));
+}
 export function smithLevel(metal: MetalId, piece: SmithPiece) {
-  const offset = SMITH_PIECES.find(entry => entry.piece === piece)!.offset;
-  return Math.min(99, SMITHING_BASE[metal] + offset);
+  return metalLevel(metal, SMITH_PIECES.find(entry => entry.piece === piece)!.offset);
 }
 export const CRAFTING = [
   { product: "leather_gloves", level: 1, xp: 13.8, leather: 1 },
@@ -482,6 +529,7 @@ export const FLETCH_BOWS = [
 /** Arrow tiers: Fletching level and XP per arrow. Arrowheads come from the anvil (15 per bar). */
 export const FLETCH_ARROWS: Record<MetalId, { level: number; xp: number }> = {
   pewter: { level: 1, xp: 1.3 }, blackiron: { level: 15, xp: 2.5 }, ashsteel: { level: 30, xp: 5 }, moonsilver: { level: 45, xp: 7.5 }, glimmer: { level: 60, xp: 10 }, rarite: { level: 75, xp: 12.5 },
+  frostsilver: { level: 80, xp: 15 }, gloomsteel: { level: 84, xp: 17.5 }, wyrmscale: { level: 88, xp: 20 }, hollowsteel: { level: 91, xp: 22 }, cindersteel: { level: 93, xp: 24 }, ashenheart: { level: 95, xp: 27 },
 };
 /** Sigilcraft: the altar for each sigil, the level it needs and XP per stone. Higher levels press more sigils per stone. */
 export const SIGILCRAFT = [
@@ -587,17 +635,17 @@ export const MONSTERS: Record<string, MonsterDef> = {
   skeleton: { id: "skeleton", name: "Crypt skeleton", level: 25, hp: 29, attack: 22, strength: 22, defence: 20, attackBonus: 14, defenceBonus: 16, maxHit: 4, speed: 4, respawn: 40, wander: 4, examine: "It rattles when it walks. It used to be a Friend.", aggressive: true,
     always: [one("bones", 1)], drops: [coins(10, 90, 0.6), one("blackiron_greaves", 0.03), one("storm_sigil", 0.06, 3, 7), one("hollow_sigil", 0.02, 1, 3), one("ashsteel_helm", 0.03)], art: 107 },
   wolf: { id: "wolf", name: "Frost wolf", level: 32, hp: 40, attack: 30, strength: 28, defence: 26, attackBonus: 18, defenceBonus: 18, maxHit: 5, speed: 4, respawn: 40, wander: 6, examine: "Its breath freezes as it growls.", aggressive: true,
-    always: [one("large_bones", 1)], drops: [coins(20, 110, 0.4), one("rough_rosestone", 0.02), one("moonsilver_ore", 0.05), one("frosthide_bracers", 0.02), one("moonsilver_arrow", 0.06, 5, 12)], art: 108 },
+    always: [one("large_bones", 1)], drops: [one("frost_shard", 0.03), coins(20, 110, 0.4), one("rough_rosestone", 0.02), one("moonsilver_ore", 0.05), one("frosthide_bracers", 0.02), one("moonsilver_arrow", 0.06, 5, 12)], art: 108 },
   moss_colossus: { id: "moss_colossus", name: "Moss colossus", level: 42, hp: 60, attack: 32, strength: 34, defence: 30, attackBonus: 20, defenceBonus: 22, maxHit: 7, speed: 6, respawn: 60, wander: 3, examine: "A Colossus-family giant, grown over with moss.", size: 2,
     always: [one("large_bones", 1)], drops: [coins(30, 250, 0.6), one("moonsilver_sword", 0.03), one("path_sigil", 0.06, 1, 3), one("rough_sagestone", 0.04), one("ashsteel_cuirass", 0.02)], art: 109 },
   frost_yeti: { id: "frost_yeti", name: "Frost yeti", level: 55, hp: 85, attack: 50, strength: 52, defence: 45, attackBonus: 30, defenceBonus: 32, maxHit: 10, speed: 5, respawn: 60, wander: 4, examine: "Every footstep is an avalanche.", aggressive: true, size: 2,
-    always: [one("large_bones", 1)], drops: [coins(80, 400, 0.6), one("glimmer_sabre", 0.02), one("hollow_sigil", 0.08, 2, 5), one("glimmer_ore", 0.06), one("rough_rosestone", 0.04), one("rosestone_pendant", 0.004)], art: 110 },
+    always: [one("large_bones", 1)], drops: [one("frost_shard", 0.3), one("frostsilver_helm", 0.012), one("frostsilver_sabre", 0.008), coins(80, 400, 0.6), one("glimmer_sabre", 0.02), one("hollow_sigil", 0.08, 2, 5), one("glimmer_ore", 0.06), one("rough_rosestone", 0.04), one("rosestone_pendant", 0.004)], art: 110 },
   shade: { id: "shade", name: "Shade", level: 38, hp: 45, attack: 32, strength: 30, defence: 34, magicDef: 10, attackBonus: 20, defenceBonus: 26, maxHit: 6, speed: 4, respawn: 40, wander: 4, examine: "A shadow with no Friend to belong to.", aggressive: true,
-    always: [one("ink_bones", 1)], drops: [coins(40, 220, 0.6), one("hollow_sigil", 0.06, 2, 6), one("moonsilver_helm", 0.03), one("rough_rosestone", 0.02)], art: 111, ink: "#2c2b3a" },
+    always: [one("ink_bones", 1)], drops: [one("gloom_shard", 0.05), coins(40, 220, 0.6), one("hollow_sigil", 0.06, 2, 6), one("moonsilver_helm", 0.03), one("rough_rosestone", 0.02)], art: 111, ink: "#2c2b3a" },
   hollow_sentinel: { id: "hollow_sentinel", name: "Hollow sentinel", level: 64, hp: 95, attack: 60, strength: 60, defence: 58, attackBonus: 40, defenceBonus: 48, maxHit: 12, speed: 5, respawn: 50, wander: 3, examine: "Armour with nothing inside. It still remembers how to fight.", aggressive: true,
-    always: [one("ink_bones", 1)], drops: [coins(100, 600, 0.7), one("glimmer_cuirass", 0.02), one("rarite_ore", 0.03), one("hollow_sigil", 0.1, 4, 9), one("path_sigil", 0.08, 2, 5)], art: 112, ink: "#1d1d26" },
+    always: [one("ink_bones", 1)], drops: [one("gloom_shard", 0.08), one("hollow_essence", 0.2), one("gloomsteel_shield", 0.008), coins(100, 600, 0.7), one("glimmer_cuirass", 0.02), one("rarite_ore", 0.03), one("hollow_sigil", 0.1, 4, 9), one("path_sigil", 0.08, 2, 5)], art: 112, ink: "#1d1d26" },
   hollow_king: { id: "hollow_king", name: "The Hollow King", level: 92, hp: 250, attack: 80, strength: 82, defence: 70, magicDef: 50, attackBonus: 60, defenceBonus: 70, maxHit: 18, speed: 5, respawn: 100, wander: 2, examine: "A crown floating over an empty ring of shadow.", aggressive: true, size: 3, boss: true,
-    always: [one("ink_bones", 1), coins(1000, 3000, 1)], drops: [one("rarite_sabre", 0.12), one("rarite_helm", 0.1), one("moonlit_staff", 0.08), one("rarite_bar", 0.3, 1, 3), one("rosestone_pendant", 0.1)], art: 113, ink: "#111" },
+    always: [one("ink_bones", 1), coins(1000, 3000, 1)], drops: [one("hollow_essence", 1, 3, 5), one("hollowsteel_sabre", 0.1), one("hollowsteel_helm", 0.08), one("hollowsteel_staff", 0.06), one("rarite_sabre", 0.12), one("rarite_helm", 0.1), one("moonlit_staff", 0.08), one("rarite_bar", 0.3, 1, 3), one("rosestone_pendant", 0.1)], art: 113, ink: "#111" },
 };
 Object.assign(MONSTERS, {
   mire_crawler: { id: "mire_crawler", name: "Mire crawler", level: 18, hp: 26, attack: 16, strength: 15, defence: 14, attackBonus: 10, defenceBonus: 10, maxHit: 3, speed: 4, respawn: 30, wander: 4, slayer: 10,
@@ -605,22 +653,22 @@ Object.assign(MONSTERS, {
     always: [one("bones", 1)], drops: [coins(10, 60, 0.5), one("bloom_sigil", 0.1, 2, 5), one("blackiron_arrow", 0.15, 8, 20), one("rough_sagestone", 0.03), one("oak_bow", 0.03)], art: 106, ink: "#3d4a36" },
   frost_wisp: { id: "frost_wisp", name: "Frost wisp", level: 36, hp: 44, attack: 30, strength: 28, defence: 30, magicDef: 18, attackBonus: 18, defenceBonus: 22, maxHit: 5, speed: 4, respawn: 35, wander: 5, slayer: 30,
     examine: "A shiver with a face. Blows straight through anyone who hasn't learnt the trick of it.", aggressive: true,
-    always: [one("ink_bones", 1)], drops: [coins(30, 180, 0.6), one("star_sigil", 0.12, 4, 10), one("glimmer_arrow", 0.1, 5, 12), one("frosthide_coif", 0.03), one("frosthide_chaps", 0.02), one("rough_rosestone", 0.03)], art: 111, ink: "#5c7f9e" },
+    always: [one("ink_bones", 1)], drops: [one("frost_shard", 0.06), coins(30, 180, 0.6), one("star_sigil", 0.12, 4, 10), one("glimmer_arrow", 0.1, 5, 12), one("frosthide_coif", 0.03), one("frosthide_chaps", 0.02), one("rough_rosestone", 0.03)], art: 111, ink: "#5c7f9e" },
   gloom_hound: { id: "gloom_hound", name: "Gloom hound", level: 58, hp: 80, attack: 52, strength: 54, defence: 46, attackBonus: 32, defenceBonus: 34, maxHit: 9, speed: 4, respawn: 45, wander: 5, slayer: 50,
     examine: "A hound made of the dark between two torches.", aggressive: true,
-    always: [one("ink_bones", 1)], drops: [coins(100, 500, 0.7), one("gloomfang_bow", 0.012), one("rarite_arrow", 0.08, 5, 15), one("frosthide_vest", 0.02), one("hollow_sigil", 0.1, 3, 8), one("rarite_ore", 0.03)], art: 108, ink: "#2e2440" },
+    always: [one("ink_bones", 1)], drops: [one("gloom_shard", 0.3), one("gloomsteel_sword", 0.01), one("gloomsteel_helm", 0.01), coins(100, 500, 0.7), one("gloomfang_bow", 0.012), one("rarite_arrow", 0.08, 5, 15), one("frosthide_vest", 0.02), one("hollow_sigil", 0.1, 3, 8), one("rarite_ore", 0.03)], art: 108, ink: "#2e2440" },
   ash_drake: { id: "ash_drake", name: "Ash drake", level: 68, hp: 90, attack: 58, strength: 60, defence: 56, magicDef: 40, attackBonus: 34, defenceBonus: 40, maxHit: 9, speed: 5, respawn: 45, wander: 5, breath: 32, size: 2,
     examine: "A young dragon, all ash and appetite. Mind the breath.", aggressive: true,
-    always: [one("drake_bones", 1), one("drakehide", 1)], drops: [coins(200, 900, 0.7), one("rarite_ore", 0.06), one("hollow_sigil", 0.1, 5, 15), one("path_sigil", 0.08, 3, 8), one("rough_rosestone", 0.05), one("rarite_arrow", 0.08, 8, 20)], art: 114, ink: "#3b3a38" },
+    always: [one("drake_bones", 1), one("drakehide", 1)], drops: [one("wyrm_scale", 0.3), one("wyrmscale_helm", 0.01), coins(200, 900, 0.7), one("rarite_ore", 0.06), one("hollow_sigil", 0.1, 5, 15), one("path_sigil", 0.08, 3, 8), one("rough_rosestone", 0.05), one("rarite_arrow", 0.08, 8, 20)], art: 114, ink: "#3b3a38" },
   cinder_drake: { id: "cinder_drake", name: "Cinder drake", level: 86, hp: 125, attack: 76, strength: 80, defence: 72, magicDef: 56, attackBonus: 44, defenceBonus: 52, maxHit: 12, speed: 5, respawn: 55, wander: 4, breath: 45, size: 2,
     examine: "Its scales crack like cooling lava.", aggressive: true,
-    always: [one("drake_bones", 1), one("drakehide", 1, 1, 2)], drops: [coins(500, 1800, 0.75), one("rarite_bar", 0.08, 1, 2), one("drakehide_bracers", 0.02), one("rarite_sabre", 0.01), one("hollow_sigil", 0.12, 8, 20)], art: 114, ink: "#6b2a22" },
+    always: [one("drake_bones", 1), one("drakehide", 1, 1, 2)], drops: [one("wyrm_scale", 0.35, 1, 2), one("cinder_core", 0.08), one("wyrmscale_sabre", 0.01), one("wyrmscale_shield", 0.008), coins(500, 1800, 0.75), one("rarite_bar", 0.08, 1, 2), one("drakehide_bracers", 0.02), one("rarite_sabre", 0.01), one("hollow_sigil", 0.12, 8, 20)], art: 114, ink: "#6b2a22" },
   emberwyrm: { id: "emberwyrm", name: "Old Cinder", level: 148, hp: 340, attack: 110, strength: 112, defence: 96, magicDef: 70, attackBonus: 70, defenceBonus: 80, maxHit: 20, speed: 5, respawn: 120, wander: 2, breath: 65, size: 3, boss: true,
     examine: "The oldest dragon in the Realm. The mountain is warm because she sleeps in it.", aggressive: true,
-    always: [one("drake_bones", 1, 3, 3), coins(3000, 9000, 1)], drops: [one("wyrm_heart", 0.25), one("drakehide_vest", 0.08), one("drakehide_chaps", 0.1), one("rarite_helm", 0.1), one("rarite_bar", 0.4, 2, 5), one("gloomfang_bow", 0.02)], art: 114, ink: "#161616" },
+    always: [one("drake_bones", 1, 3, 3), coins(3000, 9000, 1)], drops: [one("cinder_core", 1, 1, 3), one("colossus_ember", 0.1), one("cindersteel_sabre", 0.08), one("cindersteel_shield", 0.06), one("wyrm_heart", 0.25), one("drakehide_vest", 0.08), one("drakehide_chaps", 0.1), one("rarite_helm", 0.1), one("rarite_bar", 0.4, 2, 5), one("gloomfang_bow", 0.02)], art: 114, ink: "#161616" },
   ashen_colossus: { id: "ashen_colossus", name: "The Ashen Colossus", level: 210, hp: 1500, attack: 120, strength: 118, defence: 110, magicDef: 90, attackBonus: 70, defenceBonus: 70, maxHit: 18, speed: 6, respawn: 99_999, wander: 1,
     size: 3, boss: true, worldBoss: true, aggressive: true, examine: "A Colossus-family giant of cinder and ash. It wakes every two hours, and it takes a crowd to put it back to sleep.",
-    always: [one("large_bones", 1, 2, 4), coins(4000, 12_000, 1), one("rarite_bar", 1, 1, 3)], drops: [one("wyrm_heart", 0.3), one("rarite_helm", 0.12), one("drakehide_vest", 0.1), one("gloomfang_bow", 0.04), one("rough_rosestone", 0.25, 1, 3), one("insight_lamp", 0.2)],
+    always: [one("large_bones", 1, 2, 4), coins(4000, 12_000, 1), one("rarite_bar", 1, 1, 3)], drops: [one("colossus_ember", 1, 2, 4), one("ashenheart_sabre", 0.04), one("ashenheart_helm", 0.05), one("ashenheart_staff", 0.03), one("wyrm_heart", 0.3), one("rarite_helm", 0.12), one("drakehide_vest", 0.1), one("gloomfang_bow", 0.04), one("rough_rosestone", 0.25, 1, 3), one("insight_lamp", 0.2)],
     art: 109, ink: "#5a1f14" },
 } satisfies Record<string, MonsterDef>);
 export function combatLevelOf(monster: MonsterDef) { return monster.level; }
@@ -673,7 +721,7 @@ export function itemCategory(id: string): Category {
   if (shape === "fish") return "fish";
   if (shape === "log") return "logs";
   if (id === "sigil_stone" || shape === "sigil") return "sigil";
-  if (shape === "ore") return "ore";
+  if (shape === "ore" || shape === "material") return "ore";
   if (shape === "bar") return "bar";
   if (shape === "gem" && id !== "slayer_gem") return "gem";
   if (shape === "hide" || shape === "leather" || id.startsWith("drakehide") || id.startsWith("leather_") || id.startsWith("hunter_") || id.startsWith("frosthide")) return "hide";
@@ -699,7 +747,8 @@ export const SHOPS: Record<string, ShopDef> = {
   sigils: { id: "sigils", name: "Runa's Sigils", buys: ["sigil", "magic"], rate: 0.6, stock: ["breeze_sigil", "tide_sigil", "stone_sigil", "ember_sigil", "thought_sigil", "shade_sigil", "storm_sigil", "bloom_sigil", "star_sigil", "path_sigil", "hollow_sigil", "staff", "breeze_staff", "scholar_hat", "scholar_robe"] },
   crafting: { id: "crafting", name: "Tessa's Tannery", buys: ["hide"], rate: 0.6, stock: ["needle", "thread", "chisel", "leather", "leather_gloves", "leather_boots"] },
   oasis: { id: "oasis", name: "Oasis Bazaar", buys: ["gem", "jewellery", "food"], rate: 0.7, stock: ["cake", "bread", "inkshark", "sailfish", "silk", "rough_moonstone", "friends_charm", "moonstone_pendant"] },
-  frost: { id: "frost", name: "Frostpeak Outfitters", stock: ["inkcrab", "sailfish", "glimmer_pickaxe", "glimmer_axe", "glimmer_sabre", "glimmer_helm", "glimmer_shield", "hollow_sigil", "path_sigil", "frosthide_coif", "frosthide_bracers", "glimmer_arrow"] },
+  frost: { id: "frost", name: "Frostpeak Outfitters", stock: ["inkcrab", "sailfish", "glimmer_pickaxe", "glimmer_axe", "glimmer_sabre", "glimmer_helm", "glimmer_shield", "hollow_sigil", "path_sigil", "frosthide_coif", "frosthide_bracers", "glimmer_arrow",
+    "rarite_pickaxe", "rarite_axe", "frostsilver_pickaxe", "frostsilver_axe", "frostsilver_sword", "frostsilver_helm", "frostsilver_shield", "frostsilver_arrow", "frostsilver_bolts"] },
   armour: { id: "armour", name: "Hollis Armoury", buys: ["armour"], rate: 0.55, stock: ["pewter_helm", "pewter_cuirass", "pewter_greaves", "pewter_shield", "blackiron_helm", "blackiron_cuirass", "blackiron_greaves", "blackiron_shield",
     "ashsteel_helm", "ashsteel_cuirass", "ashsteel_greaves", "ashsteel_shield", "moonsilver_helm", "moonsilver_shield", "leather_gloves", "leather_boots"] },
   weapons: { id: "weapons", name: "Edge & Hilt", buys: ["weapon"], rate: 0.55, stock: ["pewter_dagger", "pewter_sword", "pewter_sabre", "blackiron_dagger", "blackiron_sword", "blackiron_sabre", "ashsteel_dagger", "ashsteel_sword", "ashsteel_sabre",

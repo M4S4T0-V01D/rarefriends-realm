@@ -4,6 +4,13 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 23, date: "2026-09-29", title: "Forged gear: six new tiers, levels 50 to 90", items: [
+    "Six forged metals above rarite: Frostsilver (50), Gloomsteel (60), Wyrmscale (70), Hollowsteel (75), Cindersteel (80) and Ashenheart (90). Each makes a full set: dagger, sword, sabre, helm, shield, cuirass, greaves, an axe and a pickaxe, plus a staff, crossbow limbs, arrowheads and bolts.",
+    "They're smelted from what the Realm's strongest creatures drop: frost shards (Frost yetis), gloom shards (gloom hounds), wyrm scales (drakes), Hollow essence (sentinels and the Hollow King), cinder cores (cinder drakes and Old Cinder) and Colossus embers (the Ashen Colossus). Smelting and smithing them takes Smithing 86 to 99.",
+    "Every piece glows in its metal's light: an icy plume on frostsilver, violet on gloomsteel, ember orange on ashenheart. Forged staffs are metal from foot to orb.",
+    "Finished pieces sometimes drop straight from those creatures, and Frostpeak Outfitters sells frostsilver (and rarite tools) for those with the coin.",
+    "New axes and pickaxes cut and mine faster at every tier. Ashwood crossbow stocks (Fletching 84) hold the top crossbows, and the rarite crossbow now needs Ranged 45.",
+  ] },
   { id: 22, date: "2026-09-28", title: "Fernwick, crossbows, war bows and Hazel's quiver", items: [
     "Fernwick, a woodcutters' village in the heart of Whisperwood (take the woods road west from the Ashen mine): Hazel's War Bows, the Timber Yard (the best price for logs, and axes), a bank, cottages, a willow pond and archery butts.",
     "Crossbows in six tiers: metal limbs from the anvil (two bars) on a stock carved from logs, fitted together with Crafting. Pewter on a wooden stock, blackiron and ashsteel on oak, moonsilver on willow, glimmer on maple, rarite on yew. Or buy the first few at Fletch & Feather.",
