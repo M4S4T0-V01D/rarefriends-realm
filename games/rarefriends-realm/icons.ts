@@ -20,9 +20,9 @@ const METAL_COLORS = new Set<string>(METALS.map(metal => metal.color));
 const WOOD_C = "#9c7a5c", DARK_WOOD = "#6f5440", GOLD_C = "#d9b866", STEEL_C = "#b9bfc6", PARCH = "#efe3c4", WHITE = "#f7f5f0";
 /** Rasterize one part and shade it into the picture. */
 function part(p: Pixels, draw: (q: Pixels) => void, color: string, material: Material = "flat", ink = true) {
-  const q = new Pixels(S, S); draw(q);
-  let x0 = S, y0 = S, x1 = -1, y1 = -1;
-  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) if (q.get(x, y)) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+  const W = p.w, H = p.h, q = new Pixels(W, H); draw(q);
+  let x0 = W, y0 = H, x1 = -1, y1 = -1;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (q.get(x, y)) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
   if (x1 < 0) return;
   const before = p.data.slice(), w = Math.max(1, x1 - x0), h = Math.max(1, y1 - y0), inQ = (x: number, y: number) => q.inside(x, y) && q.get(x, y) !== 0;
   const flat = material === "flat" || material === "glow", shiny = material === "metal" || material === "gem";
@@ -45,7 +45,7 @@ function part(p: Pixels, draw: (q: Pixels) => void, color: string, material: Mat
     if (!inQ(x, y)) continue;
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const nx = x + dx, ny = y + dy;
-      if (!inQ(nx, ny) && p.inside(nx, ny) && before[ny * S + nx] && before[ny * S + nx] !== inkValue) { p.data[y * S + x] = inkValue; break; }
+      if (!inQ(nx, ny) && p.inside(nx, ny) && before[ny * W + nx] && before[ny * W + nx] !== inkValue) { p.data[y * W + x] = inkValue; break; }
     }
   }
 }
@@ -573,19 +573,81 @@ const SKILL_PAINTERS: Record<Skill, Painter> = {
 };
 export const skillArt = (skill: Skill) => icon16(`skill:${skill}`, SKILL_PAINTERS[skill]);
 export type TabIcon = "combat" | "skills" | "quests" | "inventory" | "equipment" | "prayer" | "magic" | "friends" | "settings" | "emotes";
+/** Side-panel tab icons: 24 pixels, shaded like the items, each a distinct silhouette so they read at a glance. */
 const TAB_PAINTERS: Record<TabIcon, Painter> = {
-  combat: p => { p.line(2, 14, 13, 3, INK, 3); p.line(2, 14, 13, 3, STEEL); p.line(15, 14, 4, 3, INK, 3); p.line(15, 14, 4, 3, STEEL); p.rect(3, 12, 3, 3, GOLD); p.rect(12, 12, 3, 3, GOLD); },
-  skills: p => { for (let i = 0; i < 3; i++) p.rect(2 + i * 5, 12 - i * 4, 4, 4 + i * 4, [SAGE, BLUE, GOLD][i]); },
-  quests: p => { p.poly([[4, 2], [14, 2], [14, 15], [4, 15]], "#efe3c4"); p.line(6, 6, 12, 6, INK); p.line(6, 9, 12, 9, INK); p.line(6, 12, 10, 12, INK); p.rect(2, 1, 14, 2, WOOD); p.rect(2, 15, 14, 2, WOOD); },
-  inventory: p => { p.poly([[3, 6], [14, 6], [15, 16], [2, 16]], "#b58b6b"); p.poly([[6, 6], [6, 3], [11, 3], [11, 6]], null); p.rect(7, 9, 3, 2, GOLD); },
-  equipment: p => { p.poly([[3, 14], [3, 6], [8.5, 1], [14, 6], [14, 14]], STEEL); p.rect(5, 7, 7, 2, INK); p.line(8.5, 2, 8.5, 6, "#ffffff"); },
-  prayer: p => { p.rect(7, 1, 3, 15, PAPER); p.rect(3, 5, 11, 3, PAPER); p.poly([[7, 1], [10, 1], [10, 5], [14, 5], [14, 8], [10, 8], [10, 16], [7, 16], [7, 8], [3, 8], [3, 5], [7, 5]], null); },
-  magic: p => { p.line(3, 16, 12, 4, INK, 3); p.line(3, 16, 12, 4, WOOD); p.poly([[12, 0], [13.5, 3.5], [17, 4.5], [13.5, 5.5], [12, 9], [10.5, 5.5], [7, 4.5], [10.5, 3.5]], "#b6c3e0"); },
-  friends: p => { p.disc(8.5, 7, 6, 5.5, INK, INK); p.rect(5, 12, 2, 3, INK); p.rect(10, 12, 2, 3, INK); p.rect(6, 6, 2, 2, "#ffffff"); p.rect(10, 6, 2, 2, "#ffffff"); p.rect(4, 3, 2, 2, INK); p.rect(11, 3, 2, 2, INK); },
-  emotes: p => { p.disc(8.5, 8.5, 7, 7, GOLD); p.rect(5, 5, 2, 3, INK); p.rect(10, 5, 2, 3, INK); p.line(5, 11, 8.5, 13, INK); p.line(8.5, 13, 12, 11, INK); },
-  settings: p => { p.disc(8.5, 8.5, 6, 6, "#8b8e92"); for (const [x, y] of [[8, 0], [8, 15], [0, 8], [15, 8], [2, 2], [14, 14], [2, 14], [14, 2]] as Pt[]) p.rect(x, y, 2, 2, "#8b8e92"); p.disc(8.5, 8.5, 2.5, 2.5, "#242322"); },
+  // Crossed swords with gold guards.
+  combat: p => {
+    for (const flip of [1, -1]) {
+      const X = (x: number) => flip > 0 ? x : 23 - x;
+      part(p, all(stroke([[X(5), 18], [X(18), 5]], 3), poly([[X(17), 3], [X(21), 2], [X(20), 6]])), STEEL, "metal");
+      part(p, stroke([[X(3), 14], [X(9), 20]], 2.4), GOLD_C, "metal"); part(p, stroke([[X(2), 22], [X(5), 19]], 2.4), DARK_WOOD, "wood");
+    }
+  },
+  // Three rising bars and an arrow climbing past them.
+  skills: p => {
+    part(p, box(3, 14, 5, 7), "#8fbf9a", "cloth"); part(p, box(9, 10, 5, 11), "#8fa3c9", "cloth"); part(p, box(15, 6, 5, 15), "#e2c46a", "cloth");
+    part(p, all(stroke([[3, 11], [9, 7], [13, 8], [19, 3]], 2), poly([[16, 1], [22, 1], [21, 7]])), "#e7677a", "flat");
+  },
+  // A rolled scroll with a red wax seal and a quill.
+  quests: p => {
+    part(p, poly([[5, 4], [18, 4], [18, 20], [5, 20]]), PARCH, "cloth");
+    part(p, all(box(3, 2, 17, 4), box(3, 18, 17, 4)), "#c9ad7a", "wood");
+    for (const y of [9, 12, 15]) line(p, [[7, y], [15, y]], shadeHex(PARCH, -0.4));
+    part(p, disc(15, 17, 2.6), "#c24a4a", "gem");
+    part(p, stroke([[13, 13], [21, 1]], 1.6), WHITE, "cloth"); line(p, [[20, 2], [16, 8]], "#c8c5be");
+  },
+  // A leather backpack: flap, buckle and straps.
+  inventory: p => {
+    part(p, stroke([[7, 7], [7, 3], [16, 3], [16, 7]], 2), DARK_WOOD, "wood");
+    part(p, poly([[4, 7], [19, 7], [21, 21], [2, 21]]), "#b58b6b", "cloth");
+    part(p, poly([[3, 7], [20, 7], [19, 13], [12, 15], [4, 13]]), shadeHex("#b58b6b", -0.15), "cloth");
+    part(p, box(10, 12, 4, 4), GOLD_C, "metal"); dot(p, 12, 14, INK);
+    part(p, all(box(3, 16, 3, 5), box(18, 16, 3, 5)), shadeHex("#b58b6b", -0.25), "cloth");
+  },
+  // A knight's helm facing you: visor slit, rivets and a red plume.
+  equipment: p => {
+    part(p, stroke([[12, 4], [14, 1], [17, 1]], 2.4), "#c24a4a", "cloth");
+    part(p, poly([[4, 21], [4, 10], [7, 5], [12, 3], [17, 5], [20, 10], [20, 21], [15, 21], [15, 16], [9, 16], [9, 21]]), STEEL, "metal");
+    part(p, box(6, 11, 12, 2), INK, "flat", false); line(p, [[12, 5], [12, 10]], shadeHex(STEEL, 0.3));
+    dot(p, 6, 18, WHITE); dot(p, 18, 18, WHITE);
+  },
+  // Hands pressed together in prayer, with a glow above them.
+  prayer: p => {
+    part(p, poly([[12, 1], [13, 4], [16, 5], [13, 6], [12, 9], [11, 6], [8, 5], [11, 4]]), "#fff2b0", "glow");
+    part(p, poly([[11, 8], [11, 20], [6, 22], [5, 17], [8, 12]]), "#e8c7a8", "cloth");
+    part(p, poly([[13, 8], [13, 20], [18, 22], [19, 17], [16, 12]]), shadeHex("#e8c7a8", -0.08), "cloth");
+    part(p, all(box(4, 20, 7, 3), box(13, 20, 7, 3)), "#8fa3c9", "cloth");
+  },
+  // A spellbook with a glowing sigil on its cover.
+  magic: p => {
+    part(p, poly([[4, 5], [19, 3], [21, 19], [6, 21]]), "#6f7ea6", "cloth");
+    part(p, poly([[4, 5], [6, 21], [4, 21], [2, 6]]), "#4a5578", "cloth");
+    line(p, [[6, 20], [20, 18]], PARCH, 2);
+    part(p, poly([[12, 7], [13.5, 10.5], [17, 11], [13.5, 12.5], [12, 16], [10.5, 12.5], [7, 11], [10.5, 10.5]]), "#e2d49e", "glow");
+  },
+  // Two Friends side by side: one dark, one pale.
+  friends: p => {
+    const friend = (x: number, color: string, eye: string) => {
+      part(p, all(poly([[x - 5, 9], [x - 4, 4], [x - 2, 7], [x + 2, 7], [x + 4, 4], [x + 5, 9], [x + 5, 17], [x - 5, 17]]), box(x - 4, 17, 2, 4), box(x + 2, 17, 2, 4)), color, "cloth");
+      p.rect(x - 3, 10, 2, 2, eye); p.rect(x + 1, 10, 2, 2, eye);
+    };
+    friend(8, "#d6d0c2", INK); friend(16, "#2e2c2a", WHITE);
+  },
+  // A steel cog: square teeth round a wheel with a hole.
+  settings: p => {
+    for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2, x = Math.round(12 + Math.cos(a) * 8), y = Math.round(12 + Math.sin(a) * 8); part(p, box(x - 2, y - 2, 4, 4), "#8b8e92", "metal", false); }
+    part(p, disc(12, 12, 7.2), "#a3a7ab", "metal");
+    part(p, disc(12, 12, 2.8), "#2e2c2a", "flat");
+  },
+  // A beaming face with a waving hand.
+  emotes: p => {
+    part(p, disc(11, 13, 8.5), "#f2d56b", "cloth");
+    for (const x of [8, 13]) p.rect(x, 10, 2, 3, INK);
+    line(p, [[7, 16], [9, 18], [13, 18], [15, 16]], INK);
+    part(p, all(poly([[17, 7], [18, 1], [20, 1], [20, 5], [22, 3], [23, 5], [21, 10], [17, 10]])), "#e8c7a8", "cloth");
+  },
 };
-export const tabArt = (tab: TabIcon) => icon16(`tab:${tab}`, TAB_PAINTERS[tab]);
+export const tabArt = (tab: TabIcon) => pixelArt(`tab24:${tab}`, 24, 24, p => { TAB_PAINTERS[tab](p); p.outline(); p.halo(); });
 export type OrbIcon = "hitpoints" | "prayer" | "run" | "walk" | "map";
 const ORB_PAINTERS: Record<OrbIcon, Painter> = {
   hitpoints: SKILL_PAINTERS.hitpoints, prayer: SKILL_PAINTERS.prayer,

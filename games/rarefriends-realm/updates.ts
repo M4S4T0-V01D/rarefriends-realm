@@ -4,6 +4,9 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 28, date: "2026-09-29", title: "Clearer panel tabs", items: [
+    "The side panel's tabs have new icons, drawn crisp and shaded like the items so each is easy to tell apart: crossed swords (combat), rising bars (skills), a sealed scroll (quests), a backpack (inventory), a knight's helm (equipment), praying hands (prayer), a spellbook (magic), two Friends (friends), a cog (settings) and a waving smile (emotes).",
+  ] },
   { id: 27, date: "2026-09-29", title: "The sigil stone box, and steadier early levels", items: [
     "The sigil stone box: carry it and the sigil stones you mine go into it (up to 120), and an altar presses every stone inside. Right-click to check, fill or empty it. The Tower Stores and Runa's Sigils sell them.",
     "At the bank, right-click a sigil stone box or inkcoal satchel in your pack to Fill it straight from the bank (or empty it in), or use the Fill button.",

@@ -135,7 +135,7 @@ export function SidePanel(props: PanelProps) {
       <div className="realm-tabs" role="tablist">
         {TABS.map(entry => (
           <button key={entry.id} type="button" role="tab" aria-selected={tab === entry.id} title={`${entry.label} (${entry.key})`} aria-label={entry.label} onClick={() => setTab(entry.id)}
-            {...rightClick(props.openMenu, () => [{ verb: "Open", noun: entry.label, run: () => setTab(entry.id) }])}><PixelIcon art={tabArt(entry.id as TabIcon)} size={27} /></button>
+            {...rightClick(props.openMenu, () => [{ verb: "Open", noun: entry.label, run: () => setTab(entry.id) }])}><PixelIcon art={tabArt(entry.id as TabIcon)} size={24} /></button>
         ))}
       </div>
       <div className="realm-tab-body" role="tabpanel" aria-label={TABS.find(entry => entry.id === tab)?.label}>
