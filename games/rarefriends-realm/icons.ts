@@ -197,6 +197,29 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
         if (accent) for (const [x, y] of [[14, 17], [18, 13], [22, 9]] as Pt[]) dot(p, x, y, accent);
         part(p, stroke([[5, 18], [14, 27]], 3), accent ? shadeHex(color, -0.3) : GOLD_C, "metal");
         part(p, stroke([[4, 28], [8, 24]], 3), DARK_WOOD, "wood"); part(p, disc(3.5, 29.5, 2), accent ?? GOLD_C, accent ? "gem" : "metal"); break;
+      case "greatsword":
+        // A long two-handed blade from corner to corner, a broad crossguard and a long grip.
+        part(p, all(stroke([[8, 24], [28, 4]], 4), poly([[27, 1], [31, 1], [31, 5]])), color, "metal");
+        line(p, [[10, 22], [27, 5]], shadeHex(color, -0.2)); line(p, [[13, 17], [24, 6]], accent ?? shadeHex(color, 0.3));
+        part(p, stroke([[3, 17], [15, 29]], 3.2), accent ? shadeHex(color, -0.3) : GOLD_C, "metal");
+        part(p, stroke([[2, 30], [8, 24]], 3), DARK_WOOD, "wood"); part(p, disc(2, 30.5, 1.8), accent ?? GOLD_C, "metal"); break;
+      case "battleaxe":
+        // A long haft with a great double-bitted head.
+        part(p, stroke([[5, 30], [23, 4]], 3), WOOD_C, "wood"); line(p, [[8, 26], [10, 23]], DARK_WOOD); line(p, [[12, 20], [14, 17]], DARK_WOOD);
+        part(p, poly([[20, 2], [13, 1], [10, 8], [15, 12], [20, 8]]), color, "metal");
+        part(p, poly([[24, 7], [31, 8], [30, 16], [24, 16], [21, 11]]), color, "metal");
+        line(p, [[11, 4], [13, 9]], accent ?? shadeHex(color, 0.3)); line(p, [[30, 10], [29, 15]], accent ?? shadeHex(color, 0.3)); break;
+      case "warhammer":
+        // A long haft and a heavy block head with a spike.
+        part(p, stroke([[6, 30], [21, 7]], 3), WOOD_C, "wood"); line(p, [[9, 25], [11, 22]], DARK_WOOD);
+        part(p, poly([[13, 5], [22, 0], [29, 9], [20, 14]]), color, "metal");
+        part(p, poly([[27, 7], [31, 5], [29, 10]]), shadeHex(color, -0.15), "metal");
+        line(p, [[15, 5], [22, 1]], accent ?? shadeHex(color, 0.3)); dot(p, 21, 7, INK); break;
+      case "spear":
+        // A long shaft and a leaf-shaped head, a tuft of hide below it.
+        part(p, stroke([[4, 30], [23, 8]], 2.4), accent ?? WOOD_C, "wood");
+        part(p, poly([[22, 9], [26, 2], [31, 1], [30, 6], [24, 11]]), color, "metal");
+        part(p, disc(21, 11, 2.2), "#8a6a50", "cloth"); break;
       case "dagger":
         part(p, all(stroke([[12, 21], [23, 10]], 4), poly([[22, 7], [26, 6], [25, 10]])), color, "metal");
         line(p, [[14, 19], [22, 11]], shadeHex(color, -0.18));
@@ -208,9 +231,10 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
         part(p, all(stroke([[5, 20], [9, 26]], 3), stroke([[9, 26], [13, 26]], 2)), accent ? shadeHex(color, -0.3) : GOLD_C, "metal");
         if (accent) part(p, disc(8, 23, 1.6), accent, "gem"); part(p, stroke([[4, 29], [8, 25]], 3), DARK_WOOD, "wood"); break;
       case "helm":
+        if (icon.kind === "horned") for (const flip of [1, -1]) { const X = (x: number) => flip > 0 ? x : 32 - x; part(p, stroke([[X(8), 13], [X(3), 10], [X(2), 4], [X(5), 1]], 3), accent ?? "#e8dcc0", "stone"); }
         part(p, poly([[6, 27], [6, 14], [9, 8], [16, 4], [23, 8], [26, 14], [26, 27], [20, 27], [20, 21], [12, 21], [12, 27]]), color, armour);
         part(p, box(9, 15, 14, 3), INK, "flat", false);
-        if (accent) part(p, stroke([[16, 2], [16, 9]], 3), accent, "cloth"); else line(p, [[16, 5], [16, 13]], light);
+        if (accent && icon.kind !== "horned") part(p, stroke([[16, 2], [16, 9]], 3), accent, "cloth"); else line(p, [[16, 5], [16, 13]], light);
         if (metal) { dot(p, 8, 23, light); dot(p, 24, 23, light); }
         break;
       case "hood":
@@ -589,7 +613,111 @@ const SKILL_PAINTERS: Record<Skill, Painter> = {
   fletching: p => { p.line(2, 15, 14, 3, INK, 2); p.line(2, 15, 14, 3, WOOD); p.poly([[12, 1], [16, 1], [16, 5]], STEEL); p.poly([[1, 12], [5, 16], [2, 16]], PAPER); p.poly([[3, 10], [7, 14], [4, 14]], "#d8b6b4"); },
   slayer: p => { p.disc(8.5, 7, 6, 5.5, "#e8e4dc"); p.rect(5, 11, 7, 4, "#e8e4dc"); p.rect(5, 5, 3, 3, INK); p.rect(10, 5, 3, 3, INK); p.rect(8, 9, 1, 2, INK); p.line(6, 14, 11, 14, INK); p.line(1, 16, 16, 1, "#cf6e6e", 1); },
 };
-export const skillArt = (skill: Skill) => icon16(`skill:${skill}`, SKILL_PAINTERS[skill]);
+/** Skill icons: 24 pixels, shaded like the items, a distinct picture for each skill (the 16-pixel ones above stay for the orbs). */
+const SKILL24: Record<Skill, Painter> = {
+  attack: p => {
+    part(p, all(stroke([[6, 18], [19, 5]], 3.4), poly([[18, 3], [22, 2], [21, 6]])), STEEL_C, "metal"); line(p, [[8, 16], [18, 6]], shadeHex(STEEL_C, -0.2));
+    part(p, stroke([[3, 14], [10, 21]], 2.6), GOLD_C, "metal"); part(p, stroke([[2, 22], [5, 19]], 2.6), DARK_WOOD, "wood");
+  },
+  strength: p => {
+    // A clenched fist.
+    part(p, poly([[4, 10], [7, 5], [18, 4], [21, 8], [20, 17], [15, 21], [8, 21], [4, 16]]), "#e8b89a", "cloth");
+    for (const x of [8, 12, 16]) line(p, [[x, 5], [x, 11]], shadeHex("#e8b89a", -0.28));
+    line(p, [[5, 13], [13, 13], [16, 11]], shadeHex("#e8b89a", -0.3)); part(p, box(7, 20, 11, 3), "#c24a4a", "cloth");
+  },
+  defence: p => {
+    part(p, poly([[3, 3], [21, 3], [21, 12], [12, 22], [3, 12]]), STEEL_C, "metal");
+    part(p, all(box(10, 4, 4, 15), box(4, 8, 16, 4)), "#6f7ea6", "cloth");
+  },
+  ranged: p => {
+    part(p, stroke([[7, 2], [13, 6], [16, 12], [13, 18], [7, 22]], 2.6), WOOD_C, "wood"); line(p, [[7, 3], [7, 21]], WHITE);
+    part(p, stroke([[3, 20], [20, 5]], 1.6), "#8a6a50", "wood"); part(p, poly([[19, 3], [23, 1], [22, 6]]), STEEL_C, "metal");
+    part(p, poly([[2, 18], [5, 21], [2, 23], [0, 21]]), "#cf6e6e", "cloth");
+  },
+  hitpoints: p => {
+    part(p, all(disc(8, 9, 5), disc(16, 9, 5), poly([[3, 11], [21, 11], [12, 21]])), "#cf4e5a", "gem");
+  },
+  magic: p => {
+    // A wizard's hat with a star.
+    part(p, disc(12, 19, 10, 3.2), "#4a5578", "cloth");
+    part(p, poly([[6, 19], [18, 19], [15, 10], [17, 2], [11, 7], [9, 12]]), "#6f7ea6", "cloth");
+    line(p, [[7, 17], [17, 17]], "#e2c46a", 2); part(p, poly([[12, 9], [13, 11], [15, 11], [13.5, 12.5], [14, 14.5], [12, 13.3], [10, 14.5], [10.5, 12.5], [9, 11], [11, 11]]), "#f2e28f", "glow");
+  },
+  prayer: p => {
+    // A shining star of the Old Friend, sparkles round it.
+    part(p, poly([[12, 1], [14.5, 9.5], [23, 12], [14.5, 14.5], [12, 23], [9.5, 14.5], [1, 12], [9.5, 9.5]]), "#f2d56b", "metal");
+    part(p, disc(12, 12, 2.6), WHITE, "gem");
+    for (const [x, y] of [[4, 4], [20, 4], [4, 20], [20, 20]] as Pt[]) { dot(p, x, y, "#fff2b0"); dot(p, x + 1, y, "#fff2b0"); dot(p, x, y + 1, "#fff2b0"); }
+  },
+  sigilcraft: p => {
+    part(p, poly([[4, 8], [12, 2], [20, 7], [21, 18], [12, 22], [3, 17]]), "#d9d4e6", "stone");
+    part(p, disc(12, 12, 4.5), "#8a62c8", "glow"); line(p, [[12, 9], [12, 15]], WHITE); line(p, [[9, 12], [15, 12]], WHITE);
+  },
+  woodcutting: p => {
+    // An axe bitten into a log.
+    part(p, poly([[2, 14], [18, 10], [22, 14], [20, 20], [4, 22]]), "#9c7a5c", "wood"); part(p, disc(4, 18, 3, 3.8), "#e8d2a8", "wood");
+    part(p, stroke([[13, 13], [20, 2]], 2.4), "#6f5440", "wood"); part(p, poly([[14, 3], [22, 1], [23, 8], [17, 8]]), STEEL_C, "metal");
+  },
+  fletching: p => {
+    for (const off of [-3, 3]) {
+      line(p, [[3, 20 + off], [19, 4 + off]], "#9c7a5c", 2);
+      part(p, poly([[18, 3 + off], [23, 1 + off], [21, 6 + off]]), STEEL_C, "metal");
+      part(p, poly([[3, 20 + off], [2, 15 + off], [6, 17 + off], [8, 15 + off], [8, 21 + off]]), off < 0 ? WHITE : "#cf6e6e", "cloth");
+    }
+  },
+  fishing: p => {
+    part(p, poly([[2, 12], [7, 7], [15, 6], [19, 10], [15, 15], [7, 16]]), "#5f86b4", "metal");
+    part(p, poly([[18, 11], [23, 6], [23, 17]]), "#4a6a94", "metal"); line(p, [[7, 12], [15, 11]], "#bfe0ff");
+    dot(p, 5, 10, INK); dot(p, 6, 10, WHITE); part(p, poly([[10, 6], [13, 3], [15, 6]]), "#4a6a94", "metal");
+  },
+  cooking: p => {
+    // A pot bubbling over, steam rising.
+    part(p, poly([[3, 11], [21, 11], [19, 22], [5, 22]]), "#6d6b67", "metal"); part(p, box(2, 10, 20, 3), "#8b8e92", "metal");
+    part(p, disc(12, 10, 7, 1.8), "#e9a07a", "food");
+    for (const x of [8, 12, 16]) line(p, [[x, 7], [x - 1, 5], [x + 1, 3], [x, 1]], "#e8e4da");
+  },
+  firemaking: p => {
+    part(p, all(stroke([[3, 21], [21, 16]], 3), stroke([[3, 16], [21, 21]], 3)), "#7a5a40", "wood");
+    part(p, poly([[6, 18], [5, 12], [8, 7], [9, 11], [12, 2], [15, 10], [16, 7], [19, 13], [18, 18]]), "#e97a4a", "glow");
+    part(p, poly([[9, 18], [9, 14], [12, 9], [15, 15], [14, 18]]), "#f2d56b", "glow");
+  },
+  mining: p => {
+    part(p, poly([[2, 20], [5, 13], [12, 11], [19, 14], [22, 21], [12, 23]]), "#8f8a84", "stone");
+    for (const [x, y] of [[8, 17], [15, 18], [12, 15]] as Pt[]) part(p, disc(x, y, 1.8), "#d8b6b4", "metal");
+    part(p, stroke([[8, 13], [16, 3]], 2.2), "#6f5440", "wood"); part(p, poly([[8, 2], [14, 1], [22, 4], [16, 3], [11, 4]]), STEEL_C, "metal");
+  },
+  smithing: p => {
+    // An anvil and a hammer raised over it.
+    part(p, poly([[2, 13], [22, 13], [19, 16], [16, 16], [16, 20], [19, 22], [5, 22], [8, 20], [8, 16], [5, 16]]), "#6d6b67", "metal");
+    part(p, stroke([[12, 11], [18, 3]], 2), "#6f5440", "wood"); part(p, box(13, 1, 8, 4), STEEL_C, "metal");
+    dot(p, 6, 11, "#f2d56b"); dot(p, 9, 10, "#e97a4a");
+  },
+  crafting: p => {
+    // A spool of thread and a needle.
+    part(p, box(4, 5, 12, 3), "#9c7a5c", "wood"); part(p, box(4, 18, 12, 3), "#9c7a5c", "wood");
+    part(p, box(5, 8, 10, 10), "#cf6e6e", "cloth"); for (const y of [10, 13, 16]) line(p, [[5, y], [14, y]], shadeHex("#cf6e6e", -0.25));
+    part(p, stroke([[14, 21], [22, 3]], 1.4), STEEL_C, "metal"); line(p, [[15, 17], [19, 12], [17, 9]], "#cf6e6e");
+  },
+  thieving: p => {
+    // A burglar's mask.
+    part(p, poly([[2, 9], [6, 6], [12, 8], [18, 6], [22, 9], [21, 15], [17, 17], [12, 15], [7, 17], [3, 15]]), "#2e2c2a", "cloth");
+    part(p, all(disc(7.5, 11.5, 2.4, 2), disc(16.5, 11.5, 2.4, 2)), "#f7f5f0", "flat");
+    line(p, [[2, 11], [0, 13]], "#2e2c2a", 2); line(p, [[22, 11], [24, 13]], "#2e2c2a", 2);
+  },
+  agility: p => {
+    // A winged running boot.
+    part(p, poly([[5, 4], [12, 4], [12, 14], [21, 16], [22, 21], [5, 21]]), "#8fbf9a", "cloth");
+    part(p, box(4, 20, 19, 3), "#5a7a5a", "flat");
+    part(p, poly([[4, 8], [0, 5], [1, 10], [0, 13], [4, 12]]), WHITE, "cloth");
+  },
+  slayer: p => {
+    part(p, disc(12, 10, 8, 7.5), "#e8e4dc", "stone"); part(p, box(7, 15, 10, 5), "#e8e4dc", "stone");
+    part(p, all(disc(8.5, 10, 2.2), disc(15.5, 10, 2.2)), "#2e2c2a", "flat");
+    for (const x of [9, 12, 15]) line(p, [[x, 16], [x, 19]], "#8f8a84");
+    line(p, [[2, 22], [22, 2]], "#c24a4a", 2);
+  },
+};
+export const skillArt = (skill: Skill) => pixelArt(`skill24:${skill}`, 24, 24, p => { SKILL24[skill](p); p.outline(); p.halo(); });
 export type TabIcon = "combat" | "skills" | "quests" | "inventory" | "equipment" | "prayer" | "magic" | "friends" | "settings" | "emotes";
 /** Side-panel tab icons: 24 pixels, shaded like the items, each a distinct silhouette so they read at a glance. */
 const TAB_PAINTERS: Record<TabIcon, Painter> = {

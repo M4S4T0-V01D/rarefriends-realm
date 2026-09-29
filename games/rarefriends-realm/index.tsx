@@ -806,7 +806,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
             </div>
           </div>
           <div className="realm-drops" aria-hidden="true">
-            {drops.map(drop => <span key={drop.id} style={{ animationDuration: reducedMotion ? "0s" : undefined }}><PixelIcon art={skillArt(drop.skill)} size={20} /> +{Math.round(drop.amount).toLocaleString()}</span>)}
+            {drops.map(drop => <span key={drop.id} style={{ animationDuration: reducedMotion ? "0s" : undefined }}><PixelIcon art={skillArt(drop.skill)} size={24} /> +{Math.round(drop.amount).toLocaleString()}</span>)}
           </div>
           {phase === "playing" && currentStep(state) && <FirstStepsCard game={state} onSkip={() => { skipFirstSteps(state); refresh(); }} openMenu={(x, y, entries) => setMenu({ x, y, entries })} />}
           {toast && <div className="realm-toast" role="status"><b>{toast.title}</b>{toast.sub && <small>♪ {toast.sub}</small>}</div>}

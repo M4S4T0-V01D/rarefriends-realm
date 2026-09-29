@@ -498,7 +498,7 @@ export function craftSigils(game: Game, object: WorldObject) {
 export function fletchingRecipes(log: string): Recipe[] {
   const bow = FLETCH_BOWS.find(entry => entry.log === log)!;
   return [
-    { skill: "fletching", label: "15 arrow shafts", level: 1, xp: 5, ticks: 3, inputs: { [log]: 1 }, outputs: { arrow_shaft: 15 }, tools: ["knife"] },
+    { skill: "fletching", label: "15 arrow shafts", level: 1, xp: 8, ticks: 3, inputs: { [log]: 1 }, outputs: { arrow_shaft: 15 }, tools: ["knife"] },
     { skill: "fletching", label: item(`${bow.bow}_u`).name, level: bow.level, xp: bow.xp / 2, ticks: 3, inputs: { [log]: 1 }, outputs: { [`${bow.bow}_u`]: 1 }, tools: ["knife"] },
     ...WAR_BOWS.filter(war => war.log === log).map(war => ({ skill: "fletching" as const, label: `${war.name} (unstrung, 2 logs)`, level: war.fletch, xp: war.xp / 2, ticks: 4, inputs: { [log]: 2 }, outputs: { [`${war.id}_u`]: 1 }, tools: ["knife"] })),
     ...STOCKS.filter(stock => stock.log === log).map(stock => ({ skill: "fletching" as const, label: stock.name, level: stock.level, xp: stock.xp, ticks: 3, inputs: { [log]: 1 }, outputs: { [stock.id]: 1 }, tools: ["knife"] })),

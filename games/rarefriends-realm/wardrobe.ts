@@ -206,7 +206,10 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
         p.poly([[l, top + 5], [l, top], [l + 2, top - 3], [r - 2, top - 3], [r, top], [r, top + 5], [r - 2, top + 5], [r - 2, top + 2], [l + 2, top + 2], [l + 2, top + 5]], color, null);
         p.line(l + 1, top - 1, r - 2, top - 1, light); p.line(l, top + 2, r - 1, top + 2, dark);
         p.rect(Math.round(cx) - 1, top + 2, 2, 3, color);
-        if (piece.trim) p.poly([[cx - 1, top - 3], [cx + 1, top - 3], [cx + 2, top - 8], [cx - 2, top - 7]], piece.trim, null);
+        if (isItem(piece.id) && item(piece.id).icon.kind === "horned") {
+          // Curled horns sweeping out and up from the sides.
+          for (const s2 of side ? [side] : [-1, 1]) { const hx = s2 < 0 ? l : r; p.polyline([[hx, top + 1], [hx + s2 * 4, top - 1], [hx + s2 * 5, top - 5], [hx + s2 * 3, top - 7]], piece.trim ?? "#e8dcc0", 2); }
+        } else if (piece.trim) p.poly([[cx - 1, top - 3], [cx + 1, top - 3], [cx + 2, top - 8], [cx - 2, top - 7]], piece.trim, null);
         break;
       }
       case "gear_hood": {
@@ -335,6 +338,28 @@ function drawWeapon(p: Pixels, piece: Piece, x: number, y: number, dir: number, 
   };
   switch (shape) {
     case "sword": blade(15); break;
+    case "greatsword": blade(21); break;
+    case "battleaxe": case "warhammer": {
+      // A long haft held two-handed across the body, the head high over the shoulder.
+      const top = { x: x + dir * (5 + lean), y: y - 18 }; tip = top;
+      p.line(x - dir * 2, y + 6, top.x, top.y, wood, 2); p.line(x - dir * 2, y + 5, top.x - dir, top.y + 1, woodLight);
+      if (shape === "battleaxe") {
+        p.poly([[top.x, top.y - 3], [top.x + dir * 6, top.y - 5], [top.x + dir * 7, top.y + 3], [top.x, top.y + 2]], metal, null);
+        p.poly([[top.x, top.y - 2], [top.x - dir * 4, top.y - 4], [top.x - dir * 5, top.y + 2], [top.x, top.y + 1]], dark, null);
+        p.line(top.x + dir * 6, top.y - 4, top.x + dir * 7, top.y + 2, piece.trim ?? light);
+      } else {
+        p.rect(Math.min(top.x - dir * 3, top.x + dir * 5), top.y - 3, 8, 6, metal); p.line(top.x - dir * 3, top.y - 3, top.x + dir * 4, top.y - 3, piece.trim ?? light);
+        p.line(top.x - dir * 3, top.y, top.x - dir * 6, top.y, dark, 2);
+      }
+      break;
+    }
+    case "spear": {
+      // A long spear held upright, its point high above the head.
+      const top = { x: x + dir * (3 + lean), y: y - 24 }; tip = top;
+      p.line(x - dir, y + 10, top.x, top.y + 3, piece.trim ?? wood, 2);
+      p.poly([[top.x, top.y - 4], [top.x + dir * 2, top.y + 1], [top.x, top.y + 4], [top.x - dir * 2, top.y + 1]], metal, null); p.set(top.x, top.y - 3, light);
+      break;
+    }
     case "dagger": blade(8); break;
     case "sabre": blade(14, 2.4); break;
     case "axe": case "pickaxe": {
@@ -420,6 +445,7 @@ function drawWeapon(p: Pixels, piece: Piece, x: number, y: number, dir: number, 
     default: drawIconHeld(p, piece.id, x, y); tip = { x, y: y - 8 };
   }
   if (shape === "axe" || shape === "pickaxe") tip = { x: x + dir * (3 + lean), y: y - 13 };
+  else if (shape === "battleaxe" || shape === "warhammer") tip = { x: x + dir * (5 + lean), y: y - 18 };
   else if (shape === "staff") tip = { x: x + dir * (1 + lean), y: y - 20 };
   else if (shape === "bow") tip = { x: x + dir * lean, y: y - 12 };
   return tip;

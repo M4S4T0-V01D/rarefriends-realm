@@ -74,7 +74,7 @@ export type IconShape =
   | "amulet" | "log" | "fish" | "ore" | "bar" | "bones" | "sigil" | "staff" | "net" | "rod" | "harpoon" | "pot" | "bucket" | "egg" | "flour"
   | "milk" | "tinderbox" | "hammer" | "knife" | "needle" | "thread" | "chisel" | "gem" | "hide" | "leather" | "meat" | "feather" | "bait"
   | "cake" | "bread" | "berries" | "key" | "wheat" | "lamp" | "scroll" | "silk" | "hood" | "bracer" | "burnt" | "hat" | "crown" | "orb" | "trophy"
-  | "bow" | "arrow" | "tablet" | "arrowheads" | "material" | "quiver" | "satchel" | "mask" | "stonebox" | "wool" | "string" | "shears" | "warbow" | "crossbow" | "bolts" | "limbs" | "stock";
+  | "bow" | "arrow" | "tablet" | "arrowheads" | "material" | "quiver" | "satchel" | "mask" | "stonebox" | "wool" | "string" | "shears" | "greatsword" | "battleaxe" | "warhammer" | "spear" | "warbow" | "crossbow" | "bolts" | "limbs" | "stock";
 export type Item = {
   id: string; name: string; examine: string; value: number; icon: Icon;
   stackable?: boolean; tradeable?: boolean;
@@ -132,6 +132,10 @@ export const SMITH_PIECES = [
   { piece: "greaves", name: "greaves", bars: 3, offset: 16, shape: "legs", slot: "legs", att: 0, str: 0, def: 11, speed: 0 },
   { piece: "shield", name: "shield", bars: 3, offset: 12, shape: "shield", slot: "shield", att: 0, str: 0, def: 12, speed: 0 },
   { piece: "cuirass", name: "cuirass", bars: 5, offset: 18, shape: "body", slot: "body", att: 0, str: 0, def: 20, speed: 0 },
+  // Two-handed weapons: a tick slower than a sword, much harder hitting, and no shield.
+  { piece: "greatsword", name: "greatsword", bars: 3, offset: 10, shape: "greatsword", slot: "weapon", att: 10, str: 13, def: 0, speed: 5, twoHanded: true },
+  { piece: "battleaxe", name: "battleaxe", bars: 3, offset: 9, shape: "battleaxe", slot: "weapon", att: 8, str: 14, def: 0, speed: 5, twoHanded: true },
+  { piece: "warhammer", name: "war hammer", bars: 3, offset: 11, shape: "warhammer", slot: "weapon", att: 6, str: 16, def: 0, speed: 5, twoHanded: true },
 ] as const;
 export type SmithPiece = typeof SMITH_PIECES[number]["piece"];
 export const SMITHING_BASE: Record<MetalId, number> = { pewter: 1, blackiron: 15, ashsteel: 30, moonsilver: 50, glimmer: 70, rarite: 85,
@@ -259,7 +263,7 @@ function metalGear(): Item[] {
         equip: {
           slot: piece.slot as EquipSlot, bonuses,
           requires: metal.level > 1 ? { [requireSkill]: metal.level } : undefined,
-          speed: piece.speed || undefined,
+          speed: piece.speed || undefined, twoHanded: "twoHanded" in piece ? piece.twoHanded : undefined,
         },
         tool: isTool ? { kind: piece.piece as "axe" | "pickaxe", tier, level: metal.level } : undefined,
       });
@@ -396,6 +400,15 @@ const RANGED_GEAR: Item[] = [
   // A very rare Grumblin drop, worn over your Friend's head.
   { id: "grumblin_head", name: "Grumblin head", examine: "A Grumblin's head, hollowed out and surprisingly comfy. It still grumbles a little.", value: 5000,
     icon: { shape: "mask", color: "#8e9a7a", accent: "#e2c46a" }, equip: { slot: "head", bonuses: { defence: 3, attack: 1 } } },
+  // Creature drops: weapons and gear you can only get from particular monsters.
+  { id: "grumblin_spear", name: "Grumblin spear", examine: "Crude, sharp, and still faintly grumbling.", value: 220, icon: { shape: "spear", color: "#9aa3a8", accent: "#6d5a48" }, equip: { slot: "weapon", bonuses: { attack: 9, strength: 7 }, requires: { attack: 5 }, speed: 4 } },
+  { id: "spider_fang", name: "Spider-fang dagger", examine: "A spider's fang set in a grip. Quick, and nasty.", value: 900, icon: { shape: "dagger", color: "#e8e4da" }, equip: { slot: "weapon", bonuses: { attack: 13, strength: 9 }, requires: { attack: 10 }, speed: 3 } },
+  { id: "tusker_axe", name: "Tusker axe", examine: "A great axe with a boar's tusks for blades. Two hands.", value: 1400, icon: { shape: "battleaxe", color: "#e8dcc0" }, equip: { slot: "weapon", bonuses: { attack: 15, strength: 26 }, requires: { attack: 15 }, speed: 5, twoHanded: true } },
+  { id: "horned_helm", name: "Horned helm", examine: "A helm with a mountain goat's horns. Headbutts not included.", value: 800, icon: { shape: "helm", color: "#8a8680", accent: "#e8dcc0", kind: "horned" }, equip: { slot: "head", bonuses: { defence: 13, strength: 2 }, requires: { defence: 15 } } },
+  { id: "stinger_sabre", name: "Stinger sabre", examine: "Curved like a scorpion's tail, and about as friendly.", value: 4000, icon: { shape: "sabre", color: "#d9a441", accent: "#8a4a3a" }, equip: { slot: "weapon", bonuses: { attack: 31, strength: 27 }, requires: { attack: 25 }, speed: 4 } },
+  { id: "golem_maul", name: "Golem maul", examine: "A stone golem's fist on a haft. Two hands, and then some.", value: 12000, icon: { shape: "warhammer", color: "#8f8a83", accent: "#c9e07a" }, equip: { slot: "weapon", bonuses: { attack: 26, strength: 58 }, requires: { attack: 40 }, speed: 5, twoHanded: true } },
+  { id: "mossy_staff", name: "Mossy staff", examine: "Moss still grows on it, and something hums in the moss.", value: 6000, icon: { shape: "staff", color: "#7f9a5c", accent: "#c9e07a" }, equip: { slot: "weapon", bonuses: { attack: 6, strength: 6, magic: 22 }, requires: { magic: 30 }, speed: 5, staff: true } },
+  { id: "mossblade", name: "Mossblade", examine: "A sword grown over with moss. It cuts better for it.", value: 8000, icon: { shape: "sword", color: "#8fa87a", accent: "#c9e07a" }, equip: { slot: "weapon", bonuses: { attack: 37, strength: 31 }, requires: { attack: 35 }, speed: 4 } },
   // Sheep, wool and string: shear a sheep, spin the wool into string at a spinning wheel, string bows and amulets with it.
   { id: "shears", name: "Shears", examine: "For shearing sheep.", value: 8, icon: { shape: "shears", color: "#b9bfc6" } },
   { id: "wool", name: "Wool", examine: "Fresh off a sheep. A spinning wheel would turn it into string.", value: 4, icon: { shape: "wool", color: "#efeae0" } },
@@ -651,12 +664,22 @@ export const MONSTERS: Record<string, MonsterDef> = {
     always: [one("bones", 1), one("cowhide", 1), one("raw_beef", 1)], drops: [], art: 101 },
   sheep: { id: "sheep", name: "Sheep", level: 1, hp: 5, attack: 1, strength: 1, defence: 1, attackBonus: 0, defenceBonus: 0, maxHit: 1, speed: 4, respawn: 25, wander: 3, examine: "Baa. A fleece like that wants shearing.",
     always: [one("bones", 1)], drops: [one("wool", 0.5)], art: 115, shear: { item: "wool", regrow: 90, art: 116 } },
+  forest_spider: { id: "forest_spider", name: "Forest spider", level: 12, hp: 16, attack: 10, strength: 10, defence: 8, attackBonus: 6, defenceBonus: 4, maxHit: 2, speed: 4, respawn: 30, wander: 5, examine: "Eight eyes, all of them on you.", aggressive: true,
+    always: [one("bones", 1)], drops: [one("spider_fang", 0.04), coins(5, 40, 0.5), one("silk", 0.2), one("pewter_arrow", 0.15, 3, 8)], art: 117 },
+  boar: { id: "boar", name: "Wild boar", level: 16, hp: 22, attack: 14, strength: 16, defence: 10, attackBonus: 6, defenceBonus: 6, maxHit: 3, speed: 5, respawn: 30, wander: 5, examine: "Tusks first, questions later.",
+    always: [one("bones", 1), one("raw_beef", 1)], drops: [one("tusker_axe", 0.03), one("cowhide", 0.4), coins(5, 30, 0.3)], art: 118 },
+  highland_goat: { id: "highland_goat", name: "Highland goat", level: 22, hp: 26, attack: 18, strength: 16, defence: 16, attackBonus: 8, defenceBonus: 10, maxHit: 3, speed: 4, respawn: 30, wander: 6, examine: "It climbed up there somehow.",
+    always: [one("bones", 1)], drops: [one("horned_helm", 0.04), one("wool", 0.35), one("raw_beef", 0.5), coins(10, 60, 0.3)], art: 119 },
+  sand_scorpion: { id: "sand_scorpion", name: "Sand scorpion", level: 30, hp: 34, attack: 26, strength: 24, defence: 24, attackBonus: 14, defenceBonus: 18, maxHit: 5, speed: 4, respawn: 35, wander: 5, examine: "Its tail is always raised. Always.", aggressive: true,
+    always: [one("bones", 1)], drops: [one("stinger_sabre", 0.03), coins(20, 120, 0.5), one("rough_sagestone", 0.03), one("moonsilver_arrow", 0.08, 5, 12)], art: 121 },
+  stone_golem: { id: "stone_golem", name: "Stone golem", level: 45, hp: 62, attack: 36, strength: 38, defence: 44, attackBonus: 20, defenceBonus: 40, maxHit: 7, speed: 6, respawn: 60, wander: 3, examine: "A heap of mountain that got up.", aggressive: true,
+    always: [one("large_bones", 1)], drops: [one("golem_maul", 0.02), one("glimmer_ore", 0.25), one("rarite_ore", 0.06), one("moonsilver_ore", 0.3), coins(40, 240, 0.4)], art: 120 },
   ink_rat: { id: "ink_rat", name: "Ink rat", level: 1, hp: 2, attack: 1, strength: 1, defence: 1, attackBonus: 0, defenceBonus: 0, maxHit: 1, speed: 4, respawn: 15, wander: 6, examine: "A rat made of spilled ink. It squeaks in monochrome.",
     always: [one("bones", 1)], drops: [coins(1, 4, 0.3)], art: 102 },
   grumblin: { id: "grumblin", name: "Grumblin", level: 5, hp: 7, attack: 4, strength: 4, defence: 1, attackBonus: 2, defenceBonus: 0, maxHit: 2, speed: 4, respawn: 25, wander: 6, examine: "An ugly, grumbling green-grey creature.", aggressive: true,
-    always: [one("bones", 1)], drops: [one("grumblin_head", 0.002), coins(2, 25, 0.45), one("breeze_sigil", 0.1, 3, 8), one("thought_sigil", 0.08, 2, 6), one("pewter_dagger", 0.04), one("pewter_helm", 0.03), one("fishing_bait", 0.08, 5, 15), one("tide_sigil", 0.05, 2, 6), one("pewter_arrow", 0.12, 4, 12), one("shortbow", 0.02)], art: 103 },
+    always: [one("bones", 1)], drops: [one("grumblin_spear", 0.03), one("grumblin_head", 0.002), coins(2, 25, 0.45), one("breeze_sigil", 0.1, 3, 8), one("thought_sigil", 0.08, 2, 6), one("pewter_dagger", 0.04), one("pewter_helm", 0.03), one("fishing_bait", 0.08, 5, 15), one("tide_sigil", 0.05, 2, 6), one("pewter_arrow", 0.12, 4, 12), one("shortbow", 0.02)], art: 103 },
   grumblin_chief: { id: "grumblin_chief", name: "Grumblin chief", level: 13, hp: 20, attack: 10, strength: 11, defence: 8, attackBonus: 6, defenceBonus: 5, maxHit: 3, speed: 4, respawn: 50, wander: 3, examine: "The loudest Grumblin. That's how they choose.", aggressive: true,
-    always: [one("bones", 1)], drops: [one("grumblin_head", 0.02), coins(20, 80, 0.6), one("blackiron_sabre", 0.05), one("stone_sigil", 0.1, 5, 12), one("blackiron_helm", 0.05), one("rough_moonstone", 0.03)], art: 104 },
+    always: [one("bones", 1)], drops: [one("grumblin_spear", 0.12), one("grumblin_head", 0.02), coins(20, 80, 0.6), one("blackiron_sabre", 0.05), one("stone_sigil", 0.1, 5, 12), one("blackiron_helm", 0.05), one("rough_moonstone", 0.03)], art: 104 },
   bandit: { id: "bandit", name: "Dune bandit", level: 22, hp: 28, attack: 20, strength: 20, defence: 16, attackBonus: 12, defenceBonus: 12, maxHit: 4, speed: 4, respawn: 40, wander: 5, examine: "A Friend who took a wrong turn in life.", aggressive: true,
     always: [one("bones", 1)], drops: [coins(20, 120, 0.7), one("ashsteel_dagger", 0.05), one("storm_sigil", 0.08, 2, 6), one("rough_sagestone", 0.02), one("path_sigil", 0.02, 1, 2), one("ashsteel_arrow", 0.1, 5, 15), one("willow_bow", 0.02)], art: 105 },
   swamp_lurker: { id: "swamp_lurker", name: "Swamp lurker", level: 16, hp: 22, attack: 14, strength: 14, defence: 12, attackBonus: 8, defenceBonus: 8, maxHit: 3, speed: 5, respawn: 35, wander: 4, examine: "Mostly mouth, partly mud.", aggressive: true,
@@ -666,7 +689,7 @@ export const MONSTERS: Record<string, MonsterDef> = {
   wolf: { id: "wolf", name: "Frost wolf", level: 32, hp: 40, attack: 30, strength: 28, defence: 26, attackBonus: 18, defenceBonus: 18, maxHit: 5, speed: 4, respawn: 40, wander: 6, examine: "Its breath freezes as it growls.", aggressive: true,
     always: [one("large_bones", 1)], drops: [one("frost_shard", 0.03), coins(20, 110, 0.4), one("rough_rosestone", 0.02), one("moonsilver_ore", 0.05), one("frosthide_bracers", 0.02), one("moonsilver_arrow", 0.06, 5, 12)], art: 108 },
   moss_colossus: { id: "moss_colossus", name: "Moss colossus", level: 42, hp: 60, attack: 32, strength: 34, defence: 30, attackBonus: 20, defenceBonus: 22, maxHit: 7, speed: 6, respawn: 60, wander: 3, examine: "A Colossus-family giant, grown over with moss.", size: 2,
-    always: [one("large_bones", 1)], drops: [coins(30, 250, 0.6), one("moonsilver_sword", 0.03), one("path_sigil", 0.06, 1, 3), one("rough_sagestone", 0.04), one("ashsteel_cuirass", 0.02)], art: 109 },
+    always: [one("large_bones", 1)], drops: [one("mossy_staff", 0.03), one("mossblade", 0.03), coins(30, 250, 0.6), one("moonsilver_sword", 0.03), one("path_sigil", 0.06, 1, 3), one("rough_sagestone", 0.04), one("ashsteel_cuirass", 0.02)], art: 109 },
   frost_yeti: { id: "frost_yeti", name: "Frost yeti", level: 55, hp: 85, attack: 50, strength: 52, defence: 45, attackBonus: 30, defenceBonus: 32, maxHit: 10, speed: 5, respawn: 60, wander: 4, examine: "Every footstep is an avalanche.", aggressive: true, size: 2,
     always: [one("large_bones", 1)], drops: [one("frost_shard", 0.3), one("frostsilver_helm", 0.012), one("frostsilver_sabre", 0.008), coins(80, 400, 0.6), one("glimmer_sabre", 0.02), one("hollow_sigil", 0.08, 2, 5), one("glimmer_ore", 0.06), one("rough_rosestone", 0.04), one("rosestone_pendant", 0.004)], art: 110 },
   shade: { id: "shade", name: "Shade", level: 38, hp: 45, attack: 32, strength: 30, defence: 34, magicDef: 10, attackBonus: 20, defenceBonus: 26, maxHit: 6, speed: 4, respawn: 40, wander: 4, examine: "A shadow with no Friend to belong to.", aggressive: true,
@@ -788,6 +811,8 @@ export const SHOPS: Record<string, ShopDef> = {
   general_highcairn: { id: "general_highcairn", name: "Highcairn Stores", general: true, stock: ["shears", "pot", "bucket", "tinderbox", "hammer", "knife", "chisel", "needle", "thread", "bread", "cooked_meat", "fishing_rod", "feather"] },
   kettle: { id: "kettle", name: "The Stone Kettle", buys: ["fish", "food"], rate: 0.55, stock: ["bread", "cake", "cooked_meat", "char", "grayling", "sailfish"] },
   cairn_forge: { id: "cairn_forge", name: "Highcairn Forge", buys: ["ore", "bar", "weapon", "armour"], rate: 0.6, stock: ["hammer", "moonsilver_pickaxe", "glimmer_pickaxe", "rarite_pickaxe", "inkcoal", "moonsilver_bar", "glimmer_bar", "glimmer_helm", "glimmer_shield", "rarite_helm", "inkcoal_satchel"] },
+  heft: { id: "heft", name: "Heft & Haft", buys: ["weapon"], rate: 0.55, stock: ["pewter_greatsword", "pewter_battleaxe", "pewter_warhammer", "blackiron_greatsword", "blackiron_battleaxe", "blackiron_warhammer",
+    "ashsteel_greatsword", "ashsteel_battleaxe", "ashsteel_warhammer", "moonsilver_greatsword", "moonsilver_battleaxe", "moonsilver_warhammer", "glimmer_greatsword"] },
   mine_supplies: { id: "mine_supplies", name: "Old miner's supplies", buys: ["ore"], rate: 0.5, stock: ["pewter_pickaxe", "blackiron_pickaxe", "ashsteel_pickaxe", "moonsilver_pickaxe", "inkcoal_satchel", "hammer", "bread"] },
   // Fernwick, the woodcutters' village: the only place that sells war bows, and the best price for logs.
   war_bows: { id: "war_bows", name: "Hazel's War Bows", buys: ["bow", "arrow"], rate: 0.6, stock: ["string", "war_bow", "oak_war_bow", "willow_war_bow", "maple_war_bow", "yew_war_bow",

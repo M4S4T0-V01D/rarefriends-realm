@@ -45,7 +45,7 @@ XP follows the classic curve (83 XP for level 2, 13,034,431 for 99), multiplied 
 | Prayer | Burying bones (4.5 / 15 / 50 XP) | Recharge at altars; prayers drain points |
 | Woodcutting | Trees 1, Oak 15, Willow 30, Maple 45, Yew 60, Ashwood 70 | Better axes cut faster |
 | Firemaking | Light logs (same levels as Woodcutting) | Fires last about a minute; cook on them |
-| Fletching | A knife on logs: 15 arrow shafts, a bow (Shortbow 5, Oak 20, Willow 35, Maple 50, Yew 65, Ashwood 80), a war bow from two logs (10, 25, 40, 55, 70, 85) or a crossbow stock (wooden 9, oak 24, willow 39, maple 54, yew 69, ashwood 84); feathers on shafts; arrowheads on headless arrows (pewter 1 … rarite 75); feathers on unfeathered bolts (pewter 5 … rarite 79) | Arrowheads (15 a bar), unfeathered bolts (12 a bar) and crossbow limbs (2 bars) are smithed at the anvil. Limbs on their stock make a crossbow with Crafting (pewter 8, blackiron 18, ashsteel 28, moonsilver 42, glimmer 56, rarite 70) |
+| Fletching | A knife on logs: 15 arrow shafts (8 XP), a bow (Shortbow 5, Oak 20, Willow 35, Maple 50, Yew 65, Ashwood 80), a war bow from two logs (10, 25, 40, 55, 70, 85) or a crossbow stock (wooden 9, oak 24, willow 39, maple 54, yew 69, ashwood 84); feathers on shafts; arrowheads on headless arrows (pewter 1 … rarite 75); feathers on unfeathered bolts (pewter 5 … rarite 79) | Arrowheads (15 a bar), unfeathered bolts (12 a bar) and crossbow limbs (2 bars) are smithed at the anvil. Limbs on their stock make a crossbow with Crafting (pewter 8, blackiron 18, ashsteel 28, moonsilver 42, glimmer 56, rarite 70) |
 | Fishing | Net 1 (minnows), Bait 5/10 (perch, carp), Lure 20/30 (char, grayling), Cage 40 (inkcrab), Harpoon 50 (sailfish), Deep 76 (inkshark) | Bait and feathers are used up |
 | Cooking | Ranges and fires | About one in five burn at the food's own level (a touch more on a fire), easing off fast to none at its stop-burn level (minnows 12, chicken and beef 14, perch 22, carp 32) |
 | Mining | Clay/Pewter 1, Blackiron 15, Inkcoal 30, Gems 40, Moonsilver 55, Glimmer 70, Rarite 85 | 1/256 random gem per swing |
@@ -165,6 +165,15 @@ the Greyhorn mine (glimmer, rarite, moonsilver, inkcoal). Wolves and yetis roam 
 **Highcairn**, a stone town on a plateau in the middle, has a bank, the Highcairn Stores (a general store), the Stone
 Kettle inn (with a range), the Highcairn Forge (a furnace and anvil, and a smith selling pickaxes and bars), a mountain
 shrine and a Rare Market trader, with roads to the Frostpeak camp and the Oasis.
+
+**Two-handed weapons.** Greatswords, battleaxes and war hammers in all twelve metals (3 bars at the anvil): a tick slower
+than a sword, much harder hitting, and they take both hands. Heft & Haft, at the south end of Market Street, sells them in
+pewter to moonsilver (and a glimmer greatsword).
+
+**Creatures and their drops.** Forest spiders (level 12, Whisperwood: a Spider-fang dagger, fast), wild boars (16, the
+southern woods: the two-handed Tusker axe), highland goats (22, the Greyhorn slopes: a Horned helm, and wool), sand
+scorpions (30, the Pale Dunes: the Stinger sabre) and stone golems (45, the Greyhorn mine: the two-handed Golem maul, and
+ore). Grumblins sometimes carry a Grumblin spear, and moss colossi a Mossy staff or a Mossblade.
 
 **Sheep, wool and string.** The sheep pen sits between the cows and the chickens at Hollow Farms. Shear a sheep with shears
 (sold in general stores) for wool; it looks shorn until its fleece grows back. Spin wool into string at a spinning wheel

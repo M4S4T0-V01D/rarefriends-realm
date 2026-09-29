@@ -235,7 +235,7 @@ export function createWorld(seed = 20260927): World {
   const REGION_BLOBS: readonly [RegionId, number, number, number, number][] = [
     ["whisperwood", 44, 82, 40, 44], ["fernwick", 34, 70, 14, 10], ["ashen_hills", 114, 48, 30, 26], ["emberforge", 162, 48, 18, 14], ["frostpeak", 206, 22, 36, 22],
     ["pale_dunes", 204, 102, 36, 36], ["glass_lake", 178, 166, 34, 26], ["murkmire", 44, 166, 38, 28], ["mossy_ruins", 122, 172, 26, 20],
-    ["farmland", 88, 124, 16, 16], ["oasis", 190, 116, 11, 10], ["friendhollow", 121, 124, 26, 28], ["wizards_tower", 160, 130, 8, 8], ["wyrmreach", 36, 23, 32, 19],
+    ["farmland", 88, 124, 16, 16], ["oasis", 190, 116, 11, 10], ["friendhollow", 121, 127, 26, 33], ["wizards_tower", 160, 130, 8, 8], ["wyrmreach", 36, 23, 32, 19],
     ["greyhorn", 276, 100, 50, 84], ["highcairn", 282, 80, 17, 14],
   ];
   for (const [id, cx, cy, rx, ry] of REGION_BLOBS) regionBlob(cx, cy, rx, ry, id);
@@ -339,6 +339,10 @@ export function createWorld(seed = 20260927): World {
   building(127, 135, 134, 141, "w", T.WOOD, undefined, { name: "Fletch & Feather", color: "#9aab92" });
   npc("bowyer", 131, 138); decor(133, 136, "shelf"); decor(133, 140, "shelf"); decor(130, 136, "crate"); decor(132, 140, "hay", true, "Straw target");
   building(127, 144, 134, 150, "w", T.STONE, undefined, { name: "The Warden's Lodge", color: "#6d6b67" });
+  // Heft & Haft, at the south end of Market Street: two-handed greatswords, battleaxes and war hammers.
+  building(107, 153, 114, 158, "e", T.WOOD, undefined, { name: "Heft & Haft", color: "#8a4a3a" });
+  npc("heft", 110, 155); decor(108, 154, "armour", true, "Weapon rack"); decor(108, 157, "armour", true, "Weapon rack"); decor(112, 157, "crate");
+  fillRect(115, 155, 118, 156, T.COBBLE);
   npc("slayer_master", 131, 147); decor(133, 145, "banner"); decor(133, 149, "torch"); decor(130, 149, "chest", true, "Trophy chest"); decor(129, 145, "shelf", true, "Trophy shelf");
   building(135, 124, 141, 131, "w", T.WOOD, undefined, { name: "The Sleepy Friend", color: "#cdb98a", chimney: true });
   npc("innkeeper", 138, 126); add({ kind: "range", x: 140, y: 125, blocks: true, name: "Cooking range" }); decor(137, 129, "table"); decor(139, 129, "table"); decor(138, 128, "bench", false); decor(140, 130, "barrel");
@@ -976,7 +980,7 @@ export function createWorld(seed = 20260927): World {
     weaponsmith: ["pewter_sword", "Edge & Hilt"], bowyer: ["shortbow", "Fletch & Feather"], slayer_master: ["slayer_gem", "The Warden's Lodge"], innkeeper: ["cake", "The Sleepy Friend inn"],
     rare_trader: ["rough_moonstone", "The Rare Market"], stablemaster: ["__horse", "Friendhollow Stables"],
     hazel: ["war_bow", "Hazel's War Bows"], rowan: ["pewter_axe", "Fernwick Timber Yard"],
-    cairn_trader: ["pot", "Highcairn Stores"], kettle_keeper: ["cake", "The Stone Kettle"], cairn_smith: ["rarite_pickaxe", "Highcairn Forge"],
+    heft: ["pewter_greatsword", "Heft & Haft"], cairn_trader: ["pot", "Highcairn Stores"], kettle_keeper: ["cake", "The Stone Kettle"], cairn_smith: ["rarite_pickaxe", "Highcairn Forge"],
   };
   const signed = new Set<Building>();
   const signFor = (x: number, y: number, icon: string, label: string) => {
@@ -1021,6 +1025,12 @@ export function createWorld(seed = 20260927): World {
   monsters("cow", 61, 127, 68, 133, 5);
   add({ kind: "dairy_cow", x: 64, y: 130, blocks: true, name: "Dairy cow" });
   decor(71, 128, "hay"); decor(71, 133, "hay");
+  // Newer creatures, placed last so the rest of the Realm is laid out exactly as before.
+  monsters("forest_spider", 60, 60, 82, 96, 7);          // Whisperwood's deep woods
+  monsters("boar", 16, 98, 42, 124, 6);                  // the southern woods, among the yews
+  monsters("sand_scorpion", 196, 72, 234, 126, 7);       // the Pale Dunes
+  monsters("highland_goat", 244, 96, 300, 132, 7);       // the Greyhorn slopes
+  monsters("stone_golem", 294, 48, 316, 70, 3);          // the Greyhorn mine
   // The sheep pen, between the cows and the chickens, its gate facing the Millpond; the farmhouse keeps a spinning wheel.
   for (let y = 127; y <= 134; y++) for (let x = 73; x <= 82; x++) { clearAt(x, y); put(x, y, T.GRASS); }
   for (let x = 73; x <= 82; x++) { decor(x, 127, "fence"); if (x < 77 || x > 78) decor(x, 134, "fence"); }

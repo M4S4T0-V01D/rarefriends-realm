@@ -208,7 +208,7 @@ function drawMask(ctx: CanvasRenderingContext2D, rows: Mask, x: number, y: numbe
   ctx.globalAlpha = 1;
   return { x: x - w / 2, y: y - h + px, w, h };
 }
-const FACES_LEFT = new Set([101, 102, 108, 115, 116]);
+const FACES_LEFT = new Set([101, 102, 108, 115, 116, 118, 119, 121]);
 
 // ---------- Primitives ----------
 function poly(ctx: CanvasRenderingContext2D, points: readonly (readonly [number, number])[], fill: string | null, stroke: string | null = INK, width = 1) {
@@ -1633,7 +1633,7 @@ function questMarkerFor(game: Game, npcId: string): string | null {
 }
 function drawMonster(ctx: CanvasRenderingContext2D, scene: Scene, monster: Monster, at: { x: number; y: number; moving: boolean }, hits: Hit[]) {
   const { camera, now, game } = scene, z = camera.zoom, size = monster.def.size ?? 1, center = { x: at.x + (size - 1) / 2, y: at.y + (size - 1) / 2 };
-  const s = toScreen(camera, center.x, center.y), px = (size === 1 ? 2.6 : size === 2 ? 4.4 : 6.2) * z * (monster.def.id === "chicken" || monster.def.id === "ink_rat" ? 0.75 : monster.def.id === "cow" ? 0.85 : monster.def.id === "sheep" ? 0.7 : 1);
+  const s = toScreen(camera, center.x, center.y), px = (size === 1 ? 2.6 : size === 2 ? 4.4 : 6.2) * z * (monster.def.id === "chicken" || monster.def.id === "ink_rat" ? 0.75 : monster.def.id === "cow" ? 0.85 : monster.def.id === "sheep" ? 0.7 : monster.def.id === "stone_golem" ? 1.25 : monster.def.id === "forest_spider" ? 0.8 : 1);
   ellipse(ctx, s.x, s.y, 12 * z * size, 4.5 * z * size, "rgba(22,22,22,0.18)", null);
   // A shorn sheep looks shorn until its fleece grows back.
   const set = creatureSprite(monster.def.shear && (monster.shorn ?? 0) > game.tick ? monster.def.shear.art : monster.def.art), frame = at.moving && Math.floor(now / 150) % 2 ? set.step : set.idle;

@@ -349,6 +349,28 @@ test("Sheep: shear with shears (it looks shorn until the wool grows back), spin 
   assert(has(p, "moonstone_amulet"), "a gem on a string makes an amulet");
 });
 
+test("Two-handed greatswords, battleaxes and war hammers; new creatures with their own drops; arrow shafts pay 8 XP", () => {
+  const g = newGame(), p = g.player;
+  for (const piece of ["greatsword", "battleaxe", "warhammer"]) {
+    const two = item(`ashsteel_${piece}`), sabre = item("ashsteel_sabre");
+    assert(two.equip.twoHanded && two.equip.speed > sabre.equip.speed && two.equip.bonuses.strength > sabre.equip.bonuses.strength, `${piece}: two hands, slower, harder hitting`);
+    assert(smithingRecipes("ashsteel").some(recipe => recipe.outputs[`ashsteel_${piece}`] === 1), `${piece} at the anvil`);
+    assert(SHOPS.heft.stock.includes(`pewter_${piece}`), `Heft & Haft sells a pewter ${piece}`);
+  }
+  assert(g.npcs.some(npc => npc.id === "heft"), "Heft & Haft is open in Friendhollow");
+  give(p, "pewter_shield"); equip(g, p.inventory.findIndex(slot => slot?.id === "pewter_shield"));
+  give(p, "pewter_warhammer"); equip(g, p.inventory.findIndex(slot => slot?.id === "pewter_warhammer"));
+  assert.equal(p.equipment.weapon, "pewter_warhammer"); assert.equal(p.equipment.shield, undefined, "the shield comes off for two hands");
+  const drops = { grumblin: "grumblin_spear", forest_spider: "spider_fang", boar: "tusker_axe", highland_goat: "horned_helm", sand_scorpion: "stinger_sabre", stone_golem: "golem_maul", moss_colossus: "mossy_staff" };
+  for (const [monster, drop] of Object.entries(drops)) {
+    assert(MONSTERS[monster].drops.some(entry => entry.item === drop), `${monster} drops ${drop}`);
+    assert(g.monsters.some(entry => entry.def.id === monster), `${monster} lives in the Realm`);
+  }
+  p.inventory.fill(null); give(p, "knife"); give(p, "logs");
+  const shafts = fletchingRecipesFor(g, "logs").find(recipe => recipe.label === "15 arrow shafts");
+  assert.equal(shafts.xp, 8);
+});
+
 test("Beginner fishing by the farm, and a new cook burns far less", () => {
   const g = newGame();
   const pond = g.world.objects.filter(object => object.kind === "spot" && Math.abs(object.x - 76) <= 6 && Math.abs(object.y - 139) <= 4);

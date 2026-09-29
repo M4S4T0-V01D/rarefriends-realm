@@ -55,6 +55,7 @@ export const NPCS: Record<string, NpcDef> = {
   agility: { id: "agility", name: "Coach Skip", examine: "Never stops stretching.", options: ["Talk-to"], art: art(5, 211) },
   armourer: { id: "armourer", name: "Dora Plate", examine: "She's knocked the dents out of half the Realm's helms.", options: ["Talk-to", "Trade"], shop: "armour", art: art(6, 241) },
   weaponsmith: { id: "weaponsmith", name: "Hilt", examine: "Tests every edge on his thumb. Has a lot of plasters.", options: ["Talk-to", "Trade"], shop: "weapons", art: art(0, 251) },
+  heft: { id: "heft", name: "Grom of Heft & Haft", examine: "Arms like tree trunks. Sells weapons to match.", options: ["Talk-to", "Trade"], shop: "heft", art: art(6, 631) },
   cairn_trader: { id: "cairn_trader", name: "Brisa the trader", examine: "Runs Highcairn's stores. Buys anything you can carry up a mountain.", options: ["Talk-to", "Trade"], shop: "general_highcairn", art: art(5, 603) },
   kettle_keeper: { id: "kettle_keeper", name: "Oda of the Stone Kettle", examine: "Keeps the kettle on and the fire high.", options: ["Talk-to", "Trade"], shop: "kettle", art: art(2, 611) },
   cairn_smith: { id: "cairn_smith", name: "Tolvar the smith", examine: "Forges with mountain ore. Has opinions about it.", options: ["Talk-to", "Trade"], shop: "cairn_forge", art: art(6, 617) },
@@ -453,6 +454,9 @@ export function talk(game: Game, npcId: string): Dialogue {
     ]);
     case "birch": return chat(name, npcSays(name, (["Swing from the hips, not the shoulders. Trees respect that.", "Plain trees for learning, oaks at fifteen, willows at thirty, maples at forty-five. Yews grow south of the camp, and ashwood only up in Frostpeak.",
       "Grumblins come up from the camp some nights. We keep the fires lit.", "Fletch as you go: a knife on your logs makes shafts, bows, war bows and crossbow stocks."] as const)[Math.floor(game.rng() * 4)]));
+    case "heft": return chat(name, npcSays(name, "Two hands, one swing, no argument. Greatswords, battleaxes and war hammers: slower than a sword, and they hit like a falling tree.",
+      "No room for a shield, mind. Anvils make them too, three bars apiece, if you'd rather forge your own."), [
+      { label: "Show me.", then: () => { game.ui.shop = "heft"; return null; } }, { label: "Maybe later.", then: () => null }]);
     case "mountain_guide": return chat(name, npcSays(name, (["Welcome to Highcairn, the town above the dunes. The road north-west climbs to the Frostpeak camp; the one west drops to the Oasis.",
       "The Greyhorn mine's up the scree to the north-east: glimmer and rarite, if your pick's up to it. Wolves and yetis like the snow up there.",
       "Greyhorn Tarn's south of town. Bring a rod and some feathers; the char are fat this time of year.", "Gloom hounds hunt the southern slopes after dark. Don't go down there light."] as const)[Math.floor(game.rng() * 4)]));

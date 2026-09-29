@@ -4,6 +4,13 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 30, date: "2026-09-29", title: "Two-handed weapons, new creatures and sharper skill icons", items: [
+    "Two-handed greatswords, battleaxes and war hammers in every metal: a tick slower than a sword and much harder hitting, with no room for a shield. Smith them at an anvil (3 bars), or buy them at Heft & Haft, the new shop at the south end of Market Street.",
+    "New creatures: forest spiders in Whisperwood, wild boars in the southern woods, sand scorpions in the Pale Dunes, highland goats on the Greyhorn slopes and stone golems in the Greyhorn mine.",
+    "Each has something only it drops: a spider-fang dagger, a two-handed Tusker axe, a Horned helm, a Stinger sabre and a Golem maul. Grumblins now carry the odd Grumblin spear, and moss colossi a Mossy staff or a Mossblade.",
+    "The skill icons are redrawn, crisp and shaded like the items and tabs.",
+    "Arrow shafts give 8 Fletching XP (up from 5).",
+  ] },
   { id: 29, date: "2026-09-29", title: "Highcairn, the Greyhorn Highlands, sheep and string", items: [
     "The Realm is bigger: east of the Pale Dunes and south of Frostpeak the island swells into the Greyhorn Highlands, with a ragged new coast. Snowy peaks, scree slopes and crags, all walkable, a mountain lake, and the Greyhorn mine (glimmer, rarite and moonsilver).",
     "Highcairn, a stone town on a plateau in the middle: a bank, the Highcairn Stores, the Stone Kettle inn, the Highcairn Forge, a mountain shrine and a Rare Market trader. Roads climb to it from the Frostpeak camp and the Oasis.",

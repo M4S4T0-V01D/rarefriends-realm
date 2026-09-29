@@ -189,7 +189,7 @@ function SkillsTab({ game, openMenu, openGuide }: PanelProps) {
           return (
             <button key={skill} type="button" className="realm-skill" title={info(skill)} aria-label={info(skill)} onClick={() => openGuide?.(skill)} onMouseEnter={() => setFocus(skill)}
               {...rightClick(openMenu, () => [{ verb: "Guide", noun: SKILL_NAMES[skill], run: () => openGuide?.(skill) }, { verb: "Check", noun: SKILL_NAMES[skill], run: () => message(game, info(skill)) }])}>
-              <PixelIcon art={skillArt(skill)} size={27} /><span>{current}<small>/{level}</small></span>
+              <PixelIcon art={skillArt(skill)} size={24} /><span>{current}<small>/{level}</small></span>
               <em style={{ width: `${Math.round(progress * 100)}%` }} />
             </button>
           );
@@ -614,7 +614,7 @@ export function LevelUpBox({ skill, level, onClose }: { skill: Skill; level: num
   return (
     <section className="realm-dialogue" aria-live="assertive">
       <button type="button" className="realm-line realm-levelup" onClick={onClose}>
-        <PixelIcon art={skillArt(skill)} size={54} />
+        <PixelIcon art={skillArt(skill)} size={48} />
         <span><b>Congratulations, you just advanced a{/^[AEIOU]/.test(SKILL_NAMES[skill]) ? "n" : ""} {SKILL_NAMES[skill]} level.</b>Your {SKILL_NAMES[skill]} level is now {level}.<em>Click here to continue (Space)</em></span>
       </button>
     </section>
@@ -783,7 +783,7 @@ export function LampModal({ game, refresh }: { game: Game; refresh: () => void }
       <p>Choose a skill: you'll gain 100 × its level in experience.</p>
       <div className="realm-skills lamp">
         {SKILLS.map(skill => <button key={skill} type="button" className="realm-skill" aria-label={`${SKILL_NAMES[skill]}: ${(100 * levelForXp(game.player.xp[skill])).toLocaleString()} XP`}
-          title={SKILL_NAMES[skill]} onClick={() => { rubLamp(game, slot, skill); refresh(); }}><PixelIcon art={skillArt(skill)} size={27} /><span>{levelForXp(game.player.xp[skill])}</span></button>)}
+          title={SKILL_NAMES[skill]} onClick={() => { rubLamp(game, slot, skill); refresh(); }}><PixelIcon art={skillArt(skill)} size={24} /><span>{levelForXp(game.player.xp[skill])}</span></button>)}
       </div>
     </Modal>
   );

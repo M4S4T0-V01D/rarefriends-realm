@@ -71,7 +71,7 @@ export function skillGuide(skill: Skill): GuideEntry[] {
       for (const bow of CROSSBOWS) add(bow.craft, item(`${bow.metal}_crossbow`).name, `${bow.xp} XP · ${item(`${bow.metal}_limbs`).name.toLowerCase()} on ${/^[aeiou]/i.test(item(bow.stock).name) ? "an" : "a"} ${item(bow.stock).name.toLowerCase()}`, `${bow.metal}_crossbow`);
       break;
     case "fletching":
-      add(1, "Arrow shafts", "5 XP · a knife on any logs makes 15", "arrow_shaft"); add(1, "Headless arrows", "15 XP for 15 · feathers on shafts", "headless_arrow");
+      add(1, "Arrow shafts", "8 XP · a knife on any logs makes 15", "arrow_shaft"); add(1, "Headless arrows", "15 XP for 15 · feathers on shafts", "headless_arrow");
       for (const bow of FLETCH_BOWS) add(bow.level, item(bow.bow).name, `${bow.xp} XP · a knife on ${item(bow.log).name.toLowerCase()}, then a string on the unstrung bow`, bow.bow);
       for (const metal of METALS) add(FLETCH_ARROWS[metal.id].level, `${metal.name} arrows`, `${FLETCH_ARROWS[metal.id].xp} XP each · heads from the anvil`, `${metal.id}_arrow`);
       for (const bow of WAR_BOWS) add(bow.fletch, bow.name, `${bow.xp} XP · a knife on 2 ${item(bow.log).name.toLowerCase()}, then a string`, bow.id);
