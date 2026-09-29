@@ -148,6 +148,21 @@ try {
   assert.equal(await game.getByRole("textbox", { name: "Say something" }).inputValue(), "", "the chat line clears after sending");
   await shot("chat");
 
+  // ---------- Dragging items round the pack with the mouse (pointer events, so Chrome never gets stuck in a drag) ----------
+  {
+    const slots = game.locator(".realm-inventory.pack .realm-slot"), before = await state(() => window.__realm.game().player.inventory.slice(0, 5).map(slot => slot?.id ?? null));
+    const a = await slots.nth(0).boundingBox(), b = await slots.nth(4).boundingBox();
+    await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2); await page.mouse.down();
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 10 }); await page.mouse.up();
+    const after = await state(() => window.__realm.game().player.inventory.slice(0, 5).map(slot => slot?.id ?? null));
+    assert.deepEqual([after[0], after[4]], [before[4], before[0]], "dragging swaps two slots");
+    // The game still takes clicks afterwards.
+    const canvas = await game.locator("canvas.realm-view").boundingBox(), from = await state(() => ({ x: window.__realm.game().player.x, y: window.__realm.game().player.y }));
+    await page.mouse.click(canvas.x + canvas.width * 0.3, canvas.y + canvas.height * 0.62); await page.waitForTimeout(1500);
+    const to = await state(() => ({ x: window.__realm.game().player.x, y: window.__realm.game().player.y }));
+    assert(to.x !== from.x || to.y !== from.y, "a click on the world after a drag still walks");
+  }
+
   // ---------- Camera: arrow keys turn and tilt, the scroll wheel drags it round, the compass faces north ----------
   await page.keyboard.down("ArrowRight"); await page.waitForTimeout(700); await page.keyboard.up("ArrowRight");
   await page.keyboard.down("ArrowUp"); await page.waitForTimeout(400); await page.keyboard.up("ArrowUp");

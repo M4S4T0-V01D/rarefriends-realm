@@ -159,7 +159,11 @@ willows by the pond and archery butts behind Hazel's.
 moonsilver), Edge & Hilt (daggers, swords, sabres), Fletch & Feather (bows, arrows, the first three crossbows and their bolts, hunter's hides) and the Warden's
 Lodge (Slayer). The Sleepy Friend inn (food, and a range) is east of the square, and the Rare Market is west.
 
-**The Wizards' Tower**, across the river east of town, has three storeys: sigil stones and Apprentice Pell's stores
+**Ruins** stand out in the wild: crumbling old houses with a doorway and flagstones, broken round towers (tall on one side,
+fallen to rubble on the other) and runs of ancient wall, in Whisperwood, the Ashen Hills, past the Millpond, the Pale Dunes,
+the Murkmire, below Frostpeak, round Glass Lake, by the Mossy Ruins and on the Pale Coast.
+
+**The Wizards' Tower**, across the river east of town, rises high under an eight-sided spire, and has three storeys inside: sigil stones and Apprentice Pell's stores
 (sigils, elemental staffs, robes) on the ground floor, a library with a Rare trader above, and Archmage Solenne at the
 top. Your first visit to her gets you scholar's robes, a staff and 480 sigils.
 

@@ -28,7 +28,7 @@ export type ObjectKind =
 export type DecorKind =
   | "flowers" | "bush" | "boulder" | "lamp" | "bench" | "crate" | "barrel" | "tent" | "cactus" | "pine" | "dead_tree" | "statue"
   | "grave" | "fence" | "reeds" | "table" | "bed" | "shelf" | "pillar" | "rubble" | "snowman" | "lily" | "banner" | "torch" | "palm" | "hay" | "windmill" | "boat" | "chest"
-  | "throne" | "armour" | "logpile" | "stump" | "target";
+  | "throne" | "armour" | "logpile" | "stump" | "target" | "ruin_wall";
 export type WorldObject = {
   id: number; kind: ObjectKind; x: number; y: number; name: string; blocks: boolean;
   tree?: TreeKind; rock?: RockKind; spot?: SpotKind; decor?: DecorKind; stall?: StallKind;
@@ -39,6 +39,8 @@ export type WorldObject = {
   icon?: string;
   /** A sigil altar: the sigil it presses. */
   sigil?: string;
+  /** A crumbling ruin wall's height (pixels). */
+  height?: number;
 };
 export type StallKind = "bakery" | "silk" | "gem" | "fish";
 export type SpawnDef = { kind: "npc" | "monster"; id: string; x: number; y: number; wander?: number };
@@ -76,6 +78,10 @@ export const isUnderground = (y: number) => y >= 200 && y < FLOOR_Y;
 export type Building = {
   x0: number; y0: number; x1: number; y1: number; roof: "gable" | "flat" | "cone" | "none"; color: string; chimney: boolean; name: string;
   storeys?: number; complex?: string;
+  /** Extra wall height (pixels) seen only from outside, above the top storey (a tower taller than its floors), and a cone roof's height. */
+  tall?: number; spire?: number;
+  /** A round tower: its cone roof is eight-sided, fitted to the round wall. */
+  round?: boolean;
   /** What the walls are made of: stone brick, half-timbered plaster, or planks. */
   walls?: "stone" | "timber" | "plank";
 };
@@ -642,6 +648,72 @@ export function createWorld(seed = 20260927): World {
   npc("agility", 86, courseY + 2, 1);
   add({ kind: "sign", x: 85, y: courseY + 3, blocks: true, name: "Signpost", text: "Friendhollow Agility Course. Start at the log balance, go east, and finish all five obstacles for a lap bonus." });
 
+  // ---------- Ruins: old houses, round towers and boundary walls, crumbling out in the wild ----------
+  {
+    // Their own random stream, so adding ruins doesn't reshuffle the rest of the world.
+    const random = mulberry(seed + 404), spawnTiles = new Set(spawns.map(spawn => tileIndex(spawn.x, spawn.y)));
+    const open = (x: number, y: number) => inBounds(x, y) && free(x, y) && !spawnTiles.has(tileIndex(x, y));
+    const stub = (x: number, y: number, height: number) => { if (open(x, y)) add({ kind: "decor", decor: "ruin_wall", x, y, blocks: true, name: "Crumbling wall", height: Math.round(height) }); };
+    const litter = (x: number, y: number) => { if (open(x, y) && random() < 0.5) decor(x, y, "rubble", false, "Rubble"); };
+    const flag = (x: number, y: number) => { if (open(x, y) && random() < 0.6 && get(x, y) !== T.SAND && get(x, y) !== T.SNOW) put(x, y, T.STONE); };
+    /** Somewhere in the box with a clear w × h footprint (and a tile of space round it). */
+    const site = (x0: number, y0: number, x1: number, y1: number, w: number, h: number) => {
+      for (let tries = 0; tries < 400; tries++) {
+        const x = x0 + Math.floor(random() * (x1 - x0 - w)), y = y0 + Math.floor(random() * (y1 - y0 - h));
+        let ok = true;
+        for (let dy = -1; dy <= h && ok; dy++) for (let dx = -1; dx <= w && ok; dx++) ok = open(x + dx, y + dy);
+        if (ok) return [x, y] as const;
+      }
+      return null;
+    };
+    const house = (x0: number, y0: number, x1: number, y1: number) => {
+      const at = site(x0, y0, x1, y1, 5 + Math.floor(random() * 3), 4 + Math.floor(random() * 3));
+      if (!at) return;
+      const w = 5 + Math.floor(random() * 2), h = 4 + Math.floor(random() * 2), [hx, hy] = at, door = Math.floor(random() * (w - 2)) + 1;
+      for (let y = hy + 1; y < hy + h - 1; y++) for (let x = hx + 1; x < hx + w - 1; x++) flag(x, y);
+      for (let y = hy; y < hy + h; y++) for (let x = hx; x < hx + w; x++) {
+        const edge = x === hx || x === hx + w - 1 || y === hy || y === hy + h - 1, corner = (x === hx || x === hx + w - 1) && (y === hy || y === hy + h - 1);
+        if (!edge) { if (random() < 0.18) litter(x, y); continue; }
+        if (y === hy + h - 1 && x === hx + door) continue;                                     // the doorway
+        if (!corner && random() < 0.3) { litter(x, y); continue; }                             // fallen stretches
+        stub(x, y, corner ? 30 + random() * 26 : 10 + random() * 26);
+      }
+    };
+    const tower = (x0: number, y0: number, x1: number, y1: number) => {
+      const at = site(x0, y0, x1, y1, 7, 7);
+      if (!at) return;
+      const cx = at[0] + 3, cy = at[1] + 3, broken = random() * Math.PI * 2;
+      for (let y = cy - 3; y <= cy + 3; y++) for (let x = cx - 3; x <= cx + 3; x++) {
+        const d = Math.hypot(x - cx, y - cy);
+        if (d < 2.2) { flag(x, y); if (random() < 0.25) litter(x, y); continue; }
+        if (d > 3.3) continue;
+        // Standing tall on one side, collapsed to stubs and rubble on the other, with a doorway facing south.
+        if (y === cy + 3 && x === cx) continue;
+        const a = Math.atan2(y - cy, x - cx), fall = (1 + Math.cos(a - broken)) / 2;
+        if (fall > 0.82 && random() < 0.6) { litter(x, y); continue; }
+        stub(x, y, 16 + (1 - fall) * 70 + random() * 14);
+      }
+    };
+    const wallRun = (x0: number, y0: number, x1: number, y1: number) => {
+      const along = random() < 0.5, len = 7 + Math.floor(random() * 6), at = site(x0, y0, x1, y1, along ? len : 1, along ? 1 : len);
+      if (!at) return;
+      for (let i = 0; i < len; i++) {
+        const x = at[0] + (along ? i : 0), y = at[1] + (along ? 0 : i);
+        if (random() < 0.2) { litter(x, y); continue; }
+        stub(x, y, 12 + random() * 18 + (i % 4 === 0 ? 10 : 0));
+      }
+    };
+    house(18, 98, 44, 124); wallRun(20, 100, 46, 126);                       // Whisperwood's south woods
+    tower(86, 60, 104, 80);                                                   // the Ashen Hills' western slopes
+    house(58, 140, 76, 152);                                                  // past the Millpond
+    house(192, 78, 226, 104); tower(198, 104, 228, 128);                      // the Pale Dunes
+    tower(28, 150, 70, 190); wallRun(30, 150, 72, 192);                       // the Murkmire
+    tower(172, 6, 234, 44);                                                   // below Frostpeak
+    wallRun(162, 150, 204, 192); house(184, 170, 210, 192);                   // round Glass Lake
+    house(98, 158, 118, 176); house(124, 160, 146, 186);                      // by the Mossy Ruins
+    wallRun(14, 28, 40, 56);                                                  // the Pale Coast
+  }
+
   // ---------- Wild groves across the open meadows ----------
   const grove = makeNoise(seed + 11, 7), townDistance = (x: number, y: number) => Math.hypot(x - TOWN.x, y - TOWN.y);
   for (let y = 12; y < 196; y++) for (let x = 12; x < 228; x++) {
@@ -667,7 +739,7 @@ export function createWorld(seed = 20260927): World {
     put(x, y, ch === "#" ? T.WALL : level === 1 ? T.CARPET : T.STONE); clearAt(x, y);
     if (level) setRegion(x, y, "wizards_tower");
   })));
-  buildings.push({ x0: TOWER.x, y0: TOWER.y, x1: TOWER.x + 8, y1: TOWER.y + 8, roof: "cone", color: "#6f7ea6", chimney: false, name: "Wizards' Tower", storeys: 3, complex: "wizards", walls: "stone" });
+  buildings.push({ x0: TOWER.x, y0: TOWER.y, x1: TOWER.x + 8, y1: TOWER.y + 8, roof: "cone", color: "#6f7ea6", chimney: false, name: "Wizards' Tower", storeys: 3, complex: "wizards", walls: "stone", tall: 72, spire: 230, round: true });
   const towerStairs = (level: number, col: number, up: boolean, toLevel: number) =>
     add({ kind: "ladder", look: "stairs", ...tAt(level, col, 1), blocks: true, name: "Staircase", action: up ? "Climb-up" : "Climb-down", to: tAt(toLevel, 4, 2) });
   towerStairs(0, 5, true, 1); towerStairs(1, 5, false, 0); towerStairs(1, 3, true, 2); towerStairs(2, 3, false, 1);
@@ -891,7 +963,7 @@ const DECOR_NAMES: Record<DecorKind, string> = {
   cactus: "Cactus", pine: "Pine tree", dead_tree: "Dead tree", statue: "Statue", grave: "Grave", fence: "Fence", reeds: "Reeds", table: "Table",
   bed: "Bed", shelf: "Shelves", pillar: "Pillar", rubble: "Rubble", snowman: "Snow Friend", lily: "Lily pad", banner: "Banner", torch: "Torch",
   palm: "Palm tree", hay: "Hay bales", windmill: "Windmill", boat: "Boat", chest: "Chest", throne: "Throne", armour: "Suit of armour",
-  logpile: "Log pile", stump: "Chopping block", target: "Archery target",
+  logpile: "Log pile", stump: "Chopping block", target: "Archery target", ruin_wall: "Crumbling wall",
 };
 
 export function terrainAt(world: World, x: number, y: number) { return inBounds(x, y) ? world.tiles[tileIndex(x, y)] : T.VOID; }

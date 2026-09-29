@@ -711,6 +711,19 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
         }
         return hit(56, 40);
       case "hay": box(ctx, camera, ox, oy, 0.7, 0.5, 14, "#e2d7ad", "#d6c58f", "#c9b77f"); return hit(20);
+      case "ruin_wall": {
+        // A crumbling stretch of old wall: weathered brick to its own height, a jagged broken top, moss (sand-bleached in
+        // the dunes, snow-capped up north) on what's left.
+        const terrain = scene.game.world.tiles[oy * W + ox], sand = terrain === T.SAND, snow = terrain === T.SNOW, height = object.height ?? 20;
+        const [top, left, right] = sand ? ["#e0cfa6", "#d2bf92", "#bda97c"] : ["#b9b4ab", "#a39e95", "#8f8a82"];
+        const cap = snow ? "#f3f2ee" : sand ? "#ead9b0" : "#9fae8a", lower = height * (0.55 + hash(ox + 3, oy) * 0.25);
+        box(ctx, camera, ox, oy, 1, 1, lower, top, left, right, 0, INK, "brick");
+        // The broken top: one or two blocks left standing, off-centre.
+        const bx = ox + (hash(ox, oy + 5) - 0.5) * 0.45, by = oy + (hash(ox + 7, oy) - 0.5) * 0.45;
+        box(ctx, camera, bx, by, 0.55, 0.62, height - lower, cap, left, right, lower, INK, "brick");
+        if (hash(ox, oy + 11) < 0.5) box(ctx, camera, ox - (bx - ox), oy - (by - oy), 0.34, 0.34, 5 + hash(ox + 1, oy + 1) * 6, cap, left, right, lower, INK);
+        return hit(height + 8, 40);
+      }
       case "windmill": return drawWindmill(ctx, scene, ox, oy);
       case "boat": poly(ctx, [[sx - 22 * z, sy - 4 * z], [sx + 22 * z, sy - 4 * z], [sx + 14 * z, sy + 6 * z], [sx - 14 * z, sy + 6 * z]], "#9c8672"); return hit(12, 44);
       case "chest": box(ctx, camera, ox, oy, 0.6, 0.45, 14, "#9c8672", "#8a7563", "#7a6553"); return hit(20);
@@ -797,13 +810,15 @@ function drawHaze(ctx: CanvasRenderingContext2D, camera: Camera) {
 
 // ---------- Buildings ----------
 const WALL_H = 42;
+/** Floors inside buildings (a wall face onto one of these, under a roof, can't be seen). */
+const INDOOR_FLOORS = new Set<number>([T.WOOD, T.STONE, T.CARPET]);
 const roofAlpha = new Map<number, number>();
 type RoofVertex = [number, number, number];
 /** The roof's corners (with an overhang) and its ridge, in world coordinates and height. */
 function roofGeometry(building: Building) {
   const o = 0.3, X0 = building.x0 - 0.5 - o, X1 = building.x1 + 0.5 + o, Y0 = building.y0 - 0.5 - o, Y1 = building.y1 + 0.5 + o;
-  const alongX = X1 - X0 >= Y1 - Y0, half = (alongX ? Y1 - Y0 : X1 - X0) / 2, rise = building.roof === "cone" ? 118 : Math.max(20, Math.min(48, half * 11));
-  const base = WALL_H * (building.storeys ?? 1), top = base + rise, mid = alongX ? (Y0 + Y1) / 2 : (X0 + X1) / 2;
+  const alongX = X1 - X0 >= Y1 - Y0, half = (alongX ? Y1 - Y0 : X1 - X0) / 2, rise = building.roof === "cone" ? building.spire ?? 118 : Math.max(20, Math.min(48, half * 11));
+  const base = WALL_H * (building.storeys ?? 1) + (building.tall ?? 0), top = base + rise, mid = alongX ? (Y0 + Y1) / 2 : (X0 + X1) / 2;
   const A: RoofVertex = [X0, Y0, base], B: RoofVertex = [X1, Y0, base], C: RoofVertex = [X1, Y1, base], D: RoofVertex = [X0, Y1, base];
   const R0: RoofVertex = alongX ? [X0, mid, top] : [mid, Y0, top], R1: RoofVertex = alongX ? [X1, mid, top] : [mid, Y1, top];
   const apex: RoofVertex = [(X0 + X1) / 2, (Y0 + Y1) / 2, top];
@@ -862,13 +877,17 @@ function drawRoof(ctx: CanvasRenderingContext2D, camera: Camera, building: Build
   if (building.roof === "cone") {
     // A pointed tower roof: four slates to a peak, with a pennant.
     // Lit faces are lighter; each is tiled in shingles.
-    const faces = [[g.A, g.B], [g.B, g.C], [g.C, g.D], [g.D, g.A]].map(([a, b]) => {
-      const { rx, ry } = rotate(camera, (a[1] - b[1]), (b[0] - a[0])), lit = rx - ry < 0;
+    // A round tower's cone has eight sides, sitting just outside its round wall; others are four-sided.
+    const ring: RoofVertex[] = building.round
+      ? Array.from({ length: 8 }, (_, i) => { const a = (i + 0.5) / 8 * Math.PI * 2, r = ((g.X1 - g.X0) / 2 - 0.15) / Math.cos(Math.PI / 8); return [g.apex[0] + Math.cos(a) * r, g.apex[1] + Math.sin(a) * r, g.base] as RoofVertex; })
+      : [g.A, g.B, g.C, g.D];
+    const faces = ring.map((a, i) => {
+      const b = ring[(i + 1) % ring.length], { rx, ry } = rotate(camera, (a[1] - b[1]), (b[0] - a[0])), lit = rx - ry < 0;
       return { points: [a, b, g.apex], fill: shadeHex(building.color, lit ? 0.06 : -0.08) };
     });
     const centre = (points: RoofVertex[]) => depthOf(camera, (points[0][0] + points[1][0]) / 2, (points[0][1] + points[1][1]) / 2);
     faces.sort((a, b) => centre(a.points) - centre(b.points));
-    const side = g.X1 - g.X0, slant = Math.hypot(side * TEX_PER_TILE / 2, (g.top - g.base) * TEX_PER_HEIGHT);
+    const side = Math.hypot(ring[1][0] - ring[0][0], ring[1][1] - ring[0][1]), slant = Math.hypot((g.X1 - g.X0) * TEX_PER_TILE / 2, (g.top - g.base) * TEX_PER_HEIGHT);
     for (const face of faces) {
       const [a, b, c] = face.points.map(P).map(([x, y]) => ({ x, y }));
       if (texturesOn) texturedTriangle(ctx, shingleTexture(face.fill, Math.round(side * TEX_PER_TILE), Math.round(slant)), a, b, c, side * TEX_PER_TILE, slant);
@@ -881,17 +900,34 @@ function drawRoof(ctx: CanvasRenderingContext2D, camera: Camera, building: Build
     return;
   }
   const color = building.color, gable = building.walls === "stone" ? "#b9b4ab" : "#e6dcc6";
-  const faces: { points: RoofVertex[]; fill: string; slope?: [RoofVertex, RoofVertex, RoofVertex, RoofVertex] }[] = g.alongX
-    ? [{ points: [g.A, g.B, g.R1, g.R0], fill: shade(color, 0.07), slope: [g.A, g.B, g.R1, g.R0] }, { points: [g.D, g.C, g.R1, g.R0], fill: shade(color, -0.07), slope: [g.D, g.C, g.R1, g.R0] },
+  // (The second slope, on the high-x / high-y side, is the one a chimney stands on.)
+  const faces: { points: RoofVertex[]; fill: string; slope?: [RoofVertex, RoofVertex, RoofVertex, RoofVertex]; chimney?: boolean }[] = g.alongX
+    ? [{ points: [g.A, g.B, g.R1, g.R0], fill: shade(color, 0.07), slope: [g.A, g.B, g.R1, g.R0] }, { points: [g.D, g.C, g.R1, g.R0], fill: shade(color, -0.07), slope: [g.D, g.C, g.R1, g.R0], chimney: true },
       { points: [g.A, g.D, g.R0], fill: gable }, { points: [g.B, g.C, g.R1], fill: shade(gable, -0.08) }]
-    : [{ points: [g.A, g.D, g.R1, g.R0], fill: shade(color, 0.07), slope: [g.A, g.D, g.R1, g.R0] }, { points: [g.B, g.C, g.R1, g.R0], fill: shade(color, -0.07), slope: [g.B, g.C, g.R1, g.R0] },
+    : [{ points: [g.A, g.D, g.R1, g.R0], fill: shade(color, 0.07), slope: [g.A, g.D, g.R1, g.R0] }, { points: [g.B, g.C, g.R1, g.R0], fill: shade(color, -0.07), slope: [g.B, g.C, g.R1, g.R0], chimney: true },
       { points: [g.A, g.B, g.R0], fill: gable }, { points: [g.D, g.C, g.R1], fill: shade(gable, -0.08) }];
+  // A chimney rises out of its slope: it starts where the roof meets its downhill side (not down at the eaves, where it
+  // would show through the roof), and is drawn straight after its own slope so nearer roof faces cover its foot.
+  let slopesDrawn = 0, ridgeDrawn = false;
+  const ridge = () => { if (ridgeDrawn) return; ridgeDrawn = true; const [rx0, ry0] = P(g.R0), [rx1, ry1] = P(g.R1); ctx.strokeStyle = INK; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(rx0, ry0); ctx.lineTo(rx1, ry1); ctx.stroke(); };
+  const chimney = () => {
+    if (!building.chimney) return;
+    // On the nearer slope, the ridge goes behind the chimney.
+    if (slopesDrawn === 2) ridge();
+    const cx = g.alongX ? g.X1 - 1.4 : (g.X0 + g.X1) / 2 + 0.6, cy = g.alongX ? (g.Y0 + g.Y1) / 2 + 0.6 : g.Y1 - 1.4, w = 0.55;
+    const half = (g.alongX ? g.Y1 - g.Y0 : g.X1 - g.X0) / 2, off = Math.abs(g.alongX ? cy - (g.Y0 + g.Y1) / 2 : cx - (g.X0 + g.X1) / 2) + w / 2;
+    const foot = g.top - (g.top - g.base) * Math.min(1, off / half) - 2;
+    box(ctx, camera, cx, cy, w, w, g.top + 6 - foot, "#8f8a83", "#a39e96", "#7c7771", foot, INK, "brick");
+    box(ctx, camera, cx, cy, w + 0.12, w + 0.12, 2.5, "#a39e96", "#8f8a83", "#6d6964", g.top + 6, INK);
+    if (!reduced && Math.random() < 0.06) puff(cx, cy, g.top + 10);
+  };
   const span = g.alongX ? g.X1 - g.X0 : g.Y1 - g.Y0, across = g.alongX ? g.Y1 - g.Y0 : g.X1 - g.X0, slopeRows = Math.hypot(across * TEX_PER_TILE / 2, (g.top - g.base) * TEX_PER_HEIGHT);
   const centre = (points: RoofVertex[]) => depthOf(camera, points.reduce((sum, v) => sum + v[0], 0) / points.length, points.reduce((sum, v) => sum + v[1], 0) / points.length);
   faces.sort((a, b) => centre(a.points) - centre(b.points));
   const at = (v: RoofVertex) => { const [x, y] = P(v); return { x, y }; };
   for (const face of faces) {
-    if (!texturesOn) { poly(ctx, face.points.map(P), face.fill, INK, 1.2); continue; }
+    if (face.slope) slopesDrawn++;
+    if (!texturesOn) { poly(ctx, face.points.map(P), face.fill, INK, 1.2); if (face.chimney) chimney(); continue; }
     if (face.slope) {
       // Shingles run along the ridge, from the ridge down to the eave.
       const [e0, , r1, r0] = face.slope;
@@ -901,14 +937,9 @@ function drawRoof(ctx: CanvasRenderingContext2D, camera: Camera, building: Build
       texturedTriangle(ctx, wallTexture(building.walls === "stone" ? "brick" : building.walls === "plank" ? "plank" : "timber", face.fill.startsWith("#") ? face.fill : gable), a, b, c, across * TEX_PER_TILE, (g.top - g.base) * TEX_PER_HEIGHT);
     }
     poly(ctx, face.points.map(P), null, INK, 1.2);
+    if (face.chimney) chimney();
   }
-  const [rx0, ry0] = P(g.R0), [rx1, ry1] = P(g.R1);
-  ctx.strokeStyle = INK; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(rx0, ry0); ctx.lineTo(rx1, ry1); ctx.stroke();
-  if (building.chimney) {
-    const cx = g.alongX ? g.X1 - 1.4 : (g.X0 + g.X1) / 2 + 0.6, cy = g.alongX ? (g.Y0 + g.Y1) / 2 + 0.6 : g.Y1 - 1.4;
-    box(ctx, camera, cx, cy, 0.55, 0.55, g.top - g.base + 6, "#8f8a83", "#a39e96", "#7c7771", g.base, INK, "brick");
-    if (!reduced && Math.random() < 0.06) puff(cx, cy, g.top + 8);
-  }
+  ridge();
   ctx.globalAlpha = 1;
 }
 
@@ -1014,11 +1045,12 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   const tileOutline = (tx: number, ty: number, color: string) => { const c = (dx: number, dy: number) => { const s = toScreen(camera, tx + dx, ty + dy); return [s.x, s.y] as const; }; poly(ctx, [c(-0.5, -0.5), c(0.5, -0.5), c(0.5, 0.5), c(-0.5, 0.5)], null, color, 1.5); };
   if (scene.hoverTile && !floor) tileOutline(scene.hoverTile.x, scene.hoverTile.y, "rgba(22,22,22,0.35)");
   /** A wall tile: storeys of brick (with windows on buildings), cut low when it stands between you and the camera inside. */
-  const wall = (x: number, y: number, storeys: number, cut: boolean, near: boolean, windows: boolean, battlement = false, style: Building["walls"] = "stone") => {
+  const wall = (x: number, y: number, storeys: number, cut: boolean, near: boolean, windows: boolean, battlement = false, style: Building["walls"] = "stone", tall = 0) => {
     const d = depth(x, y), dungeon = isUnderground(y), timber = style === "timber";
     // Under a roof you can see, a wall's inward faces can't be seen: skip them (they're half the work).
     const owner = !dungeon && inBounds(x, y) ? world.buildingAt[y * W + x] : 0, roofed = owner > 0 && (roofAlpha.get(owner - 1) ?? 0) > 0.95 && !cut;
-    const hidden = roofed ? (nx: number, ny: number) => { const tx = x + nx, ty = y + ny; return inBounds(tx, ty) && world.buildingAt[ty * W + tx] === owner && world.tiles[ty * W + tx] !== T.WALL; } : undefined;
+    // (Only faces onto a real floor inside: a round tower's footprint square has open ground in its corners.)
+    const hidden = roofed ? (nx: number, ny: number) => { const tx = x + nx, ty = y + ny; return inBounds(tx, ty) && world.buildingAt[ty * W + tx] === owner && INDOOR_FLOORS.has(world.tiles[ty * W + tx]); } : undefined;
     drawables.push({ depth: d, draw: () => {
       ctx.globalAlpha = near ? 0.3 : 1;
       const [top, left, right] = dungeon ? ["#4a4950", "#3a3940", "#2f2e35"] : timber ? ["#8a6a50", "#e6dcc6", "#cfc4ab"] : style === "plank" ? ["#8a6a50", "#b89c7e", "#9c8266"] : ["#b9b4ab", "#a39e95", "#8f8a82"];
@@ -1026,7 +1058,11 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
       if (dungeon) box(ctx, camera, x, y, 1, 1, 34, top, left, right, 0, INK, "dungeon");
       else if (cut) box(ctx, camera, x, y, 1, 1, 9, top, left, right, 0, INK, plain);
       else if (battlement) { box(ctx, camera, x, y, 1, 1, 12, top, left, right, 0, INK, "brick"); if ((Math.round(x) + Math.round(y)) % 2 === 0) box(ctx, camera, x, y, 0.62, 0.62, 10, top, left, right, 12, INK, "brick"); }
-      else for (let k = 0; k < storeys; k++) box(ctx, camera, x, y, 1, 1, WALL_H, top, left, right, k * WALL_H, INK, windows && hash(x, y + k * 7) < 0.34 ? glazed : plain, hidden);
+      else {
+        for (let k = 0; k < storeys; k++) box(ctx, camera, x, y, 1, 1, WALL_H, top, left, right, k * WALL_H, INK, windows && hash(x, y + k * 7) < 0.34 ? glazed : plain, hidden);
+        // A tower taller than its floors: more wall above, with a string course of stone between.
+        if (tall) { box(ctx, camera, x, y, 1.04, 1.04, 4, top, shadeHex(left, 0.06), shadeHex(right, 0.06), storeys * WALL_H, INK, null, hidden); box(ctx, camera, x, y, 1, 1, tall - 4, top, left, right, storeys * WALL_H + 4, INK, windows && hash(x, y + 91) < 0.28 ? glazed : plain, hidden); }
+      }
       ctx.globalAlpha = 1;
     } });
   };
@@ -1040,7 +1076,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
     const d = depth(x, y) + (object.kind === "wheat" || object.kind === "spot" ? -0.4 : 0);
     drawables.push({ depth: d, draw: () => {
       let rect: { x: number; y: number; w: number; h: number };
-      const tall = object.kind === "tree" || (object.kind === "decor" && ["pine", "windmill", "palm", "pillar", "tent"].includes(object.decor!));
+      const tall = object.kind === "tree" || (object.kind === "decor" && (["pine", "windmill", "palm", "pillar", "tent"].includes(object.decor!) || (object.decor === "ruin_wall" && (object.height ?? 0) > 34)));
       // Anything tall in front of your Friend that covers it on screen turns see-through (works at any angle and zoom).
       const fade = tall && d > playerDepth + 0.3 && coversPlayer(x, y) ? 0.35 : 1;
       if (object.kind === "tree") rect = drawTree(ctx, camera, object, game.depleted.has(object.id), fade, scene.reducedMotion ? 0 : treeShake(game, object.id, now));
@@ -1061,7 +1097,7 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
       const d = depth(x, y), cut = mine && level === 0 && d > playerDepth - 0.5;
       const near = !mine && Math.abs(x - pp.x) + Math.abs(y - pp.y) < 7 && d > playerDepth + 0.5 && !floor;
       // Tall buildings show every storey from outside; inside, only the storey you're on (and the ones below).
-      wall(x, y, mine ? 1 : building?.storeys ?? 1, cut, near, !!owner && !cut, false, building?.walls ?? "stone");
+      wall(x, y, mine ? 1 : building?.storeys ?? 1, cut, near, !!owner && !cut, false, building?.walls ?? "stone", mine ? 0 : building?.tall ?? 0);
     } else if (terrain === T.CLIFF) drawables.push({ depth: depth(x, y), draw: () => box(ctx, camera, x, y, 1, 1, 22 + hash(x, y) * 10, "#a39e96", "#8f8a83", "#7c7771") });
     if (!covered(x, y)) object(x, y);
   }

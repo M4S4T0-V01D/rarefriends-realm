@@ -317,6 +317,18 @@ test("Beginner fishing by the farm, and a new cook burns far less", () => {
   assert(count(p, "minnows") >= 18, `most cook at level 1 (${count(p, "minnows")}/27)`);
 });
 
+test("Ruins: old houses, towers and walls out in the wild, never on a road or a spawn", () => {
+  const world = createWorld(), ruins = world.objects.filter(object => object.decor === "ruin_wall");
+  const regions = new Set(ruins.map(object => regionAt(world, object.x, object.y).id));
+  assert(ruins.length > 80 && regions.size >= 6, `${ruins.length} ruin walls in ${[...regions].join(", ")}`);
+  assert(ruins.some(object => object.height > 70), "some ruined towers still stand tall");
+  const spawns = new Set(world.spawns.map(spawn => `${spawn.x},${spawn.y}`));
+  for (const object of ruins) {
+    assert(![T.PATH, T.COBBLE, T.BRIDGE].includes(terrainAt(world, object.x, object.y)), `ruin on a road at ${object.x},${object.y}`);
+    assert(!spawns.has(`${object.x},${object.y}`), `ruin on a spawn at ${object.x},${object.y}`);
+  }
+});
+
 test("combat: equip a sword, kill a chicken, loot and bury its bones", () => {
   const g = newGame();
   give(g.player, "pewter_sword");

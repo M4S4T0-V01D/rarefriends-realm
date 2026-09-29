@@ -227,7 +227,7 @@ function QuestsTab({ game, openMenu }: PanelProps) {
   );
 }
 function InventoryTab({ game, selection, setSelection, openMenu, refresh, settings, paused }: PanelProps) {
-  const player = game.player, drag = useRef<number | null>(null);
+  const player = game.player, drag = useItemDrag<number>((from, target) => { if (target.startsWith("inv:")) { swapSlots(game, from, Number(target.slice(4))); refresh(); } });
   const click = (index: number, shift: boolean) => {
     if (paused) return;
     const slot = player.inventory[index];
@@ -259,15 +259,58 @@ function InventoryTab({ game, selection, setSelection, openMenu, refresh, settin
       {player.inventory.map((slot, index) => (
         <button key={index} type="button" className="realm-slot" data-selected={selection?.kind === "item" && selection.slot === index}
           aria-label={slot ? `${item(slot.id).name}${slot.n > 1 ? ` × ${slot.n}` : ""}` : `Empty slot ${index + 1}`}
-          draggable={!!slot} onDragStart={() => { drag.current = index; }} onDragOver={event => event.preventDefault()}
-          onDrop={() => { if (drag.current !== null) { swapSlots(game, drag.current, index); drag.current = null; refresh(); } }}
+          data-drop={`inv:${index}`} data-over={drag.over === `inv:${index}` || undefined} {...drag.grab(index, slot?.id)}
           onClick={event => click(index, event.shiftKey)} onContextMenu={event => { event.preventDefault(); context(event.currentTarget, event.clientX, event.clientY, index); }}
           onTouchStart={event => { const touch = event.touches[0], target = event.currentTarget; longPress(() => context(target, touch.clientX, touch.clientY, index)); }} onTouchEnd={cancelLongPress} onTouchMove={cancelLongPress}>
           {slot && <ItemIcon slot={slot} size={40} />}
         </button>
       ))}
+      {drag.layer}
     </div>
   );
+}
+/**
+ * Drag items around with the mouse (inventory and bank), built on pointer events rather than the browser's own drag and
+ * drop, which in Chrome can get stuck (and swallow every click after) when the dragged slot re-renders mid-drag. Slots
+ * spread `grab(key, itemId)` and mark where they accept drops with `data-drop`; `onDrop(from, dropKey)` runs on release.
+ * A short press is still an ordinary click; after a real drag, the click that follows is swallowed.
+ */
+export function useItemDrag<T>(onDrop: (from: T, target: string) => void) {
+  const [ghost, setGhost] = useState<{ id: string; x: number; y: number; over: string | null } | null>(null);
+  const press = useRef<{ from: T; id: string; x: number; y: number; moved: boolean; pointer: number; stage: Element } | null>(null), swallow = useRef(false), drop = useRef(onDrop);
+  drop.current = onDrop;
+  useEffect(() => {
+    const targetAt = (x: number, y: number) => (document.elementFromPoint(x, y) as HTMLElement | null)?.closest<HTMLElement>("[data-drop]")?.dataset.drop ?? null;
+    const move = (event: PointerEvent) => {
+      const held = press.current;
+      if (!held || event.pointerId !== held.pointer) return;
+      if (!held.moved && Math.hypot(event.clientX - held.x, event.clientY - held.y) < 6) return;
+      held.moved = true;
+      const [x, y] = stagePoint(held.stage, event.clientX, event.clientY);
+      setGhost({ id: held.id, x, y, over: targetAt(event.clientX, event.clientY) });
+    };
+    const end = (event: PointerEvent) => {
+      const held = press.current;
+      if (!held || event.pointerId !== held.pointer) return;
+      press.current = null;
+      if (!held.moved) return;
+      setGhost(null); swallow.current = true; setTimeout(() => { swallow.current = false; }, 0);
+      const target = event.type === "pointerup" ? targetAt(event.clientX, event.clientY) : null;
+      if (target) drop.current(held.from, target);
+    };
+    window.addEventListener("pointermove", move); window.addEventListener("pointerup", end); window.addEventListener("pointercancel", end);
+    return () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", end); window.removeEventListener("pointercancel", end); };
+  }, []);
+  const grab = (from: T, id: string | null | undefined) => ({
+    onPointerDown: (event: React.PointerEvent<HTMLElement>) => {
+      if (!id || event.button !== 0 || event.pointerType === "touch") return;
+      press.current = { from, id, x: event.clientX, y: event.clientY, moved: false, pointer: event.pointerId, stage: event.currentTarget };
+    },
+    onClickCapture: (event: React.MouseEvent) => { if (swallow.current) { event.stopPropagation(); event.preventDefault(); } },
+    onDragStart: (event: React.DragEvent) => event.preventDefault(),
+  });
+  const layer = ghost ? <img className="realm-drag-ghost pixel" src={itemIconUrl(ghost.id)} alt="" width={40} height={40} style={{ left: ghost.x - 20, top: ghost.y - 20 }} /> : null;
+  return { grab, layer, over: ghost?.over ?? null, dragging: !!ghost };
 }
 /** Convert a client point to stage (logical) coordinates; the stage may be scaled to fit the frame. */
 export function stagePoint(target: Element, clientX: number, clientY: number) {
@@ -616,33 +659,35 @@ export function Modal({ title, onClose, children, wide }: { title: string; onClo
 /** The bank tab last looked at, kept while the game is open. */
 let lastBankTab = 0;
 export function BankModal({ game, refresh, onClose, openMenu }: { game: Game; refresh: () => void; onClose: () => void; openMenu: PanelProps["openMenu"] }) {
-  const player = game.player, [search, setSearch] = useState(""), [amount, setAmount] = useState<number>(1), drag = useRef<string | null>(null);
-  const tabs = bankTabs(player), [tab, setTabState] = useState(() => Math.min(lastBankTab, tabs.length)), [over, setOver] = useState<string | null>(null);
+  const player = game.player, [search, setSearch] = useState(""), [amount, setAmount] = useState<number>(1);
+  const tabs = bankTabs(player), [tab, setTabState] = useState(() => Math.min(lastBankTab, tabs.length));
+  // Drop on an item to move before it, on a tab to file it there, on + for a new tab.
+  const drag = useItemDrag<string>((id, target) => {
+    const moved = target.startsWith("bank:") ? bankMove(player, id, target.slice(5)) : target === "tab:new" ? bankMove(player, id, null, "new") : target.startsWith("tab:") ? bankMove(player, id, null, Number(target.slice(4))) : false;
+    if (moved) refresh();
+  });
   const setTab = (next: number) => { lastBankTab = next; setTabState(next); };
   const current = tabs.includes(tab) ? tab : 0;
   // Tab 0 shows everything (the main tab's items first, then each tab's); tabs 1+ show only their own.
   const shown = bankInOrder(player).filter(slot => (current === 0 || (slot.tab ?? 0) === current) && (!search || item(slot.id).name.toLowerCase().includes(search.toLowerCase())));
-  const move = (before: string | null, to?: number | "new") => { const id = drag.current; drag.current = null; setOver(null); if (id && bankMove(player, id, before, to)) refresh(); };
-  const dropTarget = (key: string, onDrop: () => void) => ({
-    onDragOver: (event: React.DragEvent) => { if (drag.current) { event.preventDefault(); setOver(key); } }, onDragLeave: () => setOver(entry => entry === key ? null : entry),
-    onDrop: (event: React.DragEvent) => { event.preventDefault(); onDrop(); }, "data-over": over === key || undefined,
-  });
+  const dropTarget = (key: string) => ({ "data-drop": key, "data-over": drag.over === key || undefined });
+  const move = (id: string, to: number | "new") => { if (bankMove(player, id, null, to)) refresh(); };
   const moveMenu = (id: string) => [
-    ...((player.bank.find(slot => slot.id === id)?.tab ?? 0) ? [{ verb: "Move to", noun: "main tab", tone: "item" as const, run: () => { drag.current = id; move(null, 0); } }] : []),
-    ...tabs.filter(t => t !== (player.bank.find(slot => slot.id === id)?.tab ?? 0)).map(t => ({ verb: "Move to", noun: `tab ${t}`, tone: "item" as const, run: () => { drag.current = id; move(null, t); } })),
-    ...(tabs.length < BANK_TABS ? [{ verb: "Move to", noun: "a new tab", tone: "item" as const, run: () => { drag.current = id; move(null, "new"); } }] : []),
+    ...((player.bank.find(slot => slot.id === id)?.tab ?? 0) ? [{ verb: "Move to", noun: "main tab", tone: "item" as const, run: () => move(id, 0) }] : []),
+    ...tabs.filter(t => t !== (player.bank.find(slot => slot.id === id)?.tab ?? 0)).map(t => ({ verb: "Move to", noun: `tab ${t}`, tone: "item" as const, run: () => move(id, t) })),
+    ...(tabs.length < BANK_TABS ? [{ verb: "Move to", noun: "a new tab", tone: "item" as const, run: () => move(id, "new") }] : []),
   ];
   let lastTab = -1;
   return (
     <Modal title="Bank of the Realm" onClose={onClose} wide>
       <div className="realm-bank-tabs" role="tablist" aria-label="Bank tabs">
-        <button type="button" role="tab" aria-selected={current === 0} aria-label="All items" title="All items (drop here for the main tab)" onClick={() => setTab(0)} {...dropTarget("tab0", () => move(null, 0))}>∞</button>
+        <button type="button" role="tab" aria-selected={current === 0} aria-label="All items" title="All items (drop here for the main tab)" onClick={() => setTab(0)} {...dropTarget("tab:0")}>∞</button>
         {tabs.map(t => { const first = player.bank.find(slot => (slot.tab ?? 0) === t)!; return (
-          <button key={t} type="button" role="tab" aria-selected={current === t} aria-label={`Bank tab ${t}`} title={`Tab ${t} (drop items here)`} onClick={() => setTab(t)} {...dropTarget(`tab${t}`, () => move(null, t))}>
+          <button key={t} type="button" role="tab" aria-selected={current === t} aria-label={`Bank tab ${t}`} title={`Tab ${t} (drop items here)`} onClick={() => setTab(t)} {...dropTarget(`tab:${t}`)}>
             <img src={itemIconUrl(first.id)} alt="" width={26} height={26} draggable={false} className="pixel" />
           </button>
         ); })}
-        {tabs.length < BANK_TABS && <button type="button" className="new" aria-label="New tab (drop an item here)" title="New tab: drag an item here" {...dropTarget("new", () => move(null, "new"))}>+</button>}
+        {tabs.length < BANK_TABS && <button type="button" className="new" aria-label="New tab (drop an item here)" title="New tab: drag an item here" {...dropTarget("tab:new")}>+</button>}
       </div>
       <div className="realm-bank-bar">
         <input type="search" placeholder="Search" value={search} onChange={event => setSearch(event.target.value)} aria-label="Search the bank" />
@@ -658,8 +703,8 @@ export function BankModal({ game, refresh, onClose, openMenu }: { game: Game; re
             return (
               <React.Fragment key={slot.id}>
                 {divider && <span className="realm-bank-divider">Tab {slotTab}</span>}
-                <button type="button" className="realm-slot" aria-label={`Withdraw ${item(slot.id).name} (${slot.n})`} draggable
-                  onDragStart={() => { drag.current = slot.id; }} onDragEnd={() => { drag.current = null; setOver(null); }} {...dropTarget(slot.id, () => move(slot.id))}
+                <button type="button" className="realm-slot" aria-label={`Withdraw ${item(slot.id).name} (${slot.n})`}
+                  {...drag.grab(slot.id, slot.id)} {...dropTarget(`bank:${slot.id}`)}
                   onClick={() => { bankWithdraw(player, slot.id, amount); refresh(); }}
                   {...rightClick(openMenu, () => [...[1, 5, 10, Infinity].map(n => ({ verb: `Withdraw-${n === Infinity ? "All" : n}`, noun: item(slot.id).name, tone: "item", run: () => { bankWithdraw(player, slot.id, n); refresh(); } })), ...moveMenu(slot.id), examine(game, slot.id, refresh)])}>
                   <ItemIcon slot={slot} />
@@ -667,6 +712,7 @@ export function BankModal({ game, refresh, onClose, openMenu }: { game: Game; re
               </React.Fragment>
             );
           })}
+          {drag.layer}
           {!shown.length && <p className="realm-muted">{search ? "Nothing matches." : current ? "This tab is empty." : "Your bank is empty."}</p>}
         </div>
         <div className="realm-inventory small" aria-label="Inventory (click to deposit)">

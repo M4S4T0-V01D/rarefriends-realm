@@ -111,10 +111,11 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
   }
 
   const waist = Math.round((neckY + feet) / 2), waistSpan = bodySpan(Math.round((m.neck + m.bottom) / 2));
-  // The weapon hand: at your right side facing the camera or away, in front facing right, beyond your chest facing left
+  // The weapon hand: on the screen's left facing the camera, its right facing away, in front facing right, beyond your chest facing left
   // (that arm is on the far side, so the weapon is drawn behind you there).
-  const handRow = Math.round(m.neck + (m.bottom - m.neck) * 0.45), handSpan = bodySpan(handRow), dir = side < 0 ? -1 : 1;
-  const hand = { x: side < 0 ? X(handSpan.min) - 1 : X(handSpan.max) + 2, y: Y(handRow) + 1 + ([0, 1, 0, 1][phase & 3]) };
+  // Facing the camera your weapon hand is on the screen's left (mirror image of the back view), shield on the right.
+  const front = !side && !back, handRow = Math.round(m.neck + (m.bottom - m.neck) * 0.45), handSpan = bodySpan(handRow), dir = side < 0 || front ? -1 : 1;
+  const hand = { x: side < 0 || front ? X(handSpan.min) - 1 : X(handSpan.max) + 2, y: Y(handRow) + 1 + ([0, 1, 0, 1][phase & 3]) };
   let tip: { x: number; y: number } | null = null;
   // Facing right, the shield arm is the far one: the shield hangs behind you (just its rim and wooden back peek out).
   if (shield && side > 0) drawShield(p, shield, X(waistSpan.min) + 3, waist, true);
@@ -250,7 +251,7 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
   if (weapon && side >= 0 && !held) tip = drawHeld(p, weapon, hand.x, hand.y, dir, sway, turn);
   // The shield on the off arm: across your body facing left (that arm is towards you), at your side facing the camera
   // or away. (Facing right it's behind you, drawn before your Friend above.)
-  if (shield && side <= 0) drawShield(p, shield, side < 0 ? Math.round(cx) + 1 : X(waistSpan.min) - 1, waist, back);
+  if (shield && side <= 0) drawShield(p, shield, side < 0 ? Math.round(cx) + 1 : front ? X(waistSpan.max) + 2 : X(waistSpan.min) - 1, waist, back);
   // A tool at work or a weapon mid-swing goes over everything, so the motion reads.
   if (weapon && held) tip = drawHeld(p, weapon, hand.x, hand.y, dir, sway, turn);
 

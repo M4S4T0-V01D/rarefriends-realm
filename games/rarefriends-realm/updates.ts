@@ -4,6 +4,13 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 25, date: "2026-09-29", title: "Ruins, a taller Wizards' Tower and steadier dragging", items: [
+    "Ruins across the Realm: crumbling old houses, broken round towers and runs of ancient wall in Whisperwood, the Ashen Hills, the farms' edge, the Pale Dunes, the Murkmire, below Frostpeak, round Glass Lake, by the Mossy Ruins and on the Pale Coast. Mossy in the woods, sun-bleached in the dunes, snow-capped up north.",
+    "The Wizards' Tower stands much taller from outside, under an eight-sided spire, and its round walls no longer lose their sides.",
+    "Facing you, your Friend holds its weapon and shield in the right hands (the mirror of the back view).",
+    "Chimneys rise out of their roofs instead of sinking through them.",
+    "Dragging items in your pack or bank no longer stops the game taking clicks in Chrome.",
+  ] },
   { id: 24, date: "2026-09-29", title: "Bank tabs, a coal satchel and a Grumblin head", items: [
     "Bank tabs: drag an item onto + to start a tab, onto a tab to file it there, or onto another item to move it. Each tab shows its first item, the ∞ tab shows everything, and deposits go into the tab you're looking at. Right-click an item to move it without dragging.",
     "The inkcoal satchel: worn on your back (or carried), it holds 120 inkcoal, fills itself as you mine, and the furnace (and Forgeheart) take from it. Right-click it to check, fill or empty it. The Old miner at the Ashen mine sells them, or stitch one from 3 leather at Crafting 28.",
