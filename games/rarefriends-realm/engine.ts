@@ -879,8 +879,8 @@ function cookTick(game: Game, activity: Extract<Activity, { kind: "cook" }>) {
   activity.timer = 4; activity.left--;
   take(player, activity.raw);
   const cooking = level(game, "cooking"), span = Math.max(1, recipe.stopBurn - recipe.level);
-  // About a third burn at the recipe's own level (a little more on an open fire), falling to none at its stop-burn level.
-  const burn = cooking >= recipe.stopBurn ? 0 : Math.max(0, 0.32 - (cooking - recipe.level) * (0.32 / span)) + (activity.source === "fire" ? 0.05 : 0);
+  // About one in five burns at the recipe's own level (a touch more on an open fire), easing off quickly and to none at its stop-burn level.
+  const left = Math.max(0, 1 - (cooking - recipe.level) / span), burn = cooking >= recipe.stopBurn ? 0 : 0.2 * left ** 1.5 + (activity.source === "fire" ? 0.03 : 0);
   if (game.rng() < burn) { give(player, "burnt_food"); message(game, `You accidentally burn the ${item(recipe.cooked).name.toLowerCase()}.`); sound(game, "burn"); }
   else { give(player, recipe.cooked); addXp(game, "cooking", recipe.xp); message(game, `You successfully cook ${item(recipe.cooked).name.toLowerCase()}.`); sound(game, "sizzle"); }
   if (!has(player, activity.raw)) player.activity = null;

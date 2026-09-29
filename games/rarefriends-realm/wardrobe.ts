@@ -210,9 +210,29 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
         break;
       }
       case "gear_hood": {
-        // A hood drawn over the head and down to the shoulders, face open.
-        p.poly([[l - 1, neckY + 2], [l - 1, top + 1], [l + 2, top - 3], [r - 2, top - 3], [r + 1, top + 1], [r + 1, neckY + 2], [r - 2, neckY], [r - 2, top + 2], [l + 2, top + 2], [l + 2, neckY]], color, null);
-        p.line(l + 1, top - 2, r - 2, top - 2, light); p.line(l + 2, top + 2, r - 2, top + 2, dark);
+        // A proper hood: it covers the whole head and falls into a short capelet over the shoulders. Facing you, the face
+        // looks out of an oval opening; from the side the opening turns the way you face and a cowl point hangs behind;
+        // from behind it's closed, with a seam and the point down the back.
+        const hood = new Pixels(p.w, p.h), sl = X(shoulderSpan.min) - 2, sr = X(shoulderSpan.max) + 3, peak = top - 5, cap = neckY + 5;
+        hood.poly([[sl, cap], [sl, neckY + 1], [l - 1, neckY - 1], [l - 2, top + 2], [l, top - 2], [Math.round(cx) - 2, peak], [Math.round(cx) + 2, peak], [r, top - 2], [r + 2, top + 2], [r + 1, neckY - 1], [sr, neckY + 1], [sr, cap]], color, null);
+        hood.line(sl, cap, sr, cap, dark); hood.line(sl + 1, neckY + 2, sr - 1, neckY + 2, shadeHex(color, -0.08));
+        hood.line(l, top - 1, Math.round(cx) - 1, peak + 1, light);
+        if (!back) {
+          // The face opening: an oval, its inside in shadow, turned towards where you're looking.
+          const fx = Math.round(cx) + side * Math.round(headHalf * 0.4), fy = Math.round(top + (neckY - top) * 0.45), rx = side ? headHalf * 0.7 : headHalf * 0.95, ry = (neckY - top) * 0.52;
+          hood.disc(fx, fy, rx + 1, ry + 1, dark, null);
+          for (let y = Math.floor(fy - ry); y <= Math.ceil(fy + ry); y++) for (let x = Math.floor(fx - rx); x <= Math.ceil(fx + rx); x++) if (((x - fx) / rx) ** 2 + ((y - fy) / ry) ** 2 <= 1) hood.set(x, y, 0);
+        }
+        if (side) {
+          // The cowl's point hangs behind the head.
+          const bx = Math.round(cx) - side * (headHalf + 1);
+          hood.poly([[bx, top], [bx - side * 3, top + 4 + sway], [bx - side * 2, neckY + 2], [bx + side * 2, neckY]], shadeHex(color, -0.06), null);
+        }
+        if (back) {
+          hood.line(Math.round(cx), peak + 1, Math.round(cx), neckY, dark);
+          hood.poly([[Math.round(cx) - 3, neckY + 1], [Math.round(cx) + 3, neckY + 1], [Math.round(cx) + sway, neckY + 8]], shadeHex(color, -0.06), null);
+        }
+        for (let y = 0; y < p.h; y++) for (let x = 0; x < p.w; x++) { const v = hood.get(x, y); if (v) p.set(x, y, v); }
         break;
       }
       case "gear_hat": {

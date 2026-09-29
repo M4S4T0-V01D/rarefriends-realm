@@ -475,13 +475,13 @@ export const FISHING_SPOTS: Record<SpotKind, { name: string; action: string; too
 };
 /** Cooking: level, XP and the level at which you stop burning (on a range). */
 export const COOKING: Record<string, { cooked: string; level: number; xp: number; stopBurn: number }> = {
-  raw_minnows: { cooked: "minnows", level: 1, xp: 30, stopBurn: 18 },
-  raw_chicken: { cooked: "cooked_chicken", level: 1, xp: 30, stopBurn: 20 },
-  raw_beef: { cooked: "cooked_meat", level: 1, xp: 30, stopBurn: 20 },
-  raw_perch: { cooked: "perch", level: 1, xp: 40, stopBurn: 30 },
-  raw_carp: { cooked: "carp", level: 5, xp: 50, stopBurn: 41 },
-  raw_char: { cooked: "char", level: 15, xp: 70, stopBurn: 50 },
-  raw_grayling: { cooked: "grayling", level: 25, xp: 90, stopBurn: 58 },
+  raw_minnows: { cooked: "minnows", level: 1, xp: 30, stopBurn: 12 },
+  raw_chicken: { cooked: "cooked_chicken", level: 1, xp: 30, stopBurn: 14 },
+  raw_beef: { cooked: "cooked_meat", level: 1, xp: 30, stopBurn: 14 },
+  raw_perch: { cooked: "perch", level: 1, xp: 40, stopBurn: 22 },
+  raw_carp: { cooked: "carp", level: 5, xp: 50, stopBurn: 32 },
+  raw_char: { cooked: "char", level: 15, xp: 70, stopBurn: 44 },
+  raw_grayling: { cooked: "grayling", level: 25, xp: 90, stopBurn: 52 },
   raw_inkcrab: { cooked: "inkcrab", level: 40, xp: 120, stopBurn: 74 },
   raw_sailfish: { cooked: "sailfish", level: 45, xp: 140, stopBurn: 86 },
   raw_inkshark: { cooked: "inkshark", level: 80, xp: 210, stopBurn: 99 },

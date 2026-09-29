@@ -4,6 +4,11 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 26, date: "2026-09-29", title: "Real hoods, kinder cooking and a new trailer", items: [
+    "Hoods (hunter's, frosthide and leather) are proper hoods now: closed all round, with your face looking out of the front, a cowl point behind, and a short capelet over your shoulders.",
+    "Cooking burns less while you learn: about one in five at a food's own level, easing off fast. Minnows stop burning at 12, chicken and beef at 14, perch at 22 and carp at 32.",
+    "A new trailer on the website: under a minute of the Realm as it plays today.",
+  ] },
   { id: 25, date: "2026-09-29", title: "Ruins, a taller Wizards' Tower and steadier dragging", items: [
     "Ruins across the Realm: crumbling old houses, broken round towers and runs of ancient wall in Whisperwood, the Ashen Hills, the farms' edge, the Pale Dunes, the Murkmire, below Frostpeak, round Glass Lake, by the Mossy Ruins and on the Pale Coast. Mossy in the woods, sun-bleached in the dunes, snow-capped up north.",
     "The Wizards' Tower stands much taller from outside, under an eight-sided spire, and its round walls no longer lose their sides.",
