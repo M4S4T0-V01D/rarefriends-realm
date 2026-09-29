@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "RareFriends Realm: an old-school 2.5D isometric RPG with skills, quests and a large world, for the Rare Friends Vibeathon (FriendSDK v0.1.3)",
+  "description": "RareFriends Realm: an old-school 2.5D isometric RPG with skills, quests and a large world, for the Rare Friends Vibeathon (FriendSDK v0.1.4)",
   "license": "Apache-2.0",
   "engines": {
     "node": ">=22.0.0"
@@ -19,10 +19,11 @@
     "build:preview": "node scripts/build-preview.mjs"
   },
   "dependencies": {
-    "@rarefriends/friendsdk": "file:vendor/rarefriends-friendsdk-0.1.3.tgz",
+    "@rarefriends/friendsdk": "file:vendor/rarefriends-friendsdk-0.1.4.tgz",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "trystero": "^0.25.4"
+    "trystero": "^0.25.4",
+    "viem": "^2.56.3"
   },
   "devDependencies": {
     "@types/react": "^19.1.12",

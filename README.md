@@ -5,19 +5,54 @@
 **▶ Play: https://m4s4t0-v01d.github.io/rarefriends-realm/** · **🎬 Trailer: https://m4s4t0-v01d.github.io/rarefriends-realm/preview/#trailer** · **Preview page: https://m4s4t0-v01d.github.io/rarefriends-realm/preview/** · **Skill guides: https://m4s4t0-v01d.github.io/rarefriends-realm/preview/guides.html**
 *(You need a browser wallet on Robinhood mainnet holding a hardwired Rare Friends Generations NFT.)*
 
-![RareFriends Realm: Friendhollow square in greyscale isometric, with Rare Friends, a fountain and the minimap](docs/town.png)
+![Dusk over Friendhollow: long shadows across the square, a knight in gold Dawnplate, villagers in hats and capes, lamps coming on](docs/new-light-dusk.png)
+
+## New: real lighting, the Order of the Dawn, and a Realm that dresses up
+
+The Realm is lit for real now. The sun crosses the sky and **everything casts a shadow that follows it**: buildings,
+walls, trees, rocks, characters and mounts, long and golden at dusk, short at noon, faint under the moon. Lamps,
+torches, fires, forges and spells **light the ground and whatever stands near them** (walls and trees block their light),
+light bounces softly round corners in the ground's colour, alleys and forest floors sit in soft ambient shade, lava glows,
+dungeons are truly dark, and the distance haze follows the land. **The Faith update** brings the Order of the Dawn, five
+quests, faith weapons and Dawnplate, gold armour you can see on your Friend; and the townsfolk dress up.
+
+| Dusk falls on Friendhollow | The Order of the Dawn at Dawnhold | A knight in Dawnplate |
+| --- | --- | --- |
+| ![The sun sets over Friendhollow: shadows stretch and swing, the light warms, then night falls and the lamps take over](docs/gifs/realm-dusk.gif) | ![Orbiting Dawnhold, the Order of the Dawn's chapterhouse above the sea, with knights in gold and white](docs/gifs/realm-dawnhold.gif) | ![A Friend in gold Dawnplate and the Cape of the Dawn walking through Friendhollow at evening](docs/gifs/realm-knight.gif) |
+| **A day in Whisperwood** | **Campfires at night** | **The Dawnhold chapel** |
+| ![A time-lapse in Whisperwood: tree shadows sweep round from morning to evening](docs/gifs/realm-forest-light.gif) | ![Two campfires lighting the forest floor and the trees around them at night, with fireflies](docs/gifs/realm-night-fire.gif) | ![Torchlight inside the Dawnhold chapel at night, Sister Maren at the altar](docs/gifs/realm-chapel.gif) |
+| **A moonlit unicorn at dawn** | **Wyrmreach's lava at dusk** | **The full trailer** |
+| ![Riding the moonlit unicorn through Friendhollow at dawn](docs/gifs/realm-unicorn-dawn.gif) | ![Lava glowing and lighting the rocks of Wyrmreach as dusk falls](docs/gifs/realm-lava.gif) | [▶ Watch the trailer](https://m4s4t0-v01d.github.io/rarefriends-realm/preview/#trailer) (with its soundtrack) |
+
+| Night in the square | The forest by firelight | A storm at night |
+| --- | --- | --- |
+| ![Friendhollow at night: lamp pools and a campfire lighting the cobbles, a knight in gold](docs/new-light-night.png) | ![Whisperwood at night: a campfire lighting the trees, fireflies overhead](docs/new-light-forest-night.png) | ![Rain over Friendhollow at night, lamps glowing through it](docs/new-storm-night-lit.png) |
+| **Tree shadows at noon** | **Dawnhold** | **The chapel by torchlight** |
+| ![Whisperwood at midday, every tree casting its shadow](docs/new-light-forest.png) | ![Dawnhold's courtyard, chapel and hall, with knights of the Dawn](docs/new-dawnhold.png) | ![Inside the Dawnhold chapel at night, lit by torches](docs/new-dawnhold-chapel.png) |
+| **Dawnplate** | **Threadneedle Tailors** | **Townsfolk in hats and capes** |
+| ![A Friend in gold Dawnplate with the Cape of the Dawn and a Radiant greatsword, in evening light](docs/new-dawnplate.png) | ![The tailor's shop on Market Street, a Friend in a striped cape and feathered cap](docs/new-tailor.png) | ![Villagers in Friendhollow in wizard hats, feathered caps and capes, one with a pickaxe](docs/new-townsfolk.png) |
+| **The castle guard** | **The crypt by firelight** | **Wyrmreach at night** |
+| ![Castle guards in helms, breastplates and red capes with battleaxes](docs/new-guards.png) | ![The Murkmire crypt lit only by fires, skeletons in the dark](docs/new-crypt-lit.png) | ![Lava glowing in the dark around Old Cinder's crater](docs/new-lava-night.png) |
+
+![The snowy peaks around Highcairn seen low across the Greyhorn Highlands](docs/new-highcairn-peaks.png)
+
+## Everything in the Realm
 
 - **Your Friend is the hero.** The Friend you select walks the Realm in its canonical on-chain sprite, and its Generations family gives a perk (Hoverers run longer, Skeletons pray better, Colossi hit harder, and so on).
+- **Real lighting.** The sun crosses the sky and everything casts a shadow that follows it: buildings, walls, trees, rocks, characters and mounts, long and golden at dusk, short at noon, faint under the moon. Lamps, torches, fires, forges and spells light the ground and whatever stands near them, walls and trees block their light, and it bounces softly round corners in the ground's colour. Ambient occlusion darkens alleys and forest floors, lava glows, and dungeons are truly dark.
+- **The Faith update: the Order of the Dawn.** Prayer is now Faith. Knights in white and gold keep Dawnhold, east of Highcairn: keep the Dawn Vigil (offer bones on their chapel altar) and bring back their broken relic from the golems of the Greyhorn mine to earn the Cape of the Dawn. Faith weapons (Dawnsteel sword, Vigil spear, Radiant greatsword, Sunforged warhammer and three chaplains' staffs) need Faith to wield, train it a little with every hit, and hurt the undead harder. Offer bones on any altar for twice the XP of burying.
+- **Dawnplate and the Order's quests.** Three more quests for the Order of the Dawn (a pilgrimage to the Realm's old altars, laying the crypt's dead to rest with a faith weapon, and sealing the Hollow's gate) award Dawnplate, gold armour with white trim. Armour now shows on your Friend: breastplates with shoulder plates, vests, robes and greaves, and helms closed at the back.
+- **Capes, hats and amulets.** Threadneedle Tailors on Market Street sells capes in ten colours and seven patterns, wizard hats in six colours, feathered caps and traveller's hats. Amulets hang round your Friend's neck, weapons are held beside your cape from behind, and the castle guards wear helms and red capes and carry battleaxes.
+- **Townsfolk who dress up.** Villagers wear their own hats, capes and amulets and some carry axes or pickaxes; tradesfolk dress for their trades, and the castle guards wear helms, breastplates and red capes. Health bars only show in a fight.
 - **Nineteen skills on the classic curve.** Attack, Strength, Defence, Ranged, Hitpoints, Magic, Faith, Sigilcraft, Woodcutting, Fletching, Fishing, Cooking, Firemaking, Mining, Smithing, Crafting, Thieving, Agility and Slayer, from level 1 to 99. Bows fire the arrows in your pack; Fletching makes shafts and bows from logs and finishes arrows with heads smithed at the anvil; Sigilcraft presses sigil stones into the sigils magic runs on, at eleven altars across the Realm; the Slayer Warden hands out tasks and some creatures only a Slayer can wound. **Reach 99 and buy that skill's mastery cape** from the Keeper of Capes (trimmed once you've mastered two), worn on your Friend.
 - **Referral codes.** Your code is `RF-<your Friend #>` (Friends tab). A new friend who enters it and you each get 250 coins, the **Friendship cape** (with its own Friendship emote: hearts and a pink sunburst) and +15% XP for an hour of play; you get yours the next time you're online together, for every friend you bring (up to five a day; any more are credited on a later day).
 - **Skill guides and a recipe book.** Click any skill for everything it unlocks, level by level, with your progress ticked off; the recipe book lists every recipe with its ingredients and a "can make now" filter. The same guides are on the [website](https://m4s4t0-v01d.github.io/rarefriends-realm/preview/guides.html).
-- **Old-school controls.** Left-click does the first option; right-click lists them all (*Chop down Tree*, *Attack Grumblin (level-5)*, *Talk-to*, *Pickpocket*, *Examine*), in the world and in every interface: inventory, bank (*Withdraw-1/5/10/All*), shops (*Value*, *Buy-50*, *Sell-10*), equipment, spells (*Cast*, *Autocast*), prayers, production (*Make-All*), the compass (*Look North/East/South/West*) and the minimap. WASD walks; the arrow keys (or a scroll-wheel drag) turn the camera and tilt it from overhead down to almost ground level, scroll zooms in close to your Friend, and the compass turns north to the top of the screen. Use items on things. Minimap, run orb, world map. Every monster shows its health and level.
+- **Old-school controls.** Left-click does the first option; right-click lists them all (*Chop down Tree*, *Attack Grumblin (level-5)*, *Talk-to*, *Pickpocket*, *Examine*), in the world and in every interface: inventory, bank (*Withdraw-1/5/10/All*), shops (*Value*, *Buy-50*, *Sell-10*), equipment, spells (*Cast*, *Autocast*), prayers, production (*Make-All*), the compass (*Look North/East/South/West*) and the minimap. WASD walks; the arrow keys (or a scroll-wheel drag) turn the camera and tilt it from overhead down to almost ground level, scroll zooms in close to your Friend, and the compass turns north to the top of the screen. Use items on things. Minimap, run orb, world map. Health bars show only while fighting.
 - **A large, living world.** A 350 × 200 tile island (it swells east into mountains, with a ragged coast) with 17 regions and 2 dungeons: towns, a mountain town, farms, forests, a woodcutters' village, a mine, a forge, snowy peaks, a lake with a pier, dunes and an oasis, a swamp, ruins, the Wizards' Tower, the ash fields and lava of Wyrmreach, a crypt and the Hollow Depths. The land rolls in walkable hills (lit by slope, with ink contour lines) and you can see a long way across it before the haze, and it's alive: cloud shadows, birds, butterflies, falling leaves, snow, blowing dust, fireflies, jumping fish and forge smoke.
 - **Real buildings, in pixel art.** Walls and roofs are textured in the same chunky pixels as the trees and rocks: half-timbered plaster houses with oak beams, stone keeps in brick courses, leaded windows, scalloped shingle roofs and smoking chimneys. The ground matches: grassy tufts, pebbled paths, cobbled streets and flagstones, and furnaces are brick kilns with fire in the mouth. Roofs lift away as you walk in, walls in front of you drop to a cutaway, and a roof fades whenever it would hide you.
 - **A bigger Friendhollow.** Market Street with an armoury, a weaponsmith, a bowyer and the Slayer lodge, an inn, and the Rare Market.
-- **Day and night.** A 24-minute day: warm dusks, blue nights lit by lamps, torches, fires and your own small light. A clearer minimap in stronger colours.
+- **Day and night.** A 24-minute day: a sun that rises in the east and sets in the west, golden dusks and blue nights lit by lamps, torches, fires and your own small light. A clearer minimap in stronger colours.
 - **Weather.** Rain, storms with lightning and thunder, and morning ground fog, from the real clock, so every player shares the same sky.
-- **Real lighting.** The sun crosses the sky and everything casts a shadow that follows it: buildings, walls, trees, rocks, characters and mounts, long and golden at dusk, short at noon, faint under the moon. Lamps, torches, fires, forges and spells light the ground and whatever stands near them, walls and trees block their light, and it bounces softly round corners in the ground's colour. Ambient occlusion darkens alleys and forest floors, lava glows, and dungeons are truly dark.
 - **The Wizards' Tower.** East of the river: mine sigil stones on the ground floor, a Rare trader in the library, and Archmage Solenne at the top, who starts every new Friend in magic with robes, a staff and a pouch of sigils. Sigils are cheap now, and elemental staffs stand in for them.
 - **Dragons.** Wyrmreach, north-west past the deep woods: ash drakes, cinder drakes and Old Cinder (level 148) asleep in a lava crater. A third of a dragon's attacks are fire; ask King Hollis for a Wyrmward shield. Drake bones are the best to bury, and drakehide makes archer's armour.
 - **Gold to be made.** Merchants pay well for their trade: Pike for fish, Axel for logs, Emberforge for ore, bars and arms, Runa and the Tower for sigils, Tessa and the bone collector for hides and bones, the Oasis for gems, and Wren for bows and arrows.
@@ -28,12 +63,9 @@
 - **Magic that looks like magic.** Spells fly as their element: a licking flame bolt, a curling wave, a spinning whirlwind, a tumbling boulder, a curse's eyed smoke, trailing embers, droplets and grit and bursting on impact; fires and torches burn in a flickering pixel fire drawn after a community artist's sprite; staffs are held upright and raised as you cast. At night and in dungeons (now truly dark) spells, arrows, dragonfire, torches, fires and your own light all light the ground.
 - **A real spellbook.** Darts, Lances and Bursts in four elements; curses (Muddle, Wilt, Brittle) and Rootsnare; Gilded and Golden Touch, Forgeheart, Far Reach, Bonebloom, two enchantments and six ways to travel, paid in sigils.
 - **Twelve quests** from baking for the Realm Feast and winning back Hazel's quiver to keeping the Dawn Vigil and defeating the Hollow King (level 92) in his throne room.
-- **The Faith update: the Order of the Dawn.** Prayer is now Faith. Knights in white and gold keep Dawnhold, east of Highcairn: keep the Dawn Vigil (offer bones on their chapel altar) and bring back their broken relic from the golems of the Greyhorn mine to earn the Cape of the Dawn. Faith weapons (Dawnsteel sword, Vigil spear, Radiant greatsword, Sunforged warhammer and three chaplains' staffs) need Faith to wield, train it a little with every hit, and hurt the undead harder. Offer bones on any altar for twice the XP of burying.
-- **Dawnplate and the Order's quests.** Three more quests for the Order of the Dawn (a pilgrimage to the Realm's old altars, laying the crypt's dead to rest with a faith weapon, and sealing the Hollow's gate) award Dawnplate, gold armour with white trim. Armour now shows on your Friend: breastplates with shoulder plates, vests, robes and greaves, and helms closed at the back.
-- **Capes, hats and amulets.** Threadneedle Tailors on Market Street sells capes in ten colours and seven patterns, wizard hats in six colours, feathered caps and traveller's hats. Amulets hang round your Friend's neck, weapons are held beside your cape from behind, and the castle guards wear helms and red capes and carry battleaxes.
 - **A soundtrack for every region.** Twenty-one procedural tracks in an old-school MIDI style (recorder, oboe, harp, pizzicato strings, glockenspiel, timpani), including a hand-written main theme, plus level-up and quest fanfares, synthesized live in WebAudio. Entering an area unlocks its track ("You have unlocked a new music track"), and the music player replays any you've found.
 - **Play together.** Everyone playing right now shares the Realm: you see other players' Friends walk around in their wardrobes and capes, chat in public (bubbles over their heads) or whisper (`@1234 hello`), and right-click a player to *Follow*, *Trade with*, *Add-friend*, *Message*, *Wave*, *Ignore* or *Examine*. **Fight the same monster together** (both players' hits count, and you see each other's health bars), **trade items** old-school style (an offer screen, then an "are you sure?" screen), pick up what other players drop, and perform **14 emotes** they can see (dance, cheer, cry, jump for joy, the Skillcape emote…). A friends list shows who's online and where, and friends near you add +5% XP. Peer to peer, no server: see [Playing together](#playing-together).
-- **A guided start and a graphics setting.** New Friends get seven quick first steps with a gold arrow showing the way (a tree, a fire, a fish, the horses, the King, the Realm Daily) and a reward at the end. Settings → Graphics (Auto, High, Low): Low draws the busiest scenes in about 7 ms a frame even without a GPU, and Auto switches to it by itself if the game runs slowly.
+- **A guided start and a graphics setting.** New Friends get seven quick first steps with a gold arrow showing the way (a tree, a fire, a fish, the horses, the King, the Realm Daily) and a reward at the end. Settings → Graphics (High, the default, or Low): Low draws the busiest scenes in about 7 ms a frame even without a GPU. Graphics never change by themselves.
 - **A world boss.** The Ashen Colossus (level 210) rises in Wyrmreach every two hours, on the even UTC hours, and stays twenty minutes, so everyone online meets it at once. Its HP is shared, and **everyone who wounds it gets the loot**, whoever lands the last blow. The Realm Daily shows when it's next due.
 - **Duels in the Sparring Ring.** A fenced sand ring east of Market Street: step inside and right-click another player to *Fight*. Duels are safe (the loser is back on their feet at full health and nothing is lost), and your wins and losses are counted.
 - **Pets, achievements and hiscores.** Six pets turn up by chance while you train (Stumpy from woodcutting, Pebble from mining, Bubbles from fishing, Mote from Sigilcraft, Emberling from dragons, Cinderkin from the Colossus) and follow you like an old-school pet. **32 achievements** (skills, combat, quests, collecting, together, daily) are on their own tab and on your adventurer card. **Hiscores** in the Friends tab rank you against every player you've met.
@@ -56,11 +88,13 @@
 | --- | --- |
 | **Builder** | M4S4T0 · [@M4S4T0-V01D](https://github.com/M4S4T0-V01D) |
 | **Category** | Character Spotlight (primary) · Economy Potential · Token Activity |
-| **Stack** | [FriendSDK v0.1.3](https://github.com/spokesz/friendsdk/tree/v0.1.3) · React 19 · Canvas 2D · WebAudio · TypeScript |
+| **Stack** | [FriendSDK v0.1.4](https://github.com/spokesz/friendsdk/tree/v0.1.4) · React 19 · Canvas 2D · WebAudio · TypeScript |
 | **Economy** | Simulated. Caskets use the SDK's preview RF ledger; no contracts or transactions. |
 | **Wallet / network** | Browser wallet on **Robinhood mainnet (chain 4663)** holding a hardwired Generations NFT (generation ≥ 1) |
 
-## Screenshots
+## More screenshots
+
+*(From before the new lighting.)*
 
 | Title screen | Right-click menus | Talking to the Realm Guide |
 | --- | --- | --- |
@@ -87,7 +121,7 @@
 | ![Bank](docs/bank.png) | ![World map](docs/worldmap.png) | ![Caskets](docs/caskets.png) |
 | **Smelting at Emberforge** | **Level up!** | **Quest complete** |
 | ![Smelting menu](docs/smelting.png) | ![Level-up message](docs/level-up.png) | ![Quest complete](docs/quest-complete.png) |
-| **Camera turned and tilted** | **Health bars on every monster** | **The spellbook** |
+| **Camera turned and tilted** | **Fighting Grumblins** | **The spellbook** |
 | ![Camera turned](docs/camera-turned.png) | ![Grumblins with health bars](docs/combat.png) | ![Spellbook](docs/magic.png) |
 | **Chat over your head** | **Friends and the wardrobe** | **Music unlocks** |
 | ![Chat](docs/chat.png) | ![Friends and wardrobe](docs/friends.png) | ![Music player](docs/music.png) |
@@ -125,7 +159,7 @@ drawn with its own canonical art, and adds XP by generation (Gen 1 +5% … Gen 5
 - **Wardrobe:** each casket also grants one of 12 RF-exclusive pieces (capes, crowns, a hood, a halo, a bow, wings, auras and a lantern familiar), painted into your Friend's own sprite so they sit exactly on its head, shoulders and neck. They carry no RF value, so they need no prize reserve. Duplicates become coins.
 - **Two currencies:** coins are earned in the world and never convert to RF, so the game is complete without spending. RF gives bonuses and looks. It's a boost, not a paywall.
 
-**Future integrations** (not in the SDK v0.1.3 API):
+**Future integrations** (not in the SDK v0.1.4 API):
 
 | Idea | Needs |
 | --- | --- |
@@ -148,8 +182,8 @@ npm run build          # static site → games/rarefriends-realm/.friendsdk/
 ```
 
 On a phone, open the Pages link in a wallet app's in-app browser (for example MetaMask Mobile) and play in landscape:
-tap to act, long-press for the options menu. FriendSDK is vendored as `vendor/rarefriends-friendsdk-0.1.3.tgz`, packed
-from the official `v0.1.3` tag (see [NOTICE.md](NOTICE.md)). `.github/workflows/pages.yml` runs every check below and
+tap to act, long-press for the options menu. FriendSDK is vendored as `vendor/rarefriends-friendsdk-0.1.4.tgz`, the
+official `v0.1.4` release archive (see [NOTICE.md](NOTICE.md)). `.github/workflows/pages.yml` runs every check below and
 deploys to GitHub Pages on each push to `main`.
 
 ## Checks
@@ -164,7 +198,9 @@ npm test               # engine tests: XP curve, world generation and reachabili
                        # music unlocks, the castle stairs up to King Hollis and the roof, Ranged (bows, arrows, range), Slayer
                        # (tasks, XP, points, Slayer-only creatures), mastery capes (99s, trims), Rare Market bundles, tablets and lamps,
                        # Fletching (shafts, headless arrows, arrowheads from the anvil, arrows), Sigilcraft (endless sigil stone,
-                       # altars, levels), dragonfire and the Wyrmward shield, merchants' prices, the Archmage's starter kit
+                       # altars, levels), dragonfire and the Wyrmward shield, merchants' prices, the Archmage's starter kit,
+                       # Faith (offerings, faith weapons' Faith XP and the undead bonus) and all five Order of the Dawn quests;
+                       # and the preview build (runtime.js, game.js) carries no transaction-capable code
 npm run check          # friendsdk check
 npm run test:browser   # SDK mock-wallet browser runs of the custom host (a two-Friend wallet):
                        #  • title screen, real mouse clicks (chop a tree), right-click menu, dialogue, WASD walking, chat over your head

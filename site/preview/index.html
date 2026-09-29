@@ -4,15 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>RareFriends Realm</title>
-<meta name="description" content="An old-school RPG for your Rare Friend, played together: 19 skills, dragons, 7 quests, a large 2.5D world, right-click menus and a soundtrack for every region. A FriendSDK game for the Rare Friends Vibeathon.">
+<meta name="description" content="An old-school RPG for your Rare Friend, played together: 19 skills, dragons, 12 quests, real lighting, a large 2.5D world, right-click menus and a soundtrack for every region. A FriendSDK game for the Rare Friends Vibeathon.">
 <meta property="og:title" content="RareFriends Realm">
-<meta property="og:description" content="Your Rare Friend's old-school adventure: chop, fish, mine, smith and fight across a hand-built isometric island. Seven quests, nineteen skills, one Hollow King.">
-<meta property="og:image" content="https://m4s4t0-v01d.github.io/rarefriends-realm/preview/img/title.png">
+<meta property="og:description" content="Your Rare Friend's old-school adventure: chop, fish, mine, smith and fight across a hand-built isometric island. Real light and shadow, twelve quests, nineteen skills, one Hollow King.">
+<meta property="og:image" content="https://m4s4t0-v01d.github.io/rarefriends-realm/preview/img/new-light-dusk.png">
 <meta property="og:url" content="https://m4s4t0-v01d.github.io/rarefriends-realm/preview/">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="RareFriends Realm">
 <meta name="twitter:description" content="An old-school RPG starring the Rare Friend you own. @RareFriendsNFT #RareFriends #RareFriendsRealm">
-<meta name="twitter:image" content="https://m4s4t0-v01d.github.io/rarefriends-realm/preview/img/title.png">
+<meta name="twitter:image" content="https://m4s4t0-v01d.github.io/rarefriends-realm/preview/img/new-light-dusk.png">
 <meta name="theme-color" content="#161616">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23161616'/%3E%3Cpath d='M3 13 12 4M10 3h3v3M4 9l3 3M2 14l2-2' fill='none' stroke='%23f2e28f' stroke-width='1.5'/%3E%3C/svg%3E">
 <style>
@@ -88,6 +88,11 @@ h2 { font-size: clamp(26px, 3.8vw, 40px); margin: 10px 0 12px; letter-spacing: -
 .region figcaption b { display: block; font-size: 15px; }
 .region.big { grid-column: span 2; grid-row: span 2; }
 .region.big img { aspect-ratio: auto; }
+.loops { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; margin: 0 0 22px; }
+.loops figure { margin: 0; background: #fff; border: 2px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); }
+.loops video { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-bottom: 2px solid var(--ink); background: #111; }
+.loops figcaption { padding: 10px 12px; font-size: 13px; }
+.loops figcaption b { display: block; font-size: 15px; }
 
 /* Dark band: skills and quests */
 .dark { background: var(--panel); color: #e8e5de; border-block: 3px solid var(--ink); }
@@ -136,12 +141,12 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (max-width: 900px) {
   .hero, .cols, .two { grid-template-columns: 1fr; }
-  .features, .regions { grid-template-columns: 1fr 1fr; }
+  .features, .regions, .loops { grid-template-columns: 1fr 1fr; }
   .region.big { grid-column: span 2; grid-row: auto; }
   .jukebox { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 560px) {
-  .features, .regions, .skills, .shots { grid-template-columns: 1fr; }
+  .features, .regions, .skills, .shots, .loops { grid-template-columns: 1fr; }
   .region.big { grid-column: auto; }
   .bar nav { display: none; }
   table { font-size: 12px; } th, td { padding: 7px; }
@@ -158,34 +163,53 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
   <div class="wrap trailer" id="trailer">
     <div class="frame">
       <video id="trailer-video" src="media/trailer.mp4" poster="media/trailer-poster.jpg" autoplay muted loop playsinline controls preload="metadata"
-        aria-label="RareFriends Realm trailer: the Realm from above, playing together, riding a unicorn, crossbows at the Grumblin camp, pixel spells, forged gear against the Ashen Colossus, ancient ruins, skills, storms, nightfall, the Wizards' Tower and level-up fireworks"></video>
+        aria-label="RareFriends Realm trailer: dusk falling over Friendhollow with shadows sweeping round, the Order of the Dawn at Dawnhold, a knight in gold Dawnplate, a day of tree shadows in Whisperwood, campfires at night, the Dawnhold chapel by torchlight, a moonlit unicorn at dawn and Wyrmreach's lava at dusk"></video>
       <button class="btn primary sound" id="trailer-sound" type="button">🔊 Watch with sound</button>
     </div>
-    <p>Under a minute of the Realm as it plays today: every shot recorded straight from the game, set to its own main theme.</p>
+    <p>Under a minute of the Realm as it plays today, with its new lighting: every shot recorded straight from the game, set to its own main theme.</p>
   </div>
   <div class="wrap hero">
     <div>
-      <span class="tag">Rare Friends Vibeathon · FriendSDK v0.1.3</span>
+      <span class="tag">Rare Friends Vibeathon · FriendSDK v0.1.4</span>
       <h1>RareFriends<span>Realm</span></h1>
-      <p class="lead">An old-school adventure starring the Rare Friend you own, shared with everyone online. Chop, fish, mine, smith and fight across a hand-built 2.5D island, ride horses and unicorns, duel your friends, bring down a world boss together, and end the Hollow King's reign.</p>
+      <p class="lead">An old-school adventure starring the Rare Friend you own, shared with everyone online. Chop, fish, mine, smith and fight across a hand-built 2.5D island lit by a real sun, lamps and fire, join the Order of the Dawn, ride horses and unicorns, duel your friends, bring down a world boss together, and end the Hollow King's reign.</p>
       <div class="cta">
         <a class="btn primary" href="../">⚔ Play the Realm</a>
         <button class="btn" type="button" data-track="theme">♪ Hear the main theme</button>
       </div>
       <small>Needs a browser wallet on Robinhood mainnet holding a hardwired Rare Friends Generations NFT. $RAREFRIENDS is simulated: no contracts, signatures or transactions.</small>
     </div>
-    <figure class="screen"><img src="img/title.png" alt="The RareFriends Realm title screen over Friendhollow, with Friend #7730 ready to begin" width="1280" height="720"><figcaption>The title screen: the main theme plays over a flight across Friendhollow.</figcaption></figure>
+    <figure class="screen"><img src="img/new-light-dusk.png" alt="Dusk over Friendhollow: long shadows across the square, a knight in gold Dawnplate and villagers in hats and capes" width="1280" height="720"><figcaption>Dusk in Friendhollow: every building, tree and Friend casts a shadow that follows the sun.</figcaption></figure>
   </div>
 </header>
 
-<div class="ribbon"><ul class="wrap"><li><b>19</b>skills</li><li><b>7</b>quests</li><li><b>17</b>regions</li><li><b>8</b>mounts</li><li><b>6</b>pets</li><li><b>32</b>achievements</li><li><b>21</b>music tracks</li><li><b>1</b>world boss</li></ul></div>
+<div class="ribbon"><ul class="wrap"><li><b>19</b>skills</li><li><b>12</b>quests</li><li><b>17</b>regions</li><li><b>8</b>mounts</li><li><b>6</b>pets</li><li><b>32</b>achievements</li><li><b>21</b>music tracks</li><li><b>1</b>world boss</li></ul></div>
 
 <section id="new">
   <div class="wrap">
     <span class="tag">What's new</span>
-    <h2>The Realm keeps growing</h2>
-    <p class="sub">Since launch the Realm has become a place to play together: mounts, a world boss, duels, pets, achievements, a daily streak, weather and a lot of polish. Every update is listed in the game's own update log.</p>
+    <h2>Real light, and the Order of the Dawn</h2>
+    <p class="sub">The Realm is lit for real now. The sun crosses the sky and everything casts a shadow that follows it, long and golden at dusk, short at noon, faint under the moon. Lamps, torches, fires, forges and spells light the ground and whatever stands near them, walls and trees block their light, and it bounces softly round corners. Alleys and forest floors sit in soft shade, lava glows and dungeons are truly dark. The Faith update brings the Order of the Dawn: five quests, faith weapons and gold Dawnplate you can see on your Friend. And the townsfolk dress up.</p>
+    <div class="loops">
+      <figure><video src="media/loop-dusk.mp4" autoplay muted loop playsinline preload="metadata" aria-label="Dusk falling over Friendhollow: shadows stretch and swing, the light warms, then night falls and the lamps take over"></video><figcaption><b>Dusk falls</b>Shadows swing round with the sun, and lamps take over at night.</figcaption></figure>
+      <figure><video src="media/loop-dawnhold.mp4" autoplay muted loop playsinline preload="metadata" aria-label="Orbiting Dawnhold, the Order of the Dawn's chapterhouse above the sea, with knights in gold and white"></video><figcaption><b>The Order of the Dawn</b>Dawnhold, east of Highcairn.</figcaption></figure>
+      <figure><video src="media/loop-night-fire.mp4" autoplay muted loop playsinline preload="metadata" aria-label="Two campfires lighting the forest floor and the trees around them at night, with fireflies"></video><figcaption><b>By firelight</b>Fires light what's around them, and trees block the light.</figcaption></figure>
+      <figure><video src="media/loop-forest.mp4" autoplay muted loop playsinline preload="metadata" aria-label="A time-lapse in Whisperwood: tree shadows sweep round from morning to evening"></video><figcaption><b>A day in Whisperwood</b>Every tree's shadow follows the sun.</figcaption></figure>
+    </div>
     <div class="regions">
+      <figure class="region big"><img src="img/new-light-night.png" alt="Friendhollow at night: lamp pools and a campfire lighting the cobbles, a knight in gold" loading="lazy"><figcaption><b>Night in the square</b>Lamps pool light on the cobbles, a campfire warms the faces round it, and your own small light goes with you.</figcaption></figure>
+      <figure class="region"><img src="img/new-dawnhold.png" alt="Dawnhold's courtyard, chapel and hall, with knights of the Dawn" loading="lazy"><figcaption><b>Dawnhold</b>The Order of the Dawn's chapterhouse: offer bones at its chapel altar, train Faith, earn Dawnplate.</figcaption></figure>
+      <figure class="region"><img src="img/new-dawnplate.png" alt="A Friend in gold Dawnplate with the Cape of the Dawn and a Radiant greatsword" loading="lazy"><figcaption><b>Dawnplate</b>Gold armour with white trim, and armour you can see: breastplates, greaves and helms closed all round.</figcaption></figure>
+      <figure class="region"><img src="img/new-dawnhold-chapel.png" alt="Inside the Dawnhold chapel at night, lit by torches" loading="lazy"><figcaption><b>The chapel by torchlight</b>Five quests for the Order, from the Dawn Vigil to sealing the Hollow's gate.</figcaption></figure>
+      <figure class="region"><img src="img/new-light-forest.png" alt="Whisperwood at midday, every tree casting its shadow" loading="lazy"><figcaption><b>Shadows everywhere</b>Trees, rocks, walls, characters and mounts.</figcaption></figure>
+      <figure class="region"><img src="img/new-light-forest-night.png" alt="Whisperwood at night: a campfire lighting the trees, fireflies overhead" loading="lazy"><figcaption><b>A night in the woods</b>Fireflies, and a fire you lit yourself.</figcaption></figure>
+      <figure class="region"><img src="img/new-townsfolk.png" alt="Villagers in Friendhollow in wizard hats, feathered caps and capes" loading="lazy"><figcaption><b>Townsfolk dress up</b>Hats, capes and amulets, and tools for the trades.</figcaption></figure>
+      <figure class="region"><img src="img/new-tailor.png" alt="The tailor's shop on Market Street, a Friend in a striped cape and feathered cap" loading="lazy"><figcaption><b>Threadneedle Tailors</b>Capes in ten colours and seven patterns, and hats to go with them.</figcaption></figure>
+      <figure class="region"><img src="img/new-guards.png" alt="Castle guards in helms, breastplates and red capes with battleaxes" loading="lazy"><figcaption><b>The castle guard</b>Helms, breastplates, red capes and battleaxes.</figcaption></figure>
+      <figure class="region"><img src="img/new-storm-night-lit.png" alt="Rain over Friendhollow at night, lamps glowing through it" loading="lazy"><figcaption><b>Storms at night</b>Lamplight through the rain.</figcaption></figure>
+      <figure class="region"><img src="img/new-crypt-lit.png" alt="The Murkmire crypt lit only by fires, skeletons in the dark" loading="lazy"><figcaption><b>Truly dark dungeons</b>Only fire holds back the crypt's dark. Faith weapons hurt the undead more.</figcaption></figure>
+      <figure class="region"><img src="img/new-lava-night.png" alt="Lava glowing in the dark around Old Cinder's crater" loading="lazy"><figcaption><b>Wyrmreach at night</b>Lava lights the crater around Old Cinder.</figcaption></figure>
+      <figure class="region big"><img src="img/new-highcairn-peaks.png" alt="The snowy peaks around Highcairn seen low across the Greyhorn Highlands" loading="lazy"><figcaption><b>The Greyhorn Highlands</b>Turn and tilt the camera anywhere: the land draws back to front at every angle, and the haze follows it.</figcaption></figure>
       <figure class="region big"><img src="img/new-together.png" alt="Two players on a unicorn and a black warhorse chatting by the Friendhollow fountain" loading="lazy"><figcaption><b>Play together</b>Everyone online shares the Realm: see each other's Friends, gear and mounts, chat and whisper, trade, fight the same monsters, and earn +5% XP near friends.</figcaption></figure>
       <figure class="region"><img src="img/new-highcairn.png" alt="Highcairn, a stone mountain town with a fountain square, banners and snowy pines" loading="lazy"><figcaption><b>Highcairn</b>A mountain town in the new Greyhorn Highlands, east of the dunes.</figcaption></figure>
       <figure class="region"><img src="img/new-sheep.png" alt="Sheep in their pen at Hollow Farms, some woolly and some freshly shorn" loading="lazy"><figcaption><b>Sheep and string</b>Shear the sheep, spin the wool, and string your bows and amulets.</figcaption></figure>
@@ -223,8 +247,10 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
       <article class="feature" style="--accent: var(--rose)"><b class="icon">☺</b><h3>Your Friend is the hero</h3><p>The verified Generations NFT walks the Realm in its canonical on-chain sprite. Its family gives a perk: Hoverers run longer, Skeletons pray better, Colossi hit harder.</p></article>
       <article class="feature" style="--accent: var(--butter)"><b class="icon">▦</b><h3>Nineteen skills to 99</h3><p>Melee, Ranged, Magic and Faith, plus Sigilcraft, Woodcutting, Fletching, Fishing, Mining, Smithing, Cooking, Firemaking, Crafting, Thieving, Agility and Slayer, on the classic XP curve. Hit 99 and wear that skill's mastery cape.</p></article>
       <article class="feature" style="--accent: var(--blue)"><b class="icon">☰</b><h3>Right-click everything</h3><p>Left-click does the first option, right-click lists them all: Chop down, Attack (level-5), Talk-to, Pickpocket, Examine. In the bank, shops, spellbook and every other interface too. WASD walks, the arrow keys (or a scroll-wheel drag) turn and tilt the camera.</p></article>
-      <article class="feature" style="--accent: var(--sage)"><b class="icon">✎</b><h3>Seven quests</h3><p>From baking for the Realm Feast to quieting a crypt, winning back a war-bowyer's quiver, gathering the shards of a lost Glimmer, and facing the Hollow King in his throne room.</p></article>
-      <article class="feature" style="--accent: var(--lavender)"><b class="icon">♪</b><h3>A soundtrack for every region</h3><p>Eighteen procedural tracks, from Hollow Square to Anvil Song and the Hollow King's battle theme, plus level-up and quest fanfares. All synthesized live, no samples.</p></article>
+      <article class="feature" style="--accent: var(--sage)"><b class="icon">✎</b><h3>Twelve quests</h3><p>From baking for the Realm Feast to quieting a crypt, winning back a war-bowyer's quiver, gathering the shards of a lost Glimmer, facing the Hollow King in his throne room, and five for the Order of the Dawn.</p></article>
+      <article class="feature" style="--accent: var(--butter)"><b class="icon">☀</b><h3>The Order of the Dawn</h3><p>Prayer is now Faith. Keep the Dawn Vigil at Dawnhold, walk the Pilgrim's Road, lay the crypt's dead to rest and seal the Hollow's gate, for faith weapons that train Faith with every hit and gold Dawnplate.</p></article>
+      <article class="feature" style="--accent: var(--rose)"><b class="icon">✂</b><h3>Dress your Friend</h3><p>Helms, breastplates, greaves and shields you can see, capes in ten colours and seven patterns, wizard hats, feathered caps and amulets, all painted into your Friend's own sprite.</p></article>
+      <article class="feature" style="--accent: var(--lavender)"><b class="icon">♪</b><h3>A soundtrack for every region</h3><p>Twenty-one procedural tracks, from Hollow Square to Anvil Song and the Hollow King's battle theme, plus level-up and quest fanfares. All synthesized live, no samples.</p></article>
       <article class="feature" style="--accent: var(--sage)"><b class="icon">⛰</b><h3>A living, rolling world</h3><p>Walkable hills lit by slope and traced with ink contours, towns of half-timbered and stone buildings, textured in the same chunky pixels as the trees, whose roofs lift as you walk in. Cloud shadows, birds, butterflies, leaves, snow, dust and fireflies, and a sound for everything from footsteps to creature calls.</p></article>
       <article class="feature" style="--accent: var(--butter)"><b class="icon">▣</b><h3>Pixel art that moves</h3><p>Every tree, rock, item and icon is pixel art with an ink edge, like the Friends themselves. Axes swing and chips fly, pickaxes spark, lines are cast, anvils ring.</p></article>
       <article class="feature" style="--accent: var(--blue)"><b class="icon">✦</b><h3>A real spellbook</h3><p>Darts, Lances and Bursts in four elements, curses and Rootsnare, Gilded Touch, Forgeheart, Far Reach, Bonebloom, enchantments and six ways to travel, paid in sigils.</p></article>
@@ -237,7 +263,7 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
       <article class="feature" style="--accent: var(--lavender)"><b class="icon">❦</b><h3>Pets and achievements</h3><p>Six pets to find while you train, 32 achievements to earn, and hiscores that rank you against every player you've met.</p></article>
       <article class="feature" style="--accent: var(--butter)"><b class="icon">🔥</b><h3>The Realm Daily</h3><p>A login streak with a reward every day (a Lamp of insight on day 7), three daily challenges shared by everyone, and an update log after each update.</p></article>
       <article class="feature" style="--accent: var(--blue)"><b class="icon">☂</b><h3>Weather everyone shares</h3><p>Rain and thunderstorms with lightning, morning fog and dark nights, from the real clock, so every player sees the same sky. Fireworks light it up when anyone levels up.</p></article>
-      <article class="feature" style="--accent: var(--blue)"><b class="icon">☾</b><h3>Day and night</h3><p>A 24-minute day with warm dusks and blue nights, lit by lamps, torches, forges and your own little light.</p></article>
+      <article class="feature" style="--accent: var(--blue)"><b class="icon">☾</b><h3>Real light, day and night</h3><p>A 24-minute day under a sun that crosses the sky: shadows that follow it, golden dusks and blue nights, and lamps, torches, forges and fires that light the ground and cast shadows of their own.</p></article>
       <article class="feature" style="--accent: var(--rose)"><b class="icon">🜂</b><h3>Dragons</h3><p>Wyrmreach's ash drakes, cinder drakes and Old Cinder (level 148) in her lava crater. Dragonfire burns through anything but King Hollis's Wyrmward shield.</p></article>
       <article class="feature" style="--accent: var(--lavender)"><b class="icon">◈</b><h3>The Wizards' Tower</h3><p>The Archmage starts you in magic with robes, a staff and sigils. Mine sigil stones below and press them at eleven altars across the Realm: Sigilcraft.</p></article>
       <article class="feature" style="--accent: var(--butter)"><b class="icon">➴</b><h3>Fletching and trade</h3><p>Shafts, bows and war bows from logs, arrowheads and bolts from the anvil, crossbows from metal limbs on a carved stock, and forged gear to level 90 from monster materials. Merchants pay up to 70% for their trade: fish, logs, ore, sigils, hides, gems, bows.</p></article>
@@ -249,7 +275,7 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
 <section id="explore" style="padding-top: 0">
   <div class="wrap">
     <span class="tag">Explore</span>
-    <h2>A 240 × 240 tile island</h2>
+    <h2>A 350 × 200 tile island</h2>
     <p class="sub">Seventeen regions and two dungeons, each with its own music: cobbled Friendhollow with its three-storey castle, stables and Sparring Ring, the Wizards' Tower, dragon-haunted Wyrmreach, the farms, Whisperwood's Grumblins and the woodcutters' village of Fernwick, the snowy Greyhorn Highlands and the mountain town of Highcairn, the Ashen Hills mine, the Emberforge, snowy Frostpeak, Glass Lake, the Pale Dunes and Oasis, Murkmire's crypt, and the Mossy Ruins above the Hollow Depths.</p>
     <div class="regions">
       <figure class="region big"><img src="img/town.png" alt="Friendhollow square with its fountain, bank, chapel and townsfolk Friends" loading="lazy"><figcaption><b>Friendhollow</b>The fountain square, the bank, the chapel and Friendhollow Castle, where King Hollis holds court upstairs.</figcaption></figure>
@@ -288,7 +314,7 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
     </div>
     <div>
       <span class="tag" style="color: var(--gold)">Quests</span>
-      <h2>Seven quests</h2>
+      <h2>Twelve quests</h2>
       <ol class="quests">
         <li><b>A Friend's Feast</b>Cook Mabel needs an egg, flour and milk for the Realm Feast.</li>
         <li><b>Grumblin Trouble</b>Captain Rook can't sleep. Six Grumblins must go.</li>
@@ -297,6 +323,11 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
         <li><b>Hazel's Quiver</b>The Grumblins stole a war-bowyer's quiver. Win it back and it calls your arrows home.</li>
         <li><b>The Lost Glimmer</b>Old Glimmer (#7730) lost three shards across the Realm.</li>
         <li><b>The Hollow King</b>Pass the Hollow gate. Bring food. Lots.</li>
+        <li><b>The Dawn Vigil</b>Offer bones in the Dawnhold chapel and become a squire of the Order.</li>
+        <li><b>Light in the Greyhorn</b>Win the Order's relic back from the golems of the Greyhorn mine.</li>
+        <li><b>The Pilgrim's Road</b>Kneel at the Realm's three old altars.</li>
+        <li><b>The Restless Crypt</b>Lay the crypt's skeletons to rest with a faith weapon.</li>
+        <li><b>Dawn Against the Hollow</b>Seal the Hollow's gate and wear the Order's gold.</li>
       </ol>
       <div class="shots"><img src="img/dialogue.png" alt="Talking to the Realm Guide" loading="lazy"><img src="img/menu.png" alt="A right-click menu over the Realm Guide" loading="lazy"></div>
     </div>
