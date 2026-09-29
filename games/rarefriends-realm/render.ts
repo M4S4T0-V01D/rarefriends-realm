@@ -208,7 +208,7 @@ function drawMask(ctx: CanvasRenderingContext2D, rows: Mask, x: number, y: numbe
   ctx.globalAlpha = 1;
   return { x: x - w / 2, y: y - h + px, w, h };
 }
-const FACES_LEFT = new Set([101, 102, 108]);
+const FACES_LEFT = new Set([101, 102, 108, 115, 116]);
 
 // ---------- Primitives ----------
 function poly(ctx: CanvasRenderingContext2D, points: readonly (readonly [number, number])[], fill: string | null, stroke: string | null = INK, width = 1) {
@@ -556,6 +556,18 @@ function drawStation(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldO
     case "furnace": return drawFurnace(ctx, scene, object, flicker, hit);
     case "anvil": box(ctx, camera, ox, oy, 0.3, 0.3, 12, "#6d6b67", "#57555a", "#4a4846"); box(ctx, camera, ox, oy, 0.7, 0.35, 6, "#8b8e92", "#6d6b67", "#5a5856", 12); return hit(24);
     case "bank": return drawBankBooth(ctx, scene, object, hit);
+    case "wheel": {
+      // A spinning wheel: a stool-like frame, a big spoked wheel, and the spindle with a hank of wool.
+      box(ctx, camera, ox, oy, 0.7, 0.3, 8, "#9c7a58", "#8a6a50", "#7a5a40");
+      for (const leg of [-0.28, 0.28]) box(ctx, camera, ox + leg, oy, 0.08, 0.08, 18, "#7a5a40", "#8a6a50", "#6a4a30", 8);
+      const hub = toScreen(camera, ox + 0.08, oy, 26), r = 11 * z, spin = scene.reducedMotion ? 0 : now / 900;
+      ellipse(ctx, hub.x, hub.y, r, r * 0.95, null, INK, 2.4 * Math.max(0.6, z)); ellipse(ctx, hub.x, hub.y, r, r * 0.95, null, "#9c7a58", 1.2 * Math.max(0.6, z));
+      ctx.strokeStyle = "#8a6a50"; ctx.lineWidth = 1.2 * Math.max(0.6, z); ctx.beginPath();
+      for (let k = 0; k < 6; k++) { const a = spin + k * Math.PI / 3; ctx.moveTo(hub.x, hub.y); ctx.lineTo(hub.x + Math.cos(a) * r, hub.y + Math.sin(a) * r * 0.95); }
+      ctx.stroke(); ellipse(ctx, hub.x, hub.y, 2 * z, 2 * z, "#6a4a30", INK, 1);
+      const spindle = toScreen(camera, ox - 0.3, oy, 16); ellipse(ctx, spindle.x, spindle.y, 4.5 * z, 3.2 * z, "#efeae0", INK, 1);
+      return hit(40);
+    }
     case "altar": box(ctx, camera, ox, oy, 0.9, 0.6, 16, PAPER, "#d6d3cc", "#c8c5be"); box(ctx, camera, ox, oy, 0.4, 0.62, 2, C.rose, C.rose, shade(C.rose, -0.1), 16);
       ellipse(ctx, sx, sy - 26 * z, 3 * z, 3 * z, `rgba(226,215,173,${0.5 + flicker * 0.5})`, null); return hit(30);
     case "ladder": {
@@ -1621,9 +1633,10 @@ function questMarkerFor(game: Game, npcId: string): string | null {
 }
 function drawMonster(ctx: CanvasRenderingContext2D, scene: Scene, monster: Monster, at: { x: number; y: number; moving: boolean }, hits: Hit[]) {
   const { camera, now, game } = scene, z = camera.zoom, size = monster.def.size ?? 1, center = { x: at.x + (size - 1) / 2, y: at.y + (size - 1) / 2 };
-  const s = toScreen(camera, center.x, center.y), px = (size === 1 ? 2.6 : size === 2 ? 4.4 : 6.2) * z * (monster.def.id === "chicken" || monster.def.id === "ink_rat" ? 0.75 : monster.def.id === "cow" ? 0.85 : 1);
+  const s = toScreen(camera, center.x, center.y), px = (size === 1 ? 2.6 : size === 2 ? 4.4 : 6.2) * z * (monster.def.id === "chicken" || monster.def.id === "ink_rat" ? 0.75 : monster.def.id === "cow" ? 0.85 : monster.def.id === "sheep" ? 0.7 : 1);
   ellipse(ctx, s.x, s.y, 12 * z * size, 4.5 * z * size, "rgba(22,22,22,0.18)", null);
-  const set = creatureSprite(monster.def.art), frame = at.moving && Math.floor(now / 150) % 2 ? set.step : set.idle;
+  // A shorn sheep looks shorn until its fleece grows back.
+  const set = creatureSprite(monster.def.shear && (monster.shorn ?? 0) > game.tick ? monster.def.shear.art : monster.def.art), frame = at.moving && Math.floor(now / 150) % 2 ? set.step : set.idle;
   const facing = screenFacing(camera, monster.heading), faceLeft = FACES_LEFT.has(monster.def.art), mirror = faceLeft ? facing === "right" || facing === "down" : facing === "left" || facing === "up";
   if (monster.def.boss && !scene.reducedMotion) { const pulse = 1 + Math.sin(now / 300) * 0.08; ellipse(ctx, s.x, s.y - 40 * z, 48 * z * pulse, 36 * z * pulse, "rgba(20,20,30,0.25)", null); }
   const hover = monster.def.id === "shade" || monster.def.id === "hollow_king" ? Math.sin(now / 350 + monster.uid) * 3 * z : 0;

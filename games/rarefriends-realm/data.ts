@@ -74,7 +74,7 @@ export type IconShape =
   | "amulet" | "log" | "fish" | "ore" | "bar" | "bones" | "sigil" | "staff" | "net" | "rod" | "harpoon" | "pot" | "bucket" | "egg" | "flour"
   | "milk" | "tinderbox" | "hammer" | "knife" | "needle" | "thread" | "chisel" | "gem" | "hide" | "leather" | "meat" | "feather" | "bait"
   | "cake" | "bread" | "berries" | "key" | "wheat" | "lamp" | "scroll" | "silk" | "hood" | "bracer" | "burnt" | "hat" | "crown" | "orb" | "trophy"
-  | "bow" | "arrow" | "tablet" | "arrowheads" | "material" | "quiver" | "satchel" | "mask" | "stonebox" | "warbow" | "crossbow" | "bolts" | "limbs" | "stock";
+  | "bow" | "arrow" | "tablet" | "arrowheads" | "material" | "quiver" | "satchel" | "mask" | "stonebox" | "wool" | "string" | "shears" | "warbow" | "crossbow" | "bolts" | "limbs" | "stock";
 export type Item = {
   id: string; name: string; examine: string; value: number; icon: Icon;
   stackable?: boolean; tradeable?: boolean;
@@ -350,7 +350,15 @@ export const CROSSBOWS: readonly { metal: MetalId; stock: string; level: number;
 /** Crossbow limbs: two bars each, a few Smithing levels over the metal's dagger. */
 export const LIMBS_OFFSET = 6;
 const ARROW_STRENGTH = [7, 10, 16, 22, 31, 49, 56, 64, 72, 78, 84, 96], BOLT_STRENGTH = [9, 13, 20, 28, 39, 61, 68, 76, 86, 92, 100, 114];
+/** Every bow before it's strung: cut from logs with a knife, finished with a string. */
+const UNSTRUNG: Item[] = [
+  ...BOWS.filter(bow => bow.id !== "gloomfang_bow").map(bow => ({ id: `${bow.id}_u`, name: `${bow.name} (unstrung)`, examine: "A bow without its string. Use a string on it.", value: Math.round(bow.value * 0.5),
+    icon: { shape: "bow" as const, color: bow.color, kind: "unstrung" } })),
+  ...WAR_BOWS.map(bow => ({ id: `${bow.id}_u`, name: `${bow.name} (unstrung)`, examine: "A war bow without its string. Use a string on it.", value: Math.round(bow.value * 0.5),
+    icon: { shape: "warbow" as const, color: bow.color, kind: "unstrung" } })),
+];
 const RANGED_GEAR: Item[] = [
+  ...UNSTRUNG,
   ...BOWS.map(bow => ({
     id: bow.id, name: bow.name, value: bow.value, icon: { shape: "bow" as const, color: bow.color, accent: bow.id === "gloomfang_bow" ? "#cf6e6e" : undefined },
     examine: bow.id === "gloomfang_bow" ? "Strung with something that howls when you draw it." : `A bow of ${bow.id === "shortbow" ? "plain" : bow.name.split(" ")[0].toLowerCase()} wood.`,
@@ -388,6 +396,13 @@ const RANGED_GEAR: Item[] = [
   // A very rare Grumblin drop, worn over your Friend's head.
   { id: "grumblin_head", name: "Grumblin head", examine: "A Grumblin's head, hollowed out and surprisingly comfy. It still grumbles a little.", value: 5000,
     icon: { shape: "mask", color: "#8e9a7a", accent: "#e2c46a" }, equip: { slot: "head", bonuses: { defence: 3, attack: 1 } } },
+  // Sheep, wool and string: shear a sheep, spin the wool into string at a spinning wheel, string bows and amulets with it.
+  { id: "shears", name: "Shears", examine: "For shearing sheep.", value: 8, icon: { shape: "shears", color: "#b9bfc6" } },
+  { id: "wool", name: "Wool", examine: "Fresh off a sheep. A spinning wheel would turn it into string.", value: 4, icon: { shape: "wool", color: "#efeae0" } },
+  { id: "string", name: "String", examine: "Spun wool. It strings bows, amulets and necklaces.", value: 12, icon: { shape: "string", color: "#e8dcc0" } },
+  { id: "moonstone_amulet", name: "Moonstone amulet", examine: "A moonstone on a string. The Enchant Moonstone spell would wake it.", value: 320, icon: { shape: "amulet", color: "#8fa3c9", kind: "strung" }, equip: { slot: "neck", bonuses: { attack: 1, magic: 1 } } },
+  { id: "sagestone_amulet", name: "Sagestone amulet", examine: "A sagestone on a string. Calm and green.", value: 600, icon: { shape: "amulet", color: "#8fbf9a", kind: "strung" }, equip: { slot: "neck", bonuses: { defence: 2, magic: 2 } } },
+  { id: "rosestone_amulet", name: "Rosestone amulet", examine: "A rosestone on a string. The Enchant Rosestone spell would wake it.", value: 1200, icon: { shape: "amulet", color: "#c98f95", kind: "strung" }, equip: { slot: "neck", bonuses: { strength: 2, magic: 2 } } },
   // The sigil stone box: carried in your pack, it holds 120 sigil stones and the altar takes them all.
   { id: "sigil_box", name: "Sigil stone box", examine: "A carved box that holds 120 sigil stones. Carry it to an altar and every stone inside is pressed.", value: 1500,
     icon: { shape: "stonebox", color: "#9c7a58", accent: "#b49ae0" } },
@@ -572,7 +587,7 @@ export const SPELLS: readonly Spell[] = [
   { id: "breeze_dart", name: "Breeze Dart", level: 1, xp: 5.5, sigils: { breeze_sigil: 1, thought_sigil: 1 }, kind: "strike", element: "wind", target: "monster", maxHit: 2, description: "A basic air missile." },
   { id: "muddle", name: "Muddle", level: 3, xp: 13, sigils: { shade_sigil: 1, tide_sigil: 3, stone_sigil: 2 }, kind: "curse", element: "hollow", target: "monster", curse: { stat: "attack", amount: 0.1 }, description: "Lowers a monster's accuracy by 10% for a minute." },
   { id: "tide_dart", name: "Tide Dart", level: 5, xp: 7.5, sigils: { tide_sigil: 1, breeze_sigil: 1, thought_sigil: 1 }, kind: "strike", element: "water", target: "monster", maxHit: 4, description: "A basic water missile." },
-  { id: "enchant_moonstone", name: "Enchant Moonstone", level: 7, xp: 17.5, sigils: { star_sigil: 1, tide_sigil: 1 }, kind: "enchant", element: "water", target: "item", description: "Turns a cut moonstone into a moonstone pendant." },
+  { id: "enchant_moonstone", name: "Enchant Moonstone", level: 7, xp: 17.5, sigils: { star_sigil: 1, tide_sigil: 1 }, kind: "enchant", element: "water", target: "item", description: "Turns a moonstone amulet (a moonstone on a string) into a moonstone pendant." },
   { id: "stone_dart", name: "Stone Dart", level: 9, xp: 9.5, sigils: { stone_sigil: 2, breeze_sigil: 1, thought_sigil: 1 }, kind: "strike", element: "earth", target: "monster", maxHit: 6, description: "A basic earth missile." },
   { id: "wilt", name: "Wilt", level: 11, xp: 21, sigils: { shade_sigil: 1, tide_sigil: 3, stone_sigil: 2 }, kind: "curse", element: "hollow", target: "monster", curse: { stat: "strength", amount: 0.1 }, description: "Lowers a monster's strength by 10% for a minute." },
   { id: "ember_dart", name: "Ember Dart", level: 13, xp: 11.5, sigils: { ember_sigil: 3, breeze_sigil: 2, thought_sigil: 1 }, kind: "strike", element: "fire", target: "monster", maxHit: 8, description: "A basic fire missile." },
@@ -591,7 +606,7 @@ export const SPELLS: readonly Spell[] = [
   { id: "forgeheart", name: "Forgeheart", level: 43, xp: 53, sigils: { bloom_sigil: 1, ember_sigil: 4 }, kind: "superheat", element: "fire", target: "item", description: "Melts ore into a bar in your hands, no furnace needed (and trains Smithing)." },
   { id: "glide_frostpeak", name: "Glide to Frostpeak", level: 45, xp: 55.5, sigils: { path_sigil: 2, tide_sigil: 2, breeze_sigil: 2 }, kind: "teleport", element: "water", target: "self", teleport: "frostpeak", description: "Teleports you to the Frostpeak lodge." },
   { id: "glide_pier", name: "Glide to the Pier", level: 48, xp: 58, sigils: { path_sigil: 2, tide_sigil: 3 }, kind: "teleport", element: "water", target: "self", teleport: "pier", description: "Teleports you to Pike's Pier on Glass Lake." },
-  { id: "enchant_rosestone", name: "Enchant Rosestone", level: 49, xp: 59, sigils: { star_sigil: 1, ember_sigil: 5 }, kind: "enchant", element: "fire", target: "item", description: "Turns a cut rosestone into a rosestone pendant." },
+  { id: "enchant_rosestone", name: "Enchant Rosestone", level: 49, xp: 59, sigils: { star_sigil: 1, ember_sigil: 5 }, kind: "enchant", element: "fire", target: "item", description: "Turns a rosestone amulet (a rosestone on a string) into a rosestone pendant." },
   { id: "golden_touch", name: "Golden Touch", level: 55, xp: 65, sigils: { bloom_sigil: 1, ember_sigil: 5 }, kind: "alchemy", element: "gold", target: "item", description: "Turns an item into coins: 60% of its value." },
   { id: "ember_burst", name: "Ember Burst", level: 59, xp: 34.5, sigils: { ember_sigil: 5, breeze_sigil: 4, hollow_sigil: 1 }, kind: "blast", element: "fire", target: "monster", maxHit: 16, description: "A medium level fire missile." },
 ];
@@ -618,6 +633,8 @@ export type MonsterDef = {
   attackBonus: number; defenceBonus: number; maxHit: number; speed: number; aggressive?: boolean; size?: number;
   respawn: number; wander: number; examine: string; always?: readonly Drop[]; drops: readonly Drop[]; art: number; ink?: string;
   attackStyle?: "melee" | "magic"; boss?: boolean; slayerXp?: number;
+  /** A sheep: shear it (with shears) for this item; it grows back in `regrow` ticks, drawn meanwhile as `art`. */
+  shear?: { item: string; regrow: number; art: number };
   /** A world boss: it rises on a schedule for everyone at once, and everyone who wounds it gets loot. */
   worldBoss?: boolean;
   /** The Slayer level needed to wound it. */
@@ -632,6 +649,8 @@ export const MONSTERS: Record<string, MonsterDef> = {
     always: [one("bones", 1), one("raw_chicken", 1)], drops: [one("feather", 0.6, 5, 15)], art: 100 },
   cow: { id: "cow", name: "Cow", level: 2, hp: 8, attack: 1, strength: 1, defence: 1, attackBonus: 0, defenceBonus: 0, maxHit: 1, speed: 4, respawn: 25, wander: 5, examine: "Converts grass to beef.",
     always: [one("bones", 1), one("cowhide", 1), one("raw_beef", 1)], drops: [], art: 101 },
+  sheep: { id: "sheep", name: "Sheep", level: 1, hp: 5, attack: 1, strength: 1, defence: 1, attackBonus: 0, defenceBonus: 0, maxHit: 1, speed: 4, respawn: 25, wander: 3, examine: "Baa. A fleece like that wants shearing.",
+    always: [one("bones", 1)], drops: [one("wool", 0.5)], art: 115, shear: { item: "wool", regrow: 90, art: 116 } },
   ink_rat: { id: "ink_rat", name: "Ink rat", level: 1, hp: 2, attack: 1, strength: 1, defence: 1, attackBonus: 0, defenceBonus: 0, maxHit: 1, speed: 4, respawn: 15, wander: 6, examine: "A rat made of spilled ink. It squeaks in monochrome.",
     always: [one("bones", 1)], drops: [coins(1, 4, 0.3)], art: 102 },
   grumblin: { id: "grumblin", name: "Grumblin", level: 5, hp: 7, attack: 4, strength: 4, defence: 1, attackBonus: 2, defenceBonus: 0, maxHit: 2, speed: 4, respawn: 25, wander: 6, examine: "An ugly, grumbling green-grey creature.", aggressive: true,
@@ -747,7 +766,7 @@ export function itemCategory(id: string): Category {
 }
 export type ShopDef = { id: string; name: string; stock: readonly string[]; general?: boolean; buys?: readonly Category[]; rate?: number };
 export const SHOPS: Record<string, ShopDef> = {
-  general: { id: "general", name: "Friendhollow General Store", general: true, stock: ["pot", "bucket", "tinderbox", "hammer", "knife", "chisel", "needle", "thread", "small_net", "pewter_axe", "pewter_pickaxe", "bread", "team_cape"] },
+  general: { id: "general", name: "Friendhollow General Store", general: true, stock: ["shears", "pot", "bucket", "tinderbox", "hammer", "knife", "chisel", "needle", "thread", "small_net", "pewter_axe", "pewter_pickaxe", "bread", "team_cape"] },
   general_ember: { id: "general_ember", name: "Emberforge General Store", general: true, stock: ["pot", "bucket", "tinderbox", "hammer", "knife", "chisel", "pewter_pickaxe", "pewter_axe", "bread", "cooked_meat"] },
   general_frost: { id: "general_frost", name: "Frostpeak Trading Post", general: true, stock: ["pot", "bucket", "tinderbox", "hammer", "knife", "needle", "thread", "pewter_axe", "bread", "cooked_meat", "fishing_bait"] },
   general_oasis: { id: "general_oasis", name: "Oasis Sundries", general: true, stock: ["pot", "bucket", "tinderbox", "knife", "chisel", "needle", "thread", "small_net", "fishing_bait", "bread"] },
@@ -763,12 +782,15 @@ export const SHOPS: Record<string, ShopDef> = {
     "ashsteel_helm", "ashsteel_cuirass", "ashsteel_greaves", "ashsteel_shield", "moonsilver_helm", "moonsilver_shield", "leather_gloves", "leather_boots"] },
   weapons: { id: "weapons", name: "Edge & Hilt", buys: ["weapon"], rate: 0.55, stock: ["pewter_dagger", "pewter_sword", "pewter_sabre", "blackiron_dagger", "blackiron_sword", "blackiron_sabre", "ashsteel_dagger", "ashsteel_sword", "ashsteel_sabre",
     "moonsilver_dagger", "moonsilver_sword", "moonsilver_sabre", "glimmer_sword"] },
-  archery: { id: "archery", name: "Fletch & Feather", buys: ["bow", "arrow", "logs"], rate: 0.6, stock: ["knife", "arrow_shaft", "headless_arrow", "shortbow", "oak_bow", "willow_bow", "maple_bow", "yew_bow", "pewter_arrow", "blackiron_arrow", "ashsteel_arrow", "moonsilver_arrow",
+  archery: { id: "archery", name: "Fletch & Feather", buys: ["bow", "arrow", "logs"], rate: 0.6, stock: ["string", "knife", "arrow_shaft", "headless_arrow", "shortbow", "oak_bow", "willow_bow", "maple_bow", "yew_bow", "pewter_arrow", "blackiron_arrow", "ashsteel_arrow", "moonsilver_arrow",
     "pewter_crossbow", "blackiron_crossbow", "ashsteel_crossbow", "pewter_bolts", "blackiron_bolts", "ashsteel_bolts",
     "hunter_coif", "hunter_vest", "hunter_chaps", "hunter_bracers", "feather"] },
+  general_highcairn: { id: "general_highcairn", name: "Highcairn Stores", general: true, stock: ["shears", "pot", "bucket", "tinderbox", "hammer", "knife", "chisel", "needle", "thread", "bread", "cooked_meat", "fishing_rod", "feather"] },
+  kettle: { id: "kettle", name: "The Stone Kettle", buys: ["fish", "food"], rate: 0.55, stock: ["bread", "cake", "cooked_meat", "char", "grayling", "sailfish"] },
+  cairn_forge: { id: "cairn_forge", name: "Highcairn Forge", buys: ["ore", "bar", "weapon", "armour"], rate: 0.6, stock: ["hammer", "moonsilver_pickaxe", "glimmer_pickaxe", "rarite_pickaxe", "inkcoal", "moonsilver_bar", "glimmer_bar", "glimmer_helm", "glimmer_shield", "rarite_helm", "inkcoal_satchel"] },
   mine_supplies: { id: "mine_supplies", name: "Old miner's supplies", buys: ["ore"], rate: 0.5, stock: ["pewter_pickaxe", "blackiron_pickaxe", "ashsteel_pickaxe", "moonsilver_pickaxe", "inkcoal_satchel", "hammer", "bread"] },
   // Fernwick, the woodcutters' village: the only place that sells war bows, and the best price for logs.
-  war_bows: { id: "war_bows", name: "Hazel's War Bows", buys: ["bow", "arrow"], rate: 0.6, stock: ["war_bow", "oak_war_bow", "willow_war_bow", "maple_war_bow", "yew_war_bow",
+  war_bows: { id: "war_bows", name: "Hazel's War Bows", buys: ["bow", "arrow"], rate: 0.6, stock: ["string", "war_bow", "oak_war_bow", "willow_war_bow", "maple_war_bow", "yew_war_bow",
     "moonsilver_crossbow", "wooden_stock", "oak_stock", "willow_stock", "pewter_bolts", "blackiron_bolts", "ashsteel_bolts", "moonsilver_bolts", "pewter_arrow", "blackiron_arrow", "ashsteel_arrow", "feather", "knife"] },
   timber: { id: "timber", name: "Fernwick Timber Yard", buys: ["logs"], rate: 0.75, stock: ["pewter_axe", "blackiron_axe", "ashsteel_axe", "moonsilver_axe", "knife", "tinderbox", "logs", "oak_logs", "willow_logs", "bread", "cooked_meat"] },
   slayer: { id: "slayer", name: "The Warden's Lodge", stock: ["slayer_gem", "inkcrab", "sailfish", "tablet_hollow_square", "blackiron_arrow", "ashsteel_arrow", "leather_boots"] },

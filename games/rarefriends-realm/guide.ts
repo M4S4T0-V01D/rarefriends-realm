@@ -7,7 +7,7 @@ import {
   SKILL_NAMES, SLAYER_TASKS, SMELTING, SPELLS, TREES, sigilsPerStone, item, type Skill,
 } from "./data.ts";
 import { NPCS } from "./content.ts";
-import { STALLS, arrowRecipe, boltRecipe, craftingRecipes, crossbowRecipe, fletchingRecipes, headlessRecipe, smeltingRecipes, smithingRecipes } from "./engine.ts";
+import { AMULETS, STALLS, amuletRecipe, arrowRecipe, boltRecipe, craftingRecipes, crossbowRecipe, spinningRecipes, stringingRecipe, fletchingRecipes, headlessRecipe, smeltingRecipes, smithingRecipes } from "./engine.ts";
 import type { Recipe } from "./state.ts";
 
 export type GuideEntry = { level: number; name: string; detail: string; icon?: string; spell?: string };
@@ -66,13 +66,15 @@ export function skillGuide(skill: Skill): GuideEntry[] {
     case "crafting":
       for (const entry of CRAFTING) add(entry.level, item(entry.product).name, `${entry.xp} XP · ${entry.leather} ${entry.hide ? item(entry.hide).name.toLowerCase() : "leather"}`, entry.product);
       for (const [rough, cut] of Object.entries(GEM_CUTTING)) add(cut.level, item(cut.cut).name, `${cut.xp} XP · cut with a chisel`, rough);
+      add(1, "String", "5 XP · wool at a spinning wheel (the farmhouse, Tessa's tannery)", "string");
+      for (const entry of AMULETS) add(entry.level, item(entry.amulet).name, `${entry.xp} XP · a string on a cut ${entry.gem}`, entry.amulet);
       for (const bow of CROSSBOWS) add(bow.craft, item(`${bow.metal}_crossbow`).name, `${bow.xp} XP · ${item(`${bow.metal}_limbs`).name.toLowerCase()} on ${/^[aeiou]/i.test(item(bow.stock).name) ? "an" : "a"} ${item(bow.stock).name.toLowerCase()}`, `${bow.metal}_crossbow`);
       break;
     case "fletching":
       add(1, "Arrow shafts", "5 XP · a knife on any logs makes 15", "arrow_shaft"); add(1, "Headless arrows", "15 XP for 15 · feathers on shafts", "headless_arrow");
-      for (const bow of FLETCH_BOWS) add(bow.level, item(bow.bow).name, `${bow.xp} XP · a knife on ${item(bow.log).name.toLowerCase()}`, bow.bow);
+      for (const bow of FLETCH_BOWS) add(bow.level, item(bow.bow).name, `${bow.xp} XP · a knife on ${item(bow.log).name.toLowerCase()}, then a string on the unstrung bow`, bow.bow);
       for (const metal of METALS) add(FLETCH_ARROWS[metal.id].level, `${metal.name} arrows`, `${FLETCH_ARROWS[metal.id].xp} XP each · heads from the anvil`, `${metal.id}_arrow`);
-      for (const bow of WAR_BOWS) add(bow.fletch, bow.name, `${bow.xp} XP · a knife on 2 ${item(bow.log).name.toLowerCase()}`, bow.id);
+      for (const bow of WAR_BOWS) add(bow.fletch, bow.name, `${bow.xp} XP · a knife on 2 ${item(bow.log).name.toLowerCase()}, then a string`, bow.id);
       for (const stock of STOCKS) add(stock.level, stock.name, `${stock.xp} XP · a knife on ${item(stock.log).name.toLowerCase()} (for a crossbow)`, stock.id);
       for (const metal of METALS) { const recipe = boltRecipe(metal.id); add(recipe.level, `${metal.name} bolts`, `${recipe.xp / 12} XP each · feathers on unfeathered bolts from the anvil`, `${metal.id}_bolts`); }
       break;
@@ -109,6 +111,9 @@ export function recipeBook(): BookRecipe[] {
     ...FLETCH_BOWS.flatMap(bow => fletchingRecipes(bow.log).slice(2)).map(at("Anywhere (knife on logs)")),
     ...METALS.map(metal => boltRecipe(metal.id)).map(at("Anywhere (feathers on bolts)")),
     ...CROSSBOWS.map(bow => crossbowRecipe(bow.metal)).map(at("Anywhere (limbs on a stock)")),
+    ...spinningRecipes().map(at("Spinning wheel")),
+    ...[...FLETCH_BOWS.map(bow => bow.bow), ...WAR_BOWS.map(bow => bow.id)].map(id => stringingRecipe(`${id}_u`)!).map(at("Anywhere (string on the bow)")),
+    ...AMULETS.map(entry => amuletRecipe(entry.gem)).map(at("Anywhere (string on the gem)")),
     ...SIGILCRAFT.map((altar): BookRecipe => ({ skill: "sigilcraft", label: item(altar.sigil).name, level: altar.level, xp: altar.xp, ticks: 1, inputs: { sigil_stone: 1 }, outputs: { [altar.sigil]: 1 }, where: `${item(altar.sigil).name.replace(" sigil", "")} altar` })),
   ];
 }

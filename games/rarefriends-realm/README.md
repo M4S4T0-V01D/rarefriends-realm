@@ -146,7 +146,7 @@ axes and pickaxes that Woodcutting or Mining level to cut and mine (faster at ev
 
 ## The world
 
-A 240 × 240 tile island with 15 overworld regions (Friendhollow, Hollow Farms, Whisperwood, Fernwick, Ashen Hills, Emberforge,
+A 350-wide island with 17 overworld regions (Friendhollow, Hollow Farms, Whisperwood, Fernwick, Ashen Hills, the Greyhorn Highlands, Highcairn, Emberforge,
 Frostpeak, Glass Lake, Pale Dunes, Oasis, Murkmire, Mossy Ruins, the Wizards' Tower, Wyrmreach and the Pale Coast) and two dungeons
 (Murkmire Crypt, Hollow Depths). Banks in Friendhollow (and up in the castle's south-west tower), Emberforge, the Oasis, Frostpeak, Fernwick and a deposit box by Glass Lake.
 
@@ -158,6 +158,19 @@ willows by the pond and archery butts behind Hazel's.
 **Friendhollow** has grown: south of the fountain, **Market Street** has Hollis Armoury (helms to shields, pewter to
 moonsilver), Edge & Hilt (daggers, swords, sabres), Fletch & Feather (bows, arrows, the first three crossbows and their bolts, hunter's hides) and the Warden's
 Lodge (Slayer). The Sleepy Friend inn (food, and a range) is east of the square, and the Rare Market is west.
+
+**The Greyhorn Highlands**, east of the Pale Dunes and south of Frostpeak, climb into walkable mountains: grassy
+shoulders, scree, snow on the peaks, broken crags (the roads cut passes), Greyhorn Tarn (char and grayling for a rod) and
+the Greyhorn mine (glimmer, rarite, moonsilver, inkcoal). Wolves and yetis roam the snow, gloom hounds the southern slopes.
+**Highcairn**, a stone town on a plateau in the middle, has a bank, the Highcairn Stores (a general store), the Stone
+Kettle inn (with a range), the Highcairn Forge (a furnace and anvil, and a smith selling pickaxes and bars), a mountain
+shrine and a Rare Market trader, with roads to the Frostpeak camp and the Oasis.
+
+**Sheep, wool and string.** The sheep pen sits between the cows and the chickens at Hollow Farms. Shear a sheep with shears
+(sold in general stores) for wool; it looks shorn until its fleece grows back. Spin wool into string at a spinning wheel
+(the farmhouse, or Tessa's tannery) for 5 Crafting XP from level 1. Bows are cut unstrung (a knife on logs) and finished
+with a string; a string on a cut gem makes an amulet (moonstone 16, sagestone 23, rosestone 31), and Enchant Moonstone and
+Enchant Rosestone turn those amulets into pendants.
 
 **Ruins** stand out in the wild: crumbling old houses with a doorway and flagstones, broken round towers (tall on one side,
 fallen to rubble on the other) and runs of ancient wall, in Whisperwood, the Ashen Hills, past the Millpond, the Pale Dunes,

@@ -55,6 +55,10 @@ export const NPCS: Record<string, NpcDef> = {
   agility: { id: "agility", name: "Coach Skip", examine: "Never stops stretching.", options: ["Talk-to"], art: art(5, 211) },
   armourer: { id: "armourer", name: "Dora Plate", examine: "She's knocked the dents out of half the Realm's helms.", options: ["Talk-to", "Trade"], shop: "armour", art: art(6, 241) },
   weaponsmith: { id: "weaponsmith", name: "Hilt", examine: "Tests every edge on his thumb. Has a lot of plasters.", options: ["Talk-to", "Trade"], shop: "weapons", art: art(0, 251) },
+  cairn_trader: { id: "cairn_trader", name: "Brisa the trader", examine: "Runs Highcairn's stores. Buys anything you can carry up a mountain.", options: ["Talk-to", "Trade"], shop: "general_highcairn", art: art(5, 603) },
+  kettle_keeper: { id: "kettle_keeper", name: "Oda of the Stone Kettle", examine: "Keeps the kettle on and the fire high.", options: ["Talk-to", "Trade"], shop: "kettle", art: art(2, 611) },
+  cairn_smith: { id: "cairn_smith", name: "Tolvar the smith", examine: "Forges with mountain ore. Has opinions about it.", options: ["Talk-to", "Trade"], shop: "cairn_forge", art: art(6, 617) },
+  mountain_guide: { id: "mountain_guide", name: "Mountain guide", examine: "Knows every pass in the Greyhorns.", options: ["Talk-to"], art: art(4, 623) },
   hazel: { id: "hazel", name: "Hazel the war-bowyer", examine: "Her arms could bend an oak. She says she has.", options: ["Talk-to", "Trade"], shop: "war_bows", art: art(3, 412) },
   rowan: { id: "rowan", name: "Rowan the forester", examine: "Sawdust in the beard, a pencil behind the ear.", options: ["Talk-to", "Trade"], shop: "timber", art: art(2, 377) },
   birch: { id: "birch", name: "Old Birch", examine: "Has felled more trees than you've seen.", options: ["Talk-to"], art: art(4, 509) },
@@ -449,6 +453,9 @@ export function talk(game: Game, npcId: string): Dialogue {
     ]);
     case "birch": return chat(name, npcSays(name, (["Swing from the hips, not the shoulders. Trees respect that.", "Plain trees for learning, oaks at fifteen, willows at thirty, maples at forty-five. Yews grow south of the camp, and ashwood only up in Frostpeak.",
       "Grumblins come up from the camp some nights. We keep the fires lit.", "Fletch as you go: a knife on your logs makes shafts, bows, war bows and crossbow stocks."] as const)[Math.floor(game.rng() * 4)]));
+    case "mountain_guide": return chat(name, npcSays(name, (["Welcome to Highcairn, the town above the dunes. The road north-west climbs to the Frostpeak camp; the one west drops to the Oasis.",
+      "The Greyhorn mine's up the scree to the north-east: glimmer and rarite, if your pick's up to it. Wolves and yetis like the snow up there.",
+      "Greyhorn Tarn's south of town. Bring a rod and some feathers; the char are fat this time of year.", "Gloom hounds hunt the southern slopes after dark. Don't go down there light."] as const)[Math.floor(game.rng() * 4)]));
     case "miner": return chat(name, npcSays(name, "Pewter anyone can mine. Blackiron's further in. Inkcoal at the south end. There's moonsilver and a gem rock at the north edge, if you're good.",
       "Hauling inkcoal? Get yourself a satchel for your back. Holds a hundred and twenty, fills as you swing, and the furnace takes from it. I sell 'em, or stitch your own from three leather."), [
       { label: "Let's trade.", then: () => { game.ui.shop = "mine_supplies"; return null; } },

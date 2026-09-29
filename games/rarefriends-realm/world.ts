@@ -1,12 +1,12 @@
 /**
- * The Realm: a 240 × 240 tile world, built deterministically from a seed and hand-placed landmarks.
+ * The Realm: a 350 × 280 tile world, built deterministically from a seed and hand-placed landmarks.
  * Overworld in y < 200; the two dungeons (Murkmire Crypt, Hollow Depths) live in the strip below, reached by ladders.
  * Upper storeys of buildings (the castle's floors) are stored in the rows from FLOOR_Y down, and drawn stacked on the
  * building they belong to: a tile there stands for the real tile (x − dx, y − dy), `level` storeys up.
  */
 import type { RockKind, SpotKind, TreeKind } from "./data.ts";
 
-export const W = 240, H = 280;
+export const W = 350, H = 280;
 /** Rows 200–239 are the dungeons; rows from FLOOR_Y hold upper storeys. */
 export const FLOOR_Y = 240;
 /** One storey, in world pixels (the height of a wall). */
@@ -24,7 +24,7 @@ export const inRing = (x: number, y: number) => x >= RING.x0 && x <= RING.x1 && 
 
 export type ObjectKind =
   | "tree" | "stump" | "rock" | "spot" | "range" | "furnace" | "anvil" | "bank" | "altar" | "ladder" | "stall" | "obstacle"
-  | "fountain" | "mill" | "dairy_cow" | "wheat" | "coop" | "gate" | "casket" | "decor" | "sign" | "tanning" | "well" | "sigil_altar";
+  | "fountain" | "mill" | "dairy_cow" | "wheat" | "coop" | "gate" | "casket" | "decor" | "sign" | "tanning" | "well" | "sigil_altar" | "wheel";
 export type DecorKind =
   | "flowers" | "bush" | "boulder" | "lamp" | "bench" | "crate" | "barrel" | "tent" | "cactus" | "pine" | "dead_tree" | "statue"
   | "grave" | "fence" | "reeds" | "table" | "bed" | "shelf" | "pillar" | "rubble" | "snowman" | "lily" | "banner" | "torch" | "palm" | "hay" | "windmill" | "boat" | "chest"
@@ -46,7 +46,7 @@ export type StallKind = "bakery" | "silk" | "gem" | "fish";
 export type SpawnDef = { kind: "npc" | "monster"; id: string; x: number; y: number; wander?: number };
 export type RegionId =
   | "friendhollow" | "farmland" | "whisperwood" | "ashen_hills" | "emberforge" | "frostpeak" | "glass_lake" | "pale_dunes"
-  | "oasis" | "murkmire" | "mossy_ruins" | "crypt" | "hollow_depths" | "coast" | "wizards_tower" | "wyrmreach" | "fernwick";
+  | "oasis" | "murkmire" | "mossy_ruins" | "crypt" | "hollow_depths" | "coast" | "wizards_tower" | "wyrmreach" | "fernwick" | "greyhorn" | "highcairn";
 export type Region = { id: RegionId; name: string; label: { x: number; y: number }; danger: number; underground?: boolean };
 export const REGIONS: readonly Region[] = [
   { id: "coast", name: "The Pale Coast", label: { x: 10, y: 10 }, danger: 0 },
@@ -64,6 +64,8 @@ export const REGIONS: readonly Region[] = [
   { id: "wizards_tower", name: "Wizards' Tower", label: { x: 160, y: 124 }, danger: 0 },
   { id: "wyrmreach", name: "Wyrmreach", label: { x: 36, y: 20 }, danger: 5 },
   { id: "fernwick", name: "Fernwick", label: { x: 34, y: 60 }, danger: 0 },
+  { id: "greyhorn", name: "Greyhorn Highlands", label: { x: 272, y: 128 }, danger: 2 },
+  { id: "highcairn", name: "Highcairn", label: { x: 282, y: 66 }, danger: 0 },
   { id: "crypt", name: "Murkmire Crypt", label: { x: 34, y: 220 }, danger: 3, underground: true },
   { id: "hollow_depths", name: "Hollow Depths", label: { x: 150, y: 220 }, danger: 4, underground: true },
 ];
@@ -124,7 +126,9 @@ export const inBounds = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y
 export function createWorld(seed = 20260927): World {
   const tiles = new Uint8Array(W * H), region = new Uint8Array(W * H), objects: WorldObject[] = [], spawns: SpawnDef[] = [];
   const objectAt = new Int32Array(W * H).fill(-1);
-  const random = mulberry(seed), noise = makeNoise(seed, 9), noise2 = makeNoise(seed + 7, 4), coastNoise = makeNoise(seed + 3, 14);
+  const random = mulberry(seed), noise = makeNoise(seed, 9), noise2 = makeNoise(seed + 7, 4), coastNoise = makeNoise(seed + 3, 14), swell = makeNoise(seed + 55, 26);
+  /** Extra height for mountains (0 = the terrain's own relief), per tile. */
+  const lift = new Float32Array(W * H);
   const get = (x: number, y: number) => inBounds(x, y) ? tiles[tileIndex(x, y)] : T.VOID;
   const put = (x: number, y: number, terrain: number) => { if (inBounds(x, y)) tiles[tileIndex(x, y)] = terrain; };
   const setRegion = (x: number, y: number, id: RegionId) => { if (inBounds(x, y)) region[tileIndex(x, y)] = regionIndex(id); };
@@ -218,8 +222,12 @@ export function createWorld(seed = 20260927): World {
 
   // ---------- Land and sea ----------
   // The overworld is an island in the Pale Sea; the dungeon strip below starts as void.
+  // East of the old shore the island swells into the Greyhorn Highlands: a bulging, ragged east coast, with the north and
+  // south shores curving in towards it so the corners round away. (West of x = 226 the coast is as it always was.)
   for (let y = 0; y < 200; y++) for (let x = 0; x < W; x++) {
-    const edge = Math.min(x, y, W - 1 - x, 199 - y) + (coastNoise(x, y) - 0.5) * 12;
+    const out = Math.max(0, x - 226) / (W - 226), eastCoast = Math.max(252, 322 + (swell(3, y) - 0.5) * 38 - 72 * ((y - 100) / 100) ** 4);
+    const north = y - out ** 1.25 * 44 - (swell(x, 2) - 0.5) * 26 * out, south = 199 - y - out ** 1.25 * 40 - (swell(x, 9) - 0.5) * 26 * out;
+    const edge = Math.min(x, north, south, eastCoast - x) + (coastNoise(x, y) - 0.5) * 12;
     const terrain = edge < 4 ? T.DEEP : edge < 7 ? T.WATER : edge < 9 ? T.SAND : noise(x, y) > 0.62 ? T.DARK_GRASS : T.GRASS;
     put(x, y, terrain); setRegion(x, y, edge < 12 ? "coast" : "friendhollow");
   }
@@ -228,6 +236,7 @@ export function createWorld(seed = 20260927): World {
     ["whisperwood", 44, 82, 40, 44], ["fernwick", 34, 70, 14, 10], ["ashen_hills", 114, 48, 30, 26], ["emberforge", 162, 48, 18, 14], ["frostpeak", 206, 22, 36, 22],
     ["pale_dunes", 204, 102, 36, 36], ["glass_lake", 178, 166, 34, 26], ["murkmire", 44, 166, 38, 28], ["mossy_ruins", 122, 172, 26, 20],
     ["farmland", 88, 124, 16, 16], ["oasis", 190, 116, 11, 10], ["friendhollow", 121, 124, 26, 28], ["wizards_tower", 160, 130, 8, 8], ["wyrmreach", 36, 23, 32, 19],
+    ["greyhorn", 276, 100, 50, 84], ["highcairn", 282, 80, 17, 14],
   ];
   for (const [id, cx, cy, rx, ry] of REGION_BLOBS) regionBlob(cx, cy, rx, ry, id);
 
@@ -648,6 +657,66 @@ export function createWorld(seed = 20260927): World {
   npc("agility", 86, courseY + 2, 1);
   add({ kind: "sign", x: 85, y: courseY + 3, blocks: true, name: "Signpost", text: "Friendhollow Agility Course. Start at the log balance, go east, and finish all five obstacles for a lap bonus." });
 
+  // ---------- The Greyhorn Highlands and Highcairn ----------
+  // East of the Pale Dunes and south of Frostpeak the land climbs into mountains: grassy shoulders, scree slopes, snow on
+  // the peaks and broken crags (the roads cut passes through them), all walkable. Highcairn, a stone town, sits on a level
+  // plateau in the middle, with roads down to the Frostpeak camp and the Oasis.
+  const HC = { x: 282, y: 80 }, peaks = makeNoise(seed + 77, 11);
+  for (let y = 6; y < 198; y++) for (let x = 232; x < W; x++) {
+    const t = get(x, y);
+    if (t !== T.GRASS && t !== T.DARK_GRASS && t !== T.SNOW) continue;
+    const town = ((x - HC.x) / 19) ** 2 + ((y - HC.y) / 15) ** 2, ramp = Math.min(1, (x - 232) / 16), m = (peaks(x, y) + 0.1) * ramp;
+    lift[tileIndex(x, y)] = town < 1 ? 0 : Math.max(0, m - 0.3) * 2.6 * Math.min(1, town - 1);
+    if (town < 1) { put(x, y, T.GRASS); clearAt(x, y); continue; }
+    if (m > 0.7 && y < 120) put(x, y, T.SNOW);
+    else if (m > 0.5) put(x, y, T.GRAVEL);
+    else if (t === T.SNOW && m < 0.4) put(x, y, T.GRASS);
+    // Broken crag lines along the ridges.
+    if (Math.abs(m - 0.62) < 0.014 && noise2(x, y) > 0.42 && town > 1.8) put(x, y, T.CLIFF);
+  }
+  // A mountain lake to the south, with trout (char and grayling) for a rod.
+  blob(292, 122, 6, 4, T.WATER, 0.2, t => t !== T.CLIFF); blob(292, 122, 3, 2, T.DEEP, 0.15, t => t === T.WATER);
+  // Roads: down to the Frostpeak camp, west to the Oasis, and paths to the mine and the lake.
+  road([[198, 30], [214, 42], [236, 54], [256, 64], [272, 76]]);
+  road([[184, 115], [206, 108], [230, 98], [254, 90], [270, 84]]);
+  road([[292, 72], [298, 64], [304, 58]], 2.2, T.GRAVEL);
+  road([[284, 92], [288, 104], [291, 116]], 2.2, T.GRAVEL);
+  // The town: a cobbled plateau round a fountain square.
+  blob(HC.x, HC.y, 15, 11, T.COBBLE, 0.1);
+  building(270, 70, 277, 75, "s", T.STONE, undefined, { name: "Highcairn Bank", color: "#6f7ea6" });
+  add({ kind: "bank", x: 272, y: 72, blocks: true, name: "Bank booth" }); add({ kind: "bank", x: 273, y: 72, blocks: true, name: "Bank booth" }); npc("banker", 272, 71);
+  decor(276, 71, "chest", true, "Strongbox");
+  building(287, 70, 294, 75, "s", T.STONE, undefined, { name: "Highcairn Stores", color: "#8a6a50" });
+  npc("cairn_trader", 290, 72); decor(288, 71, "shelf"); decor(293, 71, "shelf"); decor(293, 74, "barrel");
+  building(268, 84, 277, 91, "n", T.WOOD, undefined, { name: "The Stone Kettle", color: "#b86b4b", chimney: true });
+  add({ kind: "range", x: 269, y: 89, blocks: true, name: "Cooking range" }); npc("kettle_keeper", 273, 87, 1);
+  decor(275, 89, "table"); decor(271, 86, "table"); decor(276, 86, "barrel");
+  building(287, 84, 295, 91, "n", T.STONE, undefined, { name: "Highcairn Forge", color: "#5f5e66", chimney: true });
+  add({ kind: "furnace", x: 293, y: 89, blocks: true, name: "Furnace" }); add({ kind: "anvil", x: 289, y: 89, blocks: true, name: "Anvil" }); npc("cairn_smith", 291, 87, 1);
+  building(279, 62, 285, 67, "s", T.STONE, undefined, { name: "Mountain Shrine", color: "#c6bed4" });
+  add({ kind: "altar", x: 282, y: 64, blocks: true, name: "Mountain shrine" });
+  building(262, 77, 266, 81, "e"); decor(263, 78, "bed");
+  building(298, 77, 302, 81, "w"); decor(301, 78, "bed");
+  building(279, 94, 285, 97, "n"); decor(284, 96, "bed");
+  for (const [fx, fy] of [[282, 79], [283, 79], [282, 80], [283, 80]] as const) add({ kind: "fountain", x: fx, y: fy, blocks: true, name: "Fountain" });
+  npc("rare_trader", 286, 79); add({ kind: "casket", x: 287, y: 78, blocks: true, name: "Rare Casket chest" });
+  for (const [lx, ly] of [[274, 78], [291, 78], [274, 83], [291, 83], [282, 73], [282, 87]] as const) decor(lx, ly, "lamp");
+  for (const [bx, by] of [[278, 77], [287, 82]] as const) decor(bx, by, "banner");
+  decor(279, 82, "bench"); decor(286, 76, "bench");
+  npc("mountain_guide", 280, 84, 3); npc("villager", 285, 84, 5); npc("villager", 277, 80, 5);
+  add({ kind: "sign", x: 266, y: 85, blocks: true, name: "Signpost", text: "Highcairn. North-west: the Frostpeak camp. West: the Oasis. North-east: the Greyhorn mine. South: Greyhorn Tarn." });
+  // The Greyhorn mine: glimmer, rarite and moonsilver high on the scree.
+  {
+    const vein = (cx: number, cy: number, kind: RockKind, n: number) => scatter(cx - 4, cy - 3, cx + 4, cy + 3, n, (x, y) => rock(x, y, kind), (x, y) => free(x, y) && get(x, y) !== T.CLIFF);
+    vein(305, 56, "glimmer", 4); vein(310, 60, "rarite", 3); vein(300, 52, "moonsilver", 4); vein(306, 64, "inkcoal", 5);
+    add({ kind: "sign", x: 303, y: 60, blocks: true, name: "Signpost", text: "The Greyhorn mine. Glimmer, rarite and moonsilver, for those who can reach them." });
+  }
+  shoreSpots(284, 116, 300, 128, "lure", 3);
+  // Pines on the slopes, trees in the valleys, boulders on the scree.
+  scatter(234, 20, W - 8, 190, 170, (x, y) => decor(x, y, get(x, y) === T.SNOW || random() < 0.55 ? "pine" : "boulder", true), (x, y) => free(x, y) && get(x, y) !== T.COBBLE && ((x - HC.x) / 19) ** 2 + ((y - HC.y) / 15) ** 2 > 1.2);
+  scatter(234, 60, W - 8, 190, 70, (x, y) => tree(x, y, random() < 0.5 ? "tree" : random() < 0.6 ? "maple" : "yew"), (x, y) => free(x, y) && (get(x, y) === T.GRASS || get(x, y) === T.DARK_GRASS) && ((x - HC.x) / 19) ** 2 + ((y - HC.y) / 15) ** 2 > 1.4);
+  monsters("wolf", 240, 36, 300, 66, 6); monsters("frost_yeti", 250, 24, 305, 52, 4); monsters("gloom_hound", 250, 132, 305, 178, 5); monsters("bandit", 238, 90, 262, 118, 4);
+
   // ---------- Ruins: old houses, round towers and boundary walls, crumbling out in the wild ----------
   {
     // Their own random stream, so adding ruins doesn't reshuffle the rest of the world.
@@ -849,7 +918,7 @@ export function createWorld(seed = 20260927): World {
   for (const [x, y] of doorways) for (const [dx, dy] of [[0, 0], ...SIDES]) { const o = objectAt[tileIndex(x + dx, y + dy)]; if (o >= 0 && (objects[o].kind === "tree" || (objects[o].kind === "decor" && get(x + dx, y + dy) !== T.WOOD && get(x + dx, y + dy) !== T.STONE && get(x + dx, y + dy) !== T.CARPET))) clearAt(x + dx, y + dy); }
   // Clean-up: removed markers stop blocking, and every station, rock or spot keeps a side you can stand on.
   for (const object of objects) if (object.name === "__removed") object.blocks = false;
-  const NEEDS_ACCESS = new Set<ObjectKind>(["sigil_altar", "spot", "bank", "range", "furnace", "anvil", "altar", "stall", "ladder", "well", "mill", "coop", "dairy_cow", "casket", "tanning", "sign", "rock", "gate"]);
+  const NEEDS_ACCESS = new Set<ObjectKind>(["wheel", "sigil_altar", "spot", "bank", "range", "furnace", "anvil", "altar", "stall", "ladder", "well", "mill", "coop", "dairy_cow", "casket", "tanning", "sign", "rock", "gate"]);
   const standable = (x: number, y: number) => WALKABLE.has(get(x, y)) && (objectAt[tileIndex(x, y)] < 0 || !objects[objectAt[tileIndex(x, y)]].blocks);
   for (const object of objects) {
     if (!NEEDS_ACCESS.has(object.kind)) continue;
@@ -907,6 +976,7 @@ export function createWorld(seed = 20260927): World {
     weaponsmith: ["pewter_sword", "Edge & Hilt"], bowyer: ["shortbow", "Fletch & Feather"], slayer_master: ["slayer_gem", "The Warden's Lodge"], innkeeper: ["cake", "The Sleepy Friend inn"],
     rare_trader: ["rough_moonstone", "The Rare Market"], stablemaster: ["__horse", "Friendhollow Stables"],
     hazel: ["war_bow", "Hazel's War Bows"], rowan: ["pewter_axe", "Fernwick Timber Yard"],
+    cairn_trader: ["pot", "Highcairn Stores"], kettle_keeper: ["cake", "The Stone Kettle"], cairn_smith: ["rarite_pickaxe", "Highcairn Forge"],
   };
   const signed = new Set<Building>();
   const signFor = (x: number, y: number, icon: string, label: string) => {
@@ -941,7 +1011,7 @@ export function createWorld(seed = 20260927): World {
       const at = pick(score); if (at) spot(at[0], at[1], kind);
     }
     decor(71, 137, "reeds", false); decor(81, 141, "reeds", false); decor(77, 139, "lily", false); decor(74, 142, "bench", true, "Bench");
-    add({ kind: "sign", x: 76, y: 135, blocks: true, name: "Signpost", text: "Millpond. Minnows for a small net, perch and carp with a rod and bait. Cook them on a fire or the farmhouse range." });
+    add({ kind: "sign", x: 76, y: 135, blocks: true, name: "Signpost", text: "Millpond. Minnows for a small net, perch and carp with a rod and bait. The sheep pen is just north: shear the sheep for wool (shears from any general store) and spin it into string on the farmhouse wheel." });
   }
 
   // The cow pen, out on the farm by the windmill (built last, so no tree or bush lands inside it), its gate facing the coop.
@@ -951,7 +1021,15 @@ export function createWorld(seed = 20260927): World {
   monsters("cow", 61, 127, 68, 133, 5);
   add({ kind: "dairy_cow", x: 64, y: 130, blocks: true, name: "Dairy cow" });
   decor(71, 128, "hay"); decor(71, 133, "hay");
-  return { tiles, region, objects, objectAt, spawns, places, heights: buildHeights(tiles, seed), buildings, buildingAt, floors };
+  // The sheep pen, between the cows and the chickens, its gate facing the Millpond; the farmhouse keeps a spinning wheel.
+  for (let y = 127; y <= 134; y++) for (let x = 73; x <= 82; x++) { clearAt(x, y); put(x, y, T.GRASS); }
+  for (let x = 73; x <= 82; x++) { decor(x, 127, "fence"); if (x < 77 || x > 78) decor(x, 134, "fence"); }
+  for (let y = 127; y <= 134; y++) { decor(73, y, "fence"); decor(82, y, "fence"); }
+  monsters("sheep", 74, 128, 81, 133, 6);
+  decor(80, 128, "hay", true, "Hay bales");
+  for (const [wx, wy] of [[74, 120], [73, 120], [75, 121], [78, 121]] as const) if (add({ kind: "wheel", x: wx, y: wy, blocks: true, name: "Spinning wheel" })) break;
+  for (const [wx, wy] of [[130, 128], [131, 129], [129, 130]] as const) if (add({ kind: "wheel", x: wx, y: wy, blocks: true, name: "Spinning wheel" })) break;
+  return { tiles, region, objects, objectAt, spawns, places, heights: buildHeights(tiles, seed, lift), buildings, buildingAt, floors };
 }
 const i2 = (random: () => number) => random() > 0.5;
 const SIDES = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
@@ -988,7 +1066,7 @@ const FLAT = new Set<number>([T.LAVA, T.VOID, T.WATER, T.DEEP, T.BRIDGE, T.COBBL
  * Rolling hills from two noise octaves, scaled by each terrain's relief, eased to flat ground near water, towns,
  * buildings and bridges (so shores and streets stay level), then blurred once for gentle slopes.
  */
-function buildHeights(tiles: Uint8Array, seed: number): Float32Array {
+function buildHeights(tiles: Uint8Array, seed: number, lift?: Float32Array): Float32Array {
   const broad = makeNoise(seed + 21, 13), fine = makeNoise(seed + 33, 5);
   // Distance (in tiles, capped) from every tile to the nearest flat tile.
   const distance = new Uint8Array(W * H).fill(255), queue: number[] = [];
@@ -1009,7 +1087,7 @@ function buildHeights(tiles: Uint8Array, seed: number): Float32Array {
     for (const [tx, ty] of [[i - 1, j - 1], [i, j - 1], [i - 1, j], [i, j]]) {
       if (tx < 0 || ty < 0 || tx >= W || ty >= H) { near = 0; continue; }
       const t = tiles[ty * W + tx];
-      relief += RELIEF[t] ?? 0; count++; near = Math.min(near, distance[ty * W + tx]);
+      relief += (RELIEF[t] ?? 0) * (1 + (lift?.[ty * W + tx] ?? 0)); count++; near = Math.min(near, distance[ty * W + tx]);
     }
     const ease = Math.min(1, near / 4), smooth = ease * ease * (3 - 2 * ease);
     const shape = broad(i, j) * 0.75 + fine(i, j) * 0.25;

@@ -176,6 +176,7 @@ function objectOptions(game: Game, object: WorldObject): string[] {
     case "spot": { const spot = FISHING_SPOTS[object.spot!]; return object.spot === "bait" ? ["Bait", "Net"] : object.spot === "lure" ? ["Lure", "Bait"] : object.spot === "cage" ? ["Cage", "Harpoon"] : [spot.action]; }
     case "range": return ["Cook"];
     case "furnace": return ["Smelt"];
+    case "wheel": return ["Spin"];
     case "anvil": return ["Smith"];
     case "bank": return ["Bank"];
     case "altar": return object.text === "crypt" ? ["Pray-at", "Search"] : ["Pray-at"];
@@ -208,6 +209,7 @@ export function menuFor(game: Game, picks: readonly Pick[], tile: Point | null, 
       const noun = `${monster.def.name}  (level-${monster.def.level})`;
       if (spell) { if (spell.target === "monster") out.push({ verb: useLabel!, noun, tone: "monster", run: g => setTarget(g, { kind: "monster", uid: monster.uid, option: "Cast", spell: spell.id }) }); continue; }
       if (used) { out.push({ verb: useLabel!, noun, tone: "monster", run: g => message(g, "Nothing interesting happens.") }); continue; }
+      if (monster.def.shear) out.push({ verb: "Shear", noun: monster.def.name, tone: "monster", run: g => setTarget(g, { kind: "monster", uid: monster.uid, option: "Shear" }) });
       out.push({ verb: "Attack", noun, tone: "monster", run: g => setTarget(g, { kind: "monster", uid: monster.uid, option: "Attack" }) });
       out.push({ verb: "Examine", noun: monster.def.name, tone: "monster", run: g => message(g, monster.def.examine) });
     } else if (pick.kind === "npc") {
@@ -394,6 +396,13 @@ export function useItemOnItem(game: Game, a: number, b: number) {
   }
   if (pair("inkcoal", SATCHEL)) { satchelFill(game); return; }
   if (pair("sigil_stone", STONE_BOX)) { boxFill(game); return; }
+  // String on an unstrung bow finishes it; on a cut gem it makes an amulet.
+  if (first.id === "string" || second.id === "string") {
+    const other2 = other("string").id;
+    if (other2.endsWith("_u")) { const recipe = stringingRecipe(other2); if (recipe) { startProduction(game, recipe, 28); return; } }
+    const amulet = AMULETS.find(entry => entry.gem === other2);
+    if (amulet) { startProduction(game, amuletRecipe(amulet.gem), 28); return; }
+  }
   if (pair("feather", "arrow_shaft")) { startProduction(game, headlessRecipe(), 100); return; }
   // Crossbows: feathers on unfeathered bolts, and metal limbs on a stock.
   const blanks = [first.id, second.id].find(id => id.endsWith("_bolts_unf"));
@@ -490,10 +499,35 @@ export function fletchingRecipes(log: string): Recipe[] {
   const bow = FLETCH_BOWS.find(entry => entry.log === log)!;
   return [
     { skill: "fletching", label: "15 arrow shafts", level: 1, xp: 5, ticks: 3, inputs: { [log]: 1 }, outputs: { arrow_shaft: 15 }, tools: ["knife"] },
-    { skill: "fletching", label: item(bow.bow).name, level: bow.level, xp: bow.xp, ticks: 3, inputs: { [log]: 1 }, outputs: { [bow.bow]: 1 }, tools: ["knife"] },
-    ...WAR_BOWS.filter(war => war.log === log).map(war => ({ skill: "fletching" as const, label: `${war.name} (2 logs)`, level: war.fletch, xp: war.xp, ticks: 4, inputs: { [log]: 2 }, outputs: { [war.id]: 1 }, tools: ["knife"] })),
+    { skill: "fletching", label: item(`${bow.bow}_u`).name, level: bow.level, xp: bow.xp / 2, ticks: 3, inputs: { [log]: 1 }, outputs: { [`${bow.bow}_u`]: 1 }, tools: ["knife"] },
+    ...WAR_BOWS.filter(war => war.log === log).map(war => ({ skill: "fletching" as const, label: `${war.name} (unstrung, 2 logs)`, level: war.fletch, xp: war.xp / 2, ticks: 4, inputs: { [log]: 2 }, outputs: { [`${war.id}_u`]: 1 }, tools: ["knife"] })),
     ...STOCKS.filter(stock => stock.log === log).map(stock => ({ skill: "fletching" as const, label: stock.name, level: stock.level, xp: stock.xp, ticks: 3, inputs: { [log]: 1 }, outputs: { [stock.id]: 1 }, tools: ["knife"] })),
   ];
+}
+/** Fletching: a string on an unstrung bow (or war bow) finishes it, for the other half of its XP. */
+export function stringingRecipe(unstrung: string): Recipe | null {
+  const id = unstrung.replace(/_u$/, ""), bow = FLETCH_BOWS.find(entry => entry.bow === id), war = WAR_BOWS.find(entry => entry.id === id);
+  if (!bow && !war) return null;
+  return { skill: "fletching", label: `String the ${item(id).name.toLowerCase()}`, level: bow ? bow.level : war!.fletch, xp: (bow ? bow.xp : war!.xp) / 2, ticks: 2, inputs: { [unstrung]: 1, string: 1 }, outputs: { [id]: 1 } };
+}
+/** Crafting at a spinning wheel: wool into string. */
+export const spinningRecipes = (): Recipe[] => [{ skill: "crafting", label: "String", level: 1, xp: 5, ticks: 3, station: "wheel", inputs: { wool: 1 }, outputs: { string: 1 } }];
+/** Crafting: a cut gem on a string makes an amulet (the Enchant spells turn moonstone and rosestone ones into pendants). */
+export const AMULETS = [{ gem: "moonstone", amulet: "moonstone_amulet", level: 16, xp: 30 }, { gem: "sagestone", amulet: "sagestone_amulet", level: 23, xp: 45 }, { gem: "rosestone", amulet: "rosestone_amulet", level: 31, xp: 60 }] as const;
+export function amuletRecipe(gem: string): Recipe {
+  const entry = AMULETS.find(row => row.gem === gem)!;
+  return { skill: "crafting", label: item(entry.amulet).name, level: entry.level, xp: entry.xp, ticks: 2, inputs: { [gem]: 1, string: 1 }, outputs: { [entry.amulet]: 1 } };
+}
+/** Shearing a sheep: wool for your pack, and the sheep looks shorn until its fleece grows back. */
+export function shear(game: Game, monster: Monster) {
+  const player = game.player, def = monster.def.shear;
+  if (!def) return;
+  if (!hasTool(player, "shears")) { message(game, "You need some shears to shear this sheep. Any general store sells them.", "warn"); return; }
+  if ((monster.shorn ?? 0) > game.tick) { message(game, "This sheep has already been shorn. Its wool will grow back."); return; }
+  if (!freeSlots(player)) { message(game, "You haven't got room for the wool.", "warn"); return; }
+  monster.shorn = game.tick + def.regrow; give(player, def.item);
+  message(game, "You shear the sheep. Baa!"); sound(game, "pickup");
+  creature(game, monster, "hurt");
 }
 /** Fletching: feathers on a dozen unfeathered bolts. */
 export function boltRecipe(metal: MetalId): Recipe {
@@ -532,6 +566,7 @@ function interact(game: Game) {
   if (target.kind === "monster") {
     const monster = monsterByUid(game, target.uid);
     if (!monster) return;
+    if (target.option === "Shear") { shear(game, monster); return; }
     player.combat = monster.uid; player.lastHitBy = null;
     if (target.spell) player.autocast = isStaffEquipped(player) ? player.autocast : null;
     player.queuedSpell = target.spell ?? null;
@@ -600,6 +635,7 @@ function interactObject(game: Game, object: WorldObject, option: string, use?: n
     }
     case "range": startCooking(game, "range", object.id, firstRaw(game)); return;
     case "furnace": game.ui.production = { title: "What would you like to smelt?", recipes: smeltingRecipes() }; return;
+    case "wheel": game.ui.production = { title: "What would you like to spin?", recipes: spinningRecipes() }; return;
     case "anvil": openSmithing(game); return;
     case "bank": game.ui.bank = true; sound(game, "click"); return;
     case "altar":
@@ -1337,10 +1373,10 @@ export function castOnItem(game: Game, spellId: string, slotIndex: number) {
     give(player, `${metal.id}_bar`); addXp(game, "smithing", SMELTING[metal.id].xp);
     message(game, `The ore melts into a ${metal.name.toLowerCase()} bar.`); sound(game, "smelt");
   } else if (spell.kind === "enchant") {
-    const recipe = spell.id === "enchant_moonstone" ? ["moonstone", "moonstone_pendant"] : ["rosestone", "rosestone_pendant"];
-    if (slot.id !== recipe[0]) { message(game, `This spell works on a cut ${recipe[0]}.`, "warn"); return false; }
+    const recipe = spell.id === "enchant_moonstone" ? ["moonstone_amulet", "moonstone_pendant"] : ["rosestone_amulet", "rosestone_pendant"];
+    if (slot.id !== recipe[0]) { message(game, `This spell works on a ${item(recipe[0]).name.toLowerCase()} (a cut gem on a string).`, "warn"); return false; }
     payRunes(game, spell); take(player, recipe[0], 1); give(player, recipe[1]);
-    message(game, `The ${recipe[0]} glows and becomes an ${item(recipe[1]).name.toLowerCase()}.`); sound(game, "spell");
+    message(game, `The ${item(recipe[0]).name.toLowerCase()} glows and becomes a ${item(recipe[1]).name.toLowerCase()}.`); sound(game, "spell");
   }
   addXp(game, "magic", spell.xp); player.castTimer = 3; player.activity = null;
   emit(game, { type: "cast", spell: spell.id, tick: game.tick });

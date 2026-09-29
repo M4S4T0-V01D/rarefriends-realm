@@ -324,6 +324,31 @@ test("Sigil stone box: stones mined go in, it fills from the bank, and the altar
   p.stoneBox = 17; const fresh = newGame(); restore(fresh, serialize(g)); assert.equal(fresh.player.stoneBox, 17);
 });
 
+test("Sheep: shear with shears (it looks shorn until the wool grows back), spin the wool into string, string a bow and an amulet", () => {
+  const g = newGame(), p = g.player;
+  p.inventory.fill(null);
+  const sheep = g.monsters.filter(monster => monster.def.id === "sheep");
+  assert(sheep.length >= 4, "a flock in the pen by the farm");
+  const baa = sheep[0];
+  standNear(g, baa.x, baa.y, 1); setTarget(g, { kind: "monster", uid: baa.uid, option: "Shear" }); run(g, 6);
+  assert(!has(p, "wool"), "no shears, no wool");
+  give(p, "shears"); standNear(g, baa.x, baa.y, 1); setTarget(g, { kind: "monster", uid: baa.uid, option: "Shear" }); until(g, () => has(p, "wool"), 40);
+  assert(baa.shorn > g.tick, "the sheep is shorn for a while");
+  standNear(g, baa.x, baa.y, 1); setTarget(g, { kind: "monster", uid: baa.uid, option: "Shear" }); run(g, 6);
+  assert.equal(count(p, "wool"), 1, "a shorn sheep has nothing to give");
+  run(g, baa.def.shear.regrow + 2); assert(baa.shorn <= g.tick, "and its wool grows back");
+  const crafting = p.xp.crafting, wheel = g.world.objects.find(object => object.kind === "wheel");
+  assert(wheel, "a spinning wheel in the farmhouse");
+  standBy(g, wheel); setTarget(g, { kind: "object", id: wheel.id, option: "Spin" }); until(g, () => g.ui.production !== null, 60);
+  startProduction(g, g.ui.production.recipes[0], 1); until(g, () => has(p, "string"), 30);
+  assert(p.xp.crafting > crafting, "spinning trains Crafting");
+  p.xp.fletching = XP_TABLE[10]; give(p, "shortbow_u"); useItemOnItem(g, p.inventory.findIndex(slot => slot?.id === "string"), p.inventory.findIndex(slot => slot?.id === "shortbow_u")); run(g, 6);
+  assert(has(p, "shortbow") && !has(p, "string"), "the string finishes the bow");
+  p.xp.crafting = XP_TABLE[20]; give(p, "string"); give(p, "moonstone");
+  useItemOnItem(g, p.inventory.findIndex(slot => slot?.id === "string"), p.inventory.findIndex(slot => slot?.id === "moonstone")); run(g, 6);
+  assert(has(p, "moonstone_amulet"), "a gem on a string makes an amulet");
+});
+
 test("Beginner fishing by the farm, and a new cook burns far less", () => {
   const g = newGame();
   const pond = g.world.objects.filter(object => object.kind === "spot" && Math.abs(object.x - 76) <= 6 && Math.abs(object.y - 139) <= 4);
@@ -484,8 +509,8 @@ test("magic utility: Gilded Touch, Forgeheart, enchanting, Far Reach, Bonebloom,
   assert(castOnItem(g, "forgeheart", g.player.inventory.findIndex(slot => slot?.id === "blackiron_ore")));
   assert(has(g.player, "ashsteel_bar")); assert(g.player.xp.smithing > smithing);
   // Enchant Moonstone.
-  give(g.player, "moonstone"); run(g, 4);
-  assert(castOnItem(g, "enchant_moonstone", g.player.inventory.findIndex(slot => slot?.id === "moonstone")));
+  give(g.player, "moonstone_amulet"); run(g, 4);
+  assert(castOnItem(g, "enchant_moonstone", g.player.inventory.findIndex(slot => slot?.id === "moonstone_amulet")));
   assert(has(g.player, "moonstone_pendant"));
   // Bonebloom.
   give(g.player, "bones", 3);
@@ -671,8 +696,10 @@ test("Crossbows and war bows: parts from the anvil and the knife, fitted with Cr
   give(p, "knife"); give(p, "logs", 4);
   useItemOnItem(g, p.inventory.findIndex(slot => slot?.id === "knife"), p.inventory.findIndex(slot => slot?.id === "logs"));
   const labels = g.ui.production.recipes.map(recipe => recipe.label);
-  assert(labels.includes("War bow (2 logs)") && labels.includes("Wooden stock"), labels.join(", "));
-  startProduction(g, g.ui.production.recipes.find(recipe => recipe.label === "War bow (2 logs)"), 1); run(g, 10);
+  assert(labels.includes("War bow (unstrung, 2 logs)") && labels.includes("Wooden stock"), labels.join(", "));
+  startProduction(g, g.ui.production.recipes.find(recipe => recipe.label === "War bow (unstrung, 2 logs)"), 1); run(g, 10);
+  assert(has(p, "war_bow_u"), "cut unstrung");
+  give(p, "string"); useItemOnItem(g, p.inventory.findIndex(slot => slot?.id === "string"), p.inventory.findIndex(slot => slot?.id === "war_bow_u")); run(g, 6);
   assert(has(p, "war_bow") && count(p, "logs") === 2, "a war bow takes two logs");
   startProduction(g, fletchingRecipesFor(g, "logs").find(recipe => recipe.label === "Wooden stock"), 1); run(g, 10);
   assert(has(p, "wooden_stock"));

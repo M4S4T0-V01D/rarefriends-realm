@@ -417,7 +417,7 @@ try {
       const g = window.__realm.game(), w = g.world, storey = o => w.floors.find(f => o.x >= f.x0 + f.dx && o.x <= f.x1 + f.dx && o.y >= f.y0 + f.dy && o.y <= f.y1 + f.dy && o.y >= 240)?.level ?? 0;
       const castle = o => storey(o) ? w.floors.some(f => f.complex === "castle" && o.x >= f.x0 + f.dx && o.x <= f.x1 + f.dx && o.y >= f.y0 + f.dy && o.y <= f.y1 + f.dy) : o.x < 140;
       const stairs = w.objects.filter(o => o.look === "stairs" && o.action === action && storey(o) === level && castle(o)).sort((a, b) => b.x - a.x)[0];
-      const open = (x, y) => { const t = w.tiles[y * 240 + x], id = w.objectAt[y * 240 + x]; return t !== 0 && t !== 16 && (id < 0 || !w.objects[id].blocks); };
+      const WW = w.tiles.length / 280, open = (x, y) => { const t = w.tiles[y * WW + x], id = w.objectAt[y * WW + x]; return t !== 0 && t !== 16 && (id < 0 || !w.objects[id].blocks); };
       const [dx, dy] = [[0, 1], [1, 0], [-1, 0], [0, -1]].find(([dx, dy]) => open(stairs.x + dx, stairs.y + dy));
       return { stairs, stand: { x: stairs.x + dx, y: stairs.y + dy } };
     }, [level, action]);

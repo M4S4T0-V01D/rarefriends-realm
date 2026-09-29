@@ -4,6 +4,13 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 29, date: "2026-09-29", title: "Highcairn, the Greyhorn Highlands, sheep and string", items: [
+    "The Realm is bigger: east of the Pale Dunes and south of Frostpeak the island swells into the Greyhorn Highlands, with a ragged new coast. Snowy peaks, scree slopes and crags, all walkable, a mountain lake, and the Greyhorn mine (glimmer, rarite and moonsilver).",
+    "Highcairn, a stone town on a plateau in the middle: a bank, the Highcairn Stores, the Stone Kettle inn, the Highcairn Forge, a mountain shrine and a Rare Market trader. Roads climb to it from the Frostpeak camp and the Oasis.",
+    "Sheep! A new pen between the cows and the chickens. Shear them with shears (any general store) for wool; a shorn sheep looks shorn until its fleece grows back.",
+    "Spin wool into string at a spinning wheel (the farmhouse, or Tessa's tannery in Friendhollow): Crafting level 1.",
+    "Bows need strings now: a knife on logs cuts an unstrung bow (or war bow), and a string finishes it. A string on a cut gem makes an amulet, and the Enchant spells turn moonstone and rosestone amulets into pendants.",
+  ] },
   { id: 28, date: "2026-09-29", title: "Clearer panel tabs", items: [
     "The side panel's tabs have new icons, drawn crisp and shaded like the items so each is easy to tell apart: crossed swords (combat), rising bars (skills), a sealed scroll (quests), a backpack (inventory), a knight's helm (equipment), praying hands (prayer), a spellbook (magic), two Friends (friends), a cog (settings) and a waving smile (emotes).",
   ] },

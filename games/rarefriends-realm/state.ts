@@ -45,7 +45,7 @@ export type Activity =
   | { kind: "firemake"; slot: number; timer: number };
 /** Timed crafting at a station or from the inventory. */
 export type Recipe = {
-  skill: Skill; label: string; level: number; xp: number; ticks: number; station?: "furnace" | "anvil" | "none";
+  skill: Skill; label: string; level: number; xp: number; ticks: number; station?: "furnace" | "anvil" | "wheel" | "none";
   inputs: Readonly<Record<string, number>>; outputs: Readonly<Record<string, number>>; tools?: readonly string[]; chance?: number; coins?: number;
 };
 
@@ -95,6 +95,8 @@ export type Player = {
 };
 export type Monster = {
   uid: number; def: MonsterDef; x: number; y: number; prev: Point; spawn: Point; hp: number; heading: Point;
+  /** A sheared sheep: the tick its wool has grown back. */
+  shorn?: number;
   target: boolean; attackTimer: number; respawnAt: number; dead: boolean; wander: number; moved: number; retreat: number;
   /** The tick it last came back to life (shared fights ignore reports from its previous life for a moment). */
   /** You've wounded it (a world boss you helped fight pays you loot, whoever lands the last blow). */

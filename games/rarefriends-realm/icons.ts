@@ -257,7 +257,9 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
         if (accent) { line(p, [[4, 27], [10, 25], [16, 28], [22, 25], [28, 27]], accent, 2); part(p, disc(16, 15, 3), accent, "metal"); }
         break;
       case "amulet":
-        line(p, [[8, 4], [8, 11], [12, 16], [16, 18], [20, 16], [24, 11], [24, 4]], GOLD_C, 1);
+        // Enchanted pendants hang on gold; a gem simply strung hangs on string, in a little knot.
+        line(p, [[8, 4], [8, 11], [12, 16], [16, 18], [20, 16], [24, 11], [24, 4]], icon.kind === "strung" ? "#e8dcc0" : GOLD_C, icon.kind === "strung" ? 2 : 1);
+        if (icon.kind === "strung") { part(p, disc(16, 24, 4.6, 5.2), color, "gem"); dot(p, 16, 18, "#c9b58f"); break; }
         part(p, disc(16, 23, 6, 6.5), GOLD_C, "metal"); part(p, disc(16, 23, 4, 4.5), color, "gem"); break;
       case "log":
         part(p, poly([[7, 11], [24, 5], [30, 11], [28, 20], [9, 26]]), color, "wood");
@@ -408,7 +410,8 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
         part(p, box(9, 24, 14, 5), shadeHex(color, -0.12), "metal"); break;
       case "bow":
         part(p, stroke([[8, 3], [15, 7], [20, 16], [15, 25], [8, 29]], 3), color, "wood");
-        line(p, [[8, 3], [8, 29]], "#efede7"); part(p, box(17, 13, 5, 6), accent ?? "#8a5a4a", "cloth");
+        if (icon.kind !== "unstrung") line(p, [[8, 3], [8, 29]], "#efede7");
+        part(p, box(17, 13, 5, 6), accent ?? "#8a5a4a", "cloth");
         if (accent) part(p, disc(20, 16, 2), accent, "gem"); break;
       case "arrow": {
         const variant = accent;
@@ -429,6 +432,21 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
         for (const x of [12, 15, 18]) dot(p, x, 24, "#f4efe2");
         dot(p, 16, 20, shadeHex(color, -0.35)); break;
       }
+      case "wool":
+        // A fluffy fleece: overlapping curls, shaded underneath.
+        for (const [x, y, r] of [[11, 18, 6], [20, 17, 6.5], [16, 12, 6], [9, 12, 4.5], [23, 11, 4.5], [15, 22, 5.5], [22, 23, 4.5]] as [number, number, number][]) part(p, disc(x, y, r), color, "cloth");
+        for (const [x, y] of [[12, 16], [18, 11], [21, 19], [14, 23]] as Pt[]) dot(p, x, y, shadeHex(color, -0.25));
+        break;
+      case "string":
+        // A neat hank of string, a loose end trailing.
+        part(p, disc(15, 16, 9, 7), color, "cloth"); part(p, disc(15, 16, 4.5, 3), shadeHex(color, -0.3), "flat");
+        for (const r of [7, 8.5]) for (let a = 0; a < 12; a++) dot(p, Math.round(15 + Math.cos(a / 12 * Math.PI * 2) * r), Math.round(16 + Math.sin(a / 12 * Math.PI * 2) * r * 0.78), shadeHex(color, -0.18));
+        line(p, [[23, 19], [27, 24], [25, 28], [29, 30]], color, 2); break;
+      case "shears":
+        // Sheep shears: two broad blades joined at a spring bow.
+        part(p, stroke([[6, 27], [6, 17], [10, 9], [14, 6], [18, 9], [22, 17], [22, 27]], 2.5), "#8a6a50", "wood");
+        part(p, poly([[5, 27], [9, 27], [13, 3], [11, 2]]), color, "metal"); part(p, poly([[23, 27], [19, 27], [15, 3], [17, 2]]), shadeHex(color, -0.08), "metal");
+        break;
       case "stonebox": {
         // A carved wooden box, lid propped open, pale sigil stones heaped inside, a glowing sigil on its front.
         part(p, poly([[5, 9], [22, 3], [27, 6], [10, 12]]), shadeHex(color, 0.12), "wood");
@@ -460,7 +478,7 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
       case "warbow": {
         // A recurve war bow, taller than a bow: limbs sweeping forward, the tips flicking back, horn nocks, a red leather grip.
         const limb: Pt[] = [[16, 1], [11, 3], [12, 8], [18, 11], [23, 16], [18, 21], [12, 24], [11, 29], [16, 31]];
-        line(p, [[11, 4], [11, 28]], "#efede7");
+        if (icon.kind !== "unstrung") line(p, [[11, 4], [11, 28]], "#efede7");
         part(p, stroke(limb, 4), color, "wood");
         line(p, [[13, 7], [18, 10], [22, 14]], shadeHex(color, 0.25)); line(p, [[22, 18], [18, 22], [13, 25]], shadeHex(color, -0.2));
         for (const [x, y] of [[15, 1], [15, 31]] as Pt[]) part(p, disc(x, y, 1.6), "#3b3a38", "stone");

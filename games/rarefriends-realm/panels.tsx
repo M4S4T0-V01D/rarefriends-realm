@@ -892,7 +892,7 @@ export function GuideModal({ game, skill, onSkill, onClose }: { game: Game; skil
 }
 export function WorldMapModal({ game, onClose, onTravel }: { game: Game; onClose: () => void; onTravel: (x: number, y: number) => void }) {
   const canvas = useRef<HTMLCanvasElement>(null), underground = isUnderground(game.player.y), me = realPoint(game.world, game.player.x, game.player.y);
-  const [focus, setFocus] = useState(() => ({ x: underground ? 130 : 120, y: underground ? 220 : 100, zoom: underground ? 3.2 : 2.3 }));
+  const [focus, setFocus] = useState(() => ({ x: underground ? 130 : 165, y: underground ? 220 : 100, zoom: underground ? 3.2 : 2.1 }));
   const toTile = useRef<((x: number, y: number) => { x: number; y: number }) | null>(null), drag = useRef<{ x: number; y: number; fx: number; fy: number; moved: boolean } | null>(null);
   useEffect(() => {
     const node = canvas.current, ctx = node?.getContext("2d");

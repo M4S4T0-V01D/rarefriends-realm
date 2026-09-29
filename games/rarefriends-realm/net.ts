@@ -10,6 +10,7 @@
  * it, rate-limits chat and strips links. Only Friend IDs travel between players, never wallet addresses. Each
  * player's world (monsters, trees, drops) still runs on their own machine: the Realm shares people, not simulation.
  */
+import { H, W } from "./world.ts";
 export const NET_PRESENCE = "rarefriends-realm:net-presence";
 export const NET_CHAT = "rarefriends-realm:net-chat";
 export const NET_SOCIAL = "rarefriends-realm:net-social";
@@ -73,7 +74,7 @@ const word = (value: unknown, max = 32) => typeof value === "string" && /^[a-z0-
 /** A presence from another player, cleaned up; null if it isn't one. */
 export function cleanPresence(raw: unknown): Presence | null {
   if (!raw || typeof raw !== "object") return null;
-  const r = raw as Record<string, unknown>, who = id(r.id), x = int(r.x, 0, 239), y = int(r.y, 0, 279);
+  const r = raw as Record<string, unknown>, who = id(r.id), x = int(r.x, 0, W - 1), y = int(r.y, 0, H - 1);
   if (who === null || x === null || y === null) return null;
   const worn = Array.isArray(r.worn) ? r.worn.map(entry => word(entry)).filter((entry): entry is string => !!entry).slice(0, 8) : [];
   return {
