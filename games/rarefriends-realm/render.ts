@@ -1322,7 +1322,8 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     if (mount) drawMountHead(ctx, mount.coat, facing, walking, now, feet.x, feet.y, z, scene.reducedMotion);
     restoreMotion();
     if (motion?.text) overheadText(ctx, motion.text, s.x, s.y - 74 * z, "#ffffff");
-    if (player.hp < maxHpOf(game) || game.monsters.some(monster => monster.target && !monster.dead)) hpBar(ctx, s.x, s.y - 62 * z, player.hp / maxHpOf(game), z);
+    // Health bars only while fighting: yours when you're in combat or something's attacking you.
+    if (player.combat !== null || game.monsters.some(monster => monster.target && !monster.dead)) hpBar(ctx, s.x, s.y - 62 * z, player.hp / maxHpOf(game), z);
     for (const hit of scene.hits.filter(entry => entry.on === "player" && now - entry.at < 1100)) splat(ctx, s.x, s.y - 30 * z, hit.damage, z, (now - hit.at) / 1100);
     if (scene.chat && scene.chat.until > now) overheadText(ctx, scene.chat.text, s.x, s.y - 66 * z);
     if (player.stunned > 0) ui(ctx, ctx => { for (let i = 0; i < 3; i++) { const a = now / 200 + i * 2.1; ellipse(ctx, s.x + Math.cos(a) * 12 * z, s.y - 56 * z + Math.sin(a) * 3 * z, 2 * z, 2 * z, C.butter); } });
@@ -1775,7 +1776,7 @@ function drawPeer(ctx: CanvasRenderingContext2D, scene: Scene, peer: PeerView, h
   if (mount) drawMountHead(ctx, mount.coat, facing, peer.moving, now, feet.x, feet.y, z, scene.reducedMotion);
   restoreMotion();
   hits.push({ ...rect, pick: { kind: "peer", id: peer.p.id } });
-  if (peer.p.hp < peer.p.maxHp || peer.p.fight) hpBar(ctx, s.x, rect.y - 22, peer.p.hp / Math.max(1, peer.p.maxHp), z);
+  if (peer.p.fight) hpBar(ctx, s.x, rect.y - 22, peer.p.hp / Math.max(1, peer.p.maxHp), z);
   const tag = `#${peer.p.id} (level-${peer.p.combat})`, tagY = rect.y - (peer.p.hp < peer.p.maxHp || peer.p.fight ? 26 : 2);
   ui(ctx, ctx => {
     ctx.font = `bold ${Math.round(11 * Math.max(0.9, Math.min(1.4, z)))}px ui-monospace, Menlo, Consolas, monospace`; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
@@ -1883,8 +1884,10 @@ function drawMonster(ctx: CanvasRenderingContext2D, scene: Scene, monster: Monst
   const rect = drawMask(ctx, frame, s.x, s.y + 2 * z - hover, px, monster.def.ink ?? INK, mirror);
   hits.push({ ...rect, pick: { kind: "monster", id: monster.uid } });
   const recent = scene.hits.filter(entry => entry.on === "monster" && entry.uid === monster.uid && now - entry.at < 1100);
-  // Every monster shows its health and level, like a nameplate.
-  hpBar(ctx, s.x, rect.y - 8 * z, monster.hp / monster.def.hp, z, 24 + 10 * size, `${monster.def.level}`);
+  // Health and level show while it's fighting: attacking you, your target, in another player's fight, or hit lately.
+  const fighting = monster.target || game.player.combat === monster.uid || scene.hits.some(entry => entry.on === "monster" && entry.uid === monster.uid && now - entry.at < 4000)
+    || (scene.peers ?? []).some(peer => peer.p.fight?.u === monster.uid);
+  if (fighting) hpBar(ctx, s.x, rect.y - 8 * z, monster.hp / monster.def.hp, z, 24 + 10 * size, `${monster.def.level}`);
   for (const hit of recent) splat(ctx, s.x, s.y - rect.h / 2, hit.damage, z, (now - hit.at) / 1100);
   void game;
 }

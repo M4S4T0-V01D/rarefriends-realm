@@ -60,13 +60,14 @@ let fixedTime: number | null = typeof navigator !== "undefined" && navigator.web
 /** Weather from the real clock (tests stay clear unless they set one). */
 /** The world boss's clock: the real one, except in automated runs, where a test sets it (null: no boss). */
 let bossClock: (() => number) | null = typeof navigator !== "undefined" && navigator.webdriver ? null : () => Date.now();
-/** How long drawing a frame takes (a rolling average, ms), and whether auto graphics has dropped to low. */
-const perf = { ms: 0, frames: 0, autoLow: false, autoSharp: true, slowSince: 0, interval: 16.7, lastFrame: 0 };
+/** How long drawing a frame takes (a rolling average, ms), and the real frame interval (for the performance check). */
+const perf = { ms: 0, frames: 0, interval: 16.7, lastFrame: 0 };
 /**
- * Canvas pixels per CSS pixel. Low draws at 1×; High at up to 1.5× on high-DPI screens (the pixel art is scaled up
- * crisply either way, and 1.5× has about half the pixels of 2× to light and shade). Auto starts sharp and, on a slow
- * device, first drops to 1× (keeping the lighting) before it drops to Low.
+ * Graphics are High unless you choose Low in Settings (they never change by themselves; an old "auto" setting is High).
+ * Canvas pixels per CSS pixel: Low draws at 1×, High at up to 1.5× on high-DPI screens (the pixel art is scaled up
+ * crisply either way, and 1.5× has about half the pixels of 2× to light and shade).
  */
+const isLow = (settings: Settings) => settings.graphics === "low";
 const HIGH_SCALE = 1.5;
 let fixedWeather: Weather | null = typeof navigator !== "undefined" && navigator.webdriver ? { rain: 0, storm: false, fog: 0 } : null;
 let lastThunder = -1;
@@ -84,7 +85,7 @@ function loadSettings(): Settings {
       music: flag("music"), sfx: flag("sfx"), musicVolume: unit("musicVolume"), sfxVolume: unit("sfxVolume"), shiftDrop: flag("shiftDrop"), autoMusic: flag("autoMusic"),
       zoom: typeof raw.zoom === "number" && Number.isFinite(raw.zoom) ? Math.max(ZOOM.min, Math.min(ZOOM.max, raw.zoom)) : DEFAULT_SETTINGS.zoom,
       dayNight: typeof raw.dayNight === "boolean" ? raw.dayNight : true, weather: typeof raw.weather === "boolean" ? raw.weather : undefined,
-      graphics: raw.graphics === "high" || raw.graphics === "low" || raw.graphics === "auto" ? raw.graphics : undefined,
+      graphics: raw.graphics === "low" ? "low" : "high",
     };
   } catch { return DEFAULT_SETTINGS; }
 }
@@ -147,9 +148,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       VIEW.width = logical.width; VIEW.height = logical.height; setSize(logical); setSideOpen(logical.width >= 900 || logical.height >= 560);
       const view = canvas.current;
       // Low graphics draws at one pixel per CSS pixel (a sharp screen at 2× costs four times the pixels).
-      const graphics = live.current.settings.graphics ?? "auto", low = graphics === "low" || (graphics === "auto" && perf.autoLow);
-      const sharp = graphics === "high" || (graphics === "auto" && perf.autoSharp);
-      if (view) { const ratio = low || !sharp ? 1 : Math.min(window.devicePixelRatio || 1, HIGH_SCALE); view.width = Math.round(logical.width * scale * ratio); view.height = Math.round(logical.height * scale * ratio); }
+      const low = isLow(live.current.settings);
+      if (view) { const ratio = low ? 1 : Math.min(window.devicePixelRatio || 1, HIGH_SCALE); view.width = Math.round(logical.width * scale * ratio); view.height = Math.round(logical.height * scale * ratio); }
     };
     const observer = new ResizeObserver(measure); observer.observe(node); measure(); resizeRef.current = measure;
     return () => observer.disconnect();
@@ -159,7 +159,6 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const setSettings = useCallback((next: Settings) => {
     if (next.autoMusic && !live.current.settings.autoMusic) region.current = ""; // back to the area's own track on the next tick
     // Choosing a graphics level yourself: Auto measures afresh, and High or Low never change on their own.
-    if ((next.graphics ?? "auto") !== (live.current.settings.graphics ?? "auto")) { perf.autoLow = false; perf.autoSharp = true; perf.slowSince = 0; perf.frames = 0; }
     setSettingsState(next); saveSettings(next); camera.current.zoom = next.zoom;
     const player = audio.current;
     if (player) { player.setMusic(next.music); player.setSfx(next.sfx); player.setVolumes(next.musicVolume, next.sfxVolume); player.unlock(); }
@@ -307,8 +306,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         /** Fix the weather ({ rain, storm, fog }), or null to follow the clock. */
         weather: (value: Weather | null) => { fixedWeather = value; },
         fireworks: () => { const state = game.current; if (state) celebrate(state.player.x, state.player.y, ["#e7a9b0", "#ebc26b", "#9fc6f0", "#b4d4a0"]); },
-        graphics: (level: "auto" | "high" | "low") => setSettings({ ...live.current.settings, graphics: level }),
-        perf: () => ({ ms: Math.round(perf.ms * 100) / 100, fps: Math.round(1000 / perf.interval), quads: textureStats.last, parts: Object.fromEntries(Object.entries(RENDER_PROFILE).map(([k, v]) => [k, Math.round(v * 10) / 10])), low: (live.current.settings.graphics ?? "auto") === "low" || perf.autoLow }),
+        graphics: (level: "auto" | "high" | "low") => setSettings({ ...live.current.settings, graphics: level === "low" ? "low" : "high" }),
+        perf: () => ({ ms: Math.round(perf.ms * 100) / 100, fps: Math.round(1000 / perf.interval), quads: textureStats.last, parts: Object.fromEntries(Object.entries(RENDER_PROFILE).map(([k, v]) => [k, Math.round(v * 10) / 10])), low: isLow(live.current.settings) }),
         boss: (ms: number | null) => { bossClock = ms === null ? null : () => ms; const state = game.current; if (state && ms !== null) { updateWorldBoss(state, ms); refresh(); } },
         view: (zoom: number, pitch: number, angle = 0) => { setSettings({ ...live.current.settings, zoom }); camera.current.pitch = pitch; camera.current.angle = angle; cameraGoal.current = null; },
         screenOf: (x: number, y: number) => {
@@ -477,11 +476,11 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       }
       const ratio = node.width / VIEW.width;
       ctx.setTransform(ratio, 0, 0, ratio, 0, 0); ctx.imageSmoothingEnabled = false;
-      const drawStart = performance.now(), graphics = live.current.settings.graphics ?? "auto";
+      const drawStart = performance.now();
       const step = current === "playing" ? currentStep(state) : null, guideTarget = step?.target?.(state) ?? null;
       renderScene(ctx, {
         guideTarget,
-        low: graphics === "low" || (graphics === "auto" && perf.autoLow),
+        low: isLow(live.current.settings),
         game: state, now, tickAt: tickAt.current, camera: camera.current, friend: friend.current,
         follower: player.follower !== null ? followerSprites.current.get(player.follower) ?? null : null, canonical: CANONICAL,
         hoverTile: current === "playing" ? hoverTile.current : null, marker: marker.current, reducedMotion, hits: hits.current, fireworks: fireworks.current, chat: chat.current,
@@ -498,23 +497,11 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         peers: current === "playing" ? players.current.view(now) : [], peerSprites: id => followerSprites.current.get(id) ?? null,
         peerDrops: current === "playing" ? players.current.drops() : [],
       });
-      // Frame cost: auto graphics drops to low when drawing stays slow for a few seconds (and says so, once).
+      // Frame cost, for the performance check.
       const cost = performance.now() - drawStart; perf.ms = perf.frames++ ? perf.ms * 0.95 + cost * 0.05 : cost;
       // The real frame rate (it counts the GPU's work too); hitches and hidden tabs are left out.
       const gap = now - perf.lastFrame; perf.lastFrame = now;
       if (gap > 0 && gap < 250 && document.visibilityState === "visible") perf.interval = perf.interval * 0.97 + gap * 0.03;
-      if (current === "playing" && graphics === "auto" && !perf.autoLow && perf.frames > 180 && !navigator.webdriver) {
-        if (perf.interval > 28) {
-          perf.slowSince ||= now;
-          if (now - perf.slowSince > 5000) {
-            // First draw fewer pixels (a high-DPI screen at 1×, the lighting kept); only if that's still slow, Low.
-            if (perf.autoSharp && (window.devicePixelRatio || 1) > 1) { perf.autoSharp = false; perf.slowSince = 0; perf.frames = 120; }
-            else { perf.autoLow = true; message(state, "Graphics set to Low to keep things smooth on this device. Choose High in Settings to keep it.", "info"); }
-            resizeRef.current();
-          }
-        }
-        else perf.slowSince = 0;
-      }
       if (mini && current === "playing" && now - lastHud > 90) {
         lastHud = now; const size = mini.canvas.width;
         renderMinimap(mini, state, size, miniZoom.current * (size / 152), camera.current.angle, players.current.view(now), guideTarget);

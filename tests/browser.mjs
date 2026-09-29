@@ -379,7 +379,7 @@ try {
       }
       rows.push(row);
     }
-    await frame().evaluate(() => { window.__realm.graphics("auto"); window.__realm.time(0.5); window.__realm.weather({ rain: 0, storm: false, fog: 0 }); });
+    await frame().evaluate(() => { window.__realm.graphics("high"); window.__realm.time(0.5); window.__realm.weather({ rain: 0, storm: false, fog: 0 }); });
     console.log("Frame cost (ms to draw a frame, headless software rendering):\n" + rows.map(row => `  ${row.name}: High ${row.high.toFixed(1)} · Low ${row.low.toFixed(1)}`).join("\n"));
     for (const row of rows) {
       assert.ok(row.low < row.high * 0.75, `${row.name}: Low is clearly cheaper than High`);
@@ -388,7 +388,8 @@ try {
     await game.getByRole("tab", { name: "Settings" }).click();
     await game.getByRole("radio", { name: "Low" }).click();
     assert.equal(await state(() => window.__realm.perf().low), true, "Settings → Graphics → Low");
-    await game.getByRole("radio", { name: "Auto" }).click();
+    await game.getByRole("radio", { name: "High" }).click();
+    assert.equal(await state(() => window.__realm.perf().low), false, "Settings → Graphics → High");
   }
 
   // ---------- The daily popup: claim the streak, see the challenges, read the update log ----------

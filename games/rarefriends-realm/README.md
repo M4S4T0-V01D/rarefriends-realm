@@ -247,12 +247,10 @@ returns to the title screen with a confirmation that the adventure is safe in th
 **Early levels.** XP in a skill is scaled by your level in it: about half speed at level 1, three-quarters at 15, and the
 full Realm rate from level 30 up, so the first levels mean something. Fixed rewards (lamps, challenges) pay in full.
 
-**Graphics and performance.** Settings → Graphics offers Auto, High and Low. Low turns off the pixel textures, ambient
-life, cloud shadows, cast shadows, footprints and fog, leaves a clear day unlit, lightens the rain, shortens the view and
-draws at 1× on high-DPI screens. Auto
-starts on High and, if the frame rate stays under about 36 fps for five seconds, first draws a high-DPI screen at 1× (the
-lighting kept) and then drops to Low (saying so, once). High and Low never change on their own, and settings are kept in
-the browser. High draws at up to 1.5× on high-DPI screens. The browser
+**Graphics and performance.** Settings → Graphics offers High (the default) and Low; they never change by themselves,
+and settings are kept in the browser. Low turns off the pixel textures, ambient life, cloud shadows, cast shadows,
+footprints and fog, leaves a clear day unlit, lightens the rain, shortens the view and draws at 1× on high-DPI screens.
+High draws at up to 1.5× on high-DPI screens. The browser
 test measures frame cost at three busy scenes on every run. Headless, without a GPU (measured before the new lighting,
 which adds its shadows and light passes to High):
 

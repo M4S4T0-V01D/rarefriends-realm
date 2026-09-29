@@ -258,19 +258,18 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
     switch (piece.kind) {
       case "gear_helm": {
         // A metal cap over the brow, cheek guards and a nose guard; a crest if it has one.
-        const nape = Math.min(neckY - 1, top + 8);
-        if (back) {
-          // From behind the helm is closed: a solid shell over the back of the head down to the neck, with a ridge.
-          p.poly([[l, nape], [l, top], [l + 2, top - 3], [r - 2, top - 3], [r, top], [r, nape]], color, null);
-          p.line(l + 1, top - 1, r - 2, top - 1, light); p.line(Math.round(cx), top - 2, Math.round(cx), nape - 1, dark);
-          p.line(l, nape, r, nape, dark); p.line(l, top + 2, r - 1, top + 2, dark);
-        } else {
-          p.poly([[l, top + 5], [l, top], [l + 2, top - 3], [r - 2, top - 3], [r, top], [r, top + 5], [r - 2, top + 5], [r - 2, top + 2], [l + 2, top + 2], [l + 2, top + 5]], color, null);
-          p.line(l + 1, top - 1, r - 2, top - 1, light); p.line(l, top + 2, r - 1, top + 2, dark);
-          p.rect(Math.round(cx) - 1, top + 2, 2, 3, color);
-          // From the side, the back of the head is covered down to the neck (the face stays open the way you look).
-          if (side) { const b0 = side > 0 ? l : Math.round(cx) + 1, b1 = side > 0 ? Math.round(cx) - 1 : r; p.poly([[b0, top], [b1, top], [b1, nape], [b0, nape]], color, null); p.line(b0, nape, b1, nape, dark); }
+        // One shell in every view, down to the same line all round: open at the face (with a nose guard) from the front,
+        // the opening turned the way you look from the side, and closed from behind with a ridge down the back.
+        const rim = Math.min(neckY - 1, top + 7), mid = Math.round(cx), helm = new Pixels(p.w, p.h);
+        helm.poly([[l, rim], [l, top], [l + 2, top - 3], [r - 2, top - 3], [r, top], [r, rim]], color, null);
+        helm.line(l + 1, top - 1, r - 2, top - 1, light); helm.line(l, rim, r, rim, dark); helm.line(l, top + 1, r - 1, top + 1, dark);
+        if (back) helm.line(mid, top - 2, mid, rim - 1, dark);
+        else {
+          // The face opening, and the nose guard down its middle (towards the side you're facing when turned).
+          const x0 = side > 0 ? mid : l + 2, x1 = side < 0 ? mid : r - 2, nose = side ? mid + side * 3 : mid;
+          for (let y = top + 2; y < rim; y++) for (let x = x0; x <= x1; x++) if (x !== nose && x !== nose - 1 || y > top + 5) helm.set(x, y, 0);
         }
+        for (let y = 0; y < p.h; y++) for (let x = 0; x < p.w; x++) { const v = helm.get(x, y); if (v) p.set(x, y, v); }
         if (isItem(piece.id) && item(piece.id).icon.kind === "horned") {
           // Curled horns sweeping out and up from the sides.
           for (const s2 of side ? [side] : [-1, 1]) { const hx = s2 < 0 ? l : r; p.polyline([[hx, top + 1], [hx + s2 * 4, top - 1], [hx + s2 * 5, top - 5], [hx + s2 * 3, top - 7]], piece.trim ?? "#e8dcc0", 2); }

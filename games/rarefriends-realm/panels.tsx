@@ -113,8 +113,8 @@ export const TABS: readonly { id: Tab; label: string; glyph: string; key: string
   { id: "emotes", label: "Emotes", glyph: "☺", key: "F10" },
 ];
 export type Settings = { music: boolean; sfx: boolean; musicVolume: number; sfxVolume: number; zoom: number; shiftDrop: boolean; autoMusic: boolean; dayNight?: boolean; weather?: boolean;
-  /** Graphics quality: auto (drops to low if frames run slow), high or low. */
-  graphics?: "auto" | "high" | "low" };
+  /** Graphics quality: high (the default) or low. */
+  graphics?: "high" | "low" };
 export type PanelProps = {
   game: Game; tab: Tab; setTab: (tab: Tab) => void; selection: Selection; setSelection: (selection: Selection) => void;
   openMenu: (x: number, y: number, entries: MenuEntry[]) => void; refresh: () => void; roster: readonly OwnedFriend[]; rosterState: "waiting" | "ready" | "none";
@@ -534,8 +534,8 @@ function SettingsTab({ game, settings, setSettings, trackName, trackId, playTrac
       <label className="realm-check"><input type="checkbox" checked={net?.status !== "offline"} onChange={event => onOnline?.(event.target.checked)} /> Online: see and meet other players</label>
       <label className="realm-check"><input type="checkbox" checked={settings.weather !== false} onChange={event => set({ weather: event.target.checked })} /> Weather (rain, storms, fog)</label>
       <div className="realm-graphics" role="radiogroup" aria-label="Graphics">
-        <span>Graphics:</span>{(["auto", "high", "low"] as const).map(level => <button key={level} type="button" role="radio" aria-checked={(settings.graphics ?? "auto") === level} onClick={() => set({ graphics: level })}
-          title={level === "auto" ? "High, dropping to Low by itself if frames run slow" : level === "high" ? "Pixel textures, ambient life, fog and footprints, sharp on high-DPI screens" : "Plain ground, no ambient life, lighter weather: smoothest on older devices"}>{level === "auto" ? "Auto" : level === "high" ? "High" : "Low"}</button>)}
+        <span>Graphics:</span>{(["high", "low"] as const).map(level => <button key={level} type="button" role="radio" aria-checked={(settings.graphics ?? "high") === level} onClick={() => set({ graphics: level })}
+          title={level === "high" ? "Pixel textures, ambient life, fog and footprints, sharp on high-DPI screens" : "Plain ground, no ambient life, lighter weather: smoothest on older devices"}>{level === "high" ? "High" : "Low"}</button>)}
       </div>
       <label className="realm-check"><input type="checkbox" checked={settings.dayNight !== false} onChange={event => set({ dayNight: event.target.checked })} /> Day and night</label>
       <label className="realm-check"><input type="checkbox" checked={settings.shiftDrop} onChange={event => set({ shiftDrop: event.target.checked })} /> Shift-click to drop</label>

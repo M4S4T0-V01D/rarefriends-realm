@@ -4,6 +4,11 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 36, date: "2026-09-29", title: "Cleaner world: health bars in fights only, High by default, whole helms", items: [
+    "Health bars only show while something is fighting: monsters when they're attacking you, you're attacking them, another player is fighting them or they've just been hit; yours and other players' in combat. (A monster's level is still in its right-click menu.)",
+    "Graphics are High by default and never change by themselves; choose Low in Settings if you want it.",
+    "Helms are one shell from every side: open at the face with a nose guard from the front, turned with you from the side, and closed with a ridge from behind.",
+  ] },
   { id: 35, date: "2026-09-29", title: "Dressed-up townsfolk", items: [
     "Villagers wear their own hats (wizard's points, feathered caps, traveller's hats, hoods), some wear capes in every colour and pattern, a few an amulet, and some carry an axe or a pickaxe. Each keeps their look.",
     "Townsfolk dress for their trades: the old miner and the mountain guide carry pickaxes, Axel and the Fernwick foresters axes, the fisher and the miller wear straw hats, and Tamsin the tailor is the best dressed of all.",
