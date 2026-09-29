@@ -177,6 +177,37 @@ export const QUESTS: readonly QuestDef[] = [
     },
   },
   {
+    id: "pilgrims_road", name: "The Pilgrim's Road", points: 1, difficulty: "Intermediate", start: "Talk to Sister Maren in the Dawnhold chapel after The Dawn Vigil.", requirements: ["The Dawn Vigil", "Faith 35"],
+    journal: game => {
+      const s = stage(game, "pilgrims_road");
+      if (s === 0) return ["Sister Maren, the Order's chaplain, sends squires on a pilgrimage once their faith has grown (Faith 35)."];
+      if (s === 1) return ["Sister Maren asked me to pray at the three old altars of the Realm:",
+        ...PILGRIM_ALTARS.map(([key, , where]) => `${data(game, key) ? "✓" : "•"} ${where}`), PILGRIM_ALTARS.every(([key]) => data(game, key)) ? "Then return to her." : ""].filter(Boolean);
+      return ["I walked the Pilgrim's Road and prayed at every old altar of the Realm. QUEST COMPLETE!"];
+    },
+  },
+  {
+    id: "restless_crypt", name: "The Restless Crypt", points: 2, difficulty: "Intermediate", start: "Talk to Sister Maren after Light in the Greyhorn and The Pilgrim's Road.", requirements: ["Light in the Greyhorn", "The Pilgrim's Road", "Faith 45", "A faith weapon"],
+    journal: game => {
+      const s = stage(game, "restless_crypt");
+      if (s === 0) return ["Sister Maren fears the dead are stirring again in the Murkmire crypt."];
+      if (s === 1) return [`The skeletons of the Murkmire crypt won't stay down. Only a blessed weapon lays them to rest for good: I should put ${CRYPT_REST} of them to rest with a faith weapon.`,
+        `Laid to rest: ${Math.min(CRYPT_REST, data(game, "crypt_rest"))}/${CRYPT_REST}`, data(game, "crypt_rest") >= CRYPT_REST ? "Then return to Sister Maren." : ""].filter(Boolean);
+      return ["The crypt is quiet, and the dead there sleep. QUEST COMPLETE!"];
+    },
+  },
+  {
+    id: "dawn_against_hollow", name: "Dawn Against the Hollow", points: 3, difficulty: "Experienced", start: "Talk to Grandmaster Aldric after The Restless Crypt and The Hollow King.", requirements: ["The Restless Crypt", "The Hollow King", "Faith 60", "A faith weapon", "Combat 80+ strongly recommended"],
+    journal: game => {
+      const s = stage(game, "dawn_against_hollow"), p = game.player;
+      if (s === 0) return ["Grandmaster Aldric has one last charge for a knight who has laid the dead to rest and seen the Hollow King fall."];
+      if (s === 1) return ["The Hollow King is ended, but his sentinels still keep his gate in the Hollow Depths. The Order must seal it for good:",
+        `${data(game, "sentinels") >= SENTINELS ? "✓" : "•"} Destroy ${SENTINELS} Hollow sentinels with a faith weapon (${Math.min(SENTINELS, data(game, "sentinels"))}/${SENTINELS})`,
+        `${count(p, "hollow_essence") >= 3 ? "✓" : "•"} Bring 3 Hollow essence to seal the gate with (${count(p, "hollow_essence")}/3)`, "Then return to Grandmaster Aldric."];
+      return ["The Hollow's gate is sealed with the Dawn's light, and I wear the Order's gold. QUEST COMPLETE!"];
+    },
+  },
+  {
     id: "hollow_king", name: "The Hollow King", points: 3, difficulty: "Grandmaster", start: "Talk to Old Glimmer after The Lost Glimmer and Hollow Whispers.", requirements: ["The Lost Glimmer", "Hollow Whispers", "Combat 60+ strongly recommended"],
     journal: game => {
       const s = stage(game, "hollow_king");
@@ -191,6 +222,11 @@ export const questPoints = (game: Game) => QUESTS.reduce((sum, quest) => sum + (
 export function finalStage(quest: string) { return quest === "hollow_whispers" ? 4 : quest === "hollow_king" || quest === "greyhorn_light" ? 3 : 2; }
 /** Bones to offer at the Dawnhold chapel for the Dawn Vigil. */
 const VIGIL_BONES = 8;
+/** The Pilgrim's Road: the old altars to pray at ([quest flag, altar name, where it is]). */
+const PILGRIM_ALTARS = [["pilgrim_chapel", "Altar", "The Friendhollow chapel, west of the fountain"], ["pilgrim_shrine", "Mountain shrine", "The mountain shrine in Highcairn"], ["pilgrim_crypt", "Crypt altar", "The crypt altar in Murkmire"]] as const;
+/** Skeletons to lay to rest (The Restless Crypt) and sentinels to destroy (Dawn Against the Hollow), with a faith weapon. */
+const CRYPT_REST = 12, SENTINELS = 5;
+const faithArmed = (game: Game) => !!(game.player.equipment.weapon && item(game.player.equipment.weapon).equip?.holy);
 export const questDone = (game: Game, quest: string) => stage(game, quest) >= finalStage(quest);
 export const MAX_QUEST_POINTS = QUESTS.reduce((sum, quest) => sum + quest.points, 0);
 
@@ -225,6 +261,14 @@ export function onMonsterKilled(game: Game, monsterId: string, x: number, y: num
     giveOrDrop(game, "torn_quiver"); message(game, "The chief was wearing Hazel's quiver as a hat. You take it back: it's torn, but it's all there.", "quest"); sound(game, "quest");
   }
   if (monsterId === "swamp_lurker") shard("shard_swamp", "glints in the lurker's mud");
+  if (monsterId === "skeleton" && stage(game, "restless_crypt") === 1 && faithArmed(game)) {
+    const n = player.questData.crypt_rest = (player.questData.crypt_rest ?? 0) + 1;
+    if (n === CRYPT_REST) message(game, "The last skeleton crumbles and stays down. I should tell Sister Maren.", "quest");
+  }
+  if (monsterId === "hollow_sentinel" && stage(game, "dawn_against_hollow") === 1 && faithArmed(game)) {
+    const n = player.questData.sentinels = (player.questData.sentinels ?? 0) + 1;
+    if (n === SENTINELS) message(game, `That's ${SENTINELS} Hollow sentinels destroyed by the Dawn's light.`, "quest");
+  }
   if (monsterId === "stone_golem" && stage(game, "greyhorn_light") === 1 && count(player, "dawnstone_shard") < 3 && game.rng() < 0.5) {
     giveOrDrop(game, "dawnstone_shard"); message(game, "Something glows in the golem's rubble: a Dawnstone shard.", "quest"); sound(game, "quest");
   }
@@ -253,6 +297,15 @@ export function onBonesOffered(game: Game, chapel: boolean) {
   if (!chapel || stage(game, "dawn_vigil") !== 1) return;
   const n = game.player.questData.vigil_bones = (game.player.questData.vigil_bones ?? 0) + 1;
   if (n === VIGIL_BONES) { message(game, "The chapel candles all flare at once. The vigil is kept: I should tell Grandmaster Aldric.", "quest"); sound(game, "quest"); }
+}
+/** Praying at an altar: the Pilgrim's Road counts the old altars of the Realm. */
+export function onAltarPrayed(game: Game, altar: { name: string }) {
+  if (stage(game, "pilgrims_road") !== 1) return;
+  const stop = PILGRIM_ALTARS.find(([, name]) => name === altar.name);
+  if (!stop || data(game, stop[0])) return;
+  game.player.questData[stop[0]] = 1;
+  const done = PILGRIM_ALTARS.every(([key]) => data(game, key));
+  message(game, done ? "You kneel at the last of the old altars. The Pilgrim's Road is walked: I should return to Sister Maren." : "You kneel and pray. This altar is one of the Pilgrim's Road.", "quest"); sound(game, "quest");
 }
 /** Dawnstone shards on the Dawnhold altar: three become the Dawnstone. */
 export function consecrateDawnstone(game: Game) {
@@ -523,12 +576,54 @@ export function talk(game: Game, npcId: string): Dialogue {
         take(game.player, "dawnstone"); giveOrDrop(game, "dawn_cape"); addXp(game, "prayer", 5000, { raw: true }); addXp(game, "defence", 2000, { raw: true });
         completeQuest(game, "greyhorn_light", ["2 Quest Points", "Cape of the Dawn", "5,000 Faith XP", "2,000 Defence XP", "The Order's finest weapons"]);
       });
+      const last = stage(game, "dawn_against_hollow");
+      if (last === 0 && questDone(game, "restless_crypt") && questDone(game, "hollow_king")) return chat(name, npcSays(name, "Knight. The Hollow King is gone, but his sentinels still keep his gate in the Depths, and while it stands, the dead will keep rising.",
+        `Destroy ${SENTINELS} of them with a blessed weapon, and bring me three Hollow essence to seal the gate with. Then you'll wear the Order's gold.`), level(game, "prayer") < 60
+        ? [{ label: "I'll seal it.", then: () => chat(name, npcSays(name, "Not yet. That gate would swallow a faith weaker than 60."))}, { label: "Goodbye.", then: () => null }]
+        : [{ label: "I'll seal it.", then: () => chat(name, npcSays(name, "Go with the Dawn."), undefined, () => { game.player.quests.dawn_against_hollow = 1; game.player.questData.sentinels = 0; message(game, "Quest started: Dawn Against the Hollow.", "quest"); }) },
+          { label: "Not yet.", then: () => null }]);
+      if (last === 1) {
+        const ready = data(game, "sentinels") >= SENTINELS && count(game.player, "hollow_essence") >= 3;
+        if (!ready) return chat(name, npcSays(name, `${Math.max(0, SENTINELS - data(game, "sentinels"))} sentinels still stand, and I need ${Math.max(0, 3 - count(game.player, "hollow_essence"))} more Hollow essence for the seal.`));
+        return chat(name, npcSays(name, "The essence, and the sentinels fallen. Sister Maren and I will seal the gate at dawn.", "Kneel. Rise a Knight-Paladin of the Dawn, in the Order's gold."), undefined, () => {
+          take(game.player, "hollow_essence", 3); giveOrDrop(game, "dawnplate_cuirass"); addXp(game, "prayer", 15000, { raw: true }); addXp(game, "defence", 5000, { raw: true });
+          completeQuest(game, "dawn_against_hollow", ["3 Quest Points", "Dawnplate cuirass", "15,000 Faith XP", "5,000 Defence XP", "The title Knight-Paladin"]);
+        });
+      }
       const owned = has(game.player, "dawn_cape") || game.player.equipment.cape === "dawn_cape" || game.player.bank.some(slot => slot.id === "dawn_cape");
       return chat(name, npcSays(name, "The dead are restless in the crypts and the Hollow, knight. Our weapons bite them harder. Keep your faith strong."),
         owned ? undefined : [{ label: "I lost my cape.", then: () => chat(name, npcSays(name, "Here. White and gold, and try to keep it clean."), undefined, () => giveOrDrop(game, "dawn_cape")) }, { label: "Goodbye.", then: () => null }]);
     }
-    case "chaplain": return chat(name, npcSays(name, "Faith is trained like any other strength. Bury bones where you find them, or better, offer them here on the chapel altar: they count three times over.",
-      "Pray at any altar to restore your faith. And a blessed weapon teaches faith with every true blow, a little at a time."));
+    case "chaplain": {
+      const road = stage(game, "pilgrims_road"), crypt = stage(game, "restless_crypt"), p = game.player;
+      const lesson = { label: "How do I grow in faith?", then: () => chat(name, npcSays(name, "Bury bones where you find them, or better, offer them here on the chapel altar: they count three times over.",
+        "Pray at any altar to restore your faith. And a blessed weapon teaches faith with every true blow, a little at a time.")) };
+      const bye = { label: "Goodbye.", then: () => null };
+      if (road === 0 && questDone(game, "dawn_vigil")) return chat(name, npcSays(name, "Every knight of the Dawn walks the Pilgrim's Road once: three old altars, one prayer at each."), level(game, "prayer") < 35
+        ? [{ label: "I'll walk it.", then: () => chat(name, npcSays(name, "Not yet. The road is long for a young faith (Faith 35)."))}, lesson, bye]
+        : [{ label: "I'll walk it.", then: () => chat(name, npcSays(name, "The chapel in Friendhollow, the mountain shrine here in Highcairn, and the old crypt altar in Murkmire. Kneel at each, then come back to me."), undefined, () => {
+          p.quests.pilgrims_road = 1; message(game, "Quest started: The Pilgrim's Road.", "quest"); }) }, lesson, bye]);
+      if (road === 1) {
+        if (!PILGRIM_ALTARS.every(([key]) => data(game, key))) return chat(name, npcSays(name, `Still ${PILGRIM_ALTARS.filter(([key]) => !data(game, key)).map(([, altar]) => altar.toLowerCase()).join(", ")} to pray at. The road waits.`));
+        return chat(name, npcSays(name, "You've the look of someone who's walked a long way to kneel. Good. These are yours: gold for the legs that carried you."), undefined, () => {
+          giveOrDrop(game, "dawnplate_greaves"); addXp(game, "prayer", 4000, { raw: true });
+          completeQuest(game, "pilgrims_road", ["1 Quest Point", "Dawnplate greaves", "4,000 Faith XP"]);
+        });
+      }
+      if (crypt === 0 && questDone(game, "pilgrims_road") && questDone(game, "greyhorn_light")) return chat(name, npcSays(name, "The candles for the Murkmire dead gutter every night. The crypt's skeletons are rising again, and ordinary steel only knocks them down for a while."),
+        level(game, "prayer") < 45
+          ? [{ label: "I'll lay them to rest.", then: () => chat(name, npcSays(name, "Your faith must be stronger first (Faith 45)."))}, lesson, bye]
+          : [{ label: "I'll lay them to rest.", then: () => chat(name, npcSays(name, `Take a blessed weapon to the crypt and lay ${CRYPT_REST} of them to rest. Only a faith weapon's blow keeps them down.`), undefined, () => {
+            p.quests.restless_crypt = 1; p.questData.crypt_rest = 0; message(game, "Quest started: The Restless Crypt.", "quest"); }) }, lesson, bye]);
+      if (crypt === 1) {
+        if (data(game, "crypt_rest") < CRYPT_REST) return chat(name, npcSays(name, `${Math.max(0, CRYPT_REST - data(game, "crypt_rest"))} more to lay to rest, with a faith weapon in your hand.`));
+        return chat(name, npcSays(name, "The candles burn steady again. You've done the dead a kindness. Wear these: the Order's helm, and its sun on your shield."), undefined, () => {
+          giveOrDrop(game, "dawnplate_helm"); giveOrDrop(game, "dawnplate_shield"); addXp(game, "prayer", 7000, { raw: true });
+          completeQuest(game, "restless_crypt", ["2 Quest Points", "Dawnplate helm", "Dawnplate shield", "7,000 Faith XP"]);
+        });
+      }
+      return chat(name, npcSays(name, "Faith is trained like any other strength. Offer your bones, pray, and strike true."), [lesson, bye]);
+    }
     case "quartermaster": return chat(name, npcSays(name, questDone(game, "dawn_vigil") ? "Blessed steel and chaplains' staffs. They'll serve you against anything, and against the dead twice over." : "The armoury is for the Order's own. Keep the Dawn Vigil first."),
       questDone(game, "dawn_vigil") ? [{ label: "Show me.", then: () => { game.ui.shop = "armoury"; return null; } }, { label: "Maybe later.", then: () => null }] : undefined);
     case "dawn_knight": return chat(name, npcSays(name, (["Dawn comes. It always does.", "The golems in the Greyhorn mine hold something of ours.", "A blessed blade cuts the dead like wet paper.", "Offer your bones in the chapel. Sister Maren will light a candle."] as const)[Math.floor(game.rng() * 4)]));

@@ -181,7 +181,7 @@ const maskCache = new Map<string, HTMLCanvasElement>();
 function maskCanvas(rows: Mask, ink: string, mirror = false): HTMLCanvasElement {
   const key = `${ink}|${mirror ? 1 : 0}|${rows.join("")}`;
   let canvas = maskCache.get(key);
-  if (canvas) return canvas;
+  if (canvas) { maskCache.delete(key); maskCache.set(key, canvas); return canvas; }
   const height = rows.length, width = rows[0]?.length ?? 16;
   canvas = document.createElement("canvas"); canvas.width = width + 2; canvas.height = height + 2;
   const ctx = canvas.getContext("2d")!;
@@ -212,15 +212,20 @@ function drawMask(ctx: CanvasRenderingContext2D, rows: Mask, x: number, y: numbe
 const FACES_LEFT = new Set([101, 102, 108, 115, 116, 118, 119, 121]);
 
 // ---------- Primitives ----------
+/**
+ * While objects are drawn again only for their shape (their shadow, or their hole in the light buffer), ink outlines are
+ * left off: the shape is the same and strokes are the slowest thing to draw.
+ */
+let bare = false;
 function poly(ctx: CanvasRenderingContext2D, points: readonly (readonly [number, number])[], fill: string | null, stroke: string | null = INK, width = 1) {
   ctx.beginPath(); points.forEach(([x, y], index) => index ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath();
   if (fill) { ctx.fillStyle = fill; ctx.fill(); }
-  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = width; ctx.stroke(); }
+  if (stroke && !bare) { ctx.strokeStyle = stroke; ctx.lineWidth = width; ctx.stroke(); }
 }
 function ellipse(ctx: CanvasRenderingContext2D, x: number, y: number, rx: number, ry: number, fill: string | null, stroke: string | null = INK, width = 1) {
   ctx.beginPath(); ctx.ellipse(x, y, Math.max(0.5, rx), Math.max(0.5, ry), 0, 0, Math.PI * 2);
   if (fill) { ctx.fillStyle = fill; ctx.fill(); }
-  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = width; ctx.stroke(); }
+  if (stroke && !bare) { ctx.strokeStyle = stroke; ctx.lineWidth = width; ctx.stroke(); }
 }
 function shade(hex: string, amount: number) {
   const n = parseInt(hex.slice(1), 16), f = (v: number) => Math.max(0, Math.min(255, Math.round(v + amount * 255)));
@@ -251,7 +256,7 @@ function box(ctx: CanvasRenderingContext2D, camera: Camera, x: number, y: number
   else poly(ctx, lid, top, null);
   outline(lid);
   // Every face's ink edge in one stroke (shared edges would otherwise be drawn twice, and each stroke is a draw call).
-  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(edges); }
+  if (stroke && !bare) { ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(edges); }
 }
 
 // ---------- Terrain ----------
@@ -1307,7 +1312,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     const stride = walking ? Math.floor(now / 80) % 8 : 0, cloth = scene.reducedMotion ? 0 : walking ? stride % 4 : Math.floor(now / 520) % 4;
     // What's in the hand, and how it moves: a tool at work, a weapon mid-swing, or the weapon at rest (all in the figure).
     const holding = heldPose(scene, pose);
-    const dressed = [...player.worn, ...(player.equipment.cape ? [player.equipment.cape] : []), ...(player.equipment.head ? [player.equipment.head] : []), ...(player.equipment.shield ? [player.equipment.shield] : []), ...(player.equipment.weapon ? [player.equipment.weapon] : []), ...(player.equipment.neck ? [player.equipment.neck] : [])];
+    const dressed = [...player.worn, ...(player.equipment.cape ? [player.equipment.cape] : []), ...(player.equipment.head ? [player.equipment.head] : []), ...(player.equipment.shield ? [player.equipment.shield] : []), ...(player.equipment.weapon ? [player.equipment.weapon] : []), ...(player.equipment.neck ? [player.equipment.neck] : []), ...(player.equipment.body ? [player.equipment.body] : []), ...(player.equipment.legs ? [player.equipment.legs] : [])];
     if (scene.friend) {
       const art = figureArt(friendRows(scene.friend, facing, walking && !mount, mount ? 0 : stride), dressed, facing, cloth, INK, holding), rect = drawFigure(ctx, art, s.x, bodyY + 2 * z, px, pose.alpha), tip = heldTip(art);
       if (pose.line && pose.target && tip) fishingLine(ctx, scene, rect.x + tip.x * px / FIGURE_K, rect.y + tip.y * px / FIGURE_K, project(pose.target.x, pose.target.y));
@@ -1375,7 +1380,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       const kx = (along.rx - along.ry) * TILE_W / 2 * z * perPx, ky = (along.rx + along.ry) * TILE_W / 2 * camera.pitch * z * perPx;
       let px = (across.rx - across.ry) * TILE_W / 2 * z * perW, py = (across.rx + across.ry) * TILE_W / 2 * camera.pitch * z * perW;
       if (px < 0) { px = -px; py = -py; }
-      const saved = texturesOn; texturesOn = false; hush.on = true; uiMuted = true; ctx = sb;
+      const saved = texturesOn; texturesOn = false; bare = true; hush.on = true; uiMuted = true; ctx = sb;
       for (const drawable of drawables) {
         if (!drawable.cast || !drawable.at || Math.abs(drawable.at.x - camera.x) + Math.abs(drawable.at.y - camera.y) > SHADOW_REACH) continue;
         const foot = toScreen(camera, drawable.at.x, drawable.at.y), count = hits.length;
@@ -1383,7 +1388,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
         drawable.draw();
         hits.length = count;
       }
-      ctx = target; texturesOn = saved; hush.on = false; uiMuted = false;
+      ctx = target; texturesOn = saved; bare = false; hush.on = false; uiMuted = false;
     }
     // The shadows keep the sky's light and lose the sun's.
     sb.setTransform(1, 0, 0, 1, 0, 0); sb.globalAlpha = 1; sb.globalCompositeOperation = "source-in";
@@ -1444,18 +1449,18 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     // The same drawing again, as a hole in the light buffer, filled with this thing's light.
     const light = litBy[index] ?? [1, 1, 1] as RGB, rect = drawable.rect || drawable.at ? rectOf(drawable) : screen();
     const count = hits.length, saved = texturesOn;
-    ctx = lb; lb.globalCompositeOperation = "destination-out"; texturesOn = false; hush.on = true; uiMuted = true;
+    ctx = lb; lb.globalCompositeOperation = "destination-out"; texturesOn = false; bare = true; hush.on = true; uiMuted = true;
     drawable.draw();
-    hits.length = count; texturesOn = saved; hush.on = false; uiMuted = false; ctx = target;
+    hits.length = count; texturesOn = saved; bare = false; hush.on = false; uiMuted = false; ctx = target;
     lb.globalAlpha = 1; lb.globalCompositeOperation = "destination-over"; lb.fillStyle = rgbCss(light); lb.fillRect(rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1]);
     lb.globalCompositeOperation = "source-over";
     // And into the haze, at its own distance (near things over far land stay clear).
     if (hazy && rect[1] < hazeBottom) {
       const at = drawable.at && drawable.at.y < FLOOR_Y - 0.5 ? drawable.at : here, far = Math.hypot(at.x - here.x, at.y - here.y);
       const t = Math.max(0, Math.min(1, (far - HAZE_START) / (DRAW_DISTANCE - 4 - HAZE_START))), clear = Math.round(255 * (1 - 0.97 * t * t * (3 - 2 * t)));
-      texturesOn = false; hush.on = true; uiMuted = true; ctx = hb; hb.globalCompositeOperation = "destination-out";
+      texturesOn = false; bare = true; hush.on = true; uiMuted = true; ctx = hb; hb.globalCompositeOperation = "destination-out";
       drawable.draw();
-      hits.length = count; texturesOn = saved; hush.on = false; uiMuted = false; ctx = target;
+      hits.length = count; texturesOn = saved; bare = false; hush.on = false; uiMuted = false; ctx = target;
       hb.globalAlpha = 1; hb.globalCompositeOperation = "destination-over"; hb.fillStyle = `rgb(${clear},${clear},${clear})`; hb.fillRect(rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1]);
       hb.globalCompositeOperation = "source-over";
     }
@@ -1718,11 +1723,11 @@ function drawNpc(ctx: CanvasRenderingContext2D, scene: Scene, npc: Npc, at: { x:
 /** What some NPCs wear, composited into their sprite like your own gear: the King's regalia, and the guards' helms, battleaxes and red capes. */
 const NPC_WEAR: Record<string, readonly string[]> = {
   king: ["paper_crown", "blue_cape"],
-  guard: ["blackiron_helm", "crimson_cape", "blackiron_battleaxe"],
-  royal_guard: ["ashsteel_helm", "crimson_cape", "ashsteel_battleaxe"],
-  captain: ["moonsilver_helm", "crimson_cape", "moonsilver_greatsword", "rosestone_pendant"],
+  guard: ["blackiron_helm", "blackiron_cuirass", "crimson_cape", "blackiron_battleaxe"],
+  royal_guard: ["ashsteel_helm", "ashsteel_cuirass", "ashsteel_greaves", "crimson_cape", "ashsteel_battleaxe"],
+  captain: ["moonsilver_helm", "moonsilver_cuirass", "crimson_cape", "moonsilver_greatsword", "rosestone_pendant"],
   // The Order of the Dawn: white and gold.
-  dawn_knight: ["moonsilver_helm", "dawn_cape", "dawnsteel_sword", "friends_charm"],
+  dawn_knight: ["dawnplate_helm", "dawnplate_cuirass", "dawnplate_greaves", "dawn_cape", "dawnsteel_sword", "dawnplate_shield"],
   grandmaster: ["dawn_cape", "radiant_greatsword", "friends_charm"],
   quartermaster: ["pewter_helm", "dawn_cape", "vigil_spear"],
   chaplain: ["dawn_cape", "dawn_staff", "friends_charm"],
@@ -1735,7 +1740,7 @@ function drawPeer(ctx: CanvasRenderingContext2D, scene: Scene, peer: PeerView, h
   if (peer.p.emote) emoteParticles(peer.p.emote, peer.emoteT, peer.x, peer.y, scene.reducedMotion, peer.p.cape && isItem(peer.p.cape) ? item(peer.p.cape).icon.color : undefined);
   const sprites = scene.peerSprites?.(peer.p.id) ?? null, stride = peer.moving ? Math.floor(now / 80) % 8 : 0;
   const rows = sprites ? friendRows(sprites, facing, peer.moving && !mount, mount ? 0 : stride) : peer.moving && Math.floor(now / 160) % 2 ? friendSprite(peer.p.family, peer.p.id).step : friendSprite(peer.p.family, peer.p.id).idle;
-  const px = 3.2 * z, worn = [...peer.p.worn, ...(peer.p.cape ? [peer.p.cape] : []), ...(peer.p.head ? [peer.p.head] : []), ...(peer.p.shield ? [peer.p.shield] : []), ...(peer.p.weapon ? [peer.p.weapon] : []), ...(peer.p.neck ? [peer.p.neck] : [])], cloth = scene.reducedMotion ? 0 : peer.moving ? stride % 4 : Math.floor(now / 520) % 4;
+  const px = 3.2 * z, worn = [...peer.p.worn, ...(peer.p.cape ? [peer.p.cape] : []), ...(peer.p.head ? [peer.p.head] : []), ...(peer.p.shield ? [peer.p.shield] : []), ...(peer.p.weapon ? [peer.p.weapon] : []), ...(peer.p.neck ? [peer.p.neck] : []), ...(peer.p.body ? [peer.p.body] : []), ...(peer.p.legs ? [peer.p.legs] : [])], cloth = scene.reducedMotion ? 0 : peer.moving ? stride % 4 : Math.floor(now / 520) % 4;
   ellipse(ctx, feet.x, feet.y, (mount ? 32 : 15) * z, (mount ? 10 : 6) * z, "rgba(22,22,22,0.18)", peer.friend ? "rgba(159,224,168,0.9)" : "rgba(255,255,255,0.6)", 1.5);
   if (peer.p.pet && isPet(peer.p.pet)) { const behind = toScreen(camera, peer.x - (peer.p.hx || 0) * 0.9, peer.y - (peer.p.hy || 1) * 0.9); drawPet(ctx, peer.p.pet, behind.x, behind.y, facing, peer.moving, now + peer.p.id * 71, z, scene.reducedMotion); }
   if (mount) drawMount(ctx, mount.coat, facing, peer.moving, now, feet.x, feet.y, z, true, scene.reducedMotion);

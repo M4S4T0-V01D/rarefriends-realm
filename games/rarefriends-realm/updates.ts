@@ -4,6 +4,13 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 34, date: "2026-09-29", title: "Dawnplate, three Order quests, armour you can see, and smoother graphics", items: [
+    "Three new quests for the Order of the Dawn. The Pilgrim's Road (Sister Maren, Faith 35): pray at the Realm's three old altars. The Restless Crypt (Faith 45): lay twelve crypt skeletons to rest with a faith weapon. Dawn Against the Hollow (Grandmaster Aldric, Faith 60, after The Hollow King): destroy five Hollow sentinels with a faith weapon and bring three Hollow essence to seal their gate.",
+    "Dawnplate, the Order's gold armour with white trim (Defence 70, Faith 60): greaves, helm and shield, and the cuirass for Dawn Against the Hollow. Each quest's pieces are sold in the Order Armoury once you've earned them.",
+    "Armour shows on your Friend: cuirasses as breastplates with shoulder plates, vests and robes, and greaves on your legs. Helms are closed at the back now, and the castle guards and knights of the Dawn wear their armour too.",
+    "Your settings are remembered in this browser. High and Low stay as you set them; only Auto adjusts itself, and on a slow high-DPI screen it first draws fewer pixels (keeping the lighting) before it tries Low.",
+    "High draws at up to 1.5× on high-DPI screens (the pixel art looks the same, with about half the pixels of 2× to light), and the lighting's hidden passes skip the ink outlines, so laptops run it more smoothly. Cached art is kept least-recently-used, with less of it.",
+  ] },
   { id: 33, date: "2026-09-29", title: "The Faith update: the Order of the Dawn", items: [
     "Prayer is now Faith. Your levels, XP and prayers carry over; faith is what your prayers draw on, and altars restore it.",
     "The Order of the Dawn keeps Dawnhold, a chapterhouse on a terrace above the sea east of Highcairn (a cobbled causeway runs there through the ridge): Grandmaster Aldric, Sister Maren the chaplain, Quartermaster Bram and the knights of the Dawn in white and gold.",

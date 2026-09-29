@@ -107,7 +107,8 @@ export class Pixels {
 /** Paint once and cache by key. */
 export function pixelArt(key: string, w: number, h: number, paint: (p: Pixels) => void): HTMLCanvasElement {
   let canvas = cache.get(key);
-  if (canvas) return canvas;
+  // Least recently used goes first: a hit moves to the back of the queue.
+  if (canvas) { cache.delete(key); cache.set(key, canvas); return canvas; }
   const p = new Pixels(w, h);
   paint(p);
   canvas = p.toCanvas();

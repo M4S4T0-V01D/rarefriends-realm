@@ -456,7 +456,7 @@ test("A Friend's Feast from start to finish", () => {
   assert.equal(g.player.quests.friends_feast, 2);
   assert.equal(questPoints(g), 1);
   assert(level(g, "cooking") >= 10, "Quest XP");
-  assert.equal(QUESTS.length, 9); assert.equal(MAX_QUEST_POINTS, 13);
+  assert.equal(QUESTS.length, 12); assert.equal(MAX_QUEST_POINTS, 19);
 });
 
 test("Grumblin Trouble counts kills and pays out", () => {
@@ -1313,4 +1313,46 @@ test("Faith: the Order of the Dawn, offerings, the Dawn Vigil, faith weapons and
   assert(has(p, "dawn_cape"), "the Cape of the Dawn");
   assert.equal(capeProblem(g, "radiant_greatsword"), null, "the finest weapons unlock");
   assert.equal(questPoints(g), 3);
+});
+
+test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn Against the Hollow award Dawnplate", () => {
+  const g = newGame({ familyId: 2 }), p = g.player;
+  const talkTo = (id, choose = 0) => {
+    const npc = g.npcs.find(entry => entry.id === id);
+    teleport(g, npc.x, npc.y + 1); if (!canWalk(g, npc.x, npc.y + 1)) teleport(g, npc.x + 1, npc.y);
+    setTarget(g, { kind: "npc", uid: npc.uid, option: "Talk-to" });
+    until(g, () => g.dialogue !== null, 40);
+    while (g.dialogue && g.dialogue.index < g.dialogue.lines.length) continueDialogue(g);
+    if (g.dialogue?.options) chooseOption(g, choose);
+    while (g.dialogue) continueDialogue(g);
+  };
+  const pray = name => { const altar = g.world.objects.find(object => object.kind === "altar" && object.name === name); standBy(g, altar); setTarget(g, { kind: "object", id: altar.id, option: "Pray-at" }); run(g, 3); };
+  p.quests.dawn_vigil = 2; p.quests.greyhorn_light = 3; p.xp.prayer = XP_TABLE[60];
+  assert(capeProblem(g, "dawnplate_greaves"), "Dawnplate is earned first");
+  // The Pilgrim's Road: pray at the three old altars.
+  talkTo("chaplain");
+  assert.equal(p.quests.pilgrims_road, 1);
+  for (const altar of ["Altar", "Mountain shrine", "Crypt altar"]) pray(altar);
+  talkTo("chaplain");
+  assert.equal(p.quests.pilgrims_road, 2); assert(has(p, "dawnplate_greaves"));
+  // The Restless Crypt: only kills with a faith weapon count.
+  talkTo("chaplain");
+  assert.equal(p.quests.restless_crypt, 1);
+  onMonsterKilled(g, "skeleton", 28, 220);
+  assert.equal(p.questData.crypt_rest ?? 0, 0, "ordinary steel doesn't lay them to rest");
+  p.equipment.weapon = "dawnsteel_sword";
+  for (let i = 0; i < 12; i++) onMonsterKilled(g, "skeleton", 28, 220);
+  talkTo("chaplain");
+  assert.equal(p.quests.restless_crypt, 2); assert(has(p, "dawnplate_helm") && has(p, "dawnplate_shield"));
+  // Dawn Against the Hollow: after the Hollow King, five sentinels with a faith weapon and three Hollow essence.
+  p.quests.hollow_king = 3;
+  talkTo("grandmaster");
+  assert.equal(p.quests.dawn_against_hollow, 1);
+  for (let i = 0; i < 5; i++) onMonsterKilled(g, "hollow_sentinel", 60, 230);
+  give(p, "hollow_essence", 3);
+  talkTo("grandmaster");
+  assert.equal(p.quests.dawn_against_hollow, 2); assert(has(p, "dawnplate_cuirass"));
+  assert.equal(count(p, "hollow_essence"), 0);
+  assert.equal(capeProblem(g, "dawnplate_cuirass"), null, "the armoury sells Dawnplate once earned");
+  assert.equal(QUESTS.length, 12); assert.equal(MAX_QUEST_POINTS, 19);
 });

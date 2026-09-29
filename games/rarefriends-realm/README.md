@@ -134,7 +134,7 @@ also drop now and then, and Frostpeak Outfitters sells frostsilver.
 Weapons need that Attack level, armour that Defence level, staffs that Magic level, crossbows that Ranged level, and
 axes and pickaxes that Woodcutting or Mining level to cut and mine (faster at every tier).
 
-## Quests (13 quest points)
+## Quests (19 quest points)
 
 1. **A Friend's Feast** (Cook Mabel, the castle kitchen): an egg, a pot of flour and a bucket of milk.
 2. **Grumblin Trouble** (Captain Rook, the castle's great hall): defeat six Grumblins.
@@ -145,6 +145,9 @@ axes and pickaxes that Woodcutting or Mining level to cut and mine (faster at ev
 7. **Hazel's Quiver** (Hazel, Fernwick): win her grandmother's quiver back from the Grumblin chief, and bring 2 leather, 15 feathers and 5 oak logs to mend it. The reward, worn on your back, returns four in five arrows and bolts to your pack.
 8. **The Dawn Vigil** (Grandmaster Aldric, Dawnhold, east of Highcairn; Faith 10): offer eight bones on the Dawnhold chapel altar. Reward: a Dawnsteel sword, 1,500 Faith XP and the Order Armoury (Quartermaster Bram).
 9. **Light in the Greyhorn** (Grandmaster Aldric, after The Dawn Vigil; Faith 30): take three Dawnstone shards from the stone golems of the Greyhorn mine, bless them on the chapel altar and bring back the Dawnstone. Reward: the Cape of the Dawn, 5,000 Faith XP, 2,000 Defence XP and the armoury's finest faith weapons.
+10. **The Pilgrim's Road** (Sister Maren, Dawnhold, after The Dawn Vigil; Faith 35): pray at the Friendhollow chapel altar, the Highcairn mountain shrine and the Murkmire crypt altar. Reward: Dawnplate greaves, 4,000 Faith XP.
+11. **The Restless Crypt** (Sister Maren, after Light in the Greyhorn and The Pilgrim's Road; Faith 45): lay twelve crypt skeletons to rest with a faith weapon (other kills don't count). Reward: Dawnplate helm and shield, 7,000 Faith XP.
+12. **Dawn Against the Hollow** (Grandmaster Aldric, after The Restless Crypt and The Hollow King; Faith 60): destroy five Hollow sentinels with a faith weapon and bring three Hollow essence. Reward: the Dawnplate cuirass, 15,000 Faith XP, 5,000 Defence XP.
 
 ## The world
 
@@ -247,7 +250,9 @@ full Realm rate from level 30 up, so the first levels mean something. Fixed rewa
 **Graphics and performance.** Settings → Graphics offers Auto, High and Low. Low turns off the pixel textures, ambient
 life, cloud shadows, cast shadows, footprints and fog, leaves a clear day unlit, lightens the rain, shortens the view and
 draws at 1× on high-DPI screens. Auto
-starts on High and drops to Low (saying so, once) if the frame rate stays under about 36 fps for five seconds. The browser
+starts on High and, if the frame rate stays under about 36 fps for five seconds, first draws a high-DPI screen at 1× (the
+lighting kept) and then drops to Low (saying so, once). High and Low never change on their own, and settings are kept in
+the browser. High draws at up to 1.5× on high-DPI screens. The browser
 test measures frame cost at three busy scenes on every run. Headless, without a GPU (measured before the new lighting,
 which adds its shadows and light passes to High):
 

@@ -61,11 +61,34 @@ let fixedTime: number | null = typeof navigator !== "undefined" && navigator.web
 /** The world boss's clock: the real one, except in automated runs, where a test sets it (null: no boss). */
 let bossClock: (() => number) | null = typeof navigator !== "undefined" && navigator.webdriver ? null : () => Date.now();
 /** How long drawing a frame takes (a rolling average, ms), and whether auto graphics has dropped to low. */
-const perf = { ms: 0, frames: 0, autoLow: false, slowSince: 0, interval: 16.7, lastFrame: 0 };
+const perf = { ms: 0, frames: 0, autoLow: false, autoSharp: true, slowSince: 0, interval: 16.7, lastFrame: 0 };
+/**
+ * Canvas pixels per CSS pixel. Low draws at 1×; High at up to 1.5× on high-DPI screens (the pixel art is scaled up
+ * crisply either way, and 1.5× has about half the pixels of 2× to light and shade). Auto starts sharp and, on a slow
+ * device, first drops to 1× (keeping the lighting) before it drops to Low.
+ */
+const HIGH_SCALE = 1.5;
 let fixedWeather: Weather | null = typeof navigator !== "undefined" && navigator.webdriver ? { rain: 0, storm: false, fog: 0 } : null;
 let lastThunder = -1;
 const timeOfDay = () => fixedTime ?? ((Date.now() / DAY_MS + 0.3) % 1);
 const DEFAULT_SETTINGS: Settings = { music: true, sfx: true, musicVolume: 0.7, sfxVolume: 0.8, zoom: 0.8, shiftDrop: false, autoMusic: true, dayNight: true };
+/** Settings are kept in this browser (so High stays High next time); anything missing or odd falls back to the default. */
+const SETTINGS_KEY = "realm-settings";
+function loadSettings(): Settings {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? "null") as Record<string, unknown> | null;
+    if (!raw || typeof raw !== "object") return DEFAULT_SETTINGS;
+    const flag = (key: keyof Settings) => typeof raw[key] === "boolean" ? raw[key] as boolean : DEFAULT_SETTINGS[key] as boolean;
+    const unit = (key: "musicVolume" | "sfxVolume") => typeof raw[key] === "number" && Number.isFinite(raw[key]) ? Math.max(0, Math.min(1, raw[key] as number)) : DEFAULT_SETTINGS[key];
+    return {
+      music: flag("music"), sfx: flag("sfx"), musicVolume: unit("musicVolume"), sfxVolume: unit("sfxVolume"), shiftDrop: flag("shiftDrop"), autoMusic: flag("autoMusic"),
+      zoom: typeof raw.zoom === "number" && Number.isFinite(raw.zoom) ? Math.max(ZOOM.min, Math.min(ZOOM.max, raw.zoom)) : DEFAULT_SETTINGS.zoom,
+      dayNight: typeof raw.dayNight === "boolean" ? raw.dayNight : true, weather: typeof raw.weather === "boolean" ? raw.weather : undefined,
+      graphics: raw.graphics === "high" || raw.graphics === "low" || raw.graphics === "auto" ? raw.graphics : undefined,
+    };
+  } catch { return DEFAULT_SETTINGS; }
+}
+function saveSettings(settings: Settings) { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch { /* storage blocked: settings last for this visit */ } }
 
 /** RareFriends Realm. The SDK runtime supplies wallet connection, the verified owned Friend and the fixed (simulated) RF client. */
 export default function RareFriendsRealm({ friendId, client, paused }: GameComponentProps) {
@@ -83,7 +106,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const [dailyTab, setDailyTab] = useState<DailyTab | null>(null);
   const [hover, setHover] = useState(""), [toast, setToast] = useState<{ title: string; sub?: string } | null>(null), [drops, setDrops] = useState<XpDrop[]>([]);
   const [levelUps, setLevelUps] = useState<{ skill: Skill; level: number }[]>([]), [quest, setQuest] = useState<string | null>(null), [dead, setDead] = useState(false);
-  const [settings, setSettingsState] = useState<Settings>(DEFAULT_SETTINGS), [roster, setRoster] = useState<OwnedFriend[]>([]), [rosterState, setRosterState] = useState<"waiting" | "ready" | "none">("waiting");
+  const [settings, setSettingsState] = useState<Settings>(loadSettings), [roster, setRoster] = useState<OwnedFriend[]>([]), [rosterState, setRosterState] = useState<"waiting" | "ready" | "none">("waiting");
   const [hosted, setHosted] = useState<"waiting" | "linked" | "none">("waiting"), [hasSave, setHasSave] = useState<{ total: number; combat: number; qp: number; where: string } | null>(null);
   const [tailorPick, setTailorPick] = useState(""), [backupStatus, setBackupStatus] = useState(""), [guide, setGuide] = useState<{ skill: Skill | null } | null>(null);
   // Playing together: other players (from the host), who you're following, and a whisper to start in the chat box.
@@ -125,7 +148,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       const view = canvas.current;
       // Low graphics draws at one pixel per CSS pixel (a sharp screen at 2× costs four times the pixels).
       const graphics = live.current.settings.graphics ?? "auto", low = graphics === "low" || (graphics === "auto" && perf.autoLow);
-      if (view) { const ratio = low ? 1 : Math.min(window.devicePixelRatio || 1, 2); view.width = Math.round(logical.width * scale * ratio); view.height = Math.round(logical.height * scale * ratio); }
+      const sharp = graphics === "high" || (graphics === "auto" && perf.autoSharp);
+      if (view) { const ratio = low || !sharp ? 1 : Math.min(window.devicePixelRatio || 1, HIGH_SCALE); view.width = Math.round(logical.width * scale * ratio); view.height = Math.round(logical.height * scale * ratio); }
     };
     const observer = new ResizeObserver(measure); observer.observe(node); measure(); resizeRef.current = measure;
     return () => observer.disconnect();
@@ -134,7 +158,9 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   // ---------- Audio ----------
   const setSettings = useCallback((next: Settings) => {
     if (next.autoMusic && !live.current.settings.autoMusic) region.current = ""; // back to the area's own track on the next tick
-    setSettingsState(next); camera.current.zoom = next.zoom;
+    // Choosing a graphics level yourself: Auto measures afresh, and High or Low never change on their own.
+    if ((next.graphics ?? "auto") !== (live.current.settings.graphics ?? "auto")) { perf.autoLow = false; perf.autoSharp = true; perf.slowSince = 0; perf.frames = 0; }
+    setSettingsState(next); saveSettings(next); camera.current.zoom = next.zoom;
     const player = audio.current;
     if (player) { player.setMusic(next.music); player.setSfx(next.sfx); player.setVolumes(next.musicVolume, next.sfxVolume); player.unlock(); }
   }, []);
@@ -478,7 +504,15 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       const gap = now - perf.lastFrame; perf.lastFrame = now;
       if (gap > 0 && gap < 250 && document.visibilityState === "visible") perf.interval = perf.interval * 0.97 + gap * 0.03;
       if (current === "playing" && graphics === "auto" && !perf.autoLow && perf.frames > 180 && !navigator.webdriver) {
-        if (perf.interval > 28) { perf.slowSince ||= now; if (now - perf.slowSince > 5000) { perf.autoLow = true; message(state, "Graphics set to Low to keep things smooth on this device. Change it in Settings.", "info"); resizeRef.current(); } }
+        if (perf.interval > 28) {
+          perf.slowSince ||= now;
+          if (now - perf.slowSince > 5000) {
+            // First draw fewer pixels (a high-DPI screen at 1×, the lighting kept); only if that's still slow, Low.
+            if (perf.autoSharp && (window.devicePixelRatio || 1) > 1) { perf.autoSharp = false; perf.slowSince = 0; perf.frames = 120; }
+            else { perf.autoLow = true; message(state, "Graphics set to Low to keep things smooth on this device. Choose High in Settings to keep it.", "info"); }
+            resizeRef.current();
+          }
+        }
         else perf.slowSince = 0;
       }
       if (mini && current === "playing" && now - lastHud > 90) {
@@ -930,7 +964,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           <div className="realm-title">
             <div className="realm-logo"><small>An old-school adventure for your Rare Friend</small><h1>RareFriends<span>Realm</span></h1></div>
             <div className="realm-title-card">
-              <FriendPortrait sprites={friend.current} size={96} worn={[...player.worn, ...(["cape", "head", "shield", "weapon", "neck"] as const).flatMap(slot => player.equipment[slot] ? [player.equipment[slot]!] : [])]} />
+              <FriendPortrait sprites={friend.current} size={96} worn={[...player.worn, ...(["cape", "head", "shield", "weapon", "neck", "body", "legs"] as const).flatMap(slot => player.equipment[slot] ? [player.equipment[slot]!] : [])]} />
               <div>
                 <h2>Friend #{player.friendId}</h2>
                 <p><b>{FAMILY_NAMES[player.familyId]}</b>: {FAMILY_PERKS[player.familyId].title}. {FAMILY_PERKS[player.familyId].text}</p>

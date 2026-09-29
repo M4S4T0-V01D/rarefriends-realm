@@ -514,12 +514,23 @@ const FAITH_GEAR: Item[] = [
     equip: { slot: "weapon", bonuses: { attack: 10, strength: 12, magic: 32, prayer: 8 }, requires: { magic: 65, prayer: 70 }, speed: 5, staff: true, holy: true } },
   { id: "dawn_cape", name: "Cape of the Dawn", examine: "White and gold: a knight of the Order of the Dawn.", value: 0, tradeable: false, icon: { shape: "cape", color: "#ecebe6", accent: DAWN_GOLD, kind: "cross" },
     equip: { slot: "cape", bonuses: { defence: 3, prayer: 6 } } },
+  // Dawnplate: the Order's own armour, gold with white trim, for knights who've earned it (Defence 70, Faith 60).
+  { id: "dawnplate_helm", name: "Dawnplate helm", examine: "Gold, with a white crest. The Order's finest helm.", value: 32000, icon: { shape: "helm", color: "#d9b866", accent: "#f7f5f0" },
+    equip: { slot: "head", bonuses: { defence: 47, magic: -3, prayer: 4 }, requires: { defence: 70, prayer: 60 } } },
+  { id: "dawnplate_cuirass", name: "Dawnplate cuirass", examine: "A breastplate of gold, trimmed in white. It seems to catch the first light even at dusk.", value: 96000, icon: { shape: "body", color: "#d9b866", accent: "#f7f5f0" },
+    equip: { slot: "body", bonuses: { defence: 190, magic: -12, prayer: 6 }, requires: { defence: 70, prayer: 60 } } },
+  { id: "dawnplate_greaves", name: "Dawnplate greaves", examine: "Gold greaves, white at the knee.", value: 48000, icon: { shape: "legs", color: "#d9b866", accent: "#f7f5f0" },
+    equip: { slot: "legs", bonuses: { defence: 102, magic: -7, prayer: 4 }, requires: { defence: 70, prayer: 60 } } },
+  { id: "dawnplate_shield", name: "Dawnplate shield", examine: "A gold heater shield with the Order's white sun.", value: 48000, icon: { shape: "shield", color: "#d9b866", accent: "#f7f5f0" },
+    equip: { slot: "shield", bonuses: { defence: 112, prayer: 4 }, requires: { defence: 70, prayer: 60 } } },
   { id: "dawnstone_shard", name: "Dawnstone shard", examine: "A shard of the Order's lost relic. Warm, like a stone left in the sun.", value: 0, tradeable: false, icon: { shape: "gem", color: "#f2e3b0", accent: DAWN_GOLD } },
   { id: "dawnstone", name: "Dawnstone", examine: "The Order of the Dawn's relic, whole again and blessed.", value: 0, tradeable: false, icon: { shape: "orb", color: "#fff2c0" } },
 ];
 /** What the Order's armoury sells: the first weapons once you've kept the Dawn Vigil, the rest after Light in the Greyhorn. */
 export const ARMOURY_FIRST = ["dawnsteel_sword", "vigil_spear", "acolyte_staff"] as const;
 export const ARMOURY_LATER = ["radiant_greatsword", "sunforged_warhammer", "dawn_staff", "first_light_staff"] as const;
+/** Dawnplate, sold once the quest that awards each piece is done. */
+export const DAWNPLATE_QUEST: Record<string, string> = { dawnplate_greaves: "pilgrims_road", dawnplate_helm: "restless_crypt", dawnplate_shield: "restless_crypt", dawnplate_cuirass: "dawn_against_hollow" };
 
 export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...FAITH_GEAR]);
 const ITEM_MAP = new Map(ITEM_LIST.map(item => [item.id, item]));
@@ -859,7 +870,7 @@ export const SHOPS: Record<string, ShopDef> = {
   axes: { id: "axes", name: "Axel's Axes", buys: ["logs"], rate: 0.6, stock: ["pewter_axe", "blackiron_axe", "ashsteel_axe", "moonsilver_axe", "pewter_pickaxe", "blackiron_pickaxe", "ashsteel_pickaxe", "moonsilver_pickaxe"] },
   swords: { id: "swords", name: "Emberforge Arms", buys: ["ore", "bar", "weapon", "armour"], rate: 0.55, stock: ["pewter_sword", "blackiron_sword", "ashsteel_sword", "pewter_sabre", "blackiron_sabre", "ashsteel_sabre", "moonsilver_sabre", "pewter_shield", "blackiron_shield", "blackiron_helm", "ashsteel_helm", "blackiron_cuirass"] },
   sigils: { id: "sigils", name: "Runa's Sigils", buys: ["sigil", "magic"], rate: 0.6, stock: ["sigil_box", "breeze_sigil", "tide_sigil", "stone_sigil", "ember_sigil", "thought_sigil", "shade_sigil", "storm_sigil", "bloom_sigil", "star_sigil", "path_sigil", "hollow_sigil", "staff", "breeze_staff", "scholar_hat", "scholar_robe"] },
-  armoury: { id: "armoury", name: "The Order Armoury", buys: ["weapon"], rate: 0.5, stock: [...ARMOURY_FIRST, ...ARMOURY_LATER] },
+  armoury: { id: "armoury", name: "The Order Armoury", buys: ["weapon"], rate: 0.5, stock: [...ARMOURY_FIRST, ...ARMOURY_LATER, ...Object.keys(DAWNPLATE_QUEST)] },
   tailor: { id: "tailor", name: "Threadneedle Tailors", buys: ["armour"], rate: 0.5, stock: ["team_cape", ...TAILOR_STOCK, "scholar_hat"] },
   crafting: { id: "crafting", name: "Tessa's Tannery", buys: ["hide"], rate: 0.6, stock: ["needle", "thread", "chisel", "leather", "leather_gloves", "leather_boots"] },
   oasis: { id: "oasis", name: "Oasis Bazaar", buys: ["gem", "jewellery", "food"], rate: 0.7, stock: ["cake", "bread", "inkshark", "sailfish", "silk", "rough_moonstone", "friends_charm", "moonstone_pendant"] },
