@@ -369,7 +369,7 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
   p.halo(); p.halo();
   canvas = p.toCanvas();
   if (tip) (canvas as HTMLCanvasElement & { tip?: { x: number; y: number } }).tip = tip;
-  if (cache.size > 500) cache.delete(cache.keys().next().value!);
+  if (cache.size > 800) cache.delete(cache.keys().next().value!);
   cache.set(key, canvas);
   return canvas;
 }

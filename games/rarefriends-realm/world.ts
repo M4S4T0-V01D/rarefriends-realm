@@ -524,6 +524,7 @@ export function createWorld(seed = 20260927): World {
   npc("hazel", 26, 65); decor(24, 63, "shelf"); decor(29, 63, "shelf"); decor(24, 66, "crate"); decor(29, 66, "barrel");
   building(33, 62, 42, 68, "s", T.WOOD, undefined, { name: "Fernwick lodge", chimney: true });
   add({ kind: "bank", x: 34, y: 65, blocks: true, name: "Bank booth" }); add({ kind: "bank", x: 35, y: 65, blocks: true, name: "Bank booth" }); npc("banker", 34, 64);
+  npc("villager", 30, 71, 4); npc("villager", 38, 72, 4); npc("villager", 45, 70, 4);
   npc("rowan", 40, 65); decor(41, 63, "logpile", true, "Stacked timber"); decor(41, 66, "crate"); decor(39, 63, "table");
   building(22, 74, 27, 78, "n");                                                                  // Old Birch's cottage
   decor(23, 77, "bed"); decor(26, 75, "table");
@@ -571,7 +572,7 @@ export function createWorld(seed = 20260927): World {
 
   // ---------- Frostpeak ----------
   building(192, 27, 199, 32, "w", T.WOOD, undefined, { name: "Frostpeak lodge", color: "#f3f2ee", chimney: true });      // Frostpeak lodge
-  add({ kind: "bank", x: 197, y: 28, blocks: true, name: "Bank booth" }); npc("banker", 196, 29); npc("outfitter", 194, 30);
+  add({ kind: "bank", x: 197, y: 28, blocks: true, name: "Bank booth" }); npc("banker", 196, 29); npc("outfitter", 194, 30); npc("villager", 200, 34, 3); npc("villager", 191, 33, 3);
   add({ kind: "range", x: 193, y: 28, blocks: true, name: "Cooking range" });
   scatter(172, 6, 236, 44, 60, (x, y) => decor(x, y, random() > 0.3 ? "pine" : "boulder"), (x, y) => free(x, y) && get(x, y) === T.SNOW);
   scatter(200, 36, 230, 44, 10, (x, y) => tree(x, y, "ashwood"), (x, y) => free(x, y) && get(x, y) === T.SNOW);
@@ -711,7 +712,7 @@ export function createWorld(seed = 20260927): World {
   for (const [lx, ly] of [[274, 78], [291, 78], [274, 83], [291, 83], [282, 73], [282, 87]] as const) decor(lx, ly, "lamp");
   for (const [bx, by] of [[278, 77], [287, 82]] as const) decor(bx, by, "banner");
   decor(279, 82, "bench"); decor(286, 76, "bench");
-  npc("mountain_guide", 280, 84, 3); npc("villager", 285, 84, 5); npc("villager", 277, 80, 5);
+  npc("mountain_guide", 280, 84, 3); npc("villager", 285, 84, 5); npc("villager", 277, 80, 5); npc("villager", 280, 76, 5);
   add({ kind: "sign", x: 266, y: 85, blocks: true, name: "Signpost", text: "Highcairn. North-west: the Frostpeak camp. West: the Oasis. North-east: the Greyhorn mine. South: Greyhorn Tarn." });
   // Dawnhold, the chapterhouse of the Order of the Dawn, on a terrace above the sea east of Highcairn: a cobbled
   // causeway through the ridge, a courtyard, the chapel (its altar takes offered bones), and the hall with the armoury.

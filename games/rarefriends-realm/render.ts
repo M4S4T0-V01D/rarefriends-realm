@@ -1709,7 +1709,7 @@ function drawNpc(ctx: CanvasRenderingContext2D, scene: Scene, npc: Npc, at: { x:
   } else {
     const set = friendSprite(def.art.family, def.art.seed + (npc.id === "villager" || npc.id === "banker" || npc.id === "guard" ? npc.uid : 0));
     const frame = at.moving && Math.floor(now / 160) % 2 ? set.step : set.idle, bob = !scene.reducedMotion && def.art.family === 5 ? Math.sin(now / 400 + npc.uid) * 2 * z : 0;
-    const regalia = NPC_WEAR[npc.id];
+    const regalia = npc.id === "villager" ? citizenLook(npc.uid) : NPC_WEAR[npc.id];
     // The King wears his crown and cape, and the guards their helms, red capes and battleaxes, like your own gear.
     if (regalia) rect = drawFigure(ctx, figureArt(frame, regalia, screenFacing(camera, npc.heading), scene.reducedMotion ? 0 : Math.floor(now / 520) % 4), s.x, s.y + 2 * z - bob, 2.6 * z);
     else rect = drawMask(ctx, frame, s.x, s.y + 2 * z - bob, 2.6 * z, INK, screenFacing(camera, npc.heading) === "left");
@@ -1731,7 +1731,31 @@ const NPC_WEAR: Record<string, readonly string[]> = {
   grandmaster: ["dawn_cape", "radiant_greatsword", "friends_charm"],
   quartermaster: ["pewter_helm", "dawn_cape", "vigil_spear"],
   chaplain: ["dawn_cape", "dawn_staff", "friends_charm"],
+  // Townsfolk dressed for their trades (tools, never weapons).
+  miner: ["leather_hood", "pewter_pickaxe"], axel: ["forest_feathered_cap", "blackiron_axe"], rowan: ["leather_wide_hat", "forest_cape", "ashsteel_axe"],
+  birch: ["straw_wide_hat", "pewter_axe"], fisher: ["straw_wide_hat", "teal_cape"], miller: ["straw_wide_hat"], mountain_guide: ["felt_wide_hat", "russet_cape", "pewter_pickaxe"],
+  cook: ["snow_cape"], tailor: ["plum_wizard_hat", "bordered_cape", "sagestone_amulet"], shop_general: ["russet_feathered_cap"], innkeeper: ["crimson_cape"],
+  kettle_keeper: ["felt_wide_hat"], cairn_trader: ["royal_feathered_cap", "halved_cape"], trader_frost: ["leather_hood", "snow_cape"],
 };
+/**
+ * A villager's own look, the same every time you meet them (from their uid): most wear a hat, some a cape, a few an
+ * amulet, and now and then one carries an axe or a pickaxe (never a weapon).
+ */
+const CITIZEN_HATS = ["scholar_hat", "crimson_wizard_hat", "emerald_wizard_hat", "midnight_wizard_hat", "plum_wizard_hat", "golden_wizard_hat", "crimson_feathered_cap", "forest_feathered_cap",
+  "royal_feathered_cap", "russet_feathered_cap", "straw_wide_hat", "felt_wide_hat", "leather_wide_hat", "leather_hood", "paper_crown"];
+const CITIZEN_CAPES = ["crimson_cape", "royal_cape", "forest_cape", "snow_cape", "plum_cape", "golden_cape", "russet_cape", "teal_cape", "rose_cape", "team_cape",
+  "striped_cape", "halved_cape", "chevron_cape", "quartered_cape", "starry_cape", "pilgrim_cape"];
+const CITIZEN_TOOLS = ["pewter_axe", "blackiron_axe", "pewter_pickaxe", "blackiron_pickaxe"];
+const citizenWear = new Map<number, readonly string[]>();
+function citizenLook(uid: number): readonly string[] {
+  let look = citizenWear.get(uid);
+  if (look) return look;
+  const roll = (salt: number) => hash(uid * 13 + salt, uid * 7 + salt * 3), pick = <T,>(list: readonly T[], salt: number) => list[Math.floor(roll(salt) * list.length) % list.length];
+  look = [...(roll(1) < 0.8 ? [pick(CITIZEN_HATS, 2)] : []), ...(roll(3) < 0.4 ? [pick(CITIZEN_CAPES, 4)] : []),
+    ...(roll(5) < 0.15 ? [pick(["moonstone_amulet", "sagestone_amulet", "rosestone_amulet"], 6)] : []), ...(roll(7) < 0.2 ? [pick(CITIZEN_TOOLS, 8)] : [])];
+  citizenWear.set(uid, look);
+  return look;
+}
 /** Another player: their Friend (canonical art once loaded, family art until then), wardrobe, cape and weapon, a name tag (green for friends) and their chat. */
 function drawPeer(ctx: CanvasRenderingContext2D, scene: Scene, peer: PeerView, hits: Hit[]) {
   const { camera, now } = scene, z = camera.zoom, turned = screenFacing(camera, { x: peer.p.hx, y: peer.p.hy || 1 });

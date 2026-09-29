@@ -4,6 +4,11 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 35, date: "2026-09-29", title: "Dressed-up townsfolk", items: [
+    "Villagers wear their own hats (wizard's points, feathered caps, traveller's hats, hoods), some wear capes in every colour and pattern, a few an amulet, and some carry an axe or a pickaxe. Each keeps their look.",
+    "Townsfolk dress for their trades: the old miner and the mountain guide carry pickaxes, Axel and the Fernwick foresters axes, the fisher and the miller wear straw hats, and Tamsin the tailor is the best dressed of all.",
+    "More villagers about in Fernwick, the Frostpeak camp and Highcairn.",
+  ] },
   { id: 34, date: "2026-09-29", title: "Dawnplate, three Order quests, armour you can see, and smoother graphics", items: [
     "Three new quests for the Order of the Dawn. The Pilgrim's Road (Sister Maren, Faith 35): pray at the Realm's three old altars. The Restless Crypt (Faith 45): lay twelve crypt skeletons to rest with a faith weapon. Dawn Against the Hollow (Grandmaster Aldric, Faith 60, after The Hollow King): destroy five Hollow sentinels with a faith weapon and bring three Hollow essence to seal their gate.",
     "Dawnplate, the Order's gold armour with white trim (Defence 70, Faith 60): greaves, helm and shield, and the cuirass for Dawn Against the Hollow. Each quest's pieces are sold in the Order Armoury once you've earned them.",
