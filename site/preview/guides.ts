@@ -10,7 +10,7 @@ const INTRO: Record<Skill, string> = {
   ranged: "Bows fire the best arrows in your pack. Accurate, Rapid (faster) and Longrange (+2 tiles) styles.",
   hitpoints: "Your health. Every hit you land in combat trains it. Eat to heal.",
   magic: "Spells paid in sigils: combat, curses, utility and teleports. Elemental staffs give free sigils of their element.",
-  prayer: "Bury bones for XP; pray at altars to recharge. Prayers boost your stats while they drain.",
+  prayer: "Bury bones, or offer them on an altar (three times the XP in the Dawnhold chapel). Pray at altars to restore your faith; prayers boost your stats while they drain. The Order of the Dawn's weapons train Faith with every hit.",
   sigilcraft: "Mine sigil stones in the Wizards' Tower and press them at the eleven altars across the Realm.",
   woodcutting: "Chop trees for logs. Better axes chop faster.",
   fletching: "A knife on logs makes shafts or bows; feathers and anvil-smithed heads finish arrows.",

@@ -4,6 +4,21 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 33, date: "2026-09-29", title: "The Faith update: the Order of the Dawn", items: [
+    "Prayer is now Faith. Your levels, XP and prayers carry over; faith is what your prayers draw on, and altars restore it.",
+    "The Order of the Dawn keeps Dawnhold, a chapterhouse on a terrace above the sea east of Highcairn (a cobbled causeway runs there through the ridge): Grandmaster Aldric, Sister Maren the chaplain, Quartermaster Bram and the knights of the Dawn in white and gold.",
+    "New quest, The Dawn Vigil (Novice, Faith 10): offer bones on the Dawnhold chapel altar and become a squire of the Order. Reward: a Dawnsteel sword, 1,500 Faith XP and the Order Armoury.",
+    "New quest, Light in the Greyhorn (Intermediate, Faith 30): win the shards of the Order's broken relic back from the stone golems of the Greyhorn mine and bless them on the altar. Reward: the Cape of the Dawn, 5,000 Faith XP, 2,000 Defence XP and the Order's finest weapons.",
+    "Faith weapons, which need Faith as well as Attack or Magic: the Dawnsteel sword, the Vigil spear, the Radiant greatsword and the Sunforged warhammer, and the Acolyte's staff, the Dawn staff and the Staff of the First Light. Every hit you land with one gives a little Faith XP, and they hurt the undead (skeletons, shades and the Hollow) harder.",
+    "More ways to train Faith: use bones on any altar to offer them for twice the XP of burying, or three times on the Dawnhold chapel altar.",
+  ] },
+  { id: 32, date: "2026-09-29", title: "Capes, hats and amulets, and sharper guards", items: [
+    "Threadneedle Tailors on Market Street, across from Heft & Haft: capes in ten solid colours and seven patterns (stripes, halves, a chevron, quarters, a gold border, stars and a pilgrim's cross), wizard hats in six colours, feathered caps and wide-brimmed traveller's hats.",
+    "Amulets and pendants show on your Friend now (and on other players), hanging round the neck.",
+    "Seen from behind, your weapon or tool is held beside your cape instead of cutting across it.",
+    "The castle guards wear helms and red capes and carry battleaxes; Captain Rook carries a greatsword.",
+    "Snowy peaks no longer vanish when you turn the camera (the land is drawn back to front at every angle), and the distance haze follows the land, so nearby mountains are never hazed.",
+  ] },
   { id: 31, date: "2026-09-29", title: "New lighting: real shadows, sunlight and lamplight", items: [
     "The sun moves across the sky: it rises in the east, crosses the south and sets in the west. Buildings, walls, trees, rocks, characters and mounts cast shadows that follow it, long and golden at dawn and dusk, short at noon, and faint in the moonlight.",
     "Lamps, torches, fires, forges and spells light the ground and everything standing near them instead of glowing over it, and walls, rocks and trees block their light.",

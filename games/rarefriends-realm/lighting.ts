@@ -116,7 +116,7 @@ function buildStatic(world: World, colors: Record<number, string>): Static {
   const K = 2;
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const i = y * W + x;
-    if (roofed[i]) { ao[i] = 0.5; continue; }
+    if (roofed[i]) { ao[i] = 0.74; continue; }
     let hidden = 0, total = 0;
     for (let dy = -K; dy <= K; dy++) for (let dx = -K; dx <= K; dx++) {
       if (!dx && !dy) continue;
@@ -172,7 +172,33 @@ export class LightField {
   readonly canvas: HTMLCanvasElement;
   private image: ImageData | null = null;
   private sunCache = new Map<number, number>();
-  constructor() { this.canvas = document.createElement("canvas"); }
+  /** How clearly each point of the ground is seen through the haze (white clear, darker hazier), at the map's grid. */
+  readonly haze: HTMLCanvasElement;
+  private hazeImage: ImageData | null = null;
+  constructor() { this.canvas = document.createElement("canvas"); this.haze = document.createElement("canvas"); }
+
+  /**
+   * The haze by distance from (cx, cy): clear to `start` tiles, 97% haze by `end`. Returns false when nothing in the map
+   * is far enough to be hazed (then there's nothing to draw).
+   */
+  buildHaze(cx: number, cy: number, start: number, end: number) {
+    const { gw, gh, S, x0, y0 } = this;
+    if (this.haze.width !== gw || this.haze.height !== gh) { this.haze.width = gw; this.haze.height = gh; this.hazeImage = null; }
+    const ctx = this.haze.getContext("2d")!;
+    if (!this.hazeImage) this.hazeImage = ctx.createImageData(gw, gh);
+    const px = this.hazeImage.data;
+    let any = false;
+    for (let j = 0; j < gh; j++) {
+      const dy = y0 - 0.5 + (j + 0.5) / S - cy;
+      for (let i = 0; i < gw; i++) {
+        const dx = x0 - 0.5 + (i + 0.5) / S - cx, v = 255 * (1 - 0.97 * smooth(start, end, Math.hypot(dx, dy))), o = (j * gw + i) * 4;
+        if (v < 254) any = true;
+        px[o] = px[o + 1] = px[o + 2] = v; px[o + 3] = 255;
+      }
+    }
+    if (any) ctx.putImageData(this.hazeImage, 0, 0);
+    return any;
+  }
 
   /** Rebuild for the tiles x0–x1, y0–y1 with `samples` per tile edge. */
   build(world: World, colors: Record<number, string>, sky: Sky, lights: PointLight[], x0: number, y0: number, x1: number, y1: number, samples: number) {
@@ -247,9 +273,9 @@ export class LightField {
   /**
    * Project the light map onto the ground on `ctx` (source-over, so it replaces what's there): in patches small enough
    * that each is flat, following the hills (`project` is world → screen on the ground). `coarse` lays big patches
-   * without following the hills, for Low.
+   * without following the hills, for Low. `source` is the light map, or the haze.
    */
-  drawGround(ctx: CanvasRenderingContext2D, project: Projector, heights: (i: number, j: number) => number, coarse = false) {
+  drawGround(ctx: CanvasRenderingContext2D, project: Projector, heights: (i: number, j: number) => number, coarse = false, source: HTMLCanvasElement = this.canvas) {
     const S = this.S, tw = this.gw / S, th = this.gh / S, base = ctx.getTransform();
     ctx.imageSmoothingEnabled = true;
     const patch = (ti: number, tj: number, size: number) => {
@@ -271,7 +297,7 @@ export class LightField {
       const ox = p0.x - a * u0 - c * v0, oy = p0.y - b * u0 - d * v0;
       ctx.setTransform(base.a * a + base.c * b, base.b * a + base.d * b, base.a * c + base.c * d, base.b * c + base.d * d, base.a * ox + base.c * oy + base.e, base.b * ox + base.d * oy + base.f);
       const su = Math.max(0, u0 - e), sv = Math.max(0, v0 - e), eu = Math.min(this.gw, u0 + du + e), ev = Math.min(this.gh, v0 + dv + e);
-      ctx.drawImage(this.canvas, su, sv, eu - su, ev - sv, su, sv, eu - su, ev - sv);
+      ctx.drawImage(source, su, sv, eu - su, ev - sv, su, sv, eu - su, ev - sv);
     };
     const SIZE = coarse ? 16 : 8;
     for (let tj = 0; tj < th; tj += SIZE) for (let ti = 0; ti < tw; ti += SIZE) patch(ti, tj, SIZE);

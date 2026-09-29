@@ -3,7 +3,7 @@
  * Pure TypeScript over the Game state, so it runs the same in the browser and in node tests.
  */
 import {
-  COOKING, CRAFTING, CROSSBOWS, FORGED_STAFF_MAGIC, LIMBS_OFFSET, metalLevel, STOCKS, WAR_BOWS, EMOTES, EQUIP_SLOTS, MOUNTS, PETS, mountDef, FLETCH_ARROWS, FLETCH_BOWS, SIGILCRAFT, STAFF_SIGILS, itemCategory, sigilsPerStone, FAMILY_NAMES, FIREMAKING, FISHING_SPOTS, GEM_CUTTING, METALS, MONSTERS, PRAYERS, RELICS, RF_BUNDLES, ROCKS, SHOPS, SHOP_BUY,
+  ARMOURY_FIRST, ARMOURY_LATER, COOKING, CRAFTING, CROSSBOWS, FORGED_STAFF_MAGIC, LIMBS_OFFSET, metalLevel, STOCKS, WAR_BOWS, EMOTES, EQUIP_SLOTS, MOUNTS, PETS, mountDef, FLETCH_ARROWS, FLETCH_BOWS, SIGILCRAFT, STAFF_SIGILS, itemCategory, sigilsPerStone, FAMILY_NAMES, FIREMAKING, FISHING_SPOTS, GEM_CUTTING, METALS, MONSTERS, PRAYERS, RELICS, RF_BUNDLES, ROCKS, SHOPS, SHOP_BUY,
   SHOP_SELL, SKILLS, SKILL_NAMES, SMELTING, SMITH_PIECES, SMITH_XP, SPELLS, TREES, WARDROBE, XP_TABLE, isItem, item, levelForXp, smithLevel,
   type EquipSlot, type MetalId, type Skill, type Spell, type SpotKind, type WardrobeId,
 } from "./data.ts";
@@ -11,7 +11,7 @@ import { cleanDaily } from "./daily.ts";
 import { FIRST_STEPS, updateFirstSteps } from "./firststeps.ts";
 import { cleanMet } from "./hiscores.ts";
 import { addSlayerPoints, slayerBoost, slayerKill, slayerProblem, taskText } from "./slayer.ts";
-import { NPCS, examineItem, npcDef, onMonsterKilled, questDone, searchCryptChest, searchWell, talk, tanHides, useCryptAltar } from "./content.ts";
+import { NPCS, consecrateDawnstone, examineItem, npcDef, onBonesOffered, onMonsterKilled, questDone, searchCryptChest, searchWell, talk, tanHides, useCryptAltar } from "./content.ts";
 import {
   BANK_SIZE, BANK_TABS, DAY_MS, SATCHEL, SATCHEL_SIZE, STONE_BOX, STONE_BOX_SIZE, compactBankTabs, hasSatchel, hasStoneBox, stock, useUp, INVENTORY_SIZE, REFERRAL_COINS, REFERRALS_PER_DAY, REFERRAL_TICKS, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
   level, maxHp, maxPrayer, message, prayerBoost, riding, sound, take, weapon, combatLevel, createGame,
@@ -336,6 +336,20 @@ export function bury(game: Game, slotIndex: number) {
   addXp(game, "prayer", item(slot.id).bones! * bonus); message(game, "You dig a hole in the ground… You bury the bones."); sound(game, "bury");
   player.activity = null;
 }
+/**
+ * Offer bones at an altar: twice the Faith XP of burying them, three times at the Dawnhold chapel (where the Order's
+ * vigil counts them).
+ */
+export function offerBones(game: Game, slotIndex: number, chapel: boolean) {
+  const player = game.player, slot = player.inventory[slotIndex];
+  if (!slot || !item(slot.id).bones) return;
+  player.inventory[slotIndex] = null;
+  const bonus = (player.familyId === 0 ? 1.5 : 1) * (chapel ? 3 : 2);
+  addXp(game, "prayer", item(slot.id).bones! * bonus); sound(game, "pray");
+  message(game, chapel ? "You offer the bones on the chapel altar. The candles flare." : "You offer the bones on the altar.");
+  onBonesOffered(game, chapel);
+  player.activity = null;
+}
 export function drop(game: Game, slotIndex: number) {
   const player = game.player, slot = player.inventory[slotIndex];
   if (!slot) return;
@@ -641,8 +655,8 @@ function interactObject(game: Game, object: WorldObject, option: string, use?: n
     case "altar":
       if (option === "Search" && object.text === "crypt") { useCryptAltar(game); return; }
       if (object.text === "crypt" && player.quests.hollow_whispers === 2) { useCryptAltar(game); return; }
-      if (player.prayer >= maxPrayer(player)) { message(game, "You already have full prayer points."); return; }
-      player.prayer = maxPrayer(player); message(game, "You pray to the Old Friend. You recharge your prayer points."); sound(game, "pray"); return;
+      if (player.prayer >= maxPrayer(player)) { message(game, "Your faith is already full."); return; }
+      player.prayer = maxPrayer(player); message(game, "You pray to the Old Friend. Your faith is restored."); sound(game, "pray"); return;
     case "ladder": travel(game, object.to!, `You ${object.action?.toLowerCase().replace("-", " ") ?? "climb"} the ${object.name.toLowerCase()}.`); return;
     case "gate": {
       const questOk = !object.requires?.quest || (player.quests[object.requires.quest] ?? 0) >= 1;
@@ -696,6 +710,8 @@ function useItemOnObject(game: Game, object: WorldObject, slotIndex: number) {
   if (object.kind === "mill" && slot.id === "grain") { interactObject(game, object, "Operate"); return; }
   if (object.kind === "dairy_cow" && slot.id === "bucket") { interactObject(game, object, "Milk"); return; }
   if (object.kind === "altar" && object.text === "crypt" && slot.id === "crypt_key") { useCryptAltar(game); return; }
+  if (object.kind === "altar" && object.text === "dawn" && slot.id === "dawnstone_shard") { consecrateDawnstone(game); return; }
+  if (object.kind === "altar" && item(slot.id).bones) { offerBones(game, slotIndex, object.text === "dawn"); return; }
   if (object.kind === "bank") { bankDepositSlot(game, slotIndex); return; }
   if (object.kind === "sigil_altar" && slot.id === "sigil_stone") { craftSigils(game, object); return; }
   if (object.kind === "well" && slot.id === "bucket") { message(game, "You fill the bucket… then think better of drinking from it, and pour it back."); return; }
@@ -999,6 +1015,8 @@ const STYLE_BONUS: Record<CombatStyle, { attack: number; strength: number; defen
 export function hitChance(attackRoll: number, defenceRoll: number) {
   return attackRoll > defenceRoll ? 1 - (defenceRoll + 2) / (2 * (attackRoll + 1)) : attackRoll / (2 * (defenceRoll + 1));
 }
+/** Faith XP per point of damage dealt with a faith weapon: a trickle (combat skills get 4), so Faith stays hard to train. */
+export const FAITH_PER_HIT = 0.25;
 export function playerMaxHit(game: Game) {
   const player = game.player, boost = prayerBoost(player), style = STYLE_BONUS[player.style];
   const effective = Math.floor(level(game, "strength") * (1 + boost.strength)) + style.strength + 8;
@@ -1027,7 +1045,8 @@ function playerCombat(game: Game) {
   const monster = monsterByUid(game, player.combat);
   if (!monster) { player.combat = null; player.queuedSpell = null; return; }
   const spellId = player.queuedSpell ?? player.autocast, spell = spellId ? SPELLS.find(entry => entry.id === spellId && entry.target === "monster") ?? null : null;
-  const range = spell ? 0 : bowRange(game), boost = slayerBoost(game, monster.def.id);
+  // A faith weapon hurts the undead more (more accurate, harder hitting).
+  const holy = !!weapon(player)?.equip?.holy, range = spell ? 0 : bowRange(game), boost = slayerBoost(game, monster.def.id) * (holy && monster.def.undead ? 1.2 : 1);
   const within = (x: number, y: number) => spell ? chebyshev({ x, y }, monster) <= 8 && chebyshev({ x, y }, monster) >= 1
     : range ? reachGap({ x, y }, monster.x, monster.y, footprint(monster)) >= 1 && reachGap({ x, y }, monster.x, monster.y, footprint(monster)) <= range
     : adjacentTo(x, y, monster.x, monster.y, footprint(monster));
@@ -1062,7 +1081,7 @@ function playerCombat(game: Game) {
     }
     const hit = game.rng() < hitChance(accuracy, defence) ? Math.floor(game.rng() * (Math.floor(spell.maxHit! * boost) + 1)) : -1;
     addXp(game, "magic", spell.xp);
-    if (hit > 0) { addXp(game, "magic", hit * 2); addXp(game, "hitpoints", hit * 1.33); }
+    if (hit > 0) { addXp(game, "magic", hit * 2); addXp(game, "hitpoints", hit * 1.33); if (holy) addXp(game, "prayer", hit * FAITH_PER_HIT); }
     damageMonster(game, monster, Math.max(0, hit), hit < 0);
     player.queuedSpell = null;
     if (!player.autocast) player.combat = null;
@@ -1078,6 +1097,7 @@ function playerCombat(game: Game) {
     else if (player.style === "defensive") addXp(game, "defence", xp);
     else { addXp(game, "attack", xp / 3); addXp(game, "strength", xp / 3); addXp(game, "defence", xp / 3); }
     addXp(game, "hitpoints", damage * 1.33);
+    if (holy) addXp(game, "prayer", damage * FAITH_PER_HIT);
   }
   emit(game, { type: "swing", weapon: weaponSound(player.equipment.weapon), tick: game.tick });
   sound(game, hit > 0 ? "hit" : "miss");
@@ -1294,7 +1314,7 @@ function upkeep(game: Game) {
     const resist = 1 + bonuses(player).prayer / 30;
     const drain = player.prayers.reduce((sum, id) => sum + (PRAYERS.find(prayer => prayer.id === id)?.drain ?? 0), 0) / resist;
     player.prayer = Math.max(0, player.prayer - drain);
-    if (player.prayer <= 0) { player.prayers = []; message(game, "You have run out of prayer points, you can recharge at an altar.", "warn"); }
+    if (player.prayer <= 0) { player.prayers = []; message(game, "You have run out of faith. Pray at an altar to restore it.", "warn"); }
   }
   const moving = player.path.length > 0 || !!game.held;
   if (!(player.run && moving) || player.mount) player.energy = Math.min(100, player.energy + 0.25 + level(game, "agility") / 110);
@@ -1305,8 +1325,8 @@ export function togglePrayer(game: Game, id: string) {
   const player = game.player, prayer = PRAYERS.find(entry => entry.id === id);
   if (!prayer) return;
   if (player.prayers.includes(id)) { player.prayers = player.prayers.filter(entry => entry !== id); sound(game, "click"); return; }
-  if (level(game, "prayer") < prayer.level) { message(game, `You need a Prayer level of ${prayer.level} to use ${prayer.name}.`, "warn"); return; }
-  if (player.prayer < 1) { message(game, "You need to recharge your prayer points at an altar.", "warn"); return; }
+  if (level(game, "prayer") < prayer.level) { message(game, `You need a Faith level of ${prayer.level} to use ${prayer.name}.`, "warn"); return; }
+  if (player.prayer < 1) { message(game, "You need to restore your faith at an altar.", "warn"); return; }
   // Only one prayer per stat: turn off overlapping ones.
   const keys = Object.keys(prayer.effect);
   player.prayers = player.prayers.filter(other => !Object.keys(PRAYERS.find(entry => entry.id === other)?.effect ?? {}).some(key => keys.includes(key)));
@@ -1506,7 +1526,10 @@ export function buyPrice(game: Game, id: string) { const fixed = item(id).price;
 /** Skills at 99. */
 export const masteredSkills = (game: Game) => SKILLS.filter(skill => level(game, skill) >= 99);
 /** Why you can't buy a mastery cape yet (null if you can). */
+/** Why you can't buy something from a shop yet (a mastery cape before 99, the Order's weapons before its quests), or null. */
 export function capeProblem(game: Game, id: string) {
+  if ((ARMOURY_FIRST as readonly string[]).includes(id) && !questDone(game, "dawn_vigil")) return "The Order only arms those who've kept the Dawn Vigil.";
+  if ((ARMOURY_LATER as readonly string[]).includes(id) && !questDone(game, "greyhorn_light")) return "The Order keeps these for those who brought the Dawnstone home.";
   const mastery = item(id).mastery;
   if (!mastery) return null;
   if (mastery.skill === "all") return masteredSkills(game).length === SKILLS.length ? null : "The Grandmaster's cape is for Friends who've mastered every skill.";
@@ -1535,6 +1558,8 @@ export function buy(game: Game, shopId: string, id: string, n: number) {
   const sold = game.shopStock[shopId]?.find(slot => slot.id === id);
   if (!shop || (!shop.stock.includes(id) && !sold)) return 0;
   if (item(id).mastery) return buyCape(game, id);
+  const locked = capeProblem(game, id);
+  if (locked) { message(game, locked, "warn"); return 0; }
   if (!shop.stock.includes(id)) n = Math.min(n, sold!.n);
   const price = buyPrice(game, id), stackable = !!item(id).stackable;
   let bought = 0;
@@ -1750,7 +1775,7 @@ export function serialize(game: Game): SaveData {
     referredBy: player.referredBy, referrals: [...player.referrals], referralTimes: [...player.referralTimes], boostTicks: player.boostTicks, coalBag: player.coalBag, stoneBox: player.stoneBox, mounts: [...player.mounts], mount: player.mount, met: JSON.parse(JSON.stringify(player.met)), achievements: { ...player.achievements }, pets: [...player.pets], petOut: player.petOut, killLog: { ...player.killLog }, stats: { ...player.stats }, daily: JSON.parse(JSON.stringify(player.daily)), seenUpdate: player.seenUpdate,
   };
 }
-const QUEST_IDS = ["friends_feast", "grumblin_trouble", "cold_forge", "hollow_whispers", "lost_glimmer", "hollow_king", "hazels_quiver"];
+const QUEST_IDS = ["friends_feast", "grumblin_trouble", "cold_forge", "hollow_whispers", "lost_glimmer", "hollow_king", "hazels_quiver", "dawn_vigil", "greyhorn_light"];
 const int = (value: unknown, min: number, max: number, fallback: number) => typeof value === "number" && Number.isFinite(value) ? Math.max(min, Math.min(max, Math.floor(value))) : fallback;
 /** Item and spell ids from saves made before the Realm's own names (old id → new id). */
 const RENAMED: Record<string, string> = {

@@ -95,12 +95,19 @@ const hexA = (hex: string, alpha: number) => { const n = parseInt(hex.slice(1, 7
  */
 const field = new LightField();
 let lightBuffer: HTMLCanvasElement | null = null, shadowBuffer: HTMLCanvasElement | null = null;
+/**
+ * The distance haze, the same way: how clearly each pixel is seen (white clear, grey hazy), laid on the land by its
+ * distance from the camera and cut by each object at its own distance, so a mountain near you is never hazed because
+ * it rises high up the screen. `hazeTint` turns it into the haze's colour, added over the frame.
+ */
+let hazeBuffer: HTMLCanvasElement | null = null, hazeTint: HTMLCanvasElement | null = null;
 
 function buffers(target: CanvasRenderingContext2D) {
   const make = (canvas: HTMLCanvasElement | null, w: number, h: number) => { canvas ??= document.createElement("canvas"); if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; } return canvas; };
   lightBuffer = make(lightBuffer, Math.ceil(VIEW.width / 2), Math.ceil(VIEW.height / 2));
   shadowBuffer = make(shadowBuffer, lightBuffer.width, lightBuffer.height);
-  return { light: lightBuffer.getContext("2d")!, shadow: shadowBuffer.getContext("2d")! };
+  hazeBuffer = make(hazeBuffer, lightBuffer.width, lightBuffer.height); hazeTint = make(hazeTint, lightBuffer.width, lightBuffer.height);
+  return { light: lightBuffer.getContext("2d")!, shadow: shadowBuffer.getContext("2d")!, haze: hazeBuffer.getContext("2d")!, hazeTint: hazeTint.getContext("2d")! };
 }
 /**
  * Overlays (health bars, names, speech, hit splats, quest markers) are UI, not things in the world: while objects are
@@ -258,6 +265,22 @@ const terrainFill = (terrain: number, variation: number) => {
   return fill;
 };
 const isWaterTerrain = (terrain: number) => terrain === T.WATER || terrain === T.DEEP;
+/**
+ * The tiles x0–x1, y0–y1 back to front for the camera's angle (packed as index into the rectangle), so a hill or a
+ * snowy peak is never painted over by the land behind it however the camera is turned. A counting sort on depth.
+ */
+let orderBuffer = new Int32Array(0), orderKeys = new Int32Array(0), orderCounts = new Int32Array(0);
+function terrainOrder(camera: Camera, x0: number, y0: number, x1: number, y1: number) {
+  const w = x1 - x0 + 1, h = y1 - y0 + 1, n = w * h, c = Math.cos(camera.angle), s = Math.sin(camera.angle), wx = c + s, wy = c - s;
+  if (orderBuffer.length < n) { orderBuffer = new Int32Array(n); orderKeys = new Int32Array(n); }
+  const base = Math.min(0, wx * (w - 1)) + Math.min(0, wy * (h - 1)), span = Math.abs(wx) * (w - 1) + Math.abs(wy) * (h - 1), buckets = Math.ceil(span * 4) + 2;
+  if (orderCounts.length < buckets + 1) orderCounts = new Int32Array(buckets + 1);
+  const counts = orderCounts.fill(0, 0, buckets + 1);
+  for (let j = 0, k = 0; j < h; j++) for (let i = 0; i < w; i++, k++) { const key = Math.round((wx * i + wy * j - base) * 4); orderKeys[k] = key; counts[key + 1]++; }
+  for (let b = 1; b <= buckets; b++) counts[b] += counts[b - 1];
+  for (let k = 0; k < n; k++) orderBuffer[counts[orderKeys[k]]++] = k;
+  return orderBuffer.subarray(0, n);
+}
 function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, x0: number, y0: number, x1: number, y1: number) {
   const { camera, game, now } = scene, world = game.world, z = camera.zoom, hw = TILE_W / 2 * z, hh = hw * camera.pitch;
   const t = scene.reducedMotion ? 0 : now / 1000;
@@ -267,7 +290,8 @@ function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, x0: number, y0
   const ex = { x: px.x - o.x, y: px.y - o.y }, ey = { x: py.x - o.x, y: py.y - o.y }, ls = liftScale(camera);
   // Inked edges and contour lines go into two paths, stroked once. Texture is left off tiles too small or far to show it.
   const edges = new Path2D(), contours = new Path2D(), small = hh < 5, near = scene.low ? 14 : 34;
-  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+  for (const packed of terrainOrder(camera, x0, y0, x1, y1)) {
+    const x = x0 + packed % (x1 - x0 + 1), y = y0 + Math.floor(packed / (x1 - x0 + 1));
     if (!inBounds(x, y)) continue;
     const terrain = world.tiles[y * W + x];
     if (terrain === T.VOID) continue;
@@ -808,15 +832,6 @@ function drawIcon(ctx: CanvasRenderingContext2D, icon: Icon, x: number, y: numbe
 
 // ---------- Distance haze ----------
 /** A soft sky haze over the far distance (visible when the camera looks low across the land). */
-function drawHaze(ctx: CanvasRenderingContext2D, camera: Camera) {
-  // "Away from the camera" in the world is screen-up; find where the haze starts and where the land ends on screen.
-  const c = Math.cos(-camera.angle), s = Math.sin(-camera.angle), ux = (-1 * c - -1 * s) * Math.SQRT1_2, uy = (-1 * s + -1 * c) * Math.SQRT1_2;
-  const start = toScreen(camera, camera.x + ux * HAZE_START, camera.y + uy * HAZE_START).y, end = toScreen(camera, camera.x + ux * (DRAW_DISTANCE - 4), camera.y + uy * (DRAW_DISTANCE - 4)).y;
-  if (start <= 0 || !(start > end)) return;
-  const haze = ctx.createLinearGradient(0, Math.max(-VIEW.height, end), 0, start);
-  haze.addColorStop(0, "rgba(207,215,220,0.97)"); haze.addColorStop(1, "rgba(215,220,222,0)");
-  ctx.fillStyle = haze; ctx.fillRect(0, 0, VIEW.width, Math.min(VIEW.height, start));
-}
 
 // ---------- Buildings ----------
 const WALL_H = 42;
@@ -1292,7 +1307,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     const stride = walking ? Math.floor(now / 80) % 8 : 0, cloth = scene.reducedMotion ? 0 : walking ? stride % 4 : Math.floor(now / 520) % 4;
     // What's in the hand, and how it moves: a tool at work, a weapon mid-swing, or the weapon at rest (all in the figure).
     const holding = heldPose(scene, pose);
-    const dressed = [...player.worn, ...(player.equipment.cape ? [player.equipment.cape] : []), ...(player.equipment.head ? [player.equipment.head] : []), ...(player.equipment.shield ? [player.equipment.shield] : []), ...(player.equipment.weapon ? [player.equipment.weapon] : [])];
+    const dressed = [...player.worn, ...(player.equipment.cape ? [player.equipment.cape] : []), ...(player.equipment.head ? [player.equipment.head] : []), ...(player.equipment.shield ? [player.equipment.shield] : []), ...(player.equipment.weapon ? [player.equipment.weapon] : []), ...(player.equipment.neck ? [player.equipment.neck] : [])];
     if (scene.friend) {
       const art = figureArt(friendRows(scene.friend, facing, walking && !mount, mount ? 0 : stride), dressed, facing, cloth, INK, holding), rect = drawFigure(ctx, art, s.x, bodyY + 2 * z, px, pose.alpha), tip = heldTip(art);
       if (pose.line && pose.target && tip) fishingLine(ctx, scene, rect.x + tip.x * px / FIGURE_K, rect.y + tip.y * px / FIGURE_K, project(pose.target.x, pose.target.y));
@@ -1376,6 +1391,17 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     sb.fillStyle = rgbCss([share(0), share(1), share(2)]); sb.fillRect(0, 0, sb.canvas.width, sb.canvas.height);
     lb.setTransform(1, 0, 0, 1, 0, 0); lb.globalCompositeOperation = "multiply"; lb.drawImage(sb.canvas, 0, 0); lb.globalCompositeOperation = "source-over";
   }
+  // The haze on the land (Low doesn't draw far enough to need it, and there's none underground).
+  const hb = bufs.haze, hazy = !low && !underground && field.buildHaze(here.x, here.y, HAZE_START, DRAW_DISTANCE - 4);
+  let hazeBottom = -Infinity;
+  if (hazy) {
+    hb.setTransform(0.5, 0, 0, 0.5, 0, 0); hb.globalCompositeOperation = "source-over"; hb.imageSmoothingEnabled = true;
+    hb.fillStyle = "#fff"; hb.fillRect(0, 0, VIEW.width, VIEW.height);
+    field.drawGround(hb, (x, y) => toScreen(camera, x, y), (i, j) => cornerHeight(world, i, j), false, field.haze);
+    hb.imageSmoothingEnabled = false;
+    // How far down the screen hazed land reaches: only things reaching above that line need to cut the haze.
+    for (let k = 0; k < 48; k++) { const a = k / 48 * Math.PI * 2, at = toScreen(camera, here.x + Math.cos(a) * HAZE_START, here.y + Math.sin(a) * HAZE_START); hazeBottom = Math.max(hazeBottom, at.y); }
+  }
   lap("shadows");
   const applyLight = () => {
     if (plain) return;
@@ -1401,12 +1427,11 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     return [s.x - side * z, s.y - up * z * Math.max(1, ls), s.x + side * z, s.y + down * z];
   };
   uiQueue = []; uiTarget = target;
-  // Last of all, over the land: particles and birds in the light where you are, then the haze and the ground fog in the
-  // sky's (a fog bank at night is a dim blue, not a white glow). Sparks and fireflies give their own light, later.
+  // Last of all, over the land: particles and birds in the light where you are, then the ground fog in the sky's (a fog
+  // bank at night is a dim blue, not a white glow). Sparks and fireflies give their own light, later.
   const screen = (): [number, number, number, number] => [0, 0, VIEW.width, VIEW.height];
   drawables.push({ depth: Infinity, at: { x: here.x, y: here.y, h: 40 }, rect: screen, draw: () => drawEffects(ctx, project, world, now, z, "lit") });
-  if (!underground || (weather && weather.fog > 0.02)) drawables.push({ depth: Infinity, light: field.skyLight().map(v => v * 1.08) as RGB, rect: screen, draw: () => {
-    if (!underground) drawHaze(ctx, camera);
+  if (weather && weather.fog > 0.02) drawables.push({ depth: Infinity, light: field.skyLight().map(v => v * 1.08) as RGB, rect: screen, draw: () => {
     if (weather && weather.fog > 0.02 && !scene.reducedMotion && !low) drawFog(ctx, camera, weather.fog, now);
     else if (weather && weather.fog > 0.02) { ctx.fillStyle = `rgba(232,235,238,${(weather.fog * 0.25).toFixed(3)})`; ctx.fillRect(0, 0, VIEW.width, VIEW.height); }
   } });
@@ -1424,10 +1449,32 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     hits.length = count; texturesOn = saved; hush.on = false; uiMuted = false; ctx = target;
     lb.globalAlpha = 1; lb.globalCompositeOperation = "destination-over"; lb.fillStyle = rgbCss(light); lb.fillRect(rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1]);
     lb.globalCompositeOperation = "source-over";
+    // And into the haze, at its own distance (near things over far land stay clear).
+    if (hazy && rect[1] < hazeBottom) {
+      const at = drawable.at && drawable.at.y < FLOOR_Y - 0.5 ? drawable.at : here, far = Math.hypot(at.x - here.x, at.y - here.y);
+      const t = Math.max(0, Math.min(1, (far - HAZE_START) / (DRAW_DISTANCE - 4 - HAZE_START))), clear = Math.round(255 * (1 - 0.97 * t * t * (3 - 2 * t)));
+      texturesOn = false; hush.on = true; uiMuted = true; ctx = hb; hb.globalCompositeOperation = "destination-out";
+      drawable.draw();
+      hits.length = count; texturesOn = saved; hush.on = false; uiMuted = false; ctx = target;
+      hb.globalAlpha = 1; hb.globalCompositeOperation = "destination-over"; hb.fillStyle = `rgb(${clear},${clear},${clear})`; hb.fillRect(rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1]);
+      hb.globalCompositeOperation = "source-over";
+    }
   });
   // Anything that strayed outside its bounds is left as it is; then the light goes over the frame.
   if (lit) { lb.globalCompositeOperation = "destination-over"; lb.fillStyle = "#fff"; lb.fillRect(0, 0, VIEW.width, VIEW.height); lb.globalCompositeOperation = "source-over"; }
+  if (hazy) {
+    // The frame is seen through the haze: its light is dimmed by how hazy each pixel is, and the haze's own colour (in
+    // the sky's light) is added where it's hazy.
+    hb.setTransform(1, 0, 0, 1, 0, 0); hb.globalCompositeOperation = "destination-over"; hb.fillStyle = "#fff"; hb.fillRect(0, 0, hb.canvas.width, hb.canvas.height); hb.globalCompositeOperation = "source-over";
+    lb.setTransform(1, 0, 0, 1, 0, 0); lb.globalCompositeOperation = "multiply"; lb.drawImage(hb.canvas, 0, 0); lb.globalCompositeOperation = "source-over";
+    const tint = bufs.hazeTint, sky = field.skyLight();
+    tint.setTransform(1, 0, 0, 1, 0, 0); tint.globalCompositeOperation = "source-over"; tint.fillStyle = "#fff"; tint.fillRect(0, 0, tint.canvas.width, tint.canvas.height);
+    tint.globalCompositeOperation = "difference"; tint.drawImage(hb.canvas, 0, 0);
+    tint.globalCompositeOperation = "multiply"; tint.fillStyle = rgbCss([207 / 255 * Math.min(1, sky[0] * 1.08), 215 / 255 * Math.min(1, sky[1] * 1.08), 220 / 255 * Math.min(1, sky[2] * 1.08)]); tint.fillRect(0, 0, tint.canvas.width, tint.canvas.height);
+    tint.globalCompositeOperation = "source-over";
+  }
   applyLight();
+  if (hazy) { target.save(); target.globalCompositeOperation = "lighter"; target.imageSmoothingEnabled = true; target.drawImage(bufs.hazeTint.canvas, 0, 0, VIEW.width, VIEW.height); target.restore(); }
   const overlays = uiQueue; uiQueue = null; uiTarget = null;
   lap("objects");
   // Projectiles: spells fly as glowing comets with sparks (by element), arrows turn in flight, dragonfire roars; all of
@@ -1657,8 +1704,8 @@ function drawNpc(ctx: CanvasRenderingContext2D, scene: Scene, npc: Npc, at: { x:
   } else {
     const set = friendSprite(def.art.family, def.art.seed + (npc.id === "villager" || npc.id === "banker" || npc.id === "guard" ? npc.uid : 0));
     const frame = at.moving && Math.floor(now / 160) % 2 ? set.step : set.idle, bob = !scene.reducedMotion && def.art.family === 5 ? Math.sin(now / 400 + npc.uid) * 2 * z : 0;
-    const regalia = ROYAL_WEAR[npc.id];
-    // The King wears his crown and cape, composited into the sprite like your own wardrobe.
+    const regalia = NPC_WEAR[npc.id];
+    // The King wears his crown and cape, and the guards their helms, red capes and battleaxes, like your own gear.
     if (regalia) rect = drawFigure(ctx, figureArt(frame, regalia, screenFacing(camera, npc.heading), scene.reducedMotion ? 0 : Math.floor(now / 520) % 4), s.x, s.y + 2 * z - bob, 2.6 * z);
     else rect = drawMask(ctx, frame, s.x, s.y + 2 * z - bob, 2.6 * z, INK, screenFacing(camera, npc.heading) === "left");
   }
@@ -1668,7 +1715,18 @@ function drawNpc(ctx: CanvasRenderingContext2D, scene: Scene, npc: Npc, at: { x:
   const said = npcOverhead(game, npc.uid);
   if (said) overheadText(ctx, said, s.x, s.y - 50 * z, "#f2e28f");
 }
-const ROYAL_WEAR: Record<string, readonly string[]> = { king: ["paper_crown", "blue_cape"] };
+/** What some NPCs wear, composited into their sprite like your own gear: the King's regalia, and the guards' helms, battleaxes and red capes. */
+const NPC_WEAR: Record<string, readonly string[]> = {
+  king: ["paper_crown", "blue_cape"],
+  guard: ["blackiron_helm", "crimson_cape", "blackiron_battleaxe"],
+  royal_guard: ["ashsteel_helm", "crimson_cape", "ashsteel_battleaxe"],
+  captain: ["moonsilver_helm", "crimson_cape", "moonsilver_greatsword", "rosestone_pendant"],
+  // The Order of the Dawn: white and gold.
+  dawn_knight: ["moonsilver_helm", "dawn_cape", "dawnsteel_sword", "friends_charm"],
+  grandmaster: ["dawn_cape", "radiant_greatsword", "friends_charm"],
+  quartermaster: ["pewter_helm", "dawn_cape", "vigil_spear"],
+  chaplain: ["dawn_cape", "dawn_staff", "friends_charm"],
+};
 /** Another player: their Friend (canonical art once loaded, family art until then), wardrobe, cape and weapon, a name tag (green for friends) and their chat. */
 function drawPeer(ctx: CanvasRenderingContext2D, scene: Scene, peer: PeerView, hits: Hit[]) {
   const { camera, now } = scene, z = camera.zoom, turned = screenFacing(camera, { x: peer.p.hx, y: peer.p.hy || 1 });
@@ -1677,7 +1735,7 @@ function drawPeer(ctx: CanvasRenderingContext2D, scene: Scene, peer: PeerView, h
   if (peer.p.emote) emoteParticles(peer.p.emote, peer.emoteT, peer.x, peer.y, scene.reducedMotion, peer.p.cape && isItem(peer.p.cape) ? item(peer.p.cape).icon.color : undefined);
   const sprites = scene.peerSprites?.(peer.p.id) ?? null, stride = peer.moving ? Math.floor(now / 80) % 8 : 0;
   const rows = sprites ? friendRows(sprites, facing, peer.moving && !mount, mount ? 0 : stride) : peer.moving && Math.floor(now / 160) % 2 ? friendSprite(peer.p.family, peer.p.id).step : friendSprite(peer.p.family, peer.p.id).idle;
-  const px = 3.2 * z, worn = [...peer.p.worn, ...(peer.p.cape ? [peer.p.cape] : []), ...(peer.p.head ? [peer.p.head] : []), ...(peer.p.shield ? [peer.p.shield] : []), ...(peer.p.weapon ? [peer.p.weapon] : [])], cloth = scene.reducedMotion ? 0 : peer.moving ? stride % 4 : Math.floor(now / 520) % 4;
+  const px = 3.2 * z, worn = [...peer.p.worn, ...(peer.p.cape ? [peer.p.cape] : []), ...(peer.p.head ? [peer.p.head] : []), ...(peer.p.shield ? [peer.p.shield] : []), ...(peer.p.weapon ? [peer.p.weapon] : []), ...(peer.p.neck ? [peer.p.neck] : [])], cloth = scene.reducedMotion ? 0 : peer.moving ? stride % 4 : Math.floor(now / 520) % 4;
   ellipse(ctx, feet.x, feet.y, (mount ? 32 : 15) * z, (mount ? 10 : 6) * z, "rgba(22,22,22,0.18)", peer.friend ? "rgba(159,224,168,0.9)" : "rgba(255,255,255,0.6)", 1.5);
   if (peer.p.pet && isPet(peer.p.pet)) { const behind = toScreen(camera, peer.x - (peer.p.hx || 0) * 0.9, peer.y - (peer.p.hy || 1) * 0.9); drawPet(ctx, peer.p.pet, behind.x, behind.y, facing, peer.moving, now + peer.p.id * 71, z, scene.reducedMotion); }
   if (mount) drawMount(ctx, mount.coat, facing, peer.moving, now, feet.x, feet.y, z, true, scene.reducedMotion);

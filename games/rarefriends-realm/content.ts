@@ -4,7 +4,7 @@
 import { FAMILY_NAMES, FAMILY_PERKS, SLAYER_REWARDS, item } from "./data.ts";
 import { assignTask, buySlayerReward, currentTask, eligibleTasks, slayerPoints, slayerStreak, taskText } from "./slayer.ts";
 import {
-  addXp, count, give, giveOrDrop, has, message, sound, take, emit, type Dialogue, type DialogueLine, type Game,
+  addXp, count, give, giveOrDrop, has, level, message, sound, take, emit, type Dialogue, type DialogueLine, type Game,
 } from "./state.ts";
 
 // ---------- NPC definitions ----------
@@ -37,6 +37,11 @@ export const NPCS: Record<string, NpcDef> = {
   tanner: { id: "tanner", name: "Tessa", examine: "The tanner. Her hands are stained brown.", options: ["Talk-to", "Trade", "Tan-hides"], shop: "crafting", art: art(2, 81) },
   king: { id: "king", name: "King Hollis", examine: "King of Friendhollow. His crown is a little too big for him.", options: ["Talk-to"], art: art(1, 7) },
   royal_guard: { id: "royal_guard", name: "Royal guard", examine: "Guards the King. Takes it very seriously.", options: ["Talk-to"], art: art(0, 223) },
+  // The Order of the Dawn, at Dawnhold east of Highcairn: holy knights, the Faith skill's home.
+  grandmaster: { id: "grandmaster", name: "Grandmaster Aldric", examine: "The Grandmaster of the Order of the Dawn. He stands like the sun is about to come up behind him.", options: ["Talk-to"], art: art(6, 404) },
+  chaplain: { id: "chaplain", name: "Sister Maren", examine: "The Order's chaplain. Her candles never seem to burn down.", options: ["Talk-to"], art: art(2, 77) },
+  quartermaster: { id: "quartermaster", name: "Quartermaster Bram", examine: "Keeps the Order's armoury. Counts every blade twice.", options: ["Talk-to", "Trade"], shop: "armoury", art: art(0, 512) },
+  dawn_knight: { id: "dawn_knight", name: "Knight of the Dawn", examine: "A knight of the Order of the Dawn, on watch.", options: ["Talk-to"], art: art(0, 145) },
   captain: { id: "captain", name: "Captain Rook", examine: "Captain of the castle guard.", options: ["Talk-to"], art: art(6, 91) },
   guard: { id: "guard", name: "Hall guard", examine: "He looks bored.", options: ["Talk-to", "Pickpocket"], art: art(0, 101),
     pickpocket: { level: 40, xp: 46.8, coins: [20, 40], stun: 5, damage: 2 } },
@@ -55,6 +60,7 @@ export const NPCS: Record<string, NpcDef> = {
   agility: { id: "agility", name: "Coach Skip", examine: "Never stops stretching.", options: ["Talk-to"], art: art(5, 211) },
   armourer: { id: "armourer", name: "Dora Plate", examine: "She's knocked the dents out of half the Realm's helms.", options: ["Talk-to", "Trade"], shop: "armour", art: art(6, 241) },
   weaponsmith: { id: "weaponsmith", name: "Hilt", examine: "Tests every edge on his thumb. Has a lot of plasters.", options: ["Talk-to", "Trade"], shop: "weapons", art: art(0, 251) },
+  tailor: { id: "tailor", name: "Tamsin the tailor", examine: "Pins in her mouth, a tape round her neck, and opinions about your cape.", options: ["Talk-to", "Trade"], shop: "tailor", art: art(2, 318) },
   heft: { id: "heft", name: "Grom of Heft & Haft", examine: "Arms like tree trunks. Sells weapons to match.", options: ["Talk-to", "Trade"], shop: "heft", art: art(6, 631) },
   cairn_trader: { id: "cairn_trader", name: "Brisa the trader", examine: "Runs Highcairn's stores. Buys anything you can carry up a mountain.", options: ["Talk-to", "Trade"], shop: "general_highcairn", art: art(5, 603) },
   kettle_keeper: { id: "kettle_keeper", name: "Oda of the Stone Kettle", examine: "Keeps the kettle on and the fire high.", options: ["Talk-to", "Trade"], shop: "kettle", art: art(2, 611) },
@@ -150,6 +156,27 @@ export const QUESTS: readonly QuestDef[] = [
     },
   },
   {
+    id: "dawn_vigil", name: "The Dawn Vigil", points: 1, difficulty: "Novice", start: "Talk to Grandmaster Aldric at Dawnhold, east of Highcairn.", requirements: ["Faith 10"],
+    journal: game => {
+      const s = stage(game, "dawn_vigil");
+      if (s === 0) return ["Grandmaster Aldric of the Order of the Dawn keeps a chapterhouse, Dawnhold, east of Highcairn. He might take on a new squire."];
+      if (s === 1) return ["To join the Order I must keep the Dawn Vigil: offer bones on the Dawnhold chapel altar (use them on it).",
+        `Bones offered: ${Math.min(VIGIL_BONES, data(game, "vigil_bones"))}/${VIGIL_BONES}`, data(game, "vigil_bones") >= VIGIL_BONES ? "✓ The vigil is kept. I should tell Grandmaster Aldric." : "• Any bones will do, but the Order notices large ones."];
+      return ["I kept the Dawn Vigil and was made a squire of the Order of the Dawn. Its armoury is open to me. QUEST COMPLETE!"];
+    },
+  },
+  {
+    id: "greyhorn_light", name: "Light in the Greyhorn", points: 2, difficulty: "Intermediate", start: "Talk to Grandmaster Aldric after The Dawn Vigil.", requirements: ["The Dawn Vigil", "Faith 30", "Able to defeat stone golems (level 45)"],
+    journal: game => {
+      const s = stage(game, "greyhorn_light"), p = game.player;
+      if (s === 0) return ["Grandmaster Aldric will have work for a squire who has kept the vigil and grown in faith (Faith 30)."];
+      if (s === 1) return ["The Order's relic, the Dawnstone, was broken and lost in the Greyhorn mine, north-east of Highcairn. The stone golems there have taken its shards into themselves.",
+        `${count(p, "dawnstone_shard") >= 3 ? "✓" : "•"} Dawnstone shards: ${count(p, "dawnstone_shard")}/3 (from stone golems)`, "Then bless them on the Dawnhold chapel altar."];
+      if (s === 2) return ["The Dawnstone is whole and blessed. I should bring it to Grandmaster Aldric."];
+      return ["The Dawnstone shines over Dawnhold again, and I am a knight of the Order. QUEST COMPLETE!"];
+    },
+  },
+  {
     id: "hollow_king", name: "The Hollow King", points: 3, difficulty: "Grandmaster", start: "Talk to Old Glimmer after The Lost Glimmer and Hollow Whispers.", requirements: ["The Lost Glimmer", "Hollow Whispers", "Combat 60+ strongly recommended"],
     journal: game => {
       const s = stage(game, "hollow_king");
@@ -161,7 +188,9 @@ export const QUESTS: readonly QuestDef[] = [
   },
 ];
 export const questPoints = (game: Game) => QUESTS.reduce((sum, quest) => sum + (stage(game, quest.id) >= finalStage(quest.id) ? quest.points : 0), 0);
-export function finalStage(quest: string) { return quest === "hollow_whispers" ? 4 : quest === "hollow_king" ? 3 : 2; }
+export function finalStage(quest: string) { return quest === "hollow_whispers" ? 4 : quest === "hollow_king" || quest === "greyhorn_light" ? 3 : 2; }
+/** Bones to offer at the Dawnhold chapel for the Dawn Vigil. */
+const VIGIL_BONES = 8;
 export const questDone = (game: Game, quest: string) => stage(game, quest) >= finalStage(quest);
 export const MAX_QUEST_POINTS = QUESTS.reduce((sum, quest) => sum + quest.points, 0);
 
@@ -196,6 +225,9 @@ export function onMonsterKilled(game: Game, monsterId: string, x: number, y: num
     giveOrDrop(game, "torn_quiver"); message(game, "The chief was wearing Hazel's quiver as a hat. You take it back: it's torn, but it's all there.", "quest"); sound(game, "quest");
   }
   if (monsterId === "swamp_lurker") shard("shard_swamp", "glints in the lurker's mud");
+  if (monsterId === "stone_golem" && stage(game, "greyhorn_light") === 1 && count(player, "dawnstone_shard") < 3 && game.rng() < 0.5) {
+    giveOrDrop(game, "dawnstone_shard"); message(game, "Something glows in the golem's rubble: a Dawnstone shard.", "quest"); sound(game, "quest");
+  }
   if (monsterId === "hollow_king" && stage(game, "hollow_king") === 1) {
     player.quests.hollow_king = 2; giveOrDrop(game, "hollow_crown");
     message(game, "The Hollow King fades. His crown drops, weightless, into your hands.", "quest"); sound(game, "quest");
@@ -215,6 +247,19 @@ export function searchCryptChest(game: Game) {
     giveOrDrop(game, "crypt_key"); game.player.quests.hollow_whispers = 2;
     message(game, "Under a mouldy shroud you find a cold blackiron key.", "quest");
   } else message(game, "The chest is empty apart from dust.");
+}
+/** Bones offered at an altar: the Dawn Vigil counts those offered in the Dawnhold chapel. */
+export function onBonesOffered(game: Game, chapel: boolean) {
+  if (!chapel || stage(game, "dawn_vigil") !== 1) return;
+  const n = game.player.questData.vigil_bones = (game.player.questData.vigil_bones ?? 0) + 1;
+  if (n === VIGIL_BONES) { message(game, "The chapel candles all flare at once. The vigil is kept: I should tell Grandmaster Aldric.", "quest"); sound(game, "quest"); }
+}
+/** Dawnstone shards on the Dawnhold altar: three become the Dawnstone. */
+export function consecrateDawnstone(game: Game) {
+  if (stage(game, "greyhorn_light") !== 1) { message(game, "The shard is warm, but the altar doesn't answer. Perhaps the Grandmaster knows why."); return; }
+  if (count(game.player, "dawnstone_shard") < 3) { message(game, `The altar needs the whole stone: you have ${count(game.player, "dawnstone_shard")} of 3 shards.`); return; }
+  take(game.player, "dawnstone_shard", 3); giveOrDrop(game, "dawnstone"); game.player.quests.greyhorn_light = 2;
+  message(game, "You lay the three shards on the altar and pray. Light runs through the cracks, and they close: the Dawnstone is whole.", "quest"); sound(game, "quest");
 }
 export function useCryptAltar(game: Game) {
   if (stage(game, "hollow_whispers") === 2 && has(game.player, "crypt_key")) {
@@ -380,13 +425,13 @@ export function talk(game: Game, npcId: string): Dialogue {
       if (s === 0) return chat(name, npcSays(name, "Rattle rattle. Forgive me, old habit. I hear whispers at night, from the Murkmire crypt."), [
         { label: "I'll look into it.", then: () => { player.quests.hollow_whispers = 1; message(game, "Quest started: Hollow Whispers.", "quest");
           return chat(name, npcSays(name, "The crypt is south-west, past the farms, in the swamp. The skeletons there were Friends once. Be kind, and be quick.")); } },
-        { label: "How do I train Prayer?", then: () => chat(name, npcSays(name, "Bury bones. Large bones and ink bones are worth more. Pray at my altar to restore your prayer points.")) },
+        { label: "How do I train Faith?", then: () => chat(name, npcSays(name, "Bury bones, or offer them on an altar for twice the blessing. Large bones and ink bones are worth more. Pray at my altar to restore your faith.", "The Order of the Dawn, east of Highcairn, can teach you more.")) },
         { label: "No thanks.", then: () => null },
       ]);
       if (s < 3) return chat(name, npcSays(name, "The whispers go on. The crypt is in Murkmire, south-west."));
       if (s === 3) return chat(name, npcSays(name, "Silence! You did it. Wear this. The Old Friend watches over those who wear it."), undefined, () => {
         giveOrDrop(game, "friends_charm"); addXp(game, "prayer", 2500, { raw: true }); giveOrDrop(game, "large_bones", 5);
-        completeQuest(game, "hollow_whispers", ["1 Quest Point", "2,500 Prayer XP", "Old Friend's charm", "5 large bones"]);
+        completeQuest(game, "hollow_whispers", ["1 Quest Point", "2,500 Faith XP", "Old Friend's charm", "5 large bones"]);
       });
       return chat(name, npcSays(name, "May your bones rest easy, when the time comes. Not soon, I hope."));
     }
@@ -454,6 +499,41 @@ export function talk(game: Game, npcId: string): Dialogue {
     ]);
     case "birch": return chat(name, npcSays(name, (["Swing from the hips, not the shoulders. Trees respect that.", "Plain trees for learning, oaks at fifteen, willows at thirty, maples at forty-five. Yews grow south of the camp, and ashwood only up in Frostpeak.",
       "Grumblins come up from the camp some nights. We keep the fires lit.", "Fletch as you go: a knife on your logs makes shafts, bows, war bows and crossbow stocks."] as const)[Math.floor(game.rng() * 4)]));
+    case "grandmaster": {
+      const vigil = stage(game, "dawn_vigil"), light = stage(game, "greyhorn_light");
+      if (vigil === 0) return chat(name, npcSays(name, "Welcome to Dawnhold. We are the Order of the Dawn: we keep watch against the dead that won't lie still, and we fight with faith as much as steel.",
+        "Faith grows by burying the dead with respect, by offering bones at an altar (our chapel's most of all), and by striking true with a blessed weapon."), level(game, "prayer") < 10
+        ? [{ label: "Can I join?", then: () => chat(name, npcSays(name, "Come back when your faith is stronger (Faith 10). Bury your bones. Pray."))}, { label: "Goodbye.", then: () => null }]
+        : [{ label: "Can I join?", then: () => chat(name, npcSays(name, "Every squire begins with a vigil. Offer bones on our chapel altar, eight of them, and think on those they belonged to. Then come to me."), undefined, () => {
+          game.player.quests.dawn_vigil = 1; game.player.questData.vigil_bones = 0; message(game, "Quest started: The Dawn Vigil.", "quest"); }) }, { label: "Not today.", then: () => null }]);
+      if (vigil === 1) {
+        if (data(game, "vigil_bones") < VIGIL_BONES) return chat(name, npcSays(name, `The vigil isn't kept yet. Offer bones on the chapel altar: ${Math.max(0, VIGIL_BONES - data(game, "vigil_bones"))} more.`));
+        return chat(name, npcSays(name, "Sister Maren says the candles flared for you. Kneel.", "I name you a squire of the Order of the Dawn. Take this sword, and let Quartermaster Bram arm you further."), undefined, () => {
+          giveOrDrop(game, "dawnsteel_sword"); addXp(game, "prayer", 1500, { raw: true });
+          completeQuest(game, "dawn_vigil", ["1 Quest Point", "Dawnsteel sword", "1,500 Faith XP", "The Order Armoury opens"]);
+        });
+      }
+      if (light === 0) return chat(name, npcSays(name, "Squire. Our relic, the Dawnstone, broke in the Greyhorn mine when the golems woke, and they took its shards into themselves. We could use a braver arm than mine these days."), level(game, "prayer") < 30
+        ? [{ label: "I'll bring it back.", then: () => chat(name, npcSays(name, "Your faith isn't ready for that mine yet (Faith 30). Offer bones. Fight with a blessed blade."))}, { label: "Goodbye.", then: () => null }]
+        : [{ label: "I'll bring it back.", then: () => chat(name, npcSays(name, "Three shards. Break the golems, bring the shards to our altar and pray over them. Then bring me the stone."), undefined, () => {
+          game.player.quests.greyhorn_light = 1; message(game, "Quest started: Light in the Greyhorn.", "quest"); }) }, { label: "Not yet.", then: () => null }]);
+      if (light === 1) return chat(name, npcSays(name, `Three shards from the golems of the Greyhorn mine, then the chapel altar. You carry ${count(game.player, "dawnstone_shard")}.`));
+      if (light === 2) return chat(name, npcSays(name, has(game.player, "dawnstone") ? "The Dawnstone! Whole again, and warm as morning. Kneel, squire, and rise a knight." : "The stone? Bring it here."), undefined, () => {
+        if (!has(game.player, "dawnstone")) return;
+        take(game.player, "dawnstone"); giveOrDrop(game, "dawn_cape"); addXp(game, "prayer", 5000, { raw: true }); addXp(game, "defence", 2000, { raw: true });
+        completeQuest(game, "greyhorn_light", ["2 Quest Points", "Cape of the Dawn", "5,000 Faith XP", "2,000 Defence XP", "The Order's finest weapons"]);
+      });
+      const owned = has(game.player, "dawn_cape") || game.player.equipment.cape === "dawn_cape" || game.player.bank.some(slot => slot.id === "dawn_cape");
+      return chat(name, npcSays(name, "The dead are restless in the crypts and the Hollow, knight. Our weapons bite them harder. Keep your faith strong."),
+        owned ? undefined : [{ label: "I lost my cape.", then: () => chat(name, npcSays(name, "Here. White and gold, and try to keep it clean."), undefined, () => giveOrDrop(game, "dawn_cape")) }, { label: "Goodbye.", then: () => null }]);
+    }
+    case "chaplain": return chat(name, npcSays(name, "Faith is trained like any other strength. Bury bones where you find them, or better, offer them here on the chapel altar: they count three times over.",
+      "Pray at any altar to restore your faith. And a blessed weapon teaches faith with every true blow, a little at a time."));
+    case "quartermaster": return chat(name, npcSays(name, questDone(game, "dawn_vigil") ? "Blessed steel and chaplains' staffs. They'll serve you against anything, and against the dead twice over." : "The armoury is for the Order's own. Keep the Dawn Vigil first."),
+      questDone(game, "dawn_vigil") ? [{ label: "Show me.", then: () => { game.ui.shop = "armoury"; return null; } }, { label: "Maybe later.", then: () => null }] : undefined);
+    case "dawn_knight": return chat(name, npcSays(name, (["Dawn comes. It always does.", "The golems in the Greyhorn mine hold something of ours.", "A blessed blade cuts the dead like wet paper.", "Offer your bones in the chapel. Sister Maren will light a candle."] as const)[Math.floor(game.rng() * 4)]));
+    case "tailor": return chat(name, npcSays(name, "Capes in every colour, stripes, chevrons, quarters and stars, and hats to go with them: wizard's points, feathered caps, wide brims. Try something on!"), [
+      { label: "Show me.", then: () => { game.ui.shop = "tailor"; return null; } }, { label: "Maybe later.", then: () => null }]);
     case "heft": return chat(name, npcSays(name, "Two hands, one swing, no argument. Greatswords, battleaxes and war hammers: slower than a sword, and they hit like a falling tree.",
       "No room for a shield, mind. Anvils make them too, three bars apiece, if you'd rather forge your own."), [
       { label: "Show me.", then: () => { game.ui.shop = "heft"; return null; } }, { label: "Maybe later.", then: () => null }]);

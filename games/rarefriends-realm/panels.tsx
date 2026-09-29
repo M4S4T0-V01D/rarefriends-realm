@@ -108,7 +108,7 @@ export function ContextMenu({ x, y, entries, onClose }: { x: number; y: number; 
 export type Tab = "combat" | "skills" | "quests" | "inventory" | "equipment" | "prayer" | "magic" | "friends" | "settings" | "emotes";
 export const TABS: readonly { id: Tab; label: string; glyph: string; key: string }[] = [
   { id: "combat", label: "Combat options", glyph: "⚔", key: "F1" }, { id: "skills", label: "Skills", glyph: "▦", key: "F2" }, { id: "quests", label: "Quest journal", glyph: "✎", key: "F3" },
-  { id: "inventory", label: "Inventory", glyph: "▣", key: "F4" }, { id: "equipment", label: "Worn equipment", glyph: "⛨", key: "F5" }, { id: "prayer", label: "Prayer", glyph: "✚", key: "F6" },
+  { id: "inventory", label: "Inventory", glyph: "▣", key: "F4" }, { id: "equipment", label: "Worn equipment", glyph: "⛨", key: "F5" }, { id: "prayer", label: "Faith", glyph: "✚", key: "F6" },
   { id: "magic", label: "Magic", glyph: "✦", key: "F7" }, { id: "friends", label: "Friends and wardrobe", glyph: "☺", key: "F8" }, { id: "settings", label: "Settings", glyph: "⚙", key: "F9" },
   { id: "emotes", label: "Emotes", glyph: "☺", key: "F10" },
 ];
@@ -341,7 +341,7 @@ function EquipmentTab({ game, refresh, openCard, openMenu }: PanelProps) {
       <dl className="realm-bonuses">
         <div><dt>Attack</dt><dd>{signed(total.attack)}</dd></div><div><dt>Strength</dt><dd>{signed(total.strength)}</dd></div>
         <div><dt>Defence</dt><dd>{signed(total.defence)}</dd></div><div><dt>Ranged</dt><dd>{signed(total.ranged)}</dd></div>
-        <div><dt>Magic</dt><dd>{signed(total.magic)}</dd></div><div><dt>Prayer</dt><dd>{signed(total.prayer)}</dd></div>
+        <div><dt>Magic</dt><dd>{signed(total.magic)}</dd></div><div><dt>Faith</dt><dd>{signed(total.prayer)}</dd></div>
       </dl>
       <button type="button" className="realm-wide" onClick={openCard}>Adventurer card · Share on X</button>
     </div>
@@ -352,7 +352,7 @@ function PrayerTab({ game, refresh, openMenu }: PanelProps) {
   const player = game.player, level = levelForXp(player.xp.prayer), [hover, setHover] = useState<string | null>(null);
   return (
     <div>
-      <p className="realm-muted">Prayer points: <b>{Math.ceil(player.prayer)}</b> / {maxPrayer(player)} · Bonus {signed(bonuses(player).prayer)}</p>
+      <p className="realm-muted">Faith: <b>{Math.ceil(player.prayer)}</b> / {maxPrayer(player)} · Bonus {signed(bonuses(player).prayer)}</p>
       <div className="realm-icon-grid prayers">
         {PRAYERS.map(prayer => (
           <button key={prayer.id} type="button" aria-pressed={player.prayers.includes(prayer.id)} disabled={level < prayer.level} aria-label={`${prayer.name} (level ${prayer.level}): ${prayer.description}`}
@@ -946,7 +946,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
 export function Orbs({ game, onRun, onRide, onMap, onZoom, onRotate, openMenu }: { game: Game; onRun: () => void; onRide?: (id?: string) => void; onMap: () => void; onZoom: (delta: number) => void; onRotate: (delta: number) => void; openMenu?: OpenMenu }) {
   const player = game.player, hpFraction = player.hp / maxHp(player), prayerFraction = player.prayer / Math.max(1, maxPrayer(player));
   const orbMenu = (label: string): MenuEntry[] => label === "Hitpoints" ? [{ verb: "Check", noun: "Hitpoints", run: () => message(game, `Hitpoints: ${player.hp} / ${maxHp(player)}.`) }]
-    : label === "Prayer" ? [{ verb: "Deactivate", noun: "Prayers", run: () => { player.prayers = []; } }, { verb: "Check", noun: "Prayer", run: () => message(game, `Prayer points: ${Math.ceil(player.prayer)} / ${maxPrayer(player)}.`) }]
+    : label === "Faith" ? [{ verb: "Deactivate", noun: "Prayers", run: () => { player.prayers = []; } }, { verb: "Check", noun: "Faith", run: () => message(game, `Faith: ${Math.ceil(player.prayer)} / ${maxPrayer(player)}.`) }]
     : [{ verb: player.run ? "Walk" : "Run", noun: "", run: onRun }, { verb: "Check", noun: "Run energy", run: () => message(game, `Run energy: ${Math.floor(player.energy)}%.`) }];
   const orb = (label: string, value: number, fraction: number, color: string, art: HTMLCanvasElement, onClick?: () => void, pressed?: boolean) => (
     <button type="button" className="realm-orb" onClick={onClick} disabled={!onClick && !openMenu} aria-pressed={pressed} aria-label={`${label}: ${value}`} title={label} {...rightClick(openMenu, () => orbMenu(label))}>
@@ -956,7 +956,7 @@ export function Orbs({ game, onRun, onRide, onMap, onZoom, onRotate, openMenu }:
   return (
     <div className="realm-orbs">
       {orb("Hitpoints", player.hp, hpFraction, "#cf6e6e", orbArt("hitpoints"))}
-      {orb("Prayer", Math.ceil(player.prayer), prayerFraction, "#9fb4d0", orbArt("prayer"))}
+      {orb("Faith", Math.ceil(player.prayer), prayerFraction, "#9fb4d0", orbArt("prayer"))}
       {orb(player.run ? "Run: on" : "Run: off", Math.floor(player.energy), player.energy / 100, player.run ? "#e2c46a" : "#9a968f", orbArt(player.run ? "run" : "walk"), onRun, player.run)}
       {onRide && player.mounts.length > 0 && (() => { const shown = mountDef(player.mount ?? player.lastMount ?? player.mounts[0])!;
         return <button type="button" className="realm-orb map ride" onClick={() => onRide()} aria-pressed={!!player.mount} aria-label={player.mount ? `Dismount (H)` : `Ride your ${shown.name.toLowerCase()} (H)`} title={player.mount ? "Dismount (H)" : "Ride (H)"}

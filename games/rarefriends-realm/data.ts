@@ -10,7 +10,7 @@ export const SKILLS = [
 ] as const;
 export type Skill = typeof SKILLS[number];
 export const SKILL_NAMES: Record<Skill, string> = {
-  attack: "Attack", strength: "Strength", defence: "Defence", ranged: "Ranged", hitpoints: "Hitpoints", magic: "Magic", prayer: "Prayer",
+  attack: "Attack", strength: "Strength", defence: "Defence", ranged: "Ranged", hitpoints: "Hitpoints", magic: "Magic", prayer: "Faith",
   woodcutting: "Woodcutting", fishing: "Fishing", cooking: "Cooking", firemaking: "Firemaking", mining: "Mining",
   smithing: "Smithing", crafting: "Crafting", thieving: "Thieving", agility: "Agility", slayer: "Slayer",
   sigilcraft: "Sigilcraft", fletching: "Fletching",
@@ -52,7 +52,7 @@ export const XP_RATE = 3;
 export const FAMILY_NAMES = ["Skeleton", "Mask", "Family", "Cellular", "Asymmetry", "Hoverer", "Colossus", "Sparkling", "Hollow"] as const;
 export type FamilyPerk = { title: string; text: string };
 export const FAMILY_PERKS: readonly FamilyPerk[] = [
-  { title: "Bone collector", text: "Burying bones gives 50% more Prayer XP." },
+  { title: "Bone collector", text: "Burying bones gives 50% more Faith XP." },
   { title: "Many faces", text: "Thieving succeeds more often and stuns are shorter." },
   { title: "Big family", text: "Shops charge you 10% less." },
   { title: "Regrowth", text: "Hitpoints regenerate twice as fast." },
@@ -80,7 +80,9 @@ export type Item = {
   stackable?: boolean; tradeable?: boolean;
   equip?: { slot: EquipSlot; bonuses: Partial<Bonuses>; requires?: Partial<Record<Skill, number>>; speed?: number; twoHanded?: boolean; staff?: boolean;
     /** A bow or crossbow: its reach, the extra punch it gives each shot, and whether it fires bolts (crossbows) or arrows. */
-    bow?: { range: number; strength?: number; bolts?: boolean } };
+    bow?: { range: number; strength?: number; bolts?: boolean };
+    /** A faith weapon (the Order of the Dawn's): each hit gives a little Faith XP, and it hurts the undead more. */
+    holy?: boolean };
   heal?: number; bones?: number; tool?: { kind: "axe" | "pickaxe"; tier: number; level: number };
   /** Arrows (fired by any bow) or bolts (by any crossbow), from your pack. */
   ammo?: { strength: number; level: number; bolt?: boolean };
@@ -461,7 +463,65 @@ const OTHER_ITEMS: Item[] = [
   { id: "insight_lamp", name: "Lamp of insight", examine: "Rub it to gain experience in a skill of your choice.", value: 0, tradeable: false, icon: { shape: "lamp", color: "#e2d49e" } },
 ];
 
-export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS]);
+// ---------- Tailoring: capes in solid colours and patterns, and hats (Threadneedle Tailors on Market Street) ----------
+/** Solid capes: [id part, name, colour]. */
+const SOLID_CAPES = [
+  ["crimson", "Crimson", "#b0443c"], ["royal", "Royal blue", "#3f5d9a"], ["forest", "Forest green", "#4f7a4a"], ["midnight", "Midnight", "#2a2a33"],
+  ["snow", "Snow white", "#ecebe6"], ["plum", "Plum", "#6e4a8a"], ["golden", "Golden", "#c9a24a"], ["russet", "Russet", "#8a5a3a"], ["teal", "Teal", "#3f8a86"], ["rose", "Rose", "#d98fa6"],
+] as const;
+/** Patterned capes: [id, name, colour, pattern colour, pattern (patterns.ts), examine]. */
+const PATTERN_CAPES = [
+  ["striped_cape", "Striped cape", "#b0443c", "#e2c46a", "stripes", "Crimson and gold, in bold stripes."],
+  ["halved_cape", "Halved cape", "#3f5d9a", "#ecebe6", "halves", "Half royal blue, half white. Very heraldic."],
+  ["chevron_cape", "Chevron cape", "#4f7a4a", "#e2c46a", "chevron", "A golden chevron on forest green."],
+  ["quartered_cape", "Quartered cape", "#2a2a33", "#ecebe6", "quartered", "Black and white, in quarters."],
+  ["bordered_cape", "Bordered cape", "#6e4a8a", "#e2c46a", "border", "Plum, bordered in gold thread."],
+  ["starry_cape", "Starry cape", "#2a2a44", "#f2e28f", "stars", "Midnight blue, sewn with little stars."],
+  ["pilgrim_cape", "Pilgrim's cape", "#ecebe6", "#b0443c", "cross", "White with a red cross, for long roads."],
+] as const;
+/** Pointed wizard's hats in colours ([id part, name, colour, band]), feathered caps and wide-brimmed hats. */
+const WIZARD_HATS = [
+  ["crimson", "Crimson", "#9a3e3a", "#e2c46a"], ["emerald", "Emerald", "#3f7a58", "#e2c46a"], ["midnight", "Midnight", "#2a2a44", "#c6bed4"],
+  ["plum", "Plum", "#6e4a8a", "#e2c46a"], ["ashen", "Ashen", "#5f5e66", "#cf6e6e"], ["golden", "Golden", "#c9a24a", "#6f5440"],
+] as const;
+const CAPS = [["crimson", "Crimson", "#9a3e3a", "#ecebe6"], ["forest", "Forest", "#4f7a4a", "#e2c46a"], ["royal", "Royal", "#3f5d9a", "#e7a9b0"], ["russet", "Russet", "#8a5a3a", "#8fbf9a"]] as const;
+const WIDE_HATS = [["straw", "Straw", "#d8c48a", "#9a3e3a"], ["felt", "Felt", "#5f5a52", "#b0443c"], ["leather", "Leather", "#8a6446", "#3b3a38"]] as const;
+const TAILORING: Item[] = [
+  ...SOLID_CAPES.map(([key, name, color]): Item => ({ id: `${key}_cape`, name: `${name} cape`, examine: `A ${name.toLowerCase()} woollen cape.`, value: 120, icon: { shape: "cape", color }, equip: { slot: "cape", bonuses: { defence: 1 } } })),
+  ...PATTERN_CAPES.map(([id, name, color, accent, kind, examine]): Item => ({ id, name, examine, value: 400, icon: { shape: "cape", color, accent, kind }, equip: { slot: "cape", bonuses: { defence: 1 } } })),
+  ...WIZARD_HATS.map(([key, name, color, accent]): Item => ({ id: `${key}_wizard_hat`, name: `${name} wizard hat`, examine: "A pointed hat. Very wizardly.", value: 90, icon: { shape: "hat", color, accent }, equip: { slot: "head", bonuses: { magic: 2 } } })),
+  ...CAPS.map(([key, name, color, accent]): Item => ({ id: `${key}_feathered_cap`, name: `${name} feathered cap`, examine: "A soft cap with a jaunty feather.", value: 70, icon: { shape: "hat", color, accent, kind: "feathered" }, equip: { slot: "head", bonuses: { ranged: 1 } } })),
+  ...WIDE_HATS.map(([key, name, color, accent]): Item => ({ id: `${key}_wide_hat`, name: `${name} traveller's hat`, examine: "A wide brim for sun and rain.", value: 60, icon: { shape: "hat", color, accent, kind: "wide" }, equip: { slot: "head", bonuses: { defence: 1 } } })),
+];
+export const TAILOR_STOCK = TAILORING.map(entry => entry.id);
+
+// ---------- Faith: the Order of the Dawn's weapons, cape and relics ----------
+const DAWN_GOLD = "#e2c46a";
+const FAITH_GEAR: Item[] = [
+  { id: "dawnsteel_sword", name: "Dawnsteel sword", examine: "A knight's sword of the Order of the Dawn. Pale steel, gold at the hilt.", value: 4000, icon: { shape: "sword", color: "#e8e4d6", accent: DAWN_GOLD },
+    equip: { slot: "weapon", bonuses: { attack: 22, strength: 20, prayer: 3 }, requires: { attack: 20, prayer: 20 }, speed: 4, holy: true } },
+  { id: "vigil_spear", name: "Vigil spear", examine: "Carried on the long night watches of the Order. Its point catches the first light.", value: 9000, icon: { shape: "spear", color: "#e8e4d6", accent: DAWN_GOLD },
+    equip: { slot: "weapon", bonuses: { attack: 34, strength: 30, defence: 4, prayer: 4 }, requires: { attack: 30, prayer: 30 }, speed: 5, holy: true } },
+  { id: "radiant_greatsword", name: "Radiant greatsword", examine: "Two hands, and a blade that seems to hold the morning in it.", value: 40000, icon: { shape: "greatsword", color: "#f2eedc", accent: DAWN_GOLD },
+    equip: { slot: "weapon", bonuses: { attack: 60, strength: 68, prayer: 6 }, requires: { attack: 50, strength: 40, prayer: 45 }, speed: 6, twoHanded: true, holy: true } },
+  { id: "sunforged_warhammer", name: "Sunforged warhammer", examine: "Forged at dawn, quenched in holy water. The undead hate the sound of it.", value: 90000, icon: { shape: "warhammer", color: "#f2e3b0", accent: "#b0443c" },
+    equip: { slot: "weapon", bonuses: { attack: 70, strength: 86, prayer: 8 }, requires: { attack: 60, strength: 55, prayer: 60 }, speed: 6, twoHanded: true, holy: true } },
+  { id: "acolyte_staff", name: "Acolyte's staff", examine: "A novice's staff of the Order, topped with a little sunburst.", value: 2500, icon: { shape: "staff", color: "#d8c9a8", accent: DAWN_GOLD },
+    equip: { slot: "weapon", bonuses: { attack: 3, strength: 4, magic: 10, prayer: 3 }, requires: { magic: 15, prayer: 15 }, speed: 5, staff: true, holy: true } },
+  { id: "dawn_staff", name: "Dawn staff", examine: "A chaplain's staff. Spells cast through it burn the dead.", value: 15000, icon: { shape: "staff", color: "#efe6c8", accent: DAWN_GOLD },
+    equip: { slot: "weapon", bonuses: { attack: 6, strength: 8, magic: 20, prayer: 5 }, requires: { magic: 40, prayer: 40 }, speed: 5, staff: true, holy: true } },
+  { id: "first_light_staff", name: "Staff of the First Light", examine: "The Grandmaster's own design. It glows faintly, even in daylight.", value: 70000, icon: { shape: "staff", color: "#fff6d8", accent: "#f2e28f" },
+    equip: { slot: "weapon", bonuses: { attack: 10, strength: 12, magic: 32, prayer: 8 }, requires: { magic: 65, prayer: 70 }, speed: 5, staff: true, holy: true } },
+  { id: "dawn_cape", name: "Cape of the Dawn", examine: "White and gold: a knight of the Order of the Dawn.", value: 0, tradeable: false, icon: { shape: "cape", color: "#ecebe6", accent: DAWN_GOLD, kind: "cross" },
+    equip: { slot: "cape", bonuses: { defence: 3, prayer: 6 } } },
+  { id: "dawnstone_shard", name: "Dawnstone shard", examine: "A shard of the Order's lost relic. Warm, like a stone left in the sun.", value: 0, tradeable: false, icon: { shape: "gem", color: "#f2e3b0", accent: DAWN_GOLD } },
+  { id: "dawnstone", name: "Dawnstone", examine: "The Order of the Dawn's relic, whole again and blessed.", value: 0, tradeable: false, icon: { shape: "orb", color: "#fff2c0" } },
+];
+/** What the Order's armoury sells: the first weapons once you've kept the Dawn Vigil, the rest after Light in the Greyhorn. */
+export const ARMOURY_FIRST = ["dawnsteel_sword", "vigil_spear", "acolyte_staff"] as const;
+export const ARMOURY_LATER = ["radiant_greatsword", "sunforged_warhammer", "dawn_staff", "first_light_staff"] as const;
+
+export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...FAITH_GEAR]);
 const ITEM_MAP = new Map(ITEM_LIST.map(item => [item.id, item]));
 export function item(id: string): Item {
   const found = ITEM_MAP.get(id);
@@ -652,6 +712,8 @@ export type MonsterDef = {
   worldBoss?: boolean;
   /** The Slayer level needed to wound it. */
   slayer?: number;
+  /** Undead (skeletons, shades, the Hollow): faith weapons hurt them more. */
+  undead?: boolean;
   /** Dragonfire: its top hit when it breathes (a Wyrmward shield turns it to a few points). */
   breath?: number;
 };
@@ -684,7 +746,7 @@ export const MONSTERS: Record<string, MonsterDef> = {
     always: [one("bones", 1)], drops: [coins(20, 120, 0.7), one("ashsteel_dagger", 0.05), one("storm_sigil", 0.08, 2, 6), one("rough_sagestone", 0.02), one("path_sigil", 0.02, 1, 2), one("ashsteel_arrow", 0.1, 5, 15), one("willow_bow", 0.02)], art: 105 },
   swamp_lurker: { id: "swamp_lurker", name: "Swamp lurker", level: 16, hp: 22, attack: 14, strength: 14, defence: 12, attackBonus: 8, defenceBonus: 8, maxHit: 3, speed: 5, respawn: 35, wander: 4, examine: "Mostly mouth, partly mud.", aggressive: true,
     always: [one("bones", 1)], drops: [coins(5, 50, 0.5), one("tide_sigil", 0.12, 6, 18), one("raw_char", 0.1), one("rough_moonstone", 0.02)], art: 106 },
-  skeleton: { id: "skeleton", name: "Crypt skeleton", level: 25, hp: 29, attack: 22, strength: 22, defence: 20, attackBonus: 14, defenceBonus: 16, maxHit: 4, speed: 4, respawn: 40, wander: 4, examine: "It rattles when it walks. It used to be a Friend.", aggressive: true,
+  skeleton: { id: "skeleton", undead: true, name: "Crypt skeleton", level: 25, hp: 29, attack: 22, strength: 22, defence: 20, attackBonus: 14, defenceBonus: 16, maxHit: 4, speed: 4, respawn: 40, wander: 4, examine: "It rattles when it walks. It used to be a Friend.", aggressive: true,
     always: [one("bones", 1)], drops: [coins(10, 90, 0.6), one("blackiron_greaves", 0.03), one("storm_sigil", 0.06, 3, 7), one("hollow_sigil", 0.02, 1, 3), one("ashsteel_helm", 0.03)], art: 107 },
   wolf: { id: "wolf", name: "Frost wolf", level: 32, hp: 40, attack: 30, strength: 28, defence: 26, attackBonus: 18, defenceBonus: 18, maxHit: 5, speed: 4, respawn: 40, wander: 6, examine: "Its breath freezes as it growls.", aggressive: true,
     always: [one("large_bones", 1)], drops: [one("frost_shard", 0.03), coins(20, 110, 0.4), one("rough_rosestone", 0.02), one("moonsilver_ore", 0.05), one("frosthide_bracers", 0.02), one("moonsilver_arrow", 0.06, 5, 12)], art: 108 },
@@ -692,11 +754,11 @@ export const MONSTERS: Record<string, MonsterDef> = {
     always: [one("large_bones", 1)], drops: [one("mossy_staff", 0.03), one("mossblade", 0.03), coins(30, 250, 0.6), one("moonsilver_sword", 0.03), one("path_sigil", 0.06, 1, 3), one("rough_sagestone", 0.04), one("ashsteel_cuirass", 0.02)], art: 109 },
   frost_yeti: { id: "frost_yeti", name: "Frost yeti", level: 55, hp: 85, attack: 50, strength: 52, defence: 45, attackBonus: 30, defenceBonus: 32, maxHit: 10, speed: 5, respawn: 60, wander: 4, examine: "Every footstep is an avalanche.", aggressive: true, size: 2,
     always: [one("large_bones", 1)], drops: [one("frost_shard", 0.3), one("frostsilver_helm", 0.012), one("frostsilver_sabre", 0.008), coins(80, 400, 0.6), one("glimmer_sabre", 0.02), one("hollow_sigil", 0.08, 2, 5), one("glimmer_ore", 0.06), one("rough_rosestone", 0.04), one("rosestone_pendant", 0.004)], art: 110 },
-  shade: { id: "shade", name: "Shade", level: 38, hp: 45, attack: 32, strength: 30, defence: 34, magicDef: 10, attackBonus: 20, defenceBonus: 26, maxHit: 6, speed: 4, respawn: 40, wander: 4, examine: "A shadow with no Friend to belong to.", aggressive: true,
+  shade: { id: "shade", undead: true, name: "Shade", level: 38, hp: 45, attack: 32, strength: 30, defence: 34, magicDef: 10, attackBonus: 20, defenceBonus: 26, maxHit: 6, speed: 4, respawn: 40, wander: 4, examine: "A shadow with no Friend to belong to.", aggressive: true,
     always: [one("ink_bones", 1)], drops: [one("gloom_shard", 0.05), coins(40, 220, 0.6), one("hollow_sigil", 0.06, 2, 6), one("moonsilver_helm", 0.03), one("rough_rosestone", 0.02)], art: 111, ink: "#2c2b3a" },
-  hollow_sentinel: { id: "hollow_sentinel", name: "Hollow sentinel", level: 64, hp: 95, attack: 60, strength: 60, defence: 58, attackBonus: 40, defenceBonus: 48, maxHit: 12, speed: 5, respawn: 50, wander: 3, examine: "Armour with nothing inside. It still remembers how to fight.", aggressive: true,
+  hollow_sentinel: { id: "hollow_sentinel", undead: true, name: "Hollow sentinel", level: 64, hp: 95, attack: 60, strength: 60, defence: 58, attackBonus: 40, defenceBonus: 48, maxHit: 12, speed: 5, respawn: 50, wander: 3, examine: "Armour with nothing inside. It still remembers how to fight.", aggressive: true,
     always: [one("ink_bones", 1)], drops: [one("gloom_shard", 0.08), one("hollow_essence", 0.2), one("gloomsteel_shield", 0.008), coins(100, 600, 0.7), one("glimmer_cuirass", 0.02), one("rarite_ore", 0.03), one("hollow_sigil", 0.1, 4, 9), one("path_sigil", 0.08, 2, 5)], art: 112, ink: "#1d1d26" },
-  hollow_king: { id: "hollow_king", name: "The Hollow King", level: 92, hp: 250, attack: 80, strength: 82, defence: 70, magicDef: 50, attackBonus: 60, defenceBonus: 70, maxHit: 18, speed: 5, respawn: 100, wander: 2, examine: "A crown floating over an empty ring of shadow.", aggressive: true, size: 3, boss: true,
+  hollow_king: { id: "hollow_king", undead: true, name: "The Hollow King", level: 92, hp: 250, attack: 80, strength: 82, defence: 70, magicDef: 50, attackBonus: 60, defenceBonus: 70, maxHit: 18, speed: 5, respawn: 100, wander: 2, examine: "A crown floating over an empty ring of shadow.", aggressive: true, size: 3, boss: true,
     always: [one("ink_bones", 1), coins(1000, 3000, 1)], drops: [one("hollow_essence", 1, 3, 5), one("hollowsteel_sabre", 0.1), one("hollowsteel_helm", 0.08), one("hollowsteel_staff", 0.06), one("rarite_sabre", 0.12), one("rarite_helm", 0.1), one("moonlit_staff", 0.08), one("rarite_bar", 0.3, 1, 3), one("rosestone_pendant", 0.1)], art: 113, ink: "#111" },
 };
 Object.assign(MONSTERS, {
@@ -797,6 +859,8 @@ export const SHOPS: Record<string, ShopDef> = {
   axes: { id: "axes", name: "Axel's Axes", buys: ["logs"], rate: 0.6, stock: ["pewter_axe", "blackiron_axe", "ashsteel_axe", "moonsilver_axe", "pewter_pickaxe", "blackiron_pickaxe", "ashsteel_pickaxe", "moonsilver_pickaxe"] },
   swords: { id: "swords", name: "Emberforge Arms", buys: ["ore", "bar", "weapon", "armour"], rate: 0.55, stock: ["pewter_sword", "blackiron_sword", "ashsteel_sword", "pewter_sabre", "blackiron_sabre", "ashsteel_sabre", "moonsilver_sabre", "pewter_shield", "blackiron_shield", "blackiron_helm", "ashsteel_helm", "blackiron_cuirass"] },
   sigils: { id: "sigils", name: "Runa's Sigils", buys: ["sigil", "magic"], rate: 0.6, stock: ["sigil_box", "breeze_sigil", "tide_sigil", "stone_sigil", "ember_sigil", "thought_sigil", "shade_sigil", "storm_sigil", "bloom_sigil", "star_sigil", "path_sigil", "hollow_sigil", "staff", "breeze_staff", "scholar_hat", "scholar_robe"] },
+  armoury: { id: "armoury", name: "The Order Armoury", buys: ["weapon"], rate: 0.5, stock: [...ARMOURY_FIRST, ...ARMOURY_LATER] },
+  tailor: { id: "tailor", name: "Threadneedle Tailors", buys: ["armour"], rate: 0.5, stock: ["team_cape", ...TAILOR_STOCK, "scholar_hat"] },
   crafting: { id: "crafting", name: "Tessa's Tannery", buys: ["hide"], rate: 0.6, stock: ["needle", "thread", "chisel", "leather", "leather_gloves", "leather_boots"] },
   oasis: { id: "oasis", name: "Oasis Bazaar", buys: ["gem", "jewellery", "food"], rate: 0.7, stock: ["cake", "bread", "inkshark", "sailfish", "silk", "rough_moonstone", "friends_charm", "moonstone_pendant"] },
   frost: { id: "frost", name: "Frostpeak Outfitters", stock: ["inkcrab", "sailfish", "glimmer_pickaxe", "glimmer_axe", "glimmer_sabre", "glimmer_helm", "glimmer_shield", "hollow_sigil", "path_sigil", "frosthide_coif", "frosthide_bracers", "glimmer_arrow",

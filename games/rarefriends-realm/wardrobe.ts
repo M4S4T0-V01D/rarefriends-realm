@@ -8,6 +8,7 @@ import { WARDROBE, isItem, item, type WardrobeId } from "./data.ts";
 import { Pixels, shadeHex } from "./pixel.ts";
 import { itemArt } from "./icons.ts";
 import type { Facing } from "./state.ts";
+import { inPattern, isPattern, type ClothPattern } from "./patterns.ts";
 
 export type Mask = readonly string[];
 /** Padding around the sprite, in sprite pixels (room for wings, hats and trailing capes). */
@@ -34,7 +35,7 @@ function measure(rows: Mask) {
  * Your Friend's frame with its worn pieces, as a pixel canvas twice the sprite's resolution.
  * `phase` (0–3) animates cloth and wings; pass the walk frame so they sway with the stride.
  */
-type Piece = { id: string; kind: string; color: string; trim?: string };
+type Piece = { id: string; kind: string; color: string; trim?: string; pattern?: ClothPattern; style?: string };
 /**
  * Something held and moving (a weapon mid-swing, an axe chopping, a rod cast out, a fish over the fire): the item and its
  * angle from the resting pose, in radians, positive swinging forward (the way you face).
@@ -47,19 +48,22 @@ export const FIGURE_K = K;
 export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, phase = 0, ink = INK, held: Held | null = null): HTMLCanvasElement {
   // An equipped cape (a mastery cape, the Cape of the Hollow…) is worn over any wardrobe cape, with its trim.
   // A quiver is worn on the back the same way, over a wardrobe cape.
-  const gear: Piece[] = worn.filter(id => isItem(id) && item(id).equip?.slot === "cape").map(id => ({ id, kind: item(id).icon.shape === "quiver" ? "quiver" : item(id).icon.shape === "satchel" ? "satchel" : "cape", color: item(id).icon.color, trim: item(id).icon.accent }));
+  const gear: Piece[] = worn.filter(id => isItem(id) && item(id).equip?.slot === "cape").map(id => { const icon = item(id).icon;
+    return { id, kind: icon.shape === "quiver" ? "quiver" : icon.shape === "satchel" ? "satchel" : "cape", color: icon.color, trim: icon.accent, pattern: isPattern(icon.kind) ? icon.kind : undefined }; });
   // Headgear you wear (a helm, hood, hat or crown) shows too, unless a wardrobe hat is on top.
   const wardrobeHat = WARDROBE.some(piece => worn.includes(piece.id) && piece.kind === "hat");
   const headgear: Piece[] = wardrobeHat ? [] : worn.filter(id => isItem(id) && item(id).equip?.slot === "head").slice(0, 1).map(id => {
-    const icon = item(id).icon; return { id, kind: `gear_${icon.shape}`, color: icon.color, trim: icon.accent };
+    const icon = item(id).icon; return { id, kind: `gear_${icon.shape}`, color: icon.color, trim: icon.accent, style: icon.kind };
   });
+  // An amulet or pendant round the neck.
+  const amulet: Piece | undefined = worn.filter(id => isItem(id) && item(id).equip?.slot === "neck").slice(0, 1).map(id => ({ id, kind: "amulet", color: item(id).icon.color, style: item(id).icon.kind }))[0];
   // A shield on the off arm.
   const shield: Piece | undefined = worn.filter(id => isItem(id) && item(id).equip?.slot === "shield").slice(0, 1).map(id => ({ id, kind: "shield", color: item(id).icon.color, trim: item(id).icon.accent }))[0];
   // A weapon in the hand (swords, daggers, sabres, axes, pickaxes, staffs and bows), when it isn't mid-swing.
   const weapon: Piece | undefined = (held && isItem(held.id) ? [held.id] : worn.filter(id => isItem(id) && item(id).equip?.slot === "weapon")).slice(0, 1).map(id => ({ id, kind: `weapon_${item(id).icon.shape}`, color: item(id).icon.color, trim: item(id).icon.accent }))[0];
   // Angles snap to steps (pixel art turns in steps anyway, and it keeps the cache small).
   const turn = held ? Math.round(held.angle / 0.14) * 0.14 : 0;
-  const pieces: Piece[] = [...WARDROBE.filter(piece => worn.includes(piece.id) && piece.kind !== "aura" && piece.kind !== "lantern" && !(gear.some(entry => entry.kind === "cape") && piece.kind === "cape")), ...gear.slice(0, 1), ...headgear, ...(shield ? [shield] : []), ...(weapon ? [weapon] : [])];
+  const pieces: Piece[] = [...WARDROBE.filter(piece => worn.includes(piece.id) && piece.kind !== "aura" && piece.kind !== "lantern" && !(gear.some(entry => entry.kind === "cape") && piece.kind === "cape")), ...gear.slice(0, 1), ...headgear, ...(shield ? [shield] : []), ...(weapon ? [weapon] : []), ...(amulet ? [amulet] : [])];
   const key = `${ink}|${facing}|${phase & 3}|${pieces.map(piece => piece.id).join(",")}|${turn.toFixed(2)}|${rows.join("")}`;
   let canvas = cache.get(key);
   if (canvas) return canvas;
@@ -95,14 +99,28 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
   // The satchel sits high on the back: seen from the side it sticks out behind you; from the front it's hidden but for its straps.
   const packTop = neckY, packBottom = backWaist + 2, packHalf = Math.max(4, Math.round((X(shoulderSpan.max) - X(shoulderSpan.min)) / 2) - 1);
   if (satchel && side) drawSatchel(p, satchel, cx - side * 6, packTop + 1, 3, packBottom - packTop - 1, false);
+  /** A cape's cloth: the shape in its colour, then its pattern (if it has one) in the second colour. */
+  const cloth = (points: [number, number][]) => {
+    if (!cape) return;
+    if (!cape.pattern || !cape.trim) { p.poly(points, cape.color, null); return; }
+    const mask = new Pixels(p.w, p.h); mask.poly(points, cape.color, null);
+    const ys = points.map(point => point[1]), top = Math.min(...ys), bottom = Math.max(...ys);
+    for (let y = Math.floor(top); y <= Math.ceil(bottom); y++) {
+      let l = -1, r = -1;
+      for (let x = 0; x < p.w; x++) if (mask.get(x, y)) { if (l < 0) l = x; r = x; }
+      for (let x = l; l >= 0 && x <= r; x++) if (mask.get(x, y)) p.set(x, y, inPattern(cape.pattern, (x - l) / Math.max(1, r - l), (y - top) / Math.max(1, bottom - top), x, y) ? cape.trim : cape.color);
+    }
+  };
+  // A patterned cape's second colour is its pattern, not a trim.
+  const capeTrim = cape && !cape.pattern ? cape.trim : undefined;
   if (cape && !back) {
     const dark = shadeHex(cape.color, -0.12), trail = side ? -side * 5 : 0;
     const top = bodySpan(m.neck + 1), shoulders = [X(top.min) - 1, X(top.max) + 2] as const;
     const hemL = X(m.left) - 3 + trail + sway, hemR = X(m.right) + 4 + trail + sway;
-    p.poly([[shoulders[0], neckY], [shoulders[1], neckY], [hemR, feet - 1], [hemL, feet - 1]], cape.color, null);
+    cloth([[shoulders[0], neckY], [shoulders[1], neckY], [hemR, feet - 1], [hemL, feet - 1]]);
     for (let fold = 1; fold < 4; fold++) { const t = fold / 4; p.line(shoulders[0] + (shoulders[1] - shoulders[0]) * t, neckY + 2, hemL + (hemR - hemL) * t, feet - 2, dark); }
-    p.line(hemL, feet - 1, hemR, feet - 1, cape.trim ?? dark);
-    if (cape.trim) p.line(hemL, feet - 2, hemR, feet - 2, cape.trim);
+    p.line(hemL, feet - 1, hemR, feet - 1, capeTrim ?? dark);
+    if (capeTrim) p.line(hemL, feet - 2, hemR, feet - 2, capeTrim);
   }
   if (pieces.some(piece => piece.kind === "scarf") && side) {
     // The scarf's long tail streams out behind you.
@@ -139,18 +157,24 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
     const strapX0 = X(shoulderSpan.max) - 1, strapX1 = X(bodySpan(Math.round(m.neck + (m.bottom - m.neck) * 0.6)).min) + 2;
     p.line(strapX0, neckY + 1, strapX1, backWaist + 1, shadeHex(quiver.color, -0.2), 2); p.set(Math.round((strapX0 + strapX1) / 2), Math.round((neckY + backWaist) / 2) + 1, quiver.trim ?? "#c9a24a");
   }
+  // From behind, a cape hangs over your back and your weapon arm comes out beside it (like the shield on the other side):
+  // the hand sits just outside the cape's edge and what you hold goes under the cape, so nothing cuts across it.
+  const capeTop = bodySpan(m.neck), capeShoulder = X(capeTop.max) + 2, capeHem = X(m.right) + 4 + sway;
+  const capeEdge = (y: number) => capeShoulder + (capeHem - capeShoulder) * Math.max(0, Math.min(1, (y - (neckY - 1)) / Math.max(1, feet - neckY)));
+  const underCape = !!cape && back;
+  if (underCape) { hand.x = Math.ceil(capeEdge(hand.y)) + 1; if (weapon) tip = drawHeld(p, weapon, hand.x, hand.y, dir, sway, turn); }
   if (cape && back) {
-    const dark = shadeHex(cape.color, -0.12), top = bodySpan(m.neck), shoulders = [X(top.min) - 1, X(top.max) + 2] as const;
-    const hemL = X(m.left) - 3 + sway, hemR = X(m.right) + 4 + sway;
-    p.poly([[shoulders[0], neckY - 1], [shoulders[1], neckY - 1], [hemR, feet - 1], [hemL, feet - 1]], cape.color, null);
+    const dark = shadeHex(cape.color, -0.12), top = capeTop, shoulders = [X(top.min) - 1, capeShoulder] as const;
+    const hemL = X(m.left) - 3 + sway, hemR = capeHem;
+    cloth([[shoulders[0], neckY - 1], [shoulders[1], neckY - 1], [hemR, feet - 1], [hemL, feet - 1]]);
     for (let fold = 1; fold < 5; fold++) { const t = fold / 5; p.line(shoulders[0] + (shoulders[1] - shoulders[0]) * t, neckY + 1, hemL + (hemR - hemL) * t, feet - 2, dark); }
     p.rect(shoulders[0], neckY - 1, shoulders[1] - shoulders[0], 2, shadeHex(cape.color, 0.08));
-    if (cape.trim) {
+    if (capeTrim) {
       // Trimmed edges, and the emblem on the back.
-      p.line(hemL, feet - 1, hemR, feet - 1, cape.trim); p.line(hemL, feet - 2, hemR, feet - 2, cape.trim);
-      p.line(shoulders[0], neckY - 1, hemL, feet - 1, cape.trim); p.line(shoulders[1] - 1, neckY - 1, hemR - 1, feet - 1, cape.trim);
+      p.line(hemL, feet - 1, hemR, feet - 1, capeTrim); p.line(hemL, feet - 2, hemR, feet - 2, capeTrim);
+      p.line(shoulders[0], neckY - 1, hemL, feet - 1, capeTrim); p.line(shoulders[1] - 1, neckY - 1, hemR - 1, feet - 1, capeTrim);
       const ex = Math.round((hemL + hemR) / 2), ey = Math.round((neckY + feet) / 2) - 1;
-      p.disc(ex, ey, 2.4, 2.4, cape.trim, null); p.set(ex, ey, cape.color);
+      p.disc(ex, ey, 2.4, 2.4, capeTrim, null); p.set(ex, ey, cape.color);
     }
   }
   for (const piece of pieces) {
@@ -197,6 +221,19 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
     }
   }
 
+  // ---------- An amulet round the neck: a string or chain, and the pendant on the chest (from behind, just the cord) ----------
+  if (amulet) {
+    const cord = amulet.style === "strung" ? "#e8dcc0" : "#d9b866", span = bodySpan(m.neck + 1), l = X(span.min) + 2, r = X(span.max) - 1, drop = neckY + 5;
+    if (back) p.line(l, neckY + 1, r, neckY + 1, cord);
+    else if (side) { const x = Math.round(cx) + side * 3; p.line(x - side * 2, neckY, x, drop, cord); p.rect(x - 1, drop, 2, 3, amulet.color); p.set(x - (side > 0 ? 1 : 0), drop, shadeHex(amulet.color, 0.25)); }
+    else {
+      const mid = Math.round(cx);
+      p.line(l, neckY, mid, drop, cord); p.line(r, neckY, mid, drop, cord);
+      if (amulet.style !== "strung") p.rect(mid - 2, drop, 4, 4, "#d9b866");
+      p.rect(mid - 1, drop + 1, 2, 2, amulet.color); p.set(mid - 1, drop + 1, shadeHex(amulet.color, 0.3));
+    }
+  }
+
   // ---------- Equipped headgear (under anything held, so a swinging axe or a shouldered sword stays outside the helm) ----------
   for (const piece of pieces.filter(entry => entry.kind.startsWith("gear_"))) {
     const color = piece.color, dark = shadeHex(color, -0.18), light = shadeHex(color, 0.16), l = Math.round(cx - headHalf) - 1, r = Math.round(cx + headHalf) + 1, top = headTop;
@@ -239,6 +276,23 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
         break;
       }
       case "gear_hat": {
+        if (piece.style === "feathered") {
+          // A soft round cap with a turned-up brim, and a feather sweeping back from the side.
+          const band = top + 1, back2 = side ? -side : 1;
+          p.poly([[l, band + 1], [l + 1, top - 3], [Math.round(cx) - 2, top - 5], [Math.round(cx) + 3, top - 5], [r - 1, top - 3], [r, band + 1]], color, null);
+          p.rect(l - 1, band, r - l + 3, 2, dark); p.line(l + 1, top - 3, r - 2, top - 3, light);
+          const fx = side ? Math.round(cx) - side * 2 : r - 1, feather = piece.trim ?? "#f7f5f0";
+          p.polyline([[fx, top - 2], [fx + back2 * 3, top - 7], [fx + back2 * 6, top - 10]], feather, 2); p.set(fx + back2 * 6, top - 11, feather);
+          break;
+        }
+        if (piece.style === "wide") {
+          // A wide brim all round and a round crown with a band.
+          const brimY = top + 1;
+          p.disc(cx, brimY, headHalf + 6, 2.4, dark, null);
+          p.poly([[l + 1, brimY], [l + 1, top - 4], [Math.round(cx) - 2, top - 6], [Math.round(cx) + 3, top - 6], [r - 1, top - 4], [r - 1, brimY]], color, null);
+          p.rect(l + 1, top - 1, r - l - 1, 2, piece.trim ?? dark); p.line(l + 2, top - 5, r - 3, top - 5, light);
+          break;
+        }
         // A pointed wizard's hat with a brim and a band.
         const brimY = top + 1, tipX = Math.round(cx) + 3 + sway * 2 - side * 2;
         p.disc(cx, brimY, headHalf + 4, 2.2, dark, null);
@@ -271,12 +325,12 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
     }
   }
 
-  if (weapon && side >= 0 && !held) tip = drawHeld(p, weapon, hand.x, hand.y, dir, sway, turn);
+  if (weapon && side >= 0 && !held && !underCape) tip = drawHeld(p, weapon, hand.x, hand.y, dir, sway, turn);
   // The shield on the off arm: across your body facing left (that arm is towards you), at your side facing the camera
   // or away. (Facing right it's behind you, drawn before your Friend above.)
   if (shield && side <= 0) drawShield(p, shield, side < 0 ? Math.round(cx) + 1 : front ? X(waistSpan.max) + 2 : X(waistSpan.min) - 1, waist, back);
   // A tool at work or a weapon mid-swing goes over everything, so the motion reads.
-  if (weapon && held) tip = drawHeld(p, weapon, hand.x, hand.y, dir, sway, turn);
+  if (weapon && held && !underCape) tip = drawHeld(p, weapon, hand.x, hand.y, dir, sway, turn);
 
   // ---------- Edges: ink around the worn colours, then the white halo around everything (one sprite pixel) ----------
   const data = p.data, filled = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && data[y * W + x] !== 0;

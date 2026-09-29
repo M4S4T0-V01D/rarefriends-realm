@@ -4,6 +4,7 @@
  */
 import { METALS, type Icon, type Skill } from "./data.ts";
 import { INK, Pixels, pixelArt, shadeHex } from "./pixel.ts";
+import { inPattern, isPattern } from "./patterns.ts";
 
 // ---------- Item art: shaded pixel art on a 32-pixel grid ----------
 /**
@@ -57,6 +58,13 @@ const all = (...draws: ((q: Pixels) => void)[]) => (q: Pixels) => draws.forEach(
 const line = (p: Pixels, points: Pt[], color: string, width = 1) => p.polyline(points, color, width);
 const dot = (p: Pixels, x: number, y: number, color: string) => p.set(x, y, color);
 
+/** Only the parts of a shape in a cloth pattern (u, v across the shape's bounds), for a patterned cape. */
+const patterned = (shape: (q: Pixels) => void, kind: Parameters<typeof inPattern>[0]) => (q: Pixels) => {
+  const mask = new Pixels(q.w, q.h); shape(mask);
+  let x0 = q.w, y0 = q.h, x1 = 0, y1 = 0;
+  for (let y = 0; y < q.h; y++) for (let x = 0; x < q.w; x++) if (mask.get(x, y)) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (mask.get(x, y) && inPattern(kind, (x - x0) / Math.max(1, x1 - x0), (y - y0) / Math.max(1, y1 - y0), x, y)) q.set(x, y, MARK);
+};
 /** A fish's body facing left: head at (x, y), `len` long and `ht` tall, with a tail; returns where its eye is. */
 function fishShape(p: Pixels, x: number, y: number, len: number, ht: number, color: string, tail: "fork" | "round" | "crescent" = "fork", snout = 0) {
   part(p, poly([[x - snout, y], [x + len * 0.18, y - ht * 0.5], [x + len * 0.58, y - ht * 0.56], [x + len * 0.84, y - ht * 0.24], [x + len * 0.84, y + ht * 0.24], [x + len * 0.58, y + ht * 0.5], [x + len * 0.2, y + ht * 0.44]]), color, "food");
@@ -242,6 +250,19 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
         part(p, disc(16, 17, 5.5, 6), "#2e2c2a", "flat");
         line(p, [[9, 27], [14, 24]], dark); line(p, [[23, 27], [18, 24]], dark); break;
       case "hat":
+        if (icon.kind === "feathered") {
+          // A soft round cap with a turned-up brim and a long feather sweeping back.
+          part(p, poly([[4, 26], [5, 17], [10, 11], [18, 10], [25, 13], [28, 20], [28, 26]]), color, "cloth");
+          part(p, box(3, 23, 26, 5), shadeHex(color, -0.08), "cloth");
+          part(p, poly([[20, 12], [27, 3], [30, 2], [29, 6], [22, 14]]), accent ?? WHITE, "cloth");
+          line(p, [[21, 13], [29, 3]], shadeHex(accent ?? WHITE, -0.25)); break;
+        }
+        if (icon.kind === "wide") {
+          // A wide brim and a round crown with a band.
+          part(p, disc(16, 23, 15, 5), shadeHex(color, -0.06), "cloth");
+          part(p, poly([[9, 23], [10, 12], [14, 9], [18, 9], [22, 12], [23, 23]]), color, "cloth");
+          line(p, [[10, 19], [22, 19]], accent ?? DARK_WOOD, 2); break;
+        }
         part(p, disc(16, 25, 13, 4), color, "cloth");
         part(p, poly([[8, 25], [24, 25], [20, 14], [22, 4], [16, 8], [13, 14]]), color, "cloth");
         line(p, [[9, 23], [23, 23]], accent ?? GOLD_C, 2); dot(p, 15, 16, GOLD_C); dot(p, 18, 12, GOLD_C); break;
@@ -274,12 +295,15 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
       case "bracer":
         part(p, poly([[8, 6], [24, 8], [23, 28], [9, 26]]), color, armour);
         for (const y of [12, 18, 23]) line(p, [[9, y], [23, y + 1]], shadeHex(color, -0.3), 2); break;
-      case "cape":
-        part(p, poly([[10, 3], [22, 3], [29, 28], [22, 26], [16, 29], [10, 26], [3, 28]]), color, "cloth");
+      case "cape": {
+        const cloth = poly([[10, 3], [22, 3], [29, 28], [22, 26], [16, 29], [10, 26], [3, 28]]), pattern = isPattern(icon.kind) ? icon.kind : null;
+        part(p, cloth, color, "cloth");
+        if (pattern && accent) part(p, patterned(cloth, pattern), accent, "cloth", false);
         line(p, [[13, 6], [9, 25]], dark); line(p, [[19, 6], [23, 25]], dark); line(p, [[16, 6], [16, 27]], dark);
         part(p, box(9, 3, 14, 3), shadeHex(color, 0.12), "cloth");
-        if (accent) { line(p, [[4, 27], [10, 25], [16, 28], [22, 25], [28, 27]], accent, 2); part(p, disc(16, 15, 3), accent, "metal"); }
+        if (accent && !pattern) { line(p, [[4, 27], [10, 25], [16, 28], [22, 25], [28, 27]], accent, 2); part(p, disc(16, 15, 3), accent, "metal"); }
         break;
+      }
       case "amulet":
         // Enchanted pendants hang on gold; a gem simply strung hangs on string, in a little knot.
         line(p, [[8, 4], [8, 11], [12, 16], [16, 18], [20, 16], [24, 11], [24, 4]], icon.kind === "strung" ? "#e8dcc0" : GOLD_C, icon.kind === "strung" ? 2 : 1);

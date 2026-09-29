@@ -6,7 +6,7 @@ import {
   successChance, hitChance, unlockMusic, bestArrow, rangedMaxHit, bowRange, syncMonster, toggleMount, grantMount, rideProblem, castOnItem, isBound, grantBundle, rubLamp, breakTablet, capeProblem, sellPrice, craftSigils,
 } from "../games/rarefriends-realm/engine.ts";
 import { currentTask, slayerPoints } from "../games/rarefriends-realm/slayer.ts";
-import { ITEM_LIST, MONSTERS, MOUNTS, SHOPS, SKILLS, SPELLS, TREES, XP_RATE, XP_TABLE, item, levelForXp } from "../games/rarefriends-realm/data.ts";
+import { ITEM_LIST, MONSTERS, MOUNTS, SHOPS, SKILLS, SKILL_NAMES, SPELLS, TREES, XP_RATE, XP_TABLE, item, levelForXp } from "../games/rarefriends-realm/data.ts";
 import { NPCS, QUESTS, MAX_QUEST_POINTS, questPoints, onMonsterKilled } from "../games/rarefriends-realm/content.ts";
 import { FLOOR_Y, H, REGIONS, T, W, createWorld, floorAt, objectAtTile, onLevel, realPoint, regionAt, terrainAt } from "../games/rarefriends-realm/world.ts";
 import { addXp, emptyToBank, fillFromBank, bankDeposit, bankInOrder, bankMove, bankTabs, bankWithdraw, combatLevel, count, earlyXp, give, has, level, xpMultiplier } from "../games/rarefriends-realm/state.ts";
@@ -456,7 +456,7 @@ test("A Friend's Feast from start to finish", () => {
   assert.equal(g.player.quests.friends_feast, 2);
   assert.equal(questPoints(g), 1);
   assert(level(g, "cooking") >= 10, "Quest XP");
-  assert.equal(QUESTS.length, 7); assert.equal(MAX_QUEST_POINTS, 10);
+  assert.equal(QUESTS.length, 9); assert.equal(MAX_QUEST_POINTS, 13);
 });
 
 test("Grumblin Trouble counts kills and pays out", () => {
@@ -1249,4 +1249,68 @@ test("XP: the early levels go slower (about half speed at level 1), the full rat
   assert(logs >= 20, `level 10 takes a while now (${logs} logs)`);
   p.xp.mining = 13_363; const before = p.xp.mining; addXp(g, "mining", 35); assert(Math.abs(p.xp.mining - before - 35 * xpMultiplier(p)) < 1e-6, "full rate at level 30+");
   p.xp.fishing = 0; addXp(g, "fishing", 300, { raw: true }); assert.equal(p.xp.fishing, 300, "fixed rewards pay in full");
+});
+
+test("Faith: the Order of the Dawn, offerings, the Dawn Vigil, faith weapons and Light in the Greyhorn", () => {
+  const g = newGame({ familyId: 2 }), p = g.player;
+  const talkTo = (id, choose = 0) => {
+    const npc = g.npcs.find(entry => entry.id === id);
+    teleport(g, npc.x, npc.y + 1); if (!canWalk(g, npc.x, npc.y + 1)) teleport(g, npc.x + 1, npc.y);
+    setTarget(g, { kind: "npc", uid: npc.uid, option: "Talk-to" });
+    until(g, () => g.dialogue !== null, 40);
+    while (g.dialogue && g.dialogue.index < g.dialogue.lines.length) continueDialogue(g);
+    if (g.dialogue?.options) chooseOption(g, choose);
+    while (g.dialogue) continueDialogue(g);
+  };
+  const altar = g.world.objects.find(object => object.kind === "altar" && object.text === "dawn");
+  assert(altar, "Dawnhold has a chapel altar");
+  const offer = id => { give(p, id); standBy(g, altar); setTarget(g, { kind: "object", id: altar.id, option: "Use", use: p.inventory.findIndex(slot => slot?.id === id) }); run(g, 3); };
+
+  // The skill is called Faith; the Order won't take a squire below Faith 10.
+  assert.equal(SKILL_NAMES.prayer, "Faith");
+  talkTo("grandmaster");
+  assert.equal(p.quests.dawn_vigil ?? 0, 0, "Faith 10 needed to start");
+  // Offering bones at the chapel: three times the burying XP.
+  const before = p.xp.prayer; offer("bones");
+  assert(p.xp.prayer - before > 4.5 * 3 * 0.9 * XP_RATE * earlyXp(1, "prayer") - 1e-9, "three times the XP of burying");
+  // The Armoury is locked until the vigil is kept.
+  assert(capeProblem(g, "dawnsteel_sword"), "the armoury is locked");
+  p.xp.prayer = XP_TABLE[10];
+  talkTo("grandmaster");
+  assert.equal(p.quests.dawn_vigil, 1, "the vigil starts");
+  for (let i = 0; i < 8; i++) offer("bones");
+  assert.equal(p.questData.vigil_bones, 8);
+  talkTo("grandmaster");
+  assert.equal(p.quests.dawn_vigil, 2, "the vigil is kept");
+  assert(has(p, "dawnsteel_sword"), "a Dawnsteel sword");
+  assert.equal(capeProblem(g, "dawnsteel_sword"), null, "the armoury opens");
+  assert(capeProblem(g, "radiant_greatsword"), "but not its finest weapons");
+
+  // A faith weapon: Faith XP with each hit, and harder hits on the undead.
+  p.xp.attack = XP_TABLE[40]; p.xp.strength = XP_TABLE[40]; p.xp.hitpoints = XP_TABLE[40]; p.hp = 40; p.xp.prayer = XP_TABLE[20];
+  equip(g, p.inventory.findIndex(slot => slot?.id === "dawnsteel_sword"));
+  assert.equal(p.equipment.weapon, "dawnsteel_sword");
+  const skeleton = g.monsters.find(monster => monster.def.id === "skeleton");
+  assert(skeleton.def.undead, "skeletons are undead");
+  const faith = p.xp.prayer, attack = p.xp.attack;
+  teleport(g, skeleton.x, skeleton.y + 1); if (!canWalk(g, skeleton.x, skeleton.y + 1)) teleport(g, skeleton.x + 1, skeleton.y);
+  setTarget(g, { kind: "monster", uid: skeleton.uid, option: "Attack" });
+  until(g, () => p.xp.attack > attack, 200);
+  assert(p.xp.prayer > faith, "a hit with a faith weapon gives Faith XP");
+  assert((p.xp.prayer - faith) < (p.xp.attack - attack) / 8, "but only a trickle");
+
+  // Light in the Greyhorn: three shards from stone golems, blessed on the altar, brought to the Grandmaster.
+  p.combat = null; p.xp.prayer = XP_TABLE[30];
+  talkTo("grandmaster");
+  assert.equal(p.quests.greyhorn_light, 1);
+  let tries = 0;
+  while (count(p, "dawnstone_shard") < 3 && tries++ < 200) onMonsterKilled(g, "stone_golem", 300, 60);
+  assert.equal(count(p, "dawnstone_shard"), 3, "golems drop the shards");
+  offer("dawnstone_shard");
+  assert.equal(p.quests.greyhorn_light, 2); assert(has(p, "dawnstone"));
+  talkTo("grandmaster");
+  assert.equal(p.quests.greyhorn_light, 3);
+  assert(has(p, "dawn_cape"), "the Cape of the Dawn");
+  assert.equal(capeProblem(g, "radiant_greatsword"), null, "the finest weapons unlock");
+  assert.equal(questPoints(g), 3);
 });

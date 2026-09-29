@@ -38,7 +38,9 @@ export function skillGuide(skill: Skill): GuideEntry[] {
     case "magic": for (const spell of SPELLS) out.push({ level: spell.level, name: spell.name, detail: spell.description, spell: spell.id }); out.push(...gear("magic")); break;
     case "prayer":
       for (const prayer of PRAYERS) add(prayer.level, prayer.name, prayer.description);
-      for (const bones of ITEM_LIST.filter(entry => entry.bones)) add(1, `Bury ${bones.name.toLowerCase()}`, `${bones.bones} Prayer XP`, bones.id);
+      for (const bones of ITEM_LIST.filter(entry => entry.bones)) add(1, `Bury ${bones.name.toLowerCase()}`, `${bones.bones} Faith XP (twice that offered on an altar, three times in the Dawnhold chapel)`, bones.id);
+      // The Order of the Dawn's faith weapons: a little Faith XP with each hit, and they hurt the undead more.
+      for (const weapon of ITEM_LIST.filter(entry => entry.equip?.holy)) add(weapon.equip!.requires?.prayer ?? 1, weapon.name, "Faith weapon: Faith XP with every hit, and it hurts the undead more", weapon.id);
       break;
     case "sigilcraft":
       for (const altar of SIGILCRAFT) add(altar.level, `${item(altar.sigil).name}s`, `${altar.xp} XP a stone at the ${item(altar.sigil).name.replace(" sigil", "")} altar; ${sigilsPerStone(altar.level + 11, altar.level)} per stone from level ${altar.level + 11}`, altar.sigil);

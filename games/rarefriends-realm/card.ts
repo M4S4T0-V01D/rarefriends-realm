@@ -31,9 +31,9 @@ export function renderCard(game: Game, friend: GenerationSprites | null, region:
   const aura = player.worn.map(id => WARDROBE.find(entry => entry.id === id)).find(entry => entry?.kind === "aura");
   if (aura) { ctx.fillStyle = `${aura.color}aa`; ctx.beginPath(); ctx.ellipse(258, 250, 150, 130, 0, 0, Math.PI * 2); ctx.fill(); }
   if (friend) {
-    // Your Friend as it looks in the Realm: wardrobe, helm, cape, shield and weapon, and on its mount if it's riding one
+    // Your Friend as it looks in the Realm: wardrobe, helm, cape, amulet, shield and weapon, and on its mount if it's riding one
     // (the mount's body behind, its head in front, as when you ride towards the camera).
-    const dressed = [...player.worn, ...(["cape", "head", "shield", "weapon"] as const).flatMap(slot => player.equipment[slot] ? [player.equipment[slot]!] : [])];
+    const dressed = [...player.worn, ...(["cape", "head", "shield", "weapon", "neck"] as const).flatMap(slot => player.equipment[slot] ? [player.equipment[slot]!] : [])];
     const art = figureArt(friendRows(friend, "down", false, 0), dressed, "down"), mount = mountDef(player.mount);
     // Mount art pixels are this many figure pixels (the in-game scales: 2 × 1.35 world pixels against 3.2 / 2).
     const ratio = 2 * 1.35 / 1.6, lift = mount ? (SADDLE - 4) * ratio : 0;

@@ -16,7 +16,7 @@ An old-school, tick-based RPG in a 2.5D isometric world. Your verified Rare Frie
 | Scroll, or + / − | Zoom (0.55× to 3×, close enough to watch every axe swing) |
 | M, or the map orb | World map (click a place to walk there) |
 | Minimap click | Walk there |
-| F1–F10, or I / K / L / O / P / N | Combat, Skills, Quests, Inventory, Equipment, Prayer, Magic, Friends, Settings, Emotes |
+| F1–F10, or I / K / L / O / P / N | Combat, Skills, Quests, Inventory, Equipment, Faith, Magic, Friends, Settings, Emotes |
 | Click a skill | Its guide: everything it unlocks, level by level (Recipe book button for every recipe) |
 | Enter | Chat (shown over your Friend's head) |
 | Space, 1–5 | Continue dialogue, pick an option |
@@ -42,7 +42,7 @@ XP follows the classic curve (83 XP for level 2, 13,034,431 for 99), multiplied 
 | Hitpoints | Any combat (1.33 XP per damage) | Starts at 10; regenerates 1 HP per minute |
 | Magic | Spells paid in sigils (damage spells: base XP + 2 per damage) | Staffs autocast damage spells; breeze, tide, stone and ember staffs give unlimited sigils of their element. Basic sigils cost about 3 coins |
 | Sigilcraft | Press sigil stones at an altar: Breeze 1, Thought 2, Tide 5, Stone 9, Ember 14, Shade 20, Star 27, Storm 35, Bloom 44, Path 54, Hollow 65 | Sigil stones are mined (endlessly) in the Wizards' Tower; one more sigil per stone for every 11 levels past the altar's |
-| Prayer | Burying bones (4.5 / 15 / 50 XP) | Recharge at altars; prayers drain points |
+| Faith | Burying bones (4.5 / 15 / 50 XP), offering them on an altar (×2, ×3 in the Dawnhold chapel), hits with a faith weapon | Pray at altars to restore faith; prayers drain it |
 | Woodcutting | Trees 1, Oak 15, Willow 30, Maple 45, Yew 60, Ashwood 70 | Better axes cut faster |
 | Firemaking | Light logs (same levels as Woodcutting) | Fires last about a minute; cook on them |
 | Fletching | A knife on logs: 15 arrow shafts (8 XP), a bow (Shortbow 5, Oak 20, Willow 35, Maple 50, Yew 65, Ashwood 80), a war bow from two logs (10, 25, 40, 55, 70, 85) or a crossbow stock (wooden 9, oak 24, willow 39, maple 54, yew 69, ashwood 84); feathers on shafts; arrowheads on headless arrows (pewter 1 … rarite 75); feathers on unfeathered bolts (pewter 5 … rarite 79) | Arrowheads (15 a bar), unfeathered bolts (12 a bar) and crossbow limbs (2 bars) are smithed at the anvil. Limbs on their stock make a crossbow with Crafting (pewter 8, blackiron 18, ashsteel 28, moonsilver 42, glimmer 56, rarite 70) |
@@ -84,7 +84,7 @@ Burning Heart, Perfect Ink and Friend's Ward (blocks most melee damage).
 
 ## Family perks
 
-Your Friend's Generations family gives one perk: Skeleton (bones +50% Prayer XP), Mask (better Thieving, shorter stuns),
+Your Friend's Generations family gives one perk: Skeleton (bones +50% Faith XP), Mask (better Thieving, shorter stuns),
 Family (shops 10% cheaper), Cellular (HP regenerates twice as fast), Asymmetry (8% chance of a second resource),
 Hoverer (run drains 40% slower), Colossus (+1 melee max hit), Sparkling (gems three times as often), Hollow (+10% magic accuracy,
 1 in 5 spells keeps its sigils).
@@ -112,7 +112,7 @@ next attack. **Death is safe:** you wake by the Friendhollow fountain with your 
 
 **Dragonfire.** A third of a dragon's attacks are breath (up to 32, 45 or 65 damage), which the Friend's Ward prayer doesn't stop.
 A **Wyrmward shield** (free from King Hollis: "I'm going after dragons") turns it into a few points. Dragons drop drake
-bones (72 Prayer XP), drakehide (Crafting 57–63: bracers, chaps and a vest for archers) and, from Old Cinder, a Wyrm heart.
+bones (72 Faith XP), drakehide (Crafting 57–63: bracers, chaps and a vest for archers) and, from Old Cinder, a Wyrm heart.
 | **The Hollow King** | 92 | The throne room (boss) |
 
 ## Forged gear (levels 50–90)
@@ -134,7 +134,7 @@ also drop now and then, and Frostpeak Outfitters sells frostsilver.
 Weapons need that Attack level, armour that Defence level, staffs that Magic level, crossbows that Ranged level, and
 axes and pickaxes that Woodcutting or Mining level to cut and mine (faster at every tier).
 
-## Quests (10 quest points)
+## Quests (13 quest points)
 
 1. **A Friend's Feast** (Cook Mabel, the castle kitchen): an egg, a pot of flour and a bucket of milk.
 2. **Grumblin Trouble** (Captain Rook, the castle's great hall): defeat six Grumblins.
@@ -143,6 +143,8 @@ axes and pickaxes that Woodcutting or Mining level to cut and mine (faster at ev
 5. **The Lost Glimmer** (Old Glimmer, by the fountain): three shards: the Grumblin chief, a swamp lurker, the town well.
 6. **The Hollow King** (Old Glimmer, after 4 and 5): pass the Hollow gate and defeat the Hollow King.
 7. **Hazel's Quiver** (Hazel, Fernwick): win her grandmother's quiver back from the Grumblin chief, and bring 2 leather, 15 feathers and 5 oak logs to mend it. The reward, worn on your back, returns four in five arrows and bolts to your pack.
+8. **The Dawn Vigil** (Grandmaster Aldric, Dawnhold, east of Highcairn; Faith 10): offer eight bones on the Dawnhold chapel altar. Reward: a Dawnsteel sword, 1,500 Faith XP and the Order Armoury (Quartermaster Bram).
+9. **Light in the Greyhorn** (Grandmaster Aldric, after The Dawn Vigil; Faith 30): take three Dawnstone shards from the stone golems of the Greyhorn mine, bless them on the chapel altar and bring back the Dawnstone. Reward: the Cape of the Dawn, 5,000 Faith XP, 2,000 Defence XP and the armoury's finest faith weapons.
 
 ## The world
 

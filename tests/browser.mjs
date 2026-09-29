@@ -217,7 +217,7 @@ try {
   assert.equal(await state(() => window.__realm.game().player.follower), 3412, "an owned Friend follows");
   await game.getByRole("tab", { name: "Inventory" }).click();
 
-  await game.getByRole("tab", { name: "Prayer" }).click(); await shot("prayer");
+  await game.getByRole("tab", { name: "Faith" }).click(); await shot("prayer");
   await game.getByRole("tab", { name: "Magic" }).click(); await shot("magic");
   await game.getByRole("tab", { name: "Friends and wardrobe" }).click(); await shot("friends");
   await game.getByRole("tab", { name: "Settings" }).click();

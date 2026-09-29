@@ -339,6 +339,10 @@ export function createWorld(seed = 20260927): World {
   building(127, 135, 134, 141, "w", T.WOOD, undefined, { name: "Fletch & Feather", color: "#9aab92" });
   npc("bowyer", 131, 138); decor(133, 136, "shelf"); decor(133, 140, "shelf"); decor(130, 136, "crate"); decor(132, 140, "hay", true, "Straw target");
   building(127, 144, 134, 150, "w", T.STONE, undefined, { name: "The Warden's Lodge", color: "#6d6b67" });
+  // Threadneedle Tailors, across the street from Heft & Haft: capes in colours and patterns, and hats.
+  building(130, 152, 137, 157, "w", T.WOOD, undefined, { name: "Threadneedle Tailors", color: "#9a5a7a" });
+  npc("tailor", 133, 154); decor(135, 153, "shelf", true, "Bolts of cloth"); decor(135, 156, "armour", true, "Tailor's dummy"); decor(132, 156, "crate");
+  for (let y = 154; y <= 155; y++) for (let x = 123; x <= 129; x++) { put(x, y, T.COBBLE); clearAt(x, y); }
   // Heft & Haft, at the south end of Market Street: two-handed greatswords, battleaxes and war hammers.
   building(107, 153, 114, 158, "e", T.WOOD, undefined, { name: "Heft & Haft", color: "#8a4a3a" });
   npc("heft", 110, 155); decor(108, 154, "armour", true, "Weapon rack"); decor(108, 157, "armour", true, "Weapon rack"); decor(112, 157, "crate");
@@ -709,6 +713,20 @@ export function createWorld(seed = 20260927): World {
   decor(279, 82, "bench"); decor(286, 76, "bench");
   npc("mountain_guide", 280, 84, 3); npc("villager", 285, 84, 5); npc("villager", 277, 80, 5);
   add({ kind: "sign", x: 266, y: 85, blocks: true, name: "Signpost", text: "Highcairn. North-west: the Frostpeak camp. West: the Oasis. North-east: the Greyhorn mine. South: Greyhorn Tarn." });
+  // Dawnhold, the chapterhouse of the Order of the Dawn, on a terrace above the sea east of Highcairn: a cobbled
+  // causeway through the ridge, a courtyard, the chapel (its altar takes offered bones), and the hall with the armoury.
+  road([[297, 81], [304, 82], [310, 82]], 2.2, T.COBBLE);
+  for (let y = 73; y <= 91; y++) for (let x = 310; x <= 321; x++) { put(x, y, T.COBBLE); clearAt(x, y); }
+  building(312, 74, 319, 80, "s", T.STONE, undefined, { name: "Dawnhold Chapel", color: "#e8e4d6", walls: "stone" });
+  add({ kind: "altar", x: 315, y: 76, blocks: true, name: "Chapel altar", text: "dawn" }); npc("chaplain", 317, 77);
+  decor(313, 75, "torch"); decor(318, 75, "torch"); decor(313, 78, "bench"); decor(318, 78, "bench");
+  building(312, 84, 320, 90, "n", T.STONE, undefined, { name: "Dawnhold Hall", color: "#c9a24a", walls: "stone" });
+  npc("grandmaster", 316, 87); npc("quartermaster", 318, 86); decor(319, 85, "armour", true, "Weapon rack"); decor(319, 88, "armour", true, "Weapon rack");
+  decor(313, 85, "banner"); decor(313, 89, "table"); decor(314, 89, "chest", true, "Order strongbox");
+  for (const [kx, ky] of [[311, 81], [311, 83], [321, 82]] as const) npc("dawn_knight", kx, ky, 3);
+  for (const [lx, ly] of [[311, 79], [320, 79], [311, 86], [321, 86]] as const) decor(lx, ly, "lamp");
+  decor(310, 80, "banner"); decor(310, 84, "banner");
+  add({ kind: "sign", x: 309, y: 83, blocks: true, name: "Signpost", text: "Dawnhold, the Order of the Dawn. All who keep faith are welcome. West: Highcairn." });
   // The Greyhorn mine: glimmer, rarite and moonsilver high on the scree.
   {
     const vein = (cx: number, cy: number, kind: RockKind, n: number) => scatter(cx - 4, cy - 3, cx + 4, cy + 3, n, (x, y) => rock(x, y, kind), (x, y) => free(x, y) && get(x, y) !== T.CLIFF);
@@ -980,7 +998,7 @@ export function createWorld(seed = 20260927): World {
     weaponsmith: ["pewter_sword", "Edge & Hilt"], bowyer: ["shortbow", "Fletch & Feather"], slayer_master: ["slayer_gem", "The Warden's Lodge"], innkeeper: ["cake", "The Sleepy Friend inn"],
     rare_trader: ["rough_moonstone", "The Rare Market"], stablemaster: ["__horse", "Friendhollow Stables"],
     hazel: ["war_bow", "Hazel's War Bows"], rowan: ["pewter_axe", "Fernwick Timber Yard"],
-    heft: ["pewter_greatsword", "Heft & Haft"], cairn_trader: ["pot", "Highcairn Stores"], kettle_keeper: ["cake", "The Stone Kettle"], cairn_smith: ["rarite_pickaxe", "Highcairn Forge"],
+    heft: ["pewter_greatsword", "Heft & Haft"], tailor: ["striped_cape", "Threadneedle Tailors"], cairn_trader: ["pot", "Highcairn Stores"], kettle_keeper: ["cake", "The Stone Kettle"], cairn_smith: ["rarite_pickaxe", "Highcairn Forge"],
   };
   const signed = new Set<Building>();
   const signFor = (x: number, y: number, icon: string, label: string) => {
