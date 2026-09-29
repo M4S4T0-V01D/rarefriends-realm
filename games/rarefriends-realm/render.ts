@@ -102,9 +102,9 @@ let lightBuffer: HTMLCanvasElement | null = null, shadowBuffer: HTMLCanvasElemen
  */
 let hazeBuffer: HTMLCanvasElement | null = null, hazeTint: HTMLCanvasElement | null = null;
 
-function buffers(target: CanvasRenderingContext2D) {
+function buffers(target: CanvasRenderingContext2D, scale: number) {
   const make = (canvas: HTMLCanvasElement | null, w: number, h: number) => { canvas ??= document.createElement("canvas"); if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; } return canvas; };
-  lightBuffer = make(lightBuffer, Math.ceil(VIEW.width / 2), Math.ceil(VIEW.height / 2));
+  lightBuffer = make(lightBuffer, Math.ceil(VIEW.width * scale), Math.ceil(VIEW.height * scale));
   shadowBuffer = make(shadowBuffer, lightBuffer.width, lightBuffer.height);
   hazeBuffer = make(hazeBuffer, lightBuffer.width, lightBuffer.height); hazeTint = make(hazeTint, lightBuffer.width, lightBuffer.height);
   return { light: lightBuffer.getContext("2d")!, shadow: shadowBuffer.getContext("2d")!, haze: hazeBuffer.getContext("2d")!, hazeTint: hazeTint.getContext("2d")! };
@@ -294,7 +294,7 @@ function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, x0: number, y0
   const o = { x: 0, y: 0 }, px = flat(0.5, 0), py = flat(0, 0.5);
   const ex = { x: px.x - o.x, y: px.y - o.y }, ey = { x: py.x - o.x, y: py.y - o.y }, ls = liftScale(camera);
   // Inked edges and contour lines go into two paths, stroked once. Texture is left off tiles too small or far to show it.
-  const edges = new Path2D(), contours = new Path2D(), small = hh < 5, near = scene.low ? 14 : 34;
+  const edges = new Path2D(), contours = new Path2D(), small = hh < 5, near = scene.low ? 16 : 34;
   for (const packed of terrainOrder(camera, x0, y0, x1, y1)) {
     const x = x0 + packed % (x1 - x0 + 1), y = y0 + Math.floor(packed / (x1 - x0 + 1));
     if (!inBounds(x, y)) continue;
@@ -881,10 +881,11 @@ function pointInPolygon(x: number, y: number, polygon: readonly [number, number]
   return inside;
 }
 /** One tile of a flat roof: a slab at the top of the walls, with a merlon on every other edge tile. */
-function flatRoofTile(ctx: CanvasRenderingContext2D, camera: Camera, building: Building, x: number, y: number, edge: boolean, alpha: number) {
+function flatRoofTile(ctx: CanvasRenderingContext2D, camera: Camera, building: Building, x: number, y: number, edge: boolean, alpha: number, covered?: (nx: number, ny: number) => boolean) {
   const base = WALL_H * (building.storeys ?? 1), color = building.color;
   ctx.globalAlpha = alpha;
-  box(ctx, camera, x, y, 1, 1, 5, shadeHex(color, 0.08), shadeHex(color, -0.06), shadeHex(color, -0.14), base, "rgba(22,22,22,0.35)", "cap");
+  // The roof's sides only show at its edges: a side against more of the same roof is covered by it.
+  box(ctx, camera, x, y, 1, 1, 5, shadeHex(color, 0.08), shadeHex(color, -0.06), shadeHex(color, -0.14), base, "rgba(22,22,22,0.35)", "cap", covered);
   if (edge) box(ctx, camera, x, y, 1, 1, 4, shadeHex(color, 0.12), shadeHex(color, -0.04), shadeHex(color, -0.12), base + 5, INK, "brick");
   if (edge && (x + y) % 2 === 0) box(ctx, camera, x, y, 0.6, 0.6, 8, shadeHex(color, 0.14), shadeHex(color, -0.04), shadeHex(color, -0.12), base + 9, INK, "brick");
   ctx.globalAlpha = 1;
@@ -1011,6 +1012,8 @@ type Drawable = {
   at?: { x: number; y: number; h?: number }; size?: readonly [number, number, number]; rect?: () => [number, number, number, number]; cast?: boolean; min?: number;
   /** A light of its own choosing (the haze takes the sky's). */
   light?: RGB;
+  /** On Low, its outline on screen (walls, roofs, cliffs): filled with its light instead of cutting it from the light. */
+  hull?: () => [number, number][] | null;
 };
 let lastHits: Hit[] = [];
 /** Picks under a point, topmost first, from the last frame. */
@@ -1054,7 +1057,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   const liftGoal = level * STOREY; liftNow = scene.reducedMotion || Math.abs(liftGoal - liftNow) > STOREY * 2 ? liftGoal : liftNow + (liftGoal - liftNow) * Math.min(1, dt * 8);
   setGround(world); viewFloor = floor; camera.base = groundHeight(world, camera.x, camera.y) + liftNow;
   const low = !!scene.low, reach = low ? 44 : DRAW_DISTANCE;
-  texturesOn = z >= 0.7 && !low; beginTextures(ctx);
+  texturesOn = z >= 0.7; beginTextures(ctx);
   const project = (x: number, y: number, lift = 0) => toScreen(camera, x, y, lift);
   updateEffects(game, camera, dt, scene.reducedMotion || low, 34 / Math.max(0.5, z));
   if (underground) { ctx.fillStyle = "#0e0e10"; ctx.fillRect(0, 0, VIEW.width, VIEW.height); }
@@ -1067,7 +1070,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   const y0 = Math.max(cy - reach, Math.min(...corners.map(c => c.y)) - 2), y1 = Math.min(cy + reach, Math.max(...corners.map(c => c.y)) + 3);
   lap("setup"); drawTerrain(ctx, scene, x0, y0, x1, y1); lap("terrain"); RENDER_PROFILE.groundQuads = textureStats.frame;
   // The sky's light for the time of day and the weather; the sun's share of it decides how dark shadows are.
-  const weather = scene.weather ?? null, sky = skyFor(scene.time, weather, underground), lit = !low;
+  const weather = scene.weather ?? null, sky = skyFor(scene.time, weather, underground), lit = true;
   const sunShare = (sky.sun[0] + sky.sun[1] + sky.sun[2]) / Math.max(0.01, sky.sun[0] + sky.sun[1] + sky.sun[2] + sky.ambient[0] + sky.ambient[1] + sky.ambient[2]);
   if (!low) { ctx.globalAlpha = Math.min(1, sunShare * 2.2); drawCloudShadows(ctx, project, camera, now, z, underground, scene.reducedMotion); ctx.globalAlpha = 1; drawPrints(ctx, camera, now); }
   const hits: Hit[] = [], drawables: Drawable[] = [], lights: PointLight[] = [], blockers: [number, number, number][] = [];
@@ -1096,13 +1099,15 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   // Hover highlight and click marker.
   const tileOutline = (tx: number, ty: number, color: string) => { const c = (dx: number, dy: number) => { const s = toScreen(camera, tx + dx, ty + dy); return [s.x, s.y] as const; }; poly(ctx, [c(-0.5, -0.5), c(0.5, -0.5), c(0.5, 0.5), c(-0.5, 0.5)], null, color, 1.5); };
   /** A wall tile: storeys of brick (with windows on buildings), cut low when it stands between you and the camera inside. */
-  const wall = (x: number, y: number, storeys: number, cut: boolean, near: boolean, windows: boolean, battlement = false, style: Building["walls"] = "stone", tall = 0) => {
+  const wall = (x: number, y: number, storeys: number, cut: boolean, near: boolean, windows: boolean, battlement = false, style: Building["walls"] = "stone", tall = 0, joined?: (nx: number, ny: number) => boolean) => {
     const d = depth(x, y), dungeon = isUnderground(y), timber = style === "timber";
     // Under a roof you can see, a wall's inward faces can't be seen: skip them (they're half the work).
     const owner = !dungeon && inBounds(x, y) ? world.buildingAt[y * W + x] : 0, roofed = owner > 0 && (roofAlpha.get(owner - 1) ?? 0) > 0.95 && !cut;
     // (Only faces onto a real floor inside: a round tower's footprint square has open ground in its corners.)
-    const hidden = roofed ? (nx: number, ny: number) => { const tx = x + nx, ty = y + ny; return inBounds(tx, ty) && world.buildingAt[ty * W + tx] === owner && INDOOR_FLOORS.has(world.tiles[ty * W + tx]); } : undefined;
-    drawables.push({ depth: d, at: { x, y, h: 20 }, size: [(cut ? 9 : dungeon ? 34 : storeys * WALL_H + tall) + 24, 52, 30], draw: () => {
+    const inward = roofed ? (nx: number, ny: number) => { const tx = x + nx, ty = y + ny; return inBounds(tx, ty) && world.buildingAt[ty * W + tx] === owner && INDOOR_FLOORS.has(world.tiles[ty * W + tx]); } : undefined;
+    const hidden = inward && joined ? (nx: number, ny: number) => inward(nx, ny) || joined(nx, ny) : inward ?? joined;
+    drawables.push({ depth: d, at: { x, y, h: 20 }, size: [(cut ? 9 : dungeon ? 34 : storeys * WALL_H + tall) + 24, 52, 30],
+      hull: () => near ? null : boxHull(camera, x, y, 1, 1, cut ? 9 : dungeon ? 34 : battlement ? 22 : storeys * WALL_H + tall), draw: () => {
       ctx.globalAlpha = near ? 0.3 : 1;
       const [top, left, right] = dungeon ? ["#4a4950", "#3a3940", "#2f2e35"] : timber ? ["#8a6a50", "#e6dcc6", "#cfc4ab"] : style === "plank" ? ["#8a6a50", "#b89c7e", "#9c8266"] : ["#b9b4ab", "#a39e95", "#8f8a82"];
       const plain: WallStyle = dungeon ? "dungeon" : timber ? "timber" : style === "plank" ? "plank" : "brick", glazed: WallStyle = timber ? "timber_window" : "window";
@@ -1147,12 +1152,18 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       const owner = world.buildingAt[y * W + x], building = owner ? world.buildings[owner - 1] : null, mine = inside !== null && complexAt(world, x, y) === inside;
       if (mine && level > 0 && !outerWall(x, y)) continue;
       const d = depth(x, y), cut = mine && level === 0 && d > playerDepth - 0.5;
-      const near = !mine && Math.abs(x - pp.x) + Math.abs(y - pp.y) < 7 && d > playerDepth + 0.5 && !floor;
+      const faded = (tx: number, ty: number) => Math.abs(tx - pp.x) + Math.abs(ty - pp.y) < 7 && depth(tx, ty) > playerDepth + 0.5 && !floor;
+      const near = !mine && faded(x, y);
+      // A side against the next tile of the same wall is covered by it (seen from outside, where both stand whole).
+      const joined = mine || near ? undefined : (nx: number, ny: number) => {
+        const tx = x + nx, ty = y + ny;
+        return inBounds(tx, ty) && world.tiles[ty * W + tx] === T.WALL && world.buildingAt[ty * W + tx] === owner && !(inside !== null && complexAt(world, tx, ty) === inside) && !faded(tx, ty);
+      };
       // Tall buildings show every storey from outside; inside, only the storey you're on (and the ones below).
-      wall(x, y, mine ? 1 : building?.storeys ?? 1, cut, near, !!owner && !cut, false, building?.walls ?? "stone", mine ? 0 : building?.tall ?? 0);
+      wall(x, y, mine ? 1 : building?.storeys ?? 1, cut, near, !!owner && !cut, false, building?.walls ?? "stone", mine ? 0 : building?.tall ?? 0, joined);
       // Walls not under a roof cast their own shadows (a building's are cast whole).
       if (!building || building.roof === "none") blockers.push([x, y, (building?.storeys ?? 1) * WALL_H]);
-    } else if (terrain === T.CLIFF) { drawables.push({ depth: depth(x, y), at: { x, y }, size: [60, 52, 30], draw: () => box(ctx, camera, x, y, 1, 1, 22 + hash(x, y) * 10, "#a39e96", "#8f8a83", "#7c7771") }); blockers.push([x, y, 28]); }
+    } else if (terrain === T.CLIFF) { drawables.push({ depth: depth(x, y), at: { x, y }, size: [60, 52, 30], hull: () => boxHull(camera, x, y, 1, 1, 22 + hash(x, y) * 10), draw: () => box(ctx, camera, x, y, 1, 1, 22 + hash(x, y) * 10, "#a39e96", "#8f8a83", "#7c7771") }); blockers.push([x, y, 28]); }
     if (!covered(x, y)) object(x, y);
   }
   // The storeys you've climbed: outer walls of the ones below, and the floor you stand on with its walls and furniture.
@@ -1285,12 +1296,14 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       for (let y = building.y0; y <= building.y1; y++) for (let x = building.x0; x <= building.x1; x++) {
         if (!own(x, y)) continue;
         const edge = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => !own(x + dx, y + dy) && complexAt(world, x + dx, y + dy) !== complex);
-        drawables.push({ depth: depth(x, y) + 0.45, at: { x, y, h: (building.storeys ?? 1) * WALL_H + 8 }, size: [(building.storeys ?? 1) * WALL_H + 40, 52, 30], draw: () => flatRoofTile(ctx, camera, building, x, y, edge, alphaNow) });
+        const covered = (nx: number, ny: number) => own(x + nx, y + ny);
+        drawables.push({ depth: depth(x, y) + 0.45, at: { x, y, h: (building.storeys ?? 1) * WALL_H + 8 }, size: [(building.storeys ?? 1) * WALL_H + 40, 52, 30],
+          hull: () => alphaNow > 0.95 ? boxHull(camera, x, y, 1, 1, 5, (building.storeys ?? 1) * WALL_H) : null, draw: () => flatRoofTile(ctx, camera, building, x, y, edge, alphaNow, covered) });
       }
       return;
     }
     drawables.push({ depth: front, at: { x: (building.x0 + building.x1) / 2, y: (building.y0 + building.y1) / 2, h: (building.storeys ?? 1) * WALL_H + 24 }, rect: () => roofRect(building),
-      draw: () => { const next = fade(); if (next > 0.02) drawRoof(ctx, camera, building, next, now, scene.reducedMotion); } });
+      hull: () => (roofAlpha.get(index) ?? 0) > 0.95 ? roofHull(camera, building) : null, draw: () => { const next = fade(); if (next > 0.02) drawRoof(ctx, camera, building, next, now, scene.reducedMotion); } });
   });
   drawables.push({ depth: playerDepth + 0.15, at: pp, cast: true, size: [200, 120, 40], draw: () => {
     // Agility: glide from the start to the landing with a hop.
@@ -1312,7 +1325,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     const stride = walking ? Math.floor(now / 80) % 8 : 0, cloth = scene.reducedMotion ? 0 : walking ? stride % 4 : Math.floor(now / 520) % 4;
     // What's in the hand, and how it moves: a tool at work, a weapon mid-swing, or the weapon at rest (all in the figure).
     const holding = heldPose(scene, pose);
-    const dressed = [...player.worn, ...(player.equipment.cape ? [player.equipment.cape] : []), ...(player.equipment.head ? [player.equipment.head] : []), ...(player.equipment.shield ? [player.equipment.shield] : []), ...(player.equipment.weapon ? [player.equipment.weapon] : []), ...(player.equipment.neck ? [player.equipment.neck] : []), ...(player.equipment.body ? [player.equipment.body] : []), ...(player.equipment.legs ? [player.equipment.legs] : [])];
+    const dressed = [...player.worn, ...(player.equipment.cape ? [player.equipment.cape] : []), ...(player.equipment.head ? [player.equipment.head] : []), ...(player.equipment.shield ? [player.equipment.shield] : []), ...(player.equipment.weapon ? [player.equipment.weapon] : []), ...(player.equipment.neck ? [player.equipment.neck] : []), ...(player.equipment.body ? [player.equipment.body] : []), ...(player.equipment.legs ? [player.equipment.legs] : []), ...(player.equipment.hands ? [player.equipment.hands] : []), ...(player.equipment.feet ? [player.equipment.feet] : [])];
     if (scene.friend) {
       const art = figureArt(friendRows(scene.friend, facing, walking && !mount, mount ? 0 : stride), dressed, facing, cloth, INK, holding), rect = drawFigure(ctx, art, s.x, bodyY + 2 * z, px, pose.alpha), tip = heldTip(art);
       if (pose.line && pose.target && tip) fishingLine(ctx, scene, rect.x + tip.x * px / FIGURE_K, rect.y + tip.y * px / FIGURE_K, project(pose.target.x, pose.target.y));
@@ -1346,22 +1359,23 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   drawables.sort((a, b) => a.depth - b.depth);
 
   // ---------- Light ----------
-  const bufs = buffers(target), ls = liftScale(camera);
-  // On Low, a clear day is left as it is drawn (no light map, no shadows): the light only matters in the dark.
-  const plain = low && !underground && sky.night < 0.08 && (weather?.rain ?? 0) < 0.3;
-  if (!plain) field.build(world, TERRAIN_COLORS, sky, lights, x0, y0, x1, Math.min(y1, FLOOR_Y - 1), low ? 1 : 2);
+  // The light is laid at half the screen's resolution (a quarter on Low: light is soft, so it hardly shows).
+  const LS = low ? 0.25 : 0.5, bufs = buffers(target, LS), ls = liftScale(camera);
+  // Low keeps High's light (a coarser field, drawn in bigger patches) and the buildings' shadows, without the
+  // silhouettes every sprite throws, the far haze and the cloud shadows.
+  field.build(world, TERRAIN_COLORS, sky, lights, x0, y0, x1, Math.min(y1, FLOOR_Y - 1), low ? 1 : 2);
   lap("light field");
   // The ground's light: the sky where there's no ground, the light map laid on the land, then the sun's shadows.
   const lb = bufs.light;
-  lb.setTransform(0.5, 0, 0, 0.5, 0, 0); lb.globalCompositeOperation = "source-over";
-  if (!plain) lb.fillStyle = rgbCss(field.skyLight()), lb.fillRect(0, 0, VIEW.width, VIEW.height);
-  if (!plain) field.drawGround(lb, (x, y) => toScreen(camera, x, y), (i, j) => cornerHeight(world, i, j), low);
+  lb.setTransform(LS, 0, 0, LS, 0, 0); lb.globalCompositeOperation = "source-over";
+  lb.fillStyle = rgbCss(field.skyLight()), lb.fillRect(0, 0, VIEW.width, VIEW.height);
+  field.drawGround(lb, (x, y) => toScreen(camera, x, y), (i, j) => cornerHeight(world, i, j), low);
   lap("light map");
   const sunPower = (sky.sun[0] + sky.sun[1] + sky.sun[2]) / 3;
-  if (sunPower > 0.02 && !floor && !low) {
+  if (sunPower > 0.02 && !floor) {
     const sb = bufs.shadow, reach = Math.min(4, 1 / sky.tanE) / 32;
     sb.setTransform(1, 0, 0, 1, 0, 0); sb.globalCompositeOperation = "source-over"; sb.clearRect(0, 0, sb.canvas.width, sb.canvas.height);
-    sb.setTransform(0.5, 0, 0, 0.5, 0, 0); sb.fillStyle = "#000";
+    sb.setTransform(LS, 0, 0, LS, 0, 0); sb.fillStyle = "#000";
     // Boxes (buildings, walls, cliffs): the footprint swept along the sun to where its top's shadow lands.
     const shadowBox = (ax: number, ay: number, bx: number, by: number, height: number) => {
       const ox = sky.dirX * height * reach, oy = sky.dirY * height * reach, points: [number, number][] = [];
@@ -1385,7 +1399,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       for (const drawable of drawables) {
         if (!drawable.cast || !drawable.at || Math.abs(drawable.at.x - camera.x) + Math.abs(drawable.at.y - camera.y) > SHADOW_REACH) continue;
         const foot = toScreen(camera, drawable.at.x, drawable.at.y), count = hits.length;
-        sb.setTransform(0.5 * px, 0.5 * py, -0.5 * kx, -0.5 * ky, 0.5 * (foot.x - foot.x * px + foot.y * kx), 0.5 * (foot.y - foot.x * py + foot.y * ky));
+        sb.setTransform(LS * px, LS * py, -LS * kx, -LS * ky, LS * (foot.x - foot.x * px + foot.y * kx), LS * (foot.y - foot.x * py + foot.y * ky));
         drawable.draw();
         hits.length = count;
       }
@@ -1401,7 +1415,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   const hb = bufs.haze, hazy = !low && !underground && field.buildHaze(here.x, here.y, HAZE_START, DRAW_DISTANCE - 4);
   let hazeBottom = -Infinity;
   if (hazy) {
-    hb.setTransform(0.5, 0, 0, 0.5, 0, 0); hb.globalCompositeOperation = "source-over"; hb.imageSmoothingEnabled = true;
+    hb.setTransform(LS, 0, 0, LS, 0, 0); hb.globalCompositeOperation = "source-over"; hb.imageSmoothingEnabled = true;
     hb.fillStyle = "#fff"; hb.fillRect(0, 0, VIEW.width, VIEW.height);
     field.drawGround(hb, (x, y) => toScreen(camera, x, y), (i, j) => cornerHeight(world, i, j), false, field.haze);
     hb.imageSmoothingEnabled = false;
@@ -1410,11 +1424,10 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   }
   lap("shadows");
   const applyLight = () => {
-    if (plain) return;
     target.save(); target.globalCompositeOperation = "multiply"; target.imageSmoothingEnabled = !low;
     target.drawImage(lb.canvas, 0, 0, VIEW.width, VIEW.height); target.restore();
   };
-  lb.setTransform(0.5, 0, 0, 0.5, 0, 0); lb.imageSmoothingEnabled = false;
+  lb.setTransform(LS, 0, 0, LS, 0, 0); lb.imageSmoothingEnabled = false;
   // The hover outline is UI: never dimmed.
   if (scene.hoverTile && !floor) { const hover = scene.hoverTile, s = toScreen(camera, hover.x, hover.y);
     drawables.unshift({ depth: -Infinity, light: [1, 1, 1], rect: () => [s.x - 50 * z, s.y - 30 * z, s.x + 50 * z, s.y + 30 * z], draw: () => tileOutline(hover.x, hover.y, "rgba(22,22,22,0.35)") }); }
@@ -1445,8 +1458,19 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   const litBy = drawables.map(lightOn);
   lap("light samples");
   drawables.forEach((drawable, index) => {
+    // The view's tile range is a box around a turned screen: whatever falls wholly off the screen is skipped.
+    if (drawable.at && drawable.depth !== Infinity) {
+      const [rx0, ry0, rx1, ry1] = rectOf(drawable), margin = 48 * z;
+      if (rx1 < -margin || rx0 > VIEW.width + margin || ry1 < -margin || ry0 > VIEW.height + margin) return;
+    }
     drawable.draw();
     if (!lit) return;
+    if (low) {
+      // Low lights walls, roofs and cliffs by their outlines (one fill each); everything else takes the light behind it.
+      const hull = drawable.hull?.();
+      if (hull && hull.length > 2) { lb.fillStyle = rgbCss(litBy[index] ?? [1, 1, 1]); lb.beginPath(); hull.forEach(([hx, hy], i) => i ? lb.lineTo(hx, hy) : lb.moveTo(hx, hy)); lb.closePath(); lb.fill(); }
+      return;
+    }
     // The same drawing again, as a hole in the light buffer, filled with this thing's light.
     const light = litBy[index] ?? [1, 1, 1] as RGB, rect = drawable.rect || drawable.at ? rectOf(drawable) : screen();
     const count = hits.length, saved = texturesOn;
@@ -1467,7 +1491,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     }
   });
   // Anything that strayed outside its bounds is left as it is; then the light goes over the frame.
-  if (lit) { lb.globalCompositeOperation = "destination-over"; lb.fillStyle = "#fff"; lb.fillRect(0, 0, VIEW.width, VIEW.height); lb.globalCompositeOperation = "source-over"; }
+  if (lit && !low) { lb.globalCompositeOperation = "destination-over"; lb.fillStyle = "#fff"; lb.fillRect(0, 0, VIEW.width, VIEW.height); lb.globalCompositeOperation = "source-over"; }
   if (hazy) {
     // The frame is seen through the haze: its light is dimmed by how hazy each pixel is, and the haze's own colour (in
     // the sky's light) is added where it's hazy.
@@ -1588,6 +1612,12 @@ function projectileFlight(projectile: Projectile, tick: number, alpha: number) {
   return { progress, x: projectile.from.x + (projectile.to.x - projectile.from.x) * progress, y: projectile.from.y + (projectile.to.y - projectile.from.y) * progress };
 }
 /** The convex hull of some points (monotone chain), for shadows of boxes. */
+/** The outline on screen of a box on a tile footprint (w × d tiles, h high, from `lift`). */
+function boxHull(camera: Camera, x: number, y: number, w: number, d: number, h: number, lift = 0) {
+  const points: [number, number][] = [];
+  for (const [px, py] of [[x - w / 2, y - d / 2], [x + w / 2, y - d / 2], [x + w / 2, y + d / 2], [x - w / 2, y + d / 2]]) for (const z of [lift, lift + h]) { const s = toScreen(camera, px, py, z); points.push([s.x, s.y]); }
+  return convexHull(points);
+}
 function convexHull(points: [number, number][]) {
   const sorted = [...points].sort((a, b) => a[0] - b[0] || a[1] - b[1]), cross = (o: [number, number], a: [number, number], b: [number, number]) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
   const lower: [number, number][] = [], upper: [number, number][] = [];
@@ -1739,21 +1769,25 @@ const NPC_WEAR: Record<string, readonly string[]> = {
   kettle_keeper: ["felt_wide_hat"], cairn_trader: ["royal_feathered_cap", "halved_cape"], trader_frost: ["leather_hood", "snow_cape"],
 };
 /**
- * A villager's own look, the same every time you meet them (from their uid): most wear a hat, some a cape, a few an
- * amulet, and now and then one carries an axe or a pickaxe (never a weapon).
+ * A villager's own look, the same every time you meet them (from their uid): most wear a hat, a shirt, tunic or dress
+ * and trousers or a skirt, some a cape, a few an amulet, and now and then one carries an axe or a pickaxe (never a weapon).
  */
 const CITIZEN_HATS = ["scholar_hat", "crimson_wizard_hat", "emerald_wizard_hat", "midnight_wizard_hat", "plum_wizard_hat", "golden_wizard_hat", "crimson_feathered_cap", "forest_feathered_cap",
   "royal_feathered_cap", "russet_feathered_cap", "straw_wide_hat", "felt_wide_hat", "leather_wide_hat", "leather_hood", "paper_crown"];
 const CITIZEN_CAPES = ["crimson_cape", "royal_cape", "forest_cape", "snow_cape", "plum_cape", "golden_cape", "russet_cape", "teal_cape", "rose_cape", "team_cape",
   "striped_cape", "halved_cape", "chevron_cape", "quartered_cape", "starry_cape", "pilgrim_cape"];
 const CITIZEN_TOOLS = ["pewter_axe", "blackiron_axe", "pewter_pickaxe", "blackiron_pickaxe"];
+const CITIZEN_TOPS = ["linen_shirt", "sky_shirt", "scarlet_shirt", "moss_shirt", "mustard_shirt", "charcoal_shirt", "blush_shirt", "oak_shirt", "forest_tunic", "royal_tunic", "wine_tunic", "sand_tunic",
+  "crimson_dress", "sapphire_dress", "emerald_dress", "lavender_dress", "golden_dress", "rose_dress"];
+const CITIZEN_BOTTOMS = ["brown_trousers", "black_trousers", "navy_trousers", "grey_trousers", "olive_trousers", "cream_trousers", "red_skirt", "blue_skirt", "green_skirt", "plum_skirt"];
 const citizenWear = new Map<number, readonly string[]>();
 function citizenLook(uid: number): readonly string[] {
   let look = citizenWear.get(uid);
   if (look) return look;
   const roll = (salt: number) => hash(uid * 13 + salt, uid * 7 + salt * 3), pick = <T,>(list: readonly T[], salt: number) => list[Math.floor(roll(salt) * list.length) % list.length];
   look = [...(roll(1) < 0.8 ? [pick(CITIZEN_HATS, 2)] : []), ...(roll(3) < 0.4 ? [pick(CITIZEN_CAPES, 4)] : []),
-    ...(roll(5) < 0.15 ? [pick(["moonstone_amulet", "sagestone_amulet", "rosestone_amulet"], 6)] : []), ...(roll(7) < 0.2 ? [pick(CITIZEN_TOOLS, 8)] : [])];
+    ...(roll(5) < 0.15 ? [pick(["moonstone_amulet", "sagestone_amulet", "rosestone_amulet"], 6)] : []), ...(roll(7) < 0.2 ? [pick(CITIZEN_TOOLS, 8)] : []),
+    ...(roll(9) < 0.7 ? [pick(CITIZEN_TOPS, 10)] : []), ...(roll(11) < 0.6 ? [pick(CITIZEN_BOTTOMS, 12)] : [])];
   citizenWear.set(uid, look);
   return look;
 }
@@ -1765,7 +1799,7 @@ function drawPeer(ctx: CanvasRenderingContext2D, scene: Scene, peer: PeerView, h
   if (peer.p.emote) emoteParticles(peer.p.emote, peer.emoteT, peer.x, peer.y, scene.reducedMotion, peer.p.cape && isItem(peer.p.cape) ? item(peer.p.cape).icon.color : undefined);
   const sprites = scene.peerSprites?.(peer.p.id) ?? null, stride = peer.moving ? Math.floor(now / 80) % 8 : 0;
   const rows = sprites ? friendRows(sprites, facing, peer.moving && !mount, mount ? 0 : stride) : peer.moving && Math.floor(now / 160) % 2 ? friendSprite(peer.p.family, peer.p.id).step : friendSprite(peer.p.family, peer.p.id).idle;
-  const px = 3.2 * z, worn = [...peer.p.worn, ...(peer.p.cape ? [peer.p.cape] : []), ...(peer.p.head ? [peer.p.head] : []), ...(peer.p.shield ? [peer.p.shield] : []), ...(peer.p.weapon ? [peer.p.weapon] : []), ...(peer.p.neck ? [peer.p.neck] : []), ...(peer.p.body ? [peer.p.body] : []), ...(peer.p.legs ? [peer.p.legs] : [])], cloth = scene.reducedMotion ? 0 : peer.moving ? stride % 4 : Math.floor(now / 520) % 4;
+  const px = 3.2 * z, worn = [...peer.p.worn, ...(peer.p.cape ? [peer.p.cape] : []), ...(peer.p.head ? [peer.p.head] : []), ...(peer.p.shield ? [peer.p.shield] : []), ...(peer.p.weapon ? [peer.p.weapon] : []), ...(peer.p.neck ? [peer.p.neck] : []), ...(peer.p.body ? [peer.p.body] : []), ...(peer.p.legs ? [peer.p.legs] : []), ...(peer.p.hands ? [peer.p.hands] : []), ...(peer.p.feet ? [peer.p.feet] : [])], cloth = scene.reducedMotion ? 0 : peer.moving ? stride % 4 : Math.floor(now / 520) % 4;
   ellipse(ctx, feet.x, feet.y, (mount ? 32 : 15) * z, (mount ? 10 : 6) * z, "rgba(22,22,22,0.18)", peer.friend ? "rgba(159,224,168,0.9)" : "rgba(255,255,255,0.6)", 1.5);
   if (peer.p.pet && isPet(peer.p.pet)) { const behind = toScreen(camera, peer.x - (peer.p.hx || 0) * 0.9, peer.y - (peer.p.hy || 1) * 0.9); drawPet(ctx, peer.p.pet, behind.x, behind.y, facing, peer.moving, now + peer.p.id * 71, z, scene.reducedMotion); }
   if (mount) drawMount(ctx, mount.coat, facing, peer.moving, now, feet.x, feet.y, z, true, scene.reducedMotion);

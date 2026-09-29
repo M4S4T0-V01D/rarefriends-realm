@@ -49,7 +49,7 @@ XP follows the classic curve (83 XP for level 2, 13,034,431 for 99), multiplied 
 | Fishing | Net 1 (minnows), Bait 5/10 (perch, carp), Lure 20/30 (char, grayling), Cage 40 (inkcrab), Harpoon 50 (sailfish), Deep 76 (inkshark) | Bait and feathers are used up |
 | Cooking | Ranges and fires | About one in five burn at the food's own level (a touch more on a fire), easing off fast to none at its stop-burn level (minnows 12, chicken and beef 14, perch 22, carp 32) |
 | Mining | Clay/Pewter 1, Blackiron 15, Inkcoal 30, Gems 40, Moonsilver 55, Glimmer 70, Rarite 85 | 1/256 random gem per swing |
-| Smithing | Furnace (pewter 1, blackiron 15 at 60%, ashsteel 30, moonsilver 50, glimmer 70, rarite 85; the higher metals add 1–4 inkcoal), then the forged metals from monster materials (frostsilver 86, gloomsteel 88, wyrmscale 90, hollowsteel 92, cindersteel 94, ashenheart 96, with 4–6 inkcoal); and the anvil | Dagger, axe, sword, pickaxe, helm, sabre, greaves, shield, cuirass in twelve metals; the forged metals also make a staff |
+| Smithing | Furnace (pewter 1, blackiron 15 at 60%, ashsteel 30, moonsilver 50, glimmer 70, rarite 85; the higher metals add 1–4 inkcoal), then the forged metals from monster materials (frostsilver 86, gloomsteel 88, wyrmscale 90, hollowsteel 92, cindersteel 94, ashenheart 96, with 4–6 inkcoal); and the anvil | Dagger, axe, sword, pickaxe, helm, sabre, gauntlets, boots, greaves, shield, cuirass in twelve metals; the forged metals also make a staff |
 | Crafting | Leather (gloves 1 … leggings 18), gems (moonstone 20, sagestone 27, rosestone 34) | Tessa tans hides for 2 coins each |
 | Thieving | Villagers 1, merchant 25, guards 40; stalls 5 / 20 / 42 / 75 | Failing a pickpocket stuns you |
 | Agility | Friendhollow course (5 obstacles, +40 XP a lap), stepping stones (20) | Agility restores run energy faster |
@@ -119,7 +119,7 @@ bones (72 Faith XP), drakehide (Crafting 57–63: bracers, chaps and a vest for 
 
 Above rarite (level 40) are six forged metals. They aren't mined: each is smelted, one bar per material plus inkcoal,
 from what the strongest creatures drop, then smithed at any anvil at Smithing 86–99 into the full set (dagger, sword,
-sabre, helm, shield, cuirass, greaves, axe, pickaxe), a staff, crossbow limbs, arrowheads and bolts. Finished pieces
+sabre, helm, shield, cuirass, greaves, gauntlets, boots, axe, pickaxe), a staff, crossbow limbs, arrowheads and bolts. Finished pieces
 also drop now and then, and Frostpeak Outfitters sells frostsilver.
 
 | Metal | Level | Material | Dropped by |
@@ -149,6 +149,12 @@ axes and pickaxes that Woodcutting or Mining level to cut and mine (faster at ev
 11. **The Restless Crypt** (Sister Maren, after Light in the Greyhorn and The Pilgrim's Road; Faith 45): lay twelve crypt skeletons to rest with a faith weapon (other kills don't count). Reward: Dawnplate helm and shield, 7,000 Faith XP.
 12. **Dawn Against the Hollow** (Grandmaster Aldric, after The Restless Crypt and The Hollow King; Faith 60): destroy five Hollow sentinels with a faith weapon and bring three Hollow essence. Reward: the Dawnplate cuirass, 15,000 Faith XP, 5,000 Defence XP.
 
+**Clothes and armour you can see.** Ribbon & Rye Clothiers (west of the south end of Market Street) sells shirts in eight
+colours, belted tunics, dresses, trousers and skirts, for looks only; Threadneedle Tailors sells capes and hats. Everything
+you wear is drawn on your Friend: helms fitted to its head, breastplates, gauntlets, greaves and boots (four-legged Friends
+wear a chest plate as barding over the back), robes, dresses and skirts. Boots and gauntlets come in every metal (one bar
+each at the anvil) and in Dawnplate.
+
 ## The world
 
 A 350-wide island with 17 overworld regions (Friendhollow, Hollow Farms, Whisperwood, Fernwick, Ashen Hills, the Greyhorn Highlands, Highcairn, Emberforge,
@@ -162,7 +168,7 @@ willows by the pond and archery butts behind Hazel's.
 
 **Friendhollow** has grown: south of the fountain, **Market Street** has Hollis Armoury (helms to shields, pewter to
 moonsilver), Edge & Hilt (daggers, swords, sabres), Fletch & Feather (bows, arrows, the first three crossbows and their bolts, hunter's hides) and the Warden's
-Lodge (Slayer). The Sleepy Friend inn (food, and a range) is east of the square, and the Rare Market is west.
+Lodge (Slayer). The Sleepy Friend inn (food, and a range) stands on its own over the east bridge, and the Rare Market is west.
 
 **The Greyhorn Highlands**, east of the Pale Dunes and south of Frostpeak, climb into walkable mountains: grassy
 shoulders, scree, snow on the peaks, broken crags (the roads cut passes), Greyhorn Tarn (char and grayling for a rod) and
@@ -248,17 +254,21 @@ returns to the title screen with a confirmation that the adventure is safe in th
 full Realm rate from level 30 up, so the first levels mean something. Fixed rewards (lamps, challenges) pay in full.
 
 **Graphics and performance.** Settings → Graphics offers High (the default) and Low; they never change by themselves,
-and settings are kept in the browser. Low turns off the pixel textures, ambient life, cloud shadows, cast shadows,
-footprints and fog, leaves a clear day unlit, lightens the rain, shortens the view and draws at 1× on high-DPI screens.
+and settings are kept in the browser. Low is a lighter cut of High: the same pixel textures (on the ground nearest you),
+the same light and the buildings' shadows, without the silhouettes trees and characters cast, the far haze, cloud
+shadows, ambient life, footprints and fog. Its light is laid at a quarter of the screen's resolution in coarser patches,
+walls and roofs take their light by their outlines rather than being cut out of it, it lightens the rain, shortens the
+view and draws at 1× on high-DPI screens. Both skip anything wholly off the screen and the covered sides of walls and
+flat roofs.
 High draws at up to 1.5× on high-DPI screens. The browser
-test measures frame cost at three busy scenes on every run. Headless, without a GPU (measured before the new lighting,
-which adds its shadows and light passes to High):
+test measures frame cost at three busy scenes on every run. Headless, with software rendering and no GPU, on a
+desktop CPU (CI runners take about half as long):
 
 | Scene | High | Low |
 |---|---|---|
-| Friendhollow (castle and Market Street) | 41 ms | 7 ms |
-| Whisperwood (dense forest) | 35 ms | 8 ms |
-| A stormy night in town | 18 ms | 8 ms |
+| Friendhollow (castle and Market Street) | 45 ms | 18 ms |
+| Whisperwood (dense forest) | 56 ms | 20 ms |
+| A stormy night in town | 33 ms | 17 ms |
 
 On a desktop GPU (an RTX 2060), High takes about 22 ms in the busiest view.
 
@@ -351,8 +361,8 @@ shadows marched through a height map of what's in the way, one bounce of each li
 colour, and lava's glow. The sun rises in the east, crosses the south and sets in the west: buildings, walls and cliffs
 cast projected shadows, and trees, rocks, characters and decor cast sheared silhouettes of their own sprites. The ground
 is lit before anything stands on it, and every object takes the light at its own feet, cut to its exact outline, so light
-lands on things instead of glowing over them. Health bars, names and speech are never dimmed. On Low, a clear day is
-drawn unlit and nights get the light without the shadows.
+lands on things instead of glowing over them. Health bars, names and speech are never dimmed. Low keeps the light and the
+buildings' shadows; walls, roofs and cliffs are lit by their outlines, and smaller things take the light behind them.
 
 **Weather.** Torches and fires flicker. The sky comes from the real clock in four-minute spells, so every player sees the
 same weather at the same moment: clear, rain, or a storm with lightning (thunder follows the flash) and a darker sky.

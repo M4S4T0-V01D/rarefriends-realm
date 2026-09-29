@@ -134,6 +134,8 @@ export const SMITH_PIECES = [
   { piece: "greaves", name: "greaves", bars: 3, offset: 16, shape: "legs", slot: "legs", att: 0, str: 0, def: 11, speed: 0 },
   { piece: "shield", name: "shield", bars: 3, offset: 12, shape: "shield", slot: "shield", att: 0, str: 0, def: 12, speed: 0 },
   { piece: "cuirass", name: "cuirass", bars: 5, offset: 18, shape: "body", slot: "body", att: 0, str: 0, def: 20, speed: 0 },
+  { piece: "gauntlets", name: "gauntlets", bars: 1, offset: 2, shape: "gloves", slot: "hands", att: 1, str: 0, def: 3, speed: 0 },
+  { piece: "boots", name: "boots", bars: 1, offset: 3, shape: "boots", slot: "feet", att: 0, str: 0, def: 3, speed: 0 },
   // Two-handed weapons: a tick slower than a sword, much harder hitting, and no shield.
   { piece: "greatsword", name: "greatsword", bars: 3, offset: 10, shape: "greatsword", slot: "weapon", att: 10, str: 13, def: 0, speed: 5, twoHanded: true },
   { piece: "battleaxe", name: "battleaxe", bars: 3, offset: 9, shape: "battleaxe", slot: "weapon", att: 8, str: 14, def: 0, speed: 5, twoHanded: true },
@@ -495,6 +497,24 @@ const TAILORING: Item[] = [
 ];
 export const TAILOR_STOCK = TAILORING.map(entry => entry.id);
 
+// ---------- Clothing: shirts, tunics, dresses, trousers and skirts (Ribbon & Rye Clothiers on Market Street) ----------
+/** [id part, name, colour, trim]: worn for looks (no combat bonuses). */
+const SHIRTS = [["linen", "Linen", "#ecebe6", "#b8a88a"], ["sky", "Sky blue", "#8fb2d6", "#ecebe6"], ["scarlet", "Scarlet", "#b0443c", "#e2c46a"], ["moss", "Moss green", "#6f8f5a", "#d8c9a8"],
+  ["mustard", "Mustard", "#d6b04a", "#6f5440"], ["charcoal", "Charcoal", "#3b3a40", "#9fabc2"], ["blush", "Blush", "#e7a9b0", "#ecebe6"], ["oak", "Oak brown", "#8a6446", "#e2c46a"]] as const;
+const TUNICS = [["forest", "Forest", "#4f7a4a", "#8a6446"], ["royal", "Royal", "#3f5d9a", "#e2c46a"], ["wine", "Wine", "#7a2e3a", "#d8c9a8"], ["sand", "Sand", "#d8c48a", "#8a5a3a"]] as const;
+const DRESSES = [["crimson", "Crimson", "#b0443c", "#e2c46a"], ["sapphire", "Sapphire", "#3f5d9a", "#ecebe6"], ["emerald", "Emerald", "#3f7a58", "#e2c46a"], ["lavender", "Lavender", "#b8a6d6", "#ecebe6"],
+  ["midnight", "Midnight", "#2a2a44", "#c6bed4"], ["golden", "Golden", "#d6b04a", "#ecebe6"], ["rose", "Rose", "#d98fa6", "#ecebe6"]] as const;
+const TROUSERS = [["brown", "Brown", "#7a5a3e", "#5a4230"], ["black", "Black", "#2e2d33", "#555"], ["navy", "Navy", "#2f4266", "#1f2c44"], ["grey", "Grey", "#8a8780", "#6d6b67"], ["olive", "Olive", "#6f7248", "#4f5234"], ["cream", "Cream", "#e6dcc0", "#b8a88a"]] as const;
+const SKIRTS = [["red", "Red", "#b0443c", "#ecebe6"], ["blue", "Blue", "#3f5d9a", "#ecebe6"], ["green", "Green", "#4f7a4a", "#e2c46a"], ["black", "Black", "#2e2d33", "#b0443c"], ["plum", "Plum", "#6e4a8a", "#e2c46a"]] as const;
+const CLOTHING: Item[] = [
+  ...SHIRTS.map(([key, name, color, accent]): Item => ({ id: `${key}_shirt`, name: `${name} shirt`, examine: "A soft shirt with a laced collar.", value: 40, icon: { shape: "body", color, accent, kind: "shirt" }, equip: { slot: "body", bonuses: {} } })),
+  ...TUNICS.map(([key, name, color, accent]): Item => ({ id: `${key}_tunic`, name: `${name} tunic`, examine: "A long tunic, belted at the waist.", value: 60, icon: { shape: "body", color, accent, kind: "tunic" }, equip: { slot: "body", bonuses: {} } })),
+  ...DRESSES.map(([key, name, color, accent]): Item => ({ id: `${key}_dress`, name: `${name} dress`, examine: "A dress that sweeps the ground.", value: 120, icon: { shape: "body", color, accent, kind: "dress" }, equip: { slot: "body", bonuses: {} } })),
+  ...TROUSERS.map(([key, name, color, accent]): Item => ({ id: `${key}_trousers`, name: `${name} trousers`, examine: "Sturdy trousers.", value: 35, icon: { shape: "legs", color, accent, kind: "trousers" }, equip: { slot: "legs", bonuses: {} } })),
+  ...SKIRTS.map(([key, name, color, accent]): Item => ({ id: `${key}_skirt`, name: `${name} skirt`, examine: "A skirt that swirls when you turn.", value: 50, icon: { shape: "legs", color, accent, kind: "skirt" }, equip: { slot: "legs", bonuses: {} } })),
+];
+export const CLOTHIER_STOCK = CLOTHING.map(entry => entry.id);
+
 // ---------- Faith: the Order of the Dawn's weapons, cape and relics ----------
 const DAWN_GOLD = "#e2c46a";
 const FAITH_GEAR: Item[] = [
@@ -521,6 +541,10 @@ const FAITH_GEAR: Item[] = [
     equip: { slot: "body", bonuses: { defence: 190, magic: -12, prayer: 6 }, requires: { defence: 70, prayer: 60 } } },
   { id: "dawnplate_greaves", name: "Dawnplate greaves", examine: "Gold greaves, white at the knee.", value: 48000, icon: { shape: "legs", color: "#d9b866", accent: "#f7f5f0" },
     equip: { slot: "legs", bonuses: { defence: 102, magic: -7, prayer: 4 }, requires: { defence: 70, prayer: 60 } } },
+  { id: "dawnplate_gauntlets", name: "Dawnplate gauntlets", examine: "Gold gauntlets, white at the cuff.", value: 24000, icon: { shape: "gloves", color: "#d9b866", accent: "#f7f5f0" },
+    equip: { slot: "hands", bonuses: { attack: 4, defence: 26, prayer: 3 }, requires: { defence: 70, prayer: 60 } } },
+  { id: "dawnplate_boots", name: "Dawnplate boots", examine: "Gold boots that ring on stone.", value: 24000, icon: { shape: "boots", color: "#d9b866", accent: "#f7f5f0" },
+    equip: { slot: "feet", bonuses: { defence: 26, prayer: 3 }, requires: { defence: 70, prayer: 60 } } },
   { id: "dawnplate_shield", name: "Dawnplate shield", examine: "A gold heater shield with the Order's white sun.", value: 48000, icon: { shape: "shield", color: "#d9b866", accent: "#f7f5f0" },
     equip: { slot: "shield", bonuses: { defence: 112, prayer: 4 }, requires: { defence: 70, prayer: 60 } } },
   { id: "dawnstone_shard", name: "Dawnstone shard", examine: "A shard of the Order's lost relic. Warm, like a stone left in the sun.", value: 0, tradeable: false, icon: { shape: "gem", color: "#f2e3b0", accent: DAWN_GOLD } },
@@ -530,9 +554,10 @@ const FAITH_GEAR: Item[] = [
 export const ARMOURY_FIRST = ["dawnsteel_sword", "vigil_spear", "acolyte_staff"] as const;
 export const ARMOURY_LATER = ["radiant_greatsword", "sunforged_warhammer", "dawn_staff", "first_light_staff"] as const;
 /** Dawnplate, sold once the quest that awards each piece is done. */
-export const DAWNPLATE_QUEST: Record<string, string> = { dawnplate_greaves: "pilgrims_road", dawnplate_helm: "restless_crypt", dawnplate_shield: "restless_crypt", dawnplate_cuirass: "dawn_against_hollow" };
+export const DAWNPLATE_QUEST: Record<string, string> = { dawnplate_greaves: "pilgrims_road", dawnplate_boots: "pilgrims_road", dawnplate_helm: "restless_crypt",
+  dawnplate_shield: "restless_crypt", dawnplate_gauntlets: "restless_crypt", dawnplate_cuirass: "dawn_against_hollow" };
 
-export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...FAITH_GEAR]);
+export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR]);
 const ITEM_MAP = new Map(ITEM_LIST.map(item => [item.id, item]));
 export function item(id: string): Item {
   const found = ITEM_MAP.get(id);
@@ -868,16 +893,17 @@ export const SHOPS: Record<string, ShopDef> = {
   general_oasis: { id: "general_oasis", name: "Oasis Sundries", general: true, stock: ["pot", "bucket", "tinderbox", "knife", "chisel", "needle", "thread", "small_net", "fishing_bait", "bread"] },
   fishing: { id: "fishing", name: "Pike's Tackle", buys: ["fish"], rate: 0.6, stock: ["small_net", "fishing_rod", "fly_rod", "harpoon", "crab_pot", "fishing_bait", "feather", "raw_minnows"] },
   axes: { id: "axes", name: "Axel's Axes", buys: ["logs"], rate: 0.6, stock: ["pewter_axe", "blackiron_axe", "ashsteel_axe", "moonsilver_axe", "pewter_pickaxe", "blackiron_pickaxe", "ashsteel_pickaxe", "moonsilver_pickaxe"] },
-  swords: { id: "swords", name: "Emberforge Arms", buys: ["ore", "bar", "weapon", "armour"], rate: 0.55, stock: ["pewter_sword", "blackiron_sword", "ashsteel_sword", "pewter_sabre", "blackiron_sabre", "ashsteel_sabre", "moonsilver_sabre", "pewter_shield", "blackiron_shield", "blackiron_helm", "ashsteel_helm", "blackiron_cuirass"] },
+  swords: { id: "swords", name: "Emberforge Arms", buys: ["ore", "bar", "weapon", "armour"], rate: 0.55, stock: ["pewter_sword", "blackiron_sword", "ashsteel_sword", "pewter_sabre", "blackiron_sabre", "ashsteel_sabre", "moonsilver_sabre", "pewter_shield", "blackiron_shield", "blackiron_helm", "blackiron_gauntlets", "blackiron_boots", "ashsteel_helm", "ashsteel_gauntlets", "ashsteel_boots", "blackiron_cuirass"] },
   sigils: { id: "sigils", name: "Runa's Sigils", buys: ["sigil", "magic"], rate: 0.6, stock: ["sigil_box", "breeze_sigil", "tide_sigil", "stone_sigil", "ember_sigil", "thought_sigil", "shade_sigil", "storm_sigil", "bloom_sigil", "star_sigil", "path_sigil", "hollow_sigil", "staff", "breeze_staff", "scholar_hat", "scholar_robe"] },
   armoury: { id: "armoury", name: "The Order Armoury", buys: ["weapon"], rate: 0.5, stock: [...ARMOURY_FIRST, ...ARMOURY_LATER, ...Object.keys(DAWNPLATE_QUEST)] },
+  clothier: { id: "clothier", name: "Ribbon & Rye Clothiers", buys: ["armour"], rate: 0.5, stock: CLOTHIER_STOCK },
   tailor: { id: "tailor", name: "Threadneedle Tailors", buys: ["armour"], rate: 0.5, stock: ["team_cape", ...TAILOR_STOCK, "scholar_hat"] },
   crafting: { id: "crafting", name: "Tessa's Tannery", buys: ["hide"], rate: 0.6, stock: ["needle", "thread", "chisel", "leather", "leather_gloves", "leather_boots"] },
   oasis: { id: "oasis", name: "Oasis Bazaar", buys: ["gem", "jewellery", "food"], rate: 0.7, stock: ["cake", "bread", "inkshark", "sailfish", "silk", "rough_moonstone", "friends_charm", "moonstone_pendant"] },
-  frost: { id: "frost", name: "Frostpeak Outfitters", stock: ["inkcrab", "sailfish", "glimmer_pickaxe", "glimmer_axe", "glimmer_sabre", "glimmer_helm", "glimmer_shield", "hollow_sigil", "path_sigil", "frosthide_coif", "frosthide_bracers", "glimmer_arrow",
-    "rarite_pickaxe", "rarite_axe", "frostsilver_pickaxe", "frostsilver_axe", "frostsilver_sword", "frostsilver_helm", "frostsilver_shield", "frostsilver_arrow", "frostsilver_bolts"] },
-  armour: { id: "armour", name: "Hollis Armoury", buys: ["armour"], rate: 0.55, stock: ["pewter_helm", "pewter_cuirass", "pewter_greaves", "pewter_shield", "blackiron_helm", "blackiron_cuirass", "blackiron_greaves", "blackiron_shield",
-    "ashsteel_helm", "ashsteel_cuirass", "ashsteel_greaves", "ashsteel_shield", "moonsilver_helm", "moonsilver_shield", "leather_gloves", "leather_boots"] },
+  frost: { id: "frost", name: "Frostpeak Outfitters", stock: ["inkcrab", "sailfish", "glimmer_pickaxe", "glimmer_axe", "glimmer_sabre", "glimmer_helm", "glimmer_gauntlets", "glimmer_boots", "glimmer_shield", "hollow_sigil", "path_sigil", "frosthide_coif", "frosthide_bracers", "glimmer_arrow",
+    "rarite_pickaxe", "rarite_axe", "frostsilver_pickaxe", "frostsilver_axe", "frostsilver_sword", "frostsilver_helm", "frostsilver_gauntlets", "frostsilver_boots", "frostsilver_shield", "frostsilver_arrow", "frostsilver_bolts"] },
+  armour: { id: "armour", name: "Hollis Armoury", buys: ["armour"], rate: 0.55, stock: ["pewter_helm", "pewter_gauntlets", "pewter_boots", "pewter_cuirass", "pewter_greaves", "pewter_shield", "blackiron_helm", "blackiron_gauntlets", "blackiron_boots", "blackiron_cuirass", "blackiron_greaves", "blackiron_shield",
+    "ashsteel_helm", "ashsteel_gauntlets", "ashsteel_boots", "ashsteel_cuirass", "ashsteel_greaves", "ashsteel_shield", "moonsilver_helm", "moonsilver_gauntlets", "moonsilver_boots", "moonsilver_shield", "leather_gloves", "leather_boots"] },
   weapons: { id: "weapons", name: "Edge & Hilt", buys: ["weapon"], rate: 0.55, stock: ["pewter_dagger", "pewter_sword", "pewter_sabre", "blackiron_dagger", "blackiron_sword", "blackiron_sabre", "ashsteel_dagger", "ashsteel_sword", "ashsteel_sabre",
     "moonsilver_dagger", "moonsilver_sword", "moonsilver_sabre", "glimmer_sword"] },
   archery: { id: "archery", name: "Fletch & Feather", buys: ["bow", "arrow", "logs"], rate: 0.6, stock: ["string", "knife", "arrow_shaft", "headless_arrow", "shortbow", "oak_bow", "willow_bow", "maple_bow", "yew_bow", "pewter_arrow", "blackiron_arrow", "ashsteel_arrow", "moonsilver_arrow",
@@ -885,7 +911,7 @@ export const SHOPS: Record<string, ShopDef> = {
     "hunter_coif", "hunter_vest", "hunter_chaps", "hunter_bracers", "feather"] },
   general_highcairn: { id: "general_highcairn", name: "Highcairn Stores", general: true, stock: ["shears", "pot", "bucket", "tinderbox", "hammer", "knife", "chisel", "needle", "thread", "bread", "cooked_meat", "fishing_rod", "feather"] },
   kettle: { id: "kettle", name: "The Stone Kettle", buys: ["fish", "food"], rate: 0.55, stock: ["bread", "cake", "cooked_meat", "char", "grayling", "sailfish"] },
-  cairn_forge: { id: "cairn_forge", name: "Highcairn Forge", buys: ["ore", "bar", "weapon", "armour"], rate: 0.6, stock: ["hammer", "moonsilver_pickaxe", "glimmer_pickaxe", "rarite_pickaxe", "inkcoal", "moonsilver_bar", "glimmer_bar", "glimmer_helm", "glimmer_shield", "rarite_helm", "inkcoal_satchel"] },
+  cairn_forge: { id: "cairn_forge", name: "Highcairn Forge", buys: ["ore", "bar", "weapon", "armour"], rate: 0.6, stock: ["hammer", "moonsilver_pickaxe", "glimmer_pickaxe", "rarite_pickaxe", "inkcoal", "moonsilver_bar", "glimmer_bar", "glimmer_helm", "glimmer_gauntlets", "glimmer_boots", "glimmer_shield", "rarite_helm", "rarite_gauntlets", "rarite_boots", "inkcoal_satchel"] },
   heft: { id: "heft", name: "Heft & Haft", buys: ["weapon"], rate: 0.55, stock: ["pewter_greatsword", "pewter_battleaxe", "pewter_warhammer", "blackiron_greatsword", "blackiron_battleaxe", "blackiron_warhammer",
     "ashsteel_greatsword", "ashsteel_battleaxe", "ashsteel_warhammer", "moonsilver_greatsword", "moonsilver_battleaxe", "moonsilver_warhammer", "glimmer_greatsword"] },
   mine_supplies: { id: "mine_supplies", name: "Old miner's supplies", buys: ["ore"], rate: 0.5, stock: ["pewter_pickaxe", "blackiron_pickaxe", "ashsteel_pickaxe", "moonsilver_pickaxe", "inkcoal_satchel", "hammer", "bread"] },

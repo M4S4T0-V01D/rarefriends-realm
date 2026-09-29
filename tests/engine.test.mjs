@@ -1334,7 +1334,7 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   assert.equal(p.quests.pilgrims_road, 1);
   for (const altar of ["Altar", "Mountain shrine", "Crypt altar"]) pray(altar);
   talkTo("chaplain");
-  assert.equal(p.quests.pilgrims_road, 2); assert(has(p, "dawnplate_greaves"));
+  assert.equal(p.quests.pilgrims_road, 2); assert(has(p, "dawnplate_greaves") && has(p, "dawnplate_boots"));
   // The Restless Crypt: only kills with a faith weapon count.
   talkTo("chaplain");
   assert.equal(p.quests.restless_crypt, 1);
@@ -1343,7 +1343,7 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   p.equipment.weapon = "dawnsteel_sword";
   for (let i = 0; i < 12; i++) onMonsterKilled(g, "skeleton", 28, 220);
   talkTo("chaplain");
-  assert.equal(p.quests.restless_crypt, 2); assert(has(p, "dawnplate_helm") && has(p, "dawnplate_shield"));
+  assert.equal(p.quests.restless_crypt, 2); assert(has(p, "dawnplate_helm") && has(p, "dawnplate_shield") && has(p, "dawnplate_gauntlets"));
   // Dawn Against the Hollow: after the Hollow King, five sentinels with a faith weapon and three Hollow essence.
   p.quests.hollow_king = 3;
   talkTo("grandmaster");
@@ -1355,4 +1355,29 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   assert.equal(count(p, "hollow_essence"), 0);
   assert.equal(capeProblem(g, "dawnplate_cuirass"), null, "the armoury sells Dawnplate once earned");
   assert.equal(QUESTS.length, 12); assert.equal(MAX_QUEST_POINTS, 19);
+});
+
+test("Boots and gauntlets in every metal, smithed at the anvil; the clothier's shirts, dresses, trousers and skirts", () => {
+  const g = newGame();
+  const metals = [...new Set(ITEM_LIST.filter(entry => entry.id.endsWith("_cuirass")).map(entry => entry.id.replace("_cuirass", "")))];
+  assert.ok(metals.length >= 12);
+  for (const metal of metals) {
+    for (const [piece, slot] of [["boots", "feet"], ["gauntlets", "hands"]]) {
+      const gear = item(`${metal}_${piece}`);
+      assert.equal(gear.equip.slot, slot, `${metal} ${piece}`);
+      assert.ok(gear.equip.bonuses.defence > 0, `${metal} ${piece} defends`);
+    }
+  }
+  // Smithed at the anvil like the rest of the set.
+  g.player.xp.smithing = XP_TABLE[99];
+  const recipes = smithingRecipes("ashsteel").flatMap(recipe => Object.keys(recipe.outputs));
+  assert.ok(recipes.some(id => String(id).includes("ashsteel_boots")) && recipes.some(id => String(id).includes("ashsteel_gauntlets")), "boots and gauntlets at the anvil");
+  // The armoury sells them next to the helm.
+  assert.ok(SHOPS.armour.stock.includes("pewter_boots") && SHOPS.armour.stock.includes("pewter_gauntlets"));
+  // Ribbon & Rye: clothes for looks, in the body and leg slots.
+  const clothes = SHOPS.clothier.stock.map(id => item(id));
+  assert.ok(clothes.length >= 25);
+  for (const kind of ["shirt", "tunic", "dress", "trousers", "skirt"]) assert.ok(clothes.some(entry => entry.icon.kind === kind), kind);
+  for (const entry of clothes) { assert.ok(["body", "legs"].includes(entry.equip.slot), entry.id); assert.equal(Object.keys(entry.equip.bonuses).length, 0, `${entry.id} is for looks`); }
+  assert.ok(g.npcs.some(npc => npc.id === "clothier"), "the clothier is in town");
 });

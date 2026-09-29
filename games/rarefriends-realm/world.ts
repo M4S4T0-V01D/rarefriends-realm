@@ -339,6 +339,10 @@ export function createWorld(seed = 20260927): World {
   building(127, 135, 134, 141, "w", T.WOOD, undefined, { name: "Fletch & Feather", color: "#9aab92" });
   npc("bowyer", 131, 138); decor(133, 136, "shelf"); decor(133, 140, "shelf"); decor(130, 136, "crate"); decor(132, 140, "hay", true, "Straw target");
   building(127, 144, 134, 150, "w", T.STONE, undefined, { name: "The Warden's Lodge", color: "#6d6b67" });
+  // Ribbon & Rye Clothiers, west of the street at its south end: shirts, tunics, dresses, trousers and skirts.
+  building(106, 159, 113, 164, "e", T.WOOD, undefined, { name: "Ribbon & Rye Clothiers", color: "#c98f95" });
+  npc("clothier", 109, 161); decor(107, 160, "shelf", true, "Folded shirts"); decor(107, 163, "armour", true, "Dress form"); decor(111, 163, "table", true, "Cutting table");
+  for (let y = 161; y <= 162; y++) for (let x = 114; x <= 118; x++) { put(x, y, T.COBBLE); clearAt(x, y); }
   // Threadneedle Tailors, across the street from Heft & Haft: capes in colours and patterns, and hats.
   building(130, 152, 137, 157, "w", T.WOOD, undefined, { name: "Threadneedle Tailors", color: "#9a5a7a" });
   npc("tailor", 133, 154); decor(135, 153, "shelf", true, "Bolts of cloth"); decor(135, 156, "armour", true, "Tailor's dummy"); decor(132, 156, "crate");
@@ -348,6 +352,7 @@ export function createWorld(seed = 20260927): World {
   npc("heft", 110, 155); decor(108, 154, "armour", true, "Weapon rack"); decor(108, 157, "armour", true, "Weapon rack"); decor(112, 157, "crate");
   fillRect(115, 155, 118, 156, T.COBBLE);
   npc("slayer_master", 131, 147); decor(133, 145, "banner"); decor(133, 149, "torch"); decor(130, 149, "chest", true, "Trophy chest"); decor(129, 145, "shelf", true, "Trophy shelf");
+  // (The inn and the house behind Fletch & Feather are laid out here, then moved at the very end: see "Town tidy-ups".)
   building(135, 124, 141, 131, "w", T.WOOD, undefined, { name: "The Sleepy Friend", color: "#cdb98a", chimney: true });
   npc("innkeeper", 138, 126); add({ kind: "range", x: 140, y: 125, blocks: true, name: "Cooking range" }); decor(137, 129, "table"); decor(139, 129, "table"); decor(138, 128, "bench", false); decor(140, 130, "barrel");
   building(136, 135, 141, 140, "w", T.WOOD, undefined, { name: "House", color: "#a996b5", chimney: true });
@@ -355,7 +360,7 @@ export function createWorld(seed = 20260927): World {
   building(99, 107, 106, 113, "s", T.CARPET, undefined, { name: "Rare Market", color: "#d8b6b4" });
   npc("rare_trader", 102, 109); add({ kind: "casket", x: 104, y: 109, blocks: true, name: "Rare Casket chest" }); decor(100, 108, "shelf"); decor(105, 108, "banner");
   for (const [x, y] of [[117, 136], [125, 136], [117, 143], [125, 143], [117, 150], [125, 150]]) decor(x, y, "lamp");
-  add({ kind: "sign", x: 124, y: 133, blocks: true, name: "Signpost", text: "Market Street. West: Hollis Armoury, Edge & Hilt. East: Fletch & Feather, the Warden's Lodge. The Sleepy Friend inn is east of the square; the Rare Market west." });
+  add({ kind: "sign", x: 124, y: 133, blocks: true, name: "Signpost", text: "Market Street. West: Hollis Armoury, Edge & Hilt. East: Fletch & Feather, the Warden's Lodge. The Sleepy Friend inn is over the east bridge; the Rare Market west." });
   decor(119, 139, "bench"); decor(123, 146, "bench"); decor(118, 147, "barrel"); decor(124, 140, "crate");
   scatter(106, 114, 138, 151, 10, (x, y) => npc("villager", x, y, 5), (x, y) => get(x, y) === T.COBBLE && objectAt[tileIndex(x, y)] < 0);
   // Riverside house: Pike's Tackle.
@@ -999,7 +1004,7 @@ export function createWorld(seed = 20260927): World {
     weaponsmith: ["pewter_sword", "Edge & Hilt"], bowyer: ["shortbow", "Fletch & Feather"], slayer_master: ["slayer_gem", "The Warden's Lodge"], innkeeper: ["cake", "The Sleepy Friend inn"],
     rare_trader: ["rough_moonstone", "The Rare Market"], stablemaster: ["__horse", "Friendhollow Stables"],
     hazel: ["war_bow", "Hazel's War Bows"], rowan: ["pewter_axe", "Fernwick Timber Yard"],
-    heft: ["pewter_greatsword", "Heft & Haft"], tailor: ["striped_cape", "Threadneedle Tailors"], cairn_trader: ["pot", "Highcairn Stores"], kettle_keeper: ["cake", "The Stone Kettle"], cairn_smith: ["rarite_pickaxe", "Highcairn Forge"],
+    heft: ["pewter_greatsword", "Heft & Haft"], tailor: ["striped_cape", "Threadneedle Tailors"], clothier: ["crimson_dress", "Ribbon & Rye Clothiers"], cairn_trader: ["pot", "Highcairn Stores"], kettle_keeper: ["cake", "The Stone Kettle"], cairn_smith: ["rarite_pickaxe", "Highcairn Forge"],
   };
   const signed = new Set<Building>();
   const signFor = (x: number, y: number, icon: string, label: string) => {
@@ -1058,6 +1063,31 @@ export function createWorld(seed = 20260927): World {
   decor(80, 128, "hay", true, "Hay bales");
   for (const [wx, wy] of [[74, 120], [73, 120], [75, 121], [78, 121]] as const) if (add({ kind: "wheel", x: wx, y: wy, blocks: true, name: "Spinning wheel" })) break;
   for (const [wx, wy] of [[130, 128], [131, 129], [129, 130]] as const) if (add({ kind: "wheel", x: wx, y: wy, blocks: true, name: "Spinning wheel" })) break;
+  // ---------- Town tidy-ups, done last so the rest of the Realm is laid out exactly as before ----------
+  // The Sleepy Friend moves across the east bridge and the house behind Fletch & Feather moves back towards the river,
+  // so neither door faces another building's wall a tile away (at least five tiles clear in front of each).
+  const demolish = (x0: number, y0: number, x1: number, y1: number, ground: number, sign?: string) => {
+    const index = buildings.findIndex(b => b.x0 === x0 && b.y0 === y0 && b.x1 === x1 && b.y1 === y1);
+    if (index >= 0) buildings.splice(index, 1);
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { clearAt(x, y); put(x, y, ground); }
+    for (let i = spawns.length - 1; i >= 0; i--) if (spawns[i].x >= x0 && spawns[i].x <= x1 && spawns[i].y >= y0 && spawns[i].y <= y1) spawns.splice(i, 1);
+    for (let i = doorways.length - 1; i >= 0; i--) { const [dx, dy] = doorways[i]; if (dx >= x0 && dx <= x1 && dy >= y0 && dy <= y1) doorways.splice(i, 1); }
+    if (sign) for (const object of objects) if (object.kind === "sign" && object.name === sign && object.x >= x0 - 3 && object.x <= x1 + 3 && object.y >= y0 - 3 && object.y <= y1 + 3) clearAt(object.x, object.y);
+  };
+  demolish(135, 124, 141, 131, T.COBBLE, "The Sleepy Friend inn");
+  demolish(136, 135, 141, 140, T.GRASS);
+  // The Sleepy Friend, on its own across the east bridge: its door on the road from the bridge, a cobbled step up to it.
+  building(166, 120, 172, 125, "n", T.WOOD, undefined, { name: "The Sleepy Friend", color: "#cdb98a", chimney: true });
+  npc("innkeeper", 171, 123); add({ kind: "range", x: 167, y: 121, blocks: true, name: "Cooking range" }); decor(167, 124, "table"); decor(168, 124, "bench", false); decor(171, 121, "barrel");
+  for (let y = 117; y <= 119; y++) for (let x = 169; x <= 170; x++) { clearAt(x, y); put(x, y, T.COBBLE); }
+  decor(168, 118, "lamp"); decor(171, 118, "lamp");
+  signFor(171, 123, ...SIGNS.innkeeper);
+  // The house behind Fletch & Feather, set back five tiles.
+  building(140, 135, 145, 140, "w", T.WOOD, undefined, { name: "House", color: "#a996b5", chimney: true });
+  decor(142, 136, "bed"); decor(144, 139, "table");
+  for (const object of objects) if (object.name === "__removed") object.blocks = false;
+  buildingAt.fill(0);
+  buildings.forEach((b, index) => { if (b.roof === "none") return; for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) buildingAt[y * W + x] = index + 1; });
   return { tiles, region, objects, objectAt, spawns, places, heights: buildHeights(tiles, seed, lift), buildings, buildingAt, floors };
 }
 const i2 = (random: () => number) => random() > 0.5;

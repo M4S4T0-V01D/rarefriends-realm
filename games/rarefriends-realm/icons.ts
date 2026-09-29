@@ -270,6 +270,24 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
         part(p, all(box(5, 18, 22, 9), poly([[5, 19], [5, 8], [10, 14]]), poly([[10, 18], [16, 5], [22, 18]]), poly([[22, 14], [27, 8], [27, 19]])), color, "metal");
         part(p, disc(16, 22, 2.5), accent ?? "#cf6e6e", "gem"); part(p, disc(9, 22, 1.8), "#8fa3c9", "gem"); part(p, disc(23, 22, 1.8), "#8fbf9a", "gem"); break;
       case "body":
+        if (icon.kind === "dress") {
+          // A fitted bodice, a sash and a full skirt to the hem.
+          part(p, poly([[11, 4], [21, 4], [23, 9], [21, 14], [29, 29], [3, 29], [11, 14], [9, 9]]), color, "cloth");
+          part(p, poly([[13, 4], [19, 4], [16, 8]]), "#2e2c2a", "flat", false);
+          line(p, [[11, 14], [21, 14]], accent ?? dark, 2); line(p, [[16, 16], [12, 28]], dark); line(p, [[16, 16], [20, 28]], dark);
+          if (accent) line(p, [[4, 28], [28, 28]], accent);
+          break;
+        }
+        if (icon.kind === "shirt" || icon.kind === "tunic") {
+          // Sleeves, a laced collar, and (a tunic) a belt and a longer hem.
+          const hem = icon.kind === "tunic" ? 29 : 25;
+          part(p, poly([[10, 5], [22, 5], [30, 12], [27, 17], [23, 14], [23, hem], [9, hem], [9, 14], [5, 17], [2, 12]]), color, "cloth");
+          part(p, poly([[13, 5], [19, 5], [16, 10]]), "#2e2c2a", "flat", false);
+          line(p, [[14, 7], [18, 7]], accent ?? dark); line(p, [[14, 9], [18, 9]], accent ?? dark);
+          if (icon.kind === "tunic") { part(p, box(9, 19, 14, 2), accent ?? DARK_WOOD, "flat"); dot(p, 16, 19, GOLD_C); }
+          else line(p, [[16, 11], [16, hem - 1]], dark);
+          break;
+        }
         part(p, poly([[9, 5], [23, 5], [29, 11], [27, 18], [23, 16], [23, 29], [9, 29], [9, 16], [5, 18], [3, 11]]), color, armour);
         part(p, poly([[12, 5], [20, 5], [16, 10]]), "#2e2c2a", "flat", false);
         line(p, [[16, 11], [16, 27]], dark); line(p, [[9, 16], [23, 16]], dark);
@@ -278,7 +296,15 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
         if (accent) line(p, [[10, 28], [22, 28]], accent, 2);
         break;
       case "legs":
-        part(p, poly([[8, 4], [24, 4], [26, 29], [18, 29], [16, 13], [14, 29], [6, 29]]), color, armour);
+        if (icon.kind === "skirt") {
+          // A waistband and a flared skirt with folds.
+          part(p, poly([[10, 5], [22, 5], [29, 26], [3, 26]]), color, "cloth");
+          part(p, box(10, 5, 12, 3), accent ?? shadeHex(color, -0.2), "flat");
+          for (const x of [9, 16, 23]) line(p, [[16 + (x - 16) * 0.4, 9], [x, 25]], dark);
+          if (accent) line(p, [[4, 25], [28, 25]], accent);
+          break;
+        }
+        part(p, poly([[8, 4], [24, 4], [26, 29], [18, 29], [16, 13], [14, 29], [6, 29]]), color, icon.kind === "trousers" ? "cloth" : armour);
         part(p, box(8, 4, 16, 3), shadeHex(color, -0.2), "flat"); line(p, [[16, 8], [16, 13]], dark);
         if (metal) { part(p, disc(10, 18, 2.5), color, "metal"); part(p, disc(22, 18, 2.5), color, "metal"); }
         if (accent) { line(p, [[8, 7], [24, 7]], accent, 2); dot(p, 10, 18, accent); dot(p, 22, 18, accent); } break;

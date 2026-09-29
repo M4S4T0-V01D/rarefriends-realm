@@ -29,7 +29,10 @@ function measure(rows: Mask) {
   // Headwear sits on the crown of the head: the centre and width of the top two rows.
   const crownRows = spans.slice(top, top + 2).filter(Boolean) as Span[];
   const crownLeft = Math.min(...crownRows.map(span => span.min)), crownRight = Math.max(...crownRows.map(span => span.max));
-  return { spans, top, bottom, left, right, neck, headLeft, headRight, centre: (crownLeft + crownRight + 1) / 2, crownWidth: crownRight - crownLeft + 1 };
+  // Four-legged (or more): three or more separate legs in one of the lowest rows.
+  const runs = (row: string) => (row.match(/#+/g) ?? []).length;
+  const quadruped = rows.slice(Math.max(top, bottom - 2), bottom + 1).some(row => runs(row) >= 3);
+  return { spans, top, bottom, left, right, neck, headLeft, headRight, centre: (crownLeft + crownRight + 1) / 2, crownWidth: crownRight - crownLeft + 1, quadruped };
 }
 /**
  * Your Friend's frame with its worn pieces, as a pixel canvas twice the sprite's resolution.
@@ -57,11 +60,15 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
   });
   // Body armour: a metal cuirass, a leather or hide vest, or a robe.
   const armour: Piece | undefined = worn.filter(id => isItem(id) && item(id).equip?.slot === "body").slice(0, 1).map(id => {
-    const icon = item(id).icon, style = id.endsWith("_cuirass") || id.endsWith("_plate") ? "plate" : id.endsWith("_robe") ? "robe" : "vest";
+    const icon = item(id).icon, clothes = icon.kind === "shirt" || icon.kind === "tunic" || icon.kind === "dress";
+    const style = clothes ? icon.kind! : id.endsWith("_cuirass") || id.endsWith("_plate") ? "plate" : id.endsWith("_robe") ? "robe" : "vest";
     return { id, kind: "armour", color: icon.color, trim: icon.accent, style };
   })[0];
   // Leg armour: greaves (or leggings, chaps, a skirt) over the Friend's own legs.
-  const legs: Piece | undefined = worn.filter(id => isItem(id) && item(id).equip?.slot === "legs").slice(0, 1).map(id => ({ id, kind: "legs", color: item(id).icon.color, trim: item(id).icon.accent }))[0];
+  const legs: Piece | undefined = worn.filter(id => isItem(id) && item(id).equip?.slot === "legs").slice(0, 1).map(id => ({ id, kind: "legs", color: item(id).icon.color, trim: item(id).icon.accent, style: item(id).icon.kind }))[0];
+  // Gauntlets or gloves on the hands, and boots on the feet.
+  const hands: Piece | undefined = worn.filter(id => isItem(id) && item(id).equip?.slot === "hands").slice(0, 1).map(id => ({ id, kind: "hands", color: item(id).icon.color, trim: item(id).icon.accent }))[0];
+  const boots: Piece | undefined = worn.filter(id => isItem(id) && item(id).equip?.slot === "feet").slice(0, 1).map(id => ({ id, kind: "feet", color: item(id).icon.color, trim: item(id).icon.accent }))[0];
   // An amulet or pendant round the neck.
   const amulet: Piece | undefined = worn.filter(id => isItem(id) && item(id).equip?.slot === "neck").slice(0, 1).map(id => ({ id, kind: "amulet", color: item(id).icon.color, style: item(id).icon.kind }))[0];
   // A shield on the off arm.
@@ -70,7 +77,7 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
   const weapon: Piece | undefined = (held && isItem(held.id) ? [held.id] : worn.filter(id => isItem(id) && item(id).equip?.slot === "weapon")).slice(0, 1).map(id => ({ id, kind: `weapon_${item(id).icon.shape}`, color: item(id).icon.color, trim: item(id).icon.accent }))[0];
   // Angles snap to steps (pixel art turns in steps anyway, and it keeps the cache small).
   const turn = held ? Math.round(held.angle / 0.14) * 0.14 : 0;
-  const pieces: Piece[] = [...WARDROBE.filter(piece => worn.includes(piece.id) && piece.kind !== "aura" && piece.kind !== "lantern" && !(gear.some(entry => entry.kind === "cape") && piece.kind === "cape")), ...gear.slice(0, 1), ...headgear, ...(shield ? [shield] : []), ...(weapon ? [weapon] : []), ...(amulet ? [amulet] : []), ...(armour ? [armour] : []), ...(legs ? [legs] : [])];
+  const pieces: Piece[] = [...WARDROBE.filter(piece => worn.includes(piece.id) && piece.kind !== "aura" && piece.kind !== "lantern" && !(gear.some(entry => entry.kind === "cape") && piece.kind === "cape")), ...gear.slice(0, 1), ...headgear, ...(shield ? [shield] : []), ...(weapon ? [weapon] : []), ...(amulet ? [amulet] : []), ...(armour ? [armour] : []), ...(legs ? [legs] : []), ...(hands ? [hands] : []), ...(boots ? [boots] : [])];
   const key = `${ink}|${facing}|${phase & 3}|${pieces.map(piece => piece.id).join(",")}|${turn.toFixed(2)}|${rows.join("")}`;
   let canvas = cache.get(key);
   // Least recently used goes first: a hit moves to the back of the queue.
@@ -155,12 +162,41 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
   // ---------- In front ----------
   if (legs) {
     // The Friend's own pixels below the waist, recoloured: lit on the left, shaded on the right, trimmed at the knee.
-    const hip = Math.round(m.neck + (m.bottom - m.neck) * 0.62) + 1, knee = Math.round((hip + m.bottom) / 2), dark = shadeHex(legs.color, -0.18), light = shadeHex(legs.color, 0.14);
-    rows.forEach((row, y) => { if (y < hip) return; [...row].forEach((pixel, x) => {
-      if (pixel !== "#") return;
-      const span = bodySpan(y), u = (x - span.min) / Math.max(1, span.max - span.min);
-      p.rect(X(x), Y(y), K, K, y === knee && legs.trim ? legs.trim : u < 0.3 ? light : u > 0.7 ? dark : legs.color);
+    const hip = (m.quadruped ? Math.round(m.top + (m.bottom - m.top) * 0.75) : Math.round(m.neck + (m.bottom - m.neck) * 0.62)) + 1, knee = Math.round((hip + m.bottom) / 2), dark = shadeHex(legs.color, -0.18), light = shadeHex(legs.color, 0.14);
+    if (legs.style === "skirt" && !m.quadruped) {
+      // A flared skirt from the hip to above the feet, with folds and a trimmed hem.
+      const top = Y(hip), hem = Y(Math.round(hip + (m.bottom - hip) * 0.65)) + 1;
+      for (let y = top; y <= hem; y++) {
+        const span = bodySpan(Math.min(m.bottom, Math.floor(y / K) - PAD_TOP)), flare = Math.round((y - top) / Math.max(1, hem - top) * 3) + sway * ((y - top) > (hem - top) / 2 ? 1 : 0);
+        const a = X(Math.min(span.min, bodySpan(hip).min)) - flare, b = X(Math.max(span.max, bodySpan(hip).max)) + 1 + flare;
+        for (let x = a; x <= b; x++) p.set(x, y, y >= hem - 1 && legs.trim ? legs.trim : (x - a) / Math.max(1, b - a) > 0.8 ? dark : legs.color);
+      }
+      for (let k = 1; k < 3; k++) { const x = X(bodySpan(hip).min) + Math.round((X(bodySpan(hip).max) - X(bodySpan(hip).min)) * k / 3); p.line(x, top + 2, x + (k - 1.5) * 2, hem - 2, dark); }
+    } else {
+      // Trousers are cloth (no shine); greaves are metal.
+      const cloth = legs.style === "trousers";
+      rows.forEach((row, y) => { if (y < hip) return; [...row].forEach((pixel, x) => {
+        if (pixel !== "#") return;
+        const span = bodySpan(y), u = (x - span.min) / Math.max(1, span.max - span.min);
+        p.rect(X(x), Y(y), K, K, y === knee && legs.trim && !cloth ? legs.trim : u < 0.3 && !cloth ? light : u > 0.7 ? dark : legs.color);
+      }); });
+    }
+  }
+  if (boots) {
+    // The Friend's own feet (its lowest two rows), recoloured: the toe lit, the heel shaded, a cuff at the top.
+    const dark = shadeHex(boots.color, -0.22), light = shadeHex(boots.color, 0.14);
+    rows.forEach((row, y) => { if (y < m.bottom - 1) return; [...row].forEach((pixel, x) => {
+      if (pixel === "#") p.rect(X(x), Y(y), K, K, y === m.bottom - 1 ? (boots.trim ?? light) : x % 2 ? dark : boots.color);
     }); });
+  }
+  if (hands && !m.quadruped) {
+    // Gauntlets: the outermost pixels at hand height on each side (where the arms end), and the weapon hand itself.
+    const dark = shadeHex(hands.color, -0.2), handRow2 = Math.round(m.neck + (m.bottom - m.neck) * 0.45);
+    for (let y = handRow2 - 1; y <= handRow2 + 1; y++) {
+      const span = m.spans[y];
+      if (!span) continue;
+      for (const x of side > 0 ? [span.max] : side < 0 ? [span.min] : [span.min, span.max]) if (rows[y][x] === "#") p.rect(X(x), Y(y), K, K, y === handRow2 + 1 ? dark : hands.color);
+    }
   }
   if (armour) drawArmour(p, armour, m, X, Y, cx, neckY, feet, side, back, sway, bodySpan);
   if (quiver && back) drawQuiver(p, quiver, quiverAt.top, quiverAt.bottom);
@@ -258,18 +294,32 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
     switch (piece.kind) {
       case "gear_helm": {
         // A metal cap over the brow, cheek guards and a nose guard; a crest if it has one.
-        // One shell in every view, down to the same line all round: open at the face (with a nose guard) from the front,
-        // the opening turned the way you look from the side, and closed from behind with a ridge down the back.
+        // One shell in every view, fitted to the head: each row follows the head's own outline a pixel outside it (kept
+        // within the crown's width, so a long body or a bulge lower down doesn't widen it), with a rounded dome on top.
+        // Open at the face (with a nose guard) from the front, the opening turned the way you look from the side, and
+        // closed from behind with a ridge down the back.
         const rim = Math.min(neckY - 1, top + 7), mid = Math.round(cx), helm = new Pixels(p.w, p.h);
-        helm.poly([[l, rim], [l, top], [l + 2, top - 3], [r - 2, top - 3], [r, top], [r, rim]], color, null);
-        helm.line(l + 1, top - 1, r - 2, top - 1, light); helm.line(l, rim, r, rim, dark); helm.line(l, top + 1, r - 1, top + 1, dark);
+        const crown = { min: Math.min(...[m.top, m.top + 1].map(row => bodySpan(row).min)), max: Math.max(...[m.top, m.top + 1].map(row => bodySpan(row).max)) };
+        const rowSpan = (y: number) => {
+          const span = m.spans[Math.floor(y / K) - PAD_TOP] ?? crown;
+          return [X(Math.max(crown.min - 1, span.min)) - 1, X(Math.min(crown.max + 1, span.max)) + 2] as const;
+        };
+        for (let y = top; y <= rim; y++) { const [a, b] = rowSpan(y); helm.line(a, y, b, y, color); }
+        const [hl, hr] = rowSpan(top);
+        for (let k = 1; k <= 3; k++) helm.line(hl + k + (k > 2 ? 1 : 0), top - k, hr - k - (k > 2 ? 1 : 0), top - k, k === 1 ? light : color);
+        { const [a, b] = rowSpan(rim); helm.line(a, rim, b, rim, dark); }
+        { const [a, b] = rowSpan(top + 1); helm.line(a, top + 1, b, top + 1, dark); }
         if (back) helm.line(mid, top - 2, mid, rim - 1, dark);
         else {
           // The face opening, and the nose guard down its middle (towards the side you're facing when turned).
-          const x0 = side > 0 ? mid : l + 2, x1 = side < 0 ? mid : r - 2, nose = side ? mid + side * 3 : mid;
-          for (let y = top + 2; y < rim; y++) for (let x = x0; x <= x1; x++) if (x !== nose && x !== nose - 1 || y > top + 5) helm.set(x, y, 0);
+          const nose = side ? mid + side * 3 : mid;
+          for (let y = top + 2; y < rim; y++) {
+            const [a, b] = rowSpan(y), x0 = side > 0 ? mid : a + 2, x1 = side < 0 ? mid : b - 2;
+            for (let x = x0; x <= x1; x++) if (x !== nose && x !== nose - 1 || y > top + 5) helm.set(x, y, 0);
+          }
         }
         for (let y = 0; y < p.h; y++) for (let x = 0; x < p.w; x++) { const v = helm.get(x, y); if (v) p.set(x, y, v); }
+        const l = hl, r = hr;
         if (isItem(piece.id) && item(piece.id).icon.kind === "horned") {
           // Curled horns sweeping out and up from the sides.
           for (const s2 of side ? [side] : [-1, 1]) { const hx = s2 < 0 ? l : r; p.polyline([[hx, top + 1], [hx + s2 * 4, top - 1], [hx + s2 * 5, top - 5], [hx + s2 * 3, top - 7]], piece.trim ?? "#e8dcc0", 2); }
@@ -380,13 +430,15 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
 function drawArmour(p: Pixels, piece: Piece, m: ReturnType<typeof measure>, X: (x: number) => number, Y: (y: number) => number, cx: number, neckY: number, feet: number,
   side: number, back: boolean, sway: number, bodySpan: (y: number) => { min: number; max: number }) {
   const color = piece.color, light = shadeHex(color, 0.16), dark = shadeHex(color, -0.16), darker = shadeHex(color, -0.3), trim = piece.trim;
-  const robe = piece.style === "robe", plate = piece.style === "plate";
-  const bottomRow = robe ? m.bottom : Math.round(m.neck + (m.bottom - m.neck) * (plate ? 0.62 : 0.58));
-  const top = neckY + (plate ? 0 : 1), bottom = Y(bottomRow) + 1;
+  const dress = piece.style === "dress", robe = piece.style === "robe" || dress, plate = piece.style === "plate", h = m.bottom - m.top;
+  const shirt = piece.style === "shirt" || piece.style === "tunic", tunic = piece.style === "tunic";
+  // On four legs the torso is the barrel between the head and the legs: armour there is barding over the back.
+  const bottomRow = m.quadruped ? Math.round(m.top + h * 0.75) : robe ? m.bottom : Math.round(m.neck + (m.bottom - m.neck) * (plate ? 0.62 : tunic ? 0.74 : 0.58));
+  const top = m.quadruped ? Y(Math.round(m.top + h * 0.45)) : neckY + (plate || shirt ? 0 : 1), bottom = Y(bottomRow) + 1, snug = plate || shirt;
   // The torso, fitted to the body's outline one fine row at a time (a robe flares a little towards the hem).
   for (let y = top; y <= bottom; y++) {
-    const row = Math.min(m.bottom, Math.max(m.neck, Math.floor((y - Y(0)) / 2))), span = bodySpan(row), flare = robe ? Math.round((y - top) / Math.max(1, bottom - top) * 2) : 0;
-    const l = X(span.min) - flare + (plate ? 0 : 1), r = X(span.max) + 1 + flare - (plate ? 0 : 1);
+    const row = Math.min(m.bottom, Math.max(m.neck, Math.floor((y - Y(0)) / 2))), span = bodySpan(row), flare = robe && !m.quadruped ? Math.round((y - top) / Math.max(1, bottom - top) * (dress ? 4 : 2)) : 0;
+    const l = X(span.min) - flare + (snug ? 0 : 1), r = X(span.max) + 1 + flare - (snug ? 0 : 1);
     for (let x = l; x <= r; x++) {
       const u = (x - l) / Math.max(1, r - l);
       // Lit from the left: a highlight down the left, shadow down the right (turned with you from the side).
@@ -405,16 +457,23 @@ function drawArmour(p: Pixels, piece: Piece, m: ReturnType<typeof measure>, X: (
     else p.line(mid, top + 2, mid, bottom - 2, dark);
     p.line(X(bodySpan(bottomRow).min), bottom, X(bodySpan(bottomRow).max) + 1, bottom, trim ?? darker);
     p.line(X(bodySpan(bottomRow).min), bottom - 1, X(bodySpan(bottomRow).max) + 1, bottom - 1, darker);
-    const shoulders = bodySpan(m.neck + 1), pad = (x: number) => { p.disc(x, neckY + 1, 3, 2.2, color, null); p.line(x - 2, neckY, x + 2, neckY, light); p.line(x - 2, neckY + 3, x + 2, neckY + 3, trim ?? darker); };
+    const shoulders = bodySpan(m.neck + 1), pad = (x: number) => { if (m.quadruped) return; p.disc(x, neckY + 1, 3, 2.2, color, null); p.line(x - 2, neckY, x + 2, neckY, light); p.line(x - 2, neckY + 3, x + 2, neckY + 3, trim ?? darker); };
     if (side <= 0 || back) pad(X(shoulders.min));
     if (side >= 0 || back) pad(X(shoulders.max) + 1);
     if (side) pad(Math.round(cx) + side);
+  } else if (shirt) {
+    // A laced collar at the throat, a placket down the front (a seam behind), and a tunic's belt and longer hem.
+    if (!back) { p.poly([[mid - 2, top], [mid + 2, top], [mid, top + 3]], darker, null); p.set(mid - 1, top + 3, trim ?? light); p.set(mid + 1, top + 4, trim ?? light); p.line(mid, top + 4, mid, bottom - 1, dark); }
+    else p.line(mid, top + 1, mid, bottom - 1, dark);
+    if (tunic) { const belt = Y(Math.round(m.neck + (m.bottom - m.neck) * 0.5)), span = bodySpan(Math.round(m.neck + (m.bottom - m.neck) * 0.5)); p.rect(X(span.min), belt, X(span.max) - X(span.min) + 2, 2, trim ?? darker); if (!back) p.set(mid, belt, "#d9b866"); }
+    p.line(X(bodySpan(bottomRow).min), bottom, X(bodySpan(bottomRow).max) + 1, bottom, trim && tunic ? trim : darker);
   } else if (robe) {
-    // A sash at the waist and the hem's folds.
-    const waist = Y(Math.round(m.neck + (m.bottom - m.neck) * 0.45)), span = bodySpan(Math.round(m.neck + (m.bottom - m.neck) * 0.45));
+    // A sash at the waist and the hem's folds (a dress is fitted higher and flares wider).
+    const waistRow = Math.round(m.neck + (m.bottom - m.neck) * (dress ? 0.35 : 0.45)), waist = Y(waistRow), span = bodySpan(waistRow);
     p.rect(X(span.min), waist, X(span.max) - X(span.min) + 2, 2, trim ?? darker);
     for (let k = 1; k < 3; k++) { const x = X(m.left) + Math.round((X(m.right) - X(m.left)) * k / 3) + sway; p.line(x, waist + 3, x, feet - 2, dark); }
-    if (!back && !side) p.line(mid, neckY + 1, mid, waist - 1, trim ?? dark);
+    if (!back && !side && !dress) p.line(mid, neckY + 1, mid, waist - 1, trim ?? dark);
+    if (dress && trim) p.line(X(m.left) - 4, bottom, X(m.right) + 5, bottom, trim);
   } else {
     // Laces up the front of a vest, and a seam down the back.
     if (!back) for (let y = top + 2; y < bottom - 1; y += 2) { p.set(mid - 1, y, darker); p.set(mid + 1, y + 1, darker); }

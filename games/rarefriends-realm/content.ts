@@ -60,6 +60,7 @@ export const NPCS: Record<string, NpcDef> = {
   agility: { id: "agility", name: "Coach Skip", examine: "Never stops stretching.", options: ["Talk-to"], art: art(5, 211) },
   armourer: { id: "armourer", name: "Dora Plate", examine: "She's knocked the dents out of half the Realm's helms.", options: ["Talk-to", "Trade"], shop: "armour", art: art(6, 241) },
   weaponsmith: { id: "weaponsmith", name: "Hilt", examine: "Tests every edge on his thumb. Has a lot of plasters.", options: ["Talk-to", "Trade"], shop: "weapons", art: art(0, 251) },
+  clothier: { id: "clothier", name: "Marisol the clothier", examine: "Measures you with her eyes before you've said hello.", options: ["Talk-to", "Trade"], shop: "clothier", art: art(4, 227) },
   tailor: { id: "tailor", name: "Tamsin the tailor", examine: "Pins in her mouth, a tape round her neck, and opinions about your cape.", options: ["Talk-to", "Trade"], shop: "tailor", art: art(2, 318) },
   heft: { id: "heft", name: "Grom of Heft & Haft", examine: "Arms like tree trunks. Sells weapons to match.", options: ["Talk-to", "Trade"], shop: "heft", art: art(6, 631) },
   cairn_trader: { id: "cairn_trader", name: "Brisa the trader", examine: "Runs Highcairn's stores. Buys anything you can carry up a mountain.", options: ["Talk-to", "Trade"], shop: "general_highcairn", art: art(5, 603) },
@@ -605,9 +606,9 @@ export function talk(game: Game, npcId: string): Dialogue {
           p.quests.pilgrims_road = 1; message(game, "Quest started: The Pilgrim's Road.", "quest"); }) }, lesson, bye]);
       if (road === 1) {
         if (!PILGRIM_ALTARS.every(([key]) => data(game, key))) return chat(name, npcSays(name, `Still ${PILGRIM_ALTARS.filter(([key]) => !data(game, key)).map(([, altar]) => altar.toLowerCase()).join(", ")} to pray at. The road waits.`));
-        return chat(name, npcSays(name, "You've the look of someone who's walked a long way to kneel. Good. These are yours: gold for the legs that carried you."), undefined, () => {
-          giveOrDrop(game, "dawnplate_greaves"); addXp(game, "prayer", 4000, { raw: true });
-          completeQuest(game, "pilgrims_road", ["1 Quest Point", "Dawnplate greaves", "4,000 Faith XP"]);
+        return chat(name, npcSays(name, "You've the look of someone who's walked a long way to kneel. Good. These are yours: gold for the legs and feet that carried you."), undefined, () => {
+          giveOrDrop(game, "dawnplate_greaves"); giveOrDrop(game, "dawnplate_boots"); addXp(game, "prayer", 4000, { raw: true });
+          completeQuest(game, "pilgrims_road", ["1 Quest Point", "Dawnplate greaves and boots", "4,000 Faith XP"]);
         });
       }
       if (crypt === 0 && questDone(game, "pilgrims_road") && questDone(game, "greyhorn_light")) return chat(name, npcSays(name, "The candles for the Murkmire dead gutter every night. The crypt's skeletons are rising again, and ordinary steel only knocks them down for a while."),
@@ -617,9 +618,9 @@ export function talk(game: Game, npcId: string): Dialogue {
             p.quests.restless_crypt = 1; p.questData.crypt_rest = 0; message(game, "Quest started: The Restless Crypt.", "quest"); }) }, lesson, bye]);
       if (crypt === 1) {
         if (data(game, "crypt_rest") < CRYPT_REST) return chat(name, npcSays(name, `${Math.max(0, CRYPT_REST - data(game, "crypt_rest"))} more to lay to rest, with a faith weapon in your hand.`));
-        return chat(name, npcSays(name, "The candles burn steady again. You've done the dead a kindness. Wear these: the Order's helm, and its sun on your shield."), undefined, () => {
-          giveOrDrop(game, "dawnplate_helm"); giveOrDrop(game, "dawnplate_shield"); addXp(game, "prayer", 7000, { raw: true });
-          completeQuest(game, "restless_crypt", ["2 Quest Points", "Dawnplate helm", "Dawnplate shield", "7,000 Faith XP"]);
+        return chat(name, npcSays(name, "The candles burn steady again. You've done the dead a kindness. Wear these: the Order's helm and gauntlets, and its sun on your shield."), undefined, () => {
+          giveOrDrop(game, "dawnplate_helm"); giveOrDrop(game, "dawnplate_shield"); giveOrDrop(game, "dawnplate_gauntlets"); addXp(game, "prayer", 7000, { raw: true });
+          completeQuest(game, "restless_crypt", ["2 Quest Points", "Dawnplate helm, shield and gauntlets", "7,000 Faith XP"]);
         });
       }
       return chat(name, npcSays(name, "Faith is trained like any other strength. Offer your bones, pray, and strike true."), [lesson, bye]);
@@ -627,6 +628,8 @@ export function talk(game: Game, npcId: string): Dialogue {
     case "quartermaster": return chat(name, npcSays(name, questDone(game, "dawn_vigil") ? "Blessed steel and chaplains' staffs. They'll serve you against anything, and against the dead twice over." : "The armoury is for the Order's own. Keep the Dawn Vigil first."),
       questDone(game, "dawn_vigil") ? [{ label: "Show me.", then: () => { game.ui.shop = "armoury"; return null; } }, { label: "Maybe later.", then: () => null }] : undefined);
     case "dawn_knight": return chat(name, npcSays(name, (["Dawn comes. It always does.", "The golems in the Greyhorn mine hold something of ours.", "A blessed blade cuts the dead like wet paper.", "Offer your bones in the chapel. Sister Maren will light a candle."] as const)[Math.floor(game.rng() * 4)]));
+    case "clothier": return chat(name, npcSays(name, "Real clothes for real adventurers! Shirts and belted tunics, trousers and skirts, and dresses that sweep the floor. Wear them under a cape, or on their own."), [
+      { label: "Show me.", then: () => { game.ui.shop = "clothier"; return null; } }, { label: "Maybe later.", then: () => null }]);
     case "tailor": return chat(name, npcSays(name, "Capes in every colour, stripes, chevrons, quarters and stars, and hats to go with them: wizard's points, feathered caps, wide brims. Try something on!"), [
       { label: "Show me.", then: () => { game.ui.shop = "tailor"; return null; } }, { label: "Maybe later.", then: () => null }]);
     case "heft": return chat(name, npcSays(name, "Two hands, one swing, no argument. Greatswords, battleaxes and war hammers: slower than a sword, and they hit like a falling tree.",

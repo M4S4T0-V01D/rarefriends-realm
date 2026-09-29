@@ -4,6 +4,17 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 38, date: "2026-09-29", title: "Low graphics that look like High, and a roomier town", items: [
+    "Low graphics now use High's textures and lighting: the same ground, walls and roofs, the same daylight, dusk and lamplight, and buildings still cast their shadows. Low leaves out the shadows of trees and Friends, the far haze and cloud shadows, and lays its light more coarsely, so it stays quick.",
+    "Both settings draw faster: nothing off the screen is drawn, and the hidden sides of flat roofs and walls are skipped.",
+    "The Sleepy Friend inn has moved across the east bridge, on its own with a cobbled step up to its door, and the house behind Fletch & Feather has moved back so its door isn't a tile from the next wall.",
+  ] },
+  { id: 37, date: "2026-09-29", title: "Real clothes, boots and gauntlets, and armour that fits", items: [
+    "Ribbon & Rye Clothiers, west of the south end of Market Street: shirts in eight colours, belted tunics, dresses that sweep the floor, trousers and skirts. They're for looks (no combat bonuses), and the townsfolk wear them too.",
+    "Boots and gauntlets in every metal, smithed at the anvil (one bar each) and sold beside the helms in the armouries. Dawnplate has them too: boots from The Pilgrim's Road, gauntlets from The Restless Crypt.",
+    "Boots, gloves and gauntlets show on your Friend, along with the rest of your armour.",
+    "Helms fit your Friend's head, following its outline, and four-legged Friends wear chest plates as barding over the back instead of shoulder plates up by the head.",
+  ] },
   { id: 36, date: "2026-09-29", title: "Cleaner world: health bars in fights only, High by default, whole helms", items: [
     "Health bars only show while something is fighting: monsters when they're attacking you, you're attacking them, another player is fighting them or they've just been hit; yours and other players' in combat. (A monster's level is still in its right-click menu.)",
     "Graphics are High by default and never change by themselves; choose Low in Settings if you want it.",
