@@ -4,6 +4,12 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 39, date: "2026-09-29", title: "Bank tabs fixed, and save codes that stay saved", items: [
+    "Bank tabs no longer squash the bank: with several tabs the All items view lists each tab under its own heading and scrolls, and the shop's stock does the same.",
+    "Restoring a save code saves it at once. Before, a second tab or window with the game open could quietly overwrite the restored adventure with its own.",
+    "One tab saves at a time: when you open the Realm in a newer tab, the older one stops saving and tells you so (reload it to continue there).",
+    "Settings says plainly when saves aren't connected, and the page keeps trying to connect them for about a minute instead of ten seconds.",
+  ] },
   { id: 38, date: "2026-09-29", title: "Low graphics that look like High, and a roomier town", items: [
     "Low graphics now use High's textures and lighting: the same ground, walls and roofs, the same daylight, dusk and lamplight, and buildings still cast their shadows. Low leaves out the shadows of trees and Friends, the far haze and cloud shadows, and lays its light more coarsely, so it stays quick.",
     "Both settings draw faster: nothing off the screen is drawn, and the hidden sides of flat roofs and walls are skipped.",

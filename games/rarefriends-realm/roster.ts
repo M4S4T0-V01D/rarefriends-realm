@@ -11,6 +11,11 @@
 export const HOST_HELLO = "rarefriends-realm:hello";
 export const HOST_STATE = "rarefriends-realm:state";
 export const SAVE_WRITE = "rarefriends-realm:save";
+/**
+ * One tab saves at a time. A newer tab for the same wallet and Friend (opened, or restoring a save code) takes over, and
+ * the host tells older tabs with SAVE_ELSEWHERE; they stop saving, so a stale adventure can't overwrite the newer one.
+ */
+export const SAVE_ELSEWHERE = "rarefriends-realm:save-elsewhere";
 
 /** One roster entry per owned Friend: `"<token id>:<generation>"`. */
 export type RosterFriend = { id: number; generation: number | null };

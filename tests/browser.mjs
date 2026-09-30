@@ -55,7 +55,7 @@ try {
     if (window !== window.top) return;
     window.__shared = { opened: [], copied: [] };
     window.open = url => { window.__shared.opened.push(String(url)); return null; };
-    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { write: async items => { window.__shared.copied.push(items.flatMap(item => item.types)); } } });
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { write: async items => { window.__shared.copied.push(items.flatMap(item => item.types)); }, writeText: async text => { window.__shared.text = text; } } });
   });
   // The same wallet also holds #3412: extend the fixture's owner-filtered discovery reads.
   await page.route("https://rpc.mainnet.chain.robinhood.com/**", async route => {
@@ -492,6 +492,11 @@ try {
   await game.getByRole("menuitem", { name: /Withdraw-All Rarite sabre/ }).waitFor();
   await page.waitForTimeout(200); await shot("bank-menu");
   await game.getByRole("menuitem", { name: /Examine Rarite sabre/ }).click();
+  // Bank tabs: with a divider per tab the list outgrows the grid, which must scroll, not squash the slots.
+  await state(() => { const g = window.__realm.game(); g.player.bank.forEach((slot, i) => { if (i % 9) slot.tab = i % 9; else delete slot.tab; }); window.__realm.refresh(); });
+  await page.waitForTimeout(300); await shot("bank-tabs");
+  const slotSizes = await game.locator(".realm-bank-grid .realm-slot").evaluateAll(slots => slots.map(slot => slot.getBoundingClientRect()).map(box => Math.round(box.height - box.width)));
+  assert(slotSizes.length === 36 && slotSizes.every(gap => Math.abs(gap) <= 1), `bank slots stay square with 8 tabs (${slotSizes})`);
   await game.getByRole("button", { name: "Close" }).click();
 
   // ---------- A tour of the Realm ----------
@@ -523,6 +528,33 @@ try {
   await game.getByRole("button", { name: "Continue your adventure" }).click();
   await game.locator('.realm-game[data-phase="playing"]').waitFor();
   assert(Number(await realm.getAttribute("data-total")) > 100, "levels restored");
+
+  // ---------- Save codes, with an older tab still open ----------
+  // The older tab's fresh-looking adventure must not overwrite a code restored in the newer one.
+  await game.getByRole("tab", { name: "Settings" }).click();
+  await game.getByRole("button", { name: "Copy save code" }).click();
+  await page.waitForFunction(() => window.__shared.text?.startsWith("RFR1-"));
+  const saveCode = await page.evaluate(() => window.__shared.text);
+  const older = await context.newPage();
+  older.on("pageerror", error => errors.push(error.message));
+  await installFixture(older, origin, { artworkCall });
+  await older.goto(origin);
+  await older.getByRole("button", { name: /^Connect (wallet|Browser wallet)$/ }).click();
+  await older.getByRole("button", { name: /^Friend #7730\b/ }).click();
+  await older.frameLocator("iframe").locator('.realm-game[data-hosted="linked"]').waitFor();
+  await older.frameLocator("iframe").getByRole("button", { name: /adventure/ }).first().click();
+  await game.locator('.realm-game[data-hosted="elsewhere"]').waitFor();
+  const olderFrame = older.frames().find(entry => entry !== older.mainFrame() && entry.url() !== "about:blank");
+  await olderFrame.evaluate(() => { const g = window.__realm.game(); for (const skill of Object.keys(g.player.xp)) g.player.xp[skill] = skill === "hitpoints" ? 1154 : 0; window.__realm.refresh(); });
+  await game.getByLabel("Save code to restore").fill(saveCode);
+  await game.getByRole("button", { name: "Restore" }).click();
+  await game.getByRole("button", { name: "Yes, restore it" }).click();
+  await game.getByText("Restored! Welcome back.").waitFor();
+  await game.locator('.realm-game[data-hosted="linked"]').waitFor();
+  await older.frameLocator("iframe").locator('.realm-game[data-hosted="elsewhere"]').waitFor();
+  await page.waitForTimeout(6000);
+  assert(JSON.parse(await page.evaluate(name => localStorage.getItem(name), key)).xp.woodcutting > 0, "the restored code stays saved while the older tab plays on");
+  await older.close();
 
   // ---------- A phone in landscape: tap to walk, long-press for options ----------
   const phone = await browser.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true });

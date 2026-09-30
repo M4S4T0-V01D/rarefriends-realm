@@ -24,7 +24,7 @@ import { GENERATION_SPRITE_MANIFEST } from "@rarefriends/friendsdk/sprites";
 import { createClient, http } from "viem";
 import { getBlockNumber, getChainId, getLogs, readContract } from "viem/actions";
 import {
-  HOST_HELLO, HOST_STATE, SAVE_EXPORT, SAVE_EXPORT_RESULT, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, type ShareAction, type ShareOutcome,
+  HOST_HELLO, HOST_STATE, SAVE_ELSEWHERE, SAVE_EXPORT, SAVE_EXPORT_RESULT, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, type ShareAction, type ShareOutcome,
 } from "../games/rarefriends-realm/roster.ts";
 import { NET_ACT, NET_CHAT, NET_ONLINE, NET_PRESENCE, NET_SOCIAL } from "../games/rarefriends-realm/net.ts";
 import { NetHub } from "./net.ts";
@@ -86,6 +86,14 @@ function RealmHost() {
   useEffect(() => {
     const session = createFriendWalletSession(), client = createRosterClient();
     let account: string | null = null, controller: AbortController | null = null, roster: string[] | null = null, friend: string | null = null;
+    // One tab saves at a time: the newest tab for a wallet and Friend takes over, and older tabs stop writing.
+    const tab = Math.random().toString(36).slice(2), saves = typeof BroadcastChannel === "function" ? new BroadcastChannel("rarefriends-realm:saves") : null;
+    let superseded = false;
+    const claim = () => { superseded = false; if (account && friend) saves?.postMessage({ key: saveKey(account, friend), tab }); };
+    if (saves) saves.onmessage = event => {
+      if (!account || !friend || event.data?.tab === tab || event.data?.key !== saveKey(account, friend)) return;
+      superseded = true; frames().forEach(target => target.postMessage({ type: SAVE_ELSEWHERE }, "*"));
+    };
     const frames = () => [...document.querySelectorAll("iframe")].flatMap(frame => frame.contentWindow ? [frame.contentWindow] : []);
     // Nothing is sent until this wallet's roster is known, so the game can match it to its verified manager.
     const owns = (id: unknown) => !!roster?.some(entry => entry.split(":")[0] === String(id));
@@ -98,21 +106,22 @@ function RealmHost() {
       const snapshot = session.getSnapshot();
       const next = snapshot.status === "connected" ? snapshot.account : null;
       if (next === account) return;
-      account = next; controller?.abort(); roster = null; sync();
+      account = next; controller?.abort(); roster = null; superseded = false; sync();
       if (!next) return;
       const current = controller = new AbortController();
-      // Discovery can hit public-RPC rate limits, so retry a few times before giving up (the game then plays unsaved).
+      // Discovery can hit public-RPC rate limits, so keep retrying for about a minute before giving up (the game then
+      // plays unsaved). Saves start as soon as it succeeds, even mid-play.
       const discover = (attempt: number): void => {
         void readOwnedFriends(client, next, { signal: current.signal })
-          .then(result => { if (!current.signal.aborted) { roster = result.friends.map(owned => `${owned.id}:${owned.generation}`); broadcast(); sync(); } })
-          .catch(() => { if (!current.signal.aborted && attempt < 3) setTimeout(() => discover(attempt + 1), 1500 * (attempt + 1)); });
+          .then(result => { if (!current.signal.aborted) { roster = result.friends.map(owned => `${owned.id}:${owned.generation}`); claim(); broadcast(); sync(); } })
+          .catch(() => { if (!current.signal.aborted && attempt < 8) setTimeout(() => discover(attempt + 1), Math.min(10_000, 1500 * (attempt + 1))); });
       };
       discover(0);
     };
     // Only the game frame we host may ask or save. Saves are accepted only for a Friend in this wallet's roster.
     const receive = (event: MessageEvent) => {
       if (!event.source || !frames().includes(event.source as Window)) return;
-      if (event.data?.type === HOST_HELLO) { friend = /^[0-9]{1,15}$/.test(String(event.data.friend)) ? String(event.data.friend) : null; send(event.source as Window); sync(); }
+      if (event.data?.type === HOST_HELLO) { friend = /^[0-9]{1,15}$/.test(String(event.data.friend)) ? String(event.data.friend) : null; claim(); send(event.source as Window); sync(); }
       else if (event.data?.type === NET_PRESENCE) hub.presence(event.data.presence);
       else if (event.data?.type === NET_CHAT) hub.chat(event.data.text, event.data.to);
       else if (event.data?.type === NET_ACT) hub.act(event.data.act, event.data.to);
@@ -126,7 +135,11 @@ function RealmHost() {
         if (event.data.action === "download") { download(new Blob([text], { type: "text/plain" }), `rarefriends-realm-friend-${friendId}-save.txt`); done("saved"); }
         else void navigator.clipboard.writeText(text).then(() => done("copied"), () => { download(new Blob([text], { type: "text/plain" }), `rarefriends-realm-friend-${friendId}-save.txt`); done("saved"); });
       }
-      else if (event.data?.type === SAVE_WRITE && account && owns(event.data.friend)) writeSave(account, String(event.data.friend), event.data.save);
+      else if (event.data?.type === SAVE_WRITE && account && owns(event.data.friend) && String(event.data.friend) === friend) {
+        // A restored save code takes this Friend's saves back from any other tab.
+        if (event.data.claim === true) claim();
+        if (!superseded) writeSave(account, friend, event.data.save);
+      }
       else if (event.data?.type === SHARE_REQUEST && ["post", "copy", "save"].includes(event.data.action) && event.data.image instanceof Blob
         && event.data.image.type === "image/png" && event.data.image.size < 5_000_000 && typeof event.data.text === "string" && event.data.text.length <= 1000) {
         const source = event.source as Window, action = event.data.action as ShareAction;
@@ -141,7 +154,7 @@ function RealmHost() {
     const poll = setInterval(() => { if (session.getSnapshot().status !== "connected") void session.refresh(); }, 2500);
     const bye = () => hub.dispose();
     window.addEventListener("pagehide", bye);
-    return () => { clearInterval(poll); unsubscribe(); window.removeEventListener("message", receive); window.removeEventListener("pagehide", bye); hub.dispose(); controller?.abort(); session.dispose(); };
+    return () => { clearInterval(poll); unsubscribe(); window.removeEventListener("message", receive); window.removeEventListener("pagehide", bye); hub.dispose(); saves?.close(); controller?.abort(); session.dispose(); };
   }, []);
   // The same wide layout as games/rarefriends-realm/host.css, set on the wrapper as HOST_INTEGRATION.md describes.
   return (

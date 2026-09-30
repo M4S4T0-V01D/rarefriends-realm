@@ -24,7 +24,7 @@ import { Players, presenceOf } from "./social.ts";
 import { Trades } from "./trade.ts";
 import { makeSaveCode, restoreSaveCode } from "./savecode.ts";
 import { strikeAt, weatherAt, type Weather } from "./weather.ts";
-import { HOST_HELLO, HOST_STATE, SAVE_EXPORT, SAVE_EXPORT_RESULT, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, parseRoster, type ShareAction, type ShareOutcome } from "./roster.ts";
+import { HOST_HELLO, HOST_STATE, SAVE_ELSEWHERE, SAVE_EXPORT, SAVE_EXPORT_RESULT, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, parseRoster, type ShareAction, type ShareOutcome } from "./roster.ts";
 import { RealmAudio, trackFor, trackById, type SfxName, type TrackId } from "./audio.ts";
 import { renderCard, shareText } from "./card.ts";
 import { dailyWaiting, rollDaily, streakStatus } from "./daily.ts";
@@ -99,7 +99,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const camera = useRef<Camera>({ x: 121, y: 121, zoom: DEFAULT_SETTINGS.zoom, angle: 0, pitch: PITCH.classic }), cameraGoal = useRef<{ angle: number; pitch: number } | null>(null),
     compass = useRef<HTMLButtonElement>(null), orbit = useRef<{ x: number; y: number; angle: number; pitch: number } | null>(null), miniZoom = useRef(3.2), tickAt = useRef(0), hits = useRef<HitSplat[]>([]), fireworks = useRef<Firework[]>([]);
   const projectiles = useRef<Projectile[]>([]), marker = useRef<ClickMarker | null>(null), hoverTile = useRef<{ x: number; y: number } | null>(null), chat = useRef<{ text: string; until: number } | null>(null);
-  const held = useRef(new Set<string>()), linked = useRef(false), lastSave = useRef(""), region = useRef(""), epoch = useRef(0), pointer = useRef<{ x: number; y: number } | null>(null);
+  const held = useRef(new Set<string>()), linked = useRef(false), elsewhere = useRef(false), lastSave = useRef(""), region = useRef(""), epoch = useRef(0), pointer = useRef<{ x: number; y: number } | null>(null);
   const [phase, setPhase] = useState<Phase>("loading"), [status, setStatus] = useState("Waking your Friend and unfolding the Realm…");
   const [, setVersion] = useState(0), [tab, setTab] = useState<Tab>("inventory"), [selection, setSelection] = useState<Selection>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; entries: MenuEntry[] } | null>(null), [modal, setModal] = useState<Modal>(null);
@@ -108,7 +108,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const [hover, setHover] = useState(""), [toast, setToast] = useState<{ title: string; sub?: string } | null>(null), [drops, setDrops] = useState<XpDrop[]>([]);
   const [levelUps, setLevelUps] = useState<{ skill: Skill; level: number }[]>([]), [quest, setQuest] = useState<string | null>(null), [dead, setDead] = useState(false);
   const [settings, setSettingsState] = useState<Settings>(loadSettings), [roster, setRoster] = useState<OwnedFriend[]>([]), [rosterState, setRosterState] = useState<"waiting" | "ready" | "none">("waiting");
-  const [hosted, setHosted] = useState<"waiting" | "linked" | "none">("waiting"), [hasSave, setHasSave] = useState<{ total: number; combat: number; qp: number; where: string } | null>(null);
+  const [hosted, setHosted] = useState<"waiting" | "linked" | "none" | "elsewhere">("waiting"), [hasSave, setHasSave] = useState<{ total: number; combat: number; qp: number; where: string } | null>(null);
   const [tailorPick, setTailorPick] = useState(""), [backupStatus, setBackupStatus] = useState(""), [guide, setGuide] = useState<{ skill: Skill | null } | null>(null);
   // Playing together: other players (from the host), who you're following, and a whisper to start in the chat box.
   const players = useRef(new Players()), following = useRef<number | null>(null);
@@ -119,7 +119,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const lastMinimapPoint = useRef<React.MouseEvent<HTMLCanvasElement> | null>(null);
   const [snapshot, setSnapshot] = useState<GameSnapshot | null>(null), [busy, setBusy] = useState(false), [casketError, setCasketError] = useState(""), [reveal, setReveal] = useState<CasketResult[] | null>(null);
   const [size, setSize] = useState({ width: 960, height: 640, scale: 1 }), [sideOpen, setSideOpen] = useState(true), [shareStatus, setShareStatus] = useState(""), [cardUrl, setCardUrl] = useState<string | null>(null);
-  const pendingSave = useRef<unknown>(null), cardBlob = useRef<Blob | null>(null), resizeRef = useRef<() => void>(() => {}), saveNow = useRef<() => void>(() => {});
+  const pendingSave = useRef<unknown>(null), cardBlob = useRef<Blob | null>(null), resizeRef = useRef<() => void>(() => {}), saveNow = useRef<(claim?: boolean) => void>(() => {});
   /** Logged out: back on the title screen with the adventure saved. */
   const [loggedOut, setLoggedOut] = useState(false);
   const live = useRef({ paused, phase, modal, menu, selection, settings }); live.current = { paused, phase, modal, menu, selection, settings };
@@ -180,7 +180,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     const version = ++epoch.current;
     audio.current?.dispose(); audio.current = new RealmAudio(); audio.current.play("theme");
     setPhase("loading"); setStatus("Waking your Friend and unfolding the Realm…"); setHosted("waiting"); setHasSave(null); setRoster([]); setRosterState("waiting");
-    linked.current = false; lastSave.current = ""; pendingSave.current = null; followerSprites.current = new Map(); game.current = null; friend.current = null;
+    linked.current = false; elsewhere.current = false; lastSave.current = ""; pendingSave.current = null; followerSprites.current = new Map(); game.current = null; friend.current = null;
     const applyHost = (data: { ids?: unknown; save?: unknown }) => {
       const state = game.current, parsed = parseRoster(data.ids, friendId);
       if (!state || parsed === null) return;
@@ -208,6 +208,11 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           "saved-and-opened": "Picture saved and X opened: attach it to your post, then press Post.", copied: "Adventurer card copied as a picture.", saved: "Adventurer card saved as a picture.",
         };
         setShareStatus(messages[event.data.result as ShareOutcome] ?? messages.failed); return;
+      }
+      // A newer tab took over this Friend's saves: stop saving here, so this older adventure can't overwrite it.
+      if (event.data?.type === SAVE_ELSEWHERE) {
+        if (!elsewhere.current) { elsewhere.current = true; setHosted("elsewhere"); const state = game.current; if (state) { message(state, "This adventure is now open in another tab or window, so this one has stopped saving. Reload this page to continue here.", "info"); refresh(); } }
+        return;
       }
       if (event.data?.type === SAVE_EXPORT_RESULT) {
         setBackupStatus(event.data.result === "copied" ? "Save code copied. Paste it somewhere safe (a note, an email to yourself)." : event.data.result === "saved" ? "Save file downloaded. Keep it somewhere safe." : "Couldn't copy from this browser. Try Download save file.");
@@ -333,12 +338,14 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
 
   // ---------- Saving (through the trusted host, per wallet) ----------
   useEffect(() => {
-    const save = () => {
-      const state = game.current;
-      if (!state || !linked.current || live.current.phase !== "playing") return;
+    // A claim (after restoring a save code) saves at once and takes this Friend's saves back from any other tab.
+    const save = (claim?: unknown) => {
+      const state = game.current, claiming = claim === true;
+      if (!state || !linked.current || (elsewhere.current && !claiming) || live.current.phase !== "playing") return;
       const data = serialize(state), raw = JSON.stringify(data);
-      if (raw === lastSave.current) return;
-      lastSave.current = raw; window.parent.postMessage({ type: SAVE_WRITE, friend: friendId.toString(), save: data }, "*");
+      if (raw === lastSave.current && !claiming) return;
+      if (elsewhere.current) { elsewhere.current = false; setHosted("linked"); }
+      lastSave.current = raw; window.parent.postMessage({ type: SAVE_WRITE, friend: friendId.toString(), save: data, ...(claiming ? { claim: true } : {}) }, "*");
     };
     saveNow.current = save;
     const timer = setInterval(save, 5000);
@@ -788,7 +795,9 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     audio.current?.speak([...who].reduce((sum, char) => sum + char.charCodeAt(0), 0), Math.ceil(line.text.split(" ").length / 3));
   }, [lineKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const definition = client.definition, pending = snapshot?.plays.filter(play => play.outcomeId === null).length ?? 0;
-  const savedText = hosted === "linked" ? "Your adventure saves automatically for this wallet on this device." : hosted === "waiting" ? "Connecting saves…" : "Saves are off: this host doesn't provide them (use the Realm's own page).";
+  const savedText = hosted === "linked" ? "Your adventure saves automatically for this wallet on this device." : hosted === "waiting" ? "Connecting saves…"
+    : hosted === "elsewhere" ? "Not saving: this adventure is open in another tab or window. Reload this page to continue here."
+    : "Saves are off: this wallet's Friends couldn't be looked up yet (reload to try again), or this host doesn't provide saves (use the Realm's own page).";
   return (
     <div ref={root} className="realm-game" data-phase={phase} data-tick={state?.tick ?? 0} data-region={state ? regionAt(state.world, state.player.x, state.player.y).id : ""}
       data-total={player ? totalLevel(player) : 0} data-hp={player?.hp ?? 0} data-quests={state ? questPoints(state) : 0} data-hosted={hosted}
@@ -847,7 +856,11 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
             onLogout={logOut}
             onExportSave={action => { const state = game.current; if (state) void makeSaveCode(state).then(text => window.parent.postMessage({ type: SAVE_EXPORT, action, text }, "*")); }}
             onRestoreSave={async code => { const state = game.current; if (!state) return "The game isn't ready."; const error = await restoreSaveCode(state, code);
-              if (!error) { const at = realPoint(state.world, state.player.x, state.player.y); camera.current.x = at.x; camera.current.y = at.y; message(state, "Your adventure has been restored from a save code.", "info"); } return error; }} settings={settings} setSettings={setSettings}
+              if (!error) {
+                const at = realPoint(state.world, state.player.x, state.player.y); camera.current.x = at.x; camera.current.y = at.y; message(state, "Your adventure has been restored from a save code.", "info");
+                if (linked.current) saveNow.current(true);
+                else message(state, "Saves aren't connected yet, so this restore isn't saved: keep playing in this tab and it saves once they connect. If Settings still says saves are off, reload the page and restore the code again.", "info");
+              } return error; }} settings={settings} setSettings={setSettings}
             friend={friend.current} trackName={audio.current?.trackName ?? ""} trackId={audio.current?.trackId ?? ""} playTrack={id => { audio.current?.play(id as TrackId); audio.current?.unlock(); setSettings({ ...settings, autoMusic: false }); }} openCard={openCard} openHelp={() => setModal("help")} paused={paused} saved={savedText}
             relicCounts={snapshot?.inventory.map(Number) ?? [0, 0, 0, 0]} openCaskets={() => setModal("caskets")} />}
           {selection && <div className="realm-selection" role="status">{selection.kind === "item" ? `Use ${player.inventory[selection.slot] ? itemName(player.inventory[selection.slot]!.id) : "item"} ->` : `Cast ${SPELLS.find(spell => spell.id === selection.spell)?.name ?? "spell"} ->`} pick a target <button type="button" onClick={() => setSelection(null)}>Cancel</button></div>}
@@ -955,7 +968,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
               <div>
                 <h2>Friend #{player.friendId}</h2>
                 <p><b>{FAMILY_NAMES[player.familyId]}</b>: {FAMILY_PERKS[player.familyId].title}. {FAMILY_PERKS[player.familyId].text}</p>
-                {loggedOut && <p className="realm-logged-out" role="status">✓ <b>Saved and logged out.</b> {hosted === "linked" ? "Your adventure is safe in this browser for this wallet and Friend. Continue any time." : "This host can't keep saves: copy a save code from Settings next time to keep your progress."} For an extra copy on any device, use Settings → Copy save code.</p>}
+                {loggedOut && <p className="realm-logged-out" role="status">{hosted === "linked" ? <>✓ <b>Saved and logged out.</b></> : <b>Logged out.</b>} {hosted === "linked" ? "Your adventure is safe in this browser for this wallet and Friend. Continue any time." : hosted === "elsewhere" ? "This tab stopped saving because the adventure is open in another tab: continue there, or reload this page." : "Saves weren't connected: copy a save code from Settings next time to keep your progress."} For an extra copy on any device, use Settings → Copy save code.</p>}
                 {hasSave ? <p className="realm-save">Saved adventure: total level <b>{hasSave.total}</b> · combat <b>{hasSave.combat}</b> · <b>{hasSave.qp}</b> quest points · in {hasSave.where}</p>
                   : hosted === "waiting" ? <p className="realm-muted">Looking for this wallet's saved adventure…</p> : <p className="realm-muted">A new adventure: 19 skills, 7 quests, one large world.</p>}
               </div>
