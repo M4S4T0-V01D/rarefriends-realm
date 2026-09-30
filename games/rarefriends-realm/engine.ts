@@ -257,7 +257,7 @@ function examineObject(game: Game, object: WorldObject): string {
   if (object.kind === "rock") return game.depleted.has(object.id) ? "There is currently no ore available in this rock." : `A rock. Mining level ${ROCKS[object.rock!].level}.`;
   if (object.kind === "spot") return `A ${object.name.toLowerCase()}. ${FISHING_SPOTS[object.spot!].catches.map(entry => `${item(entry.fish).name.replace("Raw ", "")} at ${entry.level}`).join(", ")}.`;
   if (object.kind === "obstacle") return `${object.name}. Agility level ${object.obstacle!.level}.`;
-  if (object.kind === "stall") return `A ${object.name.toLowerCase()}. Thieving level ${STALLS[object.stall!].level}.`;
+  if (object.kind === "stall") return `A ${object.name.toLowerCase()}. Stealth level ${STALLS[object.stall!].level}.`;
   if (object.kind === "decor") return DECOR_EXAMINE[object.decor!] ?? "Nothing special.";
   if (object.kind === "sign") return object.text ?? "A signpost.";
   return OBJECT_EXAMINE[object.kind] ?? object.name;
@@ -673,7 +673,7 @@ function interactObject(game: Game, object: WorldObject, option: string, use?: n
     }
     case "stall": {
       const stall = STALLS[object.stall!];
-      if (level(game, "thieving") < stall.level) { message(game, `You need a Thieving level of ${stall.level} to steal from this stall.`, "warn"); return; }
+      if (level(game, "thieving") < stall.level) { message(game, `You need a Stealth level of ${stall.level} to steal from this stall.`, "warn"); return; }
       if (!freeSlots(player)) { message(game, "Your inventory is too full.", "warn"); return; }
       player.activity = { kind: "thieve_stall", objectId: object.id, timer: 2 }; return;
     }
@@ -750,7 +750,7 @@ function interactNpc(game: Game, uid: number, option: string, use?: number) {
 }
 function pickpocket(game: Game, npc: Npc, pick: NonNullable<ReturnType<typeof npcDef>["pickpocket"]>) {
   const player = game.player, thieving = level(game, "thieving");
-  if (thieving < pick.level) { message(game, `You need a Thieving level of ${pick.level} to pickpocket this.`, "warn"); return; }
+  if (thieving < pick.level) { message(game, `You need a Stealth level of ${pick.level} to pickpocket this.`, "warn"); return; }
   if (!freeSlots(player) && !has(player, "coins")) { message(game, "Your inventory is too full.", "warn"); return; }
   const mask = player.familyId === 1 ? 0.1 : 0, chance = Math.min(0.95, 0.55 + (thieving - pick.level) * 0.02 + mask);
   message(game, `You attempt to pick the ${npcDef(npc.id).name.toLowerCase()}'s pocket.`);
@@ -829,7 +829,7 @@ function movePlayer(game: Game) {
   if (game.held) {
     // Held keys give a world-space direction (the UI turns screen keys into it for the camera angle); snap to 8 ways.
     const octant = Math.round(Math.atan2(game.held.dy, game.held.dx) / (Math.PI / 4)), tx = Math.round(Math.cos(octant * Math.PI / 4)), ty = Math.round(Math.sin(octant * Math.PI / 4));
-    const mount = riding(player), steps = mount ? mount.speed : player.run && player.energy >= 1 ? 2 : 1, start = { x: player.x, y: player.y };
+    const mount = riding(player), steps = mount ? mount.speed : player.run && !player.sneak && player.energy >= 1 ? 2 : 1, start = { x: player.x, y: player.y };
     let moved = 0;
     for (let i = 0; i < steps; i++) {
       const options: [number, number][] = [[tx, ty], [tx, 0], [0, ty]];
@@ -839,10 +839,11 @@ function movePlayer(game: Game) {
     }
     if (moved) player.prev = start;
     if (moved >= 2 && !mount) drainRun(game);
+    if (moved && player.sneak) drainSneak(game);
     return;
   }
   if (!player.path.length) return;
-  const mount = riding(player), steps = mount ? mount.speed : player.run && player.energy >= 1 && player.path.length > 1 ? 2 : 1, start = { x: player.x, y: player.y };
+  const mount = riding(player), steps = mount ? mount.speed : player.run && !player.sneak && player.energy >= 1 && player.path.length > 1 ? 2 : 1, start = { x: player.x, y: player.y };
   for (let i = 0; i < steps && player.path.length; i++) {
     const next = player.path[0];
     if (!canStep(game, player.x, player.y, next.x - player.x, next.y - player.y)) {
@@ -855,11 +856,77 @@ function movePlayer(game: Game) {
   }
   if (player.x !== start.x || player.y !== start.y) player.prev = start;
   if (!mount && Math.max(Math.abs(player.x - start.x), Math.abs(player.y - start.y)) >= 2) drainRun(game);
+  if (player.sneak && (player.x !== start.x || player.y !== start.y)) drainSneak(game);
 }
 function drainRun(game: Game) {
   const player = game.player, drain = player.familyId === 5 ? 0.36 : 0.6;
   player.energy = Math.max(0, player.energy - drain);
   if (player.energy <= 0) { player.run = false; message(game, "You're out of run energy.", "warn"); }
+}
+// ---------- Stealth: sneaking ----------
+/** The rare hood of the Stealth update: stand still in it for five seconds and you all but vanish. */
+export const VEIL_HOOD = "veilweave_hood";
+/** Sneaking walks (never runs) and spends run energy faster than running; the better your Stealth, the softer it goes. */
+function drainSneak(game: Game) {
+  const player = game.player, cost = Math.max(0.35, 1.1 - level(game, "thieving") * 0.0077) * (player.familyId === 5 ? 0.6 : 1);
+  player.energy = Math.max(0, player.energy - cost);
+  if (player.energy <= 0) { player.sneak = false; message(game, "You're too tired to keep sneaking.", "warn"); }
+}
+export function toggleSneak(game: Game) {
+  const player = game.player;
+  if (!player.sneak && player.mount) { message(game, "You can't sneak on horseback.", "warn"); return; }
+  if (!player.sneak && player.energy < 5) { message(game, "You're too tired to sneak. Catch your breath first.", "warn"); return; }
+  player.sneak = !player.sneak; sound(game, "click");
+  message(game, player.sneak ? "You drop low and tread softly. Aggressive monsters may not notice you, but it's tiring." : "You stop sneaking.");
+}
+const veilCache = new WeakMap<Game, { tick: number; on: boolean }>();
+/**
+ * Wearing the Veilweave hood, still for five seconds (9 ticks) and out of any fight: you've faded almost to nothing, and
+ * aggressive monsters can't see you at all.
+ */
+export function veiled(game: Game) {
+  const cached = veilCache.get(game);
+  if (cached && cached.tick === game.tick) return cached.on;
+  const player = game.player;
+  const on = player.equipment.head === VEIL_HOOD && game.tick - player.moved >= 9 && player.combat === null && !player.activity && !game.monsters.some(monster => monster.target && !monster.dead);
+  veilCache.set(game, { tick: game.tick, on });
+  return on;
+}
+/** Whether an aggressive monster in range notices you sneaking this tick: its level against your Stealth, how close you are, and whether you're moving. */
+function spots(game: Game, monster: Monster) {
+  const player = game.player, gap = chebyshev(monster, player);
+  let chance = Math.max(0.01, Math.min(0.35, 0.06 + (monster.def.level - level(game, "thieving")) * 0.004));
+  chance *= [2, 2, 1.4, 1, 0.7][gap] ?? 0.7;
+  if (game.tick - player.moved > 1) chance *= 0.4;
+  if (player.equipment.head === VEIL_HOOD) chance *= 0.5;
+  if (player.familyId === 1) chance *= 0.8;
+  return game.rng() < chance;
+}
+/** Caught: the monster lunges at once (a hit you can't answer), and the fight is on. */
+function caughtSneaking(game: Game, monster: Monster) {
+  const player = game.player;
+  game.sneakingPast.delete(monster.uid);
+  player.sneak = false; monster.target = true; creature(game, monster, "aggro");
+  let hit = Math.max(1, Math.round(monster.def.maxHit * (0.35 + game.rng() * 0.4)));
+  if (prayerBoost(player).protect) hit = Math.floor(hit * (monster.def.boss ? 0.4 : 0));
+  message(game, `The ${monster.def.name.toLowerCase()} spots you sneaking and lunges before you can react!`, "warn");
+  monster.attackTimer = monster.def.speed;
+  damagePlayer(game, hit, monster);
+}
+/** Out of an aggressive monster's reach without being seen: Stealth XP (once in a while per monster), and a slim chance at the hood. */
+function slippedPast(game: Game, monster: Monster) {
+  const player = game.player, since = game.sneakingPast.get(monster.uid)!;
+  game.sneakingPast.delete(monster.uid);
+  if (game.tick - since < 2 || game.tick - (game.sneakPaid.get(monster.uid) ?? -1e9) < 150) return;
+  game.sneakPaid.set(monster.uid, game.tick);
+  addXp(game, "thieving", Math.round(6 + monster.def.level * 0.9));
+  player.stats.sneaks = (player.stats.sneaks ?? 0) + 1;
+  message(game, `You slip past the ${monster.def.name.toLowerCase()} unseen.`);
+  const ownsHood = [...player.inventory.map(slot => slot?.id), ...player.bank.map(slot => slot.id), player.equipment.head].includes(VEIL_HOOD);
+  if (!ownsHood && level(game, "thieving") >= 60 && monster.def.level >= 38 && game.rng() < 1 / 150) {
+    giveOrDrop(game, VEIL_HOOD); sound(game, "rare");
+    message(game, "In the shadows where the monster couldn't see you, you find a hood woven from the dark itself: a Veilweave hood!", "info");
+  }
 }
 export function toggleRun(game: Game) {
   const player = game.player;
@@ -1047,7 +1114,8 @@ function playerCombat(game: Game) {
   if (!monster) { player.combat = null; player.queuedSpell = null; return; }
   const spellId = player.queuedSpell ?? player.autocast, spell = spellId ? SPELLS.find(entry => entry.id === spellId && entry.target === "monster") ?? null : null;
   // A faith weapon hurts the undead more (more accurate, harder hitting).
-  const holy = !!weapon(player)?.equip?.holy, range = spell ? 0 : bowRange(game), boost = slayerBoost(game, monster.def.id) * (holy && monster.def.undead ? 1.2 : 1);
+  const holy = !!weapon(player)?.equip?.holy, range = spell ? 0 : bowRange(game);
+  let boost = slayerBoost(game, monster.def.id) * (holy && monster.def.undead ? 1.2 : 1);
   const within = (x: number, y: number) => spell ? chebyshev({ x, y }, monster) <= 8 && chebyshev({ x, y }, monster) >= 1
     : range ? reachGap({ x, y }, monster.x, monster.y, footprint(monster)) >= 1 && reachGap({ x, y }, monster.x, monster.y, footprint(monster)) <= range
     : adjacentTo(x, y, monster.x, monster.y, footprint(monster));
@@ -1059,6 +1127,12 @@ function playerCombat(game: Game) {
   if (player.attackTimer > 0) return;
   const unwoundable = slayerProblem(game, monster.def.id);
   if (unwoundable) { message(game, unwoundable, "warn"); player.combat = null; player.queuedSpell = null; return; }
+  // A sneak attack: striking a monster that hasn't noticed you, from sneaking, lands harder and truer (more with Stealth).
+  if (player.sneak && !monster.target) {
+    player.sneak = false; boost *= 1.25 + level(game, "thieving") * 0.0025;
+    addXp(game, "thieving", Math.round(8 + monster.def.level * 0.5));
+    message(game, `You strike the ${monster.def.name.toLowerCase()} from the shadows!`);
+  }
   monster.target = true;
   if (!spell && range) { rangedAttack(game, monster, boost); return; }
   if (spell) {
@@ -1199,6 +1273,7 @@ function die(game: Game) {
 function monsterTick(game: Game, monster: Monster) {
   const player = game.player;
   if (monster.dead) {
+    game.sneakingPast.delete(monster.uid);
     if (game.tick >= monster.respawnAt) {
       monster.dead = false; monster.hp = monster.def.hp; monster.curses = {}; monster.bornAt = game.tick; monster.x = monster.spawn.x; monster.y = monster.spawn.y; monster.prev = { ...monster.spawn }; monster.target = false;
     }
@@ -1206,8 +1281,15 @@ function monsterTick(game: Game, monster: Monster) {
   }
   if (monster.attackTimer > 0) monster.attackTimer--;
   const sameLayer = isUnderground(monster.spawn.y) === isUnderground(player.y) && realPoint(game.world, monster.spawn.x, monster.spawn.y).level === realPoint(game.world, player.x, player.y).level;
-  // Aggression: attack players whose combat level is at most twice the monster's.
-  if (!monster.target && monster.def.aggressive && sameLayer && chebyshev(monster, player) <= 4 && combatLevel(player) <= monster.def.level * 2) { monster.target = true; creature(game, monster, "aggro"); }
+  // Aggression: attack players whose combat level is at most twice the monster's, unless they're sneaking past unseen
+  // (each tick the monster may notice them) or veiled by the Veilweave hood (it can't).
+  // Light feet: with Stealth 50 they only notice you (not sneaking) from 3 tiles, with 80 from 2.
+  const stealth = level(game, "thieving"), reach = player.sneak ? 4 : stealth >= 80 ? 2 : stealth >= 50 ? 3 : 4;
+  const wouldAttack = !monster.target && monster.def.aggressive && sameLayer && chebyshev(monster, player) <= reach && combatLevel(player) <= monster.def.level * 2;
+  if (wouldAttack && veiled(game)) { /* It looks straight through you. */ }
+  else if (wouldAttack && player.sneak) { if (spots(game, monster)) caughtSneaking(game, monster); else if (!game.sneakingPast.has(monster.uid)) game.sneakingPast.set(monster.uid, game.tick); }
+  else if (wouldAttack) { game.sneakingPast.delete(monster.uid); monster.target = true; creature(game, monster, "aggro"); }
+  else if (!monster.target && game.sneakingPast.has(monster.uid)) slippedPast(game, monster);
   if (monster.target) {
     const leash = Math.max(Math.abs(monster.x - monster.spawn.x), Math.abs(monster.y - monster.spawn.y));
     if (!sameLayer || leash > monster.wander + 12 || chebyshev(monster, player) > 16) { monster.target = false; monster.retreat = 6; return; }
@@ -1317,8 +1399,8 @@ function upkeep(game: Game) {
     player.prayer = Math.max(0, player.prayer - drain);
     if (player.prayer <= 0) { player.prayers = []; message(game, "You have run out of faith. Pray at an altar to restore it.", "warn"); }
   }
-  const moving = player.path.length > 0 || !!game.held;
-  if (!(player.run && moving) || player.mount) player.energy = Math.min(100, player.energy + 0.25 + level(game, "agility") / 110);
+  const moving = player.path.length > 0 || !!game.held, spending = moving && (player.run || player.sneak);
+  if (!spending || player.mount) player.energy = Math.min(100, player.energy + 0.25 + level(game, "agility") / 110);
 }
 
 // ---------- Prayer, magic, style ----------
@@ -1710,7 +1792,7 @@ export function toggleMount(game: Game, id?: string) {
   if (!choice || !player.mounts.includes(choice)) { message(game, "You don't own a mount. The Friendhollow stables sell them.", "warn"); return; }
   const problem = rideProblem(game);
   if (problem) { message(game, problem, "warn"); return; }
-  player.mount = choice; player.lastMount = choice; player.emote = null;
+  player.mount = choice; player.lastMount = choice; player.emote = null; player.sneak = false;
   message(game, `You mount your ${mountDef(choice)!.name.toLowerCase()}.`); sound(game, "whinny");
 }
 /** A new mount from the stables (bought with RF); you ride it straight away where you can. */

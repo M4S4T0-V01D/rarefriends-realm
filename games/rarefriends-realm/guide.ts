@@ -81,6 +81,11 @@ export function skillGuide(skill: Skill): GuideEntry[] {
       for (const metal of METALS) { const recipe = boltRecipe(metal.id); add(recipe.level, `${metal.name} bolts`, `${recipe.xp / 12} XP each · feathers on unfeathered bolts from the anvil`, `${metal.id}_bolts`); }
       break;
     case "thieving":
+      add(1, "Sneak", "Walk softly past aggressive monsters: XP each time you slip by unseen. Spends run energy; Stealth makes it cheaper and you harder to spot");
+      add(1, "Sneak attack", "Strike a monster that hasn't noticed you: harder and truer, more with Stealth");
+      add(50, "Light-footed", "Aggressive monsters notice you from 3 tiles instead of 4, even when you aren't sneaking");
+      add(80, "Shadow-footed", "They notice you from only 2 tiles");
+      add(60, "Veilweave hood (rare)", "Found in the shadows while slipping past monsters of level 38+; wear it from 70 and stand still to vanish", "veilweave_hood");
       for (const npc of Object.values(NPCS)) if (npc.pickpocket) add(npc.pickpocket.level, `Pickpocket ${npc.name.toLowerCase()}`, `${npc.pickpocket.xp} XP · ${npc.pickpocket.coins[0]}–${npc.pickpocket.coins[1]} coins`);
       for (const [name, stall] of Object.entries(STALLS)) add(stall.level, `${name[0].toUpperCase()}${name.slice(1)} stall`, `${stall.xp} XP · the Oasis market`);
       break;

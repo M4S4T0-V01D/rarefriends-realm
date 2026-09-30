@@ -51,7 +51,7 @@ XP follows the classic curve (83 XP for level 2, 13,034,431 for 99), multiplied 
 | Mining | Clay/Pewter 1, Blackiron 15, Inkcoal 30, Gems 40, Moonsilver 55, Glimmer 70, Rarite 85 | 1/256 random gem per swing |
 | Smithing | Furnace (pewter 1, blackiron 15 at 60%, ashsteel 30, moonsilver 50, glimmer 70, rarite 85; the higher metals add 1–4 inkcoal), then the forged metals from monster materials (frostsilver 86, gloomsteel 88, wyrmscale 90, hollowsteel 92, cindersteel 94, ashenheart 96, with 4–6 inkcoal); and the anvil | Dagger, axe, sword, pickaxe, helm, sabre, gauntlets, boots, greaves, shield, cuirass in twelve metals; the forged metals also make a staff |
 | Crafting | Leather (gloves 1 … leggings 18), gems (moonstone 20, sagestone 27, rosestone 34) | Tessa tans hides for 2 coins each |
-| Thieving | Villagers 1, merchant 25, guards 40; stalls 5 / 20 / 42 / 75 | Failing a pickpocket stuns you |
+| Stealth | Sneak past aggressive monsters (XP when you slip out of reach unseen, spends run energy); villagers 1, merchant 25, guards 40; stalls 5 / 20 / 42 / 75; light feet at 50 and 80; the Veilweave hood (rare, 60 to find, 70 to wear) | Spotted while sneaking: an instant hit; failing a pickpocket stuns you |
 | Agility | Friendhollow course (5 obstacles, +40 XP a lap), stepping stones (20) | Agility restores run energy faster |
 | Slayer | Tasks from Warden Thistle (Market Street): XP equal to each creature's hitpoints | 10 points a task (50 every tenth). Mire crawlers need Slayer 10, frost wisps 30, gloom hounds 50 |
 
@@ -84,7 +84,7 @@ Burning Heart, Perfect Ink and Friend's Ward (blocks most melee damage).
 
 ## Family perks
 
-Your Friend's Generations family gives one perk: Skeleton (bones +50% Faith XP), Mask (better Thieving, shorter stuns),
+Your Friend's Generations family gives one perk: Skeleton (bones +50% Faith XP), Mask (better pickpocketing, shorter stuns, harder to spot while sneaking),
 Family (shops 10% cheaper), Cellular (HP regenerates twice as fast), Asymmetry (8% chance of a second resource),
 Hoverer (run drains 40% slower), Colossus (+1 melee max hit), Sparkling (gems three times as often), Hollow (+10% magic accuracy,
 1 in 5 spells keeps its sigils).

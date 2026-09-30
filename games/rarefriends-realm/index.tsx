@@ -11,7 +11,7 @@ import { FAMILY_NAMES, FAMILY_PERKS, MOUNTS, RELICS, RF_BUNDLES, SKILL_COLORS, S
 import { QUESTS, questPoints, MAX_QUEST_POINTS } from "./content.ts";
 import { TICK_MS, attackSpeed, combatLevel, createGame, giveOrDrop, message, totalLevel, type Game, type Projectile } from "./state.ts";
 import {
-  chooseOption, closeInterfaces, collectFromCasket, creditReferral, emoteProblem, performEmote, syncMonster, continueDialogue, grantBundle, menuFor, tailorChoices, unlockMusic, restore, serialize, setFollower, setHeld, setRelics, tick, toggleRun, toggleMount, grantMount, walkTo, type OwnedFriend, type Selection,
+  chooseOption, closeInterfaces, collectFromCasket, creditReferral, emoteProblem, performEmote, syncMonster, continueDialogue, grantBundle, menuFor, tailorChoices, unlockMusic, restore, serialize, setFollower, setHeld, setRelics, tick, toggleRun, toggleSneak, toggleMount, grantMount, walkTo, type OwnedFriend, type Selection,
 } from "./engine.ts";
 import { PITCH, RENDER_PROFILE, VIEW, ZOOM, addPrint, daylight, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
 import {
@@ -668,6 +668,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       }
       if (/^[1-5]$/.test(key) && state.dialogue) { chooseOption(state, Number(key) - 1); refresh(); return; }
       if (key === "r") { toggleRun(state); refresh(); return; }
+      if (key === "c") { toggleSneak(state); refresh(); return; }
       if (key === "h") { toggleMount(state); refresh(); return; }
       if (key === "m") { setModal(modal => modal === "map" ? null : "map"); return; }
       if (key === "enter") { (root.current?.querySelector("[data-chat]") as HTMLInputElement | null)?.focus(); event.preventDefault(); return; }
@@ -814,7 +815,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         {phase === "playing" && state && player && <>
           <div className="realm-hover" aria-hidden="true">{hover}</div>
           <div className="realm-topright">
-            <Orbs game={state} openMenu={(x, y, entries) => setMenu({ x, y, entries })} onRun={() => { toggleRun(state); refresh(); }} onRide={id => { toggleMount(state, id); refresh(); }} onMap={() => setModal("map")} onZoom={delta => setSettings({ ...settings, zoom: Math.max(ZOOM.min, Math.min(ZOOM.max, settings.zoom * (delta > 0 ? 1.15 : 0.87))) })}
+            <Orbs game={state} openMenu={(x, y, entries) => setMenu({ x, y, entries })} onRun={() => { toggleRun(state); refresh(); }} onSneak={() => { toggleSneak(state); refresh(); }} onRide={id => { toggleMount(state, id); refresh(); }} onMap={() => setModal("map")} onZoom={delta => setSettings({ ...settings, zoom: Math.max(ZOOM.min, Math.min(ZOOM.max, settings.zoom * (delta > 0 ? 1.15 : 0.87))) })}
               onRotate={delta => { const from = cameraGoal.current?.angle ?? camera.current.angle; cameraGoal.current = { angle: from + delta, pitch: cameraGoal.current?.pitch ?? camera.current.pitch }; }} />
             <div className="realm-minimap">
               <canvas ref={minimap} width={180} height={180} onClick={onMinimap}

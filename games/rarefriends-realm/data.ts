@@ -12,7 +12,7 @@ export type Skill = typeof SKILLS[number];
 export const SKILL_NAMES: Record<Skill, string> = {
   attack: "Attack", strength: "Strength", defence: "Defence", ranged: "Ranged", hitpoints: "Hitpoints", magic: "Magic", prayer: "Faith",
   woodcutting: "Woodcutting", fishing: "Fishing", cooking: "Cooking", firemaking: "Firemaking", mining: "Mining",
-  smithing: "Smithing", crafting: "Crafting", thieving: "Thieving", agility: "Agility", slayer: "Slayer",
+  smithing: "Smithing", crafting: "Crafting", thieving: "Stealth", agility: "Agility", slayer: "Slayer",
   sigilcraft: "Sigilcraft", fletching: "Fletching",
 };
 /** Each skill's colour: its mastery cape, and its trim. */
@@ -26,7 +26,7 @@ export const SKILL_COLORS: Record<Skill, [string, string]> = {
 /** Small glyphs for XP drops and the skills tab (drawn as text). */
 export const SKILL_ICONS: Record<Skill, string> = {
   attack: "⚔", strength: "✊", defence: "⛨", hitpoints: "♥", magic: "✦", prayer: "✚", woodcutting: "🪓", fishing: "🐟",
-  cooking: "🍳", firemaking: "🔥", mining: "⛏", smithing: "⚒", crafting: "✂", thieving: "✋", agility: "➶", ranged: "➹", slayer: "☠", sigilcraft: "◈", fletching: "➴",
+  cooking: "🍳", firemaking: "🔥", mining: "⛏", smithing: "⚒", crafting: "✂", thieving: "👣", agility: "➶", ranged: "➹", slayer: "☠", sigilcraft: "◈", fletching: "➴",
 };
 export const MAX_LEVEL = 99;
 /** The classic old-school curve: XP needed for each level, index = level. */
@@ -53,7 +53,7 @@ export const FAMILY_NAMES = ["Skeleton", "Mask", "Family", "Cellular", "Asymmetr
 export type FamilyPerk = { title: string; text: string };
 export const FAMILY_PERKS: readonly FamilyPerk[] = [
   { title: "Bone collector", text: "Burying bones gives 50% more Faith XP." },
-  { title: "Many faces", text: "Thieving succeeds more often and stuns are shorter." },
+  { title: "Many faces", text: "Pickpocketing succeeds more often, stuns are shorter, and you're harder to spot while sneaking." },
   { title: "Big family", text: "Shops charge you 10% less." },
   { title: "Regrowth", text: "Hitpoints regenerate twice as fast." },
   { title: "Lopsided luck", text: "8% chance to gather a second resource." },
@@ -236,7 +236,7 @@ const ITEMS: Item[] = [
     ["star_sigil", "Star sigil", "#e2d49e"], ["shade_sigil", "Shade sigil", "#b9a8c9"],
   ] as const).map(([id, name, color]) => ({ id, name, examine: "Used for magic spells.", value: { path_sigil: 60, hollow_sigil: 70, storm_sigil: 35, bloom_sigil: 45, star_sigil: 25, shade_sigil: 4, thought_sigil: 3 }[id as string] ?? 2, stackable: true, icon: { shape: "sigil" as const, color } })),
   { id: "sweetberry", name: "Sweetberries", examine: "A handful of pale berries. They used to be a bone.", value: 2, heal: 2, icon: { shape: "berries", color: "#c6bed4" } },
-  // Thieving loot
+  // Stealth loot (pickpocketing and stalls)
   { id: "silk", name: "Silk", examine: "It's a sheet of silk.", value: 30, icon: { shape: "silk", color: "#e9e1ef" } },
   // Quest items
   { id: "crypt_key", name: "Crypt key", examine: "A cold blackiron key from the Murkmire crypt.", value: 0, tradeable: false, icon: { shape: "key", color: "#8b8e92" } },
@@ -305,6 +305,8 @@ const OTHER_GEAR: Item[] = [
   { id: "moonstone_pendant", name: "Moonstone pendant", examine: "An enchanted moonstone amulet.", value: 1200, icon: { shape: "amulet", color: "#8fa3c9" }, equip: { slot: "neck", bonuses: { attack: 4 } } },
   { id: "friends_charm", name: "Old Friend's charm", examine: "A blessed symbol of the Old Friend.", value: 300, icon: { shape: "amulet", color: "#efede7" }, equip: { slot: "neck", bonuses: { prayer: 8 } } },
   { id: "team_cape", name: "Wanderer's cape", examine: "A plain travelling cape.", value: 50, icon: { shape: "cape", color: "#8f8a82" }, equip: { slot: "cape", bonuses: { defence: 1 } } },
+  { id: "veilweave_hood", name: "Veilweave hood", examine: "Woven from the dark between two torches. Stand still in it and you all but vanish.", value: 0, tradeable: false,
+    icon: { shape: "hood", color: "#2f2c3d", accent: "#8f8ab8" }, equip: { slot: "head", bonuses: { defence: 5, ranged: 3 }, requires: { thieving: 70 } } },
   { id: "hollow_cape", name: "Cape of the Hollow", examine: "Proof that you ended the Hollow King's reign.", value: 0, tradeable: false, icon: { shape: "cape", color: "#161616", accent: "#d8b6b4" }, equip: { slot: "cape", bonuses: { attack: 4, strength: 4, defence: 4, magic: 4, prayer: 4 } } },
   { id: "realm_crown", name: "Crown of the Realm", examine: "Worn by the Friend who ended the Hollow King's reign.", value: 0, tradeable: false, icon: { shape: "crown", color: "#e2d49e" }, equip: { slot: "head", bonuses: { defence: 6, prayer: 4 } } },
 ];
@@ -450,11 +452,11 @@ const OTHER_ITEMS: Item[] = [
   ...SKILLS.flatMap(skill => [false, true].map(trimmed => ({
     id: `${skill}_cape${trimmed ? "_t" : ""}`, name: `${SKILL_NAMES[skill]} mastery cape${trimmed ? " (t)" : ""}`, value: 0, price: 99_000, tradeable: false,
     examine: `The cape of a true master of ${SKILL_NAMES[skill]}.${trimmed ? " Trimmed: this Friend has mastered more than one skill." : ""}`,
-    icon: { shape: "cape" as const, color: SKILL_COLORS[skill][0], accent: trimmed ? SKILL_COLORS[skill][1] : undefined },
+    icon: { shape: "cape" as const, color: SKILL_COLORS[skill][0], accent: SKILL_COLORS[skill][1], kind: trimmed ? "mantle_t" : "mantle" },
     mastery: { skill, trimmed }, equip: { slot: "cape" as const, bonuses: MASTERY_BONUS, requires: { [skill]: 99 } },
   }))),
   { id: "grandmaster_cape", name: "Grandmaster's cape", examine: "Every skill, mastered. The Realm has run out of things to teach you.", value: 0, price: 1_700_000, tradeable: false,
-    icon: { shape: "cape", color: "#e2d49e", accent: "#d8b6b4" }, mastery: { skill: "all", trimmed: true },
+    icon: { shape: "cape", color: "#e2d49e", accent: "#d8b6b4", kind: "mantle_t" }, mastery: { skill: "all", trimmed: true },
     equip: { slot: "cape", bonuses: { attack: 8, strength: 8, defence: 14, ranged: 8, magic: 8, prayer: 8 } } },
   ...([["hollow_square", "Friendhollow"], ["emberforge", "Emberforge"], ["oasis", "Oasis"], ["frostpeak", "Frostpeak"], ["pier", "Pier"]] as const).map(([place, name]) => ({
     id: `tablet_${place}`, name: `${name} tablet`, examine: `Break it to travel to ${name === "Pier" ? "Pike's Pier" : name}.`, value: 120, stackable: true, tablet: place,

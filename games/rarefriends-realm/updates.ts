@@ -4,6 +4,19 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 40, date: "2026-09-30", title: "The Stealth update, lamplit rooms, mastery capes and a new fountain", items: [
+    "Thieving is now Stealth. Your levels and XP carry over, and pickpocketing and the Oasis stalls are part of it.",
+    "Sneak (the hooded button beside your run energy, or C): walk softly past aggressive monsters. Each tick they may notice you (their level against your Stealth, how close you are, whether you're moving). Slip out of reach unseen for Stealth XP. It spends run energy faster than running, less as your Stealth grows.",
+    "Get spotted and the monster lunges at once: you take a hit, the sneak ends and the fight is on.",
+    "Sneak attacks: strike a monster that hasn't noticed you and your first blow lands harder and truer.",
+    "Light feet: from Stealth 50 aggressive monsters notice you from 3 tiles instead of 4, and from 80, only 2.",
+    "The Veilweave hood: found very rarely in the shadows while slipping past monsters of level 38 and up (Stealth 60). Wear it from 70 and stand still for five seconds, and you fade almost to nothing; aggressive monsters look straight through you. Other players see you fade too.",
+    "Two new achievements: Ghost in the grass and Now you see me.",
+    "Every room in the Realm is lamplit: hanging lanterns in the houses and shops, iron chandeliers in the castle's halls, on every storey. Windows glow warm at night.",
+    "Mastery capes stand out as capes of accomplishment: a yoke across the shoulders in the skill's second colour, a band above the hem, the skill's emblem on the back in a roundel, and gold edges on trimmed capes. The Grandmaster's carries a gold star.",
+    "Hollow Square's fountain is rebuilt: a wide eight-sided stone basin of pixel water with wishing coins, a column and a bowl spilling over its lip, and a jet on top. It glows softly at night.",
+    "Fixed: shared fights and dropped items in the Greyhorn Highlands (the far east) now work with other players.",
+  ] },
   { id: 39, date: "2026-09-29", title: "Bank tabs fixed, and save codes that stay saved", items: [
     "Bank tabs no longer squash the bank: with several tabs the All items view lists each tab under its own heading and scrolls, and the shop's stock does the same.",
     "Restoring a save code saves it at once. Before, a second tab or window with the game open could quietly overwrite the restored adventure with its own.",

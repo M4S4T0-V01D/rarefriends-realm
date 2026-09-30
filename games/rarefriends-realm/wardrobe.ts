@@ -6,7 +6,7 @@
  */
 import { WARDROBE, isItem, item, type WardrobeId } from "./data.ts";
 import { Pixels, shadeHex } from "./pixel.ts";
-import { itemArt } from "./icons.ts";
+import { itemArt, skillEmblem } from "./icons.ts";
 import type { Facing } from "./state.ts";
 import { inPattern, isPattern, type ClothPattern } from "./patterns.ts";
 
@@ -38,7 +38,7 @@ function measure(rows: Mask) {
  * Your Friend's frame with its worn pieces, as a pixel canvas twice the sprite's resolution.
  * `phase` (0–3) animates cloth and wings; pass the walk frame so they sway with the stride.
  */
-type Piece = { id: string; kind: string; color: string; trim?: string; pattern?: ClothPattern; style?: string };
+type Piece = { id: string; kind: string; color: string; trim?: string; pattern?: ClothPattern; style?: string; mastery?: { skill: string; trimmed: boolean } };
 /**
  * Something held and moving (a weapon mid-swing, an axe chopping, a rod cast out, a fish over the fire): the item and its
  * angle from the resting pose, in radians, positive swinging forward (the way you face).
@@ -52,7 +52,7 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
   // An equipped cape (a mastery cape, the Cape of the Hollow…) is worn over any wardrobe cape, with its trim.
   // A quiver is worn on the back the same way, over a wardrobe cape.
   const gear: Piece[] = worn.filter(id => isItem(id) && item(id).equip?.slot === "cape").map(id => { const icon = item(id).icon;
-    return { id, kind: icon.shape === "quiver" ? "quiver" : icon.shape === "satchel" ? "satchel" : "cape", color: icon.color, trim: icon.accent, pattern: isPattern(icon.kind) ? icon.kind : undefined }; });
+    return { id, kind: icon.shape === "quiver" ? "quiver" : icon.shape === "satchel" ? "satchel" : "cape", color: icon.color, trim: icon.accent, pattern: isPattern(icon.kind) ? icon.kind : undefined, mastery: item(id).mastery }; });
   // Headgear you wear (a helm, hood, hat or crown) shows too, unless a wardrobe hat is on top.
   const wardrobeHat = WARDROBE.some(piece => worn.includes(piece.id) && piece.kind === "hat");
   const headgear: Piece[] = wardrobeHat ? [] : worn.filter(id => isItem(id) && item(id).equip?.slot === "head").slice(0, 1).map(id => {
@@ -128,6 +128,27 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
   };
   // A patterned cape's second colour is its pattern, not a trim.
   const capeTrim = cape && !cape.pattern ? cape.trim : undefined;
+  /**
+   * A mastery cape seen from behind: gold edges when trimmed (white on the gold Grandmaster's), and the roundel: the
+   * skill's picture (a star for the Grandmaster's) on parchment, ringed in ink and the cape's second colour.
+   */
+  const masteryBack = (cape: Piece, hemL: number, hemR: number, shoulders: readonly [number, number]) => {
+    const edge = cape.color === "#e2d49e" ? "#f7f5f0" : "#e2d49e";
+    if (cape.mastery!.trimmed) {
+      p.line(hemL, feet - 1, hemR, feet - 1, edge);
+      p.line(shoulders[0], neckY - 1, hemL, feet - 1, edge); p.line(shoulders[1] - 1, neckY - 1, hemR - 1, feet - 1, edge);
+    }
+    const width = hemR - hemL, size = Math.max(9, Math.min(13, Math.round(width * 0.32))), r = size / 2 + 1.5;
+    const ex = Math.round((hemL + hemR) / 2), ey = Math.round(neckY + (feet - neckY) * 0.56);
+    p.disc(ex, ey, r + 1, r + 1, cape.trim ?? edge, INK); p.disc(ex, ey, r, r, "#f3eee2", null);
+    if (cape.mastery!.skill === "all") {
+      const star = Array.from({ length: 10 }, (_, i) => { const a = -Math.PI / 2 + i * Math.PI / 5, k = i % 2 ? r * 0.42 : r * 0.9; return [ex + Math.cos(a) * k, ey + Math.sin(a) * k] as [number, number]; });
+      p.poly(star, "#d9a93f", INK);
+      return;
+    }
+    const emblem = skillEmblem(cape.mastery!.skill as Parameters<typeof skillEmblem>[0], size), ox = ex - Math.floor(emblem.w / 2), oy = ey - Math.floor(emblem.h / 2);
+    for (let y = 0; y < emblem.h; y++) for (let x = 0; x < emblem.w; x++) { const c = emblem.get(x, y); if (c) p.set(ox + x, oy + y, c); }
+  };
   if (cape && !back) {
     const dark = shadeHex(cape.color, -0.12), trail = side ? -side * 5 : 0;
     const top = bodySpan(m.neck + 1), shoulders = [X(top.min) - 1, X(top.max) + 2] as const;
@@ -223,7 +244,8 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
     cloth([[shoulders[0], neckY - 1], [shoulders[1], neckY - 1], [hemR, feet - 1], [hemL, feet - 1]]);
     for (let fold = 1; fold < 5; fold++) { const t = fold / 5; p.line(shoulders[0] + (shoulders[1] - shoulders[0]) * t, neckY + 1, hemL + (hemR - hemL) * t, feet - 2, dark); }
     p.rect(shoulders[0], neckY - 1, shoulders[1] - shoulders[0], 2, shadeHex(cape.color, 0.08));
-    if (capeTrim) {
+    if (cape.mastery) masteryBack(cape, hemL, hemR, shoulders);
+    else if (capeTrim) {
       // Trimmed edges, and the emblem on the back.
       p.line(hemL, feet - 1, hemR, feet - 1, capeTrim); p.line(hemL, feet - 2, hemR, feet - 2, capeTrim);
       p.line(shoulders[0], neckY - 1, hemL, feet - 1, capeTrim); p.line(shoulders[1] - 1, neckY - 1, hemR - 1, feet - 1, capeTrim);

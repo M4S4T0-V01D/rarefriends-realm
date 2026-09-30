@@ -52,6 +52,8 @@ export type Recipe = {
 export type Player = {
   x: number; y: number; prev: Point; heading: Point; moved: number;
   path: Point[]; run: boolean; energy: number;
+  /** Sneaking (Stealth): walking softly past aggressive monsters, on run energy. Not saved. */
+  sneak: boolean;
   xp: Record<Skill, number>; hp: number; prayer: number;
   inventory: (Slot | null)[]; equipment: Partial<Record<EquipSlot, string>>; bank: BankSlot[];
   style: CombatStyle; autocast: string | null; prayers: string[];
@@ -138,6 +140,8 @@ export type Game = {
   overheads: Map<number, { text: string; until: number }>;
   /** Your owned-Friend follower, walking the tiles you leave behind. */
   pet: Pet | null; trail: Point[];
+  /** Stealth: aggressive monsters you're slipping past unseen (uid → tick they came in range), and when each last paid XP. */
+  sneakingPast: Map<number, number>; sneakPaid: Map<number, number>;
 };
 export type Pet = { x: number; y: number; prev: Point; heading: Point; moved: number };
 export type DialogueLine = { who: "npc" | "player"; text: string; npc?: string };
@@ -168,7 +172,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
   ["pewter_axe", "pewter_pickaxe", "small_net", "tinderbox", "pewter_dagger", "minnows", "minnows", "bread"].forEach((id, index) => { inventory[index] = { id, n: 1 }; });
   inventory[8] = { id: "coins", n: 25 };
   return {
-    x: spawn.x, y: spawn.y, prev: { ...spawn }, heading: { x: 1, y: 1 }, moved: 0, path: [], run: false, energy: 100,
+    x: spawn.x, y: spawn.y, prev: { ...spawn }, heading: { x: 1, y: 1 }, moved: 0, path: [], run: false, energy: 100, sneak: false,
     xp, hp: 10, prayer: 1, inventory, equipment: {}, bank: [{ id: "coins", n: 50 }],
     style: "accurate", autocast: null, prayers: [], target: null, activity: null, combat: null,
     attackTimer: 0, eatTimer: 0, stunned: 0, regenTimer: 0, quests: {}, questData: {},
@@ -182,7 +186,7 @@ export function createGame(options: { familyId: number; friendId: number; rng?: 
   const world = options.world ?? realmWorld(), rng = options.rng ?? Math.random;
   const game: Game = {
     world, tick: 0, player: createPlayer(world, options.familyId, options.friendId), monsters: [], npcs: [], ground: [], fires: [], shopStock: {},
-    depleted: new Map(), messages: [], events: [], rng, nextUid: 1, dialogue: null, ui: { shop: null, bank: false, production: null, lamp: null },
+    depleted: new Map(), sneakingPast: new Map(), sneakPaid: new Map(), messages: [], events: [], rng, nextUid: 1, dialogue: null, ui: { shop: null, bank: false, production: null, lamp: null },
     held: null, autoRetaliate: true, playTicks: 0, overheads: new Map(), pet: null, trail: [],
   };
   for (const spawn of world.spawns) {

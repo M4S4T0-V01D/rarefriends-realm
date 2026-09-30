@@ -20,7 +20,7 @@ import {
 } from "./state.ts";
 import {
   bestArrow, bowRange, emoteProblem, performEmote, applyReferral, shopBuys, buy, buyPrice, canCast, capeProblem, castSpell, rangedMaxHit, rubLamp, chooseOption, continueDialogue, dialogueAtOptions, itemOptions, playerMaxHit, recipeProblem, sell, sellPrice,
-  castOnItem, satchelCheck, satchelEmpty, satchelFill, setFollower, setPet, setStyle, startProduction, swapSlots, toggleRun, togglePrayer, toggleWorn, unequip, useItemOnItem, type OwnedFriend, type Selection,
+  castOnItem, satchelCheck, satchelEmpty, satchelFill, setFollower, setPet, setStyle, startProduction, swapSlots, toggleRun, toggleSneak, togglePrayer, toggleWorn, unequip, useItemOnItem, type OwnedFriend, type Selection,
 } from "./engine.ts";
 import { friendRows, renderWorldMap } from "./render.ts";
 import { isUnderground, realPoint } from "./world.ts";
@@ -932,7 +932,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
       <ul className="realm-help">
         <li><b>Left-click</b> does the first option (shown top-left). <b>Right-click</b> (or long-press) for every option.</li>
         <li><b>WASD</b> walks. <b>← →</b> turn the camera, <b>↑ ↓</b> tilt it from overhead right down to ground level; or <b>drag with the scroll wheel held</b>. Scroll zooms in close (up to 3×). Click the <b>compass</b> to face north.</li>
-        <li><b>R</b> toggles run. <b>Scroll</b> zooms. <b>M</b> opens the world map.</li>
+        <li><b>R</b> toggles run, <b>C</b> sneaks. <b>Scroll</b> zooms. <b>M</b> opens the world map.</li>
         <li><b>F1–F9</b> or the icons switch tabs. <b>Enter</b> to chat. <b>Space</b> continues dialogue, <b>1–5</b> pick options. <b>Esc</b> closes.</li>
         <li><b>Use</b> an item, then click another item or object: raw fish on a range, tinderbox on logs, needle on leather, chisel on a gem.</li>
         <li>Train <b>15 skills</b> to 99 on the old-school XP curve (Realm rate ×3). Your Friend's family adds a perk.</li>
@@ -943,7 +943,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
     </Modal>
   );
 }
-export function Orbs({ game, onRun, onRide, onMap, onZoom, onRotate, openMenu }: { game: Game; onRun: () => void; onRide?: (id?: string) => void; onMap: () => void; onZoom: (delta: number) => void; onRotate: (delta: number) => void; openMenu?: OpenMenu }) {
+export function Orbs({ game, onRun, onSneak, onRide, onMap, onZoom, onRotate, openMenu }: { game: Game; onRun: () => void; onSneak: () => void; onRide?: (id?: string) => void; onMap: () => void; onZoom: (delta: number) => void; onRotate: (delta: number) => void; openMenu?: OpenMenu }) {
   const player = game.player, hpFraction = player.hp / maxHp(player), prayerFraction = player.prayer / Math.max(1, maxPrayer(player));
   const orbMenu = (label: string): MenuEntry[] => label === "Hitpoints" ? [{ verb: "Check", noun: "Hitpoints", run: () => message(game, `Hitpoints: ${player.hp} / ${maxHp(player)}.`) }]
     : label === "Faith" ? [{ verb: "Deactivate", noun: "Prayers", run: () => { player.prayers = []; } }, { verb: "Check", noun: "Faith", run: () => message(game, `Faith: ${Math.ceil(player.prayer)} / ${maxPrayer(player)}.`) }]
@@ -957,7 +957,12 @@ export function Orbs({ game, onRun, onRide, onMap, onZoom, onRotate, openMenu }:
     <div className="realm-orbs">
       {orb("Hitpoints", player.hp, hpFraction, "#cf6e6e", orbArt("hitpoints"))}
       {orb("Faith", Math.ceil(player.prayer), prayerFraction, "#9fb4d0", orbArt("prayer"))}
-      {orb(player.run ? "Run: on" : "Run: off", Math.floor(player.energy), player.energy / 100, player.run ? "#e2c46a" : "#9a968f", orbArt(player.run ? "run" : "walk"), onRun, player.run)}
+      <div className="realm-orb-row">
+        {/* Sneak (Stealth): beside run energy, which it spends. */}
+        <button type="button" className="realm-sneak" onClick={onSneak} aria-pressed={player.sneak} aria-label={player.sneak ? "Stop sneaking (C)" : "Sneak (C)"} title={player.sneak ? "Stop sneaking (C)" : "Sneak (C): slip past aggressive monsters"}
+          {...rightClick(openMenu, () => [{ verb: player.sneak ? "Stop-sneaking" : "Sneak", noun: "", run: onSneak }])}><PixelIcon art={orbArt("sneak")} size={16} /></button>
+        {orb(player.run ? "Run: on" : "Run: off", Math.floor(player.energy), player.energy / 100, player.sneak ? "#8f8ab8" : player.run ? "#e2c46a" : "#9a968f", orbArt(player.run ? "run" : "walk"), onRun, player.run)}
+      </div>
       {onRide && player.mounts.length > 0 && (() => { const shown = mountDef(player.mount ?? player.lastMount ?? player.mounts[0])!;
         return <button type="button" className="realm-orb map ride" onClick={() => onRide()} aria-pressed={!!player.mount} aria-label={player.mount ? `Dismount (H)` : `Ride your ${shown.name.toLowerCase()} (H)`} title={player.mount ? "Dismount (H)" : "Ride (H)"}
           {...rightClick(openMenu, () => [...player.mounts.map(id => ({ verb: player.mount === id ? "Dismount" : "Ride", noun: mountDef(id)!.name, run: () => onRide(id) }))])}><PixelIcon art={mountArt(shown.coat, "side", -1, true)} size={26} /></button>; })()}

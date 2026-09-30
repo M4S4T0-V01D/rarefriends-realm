@@ -25,6 +25,8 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   { id: "old_cinder", group: "Combat", icon: "🜂", name: "Cinder quencher", text: "Defeat Old Cinder.", check: g => kills(g, "emberwyrm") >= 1 },
   { id: "kingslayer", group: "Combat", icon: "♛", name: "Kingslayer", text: "End the Hollow King's reign.", check: g => kills(g, "hollow_king") >= 1 },
   { id: "colossus", group: "Combat", icon: "☠", name: "Colossus toppler", text: "Help bring down the Ashen Colossus.", check: g => kills(g, "ashen_colossus") >= 1 },
+  { id: "ghost", group: "Combat", icon: "👣", name: "Ghost in the grass", text: "Slip past 50 aggressive monsters unseen while sneaking.", check: g => stat(g, "sneaks") >= 50 },
+  { id: "veilweave", group: "Collecting", icon: "◐", name: "Now you see me", text: "Find the Veilweave hood in the shadows.", check: g => owns(g, id => id === "veilweave_hood") },
   { id: "quester", group: "Quests", icon: "✎", name: "Quest starter", text: "Complete a quest.", check: g => questPoints(g) >= 1 },
   { id: "hero", group: "Quests", icon: "✎", name: "Hero of the Realm", text: "Complete every quest.", check: g => questPoints(g) >= MAX_QUEST_POINTS },
   { id: "saddle_up", group: "Collecting", icon: "♞", name: "Saddle up", text: "Buy a mount at the Friendhollow stables.", check: g => g.player.mounts.length >= 1 },

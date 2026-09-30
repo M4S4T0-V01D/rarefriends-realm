@@ -20,7 +20,7 @@ const INTRO: Record<Skill, string> = {
   mining: "Mine ore in the Ashen Hills, at the Emberforge and on Frostpeak. Better pickaxes mine faster.",
   smithing: "Smelt ore at a furnace, then hammer bars into weapons, armour and arrowheads at an anvil.",
   crafting: "Stitch leather and drakehide into armour, and cut gems with a chisel.",
-  thieving: "Pickpocket townsfolk and steal from the Oasis market stalls. Failing stuns you.",
+  thieving: "Sneak past aggressive monsters unseen (a new toggle beside Run), strike from the shadows, pickpocket townsfolk and steal from the Oasis market stalls. Get caught and it hurts.",
   agility: "Obstacle courses and shortcuts. Agility restores run energy faster.",
   slayer: "Warden Thistle gives kill tasks; kills on task give Slayer XP, and finished tasks give points.",
 };

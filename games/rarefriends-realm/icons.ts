@@ -328,6 +328,11 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
         line(p, [[13, 6], [9, 25]], dark); line(p, [[19, 6], [23, 25]], dark); line(p, [[16, 6], [16, 27]], dark);
         part(p, box(9, 3, 14, 3), shadeHex(color, 0.12), "cloth");
         if (accent && !pattern) { line(p, [[4, 27], [10, 25], [16, 28], [22, 25], [28, 27]], accent, 2); part(p, disc(16, 15, 3), accent, "metal"); }
+        // A mastery cape: the roundel on its back (and a gold hem when trimmed).
+        if (pattern === "mantle" || pattern === "mantle_t") {
+          part(p, disc(16, 16, 4.2), "#f3eee2", "metal"); part(p, disc(16, 16, 2), accent ?? GOLD_C, "gem");
+          if (pattern === "mantle_t") line(p, [[4, 27], [10, 25], [16, 28], [22, 25], [28, 27]], color === "#e2d49e" ? "#f7f5f0" : GOLD_C, 2);
+        }
         break;
       }
       case "amulet":
@@ -656,7 +661,7 @@ const SKILL_PAINTERS: Record<Skill, Painter> = {
   mining: p => { p.line(5, 15, 10, 5, INK, 3); p.line(5, 15, 10, 5, WOOD, 1); p.poly([[2, 6], [9, 2], [16, 5], [10, 6]], STEEL); },
   smithing: p => { p.poly([[2, 8], [15, 8], [13, 11], [11, 11], [11, 14], [6, 14], [6, 11], [4, 11]], "#8b8e92"); p.line(10, 6, 14, 2, INK, 2); p.rect(8, 1, 5, 3, STEEL); },
   crafting: p => { p.line(3, 15, 14, 3, INK, 2); p.line(3, 15, 14, 3, STEEL); p.disc(13, 4, 1.5, 1.5, PAPER); p.line(6, 5, 10, 13, ROSE, 2); },
-  thieving: p => { p.poly([[4, 16], [3, 8], [5, 7], [6, 11], [6, 4], [8, 4], [8, 10], [9, 3], [11, 3], [11, 10], [12, 5], [14, 6], [13, 16]], "#e8d4c0"); },
+  thieving: p => { p.poly([[8, 1], [13, 5], [14, 15], [2, 15], [3, 5]], "#4a4660"); p.poly([[8, 5], [11, 8], [10, 12], [6, 12], [5, 8]], "#1b1a22", null); p.set(7, 8, "#e8e2ff"); p.set(9, 8, "#e8e2ff"); },
   agility: p => { p.poly([[2, 11], [10, 11], [11, 7], [13, 7], [15, 14], [2, 14]], "#b89c86"); p.line(3, 9, 7, 5, SAGE, 2); p.line(6, 5, 9, 3, SAGE, 2); },
   ranged: p => { p.polyline([[5, 1], [10, 4], [12, 9], [10, 14], [5, 16]], INK, 3); p.polyline([[5, 1], [10, 4], [12, 9], [10, 14], [5, 16]], WOOD); p.line(5, 2, 5, 15, PAPER); p.line(2, 12, 15, 5, INK, 2); p.line(2, 12, 15, 5, "#c8c5be"); p.poly([[14, 3], [17, 3], [16, 7]], STEEL); },
   sigilcraft: p => { p.poly([[8.5, 1], [15, 6], [13, 15], [4, 15], [2, 6]], "#d9d4e6"); p.disc(8.5, 9, 3, 3, "#6f7ea6"); p.set(8, 8, "#ffffff"); },
@@ -749,10 +754,11 @@ const SKILL24: Record<Skill, Painter> = {
     part(p, stroke([[14, 21], [22, 3]], 1.4), STEEL_C, "metal"); line(p, [[15, 17], [19, 12], [17, 9]], "#cf6e6e");
   },
   thieving: p => {
-    // A burglar's mask.
-    part(p, poly([[2, 9], [6, 6], [12, 8], [18, 6], [22, 9], [21, 15], [17, 17], [12, 15], [7, 17], [3, 15]]), "#2e2c2a", "cloth");
-    part(p, all(disc(7.5, 11.5, 2.4, 2), disc(16.5, 11.5, 2.4, 2)), "#f7f5f0", "flat");
-    line(p, [[2, 11], [0, 13]], "#2e2c2a", 2); line(p, [[22, 11], [24, 13]], "#2e2c2a", 2);
+    // Stealth: a deep hood, its face lost in shadow but for two glinting eyes.
+    part(p, poly([[12, 1], [18, 5], [21, 12], [22, 22], [2, 22], [3, 12], [6, 5]]), "#4a4660", "cloth");
+    part(p, poly([[12, 6], [16, 9], [17, 16], [12, 19], [7, 16], [8, 9]]), "#1b1a22", "flat");
+    dot(p, 10, 13, "#e8e2ff"); dot(p, 14, 13, "#e8e2ff");
+    line(p, [[5, 21], [9, 14]], shadeHex("#4a4660", -0.25)); line(p, [[19, 21], [15, 14]], shadeHex("#4a4660", -0.25));
   },
   agility: p => {
     // A winged running boot.
@@ -767,6 +773,29 @@ const SKILL24: Record<Skill, Painter> = {
     line(p, [[2, 22], [22, 2]], "#c24a4a", 2);
   },
 };
+/**
+ * A skill's picture shrunk to `size` pixels for a mastery cape's roundel: each pixel takes the commonest colour of the
+ * part of the 24-pixel icon it covers (if enough of it is drawn), then gets an ink edge.
+ */
+const emblems = new Map<string, Pixels>();
+export function skillEmblem(skill: Skill, size: number): Pixels {
+  const key = `${skill}:${size}`, cached = emblems.get(key);
+  if (cached) return cached;
+  const source = new Pixels(24, 24); SKILL24[skill](source);
+  const out = new Pixels(size + 2, size + 2), step = 24 / size;
+  for (let j = 0; j < size; j++) for (let i = 0; i < size; i++) {
+    const counts = new Map<number, number>(); let drawn = 0, cells = 0;
+    for (let y = Math.floor(j * step); y < Math.ceil((j + 1) * step); y++) for (let x = Math.floor(i * step); x < Math.ceil((i + 1) * step); x++) {
+      cells++; const c = source.get(x, y); if (!c) continue; drawn++; counts.set(c, (counts.get(c) ?? 0) + 1);
+    }
+    if (drawn * 2.2 < cells) continue;
+    let best = 0, bestN = 0; for (const [c, n] of counts) if (n > bestN) { best = c; bestN = n; }
+    out.set(i + 1, j + 1, best);
+  }
+  out.outline();
+  emblems.set(key, out);
+  return out;
+}
 export const skillArt = (skill: Skill) => pixelArt(`skill24:${skill}`, 24, 24, p => { SKILL24[skill](p); p.outline(); p.halo(); });
 export type TabIcon = "combat" | "skills" | "quests" | "inventory" | "equipment" | "prayer" | "magic" | "friends" | "settings" | "emotes";
 /** Side-panel tab icons: 24 pixels, shaded like the items, each a distinct silhouette so they read at a glance. */
@@ -844,11 +873,12 @@ const TAB_PAINTERS: Record<TabIcon, Painter> = {
   },
 };
 export const tabArt = (tab: TabIcon) => pixelArt(`tab24:${tab}`, 24, 24, p => { TAB_PAINTERS[tab](p); p.outline(); p.halo(); });
-export type OrbIcon = "hitpoints" | "prayer" | "run" | "walk" | "map";
+export type OrbIcon = "hitpoints" | "prayer" | "run" | "walk" | "map" | "sneak";
 const ORB_PAINTERS: Record<OrbIcon, Painter> = {
   hitpoints: SKILL_PAINTERS.hitpoints, prayer: SKILL_PAINTERS.prayer,
   run: p => { p.poly([[3, 12], [9, 12], [10, 8], [13, 7], [15, 13], [15, 15], [3, 15]], GOLD); p.line(4, 10, 8, 6, SAGE, 2); p.line(7, 6, 10, 4, SAGE, 2); },
   walk: p => { p.poly([[3, 12], [9, 12], [10, 8], [13, 7], [15, 13], [15, 15], [3, 15]], "#9a968f"); },
+  sneak: p => { p.poly([[8, 1], [13, 5], [14, 15], [2, 15], [3, 5]], "#8f8ab8"); p.poly([[8, 5], [11, 8], [10, 12], [6, 12], [5, 8]], "#1b1a22", null); p.set(7, 8, "#f2eeff"); p.set(9, 8, "#f2eeff"); },
   map: p => { p.poly([[2, 4], [6, 2], [11, 4], [16, 2], [16, 14], [11, 16], [6, 14], [2, 16]], "#efe3c4"); p.line(6, 2, 6, 14, INK); p.line(11, 4, 11, 16, INK); p.disc(9, 9, 1.5, 1.5, "#cf6e6e", null); },
 };
 export const orbArt = (orb: OrbIcon) => icon16(`orb:${orb}`, ORB_PAINTERS[orb]);

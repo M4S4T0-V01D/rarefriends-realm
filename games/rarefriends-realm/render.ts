@@ -7,14 +7,14 @@ import { ROCKS, isItem, item, levelForXp, mountDef, petDef, type Coat, type Icon
 const isPet = (id: string) => !!petDef(id);
 import { NPCS } from "./content.ts";
 import { TICK_MS, attackSpeed, riding, type Facing, type Game, type Monster, type Npc, type Projectile } from "./state.ts";
-import { npcOverhead, type Pick } from "./engine.ts";
+import { npcOverhead, veiled, type Pick } from "./engine.ts";
 import { FLOOR_Y, REGIONS, STOREY, T, W, H, complexAt, cornerHeight, floorAt, groundHeight, inBounds, isUnderground, objectAtTile, onLevel, realPoint, type Building, type Floor, type World, type WorldObject } from "./world.ts";
 import { itemArt } from "./icons.ts";
 import type { PeerView } from "./social.ts";
 import type { Strike, Weather } from "./weather.ts";
 import { emoteMotion, emoteParticles, type Motion } from "./emotes.ts";
 import { drawPixels, pixelArt, shadeHex } from "./pixel.ts";
-import { TEX_PER_HEIGHT, TEX_PER_TILE, beginTextures, groundTexture, textureStats, shingleTexture, texturedQuad, texturedTriangle, wallTexture, type GroundStyle, type WallStyle } from "./textures.ts";
+import { TEX_PER_HEIGHT, TEX_PER_TILE, beginTextures, groundTexture, textureStats, shingleTexture, texturedQuad, texturedTriangle, wallTexture, PANE, type GroundStyle, type WallStyle } from "./textures.ts";
 import { campfireLogs, decorArt, fireArt, rockArt, treeArt } from "./scenery.ts";
 import { spellArt } from "./spellart.ts";
 import { SADDLE, mountArt, type MountView } from "./mountart.ts";
@@ -247,7 +247,14 @@ function box(ctx: CanvasRenderingContext2D, camera: Camera, x: number, y: number
     const fill = rx - ry < 0 ? left : right, corners = [p(ax, ay, lift), p(bx, by, lift), p(bx, by, lift + h), p(ax, ay, lift + h)] as const;
     if (pattern && texturesOn && fill.startsWith("#") && Math.abs(corners[1][0] - corners[0][0]) + Math.abs(corners[3][1] - corners[0][1]) > 10) {
       const length = Math.hypot(bx - ax, by - ay);
-      texturedQuad(ctx, wallTexture(pattern, fill, variant), q(ax, ay, lift + h), q(bx, by, lift + h), q(ax, ay, lift), length * TEX_PER_TILE, h * TEX_PER_HEIGHT);
+      const o = q(ax, ay, lift + h), across = q(bx, by, lift + h), down = q(ax, ay, lift);
+      texturedQuad(ctx, wallTexture(pattern, fill, variant), o, across, down, length * TEX_PER_TILE, h * TEX_PER_HEIGHT);
+      // A window lit from inside: where its glass landed on screen, so the light pass can let it shine.
+      if (!bare && (pattern === "window_lit" || pattern === "timber_window_lit")) {
+        const cols = Math.max(1, Math.round(length * TEX_PER_TILE)), rows = Math.max(1, Math.min(24, Math.round(h * TEX_PER_HEIGHT))), top = PANE.top(pattern === "timber_window_lit");
+        const at = (u: number, v: number): [number, number] => [o.x + (across.x - o.x) * u / cols + (down.x - o.x) * v / rows, o.y + (across.y - o.y) * u / cols + (down.y - o.y) * v / rows];
+        if (rows >= top + PANE.h) emitted.push([at(PANE.x0, top), at(PANE.x0 + PANE.w, top), at(PANE.x0 + PANE.w, top + PANE.h), at(PANE.x0, top + PANE.h)]);
+      }
     } else poly(ctx, corners, fill, null);
     outline(corners);
   }
@@ -574,6 +581,118 @@ function drawBankBooth(ctx: CanvasRenderingContext2D, scene: Scene, object: Worl
   for (let i = 0; i < 3; i++) ellipse(ctx, coins.x, coins.y - i * 1.4 * z, 3 * z, 1.5 * z, i === 2 ? "#f2e28f" : brass, INK, 0.8);
   return hit(50);
 }
+// ---------- The fountain in Hollow Square ----------
+/** Pixel water for the fountain, 32 × 32 in four frames: rippling blues, light caustics that drift, and wishing coins on the bottom. */
+const fountainWater = (frame: number) => pixelArt(`fountain-water:${frame}`, 32, 32, p => {
+  const n = (x: number, y: number, s: number) => { let h = Math.imul(x * 374761393 + y * 668265263 + s * 1442695041, 1274126177); h ^= h >>> 13; return ((Math.imul(h, 1103515245) >>> 0) % 1000) / 1000; };
+  for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
+    const d = Math.hypot(x - 15.5, y - 15.5), wave = Math.sin(d * 0.9 - frame * Math.PI / 2) + Math.sin((x + y) * 0.35 + frame * 0.8) * 0.5;
+    p.set(x, y, wave > 1.05 ? "#bcd6ec" : wave > 0.45 ? "#8fb5d6" : wave > -0.6 ? "#7aa3c9" : "#6a93bc");
+  }
+  // Coins tossed in for luck, and a glint or two on the surface.
+  for (const [x, y] of [[7, 20], [22, 9], [24, 23], [11, 8], [18, 26]] as const) { p.set(x, y, "#d9a93f"); p.set(x + 1, y, "#f2d27a"); }
+  for (let i = 0; i < 5; i++) { const x = Math.floor(n(i, frame, 3) * 30) + 1, y = Math.floor(n(i, frame, 7) * 30) + 1; p.set(x, y, "#ffffff"); p.set(x + 1, y, "#e6f2fb"); }
+});
+/** An eight-sided ring of points around (cx, cy), in world tiles. */
+const octagonAt = (cx: number, cy: number, r: number): [number, number][] => Array.from({ length: 8 }, (_, i) => { const a = Math.PI / 8 + i * Math.PI / 4; return [cx + Math.cos(a) * r, cy + Math.sin(a) * r]; });
+/**
+ * The sides of an eight-sided prism that face the camera, in stone texture: its outside (`inward` false), or the inside of
+ * its far wall (`inward` true, a basin seen over its rim).
+ */
+function prismSides(ctx: CanvasRenderingContext2D, camera: Camera, pts: [number, number][], lift: number, h: number, left: string, right: string, inward: boolean, cx: number, cy: number) {
+  const q = (px: number, py: number, lz: number) => toScreen(camera, px, py, lz);
+  const edges = new Path2D();
+  for (let i = 0; i < pts.length; i++) {
+    const [ax, ay] = pts[i], [bx, by] = pts[(i + 1) % pts.length], mx = (ax + bx) / 2 - cx, my = (ay + by) / 2 - cy, len = Math.hypot(mx, my) || 1;
+    const nx = (inward ? -mx : mx) / len, ny = (inward ? -my : my) / len, { rx, ry } = rotate(camera, nx, ny);
+    if (rx + ry <= 0.001) continue;
+    const fill = rx - ry < 0 ? left : right, o = q(ax, ay, lift + h), across = q(bx, by, lift + h), down = q(ax, ay, lift), foot = q(bx, by, lift);
+    const corners = [[down.x, down.y], [foot.x, foot.y], [across.x, across.y], [o.x, o.y]] as const;
+    if (texturesOn && Math.abs(across.x - o.x) + Math.abs(down.y - o.y) > 8) texturedQuad(ctx, wallTexture("brick", fill, i % 4), o, across, down, Math.hypot(bx - ax, by - ay) * TEX_PER_TILE, h * TEX_PER_HEIGHT);
+    else poly(ctx, corners, fill, null);
+    corners.forEach(([px, py], k) => k ? edges.lineTo(px, py) : edges.moveTo(px, py)); edges.closePath();
+  }
+  if (!bare) { ctx.strokeStyle = INK; ctx.lineWidth = 1; ctx.stroke(edges); }
+}
+/** A flat ring (a basin's or bowl's rim) between two octagons at one height. */
+function rimTop(ctx: CanvasRenderingContext2D, camera: Camera, outer: [number, number][], inner: [number, number][], lift: number, fill: string) {
+  const path = new Path2D(), trace = (pts: [number, number][]) => { pts.forEach(([px, py], i) => { const s = toScreen(camera, px, py, lift); i ? path.lineTo(s.x, s.y) : path.moveTo(s.x, s.y); }); path.closePath(); };
+  trace(outer); trace(inner);
+  ctx.fillStyle = fill; ctx.fill(path, "evenodd");
+  if (!bare) { ctx.strokeStyle = INK; ctx.lineWidth = 1; ctx.stroke(path); }
+}
+/**
+ * Hollow Square's fountain: a wide eight-sided basin of stone holding pixel water (ripples, drifting light, a few wishing
+ * coins), a column carrying a bowl that spills over its lip in falling streams, and a jet at the top whose droplets arc
+ * down into the bowl. Everything turns with the camera, and the moving water stills with reduced motion.
+ */
+function drawFountain(ctx: CanvasRenderingContext2D, scene: Scene, cx: number, cy: number) {
+  const { camera } = scene, z = camera.zoom, now = scene.reducedMotion ? 0 : scene.now, S = (x: number, y: number, h: number) => toScreen(camera, x, y, h);
+  const STONE_L = "#cfcbc3", STONE_R = "#b7b2aa", RIM = "#e2ded5", WATER_H = 7, RIM_H = 13;
+  const outer = octagonAt(cx, cy, 0.98), inner = octagonAt(cx, cy, 0.8), dim = (hex: string) => shadeHex(hex, -0.1);
+  // The water, clipped to the basin, with its pixels laid across it.
+  const surface = inner.map(([px, py]) => S(px, py, WATER_H));
+  ctx.save(); ctx.beginPath(); surface.forEach((s, i) => i ? ctx.lineTo(s.x, s.y) : ctx.moveTo(s.x, s.y)); ctx.closePath(); ctx.clip();
+  const frame = Math.floor(now / 260) % 4;
+  if (texturesOn) texturedQuad(ctx, fountainWater(frame), S(cx - 0.8, cy - 0.8, WATER_H), S(cx + 0.8, cy - 0.8, WATER_H), S(cx - 0.8, cy + 0.8, WATER_H), 32, 32);
+  else { ctx.fillStyle = "#7aa3c9"; ctx.fill(); }
+  // Rings spreading from where the streams land.
+  if (!bare) for (let k = 0; k < 3; k++) {
+    const t = ((now / 1400 + k / 3) % 1), r = 0.42 + t * 0.36;
+    ctx.strokeStyle = `rgba(255,255,255,${(0.55 * (1 - t)).toFixed(3)})`; ctx.lineWidth = Math.max(1, 1.2 * z); ctx.beginPath();
+    for (let i = 0; i <= 20; i++) { const a = i / 20 * Math.PI * 2, s = S(cx + Math.cos(a) * r, cy + Math.sin(a) * r, WATER_H); i ? ctx.lineTo(s.x, s.y) : ctx.moveTo(s.x, s.y); }
+    ctx.stroke();
+  }
+  ctx.restore();
+  // The inside of the basin's far wall, above the water.
+  prismSides(ctx, camera, inner, WATER_H, RIM_H - WATER_H, dim(STONE_L), dim(STONE_R), true, cx, cy);
+  // Falling water from the bowl: streams on the far side go behind the column, the near ones in front.
+  const BOWL_H = 30, BOWL_R = 0.46, streams = Array.from({ length: 8 }, (_, i) => i * Math.PI / 4 + Math.PI / 8);
+  const stream = (a: number) => {
+    const lip = S(cx + Math.cos(a) * BOWL_R, cy + Math.sin(a) * BOWL_R, BOWL_H), land = S(cx + Math.cos(a) * 0.6, cy + Math.sin(a) * 0.6, WATER_H);
+    ctx.strokeStyle = "rgba(214,232,246,0.85)"; ctx.lineWidth = Math.max(1.5, 2.6 * z);
+    ctx.beginPath(); ctx.moveTo(lip.x, lip.y); ctx.quadraticCurveTo(lip.x + (land.x - lip.x) * 0.9, lip.y + (land.y - lip.y) * 0.2, land.x, land.y); ctx.stroke();
+    // Pixel drops sliding down the stream, and a splash where it lands.
+    for (let k = 0; k < 3; k++) {
+      const t = ((now / 600 + k / 3 + a) % 1), u = 1 - t, px = u * u * lip.x + 2 * u * t * (lip.x + (land.x - lip.x) * 0.9) + t * t * land.x, py = u * u * lip.y + 2 * u * t * (lip.y + (land.y - lip.y) * 0.2) + t * t * land.y;
+      ctx.fillStyle = "#ffffff"; ctx.fillRect(Math.round(px - z), Math.round(py - z), Math.max(1, 2 * z), Math.max(1, 2 * z));
+    }
+    const splash = (now / 180 + a * 3) % 2 < 1;
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    for (const [dx, dy] of splash ? [[-3, -1], [3, -1], [0, -3]] : [[-2, -2], [2, -2], [-4, 0], [4, 0]]) ctx.fillRect(Math.round(land.x + dx * z), Math.round(land.y + dy * z), Math.max(1, 1.6 * z), Math.max(1, 1.6 * z));
+  };
+  const behind = (a: number) => { const { rx, ry } = rotate(camera, Math.cos(a), Math.sin(a)); return rx + ry < 0; };
+  streams.filter(behind).forEach(stream);
+  // The column, the bowl (stone outside, brimming water inside) and the top: a small cup with the jet.
+  const column = octagonAt(cx, cy, 0.17);
+  prismSides(ctx, camera, column, WATER_H, BOWL_H - 4 - WATER_H, STONE_L, STONE_R, false, cx, cy);
+  const bowlOut = octagonAt(cx, cy, BOWL_R), bowlIn = octagonAt(cx, cy, BOWL_R - 0.1), foot = octagonAt(cx, cy, 0.24);
+  prismSides(ctx, camera, foot, BOWL_H - 7, 3, STONE_L, STONE_R, false, cx, cy);
+  prismSides(ctx, camera, bowlOut, BOWL_H - 4, 4, STONE_L, STONE_R, false, cx, cy);
+  const pool = bowlIn.map(([px, py]) => S(px, py, BOWL_H - 0.5));
+  poly(ctx, pool.map(s => [s.x, s.y] as const), "#9cc0de", null);
+  rimTop(ctx, camera, bowlOut, bowlIn, BOWL_H, RIM);
+  const stem = octagonAt(cx, cy, 0.08), cupOut = octagonAt(cx, cy, 0.2), cupIn = octagonAt(cx, cy, 0.13), TOP_H = 44;
+  prismSides(ctx, camera, stem, BOWL_H, TOP_H - 3 - BOWL_H, STONE_L, STONE_R, false, cx, cy);
+  prismSides(ctx, camera, cupOut, TOP_H - 3, 3, STONE_L, STONE_R, false, cx, cy);
+  poly(ctx, cupIn.map(([px, py]) => { const s = S(px, py, TOP_H - 0.5); return [s.x, s.y] as const; }), "#9cc0de", null);
+  rimTop(ctx, camera, cupOut, cupIn, TOP_H, RIM);
+  // The jet: a spout of water, and droplets arcing out and down into the bowl.
+  const jet = S(cx, cy, TOP_H), peak = S(cx, cy, TOP_H + 16 + (scene.reducedMotion ? 0 : Math.sin(now / 160) * 1.5));
+  ctx.strokeStyle = "rgba(230,242,251,0.95)"; ctx.lineWidth = Math.max(1.5, 2.4 * z); ctx.beginPath(); ctx.moveTo(jet.x, jet.y); ctx.lineTo(peak.x, peak.y); ctx.stroke();
+  for (let i = 0; i < 14; i++) {
+    const t = (now / 900 + i / 14) % 1, a = i * 2.39996, r = 0.08 + t * 0.34, h = TOP_H + 16 + t * 14 - t * t * (TOP_H + 30 - BOWL_H);
+    const d = S(cx + Math.cos(a) * r, cy + Math.sin(a) * r, h);
+    ctx.fillStyle = i % 3 ? "#ffffff" : "#cfe4f5"; ctx.fillRect(Math.round(d.x - z), Math.round(d.y - z), Math.max(1, 2 * z), Math.max(1, 2 * z));
+  }
+  streams.filter(a => !behind(a)).forEach(stream);
+  // The basin's rim and its outside, in front of it all.
+  rimTop(ctx, camera, outer, inner, RIM_H, RIM);
+  prismSides(ctx, camera, outer, 0, RIM_H, STONE_L, STONE_R, false, cx, cy);
+  const c = S(cx, cy, 0);
+  return { x: c.x - 42 * z, y: c.y - 72 * z, w: 84 * z, h: 94 * z };
+}
+
 function drawStation(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObject): { x: number; y: number; w: number; h: number } {
   const { camera, now, game } = scene, z = camera.zoom, { x: sx, y: sy } = toScreen(camera, object.x, object.y), ox = object.x, oy = object.y;
   const flicker = scene.reducedMotion ? 0.5 : (Math.sin(now / 90 + ox) + 1) / 2;
@@ -648,12 +767,7 @@ function drawStation(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldO
     case "fountain": {
       const master = objectAtTile(game.world, ox - 1, oy)?.kind !== "fountain" && objectAtTile(game.world, ox, oy - 1)?.kind !== "fountain";
       if (!master) return hit(0, 0);
-      const c = toScreen(camera, ox + 0.5, oy + 0.5);
-      box(ctx, camera, ox + 0.5, oy + 0.5, 1.8, 1.8, 10, "#b1c0cf", "#c8c5be", "#b9b5ae");
-      box(ctx, camera, ox + 0.5, oy + 0.5, 0.4, 0.4, 26, "#d7d4cd", "#c8c5be", "#b9b5ae", 10);
-      ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineWidth = 1.5 * z;
-      for (let i = 0; i < 6; i++) { const a2 = i / 6 * Math.PI * 2 + now / 800; ctx.beginPath(); ctx.moveTo(c.x, c.y - 36 * z); ctx.quadraticCurveTo(c.x + Math.cos(a2) * 16 * z, c.y - 46 * z, c.x + Math.cos(a2) * 22 * z, c.y - 10 * z + Math.sin(a2) * 6 * z); ctx.stroke(); }
-      return { x: c.x - 50 * z, y: c.y - 50 * z, w: 100 * z, h: 70 * z };
+      return drawFountain(ctx, scene, ox + 0.5, oy + 0.5);
     }
     case "mill": box(ctx, camera, ox, oy, 0.7, 0.7, 12, "#cdb9a0", "#9c8672", "#8a7563"); poly(ctx, [[sx - 12 * z, sy - 30 * z], [sx + 12 * z, sy - 30 * z], [sx + 4 * z, sy - 14 * z], [sx - 4 * z, sy - 14 * z]], "#b89c86"); return hit(34);
     case "dairy_cow": {
@@ -843,6 +957,81 @@ const WALL_H = 42;
 /** Floors inside buildings (a wall face onto one of these, under a roof, can't be seen). */
 const INDOOR_FLOORS = new Set<number>([T.WOOD, T.STONE, T.CARPET]);
 const roofAlpha = new Map<number, number>();
+/** How far your Friend has faded into the Veilweave hood's veil (eased: slow to fade, quick to reappear). */
+let veilShown = 0;
+/** Draw a figure crouched (sneaking): squashed a little toward its feet. */
+function crouched<T>(ctx: CanvasRenderingContext2D, on: boolean, x: number, feetY: number, draw: () => T): T {
+  if (!on) return draw();
+  ctx.save(); ctx.translate(x, feetY); ctx.scale(1.05, 0.84); ctx.translate(-x, -feetY);
+  const out = draw(); ctx.restore(); return out;
+}
+/** How lit windows are (0 by day, 1 at night), and the glowing shapes (screen polygons) the drawable being drawn gave off. */
+let windowGlow = 0;
+const emitted: [number, number][][] = [];
+/** Paint what a drawable gave off (lit glass, flames) into the light buffer: it shines instead of taking the dark. */
+function paintEmitted(lb: CanvasRenderingContext2D, light: RGB, strength: number) {
+  if (!emitted.length) return;
+  lb.globalCompositeOperation = "source-over";
+  lb.fillStyle = rgbCss([light[0] + (1 - light[0]) * strength, light[1] + (0.95 - light[1]) * strength, light[2] + (0.84 - light[2]) * strength]);
+  lb.beginPath();
+  for (const shape of emitted) { shape.forEach(([px, py], i) => i ? lb.lineTo(px, py) : lb.moveTo(px, py)); lb.closePath(); }
+  lb.fill();
+}
+/** A small polygon around a point (a flame's glow in the light buffer). */
+const blob = (x: number, y: number, rx: number, ry: number): [number, number][] => Array.from({ length: 8 }, (_, i) => [x + Math.cos(i * Math.PI / 4) * rx, y + Math.sin(i * Math.PI / 4) * ry]);
+
+/**
+ * Lights inside buildings: every room (on the ground or up a storey, not on an open roof) gets hanging lanterns about every
+ * four tiles, or iron chandeliers in the big halls, placed once per world. Keyed by stored tile index.
+ */
+type RoomLight = { big: boolean };
+const roomLightCache = new WeakMap<World, Map<number, RoomLight>>();
+function roomLights(world: World) {
+  const cached = roomLightCache.get(world);
+  if (cached) return cached;
+  const lights = new Map<number, RoomLight>(), seen = new Uint8Array(W * H);
+  const open = (x: number, y: number) => { const t = world.tiles[y * W + x]; return t !== T.WALL && t !== T.VOID && t !== T.WATER; };
+  const indoor = (x: number, y: number) => {
+    if (!inBounds(x, y) || !open(x, y)) return false;
+    if (y >= FLOOR_Y) { const floor = floorAt(world, x, y), owner = floor ? world.buildingAt[(y - floor.dy) * W + x - floor.dx] : 0; return !!floor && owner > 0 && floor.level < (world.buildings[owner - 1].storeys ?? 1); }
+    return !isUnderground(y) && world.buildingAt[y * W + x] > 0;
+  };
+  const blocked = (x: number, y: number) => { const id = world.objectAt[y * W + x]; return id >= 0 && world.objects[id].blocks; };
+  for (let start = 0; start < W * H; start++) {
+    const sx = start % W, sy = Math.floor(start / W);
+    if (seen[start] || !indoor(sx, sy)) continue;
+    // One room: the indoor tiles joined to this one (doorways join rooms into one; the lattice still spreads the lights).
+    const room: number[] = [start], keys = new Set<number>([start]);
+    seen[start] = 1;
+    for (let i = 0; i < room.length; i++) {
+      const x = room[i] % W, y = Math.floor(room[i] / W);
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy, key = ny * W + nx; if (!seen[key] && indoor(nx, ny)) { seen[key] = 1; room.push(key); keys.add(key); } }
+    }
+    if (room.length < 4) continue;
+    let x0 = W, y0 = H, x1 = 0, y1 = 0;
+    for (const key of room) { const x = key % W, y = Math.floor(key / W); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    const bw = x1 - x0 + 1, bh = y1 - y0 + 1, nx = Math.max(1, Math.round(bw / 4)), ny = Math.max(1, Math.round(bh / 4));
+    const wallDistance = (x: number, y: number) => { for (let r = 1; r <= 3; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (!keys.has((y + dy) * W + x + dx)) return r - 1; return 3; };
+    let placed = 0;
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+      const tx = Math.floor(x0 + (i + 0.5) * bw / nx), ty = Math.floor(y0 + (j + 0.5) * bh / ny);
+      // The nearest room tile to the lattice point, preferring one with nothing standing on it.
+      let best = -1, bestScore = Infinity;
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+        const key = (ty + dy) * W + tx + dx;
+        if (!keys.has(key)) continue;
+        const score = Math.hypot(dx, dy) + (blocked(tx + dx, ty + dy) ? 2 : 0);
+        if (score < bestScore) { bestScore = score; best = key; }
+      }
+      if (best < 0 || lights.has(best)) continue;
+      lights.set(best, { big: room.length >= 120 && wallDistance(best % W, Math.floor(best / W)) >= 2 });
+      placed++;
+    }
+    if (!placed) { const key = room[Math.floor(room.length / 2)]; lights.set(key, { big: false }); }
+  }
+  roomLightCache.set(world, lights);
+  return lights;
+}
 type RoofVertex = [number, number, number];
 /** The roof's corners (with an overhang) and its ridge, in world coordinates and height. */
 function roofGeometry(building: Building) {
@@ -1071,6 +1260,8 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   lap("setup"); drawTerrain(ctx, scene, x0, y0, x1, y1); lap("terrain"); RENDER_PROFILE.groundQuads = textureStats.frame;
   // The sky's light for the time of day and the weather; the sun's share of it decides how dark shadows are.
   const weather = scene.weather ?? null, sky = skyFor(scene.time, weather, underground), lit = true;
+  windowGlow = underground ? 0 : Math.max(0, Math.min(1, (sky.night - 0.3) / 0.45));
+  const rooms = roomLights(world);
   const sunShare = (sky.sun[0] + sky.sun[1] + sky.sun[2]) / Math.max(0.01, sky.sun[0] + sky.sun[1] + sky.sun[2] + sky.ambient[0] + sky.ambient[1] + sky.ambient[2]);
   if (!low) { ctx.globalAlpha = Math.min(1, sunShare * 2.2); drawCloudShadows(ctx, project, camera, now, z, underground, scene.reducedMotion); ctx.globalAlpha = 1; drawPrints(ctx, camera, now); }
   const hits: Hit[] = [], drawables: Drawable[] = [], lights: PointLight[] = [], blockers: [number, number, number][] = [];
@@ -1110,25 +1301,59 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       hull: () => near ? null : boxHull(camera, x, y, 1, 1, cut ? 9 : dungeon ? 34 : battlement ? 22 : storeys * WALL_H + tall), draw: () => {
       ctx.globalAlpha = near ? 0.3 : 1;
       const [top, left, right] = dungeon ? ["#4a4950", "#3a3940", "#2f2e35"] : timber ? ["#8a6a50", "#e6dcc6", "#cfc4ab"] : style === "plank" ? ["#8a6a50", "#b89c7e", "#9c8266"] : ["#b9b4ab", "#a39e95", "#8f8a82"];
-      const plain: WallStyle = dungeon ? "dungeon" : timber ? "timber" : style === "plank" ? "plank" : "brick", glazed: WallStyle = timber ? "timber_window" : "window";
+      const plain: WallStyle = dungeon ? "dungeon" : timber ? "timber" : style === "plank" ? "plank" : "brick";
+      // At night most windows glow with the lamps inside.
+      const glazed = (k: number): WallStyle => windowGlow > 0.02 && hash(x * 5 + 3, y + k * 11) < 0.8 ? (timber ? "timber_window_lit" : "window_lit") : timber ? "timber_window" : "window";
       if (dungeon) box(ctx, camera, x, y, 1, 1, 34, top, left, right, 0, INK, "dungeon");
       else if (cut) box(ctx, camera, x, y, 1, 1, 9, top, left, right, 0, INK, plain);
       else if (battlement) { box(ctx, camera, x, y, 1, 1, 12, top, left, right, 0, INK, "brick"); if ((Math.round(x) + Math.round(y)) % 2 === 0) box(ctx, camera, x, y, 0.62, 0.62, 10, top, left, right, 12, INK, "brick"); }
       else {
-        for (let k = 0; k < storeys; k++) box(ctx, camera, x, y, 1, 1, WALL_H, top, left, right, k * WALL_H, INK, windows && hash(x, y + k * 7) < 0.34 ? glazed : plain, hidden);
+        for (let k = 0; k < storeys; k++) box(ctx, camera, x, y, 1, 1, WALL_H, top, left, right, k * WALL_H, INK, windows && hash(x, y + k * 7) < 0.34 ? glazed(k) : plain, hidden);
         // A tower taller than its floors: more wall above, with a string course of stone between.
-        if (tall) { box(ctx, camera, x, y, 1.04, 1.04, 4, top, shadeHex(left, 0.06), shadeHex(right, 0.06), storeys * WALL_H, INK, null, hidden); box(ctx, camera, x, y, 1, 1, tall - 4, top, left, right, storeys * WALL_H + 4, INK, windows && hash(x, y + 91) < 0.28 ? glazed : plain, hidden); }
+        if (tall) { box(ctx, camera, x, y, 1.04, 1.04, 4, top, shadeHex(left, 0.06), shadeHex(right, 0.06), storeys * WALL_H, INK, null, hidden); box(ctx, camera, x, y, 1, 1, tall - 4, top, left, right, storeys * WALL_H + 4, INK, windows && hash(x, y + 91) < 0.28 ? glazed(storeys) : plain, hidden); }
       }
       ctx.globalAlpha = 1;
     } });
   };
+  /** A lantern hanging from the ceiling (or an iron chandelier of six candles in a big hall), lighting the room. */
+  const roomLight = (x: number, y: number, big: boolean) => {
+    glow(x, y, 32, big ? 230 : 180, "#f3b262", big ? 1.25 : 1.05, true);
+    drawables.push({ depth: depth(x, y) + 0.2, at: { x, y, h: 32 }, size: [STOREY + 24, 36, 12], draw: () => {
+      const ceiling = toScreen(camera, x, y, STOREY - 1), flick = scene.reducedMotion ? 0 : Math.sin(now / 70 + x * 3.1 + y) * 0.5 * z;
+      ctx.strokeStyle = "#2e2823"; ctx.lineWidth = Math.max(1, 1.2 * z);
+      if (!big) {
+        const s = toScreen(camera, x, y, 26);
+        ctx.beginPath(); ctx.moveTo(ceiling.x, ceiling.y); ctx.lineTo(s.x, s.y - 11 * z); ctx.stroke();
+        poly(ctx, [[s.x - 4.5 * z, s.y - 8 * z], [s.x + 4.5 * z, s.y - 8 * z], [s.x, s.y - 12 * z]], "#3b332c", INK, 1);
+        poly(ctx, [[s.x - 3.5 * z, s.y - 8 * z], [s.x + 3.5 * z, s.y - 8 * z], [s.x + 3.5 * z, s.y + 1 * z], [s.x - 3.5 * z, s.y + 1 * z]], "#ffd98a", INK, 1);
+        ctx.fillStyle = "#6b4a2c"; ctx.fillRect(s.x - 0.5 * z, s.y - 8 * z, 1 * z, 9 * z);
+        ellipse(ctx, s.x, s.y - 3.5 * z + flick, 1.5 * z, 2.3 * z, "#fff3c4", null);
+        poly(ctx, [[s.x - 4.5 * z, s.y + 1 * z], [s.x + 4.5 * z, s.y + 1 * z], [s.x + 3 * z, s.y + 3 * z], [s.x - 3 * z, s.y + 3 * z]], "#3b332c", INK, 1);
+        if (!bare) emitted.push(blob(s.x, s.y - 3.5 * z, 4 * z, 5.5 * z));
+        return;
+      }
+      // Chains from the ceiling to an iron ring, candles around it (the ring turns with the camera like the world does).
+      const ring = Array.from({ length: 6 }, (_, i) => { const a = i * Math.PI / 3; return toScreen(camera, x + Math.cos(a) * 0.36, y + Math.sin(a) * 0.36, 28); });
+      for (const k of [0, 2, 4]) { ctx.beginPath(); ctx.moveTo(ceiling.x, ceiling.y); ctx.lineTo(ring[k].x, ring[k].y); ctx.stroke(); }
+      ctx.lineWidth = Math.max(1.5, 2.4 * z); ctx.strokeStyle = "#2e2823"; ctx.beginPath(); ring.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath(); ctx.stroke();
+      ctx.lineWidth = Math.max(0.8, 1 * z); ctx.strokeStyle = "#5a4c3e"; ctx.stroke();
+      for (const [i, p] of ring.entries()) {
+        ctx.fillStyle = "#efe6cf"; ctx.fillRect(p.x - 1.2 * z, p.y - 6 * z, 2.4 * z, 6 * z);
+        const f = scene.reducedMotion ? 0 : Math.sin(now / 60 + i * 1.9 + x) * 0.6 * z;
+        ellipse(ctx, p.x, p.y - 8 * z + f, 1.4 * z, 2.4 * z, "#ffd26b", null); ellipse(ctx, p.x, p.y - 7.6 * z + f, 0.7 * z, 1.2 * z, "#fff6d0", null);
+        if (!bare) emitted.push(blob(p.x, p.y - 8 * z, 3 * z, 4 * z));
+      }
+    } });
+  };
   /** A world object on a tile (trees, rocks, stations, decor). Out in the haze, the smallest decorations are left off. */
   const object = (x: number, y: number) => {
+    const room = rooms.get(y * W + x);
+    if (room) roomLight(x, y, room.big);
     const object = objectAtTile(world, x, y);
     if (!object || object.name === "__removed") return;
     if (object.kind === "decor" && SMALL_DECOR.has(object.decor!) && Math.abs(x - camera.x) + Math.abs(y - camera.y) > HAZE_START) return;
     if (object.decor === "lamp") glow(x, y, 48, 150, "#f2b261", 0.9); else if (object.decor === "torch") glow(x, y, 32, 130, "#ef9a4c", 1, true);
-    else if (object.kind === "furnace" || object.kind === "range") glow(x, y, 16, 110); else if (object.kind === "altar") glow(x, y, 26, 70); else if (object.kind === "sigil_altar") glow(x, y, 30, 90);
+    else if (object.kind === "furnace" || object.kind === "range") glow(x, y, 16, 110); else if (object.kind === "altar") glow(x, y, 26, 70); else if (object.kind === "fountain" && objectAtTile(world, x - 1, y)?.kind !== "fountain" && objectAtTile(world, x, y - 1)?.kind !== "fountain") glow(x + 0.5, y + 0.5, 12, 110, "#a9d4f2", 0.55); else if (object.kind === "sigil_altar") glow(x, y, 30, 90);
     const d = depth(x, y) + (object.kind === "wheat" || object.kind === "spot" ? -0.4 : 0);
     const flat = object.kind === "spot" || (object.kind === "decor" && FLAT_DECOR.has(object.decor!));
     drawables.push({ depth: d, at: { x, y }, cast: !flat, size: object.decor === "windmill" ? [320, 140, 40] : object.kind === "tree" ? [260, 110, 40] : [200, 110, 40], draw: () => {
@@ -1305,6 +1530,8 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     drawables.push({ depth: front, at: { x: (building.x0 + building.x1) / 2, y: (building.y0 + building.y1) / 2, h: (building.storeys ?? 1) * WALL_H + 24 }, rect: () => roofRect(building),
       hull: () => (roofAlpha.get(index) ?? 0) > 0.95 ? roofHull(camera, building) : null, draw: () => { const next = fade(); if (next > 0.02) drawRoof(ctx, camera, building, next, now, scene.reducedMotion); } });
   });
+  const veilTarget = veiled(game) ? 1 : 0;
+  veilShown = scene.reducedMotion ? veilTarget : veilShown + (veilTarget - veilShown) * Math.min(1, dt * (veilTarget ? 1.4 : 8));
   drawables.push({ depth: playerDepth + 0.15, at: pp, cast: true, size: [200, 120, 40], draw: () => {
     // Agility: glide from the start to the landing with a hop.
     let at = pp;
@@ -1316,7 +1543,9 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     const facing: Facing = motion?.facing ?? (pose.target ? (pose.side < 0 ? "left" : "right") : playerFacing);
     if (emote) { const capeColor = player.equipment.cape && isItem(player.equipment.cape) ? item(player.equipment.cape).icon.color : undefined; emoteParticles(emote.id, emoteT, at.x, at.y, scene.reducedMotion, capeColor); if (emote.id === "skillcape" || emote.id === "friendship") skillcapeRays(ctx, feet.x, feet.y - 30 * z, z, now, capeColor ?? "#e2d49e", scene.reducedMotion);
       if (emote.id === "friendship" && !scene.reducedMotion) for (let i = 0; i < 3; i++) { const a = now / 500 + i * 2.1, hx = feet.x + Math.cos(a) * 26 * z, hy = feet.y - 44 * z + Math.sin(a) * 10 * z; heart(ctx, hx, hy, 5 * z); } }
+    ctx.globalAlpha = 1 - veilShown * 0.8;
     ellipse(ctx, feet.x, feet.y, (mount ? 32 : 15) * z, (mount ? 10 : 6) * z, "rgba(22,22,22,0.2)", "rgba(255,255,255,0.75)", 1.5);
+    ctx.globalAlpha = 1;
     if (mount) drawMount(ctx, mount.coat, facing, walking, now + 0, feet.x, feet.y, z, true, scene.reducedMotion);
     const bodyY = s.y - pose.bob * z;
     // Your Friend with its worn pieces composited into the same pixel frame (leaning and squashing for emotes).
@@ -1327,7 +1556,14 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     const holding = heldPose(scene, pose);
     const dressed = [...player.worn, ...(player.equipment.cape ? [player.equipment.cape] : []), ...(player.equipment.head ? [player.equipment.head] : []), ...(player.equipment.shield ? [player.equipment.shield] : []), ...(player.equipment.weapon ? [player.equipment.weapon] : []), ...(player.equipment.neck ? [player.equipment.neck] : []), ...(player.equipment.body ? [player.equipment.body] : []), ...(player.equipment.legs ? [player.equipment.legs] : []), ...(player.equipment.hands ? [player.equipment.hands] : []), ...(player.equipment.feet ? [player.equipment.feet] : [])];
     if (scene.friend) {
-      const art = figureArt(friendRows(scene.friend, facing, walking && !mount, mount ? 0 : stride), dressed, facing, cloth, INK, holding), rect = drawFigure(ctx, art, s.x, bodyY + 2 * z, px, pose.alpha), tip = heldTip(art);
+      // Sneaking: crouched and a little faded. Veiled: all but gone, with a faint shimmer where you stand.
+      const shown = pose.alpha * (1 - 0.84 * veilShown) * (player.sneak ? 0.8 : 1);
+      const art = figureArt(friendRows(scene.friend, facing, walking && !mount, mount ? 0 : stride), dressed, facing, cloth, INK, holding), rect = crouched(ctx, player.sneak && !mount, s.x, bodyY + 2 * z, () => drawFigure(ctx, art, s.x, bodyY + 2 * z, px, shown)), tip = heldTip(art);
+      if (veilShown > 0.4 && !bare) for (let i = 0; i < 4; i++) {
+        const t = ((now / 1600 + i / 4) % 1), a = i * 1.7 + now / 900;
+        ctx.fillStyle = `rgba(200,192,240,${(0.5 * veilShown * Math.sin(t * Math.PI)).toFixed(3)})`;
+        ctx.fillRect(Math.round(s.x + Math.cos(a) * 9 * z), Math.round(bodyY - (8 + t * 30) * z), Math.max(1, 2 * z), Math.max(1, 2 * z));
+      }
       if (pose.line && pose.target && tip) fishingLine(ctx, scene, rect.x + tip.x * px / FIGURE_K, rect.y + tip.y * px / FIGURE_K, project(pose.target.x, pose.target.y));
     }
     else ellipse(ctx, s.x, bodyY - 20 * z, 12 * z, 16 * z, INK);
@@ -1463,12 +1699,14 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       const [rx0, ry0, rx1, ry1] = rectOf(drawable), margin = 48 * z;
       if (rx1 < -margin || rx0 > VIEW.width + margin || ry1 < -margin || ry0 > VIEW.height + margin) return;
     }
+    emitted.length = 0;
     drawable.draw();
     if (!lit) return;
     if (low) {
       // Low lights walls, roofs and cliffs by their outlines (one fill each); everything else takes the light behind it.
       const hull = drawable.hull?.();
       if (hull && hull.length > 2) { lb.fillStyle = rgbCss(litBy[index] ?? [1, 1, 1]); lb.beginPath(); hull.forEach(([hx, hy], i) => i ? lb.lineTo(hx, hy) : lb.moveTo(hx, hy)); lb.closePath(); lb.fill(); }
+      paintEmitted(lb, litBy[index] ?? [1, 1, 1], Math.max(0.35, windowGlow));
       return;
     }
     // The same drawing again, as a hole in the light buffer, filled with this thing's light.
@@ -1479,6 +1717,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     hits.length = count; texturesOn = saved; bare = false; hush.on = false; uiMuted = false; ctx = target;
     lb.globalAlpha = 1; lb.globalCompositeOperation = "destination-over"; lb.fillStyle = rgbCss(light); lb.fillRect(rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1]);
     lb.globalCompositeOperation = "source-over";
+    paintEmitted(lb, light, Math.max(0.35, windowGlow));
     // And into the haze, at its own distance (near things over far land stay clear).
     if (hazy && rect[1] < hazeBottom) {
       const at = drawable.at && drawable.at.y < FLOOR_Y - 0.5 ? drawable.at : here, far = Math.hypot(at.x - here.x, at.y - here.y);
@@ -1805,7 +2044,7 @@ function drawPeer(ctx: CanvasRenderingContext2D, scene: Scene, peer: PeerView, h
   if (mount) drawMount(ctx, mount.coat, facing, peer.moving, now, feet.x, feet.y, z, true, scene.reducedMotion);
   const restoreMotion = applyMotion(ctx, motion, s.x, s.y);
   drawAuras(ctx, worn, s.x, s.y, px, now, scene.reducedMotion, "back");
-  const rect = drawFigure(ctx, figureArt(rows, worn, facing, cloth, INK, peerHeld(scene, peer)), s.x, s.y + 2 * z, px);
+  const rect = crouched(ctx, !!peer.p.sneak, s.x, s.y + 2 * z, () => drawFigure(ctx, figureArt(rows, worn, facing, cloth, INK, peerHeld(scene, peer)), s.x, s.y + 2 * z, px, peer.p.veiled ? 0.16 : peer.p.sneak ? 0.8 : 1));
   drawAuras(ctx, worn, s.x, s.y, px, now, scene.reducedMotion, "front");
   if (mount) drawMountHead(ctx, mount.coat, facing, peer.moving, now, feet.x, feet.y, z, scene.reducedMotion);
   restoreMotion();

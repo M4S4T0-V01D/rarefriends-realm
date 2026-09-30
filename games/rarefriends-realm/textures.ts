@@ -9,7 +9,9 @@ import { Pixels, pixelArt, shadeHex } from "./pixel.ts";
 export const TEX_PER_TILE = 16;
 /** Texture rows per world pixel of height. */
 export const TEX_PER_HEIGHT = 0.5;
-export type WallStyle = "brick" | "window" | "timber" | "timber_window" | "plank" | "cap" | "dungeon";
+export type WallStyle = "brick" | "window" | "timber" | "timber_window" | "window_lit" | "timber_window_lit" | "plank" | "cap" | "dungeon";
+/** Where a window's glass sits on a 16-wide wall texture (x0, width) and, per wall kind, its top row and height. */
+export const PANE = { x0: 5, w: 6, h: 7, top: (timber: boolean) => timber ? 3 : 5 };
 const BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
 const noise = (x: number, y: number, seed: number) => { let h = Math.imul(x * 374761393 + y * 668265263 + seed * 1442695041, 1274126177); h ^= h >>> 13; return ((Math.imul(h, 1103515245) >>> 0) % 1000) / 1000; };
 
@@ -17,8 +19,9 @@ const noise = (x: number, y: number, seed: number) => { let h = Math.imul(x * 37
 export function wallTexture(style: WallStyle, color: string, variant = 0): HTMLCanvasElement {
   return pixelArt(`wall:${style}:${color}:${variant}`, TEX_PER_TILE, 24, p => {
     const W = TEX_PER_TILE, H = 24, mortar = shadeHex(color, -0.2), light = shadeHex(color, 0.07), dark = shadeHex(color, -0.08);
-    const glazed = style === "window" || style === "timber_window";
-    if (style === "brick" || style === "window" || style === "dungeon" || style === "cap") {
+    const lit = style === "window_lit" || style === "timber_window_lit", glazed = lit || style === "window" || style === "timber_window";
+    const timberish = style === "timber" || style === "timber_window" || style === "timber_window_lit";
+    if (style === "brick" || style === "window" || style === "window_lit" || style === "dungeon" || style === "cap") {
       // Courses of stone, 4 pixels high, joints staggered; each stone a slightly different tone with a lit top edge.
       p.rect(0, 0, W, H, color);
       for (let row = 0; row < H / 4; row++) {
@@ -33,7 +36,7 @@ export function wallTexture(style: WallStyle, color: string, variant = 0): HTMLC
         for (let bx = -offset; bx <= W; bx += 8) p.rect(bx, y, 1, 4, mortar);
       }
       if (style !== "cap") for (let i = 0; i < 4; i++) { const x = Math.floor(noise(i, 7, variant) * W), y = Math.floor(noise(i, 9, variant) * H); p.set(x, y, noise(i, 3, variant) > 0.5 ? "#8e9d80" : dark); }
-    } else if (style === "timber" || style === "timber_window") {
+    } else if (timberish) {
       // Cream plaster between dark oak beams.
       const plaster = color, beam = "#6f5440", beamLight = "#8a6a50";
       p.rect(0, 0, W, H, plaster);
@@ -48,12 +51,19 @@ export function wallTexture(style: WallStyle, color: string, variant = 0): HTMLC
       for (let i = 0; i < 3; i++) p.set(Math.floor(noise(i, 1, variant) * W), 2 + Math.floor(noise(i, 2, variant) * 7) * 3, shadeHex(color, -0.25));
     }
     if (glazed) {
-      // A leaded window: a dark oak frame, blue-grey glass with a glint, and a stone sill.
-      const x0 = 5, y0 = style === "timber_window" ? 3 : 5, w = 6, h = 7;
+      // A leaded window: a dark oak frame, blue-grey glass with a glint (or, at night, warm lamplight from inside, brightest
+      // in the middle), and a stone sill.
+      const x0 = PANE.x0, y0 = PANE.top(timberish), w = PANE.w, h = PANE.h;
       p.rect(x0 - 1, y0 - 1, w + 2, h + 2, "#4a3a2e");
-      p.rect(x0, y0, w, h, "#5d6f84");
-      p.rect(x0, y0, w, 1, "#71849a"); p.set(x0 + 1, y0 + 1, "#c9d5e0"); p.set(x0 + 2, y0 + 1, "#a9b8c8"); p.set(x0 + 1, y0 + 2, "#a9b8c8");
-      p.rect(x0 + 3, y0, 1, h, "#3b3a38"); p.rect(x0, y0 + 3, w, 1, "#3b3a38");
+      if (lit) {
+        p.rect(x0, y0, w, h, "#e9a94f");
+        p.rect(x0 + 1, y0 + 1, w - 2, h - 2, "#f6c774"); p.rect(x0 + 2, y0 + 2, w - 4, h - 4, "#ffe2a0");
+        p.rect(x0 + 3, y0, 1, h, "#5a3f28"); p.rect(x0, y0 + 3, w, 1, "#5a3f28");
+      } else {
+        p.rect(x0, y0, w, h, "#5d6f84");
+        p.rect(x0, y0, w, 1, "#71849a"); p.set(x0 + 1, y0 + 1, "#c9d5e0"); p.set(x0 + 2, y0 + 1, "#a9b8c8"); p.set(x0 + 1, y0 + 2, "#a9b8c8");
+        p.rect(x0 + 3, y0, 1, h, "#3b3a38"); p.rect(x0, y0 + 3, w, 1, "#3b3a38");
+      }
       p.rect(x0 - 1, y0 + h + 1, w + 2, 1, shadeHex(color, 0.14));
     }
   });

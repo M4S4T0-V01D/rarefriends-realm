@@ -63,6 +63,8 @@ export type Presence = {
   /** The Friend whose referral code this player used (so that Friend's game can reward them). */
   referredBy: number | null;
   hp: number; maxHp: number; fight: { u: number; id: string; hp: number; x: number; y: number } | null;
+  /** Sneaking (crouched, a little faded), or veiled by the Veilweave hood (all but invisible). Older clients don't send these. */
+  sneak?: boolean; veiled?: boolean;
 };
 export type NetStatus = "offline" | "connecting" | "online";
 export type NetState = { status: NetStatus; peers: Presence[]; friends: number[]; ignored: number[]; players: number;
@@ -85,10 +87,10 @@ export function cleanPresence(raw: unknown): Presence | null {
     region: typeof r.region === "string" ? r.region.slice(0, 32).replace(/[^\w' ]/g, "") : "",
     emote: word(r.emote),
     head: word(r.head, 40), shield: word(r.shield, 40), neck: word(r.neck, 40), body: word(r.body, 40), legs: word(r.legs, 40), hands: word(r.hands, 40), feet: word(r.feet, 40), mount: word(r.mount, 40), celebrate: word(r.celebrate, 24), pet: word(r.pet, 24), referredBy: id(r.referredBy),
-    hp: int(r.hp, 0, 99) ?? 10, maxHp: int(r.maxHp, 1, 99) ?? 10,
-    fight: (() => { const f = r.fight as Record<string, unknown> | null; if (!f || typeof f !== "object") return null; const u = int(f.u, 0, 1e9), fid = word(f.id, 40), fhp = int(f.hp, 0, 10_000), fx = int(f.x, 0, 239), fy = int(f.y, 0, 279);
+    hp: int(r.hp, 0, 99) ?? 10, maxHp: int(r.maxHp, 1, 99) ?? 10, sneak: r.sneak === true, veiled: r.veiled === true,
+    fight: (() => { const f = r.fight as Record<string, unknown> | null; if (!f || typeof f !== "object") return null; const u = int(f.u, 0, 1e9), fid = word(f.id, 40), fhp = int(f.hp, 0, 10_000), fx = int(f.x, 0, W - 1), fy = int(f.y, 0, H - 1);
       return u !== null && fid && fhp !== null && fx !== null && fy !== null ? { u, id: fid, hp: fhp, x: fx, y: fy } : null; })(),
-    drops: Array.isArray(r.drops) ? r.drops.slice(0, 16).flatMap(entry => { const e = entry as Record<string, unknown>, u = int(e?.u, 0, 1e12), id = word(e?.id, 40), n = int(e?.n, 1, 2_147_483_647), dx = int(e?.x, 0, 239), dy = int(e?.y, 0, 279);
+    drops: Array.isArray(r.drops) ? r.drops.slice(0, 16).flatMap(entry => { const e = entry as Record<string, unknown>, u = int(e?.u, 0, 1e12), id = word(e?.id, 40), n = int(e?.n, 1, 2_147_483_647), dx = int(e?.x, 0, W - 1), dy = int(e?.y, 0, H - 1);
       return u !== null && id && n && dx !== null && dy !== null ? [{ u, id, n, x: dx, y: dy }] : []; }) : [],
   };
 }

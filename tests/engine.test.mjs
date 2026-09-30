@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   buy, canWalk, castSpell, chooseOption, collectFromCasket, continueDialogue, createGame, equip, findPath, itemOptions, menuFor, restore, sell,
   serialize, setFollower, setRelics, setTarget, smeltingRecipes, smithingRecipes, startProduction, tick, togglePrayer, useItemOnItem, walkTo, setHeld,
-  successChance, hitChance, unlockMusic, bestArrow, rangedMaxHit, bowRange, syncMonster, toggleMount, grantMount, rideProblem, castOnItem, isBound, grantBundle, rubLamp, breakTablet, capeProblem, sellPrice, craftSigils,
+  successChance, hitChance, unlockMusic, toggleSneak, veiled, VEIL_HOOD, toggleRun, bestArrow, rangedMaxHit, bowRange, syncMonster, toggleMount, grantMount, rideProblem, castOnItem, isBound, grantBundle, rubLamp, breakTablet, capeProblem, sellPrice, craftSigils,
 } from "../games/rarefriends-realm/engine.ts";
 import { currentTask, slayerPoints } from "../games/rarefriends-realm/slayer.ts";
 import { ITEM_LIST, MONSTERS, MOUNTS, SHOPS, SKILLS, SKILL_NAMES, SPELLS, TREES, XP_RATE, XP_TABLE, item, levelForXp } from "../games/rarefriends-realm/data.ts";
@@ -486,6 +486,52 @@ test("thieving: pickpocket villagers and steal from stalls", () => {
   }
   assert(count(g.player, "coins") > before);
   assert(g.player.xp.thieving > 0);
+});
+
+test("stealth: sneaking past an aggressive monster unseen pays XP; being spotted hurts", () => {
+  // Unseen: every roll misses, so the yeti never notices; out of its reach, you've slipped past.
+  const g = newGame(), yeti = g.monsters.find(monster => monster.def.id === "frost_yeti");
+  g.monsters = [yeti]; g.rng = () => 0.5;
+  toggleSneak(g); assert.equal(g.player.sneak, true);
+  standNear(g, yeti.x, yeti.y, 3); run(g, 3);
+  assert.equal(yeti.target, false, "the yeti hasn't noticed");
+  assert(g.sneakingPast.has(yeti.uid));
+  const before = g.player.xp.thieving;
+  standNear(g, yeti.x, yeti.y, 8); run(g, 1);
+  assert(g.player.xp.thieving > before, "Stealth XP for slipping past");
+  assert.equal(g.sneakingPast.size, 0);
+  // The same monster doesn't pay again straight away.
+  const paid = g.player.xp.thieving;
+  standNear(g, yeti.x, yeti.y, 3); run(g, 3); standNear(g, yeti.x, yeti.y, 8); run(g, 1);
+  assert.equal(g.player.xp.thieving, paid);
+
+  // Spotted: every roll hits, so it lunges at once, the sneak ends and the fight is on.
+  const h = newGame(), wolf = h.monsters.find(monster => monster.def.id === "frost_yeti");
+  h.monsters = [wolf]; h.rng = () => 0;
+  toggleSneak(h); standNear(h, wolf.x, wolf.y, 3);
+  const hp = h.player.hp; run(h, 1);
+  assert.equal(h.player.sneak, false); assert.equal(wolf.target, true); assert(h.player.hp < hp, "the lunge hurts");
+});
+
+test("stealth: sneaking walks and spends run energy; the Veilweave hood hides you when still", () => {
+  const g = newGame();
+  g.player.energy = 100; toggleRun(g); toggleSneak(g);
+  const start = { x: g.player.x, y: g.player.y };
+  walkTo(g, start.x + 6, start.y); run(g, 1);
+  assert.equal(Math.max(Math.abs(g.player.x - start.x), Math.abs(g.player.y - start.y)), 1, "sneaking never runs");
+  run(g, 4);
+  assert(g.player.energy < 100, "sneaking spends run energy");
+  g.player.energy = 0.2; walkTo(g, g.player.x - 3, g.player.y); run(g, 2);
+  assert.equal(g.player.sneak, false, "out of energy, the sneak ends");
+  // The hood: still for five seconds and out of any fight, aggressive monsters look straight through you.
+  const h = newGame(), yeti = h.monsters.find(monster => monster.def.id === "frost_yeti");
+  h.monsters = [yeti]; h.rng = () => 0; h.player.equipment.head = VEIL_HOOD;
+  standNear(h, yeti.x, yeti.y, 12); run(h, 10);
+  assert.equal(veiled(h), true);
+  standNear(h, yeti.x, yeti.y, 3); h.player.moved = h.tick - 20; run(h, 3);
+  assert.equal(yeti.target, false, "the veiled player isn't attacked");
+  h.player.equipment.head = undefined; run(h, 1);
+  assert.equal(yeti.target, true, "without the hood, it attacks");
 });
 
 test("agility: a full lap of the Friendhollow course", () => {
