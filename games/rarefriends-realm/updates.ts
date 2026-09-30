@@ -4,6 +4,10 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 41, date: "2026-09-30", title: "Lanterns up high, and hills that hide what's behind them", items: [
+    "Lanterns and chandeliers hang higher, up in the rafters, and one that would sit in front of your Friend's face turns see-through.",
+    "Snowy slopes and hills cover whatever stands behind them: Friends, other players, monsters and houses no longer show through the snow around Highcairn (or any other hill).",
+  ] },
   { id: 40, date: "2026-09-30", title: "The Stealth update, lamplit rooms, mastery capes and a new fountain", items: [
     "Thieving is now Stealth. Your levels and XP carry over, and pickpocketing and the Oasis stalls are part of it.",
     "Sneak (the hooded button beside your run energy, or C): walk softly past aggressive monsters. Each tick they may notice you (their level against your Stealth, how close you are, whether you're moving). Slip out of reach unseen for Stealth XP. It spends run energy faster than running, less as your Stealth grows.",

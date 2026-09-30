@@ -293,6 +293,42 @@ function terrainOrder(camera: Camera, x0: number, y0: number, x1: number, y1: nu
   for (let k = 0; k < n; k++) orderBuffer[counts[orderKeys[k]]++] = k;
   return orderBuffer.subarray(0, n);
 }
+/**
+ * One ground tile drawn again, as the terrain pass drew it (fill, pixel texture, inked edges and contours): for a ridge
+ * that has to cover something standing behind it. Returns its corners on screen.
+ */
+function groundTile(ctx: CanvasRenderingContext2D, scene: Scene, x: number, y: number, draw = true): [number, number][] {
+  const { camera, game } = scene, world = game.world, z = camera.zoom, terrain = world.tiles[y * W + x];
+  const flat = (dx: number, dy: number) => { const { rx, ry } = rotate(camera, dx, dy); return { x: (rx - ry) * TILE_W / 2 * z, y: (rx + ry) * TILE_W / 2 * camera.pitch * z }; };
+  const ex = flat(0.5, 0), ey = flat(0, 0.5), lifted = liftScale(camera) * z, { x: sx, y: sy } = toScreen(camera, x, y);
+  const hA = cornerHeight(world, x, y), hB = cornerHeight(world, x + 1, y), hC = cornerHeight(world, x + 1, y + 1), hD = cornerHeight(world, x, y + 1), hMid = (hA + hB + hC + hD) / 4;
+  const ax = sx - ex.x - ey.x, ay = sy - ex.y - ey.y - (hA - hMid) * lifted, bx = sx + ex.x - ey.x, by = sy + ex.y - ey.y - (hB - hMid) * lifted;
+  const cx = sx + ex.x + ey.x, cy = sy + ex.y + ey.y - (hC - hMid) * lifted, dx = sx - ex.x + ey.x, dy = sy - ex.y + ey.y - (hD - hMid) * lifted;
+  const corners: [number, number][] = [[ax, ay], [bx, by], [cx, cy], [dx, dy]];
+  if (!draw) return corners;
+  const slope = Math.max(-0.22, Math.min(0.22, ((hA + hD) - (hB + hC) + (hA + hB) - (hD + hC)) * 0.011));
+  ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.lineTo(cx, cy); ctx.lineTo(dx, dy); ctx.closePath();
+  ctx.fillStyle = terrainFill(terrain, (hash(x, y) - 0.5) * 0.035 + slope); ctx.fill();
+  const style = GROUND_STYLE[terrain], hh = TILE_W / 2 * z * camera.pitch;
+  if (texturesOn && style && hh >= 5) texturedQuad(ctx, groundTexture(style, TERRAIN_COLORS[terrain], Math.floor(hash(y, x) * 4)), { x: ax, y: ay }, { x: bx, y: by }, { x: dx, y: dy }, TEX_PER_TILE, TEX_PER_TILE);
+  if (bare) return corners;
+  const edges = new Path2D(), contours = new Path2D(), mine = EDGE_CLASS[terrain];
+  const edge = (nx: number, ny: number, px: number, py: number, qx: number, qy: number) => {
+    const other = inBounds(nx, ny) ? world.tiles[ny * W + nx] : T.VOID;
+    if (other === T.VOID || EDGE_CLASS[other] === mine || other === T.WALL || other === T.CLIFF) return;
+    edges.moveTo(px, py); edges.lineTo(qx, qy);
+  };
+  edge(x, y - 1, ax, ay, bx, by); edge(x + 1, y, bx, by, cx, cy); edge(x, y + 1, cx, cy, dx, dy); edge(x - 1, y, dx, dy, ax, ay);
+  const hs = [hA, hB, hC, hD], lo = Math.floor(Math.min(...hs) / CONTOUR), hi = Math.floor(Math.max(...hs) / CONTOUR);
+  for (let level = lo + 1; level <= hi; level++) {
+    const at = level * CONTOUR, cross: [number, number][] = [];
+    for (let e = 0; e < 4; e++) { const h0 = hs[e], h1 = hs[(e + 1) % 4]; if ((h0 < at) !== (h1 < at)) { const t = (at - h0) / (h1 - h0), [x0, y0] = corners[e], [x1, y1] = corners[(e + 1) % 4]; cross.push([x0 + (x1 - x0) * t, y0 + (y1 - y0) * t]); } }
+    for (let k = 0; k + 1 < cross.length; k += 2) { contours.moveTo(cross[k][0], cross[k][1]); contours.lineTo(cross[k + 1][0], cross[k + 1][1]); }
+  }
+  ctx.strokeStyle = "rgba(22,22,22,0.16)"; ctx.lineWidth = 1; ctx.stroke(contours);
+  ctx.strokeStyle = "rgba(22,22,22,0.55)"; ctx.lineWidth = Math.max(0.8, z); ctx.stroke(edges);
+  return corners;
+}
 function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, x0: number, y0: number, x1: number, y1: number) {
   const { camera, game, now } = scene, world = game.world, z = camera.zoom, hw = TILE_W / 2 * z, hh = hw * camera.pitch;
   const t = scene.reducedMotion ? 0 : now / 1000;
@@ -1203,6 +1239,8 @@ type Drawable = {
   light?: RGB;
   /** On Low, its outline on screen (walls, roofs, cliffs): filled with its light instead of cutting it from the light. */
   hull?: () => [number, number][] | null;
+  /** Scenery (trees, rocks, decorations) isn't checked for hills in front of it: there's too much of it to be worth it. */
+  scenery?: boolean;
 };
 let lastHits: Hit[] = [];
 /** Picks under a point, topmost first, from the last frame. */
@@ -1315,25 +1353,32 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       ctx.globalAlpha = 1;
     } });
   };
-  /** A lantern hanging from the ceiling (or an iron chandelier of six candles in a big hall), lighting the room. */
+  /**
+   * A lantern hanging from the rafters (or an iron chandelier of six candles in a big hall), lighting the room. They hang
+   * high, above a Friend's head, and one that still lands over your Friend on screen turns see-through.
+   */
+  const LAMP_H = 52, RAFTER_H = STOREY + 22;
   const roomLight = (x: number, y: number, big: boolean) => {
-    glow(x, y, 32, big ? 230 : 180, "#f3b262", big ? 1.25 : 1.05, true);
-    drawables.push({ depth: depth(x, y) + 0.2, at: { x, y, h: 32 }, size: [STOREY + 24, 36, 12], draw: () => {
-      const ceiling = toScreen(camera, x, y, STOREY - 1), flick = scene.reducedMotion ? 0 : Math.sin(now / 70 + x * 3.1 + y) * 0.5 * z;
+    glow(x, y, 40, big ? 240 : 190, "#f3b262", big ? 1.25 : 1.05, true);
+    drawables.push({ depth: depth(x, y) + 0.2, at: { x, y, h: LAMP_H }, size: [RAFTER_H + 24, 36, 12], draw: () => {
+      const ceiling = toScreen(camera, x, y, RAFTER_H), flick = scene.reducedMotion ? 0 : Math.sin(now / 70 + x * 3.1 + y) * 0.5 * z;
+      const lamp = toScreen(camera, x, y, LAMP_H), overMe = Math.abs(lamp.x - me.x) < 30 * z && lamp.y > me.y - 80 * z && lamp.y < me.y + 8 * z;
+      if (overMe) ctx.globalAlpha = 0.25;
       ctx.strokeStyle = "#2e2823"; ctx.lineWidth = Math.max(1, 1.2 * z);
       if (!big) {
-        const s = toScreen(camera, x, y, 26);
+        const s = lamp;
         ctx.beginPath(); ctx.moveTo(ceiling.x, ceiling.y); ctx.lineTo(s.x, s.y - 11 * z); ctx.stroke();
         poly(ctx, [[s.x - 4.5 * z, s.y - 8 * z], [s.x + 4.5 * z, s.y - 8 * z], [s.x, s.y - 12 * z]], "#3b332c", INK, 1);
         poly(ctx, [[s.x - 3.5 * z, s.y - 8 * z], [s.x + 3.5 * z, s.y - 8 * z], [s.x + 3.5 * z, s.y + 1 * z], [s.x - 3.5 * z, s.y + 1 * z]], "#ffd98a", INK, 1);
         ctx.fillStyle = "#6b4a2c"; ctx.fillRect(s.x - 0.5 * z, s.y - 8 * z, 1 * z, 9 * z);
         ellipse(ctx, s.x, s.y - 3.5 * z + flick, 1.5 * z, 2.3 * z, "#fff3c4", null);
         poly(ctx, [[s.x - 4.5 * z, s.y + 1 * z], [s.x + 4.5 * z, s.y + 1 * z], [s.x + 3 * z, s.y + 3 * z], [s.x - 3 * z, s.y + 3 * z]], "#3b332c", INK, 1);
-        if (!bare) emitted.push(blob(s.x, s.y - 3.5 * z, 4 * z, 5.5 * z));
+        if (!bare && !overMe) emitted.push(blob(s.x, s.y - 3.5 * z, 4 * z, 5.5 * z));
+        ctx.globalAlpha = 1;
         return;
       }
       // Chains from the ceiling to an iron ring, candles around it (the ring turns with the camera like the world does).
-      const ring = Array.from({ length: 6 }, (_, i) => { const a = i * Math.PI / 3; return toScreen(camera, x + Math.cos(a) * 0.36, y + Math.sin(a) * 0.36, 28); });
+      const ring = Array.from({ length: 6 }, (_, i) => { const a = i * Math.PI / 3; return toScreen(camera, x + Math.cos(a) * 0.36, y + Math.sin(a) * 0.36, LAMP_H); });
       for (const k of [0, 2, 4]) { ctx.beginPath(); ctx.moveTo(ceiling.x, ceiling.y); ctx.lineTo(ring[k].x, ring[k].y); ctx.stroke(); }
       ctx.lineWidth = Math.max(1.5, 2.4 * z); ctx.strokeStyle = "#2e2823"; ctx.beginPath(); ring.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath(); ctx.stroke();
       ctx.lineWidth = Math.max(0.8, 1 * z); ctx.strokeStyle = "#5a4c3e"; ctx.stroke();
@@ -1341,8 +1386,9 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
         ctx.fillStyle = "#efe6cf"; ctx.fillRect(p.x - 1.2 * z, p.y - 6 * z, 2.4 * z, 6 * z);
         const f = scene.reducedMotion ? 0 : Math.sin(now / 60 + i * 1.9 + x) * 0.6 * z;
         ellipse(ctx, p.x, p.y - 8 * z + f, 1.4 * z, 2.4 * z, "#ffd26b", null); ellipse(ctx, p.x, p.y - 7.6 * z + f, 0.7 * z, 1.2 * z, "#fff6d0", null);
-        if (!bare) emitted.push(blob(p.x, p.y - 8 * z, 3 * z, 4 * z));
+        if (!bare && !overMe) emitted.push(blob(p.x, p.y - 8 * z, 3 * z, 4 * z));
       }
+      ctx.globalAlpha = 1;
     } });
   };
   /** A world object on a tile (trees, rocks, stations, decor). Out in the haze, the smallest decorations are left off. */
@@ -1356,7 +1402,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     else if (object.kind === "furnace" || object.kind === "range") glow(x, y, 16, 110); else if (object.kind === "altar") glow(x, y, 26, 70); else if (object.kind === "fountain" && objectAtTile(world, x - 1, y)?.kind !== "fountain" && objectAtTile(world, x, y - 1)?.kind !== "fountain") glow(x + 0.5, y + 0.5, 12, 110, "#a9d4f2", 0.55); else if (object.kind === "sigil_altar") glow(x, y, 30, 90);
     const d = depth(x, y) + (object.kind === "wheat" || object.kind === "spot" ? -0.4 : 0);
     const flat = object.kind === "spot" || (object.kind === "decor" && FLAT_DECOR.has(object.decor!));
-    drawables.push({ depth: d, at: { x, y }, cast: !flat, size: object.decor === "windmill" ? [320, 140, 40] : object.kind === "tree" ? [260, 110, 40] : [200, 110, 40], draw: () => {
+    drawables.push({ depth: d, at: { x, y }, cast: !flat, scenery: object.kind === "tree" || object.kind === "rock" || object.kind === "decor" || object.kind === "spot", size: object.decor === "windmill" ? [320, 140, 40] : object.kind === "tree" ? [260, 110, 40] : [200, 110, 40], draw: () => {
       let rect: { x: number; y: number; w: number; h: number };
       const tall = object.kind === "tree" || (object.kind === "decor" && (["pine", "windmill", "palm", "pillar", "tent"].includes(object.decor!) || (object.decor === "ruin_wall" && (object.height ?? 0) > 34)));
       // Anything tall in front of your Friend that covers it on screen turns see-through (works at any angle and zoom).
@@ -1592,6 +1638,45 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     else glow(flight.x, flight.y, 26, 150, (MAGIC_LOOKS[projectile.element ?? ""] ?? { glow: projectile.color }).glow, 1.1);
   }
   lap("gather");
+  // Hills and snowy ridges: the ground is drawn first, under everything, so rising ground between the camera and
+  // something standing behind it (a Friend, a tree, a house on lower land) is drawn again in depth order to cover it.
+  // Skipped when the land in view is flat, and for scenery; the heights come from one table per frame.
+  if (!underground) {
+    const vw = x1 - x0 + 1, vh = y1 - y0 + 1, tops = new Float32Array(vw * vh);
+    let lowest = Infinity, highest = -Infinity;
+    for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) {
+      const h = inBounds(tx, ty) ? Math.max(cornerHeight(world, tx, ty), cornerHeight(world, tx + 1, ty), cornerHeight(world, tx + 1, ty + 1), cornerHeight(world, tx, ty + 1)) : 0;
+      tops[(ty - y0) * vw + tx - x0] = h; if (h < lowest) lowest = h; if (h > highest) highest = h;
+    }
+    if (highest - lowest > 6) {
+      const c = Math.cos(camera.angle), sn = Math.sin(camera.angle), fx = c + sn, fy = c - sn, fl = Math.hypot(fx, fy) || 1, ux = fx / fl, uy = fy / fl;
+      // A tile k steps nearer the camera sits k × `step` lower on screen; it only reaches up over something's feet if its
+      // ground rises more than that (in screen terms).
+      const step = Math.SQRT1_2 * TILE_W * camera.pitch, rise = liftScale(camera), slack = TILE_W * camera.pitch * 0.6;
+      const ridges = new Set<number>();
+      for (const drawable of drawables) {
+        const at = drawable.at;
+        if (!at || drawable.scenery || drawable.depth === Infinity || at.y >= FLOOR_Y - 0.5 || isUnderground(at.y)) continue;
+        const feet = groundHeight(world, at.x, at.y);
+        if ((highest - feet) * rise <= step - slack) continue;
+        for (let k = 1; k <= 8; k++) {
+          if ((highest - feet) * rise <= k * step - slack) break;
+          for (const side of [-0.6, 0, 0.6]) {
+            const tx = Math.round(at.x + ux * k - uy * side), ty = Math.round(at.y + uy * k + ux * side);
+            if (tx < x0 || tx > x1 || ty < y0 || ty > y1) continue;
+            const key = ty * W + tx;
+            if (ridges.has(key) || (tops[(ty - y0) * vw + tx - x0] - feet) * rise <= k * step - slack) continue;
+            const terrain = world.tiles[key];
+            if (terrain !== T.WALL && terrain !== T.VOID && terrain !== T.CLIFF) ridges.add(key);
+          }
+        }
+      }
+      for (const key of ridges) {
+        const tx = key % W, ty = (key - tx) / W;
+        drawables.push({ depth: depth(tx, ty) - 0.45, at: { x: tx, y: ty, h: 2 }, size: [70, 50, 30], hull: () => groundTile(ctx, scene, tx, ty, false), draw: () => { groundTile(ctx, scene, tx, ty); } });
+      }
+    }
+  }
   drawables.sort((a, b) => a.depth - b.depth);
 
   // ---------- Light ----------
