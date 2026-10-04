@@ -397,7 +397,7 @@ try {
       // Headless software rendering on a shared CI runner measures slower than a desktop (about 16 ms where this machine sees 12); 20 still catches a real regression.
       assert.ok(row.low < 20, `${row.name}: Low draws inside a 50 fps budget even without a GPU (${row.low.toFixed(1)} ms)`);
     }
-    await game.getByRole("tab", { name: "Settings" }).click();
+    await state(() => { const tab = document.querySelector('.realm-tabs [aria-label="Settings"]'); if (tab?.getAttribute("aria-selected") !== "true" || !document.querySelector(".realm-tab-body")) tab?.click(); });
     await game.getByRole("radio", { name: "Low" }).click();
     assert.equal(await state(() => window.__realm.perf().low), true, "Settings → Graphics → Low");
     await game.getByRole("radio", { name: "High" }).click();
@@ -543,7 +543,7 @@ try {
 
   // ---------- Save codes, with an older tab still open ----------
   // The older tab's fresh-looking adventure must not overwrite a code restored in the newer one.
-  await game.getByRole("tab", { name: "Settings" }).click();
+  await state(() => { const tab = document.querySelector('.realm-tabs [aria-label="Settings"]'); if (tab?.getAttribute("aria-selected") !== "true" || !document.querySelector(".realm-tab-body")) tab?.click(); });
   await game.getByRole("button", { name: "Copy save code" }).click();
   await page.waitForFunction(() => window.__shared.text?.startsWith("RFR1-"));
   const saveCode = await page.evaluate(() => window.__shared.text);

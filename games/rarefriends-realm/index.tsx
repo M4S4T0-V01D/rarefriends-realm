@@ -666,7 +666,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       if (KEY_DIRECTIONS[key]) { held.current.add(key); setHeld(state, heldDirection(held.current, camera.current.angle)); event.preventDefault(); return; }
       if (CAMERA_KEYS.has(key)) { held.current.add(key); event.preventDefault(); return; }
       const fn = /^f(10|[1-9])$/.exec(key);
-      if (fn) { setTab(TABS[Number(fn[1]) - 1].id); event.preventDefault(); return; }
+      if (fn) { setTab(TABS[Number(fn[1]) - 1].id); setSideOpen(true); event.preventDefault(); return; }
       if (key === "escape") { setMenu(null); setModal(null); setDailyTab(null); setGuide(null); setSelection(null); closeInterfaces(state); setLevelUps([]); refresh(); return; }
       if (key === " " || key === "spacebar") {
         if (live.current.phase === "playing") {
@@ -682,8 +682,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       if (key === "h") { toggleMount(state); refresh(); return; }
       if (key === "m") { setModal(modal => modal === "map" ? null : "map"); return; }
       if (key === "enter") { (root.current?.querySelector("[data-chat]") as HTMLInputElement | null)?.focus(); event.preventDefault(); return; }
-      if (key === "i") setTab("inventory"); else if (key === "k") setTab("skills"); else if (key === "l") setTab("quests");
-      else if (key === "p") setTab("prayer"); else if (key === "n") setTab("magic"); else if (key === "o") setTab("equipment");
+      const hot: Record<string, Tab> = { i: "inventory", k: "skills", l: "quests", p: "prayer", n: "magic", o: "equipment" };
+      if (hot[key]) { setTab(hot[key]); setSideOpen(true); }
     };
     const up = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase();
@@ -783,9 +783,9 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
 
   // ---------- Adventurer card ----------
   const drawCard = (state: Game) => {
-    const paint = (art: Parameters<typeof renderCard>[3]) => {
+    const paint = (art: Parameters<typeof renderCard>[2]) => {
       if (game.current !== state) return;
-      const picture = renderCard(state, friend.current, regionAt(state.world, state.player.x, state.player.y).name, art);
+      const picture = renderCard(state, friend.current, art);
       picture.toBlob(blob => { if (!blob) return; cardBlob.current = blob; setCardUrl(url => { if (url) URL.revokeObjectURL(url); return URL.createObjectURL(blob); }); });
     };
     // The fellowship's logo and background come from the site's fellowships folder; draw at once and again when they arrive.
@@ -869,8 +869,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
               : state.ui.production ? <ProductionBox game={state} refresh={refresh} openMenu={(x, y, entries) => setMenu({ x, y, entries })} />
               : <ChatBox messages={state.messages} onSend={say} prefill={whisper} />}
           </div>
-          <button type="button" className="realm-side-toggle" aria-expanded={sideOpen} onClick={() => setSideOpen(open => !open)}>{sideOpen ? "▾" : "▴"} Panels</button>
-          {sideOpen && <SidePanel game={state} tab={tab} setTab={setTab} selection={selection} setSelection={setSelection} openMenu={(x, y, entries) => setMenu({ x, y, entries })}
+          <SidePanel open={sideOpen} setOpen={setSideOpen} game={state} tab={tab} setTab={setTab} selection={selection} setSelection={setSelection} openMenu={(x, y, entries) => setMenu({ x, y, entries })}
             refresh={refresh} roster={roster} rosterState={rosterState} friendSprites={followerSprites.current} loadFriend={loadFriendSprite}
             net={netState} onSocial={(op, id) => window.parent.postMessage({ type: NET_SOCIAL, op, id }, "*")} onWhisper={id => setWhisper({ text: `@${id} `, at: performance.now() })}
             onOnline={on => window.parent.postMessage({ type: NET_ONLINE, on }, "*")} backupStatus={backupStatus} openGuide={skill => setGuide({ skill })}
@@ -883,7 +882,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
                 else message(state, "Saves aren't connected yet, so this restore isn't saved: keep playing in this tab and it saves once they connect. If Settings still says saves are off, reload the page and restore the code again.", "info");
               } return error; }} settings={settings} setSettings={setSettings}
             friend={friend.current} trackName={audio.current?.trackName ?? ""} trackId={audio.current?.trackId ?? ""} playTrack={id => { audio.current?.play(id as TrackId); audio.current?.unlock(); setSettings({ ...settings, autoMusic: false }); }} openCard={openCard} openHelp={() => setModal("help")} paused={paused} saved={savedText}
-            relicCounts={snapshot?.inventory.map(Number) ?? [0, 0, 0, 0]} openCaskets={() => setModal("caskets")} />}
+            relicCounts={snapshot?.inventory.map(Number) ?? [0, 0, 0, 0]} openCaskets={() => setModal("caskets")} />
           {selection && <div className="realm-selection" role="status">{selection.kind === "item" ? `Use ${player.inventory[selection.slot] ? itemName(player.inventory[selection.slot]!.id) : "item"} ->` : `Cast ${SPELLS.find(spell => spell.id === selection.spell)?.name ?? "spell"} ->`} pick a target <button type="button" onClick={() => setSelection(null)}>Cancel</button></div>}
 
           {state.ui.bank && <BankModal game={state} refresh={refresh} onClose={() => { state.ui.bank = false; refresh(); }} openMenu={(x, y, entries) => setMenu({ x, y, entries })} />}
@@ -976,7 +975,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
                       return <button key={option.id} type="button" role="radio" aria-checked={(player.card[category] ?? "") === option.id || (!CARD_OPTIONS[category].some(entry => entry.id === player.card[category]) && option === CARD_OPTIONS[category][0])} disabled={!open}
                         title={open ? option.text ?? option.name : `Locked: ${need}`} onClick={() => { player.card[category] = option.id; drawCard(state); refresh(); }}>{open ? option.name : `🔒 ${option.name}`}</button>; })}
                   </div>))}
-                <p className="realm-muted">Locked styles open with Presence, quests and achievements (hover one to see). Fellowship logos and backgrounds come from the site's fellowships folder: see preview/fellowships/README on the site.</p>
+                <p className="realm-muted">Most styles are free; the locked ones open with Presence, quests and achievements (hover one to see). Fellowship logos and backgrounds come from the site's fellowships folder: see preview/fellowships/README on the site.</p>
               </div>
               <p className="realm-note">Post text: “{shareText(state)}”</p>
             </Modal>

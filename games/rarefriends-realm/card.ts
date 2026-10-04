@@ -55,7 +55,7 @@ function paintFrame(ctx: CanvasRenderingContext2D, frame: string, x: number, y: 
   ctx.restore();
 }
 
-export function renderCard(game: Game, friend: GenerationSprites | null, region: string, fellowship: FellowshipArt | null = null): HTMLCanvasElement {
+export function renderCard(game: Game, friend: GenerationSprites | null, fellowship: FellowshipArt | null = null): HTMLCanvasElement {
   const canvas = document.createElement("canvas"); canvas.width = CARD.width; canvas.height = CARD.height;
   const ctx = canvas.getContext("2d")!, player = game.player, style = cardStyle(game), FONT = FONTS[style.font] ?? FONTS.mono;
   const dark = paintBackground(ctx, style.bg), inks = INKS[style.ink] ?? INKS.ink, TEXT = dark ? inks.light : inks.dark, MUTED = dark ? "rgba(239,237,231,0.7)" : "#6d6b67";
@@ -91,7 +91,7 @@ export function renderCard(game: Game, friend: GenerationSprites | null, region:
   ctx.fillStyle = TEXT; ctx.font = `bold ${banner ? 40 : 34}px ${FONT}`; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
   const label = player.name ?? `FRIEND #${player.friendId}`; ctx.fillText(label, nameX, nameY);
   if (player.name) { const w = ctx.measureText(label).width; ctx.font = `${banner ? 20 : 17}px ${FONT}`; ctx.fillStyle = MUTED; ctx.fillText(`(${player.friendId})`, nameX + w + 12, nameY); }
-  ctx.font = `${banner ? 22 : 20}px ${FONT}`; ctx.fillStyle = MUTED; ctx.fillText(`${title ? `${title} · ` : ""}${FAMILY_NAMES[player.familyId]} · ${region}`, nameX, nameY + 32);
+  ctx.font = `${banner ? 22 : 20}px ${FONT}`; ctx.fillStyle = MUTED; ctx.fillText(`${title ? `${title} · ` : ""}${FAMILY_NAMES[player.familyId]}`, nameX, nameY + 32);
   if (fellow) {
     ctx.font = `bold ${banner ? 22 : 19}px ${FONT}`; ctx.fillStyle = dark ? GOLD : "#8a6a10";
     const tagText = `[${fellow.tag}] ${fellow.name}`, logoSize = banner ? 34 : 28;

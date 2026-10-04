@@ -13,23 +13,23 @@ export const CARD_CATEGORY_NAMES: Record<CardCategory, string> = { bg: "Card bac
 export const CARD_OPTIONS: Record<CardCategory, readonly CardOption[]> = {
   bg: [
     { id: "paper", name: "Paper", text: "The Realm's own paper and grid." },
-    { id: "parchment", name: "Parchment", presence: 10 },
+    { id: "parchment", name: "Parchment" },
+    { id: "rose", name: "Rose" },
     { id: "night", name: "Starry night", presence: 20 },
-    { id: "rose", name: "Rose", presence: 30 },
     { id: "deadwood", name: "Deadwood", quest: "gravesend_lanterns", text: "Light Gravesend's lanterns." },
     { id: "ashfall", name: "Ashfall", quest: "ashfall_embers", text: "Clear Ashfall's passes." },
-    { id: "gold", name: "Gilt", presence: 60 },
+    { id: "gold", name: "Gilt", presence: 50 },
     { id: "void", name: "The Hollow", presence: 80 },
   ],
   frame: [
-    { id: "rose", name: "Rose" }, { id: "sage", name: "Sage", presence: 5 }, { id: "sky", name: "Sky", presence: 15 }, { id: "sunset", name: "Sunset", presence: 25 },
+    { id: "rose", name: "Rose" }, { id: "sage", name: "Sage" }, { id: "sky", name: "Sky" }, { id: "sunset", name: "Sunset" },
     { id: "dawn", name: "Dawn", quest: "dawn_vigil", text: "Keep the Dawn Vigil." }, { id: "hollow", name: "Hollow", quest: "hollow_king", text: "End the Hollow King's reign." },
-    { id: "starry", name: "Starry", presence: 45 }, { id: "renown", name: "Renown", quest: "the_remembered", text: "Be remembered." },
+    { id: "starry", name: "Starry", presence: 35 }, { id: "renown", name: "Renown", quest: "the_remembered", text: "Be remembered." },
   ],
-  skills: [{ id: "boxes", name: "Boxes" }, { id: "pills", name: "Pills", presence: 12 }, { id: "dark", name: "Ink", presence: 35 }, { id: "gilded", name: "Gilded", presence: 70 }],
-  font: [{ id: "mono", name: "Mono" }, { id: "serif", name: "Serif", presence: 8 }, { id: "sans", name: "Sans", presence: 18 }, { id: "display", name: "Display", presence: 40 }],
-  ink: [{ id: "ink", name: "Ink" }, { id: "navy", name: "Navy", presence: 10 }, { id: "wine", name: "Wine", presence: 22 }, { id: "forest", name: "Forest", presence: 33 }, { id: "gilt", name: "Gold", achievements: 20, text: "Twenty achievements." }],
-  layout: [{ id: "classic", name: "Classic" }, { id: "ledger", name: "Ledger", presence: 30, text: "Skills on the left, your Friend on the right." }, { id: "banner", name: "Banner", presence: 50, text: "Your Friend up top, every skill in a wide row." }],
+  skills: [{ id: "boxes", name: "Boxes" }, { id: "pills", name: "Pills" }, { id: "dark", name: "Ink", presence: 25 }, { id: "gilded", name: "Gilded", presence: 60 }],
+  font: [{ id: "mono", name: "Mono" }, { id: "serif", name: "Serif" }, { id: "sans", name: "Sans" }, { id: "display", name: "Display", presence: 25 }],
+  ink: [{ id: "ink", name: "Ink" }, { id: "navy", name: "Navy" }, { id: "wine", name: "Wine" }, { id: "forest", name: "Forest" }, { id: "gilt", name: "Gold", achievements: 20, text: "Twenty achievements." }],
+  layout: [{ id: "classic", name: "Classic" }, { id: "ledger", name: "Ledger", text: "Skills on the left, your Friend on the right." }, { id: "banner", name: "Banner", presence: 30, text: "Your Friend up top, every skill in a wide row." }],
 };
 export function cardUnlocked(game: Game, option: CardOption): boolean {
   const player = game.player;

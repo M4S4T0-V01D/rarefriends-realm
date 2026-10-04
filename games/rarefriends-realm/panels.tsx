@@ -131,17 +131,13 @@ export type PanelProps = {
   onExportSave?: (action: "copy" | "download") => void; onRestoreSave?: (code: string) => Promise<string | null>; backupStatus?: string;
   net?: NetState; onSocial?: (op: "add" | "remove" | "ignore" | "unignore", id: number) => void; onWhisper?: (id: number) => void; onOnline?: (on: boolean) => void;
 };
-export function SidePanel(props: PanelProps) {
-  const { tab, setTab } = props;
+export function SidePanel(props: PanelProps & { open: boolean; setOpen: (open: boolean) => void }) {
+  const { tab, setTab, open, setOpen } = props;
+  // The tab buttons sit along the bottom; pressing the open tab folds the panel away, pressing any tab opens it.
+  const press = (id: Tab) => { if (open && tab === id) setOpen(false); else { setTab(id); setOpen(true); } };
   return (
-    <aside className="realm-side" aria-label="Game panels">
-      <div className="realm-tabs" role="tablist">
-        {TABS.map(entry => (
-          <button key={entry.id} type="button" role="tab" aria-selected={tab === entry.id} title={`${entry.label} (${entry.key})`} aria-label={entry.label} onClick={() => setTab(entry.id)}
-            {...rightClick(props.openMenu, () => [{ verb: "Open", noun: entry.label, run: () => setTab(entry.id) }])}><PixelIcon art={tabArt(entry.id as TabIcon)} size={24} /></button>
-        ))}
-      </div>
-      <div className="realm-tab-body" role="tabpanel" aria-label={TABS.find(entry => entry.id === tab)?.label}>
+    <aside className="realm-side" aria-label="Game panels" data-open={open}>
+      {open && <div className="realm-tab-body" role="tabpanel" aria-label={TABS.find(entry => entry.id === tab)?.label}>
         {tab === "combat" && <CombatTab {...props} />}
         {tab === "skills" && <SkillsTab {...props} />}
         {tab === "quests" && <QuestsTab {...props} />}
@@ -152,6 +148,13 @@ export function SidePanel(props: PanelProps) {
         {tab === "friends" && <FriendsTab {...props} />}
         {tab === "settings" && <SettingsTab {...props} />}
         {tab === "emotes" && <EmotesTab {...props} />}
+      </div>}
+      <div className="realm-tabs" role="tablist">
+        {TABS.map(entry => (
+          <button key={entry.id} type="button" role="tab" aria-selected={tab === entry.id} title={`${entry.label} (${entry.key})${open && tab === entry.id ? " · press again to hide" : ""}`} aria-label={entry.label} onClick={() => press(entry.id)}
+            {...rightClick(props.openMenu, () => [{ verb: "Open", noun: entry.label, run: () => { setTab(entry.id); setOpen(true); } }, { verb: open ? "Hide" : "Show", noun: "panel", run: () => setOpen(!open) }])}><PixelIcon art={tabArt(entry.id as TabIcon)} size={24} /></button>
+        ))}
+        <button type="button" className="realm-side-toggle" aria-expanded={open} aria-label={open ? "Hide the panel" : "Show the panel"} title={open ? "Hide the panel" : "Show the panel"} onClick={() => setOpen(!open)}>{open ? "▾" : "▴"}</button>
       </div>
     </aside>
   );
