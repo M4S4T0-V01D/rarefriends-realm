@@ -42,7 +42,7 @@ export type ObjectKind =
 export type DecorKind =
   | "flowers" | "bush" | "boulder" | "lamp" | "bench" | "crate" | "barrel" | "tent" | "cactus" | "pine" | "dead_tree" | "statue"
   | "grave" | "fence" | "reeds" | "table" | "bed" | "shelf" | "pillar" | "rubble" | "snowman" | "lily" | "banner" | "torch" | "palm" | "hay" | "windmill" | "boat" | "chest"
-  | "throne" | "armour" | "logpile" | "stump" | "target" | "ruin_wall" | "old_friend";
+  | "throne" | "armour" | "logpile" | "stump" | "target" | "ruin_wall" | "old_friend" | "tomb" | "crypt" | "obelisk" | "bones";
 export type WorldObject = {
   id: number; kind: ObjectKind; x: number; y: number; name: string; blocks: boolean;
   tree?: TreeKind; rock?: RockKind; spot?: SpotKind; decor?: DecorKind; stall?: StallKind;
@@ -647,7 +647,7 @@ function buildMainland(seed: number) {
   building(192, 27, 199, 32, "w", T.WOOD, undefined, { name: "Frostpeak lodge", color: "#f3f2ee", chimney: true });      // Frostpeak lodge
   add({ kind: "bank", x: 197, y: 28, blocks: true, name: "Bank booth" }); npc("banker", 196, 29); npc("outfitter", 194, 30); npc("villager", 200, 34, 3); npc("villager", 191, 33, 3);
   add({ kind: "range", x: 193, y: 28, blocks: true, name: "Cooking range" });
-  scatter(172, 6, 236, 44, 60, (x, y) => decor(x, y, random() > 0.3 ? "pine" : "boulder"), (x, y) => free(x, y) && get(x, y) === T.SNOW);
+  scatter(172, 6, 236, 44, 60, (x, y) => random() > 0.3 ? tree(x, y, "pine") : decor(x, y, "boulder"), (x, y) => free(x, y) && get(x, y) === T.SNOW);
   scatter(200, 36, 230, 44, 10, (x, y) => tree(x, y, "ashwood"), (x, y) => free(x, y) && get(x, y) === T.SNOW);
   decor(188, 34, "snowman", true, "Snow Friend");
   monsters("wolf", 180, 14, 204, 26, 8);
@@ -692,13 +692,13 @@ function buildMainland(seed: number) {
   add({ kind: "stall", stall: "gem", x: 189, y: 110, blocks: true, name: "Gem stall" });
   npc("merchant", 186, 110, 2); npc("villager", 184, 114, 4); npc("villager", 181, 114, 4);
   scatter(172, 72, 236, 136, 40, (x, y) => decor(x, y, random() > 0.35 ? "cactus" : "boulder"), (x, y) => free(x, y) && get(x, y) === T.SAND);
-  scatter(186, 112, 196, 122, 6, (x, y) => decor(x, y, "palm"), (x, y) => free(x, y) && [[2, 0], [0, 2], [-2, 0], [0, -2]].some(([dx, dy]) => isWater(get(x + dx, y + dy))));
+  scatter(186, 112, 196, 122, 6, (x, y) => tree(x, y, "palm"), (x, y) => free(x, y) && [[2, 0], [0, 2], [-2, 0], [0, -2]].some(([dx, dy]) => isWater(get(x + dx, y + dy))));
   monsters("bandit", 198, 84, 226, 104, 10);
   for (let i = 0; i < 5; i++) { const x = 222 + (i % 3) * 2, y = 118 + Math.floor(i / 3) * 3; if (get(x, y) === T.SAND) rock(x, y, "gem"); }
   decor(214, 78, "rubble"); decor(216, 79, "pillar"); decor(211, 80, "pillar");
 
   // ---------- Murkmire ----------
-  scatter(10, 142, 82, 194, 40, (x, y) => decor(x, y, random() > 0.5 ? "dead_tree" : "reeds", random() > 0.5), (x, y) => free(x, y) && get(x, y) === T.SWAMP);
+  scatter(10, 142, 82, 194, 40, (x, y) => random() > 0.5 ? tree(x, y, "deadwood") : decor(x, y, "reeds", random() > 0.5), (x, y) => free(x, y) && get(x, y) === T.SWAMP);
   scatter(12, 140, 80, 194, 14, (x, y) => tree(x, y, "willow"), (x, y) => free(x, y) && get(x, y) === T.SWAMP);
   monsters("swamp_lurker", 16, 158, 76, 190, 14);
   building(36, 172, 44, 179, "n", T.STONE, undefined, { name: "Crypt", color: "#6d6b67" });                              // The crypt
@@ -836,7 +836,7 @@ function buildMainland(seed: number) {
   }
   shoreSpots(284, 116, 300, 128, "lure", 3);
   // Pines on the slopes, trees in the valleys, boulders on the scree.
-  scatter(234, 20, W - 8, 190, 170, (x, y) => decor(x, y, get(x, y) === T.SNOW || random() < 0.55 ? "pine" : "boulder", true), (x, y) => free(x, y) && get(x, y) !== T.COBBLE && ((x - HC.x) / 19) ** 2 + ((y - HC.y) / 15) ** 2 > 1.2);
+  scatter(234, 20, W - 8, 190, 170, (x, y) => get(x, y) === T.SNOW || random() < 0.55 ? tree(x, y, "pine") : decor(x, y, "boulder", true), (x, y) => free(x, y) && get(x, y) !== T.COBBLE && ((x - HC.x) / 19) ** 2 + ((y - HC.y) / 15) ** 2 > 1.2);
   scatter(234, 60, W - 8, 190, 70, (x, y) => tree(x, y, random() < 0.5 ? "tree" : random() < 0.6 ? "maple" : "yew"), (x, y) => free(x, y) && (get(x, y) === T.GRASS || get(x, y) === T.DARK_GRASS) && ((x - HC.x) / 19) ** 2 + ((y - HC.y) / 15) ** 2 > 1.4);
   monsters("wolf", 240, 36, 300, 66, 6); monsters("frost_yeti", 250, 24, 305, 52, 4); monsters("gloom_hound", 250, 132, 305, 178, 5); monsters("bandit", 238, 90, 262, 118, 4);
 
@@ -1224,13 +1224,14 @@ const i2 = (random: () => number) => random() > 0.5;
 const SIDES = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
 /** Faded roof tiles in the Rare Friends accents. */
 const ROOF_COLORS = ["#c99a96", "#9aab92", "#8f9cb2", "#cdb98a", "#a996b5"];
-const TREE_NAMES: Record<TreeKind, string> = { tree: "Tree", oak: "Oak", willow: "Willow", maple: "Maple tree", yew: "Yew", ashwood: "Ashwood" };
+const TREE_NAMES: Record<TreeKind, string> = { tree: "Tree", oak: "Oak", willow: "Willow", maple: "Maple tree", yew: "Yew", ashwood: "Ashwood", palm: "Palm tree", pine: "Pine tree", deadwood: "Dead tree" };
 const DECOR_NAMES: Record<DecorKind, string> = {
   flowers: "Flowers", bush: "Bush", boulder: "Boulder", lamp: "Lamp post", bench: "Bench", crate: "Crate", barrel: "Barrel", tent: "Tent",
   cactus: "Cactus", pine: "Pine tree", dead_tree: "Dead tree", statue: "Statue", grave: "Grave", fence: "Fence", reeds: "Reeds", table: "Table",
   bed: "Bed", shelf: "Shelves", pillar: "Pillar", rubble: "Rubble", snowman: "Snow Friend", lily: "Lily pad", banner: "Banner", torch: "Torch",
   palm: "Palm tree", hay: "Hay bales", windmill: "Windmill", boat: "Boat", chest: "Chest", throne: "Throne", armour: "Suit of armour",
   logpile: "Log pile", stump: "Chopping block", target: "Archery target", ruin_wall: "Crumbling wall", old_friend: "Statue of the Old Friend",
+  tomb: "Stone tomb", crypt: "Crypt", obelisk: "Obelisk", bones: "Bones",
 };
 
 export function terrainAt(world: World, x: number, y: number) { return inBounds(x, y) ? world.tiles[tileIndex(x, y)] : T.VOID; }

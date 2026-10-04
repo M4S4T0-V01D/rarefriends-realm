@@ -191,6 +191,9 @@ const ITEMS: Item[] = [
   { id: "maple_logs", name: "Maple logs", examine: "Logs cut from a maple tree.", value: 70, icon: { shape: "log", color: "#c49a74" } },
   { id: "yew_logs", name: "Yew logs", examine: "Logs cut from a yew tree.", value: 180, icon: { shape: "log", color: "#7d6b5c" } },
   { id: "ash_logs", name: "Ashwood logs", examine: "Pale logs that hum faintly. From the Frostpeak ashwoods.", value: 400, icon: { shape: "log", color: "#d6d3cc" } },
+  { id: "palm_logs", name: "Palm logs", examine: "Fibrous logs that burn hot and quick. Springy enough for a bow.", value: 50, icon: { shape: "log", color: "#c9b48a" } },
+  { id: "pine_logs", name: "Pine logs", examine: "Resinous logs from the high slopes. They crackle.", value: 120, icon: { shape: "log", color: "#8a6446", accent: "#4f5234" } },
+  { id: "deadwood_logs", name: "Deadwood logs", examine: "Grey, light, unnaturally dry. They burn with a pale flame, and a wand cut from one holds a charge.", value: 300, icon: { shape: "log", color: "#9a958d", accent: "#4a3a60" } },
   // Ores and bars
   { id: "pewter_ore", name: "Pewter ore", examine: "Soft grey ore. Smelts straight into pewter.", value: 3, icon: { shape: "ore", kind: "pewter", color: "#a4a7aa" } },
   { id: "blackiron_ore", name: "Blackiron ore", examine: "This needs refining.", value: 17, icon: { shape: "ore", kind: "blackiron", color: "#8c6f62" } },
@@ -245,7 +248,7 @@ const ITEMS: Item[] = [
     ["ember_sigil", "Ember sigil", "#d99a82"], ["thought_sigil", "Thought sigil", "#d6c58f"], ["storm_sigil", "Storm sigil", "#d0b27c"],
     ["path_sigil", "Path sigil", "#8fa0c9"], ["hollow_sigil", "Hollow sigil", "#6d6b67"], ["bloom_sigil", "Bloom sigil", "#9fbf9a"],
     ["star_sigil", "Star sigil", "#e2d49e"], ["shade_sigil", "Shade sigil", "#b9a8c9"],
-  ] as const).map(([id, name, color]) => ({ id, name, examine: "Used for magic spells.", value: { path_sigil: 60, hollow_sigil: 70, storm_sigil: 35, bloom_sigil: 45, star_sigil: 25, shade_sigil: 4, thought_sigil: 3 }[id as string] ?? 2, stackable: true, icon: { shape: "sigil" as const, color } })),
+  ] as const).map(([id, name, color]) => ({ id, name, examine: "Used for magic spells.", value: { path_sigil: 60, hollow_sigil: 70, storm_sigil: 35, bloom_sigil: 45, star_sigil: 25, shade_sigil: 4, thought_sigil: 3 }[id as string] ?? 2, stackable: true, icon: { shape: "sigil" as const, color, kind: id.replace("_sigil", "") } })),
   { id: "sweetberry", name: "Sweetberries", examine: "A handful of pale berries. They used to be a bone.", value: 2, heal: 2, icon: { shape: "berries", color: "#c6bed4" } },
   // Stealth loot (pickpocketing and stalls)
   { id: "silk", name: "Silk", examine: "It's a sheet of silk.", value: 30, icon: { shape: "silk", color: "#e9e1ef" } },
@@ -386,6 +389,8 @@ const OTHER_GEAR: Item[] = [
   { id: "tide_staff", name: "Tide staff", examine: "A magical staff. Provides unlimited tide sigils.", value: 1500, icon: { shape: "staff", color: "#9fb4d0" }, equip: { slot: "weapon", bonuses: { attack: 4, strength: 5, magic: 10 }, speed: 5, staff: true, requires: { magic: 10 } } },
   { id: "stone_staff", name: "Stone staff", examine: "A magical staff. Provides unlimited stone sigils.", value: 1500, icon: { shape: "staff", color: "#a89479" }, equip: { slot: "weapon", bonuses: { attack: 4, strength: 5, magic: 10 }, speed: 5, staff: true, requires: { magic: 10 } } },
   { id: "ember_staff", name: "Ember staff", examine: "A magical staff. Provides unlimited ember sigils.", value: 1500, icon: { shape: "staff", color: "#e9a07a" }, equip: { slot: "weapon", bonuses: { attack: 4, strength: 5, magic: 10 }, speed: 5, staff: true, requires: { magic: 10 } } },
+  { id: "deadwood_wand", name: "Deadwood wand", examine: "A wand of grey deadwood. It holds a charge the way the Deadwood holds its dead: quietly, and for a long time. Autocasts like a staff.", value: 2400, icon: { shape: "staff", color: "#9a958d", accent: "#8a62c8", kind: "wand" },
+    equip: { slot: "weapon", bonuses: { attack: 6, strength: 2, magic: 18 }, requires: { magic: 50 }, speed: 4, staff: true } },
   { id: "wyrmward_shield", name: "Wyrmward shield", examine: "King Hollis's gift. Dragonfire slides right off it.", value: 200, icon: { shape: "shield", color: "#c9c2b6", accent: "#cf6e6e" }, equip: { slot: "shield", bonuses: { defence: 8 } } },
   { id: "drakehide_bracers", name: "Drakehide bracers", examine: "Scaled drakehide bracers.", value: 2500, icon: { shape: "bracer", color: "#6f8a5c" }, equip: { slot: "hands", bonuses: { ranged: 9, defence: 7 }, requires: { ranged: 50 } } },
   { id: "drakehide_chaps", name: "Drakehide chaps", examine: "Scaled drakehide chaps.", value: 5000, icon: { shape: "legs", color: "#6f8a5c" }, equip: { slot: "legs", bonuses: { ranged: 14, defence: 20 }, requires: { ranged: 50 } } },
@@ -407,7 +412,9 @@ export const BOWS = [
   { id: "shortbow", name: "Shortbow", level: 1, ranged: 8, value: 50, color: "#9c8672" },
   { id: "oak_bow", name: "Oak bow", level: 5, ranged: 14, value: 160, color: "#b59c7d" },
   { id: "willow_bow", name: "Willow bow", level: 20, ranged: 20, value: 320, color: "#a5a67d" },
+  { id: "palm_bow", name: "Palm bow", level: 25, ranged: 24, value: 480, color: "#c9b48a" },
   { id: "maple_bow", name: "Maple bow", level: 30, ranged: 29, value: 640, color: "#c49a74" },
+  { id: "pine_bow", name: "Pine bow", level: 35, ranged: 36, value: 1000, color: "#8a6446" },
   { id: "yew_bow", name: "Yew bow", level: 40, ranged: 47, value: 1600, color: "#7d6b5c" },
   { id: "ashwood_bow", name: "Ashwood bow", level: 50, ranged: 69, value: 3200, color: "#d6d3cc" },
   { id: "gloomfang_bow", name: "Gloomfang bow", level: 60, ranged: 88, value: 40000, color: "#4a4458" },
@@ -731,7 +738,7 @@ export function item(id: string): Item {
 export const isItem = (id: unknown): id is string => typeof id === "string" && ITEM_MAP.has(id);
 
 // ---------- Gathering ----------
-export type TreeKind = "tree" | "oak" | "willow" | "maple" | "yew" | "ashwood";
+export type TreeKind = "tree" | "oak" | "willow" | "maple" | "yew" | "ashwood" | "palm" | "pine" | "deadwood";
 export const TREES: Record<TreeKind, { name: string; level: number; xp: number; log: string; low: number; high: number; deplete: number; respawn: number }> = {
   tree: { name: "Tree", level: 1, xp: 25, log: "logs", low: 64, high: 200, deplete: 1, respawn: 12 },
   oak: { name: "Oak tree", level: 15, xp: 37.5, log: "oak_logs", low: 32, high: 100, deplete: 1 / 8, respawn: 14 },
@@ -739,6 +746,10 @@ export const TREES: Record<TreeKind, { name: string; level: number; xp: number; 
   maple: { name: "Maple tree", level: 45, xp: 100, log: "maple_logs", low: 8, high: 25, deplete: 1 / 8, respawn: 50 },
   yew: { name: "Yew tree", level: 60, xp: 175, log: "yew_logs", low: 4, high: 12, deplete: 1 / 8, respawn: 100 },
   ashwood: { name: "Ashwood tree", level: 70, xp: 250, log: "ash_logs", low: 3, high: 9, deplete: 1 / 10, respawn: 150 },
+  // The wider world's trees: every tree in the Realm can be cut and burnt.
+  palm: { name: "Palm tree", level: 25, xp: 55, log: "palm_logs", low: 20, high: 60, deplete: 1 / 8, respawn: 30 },
+  pine: { name: "Pine tree", level: 35, xp: 80, log: "pine_logs", low: 14, high: 45, deplete: 1 / 8, respawn: 40 },
+  deadwood: { name: "Dead tree", level: 55, xp: 150, log: "deadwood_logs", low: 6, high: 18, deplete: 1 / 8, respawn: 90 },
 };
 export type RockKind = "pewter" | "clay" | "blackiron" | "inkcoal" | "moonsilver" | "glimmer" | "rarite" | "gem" | "sigil";
 export const ROCKS: Record<RockKind, { name: string; level: number; xp: number; ore: string; low: number; high: number; respawn: number; color: string }> = {
@@ -780,6 +791,7 @@ export const COOKING: Record<string, { cooked: string; level: number; xp: number
 export const FIREMAKING: Record<string, { level: number; xp: number }> = {
   logs: { level: 1, xp: 40 }, oak_logs: { level: 15, xp: 60 }, willow_logs: { level: 30, xp: 90 },
   maple_logs: { level: 45, xp: 135 }, yew_logs: { level: 60, xp: 202.5 }, ash_logs: { level: 70, xp: 280 },
+  palm_logs: { level: 25, xp: 80 }, pine_logs: { level: 35, xp: 110 }, deadwood_logs: { level: 55, xp: 180 },
 };
 /** Smelting: ores in, bar out. Blackiron has a 50% success rate without a ring (like the classic furnace). */
 export const SMELTING: Record<MetalId, { level: number; xp: number; ores: Readonly<Record<string, number>>; chance?: number }> = {
@@ -823,7 +835,10 @@ export const FLETCH_BOWS = [
   { log: "logs", bow: "shortbow", level: 5, xp: 5 }, { log: "oak_logs", bow: "oak_bow", level: 20, xp: 16.5 },
   { log: "willow_logs", bow: "willow_bow", level: 35, xp: 33 }, { log: "maple_logs", bow: "maple_bow", level: 50, xp: 50 },
   { log: "yew_logs", bow: "yew_bow", level: 65, xp: 67.5 }, { log: "ash_logs", bow: "ashwood_bow", level: 80, xp: 83 },
+  { log: "palm_logs", bow: "palm_bow", level: 40, xp: 40 }, { log: "pine_logs", bow: "pine_bow", level: 52, xp: 55 },
 ] as const;
+/** Wands: a magic weapon fletched from a log that holds a charge (deadwood). One-handed, a staff for autocasting, no sigils of its own. */
+export const FLETCH_WANDS = [{ log: "deadwood_logs", wand: "deadwood_wand", level: 58, xp: 70 }] as const;
 /** Arrow tiers: Fletching level and XP per arrow. Arrowheads come from the anvil (15 per bar). */
 export const FLETCH_ARROWS: Record<MetalId, { level: number; xp: number }> = {
   pewter: { level: 1, xp: 1.3 }, blackiron: { level: 15, xp: 2.5 }, ashsteel: { level: 30, xp: 5 }, moonsilver: { level: 45, xp: 7.5 }, glimmer: { level: 60, xp: 10 }, rarite: { level: 75, xp: 12.5 },

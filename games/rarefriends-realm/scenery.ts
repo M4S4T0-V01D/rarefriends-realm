@@ -136,7 +136,16 @@ export function decorArt(kind: string, variant: number, frame = 0): HTMLCanvasEl
     case "lamp": return pixelArt(key, 10, 30, p => { p.rect(4, 8, 2, 21, "#3b3a38"); p.rect(2, 28, 6, 2, "#3b3a38"); p.rect(1, 1, 8, 7, "#f4ecc8"); p.rect(1, 1, 8, 1, "#3b3a38"); p.rect(4, 3, 2, 3, "#ffffff"); p.outline(); });
     case "torch": return pixelArt(key, 10, 22, p => { p.rect(4, 9, 2, 12, BARK); p.rect(3, 8, 4, 2, "#5f5e66"); p.outline(); });
     case "banner": return pixelArt(key, 14, 30, p => { p.rect(1, 1, 2, 28, "#3b3a38"); p.poly([[3, 2], [13, 3], [13, 17], [8, 14], [3, 17]], COLORS.rose, null); p.rect(6, 6, 4, 4, COLORS.paper); p.outline(); });
-    case "grave": return pixelArt(key, 12, 16, p => { p.poly([[1, 15], [1, 5], [3, 2], [9, 2], [11, 5], [11, 15]], COLORS.stone, null); p.line(6, 5, 6, 11, COLORS.stoneDark); p.line(4, 7, 8, 7, COLORS.stoneDark); p.dither(COLORS.stoneDark, x => x > 7 ? 0.4 : 0, COLORS.stone); p.outline(); });
+    // Three kinds of headstone: the rounded stone, a cross, and a slab leaning the way the frost pushed it, cracked.
+    case "grave": return variant === 1 ? pixelArt(key, 12, 18, p => { p.rect(5, 2, 3, 15, COLORS.stone); p.rect(2, 5, 9, 3, COLORS.stone); p.rect(3, 15, 7, 2, COLORS.stoneDark); p.dither(COLORS.stoneDark, x => x > 6 ? 0.4 : 0, COLORS.stone); p.outline(); })
+      : variant === 2 ? pixelArt(key, 14, 16, p => { p.poly([[2, 15], [4, 4], [6, 2], [11, 3], [12, 6], [9, 15]], COLORS.stone, null); p.line(7, 6, 6, 11, "#6f6b64"); p.line(6, 11, 8, 13, "#6f6b64"); p.dither("#9fae8a", (x, y) => y > 10 ? 0.35 : 0, COLORS.stone); p.dither(COLORS.stoneDark, x => x > 8 ? 0.4 : 0, COLORS.stone); p.outline(); })
+      : pixelArt(key, 12, 16, p => { p.poly([[1, 15], [1, 5], [3, 2], [9, 2], [11, 5], [11, 15]], COLORS.stone, null); p.line(6, 5, 6, 11, COLORS.stoneDark); p.line(4, 7, 8, 7, COLORS.stoneDark); p.dither(COLORS.stoneDark, x => x > 7 ? 0.4 : 0, COLORS.stone); p.outline(); });
+    // A heap of old bones and a skull, picked clean.
+    case "bones": return pixelArt(key, 18, 9, p => {
+      for (let i = 0; i < 3; i++) { const x = 2 + Math.floor(random() * 9), y = 3 + Math.floor(random() * 4); p.line(x, y, x + 5, y - 1, "#e8e4d6"); p.set(x, y + 1, "#e8e4d6"); p.set(x + 5, y - 2, "#e8e4d6"); }
+      const sx = 10 + Math.floor(random() * 4); p.disc(sx, 4, 3, 2.6, "#efede7", null); p.set(sx - 1, 4, "#3b3a38"); p.set(sx + 1, 4, "#3b3a38"); p.rect(sx - 1, 6, 3, 1, "#c8c5be");
+      p.outline();
+    });
     case "rubble": return pixelArt(key, 18, 8, p => { for (let i = 0; i < 4; i++) { const x = 2 + random() * 12, y = 3 + random() * 3; p.poly([[x, y + 3], [x + 1, y], [x + 4, y], [x + 5, y + 3]], COLORS.stone, null); } p.outline(); });
     case "snowman": return pixelArt(key, 16, 22, p => { p.disc(8, 16, 6, 5, "#ffffff", null); p.disc(8, 7, 4.5, 4.5, "#ffffff", null); p.set(6, 6, INK); p.set(10, 6, INK); p.rect(8, 8, 3, 1, "#e9a07a"); p.rect(4, 11, 8, 1, COLORS.rose); p.dither("#dfe7ec", (x, y) => x > 9 ? 0.4 : 0, "#ffffff"); p.outline(); });
     case "chest": return pixelArt(key, 16, 13, p => { p.rect(1, 5, 14, 7, COLORS.wood); p.poly([[1, 5], [3, 1], [13, 1], [15, 5]], "#a88f74", null); p.rect(7, 5, 2, 3, "#e2d49e"); p.line(1, 8, 14, 8, "#7a6553"); p.outline(); });

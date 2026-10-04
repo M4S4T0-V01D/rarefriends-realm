@@ -87,7 +87,7 @@ export type Player = {
   visited: Partial<Record<string, number>>; regionTicks: Partial<Record<string, number>>; talked: Partial<Record<string, 1>>; emotesUsed: Partial<Record<string, 1>>; outfits: Partial<Record<string, 1>>; friendTicks: number;
   /** Your Friend's voice: first times it remembers (the day), creature kinds it has remarked on, and the bookkeeping that keeps it from chattering (not saved). */
   firsts: Partial<Record<string, number>>; friendKinds: Partial<Record<string, 1>>; rumours: Partial<Record<string, 1>>;
-  friendLast: number; friendEventAt: Partial<Record<string, number>>; friendRegion: string | null; friendNight: boolean; friendRain: boolean; friendSeen: string | null; combatSaid: number | null;
+  friendLast: number; friendEventAt: Partial<Record<string, number>>; friendRegion: string | null; friendNight: boolean; friendRain: boolean; friendSeen: string | null; combatSaid: number | null; friendVillage: string | null;
   /** When (wall-clock ms) your recent referrals were credited: at most REFERRALS_PER_DAY in any 24 hours. */
   referralTimes: number[];
   /** You've been told today's referral limit is reached (not saved). */
@@ -158,7 +158,7 @@ export type Game = {
   shopStock: Record<string, Slot[]>;
   depleted: Map<number, number>; herbPicks: Map<number, number>; messages: Message[];
   /** What the sky is doing (set by the page each frame; the engine only reads it) and how much your Friend talks. */
-  ambient: { night: boolean; rain: boolean }; friendSpeech: "full" | "reduced" | "rare" | "off"; events: GameEvent[]; rng: () => number; nextUid: number;
+  ambient: { night: boolean; rain: boolean; storm?: boolean; fog?: boolean }; friendSpeech: "full" | "reduced" | "rare" | "off"; events: GameEvent[]; rng: () => number; nextUid: number;
   dialogue: Dialogue | null; ui: { shop: string | null; bank: boolean; production: ProductionMenu | null; lamp: number | null; naming: "first" | "rename" | null };
   held: { dx: number; dy: number } | null; autoRetaliate: boolean; playTicks: number;
   overheads: Map<number, { text: string; until: number }>;
@@ -201,7 +201,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
     style: "accurate", autocast: null, prayers: [], target: null, activity: null, combat: null,
     attackTimer: 0, eatTimer: 0, stunned: 0, regenTimer: 0, quests: {}, questData: {},
     wardrobe: [], worn: [], follower: null, courseStep: -1, kills: 0, deaths: 0, overhead: null, music: ["theme"],
-    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, boneBag: {}, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false }, seenUpdate: LATEST_UPDATE,
+    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, boneBag: {}, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, friendVillage: null, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false }, seenUpdate: LATEST_UPDATE,
     lastHitBy: null, created: Date.now(), queuedSpell: null, castTimer: 0,
   };
 }

@@ -401,8 +401,8 @@ function MagicTab({ game, refresh, setSelection, selection, openMenu }: PanelPro
   const learnt = (spell: Spell) => !spell.quest || (player.quests[spell.quest] ?? 0) >= 2;
   return (
     <div>
-      <div className="realm-magic-tabs" role="tablist" aria-label="Spellbook">
-        {SPELL_TABS.map(entry => <button key={entry.id} type="button" role="tab" aria-selected={tab === entry.id} onClick={() => setTab(entry.id)}>{entry.name}<small>{SPELLS.filter(spell => entry.kinds.includes(spell.kind) && level >= spell.level && learnt(spell)).length}/{SPELLS.filter(spell => entry.kinds.includes(spell.kind)).length}</small></button>)}
+      <div className="realm-graphics realm-magic-tabs" role="tablist" aria-label="Spellbook">
+        {SPELL_TABS.map(entry => <button key={entry.id} type="button" role="tab" aria-selected={tab === entry.id} aria-checked={tab === entry.id} onClick={() => setTab(entry.id)}>{entry.name}<small>{SPELLS.filter(spell => entry.kinds.includes(spell.kind) && level >= spell.level && learnt(spell)).length}/{SPELLS.filter(spell => entry.kinds.includes(spell.kind)).length}</small></button>)}
       </div>
       <div className="realm-icon-grid spells">
         {spells.map(spell => {
@@ -415,7 +415,7 @@ function MagicTab({ game, refresh, setSelection, selection, openMenu }: PanelPro
               {...rightClick(openMenu, () => [
                 { verb: "Cast", noun: spell.name, tone: "level", run: () => { const next = castSpell(game, spell.id); setSelection(next); refresh(); } },
                 ...(spell.maxHit && staff ? [{ verb: player.autocast === spell.id ? "Stop-autocast" : "Autocast", noun: spell.name, tone: "level", run: () => { castSpell(game, spell.id); refresh(); } }] : []),
-                { verb: "Examine", noun: spell.name, run: () => { message(game, `${spell.name} (level ${spell.level}): ${spell.description}`); refresh(); } },
+                { verb: "Examine", noun: spell.name, run: () => { const cost = Object.entries(spell.sigils).map(([id, n]) => `${n} ${item(id).name.toLowerCase()}${n > 1 ? "s" : ""}`).join(", "); message(game, `${spell.name} (level ${spell.level}): ${spell.description}${cost ? ` Sigils: ${cost}.` : " No sigils."}${spell.quest ? ` Learnt with ${QUESTS.find(entry => entry.id === spell.quest)?.name}.` : ""}`); refresh(); } },
               ])}>
               <PixelIcon art={spellArt(spell.id, spell.element, spell.kind)} size={28} />
             </button>
@@ -597,16 +597,19 @@ function SettingsTab({ game, settings, setSettings, trackName, trackId, playTrac
 // ---------- Chat, dialogue, level-ups, production ----------
 export function ChatBox({ messages, onSend, prefill }: { messages: readonly Message[]; onSend: (text: string) => void; prefill?: { text: string; at: number } | null }) {
   const [filter, setFilter] = useState<"all" | "game" | "public" | "private">("all"), [draft, setDraft] = useState(""), list = useRef<HTMLDivElement>(null), input = useRef<HTMLInputElement>(null);
+  const [folded, setFolded] = useState(() => { try { return localStorage.getItem("realm:chat-folded") === "1"; } catch { return false; } });
+  const fold = (next: boolean) => { setFolded(next); try { localStorage.setItem("realm:chat-folded", next ? "1" : "0"); } catch { /* no storage */ } };
   const social = (tone: string) => tone === "public" || tone === "private";
   const shown = messages.filter(entry => filter === "all" || (filter === "game" ? !social(entry.tone) : entry.tone === filter)).slice(-60);
   // "Message" on a player starts a private line to them.
   useEffect(() => { if (prefill) { setDraft(prefill.text); setTimeout(() => input.current?.focus(), 0); } }, [prefill]);
   useEffect(() => { const node = list.current; if (node) node.scrollTop = node.scrollHeight; }, [shown.length, filter]);
   return (
-    <section className="realm-chat" aria-label="Chat">
-      <div className="realm-chat-log" ref={list} role="log" aria-live="polite">
+    <section className="realm-chat" aria-label="Chat" data-folded={folded}>
+      <button type="button" className="realm-chat-fold" onClick={() => fold(!folded)} aria-expanded={!folded} title={folded ? "Show the chat" : "Minimise the chat"}>{folded ? "▴ Chat" : "▾"}</button>
+      {!folded && <div className="realm-chat-log" ref={list} role="log" aria-live="polite">
         {shown.map((entry, index) => <p key={`${entry.tick}-${index}`} className={`chat-${entry.tone}`}>{entry.text}</p>)}
-      </div>
+      </div>}
       {/* No <form>: the sandboxed game frame has no allow-forms, so a submit would be blocked. Enter sends. */}
       <div className="realm-chat-input">
         <label><span>You:</span><input ref={input} value={draft} maxLength={88} onChange={event => setDraft(event.target.value)} placeholder="Press Enter to chat" aria-label="Say something" data-chat="true"
@@ -842,7 +845,8 @@ export function ProfilePanel({ game, refresh }: { game: Game; refresh: () => voi
     <div className="realm-profile">
       <div className="realm-profile-head">
         <h3 className="realm-profile-name">{p.name ?? `Friend #${p.friendId}`}{p.fellowship && <span className="realm-profile-tag">[{p.fellowship.tag}]</span>}<small className="realm-profile-id">({p.friendId})</small></h3>
-        <p className="realm-muted">{p.title ?? "No title yet"} · Presence <b>{p.level}</b></p>
+        <p className="realm-muted">{p.title ?? "No title yet"} · Presence <b>{p.level}</b>{p.level < 99 && <> · {Math.round(player.xp.presence).toLocaleString()} / {XP_TABLE[p.level + 1].toLocaleString()} XP</>}</p>
+        {p.level < 99 && <div className="realm-quest-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(100 * (player.xp.presence - XP_TABLE[p.level]) / (XP_TABLE[p.level + 1] - XP_TABLE[p.level]))} aria-label="Presence to the next level"><span style={{ width: `${100 * (player.xp.presence - XP_TABLE[p.level]) / (XP_TABLE[p.level + 1] - XP_TABLE[p.level])}%` }} /></div>}
       </div>
       <dl className="realm-profile-grid">
         <div><dt>Friend</dt><dd>{p.family} #{p.friendId}</dd></div>

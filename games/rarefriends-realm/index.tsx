@@ -502,7 +502,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           const wall = Date.now(), here = regionAt(state.world, state.player.x, state.player.y).id, below = isUnderground(state.player.y);
           const weather = fixedWeather ?? weatherAt(wall, here, below, live.current.settings.dayNight !== false ? timeOfDay() : null), strike = weather.storm ? strikeAt(wall) : null;
           // What the sky is doing, for your Friend's remarks, and how much it talks.
-          state.ambient = { night: live.current.settings.dayNight !== false && daylight(timeOfDay()).label === "Night", rain: weather.rain > 0.3 };
+          state.ambient = { night: live.current.settings.dayNight !== false && daylight(timeOfDay()).label === "Night", rain: weather.rain > 0.3, storm: weather.storm, fog: weather.fog > 0.4 };
           state.friendSpeech = live.current.settings.friendSpeech ?? "full";
           // Thunder follows the flash (a second or two later, as if the storm were a little way off).
           if (strike && strike.id !== lastThunder) { lastThunder = strike.id; setTimeout(() => audio.current?.sfx("thunder", 0.9), 500 + (strike.seed % 1500)); }

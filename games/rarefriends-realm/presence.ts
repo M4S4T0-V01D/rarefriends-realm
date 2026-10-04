@@ -12,7 +12,9 @@ import { addXp, count, message, sound, take, type Game, type Player } from "./st
 import { REGIONS, regionAt, type RegionId } from "./world.ts";
 
 /** Presence XP is "raw": it ignores XP relics and rates, so it's earned at one pace for everyone. */
-export function presenceXp(game: Game, amount: number) { addXp(game, "presence", amount, { raw: true }); }
+/** Presence comes slowly: half the pace the rest of the Realm is earned at, since it should take longest of all. */
+export const PRESENCE_RATE = 0.5;
+export function presenceXp(game: Game, amount: number) { addXp(game, "presence", amount * PRESENCE_RATE, { raw: true }); }
 export const presenceLevel = (player: Player) => levelForXp(player.xp.presence);
 
 // ---------- Names and fellowships ----------

@@ -102,7 +102,7 @@ export function rumourAt(game: Game, x: number, y: number): string {
   const fresh = pool.filter(rumour => !game.player.rumours[keyOf(rumour)]);
   const pick = (fresh.length ? fresh : pool)[Math.floor(game.rng() * (fresh.length ? fresh : pool).length)];
   const key = keyOf(pick);
-  if (!game.player.rumours[key]) { game.player.rumours[key] = 1; addXp(game, "presence", 5, { raw: true }); }
+  if (!game.player.rumours[key]) { game.player.rumours[key] = 1; addXp(game, "presence", 2.5, { raw: true }); }
   return pick.text;
 }
 export const rumourCount = () => Object.values(RUMOURS).reduce((sum, pool) => sum + pool!.length, 0);

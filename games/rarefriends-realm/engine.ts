@@ -4,7 +4,7 @@
  */
 import {
   ARMOURY_FIRST, ARMOURY_LATER, DAWNPLATE_QUEST, COOKING, CRAFTING, CROSSBOWS, FORGED_STAFF_MAGIC, LIMBS_OFFSET, metalLevel, STOCKS, WAR_BOWS, EMOTES, EQUIP_SLOTS, MOUNTS, PETS, mountDef, FLETCH_ARROWS, FLETCH_BOWS, SIGILCRAFT, STAFF_SIGILS, itemCategory, sigilsPerStone, FAMILY_NAMES, FIREMAKING, FISHING_SPOTS, GEM_CUTTING, METALS, MONSTERS, PRAYERS, RELICS, RF_BUNDLES, ROCKS, SHOPS, SHOP_BUY,
-  SHOP_SELL, SKILLS, SKILL_NAMES, SMELTING, SMITH_PIECES, SMITH_XP, SPELLS, TREES, WARDROBE, XP_TABLE, isItem, item, levelForXp, smithLevel, COURSES, WAYFARER_MARK, WAYFARER_REWARDS,
+  FLETCH_WANDS, SHOP_SELL, SKILLS, SKILL_NAMES, SMELTING, SMITH_PIECES, SMITH_XP, SPELLS, TREES, WARDROBE, XP_TABLE, isItem, item, levelForXp, smithLevel, COURSES, WAYFARER_MARK, WAYFARER_REWARDS,
   type EquipSlot, type MetalId, type Skill, type Spell, type SpotKind, type WardrobeId,
 } from "./data.ts";
 import { cleanDaily } from "./daily.ts";
@@ -13,8 +13,8 @@ import { cleanMet } from "./hiscores.ts";
 import { addSlayerPoints, slayerBoost, slayerKill, slayerProblem, taskText } from "./slayer.ts";
 import { runDrain, slipChance } from "./wayfaring.ts";
 import { HERBS, brewRecipes, grindRecipes, herbDef, stillRecipes } from "./apothecary.ts";
-import { friendSays, friendTick, outfitRemark, remember } from "./friend.ts";
-import { cleanName, cleanTag, onAchievement as presenceAchievement, onBossFelled, onEmoteUsed, onFriendTime, onNpcTalked, onRareFind, onRegionEntered, onWorn } from "./presence.ts";
+import { friendSays, friendTick, friendWorks, outfitRemark, remember } from "./friend.ts";
+import { presenceXp, cleanName, cleanTag, onAchievement as presenceAchievement, onBossFelled, onEmoteUsed, onFriendTime, onNpcTalked, onRareFind, onRegionEntered, onWorn } from "./presence.ts";
 import { NPCS, QUESTS, consecrateDawnstone, onAltarPrayed, examineItem, npcDef, onBonesOffered, onMonsterKilled, questDone, searchCryptChest, searchWell, talk, tanHides, useCryptAltar } from "./content.ts";
 import {
   BANK_SIZE, BANK_TABS, DAY_MS, SATCHEL, SATCHEL_SIZE, STONE_BOX, STONE_BOX_SIZE, BONE_BAG, BONE_BAG_SIZE, bagAdd, bagBones, bagTakeAll, hasBoneBag, setPieces, wayfarerPieces, fullSlayerSet, heartguardPieces, mixtureOn, compactBankTabs, hasSatchel, hasStoneBox, stock, useUp, INVENTORY_SIZE, REFERRAL_COINS, REFERRALS_PER_DAY, REFERRAL_TICKS, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
@@ -401,7 +401,7 @@ export function drink(game: Game, slotIndex: number) {
   if (effect.antifire) { player.antifireUntil = game.tick + effect.antifire; notes.push("shields you from dragonfire"); }
   if (effect.stealth) { player.stealthUntil = game.tick + effect.stealth; notes.push("softens your step"); }
   if (effect.tonic) { player.tonicUntil = game.tick + effect.tonic; notes.push("quickens your second wind"); }
-  if (effect.mixture) { player.stats.mixtures = (player.stats.mixtures ?? 0) + 1; friendSays(game, "mixture"); player.mixture = { family: effect.mixture.family, until: game.tick + effect.mixture.ticks }; notes.push(`your ${FAMILY_NAMES[player.familyId]} nature comes to the surface`); emit(game, { type: "cast", spell: "mixture", tick: game.tick }); addXp(game, "presence", 50); }
+  if (effect.mixture) { player.stats.mixtures = (player.stats.mixtures ?? 0) + 1; friendSays(game, "mixture"); player.mixture = { family: effect.mixture.family, until: game.tick + effect.mixture.ticks }; notes.push(`your ${FAMILY_NAMES[player.familyId]} nature comes to the surface`); emit(game, { type: "cast", spell: "mixture", tick: game.tick }); presenceXp(game, 50); }
   message(game, `You drink the ${item(slot.id).name.toLowerCase()}. It ${notes.join(", ") || "tastes of very little"}.`); sound(game, "eat");
 }
 /** Coat your wielded melee weapon with a poison. */
@@ -479,7 +479,7 @@ export function startOffering(game: Game, object: WorldObject, slotIndex: number
   if (!slot || !item(slot.id).bones) return;
   const bones = slot.id;
   offerBones(game, slotIndex, object.text === "dawn");
-  player.activity = has(player, bones) ? { kind: "offer", objectId: object.id, timer: OFFER_TICKS, bones } : null;
+  player.activity = has(player, bones) ? { kind: "offer", objectId: object.id, timer: OFFER_TICKS, bones } : null; friendWorks(game, "prayer");
 }
 function offerTick(game: Game, activity: Extract<Activity, { kind: "offer" }>) {
   const player = game.player, object = game.world.objects[activity.objectId], slotIndex = player.inventory.findIndex(slot => slot?.id === activity.bones);
@@ -543,7 +543,7 @@ export function useItemOnItem(game: Game, a: number, b: number) {
   }
   // Fletching: a knife on logs, feathers on shafts, heads on headless arrows.
   if (first.id === "knife" || second.id === "knife") {
-    const log = other("knife").id, bow = FLETCH_BOWS.find(entry => entry.log === log);
+    const log = other("knife").id, bow = FLETCH_BOWS.find(entry => entry.log === log) ?? FLETCH_WANDS.find(entry => entry.log === log);
     if (bow) { game.ui.production = { title: "What would you like to fletch?", recipes: fletchingRecipes(log) }; return; }
   }
   if (pair("inkcoal", SATCHEL)) { satchelFill(game); return; }
@@ -596,7 +596,7 @@ export function lightFire(game: Game, slotIndex: number) {
   if (level(game, "firemaking") < needed) { message(game, `You need a Firemaking level of ${needed} to burn ${item(slot.id).name.toLowerCase()}.`, "warn"); return; }
   if (NO_FIRE.has(terrainAt(game.world, player.x, player.y)) || objectAtTile(game.world, player.x, player.y) || fireAt(game, player.x, player.y)) { message(game, "You can't light a fire here.", "warn"); return; }
   stopAll(game);
-  player.activity = { kind: "firemake", slot: slotIndex, timer: 2 };
+  player.activity = { kind: "firemake", slot: slotIndex, timer: 2 }; friendWorks(game, "firemaking");
   message(game, "You attempt to light the logs.");
 }
 
@@ -613,7 +613,7 @@ export function startProduction(game: Game, recipe: Recipe, n: number) {
   const problem = recipeProblem(game, recipe);
   game.ui.production = null;
   if (problem) { message(game, problem, "warn"); return; }
-  game.player.activity = { kind: "produce", recipe, timer: 1, left: n };
+  game.player.activity = { kind: "produce", recipe, timer: 1, left: n }; friendWorks(game, recipe.skill);
 }
 export function smeltingRecipes(): Recipe[] {
   return METALS.map(metal => {
@@ -657,7 +657,11 @@ export function craftSigils(game: Game, object: WorldObject) {
 }
 /** Fletching: arrow shafts (15 a log) or a bow from one kind of log. */
 export function fletchingRecipes(log: string): Recipe[] {
-  const bow = FLETCH_BOWS.find(entry => entry.log === log)!;
+  const bow = FLETCH_BOWS.find(entry => entry.log === log), wand = FLETCH_WANDS.find(entry => entry.log === log);
+  if (!bow) return [
+    { skill: "fletching", label: "15 arrow shafts", level: 1, xp: 8, ticks: 3, inputs: { [log]: 1 }, outputs: { arrow_shaft: 15 }, tools: ["knife"] },
+    ...(wand ? [{ skill: "fletching" as const, label: item(wand.wand).name, level: wand.level, xp: wand.xp, ticks: 4, inputs: { [log]: 1 }, outputs: { [wand.wand]: 1 }, tools: ["knife"] }] : []),
+  ];
   return [
     { skill: "fletching", label: "15 arrow shafts", level: 1, xp: 8, ticks: 3, inputs: { [log]: 1 }, outputs: { arrow_shaft: 15 }, tools: ["knife"] },
     { skill: "fletching", label: item(`${bow.bow}_u`).name, level: bow.level, xp: bow.xp / 2, ticks: 3, inputs: { [log]: 1 }, outputs: { [`${bow.bow}_u`]: 1 }, tools: ["knife"] },
@@ -762,7 +766,7 @@ function startCooking(game: Game, source: "range" | "fire", sourceId: number, ra
   if (!raw || !COOKING[raw]) { message(game, raw ? "You can't cook that." : "You don't have anything to cook.", "warn"); return; }
   const recipe = COOKING[raw];
   if (level(game, "cooking") < recipe.level) { message(game, `You need a Cooking level of ${recipe.level} to cook this.`, "warn"); return; }
-  game.player.activity = { kind: "cook", source, sourceId, raw, timer: 1, left: count(game.player, raw) };
+  game.player.activity = { kind: "cook", source, sourceId, raw, timer: 1, left: count(game.player, raw) }; friendWorks(game, "cooking");
 }
 
 export const STALLS = {
@@ -782,7 +786,7 @@ function interactObject(game: Game, object: WorldObject, option: string, use?: n
       if (game.depleted.has(object.id)) { message(game, "This patch has been picked clean. It will grow back."); return; }
       if (level(game, "apothecary") < herb.level) { message(game, `You need an Apothecary level of ${herb.level} to pick ${herb.name.toLowerCase()}.`, "warn"); return; }
       if (!freeSlots(player)) { message(game, "Your inventory is too full to hold any more herbs.", "warn"); return; }
-      player.activity = { kind: "gather", objectId: object.id, timer: 2 }; message(game, `You search the ${herb.name.toLowerCase()} patch…`); return;
+      player.activity = { kind: "gather", objectId: object.id, timer: 2 }; message(game, `You search the ${herb.name.toLowerCase()} patch…`); friendWorks(game, "apothecary"); return;
     }
     case "still": game.ui.production = { title: "What would you like to distil?", recipes: stillRecipes() }; return;
     case "tree": {
@@ -790,7 +794,7 @@ function interactObject(game: Game, object: WorldObject, option: string, use?: n
       if (level(game, "woodcutting") < tree.level) { message(game, `You need a Woodcutting level of ${tree.level} to chop down this tree.`, "warn"); return; }
       if (!axe) { message(game, "You do not have an axe which you have the Woodcutting level to use.", "warn"); return; }
       if (!freeSlots(player)) { message(game, "Your inventory is too full to hold any more logs.", "warn"); return; }
-      player.activity = { kind: "woodcut", objectId: object.id, timer: 3 }; message(game, "You swing your axe at the tree."); friendSays(game, "chop"); return;
+      player.activity = { kind: "woodcut", objectId: object.id, timer: 3 }; message(game, "You swing your axe at the tree."); if (!friendWorks(game, "woodcutting")) friendSays(game, "chop"); return;
     }
     case "rock": {
       const rock = ROCKS[object.rock!];
@@ -798,7 +802,7 @@ function interactObject(game: Game, object: WorldObject, option: string, use?: n
       if (level(game, "mining") < rock.level) { message(game, `You need a Mining level of ${rock.level} to mine this rock.`, "warn"); return; }
       if (!bestTool(game, "pickaxe")) { message(game, "You need a pickaxe to mine this rock. You do not have a pickaxe which you have the Mining level to use.", "warn"); return; }
       if (!freeSlots(player)) { message(game, "Your inventory is too full to hold any more ore.", "warn"); return; }
-      player.activity = { kind: "mine", objectId: object.id, timer: 3 }; message(game, "You swing your pickaxe at the rock."); friendSays(game, "mine"); return;
+      player.activity = { kind: "mine", objectId: object.id, timer: 3 }; message(game, "You swing your pickaxe at the rock."); if (!friendWorks(game, "mining")) friendSays(game, "mine"); return;
     }
     case "spot": {
       const kind: SpotKind = option === "Net" ? "net" : option === "Bait" ? "bait" : option === "Lure" ? "lure" : option === "Cage" ? "cage" : object.spot === "deep" ? "deep" : option === "Harpoon" ? "harpoon" : object.spot!;
@@ -807,13 +811,13 @@ function interactObject(game: Game, object: WorldObject, option: string, use?: n
       if (!hasTool(player, spot.tool)) { message(game, `You need a ${item(spot.tool).name.toLowerCase()} to fish here.`, "warn"); return; }
       if (spot.bait && !has(player, spot.bait)) { message(game, `You don't have any ${item(spot.bait).name.toLowerCase()}s.`, "warn"); return; }
       if (!freeSlots(player)) { message(game, "You can't carry any more fish.", "warn"); return; }
-      player.activity = { kind: "fish", objectId: object.id, timer: 4, spot: kind }; message(game, spot.tool === "small_net" ? "You cast out your net…" : "You attempt to catch a fish."); sound(game, "splash"); return;
+      player.activity = { kind: "fish", objectId: object.id, timer: 4, spot: kind }; message(game, spot.tool === "small_net" ? "You cast out your net…" : "You attempt to catch a fish."); sound(game, "splash"); friendWorks(game, "fishing"); return;
     }
     case "range": startCooking(game, "range", object.id, firstRaw(game)); return;
     case "furnace": game.ui.production = { title: "What would you like to smelt?", recipes: smeltingRecipes() }; return;
     case "wheel": game.ui.production = { title: "What would you like to spin?", recipes: spinningRecipes() }; return;
     case "anvil": openSmithing(game); return;
-    case "bank": game.ui.bank = true; sound(game, "click"); return;
+    case "bank": game.ui.bank = true; sound(game, "click"); friendSays(game, "bank"); return;
     case "altar":
       if (option === "Search" && object.text === "crypt") { useCryptAltar(game); return; }
       if (object.text === "crypt" && player.quests.hollow_whispers === 2) { useCryptAltar(game); return; }
@@ -830,14 +834,14 @@ function interactObject(game: Game, object: WorldObject, option: string, use?: n
     case "obstacle": {
       const obstacle = object.obstacle!;
       if (level(game, "agility") < obstacle.level) { message(game, `You need a Wayfaring level of ${obstacle.level} to attempt this.`, "warn"); return; }
-      player.activity = { kind: "obstacle", objectId: object.id, timer: obstacle.ticks, from: { x: player.x, y: player.y }, to: object.to! };
+      player.activity = { kind: "obstacle", objectId: object.id, timer: obstacle.ticks, from: { x: player.x, y: player.y }, to: object.to! }; friendWorks(game, "agility");
       message(game, `You ${object.action?.toLowerCase().replace("-", " ")} the ${object.name.toLowerCase()}…`); sound(game, "jump"); return;
     }
     case "stall": {
       const stall = STALLS[object.stall!];
       if (level(game, "thieving") < stall.level) { message(game, `You need a Stealth level of ${stall.level} to steal from this stall.`, "warn"); return; }
       if (!freeSlots(player)) { message(game, "Your inventory is too full.", "warn"); return; }
-      player.activity = { kind: "thieve_stall", objectId: object.id, timer: 2 }; return;
+      player.activity = { kind: "thieve_stall", objectId: object.id, timer: 2 }; friendWorks(game, "thieving"); return;
     }
     case "mill":
       if (!has(player, "grain")) { message(game, "You need some grain to put in the hopper.", "warn"); return; }
@@ -901,7 +905,7 @@ function interactNpc(game: Game, uid: number, option: string, use?: number) {
     message(game, "Nothing interesting happens."); return;
   }
   if (option === "Talk-to") { game.dialogue = talk(game, npc.id); sound(game, "click"); return; }
-  if (option === "Trade" && def.shop) { game.ui.shop = def.shop; sound(game, "click"); return; }
+  if (option === "Trade" && def.shop) { game.ui.shop = def.shop; sound(game, "click"); friendSays(game, "shop"); return; }
   if (option === "Talk-to" || option === "Assignment") onNpcTalked(game, npc.id);
   if (option === "Bank") { game.ui.bank = true; sound(game, "click"); return; }
   if (option === "Caskets") { game.ui.shop = "__caskets"; sound(game, "click"); return; }
@@ -1133,7 +1137,7 @@ function gatherTick(game: Game, activity: Extract<Activity, { kind: "gather" }>)
   activity.timer = 2;
   const chance = Math.min(0.95, successChance(level(game, "apothecary"), 40 + herb.level * 2, 220 + herb.level * 2) * gatherBonus(game));
   if (game.rng() >= chance) return;
-  give(player, herb.id); addXp(game, "apothecary", herb.xp); addXp(game, "presence", 0.5);
+  give(player, herb.id); addXp(game, "apothecary", herb.xp); presenceXp(game, 0.5);
   if (mixtureOn(game, 3) && game.rng() < 0.25 && freeSlots(player)) { give(player, herb.id); message(game, "The Division brew splits the pick in two."); }
   message(game, `You pick some ${herb.name.toLowerCase()}.`); sound(game, "pickup");
   const picked = (game.herbPicks.get(object.id) ?? 0) + 1; game.herbPicks.set(object.id, picked);
@@ -1222,7 +1226,7 @@ function produceTick(game: Game, activity: Extract<Activity, { kind: "produce" }
   sound(game, recipe.station === "anvil" ? "anvil" : recipe.station === "furnace" ? "smelt" : "click");
   if (recipe.chance !== undefined && game.rng() >= recipe.chance + level(game, recipe.skill) * 0.004) { message(game, "The ore is too impure and you fail to refine it."); return; }
   for (const [id, n] of Object.entries(recipe.outputs)) give(player, id, n);
-  if (recipe.skill === "apothecary" && Object.keys(recipe.outputs).some(id => item(id).potion)) { player.stats.brews = (player.stats.brews ?? 0) + 1; addXp(game, "presence", 1); }
+  if (recipe.skill === "apothecary" && Object.keys(recipe.outputs).some(id => item(id).potion)) { player.stats.brews = (player.stats.brews ?? 0) + 1; presenceXp(game, 1); }
   addXp(game, recipe.skill, recipe.xp);
   message(game, recipe.station === "furnace" ? `You retrieve a bar of ${recipe.label.replace(" bar", "").toLowerCase()}.` : `You make ${aOrAn(recipe.label)} ${recipe.label.toLowerCase()}.`);
 }
@@ -1633,6 +1637,7 @@ function upkeep(game: Game) {
   onFriendTime(game);
   if (game.tick % 5 === 0 && player.hp > 0) friendTick(game);
   if (game.tick % 50 === 0) friendMilestones(game);
+  if (game.events.some(event => event.type === "level" && event.tick === game.tick && event.skill !== "presence")) friendSays(game, "levelup");
   if (player.combat !== null && player.combatSaid !== player.combat) { player.combatSaid = player.combat; friendSays(game, "fight"); }
   // Prayer drains while prayers are active.
   if (player.prayers.length) {

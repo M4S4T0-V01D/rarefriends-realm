@@ -9,7 +9,7 @@ const isPet = (id: string) => !!petDef(id);
 import { NPCS } from "./content.ts";
 import { TICK_MS, attackSpeed, riding, type Facing, type Game, type Monster, type Npc, type Projectile } from "./state.ts";
 import { npcOverhead, veiled, type Pick } from "./engine.ts";
-import { DUNGEON_Y, FLOOR_Y, OVERWORLD_H, REGIONS, STOREY, T, W, H, complexAt, cornerHeight, floorAt, groundHeight, inBounds, isUnderground, objectAtTile, onLevel, realPoint, type Building, type Floor, type World, type WorldObject } from "./world.ts";
+import { DUNGEON_Y, FLOOR_Y, OVERWORLD_H, REGIONS, STOREY, T, W, H, complexAt, cornerHeight, floorAt, groundHeight, inBounds, isUnderground, objectAtTile, onLevel, realPoint, type Building, type DecorKind, type Floor, type World, type WorldObject } from "./world.ts";
 import { itemArt } from "./icons.ts";
 import type { PeerView } from "./social.ts";
 import type { Strike, Weather } from "./weather.ts";
@@ -57,7 +57,7 @@ export const ZOOM = { min: 0.55, max: 3, classic: 0.8 } as const;
 /** How far the land is drawn, and where the haze begins (tiles from the camera). */
 const DRAW_DISTANCE = 72, HAZE_START = 48;
 /** Decorations too small to matter in the far distance. */
-const SMALL_DECOR = new Set(["flowers", "reeds", "lily", "rubble", "bush", "hay", "crate", "barrel"]);
+const SMALL_DECOR = new Set(["flowers", "reeds", "lily", "rubble", "bush", "hay", "crate", "barrel", "bones"]);
 export type ClickMarker = { x: number; y: number; at: number; red: boolean };
 export type Firework = { at: number; color: string };
 export type Scene = {
@@ -476,11 +476,20 @@ function drawPrints(ctx: CanvasRenderingContext2D, camera: Camera, now: number) 
 /** How far from the camera (tiles) sprites cast their own shadows; beyond it the haze hides them. */
 const SHADOW_REACH = 30;
 /** Decorations lying flat on the ground: they cast no shadow. */
-const FLAT_DECOR = new Set(["flowers", "lily", "rubble", "reeds", "grave"]);
+const FLAT_DECOR = new Set(["flowers", "lily", "rubble", "reeds", "grave", "bones"]);
 /** Pixel art scale: two world pixels per art pixel. */
 const ART = 2;
-function drawTree(ctx: CanvasRenderingContext2D, camera: Camera, object: WorldObject, depleted: boolean, alpha: number, shake: number) {
-  const z = camera.zoom, { x: sx, y: sy } = toScreen(camera, object.x, object.y), variant = Math.floor(hash(object.x, object.y) * 4);
+/** Trees drawn as scenery was: palms, pines and dead trees keep their old look, and show a stump when they're cut. */
+const DECOR_TREES: Partial<Record<string, DecorKind>> = { palm: "palm", pine: "pine", deadwood: "dead_tree" };
+function drawTree(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObject, depleted: boolean, alpha: number, shake: number) {
+  const camera = scene.camera, z = camera.zoom, { x: sx, y: sy } = toScreen(camera, object.x, object.y), variant = Math.floor(hash(object.x, object.y) * 4);
+  const asDecor = DECOR_TREES[object.tree!];
+  if (asDecor) {
+    if (depleted) { box(ctx, camera, object.x, object.y, 0.45, 0.45, 8, "#9c8672", "#8a7563", "#7a6553"); return { x: sx - 12 * z, y: sy - 14 * z, w: 24 * z, h: 20 * z }; }
+    ctx.save(); ctx.globalAlpha = alpha; ctx.translate(shake * z, 0);
+    const rect = drawDecor(ctx, scene, { ...object, kind: "decor", decor: asDecor }, alpha);
+    ctx.restore(); return rect;
+  }
   if (Math.abs(object.x - camera.x) + Math.abs(object.y - camera.y) < HAZE_START) ellipse(ctx, sx, sy + 1 * z, (depleted ? 9 : 17) * z, (depleted ? 4 : 7) * z, "rgba(22,22,22,0.14)", null);
   return drawPixels(ctx, treeArt(object.tree!, variant, depleted), sx + shake * z, sy + 3 * z, ART * z, alpha);
 }
@@ -930,6 +939,33 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
         return hit(84, 56);
       }
       case "grave": box(ctx, camera, ox, oy, 0.3, 0.6, 18, "#c8c5be", "#a9a59e", "#9a968f"); return hit(24, 24);
+      case "tomb": {
+        // A stone tomb: a low chest of weathered blocks with a heavier lid, pushed a little askew on some.
+        const askew = hash(ox + 2, oy + 9) < 0.3 ? 0.12 : 0;
+        box(ctx, camera, ox, oy, 0.84, 0.5, 9, "#aaa59d", "#8f8a82", "#7d7870", 0, INK, "brick");
+        box(ctx, camera, ox + askew, oy - askew * 0.5, 0.94, 0.6, 3, "#c3bfb7", "#a9a59e", "#9a968f", 9);
+        if (askew) box(ctx, camera, ox - 0.2, oy, 0.3, 0.3, 1, "#1e1c22", "#1e1c22", "#1e1c22", 9, null);
+        return hit(18, 40);
+      }
+      case "crypt": {
+        // A family crypt: a squat stone house for the dead, a stepped roof, a black door, a lintel with the frost in it.
+        box(ctx, camera, ox, oy, 1.3, 1.1, 30, "#9f9a92", "#8a857d", "#767169", 0, INK, "brick");
+        box(ctx, camera, ox, oy, 1.1, 0.9, 7, "#b3aea6", "#9a958d", "#8a857d", 30, INK);
+        box(ctx, camera, ox, oy, 0.7, 0.5, 5, "#c3bfb7", "#a9a59e", "#9a968f", 37, INK);
+        const door = (dx: number, zz: number) => { const s = toScreen(camera, ox + dx, oy + 0.56, zz); return [s.x, s.y] as const; };
+        poly(ctx, [door(-0.22, 0), door(0.22, 0), door(0.22, 19), door(0, 23), door(-0.22, 19)], "#1e1c22", "#3b3a38");
+        if (hash(ox, oy + 3) < 0.5) { const s = toScreen(camera, ox, oy + 0.56, 26); ellipse(ctx, s.x, s.y, 3.5 * z, 3.5 * z, "#f3f2ee", "#8a857d", 1); }
+        return hit(48, 56);
+      }
+      case "obelisk": {
+        // An obelisk nobody remembers raising, carved all over with the symbol from the standing stones.
+        box(ctx, camera, ox, oy, 0.5, 0.5, 6, "#b3aea6", "#9a958d", "#8a857d", 0, INK);
+        box(ctx, camera, ox, oy, 0.32, 0.32, 40, "#c3bfb7", "#a9a59e", "#8f8a82", 6, INK);
+        const tip = toScreen(camera, ox, oy, 56), a = toScreen(camera, ox - 0.16, oy + 0.16, 46), b = toScreen(camera, ox + 0.16, oy + 0.16, 46), c = toScreen(camera, ox + 0.16, oy - 0.16, 46);
+        poly(ctx, [[a.x, a.y], [b.x, b.y], [tip.x, tip.y]], "#a9a59e"); poly(ctx, [[b.x, b.y], [c.x, c.y], [tip.x, tip.y]], "#8f8a82");
+        ctx.strokeStyle = "#6f6b64"; ctx.lineWidth = Math.max(1, z); for (let i = 0; i < 4; i++) { const s = toScreen(camera, ox, oy + 0.16, 14 + i * 7); ctx.beginPath(); ctx.moveTo(s.x - 3 * z, s.y); ctx.lineTo(s.x + 3 * z, s.y); ctx.stroke(); }
+        return hit(62, 26);
+      }
       case "fence": {
         const world = scene.game.world, same = (dx: number, dy: number) => objectAtTile(world, ox + dx, oy + dy)?.decor === "fence";
         ctx.strokeStyle = "#8a7563"; ctx.lineWidth = 2 * z; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx, sy - 14 * z);
@@ -1278,7 +1314,8 @@ function splat(ctx: CanvasRenderingContext2D, x: number, y: number, damage: numb
  * A nameplate over a Friend: the name large and bright, the fellowship tag under it, the token id small, muted and a
  * little transparent (an unnamed Friend shows just "#id"). Titles are kept for Examine, so a full square stays readable.
  */
-function nameplate(ctx: CanvasRenderingContext2D, x: number, bottom: number, name: string | null, tag: string | null, id: number, z: number, color = "#ffffff") {
+function nameplate(ctx: CanvasRenderingContext2D, x: number, bottom: number, name: string | null, tag: string | null, id: number, z: number, color = "#ffffff"): number {
+  const scaleH = Math.max(0.9, Math.min(1.4, z)), height = name ? Math.round((10 + (tag ? 11 : 0) + 14) * scaleH) : Math.round((12 + (tag ? 12 : 0)) * scaleH);
   ui(ctx, ctx => {
     const scale = Math.max(0.9, Math.min(1.4, z)), mono = "ui-monospace, Menlo, Consolas, monospace";
     ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.strokeStyle = INK;
@@ -1292,6 +1329,7 @@ function nameplate(ctx: CanvasRenderingContext2D, x: number, bottom: number, nam
       if (tag) { y -= Math.round(12 * scale); ctx.font = `bold ${Math.round(10 * scale)}px ${mono}`; ctx.strokeText(`[${tag}]`, x, y); ctx.fillStyle = "#f2e28f"; ctx.fillText(`[${tag}]`, x, y); }
     }
   });
+  return height;
 }
 function overheadText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color = "#f2e28f") { ui(ctx, ctx => {
   ctx.font = "bold 13px ui-monospace, Menlo, Consolas, monospace"; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
@@ -1479,10 +1517,10 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     const flat = object.kind === "spot" || (object.kind === "decor" && FLAT_DECOR.has(object.decor!));
     drawables.push({ depth: d, at: { x, y }, cast: !flat, scenery: object.kind === "tree" || object.kind === "rock" || object.kind === "decor" || object.kind === "spot", size: object.decor === "windmill" ? [320, 140, 40] : object.kind === "tree" ? [260, 110, 40] : [200, 110, 40], draw: () => {
       let rect: { x: number; y: number; w: number; h: number };
-      const tall = object.kind === "tree" || (object.kind === "decor" && (["pine", "windmill", "palm", "pillar", "tent"].includes(object.decor!) || (object.decor === "ruin_wall" && (object.height ?? 0) > 34)));
+      const tall = object.kind === "tree" || (object.kind === "decor" && (["pine", "windmill", "palm", "pillar", "tent", "crypt", "obelisk"].includes(object.decor!) || (object.decor === "ruin_wall" && (object.height ?? 0) > 34)));
       // Anything tall in front of your Friend that covers it on screen turns see-through (works at any angle and zoom).
       const fade = tall && d > playerDepth + 0.3 && coversPlayer(x, y) ? 0.35 : 1;
-      if (object.kind === "tree") rect = drawTree(ctx, camera, object, game.depleted.has(object.id), fade, scene.reducedMotion ? 0 : treeShake(game, object.id, now));
+      if (object.kind === "tree") rect = drawTree(ctx, scene, object, game.depleted.has(object.id), fade, scene.reducedMotion ? 0 : treeShake(game, object.id, now));
       else if (object.kind === "rock") rect = drawRock(ctx, camera, object, game.depleted.has(object.id));
       else if (object.kind === "spot") rect = drawSpot(ctx, camera, object, now, scene.reducedMotion);
       else if (object.kind === "decor") rect = drawDecor(ctx, scene, object, fade);
@@ -1691,12 +1729,12 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     drawAuras(ctx, player.worn, s.x, bodyY, px, now, scene.reducedMotion, "front");
     if (mount) drawMountHead(ctx, mount.coat, facing, walking, now, feet.x, feet.y, z, scene.reducedMotion);
     restoreMotion();
-    if (motion?.text) overheadText(ctx, motion.text, s.x, s.y - 74 * z, "#ffffff");
+    const plateH = player.name || player.fellowship ? nameplate(ctx, s.x, s.y - 52 * z, player.name, player.fellowship?.tag ?? null, player.friendId, z, "#e8e5de") : 0;
+    if (motion?.text) overheadText(ctx, motion.text, s.x, s.y - 60 * z - plateH, "#ffffff");
     // Health bars only while fighting: yours when you're in combat or something's attacking you.
     if (player.combat !== null || game.monsters.some(monster => monster.target && !monster.dead)) hpBar(ctx, s.x, s.y - 62 * z, player.hp / maxHpOf(game), z);
     for (const hit of scene.hits.filter(entry => entry.on === "player" && now - entry.at < 1100)) splat(ctx, s.x, s.y - 30 * z, hit.damage, z, (now - hit.at) / 1100);
-    if (scene.chat && scene.chat.until > now) overheadText(ctx, scene.chat.text, s.x, s.y - 66 * z);
-    if (player.name || player.fellowship) nameplate(ctx, s.x, s.y - 52 * z, player.name, player.fellowship?.tag ?? null, player.friendId, z, "#e8e5de");
+    if (scene.chat && scene.chat.until > now) overheadText(ctx, scene.chat.text, s.x, s.y - 56 * z - plateH);
     if (player.stunned > 0) ui(ctx, ctx => { for (let i = 0; i < 3; i++) { const a = now / 200 + i * 2.1; ellipse(ctx, s.x + Math.cos(a) * 12 * z, s.y - 56 * z + Math.sin(a) * 3 * z, 2 * z, 2 * z, C.butter); } });
     ui(ctx, ctx => { for (const firework of scene.fireworks) {
       const age = (now - firework.at) / 2200;
@@ -2233,9 +2271,9 @@ function drawPeer(ctx: CanvasRenderingContext2D, scene: Scene, peer: PeerView, h
   hits.push({ ...rect, pick: { kind: "peer", id: peer.p.id } });
   if (peer.p.fight) hpBar(ctx, s.x, rect.y - 22, peer.p.hp / Math.max(1, peer.p.maxHp), z);
   const tagY = rect.y - (peer.p.hp < peer.p.maxHp || peer.p.fight ? 26 : 2);
-  nameplate(ctx, s.x, tagY, peer.p.name ?? null, peer.p.tag ?? null, peer.p.id, z, peer.friend ? "#9fe0a8" : "#ffffff");
-  if (peer.said) overheadText(ctx, peer.said, s.x, tagY - 14);
-  else if (motion?.text) overheadText(ctx, motion.text, s.x, tagY - 14, "#ffffff");
+  const plateH = nameplate(ctx, s.x, tagY, peer.p.name ?? null, peer.p.tag ?? null, peer.p.id, z, peer.friend ? "#9fe0a8" : "#ffffff");
+  if (peer.said) overheadText(ctx, peer.said, s.x, tagY - plateH - 6);
+  else if (motion?.text) overheadText(ctx, motion.text, s.x, tagY - plateH - 6, "#ffffff");
 }
 /** Lean and squash a figure about its feet for an emote; returns the undo. */
 function applyMotion(ctx: CanvasRenderingContext2D, motion: Motion | null, x: number, feetY: number) {

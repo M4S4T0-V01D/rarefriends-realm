@@ -366,10 +366,27 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
         if (icon.kind && icon.kind !== "small") { drawBones(p, icon.kind, color, accent); break; }
         part(p, all(stroke([[8, 24], [24, 8]], 4), disc(6, 22, 3.5), disc(10, 26, 3.5), disc(22, 6, 3.5), disc(26, 10, 3.5)), color, "stone");
         if (accent) line(p, [[12, 20], [20, 12]], accent); break;
-      case "sigil":
+      case "sigil": {
+        // A pressed stone with the sigil's own mark: a swirl of breeze, a tide's wave, a stone, a flame, an eye for thought, a bolt for storm, a path's arrow, a hollow ring, a bloom, a star, a crescent shade.
         part(p, poly([[7, 7], [16, 3], [25, 7], [26, 23], [16, 29], [6, 23]]), "#c8c5be", "stone");
-        part(p, disc(16, 16, 6), color, "glow"); part(p, disc(16, 16, 2.5), shadeHex(color, 0.3), "flat", false);
+        part(p, disc(16, 16, 7.5), color, "glow");
+        const g = shadeHex(color, -0.45), w = "#f4f1ea";
+        switch (icon.kind) {
+          case "breeze": line(p, [[10, 14], [14, 11], [18, 13], [22, 11]], g, 2); line(p, [[11, 19], [15, 16], [19, 18], [23, 16]], g, 2); break;
+          case "tide": line(p, [[9, 15], [12, 12], [15, 15], [18, 12], [21, 15]], g, 2); line(p, [[10, 20], [13, 17], [16, 20], [19, 17], [22, 20]], w, 1); break;
+          case "stone": part(p, poly([[12, 20], [11, 14], [15, 11], [20, 12], [21, 18], [17, 21]]), g, "stone"); dot(p, 14, 14, w); break;
+          case "ember": part(p, poly([[16, 8], [20, 14], [19, 20], [16, 23], [13, 20], [12, 14]]), g, "glow"); part(p, poly([[16, 13], [18, 17], [16, 21], [14, 17]]), "#ffd27a", "glow"); break;
+          case "thought": part(p, poly([[9, 16], [16, 11], [23, 16], [16, 21]]), g, "flat"); part(p, disc(16, 16, 2.5), w, "flat"); dot(p, 16, 16, g); break;
+          case "storm": part(p, poly([[18, 8], [12, 17], [16, 17], [13, 24], [21, 14], [17, 14]]), "#fff2a8", "glow"); line(p, [[18, 8], [12, 17], [16, 17], [13, 24]], g, 1); break;
+          case "path": line(p, [[9, 20], [16, 12], [23, 20]], g, 2); line(p, [[16, 12], [16, 23]], g, 2); dot(p, 16, 11, w); break;
+          case "hollow": part(p, disc(16, 16, 5.5), "#1a1a1e", "flat"); part(p, disc(16, 16, 3.2), color, "flat"); line(p, [[12, 12], [20, 20]], g, 1); break;
+          case "bloom": for (const [dx, dy] of [[0, -4], [4, 0], [0, 4], [-4, 0], [3, -3], [3, 3], [-3, 3], [-3, -3]] as [number, number][]) part(p, disc(16 + dx, 16 + dy, 2.4), "#e7a9b0", "cloth"); part(p, disc(16, 16, 2.4), "#f2e28f", "glow"); break;
+          case "star": part(p, poly([[16, 9], [18, 14], [23, 14], [19, 17], [21, 23], [16, 19], [11, 23], [13, 17], [9, 14], [14, 14]]), "#fff6c8", "glow"); line(p, [[16, 9], [18, 14], [23, 14], [19, 17], [21, 23], [16, 19], [11, 23], [13, 17], [9, 14], [14, 14], [16, 9]], g, 1); break;
+          case "shade": part(p, disc(16, 16, 6), "#3b3a40", "flat"); part(p, disc(19, 14, 5.5), color, "glow"); break;
+          default: part(p, disc(16, 16, 2.5), shadeHex(color, 0.3), "flat", false);
+        }
         line(p, [[9, 9], [12, 8]], "#e8e6e0"); break;
+      }
       case "staff":
         if (icon.kind === "forged") {
           // A forged staff: a metal shaft with bands, claws of the metal holding a glowing orb.
@@ -699,7 +716,8 @@ const SKILL_PAINTERS: Record<Skill, Painter> = {
   fletching: p => { p.line(2, 15, 14, 3, INK, 2); p.line(2, 15, 14, 3, WOOD); p.poly([[12, 1], [16, 1], [16, 5]], STEEL); p.poly([[1, 12], [5, 16], [2, 16]], PAPER); p.poly([[3, 10], [7, 14], [4, 14]], "#d8b6b4"); },
   // Apothecary: a round-bottomed flask with a green brew and a bubble. Presence: a four-point star with a soft glow.
   apothecary: p => { p.rect(7, 2, 3, 3, PAPER); p.disc(8.5, 10, 5, 4.5, "#8fbf9a"); p.rect(6, 5, 5, 3, PAPER); p.set(10, 8, PAPER); p.set(7, 11, "#d8c9a8"); p.line(8, 2, 8, 5, INK); },
-  presence: p => { p.line(8, 1, 8, 15, GOLD, 2); p.line(1, 8, 15, 8, GOLD, 2); p.line(4, 4, 12, 12, "#e2c46a", 1); p.line(12, 4, 4, 12, "#e2c46a", 1); p.disc(8, 8, 2.5, 2.5, PAPER); },
+  // Presence: an adventurer seen from behind, hat on, cape out, a walking stick, the road ahead.
+  presence: p => { p.rect(3, 13, 10, 2, "#8a6446"); p.rect(6, 6, 4, 6, "#4a3a60"); p.rect(5, 7, 1, 5, "#b0443c"); p.rect(10, 7, 1, 5, "#b0443c"); p.disc(8, 4, 2.2, 2.2, "#e8c9a0"); p.rect(4, 2, 8, 1, "#5f5a52"); p.rect(6, 1, 4, 2, "#5f5a52"); p.line(12, 5, 12, 13, "#9c8672", 1); p.rect(6, 12, 1, 2, "#3b3a38"); p.rect(9, 12, 1, 2, "#3b3a38"); },
   slayer: p => { p.disc(8.5, 7, 6, 5.5, "#e8e4dc"); p.rect(5, 11, 7, 4, "#e8e4dc"); p.rect(5, 5, 3, 3, INK); p.rect(10, 5, 3, 3, INK); p.rect(8, 9, 1, 2, INK); p.line(6, 14, 11, 14, INK); p.line(1, 16, 16, 1, "#cf6e6e", 1); },
 };
 /** Skill icons: 24 pixels, shaded like the items, a distinct picture for each skill (the 16-pixel ones above stay for the orbs). */
@@ -805,8 +823,11 @@ const SKILL24: Record<Skill, Painter> = {
     part(p, disc(10, 13, 1.4), "#e8f4e8", "glow"); line(p, [[13, 7], [13, 11]], "#c6dcc6");
   },
   presence: p => {
-    part(p, poly([[12, 1], [14, 10], [23, 12], [14, 14], [12, 23], [10, 14], [1, 12], [10, 10]]), "#e2d49e", "glow"); part(p, disc(12, 12, 2.4), "#efede7", "glow");
-    for (const [x, y] of [[4, 4], [20, 4], [4, 20], [20, 20]] as [number, number][]) dot(p, x, y, "#e2c46a");
+    // An adventurer on the road: wide hat, a cape swept to one side, pack on the back, staff in hand, a long shadow.
+    part(p, poly([[2, 21], [22, 21], [20, 23], [4, 23]]), "#8a6446", "wood");
+    part(p, poly([[8, 9], [16, 9], [18, 19], [6, 19]]), "#4a3a60", "cloth"); part(p, poly([[6, 9], [9, 9], [8, 19], [3, 19]]), "#b0443c", "cloth");
+    part(p, disc(12, 6, 3.2), "#e8c9a0", "cloth"); part(p, box(6, 3, 12, 2), "#5f5a52", "cloth"); part(p, box(9, 1, 6, 3), "#5f5a52", "cloth");
+    part(p, box(13, 10, 4, 6), "#9c8672", "wood"); line(p, [[19, 7], [19, 20]], "#c49a74", 2); part(p, box(9, 19, 2, 3), "#3b3a38", "cloth"); part(p, box(13, 19, 2, 3), "#3b3a38", "cloth");
   },
   slayer: p => {
     part(p, disc(12, 10, 8, 7.5), "#e8e4dc", "stone"); part(p, box(7, 15, 10, 5), "#e8e4dc", "stone");

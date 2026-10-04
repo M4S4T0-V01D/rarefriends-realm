@@ -19,7 +19,7 @@ import { MONSTERS } from "./data.ts";
 import { ECO_REGIONS, HERBS } from "./apothecary.ts";
 import { buildVillages } from "./villages.ts";
 // REGIONS is read only inside buildExpansion (called from createWorld), never at load, since world.ts imports this module.
-import { MAINLAND_RECT, OVERWORLD_H, REGIONS, T, isWater, type GenContext, type RegionId, type worldTools } from "./world.ts";
+import { MAINLAND_RECT, OVERWORLD_H, REGIONS, T, isWater, type DecorKind, type GenContext, type RegionId, type worldTools } from "./world.ts";
 
 export type Tools = ReturnType<typeof worldTools>;
 type Pt = readonly [number, number];
@@ -230,28 +230,116 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
 
   // ---------- 5. Scenery ----------
   const inRegion = (id: RegionId) => (x: number, y: number) => regionIs(x, y, id) && free(x, y) && !inMainland(x, y);
-  // The Deadwood: dense dead trees, a few hardy yews, graves and rubble, ruined walls; thicker the deeper north you go.
-  scatter(150, 0, 520, 185, 1700, (x, y) => decor(x, y, "dead_tree"), (x, y) => inRegion("deadwood")(x, y) && random() < 0.35 + (1 - y / 185) * 0.6);
+  // ---------- 5a. The Deadwood's dead ----------
+  // The forest swallowed villages. What's left: roofless houses, family crypts, railed plots, tombs, obelisks nobody
+  // remembers raising, and graves of every kind, everywhere. Footprints go only on clear dead grass, off every road
+  // and track, well away from Gravesend, the ruined chapel and the faceless shrine.
+  const keepOut = [[284, 116, 318, 152], [328, 38, 348, 56], [398, 30, 418, 48]] as const;
+  // The old road and the woodsmen's track are gravel like the Deadwood's bare patches, so the one big footprint that may sit on gravel keeps off their whole run.
+  const roads = [[294, 46, 344, 130], [192, 66, 306, 132]] as const;
+  const openGround = (x0: number, y0: number, x1: number, y1: number, gravelToo = false) => {
+    if (keepOut.some(([a, b, c, d]) => x1 >= a && x0 <= c && y1 >= b && y0 <= d)) return false;
+    if (gravelToo && roads.some(([a, b, c, d]) => x1 >= a && x0 <= c && y1 >= b && y0 <= d)) return false;
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      if (!inBounds(x, y) || y >= OH || !regionIs(x, y, "deadwood") || inMainland(x, y) || !free(x, y)) return false;
+      const tt = get(x, y); if (tt !== T.GRASS && tt !== T.DARK_GRASS && !(gravelToo && tt === T.GRAVEL)) return false;
+    }
+    return true;
+  };
+  const findGround = (w: number, h: number, tries = 400, gravelToo = false): [number, number] | null => {
+    for (let i = 0; i < tries; i++) { const x = 160 + Math.floor(random() * 340), y = 6 + Math.floor(random() * 170); if (openGround(x - 1, y - 1, x + w + 1, y + h + 1, gravelToo)) return [x, y]; }
+    return null;
+  };
+  const pick = <X,>(list: readonly X[]) => list[Math.floor(random() * list.length)];
+  const EPITAPHS = ["Here lies Tam Ashworth, who went into the trees", "A grave with no name", "A grave, the stone split by frost", "Three small graves, one stone",
+    "'Beloved.' The rest is gone.", "A grave, fresh. Nobody in Gravesend will say whose.", "'She said she heard singing.'", "A grave with a lantern on it, lit",
+    "'He kept the altar swept.' An old Dawnhold grave.", "A grave the roots have lifted half out of the ground", "A grave marked only with the symbol from the stones",
+    "'Came back. Buried twice.'", "A grave someone still leaves flowers on", "A child's grave with a wooden horse on it", "'Lost in the Deadwood. Found in the Deadwood.'",
+    "A grave, the name scratched out", "A grave turned to face west, like the watch-stones", "'Gone to see what the trees wanted.'", "A grave with two names and one body's worth of earth"];
+  const epitaph = () => random() < 0.35 ? pick(EPITAPHS) : undefined;
+  const TOMB_NAMES = ["A stone tomb, the lid askew", "A stone tomb, sealed", "A tomb carved with vines that never grew here", "A tomb. Somebody has been sleeping on it.", "A tomb with the symbol from the stones cut deep into the lid", "A tomb, the lid moved from the inside"];
+  const BONE_NAMES = ["Bones", "Bones, arranged in a circle", "Bones. Not all the same creature.", "Bones, very old, very tidy", "A skull on a stick, facing the road"];
+  const CRYPT_NAMES = ["Family crypt, the name worn off", "Crypt of the Ashworths", "Crypt of House Vellan", "A crypt, the door bricked up from outside", "A crypt, the door open", "Crypt of the Three Sisters", "A crypt with fresh flowers at the door", "A crypt with no door at all"];
+  // Ruined houses: roofless, walls down in places, the floors gone to rubble, and what the people left behind.
+  const RUIN_NAMES = ["Ruined cottage", "Ruined farmhouse", "Ruined mill house", "Ruined chapel-of-ease", "Ruined inn", "Ruined smithy", "Ruined longhouse", "Ruined watch-house", "Ruined granary", "Ruined schoolhouse", "Ruined bakehouse", "Ruined weaver's house", "Ruined almshouse", "Ruined tollhouse"];
+  const RUIN_INSIDES: readonly (readonly [DecorKind, string])[] = [["rubble", "A fallen roof-beam"], ["bones", "Bones. Somebody stayed."], ["table", "A table laid for four, the plates long gone"], ["bed", "A bed, the blankets rotted to lace"],
+    ["crate", "A crate of nothing"], ["barrel", "A barrel, dry"], ["chest", "An empty chest, the lock forced long ago"], ["armour", "A rusted helm on a peg"], ["shelf", "Shelves. Somebody's whole life, mouldered."], ["bench", "A bench by a hearth that doesn't remember fire"], ["rubble", "The hearthstone, cracked"]];
+  const ruinHouse = (x0: number, y0: number, w: number, h: number, name: string, extra?: (x0: number, y0: number, x1: number, y1: number) => void) => {
+    const x1 = x0 + w, y1 = y0 + h, door = pick(["n", "s", "e", "w"] as const);
+    t.building(x0, y0, x1, y1, door, T.STONE, undefined, { name, color: "#6d6b67", walls: "stone", roof: "none" });
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      if (get(x, y) === T.WALL && noise2(x * 1.3, y * 1.3) > 0.5) put(x, y, T.GRAVEL);
+      else if (get(x, y) === T.STONE && random() < 0.3) put(x, y, T.GRAVEL);
+    }
+    const inside = 1 + Math.floor(random() * 3);
+    for (let k = 0; k < inside; k++) { const [kind, label] = pick(RUIN_INSIDES), x = x0 + 1 + Math.floor(random() * (w - 1)), y = y0 + 1 + Math.floor(random() * (h - 1)); if (free(x, y)) decor(x, y, kind, true, label); }
+    extra?.(x0, y0, x1, y1);
+  };
+  // Ashworth Hall: the manor the Deadwood took first. The family buried their own under the hall floor.
+  const hall = findGround(11, 7, 2000) ?? findGround(11, 7, 3000, true);
+  if (hall) ruinHouse(hall[0], hall[1], 11, 7, "Ashworth Hall, ruined", (x0, y0, x1, y1) => {
+    const cx = Math.floor((x0 + x1) / 2), cy = Math.floor((y0 + y1) / 2);
+    if (free(cx, cy)) decor(cx, cy, "tomb", true, "The Ashworths' tomb, under what was the hall floor. The lid is askew.");
+    if (free(cx - 3, cy)) decor(cx - 3, cy, "armour", true, "A suit of armour, still standing guard over nothing"); if (free(cx + 3, cy)) decor(cx + 3, cy, "armour", true, "A suit of armour, fallen");
+    if (free(cx, y1 + 2)) decor(cx, y1 + 2, "obelisk", true, "The Ashworth obelisk: every name in the family, the last cut in a hurry");
+    if (free(cx - 2, y0 + 1)) decor(cx - 2, y0 + 1, "bones", true, "Bones at the high table"); if (free(cx + 2, y0 + 1)) decor(cx + 2, y0 + 1, "table", true, "The high table, set");
+  });
+  let ruined = 0;
+  for (let i = 0; i < 20 && ruined < 14; i++) {
+    const w = 4 + Math.floor(random() * 4), h = 3 + Math.floor(random() * 3), at = findGround(w, h); if (!at) continue;
+    ruinHouse(at[0], at[1], w, h, RUIN_NAMES[ruined % RUIN_NAMES.length]); ruined++;
+  }
+  // Named crypts: little stone houses for the dead, roofed, with a tomb inside and a story on it.
+  const CRYPTS: readonly [string, string][] = [["Crypt of the Ashworths", "A stone tomb. The Ashworth name, worn almost smooth. Tam's is the newest cut, and it isn't finished."],
+    ["Crypt of House Vellan", "A stone tomb with a dyer's blue still in the carving. Vell's grandfather's grandfather. Vell has the receipt."],
+    ["Crypt of the Three Sisters", "Three names. One date. Nobody in Gravesend will say what happened, which in Gravesend means everybody knows."],
+    ["The Namekeeper's Crypt", "A tomb carved in a hand nobody reads. The Namekeeper's register goes back further than the town. So does this."],
+    ["Crypt, unmarked", "A tomb with no name. The lid has been moved, from the inside, and put back carefully."],
+    ["Crypt of the Altar-Keepers", "A tomb for the people who kept the altars swept, before there was an Order. The sun disc over the door has a beard carved into it."]];
+  for (const [name, tombText] of CRYPTS) {
+    const at = findGround(4, 3); if (!at) continue;
+    const [x0, y0] = at;
+    t.building(x0, y0, x0 + 4, y0 + 3, "s", T.STONE, undefined, { name, color: "#7a7772", walls: "stone", roof: "flat" });
+    decor(x0 + 2, y0 + 1, "tomb", true, tombText); if (random() < 0.6) decor(x0 + 1, y0 + 2, "bones", true, pick(BONE_NAMES));
+    if (free(x0 + 1, y0 + 4)) decor(x0 + 1, y0 + 4, "torch", true, "A candle at the crypt door, lit"); if (free(x0 + 3, y0 + 4)) decor(x0 + 3, y0 + 4, "torch", true, "A candle at the crypt door, lit");
+  }
+  // Railed plots: rusted iron round a family's dead, a gate on the south side, a tomb or an obelisk in the middle of the grander ones.
+  for (let i = 0; i < 10; i++) {
+    const w = 5 + Math.floor(random() * 4), h = 4 + Math.floor(random() * 3), at = findGround(w, h); if (!at) continue;
+    const [x0, y0] = at, x1 = x0 + w, y1 = y0 + h, gate = x0 + Math.floor(w / 2), rail = (x: number, y: number) => decor(x, y, "fence", true, "Iron railing, rusted");
+    for (let x = x0; x <= x1; x++) { rail(x, y0); if (x !== gate && x !== gate + 1) rail(x, y1); }
+    for (let y = y0 + 1; y < y1; y++) { rail(x0, y); rail(x1, y); }
+    const cx = x0 + Math.floor(w / 2), cy = y0 + Math.floor(h / 2);
+    if (random() < 0.5) decor(cx, cy, random() < 0.5 ? "obelisk" : "tomb", true, random() < 0.5 ? "A family's obelisk, the names running out of room" : pick(TOMB_NAMES));
+    for (let y = y0 + 1; y < y1; y++) for (let x = x0 + 1; x < x1; x++) if ((x + y) % 2 === 0 && random() < 0.75 && free(x, y)) decor(x, y, random() < 0.2 ? "tomb" : "grave", true, epitaph() ?? (random() < 0.5 ? undefined : "A grave in the family plot"));
+  }
+  // Loose in the trees: graves of every kind, tombs, little crypts, bone-heaps, obelisks, and the walls of houses that didn't even leave a floor.
+  scatter(150, 0, 520, 185, 20, (x, y) => decor(x, y, "crypt", true, pick(CRYPT_NAMES)), (x, y) => openGround(x - 1, y - 1, x + 1, y + 1));
+  scatter(150, 0, 520, 185, 14, (x, y) => decor(x, y, "obelisk", true, "An obelisk, carved all over with the symbol from the stones"), (x, y) => openGround(x, y, x, y));
+  scatter(150, 0, 520, 185, 70, (x, y) => decor(x, y, "tomb", true, pick(TOMB_NAMES)), inRegion("deadwood"));
+  scatter(150, 0, 520, 185, 60, (x, y) => decor(x, y, "bones", false, pick(BONE_NAMES)), inRegion("deadwood"));
+  scatter(150, 0, 520, 185, 260, (x, y) => decor(x, y, "grave", true, epitaph()), inRegion("deadwood"));
+  scatter(150, 0, 520, 185, 160, (x, y) => decor(x, y, random() > 0.5 ? "rubble" : "ruin_wall"), inRegion("deadwood"));
+  // The Deadwood: dense dead trees, a few hardy yews; thicker the deeper north you go.
+  scatter(150, 0, 520, 185, 1700, (x, y) => tree(x, y, "deadwood"), (x, y) => inRegion("deadwood")(x, y) && random() < 0.35 + (1 - y / 185) * 0.6);
   scatter(150, 0, 520, 185, 60, (x, y) => tree(x, y, "yew"), inRegion("deadwood"));
-  scatter(150, 0, 520, 185, 120, (x, y) => decor(x, y, "grave"), inRegion("deadwood"));
-  scatter(150, 0, 520, 185, 90, (x, y) => decor(x, y, random() > 0.5 ? "rubble" : "ruin_wall"), inRegion("deadwood"));
   scatter(150, 0, 520, 185, 40, (x, y) => decor(x, y, "torch", true, "Will-o'-the-wisp lantern"), inRegion("deadwood"));
   // Westmarch: oaks and willows in clumps, boulders, the odd lonely house further on.
   scatter(60, 220, 230, 370, 220, (x, y) => tree(x, y, random() > 0.6 ? "oak" : "tree"), inRegion("westmarch"));
   scatter(60, 220, 230, 370, 40, (x, y) => tree(x, y, "willow"), inRegion("westmarch"));
   scatter(60, 220, 230, 370, 50, (x, y) => decor(x, y, "boulder"), inRegion("westmarch"));
   // The Drakespine: scree, dead trees, pines on the slopes, rocks worth mining up high.
-  scatter(30, 110, 130, 280, 90, (x, y) => decor(x, y, random() > 0.5 ? "boulder" : "dead_tree"), inRegion("drakespine"));
-  scatter(30, 110, 130, 280, 60, (x, y) => decor(x, y, "pine"), inRegion("drakespine"));
+  scatter(30, 110, 130, 280, 90, (x, y) => random() > 0.5 ? decor(x, y, "boulder") : tree(x, y, "deadwood"), inRegion("drakespine"));
+  scatter(30, 110, 130, 280, 60, (x, y) => tree(x, y, "pine"), inRegion("drakespine"));
   scatter(30, 110, 130, 280, 14, (x, y) => rock(x, y, "inkcoal"), inRegion("drakespine"));
   scatter(30, 110, 130, 280, 8, (x, y) => rock(x, y, "glimmer"), inRegion("drakespine"));
   // Ashfall: ruins of whoever lived here before the dragons, and bones.
   scatter(10, 30, 130, 150, 60, (x, y) => decor(x, y, random() > 0.4 ? "pillar" : "ruin_wall"), inRegion("ashfall"));
   scatter(10, 30, 130, 150, 40, (x, y) => decor(x, y, "rubble"), inRegion("ashfall"));
-  scatter(10, 30, 130, 150, 24, (x, y) => decor(x, y, "dead_tree"), inRegion("ashfall"));
+  scatter(10, 30, 130, 150, 24, (x, y) => tree(x, y, "deadwood"), inRegion("ashfall"));
   scatter(10, 30, 130, 150, 10, (x, y) => rock(x, y, "rarite"), inRegion("ashfall"));
   // Southshore: palms on the beaches, bushes and flowers on the downs, reeds by the river mouths.
-  scatter(150, 360, 560, OH - 1, 90, (x, y) => decor(x, y, "palm"), (x, y) => inRegion("southshore")(x, y) && get(x, y) === T.SAND);
+  scatter(150, 360, 560, OH - 1, 90, (x, y) => tree(x, y, "palm"), (x, y) => inRegion("southshore")(x, y) && get(x, y) === T.SAND);
   scatter(150, 360, 560, OH - 1, 160, (x, y) => (random() > 0.5 ? decor(x, y, "bush") : decor(x, y, "flowers", false)), inRegion("southshore"));
   scatter(150, 360, 560, OH - 1, 120, (x, y) => tree(x, y, random() > 0.7 ? "willow" : "tree"), inRegion("southshore"));
   // Thistle Vale: meadow flowers, maples and oaks, farmland strips the herb gardens will grow on.
@@ -263,16 +351,16 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
   scatter(500, 370, 660, 480, 120, (x, y) => decor(x, y, "bush"), inRegion("the_wilds"));
   scatter(500, 370, 660, 480, 40, (x, y) => decor(x, y, "boulder"), inRegion("the_wilds"));
   // Ironreach: pines below the snow, boulders, and the ore that made Cragmaw.
-  scatter(520, 120, 719, 370, 160, (x, y) => decor(x, y, "pine"), (x, y) => inRegion("ironreach")(x, y) && get(x, y) !== T.SNOW);
+  scatter(520, 120, 719, 370, 160, (x, y) => tree(x, y, "pine"), (x, y) => inRegion("ironreach")(x, y) && get(x, y) !== T.SNOW);
   scatter(520, 120, 719, 370, 120, (x, y) => decor(x, y, "boulder"), inRegion("ironreach"));
   for (const [kind, n] of [["blackiron", 16], ["inkcoal", 14], ["moonsilver", 8], ["glimmer", 6], ["gem", 4]] as const) scatter(560, 150, 719, 330, n, (x, y) => rock(x, y, kind), inRegion("ironreach"));
   rockCluster(640, 190, 6, "blackiron", 6); rockCluster(624, 214, 5, "inkcoal", 5);
   // Quillhaven's headland: cypress-like pines, standing stones.
-  scatter(610, 370, 690, 440, 40, (x, y) => decor(x, y, "pine"), inRegion("quillhaven"));
+  scatter(610, 370, 690, 440, 40, (x, y) => tree(x, y, "pine"), inRegion("quillhaven"));
   scatter(610, 370, 690, 440, 14, (x, y) => decor(x, y, "pillar", true, "Standing stone"), inRegion("quillhaven"));
   // The Pale Isles: palms and a rock or two.
-  scatter(0, 380, 150, OH - 1, 30, (x, y) => decor(x, y, "palm"), inRegion("pale_isles"));
-  scatter(540, 40, 600, 100, 12, (x, y) => decor(x, y, "pine"), inRegion("pale_isles"));
+  scatter(0, 380, 150, OH - 1, 30, (x, y) => tree(x, y, "palm"), inRegion("pale_isles"));
+  scatter(540, 40, 600, 100, 12, (x, y) => tree(x, y, "pine"), inRegion("pale_isles"));
   // Fishing all round the new coasts.
   t.shoreSpots(410, 474, 440, 486, "net", 4); t.shoreSpots(410, 474, 440, 486, "deep", 3); t.shoreSpots(240, 480, 270, 495, "bait", 3);
   t.shoreSpots(86, 494, 106, 506, "deep", 3); t.shoreSpots(636, 414, 660, 426, "lure", 3);
@@ -301,6 +389,7 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
   decor(156, 330, "rubble", true, "A cold hearth"); decor(152, 330, "crate", true, "A child's wooden horse, unburnt"); decor(154, 329, "armour", true, "A broken sword, driven into the floor");
   decor(158, 334, "flowers", false, "Footprints, old, leading into the trees"); decor(160, 337, "flowers", false, "Footprints, old, leading into the trees"); decor(162, 340, "flowers", false, "Footprints. Then nothing.");
   // Up the Thistle Vale, a farmer has a carved stone for a fence post. It's an altar. He doesn't care.
+  for (let x = 118; x <= 132; x++) clearAt(x, 414);
   for (let x = 118; x <= 130; x += 2) decor(x, 414, "fence");
   decor(132, 414, "pillar", true, "An old carved stone, used as a fence post. It's an altar. Nobody minds.");
   // The Thistle road crosses ancient stonework where the mud's worn through.
@@ -315,7 +404,7 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
   t.building(366, 428, 370, 431, "s", T.WOOD, undefined, { name: "Fisherman's shack", color: "#6d6b67", walls: "plank" });
   decor(367, 429, "bed", true, "A bed, made"); decor(369, 429, "barrel", true, "Nets, hung to dry years ago"); decor(372, 433, "boat", true, "A boat, keel up, bleached");
   // The Friendhollow castle was built against something from the west: on the Westmarch road, a line of old watch-stones faces west, every one toppled the same way.
-  for (const x of [166, 160, 154, 148, 142]) decor(x, 262 + (x % 4 === 0 ? 1 : -1), "rubble", true, "A toppled watch-stone, fallen westward");
+  for (const x of [166, 160, 154, 148, 142]) { clearAt(x, 262 + (x % 4 === 0 ? 1 : -1)); decor(x, 262 + (x % 4 === 0 ? 1 : -1), "rubble", true, "A toppled watch-stone, fallen westward"); }
   // ---------- 6. Creatures (the Realm's existing bestiary; the new regions' own come with their villages and skills) ----------
   monsters("skeleton", 200, 30, 460, 150, 26); monsters("shade", 220, 10, 440, 110, 16); monsters("wolf", 160, 100, 300, 180, 10); monsters("cairn_wight", 260, 20, 400, 90, 8);
   monsters("gloom_hound", 300, 10, 400, 60, 5);

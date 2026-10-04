@@ -16,7 +16,7 @@ import { talk } from "../games/rarefriends-realm/content.ts";
 import { cleanPresence } from "../games/rarefriends-realm/net.ts";
 import { buySlayerReward, longTasks, slayerXpBoost, eligibleTasks } from "../games/rarefriends-realm/slayer.ts";
 import { currentTask, slayerPoints } from "../games/rarefriends-realm/slayer.ts";
-import { COURSES, HEARTGUARD, ITEM_LIST, METALS, MONSTERS, SMITH_PIECES, SPELL_TABS, MOUNTS, SHOPS, SKILLS, SKILL_NAMES, SLAYER_SETS, SLAYER_TASKS, SPELLS, TREES, WAYFARER_MARK, WAYFARER_REWARDS, XP_RATE, XP_TABLE, heavyStrength, item, levelForXp } from "../games/rarefriends-realm/data.ts";
+import { COURSES, HEARTGUARD, ITEM_LIST, METALS, MONSTERS, SMITH_PIECES, SPELL_TABS, FIREMAKING, MOUNTS, SHOPS, SKILLS, SKILL_NAMES, SLAYER_SETS, SLAYER_TASKS, SPELLS, TREES, WAYFARER_MARK, WAYFARER_REWARDS, XP_RATE, XP_TABLE, heavyStrength, item, levelForXp } from "../games/rarefriends-realm/data.ts";
 import { NPCS, QUESTS, MAX_QUEST_POINTS, questPoints, onMonsterKilled } from "../games/rarefriends-realm/content.ts";
 import { FLOOR_Y, H, MAINLAND, REGIONS, T, W, createWorld, floorAt, isUnderground, mainlandToWorld, objectAtTile, onLevel, realPoint, regionAt, terrainAt } from "../games/rarefriends-realm/world.ts";
 import { addXp, emptyToBank, fillFromBank, bankDeposit, bankInOrder, bankMove, bankTabs, bankWithdraw, bonuses, bagBones, combatLevel, count, dropItem, earlyXp, give, has, heft, level, maxHp, xpMultiplier, BONE_BAG, BONE_BAG_SIZE } from "../games/rarefriends-realm/state.ts";
@@ -487,7 +487,7 @@ test("The ossuary bag: holds 60 bones of any kind, catches picked-up bones, empt
   assert.equal(p.questData.vigil_bones, n, "every bone counted for the vigil");
   const expected = (inside.bones * 4.5 + inside.large_bones * 15) * 3 * XP_RATE * earlyXp(1, "prayer");
   assert(p.xp.prayer - before > expected * 0.5, `three times the burying XP for the lot (${p.xp.prayer - before} vs ${expected})`);
-  assert.match(g.messages.at(-1).text, new RegExp(`offer ${n} bones at once`));
+  assert(g.messages.slice(-3).some(line => new RegExp(`offer ${n} bones at once`).test(line.text)), "the offering is announced (your Friend may remark on the level after)");
   offerBag(g, false);
   assert.match(g.messages.at(-1).text, /empty/, "an empty bag offers nothing");
   // Sister Maren gives a squire without a bag one.
@@ -956,6 +956,33 @@ test("Teleports to the wider world, learnt by quest and level, in a tabbed spell
   castSpell(g, "glide_highcairn"); assert.equal(p.activity?.kind, "teleport", "Highcairn's glide needs no quest");
 });
 
+test("Every tree can be cut and burnt: palms, pines and dead trees give logs, bows and a wand; every sigil carries its own mark", () => {
+  const g = newGame(), p = g.player, world = g.world;
+  for (const kind of ["palm", "pine", "deadwood"]) {
+    assert(TREES[kind], `${kind} is a tree`); assert(world.objects.some(object => object.kind === "tree" && object.tree === kind), `${kind} trees grow in the Realm`);
+    assert(item(TREES[kind].log) && FIREMAKING[TREES[kind].log], `${kind} logs burn`);
+  }
+  assert(!world.objects.some(object => object.kind === "decor" && ["pine", "palm", "dead_tree"].includes(object.decor)), "no tree is mere scenery any more");
+  assert(item("palm_bow").equip.bow && item("pine_bow").equip.bow, "palm and pine bows");
+  assert(item("deadwood_wand").equip.staff && item("deadwood_wand").equip.requires.magic === 50, "a wand that autocasts");
+  p.inventory.fill(null); give(p, "knife"); give(p, "deadwood_logs"); p.xp.fletching = XP_TABLE[60];
+  const recipes = fletchingRecipesFor(g, "deadwood_logs");
+  assert(recipes.some(recipe => recipe.outputs.deadwood_wand === 1), "a wand from deadwood logs");
+  startProduction(g, recipes.find(recipe => recipe.outputs.deadwood_wand === 1), 1); until(g, () => has(p, "deadwood_wand"), 20);
+  // Chop a palm by the Oasis: Woodcutting 25.
+  const palm = world.objects.find(object => object.kind === "tree" && object.tree === "palm" && [[0, 1], [1, 0], [0, -1], [-1, 0]].some(([dx, dy]) => canWalk(g, object.x + dx, object.y + dy)));
+  for (const other of g.monsters) { other.dead = true; other.respawnAt = Infinity; }
+  give(p, "pewter_axe"); p.xp.woodcutting = XP_TABLE[30]; standBy(g, palm);
+  setTarget(g, { kind: "object", id: palm.id, option: "Chop down" }); until(g, () => count(p, "palm_logs") >= 1, 300);
+  for (const id of ["breeze_sigil", "storm_sigil", "hollow_sigil", "star_sigil"]) assert.equal(item(id).icon.kind, id.replace("_sigil", ""), `${id} has its own mark`);
+  // The Deadwood's dead: crypts, tombs, obelisks, bone-heaps, railed plots and the ruins of the villages the forest took.
+  const kinds = {}; for (const object of world.objects) if (object.kind === "decor") kinds[object.decor] = (kinds[object.decor] ?? 0) + 1;
+  assert(kinds.crypt >= 20 && kinds.tomb >= 60 && kinds.obelisk >= 12 && kinds.bones >= 50, `the Deadwood is dressed: ${JSON.stringify({ crypt: kinds.crypt, tomb: kinds.tomb, obelisk: kinds.obelisk, bones: kinds.bones })}`);
+  assert(world.objects.filter(object => object.decor === "fence" && object.name === "Iron railing, rusted").length >= 60, "railed plots");
+  assert(world.buildings.filter(building => /^Ruined|^Crypt|Namekeeper's Crypt|Ashworth Hall/.test(building.name)).length >= 14, "ruined houses and named crypts");
+  assert(world.objects.some(object => object.name?.startsWith("Here lies Tam Ashworth")), "graves with epitaphs");
+});
+
 test("Presence: a name for your Friend (the token stays), fellowships, titles, and XP from living in the Realm", () => {
   const g = newGame(), p = g.player;
   assert.equal(SKILL_NAMES.presence, "Presence");
@@ -964,7 +991,7 @@ test("Presence: a name for your Friend (the token stays), fellowships, titles, a
   assert.equal(cleanTag("void"), "VOID"); assert.equal(cleanTag("toolong"), null);
   assert.equal(playerName(p), "Friend #7730");
   assert(nameFriend(g, "M4S4T0")); assert.equal(p.name, "M4S4T0"); assert.equal(playerName(p), "M4S4T0 (7730)"); assert.equal(p.friendId, 7730, "the token never changes");
-  const afterName = p.xp.presence; assert(afterName >= 150, "naming is worth Presence");
+  const afterName = p.xp.presence; assert(afterName >= 75, "naming is worth Presence");
   assert(!nameFriend(g, "Someone", true), "a rename costs coins you don't have"); assert.equal(p.name, "M4S4T0");
   const purse = count(p, "coins"); give(p, "coins", 1000); assert(nameFriend(g, "Someone", true)); assert.equal(p.name, "Someone"); assert.equal(count(p, "coins"), purse, "a thousand coins for the ink");
   assert(g.npcs.some(npc => npc.id === "namekeeper"), "the Namekeeper is in Friendhollow");
@@ -1001,7 +1028,7 @@ test("Your Friend talks back: in its family's manner, to what's around it, remem
   assert.equal(g.messages.at(-1).text, "Friend #7730: Big.", "the line goes to chat as your Friend");
   assert(g.events.some(event => event.type === "friend" && event.text === "Big." && event.share), "and over its head, shared with players nearby on Full");
   g.friendSpeech = "off"; assert.equal(friendSays(g, "quest"), null, "off is off");
-  g.friendSpeech = "rare"; p.friendLast = -1e9; assert.equal(friendSays(g, "grave"), null, "rare keeps the small talk"); assert.equal(friendSays(g, "boss"), "Down.", "but not the moments that matter");
+  g.friendSpeech = "rare"; p.friendLast = -1e9; assert.equal(friendSays(g, "grave"), null, "rare keeps the small talk"); assert(["Down.", "Big. Was big."].includes(friendSays(g, "boss")), "but not the moments that matter");
   // Families differ.
   const sk = newGame({ familyId: 0 }); sk.friendSpeech = "full"; assert.equal(friendSays(sk, "grave", null), sk.messages.at(-1).text.replace("Friend #7730: ", ""));
   assert(["Finally. Someone who planned ahead.", "Nice plot. Quiet neighbours."].includes(sk.messages.at(-1).text.replace("Friend #7730: ", "")), "a Skeleton at a grave");
