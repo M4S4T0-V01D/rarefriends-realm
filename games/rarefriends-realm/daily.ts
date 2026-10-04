@@ -1,6 +1,6 @@
 /**
  * The daily streak and daily challenges. Days are UTC calendar days of the real clock, so everyone's day turns over at
- * the same moment and everyone gets the same three challenges.
+ * the same moment; the three challenges are rolled from the day and your token, so yours are yours alone.
  *
  * Streak: claim once a day for a reward on a seven-day cycle (day 7 is the big one); miss a day and it starts again at 1.
  * Every full week you've kept up adds 25% to the coin rewards (up to +100%). Challenges: gain XP in two skills and defeat
@@ -11,7 +11,7 @@ import { addXp, combatLevel, giveOrDrop, level, message, sound, type Game } from
 
 export const DAY_MS = 86_400_000;
 export const dayNumber = (ms: number) => Math.floor(ms / DAY_MS);
-export type Challenge = { kind: "xp"; skill: Skill; target: number } | { kind: "kills"; target: number };
+export type Challenge = { kind: "xp"; skill: Skill; target: number } | { kind: "kills"; target: number } | { kind: "orders"; target: number };
 export type Daily = {
   /** The last day you claimed a streak reward, your streak and your best. */
   day: number; streak: number; best: number;
@@ -61,32 +61,33 @@ export function claimStreak(game: Game, now: number) {
 }
 
 // ---------- Challenges ----------
-const hash = (n: number, salt: number) => { let h = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(salt + 1, 0xc2b2ae35); h ^= h >>> 13; h = Math.imul(h, 0x27d4eb2f); h ^= h >>> 16; return (h >>> 0) / 4294967296; };
+export const hash = (n: number, salt: number) => { let h = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(salt + 1, 0xc2b2ae35); h ^= h >>> 13; h = Math.imul(h, 0x27d4eb2f); h ^= h >>> 16; return (h >>> 0) / 4294967296; };
 /** Skills a challenge can ask for (ones anyone can train from the start). */
 export const CHALLENGE_SKILLS: readonly Skill[] = ["woodcutting", "fishing", "mining", "cooking", "firemaking", "smithing", "crafting", "fletching", "thieving", "agility", "magic", "ranged", "prayer", "sigilcraft", "attack", "strength", "defence"];
 /** XP to gain in a skill for a challenge, by your level in it when the day began. */
 export const xpTarget = (skillLevel: number) => Math.round((300 + 3 * skillLevel * skillLevel) / 50) * 50;
-const current = (game: Game, challenge: Challenge) => challenge.kind === "xp" ? game.player.xp[challenge.skill] : game.player.kills;
+const current = (game: Game, challenge: Challenge) => challenge.kind === "xp" ? game.player.xp[challenge.skill] : challenge.kind === "orders" ? (game.player.stats.orders ?? 0) : game.player.kills;
 /** Start today's challenges if the day has turned over (call as often as you like). */
 export function rollDaily(game: Game, now: number) {
   const daily = game.player.daily, today = dayNumber(now);
   if (daily.challengeDay === today) return false;
-  const pool = [...CHALLENGE_SKILLS], picks: Skill[] = [];
-  for (let i = 0; i < 2; i++) picks.push(pool.splice(Math.floor(hash(today, i) * pool.length), 1)[0]);
+  const pool = [...CHALLENGE_SKILLS], picks: Skill[] = [], seed = today * 1_000_003 + game.player.friendId % 1_000_003;
+  for (let i = 0; i < 2; i++) picks.push(pool.splice(Math.floor(hash(seed, i) * pool.length), 1)[0]);
   daily.challengeDay = today;
-  daily.challenges = [...picks.map((skill): Challenge => ({ kind: "xp", skill, target: xpTarget(level(game, skill)) })), { kind: "kills", target: 10 + Math.floor(hash(today, 9) * 3) * 5 }];
+  const third: Challenge = hash(seed, 11) < 0.4 ? { kind: "orders", target: 1 + Math.floor(hash(seed, 12) * 2) } : { kind: "kills", target: 10 + Math.floor(hash(seed, 9) * 3) * 5 };
+  daily.challenges = [...picks.map((skill): Challenge => ({ kind: "xp", skill, target: xpTarget(level(game, skill)) })), third];
   daily.base = daily.challenges.map(challenge => current(game, challenge));
   daily.claimed = daily.challenges.map(() => false); daily.chest = false;
   return true;
 }
-export const challengeText = (challenge: Challenge) => challenge.kind === "xp" ? `Gain ${challenge.target.toLocaleString()} ${SKILL_NAMES[challenge.skill]} XP` : `Defeat ${challenge.target} monsters`;
+export const challengeText = (challenge: Challenge) => challenge.kind === "xp" ? `Gain ${challenge.target.toLocaleString()} ${SKILL_NAMES[challenge.skill]} XP` : challenge.kind === "orders" ? `Fill ${challenge.target} work order${challenge.target === 1 ? "" : "s"}` : `Defeat ${challenge.target} monsters`;
 export function challengeProgress(game: Game, index: number) {
   const daily = game.player.daily, challenge = daily.challenges[index];
   return challenge ? Math.max(0, Math.min(challenge.target, Math.floor(current(game, challenge) - (daily.base[index] ?? 0)))) : 0;
 }
 export function challengeReward(game: Game, challenge: Challenge): Reward {
   const lvl = challenge.kind === "xp" ? level(game, challenge.skill) : combatLevel(game.player);
-  return { coins: 250 + lvl * 15 };
+  return { coins: challenge.kind === "orders" ? 400 + challenge.target * 300 : 250 + lvl * 15 };
 }
 export function claimChallenge(game: Game, index: number) {
   const daily = game.player.daily, challenge = daily.challenges[index];
@@ -119,7 +120,7 @@ export function cleanDaily(raw: unknown, skills: readonly string[]): Daily {
     const e = c as Record<string, unknown>, target = int(e?.target, 1, 10_000_000, 0);
     if (!target) return [];
     if (e.kind === "xp" && typeof e.skill === "string" && skills.includes(e.skill)) return [{ kind: "xp", skill: e.skill as Skill, target }];
-    return e.kind === "kills" ? [{ kind: "kills", target }] : [];
+    return e.kind === "kills" ? [{ kind: "kills", target }] : e.kind === "orders" ? [{ kind: "orders", target }] : [];
   }) : [];
   const base = Array.isArray(r.base) ? r.base.slice(0, challenges.length).map(v => int(v, 0, 1e12, 0)) : [];
   const claimed = Array.isArray(r.claimed) ? r.claimed.slice(0, challenges.length).map(v => v === true) : [];

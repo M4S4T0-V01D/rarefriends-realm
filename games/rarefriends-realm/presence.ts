@@ -14,7 +14,11 @@ import { REGIONS, regionAt, type RegionId } from "./world.ts";
 /** Presence XP is "raw": it ignores XP relics and rates, so it's earned at one pace for everyone. */
 /** Presence comes slowly: half the pace the rest of the Realm is earned at, since it should take longest of all. */
 export const PRESENCE_RATE = 0.5;
-export function presenceXp(game: Game, amount: number) { addXp(game, "presence", amount * PRESENCE_RATE, { raw: true }); }
+/** Presence XP, at the slow rate; a Wanderer's cloak adds a fifth, a Cape of Renown a third. */
+export function presenceXp(game: Game, amount: number) {
+  const cape = game.player.equipment.cape, more = cape === "cape_of_renown" ? 1.3 : cape === "wanderers_cloak" ? 1.2 : 1;
+  addXp(game, "presence", amount * PRESENCE_RATE * more, { raw: true });
+}
 export const presenceLevel = (player: Player) => levelForXp(player.xp.presence);
 
 // ---------- Names and fellowships ----------
@@ -144,9 +148,10 @@ export const QUEST_REGIONS: Record<string, RegionId> = {
   friends_feast: "friendhollow", grumblin_trouble: "friendhollow", cold_forge: "emberforge", hollow_whispers: "friendhollow", lost_glimmer: "friendhollow", hollow_king: "hollow_depths", hazels_quiver: "fernwick",
   dawn_vigil: "highcairn", greyhorn_light: "highcairn", pilgrims_road: "highcairn", restless_crypt: "highcairn", dawn_against_hollow: "highcairn",
   gravesend_lanterns: "gravesend", saltmarrow_tithe: "saltmarrow", hollyhock_errand: "hollyhock", dyemoor_dye: "dyemoor", tallgrass_tracks: "tallgrass", cragmaw_shaft: "cragmaw", quillhaven_folio: "quillhaven", ashfall_embers: "ashfall",
+  name_worth_knowing: "friendhollow", known_hall: "quillhaven", the_remembered: "friendhollow",
 };
 /** Dawnhold's people live in Highcairn's region; a few settlements are their own. */
-const REPUTATION_PLACES: readonly { id: RegionId; name: string }[] = [
+export const REPUTATION_PLACES: readonly { id: RegionId; name: string }[] = [
   { id: "friendhollow", name: "Friendhollow" }, { id: "fernwick", name: "Fernwick" }, { id: "emberforge", name: "Emberforge" }, { id: "highcairn", name: "Highcairn & Dawnhold" }, { id: "oasis", name: "The Oasis" },
   { id: "gravesend", name: "Gravesend" }, { id: "saltmarrow", name: "Saltmarrow" }, { id: "hollyhock", name: "Hollyhock" }, { id: "dyemoor", name: "Dyemoor" }, { id: "tallgrass", name: "Tallgrass" }, { id: "cragmaw", name: "Cragmaw" }, { id: "quillhaven", name: "Quillhaven" }, { id: "deadwood", name: "The Deadwood" }, { id: "ashfall", name: "Ashfall" },
 ];

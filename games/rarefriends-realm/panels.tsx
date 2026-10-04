@@ -882,7 +882,7 @@ export function ProfilePanel({ game, refresh }: { game: Game; refresh: () => voi
           <button type="button" disabled={!cleanName(fname) || !cleanTag(ftag)} onClick={() => { if (joinFellowship(game, fname, ftag)) { remember(game, "first_fellowship"); friendSays(game, "fellowship"); } refresh(); }}>Stand with them ({FELLOWSHIP_COST.toLocaleString()} coins)</button>
           <small className="realm-muted">Found one, or declare the one your friends made: the tag is what the Realm sees under your name.</small>
         </div>}
-      <p className="realm-note">Presence grows by living here: new regions, quests, bosses, rare finds, people met, emotes, clothes worn for the first time, your name, your fellowship, and time with your Friend behind you.</p>
+      <p className="realm-note">Presence grows by living here: new regions, quests, bosses, rare finds, people met, rumours heard, work orders filled, emotes, clothes worn for the first time, your name, your fellowship, and time with your Friend behind you. Open the skill guide (click Presence on the Skills tab) for what each level brings.</p>
     </div>
   );
 }
@@ -1140,7 +1140,7 @@ export function DailyModal({ game, tab, onTab, onClose, refresh, openMenu }: { g
             {status.canClaim ? <button type="button" className="realm-primary big" onClick={claim}>Claim day {status.next}: {rewardText(status.reward)}</button>
               : <span className="realm-muted">Today's reward is claimed. Come back tomorrow for day {daily.streak + 1}: {rewardText(streakReward(daily.streak + 1))}.</span>}
           </div>
-          <h3>Today's challenges <small>(the same for everyone)</small></h3>
+          <h3>Today's challenges <small>(yours alone; everyone's differ)</small></h3>
           <ul className="realm-challenges">
             {daily.challenges.map((challenge, i) => {
               const progress = challengeProgress(game, i), complete = progress >= challenge.target, reward = challengeReward(game, challenge);
@@ -1157,6 +1157,7 @@ export function DailyModal({ game, tab, onTab, onClose, refresh, openMenu }: { g
               {daily.chest ? <span className="realm-done">✓ Opened</span> : <button type="button" className={done ? "realm-primary" : ""} disabled={!done} onClick={() => { claimChest(game); refresh(); }}>Open</button>}
             </li>
           </ul>
+          <p className="realm-muted"><b>Work orders:</b> craftsfolk across the Realm pay well over shop prices for what you can make at your level, one order each a day (Hazel, Brann, Cook Mabel, Rowan, the old fisher, Nell Gutting, Mother Yarrow, Bolt, Gristle and Scribe Nettle). Ask them "Any work going?". Filled today: {player.stats.orders ?? 0}.</p>
         </div>
       ) : (
         <div className="realm-updates">

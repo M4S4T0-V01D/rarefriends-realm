@@ -51,6 +51,59 @@ function friendBody(family: number, random: () => number, step: boolean): Grid {
   }
   return grid;
 }
+/**
+ * Townsfolk: people-shaped bodies in the same one-bit style, in many builds. A round or long head with two eye pixels,
+ * a neck, shoulders of varying width, a torso (slim, average, stout, broad, round), arms at the sides or one on a hip,
+ * legs short or long, and now and then an elder with a stoop and a stick, or (rarely) a parent with a small child.
+ */
+export const CITIZEN = 9;
+const BUILDS = ["slim", "average", "stout", "broad", "round", "tall", "short", "elder", "parent"] as const;
+export type Build = typeof BUILDS[number];
+export function citizenBuild(random: () => number): Build {
+  const roll = random();
+  // The parent-and-child look is rare now (one in twenty); elders one in ten; the rest spread evenly.
+  if (roll < 0.05) return "parent"; if (roll < 0.15) return "elder";
+  return BUILDS[Math.floor((roll - 0.15) / 0.85 * 7)] ?? "average";
+}
+function citizenBody(random: () => number, step: boolean): Grid {
+  const grid = blank(), r = () => random(), build = citizenBuild(r);
+  if (build === "parent") {
+    // A grown-up on the left, a child holding their hand on the right.
+    ellipse(grid, 5.5, 3.5, 3, 3); set(grid, 4, 3, false); set(grid, 6, 3, false);
+    rect(grid, 3, 7, 6, 5); rect(grid, 2, 8, 1, 3); rect(grid, 9, 8, 1, 3);
+    rect(grid, 3, 12, 2, 3); rect(grid, 6, 12, 2, 3); if (step) { set(grid, 2, 14); set(grid, 7, 14, false); set(grid, 8, 14); }
+    ellipse(grid, 12.5, 8, 2, 2); set(grid, 12, 8, false); set(grid, 13, 8, false);
+    rect(grid, 11, 10, 3, 3); set(grid, 10, 10); rect(grid, 11, 13, 1, 2); rect(grid, 13, 13, 1, 2); if (step) { set(grid, 10, 14); set(grid, 13, 14, false); }
+    return grid;
+  }
+  const round = r() < 0.5, hair = r() < 0.55, top = build === "short" ? 3 : build === "tall" ? 0 : 1, stoop = build === "elder" ? 1 : 0;
+  // The head: rows top … top+4 (five tall), six or seven wide, round or a little long; two eyes; a tuft or a side part of hair.
+  const headRy = 2.6, headRx = round ? 3.3 : 2.9;
+  ellipse(grid, 8, top + headRy, headRx, headRy);
+  if (hair) { set(grid, 8 - Math.round(headRx), top + 1); set(grid, 8 + Math.round(headRx) - 1, top + 1); set(grid, 8 + (r() < 0.5 ? -1 : 0), top - 1 < 0 ? 0 : top - 1); }
+  const eyeRow = top + (r() < 0.5 ? 2 : 3); set(grid, 6, eyeRow, false); set(grid, 9, eyeRow, false);
+  if (r() < 0.3) set(grid, 8, top + 4, false); // an open mouth, or a beard's edge
+  // Neck, then shoulders and torso: slim 4 wide, average 6, stout and broad 8, round an ellipse; tall or short changes the trunk.
+  const neckY = top + 5, half = build === "slim" ? 2 : build === "broad" || build === "stout" ? 4 : 3;
+  rect(grid, 7, neckY, 2, 1);
+  const torsoTop = neckY + 1 + stoop, torsoH = build === "tall" ? 5 : build === "short" ? 3 : build === "elder" ? 3 : 4;
+  if (build === "round") ellipse(grid, 8, torsoTop + torsoH / 2, half + 1.2, torsoH / 2 + 0.8);
+  else if (build === "stout") { rect(grid, 8 - half + 1, torsoTop, half * 2 - 2, 1); rect(grid, 8 - half, torsoTop + 1, half * 2, torsoH - 1); }
+  else if (build === "broad") { rect(grid, 8 - half, torsoTop, half * 2, 2); rect(grid, 8 - half + 1, torsoTop + 2, half * 2 - 2, torsoH - 2); }
+  else rect(grid, 8 - half, torsoTop, half * 2, torsoH);
+  if (build !== "round" && r() < 0.4) { set(grid, 8 - half, torsoTop + 2, false); set(grid, 7 + half, torsoTop + 2, false); } // a belt
+  // Arms: down the sides, or one hand on a hip, or an elder's stick.
+  const armX = 8 - half - 1, armsDown = r() < 0.6;
+  if (build === "elder") { rect(grid, armX, torsoTop, 1, 3); rect(grid, 15 - armX, torsoTop, 1, 2); rect(grid, 15 - armX + 1, torsoTop + 1, 1, 15 - torsoTop - 1); }
+  else if (armsDown) { rect(grid, armX, torsoTop, 1, torsoH); rect(grid, 15 - armX, torsoTop, 1, torsoH); }
+  else { rect(grid, armX, torsoTop, 1, torsoH); rect(grid, 15 - armX, torsoTop, 1, 2); set(grid, 15 - armX - 1, torsoTop + 2); }
+  // Legs: two, a pixel apart (a little more on a broad frame), down to the last row; a step swings one leg out.
+  const legTop = torsoTop + torsoH, legH = Math.max(1, 16 - legTop), gap = build === "broad" || build === "stout" ? 2 : 1;
+  rect(grid, 8 - gap - 1, legTop, 2, legH); rect(grid, 8 + gap - 1, legTop, 2, legH);
+  if (gap === 1 && legH > 1) { for (let y = legTop; y < 16; y++) { set(grid, 7, y, false); set(grid, 8, y, false); } rect(grid, 5, legTop, 2, legH); rect(grid, 9, legTop, 2, legH); }
+  if (step) { set(grid, 4, 15); set(grid, 10, 15, false); set(grid, 11, 15); }
+  return grid;
+}
 const friendCache = new Map<string, SpriteSet>();
 /** A procedural Friend of a family, stable for its seed. */
 export function friendSprite(family: number, seed: number): SpriteSet {
@@ -58,7 +111,9 @@ export function friendSprite(family: number, seed: number): SpriteSet {
   let set = friendCache.get(key);
   if (!set) {
     const artSeed = Math.floor(mulberry(seed * 7919 + family)() * 2 ** 31);
-    set = Object.freeze({ idle: toMask(friendBody(family, mulberry(artSeed), false)), step: toMask(friendBody(family, mulberry(artSeed), true)) });
+    set = family === CITIZEN
+      ? Object.freeze({ idle: toMask(citizenBody(mulberry(artSeed), false)), step: toMask(citizenBody(mulberry(artSeed), true)) })
+      : Object.freeze({ idle: toMask(friendBody(family, mulberry(artSeed), false)), step: toMask(friendBody(family, mulberry(artSeed), true)) });
     friendCache.set(key, set);
   }
   return set;

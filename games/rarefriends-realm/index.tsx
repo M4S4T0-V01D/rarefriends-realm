@@ -27,6 +27,7 @@ import { strikeAt, weatherAt, type Weather } from "./weather.ts";
 import { HOST_HELLO, HOST_STATE, SAVE_ELSEWHERE, SAVE_EXPORT, SAVE_EXPORT_RESULT, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, parseRoster, type ShareAction, type ShareOutcome } from "./roster.ts";
 import { RealmAudio, trackFor, trackById, type SfxName, type TrackId } from "./audio.ts";
 import { renderCard, shareText } from "./card.ts";
+import { CARD_CATEGORY_NAMES, CARD_OPTIONS, cardRequirement, cardUnlocked, fellowshipArt, type CardCategory } from "./cardstyle.ts";
 import { dailyWaiting, rollDaily, streakStatus } from "./daily.ts";
 import { FIRST_STEPS, currentStep, skipFirstSteps } from "./firststeps.ts";
 import { updateWorldBoss } from "./worldboss.ts";
@@ -781,11 +782,19 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   };
 
   // ---------- Adventurer card ----------
+  const drawCard = (state: Game) => {
+    const paint = (art: Parameters<typeof renderCard>[3]) => {
+      if (game.current !== state) return;
+      const picture = renderCard(state, friend.current, regionAt(state.world, state.player.x, state.player.y).name, art);
+      picture.toBlob(blob => { if (!blob) return; cardBlob.current = blob; setCardUrl(url => { if (url) URL.revokeObjectURL(url); return URL.createObjectURL(blob); }); });
+    };
+    // The fellowship's logo and background come from the site's fellowships folder; draw at once and again when they arrive.
+    if (state.player.fellowship) fellowshipArt(state.player.fellowship.tag).then(paint, () => paint(null)); else paint(null);
+  };
   const openCard = () => {
     const state = game.current;
     if (!state) return;
-    const picture = renderCard(state, friend.current, regionAt(state.world, state.player.x, state.player.y).name);
-    picture.toBlob(blob => { if (!blob) return; cardBlob.current = blob; setCardUrl(url => { if (url) URL.revokeObjectURL(url); return URL.createObjectURL(blob); }); });
+    drawCard(state);
     setShareStatus(""); setModal("card");
   };
   const share = (action: ShareAction) => {
@@ -959,6 +968,16 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
                 <button type="button" onClick={() => share("save")}>Save picture</button>
               </div>
               {shareStatus && <p className="realm-note" role="status">{shareStatus}</p>}
+              <div className="realm-card-styles">
+                {(Object.keys(CARD_OPTIONS) as CardCategory[]).map(category => (
+                  <div key={category} className="realm-graphics realm-card-row" role="radiogroup" aria-label={CARD_CATEGORY_NAMES[category]}>
+                    <span>{CARD_CATEGORY_NAMES[category]}:</span>
+                    {CARD_OPTIONS[category].map(option => { const open = cardUnlocked(state, option), need = cardRequirement(option);
+                      return <button key={option.id} type="button" role="radio" aria-checked={(player.card[category] ?? "") === option.id || (!CARD_OPTIONS[category].some(entry => entry.id === player.card[category]) && option === CARD_OPTIONS[category][0])} disabled={!open}
+                        title={open ? option.text ?? option.name : `Locked: ${need}`} onClick={() => { player.card[category] = option.id; drawCard(state); refresh(); }}>{open ? option.name : `🔒 ${option.name}`}</button>; })}
+                  </div>))}
+                <p className="realm-muted">Locked styles open with Presence, quests and achievements (hover one to see). Fellowship logos and backgrounds come from the site's fellowships folder: see preview/fellowships/README on the site.</p>
+              </div>
               <p className="realm-note">Post text: “{shareText(state)}”</p>
             </Modal>
           )}

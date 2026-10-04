@@ -112,7 +112,23 @@ export function skillGuide(skill: Skill): GuideEntry[] {
       for (const mix of MIXTURES) add(mix.level, mix.name, `For ${FAMILY_NAMES[mix.family]} Friends only: ${mix.effect.toLowerCase()} for ten minutes`, mix.id);
       break;
     case "presence":
-      add(1, "Presence", "The mark you leave on the world. Earned by discovering regions, finishing quests, felling bosses, rare finds, your Friend, your name and the clothes you're seen in.");
+      add(1, "Presence", "The mark you leave on the world. Earned by discovering regions, finishing quests, felling bosses, rare finds, people met, rumours heard, work orders filled, your Friend, your name and the clothes you're seen in. The slowest skill in the Realm.");
+      add(1, "Title: Newcomer", "Everyone starts somewhere. Titles show when players examine you.");
+      add(10, "Title: Wanderer of the Realm", "Your Friend starts remarking on places you come back to.");
+      add(20, "People notice you", "Townsfolk you've met greet you with \"Back already?\". The Namekeeper offers A Name Worth Knowing (with a name).");
+      add(20, "Wanderer's cloak", "From A Name Worth Knowing · Presence grows a fifth faster", "wanderers_cloak");
+      add(25, "Title: Traveller", "Presence 25.");
+      add(30, "Memory moments", "Your Friend recalls firsts: the first dragon, the first death, the first Hollow.");
+      add(40, "Known by name", "Townsfolk greet you by your name. Title: Adventurer. Archivist Perrin offers Known in Every Hall.");
+      add(40, "Chronicler's mantle", "From Known in Every Hall · work orders pay 15% more", "chroniclers_mantle");
+      add(40, "Storyteller's hat", "From Known in Every Hall", "storytellers_hat");
+      add(50, "Personality", "Your Friend's own tendencies show in what it says: explorer, warrior, scholar, collector, socialite.");
+      add(60, "Title: Seasoned Adventurer", "King Hollis offers The Remembered.");
+      add(60, "Blade of Renown", "From The Remembered · strength grows with Presence (one for every four levels)", "blade_of_renown");
+      add(60, "Cape of Renown", "From The Remembered · Presence grows a third faster", "cape_of_renown");
+      add(70, "Everyone knows you", "\"Everyone here knows\" your name, in every village you've spent time in.");
+      add(80, "Title: Legend of the Realm", "Presence 80.");
+      add(99, "Title: Presence of the Realm", "Presence 99.");
       break;
     case "slayer":
       for (const task of SLAYER_TASKS) add("slayer" in task ? task.slayer : 1, `Task: ${task.name}`, `From combat level ${task.min}`);

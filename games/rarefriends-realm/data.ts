@@ -391,6 +391,17 @@ const OTHER_GEAR: Item[] = [
   { id: "ember_staff", name: "Ember staff", examine: "A magical staff. Provides unlimited ember sigils.", value: 1500, icon: { shape: "staff", color: "#e9a07a" }, equip: { slot: "weapon", bonuses: { attack: 4, strength: 5, magic: 10 }, speed: 5, staff: true, requires: { magic: 10 } } },
   { id: "deadwood_wand", name: "Deadwood wand", examine: "A wand of grey deadwood. It holds a charge the way the Deadwood holds its dead: quietly, and for a long time. Autocasts like a staff.", value: 2400, icon: { shape: "staff", color: "#9a958d", accent: "#8a62c8", kind: "wand" },
     equip: { slot: "weapon", bonuses: { attack: 6, strength: 2, magic: 18 }, requires: { magic: 50 }, speed: 4, staff: true } },
+  // Presence gear: earned by the long quests of being known (the Namekeeper, Archivist Perrin, King Hollis).
+  { id: "wanderers_cloak", name: "Wanderer's cloak", examine: "A travelling cloak with a stitch from every village you've passed through. Presence grows a fifth faster in it.", value: 0, tradeable: false,
+    icon: { shape: "cape", color: "#7a6a52", accent: "#e2c46a" }, equip: { slot: "cape", bonuses: { defence: 4, prayer: 2 }, requires: { presence: 20 } } },
+  { id: "storytellers_hat", name: "Storyteller's hat", examine: "A wide hat with a quill in the band. People lean in when you wear it.", value: 0, tradeable: false,
+    icon: { shape: "hat", color: "#4a3f5c", accent: "#e2c46a" }, equip: { slot: "head", bonuses: { defence: 6, magic: 3 }, requires: { presence: 40 } } },
+  { id: "chroniclers_mantle", name: "Chronicler's mantle", examine: "Deep blue, inked with the symbol from the stones. Patrons pay 15% more for work orders brought in it.", value: 0, tradeable: false,
+    icon: { shape: "body", color: "#2f3a6b", accent: "#e2c46a" }, equip: { slot: "body", bonuses: { defence: 14, magic: 5 }, requires: { presence: 40 } } },
+  { id: "blade_of_renown", name: "Blade of Renown", examine: "A sword with your name on the blade, cut the day the Realm remembered you. Its strength grows with your Presence.", value: 0, tradeable: false,
+    icon: { shape: "sword", color: "#e8e5de", accent: "#e2c46a" }, equip: { slot: "weapon", bonuses: { attack: 50, strength: 44 }, requires: { presence: 60, attack: 60 }, speed: 4 } },
+  { id: "cape_of_renown", name: "Cape of Renown", examine: "Gold on black, with the Realm's crown at the clasp. Presence grows a third faster in it.", value: 0, tradeable: false,
+    icon: { shape: "cape", color: "#1c1b1f", accent: "#e2c46a", kind: "cross" }, equip: { slot: "cape", bonuses: { defence: 8, prayer: 4, attack: 2, strength: 2 }, requires: { presence: 60 } } },
   { id: "wyrmward_shield", name: "Wyrmward shield", examine: "King Hollis's gift. Dragonfire slides right off it.", value: 200, icon: { shape: "shield", color: "#c9c2b6", accent: "#cf6e6e" }, equip: { slot: "shield", bonuses: { defence: 8 } } },
   { id: "drakehide_bracers", name: "Drakehide bracers", examine: "Scaled drakehide bracers.", value: 2500, icon: { shape: "bracer", color: "#6f8a5c" }, equip: { slot: "hands", bonuses: { ranged: 9, defence: 7 }, requires: { ranged: 50 } } },
   { id: "drakehide_chaps", name: "Drakehide chaps", examine: "Scaled drakehide chaps.", value: 5000, icon: { shape: "legs", color: "#6f8a5c" }, equip: { slot: "legs", bonuses: { ranged: 14, defence: 20 }, requires: { ranged: 50 } } },
@@ -533,8 +544,8 @@ const RANGED_GEAR: Item[] = [
   // The Warden's bracers (a Slayer reward): more Slayer XP on task.
   { id: "warden_bracers", name: "Warden's bracers", examine: "Dark leather bracers stamped with the Warden's mark. +10% Slayer XP on task.", value: 15000, tradeable: false, icon: { shape: "bracer", color: "#3b3a38", accent: "#cf6e6e" }, equip: { slot: "hands", bonuses: { attack: 2, ranged: 2, defence: 3 }, requires: { slayer: 30 } } },
   // The ossuary bag (the Dawn Vigil's reward): carried in your pack, it holds 60 bones of any kind, catches the bones you pick up, and an altar takes them all at once.
-  { id: "bone_bag", name: "Ossuary bag", examine: "A linen bag blessed by the Order of the Dawn. It holds 60 bones of any kind, catches the bones you pick up, and an altar takes every one at once.", value: 1200, tradeable: false,
-    icon: { shape: "satchel", color: "#d8cdb6", accent: "#f2efe8", kind: "bones" } },
+  { id: "bone_bag", name: "Ossuary bag", examine: "A linen bag blessed by the Order of the Dawn. Worn on the back or carried, it holds 60 bones of any kind, catches the bones you pick up, and an altar takes every one at once (pray at one while wearing it).", value: 1200, tradeable: false,
+    icon: { shape: "satchel", color: "#d8cdb6", accent: "#f2efe8", kind: "bones" }, equip: { slot: "cape", bonuses: { prayer: 2 } } },
   // The inkcoal satchel: worn on your back (or carried), it catches mined inkcoal and feeds the furnace.
   { id: "inkcoal_satchel", name: "Inkcoal satchel", examine: "A stout leather pack for your back. It holds 120 inkcoal, fills itself as you mine, and the furnace reaches into it.", value: 2500,
     icon: { shape: "satchel", color: "#8a6446", accent: "#3b3a38" }, equip: { slot: "cape", bonuses: { defence: 1 } } },

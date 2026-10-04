@@ -1,10 +1,11 @@
 /**
  * NPCs, their dialogue and the Realm's quests. Dialogue is built on demand from the player's quest state.
  */
-import { COURSES, FAMILY_NAMES, FAMILY_PERKS, SLAYER_REWARDS, WAYFARER_MARK, WAYFARER_REWARDS, item } from "./data.ts";
+import { COURSES, FAMILY_NAMES, FAMILY_PERKS, SLAYER_REWARDS, WAYFARER_MARK, WAYFARER_REWARDS, item , REGIONAL_CLOTHING, SKILL_NAMES } from "./data.ts";
 import { assignTask, buySlayerReward, currentTask, eligibleTasks, slayerPoints, slayerStreak, taskText } from "./slayer.ts";
 import { buyWayfarerReward } from "./wayfaring.ts";
-import { RENAME_COST, onQuestCompleted, playerName, presenceLevel } from "./presence.ts";
+import { REPUTATION_PLACES, RENAME_COST, onQuestCompleted, playerName, presenceLevel, reputation, unlockedTitles } from "./presence.ts";
+import { PATRONS, askText, currentOrder, fillOrder, orderText } from "./orders.ts";
 import { friendSays, remember } from "./friend.ts";
 import { rumourAt } from "./rumours.ts";
 import {
@@ -29,31 +30,31 @@ export const NPCS: Record<string, NpcDef> = {
   gravesend_keeper: { id: "gravesend_keeper", name: "Warden Mira Thorne", examine: "Gravesend's gravekeeper. She knows every name on every stone.", options: ["Talk-to"], art: art(2, 501) },
   gravesend_clothier: { id: "gravesend_clothier", name: "Old Wick", examine: "Sews mourning wear, and has for sixty years.", options: ["Talk-to", "Trade"], shop: "gravesend_clothier", art: art(7, 502) },
   gravesend_trader: { id: "gravesend_trader", name: "Lantern-seller Pip", examine: "Sells lanterns, candles and whatever else keeps the dark off.", options: ["Talk-to", "Trade"], shop: "gravesend_general", art: art(0, 503) },
-  gravesend_villager: { id: "gravesend_villager", name: "Gravesend villager", examine: "Pale, quiet, and unbothered by the Deadwood.", options: ["Talk-to"], art: art(2, 504) },
+  gravesend_villager: { id: "gravesend_villager", name: "Gravesend villager", examine: "Pale, quiet, and unbothered by the Deadwood.", options: ["Talk-to"], art: art(9, 504) },
   saltmarrow_harbour: { id: "saltmarrow_harbour", name: "Harbourmaster Brine", examine: "Runs the docks and the Salt Tithe. Barnacled.", options: ["Talk-to"], art: art(4, 511) },
   saltmarrow_fishmonger: { id: "saltmarrow_fishmonger", name: "Nell Gutting", examine: "Can fillet a sailfish in the time it takes to say so.", options: ["Talk-to", "Trade"], shop: "saltmarrow_fish", art: art(3, 512) },
   saltmarrow_clothier: { id: "saltmarrow_clothier", name: "Sal Oilskin", examine: "Waxes canvas by the yard.", options: ["Talk-to", "Trade"], shop: "saltmarrow_clothier", art: art(1, 513) },
-  saltmarrow_villager: { id: "saltmarrow_villager", name: "Saltmarrow fisher", examine: "Smells of the sea. Proudly.", options: ["Talk-to"], art: art(4, 514) },
+  saltmarrow_villager: { id: "saltmarrow_villager", name: "Saltmarrow fisher", examine: "Smells of the sea. Proudly.", options: ["Talk-to"], art: art(9, 514) },
   hollyhock_apothecary: { id: "hollyhock_apothecary", name: "Mother Yarrow", examine: "Hollyhock's apothecary. Her garden is the finest in the Realm, and she knows it.", options: ["Talk-to", "Trade"], shop: "hollyhock_herbs", art: art(5, 521) },
   hollyhock_clothier: { id: "hollyhock_clothier", name: "Posy Wren", examine: "Prints leaves on everything.", options: ["Talk-to", "Trade"], shop: "hollyhock_clothier", art: art(6, 522) },
-  hollyhock_villager: { id: "hollyhock_villager", name: "Hollyhock gardener", examine: "Soil under every fingernail.", options: ["Talk-to"], art: art(5, 523) },
+  hollyhock_villager: { id: "hollyhock_villager", name: "Hollyhock gardener", examine: "Soil under every fingernail.", options: ["Talk-to"], art: art(9, 523) },
   dyemoor_dyer: { id: "dyemoor_dyer", name: "Master Dyer Indigo Vell", examine: "His hands have been blue since he was nine.", options: ["Talk-to"], art: art(8, 531) },
   dyemoor_clothier: { id: "dyemoor_clothier", name: "Marigold Hem", examine: "Dyemoor's finest cut, and the loudest.", options: ["Talk-to", "Trade"], shop: "dyemoor_clothier", art: art(1, 532) },
   dyemoor_tailor: { id: "dyemoor_tailor", name: "Bolt", examine: "Sells thread, cloth and capes by the armful.", options: ["Talk-to", "Trade"], shop: "dyemoor_tailor", art: art(0, 533) },
-  dyemoor_villager: { id: "dyemoor_villager", name: "Dyemoor villager", examine: "Dressed in colours the rest of the Realm hasn't heard of.", options: ["Talk-to"], art: art(8, 534) },
+  dyemoor_villager: { id: "dyemoor_villager", name: "Dyemoor villager", examine: "Dressed in colours the rest of the Realm hasn't heard of.", options: ["Talk-to"], art: art(9, 534) },
   tallgrass_huntmaster: { id: "tallgrass_huntmaster", name: "Huntmaster Fenn", examine: "Reads tracks like other people read signs.", options: ["Talk-to"], art: art(3, 541) },
   tallgrass_outfitter: { id: "tallgrass_outfitter", name: "Ash Quiverly", examine: "Bows, arrows, hides and a story for each.", options: ["Talk-to", "Trade"], shop: "tallgrass_hunting", art: art(6, 542) },
   tallgrass_clothier: { id: "tallgrass_clothier", name: "Lark", examine: "Sews clothes you can't see in the grass.", options: ["Talk-to", "Trade"], shop: "tallgrass_clothier", art: art(3, 543) },
-  tallgrass_villager: { id: "tallgrass_villager", name: "Tallgrass hunter", examine: "Still as a heron.", options: ["Talk-to"], art: art(3, 544) },
+  tallgrass_villager: { id: "tallgrass_villager", name: "Tallgrass hunter", examine: "Still as a heron.", options: ["Talk-to"], art: art(9, 544) },
   cragmaw_foreman: { id: "cragmaw_foreman", name: "Foreman Durga Pike", examine: "Runs the Cragmaw mine, and misses nothing that comes out of it.", options: ["Talk-to"], art: art(6, 551) },
   cragmaw_armourer: { id: "cragmaw_armourer", name: "Brenna Anvilsong", examine: "Ironreach's master smith. Her glimmer and rarite work is the finest in the Realm, and priced like it.", options: ["Talk-to", "Trade"], shop: "cragmaw_armoury", art: art(6, 555) },
   cragmaw_ore: { id: "cragmaw_ore", name: "Gristle", examine: "Buys ore by weight and sells it by the lie.", options: ["Talk-to", "Trade"], shop: "cragmaw_ore", art: art(6, 552) },
   cragmaw_clothier: { id: "cragmaw_clothier", name: "Hearthkeeper Olwen", examine: "Keeps the one warm room in Cragmaw, and sells the coats to leave it in.", options: ["Talk-to", "Trade"], shop: "cragmaw_clothier", art: art(0, 553) },
-  cragmaw_villager: { id: "cragmaw_villager", name: "Cragmaw miner", examine: "Soot to the eyebrows.", options: ["Talk-to"], art: art(6, 554) },
+  cragmaw_villager: { id: "cragmaw_villager", name: "Cragmaw miner", examine: "Soot to the eyebrows.", options: ["Talk-to"], art: art(9, 554) },
   quillhaven_archivist: { id: "quillhaven_archivist", name: "Archivist Perrin Quill", examine: "Keeper of the Quillhaven library. Shushes you before you've spoken.", options: ["Talk-to"], art: art(5, 561) },
   quillhaven_scribe: { id: "quillhaven_scribe", name: "Scribe Nettle", examine: "Copies sigils into books, and sells both.", options: ["Talk-to", "Trade"], shop: "quillhaven_sigils", art: art(8, 562) },
   quillhaven_clothier: { id: "quillhaven_clothier", name: "Brother Folio", examine: "Keeps the vestry: robes, caps and capes for the scholarly.", options: ["Talk-to", "Trade"], shop: "quillhaven_clothier", art: art(5, 563) },
-  quillhaven_villager: { id: "quillhaven_villager", name: "Quillhaven scholar", examine: "Reading while walking. Hasn't fallen in the sea yet.", options: ["Talk-to"], art: art(5, 564) },
+  quillhaven_villager: { id: "quillhaven_villager", name: "Quillhaven scholar", examine: "Reading while walking. Hasn't fallen in the sea yet.", options: ["Talk-to"], art: art(9, 564) },
   ashfall_trader: { id: "ashfall_trader", name: "Ember Tamsin", examine: "Camps at the edge of the dragons' country and sells what she finds in the ash.", options: ["Talk-to", "Trade"], shop: "ashfall_trader", art: art(7, 571) },
   namekeeper: { id: "namekeeper", name: "Namekeeper Elian", examine: "Keeps the Realm's register of names. A number tells him which Friend you are; a name tells him who you became.", options: ["Talk-to"], art: art(5, 777) },
   priest: { id: "priest", name: "Brother Ossic", examine: "Friend #3412. A Skeleton who tends the chapel of the Old Friend.", options: ["Talk-to"], art: { canonical: 3412 } },
@@ -83,7 +84,7 @@ export const NPCS: Record<string, NpcDef> = {
     pickpocket: { level: 40, xp: 46.8, coins: [20, 40], stun: 5, damage: 2 } },
   cook: { id: "cook", name: "Cook Mabel", examine: "The castle cook. She looks worried.", options: ["Talk-to"], art: art(3, 111) },
   emporium: { id: "emporium", name: "Relic keeper", examine: "Keeper of the Rare Casket chest.", options: ["Talk-to", "Caskets"], art: art(7, 121) },
-  villager: { id: "villager", name: "Villager", examine: "One of the Realm's many Friends.", options: ["Talk-to", "Pickpocket"], art: art(4, 131),
+  villager: { id: "villager", name: "Villager", examine: "One of the Realm's many Friends.", options: ["Talk-to", "Pickpocket"], art: art(9, 131),
     pickpocket: { level: 1, xp: 8, coins: [3, 12], stun: 4, damage: 1 } },
   miller: { id: "miller", name: "Miller Dunn", examine: "Flour on every surface.", options: ["Talk-to"], art: art(2, 141) },
   miner: { id: "miner", name: "Old miner", examine: "Coughs a lot.", options: ["Talk-to", "Trade"], shop: "mine_supplies", art: art(6, 151) },
@@ -341,6 +342,44 @@ export const QUESTS: readonly QuestDef[] = [
       return ["The passes are clear for now. Tamsin gave me a cloak burnt by a dragon, and a warning about the crater. QUEST COMPLETE!"];
     },
   },
+  // ---------- The quests of being known: long ones, for Presence, with gear only they give ----------
+  {
+    id: "name_worth_knowing", name: "A Name Worth Knowing", points: 2, difficulty: "Long", start: "Talk to Namekeeper Elian by the Friendhollow square, once your Presence is 20 and your Friend has a name.",
+    requirements: ["Presence 20", "A name for your Friend"], rewards: ["2 Quest Points", "Wanderer's cloak (Presence 20: Presence grows a fifth faster)", "3,000 coins", "2,000 Presence XP"],
+    journal: game => {
+      const s = stage(game, "name_worth_knowing"), k = KNOWN(game);
+      if (s === 0) return ["Namekeeper Elian says a name is only worth what the Realm knows of it. He'd write more beside mine, if there were more to write."];
+      if (s === 1) return ["Elian wants my name to mean something in the register: places seen, people met, things heard, things done.",
+        `${k.regions >= 10 ? "✓" : "•"} Regions discovered: ${Math.min(10, k.regions)}/10`, `${k.people >= 25 ? "✓" : "•"} People spoken to: ${Math.min(25, k.people)}/25`,
+        `${k.rumours >= 10 ? "✓" : "•"} Rumours heard: ${Math.min(10, k.rumours)}/10`, `${k.quests >= 5 ? "✓" : "•"} Quests completed: ${Math.min(5, k.quests)}/5`];
+      return ["Elian wrote a second line under my name, and gave me a cloak with a stitch from every village I'd passed through. QUEST COMPLETE!"];
+    },
+  },
+  {
+    id: "known_hall", name: "Known in Every Hall", points: 3, difficulty: "Long", start: "Talk to Archivist Perrin Quill in Quillhaven, after The Quillhaven Folio and A Name Worth Knowing, with Presence 40.",
+    requirements: ["Presence 40", "A Name Worth Knowing", "The Quillhaven Folio"], rewards: ["3 Quest Points", "Chronicler's mantle (Presence 40: work orders pay 15% more)", "Storyteller's hat", "6,000 coins", "3,000 Presence XP"],
+    journal: game => {
+      const s = stage(game, "known_hall"), k = KNOWN(game);
+      if (s === 0) return ["Archivist Perrin keeps a shelf for people the whole Realm knows. It's nearly empty. He thinks I could fill a page of it."];
+      if (s === 1) return ["Perrin wants proof I'm known in every hall: a name in eight settlements, their clothes on my back, their stories in my head, and deeds to my name.",
+        `${k.known >= 8 ? "✓" : "•"} Settlements where I'm known: ${Math.min(8, k.known)}/8`, `${k.styles >= 4 ? "✓" : "•"} Regional outfits worn: ${Math.min(4, k.styles)}/4`,
+        `${k.rumours >= 20 ? "✓" : "•"} Rumours heard: ${Math.min(20, k.rumours)}/20`, `${k.achievements >= 15 ? "✓" : "•"} Achievements: ${Math.min(15, k.achievements)}/15`];
+      return ["Perrin bound a page with my name at the top and gave me the mantle and hat the library keeps for its chroniclers. QUEST COMPLETE!"];
+    },
+  },
+  {
+    id: "the_remembered", name: "The Remembered", points: 4, difficulty: "Long", start: "Talk to King Hollis in Friendhollow Castle, after Known in Every Hall, with Presence 60.",
+    requirements: ["Presence 60", "Known in Every Hall", "Attack 60 to wield the reward"], rewards: ["4 Quest Points", "Blade of Renown (Presence 60: strength grows with Presence)", "Cape of Renown (Presence grows a third faster)", "12,000 coins", "5,000 Presence XP"],
+    journal: game => {
+      const s = stage(game, "the_remembered"), k = KNOWN(game);
+      if (s === 0) return ["King Hollis says the Realm remembers very few, and that the ones it does are not always the ones who deserved it. He means to see to it, this once."];
+      if (s === 1) return ["The King wants the deeds of someone the Realm will remember: bosses felled, titles earned, trust in the villages, and a long list of things done.",
+        `${k.bosses >= 4 ? "✓" : "•"} Bosses felled: ${Math.min(4, k.bosses)}/4`, `${k.titles >= 8 ? "✓" : "•"} Titles earned: ${Math.min(8, k.titles)}/8`,
+        `${k.trusted >= 4 ? "✓" : "•"} Settlements where I'm trusted: ${Math.min(4, k.trusted)}/4`, `${k.quests >= 12 ? "✓" : "•"} Quests completed: ${Math.min(12, k.quests)}/12`,
+        `${k.achievements >= 30 ? "✓" : "•"} Achievements: ${Math.min(30, k.achievements)}/30`];
+      return ["The King had my name cut into a blade and a cape made for the court. The Realm remembers me. QUEST COMPLETE!"];
+    },
+  },
 ];
 export const questPoints = (game: Game) => QUESTS.reduce((sum, quest) => sum + (stage(game, quest.id) >= finalStage(quest.id) ? quest.points : 0), 0);
 export function finalStage(quest: string) { return quest === "hollow_whispers" ? 4 : quest === "hollow_king" || quest === "greyhorn_light" ? 3 : 2; }
@@ -460,6 +499,55 @@ export function useCryptAltar(game: Game) {
 
 // ---------- Dialogue ----------
 /** A village quest in one shape: an offer, a job to bring back or a tally to fill, and a reward. Stage 1 while on it, 2 when done. */
+/** What the Realm knows of you, for the quests of being known. */
+function KNOWN(game: Game) {
+  const player = game.player, reps = REPUTATION_PLACES.map(place => reputation(game, place.id));
+  return {
+    regions: Object.keys(player.visited).length, people: Object.keys(player.talked).length, rumours: Object.keys(player.rumours).length,
+    quests: QUESTS.filter(quest => questDone(game, quest.id)).length, known: reps.filter(rep => rep.score >= 1).length, trusted: reps.filter(rep => rep.score >= 4).length,
+    styles: REGIONAL_CLOTHING.filter(set => set.pieces.some(piece => player.outfits[piece.id])).length, achievements: Object.keys(player.achievements).length,
+    bosses: player.stats.bosses ?? 0, titles: unlockedTitles(game).length,
+  };
+}
+const presenceReward = (game: Game, coins: number, xp: number, ...items: string[]) => { giveOrDrop(game, "coins", coins); addXp(game, "presence", xp, { raw: true }); for (const id of items) giveOrDrop(game, id); };
+function nameWorthKnowing(game: Game, name: string): Dialogue {
+  const k = KNOWN(game);
+  return fetchQuest(game, name, "name_worth_knowing", {
+    offer: [`${game.player.name}. It's written. But a name is only worth what the Realm knows of it, and so far the register says: a name.`, "Go and be known. Ten regions seen, twenty-five people spoken to, ten rumours heard, five quests done. Then I'll write the second line."],
+    accept: "Good. The ink's ready when you are.", progress: `The register still has one line under ${game.player.name}. Regions ${Math.min(10, k.regions)}/10, people ${Math.min(25, k.people)}/25, rumours ${Math.min(10, k.rumours)}/10, quests ${Math.min(5, k.quests)}/5.`,
+    have: () => k.regions >= 10 && k.people >= 25 && k.rumours >= 10 && k.quests >= 5, take: () => {},
+    done: [`${game.player.name}: seen, spoken to, heard of, and owed. That's a second line. Take this cloak; every village you passed through put a stitch in it.`],
+    reward: () => presenceReward(game, 3000, 2000, "wanderers_cloak"),
+  });
+}
+function knownHall(game: Game, name: string): Dialogue {
+  const k = KNOWN(game);
+  return fetchQuest(game, name, "known_hall", {
+    offer: ["The library keeps a shelf for people the whole Realm knows. It is nearly empty. Not for want of people; for want of proof.", "Be known in eight settlements. Wear the clothes of four. Carry twenty of their stories and fifteen deeds of your own. Then I'll bind a page with your name at the top."],
+    accept: "Then go and be known. Quietly, please. This is a library.", progress: `Not yet a page. Known in ${Math.min(8, k.known)}/8 settlements, outfits of ${Math.min(4, k.styles)}/4, rumours ${Math.min(20, k.rumours)}/20, achievements ${Math.min(15, k.achievements)}/15.`,
+    have: () => k.known >= 8 && k.styles >= 4 && k.rumours >= 20 && k.achievements >= 15, take: () => {},
+    done: ["Every hall. I've bound the page. The library keeps a mantle and a hat for its chroniclers; they've been waiting for someone the ink would stick to."],
+    reward: () => presenceReward(game, 6000, 3000, "chroniclers_mantle", "storytellers_hat"),
+  });
+}
+function theRemembered(game: Game, name: string): Dialogue {
+  const k = KNOWN(game);
+  return fetchQuest(game, name, "the_remembered", {
+    offer: ["The Realm remembers very few, and not always the ones who deserved it. I mean to see to it, this once.", "Fell four of its terrors. Earn eight titles. Be trusted in four settlements, finish twelve quests, and thirty deeds besides. Then the court will remember you the way courts do: in steel and cloth."],
+    accept: "Go on, then. I'll have the smith stand ready.", progress: `Not yet. Bosses ${Math.min(4, k.bosses)}/4, titles ${Math.min(8, k.titles)}/8, trusted in ${Math.min(4, k.trusted)}/4, quests ${Math.min(12, k.quests)}/12, achievements ${Math.min(30, k.achievements)}/30.`,
+    have: () => k.bosses >= 4 && k.titles >= 8 && k.trusted >= 4 && k.quests >= 12 && k.achievements >= 30, take: () => {},
+    done: ["It's done, then. Your name is on the blade; the cape is the court's. The Realm remembers you. Try to deserve it a while longer."],
+    reward: () => presenceReward(game, 12000, 5000, "blade_of_renown", "cape_of_renown"),
+  });
+}
+/** A patron's work for the day: what they want, what it pays, and the hand-over. */
+function orderDialogue(game: Game, npc: string, name: string): Dialogue {
+  const order = currentOrder(game, npc), patron = PATRONS[npc], player = game.player;
+  if (!order) return chat(name, npcSays(name, `Nothing you could make for me yet. Come back when your ${SKILL_NAMES[patron.skill]} is better.`));
+  if (order.done) return chat(name, npcSays(name, "You've done today's. Come back tomorrow; there's always more."));
+  if (count(player, order.item) >= order.n) return chat(name, npcSays(name, `${orderText(order)}! ${patron.thanks}`), undefined, () => { fillOrder(game, npc); });
+  return chat(name, npcSays(name, askText(npc, order), `I'll pay ${order.pay.toLocaleString()} coins, well over what any shop gives, and you'll be the better ${SKILL_NAMES[patron.skill].toLowerCase() === "wayfaring" ? "for it" : "at it"}.`));
+}
 function fetchQuest(game: Game, name: string, quest: string, q: { offer: string[]; accept: string; progress: string; have: () => boolean; take: () => void; done: string[]; reward: () => void }): Dialogue {
   const s = stage(game, quest), def = QUESTS.find(entry => entry.id === quest)!;
   if (s === 0) return chat(name, npcSays(name, ...q.offer), [
@@ -493,6 +581,11 @@ export function talk(game: Game, npcId: string): Dialogue {
   else if (player.talked[base] && presenceLevel(player) >= 20 && game.rng() < 0.3) {
     const level = presenceLevel(player), who = player.name ?? "you";
     dialogue.lines.unshift(...npcSays(name, level >= 70 && player.name ? `Everyone here knows ${who}.` : level >= 40 && player.name ? `${who}! What brings you back?` : "Back already?"));
+  }
+  // Craftsfolk have work going.
+  if (PATRONS[base] && !dialogue.onEnd) {
+    const option = { label: "Any work going?", then: () => orderDialogue(game, base, name) };
+    dialogue.options = [...(dialogue.options ?? []).filter(entry => !/^(Goodbye|Not today|Just|Maybe later|Nothing)/.test(entry.label)), option, { label: "Goodbye.", then: () => null }];
   }
   // Townsfolk have heard things.
   if (GOSSIPS.test(base) && !dialogue.onEnd) {
@@ -875,6 +968,7 @@ function talkInner(game: Game, npcId: string): Dialogue {
           if (has(player, "wyrmward_shield") || player.equipment.shield === "wyrmward_shield") return chat(name, npcSays(name, "You already carry one of my shields. Keep it between you and the fire."));
           return chat(name, npcSays(name, "Dragons! Then take this. A Wyrmward shield: it turns their breath to a warm breeze. Mostly."), undefined, () => { giveOrDrop(game, "wyrmward_shield"); message(game, "King Hollis hands you a Wyrmward shield.", "quest"); });
         } },
+        ...(questDone(game, "known_hall") && (stage(game, "the_remembered") > 0 || presenceLevel(player) >= 60) ? [{ label: stage(game, "the_remembered") === 0 ? "They say the Realm forgets." : "About being remembered…", then: () => theRemembered(game, name) }] : []),
         { label: "Goodbye, Your Majesty.", then: () => null },
       ];
       if (!data(game, "royal_audience")) return chat(name, npcSays(name, "A visitor! Welcome to Friendhollow Castle. Here: every Friend on the road should have a little coin."), undefined, () => {
@@ -926,7 +1020,9 @@ function talkInner(game: Game, npcId: string): Dialogue {
       done: ["The seam runs. The mine works. Cragmaw owes you.", "Take a greatcoat off the hook. You'll freeze otherwise, and I need you alive to hire again."],
       reward: () => { giveOrDrop(game, "ironreach_greatcoat"); give(game.player, "coins", 800); addXp(game, "mining", 3500, { raw: true }); addXp(game, "smithing", 2000, { raw: true }); },
     });
-    case "quillhaven_archivist": return fetchQuest(game, name, "quillhaven_folio", {
+    case "quillhaven_archivist":
+      if (questDone(game, "quillhaven_folio") && questDone(game, "name_worth_knowing") && (stage(game, "known_hall") > 0 || presenceLevel(player) >= 40)) return knownHall(game, name);
+      return fetchQuest(game, name, "quillhaven_folio", {
       offer: ["Shh. This is a library. The Quillhaven folio is the oldest map of the Realm, and I am restoring it, and I have run out of ink.", "We grind sigils for ink here. Five thought sigils and two shade sigils, and the folio can be finished."],
       accept: "Five thought, two shade. Quietly.", progress: "Five thought sigils and two shade sigils. The folio waits.",
       have: () => count(game.player, "thought_sigil") >= 5 && count(game.player, "shade_sigil") >= 2, take: () => { take(game.player, "thought_sigil", 5); take(game.player, "shade_sigil", 2); },
@@ -946,6 +1042,7 @@ function talkInner(game: Game, npcId: string): Dialogue {
         "Every Friend deserves a name. The first is a gift. After that, the register charges for the ink."), [
         { label: p.name ? `Change my Friend's name (${RENAME_COST.toLocaleString()} coins).` : "Name my Friend.", then: () => { game.ui.naming = p.name ? "rename" : "first"; return null; } },
         { label: "What's the difference?", then: () => chat(name, npcSays(name, "The number is the token: it never changes, and it's how the Realm knows you. The name is yours: it's how the Realm remembers you.", `Right now the Realm knows you as ${playerName(p)}.`)) },
+        ...(p.name && (stage(game, "name_worth_knowing") > 0 || presenceLevel(p) >= 20) ? [{ label: stage(game, "name_worth_knowing") === 0 ? "Is a name all the register holds?" : "About the register…", then: () => nameWorthKnowing(game, name) }] : []),
         { label: "Not today.", then: () => null },
       ]);
     }

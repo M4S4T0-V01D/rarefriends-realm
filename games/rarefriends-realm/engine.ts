@@ -8,6 +8,8 @@ import {
   type EquipSlot, type MetalId, type Skill, type Spell, type SpotKind, type WardrobeId,
 } from "./data.ts";
 import { cleanDaily } from "./daily.ts";
+import { cleanOrders } from "./orders.ts";
+import { cleanCard } from "./cardstyle.ts";
 import { FIRST_STEPS, updateFirstSteps } from "./firststeps.ts";
 import { cleanMet } from "./hiscores.ts";
 import { addSlayerPoints, slayerBoost, slayerKill, slayerProblem, taskText } from "./slayer.ts";
@@ -20,6 +22,7 @@ import {
   BANK_SIZE, BANK_TABS, DAY_MS, SATCHEL, SATCHEL_SIZE, STONE_BOX, STONE_BOX_SIZE, BONE_BAG, BONE_BAG_SIZE, bagAdd, bagBones, bagTakeAll, hasBoneBag, setPieces, wayfarerPieces, fullSlayerSet, heartguardPieces, mixtureOn, compactBankTabs, hasSatchel, hasStoneBox, stock, useUp, INVENTORY_SIZE, REFERRAL_COINS, REFERRALS_PER_DAY, REFERRAL_TICKS, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
   level, maxHp, maxPrayer, message, prayerBoost, riding, sound, take, weapon, combatLevel, createGame,
   type Activity, type CombatStyle, type Dialogue, type Game, type Monster, type Npc, type Player, type Point, type Recipe, type Slot, type BankSlot, type Target,
+ type WorkOrder,
 } from "./state.ts";
 import { FLOOR_Y, MAINLAND, T, W, H, inBounds, isUnderground, isWater, mainlandToWorld, objectAtTile, realPoint, regionAt, terrainAt, tileIndex, walkable, type WorldObject } from "./world.ts";
 
@@ -822,6 +825,8 @@ function interactObject(game: Game, object: WorldObject, option: string, use?: n
       if (option === "Search" && object.text === "crypt") { useCryptAltar(game); return; }
       if (object.text === "crypt" && player.quests.hollow_whispers === 2) { useCryptAltar(game); return; }
       onAltarPrayed(game, object);
+      // An ossuary bag worn on the back empties itself onto the altar as you pray.
+      if (player.equipment.cape === BONE_BAG && bagBones(player) > 0) offerBag(game, object.text === "dawn");
       if (player.prayer >= maxPrayer(player)) { message(game, "Your faith is already full."); return; }
       player.prayer = maxPrayer(player); message(game, "You pray to the Old Friend. Your faith is restored."); sound(game, "pray"); return;
     case "ladder": travel(game, object.to!, `You ${object.action?.toLowerCase().replace("-", " ") ?? "climb"} the ${object.name.toLowerCase()}.`); return;
@@ -1442,7 +1447,7 @@ function killMonster(game: Game, monster: Monster) {
   monster.dead = true; monster.target = false; monster.respawnAt = game.tick + monster.def.respawn;
   if (player.combat === monster.uid) player.combat = null;
   player.kills++; player.killLog[monster.def.id] = (player.killLog[monster.def.id] ?? 0) + 1; sound(game, "kill"); creature(game, monster, "death");
-  if (monster.def.boss || monster.def.worldBoss) { onBossFelled(game, !!monster.def.worldBoss); friendSays(game, "boss"); remember(game, "first_boss"); }
+  if (monster.def.boss || monster.def.worldBoss) { onBossFelled(game, !!monster.def.worldBoss); friendSays(game, "boss"); remember(game, "first_boss"); player.stats.bosses = (player.stats.bosses ?? 0) + 1; }
   if (monster.def.breath) remember(game, "first_dragon");
   const at = { x: monster.x, y: monster.y }, silver = Math.min(RELICS[1].max, player.relics[1] ?? 0) * RELICS[1].coinsPer + (riding(player)?.coins ?? 0);
   const roll = (drop: { item: string; min: number; max: number }) => {
@@ -2104,7 +2109,7 @@ export type SaveData = {
   met?: unknown; achievements?: Record<string, number>; pets?: string[]; petOut?: string | null; killLog?: Record<string, number>; stats?: Record<string, number>; referredBy?: number | null; referrals?: number[]; referralTimes?: number[]; boostTicks?: number; coalBag?: number; stoneBox?: number; boneBag?: Record<string, number>;
   boosts?: Record<string, number>; poison?: { damage: number; left: number; timer: number } | null; weaponPoison?: { weapon: string; damage: number; charges: number; weaken: boolean } | null;
   antidoteUntil?: number; antifireUntil?: number; stealthUntil?: number; tonicUntil?: number; mixture?: { family: number; until: number } | null;
-  firsts?: Record<string, number>; friendKinds?: Record<string, 1>; rumours?: Record<string, 1>;
+  firsts?: Record<string, number>; friendKinds?: Record<string, 1>; rumours?: Record<string, 1>; orders?: Record<string, WorkOrder>; card?: Record<string, string>;
   name?: string | null; fellowship?: { name: string; tag: string } | null; title?: string | null; visited?: Record<string, number>; regionTicks?: Record<string, number>; talked?: Record<string, 1>; emotesUsed?: Record<string, 1>; outfits?: Record<string, 1>; friendTicks?: number; mounts?: string[]; mount?: string | null; daily?: unknown; seenUpdate?: number;
 };
 export function serialize(game: Game): SaveData {
@@ -2117,12 +2122,12 @@ export function serialize(game: Game): SaveData {
     playTicks: game.playTicks, retaliate: game.autoRetaliate, music: [...player.music],
     referredBy: player.referredBy, referrals: [...player.referrals], referralTimes: [...player.referralTimes], boostTicks: player.boostTicks, coalBag: player.coalBag, stoneBox: player.stoneBox, boneBag: { ...player.boneBag }, boosts: { ...player.boosts }, poison: player.poison ? { ...player.poison } : null, weaponPoison: player.weaponPoison ? { ...player.weaponPoison } : null,
     antidoteUntil: Math.max(0, player.antidoteUntil - game.tick), antifireUntil: Math.max(0, player.antifireUntil - game.tick), stealthUntil: Math.max(0, player.stealthUntil - game.tick), tonicUntil: Math.max(0, player.tonicUntil - game.tick), mixture: player.mixture ? { family: player.mixture.family, until: Math.max(0, player.mixture.until - game.tick) } : null,
-    firsts: { ...player.firsts } as Record<string, number>, friendKinds: { ...player.friendKinds } as Record<string, 1>, rumours: { ...player.rumours } as Record<string, 1>,
+    firsts: { ...player.firsts } as Record<string, number>, friendKinds: { ...player.friendKinds } as Record<string, 1>, rumours: { ...player.rumours } as Record<string, 1>, orders: { ...player.orders }, card: { ...player.card },
     name: player.name, fellowship: player.fellowship ? { ...player.fellowship } : null, title: player.title, visited: { ...player.visited } as Record<string, number>, regionTicks: { ...player.regionTicks } as Record<string, number>, talked: { ...player.talked } as Record<string, 1>, emotesUsed: { ...player.emotesUsed } as Record<string, 1>, outfits: { ...player.outfits } as Record<string, 1>, friendTicks: player.friendTicks, mounts: [...player.mounts], mount: player.mount, met: JSON.parse(JSON.stringify(player.met)), achievements: { ...player.achievements }, pets: [...player.pets], petOut: player.petOut, killLog: { ...player.killLog }, stats: { ...player.stats }, daily: JSON.parse(JSON.stringify(player.daily)), seenUpdate: player.seenUpdate,
   };
 }
 const QUEST_IDS = ["friends_feast", "grumblin_trouble", "cold_forge", "hollow_whispers", "lost_glimmer", "hollow_king", "hazels_quiver", "dawn_vigil", "greyhorn_light", "pilgrims_road", "restless_crypt", "dawn_against_hollow",
-  "gravesend_lanterns", "saltmarrow_tithe", "hollyhock_errand", "dyemoor_dye", "tallgrass_tracks", "cragmaw_shaft", "quillhaven_folio", "ashfall_embers"];
+  "gravesend_lanterns", "saltmarrow_tithe", "hollyhock_errand", "dyemoor_dye", "tallgrass_tracks", "cragmaw_shaft", "quillhaven_folio", "ashfall_embers", "name_worth_knowing", "known_hall", "the_remembered"];
 const int = (value: unknown, min: number, max: number, fallback: number) => typeof value === "number" && Number.isFinite(value) ? Math.max(min, Math.min(max, Math.floor(value))) : fallback;
 /** Item and spell ids from saves made before the Realm's own names (old id → new id). */
 const RENAMED: Record<string, string> = {
@@ -2230,7 +2235,7 @@ export function restore(game: Game, raw: unknown): boolean {
   player.referralTimes = (Array.isArray(save.referralTimes) ? save.referralTimes : []).filter((at): at is number => typeof at === "number" && Number.isFinite(at) && at > 0).slice(-REFERRALS_PER_DAY);
   player.mounts = MOUNTS.filter(mount => Array.isArray(save.mounts) && save.mounts.includes(mount.id)).map(mount => mount.id);
   player.mount = typeof save.mount === "string" && player.mounts.includes(save.mount) ? save.mount : null;
-  player.daily = cleanDaily(save.daily, SKILLS);
+  player.daily = cleanDaily(save.daily, SKILLS); player.orders = cleanOrders(save.orders); player.card = cleanCard(save.card);
   player.met = cleanMet(save.met);
   player.achievements = Object.fromEntries(Object.entries(save.achievements && typeof save.achievements === "object" ? save.achievements : {}).filter(([id, day]) => /^[a-z0-9_]{1,32}$/.test(id) && typeof day === "number" && Number.isFinite(day)).slice(0, 100).map(([id, day]) => [id, Math.floor(day as number)]));
   player.pets = PETS.filter(pet => Array.isArray(save.pets) && save.pets.includes(pet.id)).map(pet => pet.id);

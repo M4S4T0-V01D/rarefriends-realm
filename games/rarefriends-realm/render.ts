@@ -2185,7 +2185,7 @@ function drawNpc(ctx: CanvasRenderingContext2D, scene: Scene, npc: Npc, at: { x:
     const sprites = scene.canonical.get(def.art.canonical);
     rect = sprites ? drawMask(ctx, friendRows(sprites, screenFacing(camera, npc.heading), at.moving, at.moving ? Math.floor(now / 90) % 8 : 0), s.x, s.y + 2 * z, 2.8 * z) : drawMask(ctx, friendSprite(5, 1).idle, s.x, s.y + 2 * z, 2.8 * z);
   } else {
-    const set = friendSprite(def.art.family, def.art.seed + (npc.id === "villager" || npc.id === "banker" || npc.id === "guard" ? npc.uid : 0));
+    const set = friendSprite(def.art.family, def.art.seed + (npc.id === "villager" || npc.id.endsWith("_villager") || npc.id === "banker" || npc.id === "guard" ? npc.uid : 0));
     const frame = at.moving && Math.floor(now / 160) % 2 ? set.step : set.idle, bob = !scene.reducedMotion && def.art.family === 5 ? Math.sin(now / 400 + npc.uid) * 2 * z : 0;
     const regalia = npc.id === "villager" ? citizenLook(npc.uid) : npc.id.endsWith("_villager") ? regionalLook(npc.id.slice(0, -9), npc.uid) : NPC_WEAR[npc.id];
     // The King wears his crown and cape, and the guards their helms, red capes and battleaxes, like your own gear.

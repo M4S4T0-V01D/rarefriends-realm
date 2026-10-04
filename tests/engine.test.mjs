@@ -16,7 +16,7 @@ import { talk } from "../games/rarefriends-realm/content.ts";
 import { cleanPresence } from "../games/rarefriends-realm/net.ts";
 import { buySlayerReward, longTasks, slayerXpBoost, eligibleTasks } from "../games/rarefriends-realm/slayer.ts";
 import { currentTask, slayerPoints } from "../games/rarefriends-realm/slayer.ts";
-import { COURSES, HEARTGUARD, ITEM_LIST, METALS, MONSTERS, SMITH_PIECES, SPELL_TABS, FIREMAKING, MOUNTS, SHOPS, SKILLS, SKILL_NAMES, SLAYER_SETS, SLAYER_TASKS, SPELLS, TREES, WAYFARER_MARK, WAYFARER_REWARDS, XP_RATE, XP_TABLE, heavyStrength, item, levelForXp } from "../games/rarefriends-realm/data.ts";
+import { COURSES, HEARTGUARD, ITEM_LIST, METALS, MONSTERS, SMITH_PIECES, SPELL_TABS, FIREMAKING, REGIONAL_CLOTHING, MOUNTS, SHOPS, SKILLS, SKILL_NAMES, SLAYER_SETS, SLAYER_TASKS, SPELLS, TREES, WAYFARER_MARK, WAYFARER_REWARDS, XP_RATE, XP_TABLE, heavyStrength, item, levelForXp } from "../games/rarefriends-realm/data.ts";
 import { NPCS, QUESTS, MAX_QUEST_POINTS, questPoints, onMonsterKilled } from "../games/rarefriends-realm/content.ts";
 import { FLOOR_Y, H, MAINLAND, REGIONS, T, W, createWorld, floorAt, isUnderground, mainlandToWorld, objectAtTile, onLevel, realPoint, regionAt, terrainAt } from "../games/rarefriends-realm/world.ts";
 import { addXp, emptyToBank, fillFromBank, bankDeposit, bankInOrder, bankMove, bankTabs, bankWithdraw, bonuses, bagBones, combatLevel, count, dropItem, earlyXp, give, has, heft, level, maxHp, xpMultiplier, BONE_BAG, BONE_BAG_SIZE } from "../games/rarefriends-realm/state.ts";
@@ -449,8 +449,8 @@ test("The ossuary bag: holds 60 bones of any kind, catches picked-up bones, empt
   p.inventory.fill(null);
   give(p, BONE_BAG); give(p, "bones", 3); give(p, "large_bones", 2);
   const bag = () => p.inventory.findIndex(slot => slot?.id === BONE_BAG);
-  assert.deepEqual(itemOptions(g, bag()).map(option => option.verb), ["Check", "Fill", "Empty", "Use", "Drop", "Examine"]);
-  itemOptions(g, bag())[0].run(g);
+  assert.deepEqual(itemOptions(g, bag()).map(option => option.verb), ["Wear", "Check", "Fill", "Empty", "Use", "Drop", "Examine"]);
+  itemOptions(g, bag())[1].run(g);
   assert.match(g.messages.at(-1).text, /empty/);
   // Bones on the bag put that kind in; Fill puts every kind in.
   useItemOnItem(g, p.inventory.findIndex(slot => slot?.id === "large_bones"), bag());
@@ -458,10 +458,10 @@ test("The ossuary bag: holds 60 bones of any kind, catches picked-up bones, empt
   bagFill(g);
   assert.equal(count(p, "bones"), 0); assert.equal(bagBones(p), 5);
   assert.deepEqual(p.boneBag, { large_bones: 2, bones: 3 });
-  itemOptions(g, bag())[0].run(g);
+  itemOptions(g, bag())[1].run(g);
   assert.match(g.messages.at(-1).text, /5 of 60 bones: 2 large bones, 3 bones/);
   // Empty tips them back out.
-  itemOptions(g, bag())[2].run(g);
+  itemOptions(g, bag())[3].run(g);
   assert.equal(bagBones(p), 0); assert.equal(count(p, "bones"), 3); assert.equal(count(p, "large_bones"), 2);
   bagFill(g);
   // Picking bones up with the bag in your pack puts them straight in it.
@@ -591,7 +591,7 @@ test("A Friend's Feast from start to finish", () => {
   assert.equal(g.player.quests.friends_feast, 2);
   assert.equal(questPoints(g), 1);
   assert(level(g, "cooking") >= 10, "Quest XP");
-  assert.equal(QUESTS.length, 20); assert.equal(MAX_QUEST_POINTS, 28);
+  assert.equal(QUESTS.length, 23); assert.equal(MAX_QUEST_POINTS, 37);
 });
 
 test("Grumblin Trouble counts kills and pays out", () => {
@@ -1690,11 +1690,13 @@ test("Daily: a streak that grows day by day and resets after a missed day, three
   assert(claimStreak(game, t0 + 9 * DAY_MS)); assert.equal(p.daily.streak, 1, "a missed day starts again"); assert.equal(p.daily.best, 7);
   // Challenges: the same three for everyone on a day; progress from XP and kills gained since the day began.
   const other = newGame({ friendId: 3412 }), day = t0 + 9 * DAY_MS;
-  rollDaily(game, day); rollDaily(other, day);
-  assert.deepEqual(game.player.daily.challenges.map(c => c.kind === "xp" ? c.skill : "kills"), other.player.daily.challenges.map(c => c.kind === "xp" ? c.skill : "kills"));
+  rollDaily(game, day);
+  let differ = false;
+  for (let d = 0; d < 12 && !differ; d++) { rollDaily(other, day + d * DAY_MS); const mine = newGame(); rollDaily(mine, day + d * DAY_MS); differ = JSON.stringify(mine.player.daily.challenges) !== JSON.stringify(other.player.daily.challenges); }
+  assert(differ, "challenges are rolled for each player, not shared");
   assert.equal(p.daily.challenges.length, 3);
   assert(!claimChallenge(game, 0), "not done yet");
-  for (const [i, c] of p.daily.challenges.entries()) { if (c.kind === "xp") p.xp[c.skill] += c.target; else p.kills += c.target; assert.equal(challengeProgress(game, i), c.target); }
+  for (const [i, c] of p.daily.challenges.entries()) { if (c.kind === "xp") p.xp[c.skill] += c.target; else if (c.kind === "orders") p.stats.orders = (p.stats.orders ?? 0) + c.target; else p.kills += c.target; assert.equal(challengeProgress(game, i), c.target); }
   assert(!claimChest(game), "the chest waits for all three");
   for (let i = 0; i < 3; i++) assert(claimChallenge(game, i));
   assert(!claimChallenge(game, 0), "each once");
@@ -1915,7 +1917,7 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   assert.equal(p.quests.dawn_against_hollow, 2); assert(has(p, "dawnplate_cuirass"));
   assert.equal(count(p, "hollow_essence"), 0);
   assert.equal(capeProblem(g, "dawnplate_cuirass"), null, "the armoury sells Dawnplate once earned");
-  assert.equal(QUESTS.length, 20); assert.equal(MAX_QUEST_POINTS, 28);
+  assert.equal(QUESTS.length, 23); assert.equal(MAX_QUEST_POINTS, 37);
 });
 
 test("Boots and gauntlets in every metal, smithed at the anvil; the clothier's shirts, dresses, trousers and skirts", () => {
@@ -1941,4 +1943,98 @@ test("Boots and gauntlets in every metal, smithed at the anvil; the clothier's s
   for (const kind of ["shirt", "tunic", "dress", "trousers", "skirt"]) assert.ok(clothes.some(entry => entry.icon.kind === kind), kind);
   for (const entry of clothes) { assert.ok(["body", "legs"].includes(entry.equip.slot), entry.id); assert.equal(Object.keys(entry.equip.bonuses).length, 0, `${entry.id} is for looks`); }
   assert.ok(g.npcs.some(npc => npc.id === "clothier"), "the clothier is in town");
+});
+
+test("Work orders: craftsfolk pay above market for what you can make, one order a day each and yours alone; a Chronicler's mantle pays more; saved", async () => {
+  const { currentOrder, fillOrder, orderPay, cleanOrders, PATRONS } = await import("../games/rarefriends-realm/orders.ts");
+  const { DAY_MS } = await import("../games/rarefriends-realm/daily.ts");
+  const g = newGame(), p = g.player, day = 20_000 * DAY_MS + 1000;
+  p.inventory.fill(null); p.xp.fletching = XP_TABLE[40];
+  const order = currentOrder(g, "hazel", day);
+  assert(order && order.n >= 3 && order.pay > item(order.item).value * order.n, "a bow order that pays above market");
+  assert.equal(order.pay, orderPay(order.n, item(order.item).value, 40));
+  assert.deepEqual(currentOrder(g, "hazel", day + 1000), order, "the same order all day");
+  const other = newGame({ friendId: 3412 }); other.player.xp.fletching = XP_TABLE[40];
+  let differs = false;
+  for (let d = 0; d < 20 && !differs; d++) differs = currentOrder(g, "hazel", day + d * DAY_MS).item !== currentOrder(other, "hazel", day + d * DAY_MS).item;
+  assert(differs, "orders are rolled per player");
+  const today = currentOrder(g, "hazel", day);
+  assert(!fillOrder(g, "hazel", day), "nothing to hand over yet");
+  give(p, today.item, today.n); const coins = count(p, "coins"), xp = p.xp.fletching, presence = p.xp.presence;
+  assert(fillOrder(g, "hazel", day)); assert.equal(count(p, "coins"), coins + today.pay); assert(!has(p, today.item)); assert(p.xp.fletching > xp && p.xp.presence > presence, "XP and Presence");
+  assert.equal(p.stats.orders, 1); assert(!fillOrder(g, "hazel", day), "one a day"); assert.equal(currentOrder(g, "hazel", day).done, 1);
+  const next = currentOrder(g, "hazel", day + DAY_MS); assert.equal(next.done, 0, "a new day, a new order");
+  give(p, "chroniclers_mantle"); p.xp.presence = XP_TABLE[40]; equip(g, p.inventory.findIndex(slot => slot?.id === "chroniclers_mantle")); assert.equal(p.equipment.body, "chroniclers_mantle");
+  give(p, next.item, next.n); const c2 = count(p, "coins"); assert(fillOrder(g, "hazel", day + DAY_MS)); assert.equal(count(p, "coins"), c2 + Math.round(next.pay * 1.15), "the mantle pays 15% more");
+  for (const npc of Object.keys(PATRONS)) { p.xp[PATRONS[npc].skill] = XP_TABLE[60]; assert(currentOrder(g, npc, day), `${npc} has work`); assert(g.npcs.some(entry => entry.id === npc), `${npc} is in the Realm`); }
+  const hazel = g.npcs.find(npc => npc.id === "hazel"); standNear(g, hazel.x, hazel.y, 1); setTarget(g, { kind: "npc", uid: hazel.uid, option: "Talk-to" }); until(g, () => g.dialogue !== null, 30);
+  while (g.dialogue.index < g.dialogue.lines.length) continueDialogue(g);
+  const work = g.dialogue.options.findIndex(option => option.label === "Any work going?"); assert(work >= 0, "Hazel offers work"); chooseOption(g, work);
+  assert(g.dialogue.lines.some(line => /coins|done today's/.test(line.text)), `and names her price: ${JSON.stringify(g.dialogue.lines.map(line => line.text))}`); while (g.dialogue) continueDialogue(g);
+  const save = JSON.parse(JSON.stringify(serialize(g))), fresh = newGame(); assert(restore(fresh, save)); assert.deepEqual(fresh.player.orders.hazel, p.orders.hazel, "orders are saved");
+  assert.deepEqual(cleanOrders({ hazel: { day: "x" }, nobody: { day: 1, item: "maple_bow", n: 3, pay: 10, xp: 5 }, smith: { day: 1, item: "not_an_item", n: 3, pay: 10, xp: 5 } }), {}, "odd orders are dropped");
+});
+
+test("The quests of being known: A Name Worth Knowing, Known in Every Hall and The Remembered, their gear, and the Presence guide", async () => {
+  const { skillGuide } = await import("../games/rarefriends-realm/guide.ts");
+  const { nameFriend, presenceXp } = await import("../games/rarefriends-realm/presence.ts");
+  const { renown } = await import("../games/rarefriends-realm/state.ts");
+  const g = newGame(), p = g.player; p.inventory.fill(null);
+  const guide = skillGuide("presence");
+  for (const id of ["wanderers_cloak", "chroniclers_mantle", "storytellers_hat", "blade_of_renown", "cape_of_renown"]) assert(guide.some(entry => entry.icon === id), `${id} in the guide`);
+  assert(guide.some(entry => entry.level === 50 && /Personality/.test(entry.name)) && guide.some(entry => entry.level === 20 && /notice/.test(entry.name)), "milestones in the guide");
+  const talk = id => { const npc = g.npcs.find(entry => entry.id === id); standNear(g, npc.x, npc.y, 1); setTarget(g, { kind: "npc", uid: npc.uid, option: "Talk-to" }); until(g, () => g.dialogue !== null, 30); };
+  const say = label => { while (g.dialogue && g.dialogue.index < g.dialogue.lines.length) continueDialogue(g); const index = g.dialogue.options.findIndex(option => option.label.startsWith(label)); assert(index >= 0, label); chooseOption(g, index); };
+  const drain = () => { for (let i = 0; g.dialogue && i < 200; i++) { if (g.dialogue.index >= g.dialogue.lines.length && g.dialogue.options?.length) { g.dialogue = null; break; } continueDialogue(g); } };
+  talk("namekeeper"); while (g.dialogue.index < g.dialogue.lines.length) continueDialogue(g); assert(!g.dialogue.options.some(option => /register/.test(option.label)), "no quest before a name and Presence 20"); drain();
+  nameFriend(g, "Tester"); p.xp.presence = XP_TABLE[20];
+  talk("namekeeper"); say("Is a name"); say("I'll do it."); drain(); assert.equal(p.quests.name_worth_knowing, 1);
+  talk("namekeeper"); say("About the register"); drain(); assert.equal(p.quests.name_worth_knowing, 1, "not known enough yet");
+  for (const region of REGIONS.slice(0, 10)) p.visited[region.id] = 1;
+  for (let i = 0; i < 25; i++) p.talked[`npc${i}`] = 1; for (let i = 0; i < 10; i++) p.rumours[`r_${i}`] = 1;
+  for (const id of ["friends_feast", "grumblin_trouble", "cold_forge", "lost_glimmer", "hazels_quiver"]) p.quests[id] = 2;
+  talk("namekeeper"); say("About the register"); drain(); assert.equal(p.quests.name_worth_knowing, 2); assert(has(p, "wanderers_cloak"), "the Wanderer's cloak");
+  equip(g, p.inventory.findIndex(slot => slot?.id === "wanderers_cloak")); const before = p.xp.presence; presenceXp(g, 100); assert.equal(Math.round(p.xp.presence - before), 60, "a fifth faster at the slow rate");
+  // Known in Every Hall.
+  p.quests.quillhaven_folio = 2; p.xp.presence = XP_TABLE[40];
+  talk("quillhaven_archivist"); say("I'll do it."); drain(); assert.equal(p.quests.known_hall, 1);
+  for (const id of ["gravesend_lanterns", "saltmarrow_tithe", "hollyhock_errand", "dyemoor_dye", "tallgrass_tracks", "cragmaw_shaft", "ashfall_embers", "dawn_vigil"]) p.quests[id] = 2;
+  for (const set of REGIONAL_CLOTHING.slice(0, 4)) p.outfits[set.pieces[0].id] = 1;
+  for (let i = 10; i < 20; i++) p.rumours[`r_${i}`] = 1; for (let i = 0; i < 15; i++) p.achievements[`a${i}`] = 1;
+  talk("quillhaven_archivist"); drain(); assert.equal(p.quests.known_hall, 2); assert(has(p, "chroniclers_mantle") && has(p, "storytellers_hat"), "the chronicler's mantle and hat");
+  // The Remembered.
+  p.xp.presence = XP_TABLE[60]; p.xp.attack = XP_TABLE[60]; p.questData.royal_audience = 1;
+  talk("king"); say("They say the Realm forgets"); say("I'll do it."); drain(); assert.equal(p.quests.the_remembered, 1);
+  p.stats.bosses = 4; for (let i = 15; i < 30; i++) p.achievements[`a${i}`] = 1; p.quests.hollow_king = 3; p.quests.dawn_against_hollow = 2; p.quests.hollow_whispers = 4;
+  p.talked.hazel = 1; p.talked.rowan = 1; p.talked.smith = 1;
+  talk("king"); say("About being remembered"); drain(); assert.equal(p.quests.the_remembered, 2); assert(has(p, "blade_of_renown") && has(p, "cape_of_renown"), "the Blade and Cape of Renown");
+  equip(g, p.inventory.findIndex(slot => slot?.id === "blade_of_renown")); assert.equal(p.equipment.weapon, "blade_of_renown");
+  assert.equal(renown(p), 15, "one strength for every four Presence levels"); assert(bonuses(p).strength >= 44 + 15);
+  assert(QUESTS.some(quest => quest.id === "the_remembered") && MAX_QUEST_POINTS >= 9, "in the journal and the quest points");
+});
+
+test("Townsfolk bodies, the worn ossuary bag, and the adventurer card's styles", async () => {
+  const { friendSprite, CITIZEN, citizenBuild } = await import("../games/rarefriends-realm/sprites.ts");
+  const { CARD_OPTIONS, cardStyle, cardUnlocked, cleanCard, DEFAULT_CARD } = await import("../games/rarefriends-realm/cardstyle.ts");
+  // People-shaped villagers: 16-row masks, each seed its own, and the parent-and-child look rare.
+  const masks = Array.from({ length: 60 }, (_, i) => friendSprite(CITIZEN, 500 + i).idle);
+  assert(masks.every(mask => mask.length === 16 && mask.every(row => row.length === 16) && mask.some(row => row.includes("#"))), "sound masks");
+  assert(new Set(masks.map(mask => mask.join(""))).size >= 32, "villagers differ");
+  let seed = 7; const random = () => ((seed = (seed * 16807) % 2147483647) / 2147483647), builds = Array.from({ length: 1000 }, () => citizenBuild(random));
+  assert(builds.filter(build => build === "parent").length < 90 && new Set(builds).size >= 8, "many builds, few parents");
+  assert.equal(NPCS.villager.art.family, CITIZEN); assert.equal(NPCS.gravesend_villager.art.family, CITIZEN);
+  // The ossuary bag on the back.
+  const g = newGame(), p = g.player; p.inventory.fill(null); give(p, "bone_bag");
+  assert.equal(item("bone_bag").equip.slot, "cape"); equip(g, p.inventory.findIndex(slot => slot?.id === "bone_bag")); assert.equal(p.equipment.cape, "bone_bag");
+  const { hasBoneBag, bagBones } = await import("../games/rarefriends-realm/state.ts"); assert(hasBoneBag(p), "worn counts as carried");
+  g.ground.push({ uid: 998, id: "bones", n: 3, x: p.x, y: p.y, expires: g.tick + 100 }); setTarget(g, { kind: "ground", uid: 998, option: "Take" }); until(g, () => bagBones(p) === 3, 40); assert.equal(bagBones(p), 3, "picked-up bones go in the worn bag");
+  const altar = g.world.objects.find(object => object.kind === "altar" && object.text !== "crypt"); standBy(g, altar); const faith = p.xp.prayer;
+  setTarget(g, { kind: "object", id: altar.id, option: "Pray-at" }); until(g, () => bagBones(p) === 0, 40); assert.equal(bagBones(p), 0, "praying offers the worn bag"); assert(p.xp.prayer > faith);
+  // Card styles: locked until earned, cleaned on load, saved.
+  assert.deepEqual(cardStyle(g), DEFAULT_CARD);
+  const night = CARD_OPTIONS.bg.find(option => option.id === "night"); assert(!cardUnlocked(g, night)); p.card.bg = "night"; assert.equal(cardStyle(g).bg, "paper", "a locked pick falls back");
+  p.xp.presence = XP_TABLE[20]; assert(cardUnlocked(g, night)); assert.equal(cardStyle(g).bg, "night");
+  p.card.frame = "dawn"; assert.equal(cardStyle(g).frame, "rose"); p.quests.dawn_vigil = 2; assert.equal(cardStyle(g).frame, "dawn");
+  assert.deepEqual(cleanCard({ bg: "night", frame: "nope", layout: "banner", extra: 1 }), { ...DEFAULT_CARD, bg: "night", layout: "banner" });
+  const save = JSON.parse(JSON.stringify(serialize(g))), fresh = newGame(); assert(restore(fresh, save)); assert.equal(fresh.player.card.bg, "night"); assert.equal(fresh.player.equipment.cape, "bone_bag");
 });

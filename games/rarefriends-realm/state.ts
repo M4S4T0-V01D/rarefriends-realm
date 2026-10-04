@@ -104,6 +104,10 @@ export type Player = {
   stats: Record<string, number>;
   /** The daily streak and challenges, and the newest update you've seen in the log. */
   daily: Daily; seenUpdate: number;
+  /** Work orders by patron NPC. */
+  orders: Record<string, WorkOrder>;
+  /** The adventurer card's chosen style (background, frame, skills panel, font, ink, layout). */
+  card: Record<string, string>;
   /** A level-up to celebrate (not saved): other players see its fireworks while it lasts. */
   celebrate?: { skill: Skill; level: number; until: number };
   /** The mount you rode last (not saved), for the ride button. */
@@ -168,6 +172,8 @@ export type Game = {
   sneakingPast: Map<number, number>; sneakPaid: Map<number, number>;
 };
 export type Pet = { x: number; y: number; prev: Point; heading: Point; moved: number };
+/** A patron's work order for a day: what to bring, how many, what it pays, and whether it's filled. */
+export type WorkOrder = { day: number; item: string; n: number; pay: number; xp: number; done: 0 | 1 };
 export type DialogueLine = { who: "npc" | "player"; text: string; npc?: string };
 export type Dialogue = {
   npc: string; lines: DialogueLine[]; index: number;
@@ -201,7 +207,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
     style: "accurate", autocast: null, prayers: [], target: null, activity: null, combat: null,
     attackTimer: 0, eatTimer: 0, stunned: 0, regenTimer: 0, quests: {}, questData: {},
     wardrobe: [], worn: [], follower: null, courseStep: -1, kills: 0, deaths: 0, overhead: null, music: ["theme"],
-    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, boneBag: {}, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, friendVillage: null, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false }, seenUpdate: LATEST_UPDATE,
+    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, boneBag: {}, orders: {}, card: { bg: "paper", frame: "rose", skills: "boxes", font: "mono", ink: "ink", layout: "classic" }, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, friendVillage: null, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false }, seenUpdate: LATEST_UPDATE,
     lastHitBy: null, created: Date.now(), queuedSpell: null, castTimer: 0,
   };
 }
@@ -392,9 +398,9 @@ export const slayerSetWorn = (player: Player, set: string) => setPieces(player, 
 export const fullSlayerSet = (player: Player, set: string) => setPieces(player, set) >= 3;
 // ---------- The ossuary bag ----------
 export const BONE_BAG = "bone_bag", BONE_BAG_SIZE = 60;
-/** Carried in your pack, the ossuary bag catches the bones you pick up and empties itself onto an altar. */
-export const hasBoneBag = (player: Player) => has(player, BONE_BAG);
-/** You own one at all (in your pack or the bank): Sister Maren hands one over otherwise. */
+/** Worn on the back or carried in your pack, the ossuary bag catches the bones you pick up and empties itself onto an altar. */
+export const hasBoneBag = (player: Player) => has(player, BONE_BAG) || player.equipment.cape === BONE_BAG;
+/** You own one at all (worn, in your pack or the bank): Sister Maren hands one over otherwise. */
 export const ownsBoneBag = (player: Player) => hasBoneBag(player) || player.bank.some(slot => slot.id === BONE_BAG);
 /** How many bones the bag holds in all. */
 export const bagBones = (player: Player) => Object.values(player.boneBag).reduce((sum, n) => sum + n, 0);
@@ -491,7 +497,7 @@ export function bonuses(player: Player): Bonuses {
     for (const key of Object.keys(total) as (keyof Bonuses)[]) total[key] += equip.bonuses[key] ?? 0;
   }
   total.defence += riding(player)?.defence ?? 0;
-  total.strength += heft(player);
+  total.strength += heft(player) + renown(player);
   return total;
 }
 /** A heavy weapon: a two-handed melee weapon (greatsword, battleaxe, war hammer, maul…), not a bow or a staff. */
@@ -502,6 +508,8 @@ export function heft(player: Player) {
   if (!isHeavy(equip)) return 0;
   return Math.floor((equip!.bonuses.strength ?? 0) * levelForXp(player.xp.strength) / 200);
 }
+/** The Blade of Renown: its strength grows with your Presence, one for every four levels. */
+export const renown = (player: Player) => player.equipment.weapon === "blade_of_renown" ? Math.floor(levelForXp(player.xp.presence) / 4) : 0;
 export const weapon = (player: Player) => player.equipment.weapon ? item(player.equipment.weapon) : null;
 export const isStaffEquipped = (player: Player) => !!weapon(player)?.equip?.staff;
 export const attackSpeed = (player: Player) => weapon(player)?.equip?.speed ?? 4;

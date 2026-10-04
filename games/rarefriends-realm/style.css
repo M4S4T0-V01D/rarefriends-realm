@@ -271,6 +271,7 @@
 .realm-modal .realm-relics small { color: var(--muted); display: block; }
 .realm-worldmap { width: 100%; aspect-ratio: 760 / 470; display: block; border: 2px solid var(--ink); cursor: grab; }
 .realm-card { width: 100%; border: 2px solid var(--ink); display: block; }
+.realm-card-styles { margin: 8px 0; } .realm-card-row { flex-wrap: wrap; } .realm-card-row > span { min-width: 128px; font-size: 12px; } .realm-card-row button { flex: 0 0 auto; font-size: 11px; padding: 2px 7px !important; margin-bottom: 2px; } .realm-card-row button:disabled { opacity: 0.45; cursor: default; }
 .realm-help { margin: 0; padding-left: 18px; display: grid; gap: 7px; }
 .realm-quest-done { display: grid; justify-items: center; text-align: center; gap: 6px; }
 .realm-quest-done span { font-size: 40px; }

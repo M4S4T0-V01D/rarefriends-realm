@@ -16,6 +16,7 @@ await cp(path.join(root, "site/preview/lore.html"), path.join(outdir, "lore.html
 for (const file of await readdir(path.join(root, "docs"))) if (file.endsWith(".png")) await cp(path.join(root, "docs", file), path.join(outdir, "img", file));
 // The trailer and its poster.
 await cp(path.join(root, "site/preview/media"), path.join(outdir, "media"), { recursive: true });
+await cp(path.join(root, "site/preview/fellowships"), path.join(outdir, "fellowships"), { recursive: true });
 await build({
   entryPoints: [path.join(root, "site/preview/music.ts")], outfile: path.join(outdir, "music.js"),
   bundle: true, format: "iife", platform: "browser", target: "es2022", minify: true, logLevel: "warning",
