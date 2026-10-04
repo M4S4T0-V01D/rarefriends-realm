@@ -2062,3 +2062,35 @@ test("Fellowship looks and renames, and the card's own colours", async () => {
   assert.deepEqual(cleanFellowshipLook({ name: "A B", tag: "AB" }, { logo: "nope", banner: "stars", colors: ["#fff", "#000000"] }), { name: "A B", tag: "AB", banner: "stars" }, "odd looks are dropped");
   assert.equal(cleanCard({ frameColor: "#ABCDEF" }).frameColor, "#abcdef");
 });
+
+test("Housing: a deed from Steward Alder for Presence and coins, furniture for coins, looks, sleeping well rested, and it all comes back with the save", async () => {
+  const { buyHome, buyFurnishing, setHomeLook, HOME_TIERS, HOME_PLOT, applyHome, homeRect } = await import("../games/rarefriends-realm/housing.ts");
+  const { xpMultiplier: xpm } = await import("../games/rarefriends-realm/state.ts");
+  const g = newGame(), p = g.player, w = g.world; p.inventory.fill(null);
+  const steward = g.npcs.find(npc => npc.id === "steward"); assert(steward, "the steward is on Homestead Row"); assert(regionAt(w, steward.x, steward.y).id === "westmarch");
+  assert(!buyHome(g), "no deed without Presence and coins"); assert.equal(p.home, null);
+  p.xp.presence = XP_TABLE[15]; give(p, "coins", 300000); const presence = p.xp.presence;
+  assert(buyHome(g)); assert.equal(p.home.tier, 1); assert(p.xp.presence > presence, "a deed is worth Presence");
+  const r = homeRect(1); assert.equal(terrainAt(w, r.x0, r.y0), T.WALL); assert.equal(terrainAt(w, r.x0 + 1, r.y0 + 1), T.WOOD); assert(w.buildings.some(b => b.name === "Your home" && b.x0 === HOME_PLOT.x), "a cottage stands on the plot");
+  assert(w.objects.some(o => o.name === "Cold hearth (furnish)"), "a cold hearth to furnish");
+  assert(!buyFurnishing(g, "altar", "house_altar"), "a manor's slot waits"); assert(buyFurnishing(g, "bed", "straw_cot")); assert(w.objects.some(o => o.name === "Straw cot (sleep)"));
+  assert(buyFurnishing(g, "hearth", "lit_hearth")); assert(w.buildings.find(b => b.name === "Your home").chimney, "a lit hearth smokes");
+  assert(!w.objects.some(o => o.name === "Cold hearth (furnish)"), "the old hearth is gone");
+  // Sleep: full and well rested.
+  p.hp = 3; p.energy = 10; const base = xpm(p); const bed = w.objects.find(o => o.name === "Straw cot (sleep)");
+  standBy(g, bed); setTarget(g, { kind: "object", id: bed.id, option: "Sleep" }); until(g, () => p.restedTicks > 0, 40);
+  assert.equal(p.hp, maxHp(p)); assert.equal(p.energy, 100); assert(xpm(p) > base, "well rested gives XP");
+  // Looks (paid for through a casket by the caller).
+  assert(setHomeLook(g, "walls", "stone")); assert.equal(w.buildings.find(b => b.name === "Your home").walls, "stone");
+  assert(setHomeLook(g, "floor", "carpet")); assert.equal(terrainAt(w, r.x0 + 2, r.y0 + 2), T.CARPET);
+  assert(setHomeLook(g, "garden", "hedge")); assert(w.objects.some(o => o.name === "Hedge" && o.x === r.x0 - 1));
+  assert(!setHomeLook(g, "roof", "#000000"), "only the Row's roofs");
+  // Upgrade to a house: bigger, with the same things in it.
+  assert(!buyHome(g), "a house needs Presence 30"); p.xp.presence = XP_TABLE[30]; assert(buyHome(g)); assert.equal(p.home.tier, 2);
+  const r2 = homeRect(2); assert.equal(terrainAt(w, r2.x1, r2.y1), T.WALL); assert.equal(terrainAt(w, r.x1, r.y1), T.CARPET, "the old wall is floor now");
+  assert(w.objects.some(o => o.name === "Straw cot (sleep)")); assert(buyFurnishing(g, "stand", "armour_stand"));
+  // Saved and rebuilt.
+  const save = JSON.parse(JSON.stringify(serialize(g))), fresh = newGame(); assert(restore(fresh, save));
+  assert.deepEqual(fresh.player.home, p.home); assert(fresh.world.buildings.some(b => b.name === "Your home" && b.walls === "stone")); assert(fresh.world.objects.some(o => o.name === "Armour stand"));
+  assert.equal(HOME_TIERS.length, 3); void applyHome;
+});

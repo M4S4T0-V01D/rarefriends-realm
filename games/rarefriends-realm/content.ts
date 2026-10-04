@@ -6,6 +6,7 @@ import { assignTask, buySlayerReward, currentTask, eligibleTasks, slayerPoints, 
 import { buyWayfarerReward } from "./wayfaring.ts";
 import { REPUTATION_PLACES, RENAME_COST, onQuestCompleted, playerName, presenceLevel, reputation, unlockedTitles } from "./presence.ts";
 import { PATRONS, askText, currentOrder, fillOrder, orderText } from "./orders.ts";
+import { HOME_TIERS, buyHome, homeDeed } from "./housing.ts";
 import { friendSays, remember } from "./friend.ts";
 import { rumourAt } from "./rumours.ts";
 import {
@@ -56,6 +57,7 @@ export const NPCS: Record<string, NpcDef> = {
   quillhaven_clothier: { id: "quillhaven_clothier", name: "Brother Folio", examine: "Keeps the vestry: robes, caps and capes for the scholarly.", options: ["Talk-to", "Trade"], shop: "quillhaven_clothier", art: art(5, 563) },
   quillhaven_villager: { id: "quillhaven_villager", name: "Quillhaven scholar", examine: "Reading while walking. Hasn't fallen in the sea yet.", options: ["Talk-to"], art: art(9, 564) },
   ashfall_trader: { id: "ashfall_trader", name: "Ember Tamsin", examine: "Camps at the edge of the dragons' country and sells what she finds in the ash.", options: ["Talk-to", "Trade"], shop: "ashfall_trader", art: art(7, 571) },
+  steward: { id: "steward", name: "Steward Alder", examine: "Keeps the deeds for Homestead Row. Has a key for every door and a price for every one.", options: ["Talk-to"], art: art(9, 808) },
   namekeeper: { id: "namekeeper", name: "Namekeeper Elian", examine: "Keeps the Realm's register of names. A number tells him which Friend you are; a name tells him who you became.", options: ["Talk-to"], art: art(5, 777) },
   priest: { id: "priest", name: "Brother Ossic", examine: "Friend #3412. A Skeleton who tends the chapel of the Old Friend.", options: ["Talk-to"], art: { canonical: 3412 } },
   banker: { id: "banker", name: "Banker", examine: "Good with money.", options: ["Talk-to", "Bank"], art: art(1, 21) },
@@ -1036,6 +1038,15 @@ function talkInner(game: Game, npcId: string): Dialogue {
       done: ["The pass is open. Thank you. I'll be in the ruins by morning.", "This cloak met a dragon and came back. Mind the crater at the far end: what's under it is older than the drakes."],
       reward: () => { giveOrDrop(game, "scorched_cloak"); give(game.player, "coins", 2000); addXp(game, "attack", 6000, { raw: true }); addXp(game, "defence", 6000, { raw: true }); },
     });
+    case "steward": {
+      const { home, next, presence, coins } = homeDeed(game);
+      const buy = { label: home ? `Upgrade to a ${next!.name.toLowerCase()} (${next!.coins.toLocaleString()} coins, Presence ${next!.presence}).` : `Buy the cottage (${HOME_TIERS[0].coins.toLocaleString()} coins, Presence ${HOME_TIERS[0].presence}).`, then: () => { buyHome(game); return null; } };
+      const furnish = { label: "Furnish and decorate.", then: () => { game.ui.home = true; return null; } };
+      if (!home) return chat(name, npcSays(name, "Homestead Row. One plot, the one behind me, and a deed with no name on it yet.", `A cottage is ${HOME_TIERS[0].coins.toLocaleString()} coins, and I'll want a name the Realm knows: Presence ${HOME_TIERS[0].presence}. You have Presence ${presence} and ${coins.toLocaleString()} coins.`),
+        [buy, { label: "What's a home for?", then: () => chat(name, npcSays(name, "Sleeping. Properly. A bed of your own sends you out well rested, and the XP comes a little quicker for a while.", "Then there's the hearth, the shelves, a bank chest if you're known enough, an altar if you're known better. And the look of the place is yours: walls, floor, roof, garden.")) }, { label: "Not today.", then: () => null }]);
+      return chat(name, npcSays(name, `Your ${HOME_TIERS[home.tier - 1].name.toLowerCase()} is behind me. ${next ? `There's room on the plot for a ${next.name.toLowerCase()}.` : "There's no grander house on the Row."}`),
+        [...(next ? [buy] : []), furnish, { label: "Not today.", then: () => null }]);
+    }
     case "namekeeper": {
       const p = game.player;
       return chat(name, npcSays(name, p.name ? `${p.name}. Friend #${p.friendId}. Both written here, in that order.` : `Friend #${p.friendId}. A number tells me which Friend you are. A name would tell me who you became.`,

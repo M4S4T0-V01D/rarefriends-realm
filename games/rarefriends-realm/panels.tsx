@@ -17,6 +17,7 @@ import { MAX_QUEST_POINTS, NPCS, QUESTS, finalStage, questPoints, type QuestDef 
 import { friendSays, remember } from "./friend.ts";
 import { FELLOWSHIP_COST, FELLOWSHIP_RENAME_COST, NAME_MAX, RENAME_COST, TITLES, chooseTitle, cleanName, cleanTag, joinFellowship, leaveFellowship, nameFriend, profile, renameFellowship, setFellowshipLook, unlockedTitles } from "./presence.ts";
 import { DEFAULT_FELLOWSHIP_COLORS, FELLOWSHIP_BANNERS, FELLOWSHIP_LOGOS, previewArt } from "./cardstyle.ts";
+import { HOME_LOOKS, HOME_TIERS, SLOTS, buyFurnishing, buyHome, furnishingOf, homeDeed, setHomeLook, slotOpen } from "./housing.ts";
 import { REGIONS } from "./world.ts";
 import {
   BANK_TABS, CONTAINERS, SATCHEL, heft, bankDeposit, emptyToBank, fillFromBank, bankDepositAll, bankDepositWorn, bankInOrder, bankMove, bankTabs, bankWithdraw, bonuses, combatLevel, count, isStaffEquipped, maxHp, maxPrayer, message, totalLevel, totalXp,
@@ -823,6 +824,38 @@ export function ShopModal({ game, shopId, refresh, onClose, openMenu }: { game: 
 }
 /** Rubbing a lamp of insight: pick the skill. */
 /** Naming your Friend: on first entering the Realm, or at the Namekeeper's for coins. The token id is shown and never changes. */
+/** Your home: the deed and its upgrades, furniture for coins, and looks for simulated RF (a casket each). */
+export function HomeModal({ game, refresh, onRf, rfPrice, rfBusy }: { game: Game; refresh: () => void; onRf?: (caskets: number, after: () => void) => void; rfPrice?: (caskets: number) => string; rfBusy?: boolean }) {
+  if (!game.ui.home) return null;
+  const close = () => { game.ui.home = false; refresh(); };
+  const { home, next, presence, coins } = homeDeed(game);
+  return (
+    <Modal title={home ? `Your ${HOME_TIERS[home.tier - 1].name.toLowerCase()} on Homestead Row` : "Homestead Row"} onClose={close} wide>
+      <p className="realm-muted">{home ? `A ${HOME_TIERS[home.tier - 1].name.toLowerCase()} west of Friendhollow on the Westmarch road. Sleep in your bed to wake Well Rested (+${Math.round(HOME_TIERS[home.tier - 1].rested * 100)}% XP for ten minutes).` : "Steward Alder keeps the deed. A home takes Presence and coins; its furniture takes coins; its looks take simulated RF, a Rare Casket each."} You have Presence <b>{presence}</b> and <b>{coins.toLocaleString()}</b> coins.</p>
+      {next && <div className="realm-buttons"><button type="button" className="realm-primary" disabled={presence < next.presence || coins < next.coins} onClick={() => { buyHome(game); refresh(); }}>{home ? `Upgrade to a ${next.name.toLowerCase()}` : "Buy the cottage"} · {next.coins.toLocaleString()} coins · Presence {next.presence}</button>
+        <small className="realm-muted">{next.w - 2} × {next.h - 2} floor tiles{home ? ", more slots for furniture" : ""}.</small></div>}
+      {home && <>
+        <h3>Furniture (coins)</h3>
+        <ul className="realm-challenges realm-home-slots">
+          {SLOTS.map(slot => { const current = furnishingOf(home, slot), open = slotOpen(home, slot);
+            return <li key={slot.id} className={current ? "claimed" : ""}>
+              <div><b>{slot.name}</b><small>{!open ? `Needs a ${HOME_TIERS[slot.tier - 1].name.toLowerCase()}.` : current ? `${current.name}${current.text ? ` · ${current.text}` : ""}` : "Empty."}</small></div>
+              {open && <div className="realm-home-options">{slot.options.map(option => <button key={option.id} type="button" className={home.furniture[slot.id] === option.id ? "realm-primary" : "realm-dark"} disabled={home.furniture[slot.id] === option.id || coins < option.coins || (!!option.presence && presence < option.presence)}
+                title={option.text ?? option.name} onClick={() => { buyFurnishing(game, slot.id, option.id); refresh(); }}>{option.name}{option.coins ? ` · ${option.coins.toLocaleString()}` : ""}{option.presence ? ` · P${option.presence}` : ""}</button>)}</div>}
+            </li>; })}
+        </ul>
+        <h3>Looks (simulated RF: a Rare Casket each)</h3>
+        {(Object.keys(HOME_LOOKS) as (keyof typeof HOME_LOOKS)[]).map(kind => <div key={kind} className="realm-graphics realm-card-row" role="radiogroup" aria-label={`Home ${kind}`}>
+          <span>{kind[0].toUpperCase()}{kind.slice(1)}:</span>
+          {HOME_LOOKS[kind].map(option => <button key={option.id} type="button" role="radio" aria-checked={home[kind] === option.id} disabled={home[kind] === option.id || rfBusy || !onRf}
+            title={onRf ? `${option.name} · 1 casket${rfPrice ? ` (${rfPrice(1)})` : ""}` : option.name} onClick={() => onRf?.(1, () => { setHomeLook(game, kind, option.id); refresh(); })}>{option.name}</button>)}
+        </div>)}
+        <small className="realm-muted">Simulated $RAREFRIENDS. The caskets are yours to open as well.</small>
+      </>}
+      <div className="realm-buttons"><button type="button" className="realm-dark" onClick={close}>Done</button></div>
+    </Modal>
+  );
+}
 /** The fellowship's own menu: rename it for coins, pick its emblem, banner and colours for every member's card, or leave. */
 export function FellowshipModal({ game, refresh }: { game: Game; refresh: () => void }) {
   const fellowship = game.player.fellowship, [name, setName] = useState(fellowship?.name ?? ""), [confirmLeave, setConfirmLeave] = useState(false);

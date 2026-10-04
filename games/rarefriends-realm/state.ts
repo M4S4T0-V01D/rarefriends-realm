@@ -108,6 +108,8 @@ export type Player = {
   orders: Record<string, WorkOrder>;
   /** The adventurer card's chosen style (background, frame, skills panel, font, ink, layout). */
   card: Record<string, string>;
+  /** Your home, if you hold a deed, and the ticks of Well Rested left after sleeping in it. */
+  home: Home | null; restedTicks: number;
   /** A level-up to celebrate (not saved): other players see its fireworks while it lasts. */
   celebrate?: { skill: Skill; level: number; until: number };
   /** The mount you rode last (not saved), for the ride button. */
@@ -157,13 +159,15 @@ export type SoundName =
 export type Message = { text: string; tone: "game" | "info" | "warn" | "quest" | "level" | "npc" | "public" | "private"; tick: number };
 
 export type Game = {
+  /** Bumped whenever the world is rebuilt in part (a home painted in), so renderers drop their caches. */
+  worldVersion?: number;
   world: World; tick: number; player: Player; monsters: Monster[]; npcs: Npc[]; ground: GroundItem[]; fires: Fire[];
   /** What you've sold to each shop that it doesn't normally stock (you can buy it back until you leave). */
   shopStock: Record<string, Slot[]>;
   depleted: Map<number, number>; herbPicks: Map<number, number>; messages: Message[];
   /** What the sky is doing (set by the page each frame; the engine only reads it) and how much your Friend talks. */
   ambient: { night: boolean; rain: boolean; storm?: boolean; fog?: boolean }; friendSpeech: "full" | "reduced" | "rare" | "off"; events: GameEvent[]; rng: () => number; nextUid: number;
-  dialogue: Dialogue | null; ui: { shop: string | null; bank: boolean; production: ProductionMenu | null; lamp: number | null; naming: "first" | "rename" | null; fellowship?: boolean };
+  dialogue: Dialogue | null; ui: { shop: string | null; bank: boolean; production: ProductionMenu | null; lamp: number | null; naming: "first" | "rename" | null; fellowship?: boolean; home?: boolean };
   held: { dx: number; dy: number } | null; autoRetaliate: boolean; playTicks: number;
   overheads: Map<number, { text: string; until: number }>;
   /** Your owned-Friend follower, walking the tiles you leave behind. */
@@ -172,6 +176,8 @@ export type Game = {
   sneakingPast: Map<number, number>; sneakPaid: Map<number, number>;
 };
 export type Pet = { x: number; y: number; prev: Point; heading: Point; moved: number };
+/** Your home on Homestead Row: its size, its looks, and what's in it (slot id → furnishing id). */
+export type Home = { tier: 1 | 2 | 3; walls: string; floor: string; roof: string; garden: string; furniture: Record<string, string> };
 /** A fellowship as you've declared it: its name and tag, and the look it wears on your cards (an emblem, a banner style, two colours). */
 export type Fellowship = { name: string; tag: string; logo?: string; banner?: string; colors?: [string, string] };
 /** A patron's work order for a day: what to bring, how many, what it pays, and whether it's filled. */
@@ -209,7 +215,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
     style: "accurate", autocast: null, prayers: [], target: null, activity: null, combat: null,
     attackTimer: 0, eatTimer: 0, stunned: 0, regenTimer: 0, quests: {}, questData: {},
     wardrobe: [], worn: [], follower: null, courseStep: -1, kills: 0, deaths: 0, overhead: null, music: ["theme"],
-    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, boneBag: {}, orders: {}, card: { bg: "paper", frame: "rose", skills: "boxes", font: "mono", ink: "ink", layout: "classic" }, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, friendVillage: null, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false, rerolls: 0 }, seenUpdate: LATEST_UPDATE,
+    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, boneBag: {}, orders: {}, card: { bg: "paper", frame: "rose", skills: "boxes", font: "mono", ink: "ink", layout: "classic" }, home: null, restedTicks: 0, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, friendVillage: null, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false, rerolls: 0 }, seenUpdate: LATEST_UPDATE,
     lastHitBy: null, created: Date.now(), queuedSpell: null, castTimer: 0,
   };
 }
@@ -259,7 +265,8 @@ export function combatLevel(player: Player) {
 /** XP multiplier from the realm rate, kept Rare Relics and your follower's generation. */
 export function xpMultiplier(player: Player) {
   const plain = Math.min(RELICS[0].max, player.relics[0] ?? 0) * RELICS[0].xpPer, golden = (player.relics[3] ?? 0) > 0 ? RELICS[3].xpPer : 0;
-  return XP_RATE * (1 + plain + golden + followerBonus(player) + ((player.nearFriends ?? 0) > 0 ? 0.05 : 0) + (player.boostTicks > 0 ? REFERRAL_BOOST : 0) + (riding(player)?.xp ?? 0));
+  const rested = player.restedTicks > 0 && player.home ? [0.05, 0.07, 0.1][player.home.tier - 1] : 0;
+  return XP_RATE * (1 + plain + golden + followerBonus(player) + ((player.nearFriends ?? 0) > 0 ? 0.05 : 0) + (player.boostTicks > 0 ? REFERRAL_BOOST : 0) + (riding(player)?.xp ?? 0) + rested);
 }
 /** The mount you're riding, if any. */
 export function riding(player: Player) { return mountDef(player.mount); }

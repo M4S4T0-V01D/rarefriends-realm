@@ -15,7 +15,7 @@ import {
 } from "./engine.ts";
 import { PITCH, RENDER_PROFILE, VIEW, ZOOM, addPrint, daylight, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
 import {
-  BankModal, ChatBox, ContextMenu, DailyModal, FellowshipModal, FirstStepsCard, GuideModal, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, NamingModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
+  BankModal, ChatBox, ContextMenu, DailyModal, FellowshipModal, HomeModal, FirstStepsCard, GuideModal, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, NamingModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
   cancelLongPress, longPress, rightClick, type MenuEntry, type Settings, type Tab,
 } from "./panels.tsx";
 import { REGULAR_SPRITES } from "./regulars.ts";
@@ -890,6 +890,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           <NamingModal game={state} refresh={refresh} />
           {guide && <GuideModal game={state} skill={guide.skill} onSkill={skill => setGuide({ skill })} onClose={() => setGuide(null)} />}
           <FellowshipModal key={`${state.ui.fellowship ? 1 : 0}:${state.player.fellowship?.name ?? ""}`} game={state} refresh={refresh} />
+          <HomeModal game={state} refresh={refresh} onRf={(caskets, after) => void casket(() => client.buy(BigInt(caskets)), () => { after(); audio.current?.sfx("coins"); })} rfPrice={caskets => rf(definition.price * BigInt(caskets))} rfBusy={busy || paused} />
           {(() => { const view = trades.current.view(); return view ? <TradeModal game={state} view={view} openMenu={(x, y, entries) => setMenu({ x, y, entries })}
             onOffer={(id, n) => { trades.current.offer(state, id, n); refresh(); }} onAccept={() => { trades.current.accept(state); refresh(); }} onDecline={() => { trades.current.decline(state); refresh(); }} /> : null; })()}
           {!trades.current.view() && trades.current.incoming.size > 0 && <div className="realm-trade-requests" role="status">

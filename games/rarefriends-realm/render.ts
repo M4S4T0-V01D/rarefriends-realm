@@ -21,8 +21,9 @@ import { spellArt } from "./spellart.ts";
 import { SADDLE, mountArt, type MountView } from "./mountart.ts";
 import { petArt } from "./petart.ts";
 import { burst, drawCloudShadows, drawEffects, hush, playerPose, puff, treeShake, updateEffects, type Pose } from "./effects.ts";
-import { LightField, hexRgb, rgbCss, skyFor, type PointLight, type RGB } from "./lighting.ts";
+import { LightField, hexRgb, rgbCss, skyFor, type PointLight, type RGB , resetLighting } from "./lighting.ts";
 import { FIGURE_K, drawAuras, drawFigure, figureArt, heldTip, type Held } from "./wardrobe.ts";
+import { homeRect } from "./housing.ts";
 import { creatureSprite, friendSprite, type Mask } from "./sprites.ts";
 
 /** The logical view size; the game sets it to match the frame (960 × 640 is the reference). */
@@ -941,6 +942,15 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
         return hit(84, 56);
       }
       case "grave": box(ctx, camera, ox, oy, 0.3, 0.6, 18, "#c8c5be", "#a9a59e", "#9a968f"); return hit(24, 24);
+      case "hearth": {
+        // A stone hearth: a low block of masonry with a fire burning in its mouth and a warm glow on the floor.
+        box(ctx, camera, ox, oy, 0.9, 0.55, 16, "#9f9a92", "#8a857d", "#767169", 0, INK, "brick");
+        const mouth = toScreen(camera, ox, oy + 0.28, 2);
+        ctx.fillStyle = "#1e1c22"; ctx.fillRect(mouth.x - 7 * z, mouth.y - 12 * z, 14 * z, 11 * z);
+        ellipse(ctx, mouth.x, mouth.y + 4 * z, 20 * z, 8 * z, `rgba(240,200,150,${0.16 + (scene.reducedMotion ? 0 : Math.sin(now / 300 + ox) * 0.04)})`, null);
+        drawPixels(ctx, fireArt(scene.reducedMotion ? 0 : Math.floor(now / 110 + ox * 5) % 8, 11, 14, 6), mouth.x, mouth.y - 1 * z, ART * z, alpha);
+        return hit(24, 40);
+      }
       case "tomb": {
         // A stone tomb: a low chest of weathered blocks with a heavier lid, pushed a little askew on some.
         const askew = hash(ox + 2, oy + 9) < 0.3 ? 0.12 : 0;
@@ -1112,7 +1122,7 @@ const blob = (x: number, y: number, rx: number, ry: number): [number, number][] 
  * four tiles, or iron chandeliers in the big halls, placed once per world. Keyed by stored tile index.
  */
 type RoomLight = { big: boolean };
-const roomLightCache = new WeakMap<World, Map<number, RoomLight>>();
+const roomLightCache = new WeakMap<World, Map<number, RoomLight>>(), seenVersion = new WeakMap<World, number>();
 function roomLights(world: World) {
   const cached = roomLightCache.get(world);
   if (cached) return cached;
@@ -1418,6 +1428,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   // The sky's light for the time of day and the weather; the sun's share of it decides how dark shadows are.
   const weather = scene.weather ?? null, sky = skyFor(scene.time, weather, underground), lit = true;
   windowGlow = underground ? 0 : Math.max(0, Math.min(1, (sky.night - 0.3) / 0.45));
+  if ((seenVersion.get(world) ?? 0) !== (game.worldVersion ?? 0)) { seenVersion.set(world, game.worldVersion ?? 0); roomLightCache.delete(world); resetLighting(world); }
   const rooms = roomLights(world);
   const sunShare = (sky.sun[0] + sky.sun[1] + sky.sun[2]) / Math.max(0.01, sky.sun[0] + sky.sun[1] + sky.sun[2] + sky.ambient[0] + sky.ambient[1] + sky.ambient[2]);
   if (!low) { ctx.globalAlpha = Math.min(1, sunShare * 2.2); drawCloudShadows(ctx, project, camera, now, z, underground, scene.reducedMotion); ctx.globalAlpha = 1; drawPrints(ctx, camera, now); }
@@ -1517,7 +1528,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     const object = objectAtTile(world, x, y);
     if (!object || object.name === "__removed") return;
     if (object.kind === "decor" && SMALL_DECOR.has(object.decor!) && Math.abs(x - camera.x) + Math.abs(y - camera.y) > HAZE_START) return;
-    if (object.decor === "lamp") glow(x, y, 48, 150, "#f2b261", 0.9); else if (object.decor === "torch") glow(x, y, 32, 130, "#ef9a4c", 1, true);
+    if (object.decor === "lamp") glow(x, y, 48, 150, "#f2b261", 0.9); else if (object.decor === "torch") glow(x, y, 32, 130, "#ef9a4c", 1, true); else if (object.decor === "hearth") glow(x, y, 14, 170, "#f0a050", 1, true);
     else if (object.kind === "furnace" || object.kind === "range") glow(x, y, 16, 110); else if (object.kind === "altar") glow(x, y, 26, 70); else if (object.kind === "fountain" && objectAtTile(world, x - 1, y)?.kind !== "fountain" && objectAtTile(world, x, y - 1)?.kind !== "fountain") glow(x + 0.5, y + 0.5, 12, 110, "#a9d4f2", 0.55); else if (object.kind === "sigil_altar") glow(x, y, 30, 90);
     // The fountain is 2 × 2: sorted by its centre (a little forward, for its rim), not its back tile, so Friends beside it
     // stand behind its rim rather than on it, at any camera angle.
@@ -1643,7 +1654,9 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     drawables.push({ depth: depth(center.x, center.y) + (size - 1) / 2 + 0.1, at: center, cast: true, size: [80 + 90 * size, 40 + 50 * size, 20 + 10 * size], draw: () => drawMonster(ctx, scene, monster, at, hits) });
   }
   // Other players, walking their own adventures through yours.
+  const home = game.player.home ? homeRect(game.player.home.tier) : null;
   for (const peer of scene.peers ?? []) {
+    if (home && peer.x > home.x0 && peer.x < home.x1 && peer.y > home.y0 && peer.y < home.y1) continue; // your home is yours alone
     if (!shown(peer.x, peer.y)) continue;
     drawables.push({ depth: depth(peer.x, peer.y) + 0.12, at: { x: peer.x, y: peer.y }, cast: true, size: [190, 100, 30], draw: () => drawPeer(ctx, scene, peer, hits) });
   }

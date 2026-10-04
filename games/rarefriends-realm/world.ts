@@ -42,7 +42,7 @@ export type ObjectKind =
 export type DecorKind =
   | "flowers" | "bush" | "boulder" | "lamp" | "bench" | "crate" | "barrel" | "tent" | "cactus" | "pine" | "dead_tree" | "statue"
   | "grave" | "fence" | "reeds" | "table" | "bed" | "shelf" | "pillar" | "rubble" | "snowman" | "lily" | "banner" | "torch" | "palm" | "hay" | "windmill" | "boat" | "chest"
-  | "throne" | "armour" | "logpile" | "stump" | "target" | "ruin_wall" | "old_friend" | "tomb" | "crypt" | "obelisk" | "bones";
+  | "throne" | "armour" | "logpile" | "stump" | "target" | "ruin_wall" | "old_friend" | "tomb" | "crypt" | "obelisk" | "bones" | "hearth";
 export type WorldObject = {
   id: number; kind: ObjectKind; x: number; y: number; name: string; blocks: boolean;
   tree?: TreeKind; rock?: RockKind; spot?: SpotKind; decor?: DecorKind; stall?: StallKind;
@@ -1231,7 +1231,7 @@ const DECOR_NAMES: Record<DecorKind, string> = {
   bed: "Bed", shelf: "Shelves", pillar: "Pillar", rubble: "Rubble", snowman: "Snow Friend", lily: "Lily pad", banner: "Banner", torch: "Torch",
   palm: "Palm tree", hay: "Hay bales", windmill: "Windmill", boat: "Boat", chest: "Chest", throne: "Throne", armour: "Suit of armour",
   logpile: "Log pile", stump: "Chopping block", target: "Archery target", ruin_wall: "Crumbling wall", old_friend: "Statue of the Old Friend",
-  tomb: "Stone tomb", crypt: "Crypt", obelisk: "Obelisk", bones: "Bones",
+  tomb: "Stone tomb", crypt: "Crypt", obelisk: "Obelisk", bones: "Bones", hearth: "Hearth",
 };
 
 export function terrainAt(world: World, x: number, y: number) { return inBounds(x, y) ? world.tiles[tileIndex(x, y)] : T.VOID; }

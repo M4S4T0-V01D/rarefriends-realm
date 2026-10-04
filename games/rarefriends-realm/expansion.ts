@@ -404,6 +404,8 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
   t.building(366, 428, 370, 431, "s", T.WOOD, undefined, { name: "Fisherman's shack", color: "#6d6b67", walls: "plank" });
   decor(367, 429, "bed", true, "A bed, made"); decor(369, 429, "barrel", true, "Nets, hung to dry years ago"); decor(372, 433, "boat", true, "A boat, keel up, bleached");
   // The Friendhollow castle was built against something from the west: on the Westmarch road, a line of old watch-stones faces west, every one toppled the same way.
+  // Homestead Row: the steward keeps the deed to a plot west of the road (the cottage itself is painted in when a deed is bought).
+  clearAt(158, 272); npc("steward", 158, 272); clearAt(158, 274); decor(158, 274, "fence", true, "Homestead Row: a plot with a deed, from Steward Alder");
   for (const x of [166, 160, 154, 148, 142]) { clearAt(x, 262 + (x % 4 === 0 ? 1 : -1)); decor(x, 262 + (x % 4 === 0 ? 1 : -1), "rubble", true, "A toppled watch-stone, fallen westward"); }
   // ---------- 6. Creatures (the Realm's existing bestiary; the new regions' own come with their villages and skills) ----------
   monsters("skeleton", 200, 30, 460, 150, 26); monsters("shade", 220, 10, 440, 110, 16); monsters("wolf", 160, 100, 300, 180, 10); monsters("cairn_wight", 260, 20, 400, 90, 8);

@@ -149,10 +149,21 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
     const emblem = skillEmblem(cape.mastery!.skill as Parameters<typeof skillEmblem>[0], size), ox = ex - Math.floor(emblem.w / 2), oy = ey - Math.floor(emblem.h / 2);
     for (let y = 0; y < emblem.h; y++) for (let x = 0; x < emblem.w; x++) { const c = emblem.get(x, y); if (c) p.set(ox + x, oy + y, c); }
   };
-  if (cape && !back) {
-    const dark = shadeHex(cape.color, -0.12), trail = side ? -side * 5 : 0;
+  if (cape && !back && side) {
+    // Seen from the side the cape hangs down your back: it follows the back line of the body (shoulder to waist to
+    // heel, so a long Friend's cape stays with its back instead of boxing in the whole silhouette) and trails behind.
+    const dark = shadeHex(cape.color, -0.12), top = bodySpan(m.neck + 1), waist = bodySpan(Math.round(m.neck + (m.bottom - m.neck) * 0.6));
+    const backTop = side > 0 ? X(top.min) : X(top.max) + 2, backWaist = side > 0 ? X(waist.min) : X(waist.max) + 2;
+    const hemBack = backWaist - side * 6 - side * sway, hemFront = backWaist + side * 3;
+    cloth([[backTop + side * 4, neckY], [backTop - side, neckY], [backWaist - side * 3, Y(Math.round(m.neck + (m.bottom - m.neck) * 0.6))], [hemBack, feet - 1], [hemFront, feet - 1]]);
+    p.line(backTop - side, neckY + 2, hemBack + side, feet - 2, dark);
+    p.line(hemBack, feet - 1, hemFront, feet - 1, capeTrim ?? dark);
+    if (capeTrim) p.line(backTop - side, neckY, hemBack, feet - 2, capeTrim);
+  } else if (cape && !back) {
+    const dark = shadeHex(cape.color, -0.12);
     const top = bodySpan(m.neck + 1), shoulders = [X(top.min) - 1, X(top.max) + 2] as const;
-    const hemL = X(m.left) - 3 + trail + sway, hemR = X(m.right) + 4 + trail + sway;
+    // The hem flares a little past the shoulders, not past the widest part of a broad Friend.
+    const hemL = Math.max(X(m.left) - 3, shoulders[0] - 4) + sway, hemR = Math.min(X(m.right) + 4, shoulders[1] + 4) + sway;
     cloth([[shoulders[0], neckY], [shoulders[1], neckY], [hemR, feet - 1], [hemL, feet - 1]]);
     for (let fold = 1; fold < 4; fold++) { const t = fold / 4; p.line(shoulders[0] + (shoulders[1] - shoulders[0]) * t, neckY + 2, hemL + (hemR - hemL) * t, feet - 2, dark); }
     p.line(hemL, feet - 1, hemR, feet - 1, capeTrim ?? dark);
@@ -234,13 +245,13 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
   }
   // From behind, a cape hangs over your back and your weapon arm comes out beside it (like the shield on the other side):
   // the hand sits just outside the cape's edge and what you hold goes under the cape, so nothing cuts across it.
-  const capeTop = bodySpan(m.neck), capeShoulder = X(capeTop.max) + 2, capeHem = X(m.right) + 4 + sway;
+  const capeTop = bodySpan(m.neck), capeShoulder = X(capeTop.max) + 2, capeHem = Math.min(X(m.right) + 4, capeShoulder + 4) + sway;
   const capeEdge = (y: number) => capeShoulder + (capeHem - capeShoulder) * Math.max(0, Math.min(1, (y - (neckY - 1)) / Math.max(1, feet - neckY)));
   const underCape = !!cape && back;
   if (underCape) { hand.x = Math.ceil(capeEdge(hand.y)) + 1; if (weapon) tip = drawHeld(p, weapon, hand.x, hand.y, dir, sway, turn); }
   if (cape && back) {
     const dark = shadeHex(cape.color, -0.12), top = capeTop, shoulders = [X(top.min) - 1, capeShoulder] as const;
-    const hemL = X(m.left) - 3 + sway, hemR = capeHem;
+    const hemL = Math.max(X(m.left) - 3, shoulders[0] - 4) + sway, hemR = capeHem;
     cloth([[shoulders[0], neckY - 1], [shoulders[1], neckY - 1], [hemR, feet - 1], [hemL, feet - 1]]);
     for (let fold = 1; fold < 5; fold++) { const t = fold / 5; p.line(shoulders[0] + (shoulders[1] - shoulders[0]) * t, neckY + 1, hemL + (hemR - hemL) * t, feet - 2, dark); }
     p.rect(shoulders[0], neckY - 1, shoulders[1] - shoulders[0], 2, shadeHex(cape.color, 0.08));

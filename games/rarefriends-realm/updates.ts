@@ -4,6 +4,12 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 49, date: "2026-10-06", title: "A home of your own on Homestead Row, and capes that hang right", items: [
+    "Player housing: Steward Alder keeps the deed to a plot on Homestead Row, west of Friendhollow on the Westmarch road. A cottage costs 25,000 coins at Presence 15; it grows into a house (60,000, Presence 30) and a manor (150,000, Presence 50). Every Friend sees its own home there.",
+    "Furnish it with coins: a hearth to light, beds from a straw cot to a canopy bed (sleep in yours to wake with full health, faith and run energy and Well Rested, +5% to +10% XP for ten minutes), tables, seating, shelves, lamps, plants, a chest that becomes your bank at Presence 40, an armour stand and a statue of your Friend in a house, a house altar and a high seat in a manor.",
+    "Decorate it with simulated RF, a Rare Casket each: half-timber, plank or stone walls; boards, flagstones, carpet or cobbles; six roofs; flower beds, hedges, lanterns or a family plot in the garden. Right-click the hearth (or ask the steward) to furnish and decorate.",
+    "Capes hang properly on long Friends: seen from the side the cape follows the back of the body and trails behind instead of boxing in the whole figure; from behind and in front the hem flares from the shoulders, not the widest part.",
+  ] },
   { id: 48, date: "2026-10-05", title: "Work orders, your own daily challenges, and the quests of being known", items: [
     "Work orders: ten craftsfolk pay well over shop prices for what you can make at your level, one order each a day and yours alone: Hazel (bows), Brann (smithed arms), Cook Mabel (cooked food), Rowan (logs), the old fisher and Nell Gutting (fish), Mother Yarrow (potions), Bolt (leatherwork), Gristle (ore) and Scribe Nettle (sigils). Ask them \"Any work going?\": they ask for the best thing you can make, pay coins at half as much again as it's worth plus a fee that grows with your level, and give XP in the skill and a little Presence.",
     "Daily challenges are now rolled for you alone (from the day and your token), so no two players share a day's three. A new kind asks you to fill one or two work orders.",

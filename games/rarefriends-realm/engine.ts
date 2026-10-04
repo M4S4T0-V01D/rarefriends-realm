@@ -10,6 +10,7 @@ import {
 import { cleanDaily } from "./daily.ts";
 import { cleanOrders } from "./orders.ts";
 import { cleanCard, cleanFellowshipLook } from "./cardstyle.ts";
+import { applyHome, cleanHome, sleep } from "./housing.ts";
 import { FIRST_STEPS, updateFirstSteps } from "./firststeps.ts";
 import { cleanMet } from "./hiscores.ts";
 import { addSlayerPoints, slayerBoost, slayerKill, slayerProblem, taskText } from "./slayer.ts";
@@ -200,7 +201,7 @@ function objectOptions(game: Game, object: WorldObject): string[] {
     case "tanning": return ["Tan"];
     case "well": return ["Search"];
     case "sigil_altar": return ["Craft-sigil"];
-    case "decor": return object.decor === "chest" ? ["Search"] : [];
+    case "decor": return object.name.endsWith("(sleep)") ? ["Sleep"] : object.name.endsWith("(furnish)") ? ["Warm-up", "Furnish"] : object.decor === "chest" && !object.name.startsWith("Chest") ? ["Search"] : [];
     default: return [];
   }
 }
@@ -865,7 +866,10 @@ function interactObject(game: Game, object: WorldObject, option: string, use?: n
     case "sign": message(game, object.text ?? "The sign is blank.", "info"); return;
     case "tanning": tanHides(game); return;
     case "well": searchWell(game); return;
-    case "decor": if (object.decor === "chest") searchCryptChest(game); return;
+    case "decor":
+      if (object.name.endsWith("(sleep)")) { sleep(game); return; }
+      if (object.name.endsWith("(furnish)")) { if (option === "Furnish") { game.ui.home = true; sound(game, "click"); } else message(game, "You warm your hands at the hearth. Home."); return; }
+      if (object.decor === "chest") searchCryptChest(game); return;
     default: message(game, examineObject(game, object));
   }
 }
@@ -980,6 +984,7 @@ export function tick(game: Game) {
   movePlayer(game);
   rideUpkeep(game);
   if (player.boostTicks > 0) { player.boostTicks--; if (player.boostTicks === 0) message(game, "Your referral XP boost has run out. Refer another friend for more!"); }
+  if (player.restedTicks > 0) { player.restedTicks--; if (player.restedTicks === 0) message(game, "You no longer feel well rested."); }
   // An emote ends when it's done, or when you walk off.
   if (player.emote && (game.tick >= player.emote.until || player.moved === game.tick || player.combat !== null || player.activity)) player.emote = null;
   updatePet(game);
@@ -2109,7 +2114,7 @@ export type SaveData = {
   met?: unknown; achievements?: Record<string, number>; pets?: string[]; petOut?: string | null; killLog?: Record<string, number>; stats?: Record<string, number>; referredBy?: number | null; referrals?: number[]; referralTimes?: number[]; boostTicks?: number; coalBag?: number; stoneBox?: number; boneBag?: Record<string, number>;
   boosts?: Record<string, number>; poison?: { damage: number; left: number; timer: number } | null; weaponPoison?: { weapon: string; damage: number; charges: number; weaken: boolean } | null;
   antidoteUntil?: number; antifireUntil?: number; stealthUntil?: number; tonicUntil?: number; mixture?: { family: number; until: number } | null;
-  firsts?: Record<string, number>; friendKinds?: Record<string, 1>; rumours?: Record<string, 1>; orders?: Record<string, WorkOrder>; card?: Record<string, string>;
+  firsts?: Record<string, number>; friendKinds?: Record<string, 1>; rumours?: Record<string, 1>; orders?: Record<string, WorkOrder>; card?: Record<string, string>; home?: unknown; restedTicks?: number;
   name?: string | null; fellowship?: { name: string; tag: string; logo?: string; banner?: string; colors?: [string, string] } | null; title?: string | null; visited?: Record<string, number>; regionTicks?: Record<string, number>; talked?: Record<string, 1>; emotesUsed?: Record<string, 1>; outfits?: Record<string, 1>; friendTicks?: number; mounts?: string[]; mount?: string | null; daily?: unknown; seenUpdate?: number;
 };
 export function serialize(game: Game): SaveData {
@@ -2122,7 +2127,7 @@ export function serialize(game: Game): SaveData {
     playTicks: game.playTicks, retaliate: game.autoRetaliate, music: [...player.music],
     referredBy: player.referredBy, referrals: [...player.referrals], referralTimes: [...player.referralTimes], boostTicks: player.boostTicks, coalBag: player.coalBag, stoneBox: player.stoneBox, boneBag: { ...player.boneBag }, boosts: { ...player.boosts }, poison: player.poison ? { ...player.poison } : null, weaponPoison: player.weaponPoison ? { ...player.weaponPoison } : null,
     antidoteUntil: Math.max(0, player.antidoteUntil - game.tick), antifireUntil: Math.max(0, player.antifireUntil - game.tick), stealthUntil: Math.max(0, player.stealthUntil - game.tick), tonicUntil: Math.max(0, player.tonicUntil - game.tick), mixture: player.mixture ? { family: player.mixture.family, until: Math.max(0, player.mixture.until - game.tick) } : null,
-    firsts: { ...player.firsts } as Record<string, number>, friendKinds: { ...player.friendKinds } as Record<string, 1>, rumours: { ...player.rumours } as Record<string, 1>, orders: { ...player.orders }, card: { ...player.card },
+    firsts: { ...player.firsts } as Record<string, number>, friendKinds: { ...player.friendKinds } as Record<string, 1>, rumours: { ...player.rumours } as Record<string, 1>, orders: { ...player.orders }, card: { ...player.card }, home: player.home ? { ...player.home, furniture: { ...player.home.furniture } } : null, restedTicks: player.restedTicks,
     name: player.name, fellowship: player.fellowship ? { ...player.fellowship } : null, title: player.title, visited: { ...player.visited } as Record<string, number>, regionTicks: { ...player.regionTicks } as Record<string, number>, talked: { ...player.talked } as Record<string, 1>, emotesUsed: { ...player.emotesUsed } as Record<string, 1>, outfits: { ...player.outfits } as Record<string, 1>, friendTicks: player.friendTicks, mounts: [...player.mounts], mount: player.mount, met: JSON.parse(JSON.stringify(player.met)), achievements: { ...player.achievements }, pets: [...player.pets], petOut: player.petOut, killLog: { ...player.killLog }, stats: { ...player.stats }, daily: JSON.parse(JSON.stringify(player.daily)), seenUpdate: player.seenUpdate,
   };
 }
@@ -2235,7 +2240,7 @@ export function restore(game: Game, raw: unknown): boolean {
   player.referralTimes = (Array.isArray(save.referralTimes) ? save.referralTimes : []).filter((at): at is number => typeof at === "number" && Number.isFinite(at) && at > 0).slice(-REFERRALS_PER_DAY);
   player.mounts = MOUNTS.filter(mount => Array.isArray(save.mounts) && save.mounts.includes(mount.id)).map(mount => mount.id);
   player.mount = typeof save.mount === "string" && player.mounts.includes(save.mount) ? save.mount : null;
-  player.daily = cleanDaily(save.daily, SKILLS); player.orders = cleanOrders(save.orders); player.card = cleanCard(save.card);
+  player.daily = cleanDaily(save.daily, SKILLS); player.orders = cleanOrders(save.orders); player.card = cleanCard(save.card); player.home = cleanHome(save.home); player.restedTicks = int(save.restedTicks, 0, 100000, 0); applyHome(game);
   player.met = cleanMet(save.met);
   player.achievements = Object.fromEntries(Object.entries(save.achievements && typeof save.achievements === "object" ? save.achievements : {}).filter(([id, day]) => /^[a-z0-9_]{1,32}$/.test(id) && typeof day === "number" && Number.isFinite(day)).slice(0, 100).map(([id, day]) => [id, Math.floor(day as number)]));
   player.pets = PETS.filter(pet => Array.isArray(save.pets) && save.pets.includes(pet.id)).map(pet => pet.id);
