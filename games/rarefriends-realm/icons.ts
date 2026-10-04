@@ -535,11 +535,14 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
         part(p, disc(16, 24, 3), accent ?? "#b49ae0", "glow"); dot(p, 16, 24, "#ffffff"); break;
       }
       case "satchel": {
-        // A leather pack with a flap and buckle, lumps of inkcoal peeking out of the top.
-        for (const [x, y] of [[11, 7], [16, 5], [21, 7]] as Pt[]) part(p, disc(x, y, 3), accent ?? "#3b3a38", "stone");
+        // A leather pack with a flap and buckle, lumps of inkcoal peeking out of the top (bones, for the ossuary bag, with a sun clasp).
+        if (icon.kind === "bones") for (const [x, y, dx] of [[10, 7, 1], [16, 5, 0], [22, 7, -1]] as [number, number, number][]) {
+          line(p, [[x - 2 * dx, y + 2], [x + 2 * dx, y - 2]], accent ?? "#f2efe8", 2); dot(p, x - 2 * dx, y + 2, accent ?? "#f2efe8"); dot(p, x + 2 * dx, y - 2, accent ?? "#f2efe8");
+        } else for (const [x, y] of [[11, 7], [16, 5], [21, 7]] as Pt[]) part(p, disc(x, y, 3), accent ?? "#3b3a38", "stone");
         part(p, poly([[6, 9], [26, 9], [27, 28], [5, 28]]), color, "cloth");
         part(p, poly([[5, 9], [27, 9], [26, 18], [16, 20], [6, 18]]), shadeHex(color, -0.15), "cloth");
-        part(p, box(14, 16, 4, 5), "#c9a24a", "metal"); dot(p, 16, 18, INK);
+        if (icon.kind === "bones") { part(p, disc(16, 18, 3), "#e8c25a", "metal"); dot(p, 16, 18, "#fff3c4"); }
+        else { part(p, box(14, 16, 4, 5), "#c9a24a", "metal"); dot(p, 16, 18, INK); }
         line(p, [[9, 5], [8, 10]], shadeHex(color, -0.3), 2); line(p, [[23, 5], [24, 10]], shadeHex(color, -0.3), 2); break;
       }
       case "quiver": {

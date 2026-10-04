@@ -29,26 +29,30 @@ export function taskText(game: Game) {
 /** Tasks you can be given: your combat level is high enough, and your Slayer level for the creature. */
 export function eligibleTasks(game: Game) {
   const combat = combatLevel(game.player), slayer = level(game, "slayer");
-  return SLAYER_TASKS.filter(task => combat >= task.min && slayer >= ("slayer" in task ? task.slayer : 1));
+  return SLAYER_TASKS.filter(task => combat >= task.min && slayer >= ("slayer" in task ? task.slayer : 1)).sort((a, b) => a.min - b.min);
 }
 /** A new task. Returns false (and a message) if you already have one. */
 export function assignTask(game: Game, force = false): boolean {
   if (currentTask(game) && !force) return false;
   const options = eligibleTasks(game), pool = options.slice(-6), task = pool[Math.floor(game.rng() * pool.length)] ?? SLAYER_TASKS[0];
-  const [low, high] = task.amount, amount = low + Math.floor(game.rng() * (high - low + 1));
+  const [low, high] = task.amount, longer = longTasks(game) ? 1.5 : 1, amount = Math.round((low + Math.floor(game.rng() * (high - low + 1))) * longer);
   game.player.questData.slayer_task = SLAYER_TASKS.indexOf(task) + 1; game.player.questData.slayer_left = amount;
   message(game, `Your new Slayer task: kill ${amount} ${task.name}.`, "quest");
   return true;
 }
+/** Longer tasks (a Warden reward you can switch on and off): half as long again, half as many points again. */
+export const longTasks = (game: Game) => data(game, "slayer_long") > 0;
+/** The Warden's bracers: +10% Slayer XP on task. */
+export const slayerXpBoost = (game: Game) => game.player.equipment.hands === "warden_bracers" ? 1.1 : 1;
 /** Called for every kill: XP and progress when it's on task. */
 export function slayerKill(game: Game, monsterId: string) {
   if (!onTask(game, monsterId)) return;
   const def = MONSTERS[monsterId], player = game.player;
-  addXp(game, "slayer", def.slayerXp ?? def.hp);
+  addXp(game, "slayer", (def.slayerXp ?? def.hp) * slayerXpBoost(game));
   const left = data(game, "slayer_left") - 1;
   player.questData.slayer_left = left;
   if (left > 0) { if (left % 10 === 0 || left <= 3) message(game, `You're doing well: ${left} left on your task.`); return; }
-  const streak = slayerStreak(game) + 1, points = streak % 10 === 0 ? 50 : 10;
+  const streak = slayerStreak(game) + 1, points = Math.round((streak % 10 === 0 ? 50 : 10) * (longTasks(game) ? 1.5 : 1));
   player.questData.slayer_streak = streak; player.questData.slayer_points = slayerPoints(game) + points;
   message(game, `You've completed your Slayer task (${streak} in a row) and earned ${points} Slayer points. Return to the Warden for another.`, "quest");
   sound(game, "quest");
@@ -57,10 +61,16 @@ export function slayerKill(game: Game, monsterId: string) {
 export function buySlayerReward(game: Game, id: string) {
   const reward = SLAYER_REWARDS.find(entry => entry.id === id);
   if (!reward) return false;
+  if (id === "long" && longTasks(game)) { game.player.questData.slayer_long = 0; message(game, "Your tasks are back to their usual length."); return true; }
   if (slayerPoints(game) < reward.cost) { message(game, `You need ${reward.cost} Slayer points for that. You have ${slayerPoints(game)}.`, "warn"); return false; }
   if (id === "skip") {
     if (!currentTask(game)) { message(game, "You don't have a task to cancel.", "warn"); return false; }
     game.player.questData.slayer_points = slayerPoints(game) - reward.cost; assignTask(game, true);
+    return true;
+  }
+  if (id === "long") {
+    game.player.questData.slayer_points = slayerPoints(game) - reward.cost; game.player.questData.slayer_long = 1;
+    message(game, "The Warden nods. Your tasks will run half as long again, and pay half as many points again."); sound(game, "coins");
     return true;
   }
   game.player.questData.slayer_points = slayerPoints(game) - reward.cost;

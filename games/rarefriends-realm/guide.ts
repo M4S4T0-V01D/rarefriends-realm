@@ -4,7 +4,7 @@
  */
 import {
   BOWS, COOKING, CRAFTING, CROSSBOWS, STOCKS, WAR_BOWS, FIREMAKING, FISHING_SPOTS, FLETCH_ARROWS, FLETCH_BOWS, GEM_CUTTING, ITEM_LIST, METALS, MONSTERS, PRAYERS, ROCKS, SIGILCRAFT,
-  SKILL_NAMES, SLAYER_TASKS, SMELTING, SPELLS, TREES, sigilsPerStone, item, type Skill,
+  SKILL_NAMES, SLAYER_SETS, SLAYER_TASKS, COURSES, WAYFARER_REWARDS, SMELTING, SPELLS, TREES, sigilsPerStone, item, type Skill,
 } from "./data.ts";
 import { NPCS } from "./content.ts";
 import { AMULETS, STALLS, amuletRecipe, arrowRecipe, boltRecipe, craftingRecipes, crossbowRecipe, spinningRecipes, stringingRecipe, fletchingRecipes, headlessRecipe, smeltingRecipes, smithingRecipes } from "./engine.ts";
@@ -31,8 +31,13 @@ export function skillGuide(skill: Skill): GuideEntry[] {
       out.push(...gear(skill));
       for (const ammo of ITEM_LIST.filter(entry => entry.ammo)) add(ammo.ammo!.level, ammo.name, `${ammo.ammo!.bolt ? "Fired by any crossbow" : "Fired by any bow"} · +${ammo.ammo!.strength} strength`, ammo.id);
       break;
-    case "strength": add(1, "Aggressive style", "Train Strength by fighting in the Aggressive style. Every level raises your max hit."); break;
+    case "strength":
+      add(1, "Aggressive style", "Train Strength by fighting in the Aggressive style. Every level raises your max hit.");
+      add(1, "Heft", "Greatswords, battleaxes and war hammers swing harder the stronger you are: +1% of the weapon's strength bonus for every two Strength levels.");
+      out.push(...gear("strength")); break;
     case "hitpoints": add(10, "Hitpoints", "Every combat level-up you train raises your hitpoints. You regenerate 1 HP a minute; eat food to heal.");
+      add(10, "The Heartguard", "Red-and-white armour from Mender Hale at the Friendhollow chapel, a piece every ten levels. Each adds a hitpoint and quickens healing 6%; all nine make food heal a quarter more.", "heartguard_helm");
+      out.push(...gear("hitpoints")); break;
       for (const food of ITEM_LIST.filter(entry => entry.heal).sort((a, b) => (a.heal ?? 0) - (b.heal ?? 0))) add(1, food.name, `Heals ${food.heal}`, food.id);
       break;
     case "magic": for (const spell of SPELLS) out.push({ level: spell.level, name: spell.name, detail: spell.description, spell: spell.id }); out.push(...gear("magic")); break;
@@ -89,11 +94,21 @@ export function skillGuide(skill: Skill): GuideEntry[] {
       for (const npc of Object.values(NPCS)) if (npc.pickpocket) add(npc.pickpocket.level, `Pickpocket ${npc.name.toLowerCase()}`, `${npc.pickpocket.xp} XP · ${npc.pickpocket.coins[0]}–${npc.pickpocket.coins[1]} coins`);
       for (const [name, stall] of Object.entries(STALLS)) add(stall.level, `${name[0].toUpperCase()}${name.slice(1)} stall`, `${stall.xp} XP · the Oasis market`);
       break;
-    case "agility": add(1, "Friendhollow course", "Five obstacles west of the castle, +40 XP a lap"); add(20, "Murkmire stepping stones", "A shortcut over the bog river"); break;
+    case "agility":
+      for (const [id, course] of Object.entries(COURSES)) add(course.level, course.name, `${id === "friendhollow" ? "Five obstacles west of the castle" : id === "dunes" ? "Six obstacles south-east of the Oasis" : "Six obstacles north of the Frostpeak camp"}: +${course.lapXp} XP and ${course.marks} Wayfarer's mark${course.marks > 1 ? "s" : ""} a lap`);
+      add(1, "Run energy", "Comes back faster and drains slower with every level (40% slower at 99)");
+      add(1, "Sure footing", "Hard obstacles can be slipped on: a fifth of the time at their level, never twelve levels above it");
+      add(20, "Murkmire stepping stones", "A shortcut over the bog river");
+      for (const reward of WAYFARER_REWARDS) if (reward.id !== "waybread") add(item(reward.id).equip?.requires?.agility ?? 1, reward.name, `${reward.cost} marks from Coach Skip · ${reward.text.replace(/ \(Wayfaring \d+\)/, "")}`, reward.id);
+      add(1, "Waybread", "1 mark for 3 from Coach Skip · 40 run energy each", "waybread");
+      break;
     case "slayer":
       for (const task of SLAYER_TASKS) add("slayer" in task ? task.slayer : 1, `Task: ${task.name}`, `From combat level ${task.min}`);
       for (const monster of Object.values(MONSTERS)) if (monster.slayer) add(monster.slayer, monster.name, "Only a Slayer can wound it");
       add(20, "Warden's helm", "150 points · +15% accuracy and damage on task", "slayer_helm");
+      add(30, "Warden's bracers", "250 points · +10% Slayer XP on task", "warden_bracers");
+      add(1, "Longer tasks", "100 points · tasks and their points half as big again (switch it off for free)");
+      for (const set of SLAYER_SETS) add(set.slayer, `${set.name} armour`, `Dropped by ${MONSTERS[set.monster].name.toLowerCase()}s · ${set.effect}`, `${set.id}_${set.pieces[0].suffix}`);
       break;
   }
   add(99, `${SKILL_NAMES[skill]} mastery cape`, "99,000 coins from the Keeper of Capes (trimmed with two 99s)", `${skill}_cape`);

@@ -28,7 +28,7 @@ export type ObjectKind =
 export type DecorKind =
   | "flowers" | "bush" | "boulder" | "lamp" | "bench" | "crate" | "barrel" | "tent" | "cactus" | "pine" | "dead_tree" | "statue"
   | "grave" | "fence" | "reeds" | "table" | "bed" | "shelf" | "pillar" | "rubble" | "snowman" | "lily" | "banner" | "torch" | "palm" | "hay" | "windmill" | "boat" | "chest"
-  | "throne" | "armour" | "logpile" | "stump" | "target" | "ruin_wall";
+  | "throne" | "armour" | "logpile" | "stump" | "target" | "ruin_wall" | "old_friend";
 export type WorldObject = {
   id: number; kind: ObjectKind; x: number; y: number; name: string; blocks: boolean;
   tree?: TreeKind; rock?: RockKind; spot?: SpotKind; decor?: DecorKind; stall?: StallKind;
@@ -316,7 +316,7 @@ export function createWorld(seed = 20260927): World {
   npc("shop_general", 128, 110); decor(126, 109, "shelf"); decor(130, 109, "shelf"); decor(126, 112, "crate");
   // Chapel.
   add({ kind: "altar", x: 108, y: 128, blocks: true, name: "Altar" });
-  npc("priest", 110, 127);
+  decor(108, 126, "old_friend"); npc("priest", 110, 127); npc("mender", 109, 130);
   for (let y = 126; y <= 130; y += 2) { decor(111, y, "bench"); decor(113, y, "bench"); }
   // Tannery.
   npc("tanner", 131, 128); add({ kind: "tanning", x: 132, y: 129, blocks: true, name: "Tanning rack" }); decor(128, 127, "barrel");
@@ -636,7 +636,7 @@ export function createWorld(seed = 20260927): World {
   building(36, 172, 44, 179, "n", T.STONE, undefined, { name: "Crypt", color: "#6d6b67" });                              // The crypt
   add({ kind: "ladder", x: 40, y: 176, blocks: true, name: "Crypt stairs", action: "Climb-down", to: { x: 34, y: 208 } });
   for (let i = 0; i < 8; i++) decor(30 + (i % 4) * 3, 182 + Math.floor(i / 4) * 3, "grave", true, "Grave");
-  // Stepping stones over the bog river: an Agility shortcut.
+  // Stepping stones over the bog river: a Wayfaring shortcut.
   for (let y = 146; y <= 157; y++) put(60, y, y === 147 || y === 148 || y === 155 || y === 156 ? T.SWAMP : T.WATER);
   put(60, 146, T.SWAMP); put(60, 157, T.SWAMP);
   add({ kind: "obstacle", x: 60, y: 148, blocks: true, name: "Stepping stone", action: "Jump-across", to: { x: 60, y: 156 }, obstacle: { course: "shortcut", step: 0, level: 20, xp: 15, ticks: 4 } });
@@ -651,25 +651,41 @@ export function createWorld(seed = 20260927): World {
   add({ kind: "ladder", x: 122, y: 186, blocks: true, name: "Hollow Rift", action: "Climb-down", to: { x: 92, y: 212 } });
   decor(120, 184, "pillar"); decor(124, 184, "pillar"); decor(119, 188, "torch"); decor(125, 188, "torch");
 
-  // ---------- Friendhollow Agility Course (the meadow west of the castle) ----------
-  // Each obstacle crosses a gap you can't walk; you land on the far side and face the next one.
-  const COURSE: readonly [string, string, number, number][] = [
-    ["Log balance", "Walk-across", 4, 7], ["Obstacle net", "Climb-over", 1, 7], ["Balance beam", "Walk-across", 4, 8],
-    ["Rope swing", "Swing-on", 2, 9], ["Low wall", "Climb-over", 1, 7],
-  ];
+  // ---------- Wayfaring courses ----------
+  // Each obstacle crosses a gap you can't walk ([name, action, gap, xp, gap terrain]); you land on the far side and face
+  // the next one, and a lap of every obstacle in order pays the course's lap XP and Wayfarer's marks (COURSES in data.ts).
+  const course = (id: string, x0: number, y: number, level: number, ground: number, steps: readonly [string, string, number, number, number][], sign: string) => {
+    const x1 = x0 + steps.reduce((sum, [, , gap]) => sum + gap + 2, 0);
+    fillRect(x0 - 2, y - 2, x1 + 1, y + 2, ground);
+    for (let x = x0 - 2; x <= x1 + 1; x++) for (let dy = -2; dy <= 2; dy++) clearAt(x, y + dy);
+    let cx = x0;
+    steps.forEach(([name, action, gap, xp, terrain], step) => {
+      for (let x = cx + 1; x <= cx + gap; x++) put(x, y, terrain);
+      add({ kind: "obstacle", x: cx, y, blocks: true, name, action, to: { x: cx + gap + 1, y }, obstacle: { course: id, step, level, xp, ticks: Math.max(3, gap + 1), last: step === steps.length - 1 } });
+      cx += gap + 2;
+    });
+    for (let x = x0 - 2; x <= cx; x++) { decor(x, y - 1, "fence"); decor(x, y + 1, "fence"); }
+    clearAt(x0 - 2, y - 1); clearAt(x0 - 2, y + 1); clearAt(cx, y - 1); clearAt(cx, y + 1);
+    add({ kind: "sign", x: x0 - 3, y: y + 3, blocks: true, name: "Signpost", text: sign });
+    return cx;
+  };
+  // Friendhollow course (level 1), in the meadow west of the castle, with Coach Skip at its start.
   const courseY = 99;
-  fillRect(86, courseY - 2, 111, courseY + 2, T.GRASS);
-  for (let x = 86; x <= 111; x++) for (let y = courseY - 2; y <= courseY + 2; y++) clearAt(x, y);
-  let cx = 88;
-  COURSE.forEach(([name, action, gap, xp], step) => {
-    for (let x = cx + 1; x <= cx + gap; x++) put(x, courseY, step === 1 || step === 4 ? T.CLIFF : T.WATER);
-    add({ kind: "obstacle", x: cx, y: courseY, blocks: true, name, action, to: { x: cx + gap + 1, y: courseY }, obstacle: { course: "friendhollow", step, level: 1, xp, ticks: Math.max(3, gap + 1), lapXp: 40, last: step === COURSE.length - 1 } });
-    cx += gap + 2;
-  });
-  for (let x = 86; x <= cx; x++) { decor(x, courseY - 1, "fence"); decor(x, courseY + 1, "fence"); }
-  clearAt(86, courseY - 1); clearAt(86, courseY + 1); clearAt(cx, courseY - 1); clearAt(cx, courseY + 1);
+  course("friendhollow", 88, courseY, 1, T.GRASS, [
+    ["Log balance", "Walk-across", 4, 7, T.WATER], ["Obstacle net", "Climb-over", 1, 7, T.CLIFF], ["Balance beam", "Walk-across", 4, 8, T.WATER],
+    ["Rope swing", "Swing-on", 2, 9, T.WATER], ["Low wall", "Climb-over", 1, 7, T.CLIFF],
+  ], "Friendhollow course. Start at the log balance, go east, and finish all five obstacles for a lap bonus and a Wayfarer's mark.");
   npc("agility", 86, courseY + 2, 1);
-  add({ kind: "sign", x: 85, y: courseY + 3, blocks: true, name: "Signpost", text: "Friendhollow Agility Course. Start at the log balance, go east, and finish all five obstacles for a lap bonus." });
+  // Oasis dune course (level 30), on the sands south-east of the Oasis.
+  course("dunes", 200, 128, 30, T.SAND, [
+    ["Palm swing", "Swing-on", 2, 14, T.WATER], ["Sandstone wall", "Climb-over", 1, 12, T.CLIFF], ["Rope bridge", "Walk-across", 5, 18, T.CLIFF],
+    ["Ruin ledge", "Edge-along", 3, 15, T.CLIFF], ["Dune leap", "Jump", 2, 16, T.CLIFF], ["Collapsed arch", "Climb-through", 1, 13, T.CLIFF],
+  ], "Oasis dune course (Wayfaring 30). Start at the palm swing, go east: six obstacles to a lap, worth two Wayfarer's marks.");
+  // Frostpeak ice course (level 55), on the snowfield north of the camp.
+  course("frostpeak", 198, 16, 55, T.SNOW, [
+    ["Ice ledge", "Edge-along", 3, 26, T.WATER], ["Icicle climb", "Climb-up", 1, 22, T.CLIFF], ["Frozen gap", "Jump", 3, 28, T.WATER],
+    ["Snow bridge", "Walk-across", 5, 30, T.WATER], ["Glacier slide", "Slide-down", 4, 24, T.ICE], ["Rope ladder", "Climb-up", 1, 25, T.CLIFF],
+  ], "Frostpeak ice course (Wayfaring 55). Start at the ice ledge, go east: six obstacles to a lap, worth three Wayfarer's marks.");
 
   // ---------- The Greyhorn Highlands and Highcairn ----------
   // East of the Pale Dunes and south of Frostpeak the land climbs into mountains: grassy shoulders, scree slopes, snow on
@@ -708,7 +724,7 @@ export function createWorld(seed = 20260927): World {
   building(287, 84, 295, 91, "n", T.STONE, undefined, { name: "Highcairn Forge", color: "#5f5e66", chimney: true });
   add({ kind: "furnace", x: 293, y: 89, blocks: true, name: "Furnace" }); add({ kind: "anvil", x: 289, y: 89, blocks: true, name: "Anvil" }); npc("cairn_smith", 291, 87, 1);
   building(279, 62, 285, 67, "s", T.STONE, undefined, { name: "Mountain Shrine", color: "#c6bed4" });
-  add({ kind: "altar", x: 282, y: 64, blocks: true, name: "Mountain shrine" });
+  add({ kind: "altar", x: 282, y: 64, blocks: true, name: "Mountain shrine" }); decor(282, 63, "old_friend");
   building(262, 77, 266, 81, "e"); decor(263, 78, "bed");
   building(298, 77, 302, 81, "w"); decor(301, 78, "bed");
   building(279, 94, 285, 97, "n"); decor(284, 96, "bed");
@@ -722,15 +738,26 @@ export function createWorld(seed = 20260927): World {
   // Dawnhold, the chapterhouse of the Order of the Dawn, on a terrace above the sea east of Highcairn: a cobbled
   // causeway through the ridge, a courtyard, the chapel (its altar takes offered bones), and the hall with the armoury.
   road([[297, 81], [304, 82], [310, 82]], 2.2, T.COBBLE);
-  for (let y = 73; y <= 91; y++) for (let x = 310; x <= 321; x++) { put(x, y, T.COBBLE); clearAt(x, y); }
-  building(312, 74, 319, 80, "s", T.STONE, undefined, { name: "Dawnhold Chapel", color: "#e8e4d6", walls: "stone" });
-  add({ kind: "altar", x: 315, y: 76, blocks: true, name: "Chapel altar", text: "dawn" }); npc("chaplain", 317, 77);
-  decor(313, 75, "torch"); decor(318, 75, "torch"); decor(313, 78, "bench"); decor(318, 78, "bench");
-  building(312, 84, 320, 90, "n", T.STONE, undefined, { name: "Dawnhold Hall", color: "#c9a24a", walls: "stone" });
+  for (let y = 70; y <= 94; y++) for (let x = 310; x <= 330; x++) { put(x, y, T.COBBLE); clearAt(x, y); }
+  // The chapel: tall, white and stone, with a bell tower at its north-west corner (open from inside the nave).
+  const dawnhold = "dawnhold";
+  building(312, 74, 319, 80, "s", T.STONE, undefined, { name: "Dawnhold Chapel", color: "#e8e4d6", walls: "stone", storeys: 2, tall: 10, complex: dawnhold });
+  building(311, 71, 313, 74, "s", T.STONE, undefined, { name: "Chapel bell tower", color: "#e8e4d6", walls: "stone", roof: "cone", round: true, storeys: 3, spire: 26, complex: dawnhold });
+  add({ kind: "altar", x: 315, y: 76, blocks: true, name: "Chapel altar", text: "dawn" }); decor(315, 75, "old_friend"); npc("chaplain", 317, 77);
+  decor(313, 76, "torch"); decor(318, 75, "torch"); decor(313, 78, "bench"); decor(318, 78, "bench");
+  building(312, 84, 320, 90, "n", T.STONE, undefined, { name: "Dawnhold Hall", color: "#c9a24a", walls: "stone", complex: dawnhold });
   npc("grandmaster", 316, 87); npc("quartermaster", 318, 86); decor(319, 85, "armour", true, "Weapon rack"); decor(319, 88, "armour", true, "Weapon rack");
   decor(313, 85, "banner"); decor(313, 89, "table"); decor(314, 89, "chest", true, "Order strongbox");
-  for (const [kx, ky] of [[311, 81], [311, 83], [321, 82]] as const) npc("dawn_knight", kx, ky, 3);
-  for (const [lx, ly] of [[311, 79], [320, 79], [311, 86], [321, 86]] as const) decor(lx, ly, "lamp");
+  // Dawnhold Keep: a two-storey stone fortress joining the chapel and the hall along their east ends, its gate facing
+  // straight down the causeway from Highcairn, with a round tower at each outer corner.
+  building(320, 73, 327, 91, "w", T.STONE, 81, { name: "Dawnhold Keep", color: "#b9b4ab", walls: "stone", roof: "flat", storeys: 2, tall: 8, complex: dawnhold });
+  building(326, 71, 329, 74, "w", T.STONE, undefined, { name: "Keep tower", color: "#c9a24a", walls: "stone", roof: "cone", round: true, storeys: 3, spire: 22, complex: dawnhold });
+  building(326, 90, 329, 93, "w", T.STONE, undefined, { name: "Keep tower", color: "#c9a24a", walls: "stone", roof: "cone", round: true, storeys: 3, spire: 22, complex: dawnhold });
+  decor(321, 74, "banner"); decor(321, 90, "banner"); decor(326, 77, "torch"); decor(326, 87, "torch"); decor(326, 82, "throne", true, "Grandmaster's seat");
+  decor(323, 76, "armour", true, "Suit of Dawnplate"); decor(323, 88, "armour", true, "Suit of Dawnplate"); decor(325, 79, "table"); decor(325, 85, "table"); decor(322, 79, "banner"); decor(322, 85, "banner");
+  for (const [kx, ky] of [[311, 81], [311, 83], [323, 82]] as const) npc("dawn_knight", kx, ky, 3);
+  for (const [lx, ly] of [[311, 79], [311, 86]] as const) decor(lx, ly, "lamp");
+  decor(319, 81, "torch"); decor(319, 83, "torch");
   decor(310, 80, "banner"); decor(310, 84, "banner");
   add({ kind: "sign", x: 309, y: 83, blocks: true, name: "Signpost", text: "Dawnhold, the Order of the Dawn. All who keep faith are welcome. West: Highcairn." });
   // The Greyhorn mine: glimmer, rarite and moonsilver high on the scree.
@@ -911,6 +938,10 @@ export function createWorld(seed = 20260927): World {
   // Slayer creatures: only a Slayer of the right level can wound them.
   monsters("mire_crawler", 18, 168, 62, 194, 8);
   monsters("frost_wisp", 210, 28, 236, 42, 6);
+  monsters("thornback", 22, 96, 60, 122, 7);          // the brambly south of Whisperwood
+  monsters("cairn_wight", 248, 118, 292, 152, 7);     // the Greyhorn's old cairns, south of Highcairn
+  monsters("dune_stalker", 198, 70, 232, 92, 6);      // the northern dunes
+  monsters("ember_salamander", 98, 30, 132, 52, 6);   // the Ashen Hills
 
   // ---------- Dungeons ----------
   for (let y = 200; y < FLOOR_Y; y++) for (let x = 0; x < W; x++) { put(x, y, T.VOID); setRegion(x, y, "crypt"); }
@@ -924,7 +955,7 @@ export function createWorld(seed = 20260927): World {
   for (const [x0, y0, x1, y1, , floor] of rooms) fillRect(x0, y0, x1, y1, floor);
   add({ kind: "ladder", x: 32, y: 206, blocks: true, name: "Stairs", action: "Climb-up", to: { x: 40, y: 174 } });
   monsters("skeleton", 52, 212, 68, 230, 8); monsters("skeleton", 26, 219, 48, 231, 6);
-  add({ kind: "altar", x: 28, y: 222, blocks: true, name: "Crypt altar", text: "crypt" });
+  add({ kind: "altar", x: 28, y: 222, blocks: true, name: "Crypt altar", text: "crypt" }); decor(28, 220, "old_friend");
   for (let x = 25; x <= 49; x += 6) { decor(x, 218, "pillar"); decor(x, 232, "torch", true); }
   decor(66, 214, "chest", true, "Old chest");
 
@@ -932,6 +963,7 @@ export function createWorld(seed = 20260927): World {
   add({ kind: "ladder", x: 90, y: 208, blocks: true, name: "Rope", action: "Climb-up", to: { x: 122, y: 188 } });
   monsters("gloom_hound", 150, 222, 175, 226, 5);
   monsters("shade", 86, 208, 100, 218, 5); monsters("shade", 104, 210, 148, 214, 6); monsters("hollow_sentinel", 122, 216, 148, 233, 8);
+  monsters("hollow_weaver", 150, 222, 176, 226, 2); monsters("hollow_weaver", 124, 226, 148, 233, 3);
   add({ kind: "gate", x: 176, y: 224, blocks: true, name: "Hollow gate", action: "Open", to: { x: 177, y: 224 }, requires: { quest: "hollow_king" } });
   for (let y = 221; y <= 227; y++) if (y !== 224) put(176, y, T.WALL);
   monster("hollow_king", 198, 224, 3);
@@ -1004,7 +1036,7 @@ export function createWorld(seed = 20260927): World {
     weaponsmith: ["pewter_sword", "Edge & Hilt"], bowyer: ["shortbow", "Fletch & Feather"], slayer_master: ["slayer_gem", "The Warden's Lodge"], innkeeper: ["cake", "The Sleepy Friend inn"],
     rare_trader: ["rough_moonstone", "The Rare Market"], stablemaster: ["__horse", "Friendhollow Stables"],
     hazel: ["war_bow", "Hazel's War Bows"], rowan: ["pewter_axe", "Fernwick Timber Yard"],
-    heft: ["pewter_greatsword", "Heft & Haft"], tailor: ["striped_cape", "Threadneedle Tailors"], clothier: ["crimson_dress", "Ribbon & Rye Clothiers"], cairn_trader: ["pot", "Highcairn Stores"], kettle_keeper: ["cake", "The Stone Kettle"], cairn_smith: ["rarite_pickaxe", "Highcairn Forge"],
+    heft: ["pewter_greatsword", "Heft & Haft"], mender: ["heartguard_helm", "Hale's Infirmary"], tailor: ["striped_cape", "Threadneedle Tailors"], clothier: ["crimson_dress", "Ribbon & Rye Clothiers"], cairn_trader: ["pot", "Highcairn Stores"], kettle_keeper: ["cake", "The Stone Kettle"], cairn_smith: ["rarite_pickaxe", "Highcairn Forge"],
   };
   const signed = new Set<Building>();
   const signFor = (x: number, y: number, icon: string, label: string) => {
@@ -1100,7 +1132,7 @@ const DECOR_NAMES: Record<DecorKind, string> = {
   cactus: "Cactus", pine: "Pine tree", dead_tree: "Dead tree", statue: "Statue", grave: "Grave", fence: "Fence", reeds: "Reeds", table: "Table",
   bed: "Bed", shelf: "Shelves", pillar: "Pillar", rubble: "Rubble", snowman: "Snow Friend", lily: "Lily pad", banner: "Banner", torch: "Torch",
   palm: "Palm tree", hay: "Hay bales", windmill: "Windmill", boat: "Boat", chest: "Chest", throne: "Throne", armour: "Suit of armour",
-  logpile: "Log pile", stump: "Chopping block", target: "Archery target", ruin_wall: "Crumbling wall",
+  logpile: "Log pile", stump: "Chopping block", target: "Archery target", ruin_wall: "Crumbling wall", old_friend: "Statue of the Old Friend",
 };
 
 export function terrainAt(world: World, x: number, y: number) { return inBounds(x, y) ? world.tiles[tileIndex(x, y)] : T.VOID; }

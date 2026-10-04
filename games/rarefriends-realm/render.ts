@@ -3,7 +3,7 @@
  * Draws in a 960 × 640 logical view; the caller scales the canvas for the device.
  */
 import type { GenerationSprites } from "@rarefriends/friendsdk/sprites";
-import { ROCKS, isItem, item, levelForXp, mountDef, petDef, type Coat, type Icon } from "./data.ts";
+import { COURSES, ROCKS, isItem, item, levelForXp, mountDef, petDef, type Coat, type Icon } from "./data.ts";
 const isPet = (id: string) => !!petDef(id);
 import { NPCS } from "./content.ts";
 import { TICK_MS, attackSpeed, riding, type Facing, type Game, type Monster, type Npc, type Projectile } from "./state.ts";
@@ -227,6 +227,24 @@ function ellipse(ctx: CanvasRenderingContext2D, x: number, y: number, rx: number
   if (fill) { ctx.fillStyle = fill; ctx.fill(); }
   if (stroke && !bare) { ctx.strokeStyle = stroke; ctx.lineWidth = width; ctx.stroke(); }
 }
+/** The Old Friend's likeness (a procedural Friend, the same for every altar) and the long carved beard laid over its face. */
+const OLD_FRIEND = friendSprite(5, 7730);
+const OLD_FRIEND_BEARD: Mask = Object.freeze([
+  "................", "................", "................", "................", "................", "................", "................", "................",
+  ".....######.....", "....########....", "....########....", ".....######.....", "......####......", ".......##.......", "................", "................",
+]);
+/** How each Wayfaring obstacle is drawn: a span laid across the gap, a climb, a swing, a wall or a stone. */
+type ObstacleLook = { kind: "span"; color: string; dark: string; width: number; rails?: boolean } | { kind: "climb"; color: string; dark: string; height: number }
+  | { kind: "swing"; color: string; dark: string } | { kind: "wall"; color: string; dark: string; height?: number } | { kind: "stone"; color: string; dark: string };
+const OBSTACLE_LOOKS: Record<string, ObstacleLook> = {
+  "Log balance": { kind: "span", color: "#9c8672", dark: "#7a6553", width: 7 }, "Balance beam": { kind: "span", color: "#c8c5be", dark: "#9a968f", width: 3 },
+  "Rope bridge": { kind: "span", color: "#9c8672", dark: "#6d5a48", width: 5, rails: true }, "Snow bridge": { kind: "span", color: "#eef3f6", dark: "#b9c6cf", width: 7 },
+  "Ruin ledge": { kind: "span", color: "#c9b48a", dark: "#8f7a56", width: 5 }, "Ice ledge": { kind: "span", color: "#cfe6f0", dark: "#8fb4c4", width: 5 }, "Glacier slide": { kind: "span", color: "#bcdce8", dark: "#7fa8ba", width: 9 },
+  "Obstacle net": { kind: "climb", color: "#9c8672", dark: "#8a7563", height: 34 }, "Icicle climb": { kind: "climb", color: "#d8ecf4", dark: "#8fb4c4", height: 40 }, "Rope ladder": { kind: "climb", color: "#9c8672", dark: "#6d5a48", height: 38 },
+  "Rope swing": { kind: "swing", color: "#9c8672", dark: "#8a7563" }, "Palm swing": { kind: "swing", color: "#8a6a46", dark: "#6d5a48" },
+  "Low wall": { kind: "wall", color: "#c8c5be", dark: "#9a968f" }, "Sandstone wall": { kind: "wall", color: "#d9c39a", dark: "#a8906a", height: 18 }, "Collapsed arch": { kind: "wall", color: "#c9b48a", dark: "#8f7a56", height: 24 },
+  "Stepping stone": { kind: "stone", color: "#a39e96", dark: "#6d6b67" },
+};
 function shade(hex: string, amount: number) {
   const n = parseInt(hex.slice(1), 16), f = (v: number) => Math.max(0, Math.min(255, Math.round(v + amount * 255)));
   return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`;
@@ -784,19 +802,23 @@ function drawStation(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldO
     }
     case "obstacle": {
       const to = object.to!, a = toScreen(camera, ox, oy), b = toScreen(camera, to.x - Math.sign(to.x - ox) * 0.5, to.y - Math.sign(to.y - oy) * 0.5);
-      if (object.name === "Log balance" || object.name === "Balance beam") {
-        ctx.strokeStyle = INK; ctx.lineWidth = (object.name === "Log balance" ? 9 : 5) * z; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(a.x, a.y - 3 * z); ctx.lineTo(b.x, b.y - 3 * z); ctx.stroke();
-        ctx.strokeStyle = object.name === "Log balance" ? "#9c8672" : "#c8c5be"; ctx.lineWidth = (object.name === "Log balance" ? 7 : 3) * z; ctx.stroke(); ctx.lineCap = "butt";
-      } else if (object.name === "Obstacle net") {
-        box(ctx, camera, ox + 1, oy, 0.1, 1, 34, "#9c8672", "#8a7563", "#8a7563");
+      // Each obstacle's look, by name: spans (a log, beam, bridge or ledge laid across the gap), climbs (a net, ladder or icicles), swings, walls and stones.
+      const look = OBSTACLE_LOOKS[object.name] ?? { kind: "wall", color: "#c8c5be", dark: "#9a968f" };
+      if (look.kind === "span") {
+        ctx.strokeStyle = INK; ctx.lineWidth = (look.width + 2) * z; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(a.x, a.y - 3 * z); ctx.lineTo(b.x, b.y - 3 * z); ctx.stroke();
+        ctx.strokeStyle = look.color; ctx.lineWidth = look.width * z; ctx.stroke(); ctx.lineCap = "butt";
+        if (look.rails) { ctx.strokeStyle = look.dark; ctx.lineWidth = 1.5 * z; for (const side of [-1, 1]) { ctx.beginPath(); ctx.moveTo(a.x, a.y - 3 * z + side * 6 * z); ctx.lineTo(b.x, b.y - 3 * z + side * 6 * z); ctx.stroke(); } }
+      } else if (look.kind === "climb") {
+        box(ctx, camera, ox + 1, oy, 0.1, 1, look.height, look.color, look.dark, look.dark);
         ctx.strokeStyle = "rgba(22,22,22,0.6)"; ctx.lineWidth = 1; const n = toScreen(camera, ox + 1, oy);
-        for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.moveTo(n.x - 14 * z, n.y - i * 7 * z - 4 * z); ctx.lineTo(n.x + 14 * z, n.y - i * 7 * z + 4 * z); ctx.stroke(); }
-      } else if (object.name === "Rope swing") {
-        box(ctx, camera, ox, oy, 0.2, 0.2, 60, "#9c8672", "#8a7563", "#7a6553");
+        for (let i = 0; i < Math.floor(look.height / 7); i++) { ctx.beginPath(); ctx.moveTo(n.x - 14 * z, n.y - i * 7 * z - 4 * z); ctx.lineTo(n.x + 14 * z, n.y - i * 7 * z + 4 * z); ctx.stroke(); }
+      } else if (look.kind === "swing") {
+        box(ctx, camera, ox, oy, 0.2, 0.2, 60, look.color, look.dark, look.dark);
         const top = toScreen(camera, ox + 1.5, oy, 60), swing = Math.sin(now / 500) * 10 * z;
-        ctx.strokeStyle = "#8a7563"; ctx.lineWidth = 2 * z; ctx.beginPath(); ctx.moveTo(top.x, top.y); ctx.lineTo(top.x + swing, top.y + 44 * z); ctx.stroke();
-      } else if (object.name === "Low wall") box(ctx, camera, ox + 1, oy, 0.4, 1, 14, "#c8c5be", "#a9a59e", "#9a968f");
-      else if (object.name === "Stepping stone") ellipse(ctx, sx, sy, 16 * z, 8 * z, "#a39e96", INK);
+        ctx.strokeStyle = look.dark; ctx.lineWidth = 2 * z; ctx.beginPath(); ctx.moveTo(top.x, top.y); ctx.lineTo(top.x + swing, top.y + 44 * z); ctx.stroke();
+        if (object.name === "Palm swing") for (let i = 0; i < 5; i++) { const ang = -Math.PI / 2 + (i - 2) * 0.55; ctx.strokeStyle = "#5f8a4a"; ctx.lineWidth = 3 * z; ctx.beginPath(); ctx.moveTo(top.x, top.y); ctx.lineTo(top.x + Math.cos(ang) * 18 * z, top.y + Math.sin(ang) * 10 * z + 4 * z); ctx.stroke(); }
+      } else if (look.kind === "wall") box(ctx, camera, ox + 1, oy, 0.4, 1, look.height ?? 14, look.color, shade(look.color, -0.12), look.dark);
+      else if (look.kind === "stone") ellipse(ctx, sx, sy, 16 * z, 8 * z, look.color, INK);
       if (object.name !== "Stepping stone") box(ctx, camera, ox, oy, 0.5, 0.5, 3, "#c8c5be", "#a9a59e", "#9a968f");
       return hit(36, 48);
     }
@@ -876,6 +898,15 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
       case "dead_tree": ctx.strokeStyle = "#3b3a38"; ctx.lineWidth = 3 * z; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx, sy - 34 * z); ctx.moveTo(sx, sy - 22 * z); ctx.lineTo(sx - 12 * z, sy - 34 * z); ctx.moveTo(sx, sy - 28 * z); ctx.lineTo(sx + 10 * z, sy - 40 * z); ctx.stroke(); return hit(42, 30);
       case "statue": box(ctx, camera, ox, oy, 0.8, 0.8, 12, "#d7d4cd", "#c8c5be", "#b9b5ae");
         if (scene.friend) drawMask(ctx, friendRows(scene.friend, "down", false, 0), sx, sy - 12 * z, 3.4 * z, "#8f8a83"); return hit(70, 50);
+      case "old_friend": {
+        // The Old Friend, the one every altar is raised to: a bearded Rare Friend carved in pale stone on a stepped plinth, a sun disc behind its head.
+        box(ctx, camera, ox, oy, 0.9, 0.9, 8, "#cfcbc3", "#bdb9b1", "#aaa69e"); box(ctx, camera, ox, oy, 0.7, 0.7, 16, "#d7d4cd", "#c8c5be", "#b9b5ae");
+        const top = sy - 16 * z, px = 3.6 * z;
+        ellipse(ctx, sx, top - 14 * px, 7 * px, 7 * px, "rgba(232,228,214,0.55)", "#b9b5ae", 1.5);
+        drawMask(ctx, OLD_FRIEND.idle, sx, top, px, "#9a958d");
+        drawMask(ctx, OLD_FRIEND_BEARD, sx, top, px, "#e8e4d6");
+        return hit(84, 56);
+      }
       case "grave": box(ctx, camera, ox, oy, 0.3, 0.6, 18, "#c8c5be", "#a9a59e", "#9a968f"); return hit(24, 24);
       case "fence": {
         const world = scene.game.world, same = (dx: number, dy: number) => objectAtTile(world, ox + dx, oy + dy)?.decor === "fence";
@@ -1582,7 +1613,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   const veilTarget = veiled(game) ? 1 : 0;
   veilShown = scene.reducedMotion ? veilTarget : veilShown + (veilTarget - veilShown) * Math.min(1, dt * (veilTarget ? 1.4 : 8));
   drawables.push({ depth: playerDepth + 0.15, at: pp, cast: true, size: [200, 120, 40], draw: () => {
-    // Agility: glide from the start to the landing with a hop.
+    // Wayfaring: glide from the start to the landing with a hop.
     let at = pp;
     if (player.activity?.kind === "obstacle") { const a = player.activity, total = world.objects[a.objectId].obstacle?.ticks ?? 3, k = Math.max(0, Math.min(1, 1 - (a.timer - alpha) / total)); at = { x: a.from.x + (a.to.x - a.from.x) * k, y: a.from.y + (a.to.y - a.from.y) * k, moving: true }; }
     const emote = player.emote && game.tick < player.emote.until ? player.emote : null, emoteT = emote ? (game.tick - emote.start + alpha) * TICK_MS / 1000 : 0;
@@ -2298,7 +2329,7 @@ export function mapIcons(world: World): MapIcon[] {
     else if (object.look === "stairs") add(object.x, object.y, "♜", "Friendhollow Castle", 12);
     else if (object.kind === "ladder" || object.kind === "gate") add(object.x, object.y, "▼", object.name);
     else if (object.kind === "stall") add(object.x, object.y, "✋", "Market stalls");
-    else if (object.kind === "obstacle" && object.obstacle?.course === "friendhollow") add(object.x, object.y, "➶", "Agility course", 30);
+    else if (object.kind === "obstacle" && object.obstacle && COURSES[object.obstacle.course]) add(object.x, object.y, "➶", COURSES[object.obstacle.course].name, 30);
     else if (object.kind === "casket") add(object.x, object.y, "◆", "Rare Caskets");
     else if (object.kind === "sigil_altar") add(object.x, object.y, "◈", object.name);
   }

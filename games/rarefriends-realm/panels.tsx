@@ -13,9 +13,9 @@ import { bossWindow } from "./worldboss.ts";
 import { ACHIEVEMENTS, achieved } from "./achievements.ts";
 import { hiscores } from "./hiscores.ts";
 import { petArt } from "./petart.ts";
-import { MAX_QUEST_POINTS, NPCS, QUESTS, finalStage, questPoints } from "./content.ts";
+import { MAX_QUEST_POINTS, NPCS, QUESTS, finalStage, questPoints, type QuestDef } from "./content.ts";
 import {
-  BANK_TABS, CONTAINERS, SATCHEL, bankDeposit, emptyToBank, fillFromBank, bankDepositAll, bankDepositWorn, bankInOrder, bankMove, bankTabs, bankWithdraw, bonuses, combatLevel, count, isStaffEquipped, maxHp, maxPrayer, message, totalLevel, totalXp,
+  BANK_TABS, CONTAINERS, SATCHEL, heft, bankDeposit, emptyToBank, fillFromBank, bankDepositAll, bankDepositWorn, bankInOrder, bankMove, bankTabs, bankWithdraw, bonuses, combatLevel, count, isStaffEquipped, maxHp, maxPrayer, message, totalLevel, totalXp,
   weapon, xpMultiplier, type Game, type Message, type Recipe, type Slot,
 } from "./state.ts";
 import {
@@ -202,27 +202,50 @@ function SkillsTab({ game, openMenu, openGuide }: PanelProps) {
     </div>
   );
 }
+type QuestState = "new" | "started" | "done";
+const QUEST_STATE_LABEL: Record<QuestState, string> = { new: "Not started", started: "In progress", done: "Complete" };
+const questState = (game: Game, id: string): QuestState => { const stage = game.player.quests[id] ?? 0; return stage >= finalStage(id) ? "done" : stage > 0 ? "started" : "new"; };
+/** A quest's checklist progress, from its journal's ✓/• lines (null when the journal has none). */
+function questSteps(game: Game, quest: QuestDef) {
+  const lines = quest.journal(game).filter(line => /^[✓•]/.test(line));
+  return lines.length ? { done: lines.filter(line => line.startsWith("✓")).length, total: lines.length } : null;
+}
 function QuestsTab({ game, openMenu }: PanelProps) {
   const [open, setOpen] = useState<string | null>(null), quest = QUESTS.find(entry => entry.id === open);
-  if (quest) return (
-    <div className="realm-journal">
-      <button type="button" className="realm-back" onClick={() => setOpen(null)}>‹ Quest list</button>
-      <h3>{quest.name}</h3>
-      <p className="realm-muted">{quest.difficulty} · {quest.points} quest point{quest.points > 1 ? "s" : ""}{quest.requirements.length ? ` · ${quest.requirements.join(", ")}` : ""}</p>
-      {quest.journal(game).map((line, index) => <p key={index}>{line}</p>)}
-    </div>
-  );
+  if (quest) {
+    const state = questState(game, quest.id), steps = state === "started" ? questSteps(game, quest) : null;
+    return (
+      <div className="realm-journal">
+        <button type="button" className="realm-back" onClick={() => setOpen(null)}>‹ Quest list</button>
+        <h3>{quest.name} <span className={`realm-quest-state quest-${state}`}>{QUEST_STATE_LABEL[state]}{steps ? ` · ${steps.done}/${steps.total}` : ""}</span></h3>
+        <p className="realm-muted">{quest.difficulty} · {quest.points} quest point{quest.points > 1 ? "s" : ""}{quest.requirements.length ? ` · ${quest.requirements.join(", ")}` : ""}</p>
+        {state === "new" && <p className="realm-muted"><b>Start:</b> {quest.start}</p>}
+        {quest.journal(game).map((line, index) => <p key={index} className={line.startsWith("✓") ? "quest-done" : undefined}>{line}</p>)}
+        <p className="realm-muted"><b>Rewards:</b> {quest.rewards.join(", ")}</p>
+      </div>
+    );
+  }
+  const points = questPoints(game), groups: [QuestState, QuestDef[]][] = (["started", "new", "done"] as const).map(state => [state, QUESTS.filter(entry => questState(game, entry.id) === state)]);
   return (
     <div className="realm-quests">
-      <p className="realm-muted">Quest points: <b>{questPoints(game)}</b> / {MAX_QUEST_POINTS}</p>
-      <ul>
-        {QUESTS.map(entry => {
-          const stage = game.player.quests[entry.id] ?? 0, state = stage >= finalStage(entry.id) ? "done" : stage > 0 ? "started" : "new";
-          return <li key={entry.id}><button type="button" className={`quest-${state}`} onClick={() => setOpen(entry.id)}
-            {...rightClick(openMenu, () => [{ verb: "Read-journal", noun: entry.name, run: () => setOpen(entry.id) }, { verb: "Start-at", noun: entry.name, run: () => message(game, entry.start) }])}>{entry.name}</button></li>;
-        })}
-      </ul>
-      <p className="realm-note">Red: not started · Yellow: in progress · Green: complete</p>
+      <p className="realm-muted">Quest points: <b>{points}</b> / {MAX_QUEST_POINTS} · {groups[2][1].length} of {QUESTS.length} quests complete</p>
+      <div className="realm-quest-bar" role="progressbar" aria-valuemin={0} aria-valuemax={MAX_QUEST_POINTS} aria-valuenow={points} aria-label="Quest points"><span style={{ width: `${100 * points / MAX_QUEST_POINTS}%` }} /></div>
+      {groups.map(([state, list]) => list.length > 0 && (
+        <React.Fragment key={state}>
+          <h4 className={`quest-${state}`}>{QUEST_STATE_LABEL[state]} · {list.length}</h4>
+          <ul>
+            {list.map(entry => {
+              const steps = state === "started" ? questSteps(game, entry) : null;
+              return <li key={entry.id}><button type="button" className={`quest-${state}`} onClick={() => setOpen(entry.id)}
+                {...rightClick(openMenu, () => [{ verb: "Read-journal", noun: entry.name, run: () => setOpen(entry.id) }, { verb: "Start-at", noun: entry.name, run: () => message(game, entry.start) }])}>
+                <span className="realm-quest-dot" aria-hidden="true" /><span className="realm-quest-name">{entry.name}</span>
+                <small>{steps ? `${steps.done}/${steps.total}` : state === "done" ? "✓" : entry.difficulty} · {entry.points} QP</small>
+              </button></li>;
+            })}
+          </ul>
+        </React.Fragment>
+      ))}
+      <p className="realm-note">White: not started · Orange: in progress · Green: complete</p>
     </div>
   );
 }
@@ -343,6 +366,7 @@ function EquipmentTab({ game, refresh, openCard, openMenu }: PanelProps) {
         <div><dt>Defence</dt><dd>{signed(total.defence)}</dd></div><div><dt>Ranged</dt><dd>{signed(total.ranged)}</dd></div>
         <div><dt>Magic</dt><dd>{signed(total.magic)}</dd></div><div><dt>Faith</dt><dd>{signed(total.prayer)}</dd></div>
       </dl>
+      {heft(player) > 0 && <p className="realm-note">Heft: your Strength adds <b>+{heft(player)}</b> to your two-handed weapon's strength bonus (1% for every two levels).</p>}
       <button type="button" className="realm-wide" onClick={openCard}>Adventurer card · Share on X</button>
     </div>
   );
@@ -936,7 +960,7 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
         <li><b>F1–F9</b> or the icons switch tabs. <b>Enter</b> to chat. <b>Space</b> continues dialogue, <b>1–5</b> pick options. <b>Esc</b> closes.</li>
         <li><b>Use</b> an item, then click another item or object: raw fish on a range, tinderbox on logs, needle on leather, chisel on a gem.</li>
         <li>Train <b>15 skills</b> to 99 on the old-school XP curve (Realm rate ×3). Your Friend's family adds a perk.</li>
-        <li><b>Seven quests</b>, from A Friend's Feast to The Hollow King. Look for yellow markers over quest givers.</li>
+        <li><b>Twelve quests</b>, from A Friend's Feast to The Hollow King and the Order of the Dawn. Look for yellow markers over quest givers.</li>
         <li><b>Rare Caskets</b> use simulated $RAREFRIENDS: relics give bonuses while kept, and the wardrobe dresses your Friend.</li>
         <li>Your adventure saves automatically for this wallet on this device.</li>
       </ul>

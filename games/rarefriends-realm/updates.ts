@@ -4,6 +4,28 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 44, date: "2026-10-04", title: "The Heartguard, Dawnhold Keep, and the Old Friend at every altar", items: [
+    "The Heartguard: red-and-white armour earned with Hitpoints, sold by Mender Hale at the Friendhollow chapel. A piece every ten levels, from boots at 10 to the Heartguard blade at 90 (helm, greaves, shield, amulet, cape and plate between). Every piece worn adds a hitpoint and quickens your healing by 6%; wear all nine and food heals a quarter more. The blade heals you one for every eight damage it deals.",
+    "Dawnhold has its fortress: Dawnhold Keep, a two-storey stone hold joining the chapel and the hall along their east ends, its gate facing straight down the causeway from Highcairn, with a round tower at each outer corner, a throne, banners and suits of Dawnplate inside. The chapel stands taller, in two storeys of white stone with a bell tower at its corner.",
+    "Every altar in the Realm now has a statue of the Old Friend behind it: the bearded Friend the Realm prays to, carved in pale stone under a sun disc, in the Friendhollow chapel, the Dawnhold chapel, the Highcairn mountain shrine and the Murkmire crypt.",
+    "A new achievement, Heart of the Realm, for owning the whole Heartguard. The Hitpoints skill guide lists every piece.",
+  ] },
+  { id: 43, date: "2026-10-04", title: "The Wayfaring update, and the Warden's creatures", items: [
+    "Agility is now Wayfaring. Your levels and XP carry over, and so does everything Agility did: run energy comes back faster with every level.",
+    "Wayfaring does more: running drains less energy the better you are (40% less at 99), and hard obstacles can be slipped on (a fifth of the time at their own level, never twelve levels above it; a slip hurts a little and breaks the lap).",
+    "Two new courses: the Oasis dune course south-east of the Oasis (Wayfaring 30, six obstacles) and the Frostpeak ice course north of the camp (Wayfaring 55). The Friendhollow course is still where it was.",
+    "Wayfarer's marks: every lap of a course pays marks (one, two or three by course). Coach Skip trades them for the Wayfarer's outfit: boots (run energy comes back half as fast again), gloves (you never slip), hood (+10% Wayfaring XP) and cape (running drains 20% less; the full outfit 40%, and double marks), and for waybread, a travellers' loaf that restores 40 run energy.",
+    "Five new Slayer creatures only a Slayer can wound, each with its own task and its own armour: thornbacks in southern Whisperwood (Slayer 15, Bramble armour: thorns that hurt whatever hits you), cairn wights in the Greyhorn (35, Wightbone: more Faith XP from bones), dune stalkers in the northern dunes (45, Stalker's: harder to notice while sneaking, cheaper sneaking), ember salamanders in the Ashen Hills (60, Cindershell: dragonfire burns far less) and Hollow weavers in the Hollow Depths (75, Hollowthread robes: spells keep their sigils). Each piece does a little; the full set does more.",
+    "Two new Warden rewards: the Warden's bracers (250 points, +10% Slayer XP on task) and Longer tasks (100 points: tasks and their points half as big again; switch it off for free).",
+    "The Warden now picks your task from the six hardest you qualify for, whatever order they're listed in. The Skills guide lists every course, piece of Wayfarer's gear and Slayer set, and three new achievements: Wayfarer, Dressed for the road and The Warden's wardrobe.",
+  ] },
+  { id: 42, date: "2026-10-04", title: "Heavy weapons that take Strength, a better quest journal, and the ossuary bag", items: [
+    "Greatswords, battleaxes and war hammers now take Strength to wield as well as Attack: pewter at Strength 3, 5 and 7, and each metal's own level more for every tier up (blackiron 7, 9 and 11; ashsteel 12, 14 and 16; and so on to ashenheart at 92, 94 and 96). One already in your hands stays there until you take it off.",
+    "Heft: a two-handed weapon swings harder the stronger you are. Your Strength adds 1% of the weapon's strength bonus for every two levels (half as much again at 99). The Worn equipment tab shows what your heft adds, and the Strength skill guide lists every heavy weapon.",
+    "The quest journal groups quests into In progress (orange), Not started (white) and Complete (green), with a quest point bar, each quest's difficulty and points, and a step count (2/3) beside quests you're on. Open one for its status, where to start it and its rewards; the Quest complete window lists the rewards too.",
+    "Use bones on an altar and you keep offering them, one every couple of ticks, until your pack has none of that kind left. Walk away to stop.",
+    "The ossuary bag, the Dawn Vigil's new reward: it holds 60 bones of any kind, bones you pick up go straight into it, and using it on an altar offers every bone inside at once (the chapel's three-times blessing included). Right-click it to Check, Fill or Empty, or use bones on it. Already kept the vigil? Sister Maren in the Dawnhold chapel has one for you.",
+  ] },
   { id: 41, date: "2026-09-30", title: "Lanterns up high, and hills that hide what's behind them", items: [
     "Lanterns and chandeliers hang higher, up in the rafters, and one that would sit in front of your Friend's face turns see-through.",
     "Snowy slopes and hills cover whatever stands behind them: Friends, other players, monsters and houses no longer show through the snow around Highcairn (or any other hill).",

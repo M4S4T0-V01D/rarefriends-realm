@@ -1,15 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  buy, canWalk, castSpell, chooseOption, collectFromCasket, continueDialogue, createGame, equip, findPath, itemOptions, menuFor, restore, sell,
+  buy, canWalk, castSpell, chooseOption, collectFromCasket, continueDialogue, createGame, equip, unequip, findPath, itemOptions, menuFor, restore, sell,
   serialize, setFollower, setRelics, setTarget, smeltingRecipes, smithingRecipes, startProduction, tick, togglePrayer, useItemOnItem, walkTo, setHeld,
   successChance, hitChance, unlockMusic, toggleSneak, veiled, VEIL_HOOD, toggleRun, bestArrow, rangedMaxHit, bowRange, syncMonster, toggleMount, grantMount, rideProblem, castOnItem, isBound, grantBundle, rubLamp, breakTablet, capeProblem, sellPrice, craftSigils,
+  bagFill, offerBag, OFFER_TICKS, eat, boneBoost, fireFactor, thorns, sigilSave, stalkerFactor, regenTicks, foodBoost,
 } from "../games/rarefriends-realm/engine.ts";
+import { buyWayfarerReward, runDrain, slipChance } from "../games/rarefriends-realm/wayfaring.ts";
+import { buySlayerReward, longTasks, slayerXpBoost, eligibleTasks } from "../games/rarefriends-realm/slayer.ts";
 import { currentTask, slayerPoints } from "../games/rarefriends-realm/slayer.ts";
-import { ITEM_LIST, MONSTERS, MOUNTS, SHOPS, SKILLS, SKILL_NAMES, SPELLS, TREES, XP_RATE, XP_TABLE, item, levelForXp } from "../games/rarefriends-realm/data.ts";
+import { COURSES, HEARTGUARD, ITEM_LIST, METALS, MONSTERS, MOUNTS, SHOPS, SKILLS, SKILL_NAMES, SLAYER_SETS, SLAYER_TASKS, SPELLS, TREES, WAYFARER_MARK, WAYFARER_REWARDS, XP_RATE, XP_TABLE, heavyStrength, item, levelForXp } from "../games/rarefriends-realm/data.ts";
 import { NPCS, QUESTS, MAX_QUEST_POINTS, questPoints, onMonsterKilled } from "../games/rarefriends-realm/content.ts";
 import { FLOOR_Y, H, REGIONS, T, W, createWorld, floorAt, objectAtTile, onLevel, realPoint, regionAt, terrainAt } from "../games/rarefriends-realm/world.ts";
-import { addXp, emptyToBank, fillFromBank, bankDeposit, bankInOrder, bankMove, bankTabs, bankWithdraw, combatLevel, count, earlyXp, give, has, level, xpMultiplier } from "../games/rarefriends-realm/state.ts";
+import { addXp, emptyToBank, fillFromBank, bankDeposit, bankInOrder, bankMove, bankTabs, bankWithdraw, bonuses, bagBones, combatLevel, count, dropItem, earlyXp, give, has, heft, level, maxHp, xpMultiplier, BONE_BAG, BONE_BAG_SIZE } from "../games/rarefriends-realm/state.ts";
 import game from "../games/rarefriends-realm/game.json" with { type: "json" };
 
 const fletchingRecipesFor = (g, log) => { const knife = g.player.inventory.findIndex(slot => slot?.id === "knife"), logs = g.player.inventory.findIndex(slot => slot?.id === log); useItemOnItem(g, knife, logs); const recipes = g.ui.production.recipes; g.ui.production = null; return recipes; };
@@ -92,8 +95,8 @@ test("the world is large, deterministic and every landmark is reachable on foot"
   const reach = object => object.blocks ? [[0, 1], [1, 0], [0, -1], [-1, 0]].some(([dx, dy]) => ok(object.x + dx, object.y + dy)) : ok(object.x, object.y) || [[0, 1], [1, 0], [0, -1], [-1, 0]].some(([dx, dy]) => ok(object.x + dx, object.y + dy));
   const interactive = world.objects.filter(object => object.kind !== "decor" && object.kind !== "stump" && object.name !== "__removed");
   const stuck = interactive.filter(object => !reach(object)).map(object => `${object.name}@${object.x},${object.y}`);
-  // Agility obstacles after the first are reached by crossing the one before (covered by the lap test); trees can sit deep in groves.
-  const blocked = interactive.filter(object => !reach(object) && object.kind !== "tree" && !(object.kind === "obstacle" && object.obstacle.course === "friendhollow" && object.obstacle.step > 0))
+  // Course obstacles after the first are reached by crossing the one before (covered by the lap tests); trees can sit deep in groves.
+  const blocked = interactive.filter(object => !reach(object) && object.kind !== "tree" && !(object.kind === "obstacle" && COURSES[object.obstacle.course] && object.obstacle.step > 0))
     .map(object => `${object.name}@${object.x},${object.y}`);
   assert.deepEqual(blocked, [], "Every station, rock, spot and ladder can be reached");
   assert(stuck.length < interactive.length * 0.03, `Nearly every tree can be reached (${stuck.length} can't)`);
@@ -359,6 +362,7 @@ test("Two-handed greatswords, battleaxes and war hammers; new creatures with the
   }
   assert(g.npcs.some(npc => npc.id === "heft"), "Heft & Haft is open in Friendhollow");
   give(p, "pewter_shield"); equip(g, p.inventory.findIndex(slot => slot?.id === "pewter_shield"));
+  p.xp.strength = XP_TABLE[7]; // a pewter war hammer takes Strength 7
   give(p, "pewter_warhammer"); equip(g, p.inventory.findIndex(slot => slot?.id === "pewter_warhammer"));
   assert.equal(p.equipment.weapon, "pewter_warhammer"); assert.equal(p.equipment.shield, undefined, "the shield comes off for two hands");
   const drops = { grumblin: "grumblin_spear", forest_spider: "spider_fang", boar: "tusker_axe", highland_goat: "horned_helm", sand_scorpion: "stinger_sabre", stone_golem: "golem_maul", moss_colossus: "mossy_staff" };
@@ -369,6 +373,128 @@ test("Two-handed greatswords, battleaxes and war hammers; new creatures with the
   p.inventory.fill(null); give(p, "knife"); give(p, "logs");
   const shafts = fletchingRecipesFor(g, "logs").find(recipe => recipe.label === "15 arrow shafts");
   assert.equal(shafts.xp, 8);
+});
+
+test("Heavy weapons take Strength (pewter 3, 5 and 7, each tier the metal's level more) and swing harder with it", () => {
+  const g = newGame(), p = g.player;
+  const offsets = { greatsword: 2, battleaxe: 4, warhammer: 6 };
+  for (const metal of METALS) for (const [piece, offset] of Object.entries(offsets)) {
+    const weapon = item(`${metal.id}_${piece}`);
+    assert.equal(heavyStrength(metal.id, piece), metal.level + offset);
+    assert.equal(weapon.equip.requires.strength, metal.level + offset, `${weapon.name} takes Strength ${metal.level + offset}`);
+    assert.equal(weapon.equip.requires.attack, metal.level > 1 ? metal.level : undefined, `${weapon.name} still takes the metal's Attack`);
+    assert.match(weapon.examine, /Strength \d+/, "the examine says so");
+  }
+  assert.equal(item("pewter_greatsword").equip.requires.strength, 3); assert.equal(item("pewter_battleaxe").equip.requires.strength, 5); assert.equal(item("pewter_warhammer").equip.requires.strength, 7);
+  assert.equal(item("blackiron_greatsword").equip.requires.strength, 7); assert.equal(item("ashsteel_warhammer").equip.requires.strength, 16); assert.equal(item("ashenheart_warhammer").equip.requires.strength, 96);
+  assert.equal(item("pewter_sabre").equip.requires, undefined, "one-handed pewter still needs nothing");
+  // A Friend at Strength 1 can't lift a pewter war hammer; at 7 it can.
+  give(p, "pewter_warhammer");
+  const slot = () => p.inventory.findIndex(entry => entry?.id === "pewter_warhammer");
+  equip(g, slot());
+  assert.equal(p.equipment.weapon, undefined, "too weak to wield it");
+  assert.match(g.messages.at(-1).text, /Strength level of 7 to wield/);
+  p.xp.strength = XP_TABLE[7];
+  equip(g, slot());
+  assert.equal(p.equipment.weapon, "pewter_warhammer", "wielded at Strength 7");
+  // Heft: the strength bonus grows with Strength, 1% of the weapon's bonus for every two levels; a sabre gets none.
+  const base = item("pewter_warhammer").equip.bonuses.strength;
+  assert.equal(heft(p), Math.floor(base * 7 / 200));
+  p.xp.strength = XP_TABLE[99];
+  assert.equal(heft(p), Math.floor(base * 99 / 200), "about half as much again at 99");
+  assert.equal(bonuses(p).strength, base + heft(p), "and it counts in your bonuses");
+  p.equipment.weapon = "ashenheart_warhammer";
+  assert(heft(p) > 50, `a top-tier heavy gets a big heft (${heft(p)})`);
+  p.equipment.weapon = "pewter_sabre";
+  assert.equal(heft(p), 0, "a sabre has no heft");
+  p.equipment.weapon = "oak_bow";
+  assert.equal(heft(p), 0, "nor a bow");
+});
+
+test("Bones used on an altar keep being offered until none of that kind are left", () => {
+  const g = newGame({ familyId: 2 }), p = g.player;
+  const altar = g.world.objects.find(object => object.kind === "altar" && object.text !== "crypt" && object.text !== "dawn");
+  assert(altar, "an ordinary altar");
+  p.inventory.fill(null);
+  give(p, "bones", 5); give(p, "large_bones", 2);
+  standBy(g, altar);
+  const before = p.xp.prayer;
+  setTarget(g, { kind: "object", id: altar.id, option: "Use", use: p.inventory.findIndex(slot => slot?.id === "bones") });
+  until(g, () => count(p, "bones") === 4, 10);
+  assert.equal(p.activity?.kind, "offer", "the offering carries on");
+  until(g, () => count(p, "bones") === 0, 5 * OFFER_TICKS + 10);
+  assert.equal(p.activity, null, "and stops when the bones run out");
+  assert.equal(count(p, "large_bones"), 2, "other kinds of bones stay in the pack");
+  const expected = 5 * 4.5 * 2 * XP_RATE * earlyXp(1, "prayer");
+  assert(p.xp.prayer - before > expected * 0.9 - 1e-9, `five bones' worth of altar XP (${p.xp.prayer - before} vs ${expected})`);
+  // Walking off stops it.
+  give(p, "bones", 3);
+  setTarget(g, { kind: "object", id: altar.id, option: "Use", use: p.inventory.findIndex(slot => slot?.id === "bones") });
+  until(g, () => count(p, "bones") === 2, 10);
+  walkTo(g, p.x, p.y + 3);
+  assert.equal(p.activity, null, "walking away stops the offering");
+});
+
+test("The ossuary bag: holds 60 bones of any kind, catches picked-up bones, empties onto an altar at once, and is saved", () => {
+  const g = newGame({ familyId: 2 }), p = g.player;
+  p.inventory.fill(null);
+  give(p, BONE_BAG); give(p, "bones", 3); give(p, "large_bones", 2);
+  const bag = () => p.inventory.findIndex(slot => slot?.id === BONE_BAG);
+  assert.deepEqual(itemOptions(g, bag()).map(option => option.verb), ["Check", "Fill", "Empty", "Use", "Drop", "Examine"]);
+  itemOptions(g, bag())[0].run(g);
+  assert.match(g.messages.at(-1).text, /empty/);
+  // Bones on the bag put that kind in; Fill puts every kind in.
+  useItemOnItem(g, p.inventory.findIndex(slot => slot?.id === "large_bones"), bag());
+  assert.equal(count(p, "large_bones"), 0); assert.equal(count(p, "bones"), 3); assert.equal(bagBones(p), 2);
+  bagFill(g);
+  assert.equal(count(p, "bones"), 0); assert.equal(bagBones(p), 5);
+  assert.deepEqual(p.boneBag, { large_bones: 2, bones: 3 });
+  itemOptions(g, bag())[0].run(g);
+  assert.match(g.messages.at(-1).text, /5 of 60 bones: 2 large bones, 3 bones/);
+  // Empty tips them back out.
+  itemOptions(g, bag())[2].run(g);
+  assert.equal(bagBones(p), 0); assert.equal(count(p, "bones"), 3); assert.equal(count(p, "large_bones"), 2);
+  bagFill(g);
+  // Picking bones up with the bag in your pack puts them straight in it.
+  dropItem(g, "bones", 1, p.x, p.y);
+  const ground = g.ground.find(entry => entry.id === "bones" && entry.x === p.x && entry.y === p.y);
+  setTarget(g, { kind: "ground", uid: ground.uid, option: "Take" }); run(g, 2);
+  assert.equal(count(p, "bones"), 0, "not in the pack"); assert.equal(bagBones(p), 6, "in the bag");
+  // It holds 60 at most; the rest stay in the pack.
+  give(p, "bones", 20); p.boneBag.bones = 50;
+  bagFill(g);
+  assert.equal(bagBones(p), BONE_BAG_SIZE); assert.equal(count(p, "bones"), 12, "what didn't fit stays");
+  // Saved and restored.
+  const copy = createGame({ familyId: 2, friendId: 7730, rng: seeded() });
+  restore(copy, serialize(g));
+  assert.deepEqual(copy.player.boneBag, p.boneBag, "the bag's contents survive a save");
+  // Used on an altar: everything inside is offered at once, at the altar's rate; in the chapel it counts for the vigil.
+  const altar = g.world.objects.find(object => object.kind === "altar" && object.text === "dawn");
+  standBy(g, altar);
+  p.quests.dawn_vigil = 1; p.questData.vigil_bones = 0;
+  const before = p.xp.prayer, inside = { ...p.boneBag }, n = bagBones(p);
+  setTarget(g, { kind: "object", id: altar.id, option: "Use", use: bag() }); run(g, 2);
+  assert.equal(bagBones(p), 0, "the bag is empty"); assert.deepEqual(p.boneBag, {});
+  assert.equal(p.questData.vigil_bones, n, "every bone counted for the vigil");
+  const expected = (inside.bones * 4.5 + inside.large_bones * 15) * 3 * XP_RATE * earlyXp(1, "prayer");
+  assert(p.xp.prayer - before > expected * 0.5, `three times the burying XP for the lot (${p.xp.prayer - before} vs ${expected})`);
+  assert.match(g.messages.at(-1).text, new RegExp(`offer ${n} bones at once`));
+  offerBag(g, false);
+  assert.match(g.messages.at(-1).text, /empty/, "an empty bag offers nothing");
+  // Sister Maren gives a squire without a bag one.
+  const h = newGame({ familyId: 2 }), q = h.player;
+  q.quests.dawn_vigil = 2;
+  const maren = h.npcs.find(npc => npc.id === "chaplain");
+  teleport(h, maren.x, maren.y + 1); if (!canWalk(h, maren.x, maren.y + 1)) teleport(h, maren.x + 1, maren.y);
+  const talkToMaren = () => {
+    setTarget(h, { kind: "npc", uid: maren.uid, option: "Talk-to" });
+    until(h, () => h.dialogue !== null, 40);
+    for (let i = 0; i < 20 && h.dialogue; i++) { const before = h.dialogue.index; continueDialogue(h); if (h.dialogue && h.dialogue.index === before) chooseOption(h, h.dialogue.options.length - 1); }
+  };
+  talkToMaren();
+  assert(has(q, BONE_BAG), "a bag from Sister Maren");
+  talkToMaren();
+  assert.equal(count(q, BONE_BAG), 1, "but only one");
 });
 
 test("Beginner fishing by the farm, and a new cook burns far less", () => {
@@ -545,6 +671,184 @@ test("agility: a full lap of the Friendhollow course", () => {
   }
   const perObstacle = obstacles.reduce((sum, obstacle) => sum + obstacle.obstacle.xp, 0);
   assert(g.player.xp.agility >= (perObstacle + 40) * XP_RATE * earlyXp(1, "agility") - 1e-6, "Lap bonus paid");
+});
+
+test("Wayfaring: the skill's name, three courses, marks for laps, slips, run energy and Coach Skip's outfit", () => {
+  assert.equal(SKILL_NAMES.agility, "Wayfaring", "Agility is called Wayfaring (its id stays agility)");
+  const g = newGame(), p = g.player;
+  const courseObstacles = id => g.world.objects.filter(object => object.kind === "obstacle" && object.obstacle.course === id).sort((a, b) => a.obstacle.step - b.obstacle.step);
+  assert.deepEqual(Object.keys(COURSES), ["friendhollow", "dunes", "frostpeak"]);
+  assert.equal(courseObstacles("dunes").length, 6); assert.equal(courseObstacles("frostpeak").length, 6);
+  for (const [id, course] of Object.entries(COURSES)) {
+    const obstacles = courseObstacles(id);
+    assert(obstacles.every(object => object.obstacle.level === course.level), `${course.name} needs Wayfaring ${course.level}`);
+    assert(obstacles.every(object => canWalk(g, object.to.x, object.to.y)), `${course.name}: every landing is walkable`);
+    assert(obstacles.at(-1).obstacle.last, `${course.name} ends in a lap`);
+  }
+  // Slips: never on level-1 obstacles, a fifth at the obstacle's level, none twelve levels above it, never in the gloves.
+  assert.equal(slipChance(g, { level: 1 }), 0);
+  p.xp.agility = XP_TABLE[30];
+  assert.equal(slipChance(g, { level: 30 }), 0.2); assert.equal(slipChance(g, { level: 55 }), 0.2);
+  p.xp.agility = XP_TABLE[42]; assert.equal(slipChance(g, { level: 30 }), 0);
+  p.xp.agility = XP_TABLE[30]; p.equipment.hands = "wayfarer_gloves"; assert.equal(slipChance(g, { level: 55 }), 0);
+  // Too weak for the dune course at level 1; at 30, a lap pays XP and two marks.
+  p.xp.agility = 0;
+  const dunes = courseObstacles("dunes");
+  teleport(g, dunes[0].x - 1, dunes[0].y);
+  setTarget(g, { kind: "object", id: dunes[0].id, option: dunes[0].action }); run(g, 3);
+  assert.match(g.messages.at(-1).text, /Wayfaring level of 30/);
+  p.xp.agility = XP_TABLE[30];
+  for (const obstacle of dunes) {
+    setTarget(g, { kind: "object", id: obstacle.id, option: obstacle.action });
+    until(g, () => p.x === obstacle.to.x && p.y === obstacle.to.y, 60);
+  }
+  assert.equal(count(p, WAYFARER_MARK), 2, "two marks for a dune lap"); assert.equal(p.stats.laps, 1);
+  assert.match(g.messages.at(-1).text, /lap of the Oasis dune course/);
+  // Run energy: drains less with Wayfaring and in the cape, comes back faster in the boots; waybread restores it.
+  p.equipment = {};
+  p.xp.agility = 0; const slow = runDrain(g); p.xp.agility = XP_TABLE[99]; const fast = runDrain(g);
+  assert(fast < slow * 0.62 && fast > slow * 0.58, `running drains about 40% less at 99 (${fast} vs ${slow})`);
+  p.equipment.cape = "wayfarer_cape"; assert(Math.abs(runDrain(g) - fast * 0.8) < 1e-9, "the cape takes 20% off");
+  p.equipment.hood = undefined; p.equipment.head = "wayfarer_hood"; p.equipment.hands = "wayfarer_gloves"; p.equipment.feet = "wayfarer_boots";
+  assert(Math.abs(runDrain(g) - fast * 0.6) < 1e-9, "the full outfit 40%");
+  p.path = []; p.energy = 50; tick(g); const booted = p.energy - 50;
+  p.equipment.feet = undefined; p.energy = 50; tick(g); const plain = p.energy - 50;
+  assert(Math.abs(booted - plain * 1.5) < 1e-9, `the boots bring energy back half as fast again (${booted} vs ${plain})`);
+  p.inventory.fill(null); give(p, "waybread"); p.energy = 20; p.eatTimer = 0;
+  eat(g, p.inventory.findIndex(slot => slot?.id === "waybread"));
+  assert.equal(p.energy, 60, "waybread restores 40 run energy");
+  // Coach Skip trades marks for the outfit; the full outfit doubles marks.
+  p.inventory.fill(null); give(p, WAYFARER_MARK, 25);
+  assert.equal(buyWayfarerReward(g, "wayfarer_cape"), false, "not enough marks");
+  assert.equal(buyWayfarerReward(g, "wayfarer_boots"), true); assert(has(p, "wayfarer_boots")); assert.equal(count(p, WAYFARER_MARK), 5);
+  assert.equal(buyWayfarerReward(g, "waybread"), true); assert.equal(count(p, "waybread"), 3); assert.equal(count(p, WAYFARER_MARK), 4);
+  for (const reward of WAYFARER_REWARDS) assert(item(reward.id), `${reward.name} is an item`);
+  p.equipment = { cape: "wayfarer_cape", head: "wayfarer_hood", hands: "wayfarer_gloves", feet: "wayfarer_boots" }; p.inventory.fill(null);
+  const friendhollow = courseObstacles("friendhollow");
+  teleport(g, friendhollow[0].x - 1, friendhollow[0].y);
+  for (const obstacle of friendhollow) { setTarget(g, { kind: "object", id: obstacle.id, option: obstacle.action }); until(g, () => p.x === obstacle.to.x && p.y === obstacle.to.y, 60); }
+  assert.equal(count(p, WAYFARER_MARK), 2, "double marks in the full outfit");
+  // Coach Skip has the rewards in his dialogue.
+  const coach = g.npcs.find(npc => npc.id === "agility");
+  standNear(g, coach.x, coach.y, 1);
+  setTarget(g, { kind: "npc", uid: coach.uid, option: "Talk-to" });
+  until(g, () => g.dialogue !== null, 30);
+  while (g.dialogue && g.dialogue.index < g.dialogue.lines.length) continueDialogue(g);
+  assert(g.dialogue.options.some(option => option.label === "Trade marks."));
+  chooseOption(g, 1);
+  assert(g.dialogue.options.some(option => option.label.startsWith("Wayfarer's cape")));
+  while (g.dialogue) { if (g.dialogue.options && g.dialogue.index >= g.dialogue.lines.length) chooseOption(g, g.dialogue.options.length - 1); else continueDialogue(g); }
+});
+
+test("Slayer creatures with their own armour: five new monsters, tasks, set effects, the Warden's bracers and longer tasks", () => {
+  const g = newGame(), p = g.player;
+  for (const set of SLAYER_SETS) {
+    const monster = MONSTERS[set.monster];
+    assert(monster && monster.slayer === set.slayer, `${set.monster} needs Slayer ${set.slayer}`);
+    assert(g.monsters.some(entry => entry.def.id === set.monster), `${monster.name}s live in the Realm`);
+    assert(SLAYER_TASKS.some(task => task.monsters.includes(set.monster) && task.slayer === set.slayer), `a task for ${monster.name}s`);
+    for (const piece of set.pieces) {
+      const id = `${set.id}_${piece.suffix}`, def = item(id);
+      assert(monster.drops.some(drop => drop.item === id), `${monster.name} drops ${def.name}`);
+      assert.equal(def.equip.slot, piece.slot); assert.equal(def.equip.requires.slayer, set.slayer, `${def.name} takes Slayer ${set.slayer}`);
+    }
+  }
+  const wear = set => { p.equipment = {}; for (const piece of set.pieces) p.equipment[piece.slot] = `${set.id}_${piece.suffix}`; };
+  // Each set's effect grows with its pieces, and the full set does more.
+  p.equipment = {}; assert.equal(thorns(p), 0); assert.equal(boneBoost(p), 1); assert.equal(fireFactor(p), 1); assert.equal(sigilSave(p), 0); assert.equal(stalkerFactor(p), 1);
+  p.equipment = { head: "bramble_coif" }; assert.equal(thorns(p), 1);
+  wear(SLAYER_SETS[0]); assert.equal(thorns(p), 3, "three thorns in full Bramble");
+  p.equipment = { head: "wightbone_helm", body: "wightbone_plate" }; assert(Math.abs(boneBoost(p) - 1.2) < 1e-9);
+  wear(SLAYER_SETS[1]); assert(Math.abs(boneBoost(p) - 1.4) < 1e-9, "40% more Faith XP from bones in full Wightbone");
+  p.equipment = { legs: "stalker_leggings" }; assert(Math.abs(stalkerFactor(p) - 0.88) < 1e-9);
+  wear(SLAYER_SETS[2]); assert(Math.abs(stalkerFactor(p) - 0.64) < 1e-9);
+  p.equipment = { head: "cindershell_helm" }; assert(Math.abs(fireFactor(p) - 0.85) < 1e-9);
+  wear(SLAYER_SETS[3]); assert.equal(fireFactor(p), 0.5, "full Cindershell halves dragonfire");
+  p.equipment = { body: "hollowthread_robe" }; assert(Math.abs(sigilSave(p) - 0.08) < 1e-9);
+  wear(SLAYER_SETS[4]); assert.equal(sigilSave(p), 0.3, "full Hollowthread keeps sigils 30% of the time");
+  // Wightbone: burying bones really pays more.
+  p.equipment = {}; p.inventory.fill(null); give(p, "bones"); const plain = p.xp.prayer;
+  itemOptions(g, p.inventory.findIndex(slot => slot?.id === "bones")).find(option => option.verb === "Bury").run(g);
+  const plainXp = p.xp.prayer - plain;
+  wear(SLAYER_SETS[1]); give(p, "bones"); const boosted = p.xp.prayer;
+  itemOptions(g, p.inventory.findIndex(slot => slot?.id === "bones")).find(option => option.verb === "Bury").run(g);
+  assert((p.xp.prayer - boosted) / plainXp > 1.35, "40% more Faith XP buried in Wightbone");
+  // The Warden: bracers boost task XP, and longer tasks are longer and pay more.
+  p.equipment = {}; assert.equal(slayerXpBoost(g), 1); p.equipment.hands = "warden_bracers"; assert.equal(slayerXpBoost(g), 1.1);
+  p.questData.slayer_points = 400;
+  assert.equal(buySlayerReward(g, "warden_bracers"), true); assert(has(p, "warden_bracers")); assert.equal(p.questData.slayer_points, 150);
+  assert.equal(longTasks(g), false);
+  assert.equal(buySlayerReward(g, "long"), true); assert(longTasks(g)); assert.equal(p.questData.slayer_points, 50);
+  assert.equal(buySlayerReward(g, "long"), true, "switching it off is free"); assert.equal(longTasks(g), false); assert.equal(p.questData.slayer_points, 50);
+  // Eligible tasks come hardest-last whatever order the table lists them in.
+  for (const skill of ["attack", "strength", "defence", "hitpoints", "slayer"]) p.xp[skill] = XP_TABLE[99];
+  const eligible = eligibleTasks(g);
+  assert.deepEqual(eligible.map(task => task.min), [...eligible.map(task => task.min)].sort((a, b) => a - b));
+  assert.equal(eligible.at(-1).id, "weavers", "Hollow weavers are the hardest task");
+});
+
+test("The Heartguard: nine red-and-white pieces by Hitpoints level, each a hitpoint and quicker healing; the blade heals as it cuts", () => {
+  const g = newGame(), p = g.player;
+  assert.equal(HEARTGUARD.length, 9);
+  HEARTGUARD.forEach((piece, index) => {
+    const def = item(piece.id);
+    assert.equal(def.equip.requires.hitpoints, (index + 1) * 10, `${def.name} takes Hitpoints ${(index + 1) * 10}`);
+    assert.equal(def.equip.slot, piece.slot); assert.equal(def.icon.color, "#b8333a", "red"); assert.equal(def.icon.accent, "#f2efe8", "and white");
+    assert(SHOPS.mender.stock.includes(piece.id), `Mender Hale sells ${def.name}`);
+  });
+  assert.equal(new Set(HEARTGUARD.map(piece => piece.slot)).size, 9, "one piece for every slot");
+  assert(g.npcs.some(npc => npc.id === "mender"), "Mender Hale is at the chapel");
+  // Hitpoints 10 can wear the boots but not the gloves.
+  give(p, "heartguard_boots"); give(p, "heartguard_gloves");
+  equip(g, p.inventory.findIndex(slot => slot?.id === "heartguard_gloves"));
+  assert.equal(p.equipment.hands, undefined); assert.match(g.messages.at(-1).text, /Hitpoints level of 20/);
+  equip(g, p.inventory.findIndex(slot => slot?.id === "heartguard_boots"));
+  assert.equal(p.equipment.feet, "heartguard_boots");
+  assert.equal(maxHp(p), 11, "a hitpoint more"); assert.equal(regenTicks(p), 94, "6% quicker healing"); assert.equal(foodBoost(p), 1);
+  p.equipment = {}; for (const piece of HEARTGUARD) p.equipment[piece.slot] = piece.id;
+  assert.equal(maxHp(p), 19); assert.equal(regenTicks(p), 46); assert.equal(foodBoost(p), 1.25, "food heals a quarter more in the full set");
+  p.xp.hitpoints = XP_TABLE[50]; p.hp = 5; p.inventory.fill(null); give(p, "cake"); p.eatTimer = 0;
+  eat(g, p.inventory.findIndex(slot => slot?.id === "cake"));
+  assert.equal(p.hp, 5 + 15, "a cake heals 15 instead of 12");
+  p.xp.hitpoints = 0;
+  // Taking the set off caps your health at the plain maximum.
+  p.hp = 19; unequip(g, "cape"); assert(p.hp <= maxHp(p));
+  // The blade heals you one for every eight damage it deals.
+  for (const skill of ["attack", "strength", "defence", "hitpoints"]) p.xp[skill] = XP_TABLE[99];
+  p.equipment = { weapon: "heartguard_blade" }; p.hp = 50; p.regenTimer = -10_000;
+  const chief = g.monsters.find(monster => monster.def.id === "grumblin_chief" && [[0, 1], [1, 0], [0, -1], [-1, 0]].some(([dx, dy]) => canWalk(g, monster.x + dx, monster.y + dy)));
+  standNear(g, chief.x, chief.y, 1);
+  setTarget(g, { kind: "monster", uid: chief.uid, option: "Attack" });
+  until(g, () => chief.dead, 120);
+  assert(p.hp > 50, `the blade healed on the way (${p.hp})`);
+  // Mender Hale opens her shop from the dialogue.
+  const mender = g.npcs.find(npc => npc.id === "mender");
+  standNear(g, mender.x, mender.y, 1);
+  setTarget(g, { kind: "npc", uid: mender.uid, option: "Talk-to" });
+  until(g, () => g.dialogue !== null, 30);
+  while (g.dialogue && g.dialogue.index < g.dialogue.lines.length) continueDialogue(g);
+  chooseOption(g, 0);
+  assert.equal(g.ui.shop, "mender");
+});
+
+test("The Old Friend stands behind every altar, and Dawnhold has its keep, towers and a taller chapel", () => {
+  const g = newGame(), world = g.world;
+  const altars = world.objects.filter(object => object.kind === "altar");
+  assert.equal(altars.length, 4);
+  for (const altar of altars) {
+    assert(world.objects.some(object => object.decor === "old_friend" && Math.abs(object.x - altar.x) <= 1 && Math.abs(object.y - altar.y) <= 2), `a statue of the Old Friend by the ${altar.name}`);
+  }
+  assert(world.objects.find(object => object.decor === "old_friend").name === "Statue of the Old Friend");
+  const named = name => world.buildings.filter(building => building.name === name);
+  const keep = named("Dawnhold Keep")[0];
+  assert(keep && keep.storeys === 2 && keep.walls === "stone", "a two-storey stone keep");
+  assert(keep.x0 <= 320 && keep.y0 <= 74 && keep.y1 >= 90, "joining the chapel and the hall along their east ends");
+  assert(canWalk(g, 319, 82) && canWalk(g, 321, 82) && world.tiles[82 * W + 320] !== T.WALL, "its gate opens onto the courtyard at the end of the causeway");
+  assert.equal(named("Keep tower").length, 2, "a tower at each outer corner");
+  const chapel = named("Dawnhold Chapel")[0];
+  assert(chapel.storeys === 2 && chapel.tall > 0, "the chapel stands taller");
+  assert(named("Chapel bell tower")[0]?.round, "with a bell tower");
+  assert(world.objects.some(object => object.decor === "throne" && object.x > 320 && object.y === 82), "the Grandmaster's seat inside");
 });
 
 test("magic: Breeze Dart uses sigils and trains Magic", () => {
@@ -846,7 +1150,9 @@ test("Slayer: a task from the Warden, XP per kill, points when it's done, and cr
   for (const skill of ["attack", "strength", "defence", "hitpoints"]) p.xp[skill] = 1_000_000;
   p.hp = 99;
   for (let kill = 0; kill < 2; kill++) {
-    const rat = g.monsters.filter(monster => monster.def.id === "ink_rat" && !monster.dead).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0];
+    // The nearest rat you can actually get beside (one wedged in a corner is skipped).
+    const rats = g.monsters.filter(monster => monster.def.id === "ink_rat" && !monster.dead).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y));
+    const rat = rats.find(candidate => [[0, 1], [1, 0], [0, -1], [-1, 0]].some(([dx, dy]) => canWalk(g, candidate.x + dx, candidate.y + dy) && findPath(g, p, (x, y) => x === candidate.x + dx && y === candidate.y + dy, { x: candidate.x + dx, y: candidate.y + dy })));
     standNear(g, rat.x, rat.y, 1);
     setTarget(g, { kind: "monster", uid: rat.uid, option: "Attack" });
     until(g, () => rat.dead, 200);
@@ -1329,6 +1635,7 @@ test("Faith: the Order of the Dawn, offerings, the Dawn Vigil, faith weapons and
   talkTo("grandmaster");
   assert.equal(p.quests.dawn_vigil, 2, "the vigil is kept");
   assert(has(p, "dawnsteel_sword"), "a Dawnsteel sword");
+  assert(has(p, BONE_BAG), "and the ossuary bag");
   assert.equal(capeProblem(g, "dawnsteel_sword"), null, "the armoury opens");
   assert(capeProblem(g, "radiant_greatsword"), "but not its finest weapons");
 
@@ -1373,7 +1680,7 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
     while (g.dialogue) continueDialogue(g);
   };
   const pray = name => { const altar = g.world.objects.find(object => object.kind === "altar" && object.name === name); standBy(g, altar); setTarget(g, { kind: "object", id: altar.id, option: "Pray-at" }); run(g, 3); };
-  p.quests.dawn_vigil = 2; p.quests.greyhorn_light = 3; p.xp.prayer = XP_TABLE[60];
+  p.quests.dawn_vigil = 2; p.quests.greyhorn_light = 3; p.xp.prayer = XP_TABLE[60]; give(p, BONE_BAG); // (a squire with the vigil's bag already; without it Sister Maren hands one over first)
   assert(capeProblem(g, "dawnplate_greaves"), "Dawnplate is earned first");
   // The Pilgrim's Road: pray at the three old altars.
   talkTo("chaplain");

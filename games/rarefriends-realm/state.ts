@@ -2,8 +2,8 @@
  * Game state and the small helpers every system shares: inventory, bank, equipment, experience and messages.
  */
 import {
-  EQUIP_SLOTS, FAMILY_NAMES, MAX_XP, MONSTERS, mountDef, PRAYERS, RELICS, SKILLS, SKILL_NAMES, XP_RATE, XP_TABLE, item, levelForXp,
-  type Bonuses, type EquipSlot, type MonsterDef, type Skill, type SpotKind, type WardrobeId,
+  EQUIP_SLOTS, FAMILY_NAMES, MAX_XP, MONSTERS, mountDef, PRAYERS, RELICS, SKILLS, SKILL_NAMES, WAYFARER_SET, XP_RATE, XP_TABLE, item, levelForXp,
+  type Bonuses, type EquipSlot, type Item, type MonsterDef, type Skill, type SpotKind, type WardrobeId,
 } from "./data.ts";
 import { createWorld, type World } from "./world.ts";
 import type { Daily } from "./daily.ts";
@@ -42,7 +42,9 @@ export type Activity =
   | { kind: "produce"; recipe: Recipe; timer: number; left: number }
   | { kind: "obstacle"; objectId: number; timer: number; from: Point; to: Point }
   | { kind: "teleport"; to: Point; timer: number; spell: string }
-  | { kind: "firemake"; slot: number; timer: number };
+  | { kind: "firemake"; slot: number; timer: number }
+  /** Offering bones of one kind at an altar, one after another, until the pack has none left. */
+  | { kind: "offer"; objectId: number; timer: number; bones: string };
 /** Timed crafting at a station or from the inventory. */
 export type Recipe = {
   skill: Skill; label: string; level: number; xp: number; ticks: number; station?: "furnace" | "anvil" | "wheel" | "none";
@@ -70,6 +72,8 @@ export type Player = {
   referredBy: number | null; referrals: number[]; boostTicks: number;
   /** Inkcoal kept in the inkcoal satchel, and sigil stones in the sigil stone box. */
   coalBag: number; stoneBox: number;
+  /** Bones kept in the ossuary bag, by kind. */
+  boneBag: Record<string, number>;
   /** When (wall-clock ms) your recent referrals were credited: at most REFERRALS_PER_DAY in any 24 hours. */
   referralTimes: number[];
   /** You've been told today's referral limit is reached (not saved). */
@@ -177,7 +181,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
     style: "accurate", autocast: null, prayers: [], target: null, activity: null, combat: null,
     attackTimer: 0, eatTimer: 0, stunned: 0, regenTimer: 0, quests: {}, questData: {},
     wardrobe: [], worn: [], follower: null, courseStep: -1, kills: 0, deaths: 0, overhead: null, music: ["theme"],
-    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false }, seenUpdate: LATEST_UPDATE,
+    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, boneBag: {}, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false }, seenUpdate: LATEST_UPDATE,
     lastHitBy: null, created: Date.now(), queuedSpell: null, castTimer: 0,
   };
 }
@@ -355,6 +359,34 @@ export function emptyToBank(player: Player, containerItem: string) {
   player[box.key] = 0;
   return n;
 }
+// ---------- Worn sets ----------
+/** How many pieces of a set (the Wayfarer's outfit, a Slayer set) you're wearing: ids that start with `prefix_`. */
+export const setPieces = (player: Player, prefix: string) => Object.values(player.equipment).filter(id => !!id && id.startsWith(`${prefix}_`)).length;
+/** The Wayfarer's outfit: how many of its four pieces are worn. */
+export const wayfarerPieces = (player: Player) => WAYFARER_SET.filter(id => Object.values(player.equipment).includes(id)).length;
+/** Pieces of a Slayer set worn, and whether the whole set is on. */
+export const slayerSetWorn = (player: Player, set: string) => setPieces(player, set);
+export const fullSlayerSet = (player: Player, set: string) => setPieces(player, set) >= 3;
+// ---------- The ossuary bag ----------
+export const BONE_BAG = "bone_bag", BONE_BAG_SIZE = 60;
+/** Carried in your pack, the ossuary bag catches the bones you pick up and empties itself onto an altar. */
+export const hasBoneBag = (player: Player) => has(player, BONE_BAG);
+/** You own one at all (in your pack or the bank): Sister Maren hands one over otherwise. */
+export const ownsBoneBag = (player: Player) => hasBoneBag(player) || player.bank.some(slot => slot.id === BONE_BAG);
+/** How many bones the bag holds in all. */
+export const bagBones = (player: Player) => Object.values(player.boneBag).reduce((sum, n) => sum + n, 0);
+/** Put bones of one kind in the bag (as many as fit); returns how many went in. */
+export function bagAdd(player: Player, id: string, n: number) {
+  const room = Math.max(0, BONE_BAG_SIZE - bagBones(player)), moved = Math.min(n, room);
+  if (moved > 0) player.boneBag[id] = (player.boneBag[id] ?? 0) + moved;
+  return moved;
+}
+/** Take the bag's contents out (clearing it): [bone id, count] pairs, the biggest kinds first. */
+export function bagTakeAll(player: Player) {
+  const out = Object.entries(player.boneBag).filter(([, n]) => n > 0).sort((a, b) => (item(b[0]).bones ?? 0) - (item(a[0]).bones ?? 0));
+  player.boneBag = {};
+  return out;
+}
 /** How many of an item you can use in a recipe: your pack, plus the satchel's inkcoal. */
 export const stock = (player: Player, id: string) => count(player, id) + (id === "inkcoal" && hasSatchel(player) ? player.coalBag : 0) + (id === "sigil_stone" && hasStoneBox(player) ? player.stoneBox : 0);
 /** Use up items for a recipe, taking inkcoal from the satchel first. */
@@ -436,7 +468,16 @@ export function bonuses(player: Player): Bonuses {
     for (const key of Object.keys(total) as (keyof Bonuses)[]) total[key] += equip.bonuses[key] ?? 0;
   }
   total.defence += riding(player)?.defence ?? 0;
+  total.strength += heft(player);
   return total;
+}
+/** A heavy weapon: a two-handed melee weapon (greatsword, battleaxe, war hammer, maul…), not a bow or a staff. */
+export const isHeavy = (equip: NonNullable<Item["equip"]> | undefined) => !!equip?.twoHanded && !equip.bow && !equip.staff;
+/** Heft: a heavy weapon's strength bonus grows with your Strength, 1% for every two levels (half as much again at 99). */
+export function heft(player: Player) {
+  const equip = player.equipment.weapon ? item(player.equipment.weapon).equip : undefined;
+  if (!isHeavy(equip)) return 0;
+  return Math.floor((equip!.bonuses.strength ?? 0) * levelForXp(player.xp.strength) / 200);
 }
 export const weapon = (player: Player) => player.equipment.weapon ? item(player.equipment.weapon) : null;
 export const isStaffEquipped = (player: Player) => !!weapon(player)?.equip?.staff;
@@ -455,5 +496,7 @@ export function prayerBoost(player: Player) {
   }
   return boost;
 }
-export const maxHp = (player: Player) => levelForXp(player.xp.hitpoints);
+/** Heartguard pieces worn: each adds a hitpoint and quickens healing; all nine make food heal more. */
+export const heartguardPieces = (player: Player) => setPieces(player, "heartguard");
+export const maxHp = (player: Player) => levelForXp(player.xp.hitpoints) + heartguardPieces(player);
 export const maxPrayer = (player: Player) => levelForXp(player.xp.prayer);

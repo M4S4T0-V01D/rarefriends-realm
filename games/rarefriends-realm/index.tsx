@@ -953,7 +953,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           {quest && (
             <Modal title="Quest complete!" onClose={() => setQuest(null)}>
               <div className="realm-quest-done"><span aria-hidden="true">✦</span><h3>{QUESTS.find(entry => entry.id === quest)?.name}</h3>
-                <p>Quest points: <b>{questPoints(state)}</b> / {MAX_QUEST_POINTS}</p><p className="realm-note">Rewards are in your chat and inventory.</p>
+                <p>Quest points: <b>{questPoints(state)}</b> / {MAX_QUEST_POINTS}</p>
+                <ul className="realm-quest-rewards">{QUESTS.find(entry => entry.id === quest)?.rewards.map(reward => <li key={reward}>{reward}</li>)}</ul>
                 <button type="button" className="realm-primary" onClick={() => setQuest(null)}>Continue</button></div>
             </Modal>
           )}

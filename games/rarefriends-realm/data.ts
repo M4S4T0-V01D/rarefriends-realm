@@ -12,7 +12,7 @@ export type Skill = typeof SKILLS[number];
 export const SKILL_NAMES: Record<Skill, string> = {
   attack: "Attack", strength: "Strength", defence: "Defence", ranged: "Ranged", hitpoints: "Hitpoints", magic: "Magic", prayer: "Faith",
   woodcutting: "Woodcutting", fishing: "Fishing", cooking: "Cooking", firemaking: "Firemaking", mining: "Mining",
-  smithing: "Smithing", crafting: "Crafting", thieving: "Stealth", agility: "Agility", slayer: "Slayer",
+  smithing: "Smithing", crafting: "Crafting", thieving: "Stealth", agility: "Wayfaring", slayer: "Slayer",
   sigilcraft: "Sigilcraft", fletching: "Fletching",
 };
 /** Each skill's colour: its mastery cape, and its trim. */
@@ -84,6 +84,8 @@ export type Item = {
     /** A faith weapon (the Order of the Dawn's): each hit gives a little Faith XP, and it hurts the undead more. */
     holy?: boolean };
   heal?: number; bones?: number; tool?: { kind: "axe" | "pickaxe"; tier: number; level: number };
+  /** Run energy restored when eaten (waybread). */
+  energy?: number;
   /** Arrows (fired by any bow) or bolts (by any crossbow), from your pack. */
   ammo?: { strength: number; level: number; bolt?: boolean };
   /** A fixed shop price (instead of value × markup). */
@@ -136,11 +138,17 @@ export const SMITH_PIECES = [
   { piece: "cuirass", name: "cuirass", bars: 5, offset: 18, shape: "body", slot: "body", att: 0, str: 0, def: 20, speed: 0 },
   { piece: "gauntlets", name: "gauntlets", bars: 1, offset: 2, shape: "gloves", slot: "hands", att: 1, str: 0, def: 3, speed: 0 },
   { piece: "boots", name: "boots", bars: 1, offset: 3, shape: "boots", slot: "feet", att: 0, str: 0, def: 3, speed: 0 },
-  // Two-handed weapons: a tick slower than a sword, much harder hitting, and no shield.
-  { piece: "greatsword", name: "greatsword", bars: 3, offset: 10, shape: "greatsword", slot: "weapon", att: 10, str: 13, def: 0, speed: 5, twoHanded: true },
-  { piece: "battleaxe", name: "battleaxe", bars: 3, offset: 9, shape: "battleaxe", slot: "weapon", att: 8, str: 14, def: 0, speed: 5, twoHanded: true },
-  { piece: "warhammer", name: "war hammer", bars: 3, offset: 11, shape: "warhammer", slot: "weapon", att: 6, str: 16, def: 0, speed: 5, twoHanded: true },
+  // Two-handed weapons: a tick slower than a sword, much harder hitting, and no shield. Each takes Strength to lift
+  // (`strength` over the metal's level: pewter 3, 5 and 7), and swings harder the stronger you are (see `heft`).
+  { piece: "greatsword", name: "greatsword", bars: 3, offset: 10, shape: "greatsword", slot: "weapon", att: 10, str: 13, def: 0, speed: 5, twoHanded: true, strength: 2 },
+  { piece: "battleaxe", name: "battleaxe", bars: 3, offset: 9, shape: "battleaxe", slot: "weapon", att: 8, str: 14, def: 0, speed: 5, twoHanded: true, strength: 4 },
+  { piece: "warhammer", name: "war hammer", bars: 3, offset: 11, shape: "warhammer", slot: "weapon", att: 6, str: 16, def: 0, speed: 5, twoHanded: true, strength: 6 },
 ] as const;
+/** The Strength a metal's heavy weapon (greatsword, battleaxe, war hammer) takes to wield. */
+export function heavyStrength(metal: MetalId, piece: SmithPiece) {
+  const entry = SMITH_PIECES.find(row => row.piece === piece);
+  return entry && "strength" in entry ? METALS.find(row => row.id === metal)!.level + entry.strength : 0;
+}
 export type SmithPiece = typeof SMITH_PIECES[number]["piece"];
 export const SMITHING_BASE: Record<MetalId, number> = { pewter: 1, blackiron: 15, ashsteel: 30, moonsilver: 50, glimmer: 70, rarite: 85,
   frostsilver: 86, gloomsteel: 88, wyrmscale: 90, hollowsteel: 92, cindersteel: 94, ashenheart: 96 };
@@ -246,6 +254,81 @@ const ITEMS: Item[] = [
   { id: "realm_scroll", name: "Realm scroll", examine: "A map fragment of the Realm.", value: 0, tradeable: false, icon: { shape: "scroll", color: "#efe3c4" } },
 ];
 
+// ---------- Wayfaring: courses, marks and the Wayfarer's outfit ----------
+/** The Realm's Wayfaring courses: a lap of every obstacle in order pays the lap XP and some Wayfarer's marks. */
+export const COURSES: Record<string, { name: string; level: number; lapXp: number; marks: number }> = {
+  friendhollow: { name: "Friendhollow course", level: 1, lapXp: 40, marks: 1 },
+  dunes: { name: "Oasis dune course", level: 30, lapXp: 120, marks: 2 },
+  frostpeak: { name: "Frostpeak ice course", level: 55, lapXp: 240, marks: 3 },
+};
+export const WAYFARER_MARK = "wayfarer_mark";
+/** What Coach Skip trades Wayfarer's marks for. */
+export const WAYFARER_REWARDS = [
+  { id: "waybread", name: "3 waybread", cost: 1, gives: 3, text: "Eat one for 40 run energy (and a little health)." },
+  { id: "wayfarer_boots", name: "Wayfarer's boots", cost: 20, gives: 1, text: "Run energy comes back half as fast again (Wayfaring 20)." },
+  { id: "wayfarer_gloves", name: "Wayfarer's gloves", cost: 25, gives: 1, text: "You never slip on an obstacle (Wayfaring 30)." },
+  { id: "wayfarer_hood", name: "Wayfarer's hood", cost: 30, gives: 1, text: "+10% Wayfaring XP (Wayfaring 40)." },
+  { id: "wayfarer_cape", name: "Wayfarer's cape", cost: 40, gives: 1, text: "Running drains 20% less energy; the full outfit 40%, and laps pay double marks (Wayfaring 50)." },
+] as const;
+export const WAYFARER_SET = ["wayfarer_boots", "wayfarer_gloves", "wayfarer_hood", "wayfarer_cape"] as const;
+
+// ---------- Slayer armour: sets only the Warden's creatures drop ----------
+export type SlayerSetDef = {
+  id: string; name: string; monster: string; slayer: number; wear: Partial<Record<Skill, number>>; color: string; accent: string; effect: string; each: string;
+  pieces: readonly { slot: EquipSlot; suffix: string; shape: IconShape; bonuses: Partial<Bonuses> }[];
+};
+export const SLAYER_SETS: readonly SlayerSetDef[] = [
+  { id: "bramble", name: "Bramble", monster: "thornback", slayer: 15, wear: { defence: 20 }, color: "#6f7a4a", accent: "#c9d08a",
+    effect: "Thorns: a creature that hits you in melee takes 1 damage back for every piece worn.", each: "1 thorn damage back",
+    pieces: [{ slot: "head", suffix: "coif", shape: "hood", bonuses: { ranged: 4, defence: 8 } }, { slot: "body", suffix: "vest", shape: "body", bonuses: { ranged: 10, defence: 20 } }, { slot: "legs", suffix: "chaps", shape: "legs", bonuses: { ranged: 7, defence: 14 } }] },
+  { id: "wightbone", name: "Wightbone", monster: "cairn_wight", slayer: 35, wear: { defence: 35 }, color: "#d9d2bf", accent: "#7a8a6a",
+    effect: "Bones buried or offered give 10% more Faith XP a piece (40% in the full set), and faith drains slower.", each: "+10% Faith XP from bones",
+    pieces: [{ slot: "head", suffix: "helm", shape: "helm", bonuses: { defence: 12, prayer: 3 } }, { slot: "body", suffix: "plate", shape: "body", bonuses: { defence: 30, prayer: 5 } }, { slot: "legs", suffix: "greaves", shape: "legs", bonuses: { defence: 22, prayer: 4 } }] },
+  { id: "stalker", name: "Stalker's", monster: "dune_stalker", slayer: 45, wear: { defence: 40 }, color: "#8c7a5a", accent: "#3b3a38",
+    effect: "Monsters are 12% less likely to notice you sneaking a piece; in the full set, sneaking costs a third less energy.", each: "12% harder to notice while sneaking",
+    pieces: [{ slot: "head", suffix: "hood", shape: "hood", bonuses: { ranged: 6, defence: 10 } }, { slot: "body", suffix: "jerkin", shape: "body", bonuses: { ranged: 14, defence: 26 } }, { slot: "legs", suffix: "leggings", shape: "legs", bonuses: { ranged: 10, defence: 18 } }] },
+  { id: "cindershell", name: "Cindershell", monster: "ember_salamander", slayer: 60, wear: { defence: 55 }, color: "#8a3f2e", accent: "#f0a050",
+    effect: "Dragonfire burns 15% less a piece, and the full set halves it.", each: "15% less dragonfire",
+    pieces: [{ slot: "head", suffix: "helm", shape: "helm", bonuses: { defence: 16, strength: 2, magic: -3 } }, { slot: "body", suffix: "plate", shape: "body", bonuses: { defence: 40, strength: 4, magic: -8 } }, { slot: "legs", suffix: "greaves", shape: "legs", bonuses: { defence: 30, strength: 3, magic: -5 } }] },
+  { id: "hollowthread", name: "Hollowthread", monster: "hollow_weaver", slayer: 75, wear: { magic: 60 }, color: "#3a3550", accent: "#b49ae0",
+    effect: "Each piece gives spells an 8% chance to keep their sigils; the full set, 30%.", each: "8% chance a spell keeps its sigils",
+    pieces: [{ slot: "head", suffix: "hood", shape: "hood", bonuses: { magic: 8, defence: 6 } }, { slot: "body", suffix: "robe", shape: "body", bonuses: { magic: 14, defence: 12 } }, { slot: "legs", suffix: "skirt", shape: "legs", bonuses: { magic: 10, defence: 9 } }] },
+];
+export const slayerSetOf = (id: string) => SLAYER_SETS.find(set => set.pieces.some(piece => `${set.id}_${piece.suffix}` === id));
+function slayerGear(): Item[] {
+  return SLAYER_SETS.flatMap(set => set.pieces.map((piece, index) => ({
+    id: `${set.id}_${piece.suffix}`, name: `${set.name} ${piece.suffix}`, value: [3000, 6000, 4500][index] * set.slayer / 15,
+    examine: `${set.name} armour, dropped by ${MONSTER_NAMES[set.monster] ?? set.monster}s. ${set.effect}`,
+    icon: { shape: piece.shape, color: set.color, accent: set.accent },
+    equip: { slot: piece.slot, bonuses: piece.bonuses, requires: { slayer: set.slayer, ...set.wear } },
+  })));
+}
+const MONSTER_NAMES: Record<string, string> = { thornback: "thornback", cairn_wight: "cairn wight", dune_stalker: "dune stalker", ember_salamander: "ember salamander", hollow_weaver: "Hollow weaver" };
+
+// ---------- Heartguard: red-and-white armour earned with Hitpoints ----------
+/** The Heartguard set, sold by Mender Hale at the Friendhollow chapel: a piece for every ten Hitpoints levels, 10 to 90. */
+export const HEARTGUARD = [
+  { id: "heartguard_boots", name: "Heartguard boots", level: 10, slot: "feet" as const, shape: "boots" as const, bonuses: { defence: 3 }, price: 800 },
+  { id: "heartguard_gloves", name: "Heartguard gloves", level: 20, slot: "hands" as const, shape: "gloves" as const, bonuses: { attack: 1, defence: 3 }, price: 1500 },
+  { id: "heartguard_helm", name: "Heartguard helm", level: 30, slot: "head" as const, shape: "helm" as const, bonuses: { defence: 9 }, price: 3000 },
+  { id: "heartguard_greaves", name: "Heartguard greaves", level: 40, slot: "legs" as const, shape: "legs" as const, bonuses: { defence: 15 }, price: 5000 },
+  { id: "heartguard_shield", name: "Heartguard shield", level: 50, slot: "shield" as const, shape: "shield" as const, bonuses: { defence: 20 }, price: 8000 },
+  { id: "heartguard_amulet", name: "Heartguard amulet", level: 60, slot: "neck" as const, shape: "amulet" as const, bonuses: { defence: 4, strength: 3, prayer: 2 }, price: 12000 },
+  { id: "heartguard_cape", name: "Heartguard cape", level: 70, slot: "cape" as const, shape: "cape" as const, bonuses: { defence: 6 }, price: 18000 },
+  { id: "heartguard_plate", name: "Heartguard plate", level: 80, slot: "body" as const, shape: "body" as const, bonuses: { defence: 38, magic: -6 }, price: 30000 },
+  { id: "heartguard_blade", name: "Heartguard blade", level: 90, slot: "weapon" as const, shape: "sword" as const, bonuses: { attack: 42, strength: 40 }, price: 60000 },
+] as const;
+export const HEARTGUARD_RED = "#b8333a", HEARTGUARD_WHITE = "#f2efe8";
+function heartguardGear(): Item[] {
+  return HEARTGUARD.map(piece => ({
+    id: piece.id, name: piece.name, value: Math.round(piece.price * 0.6), price: piece.price,
+    examine: piece.id === "heartguard_blade" ? "The Heartguard's red-and-white blade: every eight damage it deals heals you one (Hitpoints 90)."
+      : `Red-and-white Heartguard armour (Hitpoints ${piece.level}). Each piece adds a hitpoint and quickens your healing; the full set makes food heal more.`,
+    icon: { shape: piece.shape, color: HEARTGUARD_RED, accent: HEARTGUARD_WHITE, ...(piece.shape === "amulet" ? { kind: "strung" } : {}) },
+    equip: { slot: piece.slot, bonuses: piece.bonuses, requires: { hitpoints: piece.level }, ...(piece.slot === "weapon" ? { speed: 4 } : {}) },
+  }));
+}
+
 // ---------- Equipment ----------
 function metalGear(): Item[] {
   const out: Item[] = [];
@@ -260,13 +343,18 @@ function metalGear(): Item[] {
       if (piece.slot === "body" || piece.slot === "legs" || piece.slot === "head") bonuses.magic = -Math.round(piece.def * 0.8);
       const isTool = piece.piece === "axe" || piece.piece === "pickaxe";
       const requireSkill: Skill = piece.slot === "weapon" ? "attack" : "defence";
+      // Heavy two-handers need Strength as well as Attack: pewter 3, 5 and 7, and the metal's level more for each tier up.
+      const heavy = heavyStrength(metal.id, piece.piece);
+      const requires: Partial<Record<Skill, number>> = {};
+      if (metal.level > 1) requires[requireSkill] = metal.level;
+      if (heavy) requires.strength = heavy;
       out.push({
-        id, name, examine: isTool ? `A ${piece.name} made of ${metal.id}.` : `A ${metal.id} ${piece.name}.`,
+        id, name, examine: isTool ? `A ${piece.name} made of ${metal.id}.` : heavy ? `A ${metal.id} ${piece.name}. Two hands and Strength ${heavy} to swing it, and it hits harder the stronger you are.` : `A ${metal.id} ${piece.name}.`,
         value: Math.round(metal.value * piece.bars * 1.6 + 10),
         icon: { shape: piece.shape as IconShape, color: metal.color, accent: FORGE_GLOW[metal.id] },
         equip: {
           slot: piece.slot as EquipSlot, bonuses,
-          requires: metal.level > 1 ? { [requireSkill]: metal.level } : undefined,
+          requires: Object.keys(requires).length ? requires : undefined,
           speed: piece.speed || undefined, twoHanded: "twoHanded" in piece ? piece.twoHanded : undefined,
         },
         tool: isTool ? { kind: piece.piece as "axe" | "pickaxe", tier, level: metal.level } : undefined,
@@ -425,6 +513,18 @@ const RANGED_GEAR: Item[] = [
   // The sigil stone box: carried in your pack, it holds 120 sigil stones and the altar takes them all.
   { id: "sigil_box", name: "Sigil stone box", examine: "A carved box that holds 120 sigil stones. Carry it to an altar and every stone inside is pressed.", value: 1500,
     icon: { shape: "stonebox", color: "#9c7a58", accent: "#b49ae0" } },
+  // Wayfaring: Coach Skip's marks, waybread and the Wayfarer's outfit (each piece with its own knack).
+  { id: "wayfarer_mark", name: "Wayfarer's mark", examine: "A brass token stamped with a boot: one for every lap of a course. Coach Skip trades his outfit for them.", value: 0, stackable: true, tradeable: false, icon: { shape: "coins", color: "#c9a24a", kind: "mark" } },
+  { id: "waybread", name: "Waybread", examine: "A dense travellers' loaf. Eat it and the spring comes back into your step (40 run energy).", value: 30, heal: 2, energy: 40, icon: { shape: "bread", color: "#c9a06a", accent: "#7a4a22" } },
+  { id: "wayfarer_boots", name: "Wayfarer's boots", examine: "Soft, springy boots. Run energy comes back half as fast again.", value: 2000, tradeable: false, icon: { shape: "boots", color: "#7a8a9a", accent: "#e8e5de" }, equip: { slot: "feet", bonuses: { defence: 2 }, requires: { agility: 20 } } },
+  { id: "wayfarer_gloves", name: "Wayfarer's gloves", examine: "Grippy leather gloves. You never slip on an obstacle in these.", value: 2500, tradeable: false, icon: { shape: "gloves", color: "#7a8a9a", accent: "#e8e5de" }, equip: { slot: "hands", bonuses: { defence: 2 }, requires: { agility: 30 } } },
+  { id: "wayfarer_hood", name: "Wayfarer's hood", examine: "A light hood that keeps the wind out of your eyes. +10% Wayfaring XP.", value: 3000, tradeable: false, icon: { shape: "hood", color: "#7a8a9a", accent: "#e8e5de" }, equip: { slot: "head", bonuses: { defence: 3 }, requires: { agility: 40 } } },
+  { id: "wayfarer_cape", name: "Wayfarer's cape", examine: "A short travelling cape. Running drains 20% less energy; with the whole outfit, 40%, and laps pay double marks.", value: 4000, tradeable: false, icon: { shape: "cape", color: "#7a8a9a", accent: "#e8e5de" }, equip: { slot: "cape", bonuses: { defence: 3 }, requires: { agility: 50 } } },
+  // The Warden's bracers (a Slayer reward): more Slayer XP on task.
+  { id: "warden_bracers", name: "Warden's bracers", examine: "Dark leather bracers stamped with the Warden's mark. +10% Slayer XP on task.", value: 15000, tradeable: false, icon: { shape: "bracer", color: "#3b3a38", accent: "#cf6e6e" }, equip: { slot: "hands", bonuses: { attack: 2, ranged: 2, defence: 3 }, requires: { slayer: 30 } } },
+  // The ossuary bag (the Dawn Vigil's reward): carried in your pack, it holds 60 bones of any kind, catches the bones you pick up, and an altar takes them all at once.
+  { id: "bone_bag", name: "Ossuary bag", examine: "A linen bag blessed by the Order of the Dawn. It holds 60 bones of any kind, catches the bones you pick up, and an altar takes every one at once.", value: 1200, tradeable: false,
+    icon: { shape: "satchel", color: "#d8cdb6", accent: "#f2efe8", kind: "bones" } },
   // The inkcoal satchel: worn on your back (or carried), it catches mined inkcoal and feeds the furnace.
   { id: "inkcoal_satchel", name: "Inkcoal satchel", examine: "A stout leather pack for your back. It holds 120 inkcoal, fills itself as you mine, and the furnace reaches into it.", value: 2500,
     icon: { shape: "satchel", color: "#8a6446", accent: "#3b3a38" }, equip: { slot: "cape", bonuses: { defence: 1 } } },
@@ -559,7 +659,7 @@ export const ARMOURY_LATER = ["radiant_greatsword", "sunforged_warhammer", "dawn
 export const DAWNPLATE_QUEST: Record<string, string> = { dawnplate_greaves: "pilgrims_road", dawnplate_boots: "pilgrims_road", dawnplate_helm: "restless_crypt",
   dawnplate_shield: "restless_crypt", dawnplate_gauntlets: "restless_crypt", dawnplate_cuirass: "dawn_against_hollow" };
 
-export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR]);
+export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...slayerGear(), ...heartguardGear()]);
 const ITEM_MAP = new Map(ITEM_LIST.map(item => [item.id, item]));
 export function item(id: string): Item {
   const found = ITEM_MAP.get(id);
@@ -809,6 +909,22 @@ Object.assign(MONSTERS, {
   gloom_hound: { id: "gloom_hound", name: "Gloom hound", level: 58, hp: 80, attack: 52, strength: 54, defence: 46, attackBonus: 32, defenceBonus: 34, maxHit: 9, speed: 4, respawn: 45, wander: 5, slayer: 50,
     examine: "A hound made of the dark between two torches.", aggressive: true,
     always: [one("ink_bones", 1)], drops: [one("gloom_shard", 0.3), one("gloomsteel_sword", 0.01), one("gloomsteel_helm", 0.01), coins(100, 500, 0.7), one("gloomfang_bow", 0.012), one("rarite_arrow", 0.08, 5, 15), one("frosthide_vest", 0.02), one("hollow_sigil", 0.1, 3, 8), one("rarite_ore", 0.03)], art: 108, ink: "#2e2440" },
+  // The Warden's creatures: only a Slayer of the right level can wound them, and each drops its own armour.
+  thornback: { id: "thornback", name: "Thornback", level: 28, hp: 38, attack: 22, strength: 24, defence: 20, attackBonus: 12, defenceBonus: 14, maxHit: 5, speed: 5, respawn: 40, wander: 5, slayer: 15,
+    examine: "A boar grown over with brambles. Every hit on it costs you a scratch.", aggressive: true,
+    always: [one("bones", 1)], drops: [one("bramble_coif", 0.015), one("bramble_vest", 0.012), one("bramble_chaps", 0.012), coins(20, 120, 0.5), one("cowhide", 0.3), one("oak_logs", 0.2, 1, 3), one("rough_sagestone", 0.03), one("ashsteel_arrow", 0.12, 5, 15)], art: 122 },
+  cairn_wight: { id: "cairn_wight", undead: true, name: "Cairn wight", level: 48, hp: 60, attack: 40, strength: 38, defence: 42, magicDef: 20, attackBonus: 24, defenceBonus: 30, maxHit: 7, speed: 5, respawn: 45, wander: 4, slayer: 35,
+    examine: "The old highland dead, up and walking in what they were buried in.", aggressive: true,
+    always: [one("large_bones", 1)], drops: [one("wightbone_helm", 0.014), one("wightbone_plate", 0.01), one("wightbone_greaves", 0.012), coins(50, 260, 0.6), one("moonsilver_ore", 0.2), one("hollow_sigil", 0.1, 2, 6), one("rough_rosestone", 0.03), one("glimmer_helm", 0.02)], art: 123, ink: "#4a4a44" },
+  dune_stalker: { id: "dune_stalker", name: "Dune stalker", level: 56, hp: 70, attack: 50, strength: 46, defence: 44, attackBonus: 30, defenceBonus: 32, maxHit: 8, speed: 4, respawn: 45, wander: 6, slayer: 45,
+    examine: "A long, low cat the colour of the sand. You only see it when it wants you to.", aggressive: true,
+    always: [one("bones", 1)], drops: [one("stalker_hood", 0.014), one("stalker_jerkin", 0.01), one("stalker_leggings", 0.012), coins(60, 320, 0.6), one("cowhide", 0.3, 1, 2), one("glimmer_arrow", 0.12, 5, 15), one("rough_rosestone", 0.04), one("glimmer_sabre", 0.015)], art: 124, ink: "#8a7a58" },
+  ember_salamander: { id: "ember_salamander", name: "Ember salamander", level: 70, hp: 92, attack: 62, strength: 60, defence: 54, magicDef: 30, attackBonus: 36, defenceBonus: 40, maxHit: 10, speed: 5, respawn: 50, wander: 4, slayer: 60, breath: 20,
+    examine: "A salamander the size of a cart, with a furnace in its belly.", aggressive: true,
+    always: [one("large_bones", 1)], drops: [one("cindershell_helm", 0.014), one("cindershell_plate", 0.01), one("cindershell_greaves", 0.012), coins(80, 420, 0.65), one("cinder_core", 0.08), one("inkcoal", 0.3, 2, 6), one("rarite_ore", 0.05), one("ember_sigil", 0.15, 4, 10)], art: 125, ink: "#a0462a" },
+  hollow_weaver: { id: "hollow_weaver", undead: true, name: "Hollow weaver", level: 88, hp: 120, attack: 74, strength: 70, defence: 66, magicDef: 60, attackBonus: 44, defenceBonus: 52, maxHit: 13, speed: 5, respawn: 55, wander: 3, slayer: 75, attackStyle: "magic",
+    examine: "It spins the dark into thread. The thread is looking at you.", aggressive: true,
+    always: [one("ink_bones", 1)], drops: [one("hollowthread_hood", 0.014), one("hollowthread_robe", 0.01), one("hollowthread_skirt", 0.012), coins(150, 700, 0.7), one("hollow_essence", 0.15), one("gloom_shard", 0.1), one("hollow_sigil", 0.15, 5, 12), one("shade_sigil", 0.12, 4, 10), one("rosestone_pendant", 0.005)], art: 126, ink: "#2a2438" },
   ash_drake: { id: "ash_drake", name: "Ash drake", level: 68, hp: 90, attack: 58, strength: 60, defence: 56, magicDef: 40, attackBonus: 34, defenceBonus: 40, maxHit: 9, speed: 5, respawn: 45, wander: 5, breath: 32, size: 2,
     examine: "A young dragon, all ash and appetite. Mind the breath.", aggressive: true,
     always: [one("drake_bones", 1), one("drakehide", 1)], drops: [one("wyrm_scale", 0.3), one("wyrmscale_helm", 0.01), coins(200, 900, 0.7), one("rarite_ore", 0.06), one("hollow_sigil", 0.1, 5, 15), one("path_sigil", 0.08, 3, 8), one("rough_rosestone", 0.05), one("rarite_arrow", 0.08, 8, 20)], art: 114, ink: "#3b3a38" },
@@ -853,6 +969,11 @@ export const SLAYER_TASKS = [
   { id: "shades", name: "shades", monsters: ["shade"], min: 40, amount: [20, 40] },
   { id: "yetis", name: "frost yetis", monsters: ["frost_yeti"], min: 50, amount: [15, 30] },
   { id: "hounds", name: "gloom hounds", monsters: ["gloom_hound"], min: 55, amount: [20, 40], slayer: 50 },
+  { id: "thornbacks", name: "thornbacks", monsters: ["thornback"], min: 24, amount: [15, 30], slayer: 15 },
+  { id: "wights", name: "cairn wights", monsters: ["cairn_wight"], min: 42, amount: [15, 35], slayer: 35 },
+  { id: "stalkers", name: "dune stalkers", monsters: ["dune_stalker"], min: 50, amount: [15, 35], slayer: 45 },
+  { id: "salamanders", name: "ember salamanders", monsters: ["ember_salamander"], min: 64, amount: [15, 30], slayer: 60 },
+  { id: "weavers", name: "Hollow weavers", monsters: ["hollow_weaver"], min: 80, amount: [10, 25], slayer: 75 },
   { id: "sentinels", name: "hollow sentinels", monsters: ["hollow_sentinel"], min: 60, amount: [20, 40] },
   { id: "drakes", name: "drakes", monsters: ["ash_drake", "cinder_drake"], min: 70, amount: [10, 25] },
 ] as const;
@@ -863,6 +984,8 @@ export const SLAYER_REWARDS = [
   { id: "slayer_helm", name: "Warden's helm", cost: 150, text: "+15% accuracy and damage on task (Slayer 20, Defence 10)." },
   { id: "gloomfang_bow", name: "Gloomfang bow", cost: 600, text: "The Warden's own bow (Ranged 60)." },
   { id: "insight_lamp", name: "Lamp of insight", cost: 100, text: "Experience in a skill of your choice." },
+  { id: "warden_bracers", name: "Warden's bracers", cost: 250, text: "+10% Slayer XP on task (Slayer 30)." },
+  { id: "long", name: "Longer tasks", cost: 100, text: "Tasks half as long again, and they pay half as many points again. Buy it again to turn it off." },
 ] as const;
 
 // ---------- NPCs, shops ----------
@@ -889,6 +1012,7 @@ export function itemCategory(id: string): Category {
 }
 export type ShopDef = { id: string; name: string; stock: readonly string[]; general?: boolean; buys?: readonly Category[]; rate?: number };
 export const SHOPS: Record<string, ShopDef> = {
+  mender: { id: "mender", name: "Hale's Infirmary", buys: ["food"], rate: 0.5, stock: [...HEARTGUARD.map(piece => piece.id), "bread", "cake", "waybread"] },
   general: { id: "general", name: "Friendhollow General Store", general: true, stock: ["shears", "pot", "bucket", "tinderbox", "hammer", "knife", "chisel", "needle", "thread", "small_net", "pewter_axe", "pewter_pickaxe", "bread", "team_cape"] },
   general_ember: { id: "general_ember", name: "Emberforge General Store", general: true, stock: ["pot", "bucket", "tinderbox", "hammer", "knife", "chisel", "pewter_pickaxe", "pewter_axe", "bread", "cooked_meat"] },
   general_frost: { id: "general_frost", name: "Frostpeak Trading Post", general: true, stock: ["pot", "bucket", "tinderbox", "hammer", "knife", "needle", "thread", "pewter_axe", "bread", "cooked_meat", "fishing_bait"] },

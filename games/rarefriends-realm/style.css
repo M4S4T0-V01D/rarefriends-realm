@@ -164,10 +164,19 @@
 .realm-skill em { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--sage); }
 .realm-skill.total { grid-column: span 3; justify-content: center; height: 36px; color: #e8e5de; text-align: center; }
 .realm-skill-info { font-size: 10px; color: #c9c5bd; margin: 6px 0 0; min-height: 26px; }
-.realm-quests ul { list-style: none; margin: 6px 0; padding: 0; display: grid; gap: 2px; }
-.realm-quests button { width: 100%; text-align: left; border: 0; background: transparent; padding: 3px 4px; font-weight: 700; }
+.realm-quests ul { list-style: none; margin: 2px 0 6px; padding: 0; display: grid; gap: 2px; }
+.realm-quests h4 { margin: 8px 0 2px; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.85; }
+.realm-quests button { width: 100%; text-align: left; border: 0; background: transparent; padding: 3px 4px; font-weight: 700; display: flex; align-items: center; gap: 6px; border-radius: 3px; }
 .realm-quests button:hover { background: #ffffff12; }
-.quest-new { color: #e07a7a; } .quest-started { color: var(--gold); } .quest-done { color: #9fe0a8; }
+.realm-quests button small { margin-left: auto; font-weight: 400; font-size: 10px; color: var(--muted); white-space: nowrap; }
+.realm-quest-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.realm-quest-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 5px currentColor; }
+.quest-new .realm-quest-dot { box-shadow: none; opacity: 0.6; }
+.realm-quest-bar { height: 5px; margin: 4px 0 2px; border: 1px solid #000; border-radius: 3px; background: #00000055; overflow: hidden; }
+.realm-quest-bar span { display: block; height: 100%; background: var(--gold); }
+.realm-quest-state { font-size: 10px; font-weight: 700; margin-left: 6px; text-transform: uppercase; letter-spacing: 0.04em; vertical-align: middle; }
+.quest-new { color: #e8e5de; } .quest-started { color: #f0a33c; } .quest-done { color: #9fe0a8; }
+.realm-quest-rewards { margin: 0; padding: 0 0 0 16px; text-align: left; font-size: 12px; color: #e8e5de; }
 .realm-journal p { margin: 5px 0; color: #e8e5de; }
 .realm-back { border: 0; background: transparent; color: var(--gold); padding: 0; }
 .realm-equip-grid { display: grid; grid-template-columns: repeat(3, 56px); justify-content: center; gap: 5px; }

@@ -3,7 +3,7 @@
  * against your adventure as it stands (so older saves earn the ones they already deserve), and recorded with the UTC day
  * you earned it. Shown on the Achievements tab of the daily popup, and counted on the adventurer card.
  */
-import { MOUNTS, PETS, SKILLS, WARDROBE, isItem, item, levelForXp } from "./data.ts";
+import { HEARTGUARD, MOUNTS, PETS, SKILLS, SLAYER_SETS, WARDROBE, WAYFARER_SET, isItem, item, levelForXp } from "./data.ts";
 import { MAX_QUEST_POINTS, questPoints } from "./content.ts";
 import { count, message, sound, totalLevel, type Game } from "./state.ts";
 
@@ -27,6 +27,10 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   { id: "colossus", group: "Combat", icon: "☠", name: "Colossus toppler", text: "Help bring down the Ashen Colossus.", check: g => kills(g, "ashen_colossus") >= 1 },
   { id: "ghost", group: "Combat", icon: "👣", name: "Ghost in the grass", text: "Slip past 50 aggressive monsters unseen while sneaking.", check: g => stat(g, "sneaks") >= 50 },
   { id: "veilweave", group: "Collecting", icon: "◐", name: "Now you see me", text: "Find the Veilweave hood in the shadows.", check: g => owns(g, id => id === "veilweave_hood") },
+  { id: "wayfarer", group: "Skills", icon: "➶", name: "Wayfarer", text: "Complete 50 laps of the Realm's courses.", check: g => stat(g, "laps") >= 50 },
+  { id: "outfitted", group: "Collecting", icon: "➶", name: "Dressed for the road", text: "Own every piece of the Wayfarer's outfit.", check: g => WAYFARER_SET.every(id => owns(g, owned => owned === id)) },
+  { id: "heartguard", group: "Collecting", icon: "♥", name: "Heart of the Realm", text: "Own all nine pieces of the Heartguard.", check: g => HEARTGUARD.every(piece => owns(g, id => id === piece.id)) },
+  { id: "slayer_set", group: "Collecting", icon: "☠", name: "The Warden's wardrobe", text: "Own a full set of armour dropped by a Slayer creature.", check: g => SLAYER_SETS.some(set => set.pieces.every(piece => owns(g, id => id === `${set.id}_${piece.suffix}`))) },
   { id: "quester", group: "Quests", icon: "✎", name: "Quest starter", text: "Complete a quest.", check: g => questPoints(g) >= 1 },
   { id: "hero", group: "Quests", icon: "✎", name: "Hero of the Realm", text: "Complete every quest.", check: g => questPoints(g) >= MAX_QUEST_POINTS },
   { id: "saddle_up", group: "Collecting", icon: "♞", name: "Saddle up", text: "Buy a mount at the Friendhollow stables.", check: g => g.player.mounts.length >= 1 },

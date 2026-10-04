@@ -1,10 +1,11 @@
 /**
  * NPCs, their dialogue and the Realm's quests. Dialogue is built on demand from the player's quest state.
  */
-import { FAMILY_NAMES, FAMILY_PERKS, SLAYER_REWARDS, item } from "./data.ts";
+import { COURSES, FAMILY_NAMES, FAMILY_PERKS, SLAYER_REWARDS, WAYFARER_MARK, WAYFARER_REWARDS, item } from "./data.ts";
 import { assignTask, buySlayerReward, currentTask, eligibleTasks, slayerPoints, slayerStreak, taskText } from "./slayer.ts";
+import { buyWayfarerReward } from "./wayfaring.ts";
 import {
-  addXp, count, give, giveOrDrop, has, level, message, sound, take, emit, type Dialogue, type DialogueLine, type Game,
+  addXp, count, give, giveOrDrop, has, level, message, sound, take, emit, BONE_BAG, ownsBoneBag, type Dialogue, type DialogueLine, type Game,
 } from "./state.ts";
 
 // ---------- NPC definitions ----------
@@ -20,6 +21,7 @@ const art = (family: number, seed: number) => ({ family, seed });
 export const NPCS: Record<string, NpcDef> = {
   guide: { id: "guide", name: "Realm Guide", examine: "Knows the Realm by heart.", options: ["Talk-to"], art: art(5, 11) },
   glimmer: { id: "glimmer", name: "Old Glimmer", examine: "Friend #7730. A Hoverer who remembers when the Realm was new.", options: ["Talk-to"], art: { canonical: 7730 } },
+  mender: { id: "mender", name: "Mender Hale", examine: "The chapel's mender. Her hands are always clean and her apron never is.", options: ["Talk-to", "Trade"], shop: "mender", art: art(3, 318) },
   priest: { id: "priest", name: "Brother Ossic", examine: "Friend #3412. A Skeleton who tends the chapel of the Old Friend.", options: ["Talk-to"], art: { canonical: 3412 } },
   banker: { id: "banker", name: "Banker", examine: "Good with money.", options: ["Talk-to", "Bank"], art: art(1, 21) },
   shop_general: { id: "shop_general", name: "Shopkeeper", examine: "Sells a bit of everything.", options: ["Talk-to", "Trade"], shop: "general", art: art(2, 31) },
@@ -83,12 +85,12 @@ export const NPCS: Record<string, NpcDef> = {
 export const npcDef = (id: string) => NPCS[id];
 
 // ---------- Quests ----------
-export type QuestDef = { id: string; name: string; points: number; difficulty: string; start: string; requirements: string[]; journal: (game: Game) => string[] };
+export type QuestDef = { id: string; name: string; points: number; difficulty: string; start: string; requirements: string[]; rewards: string[]; journal: (game: Game) => string[] };
 const stage = (game: Game, quest: string) => game.player.quests[quest] ?? 0;
 const data = (game: Game, key: string) => game.player.questData[key] ?? 0;
 export const QUESTS: readonly QuestDef[] = [
   {
-    id: "friends_feast", name: "A Friend's Feast", points: 1, difficulty: "Novice", start: "Talk to Cook Mabel in the castle kitchen.", requirements: [],
+    id: "friends_feast", name: "A Friend's Feast", points: 1, difficulty: "Novice", start: "Talk to Cook Mabel in the castle kitchen.", requirements: [], rewards: ["1 Quest Point", "1,500 Cooking XP", "300 coins", "2 cakes"],
     journal: game => {
       const s = stage(game, "friends_feast");
       if (s === 0) return ["I can start this quest by talking to Cook Mabel in the castle kitchen, north of the fountain."];
@@ -100,7 +102,7 @@ export const QUESTS: readonly QuestDef[] = [
     },
   },
   {
-    id: "grumblin_trouble", name: "Grumblin Trouble", points: 1, difficulty: "Novice", start: "Talk to Captain Rook in the castle.", requirements: [],
+    id: "grumblin_trouble", name: "Grumblin Trouble", points: 1, difficulty: "Novice", start: "Talk to Captain Rook in the castle.", requirements: [], rewards: ["1 Quest Point", "1,200 Attack XP", "1,200 Strength XP", "Blackiron sabre", "200 coins"],
     journal: game => {
       const s = stage(game, "grumblin_trouble");
       if (s === 0) return ["Captain Rook in the castle might need a hand."];
@@ -109,7 +111,7 @@ export const QUESTS: readonly QuestDef[] = [
     },
   },
   {
-    id: "cold_forge", name: "The Cold Forge", points: 1, difficulty: "Intermediate", start: "Talk to Brann the smith in Emberforge.", requirements: ["Smithing 5 recommended"],
+    id: "cold_forge", name: "The Cold Forge", points: 1, difficulty: "Intermediate", start: "Talk to Brann the smith in Emberforge.", requirements: ["Smithing 5 recommended"], rewards: ["1 Quest Point", "2,500 Smithing XP", "1,200 Mining XP", "Ashsteel pickaxe", "10 inkcoal"],
     journal: game => {
       const s = stage(game, "cold_forge");
       if (s === 0) return ["Brann the smith in Emberforge, north-east past the Ashen Hills, looks troubled."];
@@ -120,7 +122,7 @@ export const QUESTS: readonly QuestDef[] = [
     },
   },
   {
-    id: "hollow_whispers", name: "Hollow Whispers", points: 1, difficulty: "Intermediate", start: "Talk to Brother Ossic in the Friendhollow chapel.", requirements: ["Combat 20 recommended"],
+    id: "hollow_whispers", name: "Hollow Whispers", points: 1, difficulty: "Intermediate", start: "Talk to Brother Ossic in the Friendhollow chapel.", requirements: ["Combat 20 recommended"], rewards: ["1 Quest Point", "2,500 Faith XP", "Old Friend's charm", "5 large bones"],
     journal: game => {
       const s = stage(game, "hollow_whispers");
       if (s === 0) return ["Brother Ossic in the chapel west of the fountain hears whispers at night."];
@@ -131,7 +133,7 @@ export const QUESTS: readonly QuestDef[] = [
     },
   },
   {
-    id: "lost_glimmer", name: "The Lost Glimmer", points: 2, difficulty: "Intermediate", start: "Talk to Old Glimmer by the fountain.", requirements: [],
+    id: "lost_glimmer", name: "The Lost Glimmer", points: 2, difficulty: "Intermediate", start: "Talk to Old Glimmer by the fountain.", requirements: [], rewards: ["2 Quest Points", "2,500 Magic XP", "Breeze staff", "100 thought sigils", "5 path sigils"],
     journal: game => {
       const s = stage(game, "lost_glimmer");
       if (s === 0) return ["Old Glimmer, a Hoverer by the fountain, seems to have lost something bright."];
@@ -144,7 +146,7 @@ export const QUESTS: readonly QuestDef[] = [
     },
   },
   {
-    id: "hazels_quiver", name: "Hazel's Quiver", points: 1, difficulty: "Novice", start: "Talk to Hazel the war-bowyer in Fernwick, in the heart of Whisperwood.", requirements: ["Woodcutting 15 (oak logs)", "Able to defeat the Grumblin chief"],
+    id: "hazels_quiver", name: "Hazel's Quiver", points: 1, difficulty: "Novice", start: "Talk to Hazel the war-bowyer in Fernwick, in the heart of Whisperwood.", requirements: ["Woodcutting 15 (oak logs)", "Able to defeat the Grumblin chief"], rewards: ["1 Quest Point", "Hazel's quiver (wear it on your back)", "1,500 Ranged XP", "1,000 Fletching XP", "500 Crafting XP"],
     journal: game => {
       const s = stage(game, "hazels_quiver"), p = game.player;
       if (s === 0) return ["Hazel, the war-bowyer in the woodcutters' village of Fernwick, looks like she's lost something."];
@@ -157,7 +159,7 @@ export const QUESTS: readonly QuestDef[] = [
     },
   },
   {
-    id: "dawn_vigil", name: "The Dawn Vigil", points: 1, difficulty: "Novice", start: "Talk to Grandmaster Aldric at Dawnhold, east of Highcairn.", requirements: ["Faith 10"],
+    id: "dawn_vigil", name: "The Dawn Vigil", points: 1, difficulty: "Novice", start: "Talk to Grandmaster Aldric at Dawnhold, east of Highcairn.", requirements: ["Faith 10"], rewards: ["1 Quest Point", "Dawnsteel sword", "Ossuary bag (holds 60 bones)", "1,500 Faith XP", "The Order Armoury opens"],
     journal: game => {
       const s = stage(game, "dawn_vigil");
       if (s === 0) return ["Grandmaster Aldric of the Order of the Dawn keeps a chapterhouse, Dawnhold, east of Highcairn. He might take on a new squire."];
@@ -167,7 +169,7 @@ export const QUESTS: readonly QuestDef[] = [
     },
   },
   {
-    id: "greyhorn_light", name: "Light in the Greyhorn", points: 2, difficulty: "Intermediate", start: "Talk to Grandmaster Aldric after The Dawn Vigil.", requirements: ["The Dawn Vigil", "Faith 30", "Able to defeat stone golems (level 45)"],
+    id: "greyhorn_light", name: "Light in the Greyhorn", points: 2, difficulty: "Intermediate", start: "Talk to Grandmaster Aldric after The Dawn Vigil.", requirements: ["The Dawn Vigil", "Faith 30", "Able to defeat stone golems (level 45)"], rewards: ["2 Quest Points", "Cape of the Dawn", "5,000 Faith XP", "2,000 Defence XP", "The Order's finest weapons"],
     journal: game => {
       const s = stage(game, "greyhorn_light"), p = game.player;
       if (s === 0) return ["Grandmaster Aldric will have work for a squire who has kept the vigil and grown in faith (Faith 30)."];
@@ -178,7 +180,7 @@ export const QUESTS: readonly QuestDef[] = [
     },
   },
   {
-    id: "pilgrims_road", name: "The Pilgrim's Road", points: 1, difficulty: "Intermediate", start: "Talk to Sister Maren in the Dawnhold chapel after The Dawn Vigil.", requirements: ["The Dawn Vigil", "Faith 35"],
+    id: "pilgrims_road", name: "The Pilgrim's Road", points: 1, difficulty: "Intermediate", start: "Talk to Sister Maren in the Dawnhold chapel after The Dawn Vigil.", requirements: ["The Dawn Vigil", "Faith 35"], rewards: ["1 Quest Point", "Dawnplate greaves and boots", "4,000 Faith XP"],
     journal: game => {
       const s = stage(game, "pilgrims_road");
       if (s === 0) return ["Sister Maren, the Order's chaplain, sends squires on a pilgrimage once their faith has grown (Faith 35)."];
@@ -188,7 +190,7 @@ export const QUESTS: readonly QuestDef[] = [
     },
   },
   {
-    id: "restless_crypt", name: "The Restless Crypt", points: 2, difficulty: "Intermediate", start: "Talk to Sister Maren after Light in the Greyhorn and The Pilgrim's Road.", requirements: ["Light in the Greyhorn", "The Pilgrim's Road", "Faith 45", "A faith weapon"],
+    id: "restless_crypt", name: "The Restless Crypt", points: 2, difficulty: "Intermediate", start: "Talk to Sister Maren after Light in the Greyhorn and The Pilgrim's Road.", requirements: ["Light in the Greyhorn", "The Pilgrim's Road", "Faith 45", "A faith weapon"], rewards: ["2 Quest Points", "Dawnplate helm, shield and gauntlets", "7,000 Faith XP"],
     journal: game => {
       const s = stage(game, "restless_crypt");
       if (s === 0) return ["Sister Maren fears the dead are stirring again in the Murkmire crypt."];
@@ -198,7 +200,7 @@ export const QUESTS: readonly QuestDef[] = [
     },
   },
   {
-    id: "dawn_against_hollow", name: "Dawn Against the Hollow", points: 3, difficulty: "Experienced", start: "Talk to Grandmaster Aldric after The Restless Crypt and The Hollow King.", requirements: ["The Restless Crypt", "The Hollow King", "Faith 60", "A faith weapon", "Combat 80+ strongly recommended"],
+    id: "dawn_against_hollow", name: "Dawn Against the Hollow", points: 3, difficulty: "Experienced", start: "Talk to Grandmaster Aldric after The Restless Crypt and The Hollow King.", requirements: ["The Restless Crypt", "The Hollow King", "Faith 60", "A faith weapon", "Combat 80+ strongly recommended"], rewards: ["3 Quest Points", "Dawnplate cuirass", "15,000 Faith XP", "5,000 Defence XP", "The title Knight-Paladin"],
     journal: game => {
       const s = stage(game, "dawn_against_hollow"), p = game.player;
       if (s === 0) return ["Grandmaster Aldric has one last charge for a knight who has laid the dead to rest and seen the Hollow King fall."];
@@ -209,7 +211,7 @@ export const QUESTS: readonly QuestDef[] = [
     },
   },
   {
-    id: "hollow_king", name: "The Hollow King", points: 3, difficulty: "Grandmaster", start: "Talk to Old Glimmer after The Lost Glimmer and Hollow Whispers.", requirements: ["The Lost Glimmer", "Hollow Whispers", "Combat 60+ strongly recommended"],
+    id: "hollow_king", name: "The Hollow King", points: 3, difficulty: "Grandmaster", start: "Talk to Old Glimmer after The Lost Glimmer and Hollow Whispers.", requirements: ["The Lost Glimmer", "Hollow Whispers", "Combat 60+ strongly recommended"], rewards: ["3 Quest Points", "Crown of the Realm", "Cape of the Hollow", "10,000 coins", "5,000 XP in five combat skills"],
     journal: game => {
       const s = stage(game, "hollow_king");
       if (s === 0) return ["Old Glimmer will have more to say once the Glimmer is whole and the crypt is quiet."];
@@ -231,10 +233,10 @@ const faithArmed = (game: Game) => !!(game.player.equipment.weapon && item(game.
 export const questDone = (game: Game, quest: string) => stage(game, quest) >= finalStage(quest);
 export const MAX_QUEST_POINTS = QUESTS.reduce((sum, quest) => sum + quest.points, 0);
 
-function completeQuest(game: Game, quest: string, rewards: string[]) {
+function completeQuest(game: Game, quest: string) {
   game.player.quests[quest] = finalStage(quest);
   const definition = QUESTS.find(entry => entry.id === quest)!;
-  message(game, `Congratulations! Quest complete: ${definition.name}. Rewards: ${rewards.join(", ")}.`, "quest");
+  message(game, `Congratulations! Quest complete: ${definition.name}. Rewards: ${definition.rewards.join(", ")}.`, "quest");
   emit(game, { type: "quest", quest, tick: game.tick }); sound(game, "quest");
 }
 
@@ -436,7 +438,7 @@ export function talk(game: Game, npcId: string): Dialogue {
         return chat(name, [...playerSays("I have everything!"), ...npcSays(name, "Wonderful! The Feast is saved. Take this, and my secrets of the range.")], undefined, () => {
           take(player, "egg"); take(player, "pot_of_flour"); take(player, "bucket_of_milk"); give(player, "pot"); give(player, "bucket");
           addXp(game, "cooking", 1500, { raw: true }); giveOrDrop(game, "coins", 300); giveOrDrop(game, "cake", 2);
-          completeQuest(game, "friends_feast", ["1 Quest Point", "1,500 Cooking XP", "300 coins", "2 cakes"]);
+          completeQuest(game, "friends_feast");
         });
       }
       return chat(name, npcSays(name, "Everyone's still talking about the Feast! Use my range whenever you like."));
@@ -452,7 +454,7 @@ export function talk(game: Game, npcId: string): Dialogue {
         if (data(game, "grumblins") < 6) return chat(name, npcSays(name, `Only ${data(game, "grumblins")} so far. I still hear grumbling.`));
         return chat(name, npcSays(name, "Silence at last! Take this sabre. You've earned it."), undefined, () => {
           giveOrDrop(game, "blackiron_sabre"); addXp(game, "attack", 1200, { raw: true }); addXp(game, "strength", 1200, { raw: true }); giveOrDrop(game, "coins", 200);
-          completeQuest(game, "grumblin_trouble", ["1 Quest Point", "1,200 Attack XP", "1,200 Strength XP", "Blackiron sabre", "200 coins"]);
+          completeQuest(game, "grumblin_trouble");
         });
       }
       return chat(name, npcSays(name, "The Hall sleeps well thanks to you."));
@@ -469,11 +471,17 @@ export function talk(game: Game, npcId: string): Dialogue {
         return chat(name, npcSays(name, "Listen to that… the forge remembers! Here, an ashsteel pickaxe and some inkcoal to go with it."), undefined, () => {
           take(player, "pewter_bar", 3); take(player, "blackiron_bar", 2); giveOrDrop(game, "ashsteel_pickaxe"); giveOrDrop(game, "inkcoal", 10); giveOrDrop(game, "forge_ember");
           addXp(game, "smithing", 2500, { raw: true }); addXp(game, "mining", 1200, { raw: true });
-          completeQuest(game, "cold_forge", ["1 Quest Point", "2,500 Smithing XP", "1,200 Mining XP", "Ashsteel pickaxe", "10 inkcoal"]);
+          completeQuest(game, "cold_forge");
         });
       }
       return chat(name, npcSays(name, "Use my anvils any time. Hammer in your pack, bars in your hand."));
     }
+    case "mender": return chat(name, npcSays(name, "Hurt? Sit. I mend what the Realm breaks, and I keep the Heartguard: red for the blood, white for the bandage.",
+      "A piece for every ten Hitpoints levels, boots at 10 to the blade at 90. Each one you wear adds a hitpoint and quickens your healing; wear all nine and food goes further."), [
+      { label: "Show me the Heartguard.", then: () => { game.ui.shop = "mender"; return null; } },
+      { label: "How do I raise Hitpoints?", then: () => chat(name, npcSays(name, "Every blow you land, every arrow, every spell: a third of that experience is Hitpoints. Fight, and eat when you must.")) },
+      { label: "Just looking.", then: () => null },
+    ]);
     case "priest": {
       const s = stage(game, "hollow_whispers");
       if (s === 0) return chat(name, npcSays(name, "Rattle rattle. Forgive me, old habit. I hear whispers at night, from the Murkmire crypt."), [
@@ -485,7 +493,7 @@ export function talk(game: Game, npcId: string): Dialogue {
       if (s < 3) return chat(name, npcSays(name, "The whispers go on. The crypt is in Murkmire, south-west."));
       if (s === 3) return chat(name, npcSays(name, "Silence! You did it. Wear this. The Old Friend watches over those who wear it."), undefined, () => {
         giveOrDrop(game, "friends_charm"); addXp(game, "prayer", 2500, { raw: true }); giveOrDrop(game, "large_bones", 5);
-        completeQuest(game, "hollow_whispers", ["1 Quest Point", "2,500 Faith XP", "Old Friend's charm", "5 large bones"]);
+        completeQuest(game, "hollow_whispers");
       });
       return chat(name, npcSays(name, "May your bones rest easy, when the time comes. Not soon, I hope."));
     }
@@ -501,7 +509,7 @@ export function talk(game: Game, npcId: string): Dialogue {
         return chat(name, npcSays(name, "Ahhh. It hums again. Take this staff. And this: the Realm remembers you now."), undefined, () => {
           take(player, "glimmer_shard", 3); giveOrDrop(game, "breeze_staff"); giveOrDrop(game, "thought_sigil", 100); giveOrDrop(game, "path_sigil", 5);
           addXp(game, "magic", 2500, { raw: true });
-          completeQuest(game, "lost_glimmer", ["2 Quest Points", "2,500 Magic XP", "Breeze staff", "100 thought sigils", "5 path sigils"]);
+          completeQuest(game, "lost_glimmer");
         });
       }
       if (k === 0) {
@@ -516,7 +524,7 @@ export function talk(game: Game, npcId: string): Dialogue {
       if (k === 2 && has(player, "hollow_crown")) return chat(name, npcSays(name, "His crown. Weightless, like I said. Wear this one instead. It's heavier, in the good way."), undefined, () => {
         take(player, "hollow_crown"); giveOrDrop(game, "realm_crown"); giveOrDrop(game, "hollow_cape"); giveOrDrop(game, "coins", 10_000);
         for (const skill of ["attack", "strength", "defence", "hitpoints", "magic"] as const) addXp(game, skill, 5000, { raw: true });
-        completeQuest(game, "hollow_king", ["3 Quest Points", "Crown of the Realm", "Cape of the Hollow", "10,000 coins", "5,000 XP in five combat skills"]);
+        completeQuest(game, "hollow_king");
       });
       if (k === 2) return chat(name, npcSays(name, "You beat him but lost his crown? Find it. It can't have gone far. It weighs nothing, after all."));
       return chat(name, npcSays(name, "Hover well, hero."));
@@ -534,7 +542,7 @@ export function talk(game: Game, npcId: string): Dialogue {
           return chat(name, npcSays(name, "My grandmother's quiver! Give me a moment…", "There. New oak frame, fresh leather, and the fletching charm stitched back in. Shoot from it and watch."), undefined, () => {
             take(player, "torn_quiver", 1); take(player, "leather", 2); take(player, "feather", 15); take(player, "oak_logs", 5); giveOrDrop(game, "hazels_quiver");
             addXp(game, "ranged", 1500, { raw: true }); addXp(game, "fletching", 1000, { raw: true }); addXp(game, "crafting", 500, { raw: true });
-            completeQuest(game, "hazels_quiver", ["1 Quest Point", "Hazel's quiver (wear it on your back)", "1,500 Ranged XP", "1,000 Fletching XP", "500 Crafting XP"]);
+            completeQuest(game, "hazels_quiver");
           });
         } }]
         : owned ? [] : [{ label: "I lost the quiver.", then: () => chat(name, npcSays(name, "Lost it? Lucky for you I kept the pattern. Here, and try to keep this one."), undefined, () => giveOrDrop(game, "hazels_quiver")) }];
@@ -563,8 +571,8 @@ export function talk(game: Game, npcId: string): Dialogue {
       if (vigil === 1) {
         if (data(game, "vigil_bones") < VIGIL_BONES) return chat(name, npcSays(name, `The vigil isn't kept yet. Offer bones on the chapel altar: ${Math.max(0, VIGIL_BONES - data(game, "vigil_bones"))} more.`));
         return chat(name, npcSays(name, "Sister Maren says the candles flared for you. Kneel.", "I name you a squire of the Order of the Dawn. Take this sword, and let Quartermaster Bram arm you further."), undefined, () => {
-          giveOrDrop(game, "dawnsteel_sword"); addXp(game, "prayer", 1500, { raw: true });
-          completeQuest(game, "dawn_vigil", ["1 Quest Point", "Dawnsteel sword", "1,500 Faith XP", "The Order Armoury opens"]);
+          giveOrDrop(game, "dawnsteel_sword"); giveOrDrop(game, BONE_BAG); addXp(game, "prayer", 1500, { raw: true });
+          completeQuest(game, "dawn_vigil");
         });
       }
       if (light === 0) return chat(name, npcSays(name, "Squire. Our relic, the Dawnstone, broke in the Greyhorn mine when the golems woke, and they took its shards into themselves. We could use a braver arm than mine these days."), level(game, "prayer") < 30
@@ -575,7 +583,7 @@ export function talk(game: Game, npcId: string): Dialogue {
       if (light === 2) return chat(name, npcSays(name, has(game.player, "dawnstone") ? "The Dawnstone! Whole again, and warm as morning. Kneel, squire, and rise a knight." : "The stone? Bring it here."), undefined, () => {
         if (!has(game.player, "dawnstone")) return;
         take(game.player, "dawnstone"); giveOrDrop(game, "dawn_cape"); addXp(game, "prayer", 5000, { raw: true }); addXp(game, "defence", 2000, { raw: true });
-        completeQuest(game, "greyhorn_light", ["2 Quest Points", "Cape of the Dawn", "5,000 Faith XP", "2,000 Defence XP", "The Order's finest weapons"]);
+        completeQuest(game, "greyhorn_light");
       });
       const last = stage(game, "dawn_against_hollow");
       if (last === 0 && questDone(game, "restless_crypt") && questDone(game, "hollow_king")) return chat(name, npcSays(name, "Knight. The Hollow King is gone, but his sentinels still keep his gate in the Depths, and while it stands, the dead will keep rising.",
@@ -588,7 +596,7 @@ export function talk(game: Game, npcId: string): Dialogue {
         if (!ready) return chat(name, npcSays(name, `${Math.max(0, SENTINELS - data(game, "sentinels"))} sentinels still stand, and I need ${Math.max(0, 3 - count(game.player, "hollow_essence"))} more Hollow essence for the seal.`));
         return chat(name, npcSays(name, "The essence, and the sentinels fallen. Sister Maren and I will seal the gate at dawn.", "Kneel. Rise a Knight-Paladin of the Dawn, in the Order's gold."), undefined, () => {
           take(game.player, "hollow_essence", 3); giveOrDrop(game, "dawnplate_cuirass"); addXp(game, "prayer", 15000, { raw: true }); addXp(game, "defence", 5000, { raw: true });
-          completeQuest(game, "dawn_against_hollow", ["3 Quest Points", "Dawnplate cuirass", "15,000 Faith XP", "5,000 Defence XP", "The title Knight-Paladin"]);
+          completeQuest(game, "dawn_against_hollow");
         });
       }
       const owned = has(game.player, "dawn_cape") || game.player.equipment.cape === "dawn_cape" || game.player.bank.some(slot => slot.id === "dawn_cape");
@@ -600,6 +608,11 @@ export function talk(game: Game, npcId: string): Dialogue {
       const lesson = { label: "How do I grow in faith?", then: () => chat(name, npcSays(name, "Bury bones where you find them, or better, offer them here on the chapel altar: they count three times over.",
         "Pray at any altar to restore your faith. And a blessed weapon teaches faith with every true blow, a little at a time.")) };
       const bye = { label: "Goodbye.", then: () => null };
+      // Squires who kept the vigil carry the Order's ossuary bag; one who has lost it (or kept the vigil before there were any) gets another.
+      if (questDone(game, "dawn_vigil") && !ownsBoneBag(p)) return chat(name, npcSays(name, "A squire of the Dawn, carrying the dead loose in your pack? Take this: an ossuary bag, blessed for the vigil.",
+        "It holds sixty bones of any kind and catches the ones you pick up. Use it on an altar and every bone inside is offered at once."), undefined, () => {
+        giveOrDrop(game, BONE_BAG); message(game, "Sister Maren gives you an ossuary bag.", "quest"); sound(game, "quest");
+      });
       if (road === 0 && questDone(game, "dawn_vigil")) return chat(name, npcSays(name, "Every knight of the Dawn walks the Pilgrim's Road once: three old altars, one prayer at each."), level(game, "prayer") < 35
         ? [{ label: "I'll walk it.", then: () => chat(name, npcSays(name, "Not yet. The road is long for a young faith (Faith 35)."))}, lesson, bye]
         : [{ label: "I'll walk it.", then: () => chat(name, npcSays(name, "The chapel in Friendhollow, the mountain shrine here in Highcairn, and the old crypt altar in Murkmire. Kneel at each, then come back to me."), undefined, () => {
@@ -608,7 +621,7 @@ export function talk(game: Game, npcId: string): Dialogue {
         if (!PILGRIM_ALTARS.every(([key]) => data(game, key))) return chat(name, npcSays(name, `Still ${PILGRIM_ALTARS.filter(([key]) => !data(game, key)).map(([, altar]) => altar.toLowerCase()).join(", ")} to pray at. The road waits.`));
         return chat(name, npcSays(name, "You've the look of someone who's walked a long way to kneel. Good. These are yours: gold for the legs and feet that carried you."), undefined, () => {
           giveOrDrop(game, "dawnplate_greaves"); giveOrDrop(game, "dawnplate_boots"); addXp(game, "prayer", 4000, { raw: true });
-          completeQuest(game, "pilgrims_road", ["1 Quest Point", "Dawnplate greaves and boots", "4,000 Faith XP"]);
+          completeQuest(game, "pilgrims_road");
         });
       }
       if (crypt === 0 && questDone(game, "pilgrims_road") && questDone(game, "greyhorn_light")) return chat(name, npcSays(name, "The candles for the Murkmire dead gutter every night. The crypt's skeletons are rising again, and ordinary steel only knocks them down for a while."),
@@ -620,7 +633,7 @@ export function talk(game: Game, npcId: string): Dialogue {
         if (data(game, "crypt_rest") < CRYPT_REST) return chat(name, npcSays(name, `${Math.max(0, CRYPT_REST - data(game, "crypt_rest"))} more to lay to rest, with a faith weapon in your hand.`));
         return chat(name, npcSays(name, "The candles burn steady again. You've done the dead a kindness. Wear these: the Order's helm and gauntlets, and its sun on your shield."), undefined, () => {
           giveOrDrop(game, "dawnplate_helm"); giveOrDrop(game, "dawnplate_shield"); giveOrDrop(game, "dawnplate_gauntlets"); addXp(game, "prayer", 7000, { raw: true });
-          completeQuest(game, "restless_crypt", ["2 Quest Points", "Dawnplate helm, shield and gauntlets", "7,000 Faith XP"]);
+          completeQuest(game, "restless_crypt");
         });
       }
       return chat(name, npcSays(name, "Faith is trained like any other strength. Offer your bones, pray, and strike true."), [lesson, bye]);
@@ -651,8 +664,18 @@ export function talk(game: Game, npcId: string): Dialogue {
       { label: "Show me the caskets.", then: () => { emit(game, { type: "sound", name: "click", tick: game.tick }); game.ui.shop = "__caskets"; return null; } },
       { label: "Maybe later.", then: () => null },
     ]);
-    case "agility": return chat(name, npcSays(name, "Five obstacles, in order, then again! Finish a lap for a bonus. Agility makes your run energy come back faster."));
-    case "witch": return chat(name, npcSays(name, "Heh heh. The stepping stones to the north need Agility 20. The crypt's the other way. Mind the lurkers, dearie."));
+    case "agility": return chat(name, npcSays(name, "Five obstacles, in order, then again! Every lap pays a Wayfarer's mark, and I trade marks for gear that keeps you moving.",
+      `You've ${count(game.player, WAYFARER_MARK)} mark${count(game.player, WAYFARER_MARK) === 1 ? "" : "s"}.`), [
+      { label: "What does Wayfaring do?", then: () => chat(name, npcSays(name, "Run energy comes back faster and drains slower the better you get, you slip less on the hard courses, and shortcuts open up: the Murkmire stones at 20.",
+        `There are three courses: this one, the ${COURSES.dunes.name} by the Oasis (level ${COURSES.dunes.level}) and the ${COURSES.frostpeak.name} up north (level ${COURSES.frostpeak.level}). Harder courses pay more marks.`)) },
+      { label: "Trade marks.", then: () => talk(game, "agility:rewards") },
+      { label: "Just stretching.", then: () => null },
+    ]);
+    case "agility:rewards": return chat(name, npcSays(name, `${count(game.player, WAYFARER_MARK)} mark${count(game.player, WAYFARER_MARK) === 1 ? "" : "s"} to spend.`), [
+      ...WAYFARER_REWARDS.map(reward => ({ label: `${reward.name} (${reward.cost} mark${reward.cost > 1 ? "s" : ""})`, then: () => { buyWayfarerReward(game, reward.id); return null; } })),
+      { label: "Nothing for now.", then: () => null },
+    ]);
+    case "witch": return chat(name, npcSays(name, "Heh heh. The stepping stones to the north need Wayfaring 20. The crypt's the other way. Mind the lurkers, dearie."));
     case "fisher": return chat(name, npcSays(name, "Cages for inkcrabs, harpoons for sailfish, off the end of the pier. Inksharks in the deep bit, if you've the skill. And there's a deep spot up on the Frostpeak tarn."));
     case "tanner": return chat(name, npcSays(name, "I'll tan cowhides into leather for 2 coins each. Then use a needle and thread on the leather to craft armour."), [
       { label: "Tan my hides.", then: () => { tanHides(game); return null; } },
