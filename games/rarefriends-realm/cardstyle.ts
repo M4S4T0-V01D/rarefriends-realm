@@ -29,7 +29,7 @@ export const CARD_OPTIONS: Record<CardCategory, readonly CardOption[]> = {
   skills: [{ id: "boxes", name: "Boxes" }, { id: "pills", name: "Pills" }, { id: "dark", name: "Ink", presence: 25 }, { id: "gilded", name: "Gilded", presence: 60 }],
   font: [{ id: "mono", name: "Mono" }, { id: "serif", name: "Serif" }, { id: "sans", name: "Sans" }, { id: "display", name: "Display", presence: 25 }],
   ink: [{ id: "ink", name: "Ink" }, { id: "navy", name: "Navy" }, { id: "wine", name: "Wine" }, { id: "forest", name: "Forest" }, { id: "gilt", name: "Gold", achievements: 20, text: "Twenty achievements." }],
-  layout: [{ id: "classic", name: "Classic" }, { id: "ledger", name: "Ledger", text: "Skills on the left, your Friend on the right." }, { id: "banner", name: "Banner", presence: 30, text: "Your Friend up top, every skill in a wide row." }],
+  layout: [{ id: "classic", name: "Classic" }, { id: "ledger", name: "Ledger", text: "Skills on the left, your Friend on the right." }, { id: "poster", name: "Poster", text: "A big portrait, the skills beside it." }, { id: "banner", name: "Banner", text: "Your Friend up top, every skill in a wide row." }],
 };
 export function cardUnlocked(game: Game, option: CardOption): boolean {
   const player = game.player;

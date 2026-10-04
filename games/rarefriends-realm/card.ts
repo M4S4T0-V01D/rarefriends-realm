@@ -59,23 +59,22 @@ export function renderCard(game: Game, friend: GenerationSprites | null, fellows
   const canvas = document.createElement("canvas"); canvas.width = CARD.width; canvas.height = CARD.height;
   const ctx = canvas.getContext("2d")!, player = game.player, style = cardStyle(game), FONT = FONTS[style.font] ?? FONTS.mono;
   const dark = paintBackground(ctx, style.bg), inks = INKS[style.ink] ?? INKS.ink, TEXT = dark ? inks.light : inks.dark, MUTED = dark ? "rgba(239,237,231,0.7)" : "#6d6b67";
-  const banner = style.layout === "banner", ledger = style.layout === "ledger";
+  const banner = style.layout === "banner", ledger = style.layout === "ledger", poster = style.layout === "poster";
   // Where things go: the portrait box and the skills block.
-  const portrait = banner ? { x: 48, y: 48, w: 300, h: 300 } : ledger ? { x: 732, y: 48, w: 420, h: 520 } : { x: 48, y: 48, w: 420, h: 520 };
-  const skills = banner ? { x: 48, y: 372, cols: 7, cellW: 158, maxH: 200 } : ledger ? { x: 60, y: 142, cols: 3, cellW: 206, maxH: 340 } : { x: 530, y: 142, cols: 3, cellW: 206, maxH: 340 };
-  const header = banner ? { x: 380, y: 104 } : ledger ? { x: 60, y: 104 } : { x: 530, y: 104 };
+  const portrait = banner ? { x: 48, y: 48, w: 300, h: 300 } : ledger ? { x: 732, y: 48, w: 420, h: 520 } : poster ? { x: 48, y: 48, w: 520, h: 520 } : { x: 48, y: 48, w: 420, h: 520 };
+  const skills = banner ? { x: 48, y: 372, cols: 7, cellW: 158, maxH: 200 } : ledger ? { x: 60, y: 142, cols: 3, cellW: 206, maxH: 340 } : poster ? { x: 610, y: 142, cols: 3, cellW: 180, maxH: 340 } : { x: 530, y: 142, cols: 3, cellW: 206, maxH: 340 };
+  const header = banner ? { x: 380, y: 104 } : ledger ? { x: 60, y: 104 } : poster ? { x: 610, y: 104 } : { x: 530, y: 104 }, bandW = poster ? 540 : 620;
   // Portrait card.
   ctx.fillStyle = INK; ctx.fillRect(portrait.x + 10, portrait.y + 10, portrait.w, portrait.h); ctx.fillStyle = dark ? "#2a2a30" : "#fff"; ctx.fillRect(portrait.x, portrait.y, portrait.w, portrait.h); ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.strokeRect(portrait.x, portrait.y, portrait.w, portrait.h);
   const inner = banner ? { x: portrait.x + 18, y: portrait.y + 18, w: portrait.w - 36, h: portrait.h - 36 } : { x: portrait.x + 24, y: portrait.y + 24, w: portrait.w - 48, h: 330 };
   paintFrame(ctx, style.frame, inner.x, inner.y, inner.w, inner.h); ctx.strokeRect(inner.x, inner.y, inner.w, inner.h);
-  const aura = player.worn.map(id => WARDROBE.find(entry => entry.id === id)).find(entry => entry?.kind === "aura"), cx = inner.x + inner.w / 2;
-  if (aura) { ctx.fillStyle = `${aura.color}aa`; ctx.beginPath(); ctx.ellipse(cx, inner.y + inner.h * 0.54, inner.w * 0.4, inner.h * 0.4, 0, 0, Math.PI * 2); ctx.fill(); }
+  const cx = inner.x + inner.w / 2;
   if (friend) {
     // Your Friend as it looks in the Realm: wardrobe, helm, cape, amulet, shield and weapon, and on its mount if it's riding one
     // (the mount's body behind, its head in front, as when you ride towards the camera).
     const dressed = [...player.worn, ...(["cape", "head", "shield", "weapon", "neck", "body", "legs", "hands", "feet"] as const).flatMap(slot => player.equipment[slot] ? [player.equipment[slot]!] : [])];
     const art = figureArt(friendRows(friend, "down", false, 0), dressed, "down"), mount = mountDef(player.mount);
-    const ratio = 2 * 1.35 / 1.6, lift = mount ? (SADDLE - 4) * ratio : 0, fitW = inner.w - 32, fitH = inner.h - 20;
+    const ratio = 2 * 1.35 / 1.6, lift = mount ? (SADDLE - 4) * ratio : 0, fitW = inner.w - 8, fitH = inner.h - 4;
     const px = Math.max(1, Math.floor(Math.min(fitW / art.width, fitH / (art.height + lift + (mount ? 4 : 0))) * (mount ? 2 : 1)) / (mount ? 2 : 1)), ground = mount ? inner.y + inner.h - 10 : inner.y + inner.h / 2 + art.height * px / 2 + px * 2;
     ctx.imageSmoothingEnabled = false;
     const drawMountLayer = (layer: "body" | "head") => {
@@ -103,7 +102,7 @@ export function renderCard(game: Game, friend: GenerationSprites | null, fellows
   ctx.fillText(`Combat ${combatLevel(player)}`, nameX, levelsY); ctx.fillText(`Total ${totalLevel(player)}`, nameX + 190, levelsY);
   // Header band: ADVENTURER, over the fellowship's background if it has one, with its logo on the right.
   if (!banner) {
-    const band = { x: header.x, y: header.y - 48, w: 620, h: 72 };
+    const band = { x: header.x, y: header.y - 48, w: bandW, h: 72 };
     if (fellowship?.bg) {
       ctx.save(); ctx.beginPath(); ctx.rect(band.x, band.y, band.w, band.h); ctx.clip(); ctx.imageSmoothingEnabled = true;
       const img = fellowship.bg, scale = Math.max(band.w / img.width, band.h / img.height);
@@ -114,7 +113,7 @@ export function renderCard(game: Game, friend: GenerationSprites | null, fellows
     if (fellowship?.bg) { ctx.strokeStyle = INK; ctx.lineWidth = 6; ctx.strokeText("ADVENTURER", header.x + 12, header.y); }
     ctx.fillText("ADVENTURER", header.x + (fellowship?.bg ? 12 : 0), header.y);
     if (fellowship?.logo) { ctx.imageSmoothingEnabled = true; ctx.fillStyle = "#fff"; ctx.fillRect(band.x + band.w - 70, band.y + 4, 64, 64); ctx.drawImage(fellowship.logo, band.x + band.w - 68, band.y + 6, 60, 60); ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.strokeRect(band.x + band.w - 70, band.y + 4, 64, 64); }
-    ctx.fillStyle = style.ink === "gilt" || dark ? GOLD : BUTTER; ctx.fillRect(header.x, header.y + 16, 620, 8);
+    ctx.fillStyle = style.ink === "gilt" || dark ? GOLD : BUTTER; ctx.fillRect(header.x, header.y + 16, bandW, 8);
   }
   // Skills grid, sized so the quest line always sits below the last row.
   const rows = Math.ceil(SKILLS.length / skills.cols), cellH = Math.min(58, Math.floor(skills.maxH / rows)), box = cellH - 8;

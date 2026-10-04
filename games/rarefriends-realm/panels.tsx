@@ -6,7 +6,7 @@ import { SPELL_TABS, type Spell, ITEM_LIST, isItem,
   type EquipSlot, type Skill, mountDef, PETS,
 } from "./data.ts";
 import { mountArt } from "./mountart.ts";
-import { CHEST_REWARD, DAY_MS, challengeProgress, challengeReward, challengeText, claimChallenge, claimChest, claimStreak, dailyWaiting, rewardText, rollDaily, streakReward, streakStatus } from "./daily.ts";
+import { CHEST_REWARD, DAY_MS, challengeProgress, challengeReward, challengeText, claimChallenge, claimChest, claimStreak, completeDaily, dailyWaiting, rerollDaily, rewardText, rollDaily, streakReward, streakStatus } from "./daily.ts";
 import { LATEST_UPDATE, UPDATES } from "./updates.ts";
 import { FIRST_STEPS, currentStep } from "./firststeps.ts";
 import { bossWindow } from "./worldboss.ts";
@@ -1091,7 +1091,7 @@ export function Orbs({ game, onRun, onSneak, onRide, onMap, onZoom, onRotate, op
 
 // ---------- The daily popup: the streak and challenges, and the update log ----------
 export type DailyTab = "daily" | "updates" | "achievements";
-export function DailyModal({ game, tab, onTab, onClose, refresh, openMenu }: { game: Game; tab: DailyTab; onTab: (tab: DailyTab) => void; onClose: () => void; refresh: () => void; openMenu?: OpenMenu }) {
+export function DailyModal({ game, tab, onTab, onClose, refresh, openMenu, onRf, rfPrice, rfBusy }: { onRf?: (caskets: number, after: () => void) => void; rfPrice?: (caskets: number) => string; rfBusy?: boolean; game: Game; tab: DailyTab; onTab: (tab: DailyTab) => void; onClose: () => void; refresh: () => void; openMenu?: OpenMenu }) {
   const now = Date.now(), player = game.player;
   player.stats.dailyOpened = 1; // first steps: you've found the Realm Daily
   rollDaily(game, now);
@@ -1160,6 +1160,11 @@ export function DailyModal({ game, tab, onTab, onClose, refresh, openMenu }: { g
               {daily.chest ? <span className="realm-done">✓ Opened</span> : <button type="button" className={done ? "realm-primary" : ""} disabled={!done} onClick={() => { claimChest(game); refresh(); }}>Open</button>}
             </li>
           </ul>
+          {onRf && <div className="realm-buttons realm-daily-rf">
+            <button type="button" disabled={rfBusy} title="Simulated RF buys a Rare Casket; the day's three challenges are rolled afresh (claimed ones stay claimed)" onClick={() => onRf(1, () => { rerollDaily(game, Date.now()); refresh(); })}>Reroll challenges · 1 casket{rfPrice ? ` (${rfPrice(1)})` : ""}</button>
+            <button type="button" disabled={rfBusy || done} title="Simulated RF buys two Rare Caskets; every challenge pays out as finished and the chest opens" onClick={() => onRf(2, () => { completeDaily(game, Date.now()); refresh(); })}>Complete all three · 2 caskets{rfPrice ? ` (${rfPrice(2)})` : ""}</button>
+            <small className="realm-muted">Simulated $RAREFRIENDS: the caskets are yours to open as well.</small>
+          </div>}
           <p className="realm-muted"><b>Work orders:</b> craftsfolk across the Realm pay well over shop prices for what you can make at your level, one order each a day (Hazel, Brann, Cook Mabel, Rowan, the old fisher, Nell Gutting, Mother Yarrow, Bolt, Gristle and Scribe Nettle). Ask them "Any work going?". Filled today: {player.stats.orders ?? 0}.</p>
         </div>
       ) : (

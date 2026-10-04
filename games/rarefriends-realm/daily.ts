@@ -17,8 +17,10 @@ export type Daily = {
   day: number; streak: number; best: number;
   /** Today's challenges (the day they're for), what you had when they began, and which you've claimed. */
   challengeDay: number; challenges: Challenge[]; base: number[]; claimed: boolean[]; chest: boolean;
+  /** Rerolls bought today (each changes the seed). */
+  rerolls: number;
 };
-export const newDaily = (): Daily => ({ day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false });
+export const newDaily = (): Daily => ({ day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false, rerolls: 0 });
 
 export type Reward = { coins?: number; items?: [string, number][] };
 /** The seven-day cycle. */
@@ -68,16 +70,35 @@ export const CHALLENGE_SKILLS: readonly Skill[] = ["woodcutting", "fishing", "mi
 export const xpTarget = (skillLevel: number) => Math.round((300 + 3 * skillLevel * skillLevel) / 50) * 50;
 const current = (game: Game, challenge: Challenge) => challenge.kind === "xp" ? game.player.xp[challenge.skill] : challenge.kind === "orders" ? (game.player.stats.orders ?? 0) : game.player.kills;
 /** Start today's challenges if the day has turned over (call as often as you like). */
-export function rollDaily(game: Game, now: number) {
+export function rollDaily(game: Game, now: number, reroll = false) {
   const daily = game.player.daily, today = dayNumber(now);
-  if (daily.challengeDay === today) return false;
-  const pool = [...CHALLENGE_SKILLS], picks: Skill[] = [], seed = today * 1_000_003 + game.player.friendId % 1_000_003;
+  if (daily.challengeDay === today && !reroll) return false;
+  if (daily.challengeDay !== today) daily.rerolls = 0;
+  const pool = [...CHALLENGE_SKILLS], picks: Skill[] = [], seed = today * 1_000_003 + game.player.friendId % 1_000_003 + daily.rerolls * 7777;
   for (let i = 0; i < 2; i++) picks.push(pool.splice(Math.floor(hash(seed, i) * pool.length), 1)[0]);
   daily.challengeDay = today;
   const third: Challenge = hash(seed, 11) < 0.4 ? { kind: "orders", target: 1 + Math.floor(hash(seed, 12) * 2) } : { kind: "kills", target: 10 + Math.floor(hash(seed, 9) * 3) * 5 };
   daily.challenges = [...picks.map((skill): Challenge => ({ kind: "xp", skill, target: xpTarget(level(game, skill)) })), third];
   daily.base = daily.challenges.map(challenge => current(game, challenge));
   daily.claimed = daily.challenges.map(() => false); daily.chest = false;
+  return true;
+}
+/** Buy a fresh set of three (simulated RF, through a casket): unclaimed progress is lost, claimed ones stay claimed. */
+export function rerollDaily(game: Game, now: number) {
+  const daily = game.player.daily, before = daily.claimed.filter(Boolean).length;
+  rollDaily(game, now); daily.rerolls = (daily.rerolls ?? 0) + 1;
+  const kept = daily.claimed.slice(); rollDaily(game, now, true);
+  daily.claimed = daily.challenges.map((_, i) => kept[i] === true);
+  void before;
+  message(game, "Fresh challenges for the day.", "quest"); sound(game, "quest");
+  return true;
+}
+/** Buy the day done (simulated RF): every unclaimed challenge pays out as if finished, and the chest opens. */
+export function completeDaily(game: Game, now: number) {
+  const daily = game.player.daily;
+  rollDaily(game, now);
+  daily.challenges.forEach((challenge, i) => { if (!daily.claimed[i]) { daily.base[i] = current(game, challenge) - challenge.target; claimChallenge(game, i); } });
+  claimChest(game);
   return true;
 }
 export const challengeText = (challenge: Challenge) => challenge.kind === "xp" ? `Gain ${challenge.target.toLocaleString()} ${SKILL_NAMES[challenge.skill]} XP` : challenge.kind === "orders" ? `Fill ${challenge.target} work order${challenge.target === 1 ? "" : "s"}` : `Defeat ${challenge.target} monsters`;
@@ -125,5 +146,5 @@ export function cleanDaily(raw: unknown, skills: readonly string[]): Daily {
   const base = Array.isArray(r.base) ? r.base.slice(0, challenges.length).map(v => int(v, 0, 1e12, 0)) : [];
   const claimed = Array.isArray(r.claimed) ? r.claimed.slice(0, challenges.length).map(v => v === true) : [];
   if (base.length !== challenges.length || claimed.length !== challenges.length) return { ...fresh, day: int(r.day, -1, 1e7, -1), streak: int(r.streak, 0, 1e6, 0), best: int(r.best, 0, 1e6, 0) };
-  return { day: int(r.day, -1, 1e7, -1), streak: int(r.streak, 0, 1e6, 0), best: int(r.best, 0, 1e6, 0), challengeDay: int(r.challengeDay, -1, 1e7, -1), challenges, base, claimed, chest: r.chest === true };
+  return { day: int(r.day, -1, 1e7, -1), streak: int(r.streak, 0, 1e6, 0), best: int(r.best, 0, 1e6, 0), challengeDay: int(r.challengeDay, -1, 1e7, -1), challenges, base, claimed, chest: r.chest === true, rerolls: int(r.rerolls, 0, 1000, 0) };
 }

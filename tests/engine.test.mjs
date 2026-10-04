@@ -16,7 +16,7 @@ import { talk } from "../games/rarefriends-realm/content.ts";
 import { cleanPresence } from "../games/rarefriends-realm/net.ts";
 import { buySlayerReward, longTasks, slayerXpBoost, eligibleTasks } from "../games/rarefriends-realm/slayer.ts";
 import { currentTask, slayerPoints } from "../games/rarefriends-realm/slayer.ts";
-import { COURSES, HEARTGUARD, ITEM_LIST, METALS, MONSTERS, SMITH_PIECES, SPELL_TABS, FIREMAKING, REGIONAL_CLOTHING, MOUNTS, SHOPS, SKILLS, SKILL_NAMES, SLAYER_SETS, SLAYER_TASKS, SPELLS, TREES, WAYFARER_MARK, WAYFARER_REWARDS, XP_RATE, XP_TABLE, heavyStrength, item, levelForXp } from "../games/rarefriends-realm/data.ts";
+import { COURSES, HEARTGUARD, ITEM_LIST, METALS, MONSTERS, SMITH_PIECES, SPELL_TABS, FIREMAKING, REGIONAL_CLOTHING, WARDROBE, MOUNTS, SHOPS, SKILLS, SKILL_NAMES, SLAYER_SETS, SLAYER_TASKS, SPELLS, TREES, WAYFARER_MARK, WAYFARER_REWARDS, XP_RATE, XP_TABLE, heavyStrength, item, levelForXp } from "../games/rarefriends-realm/data.ts";
 import { NPCS, QUESTS, MAX_QUEST_POINTS, questPoints, onMonsterKilled } from "../games/rarefriends-realm/content.ts";
 import { FLOOR_Y, H, MAINLAND, REGIONS, T, W, createWorld, floorAt, isUnderground, mainlandToWorld, objectAtTile, onLevel, realPoint, regionAt, terrainAt } from "../games/rarefriends-realm/world.ts";
 import { addXp, emptyToBank, fillFromBank, bankDeposit, bankInOrder, bankMove, bankTabs, bankWithdraw, bonuses, bagBones, combatLevel, count, dropItem, earlyXp, give, has, heft, level, maxHp, xpMultiplier, BONE_BAG, BONE_BAG_SIZE } from "../games/rarefriends-realm/state.ts";
@@ -1178,9 +1178,9 @@ test("Rare Caskets: relic bonuses, wardrobe pieces and duplicates", () => {
   const base = xpMultiplier(g.player);
   setRelics(g, [3, 0, 0, 1]);
   assert(Math.abs(xpMultiplier(g.player) - base * (1 + 0.06 + 0.1)) < 1e-9);
-  // Tier 3 holds two pieces; after both, duplicates turn into coins.
-  const first = collectFromCasket(g, 3), second = collectFromCasket(g, 3);
-  assert.deepEqual([first.wardrobe, second.wardrobe].sort(), ["golden_aura", "rarite_crown"]);
+  // Tier 3 holds six pieces; after all of them, duplicates turn into coins.
+  const tier3 = WARDROBE.filter(piece => piece.tier === 3).map(piece => piece.id).sort(), got = tier3.map(() => collectFromCasket(g, 3).wardrobe).sort();
+  assert.deepEqual(got, tier3); assert(tier3.includes("golden_aura") && tier3.includes("night_wings"));
   const again = collectFromCasket(g, 3);
   assert.equal(again.wardrobe, null); assert(again.coins > 0);
   // Economy table: 1 RF casket, 0.88 RF expected value, 5 RF max prize.
@@ -1705,6 +1705,13 @@ test("Daily: a streak that grows day by day and resets after a missed day, three
   const save = JSON.parse(JSON.stringify(serialize(game))), fresh = newGame(); assert(restore(fresh, save));
   assert.deepEqual(fresh.player.daily, p.daily, "saved");
   assert(rollDaily(fresh, day + DAY_MS) && fresh.player.daily.claimed.every(c => !c) && !fresh.player.daily.chest, "a new day, new challenges");
+  // Simulated RF: a reroll changes the unclaimed challenges (claimed ones stay claimed); buying the day done claims the rest and opens the chest.
+  const { rerollDaily, completeDaily } = await import("../games/rarefriends-realm/daily.ts");
+  const was = JSON.stringify(fresh.player.daily.challenges); let changed = false;
+  for (let i = 0; i < 6 && !changed; i++) { rerollDaily(fresh, day + DAY_MS); changed = JSON.stringify(fresh.player.daily.challenges) !== was; }
+  assert(changed, "a reroll rolls afresh"); assert(fresh.player.daily.rerolls >= 1);
+  const fp = fresh.player, before = count(fp, "coins"); completeDaily(fresh, day + DAY_MS);
+  assert(fp.daily.claimed.every(Boolean) && fp.daily.chest && count(fp, "coins") > before, "bought done");
   save.daily = { day: "x", challenges: [{ kind: "xp", skill: "hacking", target: 5 }] }; const bad = newGame(); restore(bad, save);
   assert.equal(bad.player.daily.challenges.length, 0, "odd saves start fresh");
 });

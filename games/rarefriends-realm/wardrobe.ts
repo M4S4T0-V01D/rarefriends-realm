@@ -719,13 +719,14 @@ export function drawAuras(ctx: CanvasRenderingContext2D, worn: readonly string[]
         ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(x, y - 8 * px, 12 * px, 0, Math.PI * 2); ctx.fill();
       } else if (!reduced) for (let i = 0; i < 4; i++) { const k = (t * 0.6 + i / 4) % 1; dot(x + Math.sin(i * 2.3 + t) * 8 * px, y - k * 18 * px, "#f2e28f"); }
     }
-    if (piece.id === "moon_wisps") {
-      if (layer === "back") { ctx.fillStyle = "rgba(175,188,203,0.25)"; ctx.beginPath(); ctx.ellipse(x, y, 11 * px, 3.5 * px, 0, 0, Math.PI * 2); ctx.fill(); }
+    if (piece.kind === "aura" && piece.id !== "golden_aura") {
+      const [cr, cg, cb] = [1, 3, 5].map(i => parseInt(piece.color.slice(i, i + 2), 16));
+      if (layer === "back") { ctx.fillStyle = `rgba(${cr},${cg},${cb},0.25)`; ctx.beginPath(); ctx.ellipse(x, y, 11 * px, 3.5 * px, 0, 0, Math.PI * 2); ctx.fill(); }
       for (let i = 0; i < 3; i++) {
         const a = t * 1.3 + i * (Math.PI * 2 / 3), wx = x + Math.cos(a) * 10 * px, wy = y - 7 * px + Math.sin(a) * 3.5 * px, front = Math.sin(a) > 0;
         if (front !== (layer === "front")) continue;
-        for (let k = 3; k >= 1; k--) { const ta = a - k * 0.18; ctx.fillStyle = `rgba(175,188,203,${0.18 * (4 - k)})`; ctx.fillRect(Math.round(x + Math.cos(ta) * 10 * px) - s, Math.round(y - 7 * px + Math.sin(ta) * 3.5 * px) - s, s * 2, s * 2); }
-        dot(wx, wy, "#dfe7f2", 1.5);
+        for (let k = 3; k >= 1; k--) { const ta = a - k * 0.18; ctx.fillStyle = `rgba(${cr},${cg},${cb},${0.18 * (4 - k)})`; ctx.fillRect(Math.round(x + Math.cos(ta) * 10 * px) - s, Math.round(y - 7 * px + Math.sin(ta) * 3.5 * px) - s, s * 2, s * 2); }
+        dot(wx, wy, piece.id === "moon_wisps" ? "#dfe7f2" : shadeHex(piece.color, 0.35), 1.5);
       }
     }
     if (piece.kind === "lantern" && layer === "front") {

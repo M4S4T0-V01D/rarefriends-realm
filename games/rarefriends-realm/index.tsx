@@ -957,7 +957,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           )}
           {modal === "map" && <WorldMapModal game={state} onClose={() => setModal(null)} onTravel={(x, y) => { setModal(null); walkTo(state, x, y); marker.current = { x, y, at: performance.now(), red: false }; refresh(); }} />}
           {modal === "help" && <HelpModal onClose={() => setModal(null)} />}
-          {dailyTab && <DailyModal game={state} tab={dailyTab} onTab={setDailyTab} onClose={() => setDailyTab(null)} refresh={refresh} openMenu={(x, y, entries) => setMenu({ x, y, entries })} />}
+          {dailyTab && <DailyModal game={state} tab={dailyTab} onTab={setDailyTab} onClose={() => setDailyTab(null)} refresh={refresh} openMenu={(x, y, entries) => setMenu({ x, y, entries })}
+            onRf={(caskets, after) => void casket(() => client.buy(BigInt(caskets)), () => { after(); audio.current?.sfx("coins"); })} rfPrice={caskets => rf(definition.price * BigInt(caskets))} rfBusy={busy || paused} />}
           {modal === "card" && (
             <Modal title="Adventurer card" onClose={() => setModal(null)} wide>
               {cardUrl && <img className="realm-card" src={cardUrl} alt={`Adventurer card: Friend #${player.friendId}, total level ${totalLevel(player)}, combat ${combatLevel(player)}`} />}

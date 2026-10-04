@@ -1275,5 +1275,21 @@ export const WARDROBE = [
   { id: "ink_wings", name: "Ink wings", tier: 2, kind: "wings", color: "#5a5963" },
   { id: "golden_aura", name: "Golden aura", tier: 3, kind: "aura", color: "#e2d49e" },
   { id: "rarite_crown", name: "Rarite crown", tier: 3, kind: "hat", color: "#d8b6b4" },
+  // The wider world's wardrobe: twelve more pieces for the caskets to hold.
+  { id: "ember_scarf", name: "Ember scarf", tier: 0, kind: "scarf", color: "#f0a050" },
+  { id: "sky_bow", name: "Sky bow", tier: 0, kind: "bow", color: "#9fc6f0" },
+  { id: "plum_cape", name: "Plum cape", tier: 0, kind: "cape", color: "#a98cc4" },
+  { id: "moss_bow", name: "Moss bow", tier: 0, kind: "bow", color: "#8e9887" },
+  { id: "sea_cape", name: "Sea cape", tier: 1, kind: "cape", color: "#4f8aa8" },
+  { id: "rose_halo", name: "Rose halo", tier: 1, kind: "halo", color: "#e7a9b0" },
+  { id: "ash_scarf", name: "Ash scarf", tier: 1, kind: "scarf", color: "#8f8a82" },
+  { id: "hollow_wisps", name: "Hollow wisps", tier: 2, kind: "aura", color: "#8a62c8" },
+  { id: "dawn_halo", name: "Dawn halo", tier: 2, kind: "halo", color: "#e2c46a" },
+  { id: "ember_wings", name: "Ember wings", tier: 2, kind: "wings", color: "#cf5836" },
+  { id: "snow_cape", name: "Snow cape", tier: 2, kind: "cape", color: "#f3f2ee" },
+  { id: "void_aura", name: "Void aura", tier: 3, kind: "aura", color: "#5a3a9a" },
+  { id: "night_wings", name: "Night wings", tier: 3, kind: "wings", color: "#1d2a52" },
+  { id: "deadwood_crown", name: "Deadwood crown", tier: 3, kind: "hat", color: "#4a5a40" },
+  { id: "starfall_cape", name: "Starfall cape", tier: 3, kind: "cape", color: "#1c1b2a" },
 ] as const;
 export type WardrobeId = typeof WARDROBE[number]["id"];
