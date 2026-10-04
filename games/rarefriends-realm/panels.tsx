@@ -115,7 +115,7 @@ export const TABS: readonly { id: Tab; label: string; glyph: string; key: string
   { id: "magic", label: "Magic", glyph: "✦", key: "F7" }, { id: "friends", label: "Friends and wardrobe", glyph: "☺", key: "F8" }, { id: "settings", label: "Settings", glyph: "⚙", key: "F9" },
   { id: "emotes", label: "Emotes", glyph: "☺", key: "F10" },
 ];
-export type Settings = { friendSpeech?: "full" | "reduced" | "rare" | "off"; music: boolean; sfx: boolean; musicVolume: number; sfxVolume: number; zoom: number; shiftDrop: boolean; autoMusic: boolean; dayNight?: boolean; weather?: boolean;
+export type Settings = { friendSpeech?: "full" | "reduced" | "rare" | "off"; /** Nameplates over players: name, tag and token id; the name alone; or nothing. */ nameplates?: "full" | "name" | "off"; music: boolean; sfx: boolean; musicVolume: number; sfxVolume: number; zoom: number; shiftDrop: boolean; autoMusic: boolean; dayNight?: boolean; weather?: boolean;
   /** Graphics quality: high (the default) or low. */
   graphics?: "high" | "low" };
 export type PanelProps = {
@@ -575,21 +575,25 @@ function SettingsTab({ game, settings, setSettings, trackName, trackId, playTrac
         <span>Friend speech:</span>{(["full", "reduced", "rare", "off"] as const).map(level => <button key={level} type="button" role="radio" aria-checked={(settings.friendSpeech ?? "full") === level} onClick={() => set({ friendSpeech: level })}
           title={level === "full" ? "Your Friend remarks on the world, and players nearby hear it" : level === "reduced" ? "Fewer remarks, kept to yourself" : level === "rare" ? "Only the moments that matter" : "Your Friend keeps its thoughts to itself"}>{level[0].toUpperCase()}{level.slice(1)}</button>)}
       </div>
+      <div className="realm-graphics" role="radiogroup" aria-label="Nameplates">
+        <span>Nameplates:</span>{(["full", "name", "off"] as const).map(level => <button key={level} type="button" role="radio" aria-checked={(settings.nameplates ?? "full") === level} onClick={() => set({ nameplates: level })}
+          title={level === "full" ? "Name, fellowship tag and token id over every player" : level === "name" ? "Only the name over every player" : "No nameplates at all"}>{level === "full" ? "Full" : level === "name" ? "Name only" : "Hidden"}</button>)}
+      </div>
       <label className="realm-check"><input type="checkbox" checked={settings.shiftDrop} onChange={event => set({ shiftDrop: event.target.checked })} /> Shift-click to drop</label>
       <label className="realm-check"><input type="checkbox" checked={game.player.run} onChange={() => { toggleRun(game); refresh(); }} /> Run</label>
       <p className="realm-note">{saved}</p>
       {onLogout && <button type="button" className="realm-primary realm-wide" onClick={onLogout}>⏻ Save and log out</button>}
       <h3>Back up your adventure</h3>
       <p className="realm-muted">Browser saves can be cleared. A save code holds your whole adventure: keep it anywhere, and paste it back on any browser.</p>
-      <div className="realm-buttons"><button type="button" onClick={() => onExportSave?.("copy")}>Copy save code</button><button type="button" onClick={() => onExportSave?.("download")}>Download save file</button></div>
+      <div className="realm-buttons"><button type="button" className="realm-dark" onClick={() => onExportSave?.("copy")}>Copy save code</button><button type="button" className="realm-dark" onClick={() => onExportSave?.("download")}>Download save file</button></div>
       {backupStatus && <p className="realm-note" role="status">{backupStatus}</p>}
       <label className="realm-restore">Restore from a code <input value={code} onChange={event => { setCode(event.target.value); setConfirming(false); setRestoreNote(""); }} placeholder="RFR1-…" aria-label="Save code to restore" /></label>
-      {code.trim() && <button type="button" className={confirming ? "realm-primary" : undefined} onClick={() => {
+      {code.trim() && <button type="button" className={confirming ? "realm-primary" : "realm-dark"} onClick={() => {
         if (!confirming) { setConfirming(true); setRestoreNote("This replaces your current progress with the code's. Press again to restore."); return; }
         void onRestoreSave?.(code).then(error => { setConfirming(false); setRestoreNote(error ?? "Restored! Welcome back."); if (!error) setCode(""); refresh(); });
       }}>{confirming ? "Yes, restore it" : "Restore"}</button>}
       {restoreNote && <p className="realm-note" role="status">{restoreNote}</p>}
-      <button type="button" className="realm-wide" onClick={openHelp}>Controls and tips</button>
+      <button type="button" className="realm-wide realm-dark" onClick={openHelp}>Controls and tips</button>
     </div>
   );
 }

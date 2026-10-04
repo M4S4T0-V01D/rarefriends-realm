@@ -89,6 +89,8 @@ function loadSettings(): Settings {
       zoom: typeof raw.zoom === "number" && Number.isFinite(raw.zoom) ? Math.max(ZOOM.min, Math.min(ZOOM.max, raw.zoom)) : DEFAULT_SETTINGS.zoom,
       dayNight: typeof raw.dayNight === "boolean" ? raw.dayNight : true, weather: typeof raw.weather === "boolean" ? raw.weather : undefined,
       graphics: raw.graphics === "low" ? "low" : "high",
+      friendSpeech: (["full", "reduced", "rare", "off"] as const).find(level => level === raw.friendSpeech) ?? "full",
+      nameplates: (["full", "name", "off"] as const).find(level => level === raw.nameplates) ?? "full",
     };
   } catch { return DEFAULT_SETTINGS; }
 }
@@ -491,7 +493,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       const step = current === "playing" ? currentStep(state) : null, guideTarget = step?.target?.(state) ?? null;
       renderScene(ctx, {
         guideTarget,
-        low: isLow(live.current.settings),
+        low: isLow(live.current.settings), nameplates: live.current.settings.nameplates ?? "full",
         game: state, now, tickAt: tickAt.current, camera: camera.current, friend: friend.current,
         follower: player.follower !== null ? followerSprites.current.get(player.follower) ?? null : null, canonical: CANONICAL,
         hoverTile: current === "playing" ? hoverTile.current : null, marker: marker.current, reducedMotion, hits: hits.current, fireworks: fireworks.current, chat: chat.current,

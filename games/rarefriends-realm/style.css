@@ -450,6 +450,8 @@
 .realm-graphics button:first-of-type { border-radius: 4px 0 0 4px; } .realm-graphics button:last-of-type { border-radius: 0 4px 4px 0; }
 .realm-graphics button:hover { background: #4a4743 !important; }
 .realm-graphics button[aria-checked="true"] { background: #e2c46a !important; color: #161616 !important; }
+.realm-game button.realm-dark { background: #3a3835 !important; color: #e8e5de !important; border: 1.5px solid #000 !important; box-shadow: none !important; border-radius: 4px; font-weight: 700; opacity: 1; }
+.realm-game button.realm-dark:hover:not(:disabled) { background: #4a4743 !important; }
 /* An item being dragged (inventory and bank): follows the pointer, never blocks it. */
 .realm-drag-ghost { position: fixed; z-index: 1000; pointer-events: none; opacity: 0.85; filter: drop-shadow(2px 3px 0 rgba(0,0,0,0.35)); }
 .realm-inventory .realm-slot[data-over] { outline: 2px solid var(--gold, #c9a24a); outline-offset: -2px; }

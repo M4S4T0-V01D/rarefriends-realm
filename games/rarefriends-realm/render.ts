@@ -67,6 +67,8 @@ export type Scene = {
   guideTarget?: { x: number; y: number; lift?: number } | null;
   /** Low graphics: no pixel textures, ambient life, cloud shadows, footprints or fog, lighter rain, a shorter view. */
   low?: boolean;
+  /** Nameplates over players: everything, the name alone, or none. */
+  nameplates?: "full" | "name" | "off";
   reducedMotion: boolean; hits: HitSplat[]; fireworks: Firework[]; chat: { text: string; until: number } | null; projectiles: readonly Projectile[];
   /** Plays a sound effect (swing impacts are timed by the animation). */
   sfx?: (name: string, gain?: number) => void;
@@ -1314,7 +1316,14 @@ function splat(ctx: CanvasRenderingContext2D, x: number, y: number, damage: numb
  * A nameplate over a Friend: the name large and bright, the fellowship tag under it, the token id small, muted and a
  * little transparent (an unnamed Friend shows just "#id"). Titles are kept for Examine, so a full square stays readable.
  */
-function nameplate(ctx: CanvasRenderingContext2D, x: number, bottom: number, name: string | null, tag: string | null, id: number, z: number, color = "#ffffff"): number {
+function nameplate(ctx: CanvasRenderingContext2D, x: number, bottom: number, name: string | null, tag: string | null, id: number, z: number, color = "#ffffff", mode: "full" | "name" | "off" = "full"): number {
+  if (mode === "off") return 0;
+  if (mode === "name") {
+    // The name alone (or the token number when there's no name yet), with nothing under it.
+    const scale = Math.max(0.9, Math.min(1.4, z));
+    ui(ctx, ctx => { ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.strokeStyle = INK; ctx.font = `bold ${Math.round(name ? 13 : 11)}px ui-monospace, Menlo, Consolas, monospace`.replace(/^bold (\d+)px/, (_, size) => `bold ${Math.round(Number(size) * scale)}px`); ctx.lineWidth = 3.5; ctx.strokeText(name ?? `#${id}`, x, bottom); ctx.fillStyle = color; ctx.fillText(name ?? `#${id}`, x, bottom); });
+    return Math.round(14 * scale);
+  }
   const scaleH = Math.max(0.9, Math.min(1.4, z)), height = name ? Math.round((10 + (tag ? 11 : 0) + 14) * scaleH) : Math.round((12 + (tag ? 12 : 0)) * scaleH);
   ui(ctx, ctx => {
     const scale = Math.max(0.9, Math.min(1.4, z)), mono = "ui-monospace, Menlo, Consolas, monospace";
@@ -1729,7 +1738,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     drawAuras(ctx, player.worn, s.x, bodyY, px, now, scene.reducedMotion, "front");
     if (mount) drawMountHead(ctx, mount.coat, facing, walking, now, feet.x, feet.y, z, scene.reducedMotion);
     restoreMotion();
-    const plateH = player.name || player.fellowship ? nameplate(ctx, s.x, s.y - 52 * z, player.name, player.fellowship?.tag ?? null, player.friendId, z, "#e8e5de") : 0;
+    const plateH = player.name || player.fellowship ? nameplate(ctx, s.x, s.y - 52 * z, player.name, player.fellowship?.tag ?? null, player.friendId, z, "#e8e5de", scene.nameplates) : 0;
     if (motion?.text) overheadText(ctx, motion.text, s.x, s.y - 60 * z - plateH, "#ffffff");
     // Health bars only while fighting: yours when you're in combat or something's attacking you.
     if (player.combat !== null || game.monsters.some(monster => monster.target && !monster.dead)) hpBar(ctx, s.x, s.y - 62 * z, player.hp / maxHpOf(game), z);
@@ -2271,7 +2280,7 @@ function drawPeer(ctx: CanvasRenderingContext2D, scene: Scene, peer: PeerView, h
   hits.push({ ...rect, pick: { kind: "peer", id: peer.p.id } });
   if (peer.p.fight) hpBar(ctx, s.x, rect.y - 22, peer.p.hp / Math.max(1, peer.p.maxHp), z);
   const tagY = rect.y - (peer.p.hp < peer.p.maxHp || peer.p.fight ? 26 : 2);
-  const plateH = nameplate(ctx, s.x, tagY, peer.p.name ?? null, peer.p.tag ?? null, peer.p.id, z, peer.friend ? "#9fe0a8" : "#ffffff");
+  const plateH = nameplate(ctx, s.x, tagY, peer.p.name ?? null, peer.p.tag ?? null, peer.p.id, z, peer.friend ? "#9fe0a8" : "#ffffff", scene.nameplates);
   if (peer.said) overheadText(ctx, peer.said, s.x, tagY - plateH - 6);
   else if (motion?.text) overheadText(ctx, motion.text, s.x, tagY - plateH - 6, "#ffffff");
 }
