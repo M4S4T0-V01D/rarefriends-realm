@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lore · RareFriends Realm</title>
+<meta name="description" content="The Realm's history and its regions: the Old Friend, the First Friends, the Age of Kingdoms, the Hollow, and what every village believes, fears, trades and whispers. Deliberately incomplete.">
+<meta property="og:title" content="RareFriends Realm: the lore">
+<meta property="og:description" content="A world that existed before you arrived. Not everything is explained.">
+<meta property="og:image" content="https://m4s4t0-v01d.github.io/rarefriends-realm/preview/img/new-worldmap.png">
+<style>
+:root {
+  color-scheme: light;
+  --ink: #161616; --paper: #efede7; --card: #f7f5f0; --muted: #6d6b67; --gold: #f2e28f; --butter: #e2d7ad;
+  --mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.55 var(--mono);
+  background-image: radial-gradient(rgba(22,22,22,.06) 1px, transparent 1.2px); background-size: 12px 12px; }
+a { color: inherit; }
+.wrap { width: min(1100px, 100% - 32px); margin: 0 auto; }
+.top { background: var(--ink); color: var(--paper); padding: 18px 0; }
+.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.logo { font-weight: 800; letter-spacing: .1em; text-transform: uppercase; text-decoration: none; }
+.top nav { display: flex; gap: 18px; font-size: 13px; }
+.top nav a { color: #d6d3cc; text-decoration: none; }
+.top nav a:hover { color: var(--gold); }
+h1 { font-size: clamp(28px, 5vw, 44px); margin: 34px 0 6px; }
+.sub { color: var(--muted); margin: 0 0 22px; }
+.picker { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
+.picker button { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border: 2px solid var(--ink); background: var(--card); font: 700 13px var(--mono); cursor: pointer; box-shadow: 3px 3px 0 var(--ink); }
+.picker button[aria-pressed="true"] { background: var(--gold); }
+.picker img { width: 22px; height: 22px; image-rendering: pixelated; }
+.card { background: #fff; border: 2px solid var(--ink); box-shadow: 5px 5px 0 var(--ink); padding: 18px 20px; }
+.card h2 { margin: 0 0 4px; display: flex; align-items: center; gap: 10px; }
+.card h2 img { width: 32px; height: 32px; image-rendering: pixelated; }
+.card p.intro { margin: 0 0 14px; color: var(--muted); }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1.5px solid #e4e1d9; vertical-align: middle; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+td.level { font-weight: 800; font-size: 17px; width: 56px; text-align: center; }
+td.icon { width: 44px; }
+td.icon img { width: 32px; height: 32px; image-rendering: pixelated; display: block; }
+td small { color: var(--muted); }
+.inputs { display: flex; gap: 8px; flex-wrap: wrap; }
+.inputs span { display: inline-flex; align-items: center; gap: 2px; font-weight: 700; font-size: 12px; }
+.inputs img { width: 22px; height: 22px; image-rendering: pixelated; }
+.search { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.search input, .search select { font: 14px var(--mono); padding: 6px 10px; border: 2px solid var(--ink); background: var(--card); }
+footer { margin: 40px 0; color: var(--muted); font-size: 13px; }
+@media (max-width: 640px) { td.icon { display: none; } }
+</style>
+<style>
+main h1 { font-size: 34px; margin: 10px 0 4px; } main h2 { margin-top: 36px; font-size: 24px; } main h3 { margin-top: 24px; font-size: 18px; }
+main p, main li { line-height: 1.55; max-width: 72ch; } main ul { padding-left: 20px; } main table { border-collapse: collapse; margin: 12px 0; } main td, main th { border: 1.5px solid var(--ink); padding: 6px 10px; vertical-align: top; text-align: left; }
+main hr { border: 0; border-top: 2px solid var(--ink); margin: 28px 0; } .map { width: 100%; max-width: 900px; image-rendering: pixelated; border: 2px solid var(--ink); margin: 8px 0 20px; }
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap"><a class="logo" href="./">⚔ RareFriends Realm</a>
+  <nav aria-label="Pages"><a href="./">Preview</a><a href="./guides.html">Skill guides</a><a href="./lore.html">Lore</a><a href="https://m4s4t0-v01d.github.io/rarefriends-realm/">Play</a></nav></div></header>
+<main class="wrap">
+<img class="map" src="img/new-worldmap.png" alt="The world map: the mainland at the heart of a continent, the Deadwood north, the Drakespine and Ashfall west, Southshore south, Ironreach east">
+<h1>The Realm: what is known, and what is only said</h1>
+<p>A world bible for RareFriends Realm. It is deliberately incomplete. The Realm existed before any player arrived and will go on after they leave, and not everything in it is explained, in the game or here. Where two accounts disagree, both are kept. Where nobody knows, it says so.</p>
+<hr>
+<h2>A rough history</h2>
+<h3>The Age Before</h3>
+<p>Nobody knows what was here before the oldest Friends. There are ruins everywhere that nobody built: the standing stones on the Quillhaven headland, in The Wilds and deep in the Deadwood, all carved with one symbol nobody reads; the seized mechanism under the Ironreach slopes, gears the size of cartwheels that were never a mill; the toppled watch-stones along the Westmarch road, every one fallen westward; the stonework under the Thistle road where the mud wears through; the city, if it was a city, whose pillars stand in Ashfall among the drakes.</p>
+<p>The oldest surviving carvings show the same bearded figure now called the <b>Old Friend</b>. Every altar in the Realm has a statue of him. In the Deadwood there is one with the face chiselled off, carefully, and a candle somebody keeps lit.</p>
+<p>Who the Old Friend was is not agreed:</p>
+<table>
+<tr><th>Where</th><th>What they say</th></tr>
+<tr><td>Friendhollow</td><td>A founder. The first to settle the crossroads; the castle's oldest stone has his name, in a hand nobody can read.</td></tr>
+<tr><td>Dawnhold</td><td>A saint, or the sun's own Friend. The Order prays to him, and keeps his altars, and does not discuss the one with no face.</td></tr>
+<tr><td>Highcairn</td><td>A king of the mountain, before the mountain had a town. The shrine is older than Dawnhold.</td></tr>
+<tr><td>Quillhaven</td><td>A symbol. Perrin Quill will show you three texts: one calls him a man, one a god, and one, the oldest, a Friend.</td></tr>
+<tr><td>Gravesend</td><td>The first of the dead to come back. They light lanterns for him.</td></tr>
+<tr><td>The Hollow</td><td>Says nothing. It has its own idea, and you would not like it.</td></tr>
+</table>
+<h3>The First Friends</h3>
+<p>Something happened that made Friends part of the world. This is the Realm's largest mystery, and it stays one.</p>
+<p>Two fragments in the Quillhaven library contradict each other. One says: <i>"The Friends did not come to this world."</i> The other, older, says: <i>"They were made here."</i> Perrin Quill keeps them on opposite shelves. The Wizards' Tower holds a third page the Archmage will not read again. The Order of the Dawn teaches that the Friends were given. The Hollow, if the Hollow King is to be believed, remembers it differently, and he is not to be believed.</p>
+<p>What is observable: Friends come in nine families, each with a nature of its own (Skeletons are dry and unafraid of graves, Hoverers cannot stop looking at the next hill, Hollow Friends are at home in places nothing else is). Old people in Dawnhold, Cragmaw and Quillhaven react to certain families as if they had seen them in old paintings. Some of them have.</p>
+<h3>The Age of Kingdoms</h3>
+<p><b>Friendhollow</b> is the oldest major settlement, a trading crossroads before it was anything else. The castle was not built as a palace. It was built as a fortification against something that came from the west. Nobody remembers what. The watch-stones on the Westmarch road, all fallen the same way, are the only thing that still points at it. King Hollis has never been seen to leave the castle.</p>
+<p><b>Dawnhold</b> was not always an Order. The first Dawn knights were simply the people who kept the ancient altars swept. Then something happened at one of those altars, and they armed themselves, and they have been watching the Hollow ever since. The Dawn Vigil (offering bones in their chapel) is older than the Order's armour.</p>
+<p><b>Highcairn</b> grew round the mountain shrine, which is older than the town; the Greyhorn mine came later, and the golems in it were there first.</p>
+<p><b>Fernwick</b> has been cutting the Whisperwood for four generations. Its children learn their trees before their letters. Hazel's great-grandmother made the first war bow in the village from a yew the wood gave up in a storm; the castle has one of hers in its armoury that has never been drawn.</p>
+<p><b>The Oasis</b> never runs dry, and the stalls sell things from the dunes that nobody dug up.</p>
+<p><b>The Wizards' Tower</b> was not built by wizards. The wizards moved in after.</p>
+<h3>The Hollow</h3>
+<p>Not simply an evil place with the undead in it. The questions the Realm asks about it, and does not answer:</p>
+<ul>
+<li>What is the Hollow? Why do the ancient altars seem connected to it?</li>
+<li>Why do some creatures become Hollow, and why do Hollow Friends exist, and walk among the rest?</li>
+<li>Why does the Hollow King exist, and why does he wear a crown that weighs nothing?</li>
+<li>Why do blessed weapons hurt it, and why does the Hollow draught let a spell keep its sigils?</li>
+<li>Why does the chaplain of Dawnhold light a candle when a Hollow Friend sits down?</li>
+<li>Is the Hollow evil?</li>
+</ul>
+<h3>The Wider World</h3>
+<p>Beyond the mainland's old coast the Deadwood died in a single night (Gravesend says), the Drakespine was a road to a city that is now Ashfall, the Ironreach's mine runs under a machine, Saltmarrow pays the sea a tithe every season and the storms miss it, and the Pale Isles have a drowned pier where there was never a village, and a grave with no name the ferry will not go to.</p>
+<hr>
+<h2>The regions</h2>
+<p>Each region's card. Blank lines are deliberate: nobody has filled them in yet, in the Realm or out of it.</p>
+<h3>Friendhollow</h3>
+<ul>
+<li><b>People:</b> townsfolk, guards, the King's court, Old Glimmer, the Namekeeper. <b>Architecture:</b> half-timbered houses, a stone castle built against the west. <b>Clothing:</b> shirts, tunics, capes from Threadneedle and Ribbon &amp; Rye. <b>Food:</b> bread, cake, the Realm Feast. <b>Music:</b> Hollow Square. <b>Main occupation:</b> trade, and everything a crossroads needs.</li>
+<li><b>Belief:</b> the Old Friend as founder; the altar in the chapel. <b>Fear:</b> whatever the castle was built against. <b>Celebration:</b> the Realm Feast. <b>Important NPCs:</b> King Hollis, Captain Rook, Cook Mabel, Brother Ossic, Old Glimmer, Namekeeper Elian, Mender Hale.</li>
+<li><b>Old story:</b> the castle's oldest stone carries the Old Friend's name in a hand nobody can read. <b>Rumour:</b> King Hollis has never left the castle. <b>Secret:</b> the Register of Names goes back further than the town.</li>
+<li><b>Dungeon:</b> the Hollow Depths (under the Mossy Ruins). <b>Unique item:</b> the Crown of the Realm. <b>Quests:</b> A Friend's Feast, Grumblin Trouble, Hollow Whispers, The Lost Glimmer, The Hollow King.</li>
+</ul>
+<h3>Fernwick</h3>
+<ul>
+<li><b>People:</b> woodcutters, Hazel, Rowan, Birch. <b>Architecture:</b> timber lodges in a clearing. <b>Clothing:</b> forest capes, feathered caps, wide hats. <b>Food:</b> whatever the pond gives. <b>Music:</b> Woodcutters' Reel. <b>Occupation:</b> timber and bows.</li>
+<li><b>Belief:</b> never answer the wood. <b>Fear:</b> the Whisperwood whispering. <b>Tradition:</b> children learn their trees before their letters. <b>Sayings:</b> "measure twice, fell once".</li>
+<li><b>Old story:</b> the first war bow, from a storm-fallen yew. <b>Rumour:</b> a stump in the deep wood that grows back overnight. <b>Quest:</b> Hazel's Quiver.</li>
+</ul>
+<h3>Highcairn and Dawnhold</h3>
+<ul>
+<li><b>People:</b> mountain folk, the Order of the Dawn. <b>Architecture:</b> stone, a plateau town; a chapterhouse with a keep above the sea. <b>Clothing:</b> white and gold; Dawnplate. <b>Music:</b> Greyhorn Heights. <b>Occupation:</b> the mine, the shrine, the vigil.</li>
+<li><b>Belief:</b> the Old Friend as saint; faith as a weapon against the dead. <b>Fear:</b> the Hollow, and what happened at the altar. <b>Important NPCs:</b> Grandmaster Aldric, Sister Maren, Quartermaster Bram.</li>
+<li><b>Old story:</b> the altar-keepers who became knights. <b>Rumour:</b> a village beyond the Ironreach that doesn't like Friends. <b>Secret:</b> the golems guard, they do not dig.</li>
+<li><b>Quests:</b> The Dawn Vigil, Light in the Greyhorn, The Pilgrim's Road, The Restless Crypt, Dawn Against the Hollow.</li>
+</ul>
+<h3>Gravesend and the Deadwood</h3>
+<ul>
+<li><b>People:</b> gravekeepers who have made peace with the dead; Warden Mira Thorne, Old Wick, Lantern-seller Pip. <b>Architecture:</b> dark cottages round a lamplit square, graves in rows. <b>Clothing:</b> mourning charcoal, bone-white, lantern purple. <b>Food:</b> bread and candles, the dark comes early. <b>Music:</b> Lanterns at Gravesend; the Deadwood's own.</li>
+<li><b>Belief:</b> the Old Friend as the first to return. <b>Fear:</b> the third lantern on the old road after sunset. <b>Tradition:</b> lanterns lit on bone-oil, and waving at the fence on foggy nights.</li>
+<li><b>Old story:</b> the Deadwood died in one night. <b>Rumour:</b> the Catacombs' bottom gallery has a door. <b>Secret:</b> the faceless statue, and whoever keeps its candle. <b>Dungeon:</b> the Deadwood Catacombs. <b>Unique item:</b> the Mourner's hood. <b>Quest:</b> Lanterns for the Dead.</li>
+</ul>
+<h3>Saltmarrow and Southshore</h3>
+<ul>
+<li><b>People:</b> fishers, Harbourmaster Brine, Nell Gutting, Sal Oilskin. <b>Architecture:</b> planked docks, oilskin and salt. <b>Clothing:</b> sou'westers, oilskin coats, sea capes. <b>Food:</b> sailfish, inkcrab, inkshark. <b>Music:</b> Saltmarrow Shanty.</li>
+<li><b>Belief:</b> the sea is owed a tithe. <b>Fear:</b> the hut on the north quay. <b>Tradition:</b> the tithe, every season, forty years without a storm.</li>
+<li><b>Old story:</b> the Gullwing sailed west and didn't come back. <b>Rumour:</b> a nameless grave on the little isle. <b>Secret:</b> the drowned pier. <b>Dungeon:</b> the sea cave. <b>Quest:</b> The Salt Tithe.</li>
+</ul>
+<h3>Hollyhock and the Thistle Vale</h3>
+<ul>
+<li><b>People:</b> gardeners; Mother Yarrow, Posy Wren. <b>Architecture:</b> a glasshouse, drying racks, herb beds in strips. <b>Clothing:</b> herbalists' hats, aprons, leaf-pinned capes. <b>Food:</b> everything grows twice as fast. <b>Music:</b> The Apothecary's Garden.</li>
+<li><b>Belief:</b> the river. <b>Fear:</b> spiders in the hedges. <b>Tradition:</b> the still, and the first lesson at Yarrow's bench.</li>
+<li><b>Old story:</b> the vale was planted on purpose, long ago. <b>Rumour:</b> an altar used as a fence post. <b>Secret:</b> wyrmtongue seeds crawl out of pots. <b>Quest:</b> The Apothecary's Errand.</li>
+</ul>
+<h3>Dyemoor</h3>
+<ul>
+<li><b>People:</b> dyers; Master Dyer Indigo Vell, Marigold Hem, Bolt. <b>Clothing:</b> indigo and madder, the loudest in the Realm. <b>Music:</b> Dyemoor. <b>Occupation:</b> colour.</li>
+<li><b>Old story:</b> the river ran blue before the vats. <b>Rumour:</b> a cloak dyed for the Hollow King. <b>Secret:</b> the ancient stonework under the Thistle road. <b>Quest:</b> A Dye to Remember.</li>
+</ul>
+<h3>Tallgrass and The Wilds</h3>
+<ul>
+<li><b>People:</b> hunters; Huntmaster Fenn, Ash Quiverly, Lark. <b>Architecture:</b> tents and a long lodge. <b>Clothing:</b> grass greens, pelt capes. <b>Music:</b> Tallgrass Camp. <b>Wildlife:</b> boar, wolf, goat, thornback.</li>
+<li><b>Fear:</b> the standing stones after dark. <b>Old story:</b> footprints beside a wolf's that weren't a wolf's or a man's. <b>Secret:</b> the game won't cross the stones. <b>Quest:</b> Tracks in the Tallgrass.</li>
+</ul>
+<h3>Cragmaw and Ironreach</h3>
+<ul>
+<li><b>People:</b> miners; Foreman Durga Pike, Gristle, Hearthkeeper Olwen, Brenna Anvilsong. <b>Architecture:</b> stone in a mountain pass. <b>Clothing:</b> fur hoods, greatcoats, red climbers' capes. <b>Music:</b> Cragmaw Hammers. <b>Resource:</b> the richest rock in the Realm; the only armoury that works rarite into plate.</li>
+<li><b>Fear:</b> what woke in the deep mine. <b>Old story:</b> Pike's pickaxe and grudge. <b>Secret:</b> the seized mechanism the seam runs under. <b>Dungeon:</b> the deep mine. <b>Quest:</b> The Foreman's Shaft.</li>
+</ul>
+<h3>Quillhaven</h3>
+<ul>
+<li><b>People:</b> scholars; Archivist Perrin Quill, Scribe Nettle, Brother Folio. <b>Architecture:</b> a library three floors deep, standing stones in the garden. <b>Clothing:</b> blue robes, gold-tasselled caps. <b>Music:</b> Quillhaven Library.</li>
+<li><b>Belief:</b> the Old Friend as symbol. <b>Old story:</b> the folio that shows a city where Ashfall is. <b>Secret:</b> the two fragments on opposite shelves. <b>Quest:</b> The Missing Folio.</li>
+</ul>
+<h3>Westmarch, the Drakespine and Ashfall</h3>
+<ul>
+<li><b>People:</b> nobody, and Ember Tamsin at the edge. <b>Landmarks:</b> the lonely house with nobody home, the burned farmhouse with three beds and a child's horse, the toppled watch-stones, the ruins of a city, the crater. <b>Music:</b> The Long Road West, The Drakespine, Ashfall.</li>
+<li><b>Old story:</b> the Drakespine was a road to Ashfall when Ashfall was a city. <b>Secret:</b> what's under the crater is older than the drakes. <b>Dungeon:</b> the Wyrm's Lair. <b>Quest:</b> Embers in the Ash.</li>
+</ul>
+<h3>The Pale Isles</h3>
+<ul>
+<li>One ferry, one village-less pier, one nameless grave, and pearlweed.</li>
+</ul>
+<hr>
+<h2>Your Friend, and the mark you leave</h2>
+<p>Friends speak. Not often, and not at random: a Friend remarks on where it is, what the sky is doing, what's near, what it has seen before. A Skeleton is dry; a Colossus says "Big."; a Hoverer wants to know what's over the hill; a Hollow Friend hears things hum. The family sets the manner. <b>Presence</b> sets how much there is to say: at 30 a Friend remembers (its first dragon, Hazel's arrows, the vigil at Dawnhold); at 50 its remarks lean the way you've lived (explorer, warrior, scholar, collector, crafter, faithful). The world keeps a name beside the token: #13530 is who a Friend is; the name is who it became.</p>
+<p>Presence milestones, as the Realm sees them: <b>1</b> a stranger · <b>10</b> your Friend has habits · <b>20</b> people say "Back already?" · <b>30</b> your Friend remembers · <b>40</b> people use your name · <b>50</b> your Friend sounds like how you play · <b>60</b> towns treat you as theirs · <b>70</b> everyone here knows you · <b>80</b> your legacy comes up · <b>90</b> a known figure · <b>99</b> remembered.</p>
+<hr>
+<p><i>Rumours are true, half-true or nonsense, and the game does not say which. Nothing on this page settles an argument. That is on purpose.</i></p>
+<footer>Written for the Realm's players and the people who build it. Rumours in the game are drawn from the same well; some are true.</footer>
+</main>
+</body>
+</html>

@@ -459,6 +459,34 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
         part(p, poly([[4, 18], [16, 11], [28, 18], [28, 26], [16, 31], [4, 26]]), color, "food");
         part(p, poly([[4, 18], [16, 11], [28, 18], [16, 24]]), accent ?? "#d8b6b4", "food");
         line(p, [[4, 22], [16, 28], [28, 22]], shadeHex(color, -0.18)); part(p, disc(16, 15, 2), "#cf6e6e", "gem"); break;
+      case "herb": {
+        // A sprig: a stem with leaves either side (raw: a clod of earth at the root), a bud in the accent colour.
+        line(p, [[16, 28], [16, 6]], shadeHex(color, -0.25), 2);
+        for (const [y, side] of [[24, -1], [20, 1], [16, -1], [12, 1]] as [number, number][]) part(p, poly([[16, y], [16 + side * 9, y - 5], [16 + side * 3, y - 7]]), color, "cloth");
+        if (icon.kind === "raw") part(p, disc(16, 28, 5, 2.5), "#6d5a48", "stone"); else part(p, disc(16, 6, 3), accent ?? "#e2d49e", "gem");
+        break;
+      }
+      case "mushroom": {
+        // A fat mushroom: pale stalk, a domed cap in the fungus's colour with pale spots (raw: dirt on the stalk).
+        part(p, box(13, 16, 6, 12), "#e8e4dc", "stone"); part(p, disc(16, 14, 11, 6), color, "cloth");
+        for (const [x, y] of [[11, 12], [18, 10], [21, 15]] as Pt[]) dot(p, x, y, accent ?? "#efede7");
+        if (icon.kind === "raw") part(p, disc(16, 27, 5, 2), "#6d5a48", "stone");
+        break;
+      }
+      case "vial": {
+        // A glass vial with a cork: the liquid in the potion's colour (empty: just glass; an essence glows; a mixture swirls).
+        part(p, poly([[11, 10], [21, 10], [23, 27], [9, 27]]), icon.kind === "empty" ? "#d9e4ea" : color, icon.kind === "essence" || icon.kind === "mixture" ? "glow" : "gem");
+        part(p, box(13, 4, 6, 6), "#b89c86", "wood"); part(p, box(12, 9, 8, 2), "#c3c6cb", "metal");
+        if (icon.kind !== "empty") { line(p, [[12, 14], [11, 24]], shadeHex(color, 0.35)); if (icon.kind === "mixture") part(p, disc(16, 20, 2.5), accent ?? "#efede7", "glow"); }
+        break;
+      }
+      case "mortar": {
+        // A stone mortar with its pestle leaning in (ground herbs: a heap of the herb's colour inside).
+        part(p, poly([[6, 14], [26, 14], [23, 27], [9, 27]]), "#a39e96", "stone"); part(p, disc(16, 14, 10, 3), "#8f8a83", "stone");
+        if (icon.kind === "ground") part(p, disc(16, 15, 7, 2.5), color, "cloth");
+        line(p, [[12, 18], [24, 4]], "#8f8a83", 3); dot(p, 24, 4, "#c8c5be");
+        break;
+      }
       case "berries":
         for (const [cx, cy] of [[11, 19], [18, 17], [14, 12], [21, 23], [10, 25], [17, 24]] as Pt[]) part(p, disc(cx, cy, 3.8), color, "gem");
         part(p, poly([[14, 8], [19, 3], [22, 7]]), "#8e9887", "cloth"); break;
@@ -669,6 +697,9 @@ const SKILL_PAINTERS: Record<Skill, Painter> = {
   ranged: p => { p.polyline([[5, 1], [10, 4], [12, 9], [10, 14], [5, 16]], INK, 3); p.polyline([[5, 1], [10, 4], [12, 9], [10, 14], [5, 16]], WOOD); p.line(5, 2, 5, 15, PAPER); p.line(2, 12, 15, 5, INK, 2); p.line(2, 12, 15, 5, "#c8c5be"); p.poly([[14, 3], [17, 3], [16, 7]], STEEL); },
   sigilcraft: p => { p.poly([[8.5, 1], [15, 6], [13, 15], [4, 15], [2, 6]], "#d9d4e6"); p.disc(8.5, 9, 3, 3, "#6f7ea6"); p.set(8, 8, "#ffffff"); },
   fletching: p => { p.line(2, 15, 14, 3, INK, 2); p.line(2, 15, 14, 3, WOOD); p.poly([[12, 1], [16, 1], [16, 5]], STEEL); p.poly([[1, 12], [5, 16], [2, 16]], PAPER); p.poly([[3, 10], [7, 14], [4, 14]], "#d8b6b4"); },
+  // Apothecary: a round-bottomed flask with a green brew and a bubble. Presence: a four-point star with a soft glow.
+  apothecary: p => { p.rect(7, 2, 3, 3, PAPER); p.disc(8.5, 10, 5, 4.5, "#8fbf9a"); p.rect(6, 5, 5, 3, PAPER); p.set(10, 8, PAPER); p.set(7, 11, "#d8c9a8"); p.line(8, 2, 8, 5, INK); },
+  presence: p => { p.line(8, 1, 8, 15, GOLD, 2); p.line(1, 8, 15, 8, GOLD, 2); p.line(4, 4, 12, 12, "#e2c46a", 1); p.line(12, 4, 4, 12, "#e2c46a", 1); p.disc(8, 8, 2.5, 2.5, PAPER); },
   slayer: p => { p.disc(8.5, 7, 6, 5.5, "#e8e4dc"); p.rect(5, 11, 7, 4, "#e8e4dc"); p.rect(5, 5, 3, 3, INK); p.rect(10, 5, 3, 3, INK); p.rect(8, 9, 1, 2, INK); p.line(6, 14, 11, 14, INK); p.line(1, 16, 16, 1, "#cf6e6e", 1); },
 };
 /** Skill icons: 24 pixels, shaded like the items, a distinct picture for each skill (the 16-pixel ones above stay for the orbs). */
@@ -768,6 +799,14 @@ const SKILL24: Record<Skill, Painter> = {
     part(p, poly([[5, 4], [12, 4], [12, 14], [21, 16], [22, 21], [5, 21]]), "#8fbf9a", "cloth");
     part(p, box(4, 20, 19, 3), "#5a7a5a", "flat");
     part(p, poly([[4, 8], [0, 5], [1, 10], [0, 13], [4, 12]]), WHITE, "cloth");
+  },
+  apothecary: p => {
+    part(p, disc(12, 15, 7.5, 7), "#8fbf9a", "metal"); part(p, box(9, 4, 6, 7), "#efede7", "metal"); part(p, box(8, 3, 8, 2), "#9c8672", "wood");
+    part(p, disc(10, 13, 1.4), "#e8f4e8", "glow"); line(p, [[13, 7], [13, 11]], "#c6dcc6");
+  },
+  presence: p => {
+    part(p, poly([[12, 1], [14, 10], [23, 12], [14, 14], [12, 23], [10, 14], [1, 12], [10, 10]]), "#e2d49e", "glow"); part(p, disc(12, 12, 2.4), "#efede7", "glow");
+    for (const [x, y] of [[4, 4], [20, 4], [4, 20], [20, 20]] as [number, number][]) dot(p, x, y, "#e2c46a");
   },
   slayer: p => {
     part(p, disc(12, 10, 8, 7.5), "#e8e4dc", "stone"); part(p, box(7, 15, 10, 5), "#e8e4dc", "stone");

@@ -12,13 +12,16 @@ import { FIRST_STEPS, updateFirstSteps } from "./firststeps.ts";
 import { cleanMet } from "./hiscores.ts";
 import { addSlayerPoints, slayerBoost, slayerKill, slayerProblem, taskText } from "./slayer.ts";
 import { runDrain, slipChance } from "./wayfaring.ts";
-import { NPCS, consecrateDawnstone, onAltarPrayed, examineItem, npcDef, onBonesOffered, onMonsterKilled, questDone, searchCryptChest, searchWell, talk, tanHides, useCryptAltar } from "./content.ts";
+import { HERBS, brewRecipes, grindRecipes, herbDef, stillRecipes } from "./apothecary.ts";
+import { friendSays, friendTick, outfitRemark, remember } from "./friend.ts";
+import { cleanName, cleanTag, onAchievement as presenceAchievement, onBossFelled, onEmoteUsed, onFriendTime, onNpcTalked, onRareFind, onRegionEntered, onWorn } from "./presence.ts";
+import { NPCS, QUESTS, consecrateDawnstone, onAltarPrayed, examineItem, npcDef, onBonesOffered, onMonsterKilled, questDone, searchCryptChest, searchWell, talk, tanHides, useCryptAltar } from "./content.ts";
 import {
-  BANK_SIZE, BANK_TABS, DAY_MS, SATCHEL, SATCHEL_SIZE, STONE_BOX, STONE_BOX_SIZE, BONE_BAG, BONE_BAG_SIZE, bagAdd, bagBones, bagTakeAll, hasBoneBag, setPieces, wayfarerPieces, fullSlayerSet, heartguardPieces, compactBankTabs, hasSatchel, hasStoneBox, stock, useUp, INVENTORY_SIZE, REFERRAL_COINS, REFERRALS_PER_DAY, REFERRAL_TICKS, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
+  BANK_SIZE, BANK_TABS, DAY_MS, SATCHEL, SATCHEL_SIZE, STONE_BOX, STONE_BOX_SIZE, BONE_BAG, BONE_BAG_SIZE, bagAdd, bagBones, bagTakeAll, hasBoneBag, setPieces, wayfarerPieces, fullSlayerSet, heartguardPieces, mixtureOn, compactBankTabs, hasSatchel, hasStoneBox, stock, useUp, INVENTORY_SIZE, REFERRAL_COINS, REFERRALS_PER_DAY, REFERRAL_TICKS, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
   level, maxHp, maxPrayer, message, prayerBoost, riding, sound, take, weapon, combatLevel, createGame,
   type Activity, type CombatStyle, type Dialogue, type Game, type Monster, type Npc, type Player, type Point, type Recipe, type Slot, type BankSlot, type Target,
 } from "./state.ts";
-import { FLOOR_Y, T, W, H, inBounds, isUnderground, isWater, objectAtTile, realPoint, regionAt, terrainAt, tileIndex, walkable, type WorldObject } from "./world.ts";
+import { FLOOR_Y, MAINLAND, T, W, H, inBounds, isUnderground, isWater, mainlandToWorld, objectAtTile, realPoint, regionAt, terrainAt, tileIndex, walkable, type WorldObject } from "./world.ts";
 
 export { createGame };
 
@@ -167,12 +170,14 @@ const OBJECT_EXAMINE: Partial<Record<string, string>> = {
   range: "A hot range. Good for cooking.", furnace: "A red hot furnace.", anvil: "Used for smithing.", bank: "A place to keep your things safe.",
   altar: "An altar to the Old Friend.", fountain: "The water sparkles.", mill: "Grain goes in, flour comes out.", dairy_cow: "Fat and full of milk.",
   wheat: "Some ripe wheat.", coop: "Feathers everywhere.", casket: "A chest of Rare Caskets, sold for simulated $RAREFRIENDS.", tanning: "Hides stretched out to dry.",
-  well: "A deep stone well.", sign: "A signpost.", sigil_altar: "An old altar. Press sigil stones into it to make sigils.", stump: "This tree has been cut down.", spot: "Ripples on the water.", gate: "An old gate, sealed with shadow.",
+  well: "A deep stone well.", sign: "A signpost.", herb: "A patch of herbs. An apothecary would know which.", still: "A copper still. Clean herbs go in; their essence comes out.", sigil_altar: "An old altar. Press sigil stones into it to make sigils.", stump: "This tree has been cut down.", spot: "Ripples on the water.", gate: "An old gate, sealed with shadow.",
 };
 function objectOptions(game: Game, object: WorldObject): string[] {
   if (game.depleted.has(object.id) && (object.kind === "tree" || object.kind === "rock" || object.kind === "stall" || object.kind === "wheat")) return [];
   switch (object.kind) {
     case "tree": return ["Chop down"];
+    case "herb": return ["Pick"];
+    case "still": return ["Distil"];
     case "rock": return ["Mine", "Prospect"];
     case "spot": { const spot = FISHING_SPOTS[object.spot!]; return object.spot === "bait" ? ["Bait", "Net"] : object.spot === "lure" ? ["Lure", "Bait"] : object.spot === "cage" ? ["Cage", "Harpoon"] : [spot.action]; }
     case "range": return ["Cook"];
@@ -278,6 +283,9 @@ export function itemOptions(game: Game, slotIndex: number): ItemOption[] {
   const definition = item(slot.id), out: ItemOption[] = [];
   if (definition.heal) out.push({ verb: "Eat", run: g => eat(g, slotIndex) });
   if (definition.bones) out.push({ verb: "Bury", run: g => bury(g, slotIndex) });
+  if (herbDef(slot.id)) out.push({ verb: "Clean", run: g => cleanHerb(g, slotIndex) });
+  if (definition.potion?.poison) out.push({ verb: "Coat-weapon", run: g => coatWeapon(g, slotIndex) });
+  else if (definition.potion) out.push({ verb: "Drink", run: g => drink(g, slotIndex) });
   if (definition.equip) out.push({ verb: definition.equip.slot === "weapon" || definition.equip.slot === "shield" ? "Wield" : "Wear", run: g => equip(g, slotIndex) });
   if (FIREMAKING[slot.id]) out.push({ verb: "Light", run: g => lightFire(g, slotIndex) });
   if (slot.id === "glimmer_shard") out.push({ verb: "Look-at", run: g => message(g, "The shard hums. Old Glimmer will want it back.") });
@@ -358,22 +366,81 @@ export function bagEmpty(game: Game) {
 export function offerBag(game: Game, chapel: boolean) {
   const player = game.player, bones = bagTakeAll(player), n = bones.reduce((sum, [, count]) => sum + count, 0);
   if (!n) { message(game, "Your ossuary bag is empty."); return; }
-  const bonus = (player.familyId === 0 ? 1.5 : 1) * (chapel ? 3 : 2) * boneBoost(player);
+  const bonus = (player.familyId === 0 ? 1.5 : 1) * (chapel ? 3 : 2) * boneBoost(player, game);
   let xp = 0;
   for (const [id, count] of bones) { xp += item(id).bones! * bonus * count; for (let i = 0; i < count; i++) onBonesOffered(game, chapel); }
   addXp(game, "prayer", xp); sound(game, "pray");
   message(game, `You tip the ossuary bag onto the altar and offer ${n} bones at once${chapel ? ". The candles flare" : ""}.`);
   player.activity = null;
 }
+// ---------- Apothecary: cleaning, drinking, coating and poison ----------
+/** Clean a raw herb: a little XP, and the herb is ready to brew or grind. */
+export function cleanHerb(game: Game, slotIndex: number) {
+  const player = game.player, slot = player.inventory[slotIndex], herb = slot && herbDef(slot.id);
+  if (!slot || !herb) return;
+  if (level(game, "apothecary") < herb.level) { message(game, `You need an Apothecary level of ${herb.level} to clean ${herb.name.toLowerCase()}.`, "warn"); return; }
+  player.inventory[slotIndex] = { id: `clean_${herb.id}`, n: 1 };
+  addXp(game, "apothecary", Math.round(herb.xp * 0.4)); message(game, `You clean the ${herb.name.toLowerCase()}.`); sound(game, "click");
+}
+/** A boost's size: flat plus a share of your level. */
+const boostAmount = (game: Game, skill: Skill, [flat, share]: readonly [number, number]) => flat + Math.floor(levelForXp(game.player.xp[skill]) * share);
+export function drink(game: Game, slotIndex: number) {
+  const player = game.player, slot = player.inventory[slotIndex], effect = slot && item(slot.id).potion;
+  if (!slot || !effect || effect.poison) return;
+  if (effect.mixture && effect.mixture.family !== player.familyId) { message(game, `This mixture was made for ${FAMILY_NAMES[effect.mixture.family]} Friends. Yours is a ${FAMILY_NAMES[player.familyId]}; it would do nothing.`, "warn"); return; }
+  take(player, slot.id); give(player, "vial");
+  const notes: string[] = [];
+  if (effect.heal) { const before = player.hp; player.hp = Math.min(maxHp(player), player.hp + effect.heal); if (player.hp > before) notes.push(`heals ${player.hp - before}`); }
+  if (effect.energy) { player.energy = Math.min(100, player.energy + effect.energy); notes.push("restores your run energy"); }
+  if (effect.faith) { player.prayer = Math.min(maxPrayer(player), player.prayer + Math.round(maxPrayer(player) * effect.faith)); notes.push("restores your faith"); }
+  if (effect.boost) for (const [skill, amount] of Object.entries(effect.boost) as [Skill, readonly [number, number]][]) {
+    const boost = boostAmount(game, skill, amount);
+    player.boosts[skill] = Math.max(player.boosts[skill] ?? 0, boost); notes.push(`+${boost} ${SKILL_NAMES[skill]}`);
+  }
+  if (effect.antidote) { player.poison = null; player.antidoteUntil = game.tick + effect.antidote; notes.push("cures poison and keeps it off"); }
+  if (effect.antifire) { player.antifireUntil = game.tick + effect.antifire; notes.push("shields you from dragonfire"); }
+  if (effect.stealth) { player.stealthUntil = game.tick + effect.stealth; notes.push("softens your step"); }
+  if (effect.tonic) { player.tonicUntil = game.tick + effect.tonic; notes.push("quickens your second wind"); }
+  if (effect.mixture) { player.stats.mixtures = (player.stats.mixtures ?? 0) + 1; friendSays(game, "mixture"); player.mixture = { family: effect.mixture.family, until: game.tick + effect.mixture.ticks }; notes.push(`your ${FAMILY_NAMES[player.familyId]} nature comes to the surface`); emit(game, { type: "cast", spell: "mixture", tick: game.tick }); addXp(game, "presence", 50); }
+  message(game, `You drink the ${item(slot.id).name.toLowerCase()}. It ${notes.join(", ") || "tastes of very little"}.`); sound(game, "eat");
+}
+/** Coat your wielded melee weapon with a poison. */
+export function coatWeapon(game: Game, slotIndex: number) {
+  const player = game.player, slot = player.inventory[slotIndex], poison = slot && item(slot.id).potion?.poison, weapon = player.equipment.weapon;
+  if (!slot || !poison) return;
+  const held = weapon ? item(weapon).equip : undefined;
+  if (!weapon || !held || held.staff || held.bow) { message(game, "You need to be wielding a melee weapon to coat it.", "warn"); return; }
+  take(player, slot.id); give(player, "vial");
+  player.weaponPoison = { weapon, damage: poison.damage, charges: poison.charges, weaken: !!poison.weaken };
+  message(game, `You coat your ${item(weapon).name.toLowerCase()} with ${item(slot.id).name.toLowerCase()}: ${poison.charges} poisoned hits.`); sound(game, "click");
+}
+/** A melee hit from a coated weapon poisons the creature, if poison takes on it. */
+function applyWeaponPoison(game: Game, monster: Monster) {
+  const player = game.player, coat = player.weaponPoison;
+  if (!coat || coat.weapon !== player.equipment.weapon || coat.charges <= 0) return;
+  coat.charges--; if (coat.charges <= 0) { player.weaponPoison = null; message(game, "The poison on your weapon has worn off."); }
+  if (monster.def.poisonImmune && !coat.weaken) return;
+  const damage = Math.round(coat.damage * (monster.def.poisonWeak ?? 1));
+  monster.poison = { damage, left: 4, timer: 8 };
+  if (coat.weaken) monster.curses.defence = game.tick + 40;
+  addXp(game, "apothecary", 2);
+}
+/** A venomous creature's bite. */
+function poisonPlayer(game: Game, damage: number) {
+  const player = game.player;
+  if (player.antidoteUntil > game.tick) return;
+  if (!player.poison) message(game, "You've been poisoned! An antidote would cure it.", "warn");
+  player.poison = { damage, left: 4, timer: 10 };
+}
 /** Ticks between regenerated hitpoints: 100, 50 for Cellular Friends, 6% fewer for each Heartguard piece worn. */
 export const regenTicks = (player: Player) => Math.round((player.familyId === 3 ? 50 : 100) * (1 - 0.06 * heartguardPieces(player)));
 /** Food heals a quarter more in the full Heartguard set. */
-export const foodBoost = (player: Player) => heartguardPieces(player) >= 9 ? 1.25 : 1;
+export const foodBoost = (player: Player, game?: Game) => (heartguardPieces(player) >= 9 ? 1.25 : 1) * (game && mixtureOn(game, 2) ? 1.5 : 1);
 export function eat(game: Game, slotIndex: number) {
   const player = game.player, slot = player.inventory[slotIndex];
   if (!slot || !item(slot.id).heal) return;
   if (player.eatTimer > 0) return;
-  const heal = Math.round(item(slot.id).heal! * foodBoost(player)), before = player.hp;
+  const heal = Math.round(item(slot.id).heal! * foodBoost(player, game)), before = player.hp;
   player.hp = Math.min(maxHp(player), player.hp + heal);
   const energy = item(slot.id).energy ?? 0;
   if (energy) player.energy = Math.min(100, player.energy + energy);
@@ -382,12 +449,12 @@ export function eat(game: Game, slotIndex: number) {
   message(game, `You eat the ${item(slot.id).name.toLowerCase()}.${energy ? " The spring comes back into your step." : player.hp > before ? " It heals some health." : ""}`); sound(game, "eat");
 }
 /** Wightbone armour: 10% more Faith XP from bones a piece, 40% in the full set. */
-export const boneBoost = (player: Player) => 1 + (fullSlayerSet(player, "wightbone") ? 0.4 : 0.1 * setPieces(player, "wightbone"));
+export const boneBoost = (player: Player, game?: Game) => (1 + (fullSlayerSet(player, "wightbone") ? 0.4 : 0.1 * setPieces(player, "wightbone"))) * (game && mixtureOn(game, 0) ? 2 : 1);
 export function bury(game: Game, slotIndex: number) {
   const player = game.player, slot = player.inventory[slotIndex];
   if (!slot || !item(slot.id).bones) return;
   player.inventory[slotIndex] = null;
-  const bonus = (player.familyId === 0 ? 1.5 : 1) * boneBoost(player);
+  const bonus = (player.familyId === 0 ? 1.5 : 1) * boneBoost(player, game);
   addXp(game, "prayer", item(slot.id).bones! * bonus); message(game, "You dig a hole in the ground… You bury the bones."); sound(game, "bury");
   player.activity = null;
 }
@@ -399,7 +466,7 @@ export function offerBones(game: Game, slotIndex: number, chapel: boolean) {
   const player = game.player, slot = player.inventory[slotIndex];
   if (!slot || !item(slot.id).bones) return;
   player.inventory[slotIndex] = null;
-  const bonus = (player.familyId === 0 ? 1.5 : 1) * (chapel ? 3 : 2) * boneBoost(player);
+  const bonus = (player.familyId === 0 ? 1.5 : 1) * (chapel ? 3 : 2) * boneBoost(player, game);
   addXp(game, "prayer", item(slot.id).bones! * bonus); sound(game, "pray");
   message(game, chapel ? "You offer the bones on the chapel altar. The candles flare." : "You offer the bones on the altar.");
   onBonesOffered(game, chapel);
@@ -441,7 +508,7 @@ export function equip(game: Game, slotIndex: number) {
   const weaponOff = equip.slot === "shield" && player.equipment.weapon && item(player.equipment.weapon).equip?.twoHanded ? player.equipment.weapon : undefined;
   if ((shieldOff || weaponOff) && previous && freeSlots(player) === 0) { message(game, "You need a free inventory space to do that.", "warn"); return; }
   player.inventory[slotIndex] = previous ? { id: previous, n: 1 } : null;
-  player.equipment[equip.slot] = slot.id;
+  player.equipment[equip.slot] = slot.id; onWorn(game, slot.id); outfitRemark(game, slot.id);
   if (shieldOff) { delete player.equipment.shield; give(player, shieldOff); }
   if (weaponOff) { delete player.equipment.weapon; give(player, weaponOff); }
   if (equip.slot === "weapon" && player.autocast && !equip.staff) player.autocast = null;
@@ -480,6 +547,14 @@ export function useItemOnItem(game: Game, a: number, b: number) {
     if (bow) { game.ui.production = { title: "What would you like to fletch?", recipes: fletchingRecipes(log) }; return; }
   }
   if (pair("inkcoal", SATCHEL)) { satchelFill(game); return; }
+  if (first.id === "mortar" || second.id === "mortar") {
+    const clean = other("mortar").id;
+    if (clean.startsWith("clean_") && grindRecipes(clean.slice(6)).length) { game.ui.production = { title: "Grind the herb?", recipes: grindRecipes(clean.slice(6)) }; return; }
+  }
+  if (first.id === "vial_of_water" || second.id === "vial_of_water") {
+    const recipes = brewRecipes(other("vial_of_water").id);
+    if (recipes.length) { game.ui.production = { title: "What would you like to brew?", recipes }; return; }
+  }
   if (pair("sigil_stone", STONE_BOX)) { boxFill(game); return; }
   if ((first.id === BONE_BAG || second.id === BONE_BAG) && item(other(BONE_BAG).id).bones) { bagFill(game, other(BONE_BAG).id); return; }
   // String on an unstrung bow finishes it; on a cut gem it makes an amulet.
@@ -671,6 +746,7 @@ function interact(game: Game) {
     }
     if (!canHold(player, ground.id, ground.n)) { message(game, "You don't have enough inventory space to hold that item.", "warn"); return; }
     give(player, ground.id, ground.n); game.ground.splice(index, 1); sound(game, "pickup");
+    if (item(ground.id).bones) friendSays(game, "bones");
     return;
   }
   if (target.kind === "fire") {
@@ -701,12 +777,20 @@ function interactObject(game: Game, object: WorldObject, option: string, use?: n
   if (use !== undefined) { useItemOnObject(game, object, use); return; }
   switch (object.kind) {
     case "sigil_altar": craftSigils(game, object); return;
+    case "herb": {
+      const herb = herbDef(object.herb!)!;
+      if (game.depleted.has(object.id)) { message(game, "This patch has been picked clean. It will grow back."); return; }
+      if (level(game, "apothecary") < herb.level) { message(game, `You need an Apothecary level of ${herb.level} to pick ${herb.name.toLowerCase()}.`, "warn"); return; }
+      if (!freeSlots(player)) { message(game, "Your inventory is too full to hold any more herbs.", "warn"); return; }
+      player.activity = { kind: "gather", objectId: object.id, timer: 2 }; message(game, `You search the ${herb.name.toLowerCase()} patch…`); return;
+    }
+    case "still": game.ui.production = { title: "What would you like to distil?", recipes: stillRecipes() }; return;
     case "tree": {
       const tree = TREES[object.tree!], axe = bestTool(game, "axe");
       if (level(game, "woodcutting") < tree.level) { message(game, `You need a Woodcutting level of ${tree.level} to chop down this tree.`, "warn"); return; }
       if (!axe) { message(game, "You do not have an axe which you have the Woodcutting level to use.", "warn"); return; }
       if (!freeSlots(player)) { message(game, "Your inventory is too full to hold any more logs.", "warn"); return; }
-      player.activity = { kind: "woodcut", objectId: object.id, timer: 3 }; message(game, "You swing your axe at the tree."); return;
+      player.activity = { kind: "woodcut", objectId: object.id, timer: 3 }; message(game, "You swing your axe at the tree."); friendSays(game, "chop"); return;
     }
     case "rock": {
       const rock = ROCKS[object.rock!];
@@ -714,7 +798,7 @@ function interactObject(game: Game, object: WorldObject, option: string, use?: n
       if (level(game, "mining") < rock.level) { message(game, `You need a Mining level of ${rock.level} to mine this rock.`, "warn"); return; }
       if (!bestTool(game, "pickaxe")) { message(game, "You need a pickaxe to mine this rock. You do not have a pickaxe which you have the Mining level to use.", "warn"); return; }
       if (!freeSlots(player)) { message(game, "Your inventory is too full to hold any more ore.", "warn"); return; }
-      player.activity = { kind: "mine", objectId: object.id, timer: 3 }; message(game, "You swing your pickaxe at the rock."); return;
+      player.activity = { kind: "mine", objectId: object.id, timer: 3 }; message(game, "You swing your pickaxe at the rock."); friendSays(game, "mine"); return;
     }
     case "spot": {
       const kind: SpotKind = option === "Net" ? "net" : option === "Bait" ? "bait" : option === "Lure" ? "lure" : option === "Cage" ? "cage" : object.spot === "deep" ? "deep" : option === "Harpoon" ? "harpoon" : object.spot!;
@@ -818,6 +902,7 @@ function interactNpc(game: Game, uid: number, option: string, use?: number) {
   }
   if (option === "Talk-to") { game.dialogue = talk(game, npc.id); sound(game, "click"); return; }
   if (option === "Trade" && def.shop) { game.ui.shop = def.shop; sound(game, "click"); return; }
+  if (option === "Talk-to" || option === "Assignment") onNpcTalked(game, npc.id);
   if (option === "Bank") { game.ui.bank = true; sound(game, "click"); return; }
   if (option === "Caskets") { game.ui.shop = "__caskets"; sound(game, "click"); return; }
   if (option === "Rare-market") { game.ui.shop = "__market"; sound(game, "click"); return; }
@@ -938,9 +1023,9 @@ function movePlayer(game: Game) {
   if (player.sneak && (player.x !== start.x || player.y !== start.y)) drainSneak(game);
 }
 function drainRun(game: Game) {
-  const player = game.player, drain = runDrain(game);
+  const player = game.player, drain = mixtureOn(game, 5) ? 0 : runDrain(game);
   player.energy = Math.max(0, player.energy - drain);
-  if (player.energy <= 0) { player.run = false; message(game, "You're out of run energy.", "warn"); }
+  if (player.energy <= 0) { player.run = false; message(game, "You're out of run energy.", "warn"); friendSays(game, "tired"); }
 }
 // ---------- Stealth: sneaking ----------
 /** The rare hood of the Stealth update: stand still in it for five seconds and you all but vanish. */
@@ -980,6 +1065,8 @@ function spots(game: Game, monster: Monster) {
   if (player.equipment.head === VEIL_HOOD) chance *= 0.5;
   if (player.familyId === 1) chance *= 0.8;
   chance *= stalkerFactor(player);
+  if (player.stealthUntil > game.tick) chance *= 2 / 3;
+  if (mixtureOn(game, 1)) chance *= 0.15;
   return game.rng() < chance;
 }
 /** The Stalker's set: 12% harder to notice a piece. */
@@ -1030,6 +1117,7 @@ function runActivity(game: Game) {
     case "thieve_stall": return stallTick(game, activity);
     case "obstacle": return obstacleTick(game, activity);
     case "offer": return offerTick(game, activity);
+    case "gather": return gatherTick(game, activity);
     case "teleport": {
       player.activity = null;
       const place = activity.spell.startsWith("tablet:") ? activity.spell.slice(7) : SPELLS.find(spell => spell.id === activity.spell)?.teleport ?? "hollow_square";
@@ -1038,6 +1126,20 @@ function runActivity(game: Game) {
   }
 }
 function gatherBonus(game: Game) { return 1 + Math.min(RELICS[2].max, game.player.relics[2] ?? 0) * RELICS[2].gatherPer + (riding(game.player)?.gather ?? 0); }
+/** Picking a herb patch: a chance each couple of ticks by level, a few picks before it's bare, and the Division brew's doubling. */
+function gatherTick(game: Game, activity: Extract<Activity, { kind: "gather" }>) {
+  const player = game.player, object = game.world.objects[activity.objectId], herb = herbDef(object.herb!)!;
+  if (game.depleted.has(object.id)) { player.activity = null; return; }
+  activity.timer = 2;
+  const chance = Math.min(0.95, successChance(level(game, "apothecary"), 40 + herb.level * 2, 220 + herb.level * 2) * gatherBonus(game));
+  if (game.rng() >= chance) return;
+  give(player, herb.id); addXp(game, "apothecary", herb.xp); addXp(game, "presence", 0.5);
+  if (mixtureOn(game, 3) && game.rng() < 0.25 && freeSlots(player)) { give(player, herb.id); message(game, "The Division brew splits the pick in two."); }
+  message(game, `You pick some ${herb.name.toLowerCase()}.`); sound(game, "pickup");
+  const picked = (game.herbPicks.get(object.id) ?? 0) + 1; game.herbPicks.set(object.id, picked);
+  if (picked >= herb.picks) { game.herbPicks.delete(object.id); game.depleted.set(object.id, game.tick + herb.respawn + Math.floor(game.rng() * herb.respawn)); player.activity = null; return; }
+  if (!freeSlots(player)) { message(game, "Your inventory is too full to hold any more herbs.", "warn"); player.activity = null; }
+}
 function woodcutTick(game: Game, activity: Extract<Activity, { kind: "woodcut" }>) {
   const player = game.player, object = game.world.objects[activity.objectId], tree = TREES[object.tree!], axe = bestTool(game, "axe");
   if (game.depleted.has(object.id) || !axe) { player.activity = null; return; }
@@ -1120,6 +1222,7 @@ function produceTick(game: Game, activity: Extract<Activity, { kind: "produce" }
   sound(game, recipe.station === "anvil" ? "anvil" : recipe.station === "furnace" ? "smelt" : "click");
   if (recipe.chance !== undefined && game.rng() >= recipe.chance + level(game, recipe.skill) * 0.004) { message(game, "The ore is too impure and you fail to refine it."); return; }
   for (const [id, n] of Object.entries(recipe.outputs)) give(player, id, n);
+  if (recipe.skill === "apothecary" && Object.keys(recipe.outputs).some(id => item(id).potion)) { player.stats.brews = (player.stats.brews ?? 0) + 1; addXp(game, "presence", 1); }
   addXp(game, recipe.skill, recipe.xp);
   message(game, recipe.station === "furnace" ? `You retrieve a bar of ${recipe.label.replace(" bar", "").toLowerCase()}.` : `You make ${aOrAn(recipe.label)} ${recipe.label.toLowerCase()}.`);
 }
@@ -1172,7 +1275,7 @@ function obstacleTick(game: Game, activity: Extract<Activity, { kind: "obstacle"
 }
 
 /** Hollowthread robes: an 8% chance a piece that a spell keeps its sigils, 30% in the full set. */
-export const sigilSave = (player: Player) => fullSlayerSet(player, "hollowthread") ? 0.3 : 0.08 * setPieces(player, "hollowthread");
+export const sigilSave = (player: Player, game?: Game) => Math.max(fullSlayerSet(player, "hollowthread") ? 0.3 : 0.08 * setPieces(player, "hollowthread"), game && mixtureOn(game, 8) ? 0.5 : 0);
 // ---------- Combat ----------
 const STYLE_BONUS: Record<CombatStyle, { attack: number; strength: number; defence: number }> = {
   accurate: { attack: 3, strength: 0, defence: 0 }, aggressive: { attack: 0, strength: 3, defence: 0 },
@@ -1186,7 +1289,7 @@ export const FAITH_PER_HIT = 0.25;
 export function playerMaxHit(game: Game) {
   const player = game.player, boost = prayerBoost(player), style = STYLE_BONUS[player.style];
   const effective = Math.floor(level(game, "strength") * (1 + boost.strength)) + style.strength + 8;
-  return Math.floor(0.5 + effective * (bonuses(player).strength + 64) / 640) + (player.familyId === 6 ? 1 : 0);
+  return Math.floor(0.5 + effective * (bonuses(player).strength + 64) / 640) + (player.familyId === 6 ? 1 : 0) + (mixtureOn(game, 6) ? 3 : 0);
 }
 export function playerAccuracy(game: Game, monster: Monster, factor = 1) {
   const player = game.player, boost = prayerBoost(player), style = STYLE_BONUS[player.style];
@@ -1202,6 +1305,7 @@ function spellCost(game: Game, spell: Spell) {
 }
 export function canCast(game: Game, spell: Spell) {
   if (level(game, "magic") < spell.level) return `You need a Magic level of ${spell.level} to cast this spell.`;
+  if (spell.quest && !questDone(game, spell.quest)) return `You haven't learnt that glide yet: it comes with ${QUESTS.find(entry => entry.id === spell.quest)?.name ?? "a quest"}.`;
   for (const [sigil, n] of Object.entries(spellCost(game, spell))) if (count(game.player, sigil) < n) return "You do not have enough sigils to cast this spell.";
   return null;
 }
@@ -1236,7 +1340,7 @@ function playerCombat(game: Game) {
   if (spell) {
     const problem = canCast(game, spell);
     if (problem) { message(game, problem, "warn"); player.combat = null; player.queuedSpell = null; player.autocast = null; return; }
-    const echo = (player.familyId === 8 && game.rng() < 0.2) || game.rng() < sigilSave(player);
+    const echo = (player.familyId === 8 && game.rng() < 0.2) || game.rng() < sigilSave(player, game);
     if (!echo) for (const [sigil, n] of Object.entries(spellCost(game, spell))) take(player, sigil, n);
     player.attackTimer = 5;
     const prayers = prayerBoost(player), accuracy = (Math.floor(level(game, "magic") * (1 + prayers.magic)) + 8) * (bonuses(player).magic + 64) * (player.familyId === 8 ? 1.1 : 1) * boost;
@@ -1274,7 +1378,9 @@ function playerCombat(game: Game) {
   }
   emit(game, { type: "swing", weapon: weaponSound(player.equipment.weapon), tick: game.tick });
   sound(game, hit > 0 ? "hit" : "miss");
-  damageMonster(game, monster, Math.max(0, hit), hit < 0);
+  damageMonster(game, monster, Math.max(0, hit), hit < 0, true);
+  // The Lopsided elixir: one blow in five lands twice.
+  if (hit > 0 && mixtureOn(game, 4) && game.rng() < 0.2 && monster.hp > 0) { damageMonster(game, monster, hit, false, true); message(game, "Your blow lands twice."); }
 }
 // ---------- Ranged ----------
 /** The best arrows in your pack that your Ranged level can use. */
@@ -1315,10 +1421,11 @@ function rangedAttack(game: Game, monster: Monster, boost: number) {
   damageMonster(game, monster, Math.max(0, hit), hit < 0);
 }
 const SPELL_COLORS: Record<string, string> = { breeze_dart: "#dfe6ea", tide_dart: "#9fb4d0", stone_dart: "#a89479", ember_dart: "#e3a58c", breeze_lance: "#eef2f4", tide_lance: "#8fa3c9", ember_lance: "#e39a7c", breeze_burst: "#ffffff", ember_burst: "#f0a080" };
-function damageMonster(game: Game, monster: Monster, damage: number, missed: boolean) {
+function damageMonster(game: Game, monster: Monster, damage: number, missed: boolean, melee = false) {
   const dealt = Math.min(damage, monster.hp), player = game.player;
   monster.hp -= dealt;
   if (dealt > 0) monster.mine = true;
+  if (melee && dealt > 0) applyWeaponPoison(game, monster);
   // The Heartguard blade: every eight damage it deals heals you one.
   if (dealt >= 4 && player.equipment.weapon === "heartguard_blade" && player.hp < maxHp(player)) player.hp = Math.min(maxHp(player), player.hp + Math.max(1, Math.round(dealt / 8)));
   emit(game, { type: "hit", on: "monster", uid: monster.uid, damage: missed ? -1 : dealt, tick: game.tick });
@@ -1331,6 +1438,8 @@ function killMonster(game: Game, monster: Monster) {
   monster.dead = true; monster.target = false; monster.respawnAt = game.tick + monster.def.respawn;
   if (player.combat === monster.uid) player.combat = null;
   player.kills++; player.killLog[monster.def.id] = (player.killLog[monster.def.id] ?? 0) + 1; sound(game, "kill"); creature(game, monster, "death");
+  if (monster.def.boss || monster.def.worldBoss) { onBossFelled(game, !!monster.def.worldBoss); friendSays(game, "boss"); remember(game, "first_boss"); }
+  if (monster.def.breath) remember(game, "first_dragon");
   const at = { x: monster.x, y: monster.y }, silver = Math.min(RELICS[1].max, player.relics[1] ?? 0) * RELICS[1].coinsPer + (riding(player)?.coins ?? 0);
   const roll = (drop: { item: string; min: number; max: number }) => {
     const n = drop.min + Math.floor(game.rng() * (drop.max - drop.min + 1));
@@ -1344,7 +1453,7 @@ function killMonster(game: Game, monster: Monster) {
     if (drop.item !== "coins" && (drop.chance <= 0.05 || item(drop.item).value >= 1500)) {
       for (const entry of game.ground.slice(before)) entry.rare = true;
       const found = game.ground.find(entry => entry.id === drop.item && entry.x === at.x && entry.y === at.y); if (found) found.rare = true;
-      message(game, `Valuable drop: ${item(drop.item).name}!`, "quest"); sound(game, "rare");
+      message(game, `Valuable drop: ${item(drop.item).name}!`, "quest"); sound(game, "rare"); onRareFind(game); remember(game, "first_rare"); friendSays(game, "rare");
     }
   }
   if (monster.def.breath) rollPet(game, "emberling", monster.def.id === "emberwyrm" ? 400 : 99);
@@ -1353,7 +1462,7 @@ function killMonster(game: Game, monster: Monster) {
   slayerKill(game, monster.def.id);
 }
 /** Cindershell armour: dragonfire burns 15% less a piece, half in the full set. */
-export const fireFactor = (player: Player) => fullSlayerSet(player, "cindershell") ? 0.5 : 1 - 0.15 * setPieces(player, "cindershell");
+export const fireFactor = (player: Player, game?: Game) => (fullSlayerSet(player, "cindershell") ? 0.5 : 1 - 0.15 * setPieces(player, "cindershell")) * (game && player.antifireUntil > game.tick ? 0.5 : 1);
 /** Bramble armour: thorns. A creature that hits you in melee takes 1 damage back a piece. */
 export const thorns = (player: Player) => setPieces(player, "bramble");
 function damagePlayer(game: Game, damage: number, from: Monster | null) {
@@ -1361,6 +1470,7 @@ function damagePlayer(game: Game, damage: number, from: Monster | null) {
   player.hp = Math.max(0, player.hp - damage);
   emit(game, { type: "hit", on: "player", damage, tick: game.tick });
   if (damage > 0) sound(game, "hurt");
+  if (damage > 0 && player.hp > 0 && player.hp < maxHp(player) * 0.3) friendSays(game, "hurt");
   const prick = from && damage > 0 && from.def.attackStyle !== "magic" ? Math.min(thorns(player), from.hp - 1) : 0;
   if (prick > 0) { from!.hp -= prick; emit(game, { type: "hit", on: "monster", uid: from!.uid, damage: prick, tick: game.tick }); }
   if (from && game.autoRetaliate && player.combat === null && !player.path.length && !player.target && (!player.activity || player.activity.kind !== "obstacle")) {
@@ -1370,13 +1480,20 @@ function damagePlayer(game: Game, damage: number, from: Monster | null) {
 }
 function die(game: Game) {
   const player = game.player, spawn = game.world.places.spawn;
-  message(game, "Oh dear, you are dead!", "warn"); emit(game, { type: "death", tick: game.tick }); sound(game, "death");
+  message(game, "Oh dear, you are dead!", "warn"); emit(game, { type: "death", tick: game.tick }); remember(game, "first_death"); friendSays(game, "death"); sound(game, "death");
   player.deaths++; stopAll(game); closeInterfaces(game); player.prayers = []; player.hp = maxHp(player); player.energy = 100;
   player.prev = { ...spawn }; player.x = spawn.x; player.y = spawn.y; player.moved = game.tick - 10; player.stunned = 0;
   for (const monster of game.monsters) monster.target = false;
   message(game, "You wake up by the Friendhollow fountain. Your items are safe: the Realm is kind to new heroes.", "info");
 }
 function monsterTick(game: Game, monster: Monster) {
+  // Poison on the creature: four doses, eight ticks apart.
+  if (monster.poison && !monster.dead && --monster.poison.timer <= 0) {
+    monster.poison.timer = 8; monster.poison.left--;
+    damageMonster(game, monster, monster.poison.damage, false);
+    if (monster.poison.left <= 0 || monster.hp <= 0) monster.poison = null;
+    if (monster.hp <= 0) return;
+  }
   const player = game.player;
   if (monster.dead) {
     game.sneakingPast.delete(monster.uid);
@@ -1410,13 +1527,14 @@ function monsterTick(game: Game, monster: Monster) {
         // Dragonfire: a third of a dragon's attacks are breath, which only a Wyrmward shield turns aside.
         if (monster.def.breath && game.rng() < 0.33) {
           const shielded = player.equipment.shield === "wyrmward_shield";
-          hit = Math.floor(game.rng() * ((shielded ? 4 : monster.def.breath) + 1) * fireFactor(player));
+          hit = Math.floor(game.rng() * ((shielded ? 4 : monster.def.breath) + 1) * fireFactor(player, game));
           emit(game, { type: "projectile", projectile: { from: { x: monster.x, y: monster.y }, to: { x: player.x, y: player.y }, start: game.tick, end: game.tick + 1, color: "#e9733f", style: "fire" } });
           sound(game, "fire");
           message(game, shielded ? "Your shield absorbs most of the dragon's breath." : "You're horribly burnt by the dragonfire! A Wyrmward shield would help.", shielded ? "game" : "warn");
         }
         creature(game, monster, "attack");
         damagePlayer(game, hit, monster);
+        if (hit > 0 && monster.def.poison && game.rng() < monster.def.poison.chance) poisonPlayer(game, monster.def.poison.damage);
       }
       return;
     }
@@ -1496,8 +1614,26 @@ function upkeep(game: Game) {
   for (const [id, until] of game.depleted) if (game.tick >= until) game.depleted.delete(id);
   if (game.fires.length) game.fires = game.fires.filter(fire => fire.expires > game.tick);
   if (game.ground.length) game.ground = game.ground.filter(entry => entry.expires > game.tick);
-  // Hitpoints regenerate slowly; Cellular Friends regrow twice as fast, and every Heartguard piece quickens it by 6%.
-  if (++player.regenTimer >= regenTicks(player)) { player.regenTimer = 0; if (player.hp < maxHp(player)) player.hp++; }
+  // Hitpoints regenerate slowly; Cellular Friends regrow twice as fast, and every Heartguard piece quickens it by 6% (the Hearth cordial, three times as fast).
+  if (++player.regenTimer >= Math.round(regenTicks(player) / (mixtureOn(game, 2) ? 3 : 1))) { player.regenTimer = 0; if (player.hp < maxHp(player)) player.hp++; }
+  // Poison on you: four doses, ten ticks apart; an antidote ends it.
+  if (player.poison && --player.poison.timer <= 0) {
+    player.poison.timer = 10; player.poison.left--;
+    damagePlayer(game, Math.min(player.poison.damage, Math.max(0, player.hp - 1)), null); message(game, "The poison burns.", "warn");
+    if (player.poison.left <= 0) { player.poison = null; message(game, "The poison has run its course."); }
+  }
+  // Drinks wear off a point at a time.
+  if (++player.boostTimer >= 100) {
+    player.boostTimer = 0;
+    for (const skill of Object.keys(player.boosts) as Skill[]) { const b = player.boosts[skill] ?? 0; if (b > 0) player.boosts[skill] = b - 1; if ((player.boosts[skill] ?? 0) <= 0) delete player.boosts[skill]; }
+  }
+  if (player.mixture && player.mixture.until <= game.tick) { player.mixture = null; message(game, "The mixture's effect fades."); }
+  // Presence: the region you're in (discovered once, lived in by the tick), and time with your Friend behind you.
+  if (game.tick % 5 === 0) { const here = regionAt(game.world, player.x, player.y).id; onRegionEntered(game, here); player.regionTicks[here] = (player.regionTicks[here] ?? 0) + 5; }
+  onFriendTime(game);
+  if (game.tick % 5 === 0 && player.hp > 0) friendTick(game);
+  if (game.tick % 50 === 0) friendMilestones(game);
+  if (player.combat !== null && player.combatSaid !== player.combat) { player.combatSaid = player.combat; friendSays(game, "fight"); }
   // Prayer drains while prayers are active.
   if (player.prayers.length) {
     const resist = 1 + bonuses(player).prayer / 30;
@@ -1506,7 +1642,7 @@ function upkeep(game: Game) {
     if (player.prayer <= 0) { player.prayers = []; message(game, "You have run out of faith. Pray at an altar to restore it.", "warn"); }
   }
   const moving = player.path.length > 0 || !!game.held, spending = moving && (player.run || player.sneak);
-  if (!spending || player.mount) player.energy = Math.min(100, player.energy + (0.25 + level(game, "agility") / 110) * (player.equipment.feet === "wayfarer_boots" ? 1.5 : 1));
+  if (!spending || player.mount) player.energy = Math.min(100, player.energy + (0.25 + level(game, "agility") / 110) * (player.equipment.feet === "wayfarer_boots" ? 1.5 : 1) * (player.tonicUntil > game.tick ? 2 : 1));
 }
 
 // ---------- Prayer, magic, style ----------
@@ -1549,7 +1685,7 @@ export function castSpell(game: Game, id: string): Selection {
   }
   return { kind: "spell", spell: spell.id };
 }
-const TELEPORT_NAMES: Record<string, string> = { hollow_square: "Friendhollow", emberforge: "Emberforge", oasis: "the Oasis", frostpeak: "Frostpeak", pier: "Pike's Pier" };
+const TELEPORT_NAMES: Record<string, string> = { hollow_square: "Friendhollow", emberforge: "Emberforge", oasis: "the Oasis", frostpeak: "Frostpeak", pier: "Pike's Pier", fernwick: "Fernwick", highcairn: "Highcairn", dawnhold: "Dawnhold", gravesend: "Gravesend", saltmarrow: "Saltmarrow", hollyhock: "Hollyhock", dyemoor: "Dyemoor", tallgrass: "Tallgrass", cragmaw: "Cragmaw", quillhaven: "Quillhaven", ashfall: "Ember Tamsin's camp at Ashfall" };
 const ELEMENT_COLORS: Record<string, string> = { wind: "#e6ecef", water: "#8fa3c9", earth: "#a89479", fire: "#e9a07a", hollow: "#6d6b67", moon: "#c6bed4", gold: "#e2d49e", home: "#e8d4c0" };
 function payRunes(game: Game, spell: Spell) { for (const [sigil, n] of Object.entries(spellCost(game, spell))) take(game.player, sigil, n); }
 function bonebloom(game: Game, spell: Spell) {
@@ -1686,7 +1822,7 @@ export function performEmote(game: Game, id: string) {
   if (problem || !emote) { message(game, problem ?? "You can't do that.", "warn"); return false; }
   if (player.combat !== null) { message(game, "You're a bit busy for that.", "warn"); return false; }
   player.path = []; player.activity = null; player.target = null;
-  player.emote = { id, start: game.tick, until: game.tick + emote.ticks };
+  player.emote = { id, start: game.tick, until: game.tick + emote.ticks }; onEmoteUsed(game, id);
   if (id === "skillcape") sound(game, "quest"); else if (id === "cheer" || id === "jump") sound(game, "level");
   return true;
 }
@@ -1891,6 +2027,11 @@ export function rideProblem(game: Game) {
   return null;
 }
 /** Get on a mount you own (the last one you rode, or `id`), or off the one you're on. */
+/** A first ride, and a first 99, are things your Friend remembers. */
+function friendMilestones(game: Game) {
+  const player = game.player, mastered = masteredSkills(game).length;
+  if (mastered > (player.stats.mastered ?? 0)) { player.stats.mastered = mastered; remember(game, "first_99"); friendSays(game, "mastery"); }
+}
 export function toggleMount(game: Game, id?: string) {
   const player = game.player;
   if (player.mount && (!id || id === player.mount)) { message(game, `You climb down from your ${mountDef(player.mount)!.name.toLowerCase()}.`); player.mount = null; sound(game, "click"); return; }
@@ -1899,6 +2040,7 @@ export function toggleMount(game: Game, id?: string) {
   const problem = rideProblem(game);
   if (problem) { message(game, problem, "warn"); return; }
   player.mount = choice; player.lastMount = choice; player.emote = null; player.sneak = false;
+  remember(game, "first_mount"); friendSays(game, "mount");
   message(game, `You mount your ${mountDef(choice)!.name.toLowerCase()}.`); sound(game, "whinny");
 }
 /** A new mount from the stables (bought with RF); you ride it straight away where you can. */
@@ -1948,24 +2090,34 @@ function updatePet(game: Game) {
 // ---------- Saves ----------
 export const SAVE_VERSION = 1;
 export type SaveData = {
-  v: 1; friendId: number; x: number; y: number; run: boolean; energy: number; xp: Record<string, number>; hp: number; prayer: number;
+  v: 1; friendId: number; x: number; y: number; run: boolean;
+  /** 2: positions are in the wider world's coordinates (older saves are in the mainland's own, and are moved on load). */
+  world?: number; energy: number; xp: Record<string, number>; hp: number; prayer: number;
   inventory: (Slot | null)[]; equipment: Record<string, string>; bank: BankSlot[]; style: CombatStyle; autocast: string | null;
   quests: Record<string, number>; questData: Record<string, number>; wardrobe: string[]; worn: string[]; follower: number | null; followerGeneration: number | null;
   kills: number; deaths: number; tutorial: number; guide?: number; created: number; playTicks: number; retaliate: boolean; music: string[];
-  met?: unknown; achievements?: Record<string, number>; pets?: string[]; petOut?: string | null; killLog?: Record<string, number>; stats?: Record<string, number>; referredBy?: number | null; referrals?: number[]; referralTimes?: number[]; boostTicks?: number; coalBag?: number; stoneBox?: number; boneBag?: Record<string, number>; mounts?: string[]; mount?: string | null; daily?: unknown; seenUpdate?: number;
+  met?: unknown; achievements?: Record<string, number>; pets?: string[]; petOut?: string | null; killLog?: Record<string, number>; stats?: Record<string, number>; referredBy?: number | null; referrals?: number[]; referralTimes?: number[]; boostTicks?: number; coalBag?: number; stoneBox?: number; boneBag?: Record<string, number>;
+  boosts?: Record<string, number>; poison?: { damage: number; left: number; timer: number } | null; weaponPoison?: { weapon: string; damage: number; charges: number; weaken: boolean } | null;
+  antidoteUntil?: number; antifireUntil?: number; stealthUntil?: number; tonicUntil?: number; mixture?: { family: number; until: number } | null;
+  firsts?: Record<string, number>; friendKinds?: Record<string, 1>; rumours?: Record<string, 1>;
+  name?: string | null; fellowship?: { name: string; tag: string } | null; title?: string | null; visited?: Record<string, number>; regionTicks?: Record<string, number>; talked?: Record<string, 1>; emotesUsed?: Record<string, 1>; outfits?: Record<string, 1>; friendTicks?: number; mounts?: string[]; mount?: string | null; daily?: unknown; seenUpdate?: number;
 };
 export function serialize(game: Game): SaveData {
   const player = game.player;
   return {
-    v: 1, friendId: player.friendId, x: player.x, y: player.y, run: player.run, energy: Math.round(player.energy), xp: { ...player.xp }, hp: player.hp, prayer: Math.round(player.prayer * 10) / 10,
+    v: 1, world: 2, friendId: player.friendId, x: player.x, y: player.y, run: player.run, energy: Math.round(player.energy), xp: { ...player.xp }, hp: player.hp, prayer: Math.round(player.prayer * 10) / 10,
     inventory: player.inventory.map(slot => slot ? { ...slot } : null), equipment: { ...player.equipment } as Record<string, string>, bank: player.bank.map(slot => ({ ...slot })),
     style: player.style, autocast: player.autocast, quests: { ...player.quests }, questData: { ...player.questData }, wardrobe: [...player.wardrobe], worn: [...player.worn],
     follower: player.follower, followerGeneration: player.followerGeneration, kills: player.kills, deaths: player.deaths, tutorial: player.tutorial, guide: player.guide, created: player.created,
     playTicks: game.playTicks, retaliate: game.autoRetaliate, music: [...player.music],
-    referredBy: player.referredBy, referrals: [...player.referrals], referralTimes: [...player.referralTimes], boostTicks: player.boostTicks, coalBag: player.coalBag, stoneBox: player.stoneBox, boneBag: { ...player.boneBag }, mounts: [...player.mounts], mount: player.mount, met: JSON.parse(JSON.stringify(player.met)), achievements: { ...player.achievements }, pets: [...player.pets], petOut: player.petOut, killLog: { ...player.killLog }, stats: { ...player.stats }, daily: JSON.parse(JSON.stringify(player.daily)), seenUpdate: player.seenUpdate,
+    referredBy: player.referredBy, referrals: [...player.referrals], referralTimes: [...player.referralTimes], boostTicks: player.boostTicks, coalBag: player.coalBag, stoneBox: player.stoneBox, boneBag: { ...player.boneBag }, boosts: { ...player.boosts }, poison: player.poison ? { ...player.poison } : null, weaponPoison: player.weaponPoison ? { ...player.weaponPoison } : null,
+    antidoteUntil: Math.max(0, player.antidoteUntil - game.tick), antifireUntil: Math.max(0, player.antifireUntil - game.tick), stealthUntil: Math.max(0, player.stealthUntil - game.tick), tonicUntil: Math.max(0, player.tonicUntil - game.tick), mixture: player.mixture ? { family: player.mixture.family, until: Math.max(0, player.mixture.until - game.tick) } : null,
+    firsts: { ...player.firsts } as Record<string, number>, friendKinds: { ...player.friendKinds } as Record<string, 1>, rumours: { ...player.rumours } as Record<string, 1>,
+    name: player.name, fellowship: player.fellowship ? { ...player.fellowship } : null, title: player.title, visited: { ...player.visited } as Record<string, number>, regionTicks: { ...player.regionTicks } as Record<string, number>, talked: { ...player.talked } as Record<string, 1>, emotesUsed: { ...player.emotesUsed } as Record<string, 1>, outfits: { ...player.outfits } as Record<string, 1>, friendTicks: player.friendTicks, mounts: [...player.mounts], mount: player.mount, met: JSON.parse(JSON.stringify(player.met)), achievements: { ...player.achievements }, pets: [...player.pets], petOut: player.petOut, killLog: { ...player.killLog }, stats: { ...player.stats }, daily: JSON.parse(JSON.stringify(player.daily)), seenUpdate: player.seenUpdate,
   };
 }
-const QUEST_IDS = ["friends_feast", "grumblin_trouble", "cold_forge", "hollow_whispers", "lost_glimmer", "hollow_king", "hazels_quiver", "dawn_vigil", "greyhorn_light", "pilgrims_road", "restless_crypt", "dawn_against_hollow"];
+const QUEST_IDS = ["friends_feast", "grumblin_trouble", "cold_forge", "hollow_whispers", "lost_glimmer", "hollow_king", "hazels_quiver", "dawn_vigil", "greyhorn_light", "pilgrims_road", "restless_crypt", "dawn_against_hollow",
+  "gravesend_lanterns", "saltmarrow_tithe", "hollyhock_errand", "dyemoor_dye", "tallgrass_tracks", "cragmaw_shaft", "quillhaven_folio", "ashfall_embers"];
 const int = (value: unknown, min: number, max: number, fallback: number) => typeof value === "number" && Number.isFinite(value) ? Math.max(min, Math.min(max, Math.floor(value))) : fallback;
 /** Item and spell ids from saves made before the Realm's own names (old id → new id). */
 const RENAMED: Record<string, string> = {
@@ -2023,7 +2175,9 @@ export function restore(game: Game, raw: unknown): boolean {
     if (existing) existing.n += slot.n; else bank.push({ id: slot.id, n: int((entry as Slot).n, 1, 2_147_483_647, 1), ...(tab ? { tab } : {}) });
   }
   player.bank = bank; compactBankTabs(player);
-  const x = int(save.x, 0, W - 1, -1), y = int(save.y, 0, H - 1, -1);
+  // Saves from before the wider world kept positions in the mainland's own coordinates: move them with it.
+  let x = int(save.x, 0, W - 1, -1), y = int(save.y, 0, H - 1, -1);
+  if (save.world !== 2 && x >= 0 && x < MAINLAND.w && y >= 0 && y < MAINLAND.h + MAINLAND.dungeonRows + MAINLAND.floorRows) [x, y] = mainlandToWorld(x, y);
   if (inBounds(x, y) && walkable(game.world, x, y)) { player.x = x; player.y = y; player.prev = { x, y }; }
   player.run = !!save.run; player.energy = int(save.energy, 0, 100, 100);
   player.style = (["accurate", "aggressive", "defensive", "controlled"] as const).includes(save.style as CombatStyle) ? save.style as CombatStyle : "accurate";
@@ -2052,6 +2206,22 @@ export function restore(game: Game, raw: unknown): boolean {
   for (const [id, n] of Object.entries(save.boneBag && typeof save.boneBag === "object" ? save.boneBag : {})) {
     if (isItem(id) && item(id).bones) bagAdd(player, id, int(n, 0, BONE_BAG_SIZE, 0));
   }
+  // Apothecary: boosts, poisons and protections (saved as ticks left; the game's own tick starts over).
+  player.boosts = {};
+  for (const [skill, n] of Object.entries(save.boosts && typeof save.boosts === "object" ? save.boosts : {})) if ((SKILLS as readonly string[]).includes(skill) && int(n, 0, 40, 0) > 0) player.boosts[skill as Skill] = int(n, 0, 40, 0);
+  const sp = save.poison; player.poison = sp && typeof sp === "object" && int(sp.left, 0, 4, 0) > 0 ? { damage: int(sp.damage, 1, 20, 1), left: int(sp.left, 1, 4, 1), timer: int(sp.timer, 1, 10, 10) } : null;
+  const wp = save.weaponPoison; player.weaponPoison = wp && typeof wp === "object" && typeof wp.weapon === "string" && isItem(wp.weapon) && int(wp.charges, 0, 30, 0) > 0 ? { weapon: wp.weapon, damage: int(wp.damage, 1, 20, 1), charges: int(wp.charges, 1, 30, 1), weaken: !!wp.weaken } : null;
+  player.antidoteUntil = game.tick + int(save.antidoteUntil, 0, 1000, 0); player.antifireUntil = game.tick + int(save.antifireUntil, 0, 1000, 0);
+  player.stealthUntil = game.tick + int(save.stealthUntil, 0, 1000, 0); player.tonicUntil = game.tick + int(save.tonicUntil, 0, 1000, 0);
+  const mx = save.mixture; player.mixture = mx && typeof mx === "object" && int(mx.until, 0, 1000, 0) > 0 ? { family: int(mx.family, 0, FAMILY_NAMES.length - 1, 0), until: game.tick + int(mx.until, 0, 1000, 0) } : null;
+  // Presence.
+  player.name = cleanName(save.name); const fs = save.fellowship; player.fellowship = fs && typeof fs === "object" && cleanName(fs.name) && cleanTag(fs.tag) ? { name: cleanName(fs.name)!, tag: cleanTag(fs.tag)! } : null;
+  player.title = typeof save.title === "string" && /^[a-z_]{1,24}$/.test(save.title) ? save.title : null;
+  const keyed = <T,>(raw: unknown, value: (v: unknown) => T | null, limit = 400): Partial<Record<string, T>> => Object.fromEntries(Object.entries(raw && typeof raw === "object" ? raw as Record<string, unknown> : {}).filter(([key]) => /^[a-z0-9_]{1,32}$/.test(key)).slice(0, limit).flatMap(([key, v]) => { const clean = value(v); return clean === null ? [] : [[key, clean]]; }));
+  player.visited = keyed(save.visited, v => typeof v === "number" ? int(v, 1, 1e9, 1) : null); player.regionTicks = keyed(save.regionTicks, v => typeof v === "number" ? int(v, 0, 1e9, 0) : null);
+  player.talked = keyed(save.talked, () => 1 as const); player.emotesUsed = keyed(save.emotesUsed, () => 1 as const); player.outfits = keyed(save.outfits, () => 1 as const, 2000);
+  player.friendTicks = int(save.friendTicks, 0, 1e9, 0);
+  player.firsts = keyed(save.firsts, v => typeof v === "number" ? int(v, 0, 1e6, 0) : null); player.friendKinds = keyed(save.friendKinds, () => 1 as const); player.rumours = keyed(save.rumours, () => 1 as const);
   player.referralTimes = (Array.isArray(save.referralTimes) ? save.referralTimes : []).filter((at): at is number => typeof at === "number" && Number.isFinite(at) && at > 0).slice(-REFERRALS_PER_DAY);
   player.mounts = MOUNTS.filter(mount => Array.isArray(save.mounts) && save.mounts.includes(mount.id)).map(mount => mount.id);
   player.mount = typeof save.mount === "string" && player.mounts.includes(save.mount) ? save.mount : null;

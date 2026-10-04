@@ -6,6 +6,7 @@
 import { HEARTGUARD, MOUNTS, PETS, SKILLS, SLAYER_SETS, WARDROBE, WAYFARER_SET, isItem, item, levelForXp } from "./data.ts";
 import { MAX_QUEST_POINTS, questPoints } from "./content.ts";
 import { count, message, sound, totalLevel, type Game } from "./state.ts";
+import { onAchievement } from "./presence.ts";
 
 export type Achievement = { id: string; name: string; text: string; icon: string; group: string; check: (game: Game) => boolean };
 const skillAt = (game: Game, lvl: number) => SKILLS.some(skill => skill !== "hitpoints" && levelForXp(game.player.xp[skill]) >= lvl);
@@ -29,6 +30,11 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   { id: "veilweave", group: "Collecting", icon: "◐", name: "Now you see me", text: "Find the Veilweave hood in the shadows.", check: g => owns(g, id => id === "veilweave_hood") },
   { id: "wayfarer", group: "Skills", icon: "➶", name: "Wayfarer", text: "Complete 50 laps of the Realm's courses.", check: g => stat(g, "laps") >= 50 },
   { id: "outfitted", group: "Collecting", icon: "➶", name: "Dressed for the road", text: "Own every piece of the Wayfarer's outfit.", check: g => WAYFARER_SET.every(id => owns(g, owned => owned === id)) },
+  { id: "named", group: "Friendship", icon: "✧", name: "A name of my own", text: "Name your Friend.", check: g => !!g.player.name },
+  { id: "fellow", group: "Friendship", icon: "✧", name: "Fellow", text: "Stand with a fellowship.", check: g => !!g.player.fellowship },
+  { id: "explorer", group: "Skills", icon: "✧", name: "Far afield", text: "Discover 20 regions of the Realm.", check: g => Object.keys(g.player.visited).length >= 20 },
+  { id: "brewer", group: "Skills", icon: "⚗", name: "Brewer", text: "Brew ten potions.", check: g => stat(g, "brews") >= 10 },
+  { id: "friends_own", group: "Friendship", icon: "⚗", name: "Of my own nature", text: "Drink a mixture made for your Friend's family.", check: g => stat(g, "mixtures") >= 1 },
   { id: "heartguard", group: "Collecting", icon: "♥", name: "Heart of the Realm", text: "Own all nine pieces of the Heartguard.", check: g => HEARTGUARD.every(piece => owns(g, id => id === piece.id)) },
   { id: "slayer_set", group: "Collecting", icon: "☠", name: "The Warden's wardrobe", text: "Own a full set of armour dropped by a Slayer creature.", check: g => SLAYER_SETS.some(set => set.pieces.every(piece => owns(g, id => id === `${set.id}_${piece.suffix}`))) },
   { id: "quester", group: "Quests", icon: "✎", name: "Quest starter", text: "Complete a quest.", check: g => questPoints(g) >= 1 },
@@ -58,7 +64,7 @@ export function checkAchievements(game: Game, now: number, quiet = false): Achie
   const earned: Achievement[] = [], day = Math.floor(now / 86_400_000);
   for (const entry of ACHIEVEMENTS) {
     if (game.player.achievements[entry.id] !== undefined || !entry.check(game)) continue;
-    game.player.achievements[entry.id] = day; earned.push(entry);
+    game.player.achievements[entry.id] = day; earned.push(entry); if (!quiet) onAchievement(game);
     if (!quiet) message(game, `Achievement unlocked: ${entry.name}! (${achieved(game)}/${ACHIEVEMENTS.length})`, "quest");
   }
   if (quiet && earned.length) message(game, `You've earned ${earned.length} achievement${earned.length === 1 ? "" : "s"} so far (${achieved(game)}/${ACHIEVEMENTS.length}). See them in the Realm Daily (the 🔥 button).`, "quest");

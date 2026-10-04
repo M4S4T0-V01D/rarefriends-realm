@@ -1,0 +1,419 @@
+/**
+ * The wider world: the lands around the mainland, generated in world coordinates after the mainland has been set in.
+ *
+ * Nothing here touches the mainland's own content. The only mainland tiles ever repainted are sea and sand within
+ * twelve tiles of its edge (its old shoreline), where a new land joins on; everything inside that margin is sacrosanct.
+ *
+ * Layout (world coordinates; the mainland sits at x 185–534, y 160–359):
+ *   north      The Deadwood, a huge dead forest, with Gravesend (the graveyard settlement) at its southern edge.
+ *   west       Westmarch (remote wilderness) narrowing into the Drakespine, a long rocky peninsula that curls north to
+ *              Ashfall, the dragons' country, at its far end.
+ *   south      Southshore: beaches and downs, Saltmarrow (fishing) on a bay, Thistle Vale and Hollyhock (apothecary)
+ *              in the south-west valley, Dyemoor (tailors) on the river.
+ *   east       Ironreach, a mountain range, with Cragmaw (mining) in its pass; The Wilds and Tallgrass (hunters) to the
+ *              south-east; Quillhaven (scholars) on a headland in the far south-east.
+ *   sea        The Pale Isles, small islands with their own secrets.
+ * Four new dungeons live in the dungeon strip (rows 520–579), reached only by their surface entrances.
+ */
+import { MONSTERS } from "./data.ts";
+import { ECO_REGIONS, HERBS } from "./apothecary.ts";
+import { buildVillages } from "./villages.ts";
+// REGIONS is read only inside buildExpansion (called from createWorld), never at load, since world.ts imports this module.
+import { MAINLAND_RECT, OVERWORLD_H, REGIONS, T, isWater, type GenContext, type RegionId, type worldTools } from "./world.ts";
+
+export type Tools = ReturnType<typeof worldTools>;
+type Pt = readonly [number, number];
+
+/** A village's site: where it is, its region, and the ground it's built on (filled in by villages.ts). */
+export type VillageSite = { id: RegionId; name: string; x: number; y: number; ground: number };
+export const villageSites = (): readonly VillageSite[] => [
+  { id: "gravesend", name: "Gravesend", x: 300, y: 134, ground: T.COBBLE },
+  { id: "saltmarrow", name: "Saltmarrow", x: 424, y: 468, ground: T.WOOD },
+  { id: "hollyhock", name: "Hollyhock", x: 160, y: 450, ground: T.PATH },
+  { id: "dyemoor", name: "Dyemoor", x: 254, y: 472, ground: T.COBBLE },
+  { id: "tallgrass", name: "Tallgrass", x: 556, y: 404, ground: T.PATH },
+  { id: "cragmaw", name: "Cragmaw", x: 632, y: 202, ground: T.GRAVEL },
+  { id: "quillhaven", name: "Quillhaven", x: 646, y: 402, ground: T.STONE },
+];
+
+/** Where the mainland may be repainted: only its old shoreline (sea or sand within twelve tiles of its edge). */
+function mainlandMargin(x: number, y: number, tile: number) {
+  const inside = x >= MAINLAND_RECT.x0 && x <= MAINLAND_RECT.x1 && y >= MAINLAND_RECT.y0 && y <= MAINLAND_RECT.y1;
+  if (!inside) return true;
+  const edge = Math.min(x - MAINLAND_RECT.x0, MAINLAND_RECT.x1 - x, y - MAINLAND_RECT.y0, MAINLAND_RECT.y1 - y);
+  return edge < 12 && (isWater(tile) || tile === T.SAND);
+}
+
+export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
+  const { W, tiles, lift, random, noise, noise2 } = ctx, OH = OVERWORLD_H;
+  const { get, put, setRegion, blob, regionBlob, road, river, decor, tree, rock, spot, scatter, monsters, add, clearAt, free, tileIndex, inBounds, fillRect, rockCluster, npc } = t;
+  const inMainland = (x: number, y: number) => x >= MAINLAND_RECT.x0 && x <= MAINLAND_RECT.x1 && y >= MAINLAND_RECT.y0 && y <= MAINLAND_RECT.y1;
+  /** Paint a tile unless it's part of the mainland proper. */
+  const paint = (x: number, y: number, terrain: number) => { if (inBounds(x, y) && y < OH && mainlandMargin(x, y, get(x, y))) put(x, y, terrain); };
+  const ridge = makeNoise(seed + 101, 7), fine = makeNoise(seed + 103, 3), broad = makeNoise(seed + 107, 23);
+
+  /** A mainland square coordinate in world coordinates. */
+  const mainlandSquare = (mx: number, my: number): [number, number] => [mx + MAINLAND_RECT.x0, my + MAINLAND_RECT.y0];
+  /** The nearest free walkable tile to a point, the mainland included (places a person, never changes a tile). */
+  const nearestLandAnywhere = (cx: number, cy: number): [number, number] => {
+    for (let r = 0; r < 12; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+      const x = cx + dx, y = cy + dy, tt = get(x, y);
+      if ((tt === T.GRASS || tt === T.COBBLE || tt === T.PATH || tt === T.DARK_GRASS) && ctx.objectAt[tileIndex(x, y)] < 0 && ctx.objectAt[tileIndex(x, y - 1)] < 0 && get(x, y - 1) !== T.WALL && !ctx.spawns.some(spawn => spawn.x === x && spawn.y === y)) return [x, y];
+    }
+    return [cx, cy];
+  };
+  /** The nearest walkable, unoccupied land tile to a point (for landings and the like). */
+  const nearestLand = (cx: number, cy: number): [number, number] => {
+    for (let r = 0; r < 20; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+      const x = cx + dx, y = cy + dy, tt = get(x, y);
+      if ((tt === T.GRASS || tt === T.SAND || tt === T.DARK_GRASS) && ctx.objectAt[tileIndex(x, y)] < 0 && !inMainland(x, y) && (get(x + 1, y) === T.GRASS || get(x + 1, y) === T.SAND)) return [x, y];
+    }
+    return [cx, cy];
+  };
+  // ---------- 1. Land ----------
+  // A land field from overlapping, wobbling ellipses; the mainland's own land counts as land for the coast shaping.
+  const land = new Uint8Array(W * OH);
+  for (let y = 0; y < OH; y++) for (let x = 0; x < W; x++) if (inMainland(x, y) && !isWater(get(x, y))) land[y * W + x] = 1;
+  const landBlob = (cx: number, cy: number, rx: number, ry: number, wobble = 0.5) => {
+    for (let y = Math.max(0, Math.floor(cy - ry * 1.5)); y <= Math.min(OH - 1, cy + ry * 1.5); y++) for (let x = Math.max(0, Math.floor(cx - rx * 1.5)); x <= Math.min(W - 1, cx + rx * 1.5); x++) {
+      const d = ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2, edge = 1 + (broad(x, y) - 0.5) * wobble * 2 + (noise2(x, y) - 0.5) * 0.3;
+      if (d <= edge) land[y * W + x] = 1;
+    }
+  };
+  // North: the Deadwood, joined to the mainland's north shore by a broad neck above the Ashen Hills and Whisperwood.
+  landBlob(330, 72, 175, 64, 0.6); landBlob(300, 150, 70, 30, 0.4); landBlob(430, 150, 40, 24, 0.5);
+  // West: Westmarch, off the Whisperwood shore, narrowing into the Drakespine peninsula and swelling again at Ashfall.
+  landBlob(140, 300, 70, 56, 0.5); landBlob(180, 250, 30, 40, 0.4); landBlob(88, 232, 34, 42, 0.5); landBlob(72, 170, 26, 40, 0.5); landBlob(70, 92, 58, 56, 0.55);
+  // South: Southshore along the whole south coast, the Thistle Vale valley in the south-west, headlands and bays.
+  landBlob(350, 410, 190, 52, 0.7); landBlob(170, 440, 80, 44, 0.5); landBlob(430, 460, 40, 24, 0.6); landBlob(250, 465, 36, 22, 0.5);
+  // East: Ironreach, off the Greyhorn shore; The Wilds and Tallgrass to the south-east; Quillhaven's headland.
+  landBlob(612, 240, 92, 108, 0.6); landBlob(560, 280, 40, 40, 0.5); landBlob(570, 420, 70, 44, 0.6); landBlob(646, 404, 30, 26, 0.5);
+  // The Pale Isles and a few lonely rocks.
+  landBlob(96, 500, 24, 12, 0.6); landBlob(50, 420, 14, 10, 0.6); landBlob(560, 70, 18, 12, 0.6); landBlob(690, 500, 16, 12, 0.6); landBlob(20, 300, 9, 7, 0.6);
+  // Carve bays so the coast isn't round: scoops of sea back into the land.
+  const seaBlob = (cx: number, cy: number, rx: number, ry: number) => {
+    for (let y = Math.max(0, Math.floor(cy - ry * 1.3)); y <= Math.min(OH - 1, cy + ry * 1.3); y++) for (let x = Math.max(0, Math.floor(cx - rx * 1.3)); x <= Math.min(W - 1, cx + rx * 1.3); x++) {
+      if (inMainland(x, y)) continue;
+      if (((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1 + (noise2(x, y) - 0.5) * 0.5) land[y * W + x] = 0;
+    }
+  };
+  seaBlob(470, 470, 30, 30); seaBlob(210, 500, 40, 24); seaBlob(140, 150, 40, 30); seaBlob(600, 340, 26, 18); seaBlob(20, 30, 50, 40); seaBlob(690, 120, 30, 40);
+  // Distance to the sea over land, and to land over the sea (a few tiles each way), for beaches and shallows.
+  const toSea = new Uint8Array(W * OH).fill(255), toLand = new Uint8Array(W * OH).fill(255);
+  const sweep = (from: Uint8Array, isSource: (i: number) => boolean, limit: number) => {
+    const queue: number[] = [];
+    for (let i = 0; i < W * OH; i++) if (isSource(i)) { from[i] = 0; queue.push(i); }
+    for (let head = 0; head < queue.length; head++) {
+      const i = queue[head], d = from[i]; if (d >= limit) continue;
+      const x = i % W, y = (i - x) / W;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+        const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= W || ny >= OH) continue;
+        const j = ny * W + nx; if (from[j] > d + 1) { from[j] = d + 1; queue.push(j); }
+      }
+    }
+  };
+  sweep(toSea, i => !land[i], 6); sweep(toLand, i => !!land[i], 5);
+  for (let y = 0; y < OH; y++) for (let x = 0; x < W; x++) {
+    const i = y * W + x;
+    if (land[i]) paint(x, y, toSea[i] <= 1 ? T.SAND : noise(x, y) > 0.62 ? T.DARK_GRASS : T.GRASS);
+    else paint(x, y, toLand[i] <= 3 ? T.WATER : T.DEEP);
+    if (!inMainland(x, y)) setRegion(x, y, "coast");
+  }
+
+  // ---------- 2. Regions ----------
+  regionBlob(330, 72, 170, 62, "deadwood"); regionBlob(300, 150, 66, 28, "deadwood");
+  regionBlob(300, 134, 14, 11, "gravesend");
+  regionBlob(150, 290, 76, 60, "westmarch"); regionBlob(180, 250, 30, 38, "westmarch");
+  regionBlob(86, 225, 34, 44, "drakespine"); regionBlob(72, 165, 26, 40, "drakespine");
+  regionBlob(70, 92, 56, 54, "ashfall");
+  regionBlob(350, 410, 188, 50, "southshore"); regionBlob(430, 460, 40, 24, "southshore");
+  regionBlob(170, 436, 78, 42, "thistle_vale");
+  regionBlob(160, 450, 13, 11, "hollyhock"); regionBlob(254, 472, 13, 10, "dyemoor"); regionBlob(424, 468, 15, 11, "saltmarrow");
+  regionBlob(612, 240, 90, 106, "ironreach"); regionBlob(560, 280, 38, 38, "ironreach");
+  regionBlob(632, 202, 14, 12, "cragmaw");
+  regionBlob(574, 420, 68, 42, "the_wilds"); regionBlob(556, 404, 13, 11, "tallgrass");
+  regionBlob(646, 404, 28, 24, "quillhaven");
+  regionBlob(96, 500, 26, 14, "pale_isles");  // (the other islets stay "coast": no ferry calls there, so nothing to gather grows on them)
+  // The sea keeps "coast" (set above); the mainland's own tiles are never re-regioned.
+  const REGION_ORDER = REGIONS.map(region => region.id), regionIs = (x: number, y: number, id: RegionId) => REGION_ORDER[ctx.region[tileIndex(x, y)]] === id;
+  const onLand = (tt: number) => tt === T.GRASS || tt === T.DARK_GRASS;
+  const landOnly = (tt: number) => onLand(tt) || tt === T.SAND;
+
+  // ---------- 3. Biomes ----------
+  // The Deadwood: pale dead grass, black bog, gravel where nothing grows, and the dead trees themselves.
+  for (let y = 0; y < 185; y++) for (let x = 150; x < 520; x++) {
+    if (!regionIs(x, y, "deadwood") || inMainland(x, y)) continue;
+    const tt = get(x, y); if (!onLand(tt)) continue;
+    const n = fine(x, y), m = ridge(x, y);
+    if (m < 0.3) paint(x, y, T.SWAMP); else if (n > 0.78) paint(x, y, T.GRAVEL); else if (n < 0.45) paint(x, y, T.DARK_GRASS);
+  }
+  // Westmarch: rolling downs with dark heather; the Drakespine: gravel and scree with cliffs, rising towards the end.
+  for (let y = 100; y < 370; y++) for (let x = 0; x < 230; x++) {
+    if (inMainland(x, y)) continue;
+    const tt = get(x, y); if (!onLand(tt)) continue;
+    if (regionIs(x, y, "westmarch") && noise2(x, y) > 0.6) paint(x, y, T.DARK_GRASS);
+    if (regionIs(x, y, "drakespine")) {
+      const m = ridge(x * 0.8, y * 0.8), toTip = 1 - Math.min(1, Math.hypot(x - 72, y - 150) / 120);
+      if (m > 0.72) paint(x, y, T.CLIFF); else if (m > 0.5 || noise(x, y) > 0.7) paint(x, y, T.GRAVEL);
+      lift[tileIndex(x, y)] = Math.max(0, m - 0.35) * 2.2 * (0.4 + toTip);
+    }
+  }
+  // Ashfall: ash fields, lava, cliffs ringing it so the passes matter, and a crater at the far tip.
+  for (let y = 20; y < 170; y++) for (let x = 0; x < 150; x++) {
+    if (!regionIs(x, y, "ashfall") || inMainland(x, y)) continue;
+    const tt = get(x, y); if (!landOnly(tt)) continue;
+    const d = ((x - 70) / 56) ** 2 + ((y - 92) / 54) ** 2, m = ridge(x * 1.3, y * 1.3);
+    if (d > 0.72 && d < 0.95 && noise2(x, y) > 0.3) paint(x, y, T.CLIFF);
+    else if (noise(x * 1.4 + 90, y * 1.4) > 0.73 && d < 0.6) paint(x, y, T.LAVA);
+    else paint(x, y, m > 0.62 ? T.GRAVEL : T.ASH);
+    lift[tileIndex(x, y)] = Math.max(0, m - 0.5) * 1.6;
+  }
+  // Ironreach: a mountain range with snow on the heights, cliffs in bands, a pass where the road goes.
+  for (let y = 120; y < 370; y++) for (let x = 520; x < W; x++) {
+    if (!regionIs(x, y, "ironreach") && !regionIs(x, y, "cragmaw")) continue;
+    if (inMainland(x, y)) continue;
+    const tt = get(x, y); if (!landOnly(tt)) continue;
+    const m = ridge(x * 0.9, y * 0.9), height = Math.max(0, m - 0.3) * 3.2 * Math.min(1, Math.hypot(x - 612, y - 240) < 100 ? 1 : 0.4);
+    lift[tileIndex(x, y)] = regionIs(x, y, "cragmaw") ? 0 : height;
+    if (regionIs(x, y, "cragmaw")) continue;
+    if (m > 0.78) paint(x, y, T.SNOW); else if (m > 0.66 && noise2(x, y) > 0.35) paint(x, y, T.CLIFF); else if (m > 0.52) paint(x, y, T.GRAVEL);
+  }
+  // Southshore: sandy downs; Thistle Vale: meadows with farmland strips; The Wilds: tall dark grass; Dyemoor's moor.
+  for (let y = 360; y < OH; y++) for (let x = 0; x < W; x++) {
+    if (inMainland(x, y)) continue;
+    const tt = get(x, y); if (!onLand(tt)) continue;
+    if (regionIs(x, y, "southshore") && noise(x, y) > 0.72) paint(x, y, T.SAND);
+    if (regionIs(x, y, "thistle_vale") && noise2(x, y) < 0.25) paint(x, y, T.DARK_GRASS);
+    if (regionIs(x, y, "the_wilds") && noise2(x, y) > 0.4) paint(x, y, T.DARK_GRASS);
+    if (regionIs(x, y, "dyemoor") && ridge(x, y) < 0.35) paint(x, y, T.SWAMP);
+  }
+  // Pale Isles: sand and grass, a rock or two.
+  // Rivers: Ironreach's meltwater south to the sea; the Deadwood's black river; the Thistle, down the vale past Dyemoor.
+  river([[612, 170], [596, 230], [588, 300], [578, 360], [566, 420], [560, 470]], 3);
+  river([[300, 10], [280, 50], [262, 90], [240, 120], [228, 150]], 3.5);
+  river([[110, 380], [150, 410], [200, 440], [245, 462], [262, 486], [272, 510]], 3);
+  // Shallows beside the rivers so they read as water, not void.
+  for (const [cx, cy] of [[228, 150], [272, 510], [560, 470]] as const) blob(cx, cy, 5, 4, T.WATER, 0.3, landOnly);
+
+  // ---------- 4. Roads ----------
+  // Long roads out of the mainland: north to Gravesend and into the Deadwood; west across Westmarch and up the
+  // Drakespine (ending as a broken gravel track); south to a crossroads and on to every southern village; east through
+  // the Ironreach pass to Cragmaw and down to Quillhaven. Roads bridge the water they cross.
+  const N0: Pt = [299, 169], S0: Pt = [305, 351], W0: Pt = [194, 250], E0: Pt = [520, 262];
+  road([N0, [300, 150], [300, 134]]);                                                    // to Gravesend
+  road([[300, 122], [312, 100], [320, 76], [338, 50]], 2.2, T.GRAVEL);                   // the old Deadwood road
+  road([[300, 126], [270, 112], [246, 100], [214, 92], [196, 70]], 2.2, T.GRAVEL);        // a woodsmen's track west over the black river
+  road([W0, [170, 262], [140, 292], [112, 290]]);                                        // Westmarch
+  road([[112, 290], [96, 262], [86, 230], [78, 196], [72, 160], [72, 128]], 2.2, T.GRAVEL);  // up the Drakespine
+  road([S0, [312, 380], [320, 400]]);                                                    // to the southern crossroads
+  road([[320, 400], [300, 440], [262, 462], [254, 472]]);                                // Dyemoor
+  road([[262, 462], [220, 448], [176, 450], [160, 450]]);                                // Hollyhock
+  road([[320, 400], [360, 430], [400, 456], [424, 468]]);                                // Saltmarrow
+  road([[320, 400], [400, 400], [480, 404], [556, 404]]);                                // Tallgrass
+  road([E0, [560, 250], [600, 220], [632, 202]]);                                        // Cragmaw, through the pass
+  road([[632, 202], [640, 260], [630, 330], [640, 380], [646, 402]], 2.4);               // down to Quillhaven
+  road([[556, 404], [600, 404], [630, 404]], 2.2, T.GRAVEL);                             // a hunters' track east
+  // Village grounds: a clearing of their own paving where each village will be built.
+  for (const site of villageSites()) {
+    for (let y = site.y - 9; y <= site.y + 9; y++) for (let x = site.x - 11; x <= site.x + 11; x++) {
+      if (!inBounds(x, y) || inMainland(x, y)) continue;
+      const tt = get(x, y);
+      if (isWater(tt) && site.id !== "saltmarrow") paint(x, y, T.GRASS);
+      else if (tt === T.CLIFF || tt === T.LAVA || tt === T.SWAMP) paint(x, y, site.id === "cragmaw" ? T.GRAVEL : T.GRASS);
+      clearAt(x, y);
+    }
+  }
+  // Mountain passes: no cliff on a road, and gravel beside it.
+  for (let y = 0; y < OH; y++) for (let x = 0; x < W; x++) if (get(x, y) === T.PATH || get(x, y) === T.GRAVEL) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) if (get(x + dx, y + dy) === T.CLIFF && !inMainland(x + dx, y + dy)) paint(x + dx, y + dy, T.GRAVEL);
+
+  // ---------- 5. Scenery ----------
+  const inRegion = (id: RegionId) => (x: number, y: number) => regionIs(x, y, id) && free(x, y) && !inMainland(x, y);
+  // The Deadwood: dense dead trees, a few hardy yews, graves and rubble, ruined walls; thicker the deeper north you go.
+  scatter(150, 0, 520, 185, 1700, (x, y) => decor(x, y, "dead_tree"), (x, y) => inRegion("deadwood")(x, y) && random() < 0.35 + (1 - y / 185) * 0.6);
+  scatter(150, 0, 520, 185, 60, (x, y) => tree(x, y, "yew"), inRegion("deadwood"));
+  scatter(150, 0, 520, 185, 120, (x, y) => decor(x, y, "grave"), inRegion("deadwood"));
+  scatter(150, 0, 520, 185, 90, (x, y) => decor(x, y, random() > 0.5 ? "rubble" : "ruin_wall"), inRegion("deadwood"));
+  scatter(150, 0, 520, 185, 40, (x, y) => decor(x, y, "torch", true, "Will-o'-the-wisp lantern"), inRegion("deadwood"));
+  // Westmarch: oaks and willows in clumps, boulders, the odd lonely house further on.
+  scatter(60, 220, 230, 370, 220, (x, y) => tree(x, y, random() > 0.6 ? "oak" : "tree"), inRegion("westmarch"));
+  scatter(60, 220, 230, 370, 40, (x, y) => tree(x, y, "willow"), inRegion("westmarch"));
+  scatter(60, 220, 230, 370, 50, (x, y) => decor(x, y, "boulder"), inRegion("westmarch"));
+  // The Drakespine: scree, dead trees, pines on the slopes, rocks worth mining up high.
+  scatter(30, 110, 130, 280, 90, (x, y) => decor(x, y, random() > 0.5 ? "boulder" : "dead_tree"), inRegion("drakespine"));
+  scatter(30, 110, 130, 280, 60, (x, y) => decor(x, y, "pine"), inRegion("drakespine"));
+  scatter(30, 110, 130, 280, 14, (x, y) => rock(x, y, "inkcoal"), inRegion("drakespine"));
+  scatter(30, 110, 130, 280, 8, (x, y) => rock(x, y, "glimmer"), inRegion("drakespine"));
+  // Ashfall: ruins of whoever lived here before the dragons, and bones.
+  scatter(10, 30, 130, 150, 60, (x, y) => decor(x, y, random() > 0.4 ? "pillar" : "ruin_wall"), inRegion("ashfall"));
+  scatter(10, 30, 130, 150, 40, (x, y) => decor(x, y, "rubble"), inRegion("ashfall"));
+  scatter(10, 30, 130, 150, 24, (x, y) => decor(x, y, "dead_tree"), inRegion("ashfall"));
+  scatter(10, 30, 130, 150, 10, (x, y) => rock(x, y, "rarite"), inRegion("ashfall"));
+  // Southshore: palms on the beaches, bushes and flowers on the downs, reeds by the river mouths.
+  scatter(150, 360, 560, OH - 1, 90, (x, y) => decor(x, y, "palm"), (x, y) => inRegion("southshore")(x, y) && get(x, y) === T.SAND);
+  scatter(150, 360, 560, OH - 1, 160, (x, y) => (random() > 0.5 ? decor(x, y, "bush") : decor(x, y, "flowers", false)), inRegion("southshore"));
+  scatter(150, 360, 560, OH - 1, 120, (x, y) => tree(x, y, random() > 0.7 ? "willow" : "tree"), inRegion("southshore"));
+  // Thistle Vale: meadow flowers, maples and oaks, farmland strips the herb gardens will grow on.
+  scatter(80, 380, 250, 500, 200, (x, y) => decor(x, y, "flowers", false), inRegion("thistle_vale"));
+  scatter(80, 380, 250, 500, 110, (x, y) => tree(x, y, random() > 0.5 ? "maple" : "oak"), inRegion("thistle_vale"));
+  scatter(80, 380, 250, 500, 50, (x, y) => decor(x, y, "bush"), inRegion("thistle_vale"));
+  // The Wilds: tall grass and thickets, boulders, game.
+  scatter(500, 370, 660, 480, 180, (x, y) => tree(x, y, random() > 0.5 ? "oak" : "tree"), inRegion("the_wilds"));
+  scatter(500, 370, 660, 480, 120, (x, y) => decor(x, y, "bush"), inRegion("the_wilds"));
+  scatter(500, 370, 660, 480, 40, (x, y) => decor(x, y, "boulder"), inRegion("the_wilds"));
+  // Ironreach: pines below the snow, boulders, and the ore that made Cragmaw.
+  scatter(520, 120, 719, 370, 160, (x, y) => decor(x, y, "pine"), (x, y) => inRegion("ironreach")(x, y) && get(x, y) !== T.SNOW);
+  scatter(520, 120, 719, 370, 120, (x, y) => decor(x, y, "boulder"), inRegion("ironreach"));
+  for (const [kind, n] of [["blackiron", 16], ["inkcoal", 14], ["moonsilver", 8], ["glimmer", 6], ["gem", 4]] as const) scatter(560, 150, 719, 330, n, (x, y) => rock(x, y, kind), inRegion("ironreach"));
+  rockCluster(640, 190, 6, "blackiron", 6); rockCluster(624, 214, 5, "inkcoal", 5);
+  // Quillhaven's headland: cypress-like pines, standing stones.
+  scatter(610, 370, 690, 440, 40, (x, y) => decor(x, y, "pine"), inRegion("quillhaven"));
+  scatter(610, 370, 690, 440, 14, (x, y) => decor(x, y, "pillar", true, "Standing stone"), inRegion("quillhaven"));
+  // The Pale Isles: palms and a rock or two.
+  scatter(0, 380, 150, OH - 1, 30, (x, y) => decor(x, y, "palm"), inRegion("pale_isles"));
+  scatter(540, 40, 600, 100, 12, (x, y) => decor(x, y, "pine"), inRegion("pale_isles"));
+  // Fishing all round the new coasts.
+  t.shoreSpots(410, 474, 440, 486, "net", 4); t.shoreSpots(410, 474, 440, 486, "deep", 3); t.shoreSpots(240, 480, 270, 495, "bait", 3);
+  t.shoreSpots(86, 494, 106, 506, "deep", 3); t.shoreSpots(636, 414, 660, 426, "lure", 3);
+  // The Saltmarrow ferry: a boat at the end of the south dock sails to the Pale Isles and back (a crossing you can't walk).
+  const landing = nearestLand(96, 500);
+  clearAt(431, 486); put(431, 486, T.WOOD);
+  add({ kind: "ladder", x: 431, y: 486, blocks: true, name: "Ferry to the Pale Isles", action: "Sail-to", to: { x: landing[0], y: landing[1] } });
+  clearAt(landing[0] + 1, landing[1]); put(landing[0] + 1, landing[1], T.SAND);
+  add({ kind: "ladder", x: landing[0] + 1, y: landing[1], blocks: true, name: "Ferry to Saltmarrow", action: "Sail-to", to: { x: 431, y: 484 } });
+  decor(430, 487, "boat", true, "The Gullwing II"); decor(landing[0] + 1, landing[1] + 1, "boat", true, "The Gullwing II");
+  // Secrets and strange places: a house far out in the Westmarch with nobody home, a lone grave on an island, a
+  // circle of stones in The Wilds, a drowned pier on the Pale Isles.
+  t.building(96, 332, 101, 336, "s", T.WOOD, undefined, { name: "Lonely house", color: "#6d6b67", chimney: true });
+  decor(98, 333, "bed"); decor(100, 335, "table"); decor(97, 335, "chest", true, "Dusty chest");
+  decor(50, 418, "grave", true, "A grave, far from anywhere");
+  for (const [dx, dy] of [[-4, 0], [4, 0], [0, -3], [0, 3], [-3, -2], [3, -2], [-3, 2], [3, 2]] as const) decor(600 + dx, 450 + dy, "pillar", true, "Standing stone");
+  for (let x = 84; x <= 92; x++) if (isWater(get(x, 506))) put(x, 506, T.BRIDGE);
+  decor(93, 506, "boat", true, "Wreck");
+
+  // ---------- 5b. Things that tell a story without saying it ----------
+  // A burned farmhouse out in Westmarch: three beds, one small; a cold hearth; a broken sword; a toy; footprints to the trees. Nobody explains it.
+  t.building(150, 326, 157, 331, "s", T.WOOD, undefined, { name: "Burned farmhouse", color: "#3b3a38", walls: "plank", roof: "none" });
+  for (let y = 326; y <= 331; y++) for (let x = 150; x <= 157; x++) if (get(x, y) === T.WALL && noise2(x * 2, y * 2) > 0.45) put(x, y, T.ASH);
+  for (let y = 327; y <= 330; y++) for (let x = 151; x <= 156; x++) put(x, y, T.ASH);
+  decor(151, 327, "bed", true, "A bed, burnt"); decor(153, 327, "bed", true, "A bed, burnt"); decor(155, 327, "bed", true, "A small bed, burnt");
+  decor(156, 330, "rubble", true, "A cold hearth"); decor(152, 330, "crate", true, "A child's wooden horse, unburnt"); decor(154, 329, "armour", true, "A broken sword, driven into the floor");
+  decor(158, 334, "flowers", false, "Footprints, old, leading into the trees"); decor(160, 337, "flowers", false, "Footprints, old, leading into the trees"); decor(162, 340, "flowers", false, "Footprints. Then nothing.");
+  // Up the Thistle Vale, a farmer has a carved stone for a fence post. It's an altar. He doesn't care.
+  for (let x = 118; x <= 130; x += 2) decor(x, 414, "fence");
+  decor(132, 414, "pillar", true, "An old carved stone, used as a fence post. It's an altar. Nobody minds.");
+  // The Thistle road crosses ancient stonework where the mud's worn through.
+  for (let x = 262; x <= 300; x++) for (let y = 440; y <= 464; y++) if (get(x, y) === T.PATH && noise2(x * 1.7, y * 1.7) > 0.72) put(x, y, T.COBBLE);
+  // Deep in the Deadwood, a shrine to a figure like the Old Friend. The face has been chiselled off. The Order doesn't like it mentioned.
+  for (let y = 36; y <= 42; y++) for (let x = 404; x <= 412; x++) { clearAt(x, y); paint(x, y, T.GRAVEL); }
+  decor(408, 38, "statue", true, "A statue of a bearded figure. The face has been chiselled off, carefully."); decor(406, 41, "pillar", true, "Standing stone, carved with a symbol nobody reads"); decor(410, 41, "pillar", true, "Standing stone, carved with the same symbol");
+  decor(408, 41, "torch", true, "A candle, lit. Somebody comes here.");
+  // Under Ironreach's slopes, an ancient mechanism nobody built and nobody understands, half-buried.
+  decor(590, 212, "windmill", true, "An ancient mechanism: gears the size of cartwheels, seized. Not a mill. Not anything."); decor(592, 214, "rubble", true, "Fallen gearwork, older than Cragmaw"); decor(588, 215, "pillar", true, "A pillar carved with the symbol from the stones");
+  // A fisherman's shack on the Southshore with the nets still hung, and nobody in it for years.
+  t.building(366, 428, 370, 431, "s", T.WOOD, undefined, { name: "Fisherman's shack", color: "#6d6b67", walls: "plank" });
+  decor(367, 429, "bed", true, "A bed, made"); decor(369, 429, "barrel", true, "Nets, hung to dry years ago"); decor(372, 433, "boat", true, "A boat, keel up, bleached");
+  // The Friendhollow castle was built against something from the west: on the Westmarch road, a line of old watch-stones faces west, every one toppled the same way.
+  for (const x of [166, 160, 154, 148, 142]) decor(x, 262 + (x % 4 === 0 ? 1 : -1), "rubble", true, "A toppled watch-stone, fallen westward");
+  // ---------- 6. Creatures (the Realm's existing bestiary; the new regions' own come with their villages and skills) ----------
+  monsters("skeleton", 200, 30, 460, 150, 26); monsters("shade", 220, 10, 440, 110, 16); monsters("wolf", 160, 100, 300, 180, 10); monsters("cairn_wight", 260, 20, 400, 90, 8);
+  monsters("gloom_hound", 300, 10, 400, 60, 5);
+  monsters("boar", 70, 230, 220, 360, 12); monsters("bandit", 100, 250, 200, 340, 8); monsters("wolf", 60, 240, 160, 330, 6);
+  monsters("highland_goat", 40, 120, 120, 270, 10); monsters("stone_golem", 40, 140, 110, 240, 5); monsters("frost_wisp", 40, 110, 100, 200, 4);
+  monsters("ash_drake", 20, 40, 120, 140, 8); monsters("cinder_drake", 30, 50, 110, 130, 5);
+  monsters("boar", 160, 370, 540, 500, 12); monsters("bandit", 300, 380, 520, 440, 8); monsters("forest_spider", 90, 390, 240, 490, 8);
+  monsters("boar", 500, 380, 660, 480, 10); monsters("wolf", 500, 380, 660, 480, 8); monsters("highland_goat", 500, 380, 660, 480, 6); monsters("thornback", 520, 400, 660, 480, 5);
+  monsters("stone_golem", 560, 130, 700, 330, 10); monsters("frost_yeti", 560, 130, 700, 320, 6); monsters("cairn_wight", 560, 140, 700, 320, 6); monsters("highland_goat", 540, 130, 700, 340, 10);
+  monsters("sand_scorpion", 60, 480, 140, 519, 4); monsters("skeleton", 540, 40, 600, 100, 4);
+
+  // ---------- 7. Underground: four new dungeons in the strip, each with a surface entrance that gives nothing away ----------
+  const dungeon = (id: RegionId, rooms: readonly (readonly [number, number, number, number])[], floor: number) => {
+    for (const [x0, y0, x1, y1] of rooms) for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { put(x, y, floor); setRegion(x, y, id); }
+  };
+  // The Deadwood Catacombs, under the ruined chapel at the end of the old road: galleries of the restless dead.
+  dungeon("catacombs", [[20, 524, 60, 532], [56, 528, 100, 531], [96, 522, 130, 540], [30, 532, 70, 546], [60, 544, 120, 547], [130, 528, 170, 544]], T.DUNGEON);
+  t.building(334, 44, 342, 50, "s", T.STONE, undefined, { name: "Ruined chapel", color: "#6d6b67", walls: "stone", roof: "none" });
+  for (let y = 44; y <= 50; y++) for (let x = 334; x <= 342; x++) if (get(x, y) === T.WALL && noise2(x, y) > 0.55) put(x, y, T.GRAVEL);
+  add({ kind: "ladder", x: 338, y: 47, blocks: true, name: "Catacomb stairs", action: "Climb-down", to: { x: 24, y: 528 } });
+  add({ kind: "ladder", x: 22, y: 528, blocks: true, name: "Stairs", action: "Climb-up", to: { x: 338, y: 51 } });
+  add({ kind: "altar", x: 160, y: 536, blocks: true, name: "Bone altar", text: "bone" }); decor(160, 534, "old_friend");
+  for (let x = 34; x <= 66; x += 8) { decor(x, 524, "pillar"); decor(x, 546, "torch", true); }
+  decor(104, 524, "chest", true, "Ossuary chest"); decor(166, 540, "grave", true, "The Deadwood's first grave");
+  monsters("skeleton", 20, 522, 170, 547, 18); monsters("shade", 56, 522, 170, 547, 10); monsters("cairn_wight", 96, 522, 170, 547, 8); monsters("hollow_weaver", 130, 528, 170, 544, 2);
+  // The Wyrm's Lair, under Ashfall's crater: the dragons' own halls.
+  dungeon("wyrm_lair", [[20, 556, 70, 566], [66, 560, 110, 563], [106, 554, 170, 576], [30, 566, 100, 577]], T.ASH);
+  for (let y = 554; y <= 577; y++) for (let x = 20; x <= 170; x++) if (get(x, y) === T.ASH && noise(x * 1.4, y * 1.4) > 0.74) put(x, y, T.LAVA);
+  add({ kind: "ladder", x: 70, y: 70, blocks: true, name: "Crater mouth", action: "Climb-down", to: { x: 24, y: 560 } });
+  add({ kind: "ladder", x: 22, y: 560, blocks: true, name: "Crater wall", action: "Climb-up", to: { x: 70, y: 72 } });
+  for (let x = 28; x <= 60; x += 8) decor(x, 556, "pillar"); decor(166, 556, "chest", true, "Dragon's hoard"); decor(140, 574, "chest", true, "Dragon's hoard");
+  monsters("ash_drake", 20, 554, 170, 577, 10); monsters("cinder_drake", 66, 554, 170, 577, 8);
+  // Saltmarrow's sea cave, under a ladder in an abandoned dock hut: the drowned, and what the tide brings in.
+  dungeon("sea_cave", [[548, 524, 600, 532], [596, 528, 640, 531], [636, 522, 700, 540], [560, 532, 600, 546]], T.STONE);
+  for (let y = 522; y <= 546; y++) for (let x = 548; x <= 700; x++) if (get(x, y) === T.STONE && noise2(x * 1.3, y * 1.3) > 0.68 && ![528, 529, 530, 531, 538, 539].includes(y) && !(x >= 560 && x <= 600 && y >= 532 && y <= 534) && !(x >= 636 && x <= 640)) put(x, y, T.WATER);
+  t.building(436, 476, 440, 479, "n", T.WOOD, undefined, { name: "Abandoned hut", color: "#6d6b67", walls: "plank" });
+  add({ kind: "ladder", x: 438, y: 478, blocks: true, name: "Trapdoor", action: "Climb-down", to: { x: 552, y: 528 } });
+  add({ kind: "ladder", x: 550, y: 528, blocks: true, name: "Ladder", action: "Climb-up", to: { x: 438, y: 475 } });
+  decor(696, 530, "chest", true, "Barnacled chest"); decor(590, 526, "boat", true, "Smashed boat"); for (let x = 560; x <= 596; x += 9) decor(x, 546, "torch", true);
+  monsters("skeleton", 548, 522, 700, 546, 10); monsters("swamp_lurker", 560, 522, 700, 546, 8); monsters("mire_crawler", 596, 522, 700, 546, 6);
+  // Cragmaw's deep mine, down the shaft behind the camp: the richest rock in the Realm, and what woke in it.
+  dungeon("deep_mine", [[548, 556, 620, 566], [616, 560, 660, 563], [656, 554, 710, 576], [560, 566, 640, 577]], T.DUNGEON);
+  add({ kind: "ladder", x: 550, y: 560, blocks: true, name: "Mine shaft", action: "Climb-up", to: { x: 640, y: 197 } });  // (the shaft down is in Cragmaw: villages.ts)
+  for (const [kind, n, x0, x1] of [["blackiron", 8, 548, 620], ["inkcoal", 8, 548, 660], ["moonsilver", 6, 616, 710], ["glimmer", 5, 656, 710], ["rarite", 4, 656, 710], ["gem", 3, 560, 640]] as const) {
+    scatter(x0, 554, x1, 577, n, (x, y) => rock(x, y, kind), (x, y) => get(x, y) === T.DUNGEON && ctx.objectAt[tileIndex(x, y)] < 0);
+  }
+  for (let x = 556; x <= 612; x += 8) decor(x, 556, "torch", true); decor(706, 574, "chest", true, "Foreman's chest");
+  monsters("stone_golem", 548, 554, 710, 577, 10); monsters("ember_salamander", 616, 554, 710, 577, 5); monsters("gloom_hound", 656, 554, 710, 577, 4);
+  // Venomous creatures: adders in every bog, spiders in the dark places.
+  monsters("marsh_adder", 20, 20, 500, 180, 10); monsters("marsh_adder", 200, 320, 240, 350, 3); monsters("marsh_adder", 236, 455, 272, 490, 4);
+  monsters("cave_spider", 20, 522, 170, 547, 6); monsters("cave_spider", 548, 522, 700, 546, 6); monsters("cave_spider", 548, 554, 710, 577, 4);
+  // The Namekeeper keeps his register at a table on the Friendhollow square's edge (an empty tile; nothing on the square moves).
+  { const [nx, ny] = nearestLandAnywhere(...mainlandSquare(116, 118)); npc("namekeeper", nx, ny); decor(nx, ny - 1, "table", true, "The Register of Names"); }
+  buildVillages(ctx, t);
+  // Everywhere a walker can get to from the spawn (over walkable ground, round blocking objects, down ladders and over the ferry):
+  // herbs only grow where someone can pick them.
+  const walkable = new Uint8Array(W * ctx.H);
+  {
+    const WALK = new Set<number>([T.GRASS, T.DARK_GRASS, T.PATH, T.COBBLE, T.SAND, T.SWAMP, T.SNOW, T.STONE, T.WOOD, T.GRAVEL, T.DUNGEON, T.BRIDGE, T.FARMLAND, T.ICE, T.CARPET, T.ASH]);
+    const canStep = (x: number, y: number) => { if (!inBounds(x, y)) return false; const tt = get(x, y); if (!WALK.has(tt)) return false; const id = ctx.objectAt[tileIndex(x, y)]; return id < 0 || !ctx.objects[id].blocks; };
+    const queue: number[] = [tileIndex(306, 283)]; walkable[queue[0]] = 1;
+    const ladders = ctx.objects.filter(object => object.kind === "ladder" && object.to);
+    for (let head = 0; head < queue.length; head++) {
+      const i = queue[head], x = i % W, y = (i - x) / W;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) { const nx = x + dx, ny = y + dy; if (canStep(nx, ny) && !walkable[tileIndex(nx, ny)]) { walkable[tileIndex(nx, ny)] = 1; queue.push(tileIndex(nx, ny)); } }
+      for (const ladder of ladders) if (Math.abs(ladder.x - x) + Math.abs(ladder.y - y) === 1 && ladder.to && canStep(ladder.to.x, ladder.to.y) && !walkable[tileIndex(ladder.to.x, ladder.to.y)]) { walkable[tileIndex(ladder.to.x, ladder.to.y)] = 1; queue.push(tileIndex(ladder.to.x, ladder.to.y)); }
+    }
+  }
+  // ---------- 8. Herbs: every ecosystem grows its own, on empty ground, the mainland's regions included ----------
+  // Patches per herb by rarity, spread over all the regions of its ecosystem; the regions' own bounds are found by scanning.
+  const bounds = new Map<string, [number, number, number, number]>();
+  for (let y = 0; y < OH; y++) for (let x = 0; x < W; x++) {
+    const id = REGION_ORDER[ctx.region[tileIndex(x, y)]], b = bounds.get(id);
+    if (!b) bounds.set(id, [x, y, x, y]); else { b[0] = Math.min(b[0], x); b[1] = Math.min(b[1], y); b[2] = Math.max(b[2], x); b[3] = Math.max(b[3], y); }
+  }
+  const PATCHES = { common: 14, uncommon: 8, rare: 5, "very rare": 3 } as const;
+  for (const herbKind of HERBS) {
+    for (const regionId of ECO_REGIONS[herbKind.eco]) {
+      const b = bounds.get(regionId); if (!b) continue;
+      const n = Math.max(2, Math.round(PATCHES[herbKind.rarity] * (regionId === "coast" ? 0.5 : 1)));
+      scatter(b[0], b[1], b[2], b[3], n, (x, y) => t.herb(x, y, herbKind.id, `${herbKind.name} patch`), (x, y) => regionIs(x, y, regionId) && free(x, y) && y < OH && walkable[tileIndex(x, y)] === 1 && (herbKind.eco !== "coast" || get(x, y) === T.SAND || get(x, y) === T.GRASS));
+    }
+  }
+  // Sanity: no monster of a kind that doesn't exist.
+  for (const spawn of ctx.spawns) if (spawn.kind === "monster" && !MONSTERS[spawn.id]) throw new Error(`Unknown monster ${spawn.id}`);
+  void npc; void fillRect; void spot;
+}
+
+/** Smooth value noise in [0, 1) (the same recipe as world.ts, with its own seed). */
+function makeNoise(seed: number, scale: number) {
+  let state = seed;
+  const r = () => { state = (state + 0x6d2b79f5) | 0; let t = Math.imul(state ^ (state >>> 15), 1 | state); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const size = 64, grid = Array.from({ length: size * size }, () => r());
+  const at = (x: number, y: number) => grid[((y % size + size) % size) * size + ((x % size + size) % size)];
+  const smooth = (t: number) => t * t * (3 - 2 * t);
+  return (x: number, y: number) => {
+    const fx = x / scale, fy = y / scale, x0 = Math.floor(fx), y0 = Math.floor(fy), tx = smooth(fx - x0), ty = smooth(fy - y0);
+    const a = at(x0, y0), b = at(x0 + 1, y0), c = at(x0, y0 + 1), d = at(x0 + 1, y0 + 1);
+    return (a * (1 - tx) + b * tx) * (1 - ty) + (c * (1 - tx) + d * tx) * ty;
+  };
+}

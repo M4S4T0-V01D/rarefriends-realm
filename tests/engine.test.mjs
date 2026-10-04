@@ -4,14 +4,21 @@ import {
   buy, canWalk, castSpell, chooseOption, collectFromCasket, continueDialogue, createGame, equip, unequip, findPath, itemOptions, menuFor, restore, sell,
   serialize, setFollower, setRelics, setTarget, smeltingRecipes, smithingRecipes, startProduction, tick, togglePrayer, useItemOnItem, walkTo, setHeld,
   successChance, hitChance, unlockMusic, toggleSneak, veiled, VEIL_HOOD, toggleRun, bestArrow, rangedMaxHit, bowRange, syncMonster, toggleMount, grantMount, rideProblem, castOnItem, isBound, grantBundle, rubLamp, breakTablet, capeProblem, sellPrice, craftSigils,
-  bagFill, offerBag, OFFER_TICKS, eat, boneBoost, fireFactor, thorns, sigilSave, stalkerFactor, regenTicks, foodBoost,
+  canCast, bagFill, offerBag, OFFER_TICKS, eat, boneBoost, fireFactor, thorns, sigilSave, stalkerFactor, regenTicks, foodBoost, cleanHerb, drink, coatWeapon, performEmote,
 } from "../games/rarefriends-realm/engine.ts";
 import { buyWayfarerReward, runDrain, slipChance } from "../games/rarefriends-realm/wayfaring.ts";
+import { HERBS, POTIONS, MIXTURES, ESSENCES, brewRecipes, grindRecipes, stillRecipes } from "../games/rarefriends-realm/apothecary.ts";
+import { TITLES, chooseTitle, cleanName, cleanTag, joinFellowship, leaveFellowship, nameFriend, playerName, profile, unlockedTitles, reputation } from "../games/rarefriends-realm/presence.ts";
+import { presenceOf } from "../games/rarefriends-realm/social.ts";
+import { friendSays, friendTick, remember, tendencies } from "../games/rarefriends-realm/friend.ts";
+import { RUMOURS, rumourAt, rumourCount } from "../games/rarefriends-realm/rumours.ts";
+import { talk } from "../games/rarefriends-realm/content.ts";
+import { cleanPresence } from "../games/rarefriends-realm/net.ts";
 import { buySlayerReward, longTasks, slayerXpBoost, eligibleTasks } from "../games/rarefriends-realm/slayer.ts";
 import { currentTask, slayerPoints } from "../games/rarefriends-realm/slayer.ts";
-import { COURSES, HEARTGUARD, ITEM_LIST, METALS, MONSTERS, MOUNTS, SHOPS, SKILLS, SKILL_NAMES, SLAYER_SETS, SLAYER_TASKS, SPELLS, TREES, WAYFARER_MARK, WAYFARER_REWARDS, XP_RATE, XP_TABLE, heavyStrength, item, levelForXp } from "../games/rarefriends-realm/data.ts";
+import { COURSES, HEARTGUARD, ITEM_LIST, METALS, MONSTERS, SMITH_PIECES, SPELL_TABS, MOUNTS, SHOPS, SKILLS, SKILL_NAMES, SLAYER_SETS, SLAYER_TASKS, SPELLS, TREES, WAYFARER_MARK, WAYFARER_REWARDS, XP_RATE, XP_TABLE, heavyStrength, item, levelForXp } from "../games/rarefriends-realm/data.ts";
 import { NPCS, QUESTS, MAX_QUEST_POINTS, questPoints, onMonsterKilled } from "../games/rarefriends-realm/content.ts";
-import { FLOOR_Y, H, REGIONS, T, W, createWorld, floorAt, objectAtTile, onLevel, realPoint, regionAt, terrainAt } from "../games/rarefriends-realm/world.ts";
+import { FLOOR_Y, H, MAINLAND, REGIONS, T, W, createWorld, floorAt, isUnderground, mainlandToWorld, objectAtTile, onLevel, realPoint, regionAt, terrainAt } from "../games/rarefriends-realm/world.ts";
 import { addXp, emptyToBank, fillFromBank, bankDeposit, bankInOrder, bankMove, bankTabs, bankWithdraw, bonuses, bagBones, combatLevel, count, dropItem, earlyXp, give, has, heft, level, maxHp, xpMultiplier, BONE_BAG, BONE_BAG_SIZE } from "../games/rarefriends-realm/state.ts";
 import game from "../games/rarefriends-realm/game.json" with { type: "json" };
 
@@ -29,6 +36,8 @@ const objectNear = (g, kind, predicate = () => true) => {
   return g.world.objects.filter(object => object.kind === kind && predicate(object)).sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y))[0];
 };
 const teleport = (g, x, y) => { g.player.x = x; g.player.y = y; g.player.prev = { x, y }; g.player.path = []; };
+/** Mainland places named in the mainland's own coordinates (the world puts the mainland at MAINLAND.x/y). */
+const M = (mx, my) => mainlandToWorld(mx, my);
 const standBy = (g, object) => {
   for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) if (canWalk(g, object.x + dx, object.y + dy)) { teleport(g, object.x + dx, object.y + dy); return; }
   assert.fail(`Nowhere to stand by ${object.name}`);
@@ -72,7 +81,7 @@ test("a fresh adventurer: level 3, 10 hitpoints, a starter kit", () => {
   assert.equal(level(g, "hitpoints"), 10);
   assert.equal(g.player.hp, 10);
   for (const id of ["pewter_axe", "pewter_pickaxe", "small_net", "tinderbox"]) assert(has(g.player, id), id);
-  assert.equal(SKILLS.length, 19);
+  assert.equal(SKILLS.length, 21);
 });
 
 test("the world is large, deterministic and every landmark is reachable on foot", () => {
@@ -108,14 +117,14 @@ test("the world is large, deterministic and every landmark is reachable on foot"
   for (const region of REGIONS) if (region.id !== "coast") assert(world.region.includes(REGIONS.indexOf(region)), `${region.name} exists`);
   assert.equal(regionAt(world, world.places.spawn.x, world.places.spawn.y).id, "friendhollow");
   // The throne room lies behind the Hollow gate: the king is reachable from its far side.
-  const king = world.places.king, throne = reachable(g, { x: 177, y: 224 });
+  const king = world.places.king, [tx, ty] = mainlandToWorld(177, 224), throne = reachable(g, { x: tx, y: ty });
   assert(throne[king.y * W + king.x - 1] || throne[(king.y + 3) * W + king.x], "The Hollow King can be reached past the gate");
-  assert(!ok(177, 224), "…and only through the gate");
+  assert(!ok(tx, ty), "…and only through the gate");
 });
 
 test("Friendhollow Castle: spiral stairs up to the King, on to the roof, and back down", () => {
   const g = newGame(), world = g.world, levelOf = () => realPoint(world, g.player.x, g.player.y).level;
-  const stairs = (level, action) => world.objects.filter(object => object.look === "stairs" && object.action === action && realPoint(world, object.x, object.y).level === level && realPoint(world, object.x, object.y).x < 140);
+  const stairs = (level, action) => world.objects.filter(object => object.look === "stairs" && object.action === action && realPoint(world, object.x, object.y).level === level && realPoint(world, object.x, object.y).x < M(140, 0)[0]);
   const climb = (object, level) => { standBy(g, object); menuFor(g, [{ kind: "object", id: object.id }], null)[0].run(g); until(g, () => levelOf() === level, 30); };
   // Up the north-east tower to the King's floor.
   const up = stairs(0, "Climb-up").sort((a, b) => b.x - a.x)[0];
@@ -123,7 +132,7 @@ test("Friendhollow Castle: spiral stairs up to the King, on to the roof, and bac
   climb(up, 1);
   assert(g.player.y >= FLOOR_Y && floorAt(world, g.player.x, g.player.y).complex === "castle", "Stored on the castle's first floor");
   const real = realPoint(world, g.player.x, g.player.y);
-  assert(real.x >= 112 && real.x <= 131 && real.y >= 86 && real.y <= 105, "Standing over the castle");
+  { const [cx0, cy0] = M(112, 86), [cx1, cy1] = M(131, 105); assert(real.x >= cx0 && real.x <= cx1 && real.y >= cy0 && real.y <= cy1, "Standing over the castle"); }
   assert.deepEqual(onLevel(world, real.x, real.y, 1), { x: g.player.x, y: g.player.y }, "Clicks on this storey land on its floor");
   // King Hollis receives you in the throne room (and welcomes you with coins, once).
   const king = g.npcs.find(npc => npc.id === "king"), coins = count(g.player, "coins");
@@ -137,7 +146,7 @@ test("Friendhollow Castle: spiral stairs up to the King, on to the roof, and bac
   climb(stairs(1, "Climb-up")[0], 2);
   climb(stairs(2, "Climb-down")[0], 1);
   climb(stairs(1, "Climb-down").sort((a, b) => a.x - b.x)[0], 0);
-  assert(g.player.y < 200, "Back on the ground");
+  assert(g.player.y < FLOOR_Y && !isUnderground(g.player.y), "Back on the ground");
 });
 
 test("click to walk: pathfinding goes around obstacles and never cuts corners", () => {
@@ -196,7 +205,7 @@ test("woodcutting, firemaking and cooking: the classic loop", () => {
   assert(g.player.xp.woodcutting >= TREES.tree.xp * XP_RATE * earlyXp(1, "woodcutting"));
   assert(g.depleted.has(tree.id) || g.player.activity?.kind === "woodcut");
   // Light the logs where we stand (walk to open grass first).
-  teleport(g, 100, 132);
+  teleport(g, ...M(100, 132));
   while (terrainAt(g.world, g.player.x, g.player.y) !== T.GRASS || objectAtTile(g.world, g.player.x, g.player.y)) teleport(g, g.player.x + 1, g.player.y);
   const logs = g.player.inventory.findIndex(slot => slot?.id === "logs");
   itemOptions(g, logs).find(option => option.verb === "Light").run(g);
@@ -499,7 +508,7 @@ test("The ossuary bag: holds 60 bones of any kind, catches picked-up bones, empt
 
 test("Beginner fishing by the farm, and a new cook burns far less", () => {
   const g = newGame();
-  const pond = g.world.objects.filter(object => object.kind === "spot" && Math.abs(object.x - 76) <= 6 && Math.abs(object.y - 139) <= 4);
+  const [px, py] = M(76, 139), pond = g.world.objects.filter(object => object.kind === "spot" && Math.abs(object.x - px) <= 6 && Math.abs(object.y - py) <= 4);
   assert(pond.filter(object => object.spot === "net").length >= 2 && pond.some(object => object.spot === "bait"), "the millpond has net and bait spots");
   const p = g.player; p.inventory.fill(null); give(p, "raw_minnows", 27);
   const range = objectNear(g, "range"); standBy(g, range); setTarget(g, { kind: "object", id: range.id, option: "Cook" });
@@ -582,7 +591,7 @@ test("A Friend's Feast from start to finish", () => {
   assert.equal(g.player.quests.friends_feast, 2);
   assert.equal(questPoints(g), 1);
   assert(level(g, "cooking") >= 10, "Quest XP");
-  assert.equal(QUESTS.length, 12); assert.equal(MAX_QUEST_POINTS, 19);
+  assert.equal(QUESTS.length, 20); assert.equal(MAX_QUEST_POINTS, 28);
 });
 
 test("Grumblin Trouble counts kills and pays out", () => {
@@ -834,7 +843,7 @@ test("The Heartguard: nine red-and-white pieces by Hitpoints level, each a hitpo
 test("The Old Friend stands behind every altar, and Dawnhold has its keep, towers and a taller chapel", () => {
   const g = newGame(), world = g.world;
   const altars = world.objects.filter(object => object.kind === "altar");
-  assert.equal(altars.length, 4);
+  assert.equal(altars.length, 6, "the mainland's four, Gravesend's lantern altar and the catacombs' bone altar");
   for (const altar of altars) {
     assert(world.objects.some(object => object.decor === "old_friend" && Math.abs(object.x - altar.x) <= 1 && Math.abs(object.y - altar.y) <= 2), `a statue of the Old Friend by the ${altar.name}`);
   }
@@ -842,13 +851,185 @@ test("The Old Friend stands behind every altar, and Dawnhold has its keep, tower
   const named = name => world.buildings.filter(building => building.name === name);
   const keep = named("Dawnhold Keep")[0];
   assert(keep && keep.storeys === 2 && keep.walls === "stone", "a two-storey stone keep");
-  assert(keep.x0 <= 320 && keep.y0 <= 74 && keep.y1 >= 90, "joining the chapel and the hall along their east ends");
-  assert(canWalk(g, 319, 82) && canWalk(g, 321, 82) && world.tiles[82 * W + 320] !== T.WALL, "its gate opens onto the courtyard at the end of the causeway");
+  const [gx, gy] = mainlandToWorld(320, 82);
+  assert(keep.x0 <= gx && keep.y0 <= mainlandToWorld(0, 74)[1] && keep.y1 >= mainlandToWorld(0, 90)[1], "joining the chapel and the hall along their east ends");
+  assert(canWalk(g, gx - 1, gy) && canWalk(g, gx + 1, gy) && world.tiles[gy * W + gx] !== T.WALL, "its gate opens onto the courtyard at the end of the causeway");
   assert.equal(named("Keep tower").length, 2, "a tower at each outer corner");
   const chapel = named("Dawnhold Chapel")[0];
   assert(chapel.storeys === 2 && chapel.tall > 0, "the chapel stands taller");
   assert(named("Chapel bell tower")[0]?.round, "with a bell tower");
-  assert(world.objects.some(object => object.decor === "throne" && object.x > 320 && object.y === 82), "the Grandmaster's seat inside");
+  assert(world.objects.some(object => object.decor === "throne" && object.x > gx && object.y === gy), "the Grandmaster's seat inside");
+});
+
+test("Apothecary: herbs grow by ecosystem, are picked, cleaned, ground, distilled and brewed; drinks boost, cure, coat and transform", () => {
+  const g = newGame(), p = g.player, world = g.world;
+  assert.equal(SKILL_NAMES.apothecary, "Apothecary");
+  // Every herb grows somewhere, and only where its ecosystem is.
+  for (const herb of HERBS) {
+    const patches = world.objects.filter(object => object.kind === "herb" && object.herb === herb.id);
+    assert(patches.length >= 2, `${herb.name} grows in the Realm (${patches.length} patches)`);
+    assert(item(herb.id) && item(`clean_${herb.id}`), `${herb.name} raw and clean items`);
+  }
+  assert(world.objects.some(object => object.kind === "herb" && object.herb === "wyrmtongue" && regionAt(world, object.x, object.y).id === "ashfall"), "wyrmtongue grows in Ashfall");
+  assert(!world.objects.some(object => object.kind === "herb" && object.herb === "cinderbloom" && regionAt(world, object.x, object.y).id === "friendhollow"), "and not in Friendhollow");
+  assert(world.objects.some(object => object.kind === "still"), "a still in Hollyhock");
+  // Pick feverleaf: stand by a patch (with the forest's spiders out of the way), Pick, get the raw herb, Clean it.
+  for (const other of g.monsters) { other.dead = true; other.respawnAt = Infinity; }
+  const patch = world.objects.filter(object => object.kind === "herb" && object.herb === "feverleaf" && [[0, 1], [1, 0], [0, -1], [-1, 0]].some(([dx, dy]) => canWalk(g, object.x + dx, object.y + dy)))
+    .sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0];
+  standBy(g, patch);
+  setTarget(g, { kind: "object", id: patch.id, option: "Pick" });
+  until(g, () => count(p, "feverleaf") >= 1, 200);
+  assert(p.xp.apothecary > 0, "Apothecary XP for the pick");
+  const raw = p.inventory.findIndex(slot => slot?.id === "feverleaf");
+  assert(itemOptions(g, raw).some(option => option.verb === "Clean"));
+  cleanHerb(g, raw); assert.equal(count(p, "clean_feverleaf"), 1);
+  // Brew a healing tonic with a vial of water, drink it.
+  give(p, "vial_of_water");
+  const recipes = brewRecipes("clean_feverleaf");
+  assert(recipes.some(recipe => recipe.outputs.healing_tonic === 1), "feverleaf brews a healing tonic");
+  useItemOnItem(g, p.inventory.findIndex(slot => slot?.id === "vial_of_water"), p.inventory.findIndex(slot => slot?.id === "clean_feverleaf"));
+  assert(g.ui.production?.recipes.some(recipe => recipe.outputs.healing_tonic === 1), "the brewing menu opens");
+  startProduction(g, g.ui.production.recipes.find(recipe => recipe.outputs.healing_tonic === 1), 1);
+  until(g, () => count(p, "healing_tonic") === 1, 20);
+  p.hp = 2; drink(g, p.inventory.findIndex(slot => slot?.id === "healing_tonic"));
+  assert.equal(p.hp, 10, "healed 8, and the vial comes back"); assert.equal(count(p, "vial"), 1);
+  // Boosts: an attack potion lifts your Attack level and wears off a point at a time; grinding needs a mortar.
+  p.xp.attack = XP_TABLE[40]; give(p, "attack_potion");
+  drink(g, p.inventory.findIndex(slot => slot?.id === "attack_potion"));
+  assert.equal(level(g, "attack"), 47, "+3 and 10% of 40"); assert.equal(p.boosts.attack, 7);
+  run(g, 101); assert.equal(p.boosts.attack, 6, "a point gone after a hundred ticks");
+  assert.equal(grindRecipes("oakroot")[0].tools[0], "mortar"); assert.equal(grindRecipes("feverleaf").length, 0, "not every herb is ground");
+  assert.equal(stillRecipes().length, ESSENCES.length);
+  // Poison: coat a sword, hit a boar, it takes doses; the undead shrug weak poison off; antidote cures and protects you.
+  p.inventory.fill(null); give(p, "pewter_sword"); equip(g, p.inventory.findIndex(slot => slot?.id === "pewter_sword")); give(p, "weak_poison");
+  coatWeapon(g, p.inventory.findIndex(slot => slot?.id === "weak_poison"));
+  assert.deepEqual(p.weaponPoison, { weapon: "pewter_sword", damage: 2, charges: 20, weaken: false });
+  for (const skill of ["attack", "strength", "defence", "hitpoints"]) p.xp[skill] = XP_TABLE[80];
+  p.hp = 80;
+  const boar = g.monsters.find(monster => monster.def.id === "boar" && [[0, 1], [1, 0], [0, -1], [-1, 0]].some(([dx, dy]) => canWalk(g, monster.x + dx, monster.y + dy)));
+  boar.dead = false; boar.hp = boar.def.hp; boar.respawnAt = 0; boar.poison = null;
+  standNear(g, boar.x, boar.y, 1); setTarget(g, { kind: "monster", uid: boar.uid, option: "Attack" });
+  until(g, () => !!boar.poison || boar.dead, 60);
+  if (!boar.dead) assert.equal(boar.poison.damage, 3, "soft-bodied: half as much again");
+  assert(p.weaponPoison === null || p.weaponPoison.charges < 20, "a charge spent");
+  assert(MONSTERS.skeleton.poisonImmune && MONSTERS.marsh_adder.poison, "the undead are immune; adders bite");
+  p.poison = { damage: 2, left: 4, timer: 1 }; p.hp = 50; p.combat = null; p.target = null; tick(g);
+  assert.equal(p.hp, 48, "poison burns"); 
+  give(p, "antidote"); drink(g, p.inventory.findIndex(slot => slot?.id === "antidote"));
+  assert.equal(p.poison, null); assert(p.antidoteUntil > g.tick);
+  // Friend mixtures: nine, one per family; the wrong family can't use one; the right family gets the effect.
+  assert.equal(MIXTURES.length, 9); assert.deepEqual([...new Set(MIXTURES.map(mix => mix.family))].sort((a, b) => a - b), [0, 1, 2, 3, 4, 5, 6, 7, 8]);
+  give(p, "mixture_hoverer"); drink(g, p.inventory.findIndex(slot => slot?.id === "mixture_hoverer"));
+  assert.equal(p.mixture, null, "a Skeleton can't drink the Hoverers' Updraught"); assert.match(g.messages.at(-1).text, /made for Hoverer Friends/);
+  give(p, "mixture_skeleton"); drink(g, p.inventory.findIndex(slot => slot?.id === "mixture_skeleton"));
+  assert.equal(p.mixture?.family, 0); assert(Math.abs(boneBoost(p, g) - 2) < 1e-9, "the Marrow draught doubles Faith XP from bones");
+  // Everything brewable is an item, and the save round-trips the lot.
+  for (const potion of POTIONS) assert(item(potion.id).potion, `${potion.name} is a drink`);
+  const copy = newGame(); restore(copy, serialize(g));
+  assert.equal(copy.player.mixture?.family, 0); assert(copy.player.antidoteUntil > copy.tick); assert.equal(copy.player.boosts.attack, 6);
+});
+
+test("Every weapon and piece of armour in the six ore metals can be bought somewhere, the top tiers only in the wider world", () => {
+  const sold = new Map();
+  for (const shop of Object.values(SHOPS)) for (const id of shop.stock) if (!sold.has(id)) sold.set(id, shop.id);
+  for (const metal of METALS.filter(entry => entry.tier <= 6)) for (const piece of SMITH_PIECES) assert(sold.has(`${metal.id}_${piece.piece}`), `${metal.name} ${piece.name} is sold (by someone)`);
+  assert.equal(sold.get("rarite_cuirass"), "cragmaw_armoury", "rarite plate means a walk to Cragmaw");
+  assert.equal(sold.get("moonsilver_cuirass"), "gravesend_general", "and moonsilver plate, Gravesend's salvage");
+  const g = newGame(); assert(g.npcs.some(npc => npc.id === "cragmaw_armourer"), "Brenna Anvilsong keeps the armoury");
+});
+
+test("Teleports to the wider world, learnt by quest and level, in a tabbed spellbook", () => {
+  const g = newGame(), p = g.player, world = g.world;
+  const glides = SPELLS.filter(spell => spell.kind === "teleport");
+  assert(glides.length >= 17, `a glide for every settlement (${glides.length})`);
+  for (const spell of glides) { const at = world.places[spell.teleport]; assert(at && [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1]].some(([dx, dy]) => canWalk(g, at.x + dx, at.y + dy)), `${spell.name} lands by walkable ground`); }
+  assert.equal(SPELL_TABS.length, 4); for (const spell of SPELLS) assert(SPELL_TABS.some(tab => tab.kinds.includes(spell.kind)), `${spell.name} has a tab`);
+  p.xp.magic = XP_TABLE[99]; for (const sigil of ["path_sigil", "shade_sigil", "hollow_sigil", "breeze_sigil", "bloom_sigil", "stone_sigil"]) give(p, sigil, 20);
+  assert.match(canCast(g, SPELLS.find(spell => spell.id === "glide_gravesend")), /Lanterns for the Dead/, "locked until the quest is done");
+  assert.equal(castSpell(g, "glide_gravesend"), null); assert.notEqual(p.activity?.kind, "teleport");
+  p.quests.gravesend_lanterns = 2;
+  assert.equal(canCast(g, SPELLS.find(spell => spell.id === "glide_gravesend")), null);
+  castSpell(g, "glide_gravesend"); assert.equal(p.activity?.kind, "teleport");
+  until(g, () => p.x === world.places.gravesend.x && p.y === world.places.gravesend.y, 20);
+  assert.equal(regionAt(world, p.x, p.y).id, "gravesend");
+  castSpell(g, "glide_highcairn"); assert.equal(p.activity?.kind, "teleport", "Highcairn's glide needs no quest");
+});
+
+test("Presence: a name for your Friend (the token stays), fellowships, titles, and XP from living in the Realm", () => {
+  const g = newGame(), p = g.player;
+  assert.equal(SKILL_NAMES.presence, "Presence");
+  // Names: legal and not; the first naming is free and worth Presence; renames cost coins at the Namekeeper.
+  assert.equal(cleanName("  M4S4T0 "), "M4S4T0"); assert.equal(cleanName("x"), null); assert.equal(cleanName("13530"), null, "a number is the token's job"); assert.equal(cleanName("bad!name"), null);
+  assert.equal(cleanTag("void"), "VOID"); assert.equal(cleanTag("toolong"), null);
+  assert.equal(playerName(p), "Friend #7730");
+  assert(nameFriend(g, "M4S4T0")); assert.equal(p.name, "M4S4T0"); assert.equal(playerName(p), "M4S4T0 (7730)"); assert.equal(p.friendId, 7730, "the token never changes");
+  const afterName = p.xp.presence; assert(afterName >= 150, "naming is worth Presence");
+  assert(!nameFriend(g, "Someone", true), "a rename costs coins you don't have"); assert.equal(p.name, "M4S4T0");
+  const purse = count(p, "coins"); give(p, "coins", 1000); assert(nameFriend(g, "Someone", true)); assert.equal(p.name, "Someone"); assert.equal(count(p, "coins"), purse, "a thousand coins for the ink");
+  assert(g.npcs.some(npc => npc.id === "namekeeper"), "the Namekeeper is in Friendhollow");
+  // Fellowships: a name and a tag, paid once; shared over the net with the name and title; leaving is free.
+  assert(!joinFellowship(g, "Moonlit Company", "MOON"), "needs coins");
+  give(p, "coins", 5000); assert(joinFellowship(g, "Moonlit Company", "MOON")); assert.deepEqual(p.fellowship, { name: "Moonlit Company", tag: "MOON" });
+  const packet = presenceOf(g); assert.equal(packet.name, "Someone"); assert.equal(packet.tag, "MOON");
+  const cleaned = cleanPresence(JSON.parse(JSON.stringify({ ...packet, name: "bad!name", tag: "toolongtag" }))); assert.equal(cleaned.name, null); assert.equal(cleaned.tag, null, "the net cleans what it receives");
+  leaveFellowship(g); assert.equal(p.fellowship, null);
+  // Titles by Presence level and by deed; you can only wear one you've earned.
+  assert(unlockedTitles(g).some(title => title.id === "newcomer")); assert(!unlockedTitles(g).some(title => title.id === "dragonfriend"));
+  assert(!chooseTitle(g, "dragonfriend")); p.quests.ashfall_embers = 2; assert(chooseTitle(g, "dragonfriend")); assert.equal(profile(g).title, "Dragonfriend");
+  p.xp.presence = XP_TABLE[40]; assert(unlockedTitles(g).some(title => title.id === "adventurer")); assert.equal(TITLES.length, 15);
+  // XP from living here: discovering a region, meeting someone, an emote, clothes worn for the first time, a quest.
+  const before = p.xp.presence;
+  teleport(g, ...M(34, 70)); run(g, 6); assert(p.visited.fernwick, "Fernwick discovered"); assert(p.xp.presence > before, "and worth Presence");
+  const seen = p.xp.presence; performEmote(g, "wave"); assert(p.emotesUsed.wave && p.xp.presence > seen, "a first emote");
+  const worn = p.xp.presence; give(p, "mourners_hood"); equip(g, p.inventory.findIndex(slot => slot?.id === "mourners_hood")); assert(p.outfits.mourners_hood && p.xp.presence > worn, "first worn");
+  // The profile: style follows the clothes, reputation follows quests and people.
+  assert.equal(profile(g).style, "Deadwood Wanderer", "a single Gravesend piece already reads as the Deadwood"); unequip(g, "head"); assert.equal(profile(g).style, "Friendhollow Local");
+  give(p, "gravesend_coat"); equip(g, p.inventory.findIndex(slot => slot?.id === "gravesend_coat")); equip(g, p.inventory.findIndex(slot => slot?.id === "mourners_hood")); assert.equal(profile(g).style, "Deadwood Wanderer");
+  assert.equal(reputation(g, "gravesend").rank, "Unknown"); p.quests.gravesend_lanterns = 2; assert.equal(reputation(g, "gravesend").rank, "Known"); p.talked.gravesend_keeper = 1; p.talked.gravesend_clothier = 1; assert.equal(reputation(g, "gravesend").rank, "Trusted");
+  assert.equal(profile(g).friendId, 7730); assert(profile(g).reputations.length >= 10);
+  // Saved and restored.
+  const copy = newGame(); restore(copy, serialize(g));
+  assert.equal(copy.player.name, "Someone"); assert.equal(copy.player.title, "dragonfriend"); assert(copy.player.visited.fernwick); assert(copy.player.emotesUsed.wave);
+});
+
+test("Your Friend talks back: in its family's manner, to what's around it, remembering firsts; rumours and recognition in the villages", () => {
+  const g = newGame({ familyId: 6 }), p = g.player; // a Colossus
+  g.friendSpeech = "full";
+  assert.equal(friendSays(g, "mountain"), "Big.", "a Colossus is blunt");
+  assert.equal(friendSays(g, "mountain"), null, "and doesn't repeat itself straight away");
+  assert.equal(g.messages.at(-1).text, "Friend #7730: Big.", "the line goes to chat as your Friend");
+  assert(g.events.some(event => event.type === "friend" && event.text === "Big." && event.share), "and over its head, shared with players nearby on Full");
+  g.friendSpeech = "off"; assert.equal(friendSays(g, "quest"), null, "off is off");
+  g.friendSpeech = "rare"; p.friendLast = -1e9; assert.equal(friendSays(g, "grave"), null, "rare keeps the small talk"); assert.equal(friendSays(g, "boss"), "Down.", "but not the moments that matter");
+  // Families differ.
+  const sk = newGame({ familyId: 0 }); sk.friendSpeech = "full"; assert.equal(friendSays(sk, "grave", null), sk.messages.at(-1).text.replace("Friend #7730: ", ""));
+  assert(["Finally. Someone who planned ahead.", "Nice plot. Quiet neighbours."].includes(sk.messages.at(-1).text.replace("Friend #7730: ", "")), "a Skeleton at a grave");
+  // Looking around: entering a region for the first time, and a creature in view.
+  g.friendSpeech = "full"; run(g, 6); p.friendLast = -1e9; p.friendEventAt = {};
+  teleport(g, ...M(34, 70)); run(g, 12);
+  assert(g.messages.some(m => m.tone === "public" && /Fernwick/.test(m.text)), "remarks on Fernwick on arrival");
+  // Firsts are remembered, once, and worth Presence.
+  const xp = p.xp.presence; assert(remember(g, "first_dragon")); assert(!remember(g, "first_dragon")); assert(p.firsts.first_dragon > 0); assert(p.xp.presence > xp);
+  p.xp.presence = XP_TABLE[30]; p.friendLast = -1e9; p.friendEventAt = {}; g.rng = () => 0.1;
+  assert.equal(friendSays(g, "dragon_again"), "That was our first dragon, once. We used to be afraid of these.", "a memory, at Presence 30");
+  g.rng = seeded();
+  assert(tendencies(g).explorer >= 1);
+  // Rumours: every settlement has some; asking a villager gives one and a little Presence the first time; the net never says which are true.
+  assert(rumourCount() >= 40); assert(RUMOURS.friendhollow.some(r => r.truth === "true") && RUMOURS.friendhollow.some(r => r.truth === "false"));
+  const before = p.xp.presence, text = rumourAt(g, ...M(121, 122)); assert(RUMOURS.friendhollow.some(r => r.text === text)); assert(p.xp.presence > before);
+  const d = talk(g, "villager"); assert(d.options.some(o => o.label === "Heard any rumours?"), "townsfolk gossip");
+  assert(!talk(g, "king").options?.some(o => o.label === "Heard any rumours?"), "the King does not");
+  // Recognition: a greeting for your family the first time, your name once you're known.
+  const c = newGame({ familyId: 6 }); const first = talk(c, "cragmaw_foreman"); assert.equal(first.lines[0].text, "By the old stones. A Colossus. Mind the roof.");
+  assert.notEqual(talk(c, "cragmaw_foreman").lines[0].text, "By the old stones. A Colossus. Mind the roof.", "only once");
+  c.player.name = "M4S4T0"; c.player.xp.presence = XP_TABLE[70]; c.player.talked.innkeeper = 1; c.rng = () => 0.1;
+  assert.equal(talk(c, "innkeeper").lines[0].text, "Everyone here knows M4S4T0.");
+  // The world tells stories: the burned farmhouse, the faceless statue, the toppled watch-stones.
+  const names = g.world.objects.map(o => o.name);
+  for (const name of ["A small bed, burnt", "A child's wooden horse, unburnt", "A statue of a bearded figure. The face has been chiselled off, carefully.", "A toppled watch-stone, fallen westward", "An old carved stone, used as a fence post. It's an altar. Nobody minds."]) assert(names.includes(name), name);
+  // Saved: firsts and rumours heard survive.
+  const copy = newGame(); restore(copy, serialize(g)); assert(copy.player.firsts.first_dragon > 0); assert(Object.keys(copy.player.rumours).length >= 1);
 });
 
 test("magic: Breeze Dart uses sigils and trains Magic", () => {
@@ -1030,7 +1211,7 @@ test("the follower walks the tiles you leave behind", () => {
 
 test("use item on item: tinderbox on logs lights a fire, chisel cuts gems", () => {
   const g = newGame();
-  teleport(g, 100, 132);
+  teleport(g, ...M(100, 132));
   while (terrainAt(g.world, g.player.x, g.player.y) !== T.GRASS || objectAtTile(g.world, g.player.x, g.player.y)) teleport(g, g.player.x + 1, g.player.y);
   give(g.player, "logs");
   useItemOnItem(g, g.player.inventory.findIndex(slot => slot?.id === "tinderbox"), g.player.inventory.findIndex(slot => slot?.id === "logs"));
@@ -1235,7 +1416,7 @@ test("Sigilcraft: mine sigil stones in the Wizards' Tower, press them at an alta
   assert.equal(count(p, "breeze_sigil") - before, stones); assert(p.xp.sigilcraft > 0);
   const hollow = world.objects.find(object => object.kind === "sigil_altar" && object.sigil === "hollow_sigil");
   give(p, "sigil_stone"); assert.equal(craftSigils(g, hollow), 0, "Hollow needs Sigilcraft 65");
-  assert.equal(world.objects.filter(object => object.kind === "sigil_altar").length, 11);
+  assert.equal(world.objects.filter(object => object.kind === "sigil_altar").length, 12, "eleven on the mainland and Quillhaven's thought altar");
 });
 
 test("Dragons breathe fire; the King's Wyrmward shield turns it aside", () => {
@@ -1435,7 +1616,7 @@ test("Mounts: bought at the stables, ridden faster without run energy, each with
   assert(restore(fresh, save)); assert.deepEqual(fresh.player.mounts, ["unicorn"]); assert.equal(fresh.player.mount, "unicorn");
   save.mounts = ["dragon_bus"]; save.mount = "dragon_bus"; const bad = newGame(); restore(bad, save); assert.deepEqual(bad.player.mounts, []); assert.equal(bad.player.mount, null, "unknown mounts are dropped");
   // Underground you go on foot.
-  player.y = 210; assert(rideProblem(game)); tick(game); assert.equal(player.mount, null, "left to graze outside");
+  player.y = M(0, 210)[1]; assert(rideProblem(game)); tick(game); assert.equal(player.mount, null, "left to graze outside");
   toggleMount(game); assert.equal(player.mount, null, "can't mount down here");
 });
 
@@ -1707,7 +1888,7 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   assert.equal(p.quests.dawn_against_hollow, 2); assert(has(p, "dawnplate_cuirass"));
   assert.equal(count(p, "hollow_essence"), 0);
   assert.equal(capeProblem(g, "dawnplate_cuirass"), null, "the armoury sells Dawnplate once earned");
-  assert.equal(QUESTS.length, 12); assert.equal(MAX_QUEST_POINTS, 19);
+  assert.equal(QUESTS.length, 20); assert.equal(MAX_QUEST_POINTS, 28);
 });
 
 test("Boots and gauntlets in every metal, smithed at the anvil; the clothier's shirts, dresses, trousers and skirts", () => {

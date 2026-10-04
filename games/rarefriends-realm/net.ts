@@ -45,6 +45,8 @@ export type Presence = {
   id: number; family: number; x: number; y: number; hx: number; hy: number; moving: boolean;
   worn: string[]; cape: string | null; weapon: string | null; activity: string | null; combat: number; total: number; region: string;
   emote: string | null;
+  /** Presence: the Friend's name, its fellowship's tag and its title (the token id is `id`). */
+  name?: string | null; tag?: string | null; title?: string | null;
   /** Items this player dropped from their pack, which anyone may pick up. */
   drops: Drop[];
   /** Their hitpoints, and the monster they're fighting (shared fights). */
@@ -86,6 +88,7 @@ export function cleanPresence(raw: unknown): Presence | null {
     worn, cape: word(r.cape), weapon: word(r.weapon), activity: word(r.activity), combat: int(r.combat, 3, 200) ?? 3, total: int(r.total, 1, 3000) ?? 1,
     region: typeof r.region === "string" ? r.region.slice(0, 32).replace(/[^\w' ]/g, "") : "",
     emote: word(r.emote),
+    name: typeof r.name === "string" && /^[A-Za-z0-9 '_-]{2,16}$/.test(r.name) ? r.name : null, tag: typeof r.tag === "string" && /^[A-Z0-9]{2,5}$/.test(r.tag) ? r.tag : null, title: typeof r.title === "string" ? r.title.slice(0, 32).replace(/[^\w' -]/g, "") : null,
     head: word(r.head, 40), shield: word(r.shield, 40), neck: word(r.neck, 40), body: word(r.body, 40), legs: word(r.legs, 40), hands: word(r.hands, 40), feet: word(r.feet, 40), mount: word(r.mount, 40), celebrate: word(r.celebrate, 24), pet: word(r.pet, 24), referredBy: id(r.referredBy),
     hp: int(r.hp, 0, 99) ?? 10, maxHp: int(r.maxHp, 1, 99) ?? 10, sneak: r.sneak === true, veiled: r.veiled === true,
     fight: (() => { const f = r.fight as Record<string, unknown> | null; if (!f || typeof f !== "object") return null; const u = int(f.u, 0, 1e9), fid = word(f.id, 40), fhp = int(f.hp, 0, 10_000), fx = int(f.x, 0, W - 1), fy = int(f.y, 0, H - 1);

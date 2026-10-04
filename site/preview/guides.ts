@@ -23,6 +23,8 @@ const INTRO: Record<Skill, string> = {
   thieving: "Sneak past aggressive monsters unseen (a new toggle beside Run), strike from the shadows, pickpocket townsfolk and steal from the Oasis market stalls. Get caught and it hurts.",
   agility: "Obstacle courses and shortcuts. Agility restores run energy faster.",
   slayer: "Warden Thistle gives kill tasks; kills on task give Slayer XP, and finished tasks give points.",
+  apothecary: "Gather the Realm's herbs region by region, clean, grind and brew them into tonics, potions, poisons and antidotes at Mother Yarrow's bench in Hollyhock.",
+  presence: "The mark you leave on the world: discovery, quests, bosses, rare finds, your Friend, your outfits and your name. Shown as your character's profile.",
 };
 const img = (canvas: HTMLCanvasElement, alt = "") => `<img src="${artUrl(canvas)}" alt="${alt}" loading="lazy">`;
 const escape = (text: string) => text.replace(/[&<>"]/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[char]!);

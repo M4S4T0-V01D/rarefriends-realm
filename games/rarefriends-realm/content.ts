@@ -4,6 +4,9 @@
 import { COURSES, FAMILY_NAMES, FAMILY_PERKS, SLAYER_REWARDS, WAYFARER_MARK, WAYFARER_REWARDS, item } from "./data.ts";
 import { assignTask, buySlayerReward, currentTask, eligibleTasks, slayerPoints, slayerStreak, taskText } from "./slayer.ts";
 import { buyWayfarerReward } from "./wayfaring.ts";
+import { RENAME_COST, onQuestCompleted, playerName, presenceLevel } from "./presence.ts";
+import { friendSays, remember } from "./friend.ts";
+import { rumourAt } from "./rumours.ts";
 import {
   addXp, count, give, giveOrDrop, has, level, message, sound, take, emit, BONE_BAG, ownsBoneBag, type Dialogue, type DialogueLine, type Game,
 } from "./state.ts";
@@ -22,6 +25,37 @@ export const NPCS: Record<string, NpcDef> = {
   guide: { id: "guide", name: "Realm Guide", examine: "Knows the Realm by heart.", options: ["Talk-to"], art: art(5, 11) },
   glimmer: { id: "glimmer", name: "Old Glimmer", examine: "Friend #7730. A Hoverer who remembers when the Realm was new.", options: ["Talk-to"], art: { canonical: 7730 } },
   mender: { id: "mender", name: "Mender Hale", examine: "The chapel's mender. Her hands are always clean and her apron never is.", options: ["Talk-to", "Trade"], shop: "mender", art: art(3, 318) },
+  // The wider world's villages (2026-10). Each village's people wear its own clothes (NPC_WEAR / regionalLook in render.ts).
+  gravesend_keeper: { id: "gravesend_keeper", name: "Warden Mira Thorne", examine: "Gravesend's gravekeeper. She knows every name on every stone.", options: ["Talk-to"], art: art(2, 501) },
+  gravesend_clothier: { id: "gravesend_clothier", name: "Old Wick", examine: "Sews mourning wear, and has for sixty years.", options: ["Talk-to", "Trade"], shop: "gravesend_clothier", art: art(7, 502) },
+  gravesend_trader: { id: "gravesend_trader", name: "Lantern-seller Pip", examine: "Sells lanterns, candles and whatever else keeps the dark off.", options: ["Talk-to", "Trade"], shop: "gravesend_general", art: art(0, 503) },
+  gravesend_villager: { id: "gravesend_villager", name: "Gravesend villager", examine: "Pale, quiet, and unbothered by the Deadwood.", options: ["Talk-to"], art: art(2, 504) },
+  saltmarrow_harbour: { id: "saltmarrow_harbour", name: "Harbourmaster Brine", examine: "Runs the docks and the Salt Tithe. Barnacled.", options: ["Talk-to"], art: art(4, 511) },
+  saltmarrow_fishmonger: { id: "saltmarrow_fishmonger", name: "Nell Gutting", examine: "Can fillet a sailfish in the time it takes to say so.", options: ["Talk-to", "Trade"], shop: "saltmarrow_fish", art: art(3, 512) },
+  saltmarrow_clothier: { id: "saltmarrow_clothier", name: "Sal Oilskin", examine: "Waxes canvas by the yard.", options: ["Talk-to", "Trade"], shop: "saltmarrow_clothier", art: art(1, 513) },
+  saltmarrow_villager: { id: "saltmarrow_villager", name: "Saltmarrow fisher", examine: "Smells of the sea. Proudly.", options: ["Talk-to"], art: art(4, 514) },
+  hollyhock_apothecary: { id: "hollyhock_apothecary", name: "Mother Yarrow", examine: "Hollyhock's apothecary. Her garden is the finest in the Realm, and she knows it.", options: ["Talk-to", "Trade"], shop: "hollyhock_herbs", art: art(5, 521) },
+  hollyhock_clothier: { id: "hollyhock_clothier", name: "Posy Wren", examine: "Prints leaves on everything.", options: ["Talk-to", "Trade"], shop: "hollyhock_clothier", art: art(6, 522) },
+  hollyhock_villager: { id: "hollyhock_villager", name: "Hollyhock gardener", examine: "Soil under every fingernail.", options: ["Talk-to"], art: art(5, 523) },
+  dyemoor_dyer: { id: "dyemoor_dyer", name: "Master Dyer Indigo Vell", examine: "His hands have been blue since he was nine.", options: ["Talk-to"], art: art(8, 531) },
+  dyemoor_clothier: { id: "dyemoor_clothier", name: "Marigold Hem", examine: "Dyemoor's finest cut, and the loudest.", options: ["Talk-to", "Trade"], shop: "dyemoor_clothier", art: art(1, 532) },
+  dyemoor_tailor: { id: "dyemoor_tailor", name: "Bolt", examine: "Sells thread, cloth and capes by the armful.", options: ["Talk-to", "Trade"], shop: "dyemoor_tailor", art: art(0, 533) },
+  dyemoor_villager: { id: "dyemoor_villager", name: "Dyemoor villager", examine: "Dressed in colours the rest of the Realm hasn't heard of.", options: ["Talk-to"], art: art(8, 534) },
+  tallgrass_huntmaster: { id: "tallgrass_huntmaster", name: "Huntmaster Fenn", examine: "Reads tracks like other people read signs.", options: ["Talk-to"], art: art(3, 541) },
+  tallgrass_outfitter: { id: "tallgrass_outfitter", name: "Ash Quiverly", examine: "Bows, arrows, hides and a story for each.", options: ["Talk-to", "Trade"], shop: "tallgrass_hunting", art: art(6, 542) },
+  tallgrass_clothier: { id: "tallgrass_clothier", name: "Lark", examine: "Sews clothes you can't see in the grass.", options: ["Talk-to", "Trade"], shop: "tallgrass_clothier", art: art(3, 543) },
+  tallgrass_villager: { id: "tallgrass_villager", name: "Tallgrass hunter", examine: "Still as a heron.", options: ["Talk-to"], art: art(3, 544) },
+  cragmaw_foreman: { id: "cragmaw_foreman", name: "Foreman Durga Pike", examine: "Runs the Cragmaw mine, and misses nothing that comes out of it.", options: ["Talk-to"], art: art(6, 551) },
+  cragmaw_armourer: { id: "cragmaw_armourer", name: "Brenna Anvilsong", examine: "Ironreach's master smith. Her glimmer and rarite work is the finest in the Realm, and priced like it.", options: ["Talk-to", "Trade"], shop: "cragmaw_armoury", art: art(6, 555) },
+  cragmaw_ore: { id: "cragmaw_ore", name: "Gristle", examine: "Buys ore by weight and sells it by the lie.", options: ["Talk-to", "Trade"], shop: "cragmaw_ore", art: art(6, 552) },
+  cragmaw_clothier: { id: "cragmaw_clothier", name: "Hearthkeeper Olwen", examine: "Keeps the one warm room in Cragmaw, and sells the coats to leave it in.", options: ["Talk-to", "Trade"], shop: "cragmaw_clothier", art: art(0, 553) },
+  cragmaw_villager: { id: "cragmaw_villager", name: "Cragmaw miner", examine: "Soot to the eyebrows.", options: ["Talk-to"], art: art(6, 554) },
+  quillhaven_archivist: { id: "quillhaven_archivist", name: "Archivist Perrin Quill", examine: "Keeper of the Quillhaven library. Shushes you before you've spoken.", options: ["Talk-to"], art: art(5, 561) },
+  quillhaven_scribe: { id: "quillhaven_scribe", name: "Scribe Nettle", examine: "Copies sigils into books, and sells both.", options: ["Talk-to", "Trade"], shop: "quillhaven_sigils", art: art(8, 562) },
+  quillhaven_clothier: { id: "quillhaven_clothier", name: "Brother Folio", examine: "Keeps the vestry: robes, caps and capes for the scholarly.", options: ["Talk-to", "Trade"], shop: "quillhaven_clothier", art: art(5, 563) },
+  quillhaven_villager: { id: "quillhaven_villager", name: "Quillhaven scholar", examine: "Reading while walking. Hasn't fallen in the sea yet.", options: ["Talk-to"], art: art(5, 564) },
+  ashfall_trader: { id: "ashfall_trader", name: "Ember Tamsin", examine: "Camps at the edge of the dragons' country and sells what she finds in the ash.", options: ["Talk-to", "Trade"], shop: "ashfall_trader", art: art(7, 571) },
+  namekeeper: { id: "namekeeper", name: "Namekeeper Elian", examine: "Keeps the Realm's register of names. A number tells him which Friend you are; a name tells him who you became.", options: ["Talk-to"], art: art(5, 777) },
   priest: { id: "priest", name: "Brother Ossic", examine: "Friend #3412. A Skeleton who tends the chapel of the Old Friend.", options: ["Talk-to"], art: { canonical: 3412 } },
   banker: { id: "banker", name: "Banker", examine: "Good with money.", options: ["Talk-to", "Bank"], art: art(1, 21) },
   shop_general: { id: "shop_general", name: "Shopkeeper", examine: "Sells a bit of everything.", options: ["Talk-to", "Trade"], shop: "general", art: art(2, 31) },
@@ -220,6 +254,93 @@ export const QUESTS: readonly QuestDef[] = [
       return ["The Hollow King is ended. The Realm is safe, for now. QUEST COMPLETE!"];
     },
   },
+  // ---------- The wider world's village quests (2026-10) ----------
+  {
+    id: "gravesend_lanterns", name: "Lanterns for the Dead", points: 1, difficulty: "Novice", start: "Talk to Warden Mira Thorne in Gravesend, north of the mainland at the Deadwood's edge.", requirements: ["Combat 20 recommended"],
+    rewards: ["1 Quest Point", "Mourner's hood", "2,000 Faith XP", "1,500 Attack XP", "400 coins"],
+    journal: game => {
+      const s = stage(game, "gravesend_lanterns");
+      if (s === 0) return ["Warden Mira Thorne keeps the graves at Gravesend, where the Deadwood begins. The dead there don't stay put."];
+      if (s === 1) return ["Mira asked me to put the Deadwood's restless skeletons back down and bring her bones to bless for the lanterns.",
+        `${data(game, "gs_skeletons") >= 8 ? "✓" : "•"} Skeletons laid low in the Deadwood: ${Math.min(8, data(game, "gs_skeletons"))}/8`, `${count(game.player, "bones") >= 5 ? "✓" : "•"} Bones to bless: ${Math.min(5, count(game.player, "bones"))}/5`];
+      return ["Gravesend's lanterns are lit again, and Mira gave me a mourner's hood for my trouble. QUEST COMPLETE!"];
+    },
+  },
+  {
+    id: "saltmarrow_tithe", name: "The Salt Tithe", points: 1, difficulty: "Novice", start: "Talk to Harbourmaster Brine on the docks at Saltmarrow, on the south coast.", requirements: ["Fishing 15 (carp)"],
+    rewards: ["1 Quest Point", "Sou'wester", "2,500 Fishing XP", "1,500 Cooking XP", "500 coins"],
+    journal: game => {
+      const s = stage(game, "saltmarrow_tithe");
+      if (s === 0) return ["Harbourmaster Brine at Saltmarrow owes the sea a tithe of fish and is a boat short."];
+      if (s === 1) return ["Brine asked me to catch the tithe: five raw carp, from any water.", `${count(game.player, "raw_carp") >= 5 ? "✓" : "•"} Raw carp: ${Math.min(5, count(game.player, "raw_carp"))}/5`];
+      return ["The Salt Tithe is paid and Saltmarrow's luck holds. Brine gave me a sou'wester. QUEST COMPLETE!"];
+    },
+  },
+  {
+    id: "hollyhock_errand", name: "The Apothecary's Errand", points: 1, difficulty: "Novice", start: "Talk to Mother Yarrow in Hollyhock, in the Thistle Vale south-west of the mainland.", requirements: [],
+    rewards: ["1 Quest Point", "Herbalist's hat", "1,500 Apothecary XP", "1,000 Woodcutting XP", "300 coins"],
+    journal: game => {
+      const s = stage(game, "hollyhock_errand");
+      if (s === 0) return ["Mother Yarrow, Hollyhock's apothecary, could use a pair of hands in the garden."];
+      if (s === 1) return ["Mother Yarrow needs six bones for bone meal and four oak logs for new drying racks.",
+        `${count(game.player, "bones") >= 6 ? "✓" : "•"} Bones: ${Math.min(6, count(game.player, "bones"))}/6`, `${count(game.player, "oak_logs") >= 4 ? "✓" : "•"} Oak logs: ${Math.min(4, count(game.player, "oak_logs"))}/4`];
+      return ["The racks are up and the beds are fed. Mother Yarrow gave me a herbalist's hat and her first lesson. QUEST COMPLETE!"];
+    },
+  },
+  {
+    id: "dyemoor_dye", name: "A Dye to Remember", points: 1, difficulty: "Novice", start: "Talk to Master Dyer Indigo Vell in Dyemoor, on the river south of the mainland.", requirements: ["Crafting 10 recommended"],
+    rewards: ["1 Quest Point", "Dyemoor cloak", "2,000 Crafting XP", "400 coins"],
+    journal: game => {
+      const s = stage(game, "dyemoor_dye");
+      if (s === 0) return ["Master Dyer Indigo Vell of Dyemoor is trying for a colour nobody has made."];
+      if (s === 1) return ["Vell needs four wool to dye and two rough sagestones to grind for the green.",
+        `${count(game.player, "wool") >= 4 ? "✓" : "•"} Wool: ${Math.min(4, count(game.player, "wool"))}/4`, `${count(game.player, "rough_sagestone") >= 2 ? "✓" : "•"} Rough sagestones: ${Math.min(2, count(game.player, "rough_sagestone"))}/2`];
+      return ["Vell's new green is a triumph, by his account. He gave me the first cloak dyed in it. QUEST COMPLETE!"];
+    },
+  },
+  {
+    id: "tallgrass_tracks", name: "Tracks in the Tallgrass", points: 1, difficulty: "Intermediate", start: "Talk to Huntmaster Fenn at Tallgrass, the hunters' camp east of Southshore.", requirements: ["Combat 30 recommended"],
+    rewards: ["1 Quest Point", "Pelt cape", "3,000 Ranged XP", "2,000 Strength XP", "600 coins"],
+    journal: game => {
+      const s = stage(game, "tallgrass_tracks");
+      if (s === 0) return ["Huntmaster Fenn at Tallgrass says The Wilds are overrun this season."];
+      if (s === 1) return ["Fenn asked me to thin the game in The Wilds: six boars and three wolves.",
+        `${data(game, "tg_boars") >= 6 ? "✓" : "•"} Boars: ${Math.min(6, data(game, "tg_boars"))}/6`, `${data(game, "tg_wolves") >= 3 ? "✓" : "•"} Wolves: ${Math.min(3, data(game, "tg_wolves"))}/3`];
+      return ["The Wilds are quieter and Fenn calls me a hunter. He gave me a pelt cape. QUEST COMPLETE!"];
+    },
+  },
+  {
+    id: "cragmaw_shaft", name: "The Foreman's Shaft", points: 1, difficulty: "Intermediate", start: "Talk to Foreman Durga Pike at Cragmaw, in the Ironreach pass east of the mainland.", requirements: ["Mining 15", "Combat 40 recommended"],
+    rewards: ["1 Quest Point", "Ironreach greatcoat", "3,500 Mining XP", "2,000 Smithing XP", "800 coins"],
+    journal: game => {
+      const s = stage(game, "cragmaw_shaft");
+      if (s === 0) return ["Foreman Durga Pike's deep mine under Cragmaw has stopped sending ore up."];
+      if (s === 1) return ["Something woke in the deep mine. Pike asked me to clear five stone golems from it and bring up three blackiron ore to prove the seam still runs.",
+        `${data(game, "cm_golems") >= 5 ? "✓" : "•"} Stone golems: ${Math.min(5, data(game, "cm_golems"))}/5`, `${count(game.player, "blackiron_ore") >= 3 ? "✓" : "•"} Blackiron ore: ${Math.min(3, count(game.player, "blackiron_ore"))}/3`];
+      return ["The deep mine is working again. Pike gave me a greatcoat off the hook. QUEST COMPLETE!"];
+    },
+  },
+  {
+    id: "quillhaven_folio", name: "The Missing Folio", points: 1, difficulty: "Intermediate", start: "Talk to Archivist Perrin Quill in Quillhaven, on the headland in the far south-east.", requirements: ["Magic 20 recommended"],
+    rewards: ["1 Quest Point", "Archivist's robe", "3,000 Magic XP", "1,500 Sigilcraft XP", "500 coins"],
+    journal: game => {
+      const s = stage(game, "quillhaven_folio");
+      if (s === 0) return ["Archivist Perrin Quill of Quillhaven is restoring a folio, and the ink has run dry."];
+      if (s === 1) return ["Quill grinds sigils into ink. He needs five thought sigils and two shade sigils to finish the folio.",
+        `${count(game.player, "thought_sigil") >= 5 ? "✓" : "•"} Thought sigils: ${Math.min(5, count(game.player, "thought_sigil"))}/5`, `${count(game.player, "shade_sigil") >= 2 ? "✓" : "•"} Shade sigils: ${Math.min(2, count(game.player, "shade_sigil"))}/2`];
+      return ["The folio is whole: a map of the old Realm before the sea came in. Quill gave me an archivist's robe. QUEST COMPLETE!"];
+    },
+  },
+  {
+    id: "ashfall_embers", name: "Embers in the Ash", points: 2, difficulty: "Experienced", start: "Talk to Ember Tamsin at her camp at the end of the Drakespine, before Ashfall.", requirements: ["Combat 70 recommended", "A Wyrmward shield helps"],
+    rewards: ["2 Quest Points", "Scorched cloak", "6,000 Attack XP", "6,000 Defence XP", "2,000 coins"],
+    journal: game => {
+      const s = stage(game, "ashfall_embers");
+      if (s === 0) return ["Ember Tamsin camps where the Drakespine ends and Ashfall begins. She wants something from the dragons."];
+      if (s === 1) return ["Tamsin wants three ash drakes out of Ashfall's passes so she can reach the ruins beyond.", `${data(game, "af_drakes") >= 3 ? "✓" : "•"} Ash drakes slain in Ashfall: ${Math.min(3, data(game, "af_drakes"))}/3`];
+      return ["The passes are clear for now. Tamsin gave me a cloak burnt by a dragon, and a warning about the crater. QUEST COMPLETE!"];
+    },
+  },
 ];
 export const questPoints = (game: Game) => QUESTS.reduce((sum, quest) => sum + (stage(game, quest.id) >= finalStage(quest.id) ? quest.points : 0), 0);
 export function finalStage(quest: string) { return quest === "hollow_whispers" ? 4 : quest === "hollow_king" || quest === "greyhorn_light" ? 3 : 2; }
@@ -237,6 +358,8 @@ function completeQuest(game: Game, quest: string) {
   game.player.quests[quest] = finalStage(quest);
   const definition = QUESTS.find(entry => entry.id === quest)!;
   message(game, `Congratulations! Quest complete: ${definition.name}. Rewards: ${definition.rewards.join(", ")}.`, "quest");
+  onQuestCompleted(game, definition.points);
+  remember(game, "first_quest"); friendSays(game, "quest");
   emit(game, { type: "quest", quest, tick: game.tick }); sound(game, "quest");
 }
 
@@ -250,6 +373,17 @@ function chat(npc: string, lines: DialogueLine[], options?: Dialogue["options"],
 /** Pickpocket and quest hooks the engine calls. */
 export function onMonsterKilled(game: Game, monsterId: string, x: number, y: number) {
   const player = game.player;
+  // The wider world's village quests count their kills wherever they fall.
+  const tally = (quest: string, key: string, goal: number, done: string) => {
+    if (stage(game, quest) !== 1) return;
+    const n = player.questData[key] = (player.questData[key] ?? 0) + 1;
+    if (n === goal) { message(game, done, "quest"); sound(game, "quest"); }
+  };
+  if (monsterId === "skeleton") tally("gravesend_lanterns", "gs_skeletons", 8, "That's eight skeletons down. Mira will want her bones blessed now.");
+  if (monsterId === "boar") tally("tallgrass_tracks", "tg_boars", 6, "Six boars. The Wilds will thank me, if not the boars.");
+  if (monsterId === "wolf") tally("tallgrass_tracks", "tg_wolves", 3, "Three wolves. Fenn can count the rest himself.");
+  if (monsterId === "stone_golem") tally("cragmaw_shaft", "cm_golems", 5, "Five golems back to rubble. The deep mine is quieter.");
+  if (monsterId === "ash_drake") tally("ashfall_embers", "af_drakes", 3, "Three drakes. The pass is open. Ember Tamsin should hear it.");
   if (monsterId === "grumblin" && stage(game, "grumblin_trouble") === 1) {
     player.questData.grumblins = (player.questData.grumblins ?? 0) + 1;
     if (player.questData.grumblins === 6) message(game, "That's six Grumblins. I should report to Captain Rook.", "quest");
@@ -325,7 +459,50 @@ export function useCryptAltar(game: Game) {
 }
 
 // ---------- Dialogue ----------
+/** A village quest in one shape: an offer, a job to bring back or a tally to fill, and a reward. Stage 1 while on it, 2 when done. */
+function fetchQuest(game: Game, name: string, quest: string, q: { offer: string[]; accept: string; progress: string; have: () => boolean; take: () => void; done: string[]; reward: () => void }): Dialogue {
+  const s = stage(game, quest), def = QUESTS.find(entry => entry.id === quest)!;
+  if (s === 0) return chat(name, npcSays(name, ...q.offer), [
+    { label: "I'll do it.", then: () => chat(name, npcSays(name, q.accept), undefined, () => { game.player.quests[quest] = 1; message(game, `Quest started: ${def.name}.`, "quest"); sound(game, "quest"); }) },
+    { label: "Not today.", then: () => null },
+  ]);
+  if (s === 1) {
+    if (!q.have()) return chat(name, npcSays(name, q.progress));
+    return chat(name, npcSays(name, ...q.done), undefined, () => { q.take(); q.reward(); completeQuest(game, quest); });
+  }
+  return chat(name, npcSays(name, q.done[0]));
+}
+/** Who stops to chat about what they've heard: townsfolk, traders, keepers of inns and lodges. */
+const GOSSIPS = /^(villager|.*_villager|innkeeper|shop_general|trader_.*|kettle_keeper|cairn_trader|gravesend_trader|saltmarrow_fishmonger|dyemoor_tailor|tallgrass_outfitter|cragmaw_ore|quillhaven_scribe|miller|fisher|birch|axel|pike|banker)$/;
+/** NPCs who notice what family your Friend is, the first time you meet them: [id or prefix, family, what they say]. */
+const FAMILY_GREETINGS: readonly [string, number, string][] = [
+  ["dawn_knight", 0, "That's… unusual. A Skeleton, at Dawnhold. Keep your hands where I can see them. No offence."], ["grandmaster", 0, "A Skeleton Friend. The Order has opinions about your kind. I am not the Order, today."],
+  ["chaplain", 8, "The Hollow walks in on two legs and says good morning. Sit. I'll light a candle for both of us."], ["dawn_knight", 8, "Stay where I can see you."],
+  ["priest", 8, "The Old Friend sees you. I am not sure what he sees."], ["gravesend", 0, "You'd fit right in here. No offence meant. Some taken, probably."],
+  ["cragmaw", 6, "By the old stones. A Colossus. Mind the roof."], ["quillhaven_archivist", 5, "A Hoverer! I've only ever seen that symbol in old paintings. Don't touch anything."],
+  ["hollyhock_apothecary", 3, "Oh, a Cellular Friend. You'll understand the gardens better than I do."], ["king", 7, "A Sparkling Friend! The court brightens. Guards, stand down, it's meant to glow."],
+  ["witch", 1, "A Mask. Heh heh. Which one's the real one, dearie? Don't tell me. I like a mystery."], ["glimmer", 4, "An Asymmetry Friend. The Realm was lopsided too, when it was new."],
+  ["namekeeper", 2, "A Family Friend. Then you'll know why names matter."],
+];
 export function talk(game: Game, npcId: string): Dialogue {
+  const dialogue = talkInner(game, npcId), player = game.player, base = npcId.split(":")[0], def = NPCS[base], name = def.name;
+  if (npcId.includes(":")) return dialogue;
+  // A greeting for what you are, once; then, as you become known, for who you are.
+  const greeting = FAMILY_GREETINGS.find(([id, family]) => (base === id || base.startsWith(`${id}_`)) && family === player.familyId);
+  if (greeting && !player.firsts[`greet_${base}`]) { player.firsts[`greet_${base}`] = 1; dialogue.lines.unshift(...npcSays(name, greeting[2])); }
+  else if (player.talked[base] && presenceLevel(player) >= 20 && game.rng() < 0.3) {
+    const level = presenceLevel(player), who = player.name ?? "you";
+    dialogue.lines.unshift(...npcSays(name, level >= 70 && player.name ? `Everyone here knows ${who}.` : level >= 40 && player.name ? `${who}! What brings you back?` : "Back already?"));
+  }
+  // Townsfolk have heard things.
+  if (GOSSIPS.test(base) && !dialogue.onEnd) {
+    const here = game.npcs.filter(npc => npc.id === base).sort((a, b) => Math.hypot(a.x - player.x, a.y - player.y) - Math.hypot(b.x - player.x, b.y - player.y))[0];
+    const option = { label: "Heard any rumours?", then: () => chat(name, npcSays(name, rumourAt(game, here?.x ?? player.x, here?.y ?? player.y))) };
+    dialogue.options = [...(dialogue.options ?? []).filter(entry => !/^(Goodbye|Not today|Just|Maybe later|Nothing)/.test(entry.label)), option, { label: "Goodbye.", then: () => null }];
+  }
+  return dialogue;
+}
+function talkInner(game: Game, npcId: string): Dialogue {
   const player = game.player, def = NPCS[npcId.split(":")[0]], name = def.name;
   switch (npcId) {
     case "slayer_master:assignment": case "slayer_master": {
@@ -531,6 +708,7 @@ export function talk(game: Game, npcId: string): Dialogue {
     }
     case "miller": return chat(name, npcSays(name, "Pick grain from the wheat field, then use it on the hopper. Bring a pot to catch the flour. Easy!"));
     case "hazel": {
+      if (stage(game, "hazels_quiver") >= 2 && game.rng() < 0.35) return chat(name, npcSays(name, "My grandmother's quiver. Her mother made the first war bow in Fernwick, from a yew the Whisperwood gave up in a storm. Every bow I string, I string the way she did.", "The castle has one of hers in its armoury. Never been drawn. They don't know what it's for."), [{ label: "I'll let you work.", then: () => null }]);
       const s = stage(game, "hazels_quiver"), ready = has(player, "torn_quiver") && count(player, "leather") >= 2 && count(player, "feather") >= 15 && count(player, "oak_logs") >= 5;
       const owned = has(player, "hazels_quiver") || player.equipment.cape === "hazels_quiver" || player.bank.some(slot => slot.id === "hazels_quiver");
       const quest = s === 0 ? [{ label: "You look troubled.", then: () => chat(name, npcSays(name, "The Grumblins came up from their camp last night and took my grandmother's quiver. It's no ordinary quiver: shoot from it and the arrows fly home.",
@@ -557,6 +735,7 @@ export function talk(game: Game, npcId: string): Dialogue {
     case "rowan": return chat(name, npcSays(name, "Welcome to Fernwick, the woodcutters' village. I buy logs for more than anyone in Friendhollow, and sell axes to cut them with.",
       "Oaks and maples all round us, willows by the pond. Bank's in the lodge, so you needn't walk back to town."), [
       { label: "Let's trade.", then: () => { game.ui.shop = "timber"; return null; } },
+      { label: "Tell me about Fernwick.", then: () => chat(name, npcSays(name, "Woodcutters, four generations back, since the first axe bit the Whisperwood. Children here learn their trees before their letters: oak by the bark, willow by the lean, yew by the smell of it.", "We say 'measure twice, fell once', and 'never answer the wood'. The Whisperwood whispers. That's not a name.")) },
       { label: "Goodbye.", then: () => null },
     ]);
     case "birch": return chat(name, npcSays(name, (["Swing from the hips, not the shoulders. Trees respect that.", "Plain trees for learning, oaks at fifteen, willows at thirty, maples at forty-five. Yews grow south of the camp, and ashwood only up in Frostpeak.",
@@ -704,6 +883,93 @@ export function talk(game: Game, npcId: string): Dialogue {
       if (questDone(game, "hollow_king")) return chat(name, npcSays(name, "The hero of the Hollow Depths, in my throne room! Sit anywhere. Not there, that's the Queen's."), talk);
       return chat(name, npcSays(name, "Welcome back, friend. What can the crown do for you?"), talk);
     }
+    // ---------- The wider world's villages ----------
+    case "gravesend_keeper": return fetchQuest(game, name, "gravesend_lanterns", {
+      offer: ["The Deadwood gives its dead back, and we put them down again. That's Gravesend. The lanterns keep the worst of it off, when they're lit.", "Put eight of the Deadwood's skeletons down for me, and bring five bones to bless. The lanterns burn on bone-oil."],
+      accept: "Go careful. They're slow, but there are a lot of them.", progress: "Eight skeletons, and five bones for the oil. The lanterns are waiting.",
+      have: () => data(game, "gs_skeletons") >= 8 && count(game.player, "bones") >= 5, take: () => take(game.player, "bones", 5),
+      done: ["The oil's pressed, the lanterns are lit. Gravesend sleeps a little easier.", "Take this. It's what we wear for the ones we lose. You've earned the right."],
+      reward: () => { giveOrDrop(game, "mourners_hood"); give(game.player, "coins", 400); addXp(game, "prayer", 2000, { raw: true }); addXp(game, "attack", 1500, { raw: true }); },
+    });
+    case "saltmarrow_harbour": return fetchQuest(game, name, "saltmarrow_tithe", {
+      offer: ["Every season Saltmarrow gives the sea back a tithe of what it gave us. Keeps the luck in. This season the Gullwing went down with the tithe aboard.", "Catch me five carp, raw, from any water you like. The sea isn't fussy."],
+      accept: "Five raw carp. The Millpond on the mainland has them, or the river here.", progress: "Five raw carp, and I'll tip them off the end of the dock myself.",
+      have: () => count(game.player, "raw_carp") >= 5, take: () => take(game.player, "raw_carp", 5),
+      done: ["There. Into the sea they go, and Saltmarrow's luck holds another season.", "Have a sou'wester. You'll want it: it rains here more than it doesn't."],
+      reward: () => { giveOrDrop(game, "souwester"); give(game.player, "coins", 500); addXp(game, "fishing", 2500, { raw: true }); addXp(game, "cooking", 1500, { raw: true }); },
+    });
+    case "hollyhock_apothecary": return fetchQuest(game, name, "hollyhock_errand", {
+      offer: ["Welcome to Hollyhock, dear. Everything that grows in the Realm grows here, with enough coaxing.", "I need bone meal for the beds, six bones' worth, and four oak logs for new drying racks. Do that and I'll show you where Apothecary begins."],
+      accept: "Six bones, four oak logs. The racks won't build themselves, more's the pity.", progress: "Six bones and four oak logs, when you have them.",
+      have: () => count(game.player, "bones") >= 6 && count(game.player, "oak_logs") >= 4, take: () => { take(game.player, "bones", 6); take(game.player, "oak_logs", 4); },
+      done: ["Lovely. The racks are up and the beds are fed.", "Your first lesson: pick what grows in the gardens here, and bring it to my bench. Everything else follows from that. And wear this, you'll want the brim."],
+      reward: () => { giveOrDrop(game, "herbalists_hat"); give(game.player, "coins", 300); addXp(game, "apothecary", 1500, { raw: true }); addXp(game, "woodcutting", 1000, { raw: true }); },
+    });
+    case "dyemoor_dyer": return fetchQuest(game, name, "dyemoor_dye", {
+      offer: ["Indigo from the moor, madder from the banks, and every colour between. Dyemoor dresses the Realm, whether the Realm knows it or not.", "I'm after a green nobody has made. Four wool to dye, and two rough sagestones ground for the colour. Bring them and the first cloak is yours."],
+      accept: "Four wool, two rough sagestones. Mind, rough: polished ones have had the colour cut out of them.", progress: "Four wool and two rough sagestones. The vat's warm.",
+      have: () => count(game.player, "wool") >= 4 && count(game.player, "rough_sagestone") >= 2, take: () => { take(game.player, "wool", 4); take(game.player, "rough_sagestone", 2); },
+      done: ["Look at that. Look at it! That's a green with the moor in it.", "The first cloak out of the vat is yours, as promised. Wear it where people can see."],
+      reward: () => { giveOrDrop(game, "dyemoor_cloak"); give(game.player, "coins", 400); addXp(game, "crafting", 2000, { raw: true }); },
+    });
+    case "tallgrass_huntmaster": return fetchQuest(game, name, "tallgrass_tracks", {
+      offer: ["Tallgrass hunts The Wilds and The Wilds hunt back. This season the boars have torn up every trail and the wolves follow the boars.", "Thin them for me: six boars and three wolves, out in The Wilds east of here."],
+      accept: "Six boars, three wolves. Watch the grass; it watches you.", progress: "Six boars and three wolves. I can hear the ones you haven't got yet.",
+      have: () => data(game, "tg_boars") >= 6 && data(game, "tg_wolves") >= 3, take: () => {},
+      done: ["The trails are open again. You move well for someone from the mainland.", "A hunter wears a pelt. This one's yours."],
+      reward: () => { giveOrDrop(game, "pelt_cape"); give(game.player, "coins", 600); addXp(game, "ranged", 3000, { raw: true }); addXp(game, "strength", 2000, { raw: true }); },
+    });
+    case "cragmaw_foreman": return fetchQuest(game, name, "cragmaw_shaft", {
+      offer: ["Cragmaw's the richest rock in the Realm and the deep mine's the richest in Cragmaw. Three days ago it stopped sending ore up. Something's walking about down there.", "Go down the shaft behind the camp, put five of the stone golems back to rubble, and bring me three blackiron ore to prove the seam still runs."],
+      accept: "Five golems, three blackiron ore. Take a pickaxe; the ore won't jump into your pack.", progress: "Five golems down and three blackiron ore up. Then we talk.",
+      have: () => data(game, "cm_golems") >= 5 && count(game.player, "blackiron_ore") >= 3, take: () => take(game.player, "blackiron_ore", 3),
+      done: ["The seam runs. The mine works. Cragmaw owes you.", "Take a greatcoat off the hook. You'll freeze otherwise, and I need you alive to hire again."],
+      reward: () => { giveOrDrop(game, "ironreach_greatcoat"); give(game.player, "coins", 800); addXp(game, "mining", 3500, { raw: true }); addXp(game, "smithing", 2000, { raw: true }); },
+    });
+    case "quillhaven_archivist": return fetchQuest(game, name, "quillhaven_folio", {
+      offer: ["Shh. This is a library. The Quillhaven folio is the oldest map of the Realm, and I am restoring it, and I have run out of ink.", "We grind sigils for ink here. Five thought sigils and two shade sigils, and the folio can be finished."],
+      accept: "Five thought, two shade. Quietly.", progress: "Five thought sigils and two shade sigils. The folio waits.",
+      have: () => count(game.player, "thought_sigil") >= 5 && count(game.player, "shade_sigil") >= 2, take: () => { take(game.player, "thought_sigil", 5); take(game.player, "shade_sigil", 2); },
+      done: ["There. A map of the Realm before the sea came in: the Deadwood green, the Drakespine whole, Ashfall a city.", "An archivist's robe. You've earned a place at the long table."],
+      reward: () => { giveOrDrop(game, "archivist_robe"); give(game.player, "coins", 500); addXp(game, "magic", 3000, { raw: true }); addXp(game, "sigilcraft", 1500, { raw: true }); },
+    });
+    case "ashfall_trader": return fetchQuest(game, name, "ashfall_embers", {
+      offer: ["Past this camp is Ashfall. Dragons' country. Whoever lived there before built in stone, and I want what's left in their ruins.", "The ash drakes hold the passes. Put three of them down and I can get through. I'll pay in something they can't burn."],
+      accept: "Three ash drakes, in Ashfall. A Wyrmward shield keeps the fire off, if you have one.", progress: "Three drakes. I'll be here, assuming the ground stays put.",
+      have: () => data(game, "af_drakes") >= 3, take: () => {},
+      done: ["The pass is open. Thank you. I'll be in the ruins by morning.", "This cloak met a dragon and came back. Mind the crater at the far end: what's under it is older than the drakes."],
+      reward: () => { giveOrDrop(game, "scorched_cloak"); give(game.player, "coins", 2000); addXp(game, "attack", 6000, { raw: true }); addXp(game, "defence", 6000, { raw: true }); },
+    });
+    case "namekeeper": {
+      const p = game.player;
+      return chat(name, npcSays(name, p.name ? `${p.name}. Friend #${p.friendId}. Both written here, in that order.` : `Friend #${p.friendId}. A number tells me which Friend you are. A name would tell me who you became.`,
+        "Every Friend deserves a name. The first is a gift. After that, the register charges for the ink."), [
+        { label: p.name ? `Change my Friend's name (${RENAME_COST.toLocaleString()} coins).` : "Name my Friend.", then: () => { game.ui.naming = p.name ? "rename" : "first"; return null; } },
+        { label: "What's the difference?", then: () => chat(name, npcSays(name, "The number is the token: it never changes, and it's how the Realm knows you. The name is yours: it's how the Realm remembers you.", `Right now the Realm knows you as ${playerName(p)}.`)) },
+        { label: "Not today.", then: () => null },
+      ]);
+    }
+    case "gravesend_clothier": return chat(name, npcSays(name, "Mourning wear. Charcoal, bone-white and lantern purple: the three colours of Gravesend. Everyone here owns one of each."));
+    case "gravesend_trader": return chat(name, npcSays(name, "Lanterns, candles, bone-oil and bread. The dark comes early this far north."));
+    case "gravesend_villager": return chat(name, npcSays(name, (["My grandmother's in the north plot. She comes to the fence on foggy nights. We wave.", "The old road goes right into the Deadwood. Don't take it past the third lantern.", "Mira says the Catacombs under the ruined chapel go further than anyone's walked.", "You get used to the quiet. It's the quiet stopping you notice."] as const)[Math.floor(game.rng() * 4)]));
+    case "saltmarrow_fishmonger": return chat(name, npcSays(name, "Fresh off the boats: sailfish, inkcrab, and inkshark when the deep spots are kind. I buy whatever you land."));
+    case "saltmarrow_clothier": return chat(name, npcSays(name, "Oilskins, sou'westers and sea capes. Waxed twice. You'll be dry when the whole Realm's wet."));
+    case "saltmarrow_villager": return chat(name, npcSays(name, (["There's a hut at the end of the north dock nobody uses. The trapdoor in it goes down a long way.", "The Pale Isles are out past the bay. Something's buried on the little one.", "Harbourmaster Brine has paid the tithe every season for forty years. Says that's why the storms miss us.", "Deep spots off the dock, if you've a harpoon."] as const)[Math.floor(game.rng() * 4)]));
+    case "hollyhock_clothier": return chat(name, npcSays(name, "Hats with a brim, aprons with pockets, and a leaf on everything. Gardening clothes, dear, but pretty."));
+    case "hollyhock_villager": return chat(name, npcSays(name, (["Mother Yarrow can tell what a plant is by the smell of the soil it grew in.", "Everything in the vale grows twice as fast. Nobody knows why. Nobody asks.", "The river's the Thistle. It runs down to Dyemoor and turns blue there.", "Mind the spiders in the hedges."] as const)[Math.floor(game.rng() * 4)]));
+    case "dyemoor_clothier": return chat(name, npcSays(name, "Frocks, turbans, trousers and cloaks in the moor's own indigo and madder. Nobody in the Realm dresses like Dyemoor. Nobody dares."));
+    case "dyemoor_tailor": return chat(name, npcSays(name, "Thread, wool, silk and capes by the armful. Bring your own needle."));
+    case "dyemoor_villager": return chat(name, npcSays(name, (["The river runs blue below the vats. The fish don't mind.", "Vell has been after a new green for eleven years.", "You can see a Dyemoor cloak from the far side of Southshore. That's the point.", "Madder comes from the roots on the riverbank. Indigo from the moor. Everything else is a secret."] as const)[Math.floor(game.rng() * 4)]));
+    case "tallgrass_outfitter": return chat(name, npcSays(name, "Bows, arrows, hunter's leathers and hides. Everything in here was tracked, shot or skinned by someone in this camp."));
+    case "tallgrass_clothier": return chat(name, npcSays(name, "Hoods, longcoats and pelt capes in grass colours. Stand still in them and the deer walk into you."));
+    case "tallgrass_villager": return chat(name, npcSays(name, (["There's a ring of standing stones out in The Wilds. The game won't cross it.", "Thornbacks in the thickets. Don't hit them bare-handed.", "Fenn once tracked a wolf from here to the Ironreach snow and back.", "The river from Ironreach comes down through The Wilds. Good water, bad crossing."] as const)[Math.floor(game.rng() * 4)]));
+    case "cragmaw_armourer": return chat(name, npcSays(name, "Glimmer and rarite, every piece a smith can make: helms to greaves, daggers to war hammers. Nobody else works rarite. Nobody else is this far from anywhere.", "The mainland armouries stop at helms and boots in those metals. If you want the plate, you walk to Cragmaw."));
+    case "cragmaw_ore": return chat(name, npcSays(name, "Ore in, coin out. Pickaxes, bars and inkcoal if you're buying. I weigh honest and sell dear."));
+    case "cragmaw_clothier": return chat(name, npcSays(name, "Fur hoods, greatcoats, quilted trousers and a red cape so we can dig you out of the drifts. Sit by the fire first."));
+    case "cragmaw_villager": return chat(name, npcSays(name, (["The deep mine's the richest in the Realm. Also the loudest, lately.", "Snow on the peaks all year. Yetis too.", "Pike came up from the mainland with one pickaxe and a grudge. Now look.", "The road to Quillhaven goes down the whole east side. Two days, if the golems let you."] as const)[Math.floor(game.rng() * 4)]));
+    case "quillhaven_scribe": return chat(name, npcSays(name, "Sigils copied fair, books bound, and a box to keep your stones in. The scriptorium buys sigils too."));
+    case "quillhaven_clothier": return chat(name, npcSays(name, "Robes, caps and capes for the long table. Ink stains included at no charge."));
+    case "quillhaven_villager": return chat(name, npcSays(name, (["The library goes down three floors. The bottom one is below the sea.", "Perrin says the standing stones on the headland are older than the Wizards' Tower.", "I came for a week of reading. That was nine years ago.", "The folio shows a city where Ashfall is. Imagine."] as const)[Math.floor(game.rng() * 4)]));
     default:
       if (def.shop) return chat(name, npcSays(name, "Hello! Care to see my wares?"), [
         { label: "Yes please.", then: () => { game.ui.shop = def.shop!; return null; } },

@@ -4,8 +4,9 @@
  */
 import {
   BOWS, COOKING, CRAFTING, CROSSBOWS, STOCKS, WAR_BOWS, FIREMAKING, FISHING_SPOTS, FLETCH_ARROWS, FLETCH_BOWS, GEM_CUTTING, ITEM_LIST, METALS, MONSTERS, PRAYERS, ROCKS, SIGILCRAFT,
-  SKILL_NAMES, SLAYER_SETS, SLAYER_TASKS, COURSES, WAYFARER_REWARDS, SMELTING, SPELLS, TREES, sigilsPerStone, item, type Skill,
+  SKILL_NAMES, SLAYER_SETS, SLAYER_TASKS, COURSES, WAYFARER_REWARDS, FAMILY_NAMES, SMELTING, SPELLS, TREES, sigilsPerStone, item, type Skill,
 } from "./data.ts";
+import { ESSENCES, HERBS, MIXTURES, POTIONS } from "./apothecary.ts";
 import { NPCS } from "./content.ts";
 import { AMULETS, STALLS, amuletRecipe, arrowRecipe, boltRecipe, craftingRecipes, crossbowRecipe, spinningRecipes, stringingRecipe, fletchingRecipes, headlessRecipe, smeltingRecipes, smithingRecipes } from "./engine.ts";
 import type { Recipe } from "./state.ts";
@@ -101,6 +102,17 @@ export function skillGuide(skill: Skill): GuideEntry[] {
       add(20, "Murkmire stepping stones", "A shortcut over the bog river");
       for (const reward of WAYFARER_REWARDS) if (reward.id !== "waybread") add(item(reward.id).equip?.requires?.agility ?? 1, reward.name, `${reward.cost} marks from Coach Skip · ${reward.text.replace(/ \(Wayfaring \d+\)/, "")}`, reward.id);
       add(1, "Waybread", "1 mark for 3 from Coach Skip · 40 run energy each", "waybread");
+      break;
+    case "apothecary":
+      add(1, "Pick herbs", "Every ecosystem grows its own: forest, swamp, mountain, the Deadwood, Ashfall, coast and desert. Pick (level by herb), then Clean.");
+      for (const herb of HERBS) add(herb.level, herb.name, `${herb.rarity[0].toUpperCase()}${herb.rarity.slice(1)} · ${herb.eco === "deadwood" ? "the Deadwood" : herb.eco === "ashfall" ? "Ashfall" : `${herb.eco} regions`} · ${herb.xp} XP a pick`, `clean_${herb.id}`);
+      add(10, "Grind", "A pestle and mortar on a clean herb grinds it for the stronger brews.", "mortar");
+      for (const essence of ESSENCES) add(essence.level, essence.name, `Distil two ${item(`clean_${essence.herb}`).name.toLowerCase()} at the still in Hollyhock`, essence.id);
+      for (const potion of POTIONS) add(potion.level, potion.name, `${potion.examine} (${Object.entries(potion.inputs).filter(([id]) => id !== "vial_of_water").map(([id, n]) => `${n} ${item(id).name.toLowerCase()}`).join(", ")}, in a vial of water)`, potion.id);
+      for (const mix of MIXTURES) add(mix.level, mix.name, `For ${FAMILY_NAMES[mix.family]} Friends only: ${mix.effect.toLowerCase()} for ten minutes`, mix.id);
+      break;
+    case "presence":
+      add(1, "Presence", "The mark you leave on the world. Earned by discovering regions, finishing quests, felling bosses, rare finds, your Friend, your name and the clothes you're seen in.");
       break;
     case "slayer":
       for (const task of SLAYER_TASKS) add("slayer" in task ? task.slayer : 1, `Task: ${task.name}`, `From combat level ${task.min}`);

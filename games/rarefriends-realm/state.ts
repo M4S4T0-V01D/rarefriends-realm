@@ -44,10 +44,12 @@ export type Activity =
   | { kind: "teleport"; to: Point; timer: number; spell: string }
   | { kind: "firemake"; slot: number; timer: number }
   /** Offering bones of one kind at an altar, one after another, until the pack has none left. */
-  | { kind: "offer"; objectId: number; timer: number; bones: string };
+  | { kind: "offer"; objectId: number; timer: number; bones: string }
+  /** Picking a herb patch (Apothecary). */
+  | { kind: "gather"; objectId: number; timer: number };
 /** Timed crafting at a station or from the inventory. */
 export type Recipe = {
-  skill: Skill; label: string; level: number; xp: number; ticks: number; station?: "furnace" | "anvil" | "wheel" | "none";
+  skill: Skill; label: string; level: number; xp: number; ticks: number; station?: "furnace" | "anvil" | "wheel" | "still" | "none";
   inputs: Readonly<Record<string, number>>; outputs: Readonly<Record<string, number>>; tools?: readonly string[]; chance?: number; coins?: number;
 };
 
@@ -74,6 +76,18 @@ export type Player = {
   coalBag: number; stoneBox: number;
   /** Bones kept in the ossuary bag, by kind. */
   boneBag: Record<string, number>;
+  /** Apothecary: skill boosts from drinks (wear off a point at a time), poison on you, poison on your weapon, protections (ticks), and a Friend mixture's effect. */
+  boosts: Partial<Record<Skill, number>>; boostTimer: number;
+  poison: { damage: number; left: number; timer: number } | null;
+  weaponPoison: { weapon: string; damage: number; charges: number; weaken: boolean } | null;
+  antidoteUntil: number; antifireUntil: number; stealthUntil: number; tonicUntil: number;
+  mixture: { family: number; until: number } | null;
+  /** Presence: your Friend's name (the token id never changes), fellowship and title; the regions you've found and lived in, people met, emotes learnt, outfits worn, ticks with your Friend behind you. */
+  name: string | null; fellowship: { name: string; tag: string } | null; title: string | null;
+  visited: Partial<Record<string, number>>; regionTicks: Partial<Record<string, number>>; talked: Partial<Record<string, 1>>; emotesUsed: Partial<Record<string, 1>>; outfits: Partial<Record<string, 1>>; friendTicks: number;
+  /** Your Friend's voice: first times it remembers (the day), creature kinds it has remarked on, and the bookkeeping that keeps it from chattering (not saved). */
+  firsts: Partial<Record<string, number>>; friendKinds: Partial<Record<string, 1>>; rumours: Partial<Record<string, 1>>;
+  friendLast: number; friendEventAt: Partial<Record<string, number>>; friendRegion: string | null; friendNight: boolean; friendRain: boolean; friendSeen: string | null; combatSaid: number | null;
   /** When (wall-clock ms) your recent referrals were credited: at most REFERRALS_PER_DAY in any 24 hours. */
   referralTimes: number[];
   /** You've been told today's referral limit is reached (not saved). */
@@ -110,6 +124,8 @@ export type Monster = {
   bornAt?: number;
   /** Curses and Bind: the tick each wears off. */
   curses: Partial<Record<"attack" | "strength" | "defence" | "bound", number>>;
+  /** Weapon poison on it: doses left, and ticks to the next. */
+  poison?: { damage: number; left: number; timer: number } | null;
 };
 export type Npc = { uid: number; id: string; x: number; y: number; prev: Point; spawn: Point; wander: number; heading: Point; moved: number; busy: number };
 /** An item on the ground. `shared` ones (dropped from your pack) other players see and may pick up. */
@@ -126,6 +142,8 @@ export type GameEvent =
   | { type: "death"; tick: number }
   | { type: "quest"; quest: string; tick: number }
   | { type: "cast"; spell: string; tick: number }
+  /** Your Friend said something: show it over its head, and (share) tell other players nearby. */
+  | { type: "friend"; text: string; share: boolean; tick: number }
   | { type: "creature"; id: string; action: "attack" | "hurt" | "death" | "aggro"; x: number; y: number; tick: number }
   | { type: "swing"; weapon: "slash" | "stab" | "crush" | "punch"; tick: number };
 export type SoundName =
@@ -138,8 +156,10 @@ export type Game = {
   world: World; tick: number; player: Player; monsters: Monster[]; npcs: Npc[]; ground: GroundItem[]; fires: Fire[];
   /** What you've sold to each shop that it doesn't normally stock (you can buy it back until you leave). */
   shopStock: Record<string, Slot[]>;
-  depleted: Map<number, number>; messages: Message[]; events: GameEvent[]; rng: () => number; nextUid: number;
-  dialogue: Dialogue | null; ui: { shop: string | null; bank: boolean; production: ProductionMenu | null; lamp: number | null };
+  depleted: Map<number, number>; herbPicks: Map<number, number>; messages: Message[];
+  /** What the sky is doing (set by the page each frame; the engine only reads it) and how much your Friend talks. */
+  ambient: { night: boolean; rain: boolean }; friendSpeech: "full" | "reduced" | "rare" | "off"; events: GameEvent[]; rng: () => number; nextUid: number;
+  dialogue: Dialogue | null; ui: { shop: string | null; bank: boolean; production: ProductionMenu | null; lamp: number | null; naming: "first" | "rename" | null };
   held: { dx: number; dy: number } | null; autoRetaliate: boolean; playTicks: number;
   overheads: Map<number, { text: string; until: number }>;
   /** Your owned-Friend follower, walking the tiles you leave behind. */
@@ -181,7 +201,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
     style: "accurate", autocast: null, prayers: [], target: null, activity: null, combat: null,
     attackTimer: 0, eatTimer: 0, stunned: 0, regenTimer: 0, quests: {}, questData: {},
     wardrobe: [], worn: [], follower: null, courseStep: -1, kills: 0, deaths: 0, overhead: null, music: ["theme"],
-    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, boneBag: {}, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false }, seenUpdate: LATEST_UPDATE,
+    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, boneBag: {}, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false }, seenUpdate: LATEST_UPDATE,
     lastHitBy: null, created: Date.now(), queuedSpell: null, castTimer: 0,
   };
 }
@@ -190,7 +210,7 @@ export function createGame(options: { familyId: number; friendId: number; rng?: 
   const world = options.world ?? realmWorld(), rng = options.rng ?? Math.random;
   const game: Game = {
     world, tick: 0, player: createPlayer(world, options.familyId, options.friendId), monsters: [], npcs: [], ground: [], fires: [], shopStock: {},
-    depleted: new Map(), sneakingPast: new Map(), sneakPaid: new Map(), messages: [], events: [], rng, nextUid: 1, dialogue: null, ui: { shop: null, bank: false, production: null, lamp: null },
+    depleted: new Map(), herbPicks: new Map(), ambient: { night: false, rain: false }, friendSpeech: "full", sneakingPast: new Map(), sneakPaid: new Map(), messages: [], events: [], rng, nextUid: 1, dialogue: null, ui: { shop: null, bank: false, production: null, lamp: null, naming: null },
     held: null, autoRetaliate: true, playTicks: 0, overheads: new Map(), pet: null, trail: [],
   };
   for (const spawn of world.spawns) {
@@ -216,7 +236,10 @@ export function emit(game: Game, event: GameEvent) {
 export const sound = (game: Game, name: SoundName) => emit(game, { type: "sound", name, tick: game.tick });
 
 // ---------- Experience ----------
-export const level = (game: Game, skill: Skill) => levelForXp(game.player.xp[skill]);
+/** Your level in a skill, with any Apothecary boost (never below 1). */
+export const level = (game: Game, skill: Skill) => Math.max(1, levelForXp(game.player.xp[skill]) + (game.player.boosts[skill] ?? 0));
+/** A Friend mixture in effect for your own family. */
+export const mixtureOn = (game: Game, family: number) => !!game.player.mixture && game.player.mixture.family === family && game.player.mixture.until > game.tick && game.player.familyId === family;
 export function totalLevel(player: Player) { return SKILLS.reduce((sum, skill) => sum + levelForXp(player.xp[skill]), 0); }
 export function totalXp(player: Player) { return SKILLS.reduce((sum, skill) => sum + Math.floor(player.xp[skill]), 0); }
 export function combatLevel(player: Player) {
@@ -256,7 +279,7 @@ export function followerBonus(player: Player) {
 /** Award XP (already scaled by the caller with `scaled`) and announce level-ups. */
 export function addXp(game: Game, skill: Skill, base: number, options: { raw?: boolean } = {}) {
   const player = game.player, before = levelForXp(player.xp[skill]);
-  const amount = options.raw ? base : base * xpMultiplier(player) * earlyXp(before, skill);
+  const amount = options.raw ? base : base * xpMultiplier(player) * earlyXp(before, skill) * (mixtureOn(game, 7) ? 1.15 : 1);
   if (amount <= 0) return;
   player.xp[skill] = Math.min(MAX_XP, player.xp[skill] + amount);
   emit(game, { type: "xp", skill, amount, tick: game.tick });

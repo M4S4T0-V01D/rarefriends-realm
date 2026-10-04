@@ -3,12 +3,13 @@
  * Draws in a 960 × 640 logical view; the caller scales the canvas for the device.
  */
 import type { GenerationSprites } from "@rarefriends/friendsdk/sprites";
-import { COURSES, ROCKS, isItem, item, levelForXp, mountDef, petDef, type Coat, type Icon } from "./data.ts";
+import { COURSES, ROCKS, isItem, item, levelForXp, mountDef, petDef, regionalSetOf, type Coat, type Icon } from "./data.ts";
+import { herbDef } from "./apothecary.ts";
 const isPet = (id: string) => !!petDef(id);
 import { NPCS } from "./content.ts";
 import { TICK_MS, attackSpeed, riding, type Facing, type Game, type Monster, type Npc, type Projectile } from "./state.ts";
 import { npcOverhead, veiled, type Pick } from "./engine.ts";
-import { FLOOR_Y, REGIONS, STOREY, T, W, H, complexAt, cornerHeight, floorAt, groundHeight, inBounds, isUnderground, objectAtTile, onLevel, realPoint, type Building, type Floor, type World, type WorldObject } from "./world.ts";
+import { DUNGEON_Y, FLOOR_Y, OVERWORLD_H, REGIONS, STOREY, T, W, H, complexAt, cornerHeight, floorAt, groundHeight, inBounds, isUnderground, objectAtTile, onLevel, realPoint, type Building, type Floor, type World, type WorldObject } from "./world.ts";
 import { itemArt } from "./icons.ts";
 import type { PeerView } from "./social.ts";
 import type { Strike, Weather } from "./weather.ts";
@@ -833,6 +834,27 @@ function drawStation(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldO
       drawMask(ctx, frame, sx, sy + 2 * z, 2.2 * z, INK, false); ellipse(ctx, sx - 9 * z, sy - 13 * z, 2 * z, 2 * z, C.butter);
       return { x: sx - 26 * z, y: sy - 40 * z, w: 52 * z, h: 44 * z };
     }
+    case "herb": {
+      // A herb patch: a tuft of leaves (or caps) in the herb's colour, with a flower on the uncommon ones; picked bare, just stalks.
+      const def = herbDef(object.herb!), color = def?.color ?? "#7fa86a", accent = def?.accent ?? "#e2d49e", bare = game.depleted.has(object.id);
+      if (bare) { ctx.strokeStyle = "#8a7563"; ctx.lineWidth = 1; for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.moveTo(sx + i * 4 * z, sy); ctx.lineTo(sx + i * 4 * z, sy - 3 * z); ctx.stroke(); } return hit(8, 16); }
+      if (def?.shape === "mushroom") {
+        for (const [dx, h, r] of [[-5, 7, 4], [3, 10, 5], [7, 5, 3]] as const) { ctx.fillStyle = "#e8e4dc"; ctx.fillRect(sx + dx * z - 1 * z, sy - h * z, 2 * z, h * z); ellipse(ctx, sx + dx * z, sy - h * z, r * z, r * 0.6 * z, color, INK, 1); }
+      } else {
+        for (let i = -2; i <= 2; i++) { const sway = Math.sin(now / 900 + i + ox) * 1.5 * z; ctx.strokeStyle = color; ctx.lineWidth = 2 * z; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(sx + i * 3 * z, sy); ctx.lineTo(sx + i * 4 * z + sway, sy - (9 + (i % 2) * 3) * z); ctx.stroke(); ctx.lineCap = "butt"; }
+        if (def && def.rarity !== "common") ellipse(ctx, sx + 2 * z, sy - 13 * z, 3 * z, 3 * z, accent, INK, 1);
+      }
+      return hit(16, 22);
+    }
+    case "still": {
+      // A copper still: a round pot on a brick hearth, a tall neck, a pipe coiling down to a flask.
+      box(ctx, camera, ox, oy, 0.9, 0.7, 10, "#8a6446", "#7a5a3e", "#6d5040");
+      ellipse(ctx, sx, sy - 22 * z, 12 * z, 11 * z, "#c9803f", INK, 1.5); ctx.fillStyle = "#c9803f"; ctx.fillRect(sx - 3 * z, sy - 42 * z, 6 * z, 14 * z); ctx.strokeStyle = INK; ctx.strokeRect(sx - 3 * z, sy - 42 * z, 6 * z, 14 * z);
+      ctx.strokeStyle = "#e0a060"; ctx.lineWidth = 2 * z; ctx.beginPath(); ctx.moveTo(sx, sy - 42 * z); ctx.quadraticCurveTo(sx + 16 * z, sy - 44 * z, sx + 16 * z, sy - 20 * z); ctx.lineTo(sx + 16 * z, sy - 10 * z); ctx.stroke();
+      ellipse(ctx, sx + 16 * z, sy - 7 * z, 5 * z, 6 * z, "#9fb4d0", INK, 1);
+      if (!scene.reducedMotion) ellipse(ctx, sx + Math.sin(now / 600) * 2 * z, sy - (46 + (now / 40) % 10) * z, 3 * z, 2 * z, "rgba(240,240,240,0.35)", null);
+      return hit(50, 40);
+    }
     case "wheat": {
       if (game.depleted.has(object.id)) { ctx.strokeStyle = "#8a7563"; ctx.lineWidth = 1; for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.moveTo(sx + i * 5 * z, sy); ctx.lineTo(sx + i * 5 * z, sy - 4 * z); ctx.stroke(); } return hit(8); }
       for (let i = -2; i <= 2; i++) { const sway = Math.sin(now / 700 + i + ox) * 2 * z; ctx.strokeStyle = "#b89c6a"; ctx.lineWidth = 1.2 * z; ctx.beginPath(); ctx.moveTo(sx + i * 4 * z, sy + (i % 2) * 2 * z); ctx.lineTo(sx + i * 4 * z + sway, sy - 18 * z); ctx.stroke(); ellipse(ctx, sx + i * 4 * z + sway, sy - 20 * z, 1.8 * z, 4 * z, C.butter, INK, 0.6); }
@@ -1252,6 +1274,25 @@ function splat(ctx: CanvasRenderingContext2D, x: number, y: number, damage: numb
   ctx.fillStyle = "#fff"; ctx.font = `bold ${Math.round(11 * Math.max(0.85, z))}px ui-monospace, Menlo, Consolas, monospace`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
   ctx.strokeStyle = INK; ctx.lineWidth = 2.5; ctx.strokeText(String(Math.max(0, damage)), x, y - rise + 0.5); ctx.fillText(String(Math.max(0, damage)), x, y - rise + 0.5);
 }); }
+/**
+ * A nameplate over a Friend: the name large and bright, the fellowship tag under it, the token id small, muted and a
+ * little transparent (an unnamed Friend shows just "#id"). Titles are kept for Examine, so a full square stays readable.
+ */
+function nameplate(ctx: CanvasRenderingContext2D, x: number, bottom: number, name: string | null, tag: string | null, id: number, z: number, color = "#ffffff") {
+  ui(ctx, ctx => {
+    const scale = Math.max(0.9, Math.min(1.4, z)), mono = "ui-monospace, Menlo, Consolas, monospace";
+    ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.strokeStyle = INK;
+    let y = bottom;
+    if (name) {
+      ctx.font = `${Math.round(9 * scale)}px ${mono}`; ctx.lineWidth = 2.5; ctx.globalAlpha = 0.72; ctx.strokeText(`(${id})`, x, y); ctx.fillStyle = "#d9d5cc"; ctx.fillText(`(${id})`, x, y); ctx.globalAlpha = 1; y -= Math.round(10 * scale);
+      if (tag) { ctx.font = `bold ${Math.round(10 * scale)}px ${mono}`; ctx.lineWidth = 3; ctx.strokeText(`[${tag}]`, x, y); ctx.fillStyle = "#f2e28f"; ctx.fillText(`[${tag}]`, x, y); y -= Math.round(11 * scale); }
+      ctx.font = `bold ${Math.round(13 * scale)}px ${mono}`; ctx.lineWidth = 3.5; ctx.strokeText(name, x, y); ctx.fillStyle = color; ctx.fillText(name, x, y);
+    } else {
+      ctx.font = `bold ${Math.round(11 * scale)}px ${mono}`; ctx.lineWidth = 3; ctx.strokeText(`#${id}`, x, y); ctx.fillStyle = color; ctx.fillText(`#${id}`, x, y);
+      if (tag) { y -= Math.round(12 * scale); ctx.font = `bold ${Math.round(10 * scale)}px ${mono}`; ctx.strokeText(`[${tag}]`, x, y); ctx.fillStyle = "#f2e28f"; ctx.fillText(`[${tag}]`, x, y); }
+    }
+  });
+}
 function overheadText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color = "#f2e28f") { ui(ctx, ctx => {
   ctx.font = "bold 13px ui-monospace, Menlo, Consolas, monospace"; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
   ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.strokeText(text, x, y); ctx.fillStyle = color; ctx.fillText(text, x, y);
@@ -1655,6 +1696,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     if (player.combat !== null || game.monsters.some(monster => monster.target && !monster.dead)) hpBar(ctx, s.x, s.y - 62 * z, player.hp / maxHpOf(game), z);
     for (const hit of scene.hits.filter(entry => entry.on === "player" && now - entry.at < 1100)) splat(ctx, s.x, s.y - 30 * z, hit.damage, z, (now - hit.at) / 1100);
     if (scene.chat && scene.chat.until > now) overheadText(ctx, scene.chat.text, s.x, s.y - 66 * z);
+    if (player.name || player.fellowship) nameplate(ctx, s.x, s.y - 52 * z, player.name, player.fellowship?.tag ?? null, player.friendId, z, "#e8e5de");
     if (player.stunned > 0) ui(ctx, ctx => { for (let i = 0; i < 3; i++) { const a = now / 200 + i * 2.1; ellipse(ctx, s.x + Math.cos(a) * 12 * z, s.y - 56 * z + Math.sin(a) * 3 * z, 2 * z, 2 * z, C.butter); } });
     ui(ctx, ctx => { for (const firework of scene.fireworks) {
       const age = (now - firework.at) / 2200;
@@ -2098,7 +2140,7 @@ function drawNpc(ctx: CanvasRenderingContext2D, scene: Scene, npc: Npc, at: { x:
   } else {
     const set = friendSprite(def.art.family, def.art.seed + (npc.id === "villager" || npc.id === "banker" || npc.id === "guard" ? npc.uid : 0));
     const frame = at.moving && Math.floor(now / 160) % 2 ? set.step : set.idle, bob = !scene.reducedMotion && def.art.family === 5 ? Math.sin(now / 400 + npc.uid) * 2 * z : 0;
-    const regalia = npc.id === "villager" ? citizenLook(npc.uid) : NPC_WEAR[npc.id];
+    const regalia = npc.id === "villager" ? citizenLook(npc.uid) : npc.id.endsWith("_villager") ? regionalLook(npc.id.slice(0, -9), npc.uid) : NPC_WEAR[npc.id];
     // The King wears his crown and cape, and the guards their helms, red capes and battleaxes, like your own gear.
     if (regalia) rect = drawFigure(ctx, figureArt(frame, regalia, screenFacing(camera, npc.heading), scene.reducedMotion ? 0 : Math.floor(now / 520) % 4), s.x, s.y + 2 * z - bob, 2.6 * z);
     else rect = drawMask(ctx, frame, s.x, s.y + 2 * z - bob, 2.6 * z, INK, screenFacing(camera, npc.heading) === "left");
@@ -2125,7 +2167,28 @@ const NPC_WEAR: Record<string, readonly string[]> = {
   birch: ["straw_wide_hat", "pewter_axe"], fisher: ["straw_wide_hat", "teal_cape"], miller: ["straw_wide_hat"], mountain_guide: ["felt_wide_hat", "russet_cape", "pewter_pickaxe"],
   cook: ["snow_cape"], tailor: ["plum_wizard_hat", "bordered_cape", "sagestone_amulet"], shop_general: ["russet_feathered_cap"], innkeeper: ["crimson_cape"],
   kettle_keeper: ["felt_wide_hat"], cairn_trader: ["royal_feathered_cap", "halved_cape"], trader_frost: ["leather_hood", "snow_cape"],
+  // The wider world's villagers, each in their region's own clothes.
+  gravesend_keeper: ["mourners_hood", "gravesend_coat", "ashen_trousers", "lantern_cape"], gravesend_clothier: ["mourners_hood", "gravesend_coat", "ashen_trousers"], gravesend_trader: ["gravesend_coat", "ashen_trousers", "lantern_cape"],
+  saltmarrow_harbour: ["souwester", "oilskin_coat", "sailors_trousers", "sea_cape"], saltmarrow_fishmonger: ["souwester", "oilskin_coat", "sailors_trousers", "knife"], saltmarrow_clothier: ["oilskin_coat", "sailors_trousers", "sea_cape"],
+  hollyhock_apothecary: ["herbalists_hat", "gardeners_apron", "hollyhock_skirt", "leaf_cape"], hollyhock_clothier: ["herbalists_hat", "gardeners_apron", "hollyhock_skirt"],
+  dyemoor_dyer: ["dyers_turban", "moorland_frock", "dyemoor_cloak"], dyemoor_clothier: ["dyers_turban", "moorland_frock", "madder_trousers", "dyemoor_cloak"], dyemoor_tailor: ["dyers_turban", "madder_trousers", "dyemoor_cloak"],
+  tallgrass_huntmaster: ["trackers_hood", "tallgrass_longcoat", "wildsmans_trousers", "pelt_cape", "yew_bow"], tallgrass_outfitter: ["trackers_hood", "tallgrass_longcoat", "wildsmans_trousers", "oak_bow"], tallgrass_clothier: ["tallgrass_longcoat", "wildsmans_trousers", "pelt_cape"],
+  cragmaw_foreman: ["fur_hood", "ironreach_greatcoat", "quilted_trousers", "climbers_cape", "moonsilver_pickaxe"], cragmaw_armourer: ["ironreach_greatcoat", "quilted_trousers", "rarite_gauntlets", "hammer"], cragmaw_ore: ["fur_hood", "ironreach_greatcoat", "quilted_trousers"], cragmaw_clothier: ["ironreach_greatcoat", "quilted_trousers", "climbers_cape"],
+  quillhaven_archivist: ["scholars_cap_quill", "archivist_robe", "inkstained_trousers", "librarians_cape"], quillhaven_scribe: ["scholars_cap_quill", "archivist_robe", "inkstained_trousers"], quillhaven_clothier: ["archivist_robe", "inkstained_trousers", "librarians_cape"],
+  ashfall_trader: ["drakehide_hood", "ember_coat", "scorched_trousers", "scorched_cloak"],
 };
+/** A village's people dress in its own clothes: a stable pick of its hat, top, legs and cape from their uid. */
+const regionalWear = new Map<number, readonly string[]>();
+function regionalLook(region: string, uid: number): readonly string[] {
+  let look = regionalWear.get(uid);
+  if (look) return look;
+  const set = regionalSetOf(region), roll = (salt: number) => hash(uid * 13 + salt, uid * 7 + salt * 3);
+  if (!set) return [];
+  const piece = (slot: string) => set.pieces.find(entry => entry.slot === slot)?.id;
+  look = [...(roll(1) < 0.75 ? [piece("head")] : []), ...(roll(3) < 0.9 ? [piece("body")] : []), ...(roll(5) < 0.7 ? [piece("legs")] : []), ...(roll(7) < 0.4 ? [piece("cape")] : [])].filter((id): id is string => !!id);
+  regionalWear.set(uid, look);
+  return look;
+}
 /**
  * A villager's own look, the same every time you meet them (from their uid): most wear a hat, a shirt, tunic or dress
  * and trousers or a skirt, some a cape, a few an amulet, and now and then one carries an axe or a pickaxe (never a weapon).
@@ -2169,11 +2232,8 @@ function drawPeer(ctx: CanvasRenderingContext2D, scene: Scene, peer: PeerView, h
   restoreMotion();
   hits.push({ ...rect, pick: { kind: "peer", id: peer.p.id } });
   if (peer.p.fight) hpBar(ctx, s.x, rect.y - 22, peer.p.hp / Math.max(1, peer.p.maxHp), z);
-  const tag = `#${peer.p.id} (level-${peer.p.combat})`, tagY = rect.y - (peer.p.hp < peer.p.maxHp || peer.p.fight ? 26 : 2);
-  ui(ctx, ctx => {
-    ctx.font = `bold ${Math.round(11 * Math.max(0.9, Math.min(1.4, z)))}px ui-monospace, Menlo, Consolas, monospace`; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
-    ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.strokeText(tag, s.x, tagY); ctx.fillStyle = peer.friend ? "#9fe0a8" : "#ffffff"; ctx.fillText(tag, s.x, tagY);
-  });
+  const tagY = rect.y - (peer.p.hp < peer.p.maxHp || peer.p.fight ? 26 : 2);
+  nameplate(ctx, s.x, tagY, peer.p.name ?? null, peer.p.tag ?? null, peer.p.id, z, peer.friend ? "#9fe0a8" : "#ffffff");
   if (peer.said) overheadText(ctx, peer.said, s.x, tagY - 14);
   else if (motion?.text) overheadText(ctx, motion.text, s.x, tagY - 14, "#ffffff");
 }
@@ -2258,7 +2318,8 @@ function skillcapeRays(ctx: CanvasRenderingContext2D, x: number, y: number, z: n
 }
 function questMarkerFor(game: Game, npcId: string): string | null {
   const q = game.player.quests;
-  const starts: Record<string, string> = { cook: "friends_feast", captain: "grumblin_trouble", smith: "cold_forge", priest: "hollow_whispers", glimmer: "lost_glimmer", hazel: "hazels_quiver" };
+  const starts: Record<string, string> = { cook: "friends_feast", captain: "grumblin_trouble", smith: "cold_forge", priest: "hollow_whispers", glimmer: "lost_glimmer", hazel: "hazels_quiver",
+    gravesend_keeper: "gravesend_lanterns", saltmarrow_harbour: "saltmarrow_tithe", hollyhock_apothecary: "hollyhock_errand", dyemoor_dyer: "dyemoor_dye", tallgrass_huntmaster: "tallgrass_tracks", cragmaw_foreman: "cragmaw_shaft", quillhaven_archivist: "quillhaven_folio", ashfall_trader: "ashfall_embers" };
   const quest = starts[npcId];
   if (quest && !q[quest]) return C.butter;
   if (npcId === "glimmer" && (q.lost_glimmer ?? 0) >= 2 && (q.hollow_whispers ?? 0) >= 4 && !q.hollow_king) return C.rose;
@@ -2338,7 +2399,7 @@ export function mapIcons(world: World): MapIcon[] {
     const def = spawn.kind === "npc" ? NPCS[spawn.id] : null;
     if (def?.shop) add(spawn.x, spawn.y, "¤", def.name);
     if (spawn.kind === "npc" && spawn.id === "stablemaster") add(spawn.x, spawn.y, "♞", "Stables");
-    if (spawn.kind === "npc" && ["cook", "captain", "smith", "priest", "glimmer", "hazel"].includes(spawn.id)) add(spawn.x, spawn.y, "!", `Quest: ${def!.name}`);
+    if (spawn.kind === "npc" && ["cook", "captain", "smith", "priest", "glimmer", "hazel", "gravesend_keeper", "saltmarrow_harbour", "hollyhock_apothecary", "dyemoor_dyer", "tallgrass_huntmaster", "cragmaw_foreman", "quillhaven_archivist", "ashfall_trader"].includes(spawn.id)) add(spawn.x, spawn.y, "!", `Quest: ${def!.name}`);
   }
   return icons;
 }
@@ -2393,7 +2454,7 @@ export function renderWorldMap(ctx: CanvasRenderingContext2D, game: Game, width:
   ctx.save(); ctx.fillStyle = "#1a1a1d"; ctx.fillRect(0, 0, width, height);
   ctx.translate(width / 2, height / 2); ctx.rotate(Math.PI / 4); ctx.scale(focus.zoom, focus.zoom); ctx.translate(-focus.x, -focus.y);
   ctx.imageSmoothingEnabled = false;
-  if (underground) ctx.drawImage(image, 0, 200, W, 40, 0, 200, W, 40); else ctx.drawImage(image, 0, 0, W, 200, 0, 0, W, 200);
+  if (underground) ctx.drawImage(image, 0, DUNGEON_Y, W, FLOOR_Y - DUNGEON_Y, 0, DUNGEON_Y, W, FLOOR_Y - DUNGEON_Y); else ctx.drawImage(image, 0, 0, W, OVERWORLD_H, 0, 0, W, OVERWORLD_H);
   ctx.fillStyle = "#fff"; ctx.strokeStyle = INK; ctx.lineWidth = 1 / focus.zoom;
   ctx.beginPath(); ctx.arc(player.x + 0.5, player.y + 0.5, 2.2, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
   ctx.restore();
@@ -2402,8 +2463,11 @@ export function renderWorldMap(ctx: CanvasRenderingContext2D, game: Game, width:
     return { x: width / 2 + (dx - dy) * Math.SQRT1_2, y: height / 2 + (dx + dy) * Math.SQRT1_2 };
   };
   ctx.save(); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  // Zoomed right out (the whole continent), only quests, banks and the ways underground are marked, and labels shrink.
+  const far = focus.zoom < 1;
   for (const icon of iconsCache ??= mapIcons(world)) {
-    if ((icon.y >= 200) !== underground) continue;
+    if (isUnderground(icon.y) !== underground) continue;
+    if (far && !["!", "$", "▼"].includes(icon.glyph)) continue;
     const p = toMap(icon.x, icon.y);
     ctx.font = "bold 11px ui-monospace, Menlo, Consolas, monospace"; ctx.fillStyle = PAPER; ctx.strokeStyle = INK; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.arc(p.x, p.y, 7, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.fillStyle = INK; ctx.fillText(icon.glyph, p.x, p.y + 0.5);
@@ -2411,7 +2475,7 @@ export function renderWorldMap(ctx: CanvasRenderingContext2D, game: Game, width:
   for (const region of REGIONS) {
     if (!!region.underground !== underground || region.id === "coast") continue;
     const p = toMap(region.label.x, region.label.y);
-    ctx.font = "bold 15px ui-monospace, Menlo, Consolas, monospace"; ctx.strokeStyle = INK; ctx.lineWidth = 4; ctx.strokeText(region.name, p.x, p.y - 14); ctx.fillStyle = "#f2e28f"; ctx.fillText(region.name, p.x, p.y - 14);
+    ctx.font = `bold ${far ? 11 : 15}px ui-monospace, Menlo, Consolas, monospace`; ctx.strokeStyle = INK; ctx.lineWidth = far ? 3 : 4; ctx.strokeText(region.name, p.x, p.y - 14); ctx.fillStyle = "#f2e28f"; ctx.fillText(region.name, p.x, p.y - 14);
   }
   const you = toMap(player.x + 0.5, player.y + 0.5);
   ctx.font = "bold 12px ui-monospace, Menlo, Consolas, monospace"; ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.strokeText("You", you.x, you.y - 12); ctx.fillStyle = "#fff"; ctx.fillText("You", you.x, you.y - 12);

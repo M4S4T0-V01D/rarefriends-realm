@@ -15,7 +15,7 @@ import {
 } from "./engine.ts";
 import { PITCH, RENDER_PROFILE, VIEW, ZOOM, addPrint, daylight, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
 import {
-  BankModal, ChatBox, ContextMenu, DailyModal, FirstStepsCard, GuideModal, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
+  BankModal, ChatBox, ContextMenu, DailyModal, FirstStepsCard, GuideModal, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, NamingModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
   cancelLongPress, longPress, rightClick, type MenuEntry, type Settings, type Tab,
 } from "./panels.tsx";
 import { REGULAR_SPRITES } from "./regulars.ts";
@@ -36,7 +36,10 @@ import { duelAllowed, duelReach, duelStrike, takeDuelHit, wonDuel } from "./duel
 import { LATEST_UPDATE } from "./updates.ts";
 import type { DailyTab } from "./panels.tsx";
 import { skillArt } from "./icons.ts";
-import { T, groundHeight, isUnderground, isWater, realPoint, regionAt, terrainAt, type World } from "./world.ts";
+import { playerName } from "./presence.ts";
+import { T, groundHeight, isUnderground, isWater, mainlandToWorld, realPoint, regionAt, terrainAt, type World } from "./world.ts";
+/** The Hollow King's throne room (its own music), in world coordinates. */
+const THRONE = { x: mainlandToWorld(177, 212)[0], y0: mainlandToWorld(177, 212)[1], y1: mainlandToWorld(177, 236)[1] };
 import { burst } from "./effects.ts";
 import { textureStats } from "./textures.ts";
 import "@rarefriends/friendsdk/frame.css";
@@ -96,7 +99,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const root = useRef<HTMLDivElement>(null), stage = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null), minimap = useRef<HTMLCanvasElement>(null);
   const game = useRef<Game | null>(null), friend = useRef<GenerationSprites | null>(null), audio = useRef<RealmAudio | null>(null);
   const followerSprites = useRef(new Map<number, GenerationSprites>()), loadingSprites = useRef(new Set<number>());
-  const camera = useRef<Camera>({ x: 121, y: 121, zoom: DEFAULT_SETTINGS.zoom, angle: 0, pitch: PITCH.classic }), cameraGoal = useRef<{ angle: number; pitch: number } | null>(null),
+  const camera = useRef<Camera>({ x: mainlandToWorld(121, 121)[0], y: mainlandToWorld(121, 121)[1], zoom: DEFAULT_SETTINGS.zoom, angle: 0, pitch: PITCH.classic }), cameraGoal = useRef<{ angle: number; pitch: number } | null>(null),
     compass = useRef<HTMLButtonElement>(null), orbit = useRef<{ x: number; y: number; angle: number; pitch: number } | null>(null), miniZoom = useRef(3.2), tickAt = useRef(0), hits = useRef<HitSplat[]>([]), fireworks = useRef<Firework[]>([]);
   const projectiles = useRef<Projectile[]>([]), marker = useRef<ClickMarker | null>(null), hoverTile = useRef<{ x: number; y: number } | null>(null), chat = useRef<{ text: string; until: number } | null>(null);
   const held = useRef(new Set<string>()), linked = useRef(false), elsewhere = useRef(false), lastSave = useRef(""), region = useRef(""), epoch = useRef(0), pointer = useRef<{ x: number; y: number } | null>(null);
@@ -432,12 +435,13 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
             else if (event.type === "projectile") projectiles.current.push(event.projectile);
             else if (event.type === "death") { setDead(true); setTimeout(() => setDead(false), 2600); }
             else if (event.type === "quest") setQuest(event.quest);
+            else if (event.type === "friend") { chat.current = { text: event.text, until: performance.now() + 4000 }; if (event.share && players.current.state.status === "online") window.parent.postMessage({ type: NET_CHAT, text: event.text }, "*"); }
           }
           if (xp.size) setDrops(list => [...list.filter(drop => now - drop.at < 1800), ...[...xp].map(([skill, amount]) => ({ id: ++dropId, skill, amount, at: now }))]);
           hits.current = hits.current.filter(hit => now - hit.at < 1300); projectiles.current = projectiles.current.filter(p => p.end >= state.tick - 1);
           fireworks.current = fireworks.current.filter(entry => now - entry.at < 2400);
           // Area music and the region banner.
-          const here = regionAt(state.world, state.player.x, state.player.y), throne = state.player.x >= 177 && state.player.y >= 212 && state.player.y <= 236;
+          const here = regionAt(state.world, state.player.x, state.player.y), throne = state.player.x >= THRONE.x && state.player.y >= THRONE.y0 && state.player.y <= THRONE.y1;
           const key = `${here.id}:${throne}`;
           if (key !== region.current) {
             region.current = key;
@@ -497,6 +501,9 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           if (current !== "playing" || live.current.settings.weather === false) return { weather: null, strike: null };
           const wall = Date.now(), here = regionAt(state.world, state.player.x, state.player.y).id, below = isUnderground(state.player.y);
           const weather = fixedWeather ?? weatherAt(wall, here, below, live.current.settings.dayNight !== false ? timeOfDay() : null), strike = weather.storm ? strikeAt(wall) : null;
+          // What the sky is doing, for your Friend's remarks, and how much it talks.
+          state.ambient = { night: live.current.settings.dayNight !== false && daylight(timeOfDay()).label === "Night", rain: weather.rain > 0.3 };
+          state.friendSpeech = live.current.settings.friendSpeech ?? "full";
           // Thunder follows the flash (a second or two later, as if the storm were a little way off).
           if (strike && strike.id !== lastThunder) { lastThunder = strike.id; setTimeout(() => audio.current?.sfx("thunder", 0.9), 500 + (strike.seed % 1500)); }
           return { weather, strike, wallMs: wall };
@@ -586,7 +593,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         { verb: "Message", noun, tone: "plain" as const, run: () => setWhisper({ text: `@${p.id} `, at: performance.now() }) },
         { verb: "Wave", noun, tone: "plain" as const, run: () => { state.player.heading = { x: Math.sign(p.x - state.player.x), y: Math.sign(p.y - state.player.y) || 1 }; performEmote(state, "wave"); refresh(); } },
         { verb: "Ignore", noun, tone: "plain" as const, run: () => { window.parent.postMessage({ type: NET_SOCIAL, op: "ignore", id: p.id }, "*"); message(state, `You won't see ${players.current.name(p.id)} or their chat any more.`); } },
-        { verb: "Examine", noun, tone: "plain" as const, run: () => message(state, `${players.current.name(p.id)}: combat level ${p.combat}, total level ${p.total}${p.region ? `, in ${p.region}` : ""}.`) },
+        { verb: "Examine", noun, tone: "plain" as const, run: () => message(state, `${players.current.name(p.id)}${p.title ? `, ${p.title}` : ""}${p.tag ? ` of [${p.tag}]` : ""}: combat level ${p.combat}, total level ${p.total}${p.region ? `, in ${p.region}` : ""}.`) },
       ];
     });
     // Other players' drops: Take.
@@ -707,7 +714,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     // Said as everyone else will see it (links stripped).
     const words = cleanChat(text) ?? "";
     if (!words) return;
-    message(state, `${FAMILY_NAMES[state.player.familyId]} #${state.player.friendId}: ${words}`, "public");
+    message(state, `${playerName(state.player)}: ${words}`, "public");
     if (players.current.state.status === "online") window.parent.postMessage({ type: NET_CHAT, text: words }, "*");
     chat.current = { text: words, until: performance.now() + 3500 }; refresh();
   };
@@ -727,6 +734,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     setLoggedOut(false);
     const state = game.current;
     if (!state) return;
+    // A new Friend is asked for its name as it arrives (over the Realm, so nothing waits on it).
+    if (!state.player.name && !hasSave) state.ui.naming = "first";
     audio.current?.unlock(); setPhase("playing"); region.current = ""; tickAt.current = performance.now();
     const at = realPoint(state.world, state.player.x, state.player.y);
     camera.current = { x: at.x, y: at.y, zoom: settings.zoom, angle: 0, pitch: PITCH.classic };
@@ -868,6 +877,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
 
           {state.ui.bank && <BankModal game={state} refresh={refresh} onClose={() => { state.ui.bank = false; refresh(); }} openMenu={(x, y, entries) => setMenu({ x, y, entries })} />}
           <LampModal game={state} refresh={refresh} />
+          <NamingModal game={state} refresh={refresh} />
           {guide && <GuideModal game={state} skill={guide.skill} onSkill={skill => setGuide({ skill })} onClose={() => setGuide(null)} />}
           {(() => { const view = trades.current.view(); return view ? <TradeModal game={state} view={view} openMenu={(x, y, entries) => setMenu({ x, y, entries })}
             onOffer={(id, n) => { trades.current.offer(state, id, n); refresh(); }} onAccept={() => { trades.current.accept(state); refresh(); }} onDecline={() => { trades.current.decline(state); refresh(); }} /> : null; })()}
@@ -968,7 +978,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
             <div className="realm-title-card">
               <FriendPortrait sprites={friend.current} size={96} worn={[...player.worn, ...(["cape", "head", "shield", "weapon", "neck", "body", "legs", "hands", "feet"] as const).flatMap(slot => player.equipment[slot] ? [player.equipment[slot]!] : [])]} />
               <div>
-                <h2>Friend #{player.friendId}</h2>
+                <h2>{player.name ? <>{player.name} <small className="realm-title-id">({player.friendId})</small></> : <>Friend #{player.friendId}</>}</h2>
                 <p><b>{FAMILY_NAMES[player.familyId]}</b>: {FAMILY_PERKS[player.familyId].title}. {FAMILY_PERKS[player.familyId].text}</p>
                 {loggedOut && <p className="realm-logged-out" role="status">{hosted === "linked" ? <>✓ <b>Saved and logged out.</b></> : <b>Logged out.</b>} {hosted === "linked" ? "Your adventure is safe in this browser for this wallet and Friend. Continue any time." : hosted === "elsewhere" ? "This tab stopped saving because the adventure is open in another tab: continue there, or reload this page." : "Saves weren't connected: copy a save code from Settings next time to keep your progress."} For an extra copy on any device, use Settings → Copy save code.</p>}
                 {hasSave ? <p className="realm-save">Saved adventure: total level <b>{hasSave.total}</b> · combat <b>{hasSave.combat}</b> · <b>{hasSave.qp}</b> quest points · in {hasSave.where}</p>

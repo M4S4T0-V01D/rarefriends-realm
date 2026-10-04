@@ -12,6 +12,7 @@ const outdir = path.resolve(index >= 0 ? args[index + 1] : path.join(root, "game
 await mkdir(path.join(outdir, "img"), { recursive: true });
 await cp(path.join(root, "site/preview/index.html"), path.join(outdir, "index.html"));
 await cp(path.join(root, "site/preview/guides.html"), path.join(outdir, "guides.html"));
+await cp(path.join(root, "site/preview/lore.html"), path.join(outdir, "lore.html"));
 for (const file of await readdir(path.join(root, "docs"))) if (file.endsWith(".png")) await cp(path.join(root, "docs", file), path.join(outdir, "img", file));
 // The trailer and its poster.
 await cp(path.join(root, "site/preview/media"), path.join(outdir, "media"), { recursive: true });

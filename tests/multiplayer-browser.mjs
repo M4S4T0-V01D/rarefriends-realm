@@ -2,6 +2,7 @@
 // host's same-origin test channel (never the public relays): they see each other walk, chat in public and in private,
 // add each other as friends and earn the party bonus together. Automated test only.
 import assert from "node:assert/strict";
+import { mainlandToWorld } from "../games/rarefriends-realm/world.ts";
 import { execFileSync } from "node:child_process";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -80,11 +81,13 @@ try {
     const game = page.frameLocator("iframe");
     await game.locator('.realm-game[data-phase="title"]').waitFor();
     await game.getByRole("button", { name: /Begin your adventure|Continue your adventure/ }).click();
+    const naming = game.getByRole("button", { name: "Later (the Namekeeper in Friendhollow can do it)" });
+    if (await naming.isVisible({ timeout: 1500 }).catch(() => false)) await naming.click();
     await game.locator('.realm-game[data-phase="playing"]').waitFor();
     const frame = () => page.frames().find(entry => entry !== page.mainFrame() && entry.url() !== "about:blank");
     const state = fn => frame().evaluate(fn);
     const until = async (fn, what, timeout = 20_000) => { const end = Date.now() + timeout; while (Date.now() < end) { if (await state(fn)) return; await page.waitForTimeout(200); } assert.fail(`#${friendId}: timed out waiting for ${what}`); };
-    const teleport = (x, y) => frame().evaluate(([x, y]) => { const p = window.__realm.game().player; p.x = x; p.y = y; p.prev = { x, y }; p.path = []; window.__realm.refresh(); }, [x, y]);
+    const teleport = (mx, my) => frame().evaluate(([x, y]) => { const p = window.__realm.game().player; p.x = x; p.y = y; p.prev = { x, y }; p.path = []; window.__realm.refresh(); }, mainlandToWorld(mx, my));
     return { page, game, frame, state, until, teleport };
   };
   const a = await player(7730), b = await player(3412);
@@ -93,8 +96,8 @@ try {
   await a.until(() => window.__realm.net() === "online", "going online");
   await b.until(() => window.__realm.net() === "online", "going online");
   await a.teleport(121, 123); await b.teleport(123, 124);
-  await a.until(() => window.__realm.peers().some(peer => peer.id === 3412 && peer.x === 123), "seeing #3412", process.env.REAL_RELAYS ? 90_000 : 20_000);
-  await b.until(() => window.__realm.peers().some(peer => peer.id === 7730 && peer.x === 121), "seeing #7730");
+  await a.until(() => window.__realm.peers().some(peer => peer.id === 3412 && peer.x === 308), "seeing #3412", process.env.REAL_RELAYS ? 90_000 : 20_000);
+  await b.until(() => window.__realm.peers().some(peer => peer.id === 7730 && peer.x === 306), "seeing #7730");
   if (process.env.REAL_RELAYS) {
     // And they can talk: a public line from A reaches B.
     const input = a.game.getByRole("textbox", { name: "Say something" }); await input.click(); await input.fill("hello over the relays"); await input.press("Enter");
@@ -104,8 +107,8 @@ try {
     console.log(`PASS real relays${process.env.NO_DIRECT ? " (no direct links: the relay path alone)" : ""}: both players met and chatted`); process.exit(0);
   }
   // B walks; A sees it move.
-  await b.frame().evaluate(() => { const g = window.__realm.game(); g.player.path = [{ x: 124, y: 124 }, { x: 125, y: 124 }, { x: 126, y: 124 }]; });
-  await a.until(() => window.__realm.peers().some(peer => peer.id === 3412 && peer.x === 126), "#3412 walking");
+  await b.frame().evaluate(() => { const g = window.__realm.game(); g.player.path = [{ x: 309, y: 284 }, { x: 310, y: 284 }, { x: 311, y: 284 }]; });
+  await a.until(() => window.__realm.peers().some(peer => peer.id === 3412 && peer.x === 311), "#3412 walking");
 
   // A right-clicks B: the player menu, and Add-friend.
   const at = await a.frame().evaluate(() => { const peer = window.__realm.peers().find(entry => entry.id === 3412); return window.__realm.screenOf(peer.x, peer.y); });
@@ -180,8 +183,8 @@ try {
   await a.teleport(139, 146); await b.teleport(141, 146);
   await b.frame().evaluate(() => { const p = window.__realm.game().player; p.hp = 2; p.inventory = p.inventory.map(slot => slot?.id === "coins" ? slot : null); window.__realm.refresh(); });
   await a.frame().evaluate(() => { const p = window.__realm.game().player; for (const s of ["attack", "strength"]) p.xp[s] = 200_000; });
-  await a.until(() => window.__realm.peers().some(peer => peer.id === 3412 && peer.x === 141 && peer.y === 146), "B in the ring");
-  const ringAt = await a.frame().evaluate(() => window.__realm.screenOf(141, 146)), ringBox = await a.page.locator("iframe").boundingBox();
+  await a.until(() => window.__realm.peers().some(peer => peer.id === 3412 && peer.x === 326 && peer.y === 306), "B in the ring");
+  const ringAt = await a.frame().evaluate(() => window.__realm.screenOf(326, 306)), ringBox = await a.page.locator("iframe").boundingBox();
   await a.page.mouse.click(ringBox.x + ringAt.x, ringBox.y + ringAt.y - 20, { button: "right" });
   await a.game.getByRole("menuitem", { name: /^Fight .*#3412/ }).click();
   await a.until(() => (window.__realm.game().player.stats.duelsWon ?? 0) >= 1, "A winning the duel", 40_000);

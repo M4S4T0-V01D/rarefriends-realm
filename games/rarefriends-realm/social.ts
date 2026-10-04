@@ -2,6 +2,7 @@
  * Other players, as the game sees them: avatars that glide between the positions their hosts send (one per tick),
  * their chat bubbles, and what we tell them about ourselves. The host (host/net.ts) has already validated everything.
  */
+import { titleName } from "./presence.ts";
 import { FAMILY_NAMES } from "./data.ts";
 import type { NetState, Presence } from "./net.ts";
 import { TICK_MS, combatLevel, maxHp, totalLevel, type Game } from "./state.ts";
@@ -39,7 +40,8 @@ export class Players {
   say(id: number, text: string, now: number) { this.bubbles.set(id, { text, until: now + 4000 }); }
   isFriend(id: number) { return this.state.friends.includes(id); }
   get(id: number) { return this.avatars.get(id)?.p ?? null; }
-  name(id: number) { const p = this.get(id); return p ? `${FAMILY_NAMES[p.family] ?? "Friend"} #${id}` : `Friend #${id}`; }
+  /** "M4S4T0 (13530)" when they've named their Friend, else the old "Hoverer #13530". */
+  name(id: number) { const p = this.get(id); return p?.name ? `${p.name} (${id})` : p ? `${FAMILY_NAMES[p.family] ?? "Friend"} #${id}` : `Friend #${id}`; }
   private position(avatar: Avatar, now: number) {
     const k = Math.min(1, (now - avatar.at) / TICK_MS);
     return { x: avatar.fromX + (avatar.p.x - avatar.fromX) * k, y: avatar.fromY + (avatar.p.y - avatar.fromY) * k, moving: k < 1 };
@@ -70,6 +72,7 @@ export function presenceOf(game: Game): Presence {
     activity: player.activity?.kind ?? (player.combat !== null ? "combat" : null), combat: combatLevel(player), total: totalLevel(player),
     region: regionAt(game.world, player.x, player.y).name,
     emote: player.emote && game.tick < player.emote.until ? player.emote.id : null,
+    name: player.name, tag: player.fellowship?.tag ?? null, title: titleName(player.title),
     head: player.equipment.head ?? null, shield: player.equipment.shield ?? null, neck: player.equipment.neck ?? null, body: player.equipment.body ?? null, legs: player.equipment.legs ?? null, hands: player.equipment.hands ?? null, feet: player.equipment.feet ?? null, mount: player.mount, pet: player.petOut, celebrate: player.celebrate && game.tick < player.celebrate.until ? `${player.celebrate.skill}_${player.celebrate.level}` : null, referredBy: player.referredBy, hp: player.hp, maxHp: maxHp(player), fight: currentFight(game), sneak: player.sneak, veiled: veiled(game),
     drops: game.ground.filter(entry => entry.shared).slice(-16).map(entry => ({ u: entry.uid, id: entry.id, n: entry.n, x: entry.x, y: entry.y })),
   };

@@ -5,10 +5,24 @@
  * building they belong to: a tile there stands for the real tile (x − dx, y − dy), `level` storeys up.
  */
 import type { RockKind, SpotKind, TreeKind } from "./data.ts";
+import { buildExpansion } from "./expansion.ts";
 
-export const W = 350, H = 280;
-/** Rows 200–239 are the dungeons; rows from FLOOR_Y hold upper storeys. */
-export const FLOOR_Y = 240;
+export const W = 720, H = 620;
+/** The overworld is rows 0–519; rows 520–579 are the dungeons (reached by ladders, never seen from above); rows from FLOOR_Y hold upper storeys. */
+export const OVERWORLD_H = 520, DUNGEON_Y = 520, FLOOR_Y = 580;
+/**
+ * Where the original Realm (the mainland, 350 × 200 with 40 dungeon rows and 40 storey rows) sits in the wider world.
+ * Its content is generated in its own coordinates and set in here, so nothing on it moves relative to anything else.
+ */
+export const MAINLAND = { x: 185, y: 160, w: 350, h: 200, dungeonRows: 40, floorRows: 40 } as const;
+/** A mainland coordinate (overworld, dungeon row or storey row) in world coordinates. */
+export function mainlandToWorld(x: number, y: number): [number, number] {
+  if (y >= MAINLAND.h + MAINLAND.dungeonRows) return [x + MAINLAND.x, FLOOR_Y + (y - MAINLAND.h - MAINLAND.dungeonRows)];
+  if (y >= MAINLAND.h) return [x + MAINLAND.x, DUNGEON_Y + (y - MAINLAND.h)];
+  return [x + MAINLAND.x, y + MAINLAND.y];
+}
+/** The mainland's overworld rectangle in world coordinates (inclusive). */
+export const MAINLAND_RECT = { x0: MAINLAND.x, y0: MAINLAND.y, x1: MAINLAND.x + MAINLAND.w - 1, y1: MAINLAND.y + MAINLAND.h - 1 } as const;
 /** One storey, in world pixels (the height of a wall). */
 export const STOREY = 42;
 export const T = {
@@ -19,12 +33,12 @@ export type Terrain = typeof T[keyof typeof T];
 const WALKABLE = new Set<number>([T.GRASS, T.DARK_GRASS, T.PATH, T.COBBLE, T.SAND, T.SWAMP, T.SNOW, T.STONE, T.WOOD, T.GRAVEL, T.DUNGEON, T.BRIDGE, T.FARMLAND, T.ICE, T.CARPET, T.ASH]);
 export const isWater = (terrain: number) => terrain === T.WATER || terrain === T.DEEP;
 /** The sparring ring east of Market Street: inside it, players may duel each other (safely: nobody dies or loses items). */
-export const RING = { x0: 138, y0: 144, x1: 144, y1: 149 };
+export const RING = { x0: 138 + MAINLAND.x, y0: 144 + MAINLAND.y, x1: 144 + MAINLAND.x, y1: 149 + MAINLAND.y };
 export const inRing = (x: number, y: number) => x >= RING.x0 && x <= RING.x1 && y >= RING.y0 && y <= RING.y1;
 
 export type ObjectKind =
   | "tree" | "stump" | "rock" | "spot" | "range" | "furnace" | "anvil" | "bank" | "altar" | "ladder" | "stall" | "obstacle"
-  | "fountain" | "mill" | "dairy_cow" | "wheat" | "coop" | "gate" | "casket" | "decor" | "sign" | "tanning" | "well" | "sigil_altar" | "wheel";
+  | "fountain" | "mill" | "dairy_cow" | "wheat" | "coop" | "gate" | "casket" | "decor" | "sign" | "tanning" | "well" | "sigil_altar" | "wheel" | "herb" | "still";
 export type DecorKind =
   | "flowers" | "bush" | "boulder" | "lamp" | "bench" | "crate" | "barrel" | "tent" | "cactus" | "pine" | "dead_tree" | "statue"
   | "grave" | "fence" | "reeds" | "table" | "bed" | "shelf" | "pillar" | "rubble" | "snowman" | "lily" | "banner" | "torch" | "palm" | "hay" | "windmill" | "boat" | "chest"
@@ -41,13 +55,20 @@ export type WorldObject = {
   sigil?: string;
   /** A crumbling ruin wall's height (pixels). */
   height?: number;
+  /** A herb patch: which herb grows here (Apothecary). */
+  herb?: string;
 };
 export type StallKind = "bakery" | "silk" | "gem" | "fish";
 export type SpawnDef = { kind: "npc" | "monster"; id: string; x: number; y: number; wander?: number };
 export type RegionId =
   | "friendhollow" | "farmland" | "whisperwood" | "ashen_hills" | "emberforge" | "frostpeak" | "glass_lake" | "pale_dunes"
-  | "oasis" | "murkmire" | "mossy_ruins" | "crypt" | "hollow_depths" | "coast" | "wizards_tower" | "wyrmreach" | "fernwick" | "greyhorn" | "highcairn";
+  | "oasis" | "murkmire" | "mossy_ruins" | "crypt" | "hollow_depths" | "coast" | "wizards_tower" | "wyrmreach" | "fernwick" | "greyhorn" | "highcairn"
+  // The wider world (2026-10): the lands around the mainland.
+  | "deadwood" | "gravesend" | "westmarch" | "drakespine" | "ashfall" | "southshore" | "saltmarrow" | "thistle_vale" | "hollyhock" | "dyemoor"
+  | "the_wilds" | "tallgrass" | "ironreach" | "cragmaw" | "quillhaven" | "pale_isles" | "catacombs" | "sea_cave" | "wyrm_lair" | "deep_mine";
 export type Region = { id: RegionId; name: string; label: { x: number; y: number }; danger: number; underground?: boolean };
+const MAINLAND_REGIONS = new Set<RegionId>(["coast", "friendhollow", "farmland", "whisperwood", "ashen_hills", "emberforge", "frostpeak", "glass_lake", "pale_dunes", "oasis", "murkmire", "mossy_ruins",
+  "wizards_tower", "wyrmreach", "fernwick", "greyhorn", "highcairn", "crypt", "hollow_depths"]);
 export const REGIONS: readonly Region[] = [
   { id: "coast", name: "The Pale Coast", label: { x: 10, y: 10 }, danger: 0 },
   { id: "friendhollow", name: "Friendhollow", label: { x: 121, y: 118 }, danger: 0 },
@@ -68,9 +89,34 @@ export const REGIONS: readonly Region[] = [
   { id: "highcairn", name: "Highcairn", label: { x: 282, y: 66 }, danger: 0 },
   { id: "crypt", name: "Murkmire Crypt", label: { x: 34, y: 220 }, danger: 3, underground: true },
   { id: "hollow_depths", name: "Hollow Depths", label: { x: 150, y: 220 }, danger: 4, underground: true },
+  // The wider world. Labels here are in world coordinates (the mainland's above are moved by createWorld).
+  { id: "deadwood", name: "The Deadwood", label: { x: 330, y: 62 }, danger: 3 },
+  { id: "gravesend", name: "Gravesend", label: { x: 300, y: 128 }, danger: 0 },
+  { id: "westmarch", name: "Westmarch", label: { x: 128, y: 296 }, danger: 2 },
+  { id: "drakespine", name: "The Drakespine", label: { x: 74, y: 196 }, danger: 4 },
+  { id: "ashfall", name: "Ashfall", label: { x: 72, y: 70 }, danger: 6 },
+  { id: "southshore", name: "Southshore", label: { x: 330, y: 416 }, danger: 1 },
+  { id: "saltmarrow", name: "Saltmarrow", label: { x: 424, y: 462 }, danger: 0 },
+  { id: "thistle_vale", name: "Thistle Vale", label: { x: 150, y: 404 }, danger: 1 },
+  { id: "hollyhock", name: "Hollyhock", label: { x: 160, y: 446 }, danger: 0 },
+  { id: "dyemoor", name: "Dyemoor", label: { x: 254, y: 468 }, danger: 0 },
+  { id: "the_wilds", name: "The Wilds", label: { x: 584, y: 436 }, danger: 2 },
+  { id: "tallgrass", name: "Tallgrass", label: { x: 556, y: 398 }, danger: 0 },
+  { id: "ironreach", name: "Ironreach", label: { x: 628, y: 250 }, danger: 3 },
+  { id: "cragmaw", name: "Cragmaw", label: { x: 632, y: 196 }, danger: 0 },
+  { id: "quillhaven", name: "Quillhaven", label: { x: 646, y: 396 }, danger: 0 },
+  { id: "pale_isles", name: "The Pale Isles", label: { x: 96, y: 500 }, danger: 2 },
+  { id: "catacombs", name: "Deadwood Catacombs", label: { x: 90, y: 534 }, danger: 4, underground: true },
+  { id: "wyrm_lair", name: "The Wyrm's Lair", label: { x: 90, y: 566 }, danger: 6, underground: true },
+  { id: "sea_cave", name: "Saltmarrow Sea Cave", label: { x: 630, y: 534 }, danger: 2, underground: true },
+  { id: "deep_mine", name: "Cragmaw Deep Mine", label: { x: 630, y: 566 }, danger: 3, underground: true },
 ];
 export const regionIndex = (id: RegionId) => REGIONS.findIndex(region => region.id === id);
-export const isUnderground = (y: number) => y >= 200 && y < FLOOR_Y;
+/** The mainland regions' labels were written in the mainland's own coordinates: move them with it (once, at load). */
+for (const region of REGIONS as Region[]) {
+  if (MAINLAND_REGIONS.has(region.id)) { const [x, y] = mainlandToWorld(region.label.x, region.label.y); region.label = { x, y }; }
+}
+export const isUnderground = (y: number) => y >= DUNGEON_Y && y < FLOOR_Y;
 
 /**
  * A building's footprint (walls included) and how its roof looks. Inner rooms (inside another building) have no roof.
@@ -97,7 +143,7 @@ export type World = {
   buildingAt: Uint8Array;
   /** Ground height (world pixels) at every tile corner: (W + 1) × (H + 1), corner (i, j) sits at (i − ½, j − ½). */
   heights: Float32Array;
-  places: Record<"spawn" | "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier" | "crypt" | "depths" | "king", { x: number; y: number }>;
+  places: Record<"spawn" | "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier" | "crypt" | "depths" | "king" | "fernwick" | "highcairn" | "dawnhold" | "gravesend" | "saltmarrow" | "hollyhock" | "dyemoor" | "tallgrass" | "cragmaw" | "quillhaven" | "ashfall", { x: number; y: number }>;
 };
 
 function mulberry(seed: number) {
@@ -123,12 +169,17 @@ function makeNoise(seed: number, scale: number) {
 export const tileIndex = (x: number, y: number) => y * W + x;
 export const inBounds = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H;
 
-export function createWorld(seed = 20260927): World {
-  const tiles = new Uint8Array(W * H), region = new Uint8Array(W * H), objects: WorldObject[] = [], spawns: SpawnDef[] = [];
-  const objectAt = new Int32Array(W * H).fill(-1);
-  const random = mulberry(seed), noise = makeNoise(seed, 9), noise2 = makeNoise(seed + 7, 4), coastNoise = makeNoise(seed + 3, 14), swell = makeNoise(seed + 55, 26);
-  /** Extra height for mountains (0 = the terrain's own relief), per tile. */
-  const lift = new Float32Array(W * H);
+/** Everything a world generator needs: the arrays it paints into and the dice it rolls. */
+export type GenContext = {
+  W: number; H: number; tiles: Uint8Array; region: Uint8Array; objectAt: Int32Array; lift: Float32Array;
+  objects: WorldObject[]; spawns: SpawnDef[]; buildings: Building[]; doorways: [number, number][];
+  random: () => number; noise: (x: number, y: number) => number; noise2: (x: number, y: number) => number;
+};
+/** The painting, placing and building helpers, bound to a context (the mainland's own arrays, or the whole world's). */
+export function worldTools(ctx: GenContext) {
+  const { W, H, tiles, region, objectAt, objects, spawns, buildings, doorways, random, noise, noise2 } = ctx;
+  const tileIndex = (x: number, y: number) => y * W + x;
+  const inBounds = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H;
   const get = (x: number, y: number) => inBounds(x, y) ? tiles[tileIndex(x, y)] : T.VOID;
   const put = (x: number, y: number, terrain: number) => { if (inBounds(x, y)) tiles[tileIndex(x, y)] = terrain; };
   const setRegion = (x: number, y: number, id: RegionId) => { if (inBounds(x, y)) region[tileIndex(x, y)] = regionIndex(id); };
@@ -179,7 +230,6 @@ export function createWorld(seed = 20260927): World {
   };
   const free = (x: number, y: number) => WALKABLE.has(get(x, y)) && objectAt[tileIndex(x, y)] < 0 && get(x, y) !== T.BRIDGE && get(x, y) !== T.PATH && get(x, y) !== T.COBBLE;
   /** Four-walled building with a doorway, floored inside. `door` is the side the doorway faces. */
-  const buildings: Building[] = [], doorways: [number, number][] = [];
   const building = (x0: number, y0: number, x1: number, y1: number, door: "n" | "s" | "e" | "w", floor: number = T.WOOD, doorAt?: number, roof: Partial<Building> = {}) => {
     const inner = buildings.some(b => x0 > b.x0 && y0 > b.y0 && x1 < b.x1 && y1 < b.y1);
     buildings.push({ x0, y0, x1, y1, roof: inner ? "none" : "gable", color: ROOF_COLORS[buildings.length % ROOF_COLORS.length], chimney: false, name: "",
@@ -205,6 +255,7 @@ export function createWorld(seed = 20260927): World {
   const tree = (x: number, y: number, kind: TreeKind) => add({ kind: "tree", tree: kind, x, y, blocks: true, name: TREE_NAMES[kind] });
   const rock = (x: number, y: number, kind: RockKind) => add({ kind: "rock", rock: kind, x, y, blocks: true, name: "Rocks" });
   const spot = (x: number, y: number, kind: SpotKind) => add({ kind: "spot", spot: kind, x, y, blocks: true, name: kind === "lure" ? "Rod fishing spot" : kind === "deep" ? "Deep fishing spot" : "Fishing spot" });
+  const herb = (x: number, y: number, kind: string, name: string) => add({ kind: "herb", herb: kind, x, y, blocks: false, name });
   const shoreSpots = (x0: number, y0: number, x1: number, y1: number, kind: SpotKind, count: number) => {
     let placed = 0;
     for (let y = y0; y <= y1 && placed < count; y++) for (let x = x0; x <= x1 && placed < count; x++) {
@@ -219,6 +270,23 @@ export function createWorld(seed = 20260927): World {
   const npc = (id: string, x: number, y: number, wander = 0) => spawns.push({ kind: "npc", id, x, y, wander });
   const monsters = (id: string, x0: number, y0: number, x1: number, y1: number, count: number) =>
     scatter(x0, y0, x1, y1, count, (x, y) => monster(id, x, y), (x, y) => WALKABLE.has(get(x, y)) && objectAt[tileIndex(x, y)] < 0);
+  return { tileIndex, inBounds, get, put, setRegion, fillRect, blob, regionBlob, line, road, river, add, decor, clearAt, free, building, scatter, tree, rock, spot, herb, shoreSpots, rockCluster, monster, npc, monsters };
+}
+
+/**
+ * The mainland: the original 350 × 200 Realm (plus its 40 dungeon rows and 40 storey rows), generated exactly as it
+ * always was in its own coordinates, then set into the wider world by createWorld at MAINLAND.x/y.
+ */
+function buildMainland(seed: number) {
+  const W = MAINLAND.w, H = MAINLAND.h + MAINLAND.dungeonRows + MAINLAND.floorRows, FLOOR_Y = MAINLAND.h + MAINLAND.dungeonRows;
+  const tiles = new Uint8Array(W * H), region = new Uint8Array(W * H), objects: WorldObject[] = [], spawns: SpawnDef[] = [];
+  const objectAt = new Int32Array(W * H).fill(-1);
+  const random = mulberry(seed), noise = makeNoise(seed, 9), noise2 = makeNoise(seed + 7, 4), coastNoise = makeNoise(seed + 3, 14), swell = makeNoise(seed + 55, 26);
+  /** Extra height for mountains (0 = the terrain's own relief), per tile. */
+  const lift = new Float32Array(W * H);
+  const buildings: Building[] = [], doorways: [number, number][] = [];
+  const { tileIndex, inBounds, get, put, setRegion, fillRect, blob, regionBlob, road, river, add, decor, clearAt, free, building, scatter, tree, rock, spot, shoreSpots, rockCluster, monster, npc, monsters } =
+    worldTools({ W, H, tiles, region, objectAt, lift, objects, spawns, buildings, doorways, random, noise, noise2 });
 
   // ---------- Land and sea ----------
   // The overworld is an island in the Pale Sea; the dungeon strip below starts as void.
@@ -1023,7 +1091,7 @@ export function createWorld(seed = 20260927): World {
     if (found >= 0) { for (const o of objects) if (o.name === "__removed") o.blocks = false; seen = flood(); }
   }
 
-  const places: World["places"] = {
+  const places: Pick<World["places"], "spawn" | "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier" | "crypt" | "depths" | "king"> = {
     spawn: { x: 121, y: 123 }, hollow_square: { x: 121, y: 122 }, emberforge: { x: 162, y: 49 }, oasis: { x: 186, y: 115 },
     frostpeak: { x: 195, y: 34 }, pier: { x: 178, y: 150 }, crypt: { x: 40, y: 180 }, depths: { x: 122, y: 188 }, king: { x: 198, y: 224 },
   };
@@ -1117,8 +1185,38 @@ export function createWorld(seed = 20260927): World {
   // The house behind Fletch & Feather, set back five tiles.
   building(140, 135, 145, 140, "w", T.WOOD, undefined, { name: "House", color: "#a996b5", chimney: true });
   decor(142, 136, "bed"); decor(144, 139, "table");
+  return { tiles, region, objects, objectAt, spawns, places, lift, buildings, floors, W, H };
+}
+
+export function createWorld(seed = 20260927): World {
+  const main = buildMainland(seed);
+  const tiles = new Uint8Array(W * H).fill(T.DEEP), region = new Uint8Array(W * H), objects: WorldObject[] = [], spawns: SpawnDef[] = [];
+  const objectAt = new Int32Array(W * H).fill(-1), lift = new Float32Array(W * H), buildings: Building[] = [], floors: Floor[] = [];
+  for (let y = OVERWORLD_H; y < H; y++) for (let x = 0; x < W; x++) tiles[y * W + x] = T.VOID;
+  // Set the mainland in: its overworld at MAINLAND.x/y, its dungeon rows into the dungeon strip, its storeys into the storey rows.
+  for (let y = 0; y < main.H; y++) for (let x = 0; x < main.W; x++) {
+    const [wx, wy] = mainlandToWorld(x, y), from = y * main.W + x, to = wy * W + wx;
+    tiles[to] = main.tiles[from]; region[to] = main.region[from]; lift[to] = main.lift[from];
+  }
+  for (const object of main.objects) {
+    const [x, y] = mainlandToWorld(object.x, object.y), moved: WorldObject = { ...object, x, y };
+    if (object.to) { const [tx, ty] = mainlandToWorld(object.to.x, object.to.y); moved.to = { x: tx, y: ty }; }
+    objects.push(moved); if (object.name !== "__removed") objectAt[y * W + x] = moved.id;
+  }
+  for (const spawn of main.spawns) { const [x, y] = mainlandToWorld(spawn.x, spawn.y); spawns.push({ ...spawn, x, y }); }
+  for (const b of main.buildings) { const [x0, y0] = mainlandToWorld(b.x0, b.y0), [x1, y1] = mainlandToWorld(b.x1, b.y1); buildings.push({ ...b, x0, y0, x1, y1 }); }
+  // A storey's tiles sit at real + (dx, dy): the real rectangle moves with the mainland, the stored rows move to the world's storey rows.
+  const localFloorY = MAINLAND.h + MAINLAND.dungeonRows;
+  for (const f of main.floors) { const [x0, y0] = mainlandToWorld(f.x0, f.y0), [x1, y1] = mainlandToWorld(f.x1, f.y1); floors.push({ ...f, x0, y0, x1, y1, dy: f.dy + (FLOOR_Y - localFloorY) - MAINLAND.y }); }
+  const places = Object.fromEntries(Object.entries(main.places).map(([key, at]) => { const [x, y] = mainlandToWorld(at.x, at.y); return [key, { x, y }]; })) as World["places"];
+  // Where the wider world's glides land (and two mainland towns that never had one): a village square, a courtyard, a camp.
+  const m = (x: number, y: number) => { const [wx, wy] = mainlandToWorld(x, y); return { x: wx, y: wy }; };
+  Object.assign(places, { fernwick: m(36, 72), highcairn: m(282, 84), dawnhold: m(316, 82), gravesend: { x: 300, y: 136 }, saltmarrow: { x: 424, y: 466 }, hollyhock: { x: 160, y: 452 }, dyemoor: { x: 254, y: 470 }, tallgrass: { x: 556, y: 402 }, cragmaw: { x: 632, y: 204 }, quillhaven: { x: 646, y: 404 }, ashfall: { x: 72, y: 128 } });
+  // The wider world around it.
+  const ctx: GenContext = { W, H, tiles, region, objectAt, lift, objects, spawns, buildings, doorways: [], random: mulberry(seed + 4242), noise: makeNoise(seed + 11, 9), noise2: makeNoise(seed + 19, 4) };
+  buildExpansion(ctx, worldTools(ctx), seed);
   for (const object of objects) if (object.name === "__removed") object.blocks = false;
-  buildingAt.fill(0);
+  const buildingAt = new Uint8Array(W * H);
   buildings.forEach((b, index) => { if (b.roof === "none") return; for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) buildingAt[y * W + x] = index + 1; });
   return { tiles, region, objects, objectAt, spawns, places, heights: buildHeights(tiles, seed, lift), buildings, buildingAt, floors };
 }
@@ -1181,7 +1279,8 @@ function buildHeights(tiles: Uint8Array, seed: number, lift?: Float32Array): Flo
       relief += (RELIEF[t] ?? 0) * (1 + (lift?.[ty * W + tx] ?? 0)); count++; near = Math.min(near, distance[ty * W + tx]);
     }
     const ease = Math.min(1, near / 4), smooth = ease * ease * (3 - 2 * ease);
-    const shape = broad(i, j) * 0.75 + fine(i, j) * 0.25;
+    // The hill noise is sampled in the mainland's own coordinates, so its relief is exactly what it always was (the wider world sees the same field, shifted).
+    const shape = broad(i - MAINLAND.x, j - MAINLAND.y) * 0.75 + fine(i - MAINLAND.x, j - MAINLAND.y) * 0.25;
     raw[j * CW + i] = count ? (relief / count) * (0.12 + 0.88 * Math.pow(Math.max(0, shape), 1.6)) * smooth : 0;
   }
   const heights = new Float32Array(raw.length);

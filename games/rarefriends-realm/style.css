@@ -176,6 +176,20 @@
 .realm-quest-bar span { display: block; height: 100%; background: var(--gold); }
 .realm-quest-state { font-size: 10px; font-weight: 700; margin-left: 6px; text-transform: uppercase; letter-spacing: 0.04em; vertical-align: middle; }
 .quest-new { color: #e8e5de; } .quest-started { color: #f0a33c; } .quest-done { color: #9fe0a8; }
+.realm-magic-tabs { display: flex; gap: 3px; margin: 0 0 6px; } .realm-magic-tabs button { flex: 1; font-size: 11px; padding: 4px 2px; display: grid; gap: 1px; } .realm-magic-tabs button[aria-selected="true"] { outline: 2px solid var(--gold); } .realm-magic-tabs small { font-size: 9px; opacity: 0.7; }
+.realm-icon-grid.spells button[data-locked="true"] { opacity: 0.35; filter: grayscale(1); }
+.realm-naming label { display: grid; gap: 4px; margin: 10px 0; font-size: 12px; }
+.realm-naming input, .realm-fellowship-form input { font: inherit; padding: 6px 8px; border: 1.5px solid #000; border-radius: 4px; background: #fffdf5; color: #161616; }
+.realm-naming-preview { text-align: center; font-size: 18px; margin: 6px 0 10px; } .realm-naming-preview small { display: block; font-size: 11px; opacity: 0.6; }
+.realm-title-id { font-size: 14px; opacity: 0.55; font-weight: 400; }
+.realm-profile { display: grid; gap: 8px; margin-bottom: 12px; }
+.realm-profile-name { margin: 0; font-size: 20px; } .realm-profile-tag { margin-left: 8px; color: var(--gold); font-size: 14px; } .realm-profile-id { margin-left: 6px; font-size: 12px; opacity: 0.55; font-weight: 400; }
+.realm-profile-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2px 12px; margin: 0; font-size: 11px; } .realm-profile-grid dt { color: var(--muted); } .realm-profile-grid dd { margin: 0 0 6px; font-weight: 700; }
+.realm-profile h4 { margin: 6px 0 2px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.85; }
+.realm-profile-rep { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; font-size: 11px; } .realm-profile-rep li { display: flex; justify-content: space-between; }
+.realm-profile-rep li[data-rank="Honored"] b { color: var(--gold); } .realm-profile-rep li[data-rank="Trusted"] b { color: #9fe0a8; } .realm-profile-rep li[data-rank="Known"] b { color: #e8e5de; } .realm-profile-rep li[data-rank="Unknown"] b { color: var(--muted); font-weight: 400; }
+.realm-profile-titles { display: flex; flex-wrap: wrap; gap: 4px; } .realm-profile-titles button { font-size: 11px; padding: 3px 7px; } .realm-profile-titles button[aria-pressed="true"] { outline: 2px solid var(--gold); } .realm-profile-titles button small { opacity: 0.6; }
+.realm-fellowship-form { display: grid; grid-template-columns: 2fr 1fr auto; gap: 6px; align-items: center; } .realm-fellowship-form small { grid-column: 1 / -1; }
 .realm-quest-rewards { margin: 0; padding: 0 0 0 16px; text-align: left; font-size: 12px; color: #e8e5de; }
 .realm-journal p { margin: 5px 0; color: #e8e5de; }
 .realm-back { border: 0; background: transparent; color: var(--gold); padding: 0; }

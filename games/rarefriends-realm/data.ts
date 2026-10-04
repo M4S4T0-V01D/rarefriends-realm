@@ -6,14 +6,14 @@
 // ---------- Skills and experience ----------
 export const SKILLS = [
   "attack", "strength", "defence", "ranged", "hitpoints", "magic", "prayer", "sigilcraft", "woodcutting", "fletching", "fishing",
-  "cooking", "firemaking", "mining", "smithing", "crafting", "thieving", "agility", "slayer",
+  "cooking", "firemaking", "mining", "smithing", "crafting", "thieving", "agility", "slayer", "apothecary", "presence",
 ] as const;
 export type Skill = typeof SKILLS[number];
 export const SKILL_NAMES: Record<Skill, string> = {
   attack: "Attack", strength: "Strength", defence: "Defence", ranged: "Ranged", hitpoints: "Hitpoints", magic: "Magic", prayer: "Faith",
   woodcutting: "Woodcutting", fishing: "Fishing", cooking: "Cooking", firemaking: "Firemaking", mining: "Mining",
   smithing: "Smithing", crafting: "Crafting", thieving: "Stealth", agility: "Wayfaring", slayer: "Slayer",
-  sigilcraft: "Sigilcraft", fletching: "Fletching",
+  sigilcraft: "Sigilcraft", fletching: "Fletching", apothecary: "Apothecary", presence: "Presence",
 };
 /** Each skill's colour: its mastery cape, and its trim. */
 export const SKILL_COLORS: Record<Skill, [string, string]> = {
@@ -21,12 +21,12 @@ export const SKILL_COLORS: Record<Skill, [string, string]> = {
   hitpoints: ["#e8e4dc", "#cf6e6e"], magic: ["#6f7ea6", "#e2d49e"], prayer: ["#efede7", "#e2d49e"], woodcutting: ["#8e9f7a", "#c49a74"],
   fishing: ["#8fb3c9", "#efede7"], cooking: ["#9c7aa6", "#e8d4c0"], firemaking: ["#e9a07a", "#e2d49e"], mining: ["#8b8e92", "#c9c2b6"],
   smithing: ["#6d6b67", "#e3a58c"], crafting: ["#b89c86", "#efede7"], thieving: ["#6d6b8a", "#c6bed4"], agility: ["#8f9cb2", "#efede7"],
-  slayer: ["#3b3a38", "#cf6e6e"], sigilcraft: ["#c6bed4", "#6f7ea6"], fletching: ["#7d9a86", "#e8d4c0"],
+  slayer: ["#3b3a38", "#cf6e6e"], sigilcraft: ["#c6bed4", "#6f7ea6"], fletching: ["#7d9a86", "#e8d4c0"], apothecary: ["#8fbf9a", "#c98f95"], presence: ["#e2d49e", "#6e4a8a"],
 };
 /** Small glyphs for XP drops and the skills tab (drawn as text). */
 export const SKILL_ICONS: Record<Skill, string> = {
   attack: "⚔", strength: "✊", defence: "⛨", hitpoints: "♥", magic: "✦", prayer: "✚", woodcutting: "🪓", fishing: "🐟",
-  cooking: "🍳", firemaking: "🔥", mining: "⛏", smithing: "⚒", crafting: "✂", thieving: "👣", agility: "➶", ranged: "➹", slayer: "☠", sigilcraft: "◈", fletching: "➴",
+  cooking: "🍳", firemaking: "🔥", mining: "⛏", smithing: "⚒", crafting: "✂", thieving: "👣", agility: "➶", ranged: "➹", slayer: "☠", sigilcraft: "◈", fletching: "➴", apothecary: "⚗", presence: "✧",
 };
 export const MAX_LEVEL = 99;
 /** The classic old-school curve: XP needed for each level, index = level. */
@@ -63,6 +63,7 @@ export const FAMILY_PERKS: readonly FamilyPerk[] = [
   { title: "Echo magic", text: "+10% magic accuracy, and 1 in 5 spells keeps its sigils." },
 ];
 
+import { APOTHECARY_ITEMS, type PotionEffect } from "./apothecary.ts";
 // ---------- Items ----------
 export type EquipSlot = "head" | "cape" | "neck" | "weapon" | "body" | "shield" | "legs" | "hands" | "feet";
 export const EQUIP_SLOTS: readonly EquipSlot[] = ["head", "cape", "neck", "weapon", "body", "shield", "legs", "hands", "feet"];
@@ -74,7 +75,7 @@ export type IconShape =
   | "amulet" | "log" | "fish" | "ore" | "bar" | "bones" | "sigil" | "staff" | "net" | "rod" | "harpoon" | "pot" | "bucket" | "egg" | "flour"
   | "milk" | "tinderbox" | "hammer" | "knife" | "needle" | "thread" | "chisel" | "gem" | "hide" | "leather" | "meat" | "feather" | "bait"
   | "cake" | "bread" | "berries" | "key" | "wheat" | "lamp" | "scroll" | "silk" | "hood" | "bracer" | "burnt" | "hat" | "crown" | "orb" | "trophy"
-  | "bow" | "arrow" | "tablet" | "arrowheads" | "material" | "quiver" | "satchel" | "mask" | "stonebox" | "wool" | "string" | "shears" | "greatsword" | "battleaxe" | "warhammer" | "spear" | "warbow" | "crossbow" | "bolts" | "limbs" | "stock";
+  | "bow" | "arrow" | "tablet" | "arrowheads" | "material" | "quiver" | "satchel" | "mask" | "stonebox" | "wool" | "string" | "shears" | "greatsword" | "battleaxe" | "warhammer" | "spear" | "warbow" | "crossbow" | "bolts" | "limbs" | "stock" | "herb" | "mushroom" | "vial" | "mortar";
 export type Item = {
   id: string; name: string; examine: string; value: number; icon: Icon;
   stackable?: boolean; tradeable?: boolean;
@@ -86,6 +87,8 @@ export type Item = {
   heal?: number; bones?: number; tool?: { kind: "axe" | "pickaxe"; tier: number; level: number };
   /** Run energy restored when eaten (waybread). */
   energy?: number;
+  /** A drink (Apothecary): what it does. */
+  potion?: PotionEffect;
   /** Arrows (fired by any bow) or bolts (by any crossbow), from your pack. */
   ammo?: { strength: number; level: number; bolt?: boolean };
   /** A fixed shop price (instead of value × markup). */
@@ -599,6 +602,65 @@ const TAILORING: Item[] = [
 ];
 export const TAILOR_STOCK = TAILORING.map(entry => entry.id);
 
+// ---------- Regional clothing: every settlement of the wider world dresses its own way ----------
+/** A region's clothes: [id, name, slot shape/kind, colour, accent, examine]. Sold by the village clothier and worn by its people. */
+export type RegionalSet = { region: string; shop: string; pieces: readonly { id: string; name: string; slot: EquipSlot; shape: IconShape; kind?: string; color: string; accent: string; examine: string; value: number }[] };
+export const REGIONAL_CLOTHING: readonly RegionalSet[] = [
+  { region: "gravesend", shop: "gravesend_clothier", pieces: [
+    { id: "mourners_hood", name: "Mourner's hood", slot: "head", shape: "hood", color: "#3b3a40", accent: "#d9d2bf", examine: "A deep charcoal hood, bone-white at the hem. Gravesend wears it for everyone the Deadwood took.", value: 90 },
+    { id: "gravesend_coat", name: "Gravesend coat", slot: "body", shape: "body", kind: "tunic", color: "#3b3a40", accent: "#d9d2bf", examine: "A long dark coat with bone buttons.", value: 180 },
+    { id: "ashen_trousers", name: "Ashen trousers", slot: "legs", shape: "legs", kind: "trousers", color: "#55525a", accent: "#3b3a40", examine: "Grey as the Deadwood's grass.", value: 70 },
+    { id: "lantern_cape", name: "Lantern-bearer's cape", slot: "cape", shape: "cape", color: "#4a3a60", accent: "#f2e28f", examine: "The gravekeepers' purple cape, a lantern stitched in gold on the back.", value: 240 },
+  ] },
+  { region: "saltmarrow", shop: "saltmarrow_clothier", pieces: [
+    { id: "souwester", name: "Sou'wester", slot: "head", shape: "hat", kind: "wide", color: "#e2b84a", accent: "#8a5a2a", examine: "A fisher's oilskin hat. The rain runs straight off the back.", value: 80 },
+    { id: "oilskin_coat", name: "Oilskin coat", slot: "body", shape: "body", kind: "tunic", color: "#2f5a66", accent: "#e2b84a", examine: "Waxed canvas the colour of deep water.", value: 170 },
+    { id: "sailors_trousers", name: "Sailor's trousers", slot: "legs", shape: "legs", kind: "trousers", color: "#2f4266", accent: "#ecebe6", examine: "Navy, with a white stripe down the leg.", value: 70 },
+    { id: "sea_cape", name: "Weathered sea cape", slot: "cape", shape: "cape", color: "#5f8a96", accent: "#ecebe6", examine: "Salt-stiff and sun-faded. It has seen storms.", value: 220 },
+  ] },
+  { region: "hollyhock", shop: "hollyhock_clothier", pieces: [
+    { id: "herbalists_hat", name: "Herbalist's hat", slot: "head", shape: "hat", kind: "wide", color: "#6f8f5a", accent: "#e7a9b0", examine: "A wide green hat with a hollyhock tucked in the band.", value: 80 },
+    { id: "gardeners_apron", name: "Gardener's apron", slot: "body", shape: "body", kind: "tunic", color: "#8fbf9a", accent: "#ecebe6", examine: "A sage tunic under a linen apron, pockets full of seeds.", value: 160 },
+    { id: "hollyhock_skirt", name: "Hollyhock skirt", slot: "legs", shape: "legs", kind: "skirt", color: "#c98f95", accent: "#6f8f5a", examine: "Rose pink, printed with leaves.", value: 80 },
+    { id: "leaf_cape", name: "Leaf-pinned cape", slot: "cape", shape: "cape", color: "#4f7a4a", accent: "#e2d49e", examine: "A green cape pinned with a brass leaf.", value: 200 },
+  ] },
+  { region: "dyemoor", shop: "dyemoor_clothier", pieces: [
+    { id: "dyers_turban", name: "Dyer's turban", slot: "head", shape: "hat", color: "#6e4a8a", accent: "#e2c46a", examine: "Wound from a bolt of the moor's own indigo.", value: 90 },
+    { id: "moorland_frock", name: "Moorland frock", slot: "body", shape: "body", kind: "dress", color: "#3f3f7a", accent: "#e2c46a", examine: "Dyemoor indigo, cut to swing. The dye never runs.", value: 220 },
+    { id: "madder_trousers", name: "Madder trousers", slot: "legs", shape: "legs", kind: "trousers", color: "#a8403a", accent: "#6e4a8a", examine: "Dyed red with madder root.", value: 80 },
+    { id: "dyemoor_cloak", name: "Dyemoor cloak", slot: "cape", shape: "cape", color: "#6e4a8a", accent: "#a8403a", examine: "A cloak in the dyers' two colours, indigo and madder.", value: 260 },
+  ] },
+  { region: "tallgrass", shop: "tallgrass_clothier", pieces: [
+    { id: "trackers_hood", name: "Tracker's hood", slot: "head", shape: "hood", color: "#9a8a5a", accent: "#4f5234", examine: "Tan leather, soft enough not to rustle.", value: 80 },
+    { id: "tallgrass_longcoat", name: "Tallgrass longcoat", slot: "body", shape: "body", kind: "tunic", color: "#6f7248", accent: "#9a8a5a", examine: "Olive wool that vanishes in long grass.", value: 170 },
+    { id: "wildsmans_trousers", name: "Wildsman's trousers", slot: "legs", shape: "legs", kind: "trousers", color: "#5a4230", accent: "#9a8a5a", examine: "Patched at the knee from crawling.", value: 70 },
+    { id: "pelt_cape", name: "Pelt cape", slot: "cape", shape: "cape", color: "#8a6446", accent: "#d8c9a8", examine: "Wolf pelt, the fur turned in.", value: 220 },
+  ] },
+  { region: "cragmaw", shop: "cragmaw_clothier", pieces: [
+    { id: "fur_hood", name: "Fur-lined hood", slot: "head", shape: "hood", color: "#6d5a48", accent: "#ecebe6", examine: "Goat fur against the Ironreach wind.", value: 90 },
+    { id: "ironreach_greatcoat", name: "Ironreach greatcoat", slot: "body", shape: "body", kind: "tunic", color: "#55525a", accent: "#ecebe6", examine: "Heavy grey wool, fur at the collar, soot at the cuffs.", value: 200 },
+    { id: "quilted_trousers", name: "Quilted trousers", slot: "legs", shape: "legs", kind: "trousers", color: "#4a4a50", accent: "#8a8780", examine: "Stitched in squares and stuffed with wool.", value: 80 },
+    { id: "climbers_cape", name: "Climber's cape", slot: "cape", shape: "cape", color: "#b0443c", accent: "#ecebe6", examine: "Red, so they can find you in the snow.", value: 220 },
+  ] },
+  { region: "quillhaven", shop: "quillhaven_clothier", pieces: [
+    { id: "scholars_cap_quill", name: "Quillhaven cap", slot: "head", shape: "hat", color: "#2f4266", accent: "#e2c46a", examine: "A flat scholar's cap with a gold tassel.", value: 90 },
+    { id: "archivist_robe", name: "Archivist's robe", slot: "body", shape: "body", color: "#2f4266", accent: "#e2c46a", examine: "A long blue robe, ink on both sleeves.", value: 220 },
+    { id: "inkstained_trousers", name: "Inkstained trousers", slot: "legs", shape: "legs", kind: "trousers", color: "#3b3a40", accent: "#2f4266", examine: "They were grey once.", value: 70 },
+    { id: "librarians_cape", name: "Librarian's cape", slot: "cape", shape: "cape", color: "#8fa3c9", accent: "#e2c46a", examine: "Pale blue, with a quill embroidered on the back.", value: 220 },
+  ] },
+  { region: "ashfall", shop: "ashfall_trader", pieces: [
+    { id: "drakehide_hood", name: "Drakehide hood", slot: "head", shape: "hood", color: "#6f8a5c", accent: "#e3734f", examine: "Scaled hide over the head and shoulders. Warm in a way you can't quite trust.", value: 400 },
+    { id: "ember_coat", name: "Ember-stitched coat", slot: "body", shape: "body", kind: "tunic", color: "#3b3a38", accent: "#f0a050", examine: "Black leather stitched with glowing orange thread.", value: 600 },
+    { id: "scorched_trousers", name: "Scorched trousers", slot: "legs", shape: "legs", kind: "trousers", color: "#5a4230", accent: "#3b3a38", examine: "Singed at every hem. Fashionable, in Ashfall.", value: 240 },
+    { id: "scorched_cloak", name: "Scorched cloak", slot: "cape", shape: "cape", color: "#8a3f2e", accent: "#f0a050", examine: "A dramatic red cloak burnt ragged at the edge. It has met a dragon.", value: 900 },
+  ] },
+];
+const REGIONAL_ITEMS: Item[] = REGIONAL_CLOTHING.flatMap(set => set.pieces.map((piece): Item => ({
+  id: piece.id, name: piece.name, examine: piece.examine, value: piece.value, icon: { shape: piece.shape, color: piece.color, accent: piece.accent, ...(piece.kind ? { kind: piece.kind } : {}) },
+  equip: { slot: piece.slot, bonuses: piece.slot === "cape" ? { defence: 1 } : {} },
+})));
+export const regionalSetOf = (region: string) => REGIONAL_CLOTHING.find(set => set.region === region);
+
 // ---------- Clothing: shirts, tunics, dresses, trousers and skirts (Ribbon & Rye Clothiers on Market Street) ----------
 /** [id part, name, colour, trim]: worn for looks (no combat bonuses). */
 const SHIRTS = [["linen", "Linen", "#ecebe6", "#b8a88a"], ["sky", "Sky blue", "#8fb2d6", "#ecebe6"], ["scarlet", "Scarlet", "#b0443c", "#e2c46a"], ["moss", "Moss green", "#6f8f5a", "#d8c9a8"],
@@ -659,7 +721,7 @@ export const ARMOURY_LATER = ["radiant_greatsword", "sunforged_warhammer", "dawn
 export const DAWNPLATE_QUEST: Record<string, string> = { dawnplate_greaves: "pilgrims_road", dawnplate_boots: "pilgrims_road", dawnplate_helm: "restless_crypt",
   dawnplate_shield: "restless_crypt", dawnplate_gauntlets: "restless_crypt", dawnplate_cuirass: "dawn_against_hollow" };
 
-export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...slayerGear(), ...heartguardGear()]);
+export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...slayerGear(), ...heartguardGear(), ...REGIONAL_ITEMS, ...APOTHECARY_ITEMS]);
 const ITEM_MAP = new Map(ITEM_LIST.map(item => [item.id, item]));
 export function item(id: string): Item {
   const found = ITEM_MAP.get(id);
@@ -789,9 +851,18 @@ export type SpellKind = "strike" | "bolt" | "blast" | "curse" | "bind" | "telepo
 export type SpellTarget = "monster" | "item" | "ground" | "self";
 export type Spell = {
   id: string; name: string; level: number; xp: number; sigils: Readonly<Record<string, number>>; kind: SpellKind; element: string; target: SpellTarget;
-  maxHit?: number; teleport?: "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier"; curse?: { stat: "attack" | "strength" | "defence"; amount: number };
+  maxHit?: number; teleport?: TeleportPlace; curse?: { stat: "attack" | "strength" | "defence"; amount: number };
+  /** A spell learnt by deed: castable only once this quest is complete. */
+  quest?: string;
   description: string;
 };
+/** Everywhere a teleport can land (the keys of World["places"] that spells use). */
+export type TeleportPlace = "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier" | "fernwick" | "highcairn" | "dawnhold" | "gravesend" | "saltmarrow" | "hollyhock" | "dyemoor" | "tallgrass" | "cragmaw" | "quillhaven" | "ashfall";
+/** The spellbook's tabs: which kinds go where. */
+export const SPELL_TABS: readonly { id: string; name: string; kinds: readonly SpellKind[] }[] = [
+  { id: "combat", name: "Combat", kinds: ["strike", "bolt", "blast"] }, { id: "curses", name: "Curses", kinds: ["curse", "bind"] },
+  { id: "utility", name: "Utility", kinds: ["alchemy", "superheat", "grab", "enchant", "bloom"] }, { id: "teleports", name: "Teleports", kinds: ["teleport"] },
+];
 /** The Realm's spellbook, in level order: combat, curses, utility and teleports. */
 export const SPELLS: readonly Spell[] = [
   { id: "home", name: "Homeward", level: 1, xp: 0, sigils: {}, kind: "teleport", element: "home", target: "self", teleport: "hollow_square", description: "Return to Friendhollow. Slow to cast, free, and not in combat." },
@@ -817,6 +888,18 @@ export const SPELLS: readonly Spell[] = [
   { id: "forgeheart", name: "Forgeheart", level: 43, xp: 53, sigils: { bloom_sigil: 1, ember_sigil: 4 }, kind: "superheat", element: "fire", target: "item", description: "Melts ore into a bar in your hands, no furnace needed (and trains Smithing)." },
   { id: "glide_frostpeak", name: "Glide to Frostpeak", level: 45, xp: 55.5, sigils: { path_sigil: 2, tide_sigil: 2, breeze_sigil: 2 }, kind: "teleport", element: "water", target: "self", teleport: "frostpeak", description: "Teleports you to the Frostpeak lodge." },
   { id: "glide_pier", name: "Glide to the Pier", level: 48, xp: 58, sigils: { path_sigil: 2, tide_sigil: 3 }, kind: "teleport", element: "water", target: "self", teleport: "pier", description: "Teleports you to Pike's Pier on Glass Lake." },
+  // The wider world's glides: each learnt by doing the place's own quest (the sigils are the easy part).
+  { id: "glide_fernwick", name: "Glide to Fernwick", level: 28, xp: 38, sigils: { path_sigil: 1, breeze_sigil: 2, bloom_sigil: 1 }, kind: "teleport", element: "moon", target: "self", teleport: "fernwick", quest: "hazels_quiver", description: "Teleports you to Fernwick in the Whisperwood. Learnt from Hazel, after her quiver." },
+  { id: "glide_hollyhock", name: "Glide to Hollyhock", level: 38, xp: 48, sigils: { path_sigil: 1, bloom_sigil: 2, tide_sigil: 1 }, kind: "teleport", element: "moon", target: "self", teleport: "hollyhock", quest: "hollyhock_errand", description: "Teleports you to Hollyhock in the Thistle Vale. Learnt at Mother Yarrow's bench." },
+  { id: "glide_saltmarrow", name: "Glide to Saltmarrow", level: 40, xp: 50, sigils: { path_sigil: 1, tide_sigil: 3 }, kind: "teleport", element: "water", target: "self", teleport: "saltmarrow", quest: "saltmarrow_tithe", description: "Teleports you to the Saltmarrow docks. Learnt from the harbourmaster, after the tithe." },
+  { id: "glide_gravesend", name: "Glide to Gravesend", level: 42, xp: 52, sigils: { path_sigil: 1, shade_sigil: 2, hollow_sigil: 1 }, kind: "teleport", element: "shadow", target: "self", teleport: "gravesend", quest: "gravesend_lanterns", description: "Teleports you to Gravesend at the Deadwood's edge. Learnt from Warden Mira, after the lanterns." },
+  { id: "glide_dyemoor", name: "Glide to Dyemoor", level: 44, xp: 54, sigils: { path_sigil: 1, tide_sigil: 1, star_sigil: 1 }, kind: "teleport", element: "moon", target: "self", teleport: "dyemoor", quest: "dyemoor_dye", description: "Teleports you to Dyemoor on the Thistle. Learnt from Master Dyer Vell." },
+  { id: "glide_tallgrass", name: "Glide to Tallgrass", level: 50, xp: 60, sigils: { path_sigil: 2, breeze_sigil: 2, stone_sigil: 1 }, kind: "teleport", element: "wind", target: "self", teleport: "tallgrass", quest: "tallgrass_tracks", description: "Teleports you to the Tallgrass hunters' camp. Learnt from Huntmaster Fenn." },
+  { id: "glide_highcairn", name: "Glide to Highcairn", level: 52, xp: 62, sigils: { path_sigil: 2, stone_sigil: 2, breeze_sigil: 1 }, kind: "teleport", element: "stone", target: "self", teleport: "highcairn", description: "Teleports you to Highcairn's square in the Greyhorn." },
+  { id: "glide_dawnhold", name: "Glide to Dawnhold", level: 55, xp: 66, sigils: { path_sigil: 2, star_sigil: 2 }, kind: "teleport", element: "gold", target: "self", teleport: "dawnhold", quest: "dawn_vigil", description: "Teleports you to Dawnhold's courtyard. The Order teaches it to squires who kept the vigil." },
+  { id: "glide_cragmaw", name: "Glide to Cragmaw", level: 58, xp: 70, sigils: { path_sigil: 2, stone_sigil: 3 }, kind: "teleport", element: "stone", target: "self", teleport: "cragmaw", quest: "cragmaw_shaft", description: "Teleports you to Cragmaw in the Ironreach pass. Learnt from Foreman Pike." },
+  { id: "glide_quillhaven", name: "Glide to Quillhaven", level: 62, xp: 74, sigils: { path_sigil: 2, thought_sigil: 3, star_sigil: 1 }, kind: "teleport", element: "moon", target: "self", teleport: "quillhaven", quest: "quillhaven_folio", description: "Teleports you to the Quillhaven library. Learnt from Archivist Quill." },
+  { id: "glide_ashfall", name: "Glide to Ashfall", level: 75, xp: 90, sigils: { path_sigil: 3, ember_sigil: 3, hollow_sigil: 1 }, kind: "teleport", element: "fire", target: "self", teleport: "ashfall", quest: "ashfall_embers", description: "Teleports you to Ember Tamsin's camp at the edge of Ashfall. Learnt from her, after the drakes." },
   { id: "enchant_rosestone", name: "Enchant Rosestone", level: 49, xp: 59, sigils: { star_sigil: 1, ember_sigil: 5 }, kind: "enchant", element: "fire", target: "item", description: "Turns a rosestone amulet (a rosestone on a string) into a rosestone pendant." },
   { id: "golden_touch", name: "Golden Touch", level: 55, xp: 65, sigils: { bloom_sigil: 1, ember_sigil: 5 }, kind: "alchemy", element: "gold", target: "item", description: "Turns an item into coins: 60% of its value." },
   { id: "ember_burst", name: "Ember Burst", level: 59, xp: 34.5, sigils: { ember_sigil: 5, breeze_sigil: 4, hollow_sigil: 1 }, kind: "blast", element: "fire", target: "monster", maxHit: 16, description: "A medium level fire missile." },
@@ -854,6 +937,10 @@ export type MonsterDef = {
   undead?: boolean;
   /** Dragonfire: its top hit when it breathes (a Wyrmward shield turns it to a few points). */
   breath?: number;
+  /** A venomous creature: each hit it lands may poison you (this much damage, four times, every ten ticks). */
+  poison?: { damage: number; chance: number };
+  /** How weapon poison takes: more than 1 for soft-bodied creatures, and none at all for the undead and stone (only wraith poison touches the undead). */
+  poisonWeak?: number; poisonImmune?: boolean;
 };
 const coins = (min: number, max: number, chance: number): Drop => ({ item: "coins", min, max, chance });
 const one = (id: string, chance: number, min = 1, max = min): Drop => ({ item: id, min, max, chance });
@@ -866,13 +953,13 @@ export const MONSTERS: Record<string, MonsterDef> = {
     always: [one("bones", 1)], drops: [one("wool", 0.5)], art: 115, shear: { item: "wool", regrow: 90, art: 116 } },
   forest_spider: { id: "forest_spider", name: "Forest spider", level: 12, hp: 16, attack: 10, strength: 10, defence: 8, attackBonus: 6, defenceBonus: 4, maxHit: 2, speed: 4, respawn: 30, wander: 5, examine: "Eight eyes, all of them on you.", aggressive: true,
     always: [one("bones", 1)], drops: [one("spider_fang", 0.04), coins(5, 40, 0.5), one("silk", 0.2), one("pewter_arrow", 0.15, 3, 8)], art: 117 },
-  boar: { id: "boar", name: "Wild boar", level: 16, hp: 22, attack: 14, strength: 16, defence: 10, attackBonus: 6, defenceBonus: 6, maxHit: 3, speed: 5, respawn: 30, wander: 5, examine: "Tusks first, questions later.",
+  boar: { id: "boar", poisonWeak: 1.5, name: "Wild boar", level: 16, hp: 22, attack: 14, strength: 16, defence: 10, attackBonus: 6, defenceBonus: 6, maxHit: 3, speed: 5, respawn: 30, wander: 5, examine: "Tusks first, questions later.",
     always: [one("bones", 1), one("raw_beef", 1)], drops: [one("tusker_axe", 0.03), one("cowhide", 0.4), coins(5, 30, 0.3)], art: 118 },
   highland_goat: { id: "highland_goat", name: "Highland goat", level: 22, hp: 26, attack: 18, strength: 16, defence: 16, attackBonus: 8, defenceBonus: 10, maxHit: 3, speed: 4, respawn: 30, wander: 6, examine: "It climbed up there somehow.",
     always: [one("bones", 1)], drops: [one("horned_helm", 0.04), one("wool", 0.35), one("raw_beef", 0.5), coins(10, 60, 0.3)], art: 119 },
   sand_scorpion: { id: "sand_scorpion", name: "Sand scorpion", level: 30, hp: 34, attack: 26, strength: 24, defence: 24, attackBonus: 14, defenceBonus: 18, maxHit: 5, speed: 4, respawn: 35, wander: 5, examine: "Its tail is always raised. Always.", aggressive: true,
     always: [one("bones", 1)], drops: [one("stinger_sabre", 0.03), coins(20, 120, 0.5), one("rough_sagestone", 0.03), one("moonsilver_arrow", 0.08, 5, 12)], art: 121 },
-  stone_golem: { id: "stone_golem", name: "Stone golem", level: 45, hp: 62, attack: 36, strength: 38, defence: 44, attackBonus: 20, defenceBonus: 40, maxHit: 7, speed: 6, respawn: 60, wander: 3, examine: "A heap of mountain that got up.", aggressive: true,
+  stone_golem: { id: "stone_golem", poisonImmune: true, name: "Stone golem", level: 45, hp: 62, attack: 36, strength: 38, defence: 44, attackBonus: 20, defenceBonus: 40, maxHit: 7, speed: 6, respawn: 60, wander: 3, examine: "A heap of mountain that got up.", aggressive: true,
     always: [one("large_bones", 1)], drops: [one("golem_maul", 0.02), one("glimmer_ore", 0.25), one("rarite_ore", 0.06), one("moonsilver_ore", 0.3), coins(40, 240, 0.4)], art: 120 },
   ink_rat: { id: "ink_rat", name: "Ink rat", level: 1, hp: 2, attack: 1, strength: 1, defence: 1, attackBonus: 0, defenceBonus: 0, maxHit: 1, speed: 4, respawn: 15, wander: 6, examine: "A rat made of spilled ink. It squeaks in monochrome.",
     always: [one("bones", 1)], drops: [coins(1, 4, 0.3)], art: 102 },
@@ -884,7 +971,7 @@ export const MONSTERS: Record<string, MonsterDef> = {
     always: [one("bones", 1)], drops: [coins(20, 120, 0.7), one("ashsteel_dagger", 0.05), one("storm_sigil", 0.08, 2, 6), one("rough_sagestone", 0.02), one("path_sigil", 0.02, 1, 2), one("ashsteel_arrow", 0.1, 5, 15), one("willow_bow", 0.02)], art: 105 },
   swamp_lurker: { id: "swamp_lurker", name: "Swamp lurker", level: 16, hp: 22, attack: 14, strength: 14, defence: 12, attackBonus: 8, defenceBonus: 8, maxHit: 3, speed: 5, respawn: 35, wander: 4, examine: "Mostly mouth, partly mud.", aggressive: true,
     always: [one("bones", 1)], drops: [coins(5, 50, 0.5), one("tide_sigil", 0.12, 6, 18), one("raw_char", 0.1), one("rough_moonstone", 0.02)], art: 106 },
-  skeleton: { id: "skeleton", undead: true, name: "Crypt skeleton", level: 25, hp: 29, attack: 22, strength: 22, defence: 20, attackBonus: 14, defenceBonus: 16, maxHit: 4, speed: 4, respawn: 40, wander: 4, examine: "It rattles when it walks. It used to be a Friend.", aggressive: true,
+  skeleton: { id: "skeleton", undead: true, poisonImmune: true, name: "Crypt skeleton", level: 25, hp: 29, attack: 22, strength: 22, defence: 20, attackBonus: 14, defenceBonus: 16, maxHit: 4, speed: 4, respawn: 40, wander: 4, examine: "It rattles when it walks. It used to be a Friend.", aggressive: true,
     always: [one("bones", 1)], drops: [coins(10, 90, 0.6), one("blackiron_greaves", 0.03), one("storm_sigil", 0.06, 3, 7), one("hollow_sigil", 0.02, 1, 3), one("ashsteel_helm", 0.03)], art: 107 },
   wolf: { id: "wolf", name: "Frost wolf", level: 32, hp: 40, attack: 30, strength: 28, defence: 26, attackBonus: 18, defenceBonus: 18, maxHit: 5, speed: 4, respawn: 40, wander: 6, examine: "Its breath freezes as it growls.", aggressive: true,
     always: [one("large_bones", 1)], drops: [one("frost_shard", 0.03), coins(20, 110, 0.4), one("rough_rosestone", 0.02), one("moonsilver_ore", 0.05), one("frosthide_bracers", 0.02), one("moonsilver_arrow", 0.06, 5, 12)], art: 108 },
@@ -892,11 +979,11 @@ export const MONSTERS: Record<string, MonsterDef> = {
     always: [one("large_bones", 1)], drops: [one("mossy_staff", 0.03), one("mossblade", 0.03), coins(30, 250, 0.6), one("moonsilver_sword", 0.03), one("path_sigil", 0.06, 1, 3), one("rough_sagestone", 0.04), one("ashsteel_cuirass", 0.02)], art: 109 },
   frost_yeti: { id: "frost_yeti", name: "Frost yeti", level: 55, hp: 85, attack: 50, strength: 52, defence: 45, attackBonus: 30, defenceBonus: 32, maxHit: 10, speed: 5, respawn: 60, wander: 4, examine: "Every footstep is an avalanche.", aggressive: true, size: 2,
     always: [one("large_bones", 1)], drops: [one("frost_shard", 0.3), one("frostsilver_helm", 0.012), one("frostsilver_sabre", 0.008), coins(80, 400, 0.6), one("glimmer_sabre", 0.02), one("hollow_sigil", 0.08, 2, 5), one("glimmer_ore", 0.06), one("rough_rosestone", 0.04), one("rosestone_pendant", 0.004)], art: 110 },
-  shade: { id: "shade", undead: true, name: "Shade", level: 38, hp: 45, attack: 32, strength: 30, defence: 34, magicDef: 10, attackBonus: 20, defenceBonus: 26, maxHit: 6, speed: 4, respawn: 40, wander: 4, examine: "A shadow with no Friend to belong to.", aggressive: true,
+  shade: { id: "shade", undead: true, poisonImmune: true, name: "Shade", level: 38, hp: 45, attack: 32, strength: 30, defence: 34, magicDef: 10, attackBonus: 20, defenceBonus: 26, maxHit: 6, speed: 4, respawn: 40, wander: 4, examine: "A shadow with no Friend to belong to.", aggressive: true,
     always: [one("ink_bones", 1)], drops: [one("gloom_shard", 0.05), coins(40, 220, 0.6), one("hollow_sigil", 0.06, 2, 6), one("moonsilver_helm", 0.03), one("rough_rosestone", 0.02)], art: 111, ink: "#2c2b3a" },
-  hollow_sentinel: { id: "hollow_sentinel", undead: true, name: "Hollow sentinel", level: 64, hp: 95, attack: 60, strength: 60, defence: 58, attackBonus: 40, defenceBonus: 48, maxHit: 12, speed: 5, respawn: 50, wander: 3, examine: "Armour with nothing inside. It still remembers how to fight.", aggressive: true,
+  hollow_sentinel: { id: "hollow_sentinel", undead: true, poisonImmune: true, name: "Hollow sentinel", level: 64, hp: 95, attack: 60, strength: 60, defence: 58, attackBonus: 40, defenceBonus: 48, maxHit: 12, speed: 5, respawn: 50, wander: 3, examine: "Armour with nothing inside. It still remembers how to fight.", aggressive: true,
     always: [one("ink_bones", 1)], drops: [one("gloom_shard", 0.08), one("hollow_essence", 0.2), one("gloomsteel_shield", 0.008), coins(100, 600, 0.7), one("glimmer_cuirass", 0.02), one("rarite_ore", 0.03), one("hollow_sigil", 0.1, 4, 9), one("path_sigil", 0.08, 2, 5)], art: 112, ink: "#1d1d26" },
-  hollow_king: { id: "hollow_king", undead: true, name: "The Hollow King", level: 92, hp: 250, attack: 80, strength: 82, defence: 70, magicDef: 50, attackBonus: 60, defenceBonus: 70, maxHit: 18, speed: 5, respawn: 100, wander: 2, examine: "A crown floating over an empty ring of shadow.", aggressive: true, size: 3, boss: true,
+  hollow_king: { id: "hollow_king", undead: true, poisonImmune: true, name: "The Hollow King", level: 92, hp: 250, attack: 80, strength: 82, defence: 70, magicDef: 50, attackBonus: 60, defenceBonus: 70, maxHit: 18, speed: 5, respawn: 100, wander: 2, examine: "A crown floating over an empty ring of shadow.", aggressive: true, size: 3, boss: true,
     always: [one("ink_bones", 1), coins(1000, 3000, 1)], drops: [one("hollow_essence", 1, 3, 5), one("hollowsteel_sabre", 0.1), one("hollowsteel_helm", 0.08), one("hollowsteel_staff", 0.06), one("rarite_sabre", 0.12), one("rarite_helm", 0.1), one("moonlit_staff", 0.08), one("rarite_bar", 0.3, 1, 3), one("rosestone_pendant", 0.1)], art: 113, ink: "#111" },
 };
 Object.assign(MONSTERS, {
@@ -910,21 +997,28 @@ Object.assign(MONSTERS, {
     examine: "A hound made of the dark between two torches.", aggressive: true,
     always: [one("ink_bones", 1)], drops: [one("gloom_shard", 0.3), one("gloomsteel_sword", 0.01), one("gloomsteel_helm", 0.01), coins(100, 500, 0.7), one("gloomfang_bow", 0.012), one("rarite_arrow", 0.08, 5, 15), one("frosthide_vest", 0.02), one("hollow_sigil", 0.1, 3, 8), one("rarite_ore", 0.03)], art: 108, ink: "#2e2440" },
   // The Warden's creatures: only a Slayer of the right level can wound them, and each drops its own armour.
-  thornback: { id: "thornback", name: "Thornback", level: 28, hp: 38, attack: 22, strength: 24, defence: 20, attackBonus: 12, defenceBonus: 14, maxHit: 5, speed: 5, respawn: 40, wander: 5, slayer: 15,
+  thornback: { id: "thornback", poisonWeak: 1.5, name: "Thornback", level: 28, hp: 38, attack: 22, strength: 24, defence: 20, attackBonus: 12, defenceBonus: 14, maxHit: 5, speed: 5, respawn: 40, wander: 5, slayer: 15,
     examine: "A boar grown over with brambles. Every hit on it costs you a scratch.", aggressive: true,
     always: [one("bones", 1)], drops: [one("bramble_coif", 0.015), one("bramble_vest", 0.012), one("bramble_chaps", 0.012), coins(20, 120, 0.5), one("cowhide", 0.3), one("oak_logs", 0.2, 1, 3), one("rough_sagestone", 0.03), one("ashsteel_arrow", 0.12, 5, 15)], art: 122 },
-  cairn_wight: { id: "cairn_wight", undead: true, name: "Cairn wight", level: 48, hp: 60, attack: 40, strength: 38, defence: 42, magicDef: 20, attackBonus: 24, defenceBonus: 30, maxHit: 7, speed: 5, respawn: 45, wander: 4, slayer: 35,
+  cairn_wight: { id: "cairn_wight", undead: true, poisonImmune: true, name: "Cairn wight", level: 48, hp: 60, attack: 40, strength: 38, defence: 42, magicDef: 20, attackBonus: 24, defenceBonus: 30, maxHit: 7, speed: 5, respawn: 45, wander: 4, slayer: 35,
     examine: "The old highland dead, up and walking in what they were buried in.", aggressive: true,
     always: [one("large_bones", 1)], drops: [one("wightbone_helm", 0.014), one("wightbone_plate", 0.01), one("wightbone_greaves", 0.012), coins(50, 260, 0.6), one("moonsilver_ore", 0.2), one("hollow_sigil", 0.1, 2, 6), one("rough_rosestone", 0.03), one("glimmer_helm", 0.02)], art: 123, ink: "#4a4a44" },
-  dune_stalker: { id: "dune_stalker", name: "Dune stalker", level: 56, hp: 70, attack: 50, strength: 46, defence: 44, attackBonus: 30, defenceBonus: 32, maxHit: 8, speed: 4, respawn: 45, wander: 6, slayer: 45,
+  dune_stalker: { id: "dune_stalker", poisonWeak: 1.5, name: "Dune stalker", level: 56, hp: 70, attack: 50, strength: 46, defence: 44, attackBonus: 30, defenceBonus: 32, maxHit: 8, speed: 4, respawn: 45, wander: 6, slayer: 45,
     examine: "A long, low cat the colour of the sand. You only see it when it wants you to.", aggressive: true,
     always: [one("bones", 1)], drops: [one("stalker_hood", 0.014), one("stalker_jerkin", 0.01), one("stalker_leggings", 0.012), coins(60, 320, 0.6), one("cowhide", 0.3, 1, 2), one("glimmer_arrow", 0.12, 5, 15), one("rough_rosestone", 0.04), one("glimmer_sabre", 0.015)], art: 124, ink: "#8a7a58" },
   ember_salamander: { id: "ember_salamander", name: "Ember salamander", level: 70, hp: 92, attack: 62, strength: 60, defence: 54, magicDef: 30, attackBonus: 36, defenceBonus: 40, maxHit: 10, speed: 5, respawn: 50, wander: 4, slayer: 60, breath: 20,
     examine: "A salamander the size of a cart, with a furnace in its belly.", aggressive: true,
     always: [one("large_bones", 1)], drops: [one("cindershell_helm", 0.014), one("cindershell_plate", 0.01), one("cindershell_greaves", 0.012), coins(80, 420, 0.65), one("cinder_core", 0.08), one("inkcoal", 0.3, 2, 6), one("rarite_ore", 0.05), one("ember_sigil", 0.15, 4, 10)], art: 125, ink: "#a0462a" },
-  hollow_weaver: { id: "hollow_weaver", undead: true, name: "Hollow weaver", level: 88, hp: 120, attack: 74, strength: 70, defence: 66, magicDef: 60, attackBonus: 44, defenceBonus: 52, maxHit: 13, speed: 5, respawn: 55, wander: 3, slayer: 75, attackStyle: "magic",
+  hollow_weaver: { id: "hollow_weaver", undead: true, poisonImmune: true, name: "Hollow weaver", level: 88, hp: 120, attack: 74, strength: 70, defence: 66, magicDef: 60, attackBonus: 44, defenceBonus: 52, maxHit: 13, speed: 5, respawn: 55, wander: 3, slayer: 75, attackStyle: "magic",
     examine: "It spins the dark into thread. The thread is looking at you.", aggressive: true,
     always: [one("ink_bones", 1)], drops: [one("hollowthread_hood", 0.014), one("hollowthread_robe", 0.01), one("hollowthread_skirt", 0.012), coins(150, 700, 0.7), one("hollow_essence", 0.15), one("gloom_shard", 0.1), one("hollow_sigil", 0.15, 5, 12), one("shade_sigil", 0.12, 4, 10), one("rosestone_pendant", 0.005)], art: 126, ink: "#2a2438" },
+  // Venomous creatures (Apothecary's reason to brew antidotes): adders in the bogs, spiders in the dark.
+  marsh_adder: { id: "marsh_adder", name: "Marsh adder", level: 24, hp: 30, attack: 20, strength: 14, defence: 18, attackBonus: 14, defenceBonus: 10, maxHit: 3, speed: 4, respawn: 40, wander: 5, poison: { damage: 2, chance: 0.4 }, poisonWeak: 1.5,
+    examine: "A black-and-yellow snake as long as you are tall. Its bite is worse than it looks, and it looks bad.", aggressive: true,
+    always: [one("bones", 1)], drops: [one("bogcap", 0.4), one("marshroot", 0.25), one("blackgill", 0.03), coins(10, 60, 0.5), one("antidote", 0.05)], art: 127, ink: "#4a4a2a" },
+  cave_spider: { id: "cave_spider", name: "Cave spider", level: 44, hp: 48, attack: 38, strength: 30, defence: 34, attackBonus: 22, defenceBonus: 22, maxHit: 5, speed: 4, respawn: 45, wander: 4, poison: { damage: 3, chance: 0.5 }, poisonWeak: 1.5,
+    examine: "A spider the size of a dog, pale from the dark. Its fangs drip.", aggressive: true,
+    always: [one("bones", 1)], drops: [one("blackgill", 0.1), one("ghostcap", 0.2), coins(30, 160, 0.6), one("antidote", 0.08), one("spider_fang", 0.03)], art: 128, ink: "#d9d4e6" },
   ash_drake: { id: "ash_drake", name: "Ash drake", level: 68, hp: 90, attack: 58, strength: 60, defence: 56, magicDef: 40, attackBonus: 34, defenceBonus: 40, maxHit: 9, speed: 5, respawn: 45, wander: 5, breath: 32, size: 2,
     examine: "A young dragon, all ash and appetite. Mind the breath.", aggressive: true,
     always: [one("drake_bones", 1), one("drakehide", 1)], drops: [one("wyrm_scale", 0.3), one("wyrmscale_helm", 0.01), coins(200, 900, 0.7), one("rarite_ore", 0.06), one("hollow_sigil", 0.1, 5, 15), one("path_sigil", 0.08, 3, 8), one("rough_rosestone", 0.05), one("rarite_arrow", 0.08, 8, 20)], art: 114, ink: "#3b3a38" },
@@ -1012,6 +1106,24 @@ export function itemCategory(id: string): Category {
 }
 export type ShopDef = { id: string; name: string; stock: readonly string[]; general?: boolean; buys?: readonly Category[]; rate?: number };
 export const SHOPS: Record<string, ShopDef> = {
+  // The wider world's villages: a clothier in each, and the shop its trade is built on.
+  gravesend_clothier: { id: "gravesend_clothier", name: "Mira's Mourning Wear", buys: ["other"], rate: 0.5, stock: REGIONAL_CLOTHING.find(set => set.region === "gravesend")!.pieces.map(piece => piece.id) },
+  saltmarrow_clothier: { id: "saltmarrow_clothier", name: "The Oilskin Locker", buys: ["other"], rate: 0.5, stock: REGIONAL_CLOTHING.find(set => set.region === "saltmarrow")!.pieces.map(piece => piece.id) },
+  hollyhock_herbs: { id: "hollyhock_herbs", name: "Mother Yarrow's Bench", buys: ["other"], rate: 0.6, stock: ["vial_of_water", "vial", "mortar", "feverleaf", "saltwort", "healing_tonic", "antidote"] },
+  hollyhock_clothier: { id: "hollyhock_clothier", name: "Petal & Pocket", buys: ["other"], rate: 0.5, stock: REGIONAL_CLOTHING.find(set => set.region === "hollyhock")!.pieces.map(piece => piece.id) },
+  dyemoor_clothier: { id: "dyemoor_clothier", name: "The Dyeworks", buys: ["other"], rate: 0.5, stock: REGIONAL_CLOTHING.find(set => set.region === "dyemoor")!.pieces.map(piece => piece.id) },
+  tallgrass_clothier: { id: "tallgrass_clothier", name: "Hide & Seek Outfitters", buys: ["other"], rate: 0.5, stock: REGIONAL_CLOTHING.find(set => set.region === "tallgrass")!.pieces.map(piece => piece.id) },
+  cragmaw_clothier: { id: "cragmaw_clothier", name: "The Warm Hearth", buys: ["other"], rate: 0.5, stock: REGIONAL_CLOTHING.find(set => set.region === "cragmaw")!.pieces.map(piece => piece.id) },
+  quillhaven_clothier: { id: "quillhaven_clothier", name: "Quillhaven Vestry", buys: ["other"], rate: 0.5, stock: REGIONAL_CLOTHING.find(set => set.region === "quillhaven")!.pieces.map(piece => piece.id) },
+  ashfall_trader: { id: "ashfall_trader", name: "Tamsin's Embers", buys: ["ore", "other"], rate: 0.5, stock: [...REGIONAL_CLOTHING.find(set => set.region === "ashfall")!.pieces.map(piece => piece.id), "cooked_meat", "bread", "inkcoal"] },
+  gravesend_general: { id: "gravesend_general", name: "The Last Lantern", general: true, stock: ["tinderbox", "bones", "large_bones", "bread", "cooked_meat", "hammer", "knife", "moonsilver_cuirass", "moonsilver_greaves", "moonsilver_helm"] },
+  // Cragmaw's armoury: the Ironreach smiths work glimmer and rarite into everything, the only place that sells the lot. Worth the journey.
+  cragmaw_armoury: { id: "cragmaw_armoury", name: "Ironreach Armoury", buys: ["weapon", "armour", "bar"], rate: 0.65, stock: [...SMITH_PIECES.map(piece => `glimmer_${piece.piece}`), ...SMITH_PIECES.map(piece => `rarite_${piece.piece}`)] },
+  saltmarrow_fish: { id: "saltmarrow_fish", name: "Saltmarrow Fish Market", buys: ["fish"], rate: 0.7, stock: ["small_net", "fishing_rod", "fly_rod", "harpoon", "crab_pot", "fishing_bait", "feather", "raw_sailfish", "raw_inkcrab", "inkshark", "sailfish"] },
+  cragmaw_ore: { id: "cragmaw_ore", name: "Cragmaw Ore Exchange", buys: ["ore", "bar"], rate: 0.75, stock: ["hammer", "blackiron_pickaxe", "ashsteel_pickaxe", "moonsilver_pickaxe", "blackiron_ore", "inkcoal", "moonsilver_ore", "blackiron_bar", "ashsteel_bar", "inkcoal_satchel"] },
+  tallgrass_hunting: { id: "tallgrass_hunting", name: "Tallgrass Hunting Post", buys: ["hide", "bow", "arrow"], rate: 0.6, stock: ["shortbow", "oak_bow", "willow_bow", "pewter_arrow", "blackiron_arrow", "ashsteel_arrow", "hunter_coif", "hunter_vest", "hunter_chaps", "hunter_bracers", "leather", "cowhide"] },
+  quillhaven_sigils: { id: "quillhaven_sigils", name: "The Quillhaven Scriptorium", buys: ["sigil", "magic"], rate: 0.65, stock: ["sigil_box", "breeze_sigil", "tide_sigil", "stone_sigil", "ember_sigil", "thought_sigil", "shade_sigil", "star_sigil", "path_sigil", "staff", "scholar_hat", "scholar_robe", "scholar_skirt"] },
+  dyemoor_tailor: { id: "dyemoor_tailor", name: "Dyemoor Bolts & Thread", buys: ["other"], rate: 0.5, stock: ["needle", "thread", "wool", "string", "silk", ...TAILOR_STOCK.filter(id => id.endsWith("_cape")).slice(0, 10)] },
   mender: { id: "mender", name: "Hale's Infirmary", buys: ["food"], rate: 0.5, stock: [...HEARTGUARD.map(piece => piece.id), "bread", "cake", "waybread"] },
   general: { id: "general", name: "Friendhollow General Store", general: true, stock: ["shears", "pot", "bucket", "tinderbox", "hammer", "knife", "chisel", "needle", "thread", "small_net", "pewter_axe", "pewter_pickaxe", "bread", "team_cape"] },
   general_ember: { id: "general_ember", name: "Emberforge General Store", general: true, stock: ["pot", "bucket", "tinderbox", "hammer", "knife", "chisel", "pewter_pickaxe", "pewter_axe", "bread", "cooked_meat"] },
