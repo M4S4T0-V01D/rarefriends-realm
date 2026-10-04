@@ -130,6 +130,8 @@ export type PanelProps = {
   openGuide?: (skill: Skill | null) => void;
   /** Save codes: copy or download yours, or restore one (resolves to an error message, or null). */
   onLogout?: () => void;
+  /** Full screen, through the host page (the sandbox cannot ask for it itself). */
+  fullscreen?: boolean; onFullscreen?: () => void;
   onExportSave?: (action: "copy" | "download") => void; onRestoreSave?: (code: string) => Promise<string | null>; backupStatus?: string;
   net?: NetState; onSocial?: (op: "add" | "remove" | "ignore" | "unignore", id: number) => void; onWhisper?: (id: number) => void; onOnline?: (on: boolean) => void;
 };
@@ -549,7 +551,7 @@ function Slider({ label, min, max, value, unit = "", onChange }: { label: string
     </label>
   );
 }
-function SettingsTab({ game, settings, setSettings, trackName, trackId, playTrack, openHelp, saved, refresh, openMenu, net, onOnline, onExportSave, onRestoreSave, backupStatus, onLogout }: PanelProps) {
+function SettingsTab({ game, settings, setSettings, trackName, trackId, playTrack, openHelp, saved, refresh, openMenu, net, onOnline, onExportSave, onRestoreSave, backupStatus, onLogout, fullscreen, onFullscreen }: PanelProps) {
   const set = (patch: Partial<Settings>) => setSettings({ ...settings, ...patch });
   const [code, setCode] = useState(""), [confirming, setConfirming] = useState(false), [restoreNote, setRestoreNote] = useState("");
   const unlocked = game.player.music;
@@ -571,6 +573,10 @@ function SettingsTab({ game, settings, setSettings, trackName, trackId, playTrac
       <Slider label="Zoom" min={55} max={300} value={Math.round(settings.zoom * 100)} unit="%" onChange={value => set({ zoom: value / 100 })} />
       <label className="realm-check"><input type="checkbox" checked={net?.status !== "offline"} onChange={event => onOnline?.(event.target.checked)} /> Online: see and meet other players</label>
       <label className="realm-check"><input type="checkbox" checked={settings.weather !== false} onChange={event => set({ weather: event.target.checked })} /> Weather (rain, storms, fog)</label>
+      {onFullscreen && <div className="realm-graphics" role="group" aria-label="Full screen">
+        <span>Full screen:</span><button type="button" aria-checked={!!fullscreen} role="radio" onClick={() => { if (!fullscreen) onFullscreen(); }}>On</button><button type="button" aria-checked={!fullscreen} role="radio" onClick={() => { if (fullscreen) onFullscreen(); }}>Off</button>
+        <small className="realm-muted"> or the ↗ on the minimap</small>
+      </div>}
       <div className="realm-graphics" role="radiogroup" aria-label="Graphics">
         <span>Graphics:</span>{(["high", "low"] as const).map(level => <button key={level} type="button" role="radio" aria-checked={(settings.graphics ?? "high") === level} onClick={() => set({ graphics: level })}
           title={level === "high" ? "Pixel textures, ambient life, fog and footprints, sharp on high-DPI screens" : "Plain ground, no ambient life, lighter weather: smoothest on older devices"}>{level === "high" ? "High" : "Low"}</button>)}

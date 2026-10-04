@@ -39,6 +39,9 @@ export function parseRoster(ids: unknown, friendId: bigint, limit = 60): { self:
  * Sharing the adventurer card. The sandbox can't copy, download or open tabs, so on a click the game sends
  * SHARE_REQUEST (action, post text, PNG blob) and the trusted host performs it, replying with SHARE_RESULT.
  */
+/** Full screen: on a click the game asks the trusted host to put the game frame into (or out of) full screen, and the host reports the state. */
+export const FULLSCREEN_REQUEST = "rarefriends-realm:fullscreen";
+export const FULLSCREEN_STATE = "rarefriends-realm:fullscreen-state";
 export const SHARE_REQUEST = "rarefriends-realm:share";
 export const SHARE_RESULT = "rarefriends-realm:share-result";
 export type ShareAction = "post" | "copy" | "save";

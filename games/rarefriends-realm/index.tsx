@@ -24,7 +24,7 @@ import { Players, presenceOf } from "./social.ts";
 import { Trades } from "./trade.ts";
 import { makeSaveCode, restoreSaveCode } from "./savecode.ts";
 import { strikeAt, weatherAt, type Weather } from "./weather.ts";
-import { HOST_HELLO, HOST_STATE, SAVE_ELSEWHERE, SAVE_EXPORT, SAVE_EXPORT_RESULT, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, parseRoster, type ShareAction, type ShareOutcome } from "./roster.ts";
+import { FULLSCREEN_REQUEST, FULLSCREEN_STATE, HOST_HELLO, HOST_STATE, SAVE_ELSEWHERE, SAVE_EXPORT, SAVE_EXPORT_RESULT, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, parseRoster, type ShareAction, type ShareOutcome } from "./roster.ts";
 import { RealmAudio, trackFor, trackById, type SfxName, type TrackId } from "./audio.ts";
 import { renderCard, shareText } from "./card.ts";
 import { CARD_CATEGORY_NAMES, CARD_COLOR_KEYS, CARD_COLOR_NAMES, CARD_OPTIONS, cardRequirement, cardUnlocked, fellowshipArt, type CardCategory } from "./cardstyle.ts";
@@ -124,7 +124,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const [netState, setNetState] = useState<NetState>(players.current.state), [whisper, setWhisper] = useState<{ text: string; at: number } | null>(null);
   const lastMinimapPoint = useRef<React.MouseEvent<HTMLCanvasElement> | null>(null);
   const [snapshot, setSnapshot] = useState<GameSnapshot | null>(null), [busy, setBusy] = useState(false), [casketError, setCasketError] = useState(""), [reveal, setReveal] = useState<CasketResult[] | null>(null);
-  const [size, setSize] = useState({ width: 960, height: 640, scale: 1 }), [sideOpen, setSideOpen] = useState(true), [shareStatus, setShareStatus] = useState(""), [cardUrl, setCardUrl] = useState<string | null>(null);
+  const [size, setSize] = useState({ width: 960, height: 640, scale: 1 }), [sideOpen, setSideOpen] = useState(true), [fullscreen, setFullscreen] = useState(false), [shareStatus, setShareStatus] = useState(""), [cardUrl, setCardUrl] = useState<string | null>(null);
   const pendingSave = useRef<unknown>(null), cardBlob = useRef<Blob | null>(null), resizeRef = useRef<() => void>(() => {}), saveNow = useRef<(claim?: boolean) => void>(() => {});
   /** Logged out: back on the title screen with the adventure saved. */
   const [loggedOut, setLoggedOut] = useState(false);
@@ -207,6 +207,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     };
     const receive = (event: MessageEvent) => {
       if (event.source !== window.parent) return;
+      if (event.data?.type === FULLSCREEN_STATE) { setFullscreen(event.data.on === true); return; }
       if (event.data?.type === SHARE_RESULT) {
         const messages: Record<ShareOutcome, string> = {
           shared: "Shared! Pick X in your share sheet to post it.", cancelled: "Share cancelled.", failed: "Couldn't share from this browser. Try Save picture.",
@@ -842,6 +843,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
                 {...rightClick((x, y, entries) => setMenu({ x, y, entries }), () => [{ verb: "Walk here", noun: "", run: () => { const at = lastMinimapPoint.current; if (at) onMinimap(at); } }])}
                 onMouseDown={event => { lastMinimapPoint.current = { clientX: event.clientX, clientY: event.clientY } as React.MouseEvent<HTMLCanvasElement>; }} aria-label="Minimap: click to walk, scroll to zoom"
                 onWheel={event => { miniZoom.current = Math.max(1.6, Math.min(7, miniZoom.current * (event.deltaY < 0 ? 1.15 : 0.87))); }} />
+              <button type="button" className="realm-fullscreen" title={fullscreen ? "Leave full screen" : "Full screen"} aria-label={fullscreen ? "Leave full screen" : "Full screen"} aria-pressed={fullscreen}
+                onClick={() => window.parent.postMessage({ type: FULLSCREEN_REQUEST }, "*")}>{fullscreen ? "↙" : "↗"}</button>
               <button type="button" ref={compass} className="realm-compass" title="Face north" aria-label="Compass: face north"
                 {...rightClick((x, y, entries) => setMenu({ x, y, entries }), () => ([["North", 0], ["East", -Math.PI / 2], ["South", Math.PI], ["West", Math.PI / 2]] as const).map(([name, turn]) => ({ verb: `Look ${name}`, noun: "", run: () => {
                   const from = cameraGoal.current?.angle ?? camera.current.angle, goal = NORTH + turn; cameraGoal.current = { angle: goal + Math.round((from - goal) / (Math.PI * 2)) * Math.PI * 2, pitch: cameraGoal.current?.pitch ?? camera.current.pitch }; } })))}
@@ -873,7 +876,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
             refresh={refresh} roster={roster} rosterState={rosterState} friendSprites={followerSprites.current} loadFriend={loadFriendSprite}
             net={netState} onSocial={(op, id) => window.parent.postMessage({ type: NET_SOCIAL, op, id }, "*")} onWhisper={id => setWhisper({ text: `@${id} `, at: performance.now() })}
             onOnline={on => window.parent.postMessage({ type: NET_ONLINE, on }, "*")} backupStatus={backupStatus} openGuide={skill => setGuide({ skill })}
-            onLogout={logOut}
+            onLogout={logOut} fullscreen={fullscreen} onFullscreen={() => window.parent.postMessage({ type: FULLSCREEN_REQUEST }, "*")}
             onExportSave={action => { const state = game.current; if (state) void makeSaveCode(state).then(text => window.parent.postMessage({ type: SAVE_EXPORT, action, text }, "*")); }}
             onRestoreSave={async code => { const state = game.current; if (!state) return "The game isn't ready."; const error = await restoreSaveCode(state, code);
               if (!error) {

@@ -32,6 +32,8 @@
 .realm-minimap { position: relative; width: 188px; height: 188px; border-radius: 50%; padding: 4px; background: var(--panel); border: 2px solid var(--ink); box-shadow: 0 0 0 2px #5a5753 inset, 3px 3px 0 #000; pointer-events: auto; }
 .realm-minimap canvas { width: 180px; height: 180px; border-radius: 50%; display: block; cursor: pointer; }
 .realm-compass { position: absolute; left: 0; top: 0; width: 30px; height: 30px; padding: 0; border-radius: 50%; background: var(--paper); border: 2px solid var(--ink); display: grid; place-items: center; box-shadow: 2px 2px 0 #000; cursor: pointer; transform: rotate(-63deg); }
+.realm-fullscreen { position: absolute; right: 0; bottom: 0; width: 30px; height: 30px; padding: 0 !important; min-height: 0 !important; border-radius: 50%; background: var(--paper) !important; color: var(--ink) !important; border: 2px solid var(--ink) !important; display: grid; place-items: center; box-shadow: 2px 2px 0 #000 !important; cursor: pointer; font-size: 15px; line-height: 1; }
+.realm-fullscreen:hover { background: #fff !important; } .realm-fullscreen[aria-pressed="true"] { background: var(--gold) !important; }
 .realm-compass i { position: absolute; top: -1px; font-style: normal; font-size: 9px; color: #c9605f; line-height: 1; }
 .realm-compass b { font-size: 10px; font-weight: 800; }
 .pixel { image-rendering: pixelated; image-rendering: crisp-edges; }

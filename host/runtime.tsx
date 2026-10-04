@@ -24,7 +24,7 @@ import { GENERATION_SPRITE_MANIFEST } from "@rarefriends/friendsdk/sprites";
 import { createClient, http } from "viem";
 import { getBlockNumber, getChainId, getLogs, readContract } from "viem/actions";
 import {
-  HOST_HELLO, HOST_STATE, SAVE_ELSEWHERE, SAVE_EXPORT, SAVE_EXPORT_RESULT, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, type ShareAction, type ShareOutcome,
+  FULLSCREEN_REQUEST, FULLSCREEN_STATE, HOST_HELLO, HOST_STATE, SAVE_ELSEWHERE, SAVE_EXPORT, SAVE_EXPORT_RESULT, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, type ShareAction, type ShareOutcome,
 } from "../games/rarefriends-realm/roster.ts";
 import { NET_ACT, NET_CHAT, NET_ONLINE, NET_PRESENCE, NET_SOCIAL } from "../games/rarefriends-realm/net.ts";
 import { NetHub } from "./net.ts";
@@ -140,6 +140,13 @@ function RealmHost() {
         if (event.data.claim === true) claim();
         if (!superseded) writeSave(account, friend, event.data.save);
       }
+      else if (event.data?.type === FULLSCREEN_REQUEST) {
+        // Full screen for the game frame, on the player's click (the sandbox may not ask for it itself).
+        const frame = [...document.querySelectorAll("iframe")].find(entry => entry.contentWindow === event.source);
+        const target = frame?.closest<HTMLElement>(".rf-game-frame") ?? frame?.parentElement ?? document.documentElement;
+        if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+        else void target.requestFullscreen?.().catch(() => undefined);
+      }
       else if (event.data?.type === SHARE_REQUEST && ["post", "copy", "save"].includes(event.data.action) && event.data.image instanceof Blob
         && event.data.image.type === "image/png" && event.data.image.size < 5_000_000 && typeof event.data.text === "string" && event.data.text.length <= 1000) {
         const source = event.source as Window, action = event.data.action as ShareAction;
@@ -149,12 +156,14 @@ function RealmHost() {
       }
     };
     window.addEventListener("message", receive);
+    const fullscreen = () => { for (const frame of frames()) frame.postMessage({ type: FULLSCREEN_STATE, on: !!document.fullscreenElement }, "*"); };
+    document.addEventListener("fullscreenchange", fullscreen);
     const unsubscribe = session.subscribe(check); check();
     // Pick up a connection made through GameHost even if the wallet emits no accountsChanged event.
     const poll = setInterval(() => { if (session.getSnapshot().status !== "connected") void session.refresh(); }, 2500);
     const bye = () => hub.dispose();
     window.addEventListener("pagehide", bye);
-    return () => { clearInterval(poll); unsubscribe(); window.removeEventListener("message", receive); window.removeEventListener("pagehide", bye); hub.dispose(); saves?.close(); controller?.abort(); session.dispose(); };
+    return () => { clearInterval(poll); unsubscribe(); window.removeEventListener("message", receive); document.removeEventListener("fullscreenchange", fullscreen); window.removeEventListener("pagehide", bye); hub.dispose(); saves?.close(); controller?.abort(); session.dispose(); };
   }, []);
   // The same wide layout as games/rarefriends-realm/host.css, set on the wrapper as HOST_INTEGRATION.md describes.
   return (
