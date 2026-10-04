@@ -83,7 +83,7 @@ export type Player = {
   antidoteUntil: number; antifireUntil: number; stealthUntil: number; tonicUntil: number;
   mixture: { family: number; until: number } | null;
   /** Presence: your Friend's name (the token id never changes), fellowship and title; the regions you've found and lived in, people met, emotes learnt, outfits worn, ticks with your Friend behind you. */
-  name: string | null; fellowship: { name: string; tag: string } | null; title: string | null;
+  name: string | null; fellowship: Fellowship | null; title: string | null;
   visited: Partial<Record<string, number>>; regionTicks: Partial<Record<string, number>>; talked: Partial<Record<string, 1>>; emotesUsed: Partial<Record<string, 1>>; outfits: Partial<Record<string, 1>>; friendTicks: number;
   /** Your Friend's voice: first times it remembers (the day), creature kinds it has remarked on, and the bookkeeping that keeps it from chattering (not saved). */
   firsts: Partial<Record<string, number>>; friendKinds: Partial<Record<string, 1>>; rumours: Partial<Record<string, 1>>;
@@ -163,7 +163,7 @@ export type Game = {
   depleted: Map<number, number>; herbPicks: Map<number, number>; messages: Message[];
   /** What the sky is doing (set by the page each frame; the engine only reads it) and how much your Friend talks. */
   ambient: { night: boolean; rain: boolean; storm?: boolean; fog?: boolean }; friendSpeech: "full" | "reduced" | "rare" | "off"; events: GameEvent[]; rng: () => number; nextUid: number;
-  dialogue: Dialogue | null; ui: { shop: string | null; bank: boolean; production: ProductionMenu | null; lamp: number | null; naming: "first" | "rename" | null };
+  dialogue: Dialogue | null; ui: { shop: string | null; bank: boolean; production: ProductionMenu | null; lamp: number | null; naming: "first" | "rename" | null; fellowship?: boolean };
   held: { dx: number; dy: number } | null; autoRetaliate: boolean; playTicks: number;
   overheads: Map<number, { text: string; until: number }>;
   /** Your owned-Friend follower, walking the tiles you leave behind. */
@@ -172,6 +172,8 @@ export type Game = {
   sneakingPast: Map<number, number>; sneakPaid: Map<number, number>;
 };
 export type Pet = { x: number; y: number; prev: Point; heading: Point; moved: number };
+/** A fellowship as you've declared it: its name and tag, and the look it wears on your cards (an emblem, a banner style, two colours). */
+export type Fellowship = { name: string; tag: string; logo?: string; banner?: string; colors?: [string, string] };
 /** A patron's work order for a day: what to bring, how many, what it pays, and whether it's filled. */
 export type WorkOrder = { day: number; item: string; n: number; pay: number; xp: number; done: 0 | 1 };
 export type DialogueLine = { who: "npc" | "player"; text: string; npc?: string };

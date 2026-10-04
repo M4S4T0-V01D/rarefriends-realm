@@ -22,7 +22,7 @@ export function presenceXp(game: Game, amount: number) {
 export const presenceLevel = (player: Player) => levelForXp(player.xp.presence);
 
 // ---------- Names and fellowships ----------
-export const NAME_MIN = 2, NAME_MAX = 16, RENAME_COST = 1000, FELLOWSHIP_COST = 5000;
+export const NAME_MIN = 2, NAME_MAX = 16, RENAME_COST = 1000, FELLOWSHIP_COST = 5000, FELLOWSHIP_RENAME_COST = 2500;
 /** A legal name: 2–16 characters of letters, digits, spaces, apostrophes, hyphens or underscores, trimmed, not only digits (that's the token's job). */
 export function cleanName(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
@@ -63,6 +63,25 @@ export function joinFellowship(game: Game, rawName: string, rawTag: string): boo
   }
   player.fellowship = { name, tag };
   message(game, `You stand with ${name} [${tag}].`, "quest"); sound(game, "quest");
+  return true;
+}
+/** Rename your fellowship (the tag stays: it's what the Realm knows it by). The registrar charges for the ink. */
+export function renameFellowship(game: Game, rawName: string): boolean {
+  const player = game.player, name = cleanName(rawName);
+  if (!player.fellowship) return false;
+  if (!name) { message(game, "A fellowship needs a name of 2–16 letters, digits, spaces, apostrophes, dashes or underscores.", "warn"); return false; }
+  if (name === player.fellowship.name) return false;
+  if (count(player, "coins") < FELLOWSHIP_RENAME_COST) { message(game, `Renaming a fellowship costs ${FELLOWSHIP_RENAME_COST.toLocaleString()} coins.`, "warn"); return false; }
+  take(player, "coins", FELLOWSHIP_RENAME_COST);
+  message(game, `${player.fellowship.name} is now ${name} [${player.fellowship.tag}].`, "quest"); sound(game, "quest");
+  player.fellowship = { ...player.fellowship, name };
+  return true;
+}
+/** The look your fellowship wears on cards: an emblem, a banner style and two colours (free to change). */
+export function setFellowshipLook(game: Game, look: { logo?: string; banner?: string; colors?: [string, string] }) {
+  const player = game.player;
+  if (!player.fellowship) return false;
+  player.fellowship = { ...player.fellowship, ...look };
   return true;
 }
 export function leaveFellowship(game: Game) {

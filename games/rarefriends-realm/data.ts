@@ -1035,6 +1035,10 @@ Object.assign(MONSTERS, {
   ember_salamander: { id: "ember_salamander", name: "Ember salamander", level: 70, hp: 92, attack: 62, strength: 60, defence: 54, magicDef: 30, attackBonus: 36, defenceBonus: 40, maxHit: 10, speed: 5, respawn: 50, wander: 4, slayer: 60, breath: 20,
     examine: "A salamander the size of a cart, with a furnace in its belly.", aggressive: true,
     always: [one("large_bones", 1)], drops: [one("cindershell_helm", 0.014), one("cindershell_plate", 0.01), one("cindershell_greaves", 0.012), coins(80, 420, 0.65), one("cinder_core", 0.08), one("inkcoal", 0.3, 2, 6), one("rarite_ore", 0.05), one("ember_sigil", 0.15, 4, 10)], art: 125, ink: "#a0462a" },
+  // The Ashen Hills mine by Friendhollow is a beginner's place: its salamanders are the young ones. The cart-sized adults keep to the deep mine.
+  ember_salamander_young: { id: "ember_salamander_young", name: "Ember salamander", level: 7, hp: 10, attack: 6, strength: 6, defence: 4, magicDef: 2, attackBonus: 3, defenceBonus: 2, maxHit: 2, speed: 5, respawn: 30, wander: 4,
+    examine: "A young ember salamander, no bigger than a dog. Its belly glows like a coal.", aggressive: false,
+    always: [one("bones", 1)], drops: [coins(3, 30, 0.5), one("inkcoal", 0.2, 1, 3), one("ember_sigil", 0.15, 2, 6), one("pewter_ore", 0.1, 1, 2), one("cinder_core", 0.005)], art: 125, ink: "#c2603c" },
   hollow_weaver: { id: "hollow_weaver", undead: true, poisonImmune: true, name: "Hollow weaver", level: 88, hp: 120, attack: 74, strength: 70, defence: 66, magicDef: 60, attackBonus: 44, defenceBonus: 52, maxHit: 13, speed: 5, respawn: 55, wander: 3, slayer: 75, attackStyle: "magic",
     examine: "It spins the dark into thread. The thread is looking at you.", aggressive: true,
     always: [one("ink_bones", 1)], drops: [one("hollowthread_hood", 0.014), one("hollowthread_robe", 0.01), one("hollowthread_skirt", 0.012), coins(150, 700, 0.7), one("hollow_essence", 0.15), one("gloom_shard", 0.1), one("hollow_sigil", 0.15, 5, 12), one("shade_sigil", 0.12, 4, 10), one("rosestone_pendant", 0.005)], art: 126, ink: "#2a2438" },

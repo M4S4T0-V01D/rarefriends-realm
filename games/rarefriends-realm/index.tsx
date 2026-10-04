@@ -15,7 +15,7 @@ import {
 } from "./engine.ts";
 import { PITCH, RENDER_PROFILE, VIEW, ZOOM, addPrint, daylight, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
 import {
-  BankModal, ChatBox, ContextMenu, DailyModal, FirstStepsCard, GuideModal, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, NamingModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
+  BankModal, ChatBox, ContextMenu, DailyModal, FellowshipModal, FirstStepsCard, GuideModal, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, NamingModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
   cancelLongPress, longPress, rightClick, type MenuEntry, type Settings, type Tab,
 } from "./panels.tsx";
 import { REGULAR_SPRITES } from "./regulars.ts";
@@ -27,7 +27,7 @@ import { strikeAt, weatherAt, type Weather } from "./weather.ts";
 import { HOST_HELLO, HOST_STATE, SAVE_ELSEWHERE, SAVE_EXPORT, SAVE_EXPORT_RESULT, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, parseRoster, type ShareAction, type ShareOutcome } from "./roster.ts";
 import { RealmAudio, trackFor, trackById, type SfxName, type TrackId } from "./audio.ts";
 import { renderCard, shareText } from "./card.ts";
-import { CARD_CATEGORY_NAMES, CARD_OPTIONS, cardRequirement, cardUnlocked, fellowshipArt, type CardCategory } from "./cardstyle.ts";
+import { CARD_CATEGORY_NAMES, CARD_COLOR_KEYS, CARD_COLOR_NAMES, CARD_OPTIONS, cardRequirement, cardUnlocked, fellowshipArt, type CardCategory } from "./cardstyle.ts";
 import { dailyWaiting, rollDaily, streakStatus } from "./daily.ts";
 import { FIRST_STEPS, currentStep, skipFirstSteps } from "./firststeps.ts";
 import { updateWorldBoss } from "./worldboss.ts";
@@ -889,6 +889,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           <LampModal game={state} refresh={refresh} />
           <NamingModal game={state} refresh={refresh} />
           {guide && <GuideModal game={state} skill={guide.skill} onSkill={skill => setGuide({ skill })} onClose={() => setGuide(null)} />}
+          <FellowshipModal key={`${state.ui.fellowship ? 1 : 0}:${state.player.fellowship?.name ?? ""}`} game={state} refresh={refresh} />
           {(() => { const view = trades.current.view(); return view ? <TradeModal game={state} view={view} openMenu={(x, y, entries) => setMenu({ x, y, entries })}
             onOffer={(id, n) => { trades.current.offer(state, id, n); refresh(); }} onAccept={() => { trades.current.accept(state); refresh(); }} onDecline={() => { trades.current.decline(state); refresh(); }} /> : null; })()}
           {!trades.current.view() && trades.current.incoming.size > 0 && <div className="realm-trade-requests" role="status">
@@ -976,7 +977,13 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
                       return <button key={option.id} type="button" role="radio" aria-checked={(player.card[category] ?? "") === option.id || (!CARD_OPTIONS[category].some(entry => entry.id === player.card[category]) && option === CARD_OPTIONS[category][0])} disabled={!open}
                         title={open ? option.text ?? option.name : `Locked: ${need}`} onClick={() => { player.card[category] = option.id; drawCard(state); refresh(); }}>{open ? option.name : `🔒 ${option.name}`}</button>; })}
                   </div>))}
-                <p className="realm-muted">Most styles are free; the locked ones open with Presence, quests and achievements (hover one to see). Fellowship logos and backgrounds come from the site's fellowships folder: see preview/fellowships/README on the site.</p>
+                <div className="realm-graphics realm-card-row" aria-label="Custom colours">
+                  <span>Your colours:</span>
+                  {CARD_COLOR_KEYS.map(key => <label key={key} className="realm-color">{CARD_COLOR_NAMES[key].replace(" colour", "")} <input type="color" value={player.card[key] ?? (key === "bgColor" ? "#efede7" : key === "frameColor" ? "#d8b6b4" : "#161616")} aria-label={CARD_COLOR_NAMES[key]}
+                    onChange={event => { player.card[key] = event.target.value; drawCard(state); refresh(); }} /></label>)}
+                  <button type="button" className="realm-dark" disabled={!CARD_COLOR_KEYS.some(key => player.card[key])} onClick={() => { for (const key of CARD_COLOR_KEYS) delete player.card[key]; drawCard(state); refresh(); }}>Use the presets</button>
+                </div>
+                <p className="realm-muted">Most styles are free; the locked ones open with Presence, quests and achievements (hover one to see). Your own colours override the ink, background and backdrop presets. Fellowship logos and backgrounds come from the site's fellowships folder: see preview/fellowships/README on the site.</p>
               </div>
               <p className="realm-note">Post text: “{shareText(state)}”</p>
             </Modal>

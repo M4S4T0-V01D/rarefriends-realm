@@ -7,7 +7,7 @@ import { ACHIEVEMENTS, achieved } from "./achievements.ts";
 import { combatLevel, totalLevel, type Game } from "./state.ts";
 import { friendRows } from "./render.ts";
 import { figureArt } from "./wardrobe.ts";
-import { cardStyle, type FellowshipArt } from "./cardstyle.ts";
+import { DEFAULT_FELLOWSHIP_COLORS, cardStyle, drawBanner, drawEmblem, isDarkColor, type FellowshipArt } from "./cardstyle.ts";
 import { titleName } from "./presence.ts";
 
 export const CARD: { readonly width: number; readonly height: number } = { width: 1200, height: 675 };
@@ -58,7 +58,10 @@ function paintFrame(ctx: CanvasRenderingContext2D, frame: string, x: number, y: 
 export function renderCard(game: Game, friend: GenerationSprites | null, fellowship: FellowshipArt | null = null): HTMLCanvasElement {
   const canvas = document.createElement("canvas"); canvas.width = CARD.width; canvas.height = CARD.height;
   const ctx = canvas.getContext("2d")!, player = game.player, style = cardStyle(game), FONT = FONTS[style.font] ?? FONTS.mono;
-  const dark = paintBackground(ctx, style.bg), inks = INKS[style.ink] ?? INKS.ink, TEXT = dark ? inks.light : inks.dark, MUTED = dark ? "rgba(239,237,231,0.7)" : "#6d6b67";
+  let dark = paintBackground(ctx, style.bg);
+  if (style.bgColor) { ctx.fillStyle = style.bgColor; ctx.fillRect(0, 0, CARD.width, CARD.height); dark = isDarkColor(style.bgColor); ctx.strokeStyle = dark ? "rgba(255,255,255,0.06)" : "rgba(22,22,22,0.06)"; ctx.lineWidth = 1; for (let x = -CARD.height; x < CARD.width; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + CARD.height * 2, CARD.height); ctx.stroke(); } }
+  const inks = INKS[style.ink] ?? INKS.ink, TEXT = style.inkColor ?? (dark ? inks.light : inks.dark), MUTED = style.inkColor ? `${style.inkColor}b3` : dark ? "rgba(239,237,231,0.7)" : "#6d6b67";
+  const fellow = player.fellowship, colors: [string, string] = fellow?.colors ?? DEFAULT_FELLOWSHIP_COLORS;
   const banner = style.layout === "banner", ledger = style.layout === "ledger", poster = style.layout === "poster";
   // Where things go: the portrait box and the skills block.
   const portrait = banner ? { x: 48, y: 48, w: 300, h: 300 } : ledger ? { x: 732, y: 48, w: 420, h: 520 } : poster ? { x: 48, y: 48, w: 520, h: 520 } : { x: 48, y: 48, w: 420, h: 520 };
@@ -67,7 +70,8 @@ export function renderCard(game: Game, friend: GenerationSprites | null, fellows
   // Portrait card.
   ctx.fillStyle = INK; ctx.fillRect(portrait.x + 10, portrait.y + 10, portrait.w, portrait.h); ctx.fillStyle = dark ? "#2a2a30" : "#fff"; ctx.fillRect(portrait.x, portrait.y, portrait.w, portrait.h); ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.strokeRect(portrait.x, portrait.y, portrait.w, portrait.h);
   const inner = banner ? { x: portrait.x + 18, y: portrait.y + 18, w: portrait.w - 36, h: portrait.h - 36 } : { x: portrait.x + 24, y: portrait.y + 24, w: portrait.w - 48, h: 330 };
-  paintFrame(ctx, style.frame, inner.x, inner.y, inner.w, inner.h); ctx.strokeRect(inner.x, inner.y, inner.w, inner.h);
+  if (style.frameColor) { ctx.fillStyle = style.frameColor; ctx.fillRect(inner.x, inner.y, inner.w, inner.h); } else paintFrame(ctx, style.frame, inner.x, inner.y, inner.w, inner.h);
+  ctx.strokeRect(inner.x, inner.y, inner.w, inner.h);
   const cx = inner.x + inner.w / 2;
   if (friend) {
     // Your Friend as it looks in the Realm: wardrobe, helm, cape, amulet, shield and weapon, and on its mount if it's riding one
@@ -86,7 +90,7 @@ export function renderCard(game: Game, friend: GenerationSprites | null, fellows
     if (mount) drawMountLayer("head");
   }
   // Who you are: name (or Friend number), the token id small beside it, your title, family and where you are, and your fellowship.
-  const nameX = banner ? 380 : portrait.x + 24, nameY = banner ? 150 : portrait.y + 402, title = titleName(player.title), fellow = player.fellowship;
+  const nameX = banner ? 380 : portrait.x + 24, nameY = banner ? 150 : portrait.y + 402, title = titleName(player.title);
   ctx.fillStyle = TEXT; ctx.font = `bold ${banner ? 40 : 34}px ${FONT}`; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
   const label = player.name ?? `FRIEND #${player.friendId}`; ctx.fillText(label, nameX, nameY);
   if (player.name) { const w = ctx.measureText(label).width; ctx.font = `${banner ? 20 : 17}px ${FONT}`; ctx.fillStyle = MUTED; ctx.fillText(`(${player.friendId})`, nameX + w + 12, nameY); }
@@ -94,26 +98,35 @@ export function renderCard(game: Game, friend: GenerationSprites | null, fellows
   if (fellow) {
     ctx.font = `bold ${banner ? 22 : 19}px ${FONT}`; ctx.fillStyle = dark ? GOLD : "#8a6a10";
     const tagText = `[${fellow.tag}] ${fellow.name}`, logoSize = banner ? 34 : 28;
-    if (fellowship?.logo) { ctx.imageSmoothingEnabled = true; ctx.drawImage(fellowship.logo, nameX, nameY + 42, logoSize, logoSize); ctx.fillText(tagText, nameX + logoSize + 8, nameY + 42 + logoSize * 0.75); }
-    else ctx.fillText(tagText, nameX, nameY + 62);
+    if (fellowship?.logo) { ctx.imageSmoothingEnabled = true; ctx.drawImage(fellowship.logo, nameX, nameY + 42, logoSize, logoSize); }
+    else drawEmblem(ctx, fellow.logo ?? "shield", nameX, nameY + 42, logoSize, colors);
+    ctx.fillText(tagText, nameX + logoSize + 8, nameY + 42 + logoSize * 0.75);
   }
   ctx.fillStyle = TEXT; ctx.font = `bold 22px ${FONT}`;
   const levelsY = banner ? nameY + 112 : portrait.y + 500;
   ctx.fillText(`Combat ${combatLevel(player)}`, nameX, levelsY); ctx.fillText(`Total ${totalLevel(player)}`, nameX + 190, levelsY);
-  // Header band: ADVENTURER, over the fellowship's background if it has one, with its logo on the right.
-  if (!banner) {
-    const band = { x: header.x, y: header.y - 48, w: bandW, h: 72 };
-    if (fellowship?.bg) {
-      ctx.save(); ctx.beginPath(); ctx.rect(band.x, band.y, band.w, band.h); ctx.clip(); ctx.imageSmoothingEnabled = true;
-      const img = fellowship.bg, scale = Math.max(band.w / img.width, band.h / img.height);
-      ctx.drawImage(img, band.x + (band.w - img.width * scale) / 2, band.y + (band.h - img.height * scale) / 2, img.width * scale, img.height * scale); ctx.restore();
+  // Header band: ADVENTURER over the fellowship's banner (the site's picture if it has one, else the banner it chose), its emblem on the right.
+  {
+    const band = banner ? { x: 380, y: 44, w: 770, h: 60 } : { x: header.x, y: header.y - 48, w: bandW, h: 72 }, hasBand = !!fellow;
+    if (hasBand) {
+      if (fellowship?.bg) {
+        ctx.save(); ctx.beginPath(); ctx.rect(band.x, band.y, band.w, band.h); ctx.clip(); ctx.imageSmoothingEnabled = true;
+        const img = fellowship.bg, scale = Math.max(band.w / img.width, band.h / img.height);
+        ctx.drawImage(img, band.x + (band.w - img.width * scale) / 2, band.y + (band.h - img.height * scale) / 2, img.width * scale, img.height * scale); ctx.restore();
+      } else drawBanner(ctx, fellow.banner ?? "plain", band.x, band.y, band.w, band.h, colors);
       ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.strokeRect(band.x, band.y, band.w, band.h);
+      const logoBox = band.h - 8;
+      if (fellowship?.logo) { ctx.imageSmoothingEnabled = true; ctx.fillStyle = "#fff"; ctx.fillRect(band.x + band.w - logoBox - 6, band.y + 4, logoBox, logoBox); ctx.drawImage(fellowship.logo, band.x + band.w - logoBox - 4, band.y + 6, logoBox - 4, logoBox - 4); ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.strokeRect(band.x + band.w - logoBox - 6, band.y + 4, logoBox, logoBox); }
+      else drawEmblem(ctx, fellow.logo ?? "shield", band.x + band.w - logoBox - 6, band.y + 4, logoBox, colors);
     }
-    ctx.font = `bold 40px ${FONT}`; ctx.fillStyle = fellowship?.bg ? "#fff" : TEXT;
-    if (fellowship?.bg) { ctx.strokeStyle = INK; ctx.lineWidth = 6; ctx.strokeText("ADVENTURER", header.x + 12, header.y); }
-    ctx.fillText("ADVENTURER", header.x + (fellowship?.bg ? 12 : 0), header.y);
-    if (fellowship?.logo) { ctx.imageSmoothingEnabled = true; ctx.fillStyle = "#fff"; ctx.fillRect(band.x + band.w - 70, band.y + 4, 64, 64); ctx.drawImage(fellowship.logo, band.x + band.w - 68, band.y + 6, 60, 60); ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.strokeRect(band.x + band.w - 70, band.y + 4, 64, 64); }
-    ctx.fillStyle = style.ink === "gilt" || dark ? GOLD : BUTTER; ctx.fillRect(header.x, header.y + 16, bandW, 8);
+    if (!banner) {
+      ctx.font = `bold 40px ${FONT}`; ctx.fillStyle = hasBand ? "#fff" : TEXT;
+      if (hasBand) { ctx.strokeStyle = INK; ctx.lineWidth = 6; ctx.strokeText("ADVENTURER", header.x + 12, header.y); }
+      ctx.fillText("ADVENTURER", header.x + (hasBand ? 12 : 0), header.y);
+      ctx.fillStyle = style.ink === "gilt" || dark ? GOLD : BUTTER; ctx.fillRect(header.x, header.y + 16, bandW, 8);
+    } else if (hasBand) {
+      ctx.font = `bold 30px ${FONT}`; ctx.fillStyle = "#fff"; ctx.strokeStyle = INK; ctx.lineWidth = 5; ctx.strokeText(`${fellow.name} [${fellow.tag}]`, band.x + 14, band.y + 41); ctx.fillText(`${fellow.name} [${fellow.tag}]`, band.x + 14, band.y + 41);
+    }
   }
   // Skills grid, sized so the quest line always sits below the last row.
   const rows = Math.ceil(SKILLS.length / skills.cols), cellH = Math.min(58, Math.floor(skills.maxH / rows)), box = cellH - 8;

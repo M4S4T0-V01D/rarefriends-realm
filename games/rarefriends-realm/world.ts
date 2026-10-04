@@ -1009,7 +1009,7 @@ function buildMainland(seed: number) {
   monsters("thornback", 22, 96, 60, 122, 7);          // the brambly south of Whisperwood
   monsters("cairn_wight", 248, 118, 292, 152, 7);     // the Greyhorn's old cairns, south of Highcairn
   monsters("dune_stalker", 198, 70, 232, 92, 6);      // the northern dunes
-  monsters("ember_salamander", 98, 30, 132, 52, 6);   // the Ashen Hills
+  monsters("ember_salamander_young", 98, 30, 132, 52, 6);   // the Ashen Hills: young salamanders, a beginner's foe
 
   // ---------- Dungeons ----------
   for (let y = 200; y < FLOOR_Y; y++) for (let x = 0; x < W; x++) { put(x, y, T.VOID); setRegion(x, y, "crypt"); }

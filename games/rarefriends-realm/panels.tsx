@@ -15,7 +15,8 @@ import { hiscores } from "./hiscores.ts";
 import { petArt } from "./petart.ts";
 import { MAX_QUEST_POINTS, NPCS, QUESTS, finalStage, questPoints, type QuestDef } from "./content.ts";
 import { friendSays, remember } from "./friend.ts";
-import { FELLOWSHIP_COST, NAME_MAX, RENAME_COST, TITLES, chooseTitle, cleanName, cleanTag, joinFellowship, leaveFellowship, nameFriend, profile, unlockedTitles } from "./presence.ts";
+import { FELLOWSHIP_COST, FELLOWSHIP_RENAME_COST, NAME_MAX, RENAME_COST, TITLES, chooseTitle, cleanName, cleanTag, joinFellowship, leaveFellowship, nameFriend, profile, renameFellowship, setFellowshipLook, unlockedTitles } from "./presence.ts";
+import { DEFAULT_FELLOWSHIP_COLORS, FELLOWSHIP_BANNERS, FELLOWSHIP_LOGOS, previewArt } from "./cardstyle.ts";
 import { REGIONS } from "./world.ts";
 import {
   BANK_TABS, CONTAINERS, SATCHEL, heft, bankDeposit, emptyToBank, fillFromBank, bankDepositAll, bankDepositWorn, bankInOrder, bankMove, bankTabs, bankWithdraw, bonuses, combatLevel, count, isStaffEquipped, maxHp, maxPrayer, message, totalLevel, totalXp,
@@ -822,6 +823,41 @@ export function ShopModal({ game, shopId, refresh, onClose, openMenu }: { game: 
 }
 /** Rubbing a lamp of insight: pick the skill. */
 /** Naming your Friend: on first entering the Realm, or at the Namekeeper's for coins. The token id is shown and never changes. */
+/** The fellowship's own menu: rename it for coins, pick its emblem, banner and colours for every member's card, or leave. */
+export function FellowshipModal({ game, refresh }: { game: Game; refresh: () => void }) {
+  const fellowship = game.player.fellowship, [name, setName] = useState(fellowship?.name ?? ""), [confirmLeave, setConfirmLeave] = useState(false);
+  if (!game.ui.fellowship || !fellowship) return null;
+  const close = () => { game.ui.fellowship = false; refresh(); };
+  const colors: [string, string] = fellowship.colors ?? DEFAULT_FELLOWSHIP_COLORS, set = (look: { logo?: string; banner?: string; colors?: [string, string] }) => { setFellowshipLook(game, look); refresh(); };
+  return (
+    <Modal title={`${fellowship.name} [${fellowship.tag}]`} onClose={close} wide>
+      <p className="realm-muted">The tag is what the Realm knows your fellowship by and never changes. Everything else here is yours to set: it shows on your adventurer card and on anyone's who wears the same look. The site's fellowships folder can hold a drawn logo and banner instead (preview/fellowships/{fellowship.tag}/).</p>
+      <h3>Name</h3>
+      <div className="realm-fellowship-form">
+        <input type="text" maxLength={NAME_MAX} value={name} onChange={event => setName(event.target.value)} aria-label="Fellowship name" />
+        <button type="button" className="realm-dark" disabled={!cleanName(name) || name === fellowship.name} onClick={() => { if (renameFellowship(game, name)) refresh(); }}>Rename ({FELLOWSHIP_RENAME_COST.toLocaleString()} coins)</button>
+      </div>
+      <h3>Colours</h3>
+      <div className="realm-graphics realm-card-row">
+        <label className="realm-color">Field <input type="color" value={colors[0]} onChange={event => set({ colors: [event.target.value, colors[1]] })} aria-label="Fellowship field colour" /></label>
+        <label className="realm-color">Mark <input type="color" value={colors[1]} onChange={event => set({ colors: [colors[0], event.target.value] })} aria-label="Fellowship mark colour" /></label>
+        <button type="button" className="realm-dark" onClick={() => set({ colors: DEFAULT_FELLOWSHIP_COLORS })}>Default colours</button>
+      </div>
+      <h3>Emblem</h3>
+      <div className="realm-look-grid" role="radiogroup" aria-label="Emblem">
+        {FELLOWSHIP_LOGOS.map(logo => <button key={logo} type="button" role="radio" aria-checked={(fellowship.logo ?? "shield") === logo} title={logo} onClick={() => set({ logo })}><PixelIcon art={previewArt("logo", logo, colors, 40, 40)} size={40} label={logo} /></button>)}
+      </div>
+      <h3>Card banner</h3>
+      <div className="realm-look-grid banners" role="radiogroup" aria-label="Banner">
+        {FELLOWSHIP_BANNERS.map(banner => <button key={banner} type="button" role="radio" aria-checked={(fellowship.banner ?? "plain") === banner} title={banner} onClick={() => set({ banner })}><PixelIcon art={previewArt("banner", banner, colors, 120, 28)} size={120} label={banner} /></button>)}
+      </div>
+      <div className="realm-buttons">
+        {confirmLeave ? <button type="button" className="realm-primary" onClick={() => { leaveFellowship(game); close(); }}>Yes, leave {fellowship.name}</button> : <button type="button" onClick={() => setConfirmLeave(true)}>Leave the fellowship</button>}
+        <button type="button" className="realm-dark" onClick={close}>Done</button>
+      </div>
+    </Modal>
+  );
+}
 export function NamingModal({ game, refresh, onDone }: { game: Game; refresh: () => void; onDone?: () => void }) {
   const mode = game.ui.naming, [name, setName] = useState(game.player.name ?? "");
   if (!mode) return null;
@@ -878,7 +914,7 @@ export function ProfilePanel({ game, refresh }: { game: Game; refresh: () => voi
       </div>
       <h4>Fellowship</h4>
       {player.fellowship
-        ? <p className="realm-muted">{player.fellowship.name} [{player.fellowship.tag}]. Everyone online wearing the tag is your company. <button type="button" onClick={() => { leaveFellowship(game); refresh(); }}>Leave</button></p>
+        ? <p className="realm-muted">{player.fellowship.name} [{player.fellowship.tag}]. Everyone online wearing the tag is your company. <button type="button" className="realm-dark" onClick={() => { game.ui.fellowship = true; refresh(); }}>Fellowship menu</button></p>
         : <div className="realm-fellowship-form">
           <input type="text" placeholder="Fellowship name" maxLength={NAME_MAX} value={fname} onChange={event => setFname(event.target.value)} />
           <input type="text" placeholder="TAG" maxLength={5} value={ftag} onChange={event => setFtag(event.target.value.toUpperCase())} />

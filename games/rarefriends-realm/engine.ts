@@ -9,7 +9,7 @@ import {
 } from "./data.ts";
 import { cleanDaily } from "./daily.ts";
 import { cleanOrders } from "./orders.ts";
-import { cleanCard } from "./cardstyle.ts";
+import { cleanCard, cleanFellowshipLook } from "./cardstyle.ts";
 import { FIRST_STEPS, updateFirstSteps } from "./firststeps.ts";
 import { cleanMet } from "./hiscores.ts";
 import { addSlayerPoints, slayerBoost, slayerKill, slayerProblem, taskText } from "./slayer.ts";
@@ -2110,7 +2110,7 @@ export type SaveData = {
   boosts?: Record<string, number>; poison?: { damage: number; left: number; timer: number } | null; weaponPoison?: { weapon: string; damage: number; charges: number; weaken: boolean } | null;
   antidoteUntil?: number; antifireUntil?: number; stealthUntil?: number; tonicUntil?: number; mixture?: { family: number; until: number } | null;
   firsts?: Record<string, number>; friendKinds?: Record<string, 1>; rumours?: Record<string, 1>; orders?: Record<string, WorkOrder>; card?: Record<string, string>;
-  name?: string | null; fellowship?: { name: string; tag: string } | null; title?: string | null; visited?: Record<string, number>; regionTicks?: Record<string, number>; talked?: Record<string, 1>; emotesUsed?: Record<string, 1>; outfits?: Record<string, 1>; friendTicks?: number; mounts?: string[]; mount?: string | null; daily?: unknown; seenUpdate?: number;
+  name?: string | null; fellowship?: { name: string; tag: string; logo?: string; banner?: string; colors?: [string, string] } | null; title?: string | null; visited?: Record<string, number>; regionTicks?: Record<string, number>; talked?: Record<string, 1>; emotesUsed?: Record<string, 1>; outfits?: Record<string, 1>; friendTicks?: number; mounts?: string[]; mount?: string | null; daily?: unknown; seenUpdate?: number;
 };
 export function serialize(game: Game): SaveData {
   const player = game.player;
@@ -2225,7 +2225,7 @@ export function restore(game: Game, raw: unknown): boolean {
   player.stealthUntil = game.tick + int(save.stealthUntil, 0, 1000, 0); player.tonicUntil = game.tick + int(save.tonicUntil, 0, 1000, 0);
   const mx = save.mixture; player.mixture = mx && typeof mx === "object" && int(mx.until, 0, 1000, 0) > 0 ? { family: int(mx.family, 0, FAMILY_NAMES.length - 1, 0), until: game.tick + int(mx.until, 0, 1000, 0) } : null;
   // Presence.
-  player.name = cleanName(save.name); const fs = save.fellowship; player.fellowship = fs && typeof fs === "object" && cleanName(fs.name) && cleanTag(fs.tag) ? { name: cleanName(fs.name)!, tag: cleanTag(fs.tag)! } : null;
+  player.name = cleanName(save.name); const fs = save.fellowship; player.fellowship = fs && typeof fs === "object" && cleanName(fs.name) && cleanTag(fs.tag) ? cleanFellowshipLook({ name: cleanName(fs.name)!, tag: cleanTag(fs.tag)! }, fs) : null;
   player.title = typeof save.title === "string" && /^[a-z_]{1,24}$/.test(save.title) ? save.title : null;
   const keyed = <T,>(raw: unknown, value: (v: unknown) => T | null, limit = 400): Partial<Record<string, T>> => Object.fromEntries(Object.entries(raw && typeof raw === "object" ? raw as Record<string, unknown> : {}).filter(([key]) => /^[a-z0-9_]{1,32}$/.test(key)).slice(0, limit).flatMap(([key, v]) => { const clean = value(v); return clean === null ? [] : [[key, clean]]; }));
   player.visited = keyed(save.visited, v => typeof v === "number" ? int(v, 1, 1e9, 1) : null); player.regionTicks = keyed(save.regionTicks, v => typeof v === "number" ? int(v, 0, 1e9, 0) : null);

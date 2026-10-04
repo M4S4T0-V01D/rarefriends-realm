@@ -2045,3 +2045,20 @@ test("Townsfolk bodies, the worn ossuary bag, and the adventurer card's styles",
   assert.deepEqual(cleanCard({ bg: "night", frame: "nope", layout: "banner", extra: 1 }), { ...DEFAULT_CARD, bg: "night", layout: "banner" });
   const save = JSON.parse(JSON.stringify(serialize(g))), fresh = newGame(); assert(restore(fresh, save)); assert.equal(fresh.player.card.bg, "night"); assert.equal(fresh.player.equipment.cape, "bone_bag");
 });
+
+test("Fellowship looks and renames, and the card's own colours", async () => {
+  const { joinFellowship, renameFellowship, setFellowshipLook, FELLOWSHIP_RENAME_COST } = await import("../games/rarefriends-realm/presence.ts");
+  const { cardStyle, cleanCard, cleanFellowshipLook } = await import("../games/rarefriends-realm/cardstyle.ts");
+  const g = newGame(), p = g.player; p.inventory.fill(null); give(p, "coins", 20000);
+  assert(joinFellowship(g, "Moonlit Company", "MOON"));
+  assert(!renameFellowship(g, "x"), "a bad name is refused"); assert(renameFellowship(g, "The Moonlit")); assert.equal(p.fellowship.name, "The Moonlit"); assert.equal(p.fellowship.tag, "MOON");
+  assert.equal(count(p, "coins"), 20000 - 5000 - FELLOWSHIP_RENAME_COST);
+  assert(setFellowshipLook(g, { logo: "skull", banner: "stripes", colors: ["#112233", "#ffeedd"] }));
+  p.card.inkColor = "#123456"; p.card.bgColor = "not a colour";
+  assert.equal(cardStyle(g).inkColor, "#123456"); assert.equal(cardStyle(g).bgColor, undefined, "only hex colours count");
+  const save = JSON.parse(JSON.stringify(serialize(g))), fresh = newGame(); assert(restore(fresh, save));
+  assert.deepEqual(fresh.player.fellowship, { name: "The Moonlit", tag: "MOON", logo: "skull", banner: "stripes", colors: ["#112233", "#ffeedd"] }, "the look is saved");
+  assert.equal(fresh.player.card.inkColor, "#123456"); assert.equal(fresh.player.card.bgColor, undefined);
+  assert.deepEqual(cleanFellowshipLook({ name: "A B", tag: "AB" }, { logo: "nope", banner: "stars", colors: ["#fff", "#000000"] }), { name: "A B", tag: "AB", banner: "stars" }, "odd looks are dropped");
+  assert.equal(cleanCard({ frameColor: "#ABCDEF" }).frameColor, "#abcdef");
+});
