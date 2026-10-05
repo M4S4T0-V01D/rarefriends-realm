@@ -86,7 +86,9 @@ export type RegionId =
   // The dungeon update (2026-10): three more under the lake, the library and the stones.
   | "deepglass" | "drowned_archive" | "howling_vault"
   // The Rare Friends Ring (2026-10): the arena west of the Deadwood.
-  | "friends_ring";
+  | "friends_ring"
+  // Two more dungeons (2026-10): one for new heroes, one for the middle levels.
+  | "root_cellars" | "mossy_undercroft";
 export type Region = { id: RegionId; name: string; label: { x: number; y: number }; danger: number; underground?: boolean };
 const MAINLAND_REGIONS = new Set<RegionId>(["coast", "friendhollow", "farmland", "whisperwood", "ashen_hills", "emberforge", "frostpeak", "glass_lake", "pale_dunes", "oasis", "murkmire", "mossy_ruins",
   "wizards_tower", "wyrmreach", "fernwick", "greyhorn", "highcairn", "crypt", "hollow_depths"]);
@@ -135,6 +137,8 @@ export const REGIONS: readonly Region[] = [
   { id: "drowned_archive", name: "The Drowned Archive", label: { x: 508, y: 534 }, danger: 4, underground: true },
   { id: "howling_vault", name: "The Howling Vault", label: { x: 470, y: 566 }, danger: 6, underground: true },
   { id: "friends_ring", name: "The Rare Friends Ring", label: { x: 214, y: 72 }, danger: 0 },
+  { id: "root_cellars", name: "The Root Cellars", label: { x: 436, y: 566 }, danger: 1, underground: true },
+  { id: "mossy_undercroft", name: "The Mossy Undercroft", label: { x: 508, y: 566 }, danger: 2, underground: true },
 ];
 export const regionIndex = (id: RegionId) => REGIONS.findIndex(region => region.id === id);
 /** The mainland regions' labels were written in the mainland's own coordinates: move them with it (once, at load). */

@@ -40,11 +40,15 @@ img { max-width: 100%; height: auto; display: block; }
    art (scripts/preview-backdrops.mjs), slid at their own pace as you scroll. The castle wall behind the trailer, the
    night sky and its clouds over what's new, a lamplit street and the forest's edge behind the world, and a torchlit
    dungeon below. A veil over each keeps the words readable. */
-.band { position: relative; isolation: isolate; overflow: hidden; }
-.band > .bg { position: absolute; left: 0; right: 0; top: -40%; bottom: -40%; z-index: -1; pointer-events: none; image-rendering: pixelated; background-repeat: repeat; will-change: transform; }
+.band { position: relative; isolation: isolate; overflow: hidden; background: transparent; }
+/* The bands' own backdrop boxes now carry only their torches: the scenery behind the page is one fixed stack (.parallax)
+   that scrolls as a single piece, its themes crossfading as the bands pass, so nothing restarts at a band's edge. */
+.band > .bg { position: absolute; left: 0; right: 0; top: -40%; bottom: -40%; z-index: -1; pointer-events: none; background: none !important; }
 .band > .bg.ground { top: 0; bottom: 0; }
-.band > .bg::after { content: ""; position: absolute; inset: 0; background: var(--veil, rgba(12,13,18,.42)); }
-.band > .bg.ground::after, .band > .bg.clouds::after { background: none; }
+.parallax { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; background: #0f1014; }
+.parallax .layer { position: absolute; left: 0; right: 0; top: 0; height: 100vh; opacity: 0; transition: opacity .45s linear; image-rendering: pixelated; background-repeat: repeat; will-change: transform, opacity; }
+.parallax .layer.ground { top: auto; bottom: 0; height: 70vh; }
+.parallax .veil { position: absolute; inset: 0; background: rgba(10,11,16,.42); }
 .bg.castle { background: url(media/bg/castle.png) top center / 720px auto repeat-x, url(media/bg/stone.png) center 60px / 144px 216px repeat, #0f1014; --veil: rgba(10,11,16,.5); }
 .bg.sky { background: url(media/bg/stars.png) 0 0 / 512px 512px repeat, url(media/bg/sky.png) 0 0 / 100% 100% no-repeat; --veil: rgba(10,11,16,.2); }
 .bg.clouds { background: url(media/bg/clouds.png) 0 0 / 1536px auto repeat; opacity: .8; animation: drift 180s linear infinite; }
@@ -216,6 +220,17 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
 </style>
 </head>
 <body>
+<div class="parallax" aria-hidden="true">
+  <div class="layer bg sky" data-theme="sky" data-speed=".3"></div>
+  <div class="layer bg deep" data-theme="deep" data-speed=".2"></div>
+  <div class="layer bg castle" data-theme="castle" data-speed=".22"></div>
+  <div class="layer bg dungeon" data-theme="dungeon" data-speed=".18"></div>
+  <div class="veil"></div>
+  <div class="layer bg clouds" data-theme="clouds" data-speed=".14"></div>
+  <div class="layer bg ground town" data-theme="town" data-speed="0"></div>
+  <div class="layer bg ground forest" data-theme="forest" data-speed="0"></div>
+  <div class="layer bg ground floor" data-theme="floor" data-speed="0"></div>
+</div>
 <header class="top band">
   <div class="bg castle" data-speed=".22" aria-hidden="true"><span class="torch" style="left: 7%; top: 56%"><i></i></span><span class="torch" style="left: 93%; top: 56%"><i></i></span><span class="torch small" style="left: 24%; top: 40%"><i></i></span><span class="torch small" style="left: 76%; top: 40%"><i></i></span></div>
   <div class="wrap bar">
@@ -540,22 +555,33 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
     document.addEventListener("click", event => { if (event.target.closest("[data-track], #music") && !video.muted) { video.muted = true; } });
     if (reduced) { video.removeAttribute("autoplay"); video.pause(); }
   })();
-  // Parallax: each band's backdrop layers slide at their own pace (data-speed) as you scroll, so the castle wall, sky,
-  // street and dungeon sit behind the page at different depths. Still, if motion is to be reduced.
+  // Parallax: one scene behind the whole page. Each layer of the fixed stack slides at its own pace with the page's
+  // scroll, never restarting, and fades in and out by how much of the screen the bands that use it cover, so the castle
+  // wall gives way to the night sky, the street, the forest's edge and the dungeon as you scroll, in one movement.
   (() => {
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const layers = [...document.querySelectorAll(".band > .bg[data-speed]")].map(bg => ({ bg, band: bg.parentElement, speed: Number(bg.dataset.speed) || 0 }));
+    const layers = [...document.querySelectorAll(".parallax .layer")].map(layer => ({ layer, theme: layer.dataset.theme, speed: Number(layer.dataset.speed) || 0 }));
+    const bands = [...document.querySelectorAll(".band")].map(band => ({ band, themes: [...band.querySelectorAll(":scope > .bg")].flatMap(bg => [...bg.classList].filter(name => name !== "bg" && name !== "ground")) }));
+    const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
     let queued = false;
     const update = () => {
-      queued = false; const vh = innerHeight;
-      for (const { bg, band, speed } of layers) {
-        const rect = band.getBoundingClientRect();
-        if (rect.bottom < -vh || rect.top > vh * 2) continue;
-        bg.style.transform = `translate3d(0, ${((rect.top + rect.height / 2 - vh / 2) * speed).toFixed(1)}px, 0)`;
+      queued = false;
+      const vh = innerHeight, y = scrollY, weight = {};
+      for (const { band, themes } of bands) {
+        const rect = band.getBoundingClientRect(), overlap = Math.max(0, Math.min(rect.bottom, vh) - Math.max(rect.top, 0)) / vh;
+        if (overlap <= 0) continue;
+        for (const theme of themes) weight[theme] = Math.max(weight[theme] ?? 0, overlap);
+      }
+      // Nothing on screen claims a backdrop (a gap between bands): keep the sky.
+      if (!Object.keys(weight).length) weight.sky = 1;
+      for (const { layer, theme, speed } of layers) {
+        layer.style.opacity = (weight[theme] ?? 0).toFixed(3);
+        if (!still && speed) layer.style.transform = `translate3d(0, ${(-y * speed).toFixed(1)}px, 0)`;
       }
     };
+    // A sliding layer is as tall as the page's slide needs, so it never runs out however far you scroll.
+    const size = () => { const height = document.documentElement.scrollHeight; for (const { layer, speed } of layers) if (speed) layer.style.height = `${innerHeight + height * speed + 16}px`; update(); };
     addEventListener("scroll", () => { if (!queued) { queued = true; requestAnimationFrame(update); } }, { passive: true });
-    addEventListener("resize", update); update();
+    addEventListener("resize", size); addEventListener("load", size); size();
   })();
   // Picture galleries: each figure grid marked data-gallery becomes a stage with arrows, a counter and a filmstrip of
   // every picture, in the grid's order (newest first). It turns on its own while it's on screen and nobody's hovering

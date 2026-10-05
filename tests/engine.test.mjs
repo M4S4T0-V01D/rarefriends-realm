@@ -829,7 +829,7 @@ test("The Heartguard: nine red-and-white pieces by Hitpoints level, each a hitpo
   for (const skill of ["attack", "strength", "defence", "hitpoints"]) p.xp[skill] = XP_TABLE[99];
   p.equipment = { weapon: "heartguard_blade" }; p.hp = 50; p.regenTimer = -10_000;
   const chief = g.monsters.find(monster => monster.def.id === "grumblin_chief" && [[0, 1], [1, 0], [0, -1], [-1, 0]].some(([dx, dy]) => canWalk(g, monster.x + dx, monster.y + dy)));
-  standNear(g, chief.x, chief.y, 1);
+  standNear(g, chief.x, chief.y, 1); chief.attackTimer = 10_000;  // (it never swings back: the heal is what's measured)
   setTarget(g, { kind: "monster", uid: chief.uid, option: "Attack" });
   until(g, () => chief.dead, 120);
   assert(p.hp > 50, `the blade healed on the way (${p.hp})`);
@@ -2261,7 +2261,7 @@ test("The dungeon update: three dungeons under the lake, the library and the sto
   for (const id of ["cave_bat", "glass_crab", "crystal_golem", "drowned_scholar", "ink_wraith", "archivist_below", "grave_moth", "vault_archer", "vault_knight", "howling_king"]) assert(world.spawns.some(spawn => spawn.kind === "monster" && spawn.id === id), id);
   assert.equal(regionAt(world, 430, 530).id, "deepglass"); assert.equal(regionAt(world, 490, 528).id, "drowned_archive"); assert.equal(regionAt(world, 300, 567).id, "howling_vault");
   const doors = world.objects.filter(object => object.kind === "gate" && object.requires?.item);
-  assert.deepEqual(doors.map(door => door.requires.item).sort(), ["archive_key", "deepglass_key", "vault_key"]);
+  assert.deepEqual(doors.map(door => door.requires.item).sort(), ["archive_key", "deepglass_key", "moss_key", "vault_key"]);
   const coffers = world.objects.filter(object => object.decor === "chest" && / coffer$/.test(object.name));
   assert(coffers.length >= 30, `coffers in every dungeon (${coffers.length})`);
   for (const name of ["Deepglass coffer", "Archive coffer", "Vault coffer", "Crypt coffer", "Hollow coffer", "Catacomb coffer", "Wyrm coffer", "Barnacled coffer", "Miner's coffer"]) assert(coffers.some(coffer => coffer.name === name), name);
@@ -2400,4 +2400,16 @@ test("The Rare Friends Ring: matches for coins and bloodmarks, your own foes, re
   assert(knocked(), "the hammer knocks back");
   teleport(g, ARENA.x, ARENA.y + ARENA.outer + 8); run(g, 2);
   assert(MATCHES.length === 9 && FOE_GROUPS.every(group => group.foes.every(foe => MONSTERS[foe])));
+});
+
+test("The Root Cellars and the Mossy Undercroft: a dungeon for new heroes and one for the middle levels", () => {
+  const g = newGame(), world = g.world;
+  assert(REGIONS.find(region => region.id === "root_cellars")?.underground && REGIONS.find(region => region.id === "mossy_undercroft")?.underground);
+  assert.equal(regionAt(world, 420, 560).id, "root_cellars"); assert.equal(regionAt(world, 490, 560).id, "mossy_undercroft");
+  assert(world.objects.some(o => o.name === "Cellar door" && o.to) && world.objects.some(o => o.name === "Mossy stair" && o.action === "Climb-down"), "both mouths");
+  assert(world.objects.some(o => o.kind === "gate" && o.requires?.item === "moss_key"), "the warden's door takes a moss key");
+  assert(world.objects.filter(o => o.name === "Cellar coffer").length >= 3 && world.objects.filter(o => o.name === "Undercroft coffer").length >= 3, "coffers in both");
+  assert(g.monsters.some(m => m.def.id === "rat_king") && g.monsters.some(m => m.def.id === "moss_warden"), "both bosses placed");
+  assert(MONSTERS.rat_king.level < 20 && MONSTERS.rat_king.boss && MONSTERS.moss_warden.heals && MONSTERS.moss_warden.level < 50);
+  assert(world.objects.some(o => o.decor === "monument" && o.monster === "moss_warden"), "a warning at the mossy stair");
 });

@@ -495,6 +495,37 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
   coffers("Vault coffer", 190, 562, 372, 577, 6, T.DUNGEON); decor(394, 575, "chest", true, "The Howling King's hoard");
   monsters("grave_moth", 190, 562, 372, 577, 12); monsters("vault_archer", 230, 562, 320, 569, 8); monsters("vault_knight", 290, 562, 372, 577, 8); monsters("cave_bat", 190, 562, 372, 577, 4);
   monsters("howling_king", 386, 568, 386, 568, 1);
+  // The Root Cellars, under a cellar door in the grass past the Hollow Farms mill: a dungeon for new heroes (rats, bats,
+  // grumblins, spiders, and the Rat King at the end), lit, stocked, and nothing locked.
+  dungeon("root_cellars", [[404, 556, 430, 562], [428, 560, 446, 563], [444, 556, 470, 570], [408, 564, 436, 576], [434, 572, 448, 575]], T.WOOD);
+  for (let y = 556; y <= 576; y++) for (let x = 404; x <= 470; x++) if (get(x, y) === T.WOOD && noise2(x * 1.5, y * 1.5) > 0.62) put(x, y, T.DUNGEON);
+  /** A dungeon mouth on free ground near a point: the ladder, and the tile beside it you climb back up onto. */
+  const mouth = (near: [number, number], name: string, landing: { x: number; y: number }, back: string) => {
+    const [x, y] = nearestLandAnywhere(near[0], near[1]);
+    const beside = [[0, 1], [1, 0], [0, -1], [-1, 0]].map(([dx, dy]) => [x + dx, y + dy] as const).find(([bx, by]) => ([T.GRASS, T.DARK_GRASS, T.PATH] as number[]).includes(get(bx, by)) && ctx.objectAt[tileIndex(bx, by)] < 0) ?? [x, y + 1] as const;
+    add({ kind: "ladder", x, y, blocks: true, name, action: "Climb-down", to: landing });
+    add({ kind: "ladder", x: landing.x - 2, y: landing.y, blocks: true, name: back, action: "Climb-up", to: { x: beside[0], y: beside[1] } });
+    return [x, y] as const;
+  };
+  const cellarMouth = mouth([272, 289], "Cellar door", { x: 408, y: 559 }, "Cellar steps");
+  for (const [x, y, kind] of [[410, 556, "barrel"], [414, 556, "barrel"], [418, 556, "crate"], [422, 556, "shelf"], [426, 556, "crate"], [412, 562, "hay"], [446, 556, "shelf"], [452, 556, "barrel"], [458, 556, "crate"], [466, 556, "shelf"], [412, 576, "hay"], [420, 576, "barrel"], [428, 576, "crate"]] as const) if (ctx.objectAt[tileIndex(x, y)] < 0) decor(x, y, kind, true);
+  for (const [x, y] of [[408, 560], [428, 562], [448, 562], [466, 566], [414, 570], [434, 574]] as const) if (ctx.objectAt[tileIndex(x, y)] < 0) decor(x, y, "torch", true);
+  coffers("Cellar coffer", 404, 556, 470, 576, 4, T.WOOD); decor(468, 569, "chest", true, "The Rat King's hoard");
+  monsters("ink_rat", 404, 556, 446, 576, 12); monsters("cave_bat", 404, 556, 470, 576, 6); monsters("grumblin", 428, 556, 470, 570, 5); monsters("forest_spider", 408, 564, 448, 576, 4); monsters("grumblin_chief", 444, 556, 470, 570, 1);
+  monsters("rat_king", 462, 564, 462, 564, 1);
+  // The Mossy Undercroft, down a stair in the Mossy Ruins: the vaults under the ruins, for the middle levels (bandits,
+  // the dead, thornbacks, moths), and the Moss Warden behind a door that takes a moss key.
+  dungeon("mossy_undercroft", [[474, 556, 500, 564], [498, 560, 516, 563], [514, 554, 540, 570], [488, 563, 492, 567], [478, 566, 510, 577], [511, 572, 513, 572], [514, 572, 540, 577]], T.STONE);
+  for (let y = 554; y <= 577; y++) for (let x = 474; x <= 540; x++) if (get(x, y) === T.STONE && noise(x * 1.2, y * 1.2) > 0.66) put(x, y, T.DARK_GRASS);
+  const mossyMouth = mouth([306, 331], "Mossy stair", { x: 478, y: 560 }, "Mossy stair");
+  add({ kind: "gate", x: 512, y: 572, blocks: true, name: "The warden's door", action: "Unlock", to: { x: 514, y: 572 }, requires: { item: "moss_key" } });
+  for (let x = 478; x <= 498; x += 10) decor(x, 556, "pillar"); for (let x = 518; x <= 538; x += 10) decor(x, 554, "pillar"); for (const [x, y] of [[482, 564], [506, 562], [516, 566], [536, 568], [486, 576], [504, 577]] as const) if (ctx.objectAt[tileIndex(x, y)] < 0) decor(x, y, "torch", true);
+  scatter(474, 554, 540, 577, 10, (x, y) => decor(x, y, "rubble", false), (x, y) => (get(x, y) === T.STONE || get(x, y) === T.DARK_GRASS) && ctx.objectAt[tileIndex(x, y)] < 0);
+  scatter(474, 554, 540, 570, 6, (x, y) => decor(x, y, "ruin_wall", true), (x, y) => get(x, y) === T.STONE && ctx.objectAt[tileIndex(x, y)] < 0 && [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dy]) => (get(x + dx, y + dy) === T.STONE || get(x + dx, y + dy) === T.DARK_GRASS) && ctx.objectAt[tileIndex(x + dx, y + dy)] < 0));
+  scatter(474, 554, 540, 577, 8, (x, y) => decor(x, y, "bones", false, "Old bones"), (x, y) => (get(x, y) === T.STONE || get(x, y) === T.DARK_GRASS) && ctx.objectAt[tileIndex(x, y)] < 0);
+  coffers("Undercroft coffer", 474, 554, 540, 570, 4, T.STONE); decor(538, 576, "chest", true, "The warden's hoard");
+  monsters("bandit", 474, 554, 516, 570, 8); monsters("skeleton", 478, 554, 540, 577, 8); monsters("thornback", 514, 554, 540, 570, 4); monsters("grave_moth", 474, 554, 540, 577, 4); monsters("swamp_lurker", 478, 566, 510, 577, 4); monsters("cave_bat", 474, 554, 540, 577, 4);
+  monsters("moss_warden", 528, 575, 528, 575, 1);
   // And coffers in every dungeon there was: the crypt, the Depths, the catacombs, the lair, the sea cave and the deep mine.
   { const [cx0, cy0] = mainlandToWorld(24, 205), [cx1, cy1] = mainlandToWorld(68, 232); coffers("Crypt coffer", cx0, cy0, cx1, cy1, 3, T.DUNGEON); }
   { const [hx0, hy0] = mainlandToWorld(84, 206), [hx1, hy1] = mainlandToWorld(176, 236); coffers("Hollow coffer", hx0, hy0, hx1, hy1, 4, T.DUNGEON); }
@@ -519,6 +550,7 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
   warn(227, 337, "skeleton", "skeleton", "toppled"); warn(309, 347, "hollow_sentinel", "hollow sentinel", "broken"); warn(336, 52, "shade", "shade", "whole"); warn(72, 71, "ash_drake", "drake", "buried");
   warn(441, 475, "swamp_lurker", "swamp lurker", "toppled"); warn(642, 197, "stone_golem", "stone golem", "whole"); warn(393, 328, "glass_crab", "glass crab", "broken"); warn(638, 401, "drowned_scholar", "drowned scholar", "buried");
   warn(602, 452, "vault_knight", "vault knight", "toppled"); warn(598, 452, "vault_archer", "vault archer", "whole");
+  warn(cellarMouth[0] + 2, cellarMouth[1] + 1, "ink_rat", "giant rat", "broken"); warn(mossyMouth[0] - 2, mossyMouth[1] + 2, "moss_warden", "moss warden", "buried");
   // ---------- 7c. The Rare Friends Ring: a round building west of the Deadwood, across the river, built by a Hoverer ----------
   {
     const { x: cx, y: cy, outer, inner } = ARENA, dist = (x: number, y: number) => Math.hypot(x - cx, y - cy);

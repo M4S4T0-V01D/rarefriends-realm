@@ -15,12 +15,14 @@ export const RUMOURS: Partial<Record<RegionId, readonly Rumour[]>> = {
     r("The Namekeeper's register goes back further than the town does. There are names in it in a hand nobody can read.", "true"),
     r("There's a door under the fountain. The water's to keep people from finding it.", "false"),
     r("Old Glimmer remembers when the Realm was new. Some say he remembers when it wasn't here at all."),
+    r("The Mossy Ruins have a stair going down, under the moss. Whatever the ruins were, the cellars are still there, and so is the one who kept them.", "true"),
     r("Glass Lake's gone cloudy on the east shore, and there's a crack in the rock there that wasn't there in spring. Something under it glows at night.", "true"),
   ],
   farmland: [
     r("The windmill turns on still days. The miller says it's the slope. There is no slope.", "false"),
     r("A family out past the Westmarch road vanished years back. House is still there. Nobody's touched it.", "true"),
     r("The cows won't graze the north corner of the pen. Never have."),
+    r("There's a cellar door in the grass past the mill. The miller says it's his. The miller has never gone down it.", "true"),
   ],
   fernwick: [
     r("Children here learn their trees before their letters. Hazel could name an oak from its shadow at six.", "true"),

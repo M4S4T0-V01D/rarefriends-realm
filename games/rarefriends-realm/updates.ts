@@ -4,6 +4,12 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 63, date: "2026-10-05", title: "Two dungeons for the rest of us, and capes and shields that sit right", items: [
+    "The Root Cellars, under a cellar door in the grass past the Hollow Farms mill: a dungeon for new heroes (combat 3 to 15). Rats, bats, grumblins and spiders among the barrels and hay, coffers, and the Rat King at the end: rats knotted together into one furious thing, the first boss a hero meets. Nothing locked.",
+    "The Mossy Undercroft, down a stair in the Mossy Ruins: the vaults under the ruins, for the middle levels (25 to 45). Bandits, the dead, thornbacks and grave moths among the moss and rubble, coffers, and the Moss Warden behind a door that takes a moss key (dropped down there, found in the coffers), mending itself with the damp. It drops the Mossguard shield.",
+    "Statues of what waits below stand at both new mouths, and both dungeons have a track of their own.",
+    "Long and four-legged Friends: the side-view cape lies over the near flank now, along the back and down past the legs, in front of the body. From behind with no cape on, a shield (the aegis included) hangs behind you on the off arm: you see your Friend's head and back, and the shield's edge past them.",
+  ] },
   { id: 62, date: "2026-10-05", title: "The Ring dressed: a chapel, iron gates, a fighting pit and a forecourt", items: [
     "The Ring has a chapel, built against its west wall with the door off the concourse: white stone under a gabled roof, a round bell tower at its corner, an altar with the Old Friend behind it, pews either side of a carpeted aisle, torches and the Ring's banners. Chaplain Orrin keeps it, and sells faith potions, holy sigils, vestments, maces and the aegis from there.",
     "The arena gates are iron gates now, stone posts and a lintel with a portcullis between, raised with its spikes hanging until a match drops it. The Hollow gate in the Depths is one too, black iron with shadow seething between the bars until the quest opens it.",

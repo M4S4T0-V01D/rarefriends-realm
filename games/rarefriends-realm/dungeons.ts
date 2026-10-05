@@ -9,9 +9,9 @@ import { regionAt, type RegionId, type WorldObject } from "./world.ts";
 import { searchCryptChest } from "./content.ts";
 
 type Tier = "shallow" | "deep" | "dread";
-const TIER: Partial<Record<RegionId, Tier>> = { crypt: "shallow", sea_cave: "shallow", deepglass: "shallow", hollow_depths: "deep", catacombs: "deep", deep_mine: "deep", drowned_archive: "deep", wyrm_lair: "dread", howling_vault: "dread" };
+const TIER: Partial<Record<RegionId, Tier>> = { root_cellars: "shallow", mossy_undercroft: "shallow", crypt: "shallow", sea_cave: "shallow", deepglass: "shallow", hollow_depths: "deep", catacombs: "deep", deep_mine: "deep", drowned_archive: "deep", wyrm_lair: "dread", howling_vault: "dread" };
 /** The key a dungeon's coffers can hold. */
-const KEYS: Partial<Record<RegionId, string>> = { deepglass: "deepglass_key", drowned_archive: "archive_key", howling_vault: "vault_key" };
+const KEYS: Partial<Record<RegionId, string>> = { mossy_undercroft: "moss_key", deepglass: "deepglass_key", drowned_archive: "archive_key", howling_vault: "vault_key" };
 /** Ticks before a coffer fills again (fifteen minutes). */
 export const COFFER_TICKS = 1500;
 /** `chance` here is a weight, not a probability: the commons are drawn by weight. */
