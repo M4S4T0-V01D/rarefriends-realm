@@ -27,7 +27,7 @@ import {
 import {
   bestArrow, bowRange, emoteProblem, performEmote, applyReferral, shopBuys, buy, buyPrice, canCast, capeProblem, castSpell, rangedMaxHit, rubLamp, chooseOption, continueDialogue, dialogueAtOptions, itemOptions, playerMaxHit, recipeProblem, sell, sellPrice,
   castOnItem, satchelCheck, satchelEmpty, satchelFill, setFollower, setPet, setStyle, startProduction, swapSlots, toggleRun, toggleSneak, togglePrayer, toggleWorn, unequip, useItemOnItem, type OwnedFriend, type Selection,
-} from "./engine.ts";
+ beltCheck, beltFill, beltEmpty, sipBelt, toggleFollowerWorn } from "./engine.ts";
 import { friendRows, renderWorldMap } from "./render.ts";
 import { DUNGEON_Y, FLOOR_Y, OVERWORLD_H, W, isUnderground, mainlandToWorld, realPoint } from "./world.ts";
 import type { NetState } from "./net.ts";
@@ -359,10 +359,10 @@ let pressTimer: ReturnType<typeof setTimeout> | null = null;
 /** Touch: a long press opens the right-click menu. */
 export function longPress(action: () => void) { cancelLongPress(); pressTimer = setTimeout(() => { pressTimer = null; action(); }, 450); }
 export function cancelLongPress() { if (pressTimer) clearTimeout(pressTimer); pressTimer = null; }
-const SLOT_NAMES: Record<EquipSlot, string> = { head: "Head", cape: "Cape", neck: "Neck", weapon: "Weapon", body: "Body", shield: "Shield", legs: "Legs", hands: "Hands", feet: "Feet" };
+const SLOT_NAMES: Record<EquipSlot, string> = { head: "Head", cape: "Cape", neck: "Neck", weapon: "Weapon", body: "Body", shield: "Shield", legs: "Legs", hands: "Hands", feet: "Feet", belt: "Belt" };
 function EquipmentTab({ game, refresh, openCard, openMenu }: PanelProps) {
   const player = game.player, total = bonuses(player);
-  const layout: (EquipSlot | null)[] = [null, "head", null, "cape", "neck", null, "weapon", "body", "shield", null, "legs", null, "hands", "feet", null];
+  const layout: (EquipSlot | null)[] = [null, "head", null, "cape", "neck", null, "weapon", "body", "shield", null, "legs", "belt", "hands", "feet", null];
   return (
     <div className="realm-equipment">
       <div className="realm-equip-grid">
@@ -371,7 +371,8 @@ function EquipmentTab({ game, refresh, openCard, openMenu }: PanelProps) {
             title={player.equipment[slot] ? `Remove ${item(player.equipment[slot]!).name}` : SLOT_NAMES[slot]} onClick={() => { unequip(game, slot); refresh(); }}
             {...rightClick(openMenu, () => { const id = player.equipment[slot]; return id ? [{ verb: "Remove", noun: item(id).name, tone: "item", run: () => { unequip(game, slot); refresh(); } },
               ...(id === SATCHEL ? [{ verb: "Check", noun: item(id).name, tone: "item" as const, run: () => { satchelCheck(game); refresh(); } }, { verb: "Fill", noun: item(id).name, tone: "item" as const, run: () => { satchelFill(game); refresh(); } },
-                { verb: "Empty", noun: item(id).name, tone: "item" as const, run: () => { satchelEmpty(game); refresh(); } }] : []), examine(game, id, refresh)] : []; })}>
+                { verb: "Empty", noun: item(id).name, tone: "item" as const, run: () => { satchelEmpty(game); refresh(); } }] : []),
+              ...(slot === "belt" ? [...(id === "apothecary_belt" ? [{ verb: "Sip", noun: item(id).name, tone: "item" as const, run: () => { sipBelt(game); refresh(); } }] : []), { verb: "Check", noun: item(id).name, tone: "item" as const, run: () => { beltCheck(game, id); refresh(); } }, { verb: "Fill", noun: item(id).name, tone: "item" as const, run: () => { beltFill(game, id); refresh(); } }, { verb: "Empty", noun: item(id).name, tone: "item" as const, run: () => { beltEmpty(game, id); refresh(); } }] : []), examine(game, id, refresh)] : []; })}>
             {player.equipment[slot] ? <ItemIcon slot={{ id: player.equipment[slot]!, n: 1 }} /> : <span className="realm-slot-label">{SLOT_NAMES[slot]}</span>}
           </button>
         ) : <span key={index} />)}
@@ -508,6 +509,8 @@ function FriendsTab({ game, refresh, roster, rosterState, friendSprites, loadFri
       </>}
       <p className="realm-perk"><b>{FAMILY_NAMES[player.familyId]}: {perk.title}.</b> {perk.text}</p>
       <h3>Followers</h3>
+      {player.follower !== null && player.wardrobe.length > 0 && <p className="realm-muted">Dress Friend #{player.follower} from your wardrobe: {player.wardrobe.map(id => { const piece = WARDROBE.find(entry => entry.id === id)!, on = player.followerWorn.includes(id);
+        return <button key={id} type="button" className={on ? "realm-primary" : "realm-dark"} aria-pressed={on} title={on ? `Take the ${piece.name.toLowerCase()} off your follower` : `Put the ${piece.name.toLowerCase()} on your follower`} onClick={() => { toggleFollowerWorn(game, id); refresh(); }}>{piece.name}</button>; })}</p>}
       {rosterState === "waiting" && <p className="realm-muted">Looking for your other Friends…</p>}
       {rosterState === "none" && <p className="realm-muted">Other Friends you own can follow you here. Each adds XP: Gen 1 +5% … Gen 5+ +1%.</p>}
       <div className="realm-followers">

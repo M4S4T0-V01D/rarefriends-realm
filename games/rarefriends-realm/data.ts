@@ -65,8 +65,8 @@ export const FAMILY_PERKS: readonly FamilyPerk[] = [
 
 import { APOTHECARY_ITEMS, type PotionEffect } from "./apothecary.ts";
 // ---------- Items ----------
-export type EquipSlot = "head" | "cape" | "neck" | "weapon" | "body" | "shield" | "legs" | "hands" | "feet";
-export const EQUIP_SLOTS: readonly EquipSlot[] = ["head", "cape", "neck", "weapon", "body", "shield", "legs", "hands", "feet"];
+export type EquipSlot = "head" | "cape" | "neck" | "weapon" | "body" | "shield" | "legs" | "hands" | "feet" | "belt";
+export const EQUIP_SLOTS: readonly EquipSlot[] = ["head", "cape", "neck", "weapon", "body", "shield", "legs", "hands", "feet", "belt"];
 export type Bonuses = { attack: number; strength: number; defence: number; ranged: number; magic: number; prayer: number };
 /** An item's picture: a shape in a colour; `kind` picks a variant of the shape (a fish's species, an ore's veins…). */
 export type Icon = { shape: IconShape; color: string; accent?: string; kind?: string };
@@ -547,6 +547,11 @@ const RANGED_GEAR: Item[] = [
   { id: "bone_bag", name: "Ossuary bag", examine: "A linen bag blessed by the Order of the Dawn. Worn on the back or carried, it holds 60 bones of any kind, catches the bones you pick up, and an altar takes every one at once (pray at one while wearing it).", value: 1200, tradeable: false,
     icon: { shape: "satchel", color: "#d8cdb6", accent: "#f2efe8", kind: "bones" }, equip: { slot: "cape", bonuses: { prayer: 2 } } },
   // The inkcoal satchel: worn on your back (or carried), it catches mined inkcoal and feeds the furnace.
+  // Belts: worn at the waist, each holds a trade's small things so your pack stays free and the work never stops for want of them.
+  { id: "apothecary_belt", name: "Apothecary's belt", examine: "Loops and pouches for 40 potions, 20 clean or ground herbs and 20 vials of water. Brewing draws from it; Sip drinks the potion you need.", value: 2500, tradeable: false,
+    icon: { shape: "leather", color: "#6a4a2e", accent: "#8fbf9a", kind: "belt" }, equip: { slot: "belt", bonuses: {} } },
+  { id: "fletchers_belt", name: "Fletcher's belt", examine: "Pouches for 500 arrow shafts, 500 feathers, 500 headless arrows, 300 arrowheads and 50 bowstrings. The knife reaches into it.", value: 2500, tradeable: false,
+    icon: { shape: "leather", color: "#6a4a2e", accent: "#c49a74", kind: "belt" }, equip: { slot: "belt", bonuses: {} } },
   { id: "sigil_satchel", name: "Sigil satchel", examine: "A mage's bag: purple, with gold stars. Worn on the back or carried, it holds 2,000 sigils of every kind, catches the sigils you pick up, and your spells draw from it.", value: 6000, tradeable: false,
     icon: { shape: "satchel", color: "#5a3a9a", accent: "#e2c46a", kind: "stars" }, equip: { slot: "cape", bonuses: { magic: 3 }, requires: { magic: 30 } } },
   { id: "inkcoal_satchel", name: "Inkcoal satchel", examine: "A stout leather pack for your back. It holds 120 inkcoal, fills itself as you mine, and the furnace reaches into it.", value: 2500,
@@ -1208,6 +1213,11 @@ for (const shop of Object.values(SHOPS)) {
   if (stock.filter(id => LEATHER_SET.includes(id)).length >= 2) for (const id of LEATHER_SET) if (isItem(id) && !stock.includes(id)) stock.push(id);
   (shop as { stock: readonly string[] }).stock = stock;
 }
+// Belts where their trades are taught, and vials of water (and empty vials) in every village's store, so brewers never run dry.
+const addStock = (ids: readonly string[], items: readonly string[]) => { for (const id of ids) { const shop = SHOPS[id]; if (!shop) continue; const stock = [...shop.stock]; for (const item of items) if (!stock.includes(item)) stock.push(item); (shop as { stock: readonly string[] }).stock = stock; } };
+addStock(["hollyhock_herbs", "mender"], ["apothecary_belt"]);
+addStock(["war_bows", "archery", "tallgrass_hunting"], ["fletchers_belt"]);
+addStock(["general", "general_ember", "general_frost", "general_oasis", "general_highcairn", "gravesend_general", "saltmarrow_fish", "hollyhock_herbs", "dyemoor_tailor", "tallgrass_hunting", "cragmaw_ore", "quillhaven_sigils", "kettle", "frost", "wizards", "ashfall_trader"], ["vial_of_water", "vial"]);
 // ---------- Pets ----------
 /** Little companions found by chance while you train (1 in `odds` per action, luckier at higher levels). */
 export type PetDef = { id: string; name: string; from: string; odds: number; text: string };

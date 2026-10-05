@@ -4,6 +4,13 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 51, date: "2026-10-06", title: "Belts, water barrels, a dressed follower, darker music, and capes made whole", items: [
+    "A belt slot. The Apothecary's belt (Mother Yarrow, Mender Hale) holds 40 potions, 20 clean or ground herbs and 20 vials of water: brewing draws from it, and Sip (right-click it while worn) drinks a healing draught when you're hurt or the first potion otherwise. The Fletcher's belt (Hazel, Friendhollow's archery shop, Tallgrass) holds 500 shafts, 500 feathers, 500 headless arrows, 300 arrowheads and 50 bowstrings, and the knife reaches into it. Fill, Check and Empty like the other bags.",
+    "Water barrels in every village square fill all your empty vials for nothing, and every village store sells vials of water and empty vials.",
+    "Your follower wears your wardrobe: on the Friends tab, dress the Friend following you in any piece you own (wings, halos, capes, hats, auras), one of each kind.",
+    "The music is darker: the bright modes bend to their minor cousins, tunes sit an octave lower, a drone hums under every section, the hall is deeper, and every band has a drummer now: a deep drum on every downbeat, kick and snare where the band is lively, low toms and a soft ride where it's calm.",
+    "Capes are full width again from the front and behind, so they show on both sides of a long Friend; from the side they follow the back and trail properly instead of boxing the body in.",
+  ] },
   { id: 50, date: "2026-10-06", title: "Parties and fellows, the Mage's Satchel, and a fuller fellowship wardrobe", items: [
     "Parties: right-click any player (or press their name on the Friends tab) to invite them; they join from the banner. Party members within thirty tiles give you +10% XP, and \"/p\" in chat talks to the whole party privately. Fellows wearing your tag give +5% XP within twelve tiles with no party at all. Both stack with the friends-list bonus.",
     "The Mage's Satchel: a quest from Archmage Solenne at Magic 30 (3 leather, 60 star sigils, 20 thought sigils) for a purple bag with gold stars that holds 2,000 of every kind of sigil. Wear it on your back (Magic +3) or carry it; it catches the sigils you pick up, Fill puts your whole pack's sigils in, and every spell draws from it before your pockets.",

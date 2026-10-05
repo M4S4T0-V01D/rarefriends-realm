@@ -76,6 +76,10 @@ export type Player = {
   coalBag: number; stoneBox: number;
   /** The sigil satchel's contents: sigil id → count. */
   sigilBag: Record<string, number>;
+  /** Each belt's contents (belt id → item id → count). Only the worn belt is in reach. */
+  belts: Record<string, Record<string, number>>;
+  /** Wardrobe pieces your follower wears. */
+  followerWorn: WardrobeId[];
   /** Bones kept in the ossuary bag, by kind. */
   boneBag: Record<string, number>;
   /** Apothecary: skill boosts from drinks (wear off a point at a time), poison on you, poison on your weapon, protections (ticks), and a Friend mixture's effect. */
@@ -219,7 +223,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
     style: "accurate", autocast: null, prayers: [], target: null, activity: null, combat: null,
     attackTimer: 0, eatTimer: 0, stunned: 0, regenTimer: 0, quests: {}, questData: {},
     wardrobe: [], worn: [], follower: null, courseStep: -1, kills: 0, deaths: 0, overhead: null, music: ["theme"],
-    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, boneBag: {}, sigilBag: {}, orders: {}, card: { bg: "paper", frame: "rose", skills: "boxes", font: "mono", ink: "ink", layout: "classic" }, home: null, restedTicks: 0, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, friendVillage: null, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false, rerolls: 0 }, seenUpdate: LATEST_UPDATE,
+    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, boneBag: {}, sigilBag: {}, belts: {}, followerWorn: [], orders: {}, card: { bg: "paper", frame: "rose", skills: "boxes", font: "mono", ink: "ink", layout: "classic" }, home: null, restedTicks: 0, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, friendVillage: null, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false, rerolls: 0 }, seenUpdate: LATEST_UPDATE,
     lastHitBy: null, created: Date.now(), queuedSpell: null, castTimer: 0,
   };
 }
@@ -395,6 +399,33 @@ export function sigilBagAdd(player: Player, id: string, n: number) {
   return moved;
 }
 export const sigilBagTotal = (player: Player) => Object.values(player.sigilBag).reduce((sum, n) => sum + n, 0);
+// ---------- Belts: a trade's small things at your waist ----------
+export type BeltDef = { id: string; name: string; group: (id: string) => string | null; caps: Record<string, number> };
+export const BELTS: readonly BeltDef[] = [
+  { id: "apothecary_belt", name: "Apothecary's belt", caps: { potion: 40, herb: 20, water: 20 },
+    group: id => item(id).potion ? "potion" : id.startsWith("clean_") || id.startsWith("ground_") ? "herb" : id === "vial_of_water" ? "water" : null },
+  { id: "fletchers_belt", name: "Fletcher's belt", caps: { shaft: 500, feather: 500, headless: 500, heads: 300, string: 50 },
+    group: id => id === "arrow_shaft" ? "shaft" : id === "feather" ? "feather" : id === "headless_arrow" ? "headless" : id.endsWith("_arrowheads") ? "heads" : id === "bowstring" ? "string" : null },
+];
+export const beltDef = (id: string | undefined | null) => BELTS.find(belt => belt.id === id) ?? null;
+/** The belt you're wearing, if any. */
+export const wornBelt = (player: Player) => beltDef(player.equipment.belt);
+export const beltContents = (player: Player, beltId: string) => player.belts[beltId] ?? (player.belts[beltId] = {});
+const beltGroupTotal = (contents: Record<string, number>, belt: BeltDef, group: string) => Object.entries(contents).reduce((sum, [id, n]) => sum + (belt.group(id) === group ? n : 0), 0);
+/** Put an item in a belt (as many as its group has room for); returns how many went in. */
+export function beltAdd(player: Player, belt: BeltDef, id: string, n: number) {
+  const group = belt.group(id); if (!group) return 0;
+  const contents = beltContents(player, belt.id), room = Math.max(0, belt.caps[group] - beltGroupTotal(contents, belt, group)), moved = Math.min(n, room);
+  if (moved > 0) contents[id] = (contents[id] ?? 0) + moved;
+  return moved;
+}
+const beltStock = (player: Player, id: string) => { const belt = wornBelt(player); return belt && belt.group(id) ? player.belts[belt.id]?.[id] ?? 0 : 0; };
+function beltUse(player: Player, id: string, n: number) {
+  const belt = wornBelt(player); if (!belt) return n;
+  const contents = beltContents(player, belt.id), from = Math.min(n, contents[id] ?? 0);
+  if (from > 0) { contents[id] -= from; if (!contents[id]) delete contents[id]; }
+  return n - from;
+}
 /** The containers you can carry: what each holds, where its count lives, and how many fit. */
 export const CONTAINERS = [
   { item: SATCHEL, holds: "inkcoal", size: SATCHEL_SIZE, key: "coalBag" as const, carried: hasSatchel },
@@ -449,11 +480,12 @@ export function bagTakeAll(player: Player) {
   return out;
 }
 /** How many of an item you can use in a recipe: your pack, plus the satchel's inkcoal. */
-export const stock = (player: Player, id: string) => count(player, id) + (id === "inkcoal" && hasSatchel(player) ? player.coalBag : 0) + (id === "sigil_stone" && hasStoneBox(player) ? player.stoneBox : 0);
+export const stock = (player: Player, id: string) => count(player, id) + (id === "inkcoal" && hasSatchel(player) ? player.coalBag : 0) + (id === "sigil_stone" && hasStoneBox(player) ? player.stoneBox : 0) + beltStock(player, id);
 /** Use up items for a recipe, taking inkcoal from the satchel first. */
 export function useUp(player: Player, id: string, n: number) {
   if (id === "inkcoal" && hasSatchel(player)) { const fromBag = Math.min(n, player.coalBag); player.coalBag -= fromBag; n -= fromBag; }
   if (id === "sigil_stone" && hasStoneBox(player)) { const fromBox = Math.min(n, player.stoneBox); player.stoneBox -= fromBox; n -= fromBox; }
+  n = beltUse(player, id, n);
   if (n > 0) take(player, id, n);
 }
 

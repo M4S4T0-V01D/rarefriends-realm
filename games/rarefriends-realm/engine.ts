@@ -20,7 +20,7 @@ import { friendSays, friendTick, friendWorks, outfitRemark, remember } from "./f
 import { presenceXp, cleanName, cleanTag, onAchievement as presenceAchievement, onBossFelled, onEmoteUsed, onFriendTime, onNpcTalked, onRareFind, onRegionEntered, onWorn } from "./presence.ts";
 import { NPCS, QUESTS, consecrateDawnstone, onAltarPrayed, examineItem, npcDef, onBonesOffered, onMonsterKilled, questDone, searchCryptChest, searchWell, talk, tanHides, useCryptAltar } from "./content.ts";
 import {
-  BANK_SIZE, BANK_TABS, DAY_MS, SATCHEL, SATCHEL_SIZE, STONE_BOX, STONE_BOX_SIZE, BONE_BAG, BONE_BAG_SIZE, bagAdd, bagBones, bagTakeAll, hasBoneBag, SIGIL_BAG, SIGIL_BAG_SIZE, hasSigilBag, isSigil, sigilBagAdd, sigilBagTotal, sigilStock, useSigils, setPieces, wayfarerPieces, fullSlayerSet, heartguardPieces, mixtureOn, compactBankTabs, hasSatchel, hasStoneBox, stock, useUp, INVENTORY_SIZE, REFERRAL_COINS, REFERRALS_PER_DAY, REFERRAL_TICKS, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
+  BANK_SIZE, BANK_TABS, DAY_MS, SATCHEL, SATCHEL_SIZE, STONE_BOX, STONE_BOX_SIZE, BONE_BAG, BONE_BAG_SIZE, bagAdd, bagBones, bagTakeAll, hasBoneBag, SIGIL_BAG, BELTS, beltAdd, beltContents, beltDef, wornBelt, SIGIL_BAG_SIZE, hasSigilBag, isSigil, sigilBagAdd, sigilBagTotal, sigilStock, useSigils, setPieces, wayfarerPieces, fullSlayerSet, heartguardPieces, mixtureOn, compactBankTabs, hasSatchel, hasStoneBox, stock, useUp, INVENTORY_SIZE, REFERRAL_COINS, REFERRALS_PER_DAY, REFERRAL_TICKS, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
   level, maxHp, maxPrayer, message, prayerBoost, riding, sound, take, weapon, combatLevel, createGame,
   type Activity, type CombatStyle, type Dialogue, type Game, type Monster, type Npc, type Player, type Point, type Recipe, type Slot, type BankSlot, type Target,
  type WorkOrder,
@@ -201,7 +201,7 @@ function objectOptions(game: Game, object: WorldObject): string[] {
     case "tanning": return ["Tan"];
     case "well": return ["Search"];
     case "sigil_altar": return ["Craft-sigil"];
-    case "decor": return object.name.endsWith("(sleep)") ? ["Sleep"] : object.name.endsWith("(furnish)") ? ["Warm-up", "Furnish"] : object.decor === "chest" && !object.name.startsWith("Chest") ? ["Search"] : [];
+    case "decor": return object.name.endsWith("(sleep)") ? ["Sleep"] : object.name.endsWith("(fill)") ? ["Fill vials"] : object.name.endsWith("(furnish)") ? ["Warm-up", "Furnish"] : object.decor === "chest" && !object.name.startsWith("Chest") ? ["Search"] : [];
     default: return [];
   }
 }
@@ -298,6 +298,7 @@ export function itemOptions(game: Game, slotIndex: number): ItemOption[] {
   if (slot.id === "slayer_gem") out.push({ verb: "Check", run: g => message(g, taskText(g)) });
   if (slot.id === SATCHEL) out.push({ verb: "Check", run: satchelCheck }, { verb: "Fill", run: satchelFill }, { verb: "Empty", run: satchelEmpty });
   if (slot.id === SIGIL_BAG) out.push({ verb: "Check", run: sigilBagCheck }, { verb: "Fill", run: sigilBagFill }, { verb: "Empty", run: sigilBagEmpty });
+  if (beltDef(slot.id)) out.push({ verb: "Check", run: g => beltCheck(g, slot.id) }, { verb: "Fill", run: g => beltFill(g, slot.id) }, { verb: "Empty", run: g => beltEmpty(g, slot.id) });
   if (slot.id === STONE_BOX) out.push({ verb: "Check", run: boxCheck }, { verb: "Fill", run: boxFill }, { verb: "Empty", run: boxEmpty });
   if (slot.id === BONE_BAG) out.push({ verb: "Check", run: bagCheck }, { verb: "Fill", run: bagFill }, { verb: "Empty", run: bagEmpty });
   out.push({ verb: "Use", run: () => ({ kind: "item", slot: slotIndex }) });
@@ -368,6 +369,49 @@ export function bagEmpty(game: Game) {
   message(game, `You take ${moved} bones out of the ossuary bag (${bagBones(player)} left).`); sound(game, "pickup");
 }
 /** Tip the whole ossuary bag onto an altar: every bone inside is offered at once. */
+// ---------- Belts ----------
+const beltText = (contents: Record<string, number>) => Object.entries(contents).filter(([, n]) => n > 0).map(([id, n]) => `${n.toLocaleString()} ${item(id).name.toLowerCase()}`).join(", ");
+export function beltCheck(game: Game, beltId: string) {
+  const belt = beltDef(beltId); if (!belt) return;
+  const contents = beltContents(game.player, beltId), total = Object.values(contents).reduce((sum, n) => sum + n, 0);
+  message(game, total ? `Your ${belt.name.toLowerCase()} holds ${beltText(contents)}.` : `Your ${belt.name.toLowerCase()} is empty.`);
+}
+/** Put everything the belt takes from your pack into it (or one kind). */
+export function beltFill(game: Game, beltId: string, only?: string) {
+  const player = game.player, belt = beltDef(beltId); if (!belt) return;
+  let moved = 0;
+  const totals = new Map<string, number>();
+  for (const slot of player.inventory) if (slot && (!only || slot.id === only) && belt.group(slot.id)) totals.set(slot.id, (totals.get(slot.id) ?? 0) + slot.n);
+  for (const [id, total] of totals) { const n = beltAdd(player, belt, id, total); if (n > 0) { take(player, id, n); moved += n; } }
+  message(game, moved ? `You tuck ${moved.toLocaleString()} things into the ${belt.name.toLowerCase()}: ${beltText(beltContents(player, beltId))}.` : `Nothing in your pack fits the ${belt.name.toLowerCase()}, or it's full.`); if (moved) sound(game, "pickup");
+}
+export function beltEmpty(game: Game, beltId: string) {
+  const player = game.player, belt = beltDef(beltId); if (!belt) return;
+  const contents = beltContents(player, beltId); let moved = 0;
+  for (const [id, n] of Object.entries(contents)) { if (n <= 0) continue; const given = n - give(player, id, n); if (given > 0) { contents[id] -= given; moved += given; if (!contents[id]) delete contents[id]; } }
+  message(game, moved ? `You take ${moved.toLocaleString()} things out of the ${belt.name.toLowerCase()}.` : "The belt is empty, or your pack is full."); if (moved) sound(game, "pickup");
+}
+/** Sip from the apothecary's belt: a healing draught when you're hurt, else the first potion in it. */
+export function sipBelt(game: Game) {
+  const player = game.player, belt = wornBelt(player);
+  if (!belt || belt.id !== "apothecary_belt") { message(game, "You need an apothecary's belt on to sip from it.", "warn"); return; }
+  const contents = beltContents(player, belt.id), potions = Object.keys(contents).filter(id => contents[id] > 0 && item(id).potion && !item(id).potion!.poison);
+  const pick = (player.hp < maxHp(player) ? potions.find(id => item(id).potion!.heal) : null) ?? potions[0];
+  if (!pick) { message(game, "There's no potion on your belt."); return; }
+  const effect = item(pick).potion!;
+  if (effect.mixture && effect.mixture.family !== player.familyId) { message(game, "That mixture isn't for your Friend's family.", "warn"); return; }
+  contents[pick]--; if (!contents[pick]) delete contents[pick]; give(player, "vial");
+  applyPotion(game, pick);
+}
+/** A water barrel in a village: every empty vial you carry (and the apothecary's belt) fills up. */
+export function fillVials(game: Game) {
+  const player = game.player, vials = count(player, "vial");
+  if (!vials) { message(game, "You have no empty vials to fill."); return; }
+  take(player, "vial", vials); let left = vials;
+  const belt = wornBelt(player); if (belt) left -= beltAdd(player, belt, "vial_of_water", left);
+  if (left > 0) give(player, "vial_of_water", left);
+  message(game, `You fill ${vials} vial${vials === 1 ? "" : "s"} from the barrel.`); sound(game, "pickup");
+}
 // ---------- The sigil satchel ----------
 const sigilBagText = (player: Player) => Object.entries(player.sigilBag).filter(([, n]) => n > 0).map(([id, n]) => `${n.toLocaleString()} ${item(id).name.toLowerCase().replace(" sigil", "")}`).join(", ");
 export function sigilBagCheck(game: Game) {
@@ -415,6 +459,11 @@ export function drink(game: Game, slotIndex: number) {
   if (!slot || !effect || effect.poison) return;
   if (effect.mixture && effect.mixture.family !== player.familyId) { message(game, `This mixture was made for ${FAMILY_NAMES[effect.mixture.family]} Friends. Yours is a ${FAMILY_NAMES[player.familyId]}; it would do nothing.`, "warn"); return; }
   take(player, slot.id); give(player, "vial");
+  applyPotion(game, slot.id);
+}
+/** What a potion does once it's down: the effects, and the message. */
+export function applyPotion(game: Game, id: string) {
+  const player = game.player, effect = item(id).potion!, slot = { id };
   const notes: string[] = [];
   if (effect.heal) { const before = player.hp; player.hp = Math.min(maxHp(player), player.hp + effect.heal); if (player.hp > before) notes.push(`heals ${player.hp - before}`); }
   if (effect.energy) { player.energy = Math.min(100, player.energy + effect.energy); notes.push("restores your run energy"); }
@@ -574,6 +623,7 @@ export function useItemOnItem(game: Game, a: number, b: number) {
   }
   if (pair("inkcoal", SATCHEL)) { satchelFill(game); return; }
   if ((first.id === SIGIL_BAG || second.id === SIGIL_BAG) && isSigil(other(SIGIL_BAG).id)) { sigilBagFill(game, other(SIGIL_BAG).id); return; }
+  for (const belt of BELTS) if ((first.id === belt.id || second.id === belt.id) && belt.group(other(belt.id).id)) { beltFill(game, belt.id, other(belt.id).id); return; }
   if (first.id === "mortar" || second.id === "mortar") {
     const clean = other("mortar").id;
     if (clean.startsWith("clean_") && grindRecipes(clean.slice(6)).length) { game.ui.production = { title: "Grind the herb?", recipes: grindRecipes(clean.slice(6)) }; return; }
@@ -897,6 +947,7 @@ function interactObject(game: Game, object: WorldObject, option: string, use?: n
     case "well": searchWell(game); return;
     case "decor":
       if (object.name.endsWith("(sleep)")) { sleep(game); return; }
+      if (object.name.endsWith("(fill)")) { fillVials(game); return; }
       if (object.name.endsWith("(furnish)")) { if (option === "Furnish") { game.ui.home = true; sound(game, "click"); } else message(game, "You warm your hands at the hearth. Home."); return; }
       if (object.decor === "chest") searchCryptChest(game); return;
     default: message(game, examineObject(game, object));
@@ -2026,6 +2077,14 @@ export function collectFromCasket(game: Game, tier: number): { wardrobe: Wardrob
   const coins = [250, 600, 1500, 5000][tier] ?? 250;
   giveOrDrop(game, "coins", coins); message(game, `A duplicate wardrobe piece turns into ${coins} coins.`); return { wardrobe: null, coins };
 }
+/** Dress your follower from your own wardrobe: one piece of each kind. */
+export function toggleFollowerWorn(game: Game, id: WardrobeId) {
+  const player = game.player, entry = WARDROBE.find(piece => piece.id === id);
+  if (!entry || !player.wardrobe.includes(id)) return;
+  if (player.followerWorn.includes(id)) { player.followerWorn = player.followerWorn.filter(worn => worn !== id); return; }
+  player.followerWorn = player.followerWorn.filter(worn => WARDROBE.find(piece => piece.id === worn)?.kind !== entry.kind);
+  player.followerWorn.push(id);
+}
 export function toggleWorn(game: Game, id: WardrobeId) {
   const player = game.player, entry = WARDROBE.find(piece => piece.id === id);
   if (!entry || !player.wardrobe.includes(id)) return;
@@ -2143,7 +2202,7 @@ export type SaveData = {
   met?: unknown; achievements?: Record<string, number>; pets?: string[]; petOut?: string | null; killLog?: Record<string, number>; stats?: Record<string, number>; referredBy?: number | null; referrals?: number[]; referralTimes?: number[]; boostTicks?: number; coalBag?: number; stoneBox?: number; boneBag?: Record<string, number>;
   boosts?: Record<string, number>; poison?: { damage: number; left: number; timer: number } | null; weaponPoison?: { weapon: string; damage: number; charges: number; weaken: boolean } | null;
   antidoteUntil?: number; antifireUntil?: number; stealthUntil?: number; tonicUntil?: number; mixture?: { family: number; until: number } | null;
-  firsts?: Record<string, number>; friendKinds?: Record<string, 1>; rumours?: Record<string, 1>; orders?: Record<string, WorkOrder>; card?: Record<string, string>; home?: unknown; restedTicks?: number; sigilBag?: Record<string, number>;
+  firsts?: Record<string, number>; friendKinds?: Record<string, 1>; rumours?: Record<string, 1>; orders?: Record<string, WorkOrder>; card?: Record<string, string>; home?: unknown; restedTicks?: number; sigilBag?: Record<string, number>; belts?: Record<string, Record<string, number>>; followerWorn?: string[];
   name?: string | null; fellowship?: { name: string; tag: string; logo?: string; banner?: string; colors?: [string, string] } | null; title?: string | null; visited?: Record<string, number>; regionTicks?: Record<string, number>; talked?: Record<string, 1>; emotesUsed?: Record<string, 1>; outfits?: Record<string, 1>; friendTicks?: number; mounts?: string[]; mount?: string | null; daily?: unknown; seenUpdate?: number;
 };
 export function serialize(game: Game): SaveData {
@@ -2156,7 +2215,7 @@ export function serialize(game: Game): SaveData {
     playTicks: game.playTicks, retaliate: game.autoRetaliate, music: [...player.music],
     referredBy: player.referredBy, referrals: [...player.referrals], referralTimes: [...player.referralTimes], boostTicks: player.boostTicks, coalBag: player.coalBag, stoneBox: player.stoneBox, boneBag: { ...player.boneBag }, boosts: { ...player.boosts }, poison: player.poison ? { ...player.poison } : null, weaponPoison: player.weaponPoison ? { ...player.weaponPoison } : null,
     antidoteUntil: Math.max(0, player.antidoteUntil - game.tick), antifireUntil: Math.max(0, player.antifireUntil - game.tick), stealthUntil: Math.max(0, player.stealthUntil - game.tick), tonicUntil: Math.max(0, player.tonicUntil - game.tick), mixture: player.mixture ? { family: player.mixture.family, until: Math.max(0, player.mixture.until - game.tick) } : null,
-    firsts: { ...player.firsts } as Record<string, number>, friendKinds: { ...player.friendKinds } as Record<string, 1>, rumours: { ...player.rumours } as Record<string, 1>, orders: { ...player.orders }, card: { ...player.card }, home: player.home ? { ...player.home, furniture: { ...player.home.furniture } } : null, restedTicks: player.restedTicks, sigilBag: { ...player.sigilBag },
+    firsts: { ...player.firsts } as Record<string, number>, friendKinds: { ...player.friendKinds } as Record<string, 1>, rumours: { ...player.rumours } as Record<string, 1>, orders: { ...player.orders }, card: { ...player.card }, home: player.home ? { ...player.home, furniture: { ...player.home.furniture } } : null, restedTicks: player.restedTicks, sigilBag: { ...player.sigilBag }, belts: Object.fromEntries(Object.entries(player.belts).map(([id, contents]) => [id, { ...contents }])), followerWorn: [...player.followerWorn],
     name: player.name, fellowship: player.fellowship ? { ...player.fellowship } : null, title: player.title, visited: { ...player.visited } as Record<string, number>, regionTicks: { ...player.regionTicks } as Record<string, number>, talked: { ...player.talked } as Record<string, 1>, emotesUsed: { ...player.emotesUsed } as Record<string, 1>, outfits: { ...player.outfits } as Record<string, 1>, friendTicks: player.friendTicks, mounts: [...player.mounts], mount: player.mount, met: JSON.parse(JSON.stringify(player.met)), achievements: { ...player.achievements }, pets: [...player.pets], petOut: player.petOut, killLog: { ...player.killLog }, stats: { ...player.stats }, daily: JSON.parse(JSON.stringify(player.daily)), seenUpdate: player.seenUpdate,
   };
 }
@@ -2271,6 +2330,8 @@ export function restore(game: Game, raw: unknown): boolean {
   player.mount = typeof save.mount === "string" && player.mounts.includes(save.mount) ? save.mount : null;
   player.daily = cleanDaily(save.daily, SKILLS); player.orders = cleanOrders(save.orders); player.card = cleanCard(save.card); player.home = cleanHome(save.home); player.restedTicks = int(save.restedTicks, 0, 100000, 0); applyHome(game);
   player.sigilBag = {}; for (const [id, n] of Object.entries(save.sigilBag ?? {})) if (isItem(id) && isSigil(id)) { const v = int(n, 0, SIGIL_BAG_SIZE, 0); if (v) player.sigilBag[id] = v; }
+  player.belts = {}; for (const belt of BELTS) { const raw = save.belts?.[belt.id]; if (!raw || typeof raw !== "object") continue; for (const [id, n] of Object.entries(raw)) if (isItem(id) && belt.group(id)) beltAdd(player, belt, id, int(n, 0, 100000, 0)); }
+  player.followerWorn = (save.followerWorn ?? []).filter((id): id is WardrobeId => player.wardrobe.includes(id as WardrobeId));
   player.met = cleanMet(save.met);
   player.achievements = Object.fromEntries(Object.entries(save.achievements && typeof save.achievements === "object" ? save.achievements : {}).filter(([id, day]) => /^[a-z0-9_]{1,32}$/.test(id) && typeof day === "number" && Number.isFinite(day)).slice(0, 100).map(([id, day]) => [id, Math.floor(day as number)]));
   player.pets = PETS.filter(pet => Array.isArray(save.pets) && save.pets.includes(pet.id)).map(pet => pet.id);

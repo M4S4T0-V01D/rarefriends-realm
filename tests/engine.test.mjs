@@ -2150,3 +2150,30 @@ test("Fellowship invitations: a day-long join link with the look inside, and joi
   assert(joinFellowship(g, invite.name, invite.tag, invite)); assert.equal(p.fellowship.tag, "MOON"); assert.equal(p.fellowship.logo, "paw"); assert.equal(p.fellowship.since, 20000);
   const save = JSON.parse(JSON.stringify(serialize(g))), fresh = newGame(); assert(restore(fresh, save)); assert.equal(fresh.player.fellowship.since, 20000);
 });
+
+test("Belts at the waist, barrels that fill vials, a follower in your wardrobe, and a darker band", async () => {
+  const { BELTS, beltContents, stock, wornBelt } = await import("../games/rarefriends-realm/state.ts");
+  const { beltFill, beltEmpty, sipBelt, fillVials, toggleFollowerWorn, headlessRecipe } = await import("../games/rarefriends-realm/engine.ts");
+  const { TRACKS } = await import("../games/rarefriends-realm/audio.ts");
+  const g = newGame(), p = g.player, w = g.world; p.inventory.fill(null);
+  assert.equal(item("fletchers_belt").equip.slot, "belt"); assert(SHOPS.war_bows.stock.includes("fletchers_belt") && SHOPS.hollyhock_herbs.stock.includes("apothecary_belt"));
+  give(p, "fletchers_belt"); equip(g, p.inventory.findIndex(slot => slot?.id === "fletchers_belt")); assert.equal(p.equipment.belt, "fletchers_belt"); assert.equal(wornBelt(p).id, "fletchers_belt");
+  give(p, "arrow_shaft", 600); give(p, "feather", 100); give(p, "bones", 1); beltFill(g, "fletchers_belt");
+  assert.equal(beltContents(p, "fletchers_belt").arrow_shaft, 500, "five hundred shafts fit"); assert.equal(count(p, "arrow_shaft"), 100, "the rest stay in the pack"); assert.equal(count(p, "bones"), 1, "bones don't belong on it");
+  assert.equal(stock(p, "feather"), 100, "the knife counts the belt"); give(p, "knife"); p.xp.fletching = XP_TABLE[10];
+  startProduction(g, headlessRecipe(), 1); until(g, () => has(p, "headless_arrow"), 20); assert.equal(beltContents(p, "fletchers_belt").feather, 85, "feathers came off the belt");
+  beltEmpty(g, "fletchers_belt"); assert(!beltContents(p, "fletchers_belt").feather && count(p, "feather") >= 85);
+  // The apothecary's belt: sip when hurt.
+  p.inventory.fill(null); give(p, "apothecary_belt"); equip(g, p.inventory.findIndex(slot => slot?.id === "apothecary_belt")); give(p, "healing_tonic", 3); give(p, "clean_feverleaf", 5); beltFill(g, "apothecary_belt");
+  assert.equal(beltContents(p, "apothecary_belt").healing_tonic, 3); p.hp = 1; sipBelt(g); assert(p.hp > 1, "a sip heals"); assert.equal(beltContents(p, "apothecary_belt").healing_tonic, 2); assert(has(p, "vial"), "the vial comes back");
+  // Barrels in every village fill vials (into the belt first).
+  const barrels = w.objects.filter(object => object.name === "Water barrel (fill)"); assert(barrels.length >= 7, `a barrel in every village (${barrels.length})`);
+  give(p, "vial", 5); standBy(g, barrels[0]); setTarget(g, { kind: "object", id: barrels[0].id, option: "Fill vials" }); until(g, () => !has(p, "vial"), 40);
+  assert.equal(beltContents(p, "apothecary_belt").vial_of_water, 6, "filled, onto the belt"); assert(SHOPS.gravesend_general.stock.includes("vial_of_water") && SHOPS.general.stock.includes("vial") && SHOPS.saltmarrow_fish.stock.includes("vial_of_water"));
+  // The follower in your wardrobe.
+  p.wardrobe.push("rose_cape", "silver_halo", "blue_cape"); toggleFollowerWorn(g, "rose_cape"); toggleFollowerWorn(g, "silver_halo"); toggleFollowerWorn(g, "blue_cape");
+  assert.deepEqual(p.followerWorn, ["silver_halo", "blue_cape"], "one cape at a time"); toggleFollowerWorn(g, "golden_aura"); assert.equal(p.followerWorn.length, 2, "only what you own");
+  const save = JSON.parse(JSON.stringify(serialize(g))), fresh = newGame(); assert(restore(fresh, save)); assert.deepEqual(fresh.player.followerWorn, p.followerWorn); assert.equal(fresh.player.belts.apothecary_belt.vial_of_water, 6); assert.equal(fresh.player.equipment.belt, "apothecary_belt");
+  // Every area track has a drummer and a drone now.
+  for (const track of TRACKS) if (track.id !== "theme") { assert(track.hits.some(hit => hit.drum === "deep"), `${track.name} has a deep drum`); assert(track.notes.some(note => note.voice === "drone"), `${track.name} has a drone`); }
+});

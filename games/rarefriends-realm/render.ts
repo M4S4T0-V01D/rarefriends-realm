@@ -1668,6 +1668,13 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       const s = toScreen(camera, at.x, at.y), facing = screenFacing(camera, pet.heading);
       ellipse(ctx, s.x, s.y, 11 * z, 4.5 * z, "rgba(22,22,22,0.16)", null);
       if (petOut) drawPet(ctx, petOut, s.x, s.y, facing, at.moving, now, z, scene.reducedMotion);
+      else if (game.player.followerWorn.length) {
+        // Dressed from your wardrobe: the same pieces, drawn the same way, with their auras.
+        const rows = friendRows(scene.follower!, facing, at.moving, at.moving ? Math.floor(now / 90) % 8 : 0), px = 2.6 * z;
+        drawAuras(ctx, game.player.followerWorn, s.x, s.y, px, now + 1300, scene.reducedMotion, "back");
+        drawFigure(ctx, figureArt(rows, game.player.followerWorn, facing, scene.reducedMotion ? 0 : Math.floor(now / 520) % 4), s.x, s.y + 2 * z, px);
+        drawAuras(ctx, game.player.followerWorn, s.x, s.y, px, now + 1300, scene.reducedMotion, "front");
+      }
       else drawMask(ctx, friendRows(scene.follower!, facing, at.moving, at.moving ? Math.floor(now / 90) % 8 : 0), s.x, s.y + 2 * z, 2.6 * z);
     } });
   }

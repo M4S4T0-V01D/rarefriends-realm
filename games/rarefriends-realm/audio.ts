@@ -24,8 +24,8 @@ const VOICES: Record<string, { kind: VoiceKind; f0: number; length: number; brig
   gloom_hound: { kind: "growl", f0: 120, length: 0.6, bright: 1100, wobble: 22 },
 };
 /** General-MIDI-style instruments, like an old-school RPG soundtrack: bright leads up high, plucked strings, light drums. */
-type Voice = "lute" | "flute" | "recorder" | "oboe" | "trumpet" | "bell" | "glock" | "harp" | "pizz" | "strings" | "organ" | "pad" | "bass" | "brass" | "pluck" | "choir";
-type Drum = "kick" | "snare" | "hat" | "shaker" | "tom" | "clank" | "hand" | "rim" | "timpani" | "tambourine";
+type Voice = "lute" | "flute" | "recorder" | "oboe" | "trumpet" | "bell" | "glock" | "harp" | "pizz" | "strings" | "organ" | "pad" | "bass" | "brass" | "pluck" | "choir" | "drone";
+type Drum = "kick" | "snare" | "hat" | "shaker" | "tom" | "clank" | "hand" | "rim" | "timpani" | "tambourine" | "deep" | "ride";
 type Note = { beat: number; voice: Voice; midi: number; length: number; velocity: number };
 type Hit = { beat: number; drum: Drum; velocity: number };
 export type Track = { id: TrackId; name: string; bpm: number; beats: number; notes: Note[]; hits: Hit[] };
@@ -162,12 +162,15 @@ const STYLES: readonly Style[] = [
  * answered (A), the same tune with a second instrument in thirds (A'), a contrasting bridge (B), and the tune again
  * with the glockenspiel or harp doubling it (A''). Phrases end on the fifth, then the tonic; long notes get grace notes.
  */
+/** The Realm's music leans dark: the bright modes bend to their minor cousins, the tune sits an octave lower, a drone hums under every section and every band has a drummer. */
+const DARKER: Record<string, string> = { major: "dorian", lydian: "aeolian", mixolydian: "dorian" };
+const DARK_LEADS: Partial<Record<Voice, Voice>> = { glock: "harp", recorder: "flute", trumpet: "brass" };
 function composeTrack(style: Style): Track {
-  const random = mulberry(style.seed), scale = MODES[style.mode], per = style.meter, bars = style.progression.length, loop = bars * per;
+  const random = mulberry(style.seed), scale = MODES[DARKER[style.mode] ?? style.mode], per = style.meter, bars = style.progression.length, loop = bars * per;
   const deg = (degree: number) => style.root + 12 * Math.floor(degree / 7) + scale[((degree % 7) + 7) % 7];
   const triad = (degree: number) => [deg(degree) % 12, deg(degree), deg(degree + 2), deg(degree + 4)];
   // The tune's home note lands between D4 and C#5 whatever the key, so melodies sit in a recorder's sweet spot.
-  const top = (style.root >= 2 ? 60 : 72) + (style.lift ?? 0);
+  const top = (style.root >= 2 ? 48 : 60) + (style.lift ?? 0), lead = DARK_LEADS[style.lead] ?? style.lead, second = DARK_LEADS[style.second] ?? style.second;
   const cells = per === 3
     ? [[1, 0.5, 0.5, 1], [0.5, 0.5, 0.5, 0.5, 1], [1.5, 0.5, 1], [1, 1, 1], [2, 1]]
     : [[1, 0.5, 0.5, 1, 1], [0.5, 0.5, 0.5, 0.5, 1, 1], [1.5, 0.5, 1, 1], [1, 1, 0.5, 0.5, 1], [0.75, 0.25, 1, 1, 1], [2, 1, 1]];
@@ -210,11 +213,13 @@ function composeTrack(style: Style): Track {
   const bridgeProgression = style.progression.map((_, i) => style.progression[(i + Math.floor(bars / 2)) % bars]).map((chord, i) => i === bars - 1 ? 4 : chord);
   const a = phrase(style.progression, 2), b = phrase(bridgeProgression, 4);
   const notes: Note[] = [
-    ...render(a, 0, style.lead),
-    ...render(a, loop, style.lead), ...render(a, loop, style.second, -2, 0.5, false),
-    ...render(b, loop * 2, style.second, 0, 0.85),
-    ...render(a, loop * 3, style.lead), ...render(a, loop * 3, style.lead === "glock" ? "harp" : "glock", 0, 0.34, false),
+    ...render(a, 0, lead),
+    ...render(a, loop, lead), ...render(a, loop, second, -2, 0.5, false),
+    ...render(b, loop * 2, second, 0, 0.85),
+    ...render(a, loop * 3, lead), ...render(a, loop * 3, "harp", 0, 0.3, false).map(note => ({ ...note, midi: note.midi + 12 })),
   ];
+  // A drone under each section: the root, two octaves down, held the whole way through.
+  for (let section = 0; section < 4; section++) notes.push({ beat: loop * section, voice: "drone", midi: deg(0) + top - 24, length: loop, velocity: 0.6 });
   const patterns = per === 3 ? [[0, 1, 2, 1, 2, 1], [0, 2, 1, 2, 3, 2], [2, 1, 0, 1, 2, 3], [0, 1, 2, 3, 2, 1]] : [[0, 1, 2, 1, 3, 2, 1, 2], [0, 2, 1, 3, 2, 1, 3, 2], [3, 2, 1, 0, 1, 2, 3, 2], [0, 1, 2, 3, 2, 3, 1, 2]];
   [style.progression, style.progression, bridgeProgression, style.progression].forEach((progression, section) => {
     notes.push(...chordBed(progression.map(triad), per, { pad: style.bed ?? undefined, arp: style.arp ?? undefined, bass: style.bass, arpPattern: patterns[section] }).map(note => ({ ...note, beat: note.beat + loop * section })));
@@ -234,6 +239,12 @@ function composeTrack(style: Style): Track {
       case "heartbeat": hits.push({ beat: b0, drum: "timpani", velocity: 0.4 }, { beat: b0 + 0.5, drum: "timpani", velocity: 0.25 }); break;
     }
     if (fill && style.kit !== "calm" && style.kit !== "heartbeat") for (let e = 0; e < 4; e++) hits.push({ beat: b0 + per - 1 + e / 4, drum: "timpani", velocity: 0.25 + e * 0.07 });
+    // The drummer: a deep drum on the downbeat everywhere, a kick-and-snare pulse where the band is lively, a low tom
+    // and a soft ride where it's calm, so even the quiet places have a heartbeat under them.
+    const lively = style.energy >= 0.65;
+    hits.push({ beat: b0, drum: "deep", velocity: 0.55 });
+    if (lively) { hits.push({ beat: b0, drum: "kick", velocity: 0.5 }); if (per === 4) hits.push({ beat: b0 + 2, drum: "kick", velocity: 0.4 }, { beat: b0 + 1, drum: "snare", velocity: busy ? 0.3 : 0.2 }, { beat: b0 + 3, drum: "snare", velocity: busy ? 0.34 : 0.24 }); else hits.push({ beat: b0 + 1.5, drum: "kick", velocity: 0.3 }, { beat: b0 + 2, drum: "snare", velocity: 0.22 }); for (let e = 1; e < per * 2; e += 2) hits.push({ beat: b0 + e / 2, drum: "hat", velocity: busy ? 0.14 : 0.09 }); }
+    else { if (barIndex % 2 === 1) hits.push({ beat: b0 + per - 1.5, drum: "tom", velocity: 0.28 }); if (busy) hits.push({ beat: b0 + 2, drum: "ride", velocity: 0.12 }); if (barIndex % 4 === 3) hits.push({ beat: b0 + per - 0.5, drum: "tom", velocity: 0.22 }); }
   }
   return { id: style.id, name: style.name, bpm: style.bpm, beats: loop * 4, notes, hits };
 }
@@ -265,11 +276,11 @@ export class RealmAudio {
       output.gain.value = 1.3; glue.connect(output).connect(ctx.destination);
       this.master = ctx.createGain(); this.master.connect(glue);
       // A small hall: generated impulse response, so everything sits in the same space.
-      this.reverb = ctx.createConvolver(); this.wet = ctx.createGain(); this.wet.gain.value = 0.13;
-      const length = Math.floor(ctx.sampleRate * 2.2), impulse = ctx.createBuffer(2, length, ctx.sampleRate);
+      this.reverb = ctx.createConvolver(); this.wet = ctx.createGain(); this.wet.gain.value = 0.22;
+      const length = Math.floor(ctx.sampleRate * 3.2), impulse = ctx.createBuffer(2, length, ctx.sampleRate);
       for (let channel = 0; channel < 2; channel++) { const data = impulse.getChannelData(channel); for (let i = 0; i < length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / length) ** 2.6; }
       this.reverb.buffer = impulse; this.reverb.connect(this.wet).connect(this.master);
-      const warmth = ctx.createBiquadFilter(); warmth.type = "lowpass"; warmth.frequency.value = 11000; warmth.connect(this.master);
+      const warmth = ctx.createBiquadFilter(); warmth.type = "lowpass"; warmth.frequency.value = 6500; warmth.connect(this.master);
       this.musicBus = ctx.createGain(); this.musicBus.connect(warmth); this.musicBus.connect(this.reverb);
       this.sfxBus = ctx.createGain(); this.sfxBus.connect(this.master);
       this.noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
@@ -391,6 +402,11 @@ export class RealmAudio {
         mod.connect(depth); const o = this.osc("sine", f, t, t + 2.4, gain); depth.connect(o.frequency); mod.start(t); mod.stop(t + 2.4);
         this.env(gain, t, 0.07 * v, 0.003, 0, 2.2); break; }
       case "harp": this.osc("triangle", f, t, t + 1.4, gain); this.osc("sine", f * 2, t, t + 0.6, gain); this.env(gain, t, 0.08 * v, 0.003, 0, 1.2); break;
+      case "drone": {
+        // Two detuned saws two octaves down, through a slow low-pass sweep: the dark floor under the tune.
+        const filter = ctx.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.setValueAtTime(220, t); filter.frequency.linearRampToValueAtTime(420, t + length * 0.5); filter.frequency.linearRampToValueAtTime(200, t + length); filter.Q.value = 2; filter.connect(gain);
+        this.osc("sawtooth", f, t, t + length + 1.5, filter, -6); this.osc("sawtooth", f, t, t + length + 1.5, filter, 6); this.osc("sine", f / 2, t, t + length + 1.5, filter);
+        this.env(gain, t, 0.05 * v, Math.min(2, length / 4), Math.max(0, length - 2), 1.5); break; }
       case "pluck": { const filter = ctx.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.setValueAtTime(2400, t); filter.frequency.exponentialRampToValueAtTime(400, t + 0.25); filter.connect(gain);
         this.osc("square", f, t, t + 0.5, filter); this.env(gain, t, 0.045 * v, 0.003, 0, 0.35); break; }
       case "organ": for (const [ratio, level] of [[1, 1], [2, 0.6], [4, 0.3], [6, 0.12]] as const) { const g = ctx.createGain(); g.gain.value = level; g.connect(gain); this.osc("sine", f * ratio, t, t + length + 0.4, g); }
@@ -422,6 +438,8 @@ export class RealmAudio {
   private drum(drum: Drum, t: number, v: number, bus: AudioNode) {
     switch (drum) {
       case "kick": this.thump(t, 110, 55, 0.18, 0.3 * v, bus); break;
+      case "deep": this.thump(t, 70, 36, 0.42, 0.34 * v, bus); this.noiseBurst(t, 0.04, 200, 0.03 * v, bus, "lowpass"); break;
+      case "ride": this.noiseBurst(t, 0.3, 6000, 0.035 * v, bus, "bandpass", 2.5); break;
       case "timpani": this.thump(t, 150, 105, 0.5, 0.32 * v, bus); this.noiseBurst(t, 0.05, 300, 0.05 * v, bus, "lowpass"); break;
       case "tambourine": this.noiseBurst(t, 0.07, 7500, 0.07 * v, bus); for (const ratio of [1, 1.41]) { const g = this.ctx!.createGain(); g.connect(bus); this.osc("square", 5200 * ratio, t, t + 0.08, g); this.env(g, t, 0.004 * v, 0.001, 0, 0.07); } break;
       case "snare": this.noiseBurst(t, 0.16, 1800, 0.16 * v, bus); this.thump(t, 220, 160, 0.08, 0.12 * v, bus); break;

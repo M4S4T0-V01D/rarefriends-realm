@@ -24,6 +24,8 @@ export function buildVillages(ctx: GenContext, t: Tools) {
     }
     fillRect(cx - square, cy - Math.ceil(square * 0.75), cx + square, cy + Math.ceil(square * 0.75), paving === T.WOOD ? T.COBBLE : paving);
   };
+  /** A water barrel: empty vials fill at it, for free. Placed after the ground is levelled. */
+  const barrel = (x: number, y: number) => { clearAt(x, y); decor(x, y, "barrel", true, "Water barrel (fill)"); };
   const sign = (x: number, y: number, label: string, text: string, icon?: string) => add({ kind: "sign", x, y, blocks: true, name: label, text, icon });
   const lamps = (points: readonly (readonly [number, number])[], kind: "lamp" | "torch" = "lamp") => { for (const [x, y] of points) decor(x, y, kind); };
 
@@ -48,6 +50,7 @@ export function buildVillages(ctx: GenContext, t: Tools) {
     sign(x - 1, y + 10, "Signpost", "Gravesend. North: the graves, the old road and the Deadwood. South: the mainland, over the neck. We keep the lanterns lit; you keep to the road.");
     sign(x + 8, y + 9, "The Last Lantern", "The Last Lantern.", "lamp"); sign(x - 8, y + 9, "Mira's Mourning Wear", "Mira's Mourning Wear.", "mourners_hood");
     monsters("skeleton", x - 14, y - 24, x + 14, y - 16, 4);
+    barrel(x - 2, y + 3);
   }
 
   // ---------- Saltmarrow: the fishing village on the bay ----------
@@ -73,6 +76,7 @@ export function buildVillages(ctx: GenContext, t: Tools) {
     lamps([[x - 5, y - 1], [x + 5, y - 1], [x - 5, y + 1], [x + 6, y + 6], [x + 6, y + 17]]);
     sign(x + 1, y - 10, "Signpost", "Saltmarrow. The road north goes up to Southshore and the mainland; the ferry at the end of the south dock sails to the Pale Isles. Mind the hut at the end of the north quay. Nobody goes in.");
     sign(x + 7, y - 9, "Saltmarrow Fish Market", "Saltmarrow Fish Market.", "raw_sailfish"); sign(x - 8, y + 9, "The Oilskin Locker", "The Oilskin Locker.", "souwester"); sign(x + 4, y + 9, "Bank", "Bank.", "coins");
+    barrel(x - 2, y + 3);
   }
 
   // ---------- Hollyhock: the apothecary village in Thistle Vale ----------
@@ -99,6 +103,7 @@ export function buildVillages(ctx: GenContext, t: Tools) {
     sign(x + 1, y + 11, "Signpost", "Hollyhock, in Thistle Vale. Everything grows here. East: Dyemoor, down the river. Mother Yarrow teaches Apothecary at her bench.");
     sign(x - 9, y + 10, "Petal & Pocket", "Petal & Pocket.", "herbalists_hat"); sign(x + 9, y + 10, "Bank", "Bank.", "coins"); sign(x - 2, y - 11, "The Apothecary", "The Apothecary.", "pot");
     monsters("sheep", x - 19, y - 5, x - 14, y + 5, 3);
+    barrel(x - 2, y + 3);
   }
 
   // ---------- Dyemoor: the dyers' village on the Thistle ----------
@@ -119,6 +124,7 @@ export function buildVillages(ctx: GenContext, t: Tools) {
     lamps([[x - 4, y - 1], [x + 4, y - 1], [x - 4, y + 1], [x + 4, y + 1]]);
     sign(x + 1, y - 10, "Signpost", "Dyemoor. West up the river: Hollyhock. North: the crossroads for Southshore, Saltmarrow and the mainland. The river runs blue below the vats; that's normal.");
     sign(x + 8, y - 9, "Marigold's", "Marigold's.", "moorland_frock"); sign(x - 9, y + 9, "Dyemoor Bolts & Thread", "Dyemoor Bolts & Thread.", "thread");
+    barrel(x - 2, y + 3);
   }
 
   // ---------- Tallgrass: the hunters' camp beside The Wilds ----------
@@ -137,6 +143,7 @@ export function buildVillages(ctx: GenContext, t: Tools) {
     lamps([[x - 3, y - 1], [x + 3, y - 1], [x - 3, y + 2], [x + 3, y + 2]], "torch");
     sign(x + 1, y - 10, "Signpost", "Tallgrass, the hunters' camp. East: The Wilds (boar, wolf, goat, thornback). West along the road: Southshore and the mainland. Walk soft.");
     sign(x + 8, y - 9, "Tallgrass Hunting Post", "Tallgrass Hunting Post.", "oak_bow");
+    barrel(x - 2, y + 3);
   }
 
   // ---------- Cragmaw: the mining camp in the Ironreach pass ----------
@@ -164,6 +171,7 @@ export function buildVillages(ctx: GenContext, t: Tools) {
     lamps([[x - 4, y - 1], [x + 4, y - 1], [x - 4, y + 1], [x + 4, y + 1], [x + 9, y - 7]], "torch");
     sign(x + 1, y - 10, "Signpost", "Cragmaw, the Ironreach mine. The shaft behind the camp goes down to the deep mine (Foreman Pike's business). West through the pass: Dawnhold and the mainland. South, a long way: Quillhaven.");
     sign(x + 8, y - 9, "Cragmaw Ore Exchange", "Cragmaw Ore Exchange.", "blackiron_ore"); sign(x - 9, y + 9, "The Warm Hearth", "The Warm Hearth.", "fur_hood"); sign(x + 8, y + 9, "Bank", "Bank.", "coins");
+    barrel(x - 2, y + 3);
   }
 
   // ---------- Quillhaven: the scholars' village on the headland ----------
@@ -186,6 +194,7 @@ export function buildVillages(ctx: GenContext, t: Tools) {
     lamps([[x - 4, y - 2], [x + 4, y - 2], [x - 4, y + 2], [x + 4, y + 2]]);
     sign(x + 1, y + 11, "Signpost", "Quillhaven. The library welcomes readers who are quiet. North, a long road: Cragmaw and the Ironreach pass. West: The Wilds and Tallgrass. The headland's stones are older than the Tower.");
     sign(x + 8, y - 11, "The Scriptorium", "The Scriptorium.", "thought_sigil"); sign(x - 8, y + 10, "Quillhaven Vestry", "Quillhaven Vestry.", "archivist_robe");
+    barrel(x - 2, y + 3);
   }
 
   // ---------- Ember Tamsin's camp, where the Drakespine ends and Ashfall begins ----------
