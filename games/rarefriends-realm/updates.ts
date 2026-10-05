@@ -4,6 +4,10 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 54, date: "2026-10-06", title: "The adventurer card is yours: every style free, and many more of them", items: [
+    "Every adventurer card style is free now. Eighteen backgrounds, eighteen backdrops behind your Friend, seven skills panels, eight letterings, ten inks, five layouts (a new Centre one puts your Friend in the middle with skills either side), and a Header banner of your own in sixteen patterns painted in two new colours of yours, accent and banner, on top of ink, background and backdrop.",
+    "Fellowships wear four colours: field, mark and two accents, in the emblem's ring and detail and the banner's stripes, dots and edges. The recruiting card shows all four.",
+  ] },
   { id: 53, date: "2026-10-06", title: "Herbs you can see, faith weapons in every metal, and meals that lend a hand", items: [
     "Herb patches are drawn like the trees and bushes now: a mound of leaves in the herb's colour on a ring of dark soil, a flower or seed-head on the uncommon ones, mushrooms as a cluster of stems and caps, and a few stalks once picked. Easy to spot in the foliage.",
     "Faith weapons in every metal: a mace (one hand) and a flail (two hands) from pewter to ashenheart, blessed at Dawnhold. They take Faith to wield (the metal's level and 3, or 7 for the flail), hurt the undead more, give Faith XP with every hit, carry a faith bonus, and are smithed at the anvil or bought wherever that metal's swords and war hammers are.",

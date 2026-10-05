@@ -12,9 +12,18 @@ import { titleName } from "./presence.ts";
 
 export const CARD: { readonly width: number; readonly height: number } = { width: 1200, height: 675 };
 const INK = "#161616", PAPER = "#efede7", BUTTER = "#e2d7ad", GOLD = "#e2c46a";
-const FONTS: Record<string, string> = { mono: "ui-monospace, Menlo, Consolas, monospace", serif: "Georgia, 'Times New Roman', serif", sans: "'Trebuchet MS', 'Segoe UI', Helvetica, sans-serif", display: "Impact, 'Arial Black', 'Franklin Gothic Bold', sans-serif" };
-const INKS: Record<string, { dark: string; light: string }> = { ink: { dark: INK, light: PAPER }, navy: { dark: "#1d2a52", light: "#c9d4f2" }, wine: { dark: "#5a1f2e", light: "#efc3cd" }, forest: { dark: "#1f4a2e", light: "#c2e2c7" }, gilt: { dark: "#8a6a10", light: GOLD } };
-const FRAMES: Record<string, string> = { rose: "#d8b6b4", sage: "#b4c3ab", sky: "#9fc6f0", sunset: "#f0a050", dawn: "#f6efd6", hollow: "#3b2d4f", starry: "#1d2a52", renown: "#e2c46a" };
+const FONTS: Record<string, string> = { mono: "ui-monospace, Menlo, Consolas, monospace", serif: "Georgia, 'Times New Roman', serif", sans: "'Trebuchet MS', 'Segoe UI', Helvetica, sans-serif", display: "Impact, 'Arial Black', 'Franklin Gothic Bold', sans-serif",
+  rounded: "Verdana, Geneva, 'DejaVu Sans', sans-serif", slab: "'Courier New', Courier, 'Liberation Mono', monospace", narrow: "'Arial Narrow', 'Liberation Sans Narrow', 'DejaVu Sans Condensed', sans-serif", cursive: "'Brush Script MT', 'Segoe Script', 'URW Chancery L', cursive" };
+const INKS: Record<string, { dark: string; light: string }> = { ink: { dark: INK, light: PAPER }, navy: { dark: "#1d2a52", light: "#c9d4f2" }, wine: { dark: "#5a1f2e", light: "#efc3cd" }, forest: { dark: "#1f4a2e", light: "#c2e2c7" }, gilt: { dark: "#8a6a10", light: GOLD },
+  plum: { dark: "#4a2a5c", light: "#dcc6ea" }, ember: { dark: "#7a3a1e", light: "#f5c9a6" }, teal: { dark: "#1f4a4a", light: "#bfe3e0" }, rose: { dark: "#8a3a4a", light: "#f3c9d2" }, slate: { dark: "#3a3f4a", light: "#d6dbe3" } };
+const FRAMES: Record<string, string> = { rose: "#d8b6b4", sage: "#b4c3ab", sky: "#9fc6f0", sunset: "#f0a050", dawn: "#f6efd6", hollow: "#3b2d4f", starry: "#1d2a52", renown: "#e2c46a",
+  lavender: "#c6bed4", snow: "#eef2f5", gold: "#e2d49e", ember: "#cf6e4a", ocean: "#3f6f8f", forest: "#4f7a4a", slate: "#6d7380", night: "#1a1b2e", plain: "#ffffff" };
+/** Plain backgrounds: a base colour, a faint grid in the ink of the page, and whether the lettering goes light on it. */
+const BG_SIMPLE: Record<string, { base: string; dark: boolean; dots?: string }> = {
+  sage: { base: "#d9e2d2", dark: false }, sky: { base: "#d5e6f5", dark: false }, lavender: { base: "#e2dcec", dark: false }, snow: { base: "#f4f6f8", dark: false, dots: "rgba(255,255,255,0.9)" },
+  slate: { base: "#3f444d", dark: true }, ocean: { base: "#1e3a52", dark: true, dots: "rgba(159,198,240,0.35)" }, forest: { base: "#20382a", dark: true, dots: "rgba(180,210,170,0.3)" },
+  ember: { base: "#4a2418", dark: true, dots: "rgba(240,160,80,0.5)" }, dusk: { base: "#5a3a5c", dark: true }, ink: { base: "#161616", dark: true },
+};
 
 export function shareText(game: Game) {
   const player = game.player, who = player.name ? `${player.name} (#${player.friendId})` : `Rare Friend #${player.friendId}`;
@@ -29,6 +38,8 @@ const dots = (ctx: CanvasRenderingContext2D, count: number, seed: number, color:
 };
 function paintBackground(ctx: CanvasRenderingContext2D, bg: string): boolean {
   const W = CARD.width, H = CARD.height;
+  const simple = BG_SIMPLE[bg];
+  if (simple) { ctx.fillStyle = simple.base; ctx.fillRect(0, 0, W, H); ctx.strokeStyle = simple.dark ? "rgba(255,255,255,0.06)" : "rgba(22,22,22,0.06)"; ctx.lineWidth = 1; for (let x = -H; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + H * 2, H); ctx.stroke(); } if (simple.dots) dots(ctx, 160, 17, simple.dots, 2.5); return simple.dark; }
   switch (bg) {
     case "parchment": ctx.fillStyle = "#e8dcb8"; ctx.fillRect(0, 0, W, H); dots(ctx, 900, 11, "rgba(120,90,40,0.12)", 3); return false;
     case "night": { const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#141830"); g.addColorStop(1, "#2a2140"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); dots(ctx, 260, 5, "rgba(255,255,255,0.8)", 2.5); dots(ctx, 40, 9, GOLD, 3); return true; }
@@ -44,14 +55,17 @@ function paintBackground(ctx: CanvasRenderingContext2D, bg: string): boolean {
       return false;
   }
 }
-function paintFrame(ctx: CanvasRenderingContext2D, frame: string, x: number, y: number, w: number, h: number, fellow?: { logo?: string; banner?: string } | null, colors: [string, string] = DEFAULT_FELLOWSHIP_COLORS) {
+function paintFrame(ctx: CanvasRenderingContext2D, frame: string, x: number, y: number, w: number, h: number, fellow?: { logo?: string; banner?: string } | null, colors: readonly string[] = DEFAULT_FELLOWSHIP_COLORS) {
   ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
   if (frame === "fellowship") { drawBanner(ctx, fellow?.banner ?? "plain", x, y, w, h, colors); ctx.globalAlpha = 0.28; drawEmblem(ctx, fellow?.logo ?? "shield", x + w / 2 - w * 0.36, y + h / 2 - w * 0.36, w * 0.72, colors); ctx.globalAlpha = 1; ctx.restore(); return; }
   ctx.fillStyle = FRAMES[frame] ?? FRAMES.rose; ctx.fillRect(x, y, w, h);
   if (frame === "sunset") { const g = ctx.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, "#f6d27a"); g.addColorStop(0.6, "#f0a050"); g.addColorStop(1, "#7a3b5c"); ctx.fillStyle = g; ctx.fillRect(x, y, w, h); }
   if (frame === "dawn") { ctx.strokeStyle = "rgba(226,196,106,0.55)"; ctx.lineWidth = 8; for (let a = 0; a < 12; a++) { ctx.beginPath(); ctx.moveTo(x + w / 2, y + h * 0.35); ctx.lineTo(x + w / 2 + Math.cos(a / 12 * Math.PI * 2) * w, y + h * 0.35 + Math.sin(a / 12 * Math.PI * 2) * w); ctx.stroke(); } ctx.lineWidth = 1; }
   if (frame === "hollow") { ctx.strokeStyle = "rgba(138,98,200,0.8)"; ctx.lineWidth = 10; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h * 0.45, w * 0.36, w * 0.36, 0, 0, Math.PI * 2); ctx.stroke(); ctx.lineWidth = 1; }
-  if (frame === "starry") dots(ctx, 90, 21, "rgba(255,255,255,0.85)", 3, x, y, w, h);
+  if (frame === "starry" || frame === "night") dots(ctx, 90, 21, "rgba(255,255,255,0.85)", 3, x, y, w, h);
+  if (frame === "snow") dots(ctx, 70, 23, "rgba(255,255,255,0.95)", 4, x, y, w, h);
+  if (frame === "ember") dots(ctx, 60, 27, "#ffd27a", 3, x, y, w, h);
+  if (frame === "ocean") { ctx.strokeStyle = "rgba(255,255,255,0.25)"; ctx.lineWidth = 3; for (let row = 0; row < 6; row++) { ctx.beginPath(); for (let px = x; px <= x + w; px += 24) ctx.quadraticCurveTo(px + 12, y + h * (0.2 + row * 0.14) - 8, px + 24, y + h * (0.2 + row * 0.14)); ctx.stroke(); } }
   if (frame === "renown") { const g = ctx.createRadialGradient(x + w / 2, y + h / 2, 20, x + w / 2, y + h / 2, w * 0.7); g.addColorStop(0, "#fff2c2"); g.addColorStop(1, GOLD); ctx.fillStyle = g; ctx.fillRect(x, y, w, h); }
   ctx.restore();
 }
@@ -62,12 +76,17 @@ export function renderCard(game: Game, friend: GenerationSprites | null, fellows
   let dark = paintBackground(ctx, style.bg);
   if (style.bgColor) { ctx.fillStyle = style.bgColor; ctx.fillRect(0, 0, CARD.width, CARD.height); dark = isDarkColor(style.bgColor); ctx.strokeStyle = dark ? "rgba(255,255,255,0.06)" : "rgba(22,22,22,0.06)"; ctx.lineWidth = 1; for (let x = -CARD.height; x < CARD.width; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + CARD.height * 2, CARD.height); ctx.stroke(); } }
   const inks = INKS[style.ink] ?? INKS.ink, TEXT = style.inkColor ?? (dark ? inks.light : inks.dark), MUTED = style.inkColor ? `${style.inkColor}b3` : dark ? "rgba(239,237,231,0.7)" : "#6d6b67";
-  const fellow = player.fellowship, colors: [string, string] = fellow?.colors ?? DEFAULT_FELLOWSHIP_COLORS;
-  const banner = style.layout === "banner", ledger = style.layout === "ledger", poster = style.layout === "poster";
+  const fellow = player.fellowship, colors: string[] = fellow?.colors ?? DEFAULT_FELLOWSHIP_COLORS;
+  const banner = style.layout === "banner", ledger = style.layout === "ledger", poster = style.layout === "poster", centre = style.layout === "centre";
   // Where things go: the portrait box and the skills block.
-  const portrait = banner ? { x: 48, y: 48, w: 300, h: 300 } : ledger ? { x: 732, y: 48, w: 420, h: 520 } : poster ? { x: 48, y: 48, w: 520, h: 520 } : { x: 48, y: 48, w: 420, h: 520 };
+  const portrait = banner ? { x: 48, y: 48, w: 300, h: 300 } : ledger ? { x: 732, y: 48, w: 420, h: 520 } : poster ? { x: 48, y: 48, w: 520, h: 520 } : centre ? { x: 390, y: 48, w: 420, h: 520 } : { x: 48, y: 48, w: 420, h: 520 };
   const skills = banner ? { x: 48, y: 372, cols: 7, cellW: 158, maxH: 200 } : ledger ? { x: 60, y: 142, cols: 3, cellW: 206, maxH: 340 } : poster ? { x: 610, y: 142, cols: 3, cellW: 180, maxH: 340 } : { x: 530, y: 142, cols: 3, cellW: 206, maxH: 340 };
-  const header = banner ? { x: 380, y: 104 } : ledger ? { x: 60, y: 104 } : poster ? { x: 610, y: 104 } : { x: 530, y: 104 }, bandW = poster ? 540 : 620;
+  const header = banner ? { x: 380, y: 104 } : ledger ? { x: 60, y: 104 } : poster ? { x: 610, y: 104 } : centre ? { x: 48, y: 104 } : { x: 530, y: 104 }, bandW = poster ? 540 : centre ? 320 : 620;
+  if (centre) { skills.x = 48; skills.cols = 2; skills.cellW = 166; skills.maxH = 440; skills.y = 142; }
+  /** Where a skill's cell goes: a plain grid, or (centre) two columns down the left and two down the right. */
+  const cellAt = (index: number, cellH: number) => centre
+    ? (index < 12 ? { x: 48 + (index % 2) * 166, y: 142 + Math.floor(index / 2) * cellH } : { x: 830 + ((index - 12) % 2) * 166, y: 142 + Math.floor((index - 12) / 2) * cellH })
+    : { x: skills.x + (index % skills.cols) * skills.cellW, y: skills.y + Math.floor(index / skills.cols) * cellH };
   // Portrait card.
   ctx.fillStyle = INK; ctx.fillRect(portrait.x + 10, portrait.y + 10, portrait.w, portrait.h); ctx.fillStyle = dark ? "#2a2a30" : "#fff"; ctx.fillRect(portrait.x, portrait.y, portrait.w, portrait.h); ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.strokeRect(portrait.x, portrait.y, portrait.w, portrait.h);
   const inner = banner ? { x: portrait.x + 18, y: portrait.y + 18, w: portrait.w - 36, h: portrait.h - 36 } : { x: portrait.x + 24, y: portrait.y + 24, w: portrait.w - 48, h: 330 };
@@ -114,35 +133,42 @@ export function renderCard(game: Game, friend: GenerationSprites | null, fellows
   ctx.fillText(`Combat ${combatLevel(player)}`, nameX, levelsY); ctx.fillText(`Total ${totalLevel(player)}`, nameX + 190, levelsY);
   // Header band: ADVENTURER over the fellowship's banner (the site's picture if it has one, else the banner it chose), its emblem on the right.
   {
-    const band = banner ? { x: 380, y: 44, w: 770, h: 60 } : { x: header.x, y: header.y - 48, w: bandW, h: 72 }, hasBand = !!fellow;
+    const band = banner ? { x: 380, y: 44, w: 770, h: 60 } : { x: header.x, y: header.y - 48, w: bandW, h: 72 };
+    // The band: the fellowship's banner (auto, or asked for) or the player's own pattern in the player's banner and accent colours.
+    const choice = style.banner === "auto" ? (fellow ? "fellowship" : "none") : style.banner, mine = choice !== "none" && choice !== "fellowship" ? choice : null;
+    const own = [style.bannerColor ?? "#2a2a30", style.accentColor ?? GOLD, style.frameColor ?? style.accentColor ?? GOLD, style.inkColor ?? "#efede7"];
+    const hasBand = (choice === "fellowship" && !!fellow) || !!mine;
     if (hasBand) {
-      if (fellowship?.bg) {
+      if (choice === "fellowship" && fellowship?.bg) {
         ctx.save(); ctx.beginPath(); ctx.rect(band.x, band.y, band.w, band.h); ctx.clip(); ctx.imageSmoothingEnabled = true;
         const img = fellowship.bg, scale = Math.max(band.w / img.width, band.h / img.height);
         ctx.drawImage(img, band.x + (band.w - img.width * scale) / 2, band.y + (band.h - img.height * scale) / 2, img.width * scale, img.height * scale); ctx.restore();
-      } else drawBanner(ctx, fellow.banner ?? "plain", band.x, band.y, band.w, band.h, colors);
+      } else drawBanner(ctx, mine ?? fellow?.banner ?? "plain", band.x, band.y, band.w, band.h, mine ? own : colors);
       ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.strokeRect(band.x, band.y, band.w, band.h);
       const logoBox = band.h - 8;
-      if (fellowship?.logo) { ctx.imageSmoothingEnabled = true; ctx.fillStyle = "#fff"; ctx.fillRect(band.x + band.w - logoBox - 6, band.y + 4, logoBox, logoBox); ctx.drawImage(fellowship.logo, band.x + band.w - logoBox - 4, band.y + 6, logoBox - 4, logoBox - 4); ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.strokeRect(band.x + band.w - logoBox - 6, band.y + 4, logoBox, logoBox); }
-      else drawEmblem(ctx, fellow.logo ?? "shield", band.x + band.w - logoBox - 6, band.y + 4, logoBox, colors);
+      if (choice === "fellowship" && fellow) {
+        if (fellowship?.logo) { ctx.imageSmoothingEnabled = true; ctx.fillStyle = "#fff"; ctx.fillRect(band.x + band.w - logoBox - 6, band.y + 4, logoBox, logoBox); ctx.drawImage(fellowship.logo, band.x + band.w - logoBox - 4, band.y + 6, logoBox - 4, logoBox - 4); ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.strokeRect(band.x + band.w - logoBox - 6, band.y + 4, logoBox, logoBox); }
+        else drawEmblem(ctx, fellow.logo ?? "shield", band.x + band.w - logoBox - 6, band.y + 4, logoBox, colors);
+      }
     }
     if (!banner) {
-      ctx.font = `bold 40px ${FONT}`; ctx.fillStyle = hasBand ? "#fff" : TEXT;
+      ctx.font = `bold ${centre ? 28 : 40}px ${FONT}`; ctx.fillStyle = hasBand ? "#fff" : TEXT;
       if (hasBand) { ctx.strokeStyle = INK; ctx.lineWidth = 6; ctx.strokeText("ADVENTURER", header.x + 12, header.y); }
       ctx.fillText("ADVENTURER", header.x + (hasBand ? 12 : 0), header.y);
-      ctx.fillStyle = style.ink === "gilt" || dark ? GOLD : BUTTER; ctx.fillRect(header.x, header.y + 16, bandW, 8);
-    } else if (hasBand) {
+      ctx.fillStyle = style.accentColor ?? (style.ink === "gilt" || dark ? GOLD : BUTTER); ctx.fillRect(header.x, header.y + 16, bandW, 8);
+    } else if (hasBand && choice === "fellowship" && fellow) {
       ctx.font = `bold 30px ${FONT}`; ctx.fillStyle = "#fff"; ctx.strokeStyle = INK; ctx.lineWidth = 5; ctx.strokeText(`${fellow.name} [${fellow.tag}]`, band.x + 14, band.y + 41); ctx.fillText(`${fellow.name} [${fellow.tag}]`, band.x + 14, band.y + 41);
     }
   }
   // Skills grid, sized so the quest line always sits below the last row.
-  const rows = Math.ceil(SKILLS.length / skills.cols), cellH = Math.min(58, Math.floor(skills.maxH / rows)), box = cellH - 8;
+  const rows = centre ? 6 : Math.ceil(SKILLS.length / skills.cols), cellH = Math.min(58, Math.floor(skills.maxH / rows)), box = cellH - 8;
   SKILLS.forEach((skill: Skill, index) => {
-    const x = skills.x + (index % skills.cols) * skills.cellW, y = skills.y + Math.floor(index / skills.cols) * cellH, level = levelForXp(player.xp[skill]), w = skills.cellW - 12;
+    const { x, y } = cellAt(index, cellH), level = levelForXp(player.xp[skill]), w = skills.cellW - 12;
     const fill = style.skills === "dark" ? (level >= 99 ? "#3a3220" : INK) : style.skills === "gilded" ? (level >= 99 ? GOLD : "#fff6d6") : level >= 99 ? BUTTER : level >= 10 ? (dark ? "rgba(255,255,255,0.9)" : "#fff") : (dark ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.55)");
-    ctx.fillStyle = fill; ctx.strokeStyle = style.skills === "gilded" ? "#8a6a10" : INK; ctx.lineWidth = 2;
-    if (style.skills === "pills") { ctx.beginPath(); ctx.roundRect(x, y, w, box, box / 2); ctx.fill(); ctx.stroke(); } else { ctx.fillRect(x, y, w, box); ctx.strokeRect(x, y, w, box); }
-    const text = style.skills === "dark" ? PAPER : INK;
+    ctx.fillStyle = style.skills === "outline" ? "rgba(0,0,0,0)" : style.skills === "stripes" ? (index % 2 ? (dark ? "rgba(255,255,255,0.75)" : "#fff") : (dark ? "rgba(255,255,255,0.45)" : "#eae7df")) : style.skills === "soft" ? (dark ? "rgba(255,255,255,0.85)" : "#f7f5f0") : fill;
+    ctx.strokeStyle = style.skills === "gilded" ? "#8a6a10" : style.skills === "outline" ? TEXT : style.skills === "soft" ? "rgba(22,22,22,0.25)" : INK; ctx.lineWidth = style.skills === "soft" ? 1 : 2;
+    if (style.skills === "pills" || style.skills === "soft") { ctx.beginPath(); ctx.roundRect(x, y, w, box, style.skills === "pills" ? box / 2 : 8); ctx.fill(); ctx.stroke(); } else { ctx.fillRect(x, y, w, box); ctx.strokeRect(x, y, w, box); }
+    const text = style.skills === "dark" ? PAPER : style.skills === "outline" ? TEXT : INK;
     ctx.fillStyle = text; ctx.font = `${skills.cols === 7 ? 13 : 16}px ${FONT}`; ctx.textBaseline = "middle"; ctx.fillText(SKILL_NAMES[skill], x + (style.skills === "pills" ? 16 : 10), y + box / 2 + 1);
     ctx.font = `bold ${skills.cols === 7 ? 18 : 21}px ${FONT}`; ctx.textAlign = "right"; ctx.fillText(String(level), x + w - (style.skills === "pills" ? 16 : 12), y + box / 2 + 1); ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
   });
@@ -151,7 +177,9 @@ export function renderCard(game: Game, friend: GenerationSprites | null, fellows
   ctx.font = `18px ${FONT}`; ctx.fillStyle = MUTED;
   const line2 = `${player.kills.toLocaleString()} monster${player.kills === 1 ? "" : "s"} defeated · ${player.wardrobe.length}/${WARDROBE.length} wardrobe pieces`;
   const line3 = `🏆 ${achieved(game)}/${ACHIEVEMENTS.length} achievements · ${player.pets.length} pet${player.pets.length === 1 ? "" : "s"} · ${player.stats.duelsWon ?? 0} duel win${(player.stats.duelsWon ?? 0) === 1 ? "" : "s"} · Presence ${levelForXp(player.xp.presence)}`;
-  if (banner) { ctx.fillText(`${line2} · ${line3}`, skills.x + 300, below); } else { ctx.fillText(line2, skills.x, below + 30); ctx.fillText(line3, skills.x, below + 58); }
+  if (banner) { ctx.fillText(`${line2} · ${line3}`, skills.x + 300, below); }
+  else if (centre) { ctx.font = `16px ${FONT}`; [`${player.kills.toLocaleString()} monster${player.kills === 1 ? "" : "s"} defeated`, `${player.wardrobe.length}/${WARDROBE.length} wardrobe pieces`, `🏆 ${achieved(game)}/${ACHIEVEMENTS.length} achievements · ${player.pets.length} pet${player.pets.length === 1 ? "" : "s"}`, `${player.stats.duelsWon ?? 0} duel win${(player.stats.duelsWon ?? 0) === 1 ? "" : "s"} · Presence ${levelForXp(player.xp.presence)}`].forEach((line, i) => ctx.fillText(line, 830, below - 6 + i * 20)); }
+  else { ctx.fillText(line2, skills.x, below + 30); ctx.fillText(line3, skills.x, below + 58); }
   // Footer.
   ctx.fillStyle = INK; ctx.fillRect(0, CARD.height - 72, CARD.width, 72);
   ctx.fillStyle = PAPER; ctx.font = `bold 26px ${FONT}`; ctx.fillText("⚔ RareFriends Realm", 40, CARD.height - 26);
@@ -171,7 +199,7 @@ export function recruitText(game: Game, now = Date.now()) {
 /** The fellowship's recruitment card: its banner, emblem, colours, name, tag, numbers and the join link. */
 export function renderFellowshipCard(game: Game, art: FellowshipArt | null = null, now = Date.now()): HTMLCanvasElement {
   const canvas = document.createElement("canvas"); canvas.width = CARD.width; canvas.height = CARD.height;
-  const ctx = canvas.getContext("2d")!, fellow = game.player.fellowship, colors: [string, string] = fellow?.colors ?? DEFAULT_FELLOWSHIP_COLORS, FONT = FONTS.mono;
+  const ctx = canvas.getContext("2d")!, fellow = game.player.fellowship, colors: string[] = fellow?.colors ?? DEFAULT_FELLOWSHIP_COLORS, FONT = FONTS.mono;
   if (!fellow) return canvas;
   const [field, mark] = colors, dark = isDarkColor(field), TEXT = dark ? "#efede7" : "#161616";
   ctx.fillStyle = field; ctx.fillRect(0, 0, CARD.width, CARD.height);
@@ -191,8 +219,8 @@ export function renderFellowshipCard(game: Game, art: FellowshipArt | null = nul
   ctx.fillText(`${known} fellow${known === 1 ? "" : "s"} and counting`, 410, 345); ctx.fillText(days ? `Founded ${days} day${days === 1 ? "" : "s"} ago` : "Founded today", 410, 385);
   ctx.fillText("Party up: +10% XP together", 410, 425);
   // Colours.
-  ctx.fillStyle = field; ctx.fillRect(410, 455, 44, 44); ctx.fillStyle = mark; ctx.fillRect(464, 455, 44, 44); ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.strokeRect(410, 455, 44, 44); ctx.strokeRect(464, 455, 44, 44);
-  ctx.fillStyle = TEXT; ctx.font = `22px ${FONT}`; ctx.fillText("Our colours", 522, 485);
+  colors.forEach((swatch, index) => { ctx.fillStyle = swatch; ctx.fillRect(410 + index * 54, 455, 44, 44); ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.strokeRect(410 + index * 54, 455, 44, 44); });
+  ctx.fillStyle = TEXT; ctx.font = `22px ${FONT}`; ctx.fillText("Our colours", 410 + colors.length * 54 + 14, 485);
   // The join link, good for a day.
   ctx.fillStyle = "#efede7"; ctx.fillRect(60, 520, 1080, 56); ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.strokeRect(60, 520, 1080, 56);
   ctx.fillStyle = INK; ctx.font = `bold 24px ${FONT}`; ctx.fillText("Tap the link in the post to join · good for 24 hours", 80, 557);

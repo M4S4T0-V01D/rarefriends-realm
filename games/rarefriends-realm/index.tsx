@@ -1052,11 +1052,11 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
                   </div>))}
                 <div className="realm-graphics realm-card-row" aria-label="Custom colours">
                   <span>Your colours:</span>
-                  {CARD_COLOR_KEYS.map(key => <label key={key} className="realm-color">{CARD_COLOR_NAMES[key].replace(" colour", "")} <input type="color" value={player.card[key] ?? (key === "bgColor" ? "#efede7" : key === "frameColor" ? "#d8b6b4" : "#161616")} aria-label={CARD_COLOR_NAMES[key]}
+                  {CARD_COLOR_KEYS.map(key => <label key={key} className="realm-color">{CARD_COLOR_NAMES[key].replace(" colour", "")} <input type="color" value={player.card[key] ?? ({ bgColor: "#efede7", frameColor: "#d8b6b4", accentColor: "#e2c46a", bannerColor: "#2a2a30", inkColor: "#161616" } as Record<string, string>)[key]} aria-label={CARD_COLOR_NAMES[key]}
                     onChange={event => { player.card[key] = event.target.value; drawCard(state); refresh(); }} /></label>)}
                   <button type="button" className="realm-dark" disabled={!CARD_COLOR_KEYS.some(key => player.card[key])} onClick={() => { for (const key of CARD_COLOR_KEYS) delete player.card[key]; drawCard(state); refresh(); }}>Use the presets</button>
                 </div>
-                <p className="realm-muted">Most styles are free; the locked ones open with Presence, quests and achievements (hover one to see). Your own colours override the ink, background and backdrop presets. Fellowship logos and backgrounds come from the site's fellowships folder: see preview/fellowships/README on the site.</p>
+                <p className="realm-muted">Every style is free: the card is yours. Your own colours override the ink, background and backdrop presets; the accent and banner colours paint your own header banner. Fellowship logos and backgrounds come from the site's fellowships folder: see preview/fellowships/README on the site.</p>
               </div>
               <p className="realm-note">Post text: “{shareText(state)}”</p>
             </Modal>

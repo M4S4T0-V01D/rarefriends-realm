@@ -922,7 +922,8 @@ export function FellowshipModal({ game, refresh, onRecruit, shareStatus }: { gam
   useEffect(() => { if (game.ui.fellowship && game.player.fellowship) { try { setPreview(renderFellowshipCard(game).toDataURL("image/png")); } catch { setPreview(null); } } }, [game, game.ui.fellowship, game.player.fellowship]);
   if (!game.ui.fellowship || !fellowship) return null;
   const close = () => { game.ui.fellowship = false; refresh(); };
-  const colors: [string, string] = fellowship.colors ?? DEFAULT_FELLOWSHIP_COLORS, set = (look: { logo?: string; banner?: string; colors?: [string, string] }) => { setFellowshipLook(game, look); refresh(); };
+  const colors: string[] = [...(fellowship.colors ?? DEFAULT_FELLOWSHIP_COLORS)]; while (colors.length < 4) colors.push(DEFAULT_FELLOWSHIP_COLORS[colors.length]);
+  const set = (look: { logo?: string; banner?: string; colors?: string[] }) => { setFellowshipLook(game, look); refresh(); }, setColor = (index: number, value: string) => { const next = [...colors]; next[index] = value; set({ colors: next }); };
   return (
     <Modal title={`${fellowship.name} [${fellowship.tag}]`} onClose={close} wide>
       <p className="realm-muted">The tag is what the Realm knows your fellowship by and never changes. Everything else here is yours to set: it shows on your adventurer card and on anyone's who wears the same look. The site's fellowships folder can hold a drawn logo and banner instead (preview/fellowships/{fellowship.tag}/).</p>
@@ -933,8 +934,7 @@ export function FellowshipModal({ game, refresh, onRecruit, shareStatus }: { gam
       </div>
       <h3>Colours</h3>
       <div className="realm-graphics realm-card-row">
-        <label className="realm-color">Field <input type="color" value={colors[0]} onChange={event => set({ colors: [event.target.value, colors[1]] })} aria-label="Fellowship field colour" /></label>
-        <label className="realm-color">Mark <input type="color" value={colors[1]} onChange={event => set({ colors: [colors[0], event.target.value] })} aria-label="Fellowship mark colour" /></label>
+        {(["Field", "Mark", "Accent", "Accent 2"] as const).map((label, index) => <label key={label} className="realm-color">{label} <input type="color" value={colors[index]} onChange={event => setColor(index, event.target.value)} aria-label={`Fellowship ${label.toLowerCase()} colour`} /></label>)}
         <button type="button" className="realm-dark" onClick={() => set({ colors: DEFAULT_FELLOWSHIP_COLORS })}>Default colours</button>
       </div>
       <h3>Emblem</h3>

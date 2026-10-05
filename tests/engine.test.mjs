@@ -2045,9 +2045,9 @@ test("Townsfolk bodies, the worn ossuary bag, and the adventurer card's styles",
   setTarget(g, { kind: "object", id: altar.id, option: "Pray-at" }); until(g, () => bagBones(p) === 0, 40); assert.equal(bagBones(p), 0, "praying offers the worn bag"); assert(p.xp.prayer > faith);
   // Card styles: locked until earned, cleaned on load, saved.
   assert.deepEqual(cardStyle(g), DEFAULT_CARD);
-  const night = CARD_OPTIONS.bg.find(option => option.id === "night"); assert(!cardUnlocked(g, night)); p.card.bg = "night"; assert.equal(cardStyle(g).bg, "paper", "a locked pick falls back");
-  p.xp.presence = XP_TABLE[20]; assert(cardUnlocked(g, night)); assert.equal(cardStyle(g).bg, "night");
-  p.card.frame = "dawn"; assert.equal(cardStyle(g).frame, "rose"); p.quests.dawn_vigil = 2; assert.equal(cardStyle(g).frame, "dawn");
+  for (const [category, options] of Object.entries(CARD_OPTIONS)) for (const option of options) assert(cardUnlocked(g, option), `${category} ${option.id} is free`);
+  p.card.bg = "night"; assert.equal(cardStyle(g).bg, "night"); p.card.frame = "dawn"; assert.equal(cardStyle(g).frame, "dawn"); p.card.banner = "zigzag"; assert.equal(cardStyle(g).banner, "zigzag");
+  assert(CARD_OPTIONS.bg.length >= 18 && CARD_OPTIONS.frame.length >= 18 && CARD_OPTIONS.banner.length >= 19 && CARD_OPTIONS.layout.some(option => option.id === "centre"));
   assert.deepEqual(cleanCard({ bg: "night", frame: "nope", layout: "banner", extra: 1 }), { ...DEFAULT_CARD, bg: "night", layout: "banner" });
   const save = JSON.parse(JSON.stringify(serialize(g))), fresh = newGame(); assert(restore(fresh, save)); assert.equal(fresh.player.card.bg, "night"); assert.equal(fresh.player.equipment.cape, "bone_bag");
 });
@@ -2059,11 +2059,11 @@ test("Fellowship looks and renames, and the card's own colours", async () => {
   assert(joinFellowship(g, "Moonlit Company", "MOON"));
   assert(!renameFellowship(g, "x"), "a bad name is refused"); assert(renameFellowship(g, "The Moonlit")); assert.equal(p.fellowship.name, "The Moonlit"); assert.equal(p.fellowship.tag, "MOON");
   assert.equal(count(p, "coins"), 20000 - 5000 - FELLOWSHIP_RENAME_COST);
-  assert(setFellowshipLook(g, { logo: "skull", banner: "stripes", colors: ["#112233", "#ffeedd"] }));
+  assert(setFellowshipLook(g, { logo: "skull", banner: "stripes", colors: ["#112233", "#ffeedd", "#aabbcc", "#445566"] }));
   p.card.inkColor = "#123456"; p.card.bgColor = "not a colour";
   assert.equal(cardStyle(g).inkColor, "#123456"); assert.equal(cardStyle(g).bgColor, undefined, "only hex colours count");
   const save = JSON.parse(JSON.stringify(serialize(g))), fresh = newGame(); assert(restore(fresh, save));
-  { const { since, seen, ...look } = fresh.player.fellowship; void seen; assert.deepEqual(look, { name: "The Moonlit", tag: "MOON", logo: "skull", banner: "stripes", colors: ["#112233", "#ffeedd"] }, "the look is saved"); assert.equal(since, p.fellowship.since); }
+  { const { since, seen, ...look } = fresh.player.fellowship; void seen; assert.deepEqual(look, { name: "The Moonlit", tag: "MOON", logo: "skull", banner: "stripes", colors: ["#112233", "#ffeedd", "#aabbcc", "#445566"] }, "the look is saved"); assert.equal(since, p.fellowship.since); }
   assert.equal(fresh.player.card.inkColor, "#123456"); assert.equal(fresh.player.card.bgColor, undefined);
   assert.deepEqual(cleanFellowshipLook({ name: "A B", tag: "AB" }, { logo: "nope", banner: "stars", colors: ["#fff", "#000000"] }), { name: "A B", tag: "AB", banner: "stars" }, "odd looks are dropped");
   assert.equal(cleanCard({ frameColor: "#ABCDEF" }).frameColor, "#abcdef");

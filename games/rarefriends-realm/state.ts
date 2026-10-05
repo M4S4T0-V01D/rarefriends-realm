@@ -189,7 +189,7 @@ export type Pet = { x: number; y: number; prev: Point; heading: Point; moved: nu
 /** Your home on Homestead Row: its size, its looks, and what's in it (slot id → furnishing id). */
 export type Home = { tier: 1 | 2 | 3; walls: string; floor: string; roof: string; garden: string; furniture: Record<string, string> };
 /** A fellowship as you've declared it: its name and tag, and the look it wears on your cards (an emblem, a banner style, two colours). */
-export type Fellowship = { name: string; tag: string; logo?: string; banner?: string; colors?: [string, string]; /** The UTC day it was founded (as far as you know), and the fellows you have seen online (id → day). */ since?: number; seen?: Record<number, number> };
+export type Fellowship = { name: string; tag: string; logo?: string; banner?: string; /** Field, mark, and two accents (two to four hex colours). */ colors?: string[]; /** The UTC day it was founded (as far as you know), and the fellows you have seen online (id → day). */ since?: number; seen?: Record<number, number> };
 /** A patron's work order for a day: what to bring, how many, what it pays, and whether it's filled. */
 export type WorkOrder = { day: number; item: string; n: number; pay: number; xp: number; done: 0 | 1 };
 export type DialogueLine = { who: "npc" | "player"; text: string; npc?: string };

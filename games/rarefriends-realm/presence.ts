@@ -54,7 +54,7 @@ export function nameFriend(game: Game, raw: string, paid = false): boolean {
   return true;
 }
 /** Found (or join, by declaring) a fellowship: a name and a tag shown under yours. Everyone online wearing the same tag is your fellowship, as far as the Realm can tell. */
-export function joinFellowship(game: Game, rawName: string, rawTag: string, look?: { logo?: string; banner?: string; colors?: [string, string]; since?: number }): boolean {
+export function joinFellowship(game: Game, rawName: string, rawTag: string, look?: { logo?: string; banner?: string; colors?: string[]; since?: number }): boolean {
   const player = game.player, name = cleanName(rawName), tag = cleanTag(rawTag);
   if (!name || !tag) { message(game, "A fellowship needs a name (2–16 characters) and a tag of 2–5 capitals or digits.", "warn"); return false; }
   if (!player.fellowship) {
@@ -78,7 +78,7 @@ export function renameFellowship(game: Game, rawName: string): boolean {
   return true;
 }
 /** The look your fellowship wears on cards: an emblem, a banner style and two colours (free to change). */
-export function setFellowshipLook(game: Game, look: { logo?: string; banner?: string; colors?: [string, string] }) {
+export function setFellowshipLook(game: Game, look: { logo?: string; banner?: string; colors?: string[] }) {
   const player = game.player;
   if (!player.fellowship) return false;
   player.fellowship = { ...player.fellowship, ...look };
