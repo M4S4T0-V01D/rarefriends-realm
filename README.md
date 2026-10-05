@@ -229,7 +229,11 @@ npm run test:browser   # SDK mock-wallet browser runs of the custom host (a two-
                        #    public chat and bubbles, whispers with links stripped, an emote, a dropped item taken,
                        #    a full trade by clicks (offer, accept, confirm), a shared fight on one cow, a referral code, going offline
                        #  • the skill guide (click a skill) and the recipe book; the website's skill guides page
-                       #  • preview page: the main theme and a jukebox track play audibly on desktop and phone
+                       #  • preview page: the main theme and a jukebox track play audibly on desktop and phone; the video
+                       #    carousel (newest update first, the reel of what's next, sound kept from one video to the next)
+                       #    and the picture galleries (every picture in a filmstrip, wrapping round)
+node scripts/preview-backdrops.mjs   # repaint the preview page's parallax backdrops (castle, sky, street, forest, dungeon,
+                                     # torches) from the game's own pixel art into site/preview/media/bg
 ```
 
 The mock wallet exists only in tests. `dev` and public builds always use the real ownership gate.

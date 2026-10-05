@@ -17,29 +17,57 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23161616'/%3E%3Cpath d='M3 13 12 4M10 3h3v3M4 9l3 3M2 14l2-2' fill='none' stroke='%23f2e28f' stroke-width='1.5'/%3E%3C/svg%3E">
 <style>
 :root {
-  color-scheme: light;
-  --ink: #161616; --paper: #efede7; --card: #f7f5f0; --muted: #6d6b67; --line: #cfccc4; --panel: #242322; --gold: #f2e28f;
+  color-scheme: dark;
+  --ink: #161616; --paper: #15161b; --card: #22232a; --muted: #a39f97; --line: #3a3b43; --panel: #1b1c21; --gold: #f2e28f; --text: #e8e5de;
   --rose: #d8b6b4; --sage: #b4c3ab; --butter: #e2d7ad; --blue: #afbccb; --lavender: #c6bed4;
   --mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, Consolas, monospace;
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
-body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.6 var(--mono); overflow-x: hidden;
-  background-image: radial-gradient(rgba(22,22,22,.06) 1px, transparent 1.2px); background-size: 12px 12px; }
+body { margin: 0; background: var(--paper); color: var(--text); font: 15px/1.6 var(--mono); overflow-x: hidden;
+  background-image: radial-gradient(rgba(242,226,143,.05) 1px, transparent 1.2px); background-size: 12px 12px; }
 a { color: inherit; }
 img { max-width: 100%; height: auto; display: block; }
 .wrap { width: min(1160px, 100% - 32px); margin: 0 auto; }
-.btn { display: inline-flex; align-items: center; gap: 10px; padding: 13px 22px; border: 2px solid var(--ink); background: var(--card); color: var(--ink);
-  font: 700 15px var(--mono); text-decoration: none; box-shadow: 4px 4px 0 var(--ink); cursor: pointer; transition: transform .12s, box-shadow .12s; }
-.btn:hover { transform: translate(-1px, -1px); box-shadow: 5px 5px 0 var(--ink); }
-.btn:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--ink); }
+.btn { display: inline-flex; align-items: center; gap: 10px; padding: 13px 22px; border: 2px solid #000; background: var(--card); color: var(--text);
+  font: 700 15px var(--mono); text-decoration: none; box-shadow: 4px 4px 0 #000; cursor: pointer; transition: transform .12s, box-shadow .12s; }
+.btn:hover { transform: translate(-1px, -1px); box-shadow: 5px 5px 0 #000; }
+.btn:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 #000; }
 .btn:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; }
-.btn.primary { background: var(--gold); font-size: 17px; padding: 15px 28px; }
+.btn.primary { background: var(--gold); color: var(--ink); font-size: 17px; padding: 15px 28px; }
+
+/* Bands with the Realm behind them: each section carries its own backdrop layers, painted with the game's own pixel
+   art (scripts/preview-backdrops.mjs), slid at their own pace as you scroll. The castle wall behind the trailer, the
+   night sky and its clouds over what's new, a lamplit street and the forest's edge behind the world, and a torchlit
+   dungeon below. A veil over each keeps the words readable. */
+.band { position: relative; isolation: isolate; overflow: hidden; }
+.band > .bg { position: absolute; left: 0; right: 0; top: -40%; bottom: -40%; z-index: -1; pointer-events: none; image-rendering: pixelated; background-repeat: repeat; will-change: transform; }
+.band > .bg.ground { top: 0; bottom: 0; }
+.band > .bg::after { content: ""; position: absolute; inset: 0; background: var(--veil, rgba(12,13,18,.42)); }
+.band > .bg.ground::after, .band > .bg.clouds::after { background: none; }
+.bg.castle { background: url(media/bg/castle.png) top center / 720px auto repeat-x, url(media/bg/stone.png) center 60px / 144px 216px repeat, #0f1014; --veil: rgba(10,11,16,.5); }
+.bg.sky { background: url(media/bg/stars.png) 0 0 / 512px 512px repeat, url(media/bg/sky.png) 0 0 / 100% 100% no-repeat; --veil: rgba(10,11,16,.2); }
+.bg.clouds { background: url(media/bg/clouds.png) 0 0 / 1536px auto repeat; opacity: .8; animation: drift 180s linear infinite; }
+.bg.town { background: url(media/bg/town.png) bottom center / 1920px auto repeat-x; }
+.bg.forest { background: url(media/bg/forest.png) bottom center / 1920px auto repeat-x; }
+.bg.dungeon { background: url(media/bg/dungeon.png) center top / 960px 576px repeat, #141317; --veil: rgba(8,8,12,.45); }
+.bg.floor { background: url(media/bg/dungeon-floor.png) bottom center / 960px auto repeat-x; }
+.bg.deep { background: url(media/bg/stars.png) 0 0 / 512px 512px repeat, #0c0d12; --veil: rgba(0,0,0,.2); }
+@keyframes drift { to { background-position-x: 1536px; } }
+/* Torches on the walls: the game's own fire, eight frames on a bracket, and the glow it throws. */
+.torch { position: absolute; width: 54px; height: 126px; margin-left: -27px; }
+.torch::before { content: ""; position: absolute; left: 0; top: 0; width: 54px; height: 120px; background: url(media/bg/fire.png) 0 0 / 432px 120px no-repeat; animation: burn .72s steps(8) infinite; }
+.torch::after { content: ""; position: absolute; left: 0; top: 72px; width: 54px; height: 48px; background: url(media/bg/bracket.png) 0 0 / 54px 48px no-repeat; }
+.torch i { position: absolute; left: -133px; top: -112px; width: 320px; height: 320px; border-radius: 50%; background: radial-gradient(circle, rgba(255,176,64,.30), rgba(255,120,40,.10) 42%, transparent 70%); animation: flicker 1.1s ease-in-out infinite alternate; }
+.torch.small { transform: scale(.66); }
+@keyframes burn { to { background-position-x: -432px; } }
+@keyframes flicker { from { opacity: .7; transform: scale(.95); } to { opacity: 1; transform: scale(1.05); } }
+@media (prefers-reduced-motion: reduce) { .bg.clouds, .torch::before, .torch i { animation: none; } }
+@media (max-width: 640px) { .bg.castle { background-size: 480px auto, 96px 144px; background-position: top center, center 40px; } .bg.town, .bg.forest, .bg.floor { background-size: 1280px auto; } .bg.dungeon { background-size: 640px 384px; } .torch { transform: scale(.66); } }
 .tag { display: inline-block; padding: 3px 10px; border: 1.5px solid currentColor; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
 
 /* Dark hero, like the title screen. */
-.top { background: var(--ink); color: var(--paper); border-bottom: 3px solid var(--ink);
-  background-image: radial-gradient(rgba(242,226,143,.07) 1px, transparent 1.3px); background-size: 14px 14px; }
+.top { color: var(--text); border-bottom: 3px solid #000; }
 .bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 0; }
 .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; text-decoration: none; }
 .logo i { width: 34px; height: 34px; border: 2px solid var(--gold); color: var(--gold); display: grid; place-items: center; font-style: normal; }
@@ -62,11 +90,31 @@ img { max-width: 100%; height: auto; display: block; }
 .trailer .sound { position: absolute; left: 16px; bottom: 16px; z-index: 1; box-shadow: 4px 4px 0 #000; border-color: #000; }
 .trailer .sound[hidden] { display: none; }
 .trailer p { margin: 12px 0 0; color: #a8a39c; font-size: 13px; }
-@media (max-width: 640px) { .trailer { padding-top: 12px; } .trailer .sound { left: 8px; bottom: 8px; padding: 5px 9px; font-size: 12px; box-shadow: 2px 2px 0 #000; } .trailer .frame { box-shadow: 6px 6px 0 #000; } }
+.trailer p b { color: var(--paper); }
+.trailer .count { color: var(--gold); margin-right: 8px; letter-spacing: .08em; }
+.arrow { position: absolute; top: 50%; transform: translateY(-50%); z-index: 1; width: 42px; height: 54px; border: 2px solid #000; background: rgba(239,237,231,.92); color: var(--ink);
+  font: 700 28px/1 var(--mono); cursor: pointer; box-shadow: 4px 4px 0 #000; opacity: .85; transition: opacity .12s; }
+.arrow:hover { opacity: 1; }
+.arrow:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+.arrow.prev { left: 14px; } .arrow.next { right: 14px; }
+/* The reel: what plays next, newest first, wrapping round to the start. */
+.reel { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
+.reel button { all: unset; display: block; position: relative; cursor: pointer; border: 2px solid #000; background: #000; box-shadow: 4px 4px 0 #000; transition: transform .12s, box-shadow .12s; }
+.reel button:hover { transform: translate(-1px, -1px); box-shadow: 5px 5px 0 #000; }
+.reel button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+.reel img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; opacity: .82; transition: opacity .12s; }
+.reel button:hover img, .reel button:first-child img { opacity: 1; }
+.reel button:first-child { border-color: var(--gold); }
+.reel .meta { position: absolute; left: 0; right: 0; bottom: 0; padding: 6px 9px; background: linear-gradient(transparent, rgba(0,0,0,.85) 40%); color: #e8e5de; font-size: 11px; line-height: 1.3; }
+.reel .meta b { display: block; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.reel .meta i { font-style: normal; color: var(--gold); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+@media (max-width: 900px) { .reel { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; padding: 2px 6px 8px 2px; scrollbar-width: thin; } .reel button { flex: 0 0 44%; scroll-snap-align: start; } }
+@media (max-width: 640px) { .trailer { padding-top: 12px; } .trailer .sound { left: 8px; bottom: 8px; padding: 5px 9px; font-size: 12px; box-shadow: 2px 2px 0 #000; } .trailer .frame { box-shadow: 6px 6px 0 #000; }
+  .arrow { width: 32px; height: 42px; font-size: 22px; box-shadow: 2px 2px 0 #000; } .arrow.prev { left: 8px; } .arrow.next { right: 8px; } .reel button { flex-basis: 60%; } }
 .screen figcaption { position: absolute; left: -3px; bottom: -34px; font-size: 12px; color: #a8a39c; }
 
 /* Stats ribbon */
-.ribbon { border-block: 3px solid var(--ink); background: var(--gold); }
+.ribbon { border-block: 3px solid #000; background: var(--gold); color: var(--ink); }
 .ribbon ul { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px 28px; list-style: none; margin: 0 auto; padding: 14px 0; font-weight: 800; letter-spacing: .04em; }
 .ribbon b { font-size: 26px; margin-right: 6px; }
 
@@ -74,36 +122,49 @@ section { padding: 70px 0; }
 h2 { font-size: clamp(26px, 3.8vw, 40px); margin: 10px 0 12px; letter-spacing: -.01em; }
 .sub { color: var(--muted); max-width: 680px; margin: 0 0 30px; }
 .features { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
-.feature { background: var(--card); border: 2px solid var(--ink); padding: 20px; box-shadow: 4px 4px 0 var(--ink); position: relative; }
-.feature::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 7px; background: var(--accent, var(--rose)); border-right: 2px solid var(--ink); }
+.feature { background: rgba(30,31,38,.92); border: 2px solid #000; padding: 20px; box-shadow: 4px 4px 0 #000; position: relative; }
+.feature::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 7px; background: var(--accent, var(--rose)); border-right: 2px solid #000; }
 .feature h3 { margin: 0 0 8px 8px; font-size: 16px; }
-.feature p { margin: 0 0 0 8px; font-size: 13.5px; color: #3a3936; }
-.feature b.icon { display: inline-grid; place-items: center; width: 32px; height: 32px; margin: 0 0 10px 8px; border: 1.5px solid var(--ink); background: #fff; font-size: 16px; }
+.feature p { margin: 0 0 0 8px; font-size: 13.5px; color: #cfccc4; }
+.feature b.icon { display: inline-grid; place-items: center; width: 32px; height: 32px; margin: 0 0 10px 8px; border: 1.5px solid #000; background: #2c2d35; font-size: 16px; }
 
 /* Region gallery */
 .regions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
-.region { margin: 0; background: #fff; border: 2px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); }
-.region img { border-bottom: 2px solid var(--ink); aspect-ratio: 16 / 9; object-fit: cover; }
+.region { margin: 0; background: var(--card); border: 2px solid #000; box-shadow: 4px 4px 0 #000; }
+.region img { border-bottom: 2px solid #000; aspect-ratio: 16 / 9; object-fit: cover; }
 .region figcaption { padding: 10px 12px; font-size: 13px; }
 .region figcaption b { display: block; font-size: 15px; }
 .region.big { grid-column: span 2; grid-row: span 2; }
 .region.big img { aspect-ratio: auto; }
-.loops { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; margin: 0 0 22px; }
-.loops figure { margin: 0; background: #fff; border: 2px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); }
-.loops video { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-bottom: 2px solid var(--ink); background: #111; }
-.loops figcaption { padding: 10px 12px; font-size: 13px; }
-.loops figcaption b { display: block; font-size: 15px; }
+/* Picture galleries: a figure grid becomes a stage with a filmstrip of every picture under it (newest first), turning
+   on its own and wrapping round. Without scripting the grid stays as it is. */
+.gallery { background: var(--card); border: 2px solid #000; box-shadow: 6px 6px 0 #000; }
+.gallery .stage { position: relative; background: #111; }
+.gallery .stage img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: contain; background: #111; }
+.gallery .stage .count { position: absolute; top: 10px; right: 12px; padding: 3px 9px; background: rgba(0,0,0,.72); color: var(--gold); font-size: 12px; letter-spacing: .08em; }
+.gallery .stage .arrow { opacity: .6; }
+.gallery .stage:hover .arrow, .gallery .stage .arrow:focus-visible { opacity: 1; }
+.gallery figcaption { padding: 12px 14px; font-size: 13px; border-top: 2px solid #000; min-height: 66px; color: #cfccc4; }
+.gallery figcaption b { color: var(--text); }
+.gallery figcaption b { display: block; font-size: 15px; }
+.gallery .strip { display: flex; gap: 8px; overflow-x: auto; padding: 10px; border-top: 2px solid #000; background: #191a1f; scrollbar-width: thin; scroll-snap-type: x proximity; }
+.gallery .strip button { all: unset; flex: 0 0 128px; cursor: pointer; border: 2px solid var(--line); background: #111; opacity: .72; scroll-snap-align: center; transition: opacity .12s, border-color .12s; }
+.gallery .strip button:hover { opacity: 1; }
+.gallery .strip button[aria-current="true"] { border-color: var(--gold); opacity: 1; box-shadow: 0 0 0 1px #000; }
+.gallery .strip button:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.gallery .strip img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+@media (max-width: 640px) { .gallery .strip button { flex-basis: 96px; } .gallery figcaption { min-height: 0; } }
 
 /* Dark band: skills and quests */
-.dark { background: var(--panel); color: #e8e5de; border-block: 3px solid var(--ink); }
+.dark { color: var(--text); border-block: 3px solid #000; }
 .dark .sub { color: #a8a39c; }
 .cols { display: grid; grid-template-columns: 1.2fr 1fr; gap: 36px; align-items: start; }
 .skills { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; list-style: none; padding: 0; margin: 0; }
-.skills li { display: flex; gap: 10px; align-items: center; padding: 9px 10px; background: #2f2d2b; border: 1.5px solid #000; border-radius: 3px; font-size: 13px; }
+.skills li { display: flex; gap: 10px; align-items: center; padding: 9px 10px; background: rgba(42,41,45,.9); border: 1.5px solid #000; border-radius: 3px; font-size: 13px; }
 .skills li i { font-style: normal; width: 22px; text-align: center; filter: grayscale(1) brightness(1.6); }
 .skills li b { color: var(--gold); }
 .quests { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; counter-reset: q; }
-.quests li { counter-increment: q; padding: 10px 12px 10px 46px; position: relative; background: #2f2d2b; border: 1.5px solid #000; border-radius: 3px; font-size: 13px; }
+.quests li { counter-increment: q; padding: 10px 12px 10px 46px; position: relative; background: rgba(42,41,45,.9); border: 1.5px solid #000; border-radius: 3px; font-size: 13px; }
 .quests li::before { content: counter(q); position: absolute; left: 10px; top: 10px; width: 24px; height: 24px; display: grid; place-items: center; border: 1.5px solid var(--gold); color: var(--gold); font-weight: 800; }
 .quests li b { color: var(--gold); display: block; font-size: 14px; }
 .shots { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 26px; }
@@ -111,22 +172,22 @@ h2 { font-size: clamp(26px, 3.8vw, 40px); margin: 10px 0 12px; letter-spacing: -
 
 /* Jukebox */
 .jukebox { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; list-style: none; padding: 0; margin: 0; }
-.jukebox button { width: 100%; display: grid; gap: 2px; text-align: left; padding: 12px 14px; border: 2px solid var(--ink); background: var(--card); box-shadow: 3px 3px 0 var(--ink); font: inherit; cursor: pointer; }
+.jukebox button { width: 100%; display: grid; gap: 2px; text-align: left; padding: 12px 14px; border: 2px solid #000; background: var(--card); color: var(--text); box-shadow: 3px 3px 0 #000; font: inherit; cursor: pointer; }
 .jukebox button small { color: var(--muted); font-size: 11px; }
 .jukebox button b { font-size: 14px; }
-.jukebox button[aria-pressed="true"] { background: var(--ink); color: var(--gold); }
+.jukebox button[aria-pressed="true"] { background: #000; color: var(--gold); }
 .jukebox button[aria-pressed="true"] small { color: #d6d3cc; }
 .jukebox button:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 .now { margin: 16px 0 0; font-size: 13px; color: var(--muted); }
 
 /* Economy */
-table { width: 100%; border-collapse: collapse; background: var(--card); border: 2px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); font-size: 13px; }
+table { width: 100%; border-collapse: collapse; background: rgba(34,35,42,.94); border: 2px solid #000; box-shadow: 4px 4px 0 #000; font-size: 13px; }
 th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
-th { background: #fff; border-bottom: 2px solid var(--ink); }
-.sim { display: inline-block; margin: 0 0 18px; padding: 6px 12px; background: var(--butter); border: 1.5px dashed var(--ink); font-size: 13px; }
+th { background: #2a2b33; border-bottom: 2px solid #000; }
+.sim { display: inline-block; margin: 0 0 18px; padding: 6px 12px; background: #2a2614; color: var(--gold); border: 1.5px dashed var(--gold); font-size: 13px; }
 .two { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
-.two img { border: 2px solid var(--ink); box-shadow: 6px 6px 0 var(--ink); }
-.play { text-align: center; background: var(--ink); color: var(--paper); border-top: 3px solid var(--ink); }
+.two img { border: 2px solid #000; box-shadow: 6px 6px 0 #000; }
+.play { text-align: center; color: var(--text); border-top: 3px solid #000; }
 .play h2 { color: var(--gold); }
 .play p { color: #d6d3cc; max-width: 640px; margin: 0 auto 26px; }
 .play .btn { box-shadow: 4px 4px 0 #000; }
@@ -134,19 +195,19 @@ footer { padding: 28px 0 40px; font-size: 12px; color: var(--muted); }
 footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
 
 /* Floating theme button */
-#music { position: fixed; right: 18px; bottom: 18px; z-index: 60; display: flex; align-items: center; gap: 10px; padding: 10px 16px 10px 10px; border: 2px solid var(--ink);
-  background: var(--card); box-shadow: 4px 4px 0 var(--ink); font: 700 13px var(--mono); cursor: pointer; }
-#music .disc { width: 30px; height: 30px; border-radius: 50%; background: radial-gradient(circle, var(--gold) 0 18%, var(--ink) 20% 100%); border: 2px solid var(--ink); }
+#music { position: fixed; right: 18px; bottom: 18px; z-index: 60; display: flex; align-items: center; gap: 10px; padding: 10px 16px 10px 10px; border: 2px solid #000;
+  background: var(--card); color: var(--text); box-shadow: 4px 4px 0 #000; font: 700 13px var(--mono); cursor: pointer; }
+#music .disc { width: 30px; height: 30px; border-radius: 50%; background: radial-gradient(circle, var(--gold) 0 18%, #000 20% 100%); border: 2px solid #000; }
 #music.on .disc { animation: spin 2.4s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (max-width: 900px) {
   .hero, .cols, .two { grid-template-columns: 1fr; }
-  .features, .regions, .loops { grid-template-columns: 1fr 1fr; }
+  .features, .regions { grid-template-columns: 1fr 1fr; }
   .region.big { grid-column: span 2; grid-row: auto; }
   .jukebox { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 560px) {
-  .features, .regions, .skills, .shots, .loops { grid-template-columns: 1fr; }
+  .features, .regions, .skills, .shots { grid-template-columns: 1fr; }
   .region.big { grid-column: auto; }
   .bar nav { display: none; }
   table { font-size: 12px; } th, td { padding: 7px; }
@@ -155,25 +216,22 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
 </style>
 </head>
 <body>
-<header class="top">
+<header class="top band">
+  <div class="bg castle" data-speed=".22" aria-hidden="true"><span class="torch" style="left: 7%; top: 56%"><i></i></span><span class="torch" style="left: 93%; top: 56%"><i></i></span><span class="torch small" style="left: 24%; top: 40%"><i></i></span><span class="torch small" style="left: 76%; top: 40%"><i></i></span></div>
   <div class="wrap bar">
     <a class="logo" href="#"><i>⚔</i> RareFriends Realm</a>
     <nav aria-label="Sections"><a href="#trailer">Trailer</a><a href="#new">What's new</a><a href="./lore.html">Lore</a><a href="#explore">Explore</a><a href="#skills">Skills &amp; quests</a><a href="#music-section">Soundtrack</a><a href="#caskets">Caskets</a><a href="./guides.html">Skill guides</a><a href="#play">Play</a></nav>
   </div>
   <div class="wrap trailer" id="trailer">
     <div class="frame">
-      <video id="trailer-video" src="media/update-ring.mp4" poster="media/update-ring-poster.jpg" autoplay muted loop playsinline controls preload="metadata"
+      <video id="trailer-video" src="media/update-ring.mp4" poster="media/update-ring-poster.jpg" autoplay muted playsinline controls preload="metadata"
         aria-label="RareFriends Realm update video: faith weapons against the Catacombs' dead, the Crystal Golem in the Deepglass Caverns, the Drowned Archive, the Howling King in the Howling Vault, the Rare Friends Ring from above, a match in its courtyard, and the Ring's shops"></video>
       <button class="btn primary sound" id="trailer-sound" type="button">🔊 Watch with sound</button>
+      <button class="arrow prev" id="trailer-prev" type="button" aria-label="Previous video">‹</button>
+      <button class="arrow next" id="trailer-next" type="button" aria-label="Next video">›</button>
     </div>
-    <p>New this week: faith weapons in every metal, three dungeons with keyed doors and coffers, and the Rare Friends Ring, an arena of brutality and death. Every shot recorded straight from the game, set to the Ring's own war march.</p>
-  </div>
-  <div class="wrap trailer" id="trailer-realm">
-    <div class="frame">
-      <video id="trailer-realm-video" src="media/trailer.mp4" poster="media/trailer-poster.jpg" muted loop playsinline controls preload="metadata"
-        aria-label="RareFriends Realm trailer: dusk falling over Friendhollow with shadows sweeping round, the Order of the Dawn at Dawnhold, a knight in gold Dawnplate, a day of tree shadows in Whisperwood, campfires at night, the Dawnhold chapel by torchlight, a moonlit unicorn at dawn and Wyrmreach's lava at dusk"></video>
-    </div>
-    <p>And the Realm in under a minute: every shot recorded straight from the game, set to its own main theme.</p>
+    <p><span class="count" id="trailer-count">1 / 6</span><b id="trailer-title">The Rare Friends Ring, three dungeons and faith weapons</b> <span id="trailer-note">New this week: faith weapons in every metal, three dungeons with keyed doors and coffers, and the Rare Friends Ring, an arena of brutality and death. Every shot recorded straight from the game, set to the Ring's own war march.</span></p>
+    <div class="reel" id="trailer-reel" aria-label="Up next"></div>
   </div>
   <div class="wrap hero">
     <div>
@@ -192,7 +250,8 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
 
 <div class="ribbon"><ul class="wrap"><li><b>21</b>skills</li><li><b>20</b>quests</li><li><b>37</b>regions</li><li><b>8</b>mounts</li><li><b>6</b>pets</li><li><b>43</b>achievements</li><li><b>41</b>music tracks</li><li><b>1</b>world boss</li></ul></div>
 
-<section id="new">
+<section id="new" class="band">
+  <div class="bg sky" data-speed=".28" aria-hidden="true"></div><div class="bg clouds" data-speed=".16" aria-hidden="true"></div>
   <div class="wrap">
     <span class="tag">What's new</span>
     <h2>The Rare Friends Ring, three new dungeons, and faith weapons in every metal</h2>
@@ -202,13 +261,7 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
     <p class="sub">The mainland is now the heart of a world four times its size, itself untouched: <b>the Deadwood</b> and Gravesend to the north, <b>Westmarch and the Drakespine</b> to the west with <b>Ashfall</b>, the dragons' country, at the peninsula's end, <b>Southshore</b>, Hollyhock and Dyemoor to the south, <b>Ironreach</b>, Cragmaw, The Wilds and Quillhaven to the east, the Pale Isles at sea. Seven villages in their own clothes with their own quests, four hidden underground dungeons, twenty new tracks. Two new skills: <b>Apothecary</b> (herbs by ecosystem, potions, poisons that matter, antidotes and nine Friend mixtures) and <b>Presence</b> (a character profile: name your Friend, found a fellowship, earn titles and reputation). Before that, in the same month: Wayfaring, the Warden's creatures, the Heartguard and Dawnhold Keep. <b>Agility is now Wayfaring</b>, with three courses, slips, Wayfarer's marks and Coach Skip's outfit; five new <b>Slayer-only creatures</b> each drop an armour set with its own effect (thorns, faith, stealth, fire-proofing, sigil-saving); <b>heavy weapons</b> take Strength and swing harder with it; the <b>Heartguard</b> is red-and-white armour earned a piece every ten Hitpoints levels; <b>Dawnhold</b> has a keep with corner towers and a taller chapel; every altar has a statue of the bearded <b>Old Friend</b>; the quest journal is grouped and coloured, bones offer themselves until you run out, and the Dawn Vigil's <b>ossuary bag</b> holds sixty of them.</p>
     <h3>Before that: real light, and the Order of the Dawn</h3>
     <p class="sub">The Realm is lit for real now. The sun crosses the sky and everything casts a shadow that follows it, long and golden at dusk, short at noon, faint under the moon. Lamps, torches, fires, forges and spells light the ground and whatever stands near them, walls and trees block their light, and it bounces softly round corners. Alleys and forest floors sit in soft shade, lava glows and dungeons are truly dark. The Faith update brings the Order of the Dawn: five quests, faith weapons and gold Dawnplate you can see on your Friend. And the townsfolk dress up.</p>
-    <div class="loops">
-      <figure><video src="media/loop-dusk.mp4" autoplay muted loop playsinline preload="metadata" aria-label="Dusk falling over Friendhollow: shadows stretch and swing, the light warms, then night falls and the lamps take over"></video><figcaption><b>Dusk falls</b>Shadows swing round with the sun, and lamps take over at night.</figcaption></figure>
-      <figure><video src="media/loop-dawnhold.mp4" autoplay muted loop playsinline preload="metadata" aria-label="Orbiting Dawnhold, the Order of the Dawn's chapterhouse above the sea, with knights in gold and white"></video><figcaption><b>The Order of the Dawn</b>Dawnhold, east of Highcairn.</figcaption></figure>
-      <figure><video src="media/loop-night-fire.mp4" autoplay muted loop playsinline preload="metadata" aria-label="Two campfires lighting the forest floor and the trees around them at night, with fireflies"></video><figcaption><b>By firelight</b>Fires light what's around them, and trees block the light.</figcaption></figure>
-      <figure><video src="media/loop-forest.mp4" autoplay muted loop playsinline preload="metadata" aria-label="A time-lapse in Whisperwood: tree shadows sweep round from morning to evening"></video><figcaption><b>A day in Whisperwood</b>Every tree's shadow follows the sun.</figcaption></figure>
-    </div>
-    <div class="regions">
+    <div class="regions" data-gallery data-interval="7000">
       <figure class="region big"><img src="img/new-light-night.png" alt="Friendhollow at night: lamp pools and a campfire lighting the cobbles, a knight in gold" loading="lazy"><figcaption><b>Night in the square</b>Lamps pool light on the cobbles, a campfire warms the faces round it, and your own small light goes with you.</figcaption></figure>
       <figure class="region big"><img src="img/new-worldmap.png" alt="The world map of the whole continent: the Deadwood north, the Drakespine and Ashfall west, Southshore south, Ironreach east, the mainland in the middle" loading="lazy"><figcaption><b>The Wider World</b>The whole continent on one map, the original Realm at its heart.</figcaption></figure>
       <figure class="region"><img src="img/new-gravesend.png" alt="Gravesend: dark cottages round a lamplit square, graves to the north, villagers in mourning charcoal and lantern-purple capes" loading="lazy"><figcaption><b>Gravesend</b>The graveyard settlement at the Deadwood's edge. Lanterns against the dark.</figcaption></figure>
@@ -256,7 +309,8 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
   </div>
 </section>
 
-<section>
+<section class="band">
+  <div class="bg sky" data-speed=".26" aria-hidden="true"></div><div class="bg clouds" data-speed=".14" aria-hidden="true"></div><div class="bg ground town" aria-hidden="true"></div>
   <div class="wrap">
     <span class="tag">What it is</span>
     <h2>Your Friend, an old-school hero</h2>
@@ -296,12 +350,13 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
   </div>
 </section>
 
-<section id="explore" style="padding-top: 0">
+<section id="explore" class="band" style="padding-top: 0">
+  <div class="bg sky" data-speed=".24" aria-hidden="true"></div><div class="bg ground forest" aria-hidden="true"></div>
   <div class="wrap">
     <span class="tag">Explore</span>
     <h2>A 350 × 200 tile island</h2>
     <p class="sub">Seventeen regions and two dungeons, each with its own music: cobbled Friendhollow with its three-storey castle, stables and Sparring Ring, the Wizards' Tower, dragon-haunted Wyrmreach, the farms, Whisperwood's Grumblins and the woodcutters' village of Fernwick, the snowy Greyhorn Highlands and the mountain town of Highcairn, the Ashen Hills mine, the Emberforge, snowy Frostpeak, Glass Lake, the Pale Dunes and Oasis, Murkmire's crypt, and the Mossy Ruins above the Hollow Depths.</p>
-    <div class="regions">
+    <div class="regions" data-gallery data-interval="9000">
       <figure class="region big"><img src="img/town.png" alt="Friendhollow square with its fountain, bank, chapel and townsfolk Friends" loading="lazy"><figcaption><b>Friendhollow</b>The fountain square, the bank, the chapel and Friendhollow Castle, where King Hollis holds court upstairs.</figcaption></figure>
       <figure class="region"><img src="img/castle.png" alt="Friendhollow Castle's keep and four spired towers seen from the square" loading="lazy"><figcaption><b>Friendhollow Castle</b>A keep, four towers and spiral stairs.</figcaption></figure>
       <figure class="region"><img src="img/castle-throne.png" alt="King Hollis in his throne room on the castle's first floor" loading="lazy"><figcaption><b>King Hollis</b>Throne room, library and bedchamber upstairs.</figcaption></figure>
@@ -321,7 +376,8 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
   </div>
 </section>
 
-<section id="skills" class="dark">
+<section id="skills" class="dark band">
+  <div class="bg dungeon" data-speed=".18" aria-hidden="true"><span class="torch" style="left: 5%; top: 30%"><i></i></span><span class="torch" style="left: 95%; top: 30%"><i></i></span><span class="torch small" style="left: 50%; top: 62%"><i></i></span></div><div class="bg ground floor" aria-hidden="true"></div>
   <div class="wrap cols">
     <div>
       <span class="tag" style="color: var(--gold)">Skills</span>
@@ -358,7 +414,8 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
   </div>
 </section>
 
-<section id="music-section">
+<section id="music-section" class="band">
+  <div class="bg dungeon" data-speed=".18" aria-hidden="true"><span class="torch small" style="left: 8%; top: 46%"><i></i></span><span class="torch small" style="left: 92%; top: 46%"><i></i></span></div>
   <div class="wrap">
     <span class="tag">Soundtrack</span>
     <h2>Twenty-one tracks, synthesized live</h2>
@@ -368,7 +425,8 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
   </div>
 </section>
 
-<section id="caskets" style="padding-top: 0">
+<section id="caskets" class="band" style="padding-top: 0">
+  <div class="bg dungeon" data-speed=".18" aria-hidden="true"><span class="torch" style="left: 4%; top: 36%"><i></i></span><span class="torch" style="left: 96%; top: 36%"><i></i></span></div><div class="bg ground floor" aria-hidden="true"></div>
   <div class="wrap two">
     <div>
       <span class="tag">$RAREFRIENDS</span>
@@ -391,7 +449,8 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
   </div>
 </section>
 
-<section class="dark" style="padding: 56px 0">
+<section class="dark band" style="padding: 56px 0">
+  <div class="bg deep" data-speed=".2" aria-hidden="true"></div>
   <div class="wrap two">
     <img src="img/adventurer-card.png" alt="An adventurer card for Friend #7730 riding a unicorn in a rarite helm with a shield and sabre, with levels, quest points and achievements">
     <div>
@@ -403,7 +462,8 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
   </div>
 </section>
 
-<section id="play" class="play">
+<section id="play" class="play band">
+  <div class="bg castle" data-speed=".2" aria-hidden="true"><span class="torch" style="left: 10%; top: 40%"><i></i></span><span class="torch" style="left: 90%; top: 40%"><i></i></span></div>
   <div class="wrap">
     <h2>Enter the Realm</h2>
     <p>Connect a browser wallet on Robinhood mainnet holding a hardwired Rare Friends Generations NFT, pick your Friend and press Begin. On phones, use a wallet app's in-app browser in landscape.</p>
@@ -417,14 +477,133 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
 <button id="music" type="button" aria-pressed="false"><span class="disc" aria-hidden="true"></span><span class="music-label">Play the main theme</span></button>
 <script src="music.js"></script>
 <script>
-  // The trailer plays muted on a loop; "Watch with sound" restarts it with its soundtrack. It and the page's music player take turns.
+  // The video carousel: the newest update first, then the trailer and the lighting loops, newest first. Each video plays
+  // through to the next and the list wraps round, so it never stops; the reel under the player shows what comes next.
+  // It plays muted until asked; "Watch with sound" restarts the current video with its soundtrack. It and the page's
+  // music player take turns.
   (() => {
+    const VIDEOS = [
+      { src: "media/update-ring.mp4", poster: "media/update-ring-poster.jpg", title: "The Rare Friends Ring, three dungeons and faith weapons", when: "October 2026",
+        note: "New this week: faith weapons in every metal, three dungeons with keyed doors and coffers, and the Rare Friends Ring, an arena of brutality and death. Every shot recorded straight from the game, set to the Ring's own war march.",
+        label: "RareFriends Realm update video: faith weapons against the Catacombs' dead, the Crystal Golem in the Deepglass Caverns, the Drowned Archive, the Howling King in the Howling Vault, the Rare Friends Ring from above, a match in its courtyard, and the Ring's shops" },
+      { src: "media/trailer.mp4", poster: "media/trailer-poster.jpg", title: "The Realm in under a minute", when: "September 2026",
+        note: "Every shot recorded straight from the game, set to its own main theme.",
+        label: "RareFriends Realm trailer: dusk falling over Friendhollow with shadows sweeping round, the Order of the Dawn at Dawnhold, a knight in gold Dawnplate, a day of tree shadows in Whisperwood, campfires at night, the Dawnhold chapel by torchlight, a moonlit unicorn at dawn and Wyrmreach's lava at dusk" },
+      { src: "media/loop-dusk.mp4", poster: "media/loop-dusk-poster.jpg", title: "Dusk falls", when: "September 2026",
+        note: "Shadows swing round with the sun, the light warms, then night falls and the lamps take over.",
+        label: "Dusk falling over Friendhollow: shadows stretch and swing, the light warms, then night falls and the lamps take over" },
+      { src: "media/loop-dawnhold.mp4", poster: "media/loop-dawnhold-poster.jpg", title: "The Order of the Dawn", when: "September 2026",
+        note: "Dawnhold, the Order's chapterhouse above the sea east of Highcairn, with knights in gold and white.",
+        label: "Orbiting Dawnhold, the Order of the Dawn's chapterhouse above the sea, with knights in gold and white" },
+      { src: "media/loop-night-fire.mp4", poster: "media/loop-night-fire-poster.jpg", title: "By firelight", when: "September 2026",
+        note: "Fires light what's around them, and trees block the light.",
+        label: "Two campfires lighting the forest floor and the trees around them at night, with fireflies" },
+      { src: "media/loop-forest.mp4", poster: "media/loop-forest-poster.jpg", title: "A day in Whisperwood", when: "September 2026",
+        note: "A time-lapse: every tree's shadow follows the sun from morning to evening.",
+        label: "A time-lapse in Whisperwood: tree shadows sweep round from morning to evening" },
+    ];
     const video = document.getElementById("trailer-video"), sound = document.getElementById("trailer-sound"), music = document.getElementById("music");
+    const title = document.getElementById("trailer-title"), note = document.getElementById("trailer-note"), count = document.getElementById("trailer-count"), reel = document.getElementById("trailer-reel");
+    const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let index = 0, withSound = false;
     const stopMusic = () => { if (music && music.getAttribute("aria-pressed") === "true") music.click(); };
-    sound.addEventListener("click", () => { video.muted = false; video.currentTime = 0; video.loop = false; stopMusic(); void video.play(); sound.hidden = true; });
-    video.addEventListener("volumechange", () => { sound.hidden = !video.muted; if (!video.muted) stopMusic(); });
+    const wrap = i => (i + VIDEOS.length) % VIDEOS.length;
+    /** The reel: every other video in the order it will play, the next one first. */
+    const render = () => {
+      reel.replaceChildren(...VIDEOS.map((_, k) => wrap(index + 1 + k)).filter(k => k !== index).map((k, n) => {
+        const entry = VIDEOS[k], button = document.createElement("button"), img = document.createElement("img"), meta = document.createElement("span"), strong = document.createElement("b");
+        button.type = "button"; button.dataset.video = String(k); button.setAttribute("aria-label", `Play: ${entry.title}`);
+        img.src = entry.poster; img.alt = ""; img.width = 1280; img.height = 720; img.loading = "lazy";
+        meta.className = "meta"; strong.textContent = entry.title;
+        if (n === 0) { const up = document.createElement("i"); up.textContent = "Up next"; meta.append(up); }
+        meta.append(strong); button.append(img, meta);
+        button.addEventListener("click", () => show(k, true));
+        return button;
+      }));
+      count.textContent = `${index + 1} / ${VIDEOS.length}`;
+    };
+    /** Switch the player to a video; `play` starts it (muted unless sound was asked for). */
+    const show = (i, play) => {
+      index = wrap(i); const entry = VIDEOS[index];
+      video.pause(); video.src = entry.src; video.poster = entry.poster; video.setAttribute("aria-label", entry.label);
+      title.textContent = entry.title; note.textContent = entry.note;
+      video.muted = !withSound; sound.hidden = withSound;
+      if (play) { video.currentTime = 0; void video.play().catch(() => {}); }
+      render();
+    };
+    render();
+    video.addEventListener("ended", () => show(index + 1, !reduced || !video.paused));
+    document.getElementById("trailer-next").addEventListener("click", () => show(index + 1, true));
+    document.getElementById("trailer-prev").addEventListener("click", () => show(index - 1, true));
+    sound.addEventListener("click", () => { withSound = true; video.muted = false; video.currentTime = 0; stopMusic(); void video.play(); sound.hidden = true; });
+    video.addEventListener("volumechange", () => { withSound = !video.muted; sound.hidden = withSound; if (withSound) stopMusic(); });
     document.addEventListener("click", event => { if (event.target.closest("[data-track], #music") && !video.muted) { video.muted = true; } });
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches) { video.removeAttribute("autoplay"); video.pause(); }
+    if (reduced) { video.removeAttribute("autoplay"); video.pause(); }
+  })();
+  // Parallax: each band's backdrop layers slide at their own pace (data-speed) as you scroll, so the castle wall, sky,
+  // street and dungeon sit behind the page at different depths. Still, if motion is to be reduced.
+  (() => {
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const layers = [...document.querySelectorAll(".band > .bg[data-speed]")].map(bg => ({ bg, band: bg.parentElement, speed: Number(bg.dataset.speed) || 0 }));
+    let queued = false;
+    const update = () => {
+      queued = false; const vh = innerHeight;
+      for (const { bg, band, speed } of layers) {
+        const rect = band.getBoundingClientRect();
+        if (rect.bottom < -vh || rect.top > vh * 2) continue;
+        bg.style.transform = `translate3d(0, ${((rect.top + rect.height / 2 - vh / 2) * speed).toFixed(1)}px, 0)`;
+      }
+    };
+    addEventListener("scroll", () => { if (!queued) { queued = true; requestAnimationFrame(update); } }, { passive: true });
+    addEventListener("resize", update); update();
+  })();
+  // Picture galleries: each figure grid marked data-gallery becomes a stage with arrows, a counter and a filmstrip of
+  // every picture, in the grid's order (newest first). It turns on its own while it's on screen and nobody's hovering
+  // over it, wraps round, and takes the arrow keys and swipes. New pictures just go at the top of the grid's list.
+  (() => {
+    const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    document.querySelectorAll(".regions[data-gallery]").forEach(grid => {
+      const items = [...grid.querySelectorAll("figure")].map(figure => { const img = figure.querySelector("img"); return { src: img.getAttribute("src"), alt: img.alt, caption: figure.querySelector("figcaption")?.innerHTML ?? "" }; });
+      if (items.length < 2) return;
+      const gallery = document.createElement("div"), stage = document.createElement("figure"), picture = document.createElement("img"), caption = document.createElement("figcaption");
+      const count = document.createElement("span"), prev = document.createElement("button"), next = document.createElement("button"), strip = document.createElement("div");
+      gallery.className = "gallery"; gallery.tabIndex = 0; gallery.setAttribute("aria-roledescription", "carousel"); gallery.setAttribute("aria-label", grid.closest("section")?.querySelector("h2")?.textContent ?? "Pictures");
+      stage.className = "stage"; stage.style.margin = "0"; picture.width = 1280; picture.height = 720; picture.decoding = "async"; count.className = "count";
+      prev.type = "button"; prev.className = "arrow prev"; prev.textContent = "‹"; prev.setAttribute("aria-label", "Previous picture");
+      next.type = "button"; next.className = "arrow next"; next.textContent = "›"; next.setAttribute("aria-label", "Next picture");
+      strip.className = "strip"; strip.setAttribute("aria-label", "All pictures");
+      const thumbs = items.map((item, k) => {
+        const button = document.createElement("button"), img = document.createElement("img");
+        button.type = "button"; button.setAttribute("aria-label", `Picture ${k + 1} of ${items.length}`);
+        img.src = item.src; img.alt = ""; img.loading = "lazy"; img.width = 128; img.height = 72;
+        button.append(img); button.addEventListener("click", () => { show(k); rest(); });
+        return button;
+      });
+      strip.append(...thumbs); stage.append(picture, count, prev, next); gallery.append(stage, caption, strip);
+      grid.replaceWith(gallery);
+      let index = 0, timer = 0, seen = false, hovered = false;
+      const wrap = i => (i + items.length) % items.length;
+      const show = i => {
+        index = wrap(i); const item = items[index];
+        picture.src = item.src; picture.alt = item.alt; caption.innerHTML = item.caption; count.textContent = `${index + 1} / ${items.length}`;
+        thumbs.forEach((thumb, k) => { if (k === index) thumb.setAttribute("aria-current", "true"); else thumb.removeAttribute("aria-current"); });
+        const thumb = thumbs[index]; strip.scrollTo({ left: thumb.offsetLeft - strip.clientWidth / 2 + thumb.clientWidth / 2, behavior: reduced ? "auto" : "smooth" });
+        const ahead = new Image(); ahead.src = items[wrap(index + 1)].src;
+      };
+      // It turns by itself only while on screen and left alone; any choice of your own rests it for a while.
+      const interval = Number(grid.dataset.interval) || 7000;
+      const tick = () => { if (seen && !hovered && !gallery.matches(":focus-within") && document.visibilityState === "visible") show(index + 1); };
+      const start = () => { if (!reduced && !timer) timer = setInterval(tick, interval); };
+      const rest = () => { if (timer) { clearInterval(timer); timer = 0; } start(); };
+      new IntersectionObserver(entries => { seen = entries.some(entry => entry.isIntersecting); }, { threshold: 0.3 }).observe(gallery);
+      gallery.addEventListener("pointerenter", () => { hovered = true; }); gallery.addEventListener("pointerleave", () => { hovered = false; });
+      prev.addEventListener("click", () => { show(index - 1); rest(); }); next.addEventListener("click", () => { show(index + 1); rest(); });
+      gallery.addEventListener("keydown", event => { if (event.key === "ArrowLeft") { show(index - 1); rest(); event.preventDefault(); } else if (event.key === "ArrowRight") { show(index + 1); rest(); event.preventDefault(); } });
+      let touch = null;
+      stage.addEventListener("pointerdown", event => { if (event.pointerType === "touch") touch = { x: event.clientX, y: event.clientY }; });
+      stage.addEventListener("pointerup", event => { if (!touch) return; const dx = event.clientX - touch.x, dy = event.clientY - touch.y; touch = null; if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) { show(dx < 0 ? index + 1 : index - 1); rest(); } });
+      show(0); start();
+    });
   })();
 </script>
 </body>

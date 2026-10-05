@@ -73,6 +73,22 @@ try {
     await (touch ? sound.tap() : sound.click());
     assert.equal(await trailer.evaluate(video => video.muted), false, `${name}: unmuted`);
     assert.equal(await sound.isHidden(), true);
+    // The video carousel: the newest update first, the reel of what's next under it, and "next" moving on to the trailer.
+    assert.match(await trailer.getAttribute("src"), /update-ring\.mp4$/, `${name}: the newest update plays first`);
+    assert.equal(await page.locator("#trailer-reel button").count(), 5, `${name}: the reel shows the other five videos`);
+    await page.locator("#trailer-next").click();
+    assert.match(await trailer.getAttribute("src"), /trailer\.mp4$/, `${name}: next plays the trailer`);
+    assert.equal(await trailer.evaluate(video => video.muted), false, `${name}: sound stays on from one video to the next`);
+    // The picture galleries: every figure of the two grids in a filmstrip, the stage showing the one chosen, wrapping round.
+    const galleries = page.locator(".gallery");
+    assert.equal(await galleries.count(), 2, `${name}: two picture galleries`);
+    const thumbs = galleries.first().locator(".strip button");
+    assert.ok(await thumbs.count() >= 30, `${name}: the update gallery holds every picture (${await thumbs.count()})`);
+    await galleries.first().scrollIntoViewIfNeeded();
+    await galleries.first().locator(".arrow.prev").click();
+    assert.equal(await thumbs.last().getAttribute("aria-current"), "true", `${name}: previous from the first wraps to the last`);
+    await thumbs.nth(2).click();
+    assert.equal(await galleries.first().locator(".stage img").getAttribute("src"), await thumbs.nth(2).locator("img").getAttribute("src"), `${name}: a thumbnail puts its picture on the stage`);
     // The skill guides page: a skill's unlocks, the recipe book and its search.
     await page.goto(`http://127.0.0.1:${server.address().port}/preview/guides.html#woodcutting`);
     await page.getByRole("heading", { name: "Woodcutting" }).waitFor();
@@ -88,4 +104,4 @@ try {
     await context.close();
   }
 } finally { await browser.close(); server.close(); }
-console.log("PASS preview page: trailer at the top; main theme and jukebox; skill guides and recipe book");
+console.log("PASS preview page: the video carousel at the top and the picture galleries; main theme and jukebox; skill guides and recipe book");
