@@ -1194,6 +1194,18 @@ export const SHOPS: Record<string, ShopDef> = {
   bones: { id: "bones", name: "Bone Collector", buys: ["bones", "hide"], rate: 0.65, stock: ["bones", "large_bones"] },
   capes: { id: "capes", name: "The Keeper of Capes", stock: [...SKILLS.map(skill => `${skill}_cape`), "grandmaster_cape"] },
 };
+/**
+ * Whole sets: any shop that sells a helm and boots of a metal sells its cuirass, greaves, gauntlets and shield too (and a
+ * shop with two pieces of leather sells all of it). Nobody should have to walk the Realm for the chest and legs.
+ */
+const SET_PIECES = ["helm", "cuirass", "greaves", "gauntlets", "boots", "shield"] as const, LEATHER_SET = ["leather_hood", "leather_jerkin", "leather_leggings", "leather_bracers", "leather_gloves", "leather_boots"];
+for (const shop of Object.values(SHOPS)) {
+  const stock = [...shop.stock], metals = new Set<string>();
+  for (const id of stock) { const m = id.match(/^([a-z]+)_(helm|cuirass|greaves|gauntlets|boots|shield)$/); if (m) metals.add(m[1]); }
+  for (const metal of metals) for (const piece of SET_PIECES) { const id = `${metal}_${piece}`; if (isItem(id) && !stock.includes(id)) stock.push(id); }
+  if (stock.filter(id => LEATHER_SET.includes(id)).length >= 2) for (const id of LEATHER_SET) if (isItem(id) && !stock.includes(id)) stock.push(id);
+  (shop as { stock: readonly string[] }).stock = stock;
+}
 // ---------- Pets ----------
 /** Little companions found by chance while you train (1 in `odds` per action, luckier at higher levels). */
 export type PetDef = { id: string; name: string; from: string; odds: number; text: string };

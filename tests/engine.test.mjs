@@ -16,7 +16,7 @@ import { talk } from "../games/rarefriends-realm/content.ts";
 import { cleanPresence } from "../games/rarefriends-realm/net.ts";
 import { buySlayerReward, longTasks, slayerXpBoost, eligibleTasks } from "../games/rarefriends-realm/slayer.ts";
 import { currentTask, slayerPoints } from "../games/rarefriends-realm/slayer.ts";
-import { COURSES, HEARTGUARD, ITEM_LIST, METALS, MONSTERS, SMITH_PIECES, SPELL_TABS, FIREMAKING, REGIONAL_CLOTHING, WARDROBE, MOUNTS, SHOPS, SKILLS, SKILL_NAMES, SLAYER_SETS, SLAYER_TASKS, SPELLS, TREES, WAYFARER_MARK, WAYFARER_REWARDS, XP_RATE, XP_TABLE, heavyStrength, item, levelForXp } from "../games/rarefriends-realm/data.ts";
+import { COURSES, HEARTGUARD, ITEM_LIST, METALS, MONSTERS, SMITH_PIECES, SPELL_TABS, FIREMAKING, REGIONAL_CLOTHING, WARDROBE, MOUNTS, SHOPS, SKILLS, SKILL_NAMES, SLAYER_SETS, SLAYER_TASKS, SPELLS, TREES, WAYFARER_MARK, WAYFARER_REWARDS, XP_RATE, XP_TABLE, heavyStrength, isItem, item, levelForXp } from "../games/rarefriends-realm/data.ts";
 import { NPCS, QUESTS, MAX_QUEST_POINTS, questPoints, onMonsterKilled } from "../games/rarefriends-realm/content.ts";
 import { FLOOR_Y, H, MAINLAND, REGIONS, T, W, createWorld, floorAt, isUnderground, mainlandToWorld, objectAtTile, onLevel, realPoint, regionAt, terrainAt } from "../games/rarefriends-realm/world.ts";
 import { addXp, emptyToBank, fillFromBank, bankDeposit, bankInOrder, bankMove, bankTabs, bankWithdraw, bonuses, bagBones, combatLevel, count, dropItem, earlyXp, give, has, heft, level, maxHp, xpMultiplier, BONE_BAG, BONE_BAG_SIZE } from "../games/rarefriends-realm/state.ts";
@@ -934,8 +934,14 @@ test("Every weapon and piece of armour in the six ore metals can be bought somew
   const sold = new Map();
   for (const shop of Object.values(SHOPS)) for (const id of shop.stock) if (!sold.has(id)) sold.set(id, shop.id);
   for (const metal of METALS.filter(entry => entry.tier <= 6)) for (const piece of SMITH_PIECES) assert(sold.has(`${metal.id}_${piece.piece}`), `${metal.name} ${piece.name} is sold (by someone)`);
-  assert.equal(sold.get("rarite_cuirass"), "cragmaw_armoury", "rarite plate means a walk to Cragmaw");
-  assert.equal(sold.get("moonsilver_cuirass"), "gravesend_general", "and moonsilver plate, Gravesend's salvage");
+  assert(sold.has("rarite_cuirass") && SHOPS.cragmaw_armoury.stock.includes("rarite_cuirass"), "rarite plate is sold, Cragmaw among others");
+  // Whole sets: any shop selling a metal's helm and boots sells its cuirass, greaves, gauntlets and shield (Frostpeak's frostsilver and glimmer, Highcairn's rarite, the Hollis Armoury's moonsilver…).
+  for (const shop of Object.values(SHOPS)) {
+    const metals = new Set(shop.stock.flatMap(id => { const m = id.match(/^([a-z]+)_(helm|boots)$/); return m ? [m[1]] : []; }));
+    for (const metal of metals) for (const piece of ["helm", "cuirass", "greaves", "gauntlets", "boots", "shield"]) if (isItem(`${metal}_${piece}`)) assert(shop.stock.includes(`${metal}_${piece}`), `${shop.name} sells ${metal} ${piece}`);
+  }
+  for (const piece of ["frostsilver_cuirass", "frostsilver_greaves"]) assert(SHOPS.frost.stock.includes(piece), `Frostpeak Outfitters sells ${piece}`);
+  assert(SHOPS.armour.stock.includes("leather_jerkin"), "the armoury sells the whole leather set");
   const g = newGame(); assert(g.npcs.some(npc => npc.id === "cragmaw_armourer"), "Brenna Anvilsong keeps the armoury");
 });
 
