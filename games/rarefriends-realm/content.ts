@@ -943,7 +943,7 @@ function talkInner(game: Game, npcId: string): Dialogue {
       }
       return chat(name, npcSays(name, "Faith is trained like any other strength. Offer your bones, pray, and strike true."), [lesson, bye]);
     }
-    case "quartermaster": return chat(name, npcSays(name, questDone(game, "dawn_vigil") ? "Blessed steel and chaplains' staffs. They'll serve you against anything, and against the dead twice over." : "The armoury is for the Order's own. Keep the Dawn Vigil first."),
+    case "quartermaster": return chat(name, npcSays(name, questDone(game, "dawn_vigil") ? `Blessed steel and chaplains' staffs, and the Order's own armour: an acolyte's vestments for anyone of Faith 10, the Vigil's mail at Defence and Faith 30${questDone(game, "greyhorn_light") ? "" : " once the Dawnstone's home"}, and Dawnplate for those who've earned it.` : "The armoury is for the Order's own. Keep the Dawn Vigil first."),
       questDone(game, "dawn_vigil") ? [{ label: "Show me.", then: () => { game.ui.shop = "armoury"; return null; } }, { label: "Maybe later.", then: () => null }] : undefined);
     case "dawn_knight": return chat(name, npcSays(name, (["Dawn comes. It always does.", "The golems in the Greyhorn mine hold something of ours.", "A blessed blade cuts the dead like wet paper.", "Offer your bones in the chapel. Sister Maren will light a candle."] as const)[Math.floor(game.rng() * 4)]));
     case "clothier": return chat(name, npcSays(name, "Real clothes for real adventurers! Shirts and belted tunics, trousers and skirts, and dresses that sweep the floor. Wear them under a cape, or on their own."), [

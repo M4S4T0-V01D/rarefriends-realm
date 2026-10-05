@@ -141,6 +141,12 @@ function drawBones(p: Pixels, kind: string, color: string, accent?: string) {
     part(p, all(stroke([[7, 25], [25, 8]], 6), disc(4, 23, 4.6), disc(9, 29, 4.6), disc(23, 4, 4.6), disc(28, 10, 4.6)), color, "stone");
     line(p, [[11, 20], [19, 12]], shadeHex(color, 0.12)); return;
   }
+  if (kind === "crypt") {
+    // A crypt skeleton's bones: greyer, cracked, with a bit of skull.
+    part(p, all(stroke([[8, 24], [22, 10]], 4), disc(6, 22, 3.5), disc(10, 26, 3.5), disc(20, 8, 3.5), disc(24, 12, 3.5)), color, "stone");
+    part(p, disc(25, 24, 5), color, "stone"); dot(p, 23, 23, accent ?? "#6d6b67"); dot(p, 27, 23, accent ?? "#6d6b67"); line(p, [[24, 27], [26, 27]], accent ?? "#6d6b67");
+    line(p, [[12, 20], [15, 19], [17, 15]], accent ?? "#6d6b67"); return;
+  }
   if (kind === "dragon") {
     part(p, stroke([[5, 28], [8, 20], [13, 13], [20, 8], [28, 5]], 6), color, "stone");
     part(p, stroke([[20, 8], [28, 5]], 3), accent ?? shadeHex(color, -0.3), "stone");

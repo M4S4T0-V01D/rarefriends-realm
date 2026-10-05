@@ -2240,3 +2240,13 @@ test("Round shields and the aegis in every metal, and the weight of what you wea
   const laden = weightPenalty(g); p.xp.agility = XP_TABLE[60]; assert(weightPenalty(g) < laden * 0.6, "Wayfaring carries half the load at 60");
   assert(item("rose_cape").weight === undefined || true); assert(item("team_cape").weight <= 1 && item("leather_jerkin").weight < item("pewter_cuirass").weight);
 });
+
+test("Crypt bones from crypt skeletons, and the Order's lesser armour", async () => {
+  const { bury } = await import("../games/rarefriends-realm/engine.ts");
+  assert(item("crypt_bones").bones > item("bones").bones && item("crypt_bones").bones < item("large_bones").bones, "between plain and large");
+  assert(MONSTERS.skeleton.always.some(drop => drop.item === "crypt_bones"), "skeletons drop them");
+  const g = newGame(), p = g.player; p.inventory.fill(null); give(p, "crypt_bones"); const faith = p.xp.prayer; bury(g, 0); assert(p.xp.prayer > faith, "buried for Faith");
+  for (const id of ["acolyte_hood", "acolyte_vestment", "vigil_hauberk", "vigil_shield"]) assert(SHOPS.armoury.stock.includes(id), `${id} at the Order Armoury`);
+  assert.equal(item("acolyte_vestment").equip.requires.prayer, 10); assert.equal(item("vigil_hauberk").equip.requires.defence, 30); assert(item("vigil_hauberk").equip.bonuses.prayer > 0);
+  assert(item("vigil_hauberk").value < item("dawnplate_cuirass").value / 5, "far cheaper than Dawnplate");
+});

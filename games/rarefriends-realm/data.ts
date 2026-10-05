@@ -243,6 +243,7 @@ const ITEMS: Item[] = [
   { id: "burnt_food", name: "Burnt food", examine: "Oops!", value: 1, icon: { shape: "burnt", color: "#3b3a38" } },
   // Bones and drops
   { id: "bones", name: "Bones", examine: "Bones are for burying!", value: 5, bones: 4.5, icon: { shape: "bones", kind: "small", color: "#f2efe8" } },
+  { id: "crypt_bones", name: "Crypt bones", examine: "Grey, cracked bones from a crypt skeleton. They were a Friend once; the Old Friend takes them gladly.", value: 25, bones: 9, icon: { shape: "bones", kind: "crypt", color: "#c9c4b8", accent: "#6d6b67" } },
   { id: "large_bones", name: "Large bones", examine: "Ew, it's a pile of bones.", value: 60, bones: 15, icon: { shape: "bones", kind: "large", color: "#e7e1d3" } },
   { id: "drake_bones", name: "Drake bones", examine: "Heavy, and still warm.", value: 900, bones: 72, icon: { shape: "bones", kind: "dragon", color: "#d9c9a8", accent: "#8a4a3a" } },
   { id: "drakehide", name: "Drakehide", examine: "A scaled hide from an ash drake. A crafter could stitch it.", value: 700, icon: { shape: "hide", color: "#6f8a5c", accent: "#3b3a38" } },
@@ -759,13 +760,27 @@ const FAITH_GEAR: Item[] = [
   { id: "dawnstone", name: "Dawnstone", examine: "The Order of the Dawn's relic, whole again and blessed.", value: 0, tradeable: false, icon: { shape: "orb", color: "#fff2c0" } },
 ];
 /** What the Order's armoury sells: the first weapons once you've kept the Dawn Vigil, the rest after Light in the Greyhorn. */
-export const ARMOURY_FIRST = ["dawnsteel_sword", "vigil_spear", "acolyte_staff"] as const;
-export const ARMOURY_LATER = ["radiant_greatsword", "sunforged_warhammer", "dawn_staff", "first_light_staff"] as const;
+export const ARMOURY_FIRST = ["dawnsteel_sword", "vigil_spear", "acolyte_staff", "acolyte_hood", "acolyte_vestment", "acolyte_leggings", "acolyte_gloves", "acolyte_sandals"] as const;
+export const ARMOURY_LATER = ["radiant_greatsword", "sunforged_warhammer", "dawn_staff", "first_light_staff", "vigil_helm", "vigil_hauberk", "vigil_greaves", "vigil_gauntlets", "vigil_boots", "vigil_shield"] as const;
+/** The Order's lesser armour: an acolyte's vestments (cloth, cheap, Faith 10) and the Vigil's mail (Defence 30, Faith 30), for those not yet fit for Dawnplate. */
+const ORDER_ARMOUR: Item[] = [
+  { id: "acolyte_hood", name: "Acolyte's hood", examine: "White linen, a gold sun stitched at the brow. The Order's novices wear it on the night watches.", value: 300, icon: { shape: "hood", color: "#efe9d8", accent: DAWN_GOLD }, equip: { slot: "head", bonuses: { defence: 4, prayer: 2 }, requires: { prayer: 10 } } },
+  { id: "acolyte_vestment", name: "Acolyte's vestment", examine: "A quilted white vestment with a gold hem.", value: 900, icon: { shape: "body", color: "#efe9d8", accent: DAWN_GOLD, kind: "robe" }, equip: { slot: "body", bonuses: { defence: 11, prayer: 3 }, requires: { prayer: 10 } } },
+  { id: "acolyte_leggings", name: "Acolyte's leggings", examine: "White linen leggings, gold at the hem.", value: 600, icon: { shape: "legs", color: "#efe9d8", accent: DAWN_GOLD }, equip: { slot: "legs", bonuses: { defence: 7, prayer: 2 }, requires: { prayer: 10 } } },
+  { id: "acolyte_gloves", name: "Acolyte's gloves", examine: "Thin white gloves.", value: 200, icon: { shape: "gloves", color: "#efe9d8", accent: DAWN_GOLD }, equip: { slot: "hands", bonuses: { defence: 2, prayer: 1 }, requires: { prayer: 10 } } },
+  { id: "acolyte_sandals", name: "Acolyte's sandals", examine: "Sandals for a chapel floor.", value: 200, icon: { shape: "boots", color: "#d8cfb6", accent: DAWN_GOLD }, equip: { slot: "feet", bonuses: { defence: 2, prayer: 1 }, requires: { prayer: 10 } } },
+  { id: "vigil_helm", name: "Vigil helm", examine: "Pale steel with a gold sun on the brow: the helm of the Order's night watch.", value: 3200, icon: { shape: "helm", color: "#cfd3d8", accent: DAWN_GOLD }, equip: { slot: "head", bonuses: { defence: 17, magic: -2, prayer: 3 }, requires: { defence: 30, prayer: 30 } } },
+  { id: "vigil_hauberk", name: "Vigil hauberk", examine: "A mail shirt of pale steel, blessed at the Dawnhold altar.", value: 9600, icon: { shape: "body", color: "#cfd3d8", accent: DAWN_GOLD }, equip: { slot: "body", bonuses: { defence: 52, magic: -5, prayer: 4 }, requires: { defence: 30, prayer: 30 } } },
+  { id: "vigil_greaves", name: "Vigil greaves", examine: "Mail greaves of pale steel.", value: 4800, icon: { shape: "legs", color: "#cfd3d8", accent: DAWN_GOLD }, equip: { slot: "legs", bonuses: { defence: 31, magic: -3, prayer: 3 }, requires: { defence: 30, prayer: 30 } } },
+  { id: "vigil_gauntlets", name: "Vigil gauntlets", examine: "Mail gauntlets, gold at the cuff.", value: 2400, icon: { shape: "gloves", color: "#cfd3d8", accent: DAWN_GOLD }, equip: { slot: "hands", bonuses: { attack: 2, defence: 8, prayer: 2 }, requires: { defence: 30, prayer: 30 } } },
+  { id: "vigil_boots", name: "Vigil boots", examine: "Steel-toed boots for the long watch.", value: 2400, icon: { shape: "boots", color: "#cfd3d8", accent: DAWN_GOLD }, equip: { slot: "feet", bonuses: { defence: 8, prayer: 2 }, requires: { defence: 30, prayer: 30 } } },
+  { id: "vigil_shield", name: "Vigil shield", examine: "A pale steel heater shield with the Order's sun, for those who keep the watch.", value: 4800, icon: { shape: "shield", color: "#cfd3d8", accent: DAWN_GOLD }, equip: { slot: "shield", bonuses: { defence: 34, prayer: 3 }, requires: { defence: 30, prayer: 30 } } },
+];
 /** Dawnplate, sold once the quest that awards each piece is done. */
 export const DAWNPLATE_QUEST: Record<string, string> = { dawnplate_greaves: "pilgrims_road", dawnplate_boots: "pilgrims_road", dawnplate_helm: "restless_crypt",
   dawnplate_shield: "restless_crypt", dawnplate_gauntlets: "restless_crypt", dawnplate_cuirass: "dawn_against_hollow" };
 
-export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...slayerGear(), ...heartguardGear(), ...REGIONAL_ITEMS, ...APOTHECARY_ITEMS]);
+export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...ORDER_ARMOUR, ...slayerGear(), ...heartguardGear(), ...REGIONAL_ITEMS, ...APOTHECARY_ITEMS]);
 const ITEM_MAP = new Map(ITEM_LIST.map(item => [item.id, item]));
 export function item(id: string): Item {
   const found = ITEM_MAP.get(id);
@@ -1050,7 +1065,7 @@ export const MONSTERS: Record<string, MonsterDef> = {
   swamp_lurker: { id: "swamp_lurker", name: "Swamp lurker", level: 16, hp: 22, attack: 14, strength: 14, defence: 12, attackBonus: 8, defenceBonus: 8, maxHit: 3, speed: 5, respawn: 35, wander: 4, examine: "Mostly mouth, partly mud.", aggressive: true,
     always: [one("bones", 1)], drops: [coins(5, 50, 0.5), one("tide_sigil", 0.12, 6, 18), one("raw_char", 0.1), one("rough_moonstone", 0.02)], art: 106 },
   skeleton: { id: "skeleton", undead: true, poisonImmune: true, name: "Crypt skeleton", level: 25, hp: 29, attack: 22, strength: 22, defence: 20, attackBonus: 14, defenceBonus: 16, maxHit: 4, speed: 4, respawn: 40, wander: 4, examine: "It rattles when it walks. It used to be a Friend.", aggressive: true,
-    always: [one("bones", 1)], drops: [coins(10, 90, 0.6), one("blackiron_greaves", 0.03), one("storm_sigil", 0.06, 3, 7), one("hollow_sigil", 0.02, 1, 3), one("ashsteel_helm", 0.03)], art: 107 },
+    always: [one("crypt_bones", 1)], drops: [coins(10, 90, 0.6), one("blackiron_greaves", 0.03), one("storm_sigil", 0.06, 3, 7), one("hollow_sigil", 0.02, 1, 3), one("ashsteel_helm", 0.03)], art: 107 },
   wolf: { id: "wolf", name: "Frost wolf", level: 32, hp: 40, attack: 30, strength: 28, defence: 26, attackBonus: 18, defenceBonus: 18, maxHit: 5, speed: 4, respawn: 40, wander: 6, examine: "Its breath freezes as it growls.", aggressive: true,
     always: [one("large_bones", 1)], drops: [one("frost_shard", 0.03), coins(20, 110, 0.4), one("rough_rosestone", 0.02), one("moonsilver_ore", 0.05), one("frosthide_bracers", 0.02), one("moonsilver_arrow", 0.06, 5, 12)], art: 108 },
   moss_colossus: { id: "moss_colossus", name: "Moss colossus", level: 42, hp: 60, attack: 32, strength: 34, defence: 30, attackBonus: 20, defenceBonus: 22, maxHit: 7, speed: 6, respawn: 60, wander: 3, examine: "A Colossus-family giant, grown over with moss.", size: 2,

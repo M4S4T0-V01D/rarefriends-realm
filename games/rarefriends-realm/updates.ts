@@ -4,6 +4,10 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 56, date: "2026-10-06", title: "Crypt bones, and the Order's armour for everyone", items: [
+    "Crypt skeletons drop crypt bones: grey and cracked, worth twice a plain bone's Faith and a little over half a large one's (9 Faith buried, more on an altar).",
+    "The Order Armoury at Dawnhold sells two sets below Dawnplate now. The Acolyte's vestments (hood, vestment, leggings, gloves, sandals: cloth, cheap, Faith 10) once you've kept the Dawn Vigil, and the Vigil's mail (helm, hauberk, greaves, gauntlets, boots, shield: Defence 30 and Faith 30) once the Dawnstone is home. Both carry a faith bonus. Three pieces of either give you a style of your own on the Presence profile.",
+  ] },
   { id: 55, date: "2026-10-06", title: "Round shields and the aegis, and the weight of what you wear", items: [
     "Two more shields in every metal, smithed at the anvil and sold with the metal's armour: the round shield, bigger and heavier than the kite (the best defence a metal gives, Strength to carry: the metal's level and 5), and the aegis, a faith shield blessed at Dawnhold (Faith to carry: the metal's level and 5, with a faith bonus).",
     "Weight: everything you wear weighs something now (Worn equipment shows the total), and running under a load drains faster: forty kilograms doubles it. Plate, round shields and two-handers are the heavy things; capes, cloth and leather are light.",

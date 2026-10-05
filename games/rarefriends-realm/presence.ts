@@ -193,6 +193,8 @@ export function styleName(game: Game): string {
   const cape = player.equipment.cape ? item(player.equipment.cape) : null;
   if (cape?.mastery) return cape.mastery.skill === "all" ? "Grandmaster" : `Master of ${SKILL_NAMES[cape.mastery.skill]}`;
   if (worn.filter(id => id.startsWith("dawnplate_") || id === "dawn_cape").length >= 2) return "Knight of the Dawn";
+  if (worn.filter(id => id.startsWith("vigil_")).length >= 3) return "Keeper of the Vigil";
+  if (worn.filter(id => id.startsWith("acolyte_")).length >= 3) return "Acolyte of the Dawn";
   if (worn.filter(id => id.startsWith("heartguard_")).length >= 4) return "Heartguard";
   if (worn.filter(id => id.startsWith("wayfarer_")).length >= 3) return "Wayfarer";
   const metal = worn.map(id => id.split("_")[0]).find(prefix => ["pewter", "blackiron", "ashsteel", "moonsilver", "glimmer", "rarite", "frostsilver", "gloomsteel", "wyrmscale", "hollowsteel", "cindersteel", "ashenheart"].includes(prefix));
