@@ -56,7 +56,7 @@ function paintFrame(ctx: CanvasRenderingContext2D, frame: string, x: number, y: 
   ctx.restore();
 }
 
-export function renderCard(game: Game, friend: GenerationSprites | null, fellowship: FellowshipArt | null = null): HTMLCanvasElement {
+export function renderCard(game: Game, friend: GenerationSprites | null, fellowship: FellowshipArt | null = null, follower: GenerationSprites | null = null): HTMLCanvasElement {
   const canvas = document.createElement("canvas"); canvas.width = CARD.width; canvas.height = CARD.height;
   const ctx = canvas.getContext("2d")!, player = game.player, style = cardStyle(game), FONT = FONTS[style.font] ?? FONTS.mono;
   let dark = paintBackground(ctx, style.bg);
@@ -82,12 +82,18 @@ export function renderCard(game: Game, friend: GenerationSprites | null, fellows
     const ratio = 2 * 1.35 / 1.6, lift = mount ? (SADDLE - 4) * ratio : 0, fitW = inner.w - 8, fitH = inner.h - 4;
     const px = Math.max(1, Math.floor(Math.min(fitW / art.width, fitH / (art.height + lift + (mount ? 4 : 0))) * (mount ? 2 : 1)) / (mount ? 2 : 1)), ground = mount ? inner.y + inner.h - 10 : inner.y + inner.h / 2 + art.height * px / 2 + px * 2;
     ctx.imageSmoothingEnabled = false;
+    // Your follower stands at your right hand, a little behind and smaller, in the clothes you gave it.
+    if (follower) {
+      const theirs = figureArt(friendRows(follower, "down", false, 0), player.followerWorn, "down"), fpx = Math.max(1, Math.floor(px * 0.72)), fx = Math.round(cx + inner.w * 0.27), fy = Math.round(ground - theirs.height * fpx + px * 2 - 6);
+      ctx.drawImage(theirs, Math.round(fx - theirs.width * fpx / 2), fy, theirs.width * fpx, theirs.height * fpx);
+    }
     const drawMountLayer = (layer: "body" | "head") => {
       const horse = mountArt(mount!.coat, "front", -1, true, layer), m = px * ratio;
       ctx.drawImage(horse, Math.round(cx - horse.width * m / 2), Math.round(ground + 2 * px - horse.height * m), Math.round(horse.width * m), Math.round(horse.height * m));
     };
     if (mount) drawMountLayer("body");
-    ctx.drawImage(art, Math.round(cx - art.width * px / 2), Math.round(ground - lift * px - art.height * px + px * 2), art.width * px, art.height * px);
+    const shift = follower ? -inner.w * 0.14 : 0;
+    ctx.drawImage(art, Math.round(cx + shift - art.width * px / 2), Math.round(ground - lift * px - art.height * px + px * 2), art.width * px, art.height * px);
     if (mount) drawMountLayer("head");
   }
   // Who you are: name (or Friend number), the token id small beside it, your title, family and where you are, and your fellowship.

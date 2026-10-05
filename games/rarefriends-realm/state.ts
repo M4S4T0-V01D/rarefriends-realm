@@ -87,6 +87,8 @@ export type Player = {
   poison: { damage: number; left: number; timer: number } | null;
   weaponPoison: { weapon: string; damage: number; charges: number; weaken: boolean } | null;
   antidoteUntil: number; antifireUntil: number; stealthUntil: number; tonicUntil: number;
+  /** A ward on you (a spell's), and the tick it ends; healing over time (so much a tick), and the tick it ends. */
+  ward: { defence: number; flat: number; reduce: number } | null; wardUntil: number; renew: number; renewUntil: number;
   mixture: { family: number; until: number } | null;
   /** Presence: your Friend's name (the token id never changes), fellowship and title; the regions you've found and lived in, people met, emotes learnt, outfits worn, ticks with your Friend behind you. */
   name: string | null; fellowship: Fellowship | null; title: string | null;
@@ -175,7 +177,7 @@ export type Game = {
   depleted: Map<number, number>; herbPicks: Map<number, number>; messages: Message[];
   /** What the sky is doing (set by the page each frame; the engine only reads it) and how much your Friend talks. */
   ambient: { night: boolean; rain: boolean; storm?: boolean; fog?: boolean }; friendSpeech: "full" | "reduced" | "rare" | "off"; events: GameEvent[]; rng: () => number; nextUid: number;
-  dialogue: Dialogue | null; ui: { shop: string | null; bank: boolean; production: ProductionMenu | null; lamp: number | null; naming: "first" | "rename" | null; fellowship?: boolean; home?: boolean; join?: Fellowship | null };
+  dialogue: Dialogue | null; ui: { shop: string | null; bank: boolean; production: ProductionMenu | null; lamp: number | null; naming: "first" | "rename" | null; fellowship?: boolean; home?: boolean; join?: Fellowship | null; /** A purchase with simulated RF waiting for the player's word: what it does and how many caskets it costs. */ rfAction?: { kind: "slayer-complete" | "slayer-reroll"; caskets: number; text: string } | null };
   held: { dx: number; dy: number } | null; autoRetaliate: boolean; playTicks: number;
   overheads: Map<number, { text: string; until: number }>;
   /** Your owned-Friend follower, walking the tiles you leave behind. */
@@ -223,7 +225,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
     style: "accurate", autocast: null, prayers: [], target: null, activity: null, combat: null,
     attackTimer: 0, eatTimer: 0, stunned: 0, regenTimer: 0, quests: {}, questData: {},
     wardrobe: [], worn: [], follower: null, courseStep: -1, kills: 0, deaths: 0, overhead: null, music: ["theme"],
-    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, boneBag: {}, sigilBag: {}, belts: {}, followerWorn: [], orders: {}, card: { bg: "paper", frame: "rose", skills: "boxes", font: "mono", ink: "ink", layout: "classic" }, home: null, restedTicks: 0, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, friendVillage: null, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false, rerolls: 0 }, seenUpdate: LATEST_UPDATE,
+    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, boneBag: {}, sigilBag: {}, belts: {}, followerWorn: [], orders: {}, card: { bg: "paper", frame: "rose", skills: "boxes", font: "mono", ink: "ink", layout: "classic" }, home: null, restedTicks: 0, ward: null, wardUntil: 0, renew: 0, renewUntil: 0, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, friendVillage: null, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false, rerolls: 0 }, seenUpdate: LATEST_UPDATE,
     lastHitBy: null, created: Date.now(), queuedSpell: null, castTimer: 0,
   };
 }
@@ -562,6 +564,7 @@ export function bonuses(player: Player): Bonuses {
   }
   total.defence += riding(player)?.defence ?? 0;
   total.strength += heft(player) + renown(player);
+  if (player.ward) total.defence += Math.round(total.defence * player.ward.defence) + player.ward.flat;
   return total;
 }
 /** A heavy weapon: a two-handed melee weapon (greatsword, battleaxe, war hammer, maul…), not a bow or a staff. */

@@ -880,13 +880,19 @@ export const GEM_CUTTING: Record<string, { cut: string; level: number; xp: numbe
 };
 
 // ---------- Magic and prayer ----------
-export type SpellKind = "strike" | "bolt" | "blast" | "curse" | "bind" | "teleport" | "alchemy" | "superheat" | "grab" | "enchant" | "bloom";
+export type SpellKind = "strike" | "bolt" | "blast" | "curse" | "bind" | "teleport" | "alchemy" | "superheat" | "grab" | "enchant" | "bloom" | "ward" | "smite" | "mend" | "aegis" | "bless";
 export type SpellTarget = "monster" | "item" | "ground" | "self";
 export type Spell = {
   id: string; name: string; level: number; xp: number; sigils: Readonly<Record<string, number>>; kind: SpellKind; element: string; target: SpellTarget;
   maxHit?: number; teleport?: TeleportPlace; curse?: { stat: "attack" | "strength" | "defence"; amount: number };
   /** A spell learnt by deed: castable only once this quest is complete. */
   quest?: string;
+  /** Faith spells: the level is a Faith level and each cast spends this much faith. */
+  skill?: "prayer"; faith?: number;
+  /** A ward on yourself: more defence (a fraction of your bonus plus a flat amount), less damage taken (a fraction), for so many ticks. */
+  ward?: { defence?: number; flat?: number; reduce?: number; ticks: number };
+  /** Healing: at once, and/or so much a tick for so many ticks. */
+  heal?: { now?: number; perTick?: number; ticks?: number; energy?: number; cure?: boolean };
   description: string;
 };
 /** Everywhere a teleport can land (the keys of World["places"] that spells use). */
@@ -894,7 +900,9 @@ export type TeleportPlace = "hollow_square" | "emberforge" | "oasis" | "frostpea
 /** The spellbook's tabs: which kinds go where. */
 export const SPELL_TABS: readonly { id: string; name: string; kinds: readonly SpellKind[] }[] = [
   { id: "combat", name: "Combat", kinds: ["strike", "bolt", "blast"] }, { id: "curses", name: "Curses", kinds: ["curse", "bind"] },
+  { id: "wards", name: "Wards", kinds: ["ward"] },
   { id: "utility", name: "Utility", kinds: ["alchemy", "superheat", "grab", "enchant", "bloom"] }, { id: "teleports", name: "Teleports", kinds: ["teleport"] },
+  { id: "faith", name: "Faith", kinds: ["smite", "mend", "aegis", "bless"] },
 ];
 /** The Realm's spellbook, in level order: combat, curses, utility and teleports. */
 export const SPELLS: readonly Spell[] = [
@@ -936,6 +944,22 @@ export const SPELLS: readonly Spell[] = [
   { id: "enchant_rosestone", name: "Enchant Rosestone", level: 49, xp: 59, sigils: { star_sigil: 1, ember_sigil: 5 }, kind: "enchant", element: "fire", target: "item", description: "Turns a rosestone amulet (a rosestone on a string) into a rosestone pendant." },
   { id: "golden_touch", name: "Golden Touch", level: 55, xp: 65, sigils: { bloom_sigil: 1, ember_sigil: 5 }, kind: "alchemy", element: "gold", target: "item", description: "Turns an item into coins: 60% of its value." },
   { id: "ember_burst", name: "Ember Burst", level: 59, xp: 34.5, sigils: { ember_sigil: 5, breeze_sigil: 4, hollow_sigil: 1 }, kind: "blast", element: "fire", target: "monster", maxHit: 16, description: "A medium level fire missile." },
+  // ---------- Wards: the Realm's own magic turned to defence ----------
+  { id: "stone_skin", name: "Stone Skin", level: 20, xp: 30, sigils: { stone_sigil: 3, thought_sigil: 1 }, kind: "ward", element: "earth", target: "self", ward: { defence: 0.15, flat: 8, ticks: 100 }, description: "Your skin takes on the stillness of stone: +15% defence bonus and +8 for a minute." },
+  { id: "tide_shield", name: "Tide Shield", level: 40, xp: 48, sigils: { tide_sigil: 3, thought_sigil: 2 }, kind: "ward", element: "water", target: "self", ward: { reduce: 0.25, ticks: 50 }, description: "A skin of water turns a quarter of every blow aside for half a minute." },
+  { id: "storm_cloak", name: "Storm Cloak", level: 55, xp: 66, sigils: { storm_sigil: 2, breeze_sigil: 3 }, kind: "ward", element: "wind", target: "self", ward: { defence: 0.3, flat: 12, ticks: 100 }, description: "Wind wraps you: +30% defence bonus and +12 for a minute." },
+  { id: "hollow_veil", name: "Hollow Veil", level: 75, xp: 90, sigils: { hollow_sigil: 2, shade_sigil: 3 }, kind: "ward", element: "hollow", target: "self", ward: { reduce: 0.4, defence: 0.2, ticks: 60 }, description: "The Hollow's own stillness: two fifths of every blow turned aside and +20% defence, for thirty-six seconds." },
+  // ---------- Faith: the Old Friend's light, cast at a Faith level and paid for in faith ----------
+  { id: "mend", name: "Mend", level: 5, xp: 12, sigils: { star_sigil: 1 }, kind: "mend", element: "holy", target: "self", skill: "prayer", faith: 2, heal: { now: 8 }, description: "A touch of the Old Friend's light: heals 8. Costs 2 faith." },
+  { id: "holy_dart", name: "Holy Dart", level: 10, xp: 11, sigils: { star_sigil: 1, breeze_sigil: 1 }, kind: "smite", element: "holy", target: "monster", skill: "prayer", faith: 1, maxHit: 8, description: "A dart of light (max hit 8, half as much again against the undead). Costs 1 faith a cast." },
+  { id: "ward_of_light", name: "Ward of Light", level: 15, xp: 24, sigils: { star_sigil: 2 }, kind: "aegis", element: "holy", target: "self", skill: "prayer", faith: 3, ward: { defence: 0.2, flat: 6, ticks: 100 }, description: "Light settles on your shoulders: +20% defence bonus and +6 for a minute. Costs 3 faith." },
+  { id: "greater_mend", name: "Greater Mend", level: 30, xp: 36, sigils: { star_sigil: 2, tide_sigil: 1 }, kind: "mend", element: "holy", target: "self", skill: "prayer", faith: 4, heal: { now: 20 }, description: "Heals 20. Costs 4 faith." },
+  { id: "smite", name: "Smite", level: 35, xp: 28, sigils: { star_sigil: 2, ember_sigil: 1 }, kind: "smite", element: "holy", target: "monster", skill: "prayer", faith: 2, maxHit: 16, description: "A hammer of light (max hit 16, half as much again against the undead). Costs 2 faith a cast." },
+  { id: "sanctuary", name: "Sanctuary", level: 45, xp: 54, sigils: { star_sigil: 3, stone_sigil: 1 }, kind: "aegis", element: "holy", target: "self", skill: "prayer", faith: 6, ward: { reduce: 0.5, ticks: 50 }, description: "Half of every blow falls on the light instead of you, for half a minute. Costs 6 faith." },
+  { id: "blessing", name: "Blessing", level: 50, xp: 60, sigils: { star_sigil: 2, path_sigil: 1 }, kind: "bless", element: "holy", target: "self", skill: "prayer", faith: 4, heal: { now: 6, energy: 100, cure: true }, description: "Run energy restored, poison cured, and a little healing. Costs 4 faith." },
+  { id: "radiance", name: "Radiance", level: 60, xp: 44, sigils: { star_sigil: 3, ember_sigil: 2 }, kind: "smite", element: "holy", target: "monster", skill: "prayer", faith: 3, maxHit: 24, description: "A burst of the Old Friend's light (max hit 24, half as much again against the undead). Costs 3 faith a cast." },
+  { id: "renewal", name: "Renewal", level: 70, xp: 84, sigils: { star_sigil: 3, bloom_sigil: 1 }, kind: "mend", element: "holy", target: "self", skill: "prayer", faith: 6, heal: { now: 5, perTick: 3, ticks: 20 }, description: "Heals 5 now and 3 a tick for twenty ticks. Costs 6 faith." },
+  { id: "banishment", name: "Banishment", level: 80, xp: 60, sigils: { star_sigil: 4, hollow_sigil: 1 }, kind: "smite", element: "holy", target: "monster", skill: "prayer", faith: 5, maxHit: 32, description: "Light that unmakes (max hit 32, twice that against the undead). Costs 5 faith a cast." },
 ];
 export type Prayer = { id: string; name: string; level: number; drain: number; effect: Partial<{ attack: number; strength: number; defence: number; magic: number; protect: boolean }>; description: string };
 export const PRAYERS: readonly Prayer[] = [
@@ -957,6 +981,8 @@ export const PRAYERS: readonly Prayer[] = [
 export type Drop = { item: string; min: number; max: number; chance: number };
 export type MonsterDef = {
   id: string; name: string; level: number; hp: number; attack: number; strength: number; defence: number; magicDef?: number;
+  /** The element its hide is weak to: spells of that element land truer and harder (a third again). Shown beside its health bar. */
+  weakness?: "fire" | "water" | "wind" | "earth" | "holy";
   attackBonus: number; defenceBonus: number; maxHit: number; speed: number; aggressive?: boolean; size?: number;
   respawn: number; wander: number; examine: string; always?: readonly Drop[]; drops: readonly Drop[]; art: number; ink?: string;
   attackStyle?: "melee" | "magic"; boss?: boolean; slayerXp?: number;
@@ -1321,3 +1347,11 @@ export const WARDROBE = [
   { id: "starfall_cape", name: "Starfall cape", tier: 3, kind: "cape", color: "#1c1b2a" },
 ] as const;
 export type WardrobeId = typeof WARDROBE[number]["id"];
+/** What each creature's hide gives way to: cold things to fire, fiery things to water, stone to wind, bogs to fire, and the dead to holy light. */
+const WEAKNESS: Record<string, MonsterDef["weakness"]> = {
+  frost_yeti: "fire", frost_wisp: "fire", ash_drake: "water", cinder_drake: "water", emberwyrm: "water", ember_salamander: "water", ember_salamander_young: "water", ashen_colossus: "water",
+  stone_golem: "wind", moss_colossus: "fire", swamp_lurker: "fire", mire_crawler: "fire", marsh_adder: "fire", forest_spider: "fire", cave_spider: "fire", thornback: "fire", wolf: "fire", grumblin: "fire", grumblin_chief: "fire",
+  bandit: "earth", sand_scorpion: "water", dune_stalker: "water", highland_goat: "earth",
+  skeleton: "holy", shade: "holy", cairn_wight: "holy", hollow_sentinel: "holy", hollow_king: "holy", hollow_weaver: "holy", gloom_hound: "holy",
+};
+for (const [id, weakness] of Object.entries(WEAKNESS)) if (MONSTERS[id]) (MONSTERS[id] as { weakness?: MonsterDef["weakness"] }).weakness = weakness;

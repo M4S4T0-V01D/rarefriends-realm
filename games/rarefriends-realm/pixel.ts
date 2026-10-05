@@ -17,8 +17,8 @@ export function shadeHex(hex: string, amount: number) {
 const BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
 
 export class Pixels {
-  readonly data: Uint32Array;
-  constructor(readonly w: number, readonly h: number) { this.data = new Uint32Array(w * h); }
+  readonly data: Uint32Array; readonly w: number; readonly h: number;
+  constructor(w: number, h: number) { this.w = w; this.h = h; this.data = new Uint32Array(w * h); }
   inside(x: number, y: number) { return x >= 0 && y >= 0 && x < this.w && y < this.h; }
   get(x: number, y: number) { return this.inside(x, y) ? this.data[y * this.w + x] : 0; }
   set(x: number, y: number, color: string | number) {

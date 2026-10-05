@@ -15,7 +15,7 @@ import {
 } from "./engine.ts";
 import { PITCH, RENDER_PROFILE, VIEW, ZOOM, addPrint, daylight, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
 import {
-  BankModal, ChatBox, ContextMenu, DailyModal, FellowshipModal, HomeModal, JoinModal, FirstStepsCard, GuideModal, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, NamingModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
+  BankModal, ChatBox, ContextMenu, DailyModal, FellowshipModal, HomeModal, JoinModal, RfActionModal, FirstStepsCard, GuideModal, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, NamingModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
   cancelLongPress, longPress, rightClick, type MenuEntry, type Settings, type Tab,
 } from "./panels.tsx";
 import { REGULAR_SPRITES } from "./regulars.ts";
@@ -47,7 +47,13 @@ import { textureStats } from "./textures.ts";
 import "@rarefriends/friendsdk/frame.css";
 import "./style.css";
 
-const rf = (value: bigint) => `${formatGameAmount(value, 18)} RF`;
+/**
+ * Simulated $RAREFRIENDS, shown the Realm's way: the ledger counts whole tokens (a casket is one, the preview wallet holds
+ * twenty), and the Realm shows every amount a thousand times finer, so a casket reads 1,000 RF and a purse 20,000: prices
+ * in the hundreds and thousands, as a game's should. The host's own balance line is hidden so the two never disagree.
+ */
+export const RF_DISPLAY_DECIMALS = 15;
+const rf = (value: bigint) => `${formatGameAmount(value, RF_DISPLAY_DECIMALS)} RF`;
 type Phase = "loading" | "title" | "playing" | "failed";
 type Modal = "caskets" | "map" | "card" | "help" | null;
 type XpDrop = { id: number; skill: Skill; amount: number; at: number };
@@ -810,7 +816,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const drawCard = (state: Game) => {
     const paint = (art: Parameters<typeof renderCard>[2]) => {
       if (game.current !== state) return;
-      const picture = renderCard(state, friend.current, art);
+      const picture = renderCard(state, friend.current, art, state.player.follower !== null ? followerSprites.current.get(state.player.follower) ?? null : null);
       picture.toBlob(blob => { if (!blob) return; cardBlob.current = blob; setCardUrl(url => { if (url) URL.revokeObjectURL(url); return URL.createObjectURL(blob); }); });
     };
     // The fellowship's logo and background come from the site's fellowships folder; draw at once and again when they arrive.
@@ -950,6 +956,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           {guide && <GuideModal game={state} skill={guide.skill} onSkill={skill => setGuide({ skill })} onClose={() => setGuide(null)} />}
           <FellowshipModal key={`${state.ui.fellowship ? 1 : 0}:${state.player.fellowship?.name ?? ""}`} game={state} refresh={refresh} onRecruit={recruit} shareStatus={shareStatus} />
           <JoinModal game={state} refresh={refresh} />
+          <RfActionModal game={state} refresh={refresh} onRf={(caskets, after) => void casket(() => client.buy(BigInt(caskets)), () => { after(); audio.current?.sfx("coins"); })} rfPrice={caskets => rf(definition.price * BigInt(caskets))} rfBusy={busy || paused} />
           <HomeModal game={state} refresh={refresh} onRf={(caskets, after) => void casket(() => client.buy(BigInt(caskets)), () => { after(); audio.current?.sfx("coins"); })} rfPrice={caskets => rf(definition.price * BigInt(caskets))} rfBusy={busy || paused} />
           {(() => { const view = trades.current.view(); return view ? <TradeModal game={state} view={view} openMenu={(x, y, entries) => setMenu({ x, y, entries })}
             onOffer={(id, n) => { trades.current.offer(state, id, n); refresh(); }} onAccept={() => { trades.current.accept(state); refresh(); }} onDecline={() => { trades.current.decline(state); refresh(); }} /> : null; })()}

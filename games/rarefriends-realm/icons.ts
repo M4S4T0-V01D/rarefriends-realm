@@ -947,7 +947,7 @@ const ORB_PAINTERS: Record<OrbIcon, Painter> = {
 export const orbArt = (orb: OrbIcon) => icon16(`orb:${orb}`, ORB_PAINTERS[orb]);
 
 // ---------- Spell and prayer icons (generated from their element) ----------
-const ELEMENT_COLORS: Record<string, string> = { wind: "#e6ecef", water: "#8fa3c9", earth: "#a89479", fire: "#e9a07a", hollow: "#6d6b67", moon: "#c6bed4", gold: "#e2d49e", home: "#e8d4c0" };
+const ELEMENT_COLORS: Record<string, string> = { wind: "#e6ecef", water: "#8fa3c9", earth: "#a89479", fire: "#e9a07a", hollow: "#6d6b67", moon: "#c6bed4", gold: "#e2d49e", home: "#e8d4c0", holy: "#f2e28f" };
 /** Spell icon: an element orb with a shape by kind (bolt, strike, blast, curse, teleport, alchemy, utility). */
 export function spellArt(id: string, element: string, kind: string): HTMLCanvasElement {
   const color = ELEMENT_COLORS[element] ?? "#c7d3dc";
@@ -964,6 +964,10 @@ export function spellArt(id: string, element: string, kind: string): HTMLCanvasE
       case "grab": p.poly([[4, 18], [3, 9], [5, 8], [6, 12], [6, 4], [8, 4], [8, 10], [9, 3], [11, 3], [11, 10], [12, 5], [14, 6], [13, 18]], "#e8d4c0"); p.disc(15, 4, 2.5, 2.5, GOLD); break;
       case "enchant": p.disc(10, 12, 5, 5.5, "#8fa3c9"); p.poly([[10, 1], [11, 4], [14, 5], [11, 6], [10, 9], [9, 6], [6, 5], [9, 4]], "#ffffff"); break;
       case "bloom": for (const [bx, by] of [[7, 12], [12, 11], [10, 7], [14, 15], [6, 16]]) p.disc(bx, by, 2.6, 2.6, "#c6bed4"); p.line(10, 3, 10, 7, "#8e9887"); p.line(10, 3, 13, 2, "#8e9887"); break;
+      case "ward": case "aegis": p.poly([[3, 3], [17, 3], [17, 10], [10, 18], [3, 10]], color, INK); p.poly([[6, 5], [14, 5], [14, 9], [10, 14], [6, 9]], kind === "aegis" ? "#ffffff" : shadeHex(color, -0.2), null); if (kind === "aegis") { p.line(10, 6, 10, 12, GOLD, 2); p.line(7, 8, 13, 8, GOLD, 2); } break;
+      case "smite": p.poly([[10, 1], [12, 8], [19, 10], [12, 12], [10, 19], [8, 12], [1, 10], [8, 8]], color, INK); p.disc(10, 10, 2.5, 2.5, "#ffffff", null); break;
+      case "mend": p.poly([[10, 18], [2, 9], [4, 4], [8, 4], [10, 7], [12, 4], [16, 4], [18, 9]], "#e7a9b0", INK); p.line(10, 7, 10, 14, color, 2); p.line(7, 10, 13, 10, color, 2); break;
+      case "bless": p.disc(10, 10, 4, 4, color, INK); for (const [ax, ay, bx, by] of [[10, 1, 10, 4], [10, 16, 10, 19], [1, 10, 4, 10], [16, 10, 19, 10], [3, 3, 6, 6], [17, 3, 14, 6], [3, 17, 6, 14], [17, 17, 14, 14]]) p.line(ax, ay, bx, by, color, 1); break;
       default: p.disc(10, 10, 6, 6, color);
     }
     p.halo();

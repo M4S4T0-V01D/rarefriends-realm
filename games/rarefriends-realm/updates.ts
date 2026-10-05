@@ -4,6 +4,14 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 52, date: "2026-10-06", title: "The Faith spellbook, wards, weaknesses, a follower on your card, and helmets that sit right", items: [
+    "A Faith tab in the spellbook: spells cast at a Faith level that spend faith as well as sigils. Smites (Holy Dart, Smite, Radiance, Banishment) hit the undead half as hard again (Banishment twice), Mend, Greater Mend and Renewal heal, Ward of Light and Sanctuary turn blows aside, and Blessing restores your run energy and cures poison. A holy weapon autocasts them like a staff.",
+    "A Wards tab for the Realm's own magic: Stone Skin, Tide Shield, Storm Cloak and Hollow Veil steel your defence or turn a share of every blow aside for a while.",
+    "Weaknesses: every creature's hide gives way to something (yetis and wisps to fire, drakes and salamanders to water, golems to wind, bandits to earth, the dead to holy light). A spell of that element lands truer and a third harder, a coloured orb beside its health bar shows it, and Examine names it.",
+    "Your follower stands beside you on the adventurer card, in the clothes you gave it.",
+    "Simulated RF in hundreds and thousands: a Rare Casket is 1,000 RF, bundles 1,000 to 3,000, relics pay 500 to 5,000, and a fresh wallet holds 20,000. The Warden takes RF too: call a Slayer task done for two caskets (streak and points as if you'd finished it) or get a different one for a single casket.",
+    "Helmets, hoods and crowns sit on the crown of the head now: the first row of the head at least five pixels wide, so ears, horns and antennae no longer carry the hat.",
+  ] },
   { id: 51, date: "2026-10-06", title: "Belts, water barrels, a dressed follower, darker music, and capes made whole", items: [
     "A belt slot. The Apothecary's belt (Mother Yarrow, Mender Hale) holds 40 potions, 20 clean or ground herbs and 20 vials of water: brewing draws from it, and Sip (right-click it while worn) drinks a healing draught when you're hurt or the first potion otherwise. The Fletcher's belt (Hazel, Friendhollow's archery shop, Tallgrass) holds 500 shafts, 500 feathers, 500 headless arrows, 300 arrowheads and 50 bowstrings, and the knife reaches into it. Fill, Check and Empty like the other bags.",
     "Water barrels in every village square fill all your empty vials for nothing, and every village store sells vials of water and empty vials.",

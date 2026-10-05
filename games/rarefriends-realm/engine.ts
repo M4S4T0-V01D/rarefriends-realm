@@ -221,7 +221,7 @@ export function menuFor(game: Game, picks: readonly Pick[], tile: Point | null, 
       if (used) { out.push({ verb: useLabel!, noun, tone: "monster", run: g => message(g, "Nothing interesting happens.") }); continue; }
       if (monster.def.shear) out.push({ verb: "Shear", noun: monster.def.name, tone: "monster", run: g => setTarget(g, { kind: "monster", uid: monster.uid, option: "Shear" }) });
       out.push({ verb: "Attack", noun, tone: "monster", run: g => setTarget(g, { kind: "monster", uid: monster.uid, option: "Attack" }) });
-      out.push({ verb: "Examine", noun: monster.def.name, tone: "monster", run: g => message(g, monster.def.examine) });
+      out.push({ verb: "Examine", noun: monster.def.name, tone: "monster", run: g => message(g, `${monster.def.examine}${monster.def.weakness ? ` Weak to ${monster.def.weakness === "holy" ? "holy light" : monster.def.weakness}.` : ""}`) });
     } else if (pick.kind === "npc") {
       const npc = npcByUid(game, pick.id);
       if (!npc) continue;
@@ -1065,6 +1065,9 @@ export function tick(game: Game) {
   rideUpkeep(game);
   if (player.boostTicks > 0) { player.boostTicks--; if (player.boostTicks === 0) message(game, "Your referral XP boost has run out. Refer another friend for more!"); }
   if (player.restedTicks > 0) { player.restedTicks--; if (player.restedTicks === 0) message(game, "You no longer feel well rested."); }
+  if (player.ward && game.tick >= player.wardUntil) { player.ward = null; message(game, "Your ward fades."); }
+  if (player.renew > 0 && game.tick < player.renewUntil && player.hp < maxHp(player)) player.hp = Math.min(maxHp(player), player.hp + player.renew);
+  if (player.renew > 0 && game.tick >= player.renewUntil) player.renew = 0;
   // An emote ends when it's done, or when you walk off.
   if (player.emote && (game.tick >= player.emote.until || player.moved === game.tick || player.combat !== null || player.activity)) player.emote = null;
   updatePet(game);
@@ -1398,7 +1401,8 @@ function spellCost(game: Game, spell: Spell) {
   return sigils;
 }
 export function canCast(game: Game, spell: Spell) {
-  if (level(game, "magic") < spell.level) return `You need a Magic level of ${spell.level} to cast this spell.`;
+  if (level(game, spell.skill ?? "magic") < spell.level) return `You need a ${spell.skill === "prayer" ? "Faith" : "Magic"} level of ${spell.level} to cast this spell.`;
+  if (spell.faith && game.player.prayer < spell.faith) return `You need ${spell.faith} faith to cast this spell. Pray at an altar.`;
   if (spell.quest && !questDone(game, spell.quest)) return `You haven't learnt that glide yet: it comes with ${QUESTS.find(entry => entry.id === spell.quest)?.name ?? "a quest"}.`;
   for (const [sigil, n] of Object.entries(spellCost(game, spell))) if (sigilStock(game.player, sigil) < n) return "You do not have enough sigils to cast this spell.";
   return null;
@@ -1436,8 +1440,13 @@ function playerCombat(game: Game) {
     if (problem) { message(game, problem, "warn"); player.combat = null; player.queuedSpell = null; player.autocast = null; return; }
     const echo = (player.familyId === 8 && game.rng() < 0.2) || game.rng() < sigilSave(player, game);
     if (!echo) for (const [sigil, n] of Object.entries(spellCost(game, spell))) useSigils(player, sigil, n);
+    payFaith(game, spell);
     player.attackTimer = 5;
-    const prayers = prayerBoost(player), accuracy = (Math.floor(level(game, "magic") * (1 + prayers.magic)) + 8) * (bonuses(player).magic + 64) * (player.familyId === 8 ? 1.1 : 1) * boost;
+    // Its weakness: a spell of the element its hide gives way to lands truer and harder; holy light hurts the undead more.
+    if (monster.def.weakness === spell.element) boost *= 1.33;
+    if (spell.element === "holy" && monster.def.undead) boost *= spell.kind === "smite" && spell.id === "banishment" ? 2 : 1.5;
+    const castSkill: Skill = spell.skill ?? "magic";
+    const prayers = prayerBoost(player), accuracy = (Math.floor(level(game, castSkill) * (1 + prayers.magic)) + 8) * (bonuses(player).magic + bonuses(player).prayer * (castSkill === "prayer" ? 2 : 0) + 64) * (player.familyId === 8 ? 1.1 : 1) * boost;
     const defence = ((monster.def.magicDef ?? monster.def.defence) * cursed(game, monster, "defence") + 9) * (monster.def.defenceBonus + 64);
     emit(game, { type: "projectile", projectile: { from: { x: player.x, y: player.y }, to: { x: monster.x, y: monster.y }, start: game.tick, end: game.tick + 1, color: SPELL_COLORS[spell.id] ?? ELEMENT_COLORS[spell.element] ?? "#c7d3dc", style: "magic", element: spell.element } });
     sound(game, "spell");
@@ -1445,14 +1454,14 @@ function playerCombat(game: Game) {
       // Curses and Bind: a magic accuracy roll, then an effect instead of damage.
       player.queuedSpell = null; player.combat = null;
       if (game.rng() >= hitChance(accuracy, defence)) { message(game, "Your spell had no effect."); emit(game, { type: "hit", on: "monster", uid: monster.uid, damage: -1, tick: game.tick }); return; }
-      addXp(game, "magic", spell.xp);
+      addXp(game, castSkill, spell.xp);
       if (spell.kind === "bind") { monster.curses.bound = game.tick + 16; message(game, `The ${monster.def.name.toLowerCase()} is rooted to the spot.`); }
       else if (spell.curse) { monster.curses[spell.curse.stat] = game.tick + 100; message(game, `You ${spell.name.toLowerCase()} the ${monster.def.name.toLowerCase()}.`); }
       return;
     }
     const hit = game.rng() < hitChance(accuracy, defence) ? Math.floor(game.rng() * (Math.floor(spell.maxHit! * boost) + 1)) : -1;
-    addXp(game, "magic", spell.xp);
-    if (hit > 0) { addXp(game, "magic", hit * 2); addXp(game, "hitpoints", hit * 1.33); if (holy) addXp(game, "prayer", hit * FAITH_PER_HIT); }
+    addXp(game, castSkill, spell.xp);
+    if (hit > 0) { addXp(game, castSkill, hit * 2); addXp(game, "hitpoints", hit * 1.33); if (holy) addXp(game, "prayer", hit * FAITH_PER_HIT); }
     damageMonster(game, monster, Math.max(0, hit), hit < 0);
     player.queuedSpell = null;
     if (!player.autocast) player.combat = null;
@@ -1561,6 +1570,7 @@ export const fireFactor = (player: Player, game?: Game) => (fullSlayerSet(player
 export const thorns = (player: Player) => setPieces(player, "bramble");
 function damagePlayer(game: Game, damage: number, from: Monster | null) {
   const player = game.player;
+  if (player.ward?.reduce && game.tick < player.wardUntil && damage > 0) damage = Math.max(0, Math.round(damage * (1 - player.ward.reduce)));
   player.hp = Math.max(0, player.hp - damage);
   emit(game, { type: "hit", on: "player", damage, tick: game.tick });
   if (damage > 0) sound(game, "hurt");
@@ -1764,6 +1774,7 @@ export function castSpell(game: Game, id: string): Selection {
   if (problem && spell.id !== "home") { message(game, problem, "warn"); return null; }
   if (spell.target === "self") {
     if (spell.kind === "bloom") { bonebloom(game, spell); return null; }
+    if (spell.ward || spell.heal) { castOnSelf(game, spell); return null; }
     if (isUnderground(player.y) && spell.id !== "home") { message(game, "A dark force stops you from teleporting underground.", "warn"); return null; }
     if (player.combat !== null && spell.id === "home") { message(game, "You can't use Homeward during combat.", "warn"); return null; }
     stopAll(game); closeInterfaces(game);
@@ -1773,7 +1784,7 @@ export function castSpell(game: Game, id: string): Selection {
     message(game, spell.id === "home" ? "You begin to channel home…" : "You feel the Realm fold around you…"); sound(game, "spell");
     return null;
   }
-  if (spell.maxHit && isStaffEquipped(player)) {
+  if (spell.maxHit && (isStaffEquipped(player) || (spell.skill === "prayer" && !!weapon(player)?.equip?.holy))) {
     player.autocast = player.autocast === spell.id ? null : spell.id;
     message(game, player.autocast ? `Autocasting ${spell.name}. Attack to cast it; click it again to stop.` : "Autocast off.");
     return null;
@@ -1781,7 +1792,26 @@ export function castSpell(game: Game, id: string): Selection {
   return { kind: "spell", spell: spell.id };
 }
 const TELEPORT_NAMES: Record<string, string> = { hollow_square: "Friendhollow", emberforge: "Emberforge", oasis: "the Oasis", frostpeak: "Frostpeak", pier: "Pike's Pier", fernwick: "Fernwick", highcairn: "Highcairn", dawnhold: "Dawnhold", gravesend: "Gravesend", saltmarrow: "Saltmarrow", hollyhock: "Hollyhock", dyemoor: "Dyemoor", tallgrass: "Tallgrass", cragmaw: "Cragmaw", quillhaven: "Quillhaven", ashfall: "Ember Tamsin's camp at Ashfall" };
-const ELEMENT_COLORS: Record<string, string> = { wind: "#e6ecef", water: "#8fa3c9", earth: "#a89479", fire: "#e9a07a", hollow: "#6d6b67", moon: "#c6bed4", gold: "#e2d49e", home: "#e8d4c0" };
+const ELEMENT_COLORS: Record<string, string> = { wind: "#e6ecef", water: "#8fa3c9", earth: "#a89479", fire: "#e9a07a", hollow: "#6d6b67", moon: "#c6bed4", gold: "#e2d49e", home: "#e8d4c0", holy: "#f2e28f" };
+/** Faith spells spend faith as well as sigils. */
+function payFaith(game: Game, spell: Spell) { if (spell.faith) game.player.prayer = Math.max(0, game.player.prayer - spell.faith); }
+/** Wards, mending and blessings: cast on yourself, paid in sigils (and faith), XP to the spell's skill. */
+function castOnSelf(game: Game, spell: Spell) {
+  const player = game.player, notes: string[] = [];
+  payRunes(game, spell); payFaith(game, spell);
+  if (spell.ward) { player.ward = { defence: spell.ward.defence ?? 0, flat: spell.ward.flat ?? 0, reduce: spell.ward.reduce ?? 0 }; player.wardUntil = game.tick + spell.ward.ticks; notes.push(spell.ward.reduce ? `turns ${Math.round(spell.ward.reduce * 100)}% of every blow aside` : "steels your defence"); }
+  if (spell.heal) {
+    const before = player.hp;
+    if (spell.heal.now) player.hp = Math.min(maxHp(player), player.hp + spell.heal.now);
+    if (spell.heal.perTick && spell.heal.ticks) { player.renew = spell.heal.perTick; player.renewUntil = game.tick + spell.heal.ticks; notes.push(`keeps healing you`); }
+    if (spell.heal.energy) { player.energy = Math.min(100, player.energy + spell.heal.energy); notes.push("restores your run energy"); }
+    if (spell.heal.cure) { player.poison = null; notes.push("cures poison"); }
+    if (player.hp > before) notes.unshift(`heals ${player.hp - before}`);
+  }
+  addXp(game, spell.skill ?? "magic", spell.xp);
+  message(game, `You cast ${spell.name}. It ${notes.join(", ") || "settles over you"}.`); sound(game, "spell");
+  emit(game, { type: "projectile", projectile: { from: { x: player.x, y: player.y }, to: { x: player.x, y: player.y - 0.01 }, start: game.tick, end: game.tick + 1, color: SPELL_COLORS[spell.id] ?? ELEMENT_COLORS[spell.element] ?? "#f2e28f", style: "magic", element: spell.element } });
+}
 function payRunes(game: Game, spell: Spell) { for (const [sigil, n] of Object.entries(spellCost(game, spell))) useSigils(game.player, sigil, n); }
 function bonebloom(game: Game, spell: Spell) {
   const player = game.player, slots = player.inventory.map((slot, index) => slot?.id === "bones" ? index : -1).filter(index => index >= 0);
@@ -2202,7 +2232,7 @@ export type SaveData = {
   met?: unknown; achievements?: Record<string, number>; pets?: string[]; petOut?: string | null; killLog?: Record<string, number>; stats?: Record<string, number>; referredBy?: number | null; referrals?: number[]; referralTimes?: number[]; boostTicks?: number; coalBag?: number; stoneBox?: number; boneBag?: Record<string, number>;
   boosts?: Record<string, number>; poison?: { damage: number; left: number; timer: number } | null; weaponPoison?: { weapon: string; damage: number; charges: number; weaken: boolean } | null;
   antidoteUntil?: number; antifireUntil?: number; stealthUntil?: number; tonicUntil?: number; mixture?: { family: number; until: number } | null;
-  firsts?: Record<string, number>; friendKinds?: Record<string, 1>; rumours?: Record<string, 1>; orders?: Record<string, WorkOrder>; card?: Record<string, string>; home?: unknown; restedTicks?: number; sigilBag?: Record<string, number>; belts?: Record<string, Record<string, number>>; followerWorn?: string[];
+  firsts?: Record<string, number>; friendKinds?: Record<string, 1>; rumours?: Record<string, 1>; orders?: Record<string, WorkOrder>; card?: Record<string, string>; home?: unknown; restedTicks?: number; sigilBag?: Record<string, number>; ward?: { defence: number; flat: number; reduce: number } | null; wardUntil?: number; renew?: number; renewUntil?: number; belts?: Record<string, Record<string, number>>; followerWorn?: string[];
   name?: string | null; fellowship?: { name: string; tag: string; logo?: string; banner?: string; colors?: [string, string] } | null; title?: string | null; visited?: Record<string, number>; regionTicks?: Record<string, number>; talked?: Record<string, 1>; emotesUsed?: Record<string, 1>; outfits?: Record<string, 1>; friendTicks?: number; mounts?: string[]; mount?: string | null; daily?: unknown; seenUpdate?: number;
 };
 export function serialize(game: Game): SaveData {
@@ -2215,7 +2245,7 @@ export function serialize(game: Game): SaveData {
     playTicks: game.playTicks, retaliate: game.autoRetaliate, music: [...player.music],
     referredBy: player.referredBy, referrals: [...player.referrals], referralTimes: [...player.referralTimes], boostTicks: player.boostTicks, coalBag: player.coalBag, stoneBox: player.stoneBox, boneBag: { ...player.boneBag }, boosts: { ...player.boosts }, poison: player.poison ? { ...player.poison } : null, weaponPoison: player.weaponPoison ? { ...player.weaponPoison } : null,
     antidoteUntil: Math.max(0, player.antidoteUntil - game.tick), antifireUntil: Math.max(0, player.antifireUntil - game.tick), stealthUntil: Math.max(0, player.stealthUntil - game.tick), tonicUntil: Math.max(0, player.tonicUntil - game.tick), mixture: player.mixture ? { family: player.mixture.family, until: Math.max(0, player.mixture.until - game.tick) } : null,
-    firsts: { ...player.firsts } as Record<string, number>, friendKinds: { ...player.friendKinds } as Record<string, 1>, rumours: { ...player.rumours } as Record<string, 1>, orders: { ...player.orders }, card: { ...player.card }, home: player.home ? { ...player.home, furniture: { ...player.home.furniture } } : null, restedTicks: player.restedTicks, sigilBag: { ...player.sigilBag }, belts: Object.fromEntries(Object.entries(player.belts).map(([id, contents]) => [id, { ...contents }])), followerWorn: [...player.followerWorn],
+    firsts: { ...player.firsts } as Record<string, number>, friendKinds: { ...player.friendKinds } as Record<string, 1>, rumours: { ...player.rumours } as Record<string, 1>, orders: { ...player.orders }, card: { ...player.card }, home: player.home ? { ...player.home, furniture: { ...player.home.furniture } } : null, restedTicks: player.restedTicks, sigilBag: { ...player.sigilBag }, ward: player.ward ? { ...player.ward } : null, wardUntil: Math.max(0, player.wardUntil - game.tick), renew: player.renew, renewUntil: Math.max(0, player.renewUntil - game.tick), belts: Object.fromEntries(Object.entries(player.belts).map(([id, contents]) => [id, { ...contents }])), followerWorn: [...player.followerWorn],
     name: player.name, fellowship: player.fellowship ? { ...player.fellowship } : null, title: player.title, visited: { ...player.visited } as Record<string, number>, regionTicks: { ...player.regionTicks } as Record<string, number>, talked: { ...player.talked } as Record<string, 1>, emotesUsed: { ...player.emotesUsed } as Record<string, 1>, outfits: { ...player.outfits } as Record<string, 1>, friendTicks: player.friendTicks, mounts: [...player.mounts], mount: player.mount, met: JSON.parse(JSON.stringify(player.met)), achievements: { ...player.achievements }, pets: [...player.pets], petOut: player.petOut, killLog: { ...player.killLog }, stats: { ...player.stats }, daily: JSON.parse(JSON.stringify(player.daily)), seenUpdate: player.seenUpdate,
   };
 }
@@ -2330,6 +2360,8 @@ export function restore(game: Game, raw: unknown): boolean {
   player.mount = typeof save.mount === "string" && player.mounts.includes(save.mount) ? save.mount : null;
   player.daily = cleanDaily(save.daily, SKILLS); player.orders = cleanOrders(save.orders); player.card = cleanCard(save.card); player.home = cleanHome(save.home); player.restedTicks = int(save.restedTicks, 0, 100000, 0); applyHome(game);
   player.sigilBag = {}; for (const [id, n] of Object.entries(save.sigilBag ?? {})) if (isItem(id) && isSigil(id)) { const v = int(n, 0, SIGIL_BAG_SIZE, 0); if (v) player.sigilBag[id] = v; }
+  player.ward = save.ward && typeof save.ward === "object" ? { defence: Math.max(0, Math.min(1, Number(save.ward.defence) || 0)), flat: int(save.ward.flat, 0, 100, 0), reduce: Math.max(0, Math.min(0.9, Number(save.ward.reduce) || 0)) } : null; player.wardUntil = game.tick + int(save.wardUntil, 0, 1000, 0); if (!int(save.wardUntil, 0, 1000, 0)) player.ward = null;
+  player.renew = int(save.renew, 0, 50, 0); player.renewUntil = game.tick + int(save.renewUntil, 0, 1000, 0);
   player.belts = {}; for (const belt of BELTS) { const raw = save.belts?.[belt.id]; if (!raw || typeof raw !== "object") continue; for (const [id, n] of Object.entries(raw)) if (isItem(id) && belt.group(id)) beltAdd(player, belt, id, int(n, 0, 100000, 0)); }
   player.followerWorn = (save.followerWorn ?? []).filter((id): id is WardrobeId => player.wardrobe.includes(id as WardrobeId));
   player.met = cleanMet(save.met);

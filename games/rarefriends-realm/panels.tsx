@@ -18,6 +18,7 @@ import { friendSays, remember } from "./friend.ts";
 import { FELLOWSHIP_COST, FELLOWSHIP_RENAME_COST, NAME_MAX, RENAME_COST, TITLES, chooseTitle, cleanName, cleanTag, joinFellowship, leaveFellowship, nameFriend, profile, renameFellowship, setFellowshipLook, unlockedTitles } from "./presence.ts";
 import { DEFAULT_FELLOWSHIP_COLORS, FELLOWSHIP_BANNERS, FELLOWSHIP_LOGOS, INVITE_HOURS, daysSince, previewArt } from "./cardstyle.ts";
 import { fellowsKnown, recruitText, renderFellowshipCard } from "./card.ts";
+import { completeTaskForRf, rerollTaskForRf } from "./slayer.ts";
 import { HOME_LOOKS, HOME_TIERS, SLOTS, buyFurnishing, buyHome, furnishingOf, homeDeed, setHomeLook, slotOpen } from "./housing.ts";
 import { REGIONS } from "./world.ts";
 import {
@@ -408,20 +409,21 @@ function PrayerTab({ game, refresh, openMenu }: PanelProps) {
 }
 const TARGET_HINT: Record<string, string> = { monster: "Cast on a monster", item: "Cast on an item in your pack", ground: "Cast on an item on the ground", self: "Casts straight away" };
 function MagicTab({ game, refresh, setSelection, selection, openMenu }: PanelProps) {
-  const player = game.player, level = levelForXp(player.xp.magic), staff = isStaffEquipped(player), [hover, setHover] = useState<string | null>(null), [tab, setTab] = useState(SPELL_TABS[0].id);
+  const player = game.player, staff = isStaffEquipped(player), [hover, setHover] = useState<string | null>(null), [tab, setTab] = useState(SPELL_TABS[0].id);
+  const levelFor = (spell: Spell) => levelForXp(player.xp[spell.skill ?? "magic"]);
   const shown = SPELLS.find(spell => spell.id === (hover ?? (selection?.kind === "spell" ? selection.spell : player.autocast)));
   const kinds = SPELL_TABS.find(entry => entry.id === tab)?.kinds ?? SPELL_TABS[0].kinds, spells = SPELLS.filter(spell => kinds.includes(spell.kind));
   const learnt = (spell: Spell) => !spell.quest || (player.quests[spell.quest] ?? 0) >= 2;
   return (
     <div>
       <div className="realm-graphics realm-magic-tabs" role="tablist" aria-label="Spellbook">
-        {SPELL_TABS.map(entry => <button key={entry.id} type="button" role="tab" aria-selected={tab === entry.id} aria-checked={tab === entry.id} onClick={() => setTab(entry.id)}>{entry.name}<small>{SPELLS.filter(spell => entry.kinds.includes(spell.kind) && level >= spell.level && learnt(spell)).length}/{SPELLS.filter(spell => entry.kinds.includes(spell.kind)).length}</small></button>)}
+        {SPELL_TABS.map(entry => <button key={entry.id} type="button" role="tab" aria-selected={tab === entry.id} aria-checked={tab === entry.id} onClick={() => setTab(entry.id)}>{entry.name}<small>{SPELLS.filter(spell => entry.kinds.includes(spell.kind) && levelFor(spell) >= spell.level && learnt(spell)).length}/{SPELLS.filter(spell => entry.kinds.includes(spell.kind)).length}</small></button>)}
       </div>
       <div className="realm-icon-grid spells">
         {spells.map(spell => {
           const usable = !canCast(game, spell) || spell.id === "home", armed = (selection?.kind === "spell" && selection.spell === spell.id) || player.autocast === spell.id;
           return (
-            <button key={spell.id} type="button" disabled={level < spell.level || !learnt(spell)} data-usable={usable} data-locked={!learnt(spell)} aria-pressed={armed}
+            <button key={spell.id} type="button" disabled={levelFor(spell) < spell.level || !learnt(spell)} data-usable={usable} data-locked={!learnt(spell)} aria-pressed={armed}
               aria-label={`${spell.name}, level ${spell.level}${spell.quest ? `, learnt with ${QUESTS.find(entry => entry.id === spell.quest)?.name}` : ""}. ${spell.description}`}
               onMouseEnter={() => setHover(spell.id)} onMouseLeave={() => setHover(null)} onFocus={() => setHover(spell.id)}
               onClick={() => { const next = castSpell(game, spell.id); setSelection(next); refresh(); }}
@@ -442,7 +444,7 @@ function MagicTab({ game, refresh, setSelection, selection, openMenu }: PanelPro
           <div className="realm-sigils">{Object.entries(shown.sigils).map(([sigil, n]) => { const have = count(player, sigil) + (sigil === "breeze_sigil" && player.equipment.weapon === "breeze_staff" ? 999 : 0);
             return <span key={sigil} data-short={have < n}><ItemIcon slot={{ id: sigil, n: 1 }} size={26} bare />{n}<small>/{have > 998 ? "∞" : have}</small></span>; })}
             {!Object.keys(shown.sigils).length && <span>Free</span>}</div>
-        </> : <p>Magic level <b>{level}</b>. Hover a spell for details. Darts, lances and bursts, curses, Gilded Touch, Forgeheart, Far Reach, Bonebloom and six ways home.</p>}
+        </> : <p>Magic level <b>{levelForXp(player.xp.magic)}</b>, Faith <b>{levelForXp(player.xp.prayer)}</b>. Hover a spell for details. Darts, lances and bursts, wards, curses, Gilded Touch, Forgeheart, Far Reach, Bonebloom, teleports, and the Faith tab's light.</p>}
       </InfoCard>
     </div>
   );
@@ -878,6 +880,22 @@ export function HomeModal({ game, refresh, onRf, rfPrice, rfBusy }: { game: Game
         <small className="realm-muted">Simulated $RAREFRIENDS. The caskets are yours to open as well.</small>
       </>}
       <div className="realm-buttons"><button type="button" className="realm-dark" onClick={close}>Done</button></div>
+    </Modal>
+  );
+}
+/** A purchase with simulated RF that an NPC offered (the Warden's task bought done, or rerolled): confirm, and the host's casket flow runs it. */
+export function RfActionModal({ game, refresh, onRf, rfPrice, rfBusy }: { game: Game; refresh: () => void; onRf?: (caskets: number, after: () => void) => void; rfPrice?: (caskets: number) => string; rfBusy?: boolean }) {
+  const action = game.ui.rfAction;
+  if (!action) return null;
+  const close = () => { game.ui.rfAction = null; refresh(); };
+  return (
+    <Modal title="Simulated RF" onClose={close}>
+      <p className="realm-muted">{action.text}</p>
+      <p className="realm-sim">Simulated $RAREFRIENDS. No real tokens, contracts or transactions. The caskets are yours to open as well.</p>
+      <div className="realm-buttons">
+        <button type="button" className="realm-primary" disabled={rfBusy || !onRf} onClick={() => { const kind = action.kind; game.ui.rfAction = null; onRf?.(action.caskets, () => { if (kind === "slayer-complete") completeTaskForRf(game); else rerollTaskForRf(game); refresh(); }); refresh(); }}>Spend {action.caskets} casket{action.caskets === 1 ? "" : "s"}{rfPrice ? ` (${rfPrice(action.caskets)})` : ""}</button>
+        <button type="button" className="realm-dark" onClick={close}>Not now</button>
+      </div>
     </Modal>
   );
 }

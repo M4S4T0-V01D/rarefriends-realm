@@ -178,6 +178,7 @@ function RealmHost() {
   return (
     // The SDK's own frame: a 960 × 640 viewport (3:2), which the game's stage fills exactly.
     <div>
+      <style>{".rf-frame-wallet-balance { display: none; }"}</style>
       <GameHost definition={definition} frameUrl="./game.html" />
       <p style={{ margin: "10px auto 0", maxWidth: 1280, textAlign: "center", font: "13px ui-monospace, Menlo, Consolas, monospace" }}>
         <a href="./preview/#trailer">▶ Watch the trailer</a> · <a href="./preview/">About the game</a> · <a href="./preview/guides.html">Skill guides</a>

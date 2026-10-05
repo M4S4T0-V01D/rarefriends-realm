@@ -52,11 +52,18 @@ export function slayerKill(game: Game, monsterId: string) {
   const left = data(game, "slayer_left") - 1;
   player.questData.slayer_left = left;
   if (left > 0) { if (left % 10 === 0 || left <= 3) message(game, `You're doing well: ${left} left on your task.`); return; }
-  const streak = slayerStreak(game) + 1, points = Math.round((streak % 10 === 0 ? 50 : 10) * (longTasks(game) ? 1.5 : 1));
-  player.questData.slayer_streak = streak; player.questData.slayer_points = slayerPoints(game) + points;
+  finishTask(game);
+}
+/** The task is done: a point of streak, Slayer points (five times over every tenth), and the Warden's regard. */
+export function finishTask(game: Game) {
+  const player = game.player, streak = slayerStreak(game) + 1, points = Math.round((streak % 10 === 0 ? 50 : 10) * (longTasks(game) ? 1.5 : 1));
+  player.questData.slayer_left = 0; player.questData.slayer_streak = streak; player.questData.slayer_points = slayerPoints(game) + points;
   message(game, `You've completed your Slayer task (${streak} in a row) and earned ${points} Slayer points. Return to the Warden for another.`, "quest");
   sound(game, "quest");
 }
+/** Simulated RF at the Warden's: buy the task done (it still counts for the streak), or a different one. */
+export function completeTaskForRf(game: Game) { if (!currentTask(game)) return false; finishTask(game); return true; }
+export function rerollTaskForRf(game: Game) { if (!currentTask(game)) return false; game.player.questData.slayer_streak = Math.max(0, slayerStreak(game)); return assignTask(game, true); }
 /** Spend Slayer points. */
 export function buySlayerReward(game: Game, id: string) {
   const reward = SLAYER_REWARDS.find(entry => entry.id === id);

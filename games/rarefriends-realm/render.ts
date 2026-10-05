@@ -1306,6 +1306,7 @@ function interpolate(entity: { x: number; y: number; prev: { x: number; y: numbe
   return { x: entity.prev.x + (entity.x - entity.prev.x) * alpha, y: entity.prev.y + (entity.y - entity.prev.y) * alpha, moving: alpha < 1 };
 }
 /** A health bar: green over red, ink outline. `label` (a level) sits to its left. */
+const WEAKNESS_COLORS: Record<string, string> = { fire: "#e9a07a", water: "#8fa3c9", wind: "#e6ecef", earth: "#a89479", holy: "#f2e28f" }, WEAKNESS_GLYPH: Record<string, string> = { fire: "F", water: "W", wind: "A", earth: "E", holy: "✚" };
 function hpBar(ctx: CanvasRenderingContext2D, x: number, y: number, fraction: number, z: number, width = 30, label?: string) { ui(ctx, ctx => {
   const w = width * z, h = 4.5 * Math.max(0.85, z), left = x - w / 2;
   ctx.fillStyle = "#cf6e6e"; ctx.fillRect(left, y, w, h);
@@ -2407,7 +2408,11 @@ function drawMonster(ctx: CanvasRenderingContext2D, scene: Scene, monster: Monst
   // Health and level show while it's fighting: attacking you, your target, in another player's fight, or hit lately.
   const fighting = monster.target || game.player.combat === monster.uid || scene.hits.some(entry => entry.on === "monster" && entry.uid === monster.uid && now - entry.at < 4000)
     || (scene.peers ?? []).some(peer => peer.p.fight?.u === monster.uid);
-  if (fighting) hpBar(ctx, s.x, rect.y - 8 * z, monster.hp / monster.def.hp, z, 24 + 10 * size, `${monster.def.level}`);
+  if (fighting) {
+    hpBar(ctx, s.x, rect.y - 8 * z, monster.hp / monster.def.hp, z, 24 + 10 * size, `${monster.def.level}`);
+    // Its weakness: a little coloured orb beside the bar (fire, water, wind, earth or holy light).
+    if (monster.def.weakness) { const w = (24 + 10 * size) * z, ex = s.x + w / 2 + 6 * z, ey = rect.y - 8 * z + 2.25 * Math.max(0.85, z); ui(ctx, ctx => { ctx.fillStyle = WEAKNESS_COLORS[monster.def.weakness!] ?? "#fff"; ctx.strokeStyle = INK; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(ex, ey, 4 * Math.max(0.85, z), 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.fillStyle = INK; ctx.font = `bold ${Math.round(6 * Math.max(0.85, z))}px ui-monospace, monospace`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(WEAKNESS_GLYPH[monster.def.weakness!] ?? "?", ex, ey + 0.5); }); }
+  }
   for (const hit of recent) splat(ctx, s.x, s.y - rect.h / 2, hit.damage, z, (now - hit.at) / 1100);
   void game;
 }

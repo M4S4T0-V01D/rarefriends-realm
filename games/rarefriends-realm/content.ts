@@ -613,7 +613,11 @@ function talkInner(game: Game, npcId: string): Dialogue {
   switch (npcId) {
     case "slayer_master:assignment": case "slayer_master": {
       const task = currentTask(game);
-      if (task) return chat(name, npcSays(name, `${taskText(game)} Come back when they're done.`, `Points: ${slayerPoints(game)}. Tasks in a row: ${slayerStreak(game)}. Every tenth task pays five times over.`));
+      if (task) return chat(name, npcSays(name, `${taskText(game)} Come back when they're done.`, `Points: ${slayerPoints(game)}. Tasks in a row: ${slayerStreak(game)}. Every tenth task pays five times over.`), [
+        { label: "Call it done (two caskets of RF).", then: () => { game.ui.rfAction = { kind: "slayer-complete", caskets: 2, text: `The Warden marks your task done for two Rare Caskets' worth of simulated RF: the streak and the points are yours as if you'd finished it (${taskText(game)}).` }; return null; } },
+        { label: "Give me a different one (one casket of RF).", then: () => { game.ui.rfAction = { kind: "slayer-reroll", caskets: 1, text: "A fresh task for one Rare Casket's worth of simulated RF; your streak stands." }; return null; } },
+        { label: "I'll get on with it.", then: () => null },
+      ]);
       if (npcId === "slayer_master") return chat(name, npcSays(name, "Slayer is simple. I tell you what to kill, you kill that many, I pay you in points. Some things only a Slayer knows how to hurt."), [
         { label: "Give me a task.", then: () => talk(game, "slayer_master:assignment") },
         { label: "What can points buy?", then: () => talk(game, "slayer_master:rewards") },

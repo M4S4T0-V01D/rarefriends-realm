@@ -950,7 +950,7 @@ test("Teleports to the wider world, learnt by quest and level, in a tabbed spell
   const glides = SPELLS.filter(spell => spell.kind === "teleport");
   assert(glides.length >= 17, `a glide for every settlement (${glides.length})`);
   for (const spell of glides) { const at = world.places[spell.teleport]; assert(at && [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1]].some(([dx, dy]) => canWalk(g, at.x + dx, at.y + dy)), `${spell.name} lands by walkable ground`); }
-  assert.equal(SPELL_TABS.length, 4); for (const spell of SPELLS) assert(SPELL_TABS.some(tab => tab.kinds.includes(spell.kind)), `${spell.name} has a tab`);
+  assert.equal(SPELL_TABS.length, 6); for (const spell of SPELLS) assert(SPELL_TABS.some(tab => tab.kinds.includes(spell.kind)), `${spell.name} has a tab`);
   p.xp.magic = XP_TABLE[99]; for (const sigil of ["path_sigil", "shade_sigil", "hollow_sigil", "breeze_sigil", "bloom_sigil", "stone_sigil"]) give(p, sigil, 20);
   assert.match(canCast(g, SPELLS.find(spell => spell.id === "glide_gravesend")), /Lanterns for the Dead/, "locked until the quest is done");
   assert.equal(castSpell(g, "glide_gravesend"), null); assert.notEqual(p.activity?.kind, "teleport");
@@ -2176,4 +2176,35 @@ test("Belts at the waist, barrels that fill vials, a follower in your wardrobe, 
   const save = JSON.parse(JSON.stringify(serialize(g))), fresh = newGame(); assert(restore(fresh, save)); assert.deepEqual(fresh.player.followerWorn, p.followerWorn); assert.equal(fresh.player.belts.apothecary_belt.vial_of_water, 6); assert.equal(fresh.player.equipment.belt, "apothecary_belt");
   // Every area track has a drummer and a drone now.
   for (const track of TRACKS) if (track.id !== "theme") { assert(track.hits.some(hit => hit.drum === "deep"), `${track.name} has a deep drum`); assert(track.notes.some(note => note.voice === "drone"), `${track.name} has a drone`); }
+});
+
+test("Faith spells, wards, weaknesses, and the crown of the head", async () => {
+  const { castSpell, canCast, onMonsterKilled: _k } = await import("../games/rarefriends-realm/engine.ts"); void _k;
+  const { bonuses: bon, maxHp: mh } = await import("../games/rarefriends-realm/state.ts");
+  const g = newGame(), p = g.player; p.inventory.fill(null);
+  assert(MONSTERS.frost_yeti.weakness === "fire" && MONSTERS.skeleton.weakness === "holy" && MONSTERS.ash_drake.weakness === "water", "weaknesses by hide");
+  const mend = SPELLS.find(spell => spell.id === "mend"); assert.equal(mend.skill, "prayer"); assert(SPELL_TABS.some(tab => tab.id === "faith" && tab.kinds.includes("mend")));
+  assert.match(canCast(g, mend), /Faith level/); p.xp.prayer = XP_TABLE[80]; p.prayer = 0; assert.match(canCast(g, mend), /faith to cast/);
+  p.prayer = 20; give(p, "star_sigil", 50); give(p, "tide_sigil", 10); give(p, "stone_sigil", 10); give(p, "thought_sigil", 10); give(p, "path_sigil", 5); give(p, "bloom_sigil", 5);
+  p.hp = 1; const faith = p.xp.prayer; castSpell(g, "mend"); assert.equal(p.hp, 9, "Mend heals 8"); assert.equal(p.prayer, 18, "and costs 2 faith"); assert(p.xp.prayer > faith, "Faith XP"); assert.equal(count(p, "star_sigil"), 49);
+  const before = bon(p).defence; castSpell(g, "ward_of_light"); assert(p.ward && p.wardUntil > g.tick); assert(bon(p).defence >= before + 6, "a ward steels your defence");
+  for (let i = 0; i < 101; i++) tick(g); assert.equal(p.ward, null, "wards fade");
+  castSpell(g, "sanctuary"); assert.equal(p.ward.reduce, 0.5);
+  p.xp.magic = XP_TABLE[40]; castSpell(g, "stone_skin"); assert.equal(p.ward.flat, 8, "the Realm's own wards replace a faith ward");
+  p.xp.hitpoints = XP_TABLE[60]; p.hp = 10; castSpell(g, "renewal"); for (let i = 0; i < 5; i++) tick(g); assert(p.hp >= 10 + 5 + 3 * 4, "Renewal heals over time");
+  p.prayer = 50; p.energy = 0; p.poison = { damage: 2, left: 3, timer: 5 }; castSpell(g, "blessing"); assert.equal(p.energy, 100); assert.equal(p.poison, null);
+  const save = JSON.parse(JSON.stringify(serialize(g))), fresh = newGame(); assert(restore(fresh, save)); assert(fresh.player.ward && fresh.player.wardUntil > fresh.tick, "a ward survives a save");
+  // Hats sit on the first row five pixels wide: a Friend with antennae keeps its hat on its head.
+  const { measure } = await import("../games/rarefriends-realm/wardrobe.ts");
+  const eared = ["......#..#......", "......#..#......", "....########....", "...##########...", "...##########...", "....########....", ".....######.....", ".......##.......", "....########....", "....########....", "....########....", "....########....", ".....##..##.....", ".....##..##.....", ".....##..##.....", ".....##..##....."];
+  const m = measure(eared); assert.equal(m.top, 0); assert.equal(m.crownTop, 2, "the crown starts under the antennae"); assert.equal(m.crownWidth, 10);
+  void mh;
+});
+
+test("The Warden takes RF: a task bought done keeps the streak and pays points; a reroll gives a different task", async () => {
+  const { assignTask, currentTask, slayerPoints, slayerStreak, completeTaskForRf, rerollTaskForRf } = await import("../games/rarefriends-realm/slayer.ts");
+  const g = newGame(), p = g.player; for (const s of ["attack", "strength", "defence", "hitpoints"]) p.xp[s] = XP_TABLE[60];
+  assert(!completeTaskForRf(g), "nothing to complete without a task"); assert(assignTask(g)); const first = currentTask(g).name, points = slayerPoints(g);
+  assert(rerollTaskForRf(g)); assert(currentTask(g), "a task again"); void first;
+  assert(completeTaskForRf(g)); assert.equal(slayerStreak(g), 1); assert(slayerPoints(g) > points, "points as if finished"); assert.equal(currentTask(g), null, "and the task is done");
 });

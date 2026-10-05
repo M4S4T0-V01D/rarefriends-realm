@@ -17,7 +17,7 @@ const INK = "#161616";
 const cache = new Map<string, HTMLCanvasElement>();
 type Span = { min: number; max: number };
 /** Silhouette measurements of a sprite frame (in sprite pixels). */
-function measure(rows: Mask) {
+export function measure(rows: Mask) {
   const spans: (Span | null)[] = rows.map(row => { const min = row.indexOf("#"), max = row.lastIndexOf("#"); return min < 0 ? null : { min, max }; });
   const top = Math.max(0, spans.findIndex(Boolean)), bottom = spans.length - 1 - Math.max(0, [...spans].reverse().findIndex(Boolean));
   const body = spans.slice(top, bottom + 1).filter(Boolean) as Span[];
@@ -26,13 +26,17 @@ function measure(rows: Mask) {
   for (let y = top + 2; y <= top + Math.round((bottom - top) * 0.6); y++) { const span = spans[y]; if (span && span.max - span.min < narrowest) { narrowest = span.max - span.min; neck = y; } }
   const headRows = spans.slice(top, neck + 1).filter(Boolean) as Span[];
   const headLeft = Math.min(...headRows.map(span => span.min)), headRight = Math.max(...headRows.map(span => span.max));
-  // Headwear sits on the crown of the head: the centre and width of the top two rows.
-  const crownRows = spans.slice(top, top + 2).filter(Boolean) as Span[];
+  // Headwear sits on the crown of the head: the first row that's five pixels or wider (ears, horns and antennae poking
+  // up above it don't count), and the row below it, give the centre and width.
+  let crownTop = top;
+  while (crownTop < neck && (spans[crownTop]?.max ?? 0) - (spans[crownTop]?.min ?? 0) + 1 < 5) crownTop++;
+  if (crownTop >= neck) crownTop = top;
+  const crownRows = spans.slice(crownTop, crownTop + 2).filter(Boolean) as Span[];
   const crownLeft = Math.min(...crownRows.map(span => span.min)), crownRight = Math.max(...crownRows.map(span => span.max));
   // Four-legged (or more): three or more separate legs in one of the lowest rows.
   const runs = (row: string) => (row.match(/#+/g) ?? []).length;
   const quadruped = rows.slice(Math.max(top, bottom - 2), bottom + 1).some(row => runs(row) >= 3);
-  return { spans, top, bottom, left, right, neck, headLeft, headRight, centre: (crownLeft + crownRight + 1) / 2, crownWidth: crownRight - crownLeft + 1, quadruped };
+  return { spans, top, crownTop, bottom, left, right, neck, headLeft, headRight, centre: (crownLeft + crownRight + 1) / 2, crownWidth: crownRight - crownLeft + 1, quadruped };
 }
 /**
  * Your Friend's frame with its worn pieces, as a pixel canvas twice the sprite's resolution.
@@ -86,7 +90,7 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
   const p = new Pixels(W, H), m = measure(rows), back = facing === "up", side = facing === "left" ? -1 : facing === "right" ? 1 : 0;
   // Fine-grid coordinates: sprite pixel (x, y) covers fine pixels [X(x), X(x)+1] × [Y(y), Y(y)+1].
   const X = (x: number) => (x + PAD_X) * K, Y = (y: number) => (y + PAD_TOP) * K, sway = [0, 1, 0, -1][phase & 3];
-  const cx = X(m.centre) - 0.5, headTop = Y(m.top), neckY = Y(m.neck) + 1, feet = Y(m.bottom) + 1;
+  const cx = X(m.centre) - 0.5, headTop = Y(m.crownTop), neckY = Y(m.neck) + 1, feet = Y(m.bottom) + 1;
   const headHalf = Math.max(4, Math.min(7, m.crownWidth * K / 2 + 1));
   const bodySpan = (y: number) => m.spans[y] ?? { min: m.left, max: m.right };
   const cape = pieces.find(piece => piece.kind === "cape"), wings = pieces.find(piece => piece.kind === "wings"), quiver = pieces.find(piece => piece.kind === "quiver"), satchel = pieces.find(piece => piece.kind === "satchel");
@@ -333,7 +337,7 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
         // Open at the face (with a nose guard) from the front, the opening turned the way you look from the side, and
         // closed from behind with a ridge down the back.
         const rim = Math.min(neckY - 1, top + 7), mid = Math.round(cx), helm = new Pixels(p.w, p.h);
-        const crown = { min: Math.min(...[m.top, m.top + 1].map(row => bodySpan(row).min)), max: Math.max(...[m.top, m.top + 1].map(row => bodySpan(row).max)) };
+        const crown = { min: Math.min(...[m.crownTop, m.crownTop + 1].map(row => bodySpan(row).min)), max: Math.max(...[m.crownTop, m.crownTop + 1].map(row => bodySpan(row).max)) };
         const rowSpan = (y: number) => {
           const span = m.spans[Math.floor(y / K) - PAD_TOP] ?? crown;
           return [X(Math.max(crown.min - 1, span.min)) - 1, X(Math.min(crown.max + 1, span.max)) + 2] as const;
