@@ -46,7 +46,7 @@ function mainlandMargin(x: number, y: number, tile: number) {
 
 export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
   const { W, tiles, lift, random, noise, noise2 } = ctx, OH = OVERWORLD_H;
-  const { get, put, setRegion, blob, regionBlob, road, river, decor, tree, rock, spot, scatter, monsters, add, clearAt, free, tileIndex, inBounds, fillRect, rockCluster, npc } = t;
+  const { get, put, setRegion, blob, regionBlob, road, river, decor, tree, rock, spot, scatter, monsters, add, clearAt, free, tileIndex, inBounds, fillRect, rockCluster, npc, building } = t;
   const inMainland = (x: number, y: number) => x >= MAINLAND_RECT.x0 && x <= MAINLAND_RECT.x1 && y >= MAINLAND_RECT.y0 && y <= MAINLAND_RECT.y1;
   /** Paint a tile unless it's part of the mainland proper. */
   const paint = (x: number, y: number, terrain: number) => { if (inBounds(x, y) && y < OH && mainlandMargin(x, y, get(x, y))) put(x, y, terrain); };
@@ -536,8 +536,8 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
     // wall you step through by clicking, barred from the courtyard side while a match is on.
     for (const dx of [-1, 0, 1]) for (const r of [outer, outer - 1, outer + 1]) put(cx + dx, cy + r, T.STONE);
     for (const r of [inner - 2, inner - 1, inner, inner + 1, inner + 2]) { put(cx, cy + r, T.STONE); put(cx, cy - r, T.STONE); put(cx + r, cy, T.STONE); put(cx - r, cy, T.STONE); }
-    for (const [gx, gy, tx, ty] of [[cx, cy + inner, cx, cy + inner - 2], [cx, cy - inner, cx, cy - inner + 2], [cx + inner, cy, cx + inner - 2, cy], [cx - inner, cy, cx - inner + 2, cy]] as const) {
-      add({ kind: "ladder", x: gx, y: gy, blocks: true, name: "Arena gate", action: "Go-through", to: { x: tx, y: ty } });
+    for (const [gx, gy, tx, ty, axis] of [[cx, cy + inner, cx, cy + inner - 2, "ew"], [cx, cy - inner, cx, cy - inner + 2, "ew"], [cx + inner, cy, cx + inner - 2, cy, "ns"], [cx - inner, cy, cx - inner + 2, cy, "ns"]] as const) {
+      add({ kind: "ladder", look: "gate", axis, x: gx, y: gy, blocks: true, name: "Arena gate", action: "Go-through", to: { x: tx, y: ty } });
     }
     // The courtyard: a garden to the north-west, a rock field to the south-east, a little volcano to the north-east, and
     // the Ringmaker's fountain in the middle, running red.
@@ -549,29 +549,35 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
       else if (x > cx + 3 && y > cy + 3) put(x, y, T.GRAVEL);
       else if (x < cx - 3 && y < cy - 3 && noise2(x * 1.3, y * 1.3) > 0.55) put(x, y, T.DARK_GRASS);
     }
+    // The fighting pit: a round of sand about the fountain, ringed by torches, with cobbled ways in from the four gates.
+    for (let y = cy - 8; y <= cy + 8; y++) for (let x = cx - 8; x <= cx + 8; x++) { const t = get(x, y); if (Math.hypot(x - cx + 0.5, y - cy + 0.5) < 6.5 && (t === T.GRASS || t === T.DARK_GRASS)) put(x, y, T.SAND); }
+    for (let r = 7; r <= inner - 3; r++) for (const [x, y] of [[cx, cy + r], [cx - 1, cy + r], [cx, cy - r], [cx - 1, cy - r], [cx + r, cy], [cx + r, cy - 1], [cx - r, cy], [cx - r, cy - 1]] as const) { const t = get(x, y); if (t !== T.LAVA && t !== T.CLIFF && t !== T.WALL) put(x, y, T.COBBLE); }
+    for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4 + Math.PI / 8, x = Math.round(cx - 0.5 + Math.cos(a) * 7.5), y = Math.round(cy - 0.5 + Math.sin(a) * 7.5); clearAt(x, y); decor(x, y, "torch", true); }
+    for (const [x, y] of [[cx - 2, cy + inner - 2], [cx + 2, cy + inner - 2], [cx - 2, cy - inner + 2], [cx + 2, cy - inner + 2], [cx + inner - 2, cy - 2], [cx + inner - 2, cy + 2], [cx - inner + 2, cy - 2], [cx - inner + 2, cy + 2]] as const) { clearAt(x, y); decor(x, y, "banner", true, "The Ring's banner"); }
     for (const [fx, fy] of [[cx - 1, cy - 1], [cx, cy - 1], [cx - 1, cy], [cx, cy]] as const) add({ kind: "fountain", x: fx, y: fy, blocks: true, name: "Blood fountain" });
     decor(cx, cy - 3, "old_friend", true, "The Ringmaker, the Hoverer who built the Ring: the fountain at its feet runs red");
     for (const [dx, dy] of [[-3, -1], [3, -1], [-3, 2], [3, 2]] as const) decor(cx + dx, cy + dy, "flowers", false);
     // Skulls and rib cages everywhere, flowers among them; boulders and rubble on the rocks; bushes and trees in the garden.
     const open = (x: number, y: number) => dist(x, y) < inner - 1.5 && get(x, y) !== T.LAVA && get(x, y) !== T.CLIFF && ctx.objectAt[tileIndex(x, y)] < 0 && Math.hypot(x - cx + 0.5, y - cy + 0.5) > 2.5;
     scatter(cx - inner, cy - inner, cx + inner, cy + inner, 44, (x, y) => decor(x, y, "bones", false, "Old bones"), open);
-    scatter(cx - inner, cy - inner, cx + inner, cy + inner, 26, (x, y) => decor(x, y, "flowers", false), (x, y) => open(x, y) && (x < cx || y < cy) && get(x, y) !== T.GRAVEL && get(x, y) !== T.ASH);
+    scatter(cx - inner, cy - inner, cx + inner, cy + inner, 26, (x, y) => decor(x, y, "flowers", false), (x, y) => open(x, y) && (x < cx || y < cy) && get(x, y) !== T.GRAVEL && get(x, y) !== T.ASH && get(x, y) !== T.SAND && get(x, y) !== T.COBBLE);
     scatter(cx + 3, cy + 3, cx + inner, cy + inner, 7, (x, y) => decor(x, y, "boulder"), (x, y) => open(x, y) && get(x, y) === T.GRAVEL);
     scatter(cx + 3, cy + 3, cx + inner, cy + inner, 6, (x, y) => decor(x, y, "rubble", false), (x, y) => open(x, y) && get(x, y) === T.GRAVEL);
-    scatter(cx - inner, cy - inner, cx - 3, cy - 3, 6, (x, y) => decor(x, y, "bush"), open);
+    scatter(cx - inner, cy - inner, cx - 3, cy - 3, 6, (x, y) => decor(x, y, "bush"), (x, y) => open(x, y) && get(x, y) !== T.SAND && get(x, y) !== T.COBBLE);
     scatter(cx - inner, cy - inner, cx - 3, cy - 3, 4, (x, y) => tree(x, y, "tree"), (x, y) => open(x, y) && dist(x, y) > 9);
     scatter(cx - inner, cy + 3, cx - 3, cy + inner, 3, (x, y) => tree(x, y, "deadwood"), (x, y) => open(x, y) && dist(x, y) > 9);
     // The concourse: pillars along both walls, torches between, banners at the gate.
     for (let k = 0; k < 24; k++) {
       const a = k * Math.PI / 12;
-      for (const r of [inner + 2, outer - 2]) { const x = Math.round(cx + Math.cos(a) * r), y = Math.round(cy + Math.sin(a) * r); if (get(x, y) === T.STONE && ctx.objectAt[tileIndex(x, y)] < 0 && Math.abs(x - cx) > 2 && !(Math.abs(y - cy) <= 2 && r === inner + 2)) decor(x, y, "pillar"); }
+      for (const r of [inner + 2, outer - 2]) { const x = Math.round(cx + Math.cos(a) * r), y = Math.round(cy + Math.sin(a) * r); if (get(x, y) === T.STONE && ctx.objectAt[tileIndex(x, y)] < 0 && Math.abs(x - cx) > 2 && !(Math.abs(y - cy) <= 2 && r === inner + 2) && !(Math.abs(y - cy) <= 2 && x < cx - 20)) decor(x, y, "pillar"); }
       if (k % 3 === 1) { const x = Math.round(cx + Math.cos(a) * (inner + 4)), y = Math.round(cy + Math.sin(a) * (inner + 4)); if (get(x, y) === T.STONE && ctx.objectAt[tileIndex(x, y)] < 0) decor(x, y, "torch", true); }
     }
     decor(cx - 2, cy + outer + 2, "banner", true, "The Ring's banner"); decor(cx + 2, cy + outer + 2, "banner", true, "The Ring's banner");
+    for (const x of [cx - 6, cx + 6]) { clearAt(x, cy + outer - 3); decor(x, cy + outer - 3, "statue", true, "A champion of the Ring, in stone"); }
     // The people of the Ring, around the concourse; the lobby is the south of it, by the Ringmaster.
     const on = (a: number, r: number): [number, number] => [Math.round(cx + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r)];
     const stand = (id: string, a: number, r = 20) => { const [x, y] = on(a, r); clearAt(x, y); put(x, y, T.STONE); npc(id, x, y); };
-    stand("ringmaster", Math.PI / 2 + 0.1); stand("ring_apothecary", Math.PI / 3); stand("ring_chaplain", Math.PI * 2 / 3); stand("ring_sigilist", Math.PI / 6); stand("ring_fletcher", Math.PI * 5 / 6);
+    stand("ringmaster", Math.PI / 2 + 0.1); stand("ring_apothecary", Math.PI / 3); stand("ring_sigilist", Math.PI / 6); stand("ring_fletcher", Math.PI * 5 / 6);
     stand("ring_armourer", 0); stand("ring_quartermaster", Math.PI); stand("ring_champion", Math.PI * 3 / 2);
     // Each shop's stall round its keeper: a counter either side along the concourse, and its wares behind.
     const stall = (a: number, left: DecorKind, right: DecorKind, back: DecorKind | null, backName?: string) => {
@@ -581,12 +587,26 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
         clearAt(x, y); decor(x, y, kind, true, name);
       }
     };
-    stall(Math.PI / 3, "table", "barrel", "shelf", "Tonics and tinctures"); stall(Math.PI * 2 / 3, "table", "bench", "old_friend", "A small shrine to the Ringmaker");
+    stall(Math.PI / 3, "table", "barrel", "shelf", "Tonics and tinctures");
     stall(Math.PI / 6, "shelf", "table", "crate", "Sigil crates"); stall(Math.PI * 5 / 6, "crate", "table", "target", "Practice target");
     stall(0, "armour", "table", "armour", "A suit of glimmer, on a stand"); stall(Math.PI, "armour", "chest", "banner", "The Pit's banner"); stall(Math.PI * 3 / 2, "banner", "banner", "throne", "The Champion's seat");
+    // The Ring's chapel, built against the west wall with its door into the concourse: white stone under a gabled roof
+    // with a round bell tower at its north-west corner (open from the nave), an altar with the Old Friend behind it at
+    // the west end, pews either side of a carpeted aisle, torches and the Ring's banners. Chaplain Orrin keeps it, and
+    // sells faith potions, holy sigils, vestments, maces and the aegis from it.
+    {
+      const x0 = cx - 31, y0 = cy - 3, x1 = cx - 24, y1 = cy + 3;
+      for (let y = y0 - 3; y <= y1; y++) for (let x = x0 - 1; x <= x1; x++) { clearAt(x, y); setRegion(x, y, "friends_ring"); if (get(x, y) === T.WATER || get(x, y) === T.DEEP) put(x, y, T.GRASS); }
+      building(x0, y0, x1, y1, "e", T.STONE, cy, { name: "Ring Chapel", color: "#e8e4d6", walls: "stone", storeys: 2, tall: 8 });
+      building(x0 - 1, y0 - 3, x0 + 2, y0, "s", T.STONE, x0, { name: "Chapel bell tower", color: "#e8e4d6", walls: "stone", roof: "cone", round: true, storeys: 3, spire: 22 });
+      for (let x = x0 + 3; x <= x1 - 1; x++) { put(x, cy, T.CARPET); put(x, cy + 1, T.CARPET); }
+      add({ kind: "altar", x: x0 + 2, y: cy, blocks: true, name: "Chapel altar" }); decor(x0 + 1, cy, "old_friend", true, "The Old Friend, who the Ringmaker fought by");
+      for (const y of [y0 + 1, y1 - 1]) { decor(x0 + 1, y, "torch", true); for (let x = x0 + 3; x <= x0 + 5; x++) decor(x, y, "bench", true, "Pew"); decor(x1 - 1, y, "banner", true, "The Ring's banner"); }
+      npc("ring_chaplain", x0 + 5, cy);
+    }
     // Old walls in the courtyard: what stood here before the Ring, left as cover.
     for (const [x, y] of [[cx - 10, cy + 6], [cx - 9, cy + 6], [cx - 8, cy + 6], [cx - 8, cy + 7], [cx + 2, cy + 11], [cx + 3, cy + 11], [cx + 4, cy + 11], [cx - 12, cy - 2], [cx - 12, cy - 1], [cx - 11, cy - 3], [cx + 6, cy - 12], [cx + 7, cy - 12], [cx + 1, cy - 11], [cx - 5, cy + 12], [cx - 4, cy + 12]] as const) {
-      if (dist(x, y) < inner - 1.5 && get(x, y) !== T.LAVA && get(x, y) !== T.CLIFF) { clearAt(x, y); decor(x, y, "ruin_wall", true, "Ruined wall"); }
+      if (dist(x, y) < inner - 1.5 && get(x, y) !== T.LAVA && get(x, y) !== T.CLIFF && get(x, y) !== T.COBBLE && get(x, y) !== T.SAND) { clearAt(x, y); decor(x, y, "ruin_wall", true, "Ruined wall"); }
     }
     // Statues of the Seven along the courtyard's rim, between the gates: the knights the Ring's hardest match summons.
     const SEVEN: readonly [string, string, "whole" | "toppled" | "broken" | "buried"][] = [["revenant_warden", "Revenant warden", "whole"], ["revenant_lancer", "Revenant lancer", "broken"], ["revenant_hexer", "Revenant hexer", "whole"], ["skeletal_champion", "Skeletal champion", "toppled"], ["skeletal_bowmaster", "Skeletal bowmaster", "whole"], ["bone_juggernaut", "Bone juggernaut", "buried"], ["revenant_king", "The Revenant King", "whole"]];
@@ -601,6 +621,12 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
     // A road from the Deadwood's bridge to the gate (a ruin in its way is cleared: nobody builds a road through a wall).
     road([[249, 103], [236, 101], [222, 100], [cx, cy + outer + 3]]);
     for (let y = 95; y <= 112; y++) for (let x = 205; x <= 252; x++) { const o = ctx.objectAt[tileIndex(x, y)]; if (get(x, y) === T.PATH && o >= 0 && ctx.objects[o].decor === "ruin_wall") clearAt(x, y); }
+    // The forecourt before the south gate, laid after the road so the road doesn't clear it: cobbles, lamps, benches and practice targets, so the Ring is busy at its door.
+    // (Four rows deep: the Deadwood's ruined hall, laid later, begins a row further south.)
+    for (let y = cy + outer + 1; y <= cy + outer + 4; y++) for (let x = cx - 5; x <= cx + 5; x++) { if (get(x, y) === T.STONE) continue; clearAt(x, y); setRegion(x, y, "friends_ring"); put(x, y, T.COBBLE); }
+    for (const [x, y] of [[cx - 5, cy + outer + 1], [cx + 5, cy + outer + 1], [cx - 5, cy + outer + 4], [cx + 5, cy + outer + 4]] as const) decor(x, y, "lamp");
+    for (const [x, y] of [[cx - 3, cy + outer + 4], [cx + 3, cy + outer + 4]] as const) decor(x, y, "target", true, "Practice target");
+    for (const [x, y] of [[cx - 5, cy + outer + 2], [cx + 5, cy + outer + 2]] as const) decor(x, y, "bench");
   }
   // Everywhere a walker can get to from the spawn (over walkable ground, round blocking objects, down ladders and over the ferry):
   // herbs only grow where someone can pick them.

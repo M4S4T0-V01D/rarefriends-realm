@@ -846,7 +846,7 @@ test("The Heartguard: nine red-and-white pieces by Hitpoints level, each a hitpo
 test("The Old Friend stands behind every altar, and Dawnhold has its keep, towers and a taller chapel", () => {
   const g = newGame(), world = g.world;
   const altars = world.objects.filter(object => object.kind === "altar");
-  assert.equal(altars.length, 6, "the mainland's four, Gravesend's lantern altar and the catacombs' bone altar");
+  assert.equal(altars.length, 7, "the mainland's four, Gravesend's lantern altar, the catacombs' bone altar and the Ring chapel's");
   for (const altar of altars) {
     assert(world.objects.some(object => object.decor === "old_friend" && Math.abs(object.x - altar.x) <= 1 && Math.abs(object.y - altar.y) <= 2), `a statue of the Old Friend by the ${altar.name}`);
   }
@@ -2328,6 +2328,15 @@ test("The Rare Friends Ring: matches for coins and bloodmarks, your own foes, re
   for (const id of ["ringmaster", "ring_apothecary", "ring_chaplain", "ring_sigilist", "ring_fletcher", "ring_armourer", "ring_quartermaster", "ring_champion"]) assert(g.npcs.some(npc => npc.id === id), id);
   assert(world.objects.some(object => object.kind === "fountain" && object.name === "Blood fountain"), "the fountain runs red");
   const gates = world.objects.filter(object => object.name === "Arena gate"); assert.equal(gates.length, 4, "four arena gates");
+  assert(gates.every(gate => gate.look === "gate" && (gate.axis === "ew") === (gate.x === ARENA.x)), "iron gates set along the courtyard wall, not ladders");
+  // The fighting pit, the chapel against the west wall (its altar, the Old Friend and Chaplain Orrin inside) and the forecourt.
+  assert.equal(world.tiles[(ARENA.y + 3) * W + ARENA.x + 3], T.SAND, "a sand pit about the fountain");
+  const chapel = world.buildings.find(building => building.name === "Ring Chapel"); assert(chapel && chapel.walls === "stone" && chapel.x1 === ARENA.x - ARENA.outer, "a stone chapel built against the Ring's west wall");
+  assert(world.buildings.some(building => building.name === "Chapel bell tower" && building.round && building.x0 < chapel.x0 + 1), "with a round bell tower");
+  const inChapel = object => object.x > chapel.x0 && object.x < chapel.x1 && object.y > chapel.y0 && object.y < chapel.y1;
+  assert(world.objects.some(object => object.kind === "altar" && inChapel(object)) && world.objects.filter(object => object.decor === "bench" && inChapel(object)).length === 6, "an altar and six pews inside");
+  const orrin = g.npcs.find(npc => npc.id === "ring_chaplain"); assert(orrin && inChapel(orrin), "Chaplain Orrin keeps the chapel");
+  assert(world.objects.filter(object => object.decor === "lamp" && object.y > ARENA.y + ARENA.outer && Math.abs(object.x - ARENA.x) <= 5).length === 4, "lamps on the forecourt");
   assert(world.objects.filter(object => object.decor === "ruin_wall" && inArena(object.x, object.y)).length >= 10, "ruined walls in the courtyard");
   assert(world.objects.some(object => object.decor === "target" && inRingBuilding(object.x, object.y)) && world.objects.some(object => object.decor === "throne" && inRingBuilding(object.x, object.y)), "stalls on the concourse");
   // The Seven's statues round the courtyard, stone knights on guard, and statues of what waits below at every dungeon's mouth.

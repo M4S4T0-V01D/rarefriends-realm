@@ -890,6 +890,8 @@ function drawStation(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldO
       ellipse(ctx, sx, sy - 26 * z, 3 * z, 3 * z, `rgba(226,215,173,${0.5 + flicker * 0.5})`, null); return hit(30);
     case "ladder": {
       const down = object.action?.includes("down");
+      // The Ring's arena gates: iron, in the courtyard wall, their portcullis down while a match is on.
+      if (object.look === "gate") return drawIronGate(ctx, camera, ox, oy, object.axis ?? "ew", !!game.arena, false, z, hit);
       if (object.look === "stairs") {
         // A spiral stair round a newel post: steps rising, or a stairwell going down.
         const c = (dx: number, dy: number, lift = 0) => { const p = toScreen(camera, ox + dx, oy + dy, lift); return [p.x, p.y] as const; };
@@ -975,9 +977,11 @@ function drawStation(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldO
     }
     case "coop": return drawCoop(ctx, camera, ox, oy, hit);
     case "gate": {
-      box(ctx, camera, ox, oy, 0.25, 1, 50, "#3b3a38", "#2c2b2a", "#222");
-      ctx.fillStyle = `rgba(20,20,30,${0.4 + flicker * 0.25})`; const g = toScreen(camera, ox, oy); ctx.fillRect(g.x - 4 * z, g.y - 50 * z, 8 * z, 50 * z);
-      return hit(56, 36);
+      // The Hollow gate: black iron, its portcullis down and shadow seething between the bars until the quest opens it.
+      const sealed = !!object.requires?.quest && (game.player.quests[object.requires.quest] ?? 0) < 1;
+      const result = drawIronGate(ctx, camera, ox, oy, object.axis ?? "ns", sealed, true, z, hit);
+      if (sealed) { ctx.fillStyle = `rgba(20,20,30,${0.35 + flicker * 0.25})`; const g = toScreen(camera, ox, oy); ctx.fillRect(g.x - 10 * z, g.y - 44 * z, 20 * z, 44 * z); }
+      return result;
     }
     case "casket": box(ctx, camera, ox, oy, 0.8, 0.5, 14, C.rose, shade(C.rose, -0.08), shade(C.rose, -0.14)); box(ctx, camera, ox, oy, 0.8, 0.5, 6, C.butter, shade(C.butter, -0.1), shade(C.butter, -0.15), 14);
       ellipse(ctx, sx, sy - 30 * z - flicker * 3 * z, 2.5 * z, 2.5 * z, "#fff", null); return hit(30);
@@ -2266,6 +2270,29 @@ function projectileFlight(projectile: Projectile, tick: number, alpha: number) {
 }
 /** The convex hull of some points (monotone chain), for shadows of boxes. */
 /** The outline on screen of a box on a tile footprint (w × d tiles, h high, from `lift`). */
+/**
+ * An iron gate set in a wall that runs along `axis`: two stone posts and a lintel over them, and between them a
+ * portcullis of bars (down to the ground while `closed`, drawn up with its spikes hanging when open). `dark` makes it
+ * black iron in black stone.
+ */
+function drawIronGate(ctx: CanvasRenderingContext2D, camera: Camera, ox: number, oy: number, axis: "ew" | "ns", closed: boolean, dark: boolean, z: number, hit: (w: number, h?: number) => { x: number; y: number; w: number; h: number }) {
+  const along = axis === "ew" ? { x: 1, y: 0 } : { x: 0, y: 1 }, H = 56;
+  const stone: [string, string, string] = dark ? ["#4a4850", "#3b3a40", "#2f2e33"] : ["#d7d4cd", "#c8c5be", "#b3aea6"], iron = dark ? "#141318" : "#3b3a38";
+  const posts = [-0.42, 0.42].map(t => ({ x: ox + along.x * t, y: oy + along.y * t })).sort((a, b) => depthOf(camera, a.x, a.y) - depthOf(camera, b.x, b.y));
+  const at = (t: number, lift: number) => toScreen(camera, ox + along.x * t, oy + along.y * t, lift);
+  box(ctx, camera, posts[0].x, posts[0].y, 0.26, 0.26, H, ...stone);
+  // The bars, from the ground (or, raised, from head height) up under the lintel, with two crossbars.
+  const foot = closed ? 0 : 26;
+  ctx.strokeStyle = iron; ctx.lineWidth = 2.2 * z; ctx.lineCap = "round"; ctx.beginPath();
+  for (let i = 0; i <= 5; i++) { const t = -0.34 + i * 0.136, a = at(t, foot), b = at(t, H - 2); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); }
+  for (const lift of [foot + 7, H - 11]) { const a = at(-0.34, lift), b = at(0.34, lift); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); }
+  ctx.stroke(); ctx.lineCap = "butt";
+  // Spikes at the bars' feet when it's up; studs along the crossbars.
+  if (!closed) { ctx.fillStyle = iron; for (let i = 0; i <= 5; i++) { const t = -0.34 + i * 0.136, a = at(t, foot), b = at(t, foot - 5); poly(ctx, [[a.x - 1.6 * z, a.y], [a.x + 1.6 * z, a.y], [b.x, b.y]], iron, null); } }
+  box(ctx, camera, ox, oy, axis === "ew" ? 1.1 : 0.26, axis === "ew" ? 0.26 : 1.1, 7, ...stone, H);
+  box(ctx, camera, posts[1].x, posts[1].y, 0.26, 0.26, H, ...stone);
+  return hit(56, 72);
+}
 function boxHull(camera: Camera, x: number, y: number, w: number, d: number, h: number, lift = 0) {
   const points: [number, number][] = [];
   for (const [px, py] of [[x - w / 2, y - d / 2], [x + w / 2, y - d / 2], [x + w / 2, y + d / 2], [x - w / 2, y + d / 2]]) for (const z of [lift, lift + h]) { const s = toScreen(camera, px, py, z); points.push([s.x, s.y]); }

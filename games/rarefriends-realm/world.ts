@@ -61,7 +61,9 @@ export type WorldObject = {
   tree?: TreeKind; rock?: RockKind; spot?: SpotKind; decor?: DecorKind; stall?: StallKind;
   to?: { x: number; y: number }; action?: string; requires?: { quest?: string; item?: string; level?: number };
   obstacle?: { course: string; step: number; level: number; xp: number; ticks: number; lapXp?: number; last?: boolean };
-  text?: string; big?: boolean; look?: "stairs";
+  text?: string; big?: boolean;
+  /** How a ladder-kind object looks: a spiral staircase, or an iron gate in a wall that runs along `axis`. */
+  look?: "stairs" | "gate"; axis?: "ew" | "ns";
   /** A monument: the creature it's carved as, and its state. */
   monster?: string; state?: MonumentState;
   /** A shop sign: the item painted on its board ("__horse" for the stables). */
@@ -1055,7 +1057,7 @@ function buildMainland(seed: number) {
   monsters("gloom_hound", 150, 222, 175, 226, 5);
   monsters("shade", 86, 208, 100, 218, 5); monsters("shade", 104, 210, 148, 214, 6); monsters("hollow_sentinel", 122, 216, 148, 233, 8);
   monsters("hollow_weaver", 150, 222, 176, 226, 2); monsters("hollow_weaver", 124, 226, 148, 233, 3);
-  add({ kind: "gate", x: 176, y: 224, blocks: true, name: "Hollow gate", action: "Open", to: { x: 177, y: 224 }, requires: { quest: "hollow_king" } });
+  add({ kind: "gate", axis: "ns", x: 176, y: 224, blocks: true, name: "Hollow gate", action: "Open", to: { x: 177, y: 224 }, requires: { quest: "hollow_king" } });
   for (let y = 221; y <= 227; y++) if (y !== 224) put(176, y, T.WALL);
   monster("hollow_king", 198, 224, 3);
   // A carpet from the gate to the empty throne, lit by braziers.
