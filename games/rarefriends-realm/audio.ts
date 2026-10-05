@@ -158,7 +158,8 @@ const STYLES: readonly Style[] = [
   { id: "deep_mine", name: "The Deep Mine", bpm: 86, root: 2, mode: "dorian", progression: [0, 5, 0, 6, 0, 5, 3, 0], meter: 4, lead: "oboe", second: "bell", arp: "pizz", bed: null, bass: "bass", kit: "forge", energy: 0.55, seed: 239 },
   { id: "deepglass", name: "Deepglass", bpm: 76, root: 9, mode: "lydian", progression: [0, 4, 5, 3, 0, 4, 1, 3], meter: 4, lead: "glock", second: "bell", arp: "harp", bed: "pad", bass: "pizz", kit: "heartbeat", energy: 0.4, seed: 241 },
   { id: "drowned_archive", name: "The Drowned Archive", bpm: 66, root: 4, mode: "phrygian", progression: [0, 1, 0, 6, 0, 1, 5, 0], meter: 4, lead: "organ", second: "choir", arp: "harp", bed: "choir", bass: "bass", kit: "heartbeat", energy: 0.35, seed: 251 },
-  { id: "friends_ring", name: "The Rare Friends Ring", bpm: 104, root: 2, mode: "dorian", progression: [0, 3, 4, 0, 5, 3, 4, 0], meter: 4, lead: "trumpet", second: "brass", arp: "pizz", bed: "strings", bass: "bass", kit: "march", energy: 0.75, seed: 263 },
+  // The Ring: a war march an octave down, brass over a drone, the boss kit's drums the whole way; a place of brutality and death.
+  { id: "friends_ring", name: "The Rare Friends Ring", bpm: 96, root: 0, mode: "locrian", progression: [0, 6, 0, 1, 5, 6, 4, 0], meter: 4, lead: "brass", second: "choir", arp: null, bed: "drone", bass: "bass", kit: "boss", energy: 0.9, seed: 271, lift: -12 },
   { id: "howling_vault", name: "The Howling Vault", bpm: 82, root: 7, mode: "harmonic", progression: [0, 6, 0, 5, 0, 6, 4, 0], meter: 4, lead: "brass", second: "choir", arp: null, bed: "choir", bass: "bass", kit: "march", energy: 0.6, seed: 257 },
 ];
 /**

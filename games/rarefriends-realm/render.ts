@@ -799,6 +799,8 @@ function rimTop(ctx: CanvasRenderingContext2D, camera: Camera, outer: [number, n
 function drawFountain(ctx: CanvasRenderingContext2D, scene: Scene, cx: number, cy: number, red = false) {
   const { camera } = scene, z = camera.zoom, now = scene.reducedMotion ? 0 : scene.now, S = (x: number, y: number, h: number) => toScreen(camera, x, y, h);
   const STONE_L = "#cfcbc3", STONE_R = "#b7b2aa", RIM = "#e2ded5", WATER_H = 7, RIM_H = 13;
+  // Water, or blood: the pools, the streams, the drops, the splashes, the jet and the rings.
+  const POOL = red ? "#8a2f2b" : "#9cc0de", STREAM = red ? "rgba(176,52,46,0.9)" : "rgba(214,232,246,0.85)", DROP = red ? "#e07a72" : "#ffffff", DROP2 = red ? "#b8463f" : "#cfe4f5", SPLASH = red ? "rgba(224,122,114,0.9)" : "rgba(255,255,255,0.9)", JET = red ? "rgba(196,66,60,0.95)" : "rgba(230,242,251,0.95)", RING = red ? "212,98,90" : "255,255,255";
   const outer = octagonAt(cx, cy, 0.98), inner = octagonAt(cx, cy, 0.8), dim = (hex: string) => shadeHex(hex, -0.1);
   // The water, clipped to the basin, with its pixels laid across it.
   const surface = inner.map(([px, py]) => S(px, py, WATER_H));
@@ -809,7 +811,7 @@ function drawFountain(ctx: CanvasRenderingContext2D, scene: Scene, cx: number, c
   // Rings spreading from where the streams land.
   if (!bare) for (let k = 0; k < 3; k++) {
     const t = ((now / 1400 + k / 3) % 1), r = 0.42 + t * 0.36;
-    ctx.strokeStyle = `rgba(255,255,255,${(0.55 * (1 - t)).toFixed(3)})`; ctx.lineWidth = Math.max(1, 1.2 * z); ctx.beginPath();
+    ctx.strokeStyle = `rgba(${RING},${(0.55 * (1 - t)).toFixed(3)})`; ctx.lineWidth = Math.max(1, 1.2 * z); ctx.beginPath();
     for (let i = 0; i <= 20; i++) { const a = i / 20 * Math.PI * 2, s = S(cx + Math.cos(a) * r, cy + Math.sin(a) * r, WATER_H); i ? ctx.lineTo(s.x, s.y) : ctx.moveTo(s.x, s.y); }
     ctx.stroke();
   }
@@ -820,15 +822,15 @@ function drawFountain(ctx: CanvasRenderingContext2D, scene: Scene, cx: number, c
   const BOWL_H = 30, BOWL_R = 0.46, streams = Array.from({ length: 8 }, (_, i) => i * Math.PI / 4 + Math.PI / 8);
   const stream = (a: number) => {
     const lip = S(cx + Math.cos(a) * BOWL_R, cy + Math.sin(a) * BOWL_R, BOWL_H), land = S(cx + Math.cos(a) * 0.6, cy + Math.sin(a) * 0.6, WATER_H);
-    ctx.strokeStyle = "rgba(214,232,246,0.85)"; ctx.lineWidth = Math.max(1.5, 2.6 * z);
+    ctx.strokeStyle = STREAM; ctx.lineWidth = Math.max(1.5, 2.6 * z);
     ctx.beginPath(); ctx.moveTo(lip.x, lip.y); ctx.quadraticCurveTo(lip.x + (land.x - lip.x) * 0.9, lip.y + (land.y - lip.y) * 0.2, land.x, land.y); ctx.stroke();
     // Pixel drops sliding down the stream, and a splash where it lands.
     for (let k = 0; k < 3; k++) {
       const t = ((now / 600 + k / 3 + a) % 1), u = 1 - t, px = u * u * lip.x + 2 * u * t * (lip.x + (land.x - lip.x) * 0.9) + t * t * land.x, py = u * u * lip.y + 2 * u * t * (lip.y + (land.y - lip.y) * 0.2) + t * t * land.y;
-      ctx.fillStyle = "#ffffff"; ctx.fillRect(Math.round(px - z), Math.round(py - z), Math.max(1, 2 * z), Math.max(1, 2 * z));
+      ctx.fillStyle = DROP; ctx.fillRect(Math.round(px - z), Math.round(py - z), Math.max(1, 2 * z), Math.max(1, 2 * z));
     }
     const splash = (now / 180 + a * 3) % 2 < 1;
-    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.fillStyle = SPLASH;
     for (const [dx, dy] of splash ? [[-3, -1], [3, -1], [0, -3]] : [[-2, -2], [2, -2], [-4, 0], [4, 0]]) ctx.fillRect(Math.round(land.x + dx * z), Math.round(land.y + dy * z), Math.max(1, 1.6 * z), Math.max(1, 1.6 * z));
   };
   const behind = (a: number) => { const { rx, ry } = rotate(camera, Math.cos(a), Math.sin(a)); return rx + ry < 0; };
@@ -840,20 +842,20 @@ function drawFountain(ctx: CanvasRenderingContext2D, scene: Scene, cx: number, c
   prismSides(ctx, camera, foot, BOWL_H - 7, 3, STONE_L, STONE_R, false, cx, cy);
   prismSides(ctx, camera, bowlOut, BOWL_H - 4, 4, STONE_L, STONE_R, false, cx, cy);
   const pool = bowlIn.map(([px, py]) => S(px, py, BOWL_H - 0.5));
-  poly(ctx, pool.map(s => [s.x, s.y] as const), "#9cc0de", null);
+  poly(ctx, pool.map(s => [s.x, s.y] as const), POOL, null);
   rimTop(ctx, camera, bowlOut, bowlIn, BOWL_H, RIM);
   const stem = octagonAt(cx, cy, 0.08), cupOut = octagonAt(cx, cy, 0.2), cupIn = octagonAt(cx, cy, 0.13), TOP_H = 44;
   prismSides(ctx, camera, stem, BOWL_H, TOP_H - 3 - BOWL_H, STONE_L, STONE_R, false, cx, cy);
   prismSides(ctx, camera, cupOut, TOP_H - 3, 3, STONE_L, STONE_R, false, cx, cy);
-  poly(ctx, cupIn.map(([px, py]) => { const s = S(px, py, TOP_H - 0.5); return [s.x, s.y] as const; }), "#9cc0de", null);
+  poly(ctx, cupIn.map(([px, py]) => { const s = S(px, py, TOP_H - 0.5); return [s.x, s.y] as const; }), POOL, null);
   rimTop(ctx, camera, cupOut, cupIn, TOP_H, RIM);
   // The jet: a spout of water, and droplets arcing out and down into the bowl.
   const jet = S(cx, cy, TOP_H), peak = S(cx, cy, TOP_H + 16 + (scene.reducedMotion ? 0 : Math.sin(now / 160) * 1.5));
-  ctx.strokeStyle = "rgba(230,242,251,0.95)"; ctx.lineWidth = Math.max(1.5, 2.4 * z); ctx.beginPath(); ctx.moveTo(jet.x, jet.y); ctx.lineTo(peak.x, peak.y); ctx.stroke();
+  ctx.strokeStyle = JET; ctx.lineWidth = Math.max(1.5, 2.4 * z); ctx.beginPath(); ctx.moveTo(jet.x, jet.y); ctx.lineTo(peak.x, peak.y); ctx.stroke();
   for (let i = 0; i < 14; i++) {
     const t = (now / 900 + i / 14) % 1, a = i * 2.39996, r = 0.08 + t * 0.34, h = TOP_H + 16 + t * 14 - t * t * (TOP_H + 30 - BOWL_H);
     const d = S(cx + Math.cos(a) * r, cy + Math.sin(a) * r, h);
-    ctx.fillStyle = i % 3 ? "#ffffff" : "#cfe4f5"; ctx.fillRect(Math.round(d.x - z), Math.round(d.y - z), Math.max(1, 2 * z), Math.max(1, 2 * z));
+    ctx.fillStyle = i % 3 ? DROP : DROP2; ctx.fillRect(Math.round(d.x - z), Math.round(d.y - z), Math.max(1, 2 * z), Math.max(1, 2 * z));
   }
   streams.filter(a => !behind(a)).forEach(stream);
   // The basin's rim and its outside, in front of it all.

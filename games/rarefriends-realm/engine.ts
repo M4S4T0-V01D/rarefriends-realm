@@ -27,7 +27,7 @@ import {
   type Activity, type CombatStyle, type Dialogue, type Game, type Monster, type Npc, type Player, type Point, type Recipe, type Slot, type BankSlot, type Target,
  type WorkOrder,
 } from "./state.ts";
-import { FLOOR_Y, MAINLAND, T, W, H, inBounds, inRingBuilding, isUnderground, isWater, mainlandToWorld, objectAtTile, realPoint, regionAt, terrainAt, tileIndex, walkable, type WorldObject } from "./world.ts";
+import { FLOOR_Y, MAINLAND, T, W, H, inArena, inBounds, inRingBuilding, isUnderground, isWater, mainlandToWorld, objectAtTile, realPoint, regionAt, terrainAt, tileIndex, walkable, type WorldObject } from "./world.ts";
 
 export { createGame };
 
@@ -914,7 +914,13 @@ function interactObject(game: Game, object: WorldObject, option: string, use?: n
       if (player.equipment.cape === BONE_BAG && bagBones(player) > 0) offerBag(game, object.text === "dawn");
       if (player.prayer >= maxPrayer(player)) { message(game, "Your faith is already full."); return; }
       player.prayer = maxPrayer(player); message(game, "You pray to the Old Friend. Your faith is restored."); sound(game, "pray"); return;
-    case "ladder": travel(game, object.to!, `You ${object.action?.toLowerCase().replace("-", " ") ?? "climb"} the ${object.name.toLowerCase()}.`); return;
+    case "ladder":
+      // The Ring's arena gates: you step through to the tile across; barred from inside while a match is on.
+      if (object.name === "Arena gate") {
+        if (game.arena && inArena(player.x, player.y)) { message(game, "The gate is barred. The Ring holds you until the match is done, one way or the other.", "warn"); return; }
+        travel(game, { x: object.x + Math.sign(object.x - player.x), y: object.y + Math.sign(object.y - player.y) }, "The iron gate swings, and shuts behind you."); return;
+      }
+      travel(game, object.to!, `You ${object.action?.toLowerCase().replace("-", " ") ?? "climb"} the ${object.name.toLowerCase()}.`); return;
     case "gate": {
       const questOk = !object.requires?.quest || (player.quests[object.requires.quest] ?? 0) >= 1;
       if (!questOk) { message(game, "The gate is sealed with shadow. Something must be done before it opens.", "warn"); return; }
@@ -1816,6 +1822,7 @@ export function castSpell(game: Game, id: string): Selection {
     if (spell.kind === "bloom") { bonebloom(game, spell); return null; }
     if (spell.ward || spell.heal) { castOnSelf(game, spell); return null; }
     if (isUnderground(player.y) && spell.id !== "home") { message(game, "A dark force stops you from teleporting underground.", "warn"); return null; }
+    if (game.arena) { message(game, "The Ring's magic holds you until the match is done. No glide, no homeward, no second chances.", "warn"); return null; }
     if (player.combat !== null && spell.id === "home") { message(game, "You can't use Homeward during combat.", "warn"); return null; }
     stopAll(game); closeInterfaces(game);
     for (const [sigil, n] of Object.entries(spellCost(game, spell))) useSigils(player, sigil, n);

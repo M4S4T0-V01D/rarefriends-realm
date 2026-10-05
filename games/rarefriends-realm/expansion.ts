@@ -522,9 +522,13 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
       else if (d > inner) put(x, y, T.STONE);
       else put(x, y, T.GRASS);
     }
-    // Doors: the gate on the south, and four ways from the concourse into the courtyard.
+    // Doors: the gate on the south, and four arena gates from the concourse into the courtyard: iron gates in the inner
+    // wall you step through by clicking, barred from the courtyard side while a match is on.
     for (const dx of [-1, 0, 1]) for (const r of [outer, outer - 1, outer + 1]) put(cx + dx, cy + r, T.STONE);
-    for (const dx of [-1, 0, 1]) for (const r of [inner - 1, inner, inner + 1]) { put(cx + dx, cy + r, T.STONE); put(cx + dx, cy - r, T.STONE); put(cx + r, cy + dx, T.STONE); put(cx - r, cy + dx, T.STONE); }
+    for (const r of [inner - 2, inner - 1, inner, inner + 1, inner + 2]) { put(cx, cy + r, T.STONE); put(cx, cy - r, T.STONE); put(cx + r, cy, T.STONE); put(cx - r, cy, T.STONE); }
+    for (const [gx, gy, tx, ty] of [[cx, cy + inner, cx, cy + inner - 2], [cx, cy - inner, cx, cy - inner + 2], [cx + inner, cy, cx + inner - 2, cy], [cx - inner, cy, cx - inner + 2, cy]] as const) {
+      add({ kind: "ladder", x: gx, y: gy, blocks: true, name: "Arena gate", action: "Go-through", to: { x: tx, y: ty } });
+    }
     // The courtyard: a garden to the north-west, a rock field to the south-east, a little volcano to the north-east, and
     // the Ringmaker's fountain in the middle, running red.
     const vx = cx + 8, vy = cy - 7;
@@ -559,6 +563,21 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
     const stand = (id: string, a: number, r = 20) => { const [x, y] = on(a, r); clearAt(x, y); put(x, y, T.STONE); npc(id, x, y); };
     stand("ringmaster", Math.PI / 2 + 0.1); stand("ring_apothecary", Math.PI / 3); stand("ring_chaplain", Math.PI * 2 / 3); stand("ring_sigilist", Math.PI / 6); stand("ring_fletcher", Math.PI * 5 / 6);
     stand("ring_armourer", 0); stand("ring_quartermaster", Math.PI); stand("ring_champion", Math.PI * 3 / 2);
+    // Each shop's stall round its keeper: a counter either side along the concourse, and its wares behind.
+    const stall = (a: number, left: DecorKind, right: DecorKind, back: DecorKind | null, backName?: string) => {
+      const [lx, ly] = on(a - 0.12, 20), [rx, ry] = on(a + 0.12, 20), [bx, by] = on(a, 22.5);
+      for (const [x, y, kind, name] of [[lx, ly, left, undefined], [rx, ry, right, undefined], ...(back ? [[bx, by, back, backName] as const] : [])] as const) {
+        if (get(x, y) !== T.STONE) continue;
+        clearAt(x, y); decor(x, y, kind, true, name);
+      }
+    };
+    stall(Math.PI / 3, "table", "barrel", "shelf", "Tonics and tinctures"); stall(Math.PI * 2 / 3, "table", "bench", "old_friend", "A small shrine to the Ringmaker");
+    stall(Math.PI / 6, "shelf", "table", "crate", "Sigil crates"); stall(Math.PI * 5 / 6, "crate", "table", "target", "Practice target");
+    stall(0, "armour", "table", "armour", "A suit of glimmer, on a stand"); stall(Math.PI, "armour", "chest", "banner", "The Pit's banner"); stall(Math.PI * 3 / 2, "banner", "banner", "throne", "The Champion's seat");
+    // Old walls in the courtyard: what stood here before the Ring, left as cover.
+    for (const [x, y] of [[cx - 10, cy + 6], [cx - 9, cy + 6], [cx - 8, cy + 6], [cx - 8, cy + 7], [cx + 2, cy + 11], [cx + 3, cy + 11], [cx + 4, cy + 11], [cx - 12, cy - 2], [cx - 12, cy - 1], [cx - 11, cy - 3], [cx + 6, cy - 12], [cx + 7, cy - 12], [cx + 1, cy - 11], [cx - 5, cy + 12], [cx - 4, cy + 12]] as const) {
+      if (dist(x, y) < inner - 1.5 && get(x, y) !== T.LAVA && get(x, y) !== T.CLIFF) { clearAt(x, y); decor(x, y, "ruin_wall", true, "Ruined wall"); }
+    }
     // A road from the Deadwood's bridge to the gate (a ruin in its way is cleared: nobody builds a road through a wall).
     road([[249, 103], [236, 101], [222, 100], [cx, cy + outer + 3]]);
     for (let y = 95; y <= 112; y++) for (let x = 205; x <= 252; x++) { const o = ctx.objectAt[tileIndex(x, y)]; if (get(x, y) === T.PATH && o >= 0 && ctx.objects[o].decor === "ruin_wall") clearAt(x, y); }

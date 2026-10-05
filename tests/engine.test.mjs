@@ -13,7 +13,7 @@ import { presenceOf } from "../games/rarefriends-realm/social.ts";
 import { friendSays, friendTick, remember, tendencies } from "../games/rarefriends-realm/friend.ts";
 import { RUMOURS, rumourAt, rumourCount } from "../games/rarefriends-realm/rumours.ts";
 import { talk } from "../games/rarefriends-realm/content.ts";
-import { ARENA, inArena, inRing } from "../games/rarefriends-realm/world.ts";
+import { ARENA, inArena, inRing, inRingBuilding } from "../games/rarefriends-realm/world.ts";
 import { FOE_GROUPS, MATCHES, arenaFoes, customMatch, entryFee, startMatch } from "../games/rarefriends-realm/arena.ts";
 import { wonDuel } from "../games/rarefriends-realm/duel.ts";
 import { cleanPresence } from "../games/rarefriends-realm/net.ts";
@@ -2327,6 +2327,9 @@ test("The Rare Friends Ring: matches for coins and bloodmarks, your own foes, re
   assert.equal(regionAt(world, ARENA.x, ARENA.y).id, "friends_ring"); assert(inArena(ARENA.x, ARENA.y + 5) && !inArena(ARENA.x, ARENA.y + 20) && inRing(ARENA.x + 3, ARENA.y + 3), "the courtyard is a duelling ring");
   for (const id of ["ringmaster", "ring_apothecary", "ring_chaplain", "ring_sigilist", "ring_fletcher", "ring_armourer", "ring_quartermaster", "ring_champion"]) assert(g.npcs.some(npc => npc.id === id), id);
   assert(world.objects.some(object => object.kind === "fountain" && object.name === "Blood fountain"), "the fountain runs red");
+  const gates = world.objects.filter(object => object.name === "Arena gate"); assert.equal(gates.length, 4, "four arena gates");
+  assert(world.objects.filter(object => object.decor === "ruin_wall" && inArena(object.x, object.y)).length >= 10, "ruined walls in the courtyard");
+  assert(world.objects.some(object => object.decor === "target" && inRingBuilding(object.x, object.y)) && world.objects.some(object => object.decor === "throne" && inRingBuilding(object.x, object.y)), "stalls on the concourse");
   assert(world.objects.filter(object => object.decor === "bones" && inArena(object.x, object.y)).length >= 20, "bones across the arena");
   assert(world.tiles.some((tile, i) => tile === T.LAVA && inArena(i % W, Math.floor(i / W))), "a little volcano");
   for (const skill of ["attack", "strength", "defence", "hitpoints"]) p.xp[skill] = XP_TABLE[80];
@@ -2340,6 +2343,11 @@ test("The Rare Friends Ring: matches for coins and bloodmarks, your own foes, re
   const foes = g.monsters.filter(m => m.arena); assert.equal(foes.length, 8); assert(foes.every(m => inArena(m.x, m.y) && m.target), "summoned into the courtyard, already hunting");
   assert.deepEqual(arenaFoes(g).length, 8, "what spectators see");
   talk("ringmaster"); assert.match(g.dialogue.lines[0].text, /match is on/); g.dialogue = null;
+  // Barred in: the south arena gate won't open from inside, and no teleport takes you out.
+  const south = gates.find(gate => gate.y > ARENA.y); teleport(g, south.x, south.y - 1); g.messages.length = 0;
+  menuFor(g, [{ kind: "object", id: south.id }], null)[0].run(g); run(g, 2);
+  assert.equal(p.y, south.y - 1, "still inside"); assert(g.messages.some(m => /gate is barred/.test(m.text)));
+  assert.equal(castSpell(g, "home"), null); assert(g.messages.some(m => /holds you until the match/.test(m.text)), "no homeward");
   for (const foe of foes) { standNear(g, foe.x, foe.y, 1); setTarget(g, { kind: "monster", uid: foe.uid, option: "Attack" }); until(g, () => foe.dead, 400); }
   run(g, 2);
   assert.equal(g.arena, null, "the match is over"); assert.equal(g.monsters.filter(m => m.arena).length, 0, "the creatures are gone");
@@ -2350,8 +2358,11 @@ test("The Rare Friends Ring: matches for coins and bloodmarks, your own foes, re
   assert.equal(g.monsters.filter(m => m.arena).length, 4);
   teleport(g, ARENA.x, ARENA.y + ARENA.outer + 8); run(g, 2);
   assert.equal(g.arena, null, "forfeit on leaving"); assert.equal(g.monsters.filter(m => m.arena).length, 0);
+  // With no match on, the gates swing both ways.
+  teleport(g, south.x, south.y + 1); menuFor(g, [{ kind: "object", id: south.id }], null)[0].run(g); run(g, 2); assert.equal(p.y, south.y - 1, "in through the gate");
+  menuFor(g, [{ kind: "object", id: south.id }], null)[0].run(g); run(g, 2); assert.equal(p.y, south.y + 1, "and out again");
   // Falling in the Ring: its magic stands you up in the lobby, and the match is lost.
-  teleport(g, ARENA.lobby.x, ARENA.lobby.y); p.hp = 1; p.xp.defence = 0; p.xp.hitpoints = XP_TABLE[10];
+  teleport(g, ARENA.x, ARENA.y + 6); p.hp = 1; p.xp.defence = 0; p.xp.hitpoints = XP_TABLE[10];
   assert(startMatch(g, "bone_legion"));
   until(g, () => p.x === ARENA.lobby.x && p.y === ARENA.lobby.y && g.arena === null && p.hp > 1, 400);
   assert(g.messages.some(m => /knits you back together/.test(m.text)), "revived by the Ring");
