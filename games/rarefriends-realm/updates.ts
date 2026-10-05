@@ -4,6 +4,12 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 50, date: "2026-10-06", title: "Parties and fellows, the Mage's Satchel, and a fuller fellowship wardrobe", items: [
+    "Parties: right-click any player (or press their name on the Friends tab) to invite them; they join from the banner. Party members within thirty tiles give you +10% XP, and \"/p\" in chat talks to the whole party privately. Fellows wearing your tag give +5% XP within twelve tiles with no party at all. Both stack with the friends-list bonus.",
+    "The Mage's Satchel: a quest from Archmage Solenne at Magic 30 (3 leather, 60 star sigils, 20 thought sigils) for a purple bag with gold stars that holds 2,000 of every kind of sigil. Wear it on your back (Magic +3) or carry it; it catches the sigils you pick up, Fill puts your whole pack's sigils in, and every spell draws from it before your pockets.",
+    "Recruit on X from the fellowship menu: a card with your emblem, banner and colours, how many fellows you know of and how long the fellowship has stood, and a post whose link joins the fellowship (look and all) for 24 hours. Open the Realm by that link and it asks you in.",
+    "Fellowship looks: sixteen more emblems (anchor, axe, hammer, heart, diamond, mountain, sun, key, tower, arrow, fish, rose, hourglass, lantern, paw, cup) and eight more banners (diagonal, quarters, border, dots, zigzag, sunburst, cross, fade). The adventurer card can put your fellowship's banner and emblem behind your Friend (Behind your Friend → Fellowship).",
+  ] },
   { id: 49, date: "2026-10-06", title: "A home of your own on Homestead Row, and capes that hang right", items: [
     "Player housing: Steward Alder keeps the deed to a plot on Homestead Row, west of Friendhollow on the Westmarch road. A cottage costs 25,000 coins at Presence 15; it grows into a house (60,000, Presence 30) and a manor (150,000, Presence 50). Every Friend sees its own home there.",
     "Furnish it with coins: a hearth to light, beds from a straw cot to a canopy bed (sleep in yours to wake with full health, faith and run energy and Well Rested, +5% to +10% XP for ten minutes), tables, seating, shelves, lamps, plants, a chest that becomes your bank at Presence 40, an armour stand and a statue of your Friend in a house, a house altar and a high seat in a manor.",

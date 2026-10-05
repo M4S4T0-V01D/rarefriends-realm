@@ -24,7 +24,7 @@ import { GENERATION_SPRITE_MANIFEST } from "@rarefriends/friendsdk/sprites";
 import { createClient, http } from "viem";
 import { getBlockNumber, getChainId, getLogs, readContract } from "viem/actions";
 import {
-  FULLSCREEN_REQUEST, FULLSCREEN_STATE, HOST_HELLO, HOST_STATE, SAVE_ELSEWHERE, SAVE_EXPORT, SAVE_EXPORT_RESULT, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, type ShareAction, type ShareOutcome,
+  FULLSCREEN_REQUEST, FULLSCREEN_STATE, JOIN_INVITE, TEXT_COPY, TEXT_COPY_RESULT, HOST_HELLO, HOST_STATE, SAVE_ELSEWHERE, SAVE_EXPORT, SAVE_EXPORT_RESULT, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, type ShareAction, type ShareOutcome,
 } from "../games/rarefriends-realm/roster.ts";
 import { NET_ACT, NET_CHAT, NET_ONLINE, NET_PRESENCE, NET_SOCIAL } from "../games/rarefriends-realm/net.ts";
 import { NetHub } from "./net.ts";
@@ -121,7 +121,12 @@ function RealmHost() {
     // Only the game frame we host may ask or save. Saves are accepted only for a Friend in this wallet's roster.
     const receive = (event: MessageEvent) => {
       if (!event.source || !frames().includes(event.source as Window)) return;
-      if (event.data?.type === HOST_HELLO) { friend = /^[0-9]{1,15}$/.test(String(event.data.friend)) ? String(event.data.friend) : null; claim(); send(event.source as Window); sync(); }
+      if (event.data?.type === HOST_HELLO) {
+        friend = /^[0-9]{1,15}$/.test(String(event.data.friend)) ? String(event.data.friend) : null; claim(); send(event.source as Window); sync();
+        // A fellowship invitation in the page's link (?join=…) goes to the game once it's listening.
+        const join = new URLSearchParams(window.location.search).get("join");
+        if (join && /^[A-Za-z0-9_-]{8,600}$/.test(join)) (event.source as Window).postMessage({ type: JOIN_INVITE, token: join }, "*");
+      }
       else if (event.data?.type === NET_PRESENCE) hub.presence(event.data.presence);
       else if (event.data?.type === NET_CHAT) hub.chat(event.data.text, event.data.to);
       else if (event.data?.type === NET_ACT) hub.act(event.data.act, event.data.to);
@@ -139,6 +144,10 @@ function RealmHost() {
         // A restored save code takes this Friend's saves back from any other tab.
         if (event.data.claim === true) claim();
         if (!superseded) writeSave(account, friend, event.data.save);
+      }
+      else if (event.data?.type === TEXT_COPY && typeof event.data.text === "string" && event.data.text.length <= 1000) {
+        const source = event.source as Window;
+        void navigator.clipboard.writeText(event.data.text).then(() => source.postMessage({ type: TEXT_COPY_RESULT, result: "copied" }, "*"), () => source.postMessage({ type: TEXT_COPY_RESULT, result: "failed" }, "*"));
       }
       else if (event.data?.type === FULLSCREEN_REQUEST) {
         // Full screen for the game frame, on the player's click (the sandbox may not ask for it itself).

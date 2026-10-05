@@ -74,6 +74,8 @@ export type Player = {
   referredBy: number | null; referrals: number[]; boostTicks: number;
   /** Inkcoal kept in the inkcoal satchel, and sigil stones in the sigil stone box. */
   coalBag: number; stoneBox: number;
+  /** The sigil satchel's contents: sigil id → count. */
+  sigilBag: Record<string, number>;
   /** Bones kept in the ossuary bag, by kind. */
   boneBag: Record<string, number>;
   /** Apothecary: skill boosts from drinks (wear off a point at a time), poison on you, poison on your weapon, protections (ticks), and a Friend mixture's effect. */
@@ -118,6 +120,8 @@ export type Player = {
   emote?: { id: string; start: number; until: number } | null;
   /** Friends from your friends list playing near you right now (not saved): +5% XP while any are. */
   nearFriends?: number;
+  /** Party members within thirty tiles, and fellowship members within twelve (not saved). */
+  nearParty?: number; nearFellows?: number;
 };
 export type Monster = {
   uid: number; def: MonsterDef; x: number; y: number; prev: Point; spawn: Point; hp: number; heading: Point;
@@ -167,7 +171,7 @@ export type Game = {
   depleted: Map<number, number>; herbPicks: Map<number, number>; messages: Message[];
   /** What the sky is doing (set by the page each frame; the engine only reads it) and how much your Friend talks. */
   ambient: { night: boolean; rain: boolean; storm?: boolean; fog?: boolean }; friendSpeech: "full" | "reduced" | "rare" | "off"; events: GameEvent[]; rng: () => number; nextUid: number;
-  dialogue: Dialogue | null; ui: { shop: string | null; bank: boolean; production: ProductionMenu | null; lamp: number | null; naming: "first" | "rename" | null; fellowship?: boolean; home?: boolean };
+  dialogue: Dialogue | null; ui: { shop: string | null; bank: boolean; production: ProductionMenu | null; lamp: number | null; naming: "first" | "rename" | null; fellowship?: boolean; home?: boolean; join?: Fellowship | null };
   held: { dx: number; dy: number } | null; autoRetaliate: boolean; playTicks: number;
   overheads: Map<number, { text: string; until: number }>;
   /** Your owned-Friend follower, walking the tiles you leave behind. */
@@ -179,7 +183,7 @@ export type Pet = { x: number; y: number; prev: Point; heading: Point; moved: nu
 /** Your home on Homestead Row: its size, its looks, and what's in it (slot id → furnishing id). */
 export type Home = { tier: 1 | 2 | 3; walls: string; floor: string; roof: string; garden: string; furniture: Record<string, string> };
 /** A fellowship as you've declared it: its name and tag, and the look it wears on your cards (an emblem, a banner style, two colours). */
-export type Fellowship = { name: string; tag: string; logo?: string; banner?: string; colors?: [string, string] };
+export type Fellowship = { name: string; tag: string; logo?: string; banner?: string; colors?: [string, string]; /** The UTC day it was founded (as far as you know), and the fellows you have seen online (id → day). */ since?: number; seen?: Record<number, number> };
 /** A patron's work order for a day: what to bring, how many, what it pays, and whether it's filled. */
 export type WorkOrder = { day: number; item: string; n: number; pay: number; xp: number; done: 0 | 1 };
 export type DialogueLine = { who: "npc" | "player"; text: string; npc?: string };
@@ -215,7 +219,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
     style: "accurate", autocast: null, prayers: [], target: null, activity: null, combat: null,
     attackTimer: 0, eatTimer: 0, stunned: 0, regenTimer: 0, quests: {}, questData: {},
     wardrobe: [], worn: [], follower: null, courseStep: -1, kills: 0, deaths: 0, overhead: null, music: ["theme"],
-    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, boneBag: {}, orders: {}, card: { bg: "paper", frame: "rose", skills: "boxes", font: "mono", ink: "ink", layout: "classic" }, home: null, restedTicks: 0, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, friendVillage: null, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false, rerolls: 0 }, seenUpdate: LATEST_UPDATE,
+    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, boneBag: {}, sigilBag: {}, orders: {}, card: { bg: "paper", frame: "rose", skills: "boxes", font: "mono", ink: "ink", layout: "classic" }, home: null, restedTicks: 0, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, friendVillage: null, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false, rerolls: 0 }, seenUpdate: LATEST_UPDATE,
     lastHitBy: null, created: Date.now(), queuedSpell: null, castTimer: 0,
   };
 }
@@ -265,8 +269,8 @@ export function combatLevel(player: Player) {
 /** XP multiplier from the realm rate, kept Rare Relics and your follower's generation. */
 export function xpMultiplier(player: Player) {
   const plain = Math.min(RELICS[0].max, player.relics[0] ?? 0) * RELICS[0].xpPer, golden = (player.relics[3] ?? 0) > 0 ? RELICS[3].xpPer : 0;
-  const rested = player.restedTicks > 0 && player.home ? [0.05, 0.07, 0.1][player.home.tier - 1] : 0;
-  return XP_RATE * (1 + plain + golden + followerBonus(player) + ((player.nearFriends ?? 0) > 0 ? 0.05 : 0) + (player.boostTicks > 0 ? REFERRAL_BOOST : 0) + (riding(player)?.xp ?? 0) + rested);
+  const rested = player.restedTicks > 0 && player.home ? [0.05, 0.07, 0.1][player.home.tier - 1] : 0, company = ((player.nearParty ?? 0) > 0 ? 0.1 : 0) + ((player.nearFellows ?? 0) > 0 ? 0.05 : 0);
+  return XP_RATE * (1 + plain + golden + followerBonus(player) + ((player.nearFriends ?? 0) > 0 ? 0.05 : 0) + (player.boostTicks > 0 ? REFERRAL_BOOST : 0) + (riding(player)?.xp ?? 0) + rested + company);
 }
 /** The mount you're riding, if any. */
 export function riding(player: Player) { return mountDef(player.mount); }
@@ -372,6 +376,25 @@ export const SATCHEL = "inkcoal_satchel", SATCHEL_SIZE = 120, STONE_BOX = "sigil
 export const hasSatchel = (player: Player) => player.equipment.cape === SATCHEL || has(player, SATCHEL);
 /** Carried in your pack, the sigil stone box catches the stones you mine and empties itself into the altar. */
 export const hasStoneBox = (player: Player) => has(player, STONE_BOX);
+// ---------- The sigil satchel: a mage's bag ----------
+export const SIGIL_BAG = "sigil_satchel", SIGIL_BAG_SIZE = 2000;
+/** Worn on your back or carried, the sigil satchel holds every kind of sigil and your spells draw from it. */
+export const hasSigilBag = (player: Player) => player.equipment.cape === SIGIL_BAG || has(player, SIGIL_BAG);
+export const isSigil = (id: string) => id.endsWith("_sigil");
+/** How many of a sigil you can cast with: your pack plus the satchel. */
+export const sigilStock = (player: Player, id: string) => count(player, id) + (hasSigilBag(player) ? player.sigilBag[id] ?? 0 : 0);
+/** Spend sigils, from the satchel first. */
+export function useSigils(player: Player, id: string, n: number) {
+  if (hasSigilBag(player)) { const fromBag = Math.min(n, player.sigilBag[id] ?? 0); if (fromBag > 0) { player.sigilBag[id] = (player.sigilBag[id] ?? 0) - fromBag; if (!player.sigilBag[id]) delete player.sigilBag[id]; } n -= fromBag; }
+  if (n > 0) take(player, id, n);
+}
+/** Put sigils of one kind in the satchel (as many as fit); returns how many went in. */
+export function sigilBagAdd(player: Player, id: string, n: number) {
+  const room = Math.max(0, SIGIL_BAG_SIZE - (player.sigilBag[id] ?? 0)), moved = Math.min(n, room);
+  if (moved > 0) player.sigilBag[id] = (player.sigilBag[id] ?? 0) + moved;
+  return moved;
+}
+export const sigilBagTotal = (player: Player) => Object.values(player.sigilBag).reduce((sum, n) => sum + n, 0);
 /** The containers you can carry: what each holds, where its count lives, and how many fit. */
 export const CONTAINERS = [
   { item: SATCHEL, holds: "inkcoal", size: SATCHEL_SIZE, key: "coalBag" as const, carried: hasSatchel },

@@ -20,8 +20,8 @@ export const NET_CHAT_IN = "rarefriends-realm:net-chat-in";
 /** A direct message between two players' games (trades, taking a dropped item): NET_ACT out, NET_ACT_IN in. */
 export const NET_ACT = "rarefriends-realm:net-act";
 export const NET_ACT_IN = "rarefriends-realm:net-act-in";
-export const ACT_KINDS = ["trade-request", "trade-open", "trade-offer", "trade-accept", "trade-decline", "trade-done", "take", "give", "gone", "duel-hit", "duel-won"] as const;
-export type Act = { kind: typeof ACT_KINDS[number]; trade?: string; rev?: number; stage?: number; items?: { id: string; n: number }[]; u?: number; id?: string; n?: number };
+export const ACT_KINDS = ["trade-request", "trade-open", "trade-offer", "trade-accept", "trade-decline", "trade-done", "take", "give", "gone", "duel-hit", "duel-won", "party-invite", "party-accept", "party-decline", "party-leave", "party-roster"] as const;
+export type Act = { kind: typeof ACT_KINDS[number]; trade?: string; rev?: number; stage?: number; items?: { id: string; n: number }[]; u?: number; id?: string; n?: number; ids?: number[] };
 /** A shared ground item (something a player dropped from their pack). */
 export type Drop = { u: number; id: string; n: number; x: number; y: number };
 /** A direct message from another player, cleaned up; null if it isn't one. */
@@ -37,6 +37,7 @@ export function cleanAct(raw: unknown): Act | null {
   const u = int(r.u, 0, 1e12); if (u !== null) act.u = u;
   const itemId = word(r.id, 40); if (itemId) act.id = itemId;
   const n = int(r.n, 1, 2_147_483_647); if (n !== null) act.n = n;
+  if (Array.isArray(r.ids)) act.ids = r.ids.slice(0, 8).flatMap(entry => { const id = int(entry, 1, 1e12); return id === null ? [] : [id]; });
   return act;
 }
 

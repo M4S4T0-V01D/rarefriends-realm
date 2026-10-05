@@ -26,7 +26,7 @@ export const CARD_OPTIONS: Record<CardCategory, readonly CardOption[]> = {
     { id: "void", name: "The Hollow", presence: 80 },
   ],
   frame: [
-    { id: "rose", name: "Rose" }, { id: "sage", name: "Sage" }, { id: "sky", name: "Sky" }, { id: "sunset", name: "Sunset" },
+    { id: "rose", name: "Rose" }, { id: "sage", name: "Sage" }, { id: "sky", name: "Sky" }, { id: "sunset", name: "Sunset" }, { id: "fellowship", name: "Fellowship", text: "Your fellowship's banner and emblem behind your Friend." },
     { id: "dawn", name: "Dawn", quest: "dawn_vigil", text: "Keep the Dawn Vigil." }, { id: "hollow", name: "Hollow", quest: "hollow_king", text: "End the Hollow King's reign." },
     { id: "starry", name: "Starry", presence: 35 }, { id: "renown", name: "Renown", quest: "the_remembered", text: "Be remembered." },
   ],
@@ -67,13 +67,15 @@ export function cleanCard(raw: unknown): Record<string, string> {
 export const isDarkColor = (hex: string) => { const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255); return 0.2126 * r + 0.7152 * g + 0.0722 * b < 0.45; };
 
 // ---------- Fellowship looks: emblems, banners and colours, drawn by the game ----------
-export const FELLOWSHIP_LOGOS = ["shield", "star", "skull", "flame", "moon", "tree", "wave", "crown", "sword", "eye", "leaf", "bolt"] as const;
-export const FELLOWSHIP_BANNERS = ["plain", "split", "stripes", "chevrons", "checks", "stars", "flames", "waves"] as const;
+export const FELLOWSHIP_LOGOS = ["shield", "star", "skull", "flame", "moon", "tree", "wave", "crown", "sword", "eye", "leaf", "bolt", "anchor", "axe", "hammer", "heart", "diamond", "mountain", "sun", "key", "tower", "arrow", "fish", "rose", "hourglass", "lantern", "paw", "cup"] as const;
+export const FELLOWSHIP_BANNERS = ["plain", "split", "stripes", "chevrons", "checks", "stars", "flames", "waves", "diagonal", "quarters", "border", "dots", "zigzag", "sunburst", "cross", "fade"] as const;
 export const DEFAULT_FELLOWSHIP_COLORS: [string, string] = ["#1c1b1f", "#e2c46a"];
-export function cleanFellowshipLook<T extends { name: string; tag: string }>(base: T, raw: unknown): T & { logo?: string; banner?: string; colors?: [string, string] } {
-  const out: T & { logo?: string; banner?: string; colors?: [string, string] } = { ...base };
+export function cleanFellowshipLook<T extends { name: string; tag: string }>(base: T, raw: unknown): T & { logo?: string; banner?: string; colors?: [string, string]; since?: number; seen?: Record<number, number> } {
+  const out: T & { logo?: string; banner?: string; colors?: [string, string]; since?: number; seen?: Record<number, number> } = { ...base };
   if (!raw || typeof raw !== "object") return out;
   const r = raw as Record<string, unknown>;
+  if (typeof r.since === "number" && Number.isFinite(r.since) && r.since > 0 && r.since < 1e7) out.since = Math.floor(r.since);
+  if (r.seen && typeof r.seen === "object") { const seen: Record<number, number> = {}; for (const [id, day] of Object.entries(r.seen as Record<string, unknown>).slice(0, 500)) if (/^\d{1,15}$/.test(id) && typeof day === "number" && Number.isFinite(day)) seen[Number(id)] = Math.floor(day); out.seen = seen; }
   if (typeof r.logo === "string" && (FELLOWSHIP_LOGOS as readonly string[]).includes(r.logo)) out.logo = r.logo;
   if (typeof r.banner === "string" && (FELLOWSHIP_BANNERS as readonly string[]).includes(r.banner)) out.banner = r.banner;
   if (Array.isArray(r.colors) && r.colors.length === 2 && isHexColor(r.colors[0]) && isHexColor(r.colors[1])) out.colors = [r.colors[0].toLowerCase(), r.colors[1].toLowerCase()];
@@ -99,6 +101,22 @@ export function drawEmblem(ctx: CanvasRenderingContext2D, logo: string, x: numbe
     case "eye": ctx.beginPath(); ctx.moveTo(cx - r, cy); ctx.quadraticCurveTo(cx, cy - r * 1.1, cx + r, cy); ctx.quadraticCurveTo(cx, cy + r * 1.1, cx - r, cy); ctx.fill(); ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(cx, cy, r * 0.42, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = fg; ctx.beginPath(); ctx.arc(cx, cy, r * 0.2, 0, Math.PI * 2); ctx.fill(); break;
     case "leaf": ctx.beginPath(); ctx.moveTo(cx, cy + r); ctx.quadraticCurveTo(cx - r * 1.2, cy, cx, cy - r); ctx.quadraticCurveTo(cx + r * 1.2, cy, cx, cy + r); ctx.fill(); ctx.strokeStyle = bg; ctx.beginPath(); ctx.moveTo(cx, cy + r * 0.9); ctx.lineTo(cx, cy - r * 0.6); ctx.stroke(); break;
     case "bolt": poly([[0.3, -1], [-0.5, 0.15], [0, 0.15], [-0.3, 1], [0.5, -0.15], [0, -0.15]]); break;
+    case "anchor": ctx.beginPath(); ctx.arc(cx, cy - r * 0.75, r * 0.2, 0, Math.PI * 2); ctx.stroke(); ctx.beginPath(); ctx.moveTo(cx, cy - r * 0.55); ctx.lineTo(cx, cy + r * 0.9); ctx.moveTo(cx - r * 0.6, cy - r * 0.2); ctx.lineTo(cx + r * 0.6, cy - r * 0.2); ctx.stroke(); ctx.beginPath(); ctx.arc(cx, cy + r * 0.25, r * 0.7, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke(); break;
+    case "axe": poly([[-0.1, -1], [0.1, -1], [0.1, 1], [-0.1, 1]]); poly([[0.1, -0.9], [0.9, -0.7], [0.9, 0.1], [0.1, 0]]); break;
+    case "hammer": poly([[-0.12, -0.3], [0.12, -0.3], [0.12, 1], [-0.12, 1]]); poly([[-0.8, -0.9], [0.8, -0.9], [0.8, -0.3], [-0.8, -0.3]]); break;
+    case "heart": ctx.beginPath(); ctx.moveTo(cx, cy + r * 0.9); ctx.bezierCurveTo(cx - r * 1.3, cy - r * 0.1, cx - r * 0.5, cy - r * 1.1, cx, cy - r * 0.4); ctx.bezierCurveTo(cx + r * 0.5, cy - r * 1.1, cx + r * 1.3, cy - r * 0.1, cx, cy + r * 0.9); ctx.fill(); break;
+    case "diamond": poly([[0, -1], [0.75, 0], [0, 1], [-0.75, 0]]); ctx.fillStyle = bg; poly([[0, -0.5], [0.37, 0], [0, 0.5], [-0.37, 0]]); break;
+    case "mountain": poly([[-1, 0.9], [-0.4, -0.5], [0, 0.1], [0.35, -0.9], [1, 0.9]]); ctx.fillStyle = bg; poly([[0.35, -0.9], [0.55, -0.4], [0.15, -0.4]]); break;
+    case "sun": ctx.beginPath(); ctx.arc(cx, cy, r * 0.45, 0, Math.PI * 2); ctx.fill(); for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * r * 0.6, cy + Math.sin(a) * r * 0.6); ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); ctx.stroke(); } break;
+    case "key": ctx.beginPath(); ctx.arc(cx - r * 0.45, cy - r * 0.35, r * 0.4, 0, Math.PI * 2); ctx.stroke(); ctx.beginPath(); ctx.moveTo(cx - r * 0.15, cy - r * 0.05); ctx.lineTo(cx + r * 0.9, cy + r * 0.9); ctx.moveTo(cx + r * 0.5, cy + r * 0.5); ctx.lineTo(cx + r * 0.75, cy + r * 0.25); ctx.moveTo(cx + r * 0.7, cy + r * 0.7); ctx.lineTo(cx + r * 0.95, cy + r * 0.45); ctx.stroke(); break;
+    case "tower": poly([[-0.5, 1], [-0.5, -0.5], [-0.65, -0.5], [-0.65, -0.9], [-0.35, -0.9], [-0.35, -0.7], [-0.15, -0.7], [-0.15, -0.9], [0.15, -0.9], [0.15, -0.7], [0.35, -0.7], [0.35, -0.9], [0.65, -0.9], [0.65, -0.5], [0.5, -0.5], [0.5, 1]]); ctx.fillStyle = bg; poly([[-0.15, 1], [-0.15, 0.3], [0.15, 0.3], [0.15, 1]]); break;
+    case "arrow": poly([[0, -1], [0.5, -0.4], [0.15, -0.4], [0.15, 1], [-0.15, 1], [-0.15, -0.4], [-0.5, -0.4]]); break;
+    case "fish": ctx.beginPath(); ctx.ellipse(cx - r * 0.15, cy, r * 0.65, r * 0.4, 0, 0, Math.PI * 2); ctx.fill(); poly([[0.4, 0], [1, -0.5], [1, 0.5]]); ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(cx - r * 0.5, cy - r * 0.1, r * 0.08, 0, Math.PI * 2); ctx.fill(); break;
+    case "rose": for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; ctx.beginPath(); ctx.ellipse(cx + Math.cos(a) * r * 0.45, cy + Math.sin(a) * r * 0.45, r * 0.42, r * 0.28, a, 0, Math.PI * 2); ctx.fill(); } ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(cx, cy, r * 0.22, 0, Math.PI * 2); ctx.fill(); break;
+    case "hourglass": poly([[-0.7, -1], [0.7, -1], [0.1, 0], [0.7, 1], [-0.7, 1], [-0.1, 0]]); ctx.fillStyle = bg; poly([[-0.4, -0.8], [0.4, -0.8], [0, -0.15]]); break;
+    case "lantern": poly([[-0.5, -0.5], [0.5, -0.5], [0.4, 0.7], [-0.4, 0.7]]); poly([[-0.25, -0.9], [0.25, -0.9], [0.25, -0.5], [-0.25, -0.5]]); ctx.fillStyle = bg; poly([[-0.3, -0.35], [0.3, -0.35], [0.22, 0.55], [-0.22, 0.55]]); ctx.fillStyle = fg; ctx.beginPath(); ctx.arc(cx, cy + r * 0.15, r * 0.14, 0, Math.PI * 2); ctx.fill(); break;
+    case "paw": ctx.beginPath(); ctx.ellipse(cx, cy + r * 0.35, r * 0.5, r * 0.4, 0, 0, Math.PI * 2); ctx.fill(); for (const [px, py] of [[-0.65, -0.2], [-0.25, -0.6], [0.25, -0.6], [0.65, -0.2]]) { ctx.beginPath(); ctx.arc(cx + px * r, cy + py * r, r * 0.2, 0, Math.PI * 2); ctx.fill(); } break;
+    case "cup": poly([[-0.7, -0.9], [0.7, -0.9], [0.5, 0.2], [0.15, 0.4], [0.15, 0.7], [0.5, 0.7], [0.5, 0.95], [-0.5, 0.95], [-0.5, 0.7], [-0.15, 0.7], [-0.15, 0.4], [-0.5, 0.2]]); break;
     default: poly([[-0.9, -0.9], [0.9, -0.9], [0.9, 0.2], [0, 1], [-0.9, 0.2]]); ctx.fillStyle = bg; poly([[-0.6, -0.6], [0.6, -0.6], [0.6, 0.1], [0, 0.65], [-0.6, 0.1]]); ctx.fillStyle = fg; poly([[-0.35, -0.35], [0.35, -0.35], [0.35, 0], [0, 0.35], [-0.35, 0]]);
   }
   ctx.restore();
@@ -115,6 +133,14 @@ export function drawBanner(ctx: CanvasRenderingContext2D, banner: string, x: num
     case "checks": { const s = h / 3; for (let j = 0; j < 3; j++) for (let px = x; px < x + w; px += s) if ((Math.round((px - x) / s) + j) % 2 === 0) ctx.fillRect(px, y + j * s, s, s); break; }
     case "stars": { let seed = 11; const r = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }; for (let i = 0; i < Math.round(w / 12); i++) { const sx = x + r() * w, sy = y + r() * h, sr = 1 + r() * 2.5; ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fill(); } break; }
     case "flames": for (let px = x; px < x + w; px += h / 2) { ctx.beginPath(); ctx.moveTo(px, y + h); ctx.quadraticCurveTo(px + h / 4, y + h * 0.1, px + h / 2, y + h); ctx.closePath(); ctx.fill(); } break;
+    case "diagonal": { const g = ctx.createLinearGradient(x, y, x + w, y + h); g.addColorStop(0, a); g.addColorStop(0.5, a); g.addColorStop(0.5, b); g.addColorStop(1, b); ctx.fillStyle = g; ctx.fillRect(x, y, w, h); break; }
+    case "quarters": ctx.fillRect(x, y, w / 2, h / 2); ctx.fillRect(x + w / 2, y + h / 2, w / 2, h / 2); break;
+    case "border": { const t = Math.max(3, h / 7); ctx.fillRect(x, y, w, t); ctx.fillRect(x, y + h - t, w, t); ctx.fillRect(x, y, t, h); ctx.fillRect(x + w - t, y, t, h); break; }
+    case "dots": { const s = h / 4; for (let j = 0; j < 4; j++) for (let px = x + s / 2; px < x + w; px += s) { ctx.beginPath(); ctx.arc(px + (j % 2 ? s / 2 : 0), y + j * s + s / 2, s * 0.22, 0, Math.PI * 2); ctx.fill(); } break; }
+    case "zigzag": ctx.beginPath(); ctx.moveTo(x, y + h); for (let px = x; px <= x + w; px += h / 2) { ctx.lineTo(px, y + h * 0.3); ctx.lineTo(px + h / 4, y + h * 0.7); } ctx.lineTo(x + w, y + h); ctx.closePath(); ctx.fill(); break;
+    case "sunburst": for (let i = 0; i < 12; i++) { const a0 = (i / 12) * Math.PI * 2, a1 = ((i + 0.5) / 12) * Math.PI * 2, R = w; ctx.beginPath(); ctx.moveTo(x + w / 2, y + h / 2); ctx.lineTo(x + w / 2 + Math.cos(a0) * R, y + h / 2 + Math.sin(a0) * R); ctx.lineTo(x + w / 2 + Math.cos(a1) * R, y + h / 2 + Math.sin(a1) * R); ctx.closePath(); ctx.fill(); } break;
+    case "cross": { const t = Math.max(4, h / 4); ctx.fillRect(x, y + (h - t) / 2, w, t); ctx.fillRect(x + w * 0.3 - t / 2, y, t, h); break; }
+    case "fade": { const g = ctx.createLinearGradient(x, y, x, y + h); g.addColorStop(0, b); g.addColorStop(1, a); ctx.fillStyle = g; ctx.fillRect(x, y, w, h); break; }
     case "waves": for (let row = 0; row < 3; row++) { ctx.beginPath(); ctx.moveTo(x, y + h * (0.3 + row * 0.3)); for (let px = x; px <= x + w; px += h / 2) ctx.quadraticCurveTo(px + h / 4, y + h * (0.1 + row * 0.3), px + h / 2, y + h * (0.3 + row * 0.3)); ctx.lineWidth = Math.max(2, h / 12); ctx.strokeStyle = b; ctx.stroke(); } break;
     default: break;
   }
@@ -151,3 +177,25 @@ export function fellowshipArt(tag: string): Promise<FellowshipArt> {
   }
   return pending;
 }
+
+// ---------- Recruiting: a join link good for a day, and what it says ----------
+export const INVITE_HOURS = 24, GAME_URL = "https://m4s4t0-v01d.github.io/rarefriends-realm/";
+const b64 = (text: string) => btoa(unescape(encodeURIComponent(text))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const unb64 = (text: string) => decodeURIComponent(escape(atob(text.replace(/-/g, "+").replace(/_/g, "/"))));
+export type Invite = { name: string; tag: string; logo?: string; banner?: string; colors?: [string, string]; since?: number; expires: number };
+/** A link that joins your fellowship (its look comes along), good for a day. */
+export function inviteLink(fellowship: { name: string; tag: string; logo?: string; banner?: string; colors?: [string, string]; since?: number }, now = Date.now()): string {
+  const token = b64(JSON.stringify({ n: fellowship.name, t: fellowship.tag, l: fellowship.logo, b: fellowship.banner, c: fellowship.colors, s: fellowship.since, e: now + INVITE_HOURS * 3_600_000 }));
+  return `${GAME_URL}?join=${token}`;
+}
+/** The invitation in a link, if it's sound and still good. */
+export function parseInvite(token: unknown, now = Date.now()): Invite | null {
+  if (typeof token !== "string" || token.length > 600) return null;
+  try {
+    const r = JSON.parse(unb64(token)) as Record<string, unknown>;
+    if (typeof r.n !== "string" || !/^[A-Za-z0-9 '_-]{2,16}$/.test(r.n) || /^\d+$/.test(r.n) || typeof r.t !== "string" || !/^[A-Z0-9]{2,5}$/.test(r.t) || typeof r.e !== "number" || r.e < now || r.e > now + INVITE_HOURS * 3_600_000 + 60_000) return null;
+    const look = cleanFellowshipLook({ name: r.n, tag: r.t }, { logo: r.l, banner: r.b, colors: r.c, since: r.s });
+    return { ...look, expires: r.e };
+  } catch { return null; }
+}
+export const daysSince = (day: number | undefined, now = Date.now()) => day ? Math.max(0, Math.floor(now / 86_400_000) - day) : 0;

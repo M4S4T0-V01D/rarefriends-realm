@@ -547,6 +547,8 @@ const RANGED_GEAR: Item[] = [
   { id: "bone_bag", name: "Ossuary bag", examine: "A linen bag blessed by the Order of the Dawn. Worn on the back or carried, it holds 60 bones of any kind, catches the bones you pick up, and an altar takes every one at once (pray at one while wearing it).", value: 1200, tradeable: false,
     icon: { shape: "satchel", color: "#d8cdb6", accent: "#f2efe8", kind: "bones" }, equip: { slot: "cape", bonuses: { prayer: 2 } } },
   // The inkcoal satchel: worn on your back (or carried), it catches mined inkcoal and feeds the furnace.
+  { id: "sigil_satchel", name: "Sigil satchel", examine: "A mage's bag: purple, with gold stars. Worn on the back or carried, it holds 2,000 sigils of every kind, catches the sigils you pick up, and your spells draw from it.", value: 6000, tradeable: false,
+    icon: { shape: "satchel", color: "#5a3a9a", accent: "#e2c46a", kind: "stars" }, equip: { slot: "cape", bonuses: { magic: 3 }, requires: { magic: 30 } } },
   { id: "inkcoal_satchel", name: "Inkcoal satchel", examine: "A stout leather pack for your back. It holds 120 inkcoal, fills itself as you mine, and the furnace reaches into it.", value: 2500,
     icon: { shape: "satchel", color: "#8a6446", accent: "#3b3a38" }, equip: { slot: "cape", bonuses: { defence: 1 } } },
   // Hazel's quiver (the Fernwick quest's reward): worn on your back, and most shots fly home to it.

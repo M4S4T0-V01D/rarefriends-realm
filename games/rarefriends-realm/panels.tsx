@@ -16,7 +16,8 @@ import { petArt } from "./petart.ts";
 import { MAX_QUEST_POINTS, NPCS, QUESTS, finalStage, questPoints, type QuestDef } from "./content.ts";
 import { friendSays, remember } from "./friend.ts";
 import { FELLOWSHIP_COST, FELLOWSHIP_RENAME_COST, NAME_MAX, RENAME_COST, TITLES, chooseTitle, cleanName, cleanTag, joinFellowship, leaveFellowship, nameFriend, profile, renameFellowship, setFellowshipLook, unlockedTitles } from "./presence.ts";
-import { DEFAULT_FELLOWSHIP_COLORS, FELLOWSHIP_BANNERS, FELLOWSHIP_LOGOS, previewArt } from "./cardstyle.ts";
+import { DEFAULT_FELLOWSHIP_COLORS, FELLOWSHIP_BANNERS, FELLOWSHIP_LOGOS, INVITE_HOURS, daysSince, previewArt } from "./cardstyle.ts";
+import { fellowsKnown, recruitText, renderFellowshipCard } from "./card.ts";
 import { HOME_LOOKS, HOME_TIERS, SLOTS, buyFurnishing, buyHome, furnishingOf, homeDeed, setHomeLook, slotOpen } from "./housing.ts";
 import { REGIONS } from "./world.ts";
 import {
@@ -134,6 +135,8 @@ export type PanelProps = {
   fullscreen?: boolean; onFullscreen?: () => void;
   /** Picture in picture: the game canvas in a floating window. */
   pip?: boolean; onPip?: () => void;
+  /** Your party: who's in it, and how to leave or invite. */
+  party?: { members: number[]; onLeave: () => void; onInvite: (id: number) => void };
   onExportSave?: (action: "copy" | "download") => void; onRestoreSave?: (code: string) => Promise<string | null>; backupStatus?: string;
   net?: NetState; onSocial?: (op: "add" | "remove" | "ignore" | "unignore", id: number) => void; onWhisper?: (id: number) => void; onOnline?: (on: boolean) => void;
 };
@@ -462,7 +465,7 @@ function EmotesTab({ game, refresh, openMenu }: PanelProps) {
   );
 }
 function InfoCard({ children }: { children: ReactNode }) { return <div className="realm-info" aria-live="polite">{children}</div>; }
-function FriendsTab({ game, refresh, roster, rosterState, friendSprites, loadFriend, relicCounts, openCaskets, friend, openMenu, net, onSocial, onWhisper, onOnline }: PanelProps) {
+function FriendsTab({ game, refresh, roster, rosterState, friendSprites, loadFriend, relicCounts, openCaskets, friend, openMenu, net, onSocial, onWhisper, onOnline, party }: PanelProps) {
   const player = game.player, perk = FAMILY_PERKS[player.familyId], [adding, setAdding] = useState(""), [referral, setReferral] = useState(""), [referralNote, setReferralNote] = useState("");
   useEffect(() => { for (const friend of roster.slice(0, 24)) loadFriend(friend.id); }, [roster, loadFriend]);
   const online = (id: number) => net?.peers.find(peer => peer.id === id) ?? null;
@@ -476,6 +479,13 @@ function FriendsTab({ game, refresh, roster, rosterState, friendSprites, loadFri
         onKeyDown={event => { if (event.key === "Enter" && referral.trim()) { event.preventDefault(); event.stopPropagation(); setReferralNote(applyReferral(game, referral) ?? "Welcome aboard! Check your pack."); setReferral(""); refresh(); } }} /></label>
         : <p className="realm-muted">You joined with Friend #{player.referredBy}'s code.</p>}
       {referralNote && <p className="realm-note" role="status">{referralNote}</p>}
+      {party && <>
+        <h3>Party <small>· +10% XP with a party member within {30} tiles · fellows within 12 give +5%</small></h3>
+        {party.members.length ? <ul className="realm-party">{party.members.map(id => { const peer = online(id); return <li key={id}><span>{peer?.name ? `${peer.name} (${id})` : `Friend #${id}`}{peer?.tag ? ` [${peer.tag}]` : ""}{peer ? "" : " · away"}</span></li>; })}
+          <li><button type="button" className="realm-dark" onClick={party.onLeave}>Leave the party</button></li></ul>
+          : <p className="realm-muted">No party yet. Right-click a player (or one below) to invite them; "/p" in chat talks to the party. {game.player.fellowship ? `Fellows wearing [${game.player.fellowship.tag}] give you +5% XP just by standing near.` : "Found a fellowship on the Presence profile for a standing bonus with your fellows."}</p>}
+        {!!net?.peers.length && <p className="realm-muted">Online now: {net.peers.filter(peer => !party.members.includes(peer.id)).slice(0, 12).map(peer => <button key={peer.id} type="button" className="realm-link" title="Invite to your party" onClick={() => party.onInvite(peer.id)}>{peer.name ?? `#${peer.id}`}{peer.tag ? ` [${peer.tag}]` : ""}</button>)}</p>}
+      </>}
       <h3>Friends list <small>{net?.status === "online" ? `· ${net.players} in the Realm` : net?.status === "connecting" ? "· connecting…" : "· offline"}</small></h3>
       {net?.status === "offline" ? <p className="realm-muted">You're playing offline. <button type="button" className="realm-link" onClick={() => onOnline?.(true)}>Go online</button> to see and meet other players.</p> : <>
         <ul className="realm-social">
@@ -868,9 +878,27 @@ export function HomeModal({ game, refresh, onRf, rfPrice, rfBusy }: { game: Game
     </Modal>
   );
 }
+/** An invitation that came with the link you arrived by: join the fellowship, look and all, or not. */
+export function JoinModal({ game, refresh }: { game: Game; refresh: () => void }) {
+  const invite = game.ui.join;
+  if (!invite) return null;
+  const close = () => { game.ui.join = null; refresh(); };
+  const colors = invite.colors ?? DEFAULT_FELLOWSHIP_COLORS, coins = count(game.player, "coins");
+  return (
+    <Modal title={`Join ${invite.name} [${invite.tag}]?`} onClose={close}>
+      <p className="realm-muted">A fellow sent you this link. Joining costs {FELLOWSHIP_COST.toLocaleString()} coins (the Realm's registrar) and puts [{invite.tag}] under your name; the fellowship's look comes with it.{game.player.fellowship ? ` You'd leave ${game.player.fellowship.name}.` : ""}</p>
+      <div className="realm-look-grid"><PixelIcon art={previewArt("logo", invite.logo ?? "shield", colors, 48, 48)} size={48} label="emblem" /><PixelIcon art={previewArt("banner", invite.banner ?? "plain", colors, 160, 36)} size={160} label="banner" /></div>
+      <div className="realm-buttons">
+        <button type="button" className="realm-primary" disabled={coins < FELLOWSHIP_COST && !game.player.fellowship} onClick={() => { if (game.player.fellowship) game.player.fellowship = null; if (joinFellowship(game, invite.name, invite.tag, invite)) { remember(game, "first_fellowship"); friendSays(game, "fellowship"); } close(); }}>Join {invite.name}</button>
+        <button type="button" className="realm-dark" onClick={close}>Not now</button>
+      </div>
+    </Modal>
+  );
+}
 /** The fellowship's own menu: rename it for coins, pick its emblem, banner and colours for every member's card, or leave. */
-export function FellowshipModal({ game, refresh }: { game: Game; refresh: () => void }) {
-  const fellowship = game.player.fellowship, [name, setName] = useState(fellowship?.name ?? ""), [confirmLeave, setConfirmLeave] = useState(false);
+export function FellowshipModal({ game, refresh, onRecruit, shareStatus }: { game: Game; refresh: () => void; onRecruit?: (action: "post" | "copy" | "save" | "copy-text") => void; shareStatus?: string }) {
+  const fellowship = game.player.fellowship, [name, setName] = useState(fellowship?.name ?? ""), [confirmLeave, setConfirmLeave] = useState(false), [preview, setPreview] = useState<string | null>(null);
+  useEffect(() => { if (game.ui.fellowship && game.player.fellowship) { try { setPreview(renderFellowshipCard(game).toDataURL("image/png")); } catch { setPreview(null); } } }, [game, game.ui.fellowship, game.player.fellowship]);
   if (!game.ui.fellowship || !fellowship) return null;
   const close = () => { game.ui.fellowship = false; refresh(); };
   const colors: [string, string] = fellowship.colors ?? DEFAULT_FELLOWSHIP_COLORS, set = (look: { logo?: string; banner?: string; colors?: [string, string] }) => { setFellowshipLook(game, look); refresh(); };
@@ -896,6 +924,17 @@ export function FellowshipModal({ game, refresh }: { game: Game; refresh: () => 
       <div className="realm-look-grid banners" role="radiogroup" aria-label="Banner">
         {FELLOWSHIP_BANNERS.map(banner => <button key={banner} type="button" role="radio" aria-checked={(fellowship.banner ?? "plain") === banner} title={banner} onClick={() => set({ banner })}><PixelIcon art={previewArt("banner", banner, colors, 120, 28)} size={120} label={banner} /></button>)}
       </div>
+      <h3>Recruit on X</h3>
+      <p className="realm-muted">{fellowsKnown(game)} fellow{fellowsKnown(game) === 1 ? "" : "s"} known (you and everyone you've seen wearing the tag) · {daysSince(fellowship.since) ? `founded ${daysSince(fellowship.since)} day${daysSince(fellowship.since) === 1 ? "" : "s"} ago` : "founded today"}. The post carries a link that joins your fellowship with its look, good for {INVITE_HOURS} hours.</p>
+      {preview && <img className="realm-card" src={preview} alt={`${fellowship.name} recruiting card`} />}
+      {onRecruit && <div className="realm-buttons">
+        <button type="button" className="realm-primary" onClick={() => onRecruit("post")}>Post to X</button>
+        <button type="button" className="realm-dark" onClick={() => onRecruit("copy")}>Copy picture</button>
+        <button type="button" className="realm-dark" onClick={() => onRecruit("save")}>Save picture</button>
+        <button type="button" className="realm-dark" onClick={() => onRecruit("copy-text")}>Copy post text</button>
+      </div>}
+      {shareStatus && <p className="realm-note" role="status">{shareStatus}</p>}
+      <p className="realm-note">Post text: “{recruitText(game)}”</p>
       <div className="realm-buttons">
         {confirmLeave ? <button type="button" className="realm-primary" onClick={() => { leaveFellowship(game); close(); }}>Yes, leave {fellowship.name}</button> : <button type="button" onClick={() => setConfirmLeave(true)}>Leave the fellowship</button>}
         <button type="button" className="realm-dark" onClick={close}>Done</button>

@@ -20,7 +20,7 @@ import { friendSays, friendTick, friendWorks, outfitRemark, remember } from "./f
 import { presenceXp, cleanName, cleanTag, onAchievement as presenceAchievement, onBossFelled, onEmoteUsed, onFriendTime, onNpcTalked, onRareFind, onRegionEntered, onWorn } from "./presence.ts";
 import { NPCS, QUESTS, consecrateDawnstone, onAltarPrayed, examineItem, npcDef, onBonesOffered, onMonsterKilled, questDone, searchCryptChest, searchWell, talk, tanHides, useCryptAltar } from "./content.ts";
 import {
-  BANK_SIZE, BANK_TABS, DAY_MS, SATCHEL, SATCHEL_SIZE, STONE_BOX, STONE_BOX_SIZE, BONE_BAG, BONE_BAG_SIZE, bagAdd, bagBones, bagTakeAll, hasBoneBag, setPieces, wayfarerPieces, fullSlayerSet, heartguardPieces, mixtureOn, compactBankTabs, hasSatchel, hasStoneBox, stock, useUp, INVENTORY_SIZE, REFERRAL_COINS, REFERRALS_PER_DAY, REFERRAL_TICKS, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
+  BANK_SIZE, BANK_TABS, DAY_MS, SATCHEL, SATCHEL_SIZE, STONE_BOX, STONE_BOX_SIZE, BONE_BAG, BONE_BAG_SIZE, bagAdd, bagBones, bagTakeAll, hasBoneBag, SIGIL_BAG, SIGIL_BAG_SIZE, hasSigilBag, isSigil, sigilBagAdd, sigilBagTotal, sigilStock, useSigils, setPieces, wayfarerPieces, fullSlayerSet, heartguardPieces, mixtureOn, compactBankTabs, hasSatchel, hasStoneBox, stock, useUp, INVENTORY_SIZE, REFERRAL_COINS, REFERRALS_PER_DAY, REFERRAL_TICKS, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
   level, maxHp, maxPrayer, message, prayerBoost, riding, sound, take, weapon, combatLevel, createGame,
   type Activity, type CombatStyle, type Dialogue, type Game, type Monster, type Npc, type Player, type Point, type Recipe, type Slot, type BankSlot, type Target,
  type WorkOrder,
@@ -297,6 +297,7 @@ export function itemOptions(game: Game, slotIndex: number): ItemOption[] {
   if (slot.id === "insight_lamp") out.push({ verb: "Rub", run: g => { g.ui.lamp = slotIndex; } });
   if (slot.id === "slayer_gem") out.push({ verb: "Check", run: g => message(g, taskText(g)) });
   if (slot.id === SATCHEL) out.push({ verb: "Check", run: satchelCheck }, { verb: "Fill", run: satchelFill }, { verb: "Empty", run: satchelEmpty });
+  if (slot.id === SIGIL_BAG) out.push({ verb: "Check", run: sigilBagCheck }, { verb: "Fill", run: sigilBagFill }, { verb: "Empty", run: sigilBagEmpty });
   if (slot.id === STONE_BOX) out.push({ verb: "Check", run: boxCheck }, { verb: "Fill", run: boxFill }, { verb: "Empty", run: boxEmpty });
   if (slot.id === BONE_BAG) out.push({ verb: "Check", run: bagCheck }, { verb: "Fill", run: bagFill }, { verb: "Empty", run: bagEmpty });
   out.push({ verb: "Use", run: () => ({ kind: "item", slot: slotIndex }) });
@@ -367,6 +368,27 @@ export function bagEmpty(game: Game) {
   message(game, `You take ${moved} bones out of the ossuary bag (${bagBones(player)} left).`); sound(game, "pickup");
 }
 /** Tip the whole ossuary bag onto an altar: every bone inside is offered at once. */
+// ---------- The sigil satchel ----------
+const sigilBagText = (player: Player) => Object.entries(player.sigilBag).filter(([, n]) => n > 0).map(([id, n]) => `${n.toLocaleString()} ${item(id).name.toLowerCase().replace(" sigil", "")}`).join(", ");
+export function sigilBagCheck(game: Game) {
+  const total = sigilBagTotal(game.player);
+  message(game, total ? `Your sigil satchel holds ${total.toLocaleString()} sigils: ${sigilBagText(game.player)} (${SIGIL_BAG_SIZE.toLocaleString()} of each kind at most).` : `Your sigil satchel is empty (it holds ${SIGIL_BAG_SIZE.toLocaleString()} of every kind of sigil).`);
+}
+/** Put every sigil in your pack (or one kind) into the satchel. */
+export function sigilBagFill(game: Game, only?: string) {
+  const player = game.player; let moved = 0;
+  for (const slot of player.inventory) {
+    if (!slot || !isSigil(slot.id) || (only && slot.id !== only)) continue;
+    const n = sigilBagAdd(player, slot.id, slot.n); if (n > 0) { take(player, slot.id, n); moved += n; }
+  }
+  if (!moved) { message(game, only ? "The satchel has no room for more of those." : "You have no sigils to put in the satchel (or it's full of the kinds you carry)."); return; }
+  message(game, `You put ${moved.toLocaleString()} sigils in the satchel: ${sigilBagText(player)}.`); sound(game, "pickup");
+}
+export function sigilBagEmpty(game: Game) {
+  const player = game.player; let moved = 0;
+  for (const [id, n] of Object.entries(player.sigilBag)) { if (n <= 0) continue; const given = n - give(player, id, n); if (given > 0) { player.sigilBag[id] -= given; moved += given; if (!player.sigilBag[id]) delete player.sigilBag[id]; } }
+  message(game, moved ? `You take ${moved.toLocaleString()} sigils out of the satchel.` : "Your satchel is empty, or your pack is full."); if (moved) sound(game, "pickup");
+}
 export function offerBag(game: Game, chapel: boolean) {
   const player = game.player, bones = bagTakeAll(player), n = bones.reduce((sum, [, count]) => sum + count, 0);
   if (!n) { message(game, "Your ossuary bag is empty."); return; }
@@ -551,6 +573,7 @@ export function useItemOnItem(game: Game, a: number, b: number) {
     if (bow) { game.ui.production = { title: "What would you like to fletch?", recipes: fletchingRecipes(log) }; return; }
   }
   if (pair("inkcoal", SATCHEL)) { satchelFill(game); return; }
+  if ((first.id === SIGIL_BAG || second.id === SIGIL_BAG) && isSigil(other(SIGIL_BAG).id)) { sigilBagFill(game, other(SIGIL_BAG).id); return; }
   if (first.id === "mortar" || second.id === "mortar") {
     const clean = other("mortar").id;
     if (clean.startsWith("clean_") && grindRecipes(clean.slice(6)).length) { game.ui.production = { title: "Grind the herb?", recipes: grindRecipes(clean.slice(6)) }; return; }
@@ -746,6 +769,12 @@ function interact(game: Game) {
     if (index < 0) return;
     const ground = game.ground[index];
     if (target.spell) { telegrab(game, target.spell, index); return; }
+    // With the sigil satchel on your back or in your pack, sigils you pick up go straight into it while it has room.
+    if (isSigil(ground.id) && hasSigilBag(player) && (player.sigilBag[ground.id] ?? 0) + ground.n <= SIGIL_BAG_SIZE) {
+      sigilBagAdd(player, ground.id, ground.n); game.ground.splice(index, 1); sound(game, "pickup");
+      message(game, `You put the ${item(ground.id).name.toLowerCase()} in your sigil satchel (${(player.sigilBag[ground.id] ?? 0).toLocaleString()}).`);
+      return;
+    }
     // With the ossuary bag in your pack, bones you pick up go straight into it while it has room.
     if (item(ground.id).bones && hasBoneBag(player) && bagBones(player) + ground.n <= BONE_BAG_SIZE) {
       bagAdd(player, ground.id, ground.n); game.ground.splice(index, 1); sound(game, "pickup");
@@ -1320,7 +1349,7 @@ function spellCost(game: Game, spell: Spell) {
 export function canCast(game: Game, spell: Spell) {
   if (level(game, "magic") < spell.level) return `You need a Magic level of ${spell.level} to cast this spell.`;
   if (spell.quest && !questDone(game, spell.quest)) return `You haven't learnt that glide yet: it comes with ${QUESTS.find(entry => entry.id === spell.quest)?.name ?? "a quest"}.`;
-  for (const [sigil, n] of Object.entries(spellCost(game, spell))) if (count(game.player, sigil) < n) return "You do not have enough sigils to cast this spell.";
+  for (const [sigil, n] of Object.entries(spellCost(game, spell))) if (sigilStock(game.player, sigil) < n) return "You do not have enough sigils to cast this spell.";
   return null;
 }
 function playerCombat(game: Game) {
@@ -1355,7 +1384,7 @@ function playerCombat(game: Game) {
     const problem = canCast(game, spell);
     if (problem) { message(game, problem, "warn"); player.combat = null; player.queuedSpell = null; player.autocast = null; return; }
     const echo = (player.familyId === 8 && game.rng() < 0.2) || game.rng() < sigilSave(player, game);
-    if (!echo) for (const [sigil, n] of Object.entries(spellCost(game, spell))) take(player, sigil, n);
+    if (!echo) for (const [sigil, n] of Object.entries(spellCost(game, spell))) useSigils(player, sigil, n);
     player.attackTimer = 5;
     const prayers = prayerBoost(player), accuracy = (Math.floor(level(game, "magic") * (1 + prayers.magic)) + 8) * (bonuses(player).magic + 64) * (player.familyId === 8 ? 1.1 : 1) * boost;
     const defence = ((monster.def.magicDef ?? monster.def.defence) * cursed(game, monster, "defence") + 9) * (monster.def.defenceBonus + 64);
@@ -1687,7 +1716,7 @@ export function castSpell(game: Game, id: string): Selection {
     if (isUnderground(player.y) && spell.id !== "home") { message(game, "A dark force stops you from teleporting underground.", "warn"); return null; }
     if (player.combat !== null && spell.id === "home") { message(game, "You can't use Homeward during combat.", "warn"); return null; }
     stopAll(game); closeInterfaces(game);
-    for (const [sigil, n] of Object.entries(spellCost(game, spell))) take(player, sigil, n);
+    for (const [sigil, n] of Object.entries(spellCost(game, spell))) useSigils(player, sigil, n);
     player.activity = { kind: "teleport", to: game.world.places[spell.teleport ?? "hollow_square"], timer: spell.id === "home" ? 10 : 3, spell: spell.id };
     if (spell.xp) addXp(game, "magic", spell.xp);
     message(game, spell.id === "home" ? "You begin to channel home…" : "You feel the Realm fold around you…"); sound(game, "spell");
@@ -1702,7 +1731,7 @@ export function castSpell(game: Game, id: string): Selection {
 }
 const TELEPORT_NAMES: Record<string, string> = { hollow_square: "Friendhollow", emberforge: "Emberforge", oasis: "the Oasis", frostpeak: "Frostpeak", pier: "Pike's Pier", fernwick: "Fernwick", highcairn: "Highcairn", dawnhold: "Dawnhold", gravesend: "Gravesend", saltmarrow: "Saltmarrow", hollyhock: "Hollyhock", dyemoor: "Dyemoor", tallgrass: "Tallgrass", cragmaw: "Cragmaw", quillhaven: "Quillhaven", ashfall: "Ember Tamsin's camp at Ashfall" };
 const ELEMENT_COLORS: Record<string, string> = { wind: "#e6ecef", water: "#8fa3c9", earth: "#a89479", fire: "#e9a07a", hollow: "#6d6b67", moon: "#c6bed4", gold: "#e2d49e", home: "#e8d4c0" };
-function payRunes(game: Game, spell: Spell) { for (const [sigil, n] of Object.entries(spellCost(game, spell))) take(game.player, sigil, n); }
+function payRunes(game: Game, spell: Spell) { for (const [sigil, n] of Object.entries(spellCost(game, spell))) useSigils(game.player, sigil, n); }
 function bonebloom(game: Game, spell: Spell) {
   const player = game.player, slots = player.inventory.map((slot, index) => slot?.id === "bones" ? index : -1).filter(index => index >= 0);
   if (!slots.length) { message(game, "You aren't holding any bones!", "warn"); return; }
@@ -2114,7 +2143,7 @@ export type SaveData = {
   met?: unknown; achievements?: Record<string, number>; pets?: string[]; petOut?: string | null; killLog?: Record<string, number>; stats?: Record<string, number>; referredBy?: number | null; referrals?: number[]; referralTimes?: number[]; boostTicks?: number; coalBag?: number; stoneBox?: number; boneBag?: Record<string, number>;
   boosts?: Record<string, number>; poison?: { damage: number; left: number; timer: number } | null; weaponPoison?: { weapon: string; damage: number; charges: number; weaken: boolean } | null;
   antidoteUntil?: number; antifireUntil?: number; stealthUntil?: number; tonicUntil?: number; mixture?: { family: number; until: number } | null;
-  firsts?: Record<string, number>; friendKinds?: Record<string, 1>; rumours?: Record<string, 1>; orders?: Record<string, WorkOrder>; card?: Record<string, string>; home?: unknown; restedTicks?: number;
+  firsts?: Record<string, number>; friendKinds?: Record<string, 1>; rumours?: Record<string, 1>; orders?: Record<string, WorkOrder>; card?: Record<string, string>; home?: unknown; restedTicks?: number; sigilBag?: Record<string, number>;
   name?: string | null; fellowship?: { name: string; tag: string; logo?: string; banner?: string; colors?: [string, string] } | null; title?: string | null; visited?: Record<string, number>; regionTicks?: Record<string, number>; talked?: Record<string, 1>; emotesUsed?: Record<string, 1>; outfits?: Record<string, 1>; friendTicks?: number; mounts?: string[]; mount?: string | null; daily?: unknown; seenUpdate?: number;
 };
 export function serialize(game: Game): SaveData {
@@ -2127,12 +2156,12 @@ export function serialize(game: Game): SaveData {
     playTicks: game.playTicks, retaliate: game.autoRetaliate, music: [...player.music],
     referredBy: player.referredBy, referrals: [...player.referrals], referralTimes: [...player.referralTimes], boostTicks: player.boostTicks, coalBag: player.coalBag, stoneBox: player.stoneBox, boneBag: { ...player.boneBag }, boosts: { ...player.boosts }, poison: player.poison ? { ...player.poison } : null, weaponPoison: player.weaponPoison ? { ...player.weaponPoison } : null,
     antidoteUntil: Math.max(0, player.antidoteUntil - game.tick), antifireUntil: Math.max(0, player.antifireUntil - game.tick), stealthUntil: Math.max(0, player.stealthUntil - game.tick), tonicUntil: Math.max(0, player.tonicUntil - game.tick), mixture: player.mixture ? { family: player.mixture.family, until: Math.max(0, player.mixture.until - game.tick) } : null,
-    firsts: { ...player.firsts } as Record<string, number>, friendKinds: { ...player.friendKinds } as Record<string, 1>, rumours: { ...player.rumours } as Record<string, 1>, orders: { ...player.orders }, card: { ...player.card }, home: player.home ? { ...player.home, furniture: { ...player.home.furniture } } : null, restedTicks: player.restedTicks,
+    firsts: { ...player.firsts } as Record<string, number>, friendKinds: { ...player.friendKinds } as Record<string, 1>, rumours: { ...player.rumours } as Record<string, 1>, orders: { ...player.orders }, card: { ...player.card }, home: player.home ? { ...player.home, furniture: { ...player.home.furniture } } : null, restedTicks: player.restedTicks, sigilBag: { ...player.sigilBag },
     name: player.name, fellowship: player.fellowship ? { ...player.fellowship } : null, title: player.title, visited: { ...player.visited } as Record<string, number>, regionTicks: { ...player.regionTicks } as Record<string, number>, talked: { ...player.talked } as Record<string, 1>, emotesUsed: { ...player.emotesUsed } as Record<string, 1>, outfits: { ...player.outfits } as Record<string, 1>, friendTicks: player.friendTicks, mounts: [...player.mounts], mount: player.mount, met: JSON.parse(JSON.stringify(player.met)), achievements: { ...player.achievements }, pets: [...player.pets], petOut: player.petOut, killLog: { ...player.killLog }, stats: { ...player.stats }, daily: JSON.parse(JSON.stringify(player.daily)), seenUpdate: player.seenUpdate,
   };
 }
 const QUEST_IDS = ["friends_feast", "grumblin_trouble", "cold_forge", "hollow_whispers", "lost_glimmer", "hollow_king", "hazels_quiver", "dawn_vigil", "greyhorn_light", "pilgrims_road", "restless_crypt", "dawn_against_hollow",
-  "gravesend_lanterns", "saltmarrow_tithe", "hollyhock_errand", "dyemoor_dye", "tallgrass_tracks", "cragmaw_shaft", "quillhaven_folio", "ashfall_embers", "name_worth_knowing", "known_hall", "the_remembered"];
+  "gravesend_lanterns", "saltmarrow_tithe", "hollyhock_errand", "dyemoor_dye", "tallgrass_tracks", "cragmaw_shaft", "quillhaven_folio", "ashfall_embers", "name_worth_knowing", "known_hall", "the_remembered", "mages_satchel"];
 const int = (value: unknown, min: number, max: number, fallback: number) => typeof value === "number" && Number.isFinite(value) ? Math.max(min, Math.min(max, Math.floor(value))) : fallback;
 /** Item and spell ids from saves made before the Realm's own names (old id → new id). */
 const RENAMED: Record<string, string> = {
@@ -2241,6 +2270,7 @@ export function restore(game: Game, raw: unknown): boolean {
   player.mounts = MOUNTS.filter(mount => Array.isArray(save.mounts) && save.mounts.includes(mount.id)).map(mount => mount.id);
   player.mount = typeof save.mount === "string" && player.mounts.includes(save.mount) ? save.mount : null;
   player.daily = cleanDaily(save.daily, SKILLS); player.orders = cleanOrders(save.orders); player.card = cleanCard(save.card); player.home = cleanHome(save.home); player.restedTicks = int(save.restedTicks, 0, 100000, 0); applyHome(game);
+  player.sigilBag = {}; for (const [id, n] of Object.entries(save.sigilBag ?? {})) if (isItem(id) && isSigil(id)) { const v = int(n, 0, SIGIL_BAG_SIZE, 0); if (v) player.sigilBag[id] = v; }
   player.met = cleanMet(save.met);
   player.achievements = Object.fromEntries(Object.entries(save.achievements && typeof save.achievements === "object" ? save.achievements : {}).filter(([id, day]) => /^[a-z0-9_]{1,32}$/.test(id) && typeof day === "number" && Number.isFinite(day)).slice(0, 100).map(([id, day]) => [id, Math.floor(day as number)]));
   player.pets = PETS.filter(pet => Array.isArray(save.pets) && save.pets.includes(pet.id)).map(pet => pet.id);

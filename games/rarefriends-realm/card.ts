@@ -7,7 +7,7 @@ import { ACHIEVEMENTS, achieved } from "./achievements.ts";
 import { combatLevel, totalLevel, type Game } from "./state.ts";
 import { friendRows } from "./render.ts";
 import { figureArt } from "./wardrobe.ts";
-import { DEFAULT_FELLOWSHIP_COLORS, cardStyle, drawBanner, drawEmblem, isDarkColor, type FellowshipArt } from "./cardstyle.ts";
+import { DEFAULT_FELLOWSHIP_COLORS, GAME_URL, cardStyle, daysSince, drawBanner, drawEmblem, inviteLink, isDarkColor, type FellowshipArt } from "./cardstyle.ts";
 import { titleName } from "./presence.ts";
 
 export const CARD: { readonly width: number; readonly height: number } = { width: 1200, height: 675 };
@@ -44,8 +44,9 @@ function paintBackground(ctx: CanvasRenderingContext2D, bg: string): boolean {
       return false;
   }
 }
-function paintFrame(ctx: CanvasRenderingContext2D, frame: string, x: number, y: number, w: number, h: number) {
+function paintFrame(ctx: CanvasRenderingContext2D, frame: string, x: number, y: number, w: number, h: number, fellow?: { logo?: string; banner?: string } | null, colors: [string, string] = DEFAULT_FELLOWSHIP_COLORS) {
   ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+  if (frame === "fellowship") { drawBanner(ctx, fellow?.banner ?? "plain", x, y, w, h, colors); ctx.globalAlpha = 0.28; drawEmblem(ctx, fellow?.logo ?? "shield", x + w / 2 - w * 0.36, y + h / 2 - w * 0.36, w * 0.72, colors); ctx.globalAlpha = 1; ctx.restore(); return; }
   ctx.fillStyle = FRAMES[frame] ?? FRAMES.rose; ctx.fillRect(x, y, w, h);
   if (frame === "sunset") { const g = ctx.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, "#f6d27a"); g.addColorStop(0.6, "#f0a050"); g.addColorStop(1, "#7a3b5c"); ctx.fillStyle = g; ctx.fillRect(x, y, w, h); }
   if (frame === "dawn") { ctx.strokeStyle = "rgba(226,196,106,0.55)"; ctx.lineWidth = 8; for (let a = 0; a < 12; a++) { ctx.beginPath(); ctx.moveTo(x + w / 2, y + h * 0.35); ctx.lineTo(x + w / 2 + Math.cos(a / 12 * Math.PI * 2) * w, y + h * 0.35 + Math.sin(a / 12 * Math.PI * 2) * w); ctx.stroke(); } ctx.lineWidth = 1; }
@@ -70,7 +71,7 @@ export function renderCard(game: Game, friend: GenerationSprites | null, fellows
   // Portrait card.
   ctx.fillStyle = INK; ctx.fillRect(portrait.x + 10, portrait.y + 10, portrait.w, portrait.h); ctx.fillStyle = dark ? "#2a2a30" : "#fff"; ctx.fillRect(portrait.x, portrait.y, portrait.w, portrait.h); ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.strokeRect(portrait.x, portrait.y, portrait.w, portrait.h);
   const inner = banner ? { x: portrait.x + 18, y: portrait.y + 18, w: portrait.w - 36, h: portrait.h - 36 } : { x: portrait.x + 24, y: portrait.y + 24, w: portrait.w - 48, h: 330 };
-  if (style.frameColor) { ctx.fillStyle = style.frameColor; ctx.fillRect(inner.x, inner.y, inner.w, inner.h); } else paintFrame(ctx, style.frame, inner.x, inner.y, inner.w, inner.h);
+  if (style.frameColor) { ctx.fillStyle = style.frameColor; ctx.fillRect(inner.x, inner.y, inner.w, inner.h); } else paintFrame(ctx, style.frame, inner.x, inner.y, inner.w, inner.h, fellow, colors);
   ctx.strokeRect(inner.x, inner.y, inner.w, inner.h);
   const cx = inner.x + inner.w / 2;
   if (friend) {
@@ -149,5 +150,49 @@ export function renderCard(game: Game, friend: GenerationSprites | null, fellows
   ctx.fillStyle = INK; ctx.fillRect(0, CARD.height - 72, CARD.width, 72);
   ctx.fillStyle = PAPER; ctx.font = `bold 26px ${FONT}`; ctx.fillText("⚔ RareFriends Realm", 40, CARD.height - 26);
   ctx.font = `20px ${FONT}`; ctx.textAlign = "right"; ctx.fillText("@RareFriendsNFT #RareFriends #RareFriendsRealm", CARD.width - 40, CARD.height - 28); ctx.textAlign = "left";
+  return canvas;
+}
+
+/** How many fellows you know of: the ones you've seen online wearing the tag, and you. */
+export const fellowsKnown = (game: Game) => Object.keys(game.player.fellowship?.seen ?? {}).length + 1;
+/** The recruitment post for your fellowship, with a join link good for a day. */
+export function recruitText(game: Game, now = Date.now()) {
+  const fellow = game.player.fellowship; if (!fellow) return "";
+  const days = daysSince(fellow.since, now), known = fellowsKnown(game);
+  const text = `Join ${fellow.name} [${fellow.tag}] in RareFriends Realm! ${known} fellow${known === 1 ? "" : "s"} and counting${days ? `, ${days} day${days === 1 ? "" : "s"} old` : ", founded today"}. Party up, +XP together. This link joins you (good for 24 hours): ${inviteLink(fellow, now)} @RareFriendsNFT #RareFriends #RareFriendsRealm`;
+  return text;
+}
+/** The fellowship's recruitment card: its banner, emblem, colours, name, tag, numbers and the join link. */
+export function renderFellowshipCard(game: Game, art: FellowshipArt | null = null, now = Date.now()): HTMLCanvasElement {
+  const canvas = document.createElement("canvas"); canvas.width = CARD.width; canvas.height = CARD.height;
+  const ctx = canvas.getContext("2d")!, fellow = game.player.fellowship, colors: [string, string] = fellow?.colors ?? DEFAULT_FELLOWSHIP_COLORS, FONT = FONTS.mono;
+  if (!fellow) return canvas;
+  const [field, mark] = colors, dark = isDarkColor(field), TEXT = dark ? "#efede7" : "#161616";
+  ctx.fillStyle = field; ctx.fillRect(0, 0, CARD.width, CARD.height);
+  if (art?.bg) { ctx.save(); ctx.globalAlpha = 0.35; const img = art.bg, scale = Math.max(CARD.width / img.width, CARD.height / img.height); ctx.drawImage(img, (CARD.width - img.width * scale) / 2, (CARD.height - img.height * scale) / 2, img.width * scale, img.height * scale); ctx.restore(); }
+  else { ctx.save(); ctx.globalAlpha = 0.18; drawBanner(ctx, fellow.banner ?? "plain", 0, 0, CARD.width, CARD.height, colors); ctx.restore(); }
+  // The banner across the top, the emblem big on the left.
+  drawBanner(ctx, fellow.banner ?? "plain", 0, 0, CARD.width, 110, colors); ctx.strokeStyle = INK; ctx.lineWidth = 4; ctx.strokeRect(2, 2, CARD.width - 4, 106);
+  ctx.fillStyle = "#fff"; ctx.font = `bold 44px ${FONT}`; ctx.textAlign = "left"; ctx.strokeStyle = INK; ctx.lineWidth = 7; ctx.strokeText("RECRUITING", 40, 72); ctx.fillText("RECRUITING", 40, 72);
+  const emblemAt = { x: 60, y: 160, size: 300 };
+  if (art?.logo) { ctx.fillStyle = "#fff"; ctx.fillRect(emblemAt.x, emblemAt.y, emblemAt.size, emblemAt.size); ctx.imageSmoothingEnabled = true; ctx.drawImage(art.logo, emblemAt.x + 6, emblemAt.y + 6, emblemAt.size - 12, emblemAt.size - 12); ctx.strokeStyle = INK; ctx.lineWidth = 4; ctx.strokeRect(emblemAt.x, emblemAt.y, emblemAt.size, emblemAt.size); }
+  else drawEmblem(ctx, fellow.logo ?? "shield", emblemAt.x, emblemAt.y, emblemAt.size, colors);
+  // Name, tag, numbers.
+  ctx.fillStyle = TEXT; ctx.font = `bold 64px ${FONT}`; ctx.fillText(fellow.name, 410, 230);
+  ctx.fillStyle = mark; ctx.font = `bold 40px ${FONT}`; ctx.fillText(`[${fellow.tag}]`, 410, 285);
+  const days = daysSince(fellow.since, now), known = fellowsKnown(game);
+  ctx.fillStyle = TEXT; ctx.font = `28px ${FONT}`;
+  ctx.fillText(`${known} fellow${known === 1 ? "" : "s"} and counting`, 410, 345); ctx.fillText(days ? `Founded ${days} day${days === 1 ? "" : "s"} ago` : "Founded today", 410, 385);
+  ctx.fillText("Party up: +10% XP together", 410, 425);
+  // Colours.
+  ctx.fillStyle = field; ctx.fillRect(410, 455, 44, 44); ctx.fillStyle = mark; ctx.fillRect(464, 455, 44, 44); ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.strokeRect(410, 455, 44, 44); ctx.strokeRect(464, 455, 44, 44);
+  ctx.fillStyle = TEXT; ctx.font = `22px ${FONT}`; ctx.fillText("Our colours", 522, 485);
+  // The join link, good for a day.
+  ctx.fillStyle = "#efede7"; ctx.fillRect(60, 520, 1080, 56); ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.strokeRect(60, 520, 1080, 56);
+  ctx.fillStyle = INK; ctx.font = `bold 24px ${FONT}`; ctx.fillText("Tap the link in the post to join · good for 24 hours", 80, 557);
+  // Footer.
+  ctx.fillStyle = INK; ctx.fillRect(0, CARD.height - 72, CARD.width, 72);
+  ctx.fillStyle = PAPER; ctx.font = `bold 26px ${FONT}`; ctx.fillText("⚔ RareFriends Realm", 40, CARD.height - 26);
+  ctx.font = `20px ${FONT}`; ctx.textAlign = "right"; ctx.fillText(GAME_URL.replace("https://", ""), CARD.width - 40, CARD.height - 28); ctx.textAlign = "left";
   return canvas;
 }

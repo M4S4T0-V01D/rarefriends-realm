@@ -40,6 +40,10 @@ export function parseRoster(ids: unknown, friendId: bigint, limit = 60): { self:
  * SHARE_REQUEST (action, post text, PNG blob) and the trusted host performs it, replying with SHARE_RESULT.
  */
 /** Full screen: on a click the game asks the trusted host to put the game frame into (or out of) full screen, and the host reports the state. */
+/** A fellowship invitation from the page's ?join= link, handed to the game once it says hello; and copying a short text on the player's click. */
+export const JOIN_INVITE = "rarefriends-realm:join";
+export const TEXT_COPY = "rarefriends-realm:copy-text";
+export const TEXT_COPY_RESULT = "rarefriends-realm:copy-text-result";
 export const FULLSCREEN_REQUEST = "rarefriends-realm:fullscreen";
 export const FULLSCREEN_STATE = "rarefriends-realm:fullscreen-state";
 export const SHARE_REQUEST = "rarefriends-realm:share";

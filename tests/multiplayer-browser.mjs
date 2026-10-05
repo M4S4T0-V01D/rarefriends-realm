@@ -121,11 +121,22 @@ try {
   await a.until(() => window.__realm.peers().some(peer => peer.id === 3412 && peer.friend), "#3412 on the friends list");
   await a.until(() => window.__realm.game().player.nearFriends > 0, "the party bonus");
 
+  // A invites B to a party from the same menu; B joins from the banner; both know the party, and "/p" reaches B.
+  await a.page.waitForTimeout(500);
+  await a.page.mouse.click(box.x + at.x, box.y + at.y - 20, { button: "right" });
+  await a.game.getByRole("menuitem", { name: /Invite-to-party .*#3412/ }).click();
+  await b.game.getByRole("button", { name: "Join" }).click();
+  await a.until(() => window.__realm.game().player.nearParty > 0, "the party XP bonus");
+  await b.until(() => window.__realm.game().player.nearParty > 0, "B is in the party too");
+  await a.page.locator(".rf-game-frame").screenshot({ path: "./artifacts/party.png" });
+
   // Public chat, over A's head and in B's log; then a whisper.
   const say = async (who, text) => { const input = who.game.getByRole("textbox", { name: "Say something" }); await input.click(); await input.fill(text); await input.press("Enter"); };
   await say(a, "hello from the fountain!");
   await b.until(() => window.__realm.game().messages.some(m => m.tone === "public" && m.text.includes("#7730: hello from the fountain!")), "public chat");
   await b.until(() => window.__realm.peers().some(peer => peer.id === 7730 && peer.said === "hello from the fountain!"), "a chat bubble");
+  await say(a, "/p to the Deadwood, fellows");
+  await b.until(() => window.__realm.game().messages.some(m => m.tone === "private" && m.text.includes("[Party] to the Deadwood, fellows")), "party chat");
   await say(a, "@3412 meet me at the castle https://scam.example.com");
   await b.until(() => window.__realm.game().messages.some(m => m.tone === "private" && m.text.includes("meet me at the castle [link removed]")), "a whisper, link stripped");
   await b.page.waitForTimeout(600);
@@ -214,7 +225,7 @@ try {
   await b.until(() => !window.__realm.peers().some(peer => peer.id === 7730), "#7730 leaving", 25_000);
 
   assert.deepEqual(errors, [], "browser errors");
-  console.log("PASS multiplayer: two players see each other walk, right-click menu, friends list, party bonus, public chat, whispers (links stripped), emotes, shared drops, a trade by clicks, emote sync, a duel in the ring, a shared fight, a referral, going offline");
+  console.log("PASS multiplayer: two players see each other walk, right-click menu, friends list, party bonus, a party with its chat, public chat, whispers (links stripped), emotes, shared drops, a trade by clicks, emote sync, a duel in the ring, a shared fight, a referral, going offline");
 } finally {
   await browser?.close();
   if (server) { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }

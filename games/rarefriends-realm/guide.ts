@@ -41,7 +41,7 @@ export function skillGuide(skill: Skill): GuideEntry[] {
       out.push(...gear("hitpoints")); break;
       for (const food of ITEM_LIST.filter(entry => entry.heal).sort((a, b) => (a.heal ?? 0) - (b.heal ?? 0))) add(1, food.name, `Heals ${food.heal}`, food.id);
       break;
-    case "magic": for (const spell of SPELLS) out.push({ level: spell.level, name: spell.name, detail: spell.description, spell: spell.id }); out.push(...gear("magic")); break;
+    case "magic": for (const spell of SPELLS) out.push({ level: spell.level, name: spell.name, detail: spell.description, spell: spell.id }); out.push(...gear("magic")); add(30, "Sigil satchel", "The Mage's Satchel (Archmage Solenne): a bag that holds 2,000 of every sigil and casts from them", "sigil_satchel"); break;
     case "prayer":
       for (const prayer of PRAYERS) add(prayer.level, prayer.name, prayer.description);
       for (const bones of ITEM_LIST.filter(entry => entry.bones)) add(1, `Bury ${bones.name.toLowerCase()}`, `${bones.bones} Faith XP (twice that offered on an altar, three times in the Dawnhold chapel)`, bones.id);

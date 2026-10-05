@@ -54,14 +54,14 @@ export function nameFriend(game: Game, raw: string, paid = false): boolean {
   return true;
 }
 /** Found (or join, by declaring) a fellowship: a name and a tag shown under yours. Everyone online wearing the same tag is your fellowship, as far as the Realm can tell. */
-export function joinFellowship(game: Game, rawName: string, rawTag: string): boolean {
+export function joinFellowship(game: Game, rawName: string, rawTag: string, look?: { logo?: string; banner?: string; colors?: [string, string]; since?: number }): boolean {
   const player = game.player, name = cleanName(rawName), tag = cleanTag(rawTag);
   if (!name || !tag) { message(game, "A fellowship needs a name (2–16 characters) and a tag of 2–5 capitals or digits.", "warn"); return false; }
   if (!player.fellowship) {
     if (count(player, "coins") < FELLOWSHIP_COST) { message(game, `Founding or joining a fellowship costs ${FELLOWSHIP_COST.toLocaleString()} coins (the Realm's registrar is not cheap).`, "warn"); return false; }
     take(player, "coins", FELLOWSHIP_COST); presenceXp(game, 120);
   }
-  player.fellowship = { name, tag };
+  player.fellowship = { name, tag, since: look?.since ?? Math.floor(Date.now() / 86_400_000), ...(look?.logo ? { logo: look.logo } : {}), ...(look?.banner ? { banner: look.banner } : {}), ...(look?.colors ? { colors: look.colors } : {}) };
   message(game, `You stand with ${name} [${tag}].`, "quest"); sound(game, "quest");
   return true;
 }
@@ -167,7 +167,7 @@ export const QUEST_REGIONS: Record<string, RegionId> = {
   friends_feast: "friendhollow", grumblin_trouble: "friendhollow", cold_forge: "emberforge", hollow_whispers: "friendhollow", lost_glimmer: "friendhollow", hollow_king: "hollow_depths", hazels_quiver: "fernwick",
   dawn_vigil: "highcairn", greyhorn_light: "highcairn", pilgrims_road: "highcairn", restless_crypt: "highcairn", dawn_against_hollow: "highcairn",
   gravesend_lanterns: "gravesend", saltmarrow_tithe: "saltmarrow", hollyhock_errand: "hollyhock", dyemoor_dye: "dyemoor", tallgrass_tracks: "tallgrass", cragmaw_shaft: "cragmaw", quillhaven_folio: "quillhaven", ashfall_embers: "ashfall",
-  name_worth_knowing: "friendhollow", known_hall: "quillhaven", the_remembered: "friendhollow",
+  name_worth_knowing: "friendhollow", known_hall: "quillhaven", the_remembered: "friendhollow", mages_satchel: "wizards_tower",
 };
 /** Dawnhold's people live in Highcairn's region; a few settlements are their own. */
 export const REPUTATION_PLACES: readonly { id: RegionId; name: string }[] = [

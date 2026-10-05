@@ -344,6 +344,17 @@ export const QUESTS: readonly QuestDef[] = [
       return ["The passes are clear for now. Tamsin gave me a cloak burnt by a dragon, and a warning about the crater. QUEST COMPLETE!"];
     },
   },
+  {
+    id: "mages_satchel", name: "The Mage's Satchel", points: 1, difficulty: "Intermediate", start: "Talk to Archmage Solenne at the top of the Wizards' Tower, with Magic 30.",
+    requirements: ["Magic 30", "3 leather, 60 star sigils and 20 thought sigils"], rewards: ["1 Quest Point", "Sigil satchel (holds 2,000 of every sigil; spells draw from it; worn on the back)", "2,000 Magic XP"],
+    journal: game => {
+      const s = stage(game, "mages_satchel"), p = game.player;
+      if (s === 0) return ["Archmage Solenne keeps her sigils in a bag that never seems to run out. She might show me how it's made."];
+      if (s === 1) return ["Solenne wants 3 leather for the bag, 60 star sigils to stitch the stars, and 20 thought sigils to teach it what a spell wants.",
+        `${count(p, "leather") >= 3 ? "✓" : "•"} Leather: ${Math.min(3, count(p, "leather"))}/3`, `${count(p, "star_sigil") >= 60 ? "✓" : "•"} Star sigils: ${Math.min(60, count(p, "star_sigil"))}/60`, `${count(p, "thought_sigil") >= 20 ? "✓" : "•"} Thought sigils: ${Math.min(20, count(p, "thought_sigil"))}/20`];
+      return ["Solenne stitched me a sigil satchel: purple, gold stars, and a hunger for sigils. My spells draw straight from it. QUEST COMPLETE!"];
+    },
+  },
   // ---------- The quests of being known: long ones, for Presence, with gear only they give ----------
   {
     id: "name_worth_knowing", name: "A Name Worth Knowing", points: 2, difficulty: "Long", start: "Talk to Namekeeper Elian by the Friendhollow square, once your Presence is 20 and your Friend has a name.",
@@ -638,6 +649,22 @@ function talkInner(game: Game, npcId: string): Dialogue {
         for (const [id, n] of [["breeze_sigil", 150], ["thought_sigil", 150], ["tide_sigil", 60], ["stone_sigil", 60], ["ember_sigil", 60], ["path_sigil", 3]] as const) giveOrDrop(game, id, n);
         message(game, "Archmage Solenne gives you scholar's robes, a staff and a pouch of sigils.", "quest"); sound(game, "quest");
       });
+      if (stage(game, "mages_satchel") === 1 || (stage(game, "mages_satchel") === 0 && level(game, "magic") >= 30 && game.rng() < 2)) {
+        const satchel = () => fetchQuest(game, name, "mages_satchel", {
+          offer: ["You've noticed my bag. Purple, gold stars, and it has never once run out. Every mage should have one.", "Bring me 3 leather for the bag, 60 star sigils to stitch the stars, and 20 thought sigils so it learns what a spell wants of it. I'll sew it on the spot."],
+          accept: "Good. Mind the star sigils: Frostpeak's altar presses them.", progress: "Three leather, sixty star sigils, twenty thought sigils. The bag can wait; it's patient. So am I.",
+          have: () => count(player, "leather") >= 3 && count(player, "star_sigil") >= 60 && count(player, "thought_sigil") >= 20,
+          take: () => { take(player, "leather", 3); take(player, "star_sigil", 60); take(player, "thought_sigil", 20); },
+          done: ["There. A sigil satchel: wear it on your back or keep it in your pack. Fill it with every sigil you own; your spells will reach into it before they reach into your pockets."],
+          reward: () => { giveOrDrop(game, "sigil_satchel"); addXp(game, "magic", 2000, { raw: true }); },
+        });
+        if (stage(game, "mages_satchel") === 1) return satchel();
+        return chat(name, npcSays(name, "How goes the magic?"), [
+          { label: "That bag of yours never runs out.", then: satchel },
+          { label: "Tell me about Sigilcraft.", then: () => chat(name, npcSays(name, "Mine sigil stones on the ground floor. Take them to an altar. Higher levels press more sigils from each stone.")) },
+          { label: "Goodbye.", then: () => null },
+        ]);
+      }
       return chat(name, npcSays(name, "How goes the magic?"), [
         { label: "Tell me about Sigilcraft.", then: () => chat(name, npcSays(name, "Mine sigil stones on the ground floor. Take them to an altar: Breeze by the farms, Thought in Whisperwood, Tide on the lake shore, Stone in the Ashen Hills, Ember at the forge…",
           "…Shade in the Murkmire, Star on Frostpeak, Storm in the dunes, Bloom in the ruins, Path at the Oasis, and Hollow deep underground. Higher levels press more sigils from each stone.")) },

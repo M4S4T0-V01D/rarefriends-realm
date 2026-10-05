@@ -591,7 +591,7 @@ test("A Friend's Feast from start to finish", () => {
   assert.equal(g.player.quests.friends_feast, 2);
   assert.equal(questPoints(g), 1);
   assert(level(g, "cooking") >= 10, "Quest XP");
-  assert.equal(QUESTS.length, 23); assert.equal(MAX_QUEST_POINTS, 37);
+  assert.equal(QUESTS.length, 24); assert.equal(MAX_QUEST_POINTS, 38);
 });
 
 test("Grumblin Trouble counts kills and pays out", () => {
@@ -1003,7 +1003,7 @@ test("Presence: a name for your Friend (the token stays), fellowships, titles, a
   assert(g.npcs.some(npc => npc.id === "namekeeper"), "the Namekeeper is in Friendhollow");
   // Fellowships: a name and a tag, paid once; shared over the net with the name and title; leaving is free.
   assert(!joinFellowship(g, "Moonlit Company", "MOON"), "needs coins");
-  give(p, "coins", 5000); assert(joinFellowship(g, "Moonlit Company", "MOON")); assert.deepEqual(p.fellowship, { name: "Moonlit Company", tag: "MOON" });
+  give(p, "coins", 5000); assert(joinFellowship(g, "Moonlit Company", "MOON")); assert.deepEqual({ name: p.fellowship.name, tag: p.fellowship.tag }, { name: "Moonlit Company", tag: "MOON" }); assert(p.fellowship.since > 0, "founded today");
   const packet = presenceOf(g); assert.equal(packet.name, "Someone"); assert.equal(packet.tag, "MOON");
   const cleaned = cleanPresence(JSON.parse(JSON.stringify({ ...packet, name: "bad!name", tag: "toolongtag" }))); assert.equal(cleaned.name, null); assert.equal(cleaned.tag, null, "the net cleans what it receives");
   leaveFellowship(g); assert.equal(p.fellowship, null);
@@ -1930,7 +1930,7 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   assert.equal(p.quests.dawn_against_hollow, 2); assert(has(p, "dawnplate_cuirass"));
   assert.equal(count(p, "hollow_essence"), 0);
   assert.equal(capeProblem(g, "dawnplate_cuirass"), null, "the armoury sells Dawnplate once earned");
-  assert.equal(QUESTS.length, 23); assert.equal(MAX_QUEST_POINTS, 37);
+  assert.equal(QUESTS.length, 24); assert.equal(MAX_QUEST_POINTS, 38);
 });
 
 test("Boots and gauntlets in every metal, smithed at the anvil; the clothier's shirts, dresses, trousers and skirts", () => {
@@ -2063,7 +2063,7 @@ test("Fellowship looks and renames, and the card's own colours", async () => {
   p.card.inkColor = "#123456"; p.card.bgColor = "not a colour";
   assert.equal(cardStyle(g).inkColor, "#123456"); assert.equal(cardStyle(g).bgColor, undefined, "only hex colours count");
   const save = JSON.parse(JSON.stringify(serialize(g))), fresh = newGame(); assert(restore(fresh, save));
-  assert.deepEqual(fresh.player.fellowship, { name: "The Moonlit", tag: "MOON", logo: "skull", banner: "stripes", colors: ["#112233", "#ffeedd"] }, "the look is saved");
+  { const { since, seen, ...look } = fresh.player.fellowship; void seen; assert.deepEqual(look, { name: "The Moonlit", tag: "MOON", logo: "skull", banner: "stripes", colors: ["#112233", "#ffeedd"] }, "the look is saved"); assert.equal(since, p.fellowship.since); }
   assert.equal(fresh.player.card.inkColor, "#123456"); assert.equal(fresh.player.card.bgColor, undefined);
   assert.deepEqual(cleanFellowshipLook({ name: "A B", tag: "AB" }, { logo: "nope", banner: "stars", colors: ["#fff", "#000000"] }), { name: "A B", tag: "AB", banner: "stars" }, "odd looks are dropped");
   assert.equal(cleanCard({ frameColor: "#ABCDEF" }).frameColor, "#abcdef");
@@ -2099,4 +2099,54 @@ test("Housing: a deed from Steward Alder for Presence and coins, furniture for c
   const save = JSON.parse(JSON.stringify(serialize(g))), fresh = newGame(); assert(restore(fresh, save));
   assert.deepEqual(fresh.player.home, p.home); assert(fresh.world.buildings.some(b => b.name === "Your home" && b.walls === "stone")); assert(fresh.world.objects.some(o => o.name === "Armour stand"));
   assert.equal(HOME_TIERS.length, 3); void applyHome;
+});
+
+test("The Mage's Satchel: Solenne's quest, a bag that holds every sigil, catches them, and casts from them; parties and fellows give XP; more fellowship looks", async () => {
+  const { Party } = await import("../games/rarefriends-realm/party.ts");
+  const { sigilStock, hasSigilBag, sigilBagTotal, xpMultiplier: xpm } = await import("../games/rarefriends-realm/state.ts");
+  const { sigilBagFill, sigilBagEmpty, castSpell } = await import("../games/rarefriends-realm/engine.ts");
+  const { CARD_OPTIONS, FELLOWSHIP_BANNERS, FELLOWSHIP_LOGOS, cardUnlocked } = await import("../games/rarefriends-realm/cardstyle.ts");
+  const g = newGame(), p = g.player; p.inventory.fill(null); p.xp.magic = XP_TABLE[30]; p.questData.archmage_gift = 1;
+  const talk = id => { const npc = g.npcs.find(entry => entry.id === id); standNear(g, npc.x, npc.y, 1); setTarget(g, { kind: "npc", uid: npc.uid, option: "Talk-to" }); until(g, () => g.dialogue !== null, 30); };
+  const say = label => { while (g.dialogue && g.dialogue.index < g.dialogue.lines.length) continueDialogue(g); const index = g.dialogue.options.findIndex(option => option.label.startsWith(label)); assert(index >= 0, label); chooseOption(g, index); };
+  const drain = () => { for (let i = 0; g.dialogue && i < 200; i++) { if (g.dialogue.index >= g.dialogue.lines.length && g.dialogue.options?.length) { g.dialogue = null; break; } continueDialogue(g); } };
+  talk("archmage"); say("That bag of yours"); say("I'll do it."); drain(); assert.equal(p.quests.mages_satchel, 1);
+  give(p, "leather", 3); give(p, "star_sigil", 60); give(p, "thought_sigil", 20); const magic = p.xp.magic;
+  talk("archmage"); drain(); assert.equal(p.quests.mages_satchel, 2); assert(has(p, "sigil_satchel") && !has(p, "leather"), "the satchel, for the leather and sigils"); assert(p.xp.magic > magic);
+  // Wear it, fill it, cast from it.
+  equip(g, p.inventory.findIndex(slot => slot?.id === "sigil_satchel")); assert.equal(p.equipment.cape, "sigil_satchel"); assert(hasSigilBag(p));
+  give(p, "breeze_sigil", 300); give(p, "thought_sigil", 300); sigilBagFill(g); assert.equal(count(p, "breeze_sigil"), 0); assert.equal(sigilBagTotal(p), 600); assert.equal(sigilStock(p, "breeze_sigil"), 300);
+  g.ground.push({ uid: 997, id: "ember_sigil", n: 7, x: p.x, y: p.y, expires: g.tick + 100 }); setTarget(g, { kind: "ground", uid: 997, option: "Take" }); until(g, () => (p.sigilBag.ember_sigil ?? 0) === 7, 40); assert.equal(p.sigilBag.ember_sigil, 7, "picked-up sigils go in");
+  const dart = SPELLS.find(spell => spell.id === "breeze_dart"); assert(dart); const before = p.sigilBag.breeze_sigil;
+  give(p, "staff"); equip(g, p.inventory.findIndex(slot => slot?.id === "staff")); p.autocast = "breeze_dart"; p.combat = null; void castSpell;
+  const rat = g.monsters.find(monster => !monster.dead && monster.def.level <= 5); standNear(g, rat.x, rat.y, 3);
+  setTarget(g, { kind: "monster", uid: rat.uid, option: "Attack" }); until(g, () => (p.sigilBag.breeze_sigil ?? 0) < before, 80);
+  assert(p.sigilBag.breeze_sigil < before, "the spell drew from the satchel"); p.combat = null; p.queuedSpell = null;
+  sigilBagEmpty(g); assert(count(p, "thought_sigil") >= 250 && !p.sigilBag.thought_sigil && !p.sigilBag.breeze_sigil, "emptied back into the pack");
+  give(p, "breeze_sigil", 5); const save = JSON.parse(JSON.stringify(serialize(g))), fresh = newGame(); assert(restore(fresh, save)); assert.deepEqual(fresh.player.sigilBag, p.sigilBag); assert.equal(fresh.player.equipment.cape, "sigil_satchel");
+  // Parties: two clients wired to each other.
+  const mail = []; const a = new Party((to, act) => mail.push([7730, to, act])), b = new Party((to, act) => mail.push([3412, to, act]));
+  const ga = newGame(), gb = newGame({ friendId: 3412 });
+  const deliver = () => { while (mail.length) { const [from, to, act] = mail.shift(); (to === 7730 ? a : b).receive(to === 7730 ? ga : gb, from, act, 1000); } };
+  assert(a.invite(ga, 3412, 1000)); deliver(); assert(b.invites.has(7730), "the invitation arrives");
+  assert(b.accept(gb, 7730)); deliver(); assert(a.members.has(3412) && b.members.has(7730), "both sides know the party");
+  p.nearParty = 1; const withParty = xpm(p); p.nearParty = 0; p.nearFellows = 1; const withFellows = xpm(p); p.nearFellows = 0; const alone = xpm(p);
+  assert(Math.abs(withParty - alone - XP_RATE * 0.1) < 1e-9 && Math.abs(withFellows - alone - XP_RATE * 0.05) < 1e-9, "+10% party, +5% fellows");
+  a.leave(ga); deliver(); assert(!b.members.size, "leaving tells everyone");
+  // Looks: more emblems and banners, and the fellowship backdrop is free.
+  assert(FELLOWSHIP_LOGOS.length >= 28 && FELLOWSHIP_BANNERS.length >= 16);
+  assert(cardUnlocked(g, CARD_OPTIONS.frame.find(option => option.id === "fellowship")));
+});
+
+test("Fellowship invitations: a day-long join link with the look inside, and joining by it", async () => {
+  const { inviteLink, parseInvite } = await import("../games/rarefriends-realm/cardstyle.ts");
+  const { joinFellowship } = await import("../games/rarefriends-realm/presence.ts");
+  const now = 1_800_000_000_000, fellowship = { name: "The Moonlit", tag: "MOON", logo: "paw", banner: "zigzag", colors: ["#112233", "#ffeedd"], since: 20000 };
+  const link = inviteLink(fellowship, now); assert(link.startsWith("https://m4s4t0-v01d.github.io/rarefriends-realm/?join="));
+  const token = link.split("?join=")[1], invite = parseInvite(token, now + 3_600_000);
+  assert.deepEqual(invite, { ...fellowship, expires: now + 24 * 3_600_000 }, "the look travels with the link");
+  assert.equal(parseInvite(token, now + 25 * 3_600_000), null, "a day later it's dead"); assert.equal(parseInvite("nonsense", now), null);
+  const g = newGame(), p = g.player; p.inventory.fill(null); give(p, "coins", 10000);
+  assert(joinFellowship(g, invite.name, invite.tag, invite)); assert.equal(p.fellowship.tag, "MOON"); assert.equal(p.fellowship.logo, "paw"); assert.equal(p.fellowship.since, 20000);
+  const save = JSON.parse(JSON.stringify(serialize(g))), fresh = newGame(); assert(restore(fresh, save)); assert.equal(fresh.player.fellowship.since, 20000);
 });
