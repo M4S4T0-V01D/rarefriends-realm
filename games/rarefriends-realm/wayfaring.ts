@@ -4,7 +4,7 @@
  * that Coach Skip trades for gear. The obstacle activity itself runs in engine.ts.
  */
 import { WAYFARER_MARK, WAYFARER_REWARDS, item } from "./data.ts";
-import { count, giveOrDrop, level, message, sound, take, wayfarerPieces, type Game } from "./state.ts";
+import { count, giveOrDrop, level, message, sound, take, wayfarerPieces, wornWeight, type Game } from "./state.ts";
 
 /**
  * The chance of slipping on an obstacle: none on the easiest (level 1) ones or in the Wayfarer's gloves, a fifth at the
@@ -17,7 +17,15 @@ export function slipChance(game: Game, obstacle: { level: number }) {
 /** Running drains less the better your Wayfaring (40% less at 99), and less again in the Wayfarer's cape (20%, 40% in the full outfit). */
 export function runDrain(game: Game) {
   const player = game.player, cape = player.equipment.cape === "wayfarer_cape" ? (wayfarerPieces(player) >= 4 ? 0.6 : 0.8) : 1;
-  return (player.familyId === 5 ? 0.36 : 0.6) * (1 - level(game, "agility") * 0.004) * cape;
+  return (player.familyId === 5 ? 0.36 : 0.6) * (1 - level(game, "agility") * 0.004) * cape * (1 + weightPenalty(game));
+}
+/**
+ * The load you carry: every worn thing weighs something, and running under forty kilograms drains twice as fast.
+ * Wayfaring carries it better (a quarter less at 30, half at 60, three quarters at 90), and the Wayfarer's boots a tenth more.
+ */
+export function weightPenalty(game: Game) {
+  const player = game.player, carried = 1 - Math.min(0.75, Math.floor(level(game, "agility") / 30) * 0.25) - (player.equipment.feet === "wayfarer_boots" ? 0.1 : 0);
+  return Math.max(0, wornWeight(player) / 40 * Math.max(0, carried));
 }
 /** Coach Skip's rewards, bought with Wayfarer's marks. */
 export function buyWayfarerReward(game: Game, id: string) {

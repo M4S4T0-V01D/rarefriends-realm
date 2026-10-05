@@ -4,6 +4,11 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 55, date: "2026-10-06", title: "Round shields and the aegis, and the weight of what you wear", items: [
+    "Two more shields in every metal, smithed at the anvil and sold with the metal's armour: the round shield, bigger and heavier than the kite (the best defence a metal gives, Strength to carry: the metal's level and 5), and the aegis, a faith shield blessed at Dawnhold (Faith to carry: the metal's level and 5, with a faith bonus).",
+    "Weight: everything you wear weighs something now (Worn equipment shows the total), and running under a load drains faster: forty kilograms doubles it. Plate, round shields and two-handers are the heavy things; capes, cloth and leather are light.",
+    "Wayfaring carries the load: a quarter of it stops counting at 30, half at 60, three quarters at 90, and the Wayfarer's boots a tenth more. A reason to train it, and to want the run energy.",
+  ] },
   { id: 54, date: "2026-10-06", title: "The adventurer card is yours: every style free, and many more of them", items: [
     "Every adventurer card style is free now. Eighteen backgrounds, eighteen backdrops behind your Friend, seven skills panels, eight letterings, ten inks, five layouts (a new Centre one puts your Friend in the middle with skills either side), and a Header banner of your own in sixteen patterns painted in two new colours of yours, accent and banner, on top of ink, background and backdrop.",
     "Fellowships wear four colours: field, mark and two accents, in the emblem's ring and detail and the banner's stripes, dots and edges. The recruiting card shows all four.",

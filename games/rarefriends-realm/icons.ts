@@ -323,6 +323,16 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
         part(p, poly([[5, 4], [27, 4], [27, 16], [16, 30], [5, 16]]), color, metal ? "metal" : "wood");
         part(p, all(box(14, 5, 4, 22), box(6, 11, 20, 4)), accent ?? shadeHex(color, -0.22), "flat");
         part(p, disc(16, 13, 3), metal ? shadeHex(color, 0.2) : STEEL_C, "metal"); break;
+      case "roundshield":
+        // A broad round shield: a rim, a dome, a boss, studs around the edge.
+        part(p, disc(16, 16, 14), shadeHex(color, -0.15), metal ? "metal" : "wood"); part(p, disc(16, 16, 11.5), color, metal ? "metal" : "wood");
+        part(p, disc(16, 16, 4), accent ?? shadeHex(color, 0.25), "metal"); for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; dot(p, Math.round(16 + Math.cos(a) * 12.6), Math.round(16 + Math.sin(a) * 12.6), INK); }
+        line(p, [[7, 11], [11, 7]], shadeHex(color, 0.3)); break;
+      case "aegis":
+        // A tall faith shield with a sun disc and rays.
+        part(p, poly([[6, 2], [26, 2], [26, 17], [16, 30], [6, 17]]), color, metal ? "metal" : "wood");
+        part(p, disc(16, 13, 4.5), accent ?? "#e2c46a", "glow"); for (const [ax, ay, bx, by] of [[16, 4, 16, 7], [16, 19, 16, 22], [7, 13, 10, 13], [22, 13, 25, 13], [10, 7, 12, 9], [22, 7, 20, 9], [10, 19, 12, 17], [22, 19, 20, 17]]) line(p, [[ax, ay], [bx, by]], accent ?? "#e2c46a", 2);
+        line(p, [[6, 2], [26, 2]], shadeHex(color, 0.3)); break;
       case "boots":
         part(p, poly([[7, 7], [16, 7], [16, 19], [27, 20], [28, 27], [7, 27]]), color, armour);
         part(p, box(6, 26, 23, 3), shadeHex(color, -0.35), "flat"); line(p, [[7, 11], [16, 11]], dark); break;

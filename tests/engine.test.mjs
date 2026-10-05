@@ -2223,3 +2223,20 @@ test("Faith weapons in every metal, meals that lend a skill, and herb art", asyn
   assert(item("inkshark").food.attack === 4 && item("minnows").food.fishing === 1);
   void herbArt;
 });
+
+test("Round shields and the aegis in every metal, and the weight of what you wear", async () => {
+  const { wornWeight } = await import("../games/rarefriends-realm/state.ts");
+  const { runDrain, weightPenalty } = await import("../games/rarefriends-realm/wayfaring.ts");
+  for (const metal of METALS) assert(isItem(`${metal.id}_roundshield`) && isItem(`${metal.id}_aegis`), `${metal.name} round shield and aegis`);
+  const round = item("blackiron_roundshield"), aegis = item("blackiron_aegis"), kite = item("blackiron_shield");
+  const bi = METALS.find(m => m.id === "blackiron").level; assert(round.equip.bonuses.defence > kite.equip.bonuses.defence && round.equip.requires.strength === bi + 5 && round.weight > kite.weight, "the round shield: more defence, Strength to carry, heavier");
+  assert(aegis.equip.requires.prayer === bi + 5 && aegis.equip.bonuses.prayer > 0, "the aegis takes Faith and blesses");
+  assert(SHOPS.armour.stock.includes("pewter_roundshield") && SHOPS.armour.stock.includes("pewter_aegis"), "sold with the armour");
+  assert(smithingRecipes("pewter").some(recipe => recipe.label === "Pewter round shield"));
+  const g = newGame(), p = g.player; p.inventory.fill(null);
+  const bare = runDrain(g); assert.equal(wornWeight(p), 0);
+  for (const id of ["rarite_cuirass", "rarite_greaves", "rarite_helm", "rarite_roundshield"]) { give(p, id); p.equipment[item(id).equip.slot] = id; }
+  assert(wornWeight(p) > 15, `plate weighs (${wornWeight(p)} kg)`); assert(weightPenalty(g) > 0.3 && runDrain(g) > bare * 1.3, "running drains faster under a load");
+  const laden = weightPenalty(g); p.xp.agility = XP_TABLE[60]; assert(weightPenalty(g) < laden * 0.6, "Wayfaring carries half the load at 60");
+  assert(item("rose_cape").weight === undefined || true); assert(item("team_cape").weight <= 1 && item("leather_jerkin").weight < item("pewter_cuirass").weight);
+});

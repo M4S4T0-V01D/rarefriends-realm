@@ -75,12 +75,14 @@ export type IconShape =
   | "amulet" | "log" | "fish" | "ore" | "bar" | "bones" | "sigil" | "staff" | "net" | "rod" | "harpoon" | "pot" | "bucket" | "egg" | "flour"
   | "milk" | "tinderbox" | "hammer" | "knife" | "needle" | "thread" | "chisel" | "gem" | "hide" | "leather" | "meat" | "feather" | "bait"
   | "cake" | "bread" | "berries" | "key" | "wheat" | "lamp" | "scroll" | "silk" | "hood" | "bracer" | "burnt" | "hat" | "crown" | "orb" | "trophy"
-  | "bow" | "arrow" | "tablet" | "arrowheads" | "material" | "quiver" | "satchel" | "mask" | "stonebox" | "wool" | "string" | "shears" | "greatsword" | "battleaxe" | "warhammer" | "mace" | "flail" | "spear" | "warbow" | "crossbow" | "bolts" | "limbs" | "stock" | "herb" | "mushroom" | "vial" | "mortar";
+  | "bow" | "arrow" | "tablet" | "arrowheads" | "material" | "quiver" | "satchel" | "mask" | "stonebox" | "wool" | "string" | "shears" | "greatsword" | "battleaxe" | "warhammer" | "mace" | "flail" | "roundshield" | "aegis" | "spear" | "warbow" | "crossbow" | "bolts" | "limbs" | "stock" | "herb" | "mushroom" | "vial" | "mortar";
 export type Item = {
   id: string; name: string; examine: string; value: number; icon: Icon;
   stackable?: boolean; tradeable?: boolean;
   /** Food that does more than heal: a skill boost that wears off a point a minute. */
   food?: Partial<Record<Skill, number>>;
+  /** What it weighs worn (kg): running drains faster under a load, less so with Wayfaring. */
+  weight?: number;
   equip?: { slot: EquipSlot; bonuses: Partial<Bonuses>; requires?: Partial<Record<Skill, number>>; speed?: number; twoHanded?: boolean; staff?: boolean;
     /** A bow or crossbow: its reach, the extra punch it gives each shot, and whether it fires bolts (crossbows) or arrows. */
     bow?: { range: number; strength?: number; bolts?: boolean };
@@ -152,7 +154,13 @@ export const SMITH_PIECES = [
   // two-handed flail), hurt the undead more, give a little Faith XP a hit, and carry a faith bonus. Sold with the swords.
   { piece: "mace", name: "mace", bars: 2, offset: 6, shape: "mace", slot: "weapon", att: 7, str: 9, def: 0, speed: 4, faith: 3 },
   { piece: "flail", name: "flail", bars: 3, offset: 12, shape: "flail", slot: "weapon", att: 7, str: 15, def: 0, speed: 5, twoHanded: true, strength: 4, faith: 7 },
+  // Shields beyond the kite: a round shield, bigger and heavier (Strength to carry, the best defence a metal gives), and
+  // the aegis, a faith shield blessed at Dawnhold (Faith to carry, a faith bonus, and it turns a little of the undead's bite).
+  { piece: "roundshield", name: "round shield", bars: 4, offset: 14, shape: "roundshield", slot: "shield", att: 0, str: 0, def: 17, speed: 0, strength: 5 },
+  { piece: "aegis", name: "aegis", bars: 3, offset: 13, shape: "aegis", slot: "shield", att: 0, str: 0, def: 13, speed: 0, faith: 5 },
 ] as const;
+/** What each forged piece weighs in pewter (kg); heavier metals weigh a little more a tier. */
+const PIECE_WEIGHT: Record<string, number> = { dagger: 0.6, axe: 1.2, sword: 1.4, pickaxe: 1.6, helm: 1.8, sabre: 1.6, greaves: 3.5, shield: 3, cuirass: 6, gauntlets: 0.8, boots: 1, greatsword: 3.2, battleaxe: 3.6, warhammer: 4, mace: 1.8, flail: 3.4, roundshield: 6, aegis: 3.5 };
 /** The Strength a metal's heavy weapon (greatsword, battleaxe, war hammer) takes to wield. */
 export function heavyStrength(metal: MetalId, piece: SmithPiece) {
   const entry = SMITH_PIECES.find(row => row.piece === piece);
@@ -362,6 +370,8 @@ function metalGear(): Item[] {
       if (heavy) requires.strength = heavy;
       const faith = "faith" in piece ? metal.level + piece.faith : 0;
       if (faith) { requires.prayer = faith; bonuses.prayer = Math.round(2 + tier * 0.7); }
+      if (piece.piece === "roundshield") bonuses.magic = -Math.round(piece.def * 0.5);
+      const weight = Math.round((PIECE_WEIGHT[piece.piece] ?? 1) * (1 + tier * 0.08) * 10) / 10;
       out.push({
         id, name, examine: isTool ? `A ${piece.name} made of ${metal.id}.` : faith ? `A ${metal.id} ${piece.name}, blessed at Dawnhold. Faith ${faith} to wield${heavy ? `, Strength ${heavy} and two hands` : ""}; it hurts the undead more and gives a little Faith with every hit.` : heavy ? `A ${metal.id} ${piece.name}. Two hands and Strength ${heavy} to swing it, and it hits harder the stronger you are.` : `A ${metal.id} ${piece.name}.`,
         value: Math.round(metal.value * piece.bars * 1.6 + 10),
@@ -372,6 +382,7 @@ function metalGear(): Item[] {
           speed: piece.speed || undefined, twoHanded: "twoHanded" in piece ? piece.twoHanded : undefined, holy: faith ? true : undefined,
         },
         tool: isTool ? { kind: piece.piece as "axe" | "pickaxe", tier, level: metal.level } : undefined,
+        weight,
       });
     }
     const magic = FORGED_STAFF_MAGIC[metal.id];
@@ -1239,7 +1250,7 @@ export const SHOPS: Record<string, ShopDef> = {
  * Whole sets: any shop that sells a helm and boots of a metal sells its cuirass, greaves, gauntlets and shield too (and a
  * shop with two pieces of leather sells all of it). Nobody should have to walk the Realm for the chest and legs.
  */
-const SET_PIECES = ["helm", "cuirass", "greaves", "gauntlets", "boots", "shield"] as const, LEATHER_SET = ["leather_hood", "leather_jerkin", "leather_leggings", "leather_bracers", "leather_gloves", "leather_boots"];
+const SET_PIECES = ["helm", "cuirass", "greaves", "gauntlets", "boots", "shield", "roundshield", "aegis"] as const, LEATHER_SET = ["leather_hood", "leather_jerkin", "leather_leggings", "leather_bracers", "leather_gloves", "leather_boots"];
 for (const shop of Object.values(SHOPS)) {
   const stock = [...shop.stock], metals = new Set<string>();
   for (const id of stock) { const m = id.match(/^([a-z]+)_(helm|cuirass|greaves|gauntlets|boots|shield)$/); if (m) metals.add(m[1]); }
@@ -1372,3 +1383,11 @@ const FOOD_EFFECTS: Record<string, Partial<Record<Skill, number>>> = {
   inkcrab: { defence: 3, mining: 2 }, sailfish: { strength: 3, attack: 2 }, inkshark: { attack: 4, strength: 4, defence: 2 },
 };
 for (const [id, food] of Object.entries(FOOD_EFFECTS)) { const entry = ITEM_LIST.find(item => item.id === id); if (entry) (entry as { food?: Partial<Record<Skill, number>> }).food = Object.fromEntries(Object.entries(food).filter(([, n]) => n)); }
+/** What the rest of the wardrobe weighs: anything worn that isn't forged. Clothes and capes are light; leather, hide and bone armour sit between. */
+for (const entry of ITEM_LIST) {
+  if (!entry.equip || entry.weight !== undefined) continue;
+  if (entry.id.startsWith("wayfarer_")) { (entry as { weight?: number }).weight = 0; continue; } // the Wayfarer's outfit weighs nothing: that's the point of it
+  const slot = entry.equip.slot, heavy = /plate|cuirass|greaves|helm|shield|greatsword|warhammer|battleaxe|flail/.test(entry.id);
+  const base = slot === "body" ? (heavy ? 5 : 1.5) : slot === "legs" ? (heavy ? 3 : 1) : slot === "shield" ? (heavy ? 3 : 2) : slot === "head" ? (heavy ? 1.6 : 0.4) : slot === "weapon" ? (heavy ? 3 : 1.2) : slot === "cape" ? 0.6 : slot === "belt" ? 0.8 : 0.5;
+  (entry as { weight?: number }).weight = base;
+}

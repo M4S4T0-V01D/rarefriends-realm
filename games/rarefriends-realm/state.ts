@@ -4,7 +4,7 @@
 import {
   EQUIP_SLOTS, FAMILY_NAMES, MAX_XP, MONSTERS, mountDef, PRAYERS, RELICS, SKILLS, SKILL_NAMES, WAYFARER_SET, XP_RATE, XP_TABLE, item, levelForXp,
   type Bonuses, type EquipSlot, type Item, type MonsterDef, type Skill, type SpotKind, type WardrobeId,
-} from "./data.ts";
+ isItem } from "./data.ts";
 import { createWorld, type World } from "./world.ts";
 import type { Daily } from "./daily.ts";
 import { LATEST_UPDATE } from "./updates.ts";
@@ -577,6 +577,8 @@ export function heft(player: Player) {
 }
 /** The Blade of Renown: its strength grows with your Presence, one for every four levels. */
 export const renown = (player: Player) => player.equipment.weapon === "blade_of_renown" ? Math.floor(levelForXp(player.xp.presence) / 4) : 0;
+/** Everything you wear, in kilograms. */
+export const wornWeight = (player: Player) => Math.round(Object.values(player.equipment).reduce((sum, id) => sum + (id && isItem(id) ? item(id).weight ?? 0 : 0), 0) * 10) / 10;
 export const weapon = (player: Player) => player.equipment.weapon ? item(player.equipment.weapon) : null;
 export const isStaffEquipped = (player: Player) => !!weapon(player)?.equip?.staff;
 export const attackSpeed = (player: Player) => weapon(player)?.equip?.speed ?? 4;

@@ -19,11 +19,12 @@ import { FELLOWSHIP_COST, FELLOWSHIP_RENAME_COST, NAME_MAX, RENAME_COST, TITLES,
 import { DEFAULT_FELLOWSHIP_COLORS, FELLOWSHIP_BANNERS, FELLOWSHIP_LOGOS, INVITE_HOURS, daysSince, previewArt } from "./cardstyle.ts";
 import { fellowsKnown, recruitText, renderFellowshipCard } from "./card.ts";
 import { completeTaskForRf, rerollTaskForRf } from "./slayer.ts";
+import { weightPenalty } from "./wayfaring.ts";
 import { HOME_LOOKS, HOME_TIERS, SLOTS, buyFurnishing, buyHome, furnishingOf, homeDeed, setHomeLook, slotOpen } from "./housing.ts";
 import { REGIONS } from "./world.ts";
 import {
   BANK_TABS, CONTAINERS, SATCHEL, heft, bankDeposit, emptyToBank, fillFromBank, bankDepositAll, bankDepositWorn, bankInOrder, bankMove, bankTabs, bankWithdraw, bonuses, combatLevel, count, isStaffEquipped, maxHp, maxPrayer, message, totalLevel, totalXp,
-  weapon, xpMultiplier, type Game, type Message, type Recipe, type Slot,
+  weapon, xpMultiplier, wornWeight, type Game, type Message, type Recipe, type Slot,
 } from "./state.ts";
 import {
   bestArrow, bowRange, emoteProblem, performEmote, applyReferral, shopBuys, buy, buyPrice, canCast, capeProblem, castSpell, rangedMaxHit, rubLamp, chooseOption, continueDialogue, dialogueAtOptions, itemOptions, playerMaxHit, recipeProblem, sell, sellPrice,
@@ -378,6 +379,7 @@ function EquipmentTab({ game, refresh, openCard, openMenu }: PanelProps) {
           </button>
         ) : <span key={index} />)}
       </div>
+      <p className="realm-muted realm-weight">Weight <b>{wornWeight(player)} kg</b> · running drains {Math.round(weightPenalty(game) * 100)}% faster{levelForXp(player.xp.agility) >= 30 ? ` (Wayfaring carries ${Math.min(75, Math.floor(levelForXp(player.xp.agility) / 30) * 25)}% of it)` : ""}</p>
       <dl className="realm-bonuses">
         <div><dt>Attack</dt><dd>{signed(total.attack)}</dd></div><div><dt>Strength</dt><dd>{signed(total.strength)}</dd></div>
         <div><dt>Defence</dt><dd>{signed(total.defence)}</dd></div><div><dt>Ranged</dt><dd>{signed(total.ranged)}</dd></div>

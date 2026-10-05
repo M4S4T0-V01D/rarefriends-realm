@@ -101,6 +101,8 @@ export function skillGuide(skill: Skill): GuideEntry[] {
       for (const [id, course] of Object.entries(COURSES)) add(course.level, course.name, `${id === "friendhollow" ? "Five obstacles west of the castle" : id === "dunes" ? "Six obstacles south-east of the Oasis" : "Six obstacles north of the Frostpeak camp"}: +${course.lapXp} XP and ${course.marks} Wayfarer's mark${course.marks > 1 ? "s" : ""} a lap`);
       add(1, "Run energy", "Comes back faster and drains slower with every level (40% slower at 99)");
       add(1, "Sure footing", "Hard obstacles can be slipped on: a fifth of the time at their level, never twelve levels above it");
+      add(1, "Carrying weight", "Everything worn weighs something (Worn equipment shows it): forty kilograms doubles how fast running drains. Round shields and plate are the heavy things.");
+      add(30, "Packhorse", "A quarter of your load no longer counts against your run energy"); add(60, "Long strides", "Half of it"); add(90, "Light as a Friend", "Three quarters of it");
       add(20, "Murkmire stepping stones", "A shortcut over the bog river");
       for (const reward of WAYFARER_REWARDS) if (reward.id !== "waybread") add(item(reward.id).equip?.requires?.agility ?? 1, reward.name, `${reward.cost} marks from Coach Skip · ${reward.text.replace(/ \(Wayfaring \d+\)/, "")}`, reward.id);
       add(1, "Waybread", "1 mark for 3 from Coach Skip · 40 run energy each", "waybread");

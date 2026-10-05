@@ -76,7 +76,7 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
   // An amulet or pendant round the neck.
   const amulet: Piece | undefined = worn.filter(id => isItem(id) && item(id).equip?.slot === "neck").slice(0, 1).map(id => ({ id, kind: "amulet", color: item(id).icon.color, style: item(id).icon.kind }))[0];
   // A shield on the off arm.
-  const shield: Piece | undefined = worn.filter(id => isItem(id) && item(id).equip?.slot === "shield").slice(0, 1).map(id => ({ id, kind: "shield", color: item(id).icon.color, trim: item(id).icon.accent }))[0];
+  const shield: Piece | undefined = worn.filter(id => isItem(id) && item(id).equip?.slot === "shield").slice(0, 1).map(id => ({ id, kind: "shield", color: item(id).icon.color, trim: item(id).icon.accent, style: item(id).icon.shape }))[0];
   // A weapon in the hand (swords, daggers, sabres, axes, pickaxes, staffs and bows), when it isn't mid-swing.
   const weapon: Piece | undefined = (held && isItem(held.id) ? [held.id] : worn.filter(id => isItem(id) && item(id).equip?.slot === "weapon")).slice(0, 1).map(id => ({ id, kind: `weapon_${item(id).icon.shape}`, color: item(id).icon.color, trim: item(id).icon.accent }))[0];
   // Angles snap to steps (pixel art turns in steps anyway, and it keeps the cache small).
@@ -716,6 +716,22 @@ function drawSatchel(p: Pixels, piece: Piece, x: number, y: number, half: number
 /** A heater shield centred on (x, y) in fine pixels: rim, boss and cross in its accent; from behind, its wooden back and strap. */
 function drawShield(p: Pixels, piece: Piece, x: number, y: number, rear: boolean) {
   const color = piece.color, dark = shadeHex(color, -0.2), light = shadeHex(color, 0.18), hw = rear ? 3 : 5;
+  if (piece.style === "roundshield") {
+    // A big round shield: a boss in the middle and a rim, nearly the width of the body.
+    const r = rear ? 4 : 7;
+    if (rear) { p.disc(x, y, r, r, "#7a5b40", null); p.line(x - r + 1, y, x + r - 1, y, "#4a3a2e"); return; }
+    p.disc(x, y, r, r, color, null); p.disc(x, y, r - 1.5, r - 1.5, color, dark); p.disc(x, y, 2, 2, piece.trim ?? light, null);
+    for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; p.set(Math.round(x + Math.cos(a) * (r - 2)), Math.round(y + Math.sin(a) * (r - 2)), dark); }
+    p.line(x - r + 1, y - 2, x - 2, y - r + 1, light); return;
+  }
+  if (piece.style === "aegis") {
+    // The aegis: a tall shield with a sun disc, its rays in the blessing's gold.
+    const tall: [number, number][] = [[x - hw, y - 8], [x + hw, y - 8], [x + hw, y + 2], [x, y + 8], [x - hw, y + 2]];
+    if (rear) { p.poly(tall, "#7a5b40", null); return; }
+    p.poly(tall, color, null); p.line(x - hw, y - 8, x + hw, y - 8, light); p.line(x + hw, y - 7, x + hw, y + 2, dark); p.line(x + hw, y + 2, x, y + 8, dark);
+    const gold = piece.trim ?? "#e2c46a"; p.disc(x, y - 1, 2.6, 2.6, gold, null); for (const [dx, dy] of [[0, -5], [0, 4], [-4, -1], [4, -1], [-3, -4], [3, -4], [-3, 2], [3, 2]]) p.set(x + dx, y - 1 + dy, gold);
+    return;
+  }
   const outline: [number, number][] = [[x - hw, y - 6], [x + hw, y - 6], [x + hw, y + 1], [x, y + 7], [x - hw, y + 1]];
   if (rear) { p.poly(outline, "#7a5b40", null); p.line(x - hw + 1, y - 2, x + hw - 1, y - 2, "#4a3a2e"); p.line(x - hw, y - 6, x + hw, y - 6, dark); return; }
   p.poly(outline, color, null);
