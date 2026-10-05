@@ -509,10 +509,12 @@ function startGround(scene: Scene, snap: GroundSnap, reach: number): GroundCanva
   return { canvas, ctx, snap, range: tileRange(snap.camera, reach, TERRAIN_PAD), step: 0 };
 }
 /** Paint the next slice of a ground canvas; true when it's complete. */
-function paintGround(scene: Scene, build: GroundCanvas, steps: number) {
+function paintGround(target: CanvasRenderingContext2D, scene: Scene, build: GroundCanvas, steps: number) {
   const [x0, y0, x1, y1] = build.range;
+  // Textured quads compose with the canvas's base transform: the build canvas's while painting it, the frame's after.
   beginTextures(build.ctx);
   while (steps-- > 0 && build.step < TERRAIN_STEPS) { drawTerrain(build.ctx, scene, build.snap.camera, x0, y0, x1, y1, TERRAIN_PAD, "still", build.step / TERRAIN_STEPS, (build.step + 1) / TERRAIN_STEPS); build.step++; }
+  beginTextures(target);
   return build.step >= TERRAIN_STEPS;
 }
 /** The ground for this frame: from the cache where it can be, drawn fresh where it can't. */
@@ -527,7 +529,7 @@ function drawGround(target: CanvasRenderingContext2D, scene: Scene, x0: number, 
   };
   // A build under way carries on while it's still wanted (one slice a frame), and takes over once it's whole.
   if (groundBuild && (groundBuild.snap.key !== key || groundBuild.snap.world !== world)) { dropGround(groundBuild); groundBuild = null; }
-  if (groundBuild && paintGround(scene, groundBuild, 1)) { dropGround(groundReady); groundReady = groundBuild; groundBuild = null; }
+  if (groundBuild && paintGround(target, scene, groundBuild, 1)) { dropGround(groundReady); groundReady = groundBuild; groundBuild = null; }
   let fit = usable(groundReady);
   if (!fit) {
     if (key !== groundKeyPrev) {
@@ -537,12 +539,11 @@ function drawGround(target: CanvasRenderingContext2D, scene: Scene, x0: number, 
     }
     // Settled, but nothing cached yet: paint the canvas a slice a frame (drawing straight to the frame meanwhile), so
     // the frames after a turn or a zoom carry a quarter of the work each rather than one of them all of it.
-    if (!groundBuild) { groundBuild = startGround(scene, snapOf(), reach); if (paintGround(scene, groundBuild, 1)) { dropGround(groundReady); groundReady = groundBuild; groundBuild = null; } }
+    if (!groundBuild) { groundBuild = startGround(scene, snapOf(), reach); if (paintGround(target, scene, groundBuild, 1)) { dropGround(groundReady); groundReady = groundBuild; groundBuild = null; } }
     fit = usable(groundReady);
     if (!fit) { drawTerrain(target, scene, camera, x0, y0, x1, y1); RENDER_PROFILE.groundCached = 0; return; }
   }
   groundKeyPrev = key;
-  beginTextures(target);
   target.imageSmoothingEnabled = false;
   target.drawImage(groundReady!.canvas, Math.round(fit.dx) - TERRAIN_PAD, Math.round(fit.dy) - TERRAIN_PAD);
   drawTerrain(target, scene, camera, x0, y0, x1, y1, 0, "motion");
@@ -1471,6 +1472,8 @@ type Drawable = {
   scenery?: boolean;
   /** Drawn as pixel art alone: its shadow and its hole in the light are the same sprites laid again, not a second drawing. */
   sprite?: boolean;
+  /** Its hull is exactly what it draws (a box, a ground quad): High lights it by the hull too. */
+  exact?: boolean;
   /** Set by the frame's draw: off screen (skipped), its screen box, the sprites it laid, and the glow it gave off. */
   skip?: boolean; box?: [number, number, number, number]; sprites?: SpriteDraw[] | null; emitted?: [number, number][][] | null; tag?: string;
 };
@@ -1565,7 +1568,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     const inward = roofed ? (nx: number, ny: number) => { const tx = x + nx, ty = y + ny; return inBounds(tx, ty) && world.buildingAt[ty * W + tx] === owner && INDOOR_FLOORS.has(world.tiles[ty * W + tx]); } : undefined;
     const hidden = inward && joined ? (nx: number, ny: number) => inward(nx, ny) || joined(nx, ny) : inward ?? joined;
     drawables.push({ depth: d, at: { x, y, h: 20 }, size: [(cut ? 9 : dungeon ? 34 : storeys * WALL_H + tall) + 24, 52, 30],
-      hull: () => near ? null : boxHull(camera, x, y, 1, 1, cut ? 9 : dungeon ? 34 : battlement ? 22 : storeys * WALL_H + tall), draw: () => {
+      exact: true, hull: () => near ? null : boxHull(camera, x, y, 1, 1, cut ? 9 : dungeon ? 34 : battlement ? 22 : storeys * WALL_H + tall), draw: () => {
       ctx.globalAlpha = near ? 0.3 : 1;
       const [top, left, right] = dungeon ? ["#4a4950", "#3a3940", "#2f2e35"] : timber ? ["#8a6a50", "#e6dcc6", "#cfc4ab"] : style === "plank" ? ["#8a6a50", "#b89c7e", "#9c8266"] : ["#b9b4ab", "#a39e95", "#8f8a82"];
       const plain: WallStyle = dungeon ? "dungeon" : timber ? "timber" : style === "plank" ? "plank" : "brick";
@@ -1667,7 +1670,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       wall(x, y, mine ? 1 : building?.storeys ?? 1, cut, near, !!owner && !cut, false, building?.walls ?? "stone", mine ? 0 : building?.tall ?? 0, joined);
       // Walls not under a roof cast their own shadows (a building's are cast whole).
       if (!building || building.roof === "none") blockers.push([x, y, (building?.storeys ?? 1) * WALL_H]);
-    } else if (terrain === T.CLIFF) { drawables.push({ depth: depth(x, y), at: { x, y }, size: [60, 52, 30], hull: () => boxHull(camera, x, y, 1, 1, 22 + hash(x, y) * 10), draw: () => box(ctx, camera, x, y, 1, 1, 22 + hash(x, y) * 10, "#a39e96", "#8f8a83", "#7c7771") }); blockers.push([x, y, 28]); }
+    } else if (terrain === T.CLIFF) { drawables.push({ depth: depth(x, y), at: { x, y }, size: [60, 52, 30], exact: true, hull: () => boxHull(camera, x, y, 1, 1, 22 + hash(x, y) * 10), draw: () => box(ctx, camera, x, y, 1, 1, 22 + hash(x, y) * 10, "#a39e96", "#8f8a83", "#7c7771") }); blockers.push([x, y, 28]); }
     if (!covered(x, y)) object(x, y);
   }
   // The storeys you've climbed: outer walls of the ones below, and the floor you stand on with its walls and furniture.
@@ -1916,7 +1919,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       }
       for (const key of ridges) {
         const tx = key % W, ty = (key - tx) / W;
-        drawables.push({ depth: depth(tx, ty) - 0.45, at: { x: tx, y: ty, h: 2 }, size: [70, 50, 30], hull: () => groundTile(ctx, scene, tx, ty, false), draw: () => { groundTile(ctx, scene, tx, ty); } });
+        drawables.push({ depth: depth(tx, ty) - 0.45, at: { x: tx, y: ty, h: 2 }, size: [70, 50, 30], exact: true, hull: () => groundTile(ctx, scene, tx, ty, false), draw: () => { groundTile(ctx, scene, tx, ty); } });
       }
     }
   }
@@ -2050,17 +2053,6 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   lap("light samples");
   // ---------- Each thing in the light where it stands ----------
   let tLight = 0, tHaze = 0, cuts = 0;
-  /**
-   * Whether the ground's light behind a sprite (at its feet, and behind its top) is within a shade of the sprite's own:
-   * then the light map lights it right as it is, and it needs no hole of its own.
-   */
-  const litAlike = (drawable: Drawable, light: RGB) => {
-    const at = drawable.at!, real = at.y >= FLOOR_Y - 0.5 ? realPoint(world, at.x, at.y) : at;
-    const near = (x: number, y: number) => { const g = field.ground(x, y); return Math.abs(Math.min(1, g[0]) - light[0]) < 0.06 && Math.abs(Math.min(1, g[1]) - light[1]) < 0.06 && Math.abs(Math.min(1, g[2]) - light[2]) < 0.06; };
-    if (!near(real.x, real.y)) return false;
-    const top = drawable.sprites![0], behind = toTile(camera, top.x + top.w / 2, top.y, false);
-    return near(behind.x, behind.y);
-  };
   drawables.forEach((drawable, index) => {
     if (drawable.skip || !lit) return;
     const glow = drawable.emitted;
@@ -2075,10 +2067,9 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     const light = litBy[index] ?? [1, 1, 1] as RGB, rect = drawable.box ?? (drawable.rect || drawable.at ? rectOf(drawable) : screen());
     const count = hits.length, saved = texturesOn;
     const t1 = performance.now();
-    // Walls, roofs, cliffs and ridge tiles are their outlines on screen: one fill of their light each.
-    const hull = drawable.sprites ? null : drawable.hull?.();
-    if (drawable.sprites && drawable.at && !glow && litAlike(drawable, light)) { /* the light behind it is its own already */ }
-    else if (hull && hull.length > 2) {
+    // Walls, cliffs and ridge tiles are exactly their outlines on screen: one fill of their light each.
+    const hull = drawable.sprites || !drawable.exact ? null : drawable.hull?.();
+    if (hull && hull.length > 2) {
       lb.globalCompositeOperation = "source-over"; lb.fillStyle = rgbCss(light); lb.beginPath(); hull.forEach(([hx, hy], i) => i ? lb.lineTo(hx, hy) : lb.moveTo(hx, hy)); lb.closePath(); lb.fill();
     }
     else if (drawable.sprites) {
