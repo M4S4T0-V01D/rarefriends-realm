@@ -3,7 +3,7 @@
  * Draws in a 960 × 640 logical view; the caller scales the canvas for the device.
  */
 import type { GenerationSprites } from "@rarefriends/friendsdk/sprites";
-import { COURSES, ROCKS, isItem, item, levelForXp, mountDef, petDef, regionalSetOf, type Coat, type Icon } from "./data.ts";
+import { MONSTERS, COURSES, ROCKS, isItem, item, levelForXp, mountDef, petDef, regionalSetOf, type Coat, type Icon } from "./data.ts";
 import { herbDef } from "./apothecary.ts";
 const isPet = (id: string) => !!petDef(id);
 import { NPCS } from "./content.ts";
@@ -753,11 +753,11 @@ function drawBankBooth(ctx: CanvasRenderingContext2D, scene: Scene, object: Worl
 }
 // ---------- The fountain in Hollow Square ----------
 /** Pixel water for the fountain, 32 × 32 in four frames: rippling blues, light caustics that drift, and wishing coins on the bottom. */
-const fountainWater = (frame: number) => pixelArt(`fountain-water:${frame}`, 32, 32, p => {
+const fountainWater = (frame: number, red = false) => pixelArt(`fountain-water:${frame}:${red ? "red" : ""}`, 32, 32, p => {
   const n = (x: number, y: number, s: number) => { let h = Math.imul(x * 374761393 + y * 668265263 + s * 1442695041, 1274126177); h ^= h >>> 13; return ((Math.imul(h, 1103515245) >>> 0) % 1000) / 1000; };
   for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
     const d = Math.hypot(x - 15.5, y - 15.5), wave = Math.sin(d * 0.9 - frame * Math.PI / 2) + Math.sin((x + y) * 0.35 + frame * 0.8) * 0.5;
-    p.set(x, y, wave > 1.05 ? "#bcd6ec" : wave > 0.45 ? "#8fb5d6" : wave > -0.6 ? "#7aa3c9" : "#6a93bc");
+    p.set(x, y, red ? (wave > 1.05 ? "#d4625a" : wave > 0.45 ? "#a8342e" : wave > -0.6 ? "#8a2f2b" : "#6e2320") : (wave > 1.05 ? "#bcd6ec" : wave > 0.45 ? "#8fb5d6" : wave > -0.6 ? "#7aa3c9" : "#6a93bc"));
   }
   // Coins tossed in for luck, and a glint or two on the surface.
   for (const [x, y] of [[7, 20], [22, 9], [24, 23], [11, 8], [18, 26]] as const) { p.set(x, y, "#d9a93f"); p.set(x + 1, y, "#f2d27a"); }
@@ -796,7 +796,7 @@ function rimTop(ctx: CanvasRenderingContext2D, camera: Camera, outer: [number, n
  * coins), a column carrying a bowl that spills over its lip in falling streams, and a jet at the top whose droplets arc
  * down into the bowl. Everything turns with the camera, and the moving water stills with reduced motion.
  */
-function drawFountain(ctx: CanvasRenderingContext2D, scene: Scene, cx: number, cy: number) {
+function drawFountain(ctx: CanvasRenderingContext2D, scene: Scene, cx: number, cy: number, red = false) {
   const { camera } = scene, z = camera.zoom, now = scene.reducedMotion ? 0 : scene.now, S = (x: number, y: number, h: number) => toScreen(camera, x, y, h);
   const STONE_L = "#cfcbc3", STONE_R = "#b7b2aa", RIM = "#e2ded5", WATER_H = 7, RIM_H = 13;
   const outer = octagonAt(cx, cy, 0.98), inner = octagonAt(cx, cy, 0.8), dim = (hex: string) => shadeHex(hex, -0.1);
@@ -804,8 +804,8 @@ function drawFountain(ctx: CanvasRenderingContext2D, scene: Scene, cx: number, c
   const surface = inner.map(([px, py]) => S(px, py, WATER_H));
   ctx.save(); ctx.beginPath(); surface.forEach((s, i) => i ? ctx.lineTo(s.x, s.y) : ctx.moveTo(s.x, s.y)); ctx.closePath(); ctx.clip();
   const frame = Math.floor(now / 260) % 4;
-  if (texturesOn) texturedQuad(ctx, fountainWater(frame), S(cx - 0.8, cy - 0.8, WATER_H), S(cx + 0.8, cy - 0.8, WATER_H), S(cx - 0.8, cy + 0.8, WATER_H), 32, 32);
-  else { ctx.fillStyle = "#7aa3c9"; ctx.fill(); }
+  if (texturesOn) texturedQuad(ctx, fountainWater(frame, red), S(cx - 0.8, cy - 0.8, WATER_H), S(cx + 0.8, cy - 0.8, WATER_H), S(cx - 0.8, cy + 0.8, WATER_H), 32, 32);
+  else { ctx.fillStyle = red ? "#8a2f2b" : "#7aa3c9"; ctx.fill(); }
   // Rings spreading from where the streams land.
   if (!bare) for (let k = 0; k < 3; k++) {
     const t = ((now / 1400 + k / 3) % 1), r = 0.42 + t * 0.36;
@@ -941,7 +941,7 @@ function drawStation(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldO
     case "fountain": {
       const master = objectAtTile(game.world, ox - 1, oy)?.kind !== "fountain" && objectAtTile(game.world, ox, oy - 1)?.kind !== "fountain";
       if (!master) return hit(0, 0);
-      return drawFountain(ctx, scene, ox + 0.5, oy + 0.5);
+      return drawFountain(ctx, scene, ox + 0.5, oy + 0.5, /blood/i.test(object.name));
     }
     case "mill": box(ctx, camera, ox, oy, 0.7, 0.7, 12, "#cdb9a0", "#9c8672", "#8a7563"); poly(ctx, [[sx - 12 * z, sy - 30 * z], [sx + 12 * z, sy - 30 * z], [sx + 4 * z, sy - 14 * z], [sx - 4 * z, sy - 14 * z]], "#b89c86"); return hit(34);
     case "dairy_cow": {
@@ -1762,6 +1762,14 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     if (home && peer.x > home.x0 && peer.x < home.x1 && peer.y > home.y0 && peer.y < home.y1) continue; // your home is yours alone
     if (!shown(peer.x, peer.y)) continue;
     drawables.push({ depth: depth(peer.x, peer.y) + 0.12, at: { x: peer.x, y: peer.y }, cast: true, size: [190, 100, 30], draw: () => drawPeer(ctx, scene, peer, hits) });
+    // A match they're fighting in the Ring: its creatures, as they stand, for anyone watching from the concourse.
+    if (peer.p.arena && !game.arena) for (const foe of peer.p.arena.foes) {
+      const def = MONSTERS[foe.id];
+      if (!def || !shown(foe.x, foe.y, 2)) continue;
+      const ghost: Monster = { uid: foe.u, def, x: foe.x, y: foe.y, prev: { x: foe.x, y: foe.y }, spawn: { x: foe.x, y: foe.y }, hp: foe.hp, heading: { x: Math.sign(peer.x - foe.x) || 1, y: Math.sign(peer.y - foe.y) || 1 }, target: true, attackTimer: 0, respawnAt: 0, dead: false, wander: 0, moved: 0, retreat: 0, curses: {}, arena: true };
+      const size = def.size ?? 1, center = { x: foe.x + (size - 1) / 2, y: foe.y + (size - 1) / 2 };
+      drawables.push({ depth: depth(center.x, center.y) + (size - 1) / 2 + 0.1, at: center, cast: true, size: [80 + 90 * size, 40 + 50 * size, 20 + 10 * size], draw: () => { const count = hits.length; drawMonster(ctx, scene, ghost, { x: foe.x, y: foe.y, moving: false }, hits); hits.length = count; } });
+    }
   }
   // Your follower: an owned Friend walking the tiles you leave behind, animated like any NPC.
   const petOut = game.player.petOut;

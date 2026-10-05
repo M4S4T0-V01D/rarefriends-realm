@@ -34,7 +34,18 @@ const WALKABLE = new Set<number>([T.GRASS, T.DARK_GRASS, T.PATH, T.COBBLE, T.SAN
 export const isWater = (terrain: number) => terrain === T.WATER || terrain === T.DEEP;
 /** The sparring ring east of Market Street: inside it, players may duel each other (safely: nobody dies or loses items). */
 export const RING = { x0: 138 + MAINLAND.x, y0: 144 + MAINLAND.y, x1: 144 + MAINLAND.x, y1: 149 + MAINLAND.y };
-export const inRing = (x: number, y: number) => x >= RING.x0 && x <= RING.x1 && y >= RING.y0 && y <= RING.y1;
+/**
+ * The Rare Friends Ring, west of the Deadwood across the river: a round building (a Hoverer's shape) whose covered ring
+ * holds the lobby and shops, and whose open courtyard is the arena. Fights happen inside `inner`; the lobby is on the
+ * south of the concourse.
+ */
+export const ARENA = { x: 214, y: 72, outer: 24, inner: 16, lobby: { x: 214, y: 92 } } as const;
+export const arenaDistance = (x: number, y: number) => Math.hypot(x - ARENA.x, y - ARENA.y);
+/** Inside the Ring's courtyard, where matches are fought and Friends may duel. */
+export const inArena = (x: number, y: number) => arenaDistance(x, y) < ARENA.inner;
+/** Anywhere in the Ring building (its concourse and courtyard). */
+export const inRingBuilding = (x: number, y: number) => arenaDistance(x, y) <= ARENA.outer;
+export const inRing = (x: number, y: number) => (x >= RING.x0 && x <= RING.x1 && y >= RING.y0 && y <= RING.y1) || inArena(x, y);
 
 export type ObjectKind =
   | "tree" | "stump" | "rock" | "spot" | "range" | "furnace" | "anvil" | "bank" | "altar" | "ladder" | "stall" | "obstacle"
@@ -67,7 +78,9 @@ export type RegionId =
   | "deadwood" | "gravesend" | "westmarch" | "drakespine" | "ashfall" | "southshore" | "saltmarrow" | "thistle_vale" | "hollyhock" | "dyemoor"
   | "the_wilds" | "tallgrass" | "ironreach" | "cragmaw" | "quillhaven" | "pale_isles" | "catacombs" | "sea_cave" | "wyrm_lair" | "deep_mine"
   // The dungeon update (2026-10): three more under the lake, the library and the stones.
-  | "deepglass" | "drowned_archive" | "howling_vault";
+  | "deepglass" | "drowned_archive" | "howling_vault"
+  // The Rare Friends Ring (2026-10): the arena west of the Deadwood.
+  | "friends_ring";
 export type Region = { id: RegionId; name: string; label: { x: number; y: number }; danger: number; underground?: boolean };
 const MAINLAND_REGIONS = new Set<RegionId>(["coast", "friendhollow", "farmland", "whisperwood", "ashen_hills", "emberforge", "frostpeak", "glass_lake", "pale_dunes", "oasis", "murkmire", "mossy_ruins",
   "wizards_tower", "wyrmreach", "fernwick", "greyhorn", "highcairn", "crypt", "hollow_depths"]);
@@ -115,6 +128,7 @@ export const REGIONS: readonly Region[] = [
   { id: "deepglass", name: "Deepglass Caverns", label: { x: 436, y: 534 }, danger: 2, underground: true },
   { id: "drowned_archive", name: "The Drowned Archive", label: { x: 508, y: 534 }, danger: 4, underground: true },
   { id: "howling_vault", name: "The Howling Vault", label: { x: 470, y: 566 }, danger: 6, underground: true },
+  { id: "friends_ring", name: "The Rare Friends Ring", label: { x: 214, y: 72 }, danger: 0 },
 ];
 export const regionIndex = (id: RegionId) => REGIONS.findIndex(region => region.id === id);
 /** The mainland regions' labels were written in the mainland's own coordinates: move them with it (once, at load). */
@@ -148,7 +162,7 @@ export type World = {
   buildingAt: Uint8Array;
   /** Ground height (world pixels) at every tile corner: (W + 1) × (H + 1), corner (i, j) sits at (i − ½, j − ½). */
   heights: Float32Array;
-  places: Record<"spawn" | "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier" | "crypt" | "depths" | "king" | "fernwick" | "highcairn" | "dawnhold" | "gravesend" | "saltmarrow" | "hollyhock" | "dyemoor" | "tallgrass" | "cragmaw" | "quillhaven" | "ashfall", { x: number; y: number }>;
+  places: Record<"spawn" | "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier" | "crypt" | "depths" | "king" | "fernwick" | "highcairn" | "dawnhold" | "gravesend" | "saltmarrow" | "hollyhock" | "dyemoor" | "tallgrass" | "cragmaw" | "quillhaven" | "ashfall" | "ring", { x: number; y: number }>;
 };
 
 function mulberry(seed: number) {
@@ -1216,7 +1230,7 @@ export function createWorld(seed = 20260927): World {
   const places = Object.fromEntries(Object.entries(main.places).map(([key, at]) => { const [x, y] = mainlandToWorld(at.x, at.y); return [key, { x, y }]; })) as World["places"];
   // Where the wider world's glides land (and two mainland towns that never had one): a village square, a courtyard, a camp.
   const m = (x: number, y: number) => { const [wx, wy] = mainlandToWorld(x, y); return { x: wx, y: wy }; };
-  Object.assign(places, { fernwick: m(36, 72), highcairn: m(282, 84), dawnhold: m(316, 82), gravesend: { x: 300, y: 136 }, saltmarrow: { x: 424, y: 466 }, hollyhock: { x: 160, y: 452 }, dyemoor: { x: 254, y: 470 }, tallgrass: { x: 556, y: 402 }, cragmaw: { x: 632, y: 204 }, quillhaven: { x: 646, y: 404 }, ashfall: { x: 72, y: 128 } });
+  Object.assign(places, { fernwick: m(36, 72), highcairn: m(282, 84), dawnhold: m(316, 82), gravesend: { x: 300, y: 136 }, ring: { x: ARENA.lobby.x, y: ARENA.lobby.y }, saltmarrow: { x: 424, y: 466 }, hollyhock: { x: 160, y: 452 }, dyemoor: { x: 254, y: 470 }, tallgrass: { x: 556, y: 402 }, cragmaw: { x: 632, y: 204 }, quillhaven: { x: 646, y: 404 }, ashfall: { x: 72, y: 128 } });
   // The wider world around it.
   const ctx: GenContext = { W, H, tiles, region, objectAt, lift, objects, spawns, buildings, doorways: [], random: mulberry(seed + 4242), noise: makeNoise(seed + 11, 9), noise2: makeNoise(seed + 19, 4) };
   buildExpansion(ctx, worldTools(ctx), seed);

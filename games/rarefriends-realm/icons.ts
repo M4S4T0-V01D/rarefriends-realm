@@ -235,6 +235,14 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
         part(p, disc(26, 5, 5), color, "metal"); for (const [dx, dy] of [[-5, 0], [5, 0], [0, -5], [0, 5], [-4, -4], [4, 4], [4, -4], [-4, 4]]) part(p, disc(26 + dx, 5 + dy, 1.5), shadeHex(color, -0.1), "metal");
         dot(p, 26, 5, accent ?? "#e2c46a"); break;
       case "warhammer":
+        if (icon.kind === "ringbreaker") {
+          // The Ringbreaker: a round hammer face one side, a block the other, a spike up the middle, the Ring's red band.
+          part(p, stroke([[6, 30], [20, 10]], 3), WOOD_C, "wood"); line(p, [[9, 25], [11, 22]], DARK_WOOD);
+          part(p, poly([[11, 6], [18, 2], [21, 7], [14, 11]]), shadeHex(color, -0.2), "metal");
+          part(p, disc(25, 9, 4.2), color, "metal"); line(p, [[27, 6], [29, 10]], shadeHex(color, 0.35));
+          part(p, poly([[18, 3], [22, 1], [24, 5], [20, 8]]), accent ?? "#8a2f2b", "cloth");
+          part(p, poly([[20, 2], [22, 0], [24, 1], [22, 4]]), color, "metal"); line(p, [[21, 4], [22, 0]], shadeHex(color, 0.3)); dot(p, 22, 0, INK); break;
+        }
         // A long haft and a heavy block head with a spike.
         part(p, stroke([[6, 30], [21, 7]], 3), WOOD_C, "wood"); line(p, [[9, 25], [11, 22]], DARK_WOOD);
         part(p, poly([[13, 5], [22, 0], [29, 9], [20, 14]]), color, "metal");

@@ -4,8 +4,9 @@
  * feet with full health, and the win is recorded on both sides. Nobody dies, and nothing is lost.
  */
 import { bowRange, playerMaxHit, rangedMaxHit } from "./engine.ts";
-import { combatLevel, emit, maxHp, message, sound, weapon, type Game } from "./state.ts";
-import { inRing } from "./world.ts";
+import { combatLevel, emit, giveOrDrop, maxHp, message, sound, weapon, type Game } from "./state.ts";
+import { inArena, inRing } from "./world.ts";
+import { LAURELS_PER_WIN } from "./arena.ts";
 
 /** No duel hit can exceed this, whatever a message claims. */
 export const DUEL_MAX_HIT = 40;
@@ -38,6 +39,8 @@ export function takeDuelHit(game: Game, from: number, damage: number): "hit" | "
 }
 export function wonDuel(game: Game, over: number) {
   bump(game, "duelsWon");
+  // A Friend Fight in the Rare Friends Ring pays laurels, the Champions' Hall's only coin.
+  if (inArena(game.player.x, game.player.y)) { giveOrDrop(game, "laurel", LAURELS_PER_WIN); message(game, `A Friend Fight won in the Ring: ${LAURELS_PER_WIN} laurels for the Champions' Hall.`, "quest"); }
   message(game, `You beat Friend #${over} in the sparring ring! (${stat(game, "duelsWon")} win${stat(game, "duelsWon") === 1 ? "" : "s"}, ${stat(game, "duelsLost")} loss${stat(game, "duelsLost") === 1 ? "" : "es"})`, "quest"); sound(game, "duel");
 }
 export const countStat = bump;

@@ -51,7 +51,7 @@ try {
     const playing = await level();
     assert.ok(playing > 0.03, `${name}: main theme too quiet (${playing})`);
     // The jukebox has every track; switching plays the new one.
-    assert.equal(await page.locator("#jukebox button").count(), 44);
+    assert.equal(await page.locator("#jukebox button").count(), 45);
     const forge = page.locator('#jukebox button[data-track="emberforge"]');
     await forge.scrollIntoViewIfNeeded(); await (touch ? forge.tap() : forge.click());
     await page.waitForTimeout(2500); await level(); await page.waitForTimeout(2000);

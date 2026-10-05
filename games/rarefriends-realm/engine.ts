@@ -9,6 +9,7 @@ import {
 } from "./data.ts";
 import { cleanDaily } from "./daily.ts";
 import { searchChest } from "./dungeons.ts";
+import { arenaRevive, arenaTick } from "./arena.ts";
 import { cleanOrders } from "./orders.ts";
 import { cleanCard, cleanFellowshipLook } from "./cardstyle.ts";
 import { applyHome, cleanHome, sleep } from "./housing.ts";
@@ -26,7 +27,7 @@ import {
   type Activity, type CombatStyle, type Dialogue, type Game, type Monster, type Npc, type Player, type Point, type Recipe, type Slot, type BankSlot, type Target,
  type WorkOrder,
 } from "./state.ts";
-import { FLOOR_Y, MAINLAND, T, W, H, inBounds, isUnderground, isWater, mainlandToWorld, objectAtTile, realPoint, regionAt, terrainAt, tileIndex, walkable, type WorldObject } from "./world.ts";
+import { FLOOR_Y, MAINLAND, T, W, H, inBounds, inRingBuilding, isUnderground, isWater, mainlandToWorld, objectAtTile, realPoint, regionAt, terrainAt, tileIndex, walkable, type WorldObject } from "./world.ts";
 
 export { createGame };
 
@@ -1065,6 +1066,7 @@ export function successChance(skillLevel: number, low: number, high: number) {
 export function tick(game: Game) {
   updateFirstSteps(game);
   game.tick++; game.playTicks++;
+  arenaTick(game);
   const player = game.player;
   if (player.stunned > 0) player.stunned--;
   if (player.eatTimer > 0) player.eatTimer--;
@@ -1492,6 +1494,16 @@ function playerCombat(game: Game) {
   emit(game, { type: "swing", weapon: weaponSound(player.equipment.weapon), tick: game.tick });
   sound(game, hit > 0 ? "hit" : "miss");
   damageMonster(game, monster, Math.max(0, hit), hit < 0, true);
+  // The Ringbreaker: one blow in three throws the creature back a step, and the recoil costs the wielder 1 to 4 health.
+  if (hit > 0 && player.equipment.weapon === "ringbreaker" && monster.hp > 0 && !monster.dead && game.rng() < 0.33) {
+    const dx = Math.sign(monster.x - player.x), dy = Math.sign(monster.y - player.y);
+    if ((dx || dy) && monsterCanStep(game, monster, dx, dy) && !isBound(game, monster)) {
+      moveMonster(game, monster, monster.x + dx, monster.y + dy); monster.attackTimer = Math.max(monster.attackTimer, 3);
+      const recoil = 1 + Math.floor(game.rng() * 4);
+      player.hp = Math.max(1, player.hp - recoil); emit(game, { type: "hit", on: "player", damage: recoil, tick: game.tick });
+      message(game, `The Ringbreaker throws the ${monster.def.name.replace(/^The /, "").toLowerCase()} back a step. The recoil takes ${recoil} of your health.`);
+    }
+  }
   // The Lopsided elixir: one blow in five lands twice.
   if (hit > 0 && mixtureOn(game, 4) && game.rng() < 0.2 && monster.hp > 0) { damageMonster(game, monster, hit, false, true); message(game, "Your blow lands twice."); }
 }
@@ -1596,8 +1608,10 @@ function die(game: Game) {
   const player = game.player, spawn = game.world.places.spawn;
   message(game, "Oh dear, you are dead!", "warn"); emit(game, { type: "death", tick: game.tick }); remember(game, "first_death"); friendSays(game, "death"); sound(game, "death");
   player.deaths++; stopAll(game); closeInterfaces(game); player.prayers = []; player.hp = maxHp(player); player.energy = 100;
-  player.prev = { ...spawn }; player.x = spawn.x; player.y = spawn.y; player.moved = game.tick - 10; player.stunned = 0;
   for (const monster of game.monsters) monster.target = false;
+  // Fallen in the Rare Friends Ring: its magic revives you in the lobby instead.
+  if (inRingBuilding(player.x, player.y)) { arenaRevive(game); player.moved = game.tick - 10; player.stunned = 0; return; }
+  player.prev = { ...spawn }; player.x = spawn.x; player.y = spawn.y; player.moved = game.tick - 10; player.stunned = 0;
   message(game, "You wake up by the Friendhollow fountain. Your items are safe: the Realm is kind to new heroes.", "info");
 }
 function monsterTick(game: Game, monster: Monster) {
@@ -1611,6 +1625,7 @@ function monsterTick(game: Game, monster: Monster) {
   const player = game.player;
   if (monster.dead) {
     game.sneakingPast.delete(monster.uid);
+    if (monster.arena) return;
     if (game.tick >= monster.respawnAt) {
       monster.dead = false; monster.hp = monster.def.hp; monster.curses = {}; monster.bornAt = game.tick; monster.x = monster.spawn.x; monster.y = monster.spawn.y; monster.prev = { ...monster.spawn }; monster.target = false;
     }
@@ -1622,6 +1637,8 @@ function monsterTick(game: Game, monster: Monster) {
   // (each tick the monster may notice them) or veiled by the Veilweave hood (it can't).
   // Light feet: with Stealth 50 they only notice you (not sneaking) from 3 tiles, with 80 from 2.
   const stealth = level(game, "thieving"), reach = player.sneak ? 4 : stealth >= 80 ? 2 : stealth >= 50 ? 3 : 4;
+  // A creature summoned for a match always comes for you, however strong you are.
+  if (monster.arena && !monster.target && sameLayer) monster.target = true;
   const wouldAttack = !monster.target && monster.def.aggressive && sameLayer && chebyshev(monster, player) <= reach && combatLevel(player) <= monster.def.level * 2;
   if (wouldAttack && veiled(game)) { /* It looks straight through you. */ }
   else if (wouldAttack && player.sneak) { if (spots(game, monster)) caughtSneaking(game, monster); else if (!game.sneakingPast.has(monster.uid)) game.sneakingPast.set(monster.uid, game.tick); }
@@ -1631,7 +1648,7 @@ function monsterTick(game: Game, monster: Monster) {
   if (monster.def.heals && monster.hp < monster.def.hp / 2 && game.tick % 5 === 0) monster.hp = Math.min(monster.def.hp, monster.hp + monster.def.heals);
   if (monster.target) {
     const leash = Math.max(Math.abs(monster.x - monster.spawn.x), Math.abs(monster.y - monster.spawn.y));
-    if (!sameLayer || leash > monster.wander + 12 || chebyshev(monster, player) > 16) { monster.target = false; monster.retreat = 6; return; }
+    if (!monster.arena && (!sameLayer || leash > monster.wander + 12 || chebyshev(monster, player) > 16)) { monster.target = false; monster.retreat = 6; return; }
     // An archer shoots from where it stands once you're in its range; everything else closes in.
     const reach = monster.def.ranged ?? 0, shooting = reach > 0 && chebyshev(monster, player) <= reach;
     if (shooting || adjacentTo(player.x, player.y, monster.x, monster.y, footprint(monster))) {
@@ -2035,19 +2052,19 @@ export function buy(game: Game, shopId: string, id: string, n: number) {
   const locked = capeProblem(game, id);
   if (locked) { message(game, locked, "warn"); return 0; }
   if (!shop.stock.includes(id)) n = Math.min(n, sold!.n);
-  const price = buyPrice(game, id), stackable = !!item(id).stackable;
+  const price = buyPrice(game, id), stackable = !!item(id).stackable, currency = shop.currency ?? "coins";
   let bought = 0;
-  while (bought < n && count(player, "coins") >= price && canHold(player, id)) {
+  while (bought < n && count(player, currency) >= price && canHold(player, id)) {
     if (!stackable && freeSlots(player) === 0) break;
-    take(player, "coins", price); give(player, id); bought++;
+    take(player, currency, price); give(player, id); bought++;
     if (stackable && bought < n) {
-      const more = Math.min(n - bought, Math.floor(count(player, "coins") / price));
-      if (more > 0) { take(player, "coins", price * more); give(player, id, more); bought += more; }
+      const more = Math.min(n - bought, Math.floor(count(player, currency) / price));
+      if (more > 0) { take(player, currency, price * more); give(player, id, more); bought += more; }
       break;
     }
   }
   if (sold && !shop.stock.includes(id) && bought) { sold.n -= bought; if (sold.n <= 0) game.shopStock[shopId] = game.shopStock[shopId].filter(slot => slot !== sold); }
-  if (!bought) message(game, count(player, "coins") < price ? "You don't have enough coins." : "You don't have enough inventory space.", "warn");
+  if (!bought) message(game, count(player, currency) < price ? `You don't have enough ${item(currency).name.toLowerCase()}s.` : "You don't have enough inventory space.", "warn");
   else sound(game, "coins");
   return bought;
 }

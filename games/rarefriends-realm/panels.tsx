@@ -823,12 +823,12 @@ export function ShopModal({ game, shopId, refresh, onClose, openMenu }: { game: 
   return (
     <Modal title={shop.name} onClose={onClose} wide>
       <div className="realm-bank-bar"><span>Buy/sell:</span>{[1, 5, 10, 50].map(n => <button key={n} type="button" aria-pressed={amount === n} onClick={() => setAmount(n)}>{n}</button>)}
-        <span className="realm-coins">Coins: <b>{count(player, "coins").toLocaleString()}</b></span></div>
+        <span className="realm-coins">{shop.currency ? `${item(shop.currency).name}s` : "Coins"}: <b>{count(player, shop.currency ?? "coins").toLocaleString()}</b></span></div>
       <div className="realm-bank">
         <div className="realm-bank-grid" aria-label="Shop stock">
           {[...shop.stock.map(id => ({ id, n: 0 })), ...(game.shopStock[shopId] ?? [])].map(({ id, n: have }) => { const locked = capeProblem(game, id); return (
-            <button key={`${id}${have ? ":sold" : ""}`} type="button" className={`realm-slot shop${locked ? " locked" : ""}`} aria-label={`Buy ${item(id).name} for ${buyPrice(game, id)} coins${have ? ` (${have} in stock, sold by you)` : ""}${locked ? ` (${locked})` : ""}`}
-              title={`${item(id).name}: ${buyPrice(game, id).toLocaleString()} coins${locked ? `. ${locked}` : ""}`} onClick={() => { buy(game, shopId, id, amount); refresh(); }}
+            <button key={`${id}${have ? ":sold" : ""}`} type="button" className={`realm-slot shop${locked ? " locked" : ""}`} aria-label={`Buy ${item(id).name} for ${buyPrice(game, id)} ${shop.currency ? `${item(shop.currency).name.toLowerCase()}s` : "coins"}${have ? ` (${have} in stock, sold by you)` : ""}${locked ? ` (${locked})` : ""}`}
+              title={`${item(id).name}: ${buyPrice(game, id).toLocaleString()} ${shop.currency ? `${item(shop.currency).name.toLowerCase()}s` : "coins"}${locked ? `. ${locked}` : ""}`} onClick={() => { buy(game, shopId, id, amount); refresh(); }}
               {...rightClick(openMenu, () => [{ verb: "Value", noun: item(id).name, tone: "item", run: () => { message(game, `${item(id).name}: currently costs ${buyPrice(game, id).toLocaleString()} coins.`); refresh(); } },
                 ...[1, 5, 10, 50].map(n => ({ verb: `Buy-${n}`, noun: item(id).name, tone: "item", run: () => { buy(game, shopId, id, n); refresh(); } })), examine(game, id, refresh)])}>
               <ItemIcon slot={{ id, n: have || 1 }} size={40} /><small>{buyPrice(game, id) >= 10_000 ? `${Math.round(buyPrice(game, id) / 1000)}K` : buyPrice(game, id).toLocaleString()}</small>

@@ -2,6 +2,7 @@
  * Other players, as the game sees them: avatars that glide between the positions their hosts send (one per tick),
  * their chat bubbles, and what we tell them about ourselves. The host (host/net.ts) has already validated everything.
  */
+import { arenaFoes } from "./arena.ts";
 import { titleName } from "./presence.ts";
 import { FAMILY_NAMES } from "./data.ts";
 import type { NetState, Presence } from "./net.ts";
@@ -75,5 +76,6 @@ export function presenceOf(game: Game): Presence {
     name: player.name, tag: player.fellowship?.tag ?? null, title: titleName(player.title),
     head: player.equipment.head ?? null, shield: player.equipment.shield ?? null, neck: player.equipment.neck ?? null, body: player.equipment.body ?? null, legs: player.equipment.legs ?? null, hands: player.equipment.hands ?? null, feet: player.equipment.feet ?? null, mount: player.mount, pet: player.petOut, celebrate: player.celebrate && game.tick < player.celebrate.until ? `${player.celebrate.skill}_${player.celebrate.level}` : null, referredBy: player.referredBy, hp: player.hp, maxHp: maxHp(player), fight: currentFight(game), sneak: player.sneak, veiled: veiled(game),
     drops: game.ground.filter(entry => entry.shared).slice(-16).map(entry => ({ u: entry.uid, id: entry.id, n: entry.n, x: entry.x, y: entry.y })),
+    arena: game.arena ? { match: game.arena.name, foes: arenaFoes(game) } : null,
   };
 }

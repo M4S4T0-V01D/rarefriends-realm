@@ -9,6 +9,7 @@ import { PATRONS, askText, currentOrder, fillOrder, orderText } from "./orders.t
 import { HOME_TIERS, buyHome, homeDeed } from "./housing.ts";
 import { friendSays, remember } from "./friend.ts";
 import { rumourAt } from "./rumours.ts";
+import { FOE_GROUPS, MATCHES, customMatch, entryFee, startMatch } from "./arena.ts";
 import {
   addXp, combatLevel, count, give, giveOrDrop, has, level, message, sound, take, emit, BONE_BAG, ownsBoneBag, type Dialogue, type DialogueLine, type Game,
 } from "./state.ts";
@@ -26,6 +27,15 @@ const art = (family: number, seed: number) => ({ family, seed });
 export const NPCS: Record<string, NpcDef> = {
   guide: { id: "guide", name: "Realm Guide", examine: "Knows the Realm by heart.", options: ["Talk-to"], art: art(5, 11) },
   glimmer: { id: "glimmer", name: "Old Glimmer", examine: "Friend #7730. A Hoverer who remembers when the Realm was new.", options: ["Talk-to"], art: { canonical: 7730 } },
+  // The Rare Friends Ring (2026-10): the arena west of the Deadwood.
+  ringmaster: { id: "ringmaster", name: "Ringmaster Vell Harrow", examine: "Runs the Rare Friends Ring. Has seen every match since the Ringmaker's day, or says so.", options: ["Talk-to"], art: art(6, 701) },
+  ring_apothecary: { id: "ring_apothecary", name: "Sister Mallow", examine: "Sells what puts fighters back together.", options: ["Talk-to", "Trade"], shop: "ring_potions", art: art(3, 702) },
+  ring_chaplain: { id: "ring_chaplain", name: "Chaplain Orrin", examine: "Keeps the Ring's chapel stores: faith for those who fight by it.", options: ["Talk-to", "Trade"], shop: "ring_faith", art: art(2, 703) },
+  ring_sigilist: { id: "ring_sigilist", name: "Thessaly Vane", examine: "Sigils and staffs for the Ring's mages.", options: ["Talk-to", "Trade"], shop: "ring_mage", art: art(5, 704) },
+  ring_fletcher: { id: "ring_fletcher", name: "Brisk Arrowyn", examine: "Bows and arrows for the Ring's archers.", options: ["Talk-to", "Trade"], shop: "ring_range", art: art(4, 705) },
+  ring_armourer: { id: "ring_armourer", name: "Gorm Ironhand", examine: "Metal armour and blades, for coin.", options: ["Talk-to", "Trade"], shop: "ring_armour", art: art(6, 706) },
+  ring_quartermaster: { id: "ring_quartermaster", name: "The Pit Quartermaster", examine: "Takes bloodmarks and nothing else. Sells the Ring's own armour.", options: ["Talk-to", "Trade"], shop: "ring_pit", art: art(0, 707) },
+  ring_champion: { id: "ring_champion", name: "Laurel Keeper Ismay", examine: "Keeps the Champions' Hall. Takes laurels, the coin of Friend Fights.", options: ["Talk-to", "Trade"], shop: "ring_champions", art: art(7, 708) },
   mender: { id: "mender", name: "Mender Hale", examine: "The chapel's mender. Her hands are always clean and her apron never is.", options: ["Talk-to", "Trade"], shop: "mender", art: art(3, 318) },
   // The wider world's villages (2026-10). Each village's people wear its own clothes (NPC_WEAR / regionalLook in render.ts).
   gravesend_keeper: { id: "gravesend_keeper", name: "Warden Mira Thorne", examine: "Gravesend's gravekeeper. She knows every name on every stone.", options: ["Talk-to"], art: art(2, 501) },
@@ -1021,6 +1031,30 @@ function talkInner(game: Game, npcId: string): Dialogue {
       { label: "Nothing for now.", then: () => null },
     ]);
     case "witch": return chat(name, npcSays(name, "Heh heh. The stepping stones to the north need Wayfaring 20. The crypt's the other way. Mind the lurkers, dearie."));
+    case "ringmaster": {
+      if (game.arena) return chat(name, npcSays(name, "A match is on. Finish it, or walk out of the Ring to give it up."));
+      const offer = (match: { id: string; name: string; level: number; coins: number; marks: number }) => ({ label: `${match.name} (level ${match.level}: pays ${match.coins.toLocaleString()} coins and ${match.marks} bloodmarks; ${entryFee(match.coins).toLocaleString()} to enter)`, then: () => { startMatch(game, match.id); return null; } });
+      const chooseFoes = (): Dialogue => chat(name, npcSays(name, "Name the kind, then the creature. The purse goes by its level, and the gate costs a quarter of the purse."), [
+        ...FOE_GROUPS.map(group => ({ label: group.name, then: () => chat(name, npcSays(name, `${group.name}. Which?`), [
+          ...group.foes.map(foe => customMatch(foe)!).map(offer),
+          { label: "Back.", then: () => chooseFoes() },
+        ]) })),
+        { label: "Back.", then: () => talkInner(game, "ringmaster") },
+      ]);
+      return chat(name, npcSays(name, "Welcome to the Rare Friends Ring. A great Friend built it, long ago, so the best fighters in the land could meet; the magic in these stones stands the fallen back up in the lobby. Name your match: the gate costs a quarter of the purse, and the purse and the bloodmarks are yours when the last creature falls. Anyone on the concourse can watch."), [
+        ...MATCHES.map(offer),
+        { label: "I'll choose my own foes.", then: () => chooseFoes() },
+        { label: "Tell me about Friend Fights.", then: () => chat(name, npcSays(name, "Two Friends in the courtyard, and nobody dies: that's a Friend Fight. Right-click a Friend in the Ring to challenge them. Every win pays two laurels, and the Champions' Hall takes nothing else.")) },
+        { label: "Not today.", then: () => null },
+      ]);
+    }
+    case "ring_apothecary": return chat(name, npcSays(name, "Tonics, potions and something to eat between matches. Drink before you go in, not after you come out."));
+    case "ring_chaplain": return chat(name, npcSays(name, "The Ringmaker fought by faith, they say. Faith potions, sigils for the holy spells, the Acolyte's vestments, maces and the aegis: all here."));
+    case "ring_sigilist": return chat(name, npcSays(name, "Sigils for every element, and the elemental staffs. Mages win more matches than you'd think; the creatures can't dodge."));
+    case "ring_fletcher": return chat(name, npcSays(name, "Bows and arrows, and the hunter's leathers. The archers in the Vault's Dead match are the only ones who'll shoot back."));
+    case "ring_armourer": return chat(name, npcSays(name, "Pewter to glimmer, helm to boots, for coin. The Quartermaster across the way sells the Ring's own, for bloodmarks."));
+    case "ring_quartermaster": return chat(name, npcSays(name, "Bloodmarks. Nothing else. Pitfighter for the new, ringsteel for the proven, Wildfur for the ones who fight hardest when they're nearly done. Skull masks for everyone."));
+    case "ring_champion": return chat(name, npcSays(name, "Laurels, won from other Friends in the courtyard. The crown, the cape, the gauntlets and the gilded mask: the Hall sells them for nothing else."));
     case "fisher":
       if (stage(game, "deepglass_heart") > 0 || combatLevel(player) >= 30) return fetchQuest(game, name, "deepglass_heart", {
         offer: ["Glass Lake's gone cloudy on the east shore. Never done that. There's a crack in the rock over there that wasn't there in spring, and it glows of a night.", "Something's in under the lake. Go down and see. Crack six of those glass crabs for me, bring me three shards of whatever's growing down there, and if the lake's got a heart, still it."],

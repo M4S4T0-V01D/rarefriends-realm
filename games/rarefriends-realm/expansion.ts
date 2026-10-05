@@ -19,7 +19,7 @@ import { MONSTERS } from "./data.ts";
 import { ECO_REGIONS, HERBS } from "./apothecary.ts";
 import { buildVillages } from "./villages.ts";
 // REGIONS is read only inside buildExpansion (called from createWorld), never at load, since world.ts imports this module.
-import { MAINLAND_RECT, OVERWORLD_H, REGIONS, T, isWater, mainlandToWorld, type DecorKind, type GenContext, type RegionId, type worldTools } from "./world.ts";
+import { ARENA, MAINLAND_RECT, OVERWORLD_H, REGIONS, T, isWater, mainlandToWorld, type DecorKind, type GenContext, type RegionId, type worldTools } from "./world.ts";
 
 export type Tools = ReturnType<typeof worldTools>;
 type Pt = readonly [number, number];
@@ -509,6 +509,60 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
   buildVillages(ctx, t);
   // (After the villages are built: the library's floor is laid by then.) The trapdoor to the Drowned Archive.
   add({ kind: "ladder", x: 643, y: 397, blocks: true, name: "Trapdoor", action: "Climb-down", to: { x: 476, y: 528 } });
+  // ---------- 7c. The Rare Friends Ring: a round building west of the Deadwood, across the river, built by a Hoverer ----------
+  {
+    const { x: cx, y: cy, outer, inner } = ARENA, dist = (x: number, y: number) => Math.hypot(x - cx, y - cy);
+    // Clear the ground (the Deadwood's dead and its ruins keep off it), then the two ring walls with the concourse between.
+    for (let i = ctx.spawns.length - 1; i >= 0; i--) if (dist(ctx.spawns[i].x, ctx.spawns[i].y) <= outer + 4) ctx.spawns.splice(i, 1);
+    for (let y = cy - outer - 4; y <= cy + outer + 4; y++) for (let x = cx - outer - 4; x <= cx + outer + 4; x++) {
+      const d = dist(x, y); if (d > outer + 4) continue;
+      clearAt(x, y); setRegion(x, y, "friends_ring");
+      if (d > outer + 0.8) { if (get(x, y) !== T.WATER && get(x, y) !== T.DEEP) put(x, y, T.GRASS); continue; }
+      if (Math.abs(d - outer) <= 0.8 || Math.abs(d - inner) <= 0.8) put(x, y, T.WALL);
+      else if (d > inner) put(x, y, T.STONE);
+      else put(x, y, T.GRASS);
+    }
+    // Doors: the gate on the south, and four ways from the concourse into the courtyard.
+    for (const dx of [-1, 0, 1]) for (const r of [outer, outer - 1, outer + 1]) put(cx + dx, cy + r, T.STONE);
+    for (const dx of [-1, 0, 1]) for (const r of [inner - 1, inner, inner + 1]) { put(cx + dx, cy + r, T.STONE); put(cx + dx, cy - r, T.STONE); put(cx + r, cy + dx, T.STONE); put(cx - r, cy + dx, T.STONE); }
+    // The courtyard: a garden to the north-west, a rock field to the south-east, a little volcano to the north-east, and
+    // the Ringmaker's fountain in the middle, running red.
+    const vx = cx + 8, vy = cy - 7;
+    for (let y = cy - inner; y <= cy + inner; y++) for (let x = cx - inner; x <= cx + inner; x++) {
+      const d = dist(x, y); if (d >= inner - 0.8) continue;
+      const dv = Math.hypot(x - vx, y - vy);
+      if (dv < 1.6) put(x, y, T.LAVA); else if (dv < 3.1) put(x, y, T.CLIFF); else if (dv < 5.5) put(x, y, T.ASH);
+      else if (x > cx + 3 && y > cy + 3) put(x, y, T.GRAVEL);
+      else if (x < cx - 3 && y < cy - 3 && noise2(x * 1.3, y * 1.3) > 0.55) put(x, y, T.DARK_GRASS);
+    }
+    for (const [fx, fy] of [[cx - 1, cy - 1], [cx, cy - 1], [cx - 1, cy], [cx, cy]] as const) add({ kind: "fountain", x: fx, y: fy, blocks: true, name: "Blood fountain" });
+    decor(cx, cy - 3, "old_friend", true, "The Ringmaker, the Hoverer who built the Ring: the fountain at its feet runs red");
+    for (const [dx, dy] of [[-3, -1], [3, -1], [-3, 2], [3, 2]] as const) decor(cx + dx, cy + dy, "flowers", false);
+    // Skulls and rib cages everywhere, flowers among them; boulders and rubble on the rocks; bushes and trees in the garden.
+    const open = (x: number, y: number) => dist(x, y) < inner - 1.5 && get(x, y) !== T.LAVA && get(x, y) !== T.CLIFF && ctx.objectAt[tileIndex(x, y)] < 0 && Math.hypot(x - cx + 0.5, y - cy + 0.5) > 2.5;
+    scatter(cx - inner, cy - inner, cx + inner, cy + inner, 44, (x, y) => decor(x, y, "bones", false, "Old bones"), open);
+    scatter(cx - inner, cy - inner, cx + inner, cy + inner, 26, (x, y) => decor(x, y, "flowers", false), (x, y) => open(x, y) && (x < cx || y < cy) && get(x, y) !== T.GRAVEL && get(x, y) !== T.ASH);
+    scatter(cx + 3, cy + 3, cx + inner, cy + inner, 7, (x, y) => decor(x, y, "boulder"), (x, y) => open(x, y) && get(x, y) === T.GRAVEL);
+    scatter(cx + 3, cy + 3, cx + inner, cy + inner, 6, (x, y) => decor(x, y, "rubble", false), (x, y) => open(x, y) && get(x, y) === T.GRAVEL);
+    scatter(cx - inner, cy - inner, cx - 3, cy - 3, 6, (x, y) => decor(x, y, "bush"), open);
+    scatter(cx - inner, cy - inner, cx - 3, cy - 3, 4, (x, y) => tree(x, y, "tree"), (x, y) => open(x, y) && dist(x, y) > 9);
+    scatter(cx - inner, cy + 3, cx - 3, cy + inner, 3, (x, y) => tree(x, y, "deadwood"), (x, y) => open(x, y) && dist(x, y) > 9);
+    // The concourse: pillars along both walls, torches between, banners at the gate.
+    for (let k = 0; k < 24; k++) {
+      const a = k * Math.PI / 12;
+      for (const r of [inner + 2, outer - 2]) { const x = Math.round(cx + Math.cos(a) * r), y = Math.round(cy + Math.sin(a) * r); if (get(x, y) === T.STONE && ctx.objectAt[tileIndex(x, y)] < 0 && Math.abs(x - cx) > 2 && !(Math.abs(y - cy) <= 2 && r === inner + 2)) decor(x, y, "pillar"); }
+      if (k % 3 === 1) { const x = Math.round(cx + Math.cos(a) * (inner + 4)), y = Math.round(cy + Math.sin(a) * (inner + 4)); if (get(x, y) === T.STONE && ctx.objectAt[tileIndex(x, y)] < 0) decor(x, y, "torch", true); }
+    }
+    decor(cx - 2, cy + outer + 2, "banner", true, "The Ring's banner"); decor(cx + 2, cy + outer + 2, "banner", true, "The Ring's banner");
+    // The people of the Ring, around the concourse; the lobby is the south of it, by the Ringmaster.
+    const on = (a: number, r: number): [number, number] => [Math.round(cx + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r)];
+    const stand = (id: string, a: number, r = 20) => { const [x, y] = on(a, r); clearAt(x, y); put(x, y, T.STONE); npc(id, x, y); };
+    stand("ringmaster", Math.PI / 2 + 0.1); stand("ring_apothecary", Math.PI / 3); stand("ring_chaplain", Math.PI * 2 / 3); stand("ring_sigilist", Math.PI / 6); stand("ring_fletcher", Math.PI * 5 / 6);
+    stand("ring_armourer", 0); stand("ring_quartermaster", Math.PI); stand("ring_champion", Math.PI * 3 / 2);
+    // A road from the Deadwood's bridge to the gate (a ruin in its way is cleared: nobody builds a road through a wall).
+    road([[249, 103], [236, 101], [222, 100], [cx, cy + outer + 3]]);
+    for (let y = 95; y <= 112; y++) for (let x = 205; x <= 252; x++) { const o = ctx.objectAt[tileIndex(x, y)]; if (get(x, y) === T.PATH && o >= 0 && ctx.objects[o].decor === "ruin_wall") clearAt(x, y); }
+  }
   // Everywhere a walker can get to from the spawn (over walkable ground, round blocking objects, down ladders and over the ferry):
   // herbs only grow where someone can pick them.
   const walkable = new Uint8Array(W * ctx.H);

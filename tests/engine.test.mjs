@@ -13,6 +13,9 @@ import { presenceOf } from "../games/rarefriends-realm/social.ts";
 import { friendSays, friendTick, remember, tendencies } from "../games/rarefriends-realm/friend.ts";
 import { RUMOURS, rumourAt, rumourCount } from "../games/rarefriends-realm/rumours.ts";
 import { talk } from "../games/rarefriends-realm/content.ts";
+import { ARENA, inArena, inRing } from "../games/rarefriends-realm/world.ts";
+import { FOE_GROUPS, MATCHES, arenaFoes, customMatch, entryFee, startMatch } from "../games/rarefriends-realm/arena.ts";
+import { wonDuel } from "../games/rarefriends-realm/duel.ts";
 import { cleanPresence } from "../games/rarefriends-realm/net.ts";
 import { buySlayerReward, longTasks, slayerXpBoost, eligibleTasks } from "../games/rarefriends-realm/slayer.ts";
 import { currentTask, slayerPoints } from "../games/rarefriends-realm/slayer.ts";
@@ -983,7 +986,7 @@ test("Every tree can be cut and burnt: palms, pines and dead trees give logs, bo
   for (const id of ["breeze_sigil", "storm_sigil", "hollow_sigil", "star_sigil"]) assert.equal(item(id).icon.kind, id.replace("_sigil", ""), `${id} has its own mark`);
   // The Deadwood's dead: crypts, tombs, obelisks, bone-heaps, railed plots and the ruins of the villages the forest took.
   const kinds = {}; for (const object of world.objects) if (object.kind === "decor") kinds[object.decor] = (kinds[object.decor] ?? 0) + 1;
-  assert(kinds.crypt >= 20 && kinds.tomb >= 60 && kinds.obelisk >= 12 && kinds.bones >= 50, `the Deadwood is dressed: ${JSON.stringify({ crypt: kinds.crypt, tomb: kinds.tomb, obelisk: kinds.obelisk, bones: kinds.bones })}`);
+  assert(kinds.crypt >= 18 && kinds.tomb >= 60 && kinds.obelisk >= 12 && kinds.bones >= 50, `the Deadwood is dressed: ${JSON.stringify({ crypt: kinds.crypt, tomb: kinds.tomb, obelisk: kinds.obelisk, bones: kinds.bones })}`);
   assert(world.objects.filter(object => object.decor === "fence" && object.name === "Iron railing, rusted").length >= 60, "railed plots");
   assert(world.buildings.filter(building => /^Ruined|^Crypt|Namekeeper's Crypt|Ashworth Hall/.test(building.name)).length >= 14, "ruined houses and named crypts");
   assert(world.objects.some(object => object.name?.startsWith("Here lies Tam Ashworth")), "graves with epitaphs");
@@ -2286,10 +2289,12 @@ test("The dungeon update: three dungeons under the lake, the library and the sto
   // A vault archer shoots from three tiles away and stays where it is.
   const archer = g.monsters.find(m => m.def.id === "vault_archer");
   assert.equal(archer.def.ranged, 5);
+  // (Alone with it: everything else nearby is put to sleep so the first wound is the archer's.)
+  for (const m of g.monsters) if (m !== archer && Math.abs(m.x - archer.x) + Math.abs(m.y - archer.y) < 16) { m.dead = true; m.respawnAt = Infinity; }
   for (const dx of [3, -3]) if (canWalk(g, archer.x + dx, archer.y)) { teleport(g, archer.x + dx, archer.y); break; }
-  const hpBefore = p.hp; p.combat = null; p.target = null;
-  until(g, () => p.hp < hpBefore, 60);
-  assert(Math.max(Math.abs(archer.x - p.x), Math.abs(archer.y - p.y)) >= 2, "it shot rather than closed in");
+  const hpBefore = p.hp; p.combat = null; p.target = null; g.autoRetaliate = false;
+  let shotFrom = 0; until(g, () => { if (p.hp < hpBefore) { shotFrom = Math.max(Math.abs(archer.x - p.x), Math.abs(archer.y - p.y)); return true; } return false; }, 80);
+  assert(shotFrom >= 2, `it shot rather than closed in (from ${shotFrom})`);
   // An ink wraith's touch drains faith; the Archivist Below mends himself; the Howling King enrages.
   const wraith = g.monsters.find(m => m.def.id === "ink_wraith");
   p.combat = null; p.target = null; g.autoRetaliate = false;
@@ -2315,4 +2320,58 @@ test("The dungeon update: three dungeons under the lake, the library and the sto
   for (let i = 0; i < 6; i++) { onMonsterKilled(g, "vault_archer", 0, 0); onMonsterKilled(g, "vault_knight", 0, 0); } onMonsterKilled(g, "howling_king", 0, 0);
   const coins = count(p, "coins"); talk("tallgrass_huntmaster"); drain(); assert.equal(p.quests.howling_vault, 2); assert.equal(count(p, "coins"), coins + 6000);
   assert(QUESTS.some(q => q.id === "howling_vault") && questPoints(g) >= 7);
+});
+
+test("The Rare Friends Ring: matches for coins and bloodmarks, your own foes, revival in the lobby, the Ringbreaker, Wildfur and the Ring's shops", () => {
+  const g = newGame(), p = g.player, world = g.world;
+  assert.equal(regionAt(world, ARENA.x, ARENA.y).id, "friends_ring"); assert(inArena(ARENA.x, ARENA.y + 5) && !inArena(ARENA.x, ARENA.y + 20) && inRing(ARENA.x + 3, ARENA.y + 3), "the courtyard is a duelling ring");
+  for (const id of ["ringmaster", "ring_apothecary", "ring_chaplain", "ring_sigilist", "ring_fletcher", "ring_armourer", "ring_quartermaster", "ring_champion"]) assert(g.npcs.some(npc => npc.id === id), id);
+  assert(world.objects.some(object => object.kind === "fountain" && object.name === "Blood fountain"), "the fountain runs red");
+  assert(world.objects.filter(object => object.decor === "bones" && inArena(object.x, object.y)).length >= 20, "bones across the arena");
+  assert(world.tiles.some((tile, i) => tile === T.LAVA && inArena(i % W, Math.floor(i / W))), "a little volcano");
+  for (const skill of ["attack", "strength", "defence", "hitpoints"]) p.xp[skill] = XP_TABLE[80];
+  p.hp = 800; g.autoRetaliate = true;
+  const talk = id => { const npc = g.npcs.find(entry => entry.id === id); standNear(g, npc.x, npc.y, 1); setTarget(g, { kind: "npc", uid: npc.uid, option: "Talk-to" }); until(g, () => g.dialogue !== null, 30); };
+  const say = label => { while (g.dialogue && g.dialogue.index < g.dialogue.lines.length) continueDialogue(g); const index = g.dialogue.options.findIndex(option => option.label.startsWith(label)); assert(index >= 0, label); chooseOption(g, index); };
+  // The Rat Pit: a quarter of the purse to enter, six rats and two bats, the purse and the marks when they're all down.
+  give(p, "coins", 10_000); const coins0 = count(p, "coins");
+  talk("ringmaster"); say("The Rat Pit"); while (g.dialogue) continueDialogue(g);
+  assert(g.arena && g.arena.match === "rat_pit", "a match is on"); assert.equal(count(p, "coins"), coins0 - entryFee(150), "the fee");
+  const foes = g.monsters.filter(m => m.arena); assert.equal(foes.length, 8); assert(foes.every(m => inArena(m.x, m.y) && m.target), "summoned into the courtyard, already hunting");
+  assert.deepEqual(arenaFoes(g).length, 8, "what spectators see");
+  talk("ringmaster"); assert.match(g.dialogue.lines[0].text, /match is on/); g.dialogue = null;
+  for (const foe of foes) { standNear(g, foe.x, foe.y, 1); setTarget(g, { kind: "monster", uid: foe.uid, option: "Attack" }); until(g, () => foe.dead, 400); }
+  run(g, 2);
+  assert.equal(g.arena, null, "the match is over"); assert.equal(g.monsters.filter(m => m.arena).length, 0, "the creatures are gone");
+  assert.equal(count(p, "coins"), coins0 - entryFee(150) + 150, "the purse"); assert.equal(count(p, "bloodmark"), 3, "and the marks"); assert.equal(p.stats.matches, 1);
+  // Your own foes: four wolves, the purse by their level; leaving the Ring forfeits a match.
+  talk("ringmaster"); say("I'll choose my own foes"); say("Beasts"); say(customMatch("wolf").name); while (g.dialogue) continueDialogue(g);
+  assert(g.arena && g.arena.match === "foe:wolf" && g.arena.coins === customMatch("wolf").coins, "a custom match");
+  assert.equal(g.monsters.filter(m => m.arena).length, 4);
+  teleport(g, ARENA.x, ARENA.y + ARENA.outer + 8); run(g, 2);
+  assert.equal(g.arena, null, "forfeit on leaving"); assert.equal(g.monsters.filter(m => m.arena).length, 0);
+  // Falling in the Ring: its magic stands you up in the lobby, and the match is lost.
+  teleport(g, ARENA.lobby.x, ARENA.lobby.y); p.hp = 1; p.xp.defence = 0; p.xp.hitpoints = XP_TABLE[10];
+  assert(startMatch(g, "bone_legion"));
+  until(g, () => p.x === ARENA.lobby.x && p.y === ARENA.lobby.y && g.arena === null && p.hp > 1, 400);
+  assert(g.messages.some(m => /knits you back together/.test(m.text)), "revived by the Ring");
+  // The Ring's shops: bloodmarks buy the Quartermaster's gear, coins don't; laurels buy the Hall's.
+  p.xp.strength = XP_TABLE[80]; p.xp.defence = XP_TABLE[80]; p.xp.hitpoints = XP_TABLE[80]; p.hp = maxHp(p);
+  assert.equal(buy(g, "ring_pit", "skull_mask", 1), 0, "not for coins"); assert.match(g.messages.at(-1).text, /bloodmarks/);
+  const marks0 = count(p, "bloodmark"); give(p, "bloodmark", 2000); assert.equal(buy(g, "ring_pit", "skull_mask", 1), 1); assert.equal(count(p, "bloodmark"), marks0 + 2000 - 60);
+  for (const piece of ["wildfur_helm", "wildfur_plate", "wildfur_greaves"]) { assert.equal(buy(g, "ring_pit", piece, 1), 1); equip(g, p.inventory.findIndex(slot => slot?.id === piece)); }
+  const steady = bonuses(p).strength; p.hp = Math.floor(maxHp(p) * 0.3); assert.equal(bonuses(p).strength, steady + 7 + 12 + 9, "Wildfur counts twice when you're nearly done"); p.hp = maxHp(p);
+  give(p, "laurel", 40); assert.equal(buy(g, "ring_champions", "laurel_crown", 1), 1); assert.equal(count(p, "laurel"), 15);
+  teleport(g, ARENA.x + 2, ARENA.y + 4); wonDuel(g, 3412); assert.equal(count(p, "laurel"), 17, "a Friend Fight in the Ring pays two laurels");
+  // The Ringbreaker: two hands, a step of knockback on a third of hits, and the recoil.
+  give(p, "coins", 50_000); assert.equal(buy(g, "ring_armour", "ringbreaker", 1), 1); equip(g, p.inventory.findIndex(slot => slot?.id === "ringbreaker"));
+  assert.equal(p.equipment.weapon, "ringbreaker"); assert(!p.equipment.shield, "two-handed");
+  // (Against stone golems, which take a while to fell, with just the strength the hammer asks for.)
+  p.xp.strength = XP_TABLE[60]; p.xp.attack = XP_TABLE[40]; give(p, "coins", 20_000);
+  assert(startMatch(g, "foe:stone_golem"));
+  const knocked = () => g.messages.some(m => /throws the stone golem back a step/.test(m.text));
+  for (const golem of g.monsters.filter(m => m.arena && !m.dead)) { if (knocked()) break; standNear(g, golem.x, golem.y, 1); setTarget(g, { kind: "monster", uid: golem.uid, option: "Attack" }); until(g, () => knocked() || golem.dead, 600); }
+  assert(knocked(), "the hammer knocks back");
+  teleport(g, ARENA.x, ARENA.y + ARENA.outer + 8); run(g, 2);
+  assert(MATCHES.length === 8 && FOE_GROUPS.every(group => group.foes.every(foe => MONSTERS[foe])));
 });

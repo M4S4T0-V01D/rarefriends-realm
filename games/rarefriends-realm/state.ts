@@ -142,6 +142,8 @@ export type Monster = {
   curses: Partial<Record<"attack" | "strength" | "defence" | "bound", number>>;
   /** Weapon poison on it: doses left, and ticks to the next. */
   poison?: { damage: number; left: number; timer: number } | null;
+  /** Summoned for a match in the Rare Friends Ring: it hunts you from the start and never comes back. */
+  arena?: boolean;
 };
 export type Npc = { uid: number; id: string; x: number; y: number; prev: Point; spawn: Point; wander: number; heading: Point; moved: number; busy: number };
 /** An item on the ground. `shared` ones (dropped from your pack) other players see and may pick up. */
@@ -174,6 +176,8 @@ export type Game = {
   world: World; tick: number; player: Player; monsters: Monster[]; npcs: Npc[]; ground: GroundItem[]; fires: Fire[];
   /** What you've sold to each shop that it doesn't normally stock (you can buy it back until you leave). */
   shopStock: Record<string, Slot[]>;
+  /** A match under way in the Rare Friends Ring: which, and the creatures summoned for it. */
+  arena: { match: string; name: string; uids: number[]; startedAt: number; coins: number; marks: number; level: number } | null;
   depleted: Map<number, number>; herbPicks: Map<number, number>; messages: Message[];
   /** What the sky is doing (set by the page each frame; the engine only reads it) and how much your Friend talks. */
   ambient: { night: boolean; rain: boolean; storm?: boolean; fog?: boolean }; friendSpeech: "full" | "reduced" | "rare" | "off"; events: GameEvent[]; rng: () => number; nextUid: number;
@@ -235,7 +239,7 @@ export function createGame(options: { familyId: number; friendId: number; rng?: 
   const game: Game = {
     world, tick: 0, player: createPlayer(world, options.familyId, options.friendId), monsters: [], npcs: [], ground: [], fires: [], shopStock: {},
     depleted: new Map(), herbPicks: new Map(), ambient: { night: false, rain: false }, friendSpeech: "full", sneakingPast: new Map(), sneakPaid: new Map(), messages: [], events: [], rng, nextUid: 1, dialogue: null, ui: { shop: null, bank: false, production: null, lamp: null, naming: null },
-    held: null, autoRetaliate: true, playTicks: 0, overheads: new Map(), pet: null, trail: [],
+    held: null, autoRetaliate: true, playTicks: 0, overheads: new Map(), pet: null, trail: [], arena: null,
   };
   for (const spawn of world.spawns) {
     const uid = game.nextUid++, at = { x: spawn.x, y: spawn.y };
@@ -564,6 +568,8 @@ export function bonuses(player: Player): Bonuses {
   }
   total.defence += riding(player)?.defence ?? 0;
   total.strength += heft(player) + renown(player);
+  // Wildfur, the Ring's highest tier: below a third of your health, every piece's strength counts twice.
+  if (player.hp < maxHp(player) * 0.35) for (const id of Object.values(player.equipment)) if (id?.startsWith("wildfur_")) total.strength += item(id).equip?.bonuses.strength ?? 0;
   if (player.ward) total.defence += Math.round(total.defence * player.ward.defence) + player.ward.flat;
   return total;
 }

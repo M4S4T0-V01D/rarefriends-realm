@@ -59,6 +59,7 @@ export const RUMOURS: Partial<Record<RegionId, readonly Rumour[]>> = {
     r("My grandmother comes to the fence on foggy nights. She's in the north plot. We wave.", "half"),
     r("The Deadwood was green once. The trees died in a single night. Nobody says why.", "half"),
     r("There's a shrine deep in the Deadwood with a statue like the Old Friend's, but the face is chiselled off. The Order doesn't like it mentioned.", "true"),
+    r("Over the river west of the Deadwood there's a round building like a Hoverer lying down. The Ring, they call it. Fighters go in; the ones who lose come out anyway. Nobody knows how.", "true"),
   ],
   saltmarrow: [
     r("The hut at the end of the north quay has a trapdoor. The tide comes up through it, and sometimes other things.", "true"),

@@ -66,6 +66,8 @@ export type Presence = {
   /** The Friend whose referral code this player used (so that Friend's game can reward them). */
   referredBy: number | null;
   hp: number; maxHp: number; fight: { u: number; id: string; hp: number; x: number; y: number } | null;
+  /** A match they're fighting in the Rare Friends Ring: its creatures, for anyone watching from the concourse. */
+  arena?: { match: string; foes: { u: number; id: string; x: number; y: number; hp: number }[] } | null;
   /** Sneaking (crouched, a little faded), or veiled by the Veilweave hood (all but invisible). Older clients don't send these. */
   sneak?: boolean; veiled?: boolean;
 };
@@ -94,6 +96,10 @@ export function cleanPresence(raw: unknown): Presence | null {
     hp: int(r.hp, 0, 99) ?? 10, maxHp: int(r.maxHp, 1, 99) ?? 10, sneak: r.sneak === true, veiled: r.veiled === true,
     fight: (() => { const f = r.fight as Record<string, unknown> | null; if (!f || typeof f !== "object") return null; const u = int(f.u, 0, 1e9), fid = word(f.id, 40), fhp = int(f.hp, 0, 10_000), fx = int(f.x, 0, W - 1), fy = int(f.y, 0, H - 1);
       return u !== null && fid && fhp !== null && fx !== null && fy !== null ? { u, id: fid, hp: fhp, x: fx, y: fy } : null; })(),
+    arena: (() => { const a = r.arena as Record<string, unknown> | null; if (!a || typeof a !== "object" || !Array.isArray(a.foes)) return null; const match = word(a.match, 40); if (!match) return null;
+      const foes = a.foes.slice(0, 12).flatMap(entry => { const e = entry as Record<string, unknown>, u = int(e?.u, 0, 1e9), id = word(e?.id, 40), fx = int(e?.x, 0, W - 1), fy = int(e?.y, 0, H - 1), fhp = int(e?.hp, 0, 10_000);
+        return u !== null && id && fx !== null && fy !== null && fhp !== null ? [{ u, id, x: fx, y: fy, hp: fhp }] : []; });
+      return { match, foes }; })(),
     drops: Array.isArray(r.drops) ? r.drops.slice(0, 16).flatMap(entry => { const e = entry as Record<string, unknown>, u = int(e?.u, 0, 1e12), id = word(e?.id, 40), n = int(e?.n, 1, 2_147_483_647), dx = int(e?.x, 0, W - 1), dy = int(e?.y, 0, H - 1);
       return u !== null && id && n && dx !== null && dy !== null ? [{ u, id, n, x: dx, y: dy }] : []; }) : [],
   };

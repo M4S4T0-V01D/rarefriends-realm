@@ -82,7 +82,7 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
   // A shield on the off arm.
   const shield: Piece | undefined = worn.filter(id => isItem(id) && item(id).equip?.slot === "shield").slice(0, 1).map(id => ({ id, kind: "shield", color: item(id).icon.color, trim: item(id).icon.accent, style: item(id).icon.shape }))[0];
   // A weapon in the hand (swords, daggers, sabres, axes, pickaxes, staffs and bows), when it isn't mid-swing.
-  const weapon: Piece | undefined = (held && isItem(held.id) ? [held.id] : worn.filter(id => isItem(id) && item(id).equip?.slot === "weapon")).slice(0, 1).map(id => ({ id, kind: `weapon_${item(id).icon.shape}`, color: item(id).icon.color, trim: item(id).icon.accent }))[0];
+  const weapon: Piece | undefined = (held && isItem(held.id) ? [held.id] : worn.filter(id => isItem(id) && item(id).equip?.slot === "weapon")).slice(0, 1).map(id => ({ id, kind: `weapon_${item(id).icon.shape}`, color: item(id).icon.color, trim: item(id).icon.accent, style: item(id).icon.kind }))[0];
   // Angles snap to steps (pixel art turns in steps anyway, and it keeps the cache small).
   const turn = held ? Math.round(held.angle / 0.14) * 0.14 : 0;
   const pieces: Piece[] = [...WARDROBE.filter(piece => worn.includes(piece.id) && piece.kind !== "aura" && piece.kind !== "lantern" && !(gear.some(entry => entry.kind === "cape") && piece.kind === "cape")), ...gear.slice(0, 1), ...headgear, ...(shield ? [shield] : []), ...(weapon ? [weapon] : []), ...(amulet ? [amulet] : []), ...(armour ? [armour] : []), ...(legs ? [legs] : []), ...(hands ? [hands] : []), ...(boots ? [boots] : [])];
@@ -506,9 +506,9 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
   if (shield && side <= 0 && !back) drawShield(p, shield, side < 0 ? Math.round(cx) + 1 : X(waistSpan.max) + 2, waist, false, false);
   // A tool at work or a weapon mid-swing goes over everything, so the motion reads.
   if (weapon && held && !underCape) tip = drawHeld(p, weapon, hand.x, hand.y, dir, sway, turn);
-  // From behind with no cape, the shield is slung across the back: its wooden side, whole, over everything, so it never
-  // looks half sunk into the body.
-  if (shield && back && !cape) { const row = m.long ? Math.round(m.top + (m.bottom - m.top) * 0.45) : Math.round((m.neck + m.bottom) / 2), span = bodySpan(row); drawShield(p, shield, Math.round((X(span.min) + X(span.max)) / 2), m.long ? Y(row) : waist, true, true); }
+  // From behind with no cape the shield hangs where it always did, on the off arm at your side, but it's painted last:
+  // over the body, over a pack on your back, over anything held, so it never looks sunk into you.
+  if (shield && back && !cape) drawShield(p, shield, X(waistSpan.min) - 1, waist, true, true);
 
   // ---------- Edges: ink around the worn colours, then the white halo around everything (one sprite pixel) ----------
   const data = p.data, filled = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && data[y * W + x] !== 0;
@@ -721,6 +721,13 @@ function drawWeapon(p: Pixels, piece: Piece, x: number, y: number, dir: number, 
         p.line(top.x - dir * 5, top.y - 3, top.x - dir * 6, top.y, light);
         p.line(top.x + dir * 2, top.y - 3, top.x + dir * 2, top.y + 2, dark); p.line(top.x + dir * 3, top.y - 4, top.x + dir * 3, top.y + 3, light);
         p.line(top.x, top.y - 4, top.x, top.y - 8, metal); p.set(top.x, top.y - 8, light);
+      } else if (piece.style === "ringbreaker") {
+        // The Ringbreaker: a round hammer face forward, a square block of iron behind, and a spike rising from the
+        // middle as if the haft carried on through the head; the Ring's red on the band.
+        const band = piece.trim ?? "#8a2f2b";
+        p.rect(Math.min(top.x - dir * 6, top.x), top.y - 3, 7, 7, dark); p.line(Math.min(top.x - dir * 6, top.x), top.y - 3, Math.min(top.x - dir * 6, top.x) + 6, top.y - 3, metal);
+        p.disc(top.x + dir * 4, top.y, 3.4, 3.4, metal, null); p.line(top.x + dir * 6, top.y - 2, top.x + dir * 6, top.y + 2, light); p.set(top.x + dir * 3, top.y - 2, light);
+        p.rect(top.x - dir, top.y - 3, 3, 7, band); p.line(top.x, top.y - 4, top.x, top.y - 10, metal); p.set(top.x, top.y - 10, light); p.set(top.x - 1, top.y - 9, dark); p.set(top.x + 1, top.y - 9, dark);
       } else {
         // A heavy block head: a square face forward with a bevelled rim, a long spike behind, a short one above, and a
         // dark band where the haft is seated.
