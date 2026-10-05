@@ -8,7 +8,7 @@
  */
 import type { Bonuses, EquipSlot, IconShape, Item, Skill } from "./data.ts";
 
-export type OrderId = "diamond" | "ink" | "sol" | "hood";
+export type OrderId = "diamond" | "ink" | "sol" | "hood" | "ember";
 export type OrderDef = {
   id: OrderId; name: string; short: string; god: string; godName: string; godText: string;
   /** The Order's colours: the field, its light accent and its dark shade. */
@@ -37,6 +37,10 @@ export const ORDERS: Record<OrderId, OrderDef> = {
     color: "#ccff00", accent: "#1b1b1b", dark: "#7a9a00", body: "shirt", head: "hat", statue: "god_hood",
     effect: "The Hood's ledger: every piece worn adds 4% to the coins creatures drop and 2% to your chance at a pocket (a full set, 32% and 16%).", each: "+4% coin drops, +2% pickpocketing",
     near: [556, 376], oath: { item: "coins", n: 2500, text: "two thousand five hundred coins, which will reach the villages by morning" } },
+  ember: { id: "ember", name: "Order of the Ember", short: "Ember", god: "The Ember", godName: "the Ember", godText: "The Order of the Ember serves no god but the fire it keeps burning: the brazier in its fortress at Ashfall has not gone out since the dragons came, and the knights hold the lava moat against them. Their statue is the flame itself.",
+    color: "#ff6a2a", accent: "#ffd27a", dark: "#8a2f12", body: "plate", head: "helm", statue: "god_ember",
+    effect: "Emberwarded: every piece worn turns 5% of dragonfire aside (a full set with weapon and shield, 40%).", each: "5% less dragonfire",
+    near: [72, 96], oath: { item: "wyrm_scale", n: 3, text: "three wyrm scales, taken from the drakes that circle the fortress" } },
 };
 export const ORDER_IDS = Object.keys(ORDERS) as OrderId[];
 export type OrderTier = "oath" | "knight" | "paladin";

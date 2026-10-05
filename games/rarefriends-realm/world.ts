@@ -54,7 +54,7 @@ export type DecorKind =
   | "flowers" | "bush" | "boulder" | "lamp" | "bench" | "crate" | "barrel" | "tent" | "cactus" | "pine" | "dead_tree" | "statue"
   | "grave" | "fence" | "reeds" | "table" | "bed" | "shelf" | "pillar" | "rubble" | "snowman" | "lily" | "banner" | "torch" | "palm" | "hay" | "windmill" | "boat" | "chest"
   | "throne" | "armour" | "logpile" | "stump" | "target" | "ruin_wall" | "old_friend" | "tomb" | "crypt" | "obelisk" | "bones" | "hearth" | "monument"
-  | "god_diamond" | "god_ink" | "god_sol" | "god_hood";
+  | "god_diamond" | "god_ink" | "god_sol" | "god_hood" | "god_ember";
 /** A monument's state: whole on its plinth, toppled and lying, broken off at the waist, or sunk to the chest in the ground. */
 export type MonumentState = "whole" | "toppled" | "broken" | "buried";
 export type WorldObject = {
@@ -1256,7 +1256,7 @@ const SIDES = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
 const ROOF_COLORS = ["#c99a96", "#9aab92", "#8f9cb2", "#cdb98a", "#a996b5"];
 const TREE_NAMES: Record<TreeKind, string> = { tree: "Tree", oak: "Oak", willow: "Willow", maple: "Maple tree", yew: "Yew", ashwood: "Ashwood", palm: "Palm tree", pine: "Pine tree", deadwood: "Dead tree" };
 const DECOR_NAMES: Record<DecorKind, string> = {
-  monument: "Statue", god_diamond: "Statue of the Good Friend", god_ink: "Statue of the Squid Friend", god_sol: "Statue of the Weird Friend", god_hood: "Statue of the Hood Friend",
+  monument: "Statue", god_diamond: "Statue of the Good Friend", god_ink: "Statue of the Squid Friend", god_sol: "Statue of the Weird Friend", god_hood: "Statue of the Hood Friend", god_ember: "The Ember, in its brazier",
   flowers: "Flowers", bush: "Bush", boulder: "Boulder", lamp: "Lamp post", bench: "Bench", crate: "Crate", barrel: "Water barrel", tent: "Tent",
   cactus: "Cactus", pine: "Pine tree", dead_tree: "Dead tree", statue: "Statue", grave: "Grave", fence: "Fence", reeds: "Reeds", table: "Table",
   bed: "Bed", shelf: "Shelves", pillar: "Pillar", rubble: "Rubble", snowman: "Snow Friend", lily: "Lily pad", banner: "Banner", torch: "Torch",
@@ -1360,6 +1360,24 @@ export function complexAt(world: World, x: number, y: number) {
   return building ? building.complex ?? `#${index}` : null;
 }
 
+/**
+ * The Deadwood's eternal night: an ancient magic keeps a cloud over the whole wood, and no sun gets through. How deep
+ * in it a point is, 0 to 1, softened over a few tiles at the wood's edge so the dark comes on as you walk in.
+ */
+export function gloomAt(world: World, x: number, y: number): number {
+  const deadwood = DEADWOOD_INDEX;
+  if (deadwood < 0 || y >= OVERWORLD_H) return 0;
+  let inside = 0, total = 0;
+  for (let dy = -6; dy <= 6; dy += 3) for (let dx = -6; dx <= 6; dx += 3) {
+    const tx = Math.round(x) + dx, ty = Math.round(y) + dy;
+    if (!inBounds(tx, ty)) continue;
+    total++; if (world.region[ty * W + tx] === deadwood) inside++;
+  }
+  return total ? inside / total : 0;
+}
+const DEADWOOD_INDEX = REGIONS.findIndex(region => region.id === "deadwood");
+/** Whether a tile lies in the Deadwood (its ground is darker, and it's always night there). */
+export const inDeadwood = (world: World, x: number, y: number) => DEADWOOD_INDEX >= 0 && world.region[y * W + x] === DEADWOOD_INDEX;
 export function regionAt(world: World, x: number, y: number): Region {
   return REGIONS[inBounds(x, y) ? world.region[tileIndex(x, y)] : 0] ?? REGIONS[0];
 }

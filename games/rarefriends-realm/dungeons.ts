@@ -12,8 +12,8 @@ type Tier = "shallow" | "deep" | "dread";
 const TIER: Partial<Record<RegionId, Tier>> = { root_cellars: "shallow", mossy_undercroft: "shallow", crypt: "shallow", sea_cave: "shallow", deepglass: "shallow", hollow_depths: "deep", catacombs: "deep", deep_mine: "deep", drowned_archive: "deep", wyrm_lair: "dread", howling_vault: "dread" };
 /** The key a dungeon's coffers can hold. */
 const KEYS: Partial<Record<RegionId, string>> = { mossy_undercroft: "moss_key", deepglass: "deepglass_key", drowned_archive: "archive_key", howling_vault: "vault_key" };
-/** Ticks before a coffer fills again (fifteen minutes). */
-export const COFFER_TICKS = 1500;
+/** Ticks before a coffer fills again for the one who searched it (an hour: coffers and hoards are not a living). */
+export const COFFER_TICKS = 6000;
 /** `chance` here is a weight, not a probability: the commons are drawn by weight. */
 const COMMON: Record<Tier, readonly Drop[]> = {
   shallow: [{ item: "coins", min: 40, max: 200, chance: 3 }, { item: "bones", min: 1, max: 3, chance: 2 }, { item: "bloom_sigil", min: 3, max: 8, chance: 1.5 }, { item: "breeze_sigil", min: 4, max: 10, chance: 1.5 },

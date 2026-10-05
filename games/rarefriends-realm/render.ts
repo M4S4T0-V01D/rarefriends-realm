@@ -9,7 +9,7 @@ const isPet = (id: string) => !!petDef(id);
 import { NPCS } from "./content.ts";
 import { TICK_MS, attackSpeed, riding, type Facing, type Game, type Monster, type Npc, type Projectile } from "./state.ts";
 import { npcOverhead, veiled, type Pick } from "./engine.ts";
-import { DUNGEON_Y, FLOOR_Y, OVERWORLD_H, REGIONS, STOREY, T, W, H, complexAt, cornerHeight, floorAt, groundHeight, inBounds, isUnderground, objectAtTile, onLevel, realPoint, type Building, type DecorKind, type Floor, type World, type WorldObject } from "./world.ts";
+import { gloomAt, inDeadwood, DUNGEON_Y, FLOOR_Y, OVERWORLD_H, REGIONS, STOREY, T, W, H, complexAt, cornerHeight, floorAt, groundHeight, inBounds, isUnderground, objectAtTile, onLevel, realPoint, type Building, type DecorKind, type Floor, type World, type WorldObject } from "./world.ts";
 import { itemArt } from "./icons.ts";
 import type { PeerView } from "./social.ts";
 import type { Strike, Weather } from "./weather.ts";
@@ -22,7 +22,7 @@ import { spellArt } from "./spellart.ts";
 import { SADDLE, mountArt, type MountView } from "./mountart.ts";
 import { petArt } from "./petart.ts";
 import { burst, drawCloudShadows, drawEffects, hush, playerPose, puff, treeShake, updateEffects, type Pose } from "./effects.ts";
-import { LightField, hexRgb, rgbCss, skyFor, type PointLight, type RGB , resetLighting } from "./lighting.ts";
+import { gloomSky, LightField, hexRgb, rgbCss, skyFor, type PointLight, type RGB , resetLighting } from "./lighting.ts";
 import { FIGURE_K, drawAuras, drawFigure, figureArt, heldTip, type Held } from "./wardrobe.ts";
 import { homeRect } from "./housing.ts";
 import { creatureSprite, friendSprite, type Mask } from "./sprites.ts";
@@ -332,7 +332,7 @@ function groundTile(ctx: CanvasRenderingContext2D, scene: Scene, x: number, y: n
   if (!draw) return corners;
   const slope = Math.max(-0.22, Math.min(0.22, ((hA + hD) - (hB + hC) + (hA + hB) - (hD + hC)) * 0.011));
   ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.lineTo(cx, cy); ctx.lineTo(dx, dy); ctx.closePath();
-  ctx.fillStyle = terrainFill(terrain, (hash(x, y) - 0.5) * 0.035 + slope); ctx.fill();
+  ctx.fillStyle = terrainFill(terrain, (hash(x, y) - 0.5) * 0.035 + slope - (inDeadwood(world, x, y) ? 0.3 : 0)); ctx.fill();
   const style = GROUND_STYLE[terrain], hh = TILE_W / 2 * z * camera.pitch;
   if (texturesOn && style && hh >= 5) texturedQuad(ctx, groundTexture(style, TERRAIN_COLORS[terrain], Math.floor(hash(y, x) * 4)), { x: ax, y: ay }, { x: bx, y: by }, { x: dx, y: dy }, TEX_PER_TILE, TEX_PER_TILE);
   if (bare) return corners;
@@ -382,7 +382,8 @@ function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, camera: Camera
     // Corner heights lift each corner off the tile centre; slopes facing the north-west light are brighter.
     const hA = cornerHeight(world, x, y), hB = cornerHeight(world, x + 1, y), hC = cornerHeight(world, x + 1, y + 1), hD = cornerHeight(world, x, y + 1), hMid = (hA + hB + hC + hD) / 4;
     const slope = Math.max(-0.22, Math.min(0.22, ((hA + hD) - (hB + hC) + (hA + hB) - (hD + hC)) * 0.011));
-    const variation = (hash(x, y) - 0.5) * 0.035 + slope, lifted = ls * z;
+    // The Deadwood's ground is darker than anywhere: the wood's own earth, and no sun has reached it in an age.
+    const variation = (hash(x, y) - 0.5) * 0.035 + slope - (inDeadwood(world, x, y) ? 0.3 : 0), lifted = ls * z;
     const ax = sx - ex.x - ey.x, ay = sy - ex.y - ey.y - (hA - hMid) * lifted, bx = sx + ex.x - ey.x, by = sy + ex.y - ey.y - (hB - hMid) * lifted;
     const cx = sx + ex.x + ey.x, cy = sy + ex.y + ey.y - (hC - hMid) * lifted, dx = sx - ex.x + ey.x, dy = sy - ex.y + ey.y - (hD - hMid) * lifted;
     if (mode !== "motion") {
@@ -1562,7 +1563,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   const [x0, y0, x1, y1] = tileRange(camera, reach);
   lap("setup"); drawGround(ctx, scene, x0, y0, x1, y1, reach); lap("terrain"); RENDER_PROFILE.groundQuads = textureStats.frame;
   // The sky's light for the time of day and the weather; the sun's share of it decides how dark shadows are.
-  const weather = scene.weather ?? null, sky = skyFor(scene.time, weather, underground), lit = true;
+  const weather = scene.weather ?? null, sky = gloomSky(skyFor(scene.time, weather, underground), gloomAt(world, game.player.x, game.player.y)), lit = true;
   windowGlow = underground ? 0 : Math.max(0, Math.min(1, (sky.night - 0.3) / 0.45));
   if ((seenVersion.get(world) ?? 0) !== (game.worldVersion ?? 0)) { seenVersion.set(world, game.worldVersion ?? 0); roomLightCache.delete(world); resetLighting(world); }
   const rooms = roomLights(world);
@@ -2434,7 +2435,7 @@ function drawNpc(ctx: CanvasRenderingContext2D, scene: Scene, npc: Npc, at: { x:
 /** What some NPCs wear, composited into their sprite like your own gear: the King's regalia, and the guards' helms, battleaxes and red capes. */
 const NPC_WEAR: Record<string, readonly string[]> = {
   // The four Orders: commanders in Paladin plate, quartermasters and guards in Knight.
-  ...Object.fromEntries((["diamond", "ink", "sol", "hood"] as const).flatMap(order => [
+  ...Object.fromEntries((["diamond", "ink", "sol", "hood", "ember"] as const).flatMap(order => [
     [`${order}_commander`, [`${order}_paladin_helm`, `${order}_paladin_body`, `${order}_paladin_legs`, `${order}_paladin_boots`, `${order}_cape`, `${order}_paladin_mace`]],
     [`${order}_quartermaster`, [`${order}_knight_body`, `${order}_knight_legs`, `${order}_knight_boots`, `${order}_cape`]],
     [`${order}_guard`, [`${order}_knight_helm`, `${order}_knight_body`, `${order}_knight_legs`, `${order}_knight_boots`, `${order}_knight_kite`, `${order}_knight_mace`]],

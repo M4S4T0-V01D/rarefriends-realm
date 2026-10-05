@@ -370,6 +370,10 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
         }
         break;
       }
+      case "ring":
+        // A band seen from above and a little tilted, with its stone (or seal) on top.
+        part(p, stroke([...Array.from({ length: 25 }, (_, i) => { const a = i / 24 * Math.PI * 2; return [16 + Math.cos(a) * 8, 19 + Math.sin(a) * 5] as Pt; })], 3.5), color, "metal"); line(p, [[9, 17], [12, 14]], shadeHex(color, 0.35));
+        part(p, disc(16, 11, 4), accent ?? GOLD_C, "metal"); dot(p, 15, 10, "#ffffff"); break;
       case "amulet":
         // Enchanted pendants hang on gold; a gem simply strung hangs on string, in a little knot.
         line(p, [[8, 4], [8, 11], [12, 16], [16, 18], [20, 16], [24, 11], [24, 4]], icon.kind === "strung" ? "#e8dcc0" : GOLD_C, icon.kind === "strung" ? 2 : 1);

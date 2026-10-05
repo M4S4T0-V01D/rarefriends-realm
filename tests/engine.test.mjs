@@ -19,9 +19,12 @@ import { wonDuel } from "../games/rarefriends-realm/duel.ts";
 import { cleanPresence } from "../games/rarefriends-realm/net.ts";
 import { buySlayerReward, longTasks, slayerXpBoost, eligibleTasks } from "../games/rarefriends-realm/slayer.ts";
 import { currentTask, slayerPoints } from "../games/rarefriends-realm/slayer.ts";
-import { COURSES, HEARTGUARD, ITEM_LIST, METALS, MONSTERS, SMITH_PIECES, SPELL_TABS, FIREMAKING, REGIONAL_CLOTHING, WARDROBE, MOUNTS, SHOPS, SKILLS, SKILL_NAMES, SLAYER_SETS, SLAYER_TASKS, SPELLS, TREES, WAYFARER_MARK, WAYFARER_REWARDS, XP_RATE, XP_TABLE, heavyStrength, isItem, item, levelForXp } from "../games/rarefriends-realm/data.ts";
+import { COURSES, EQUIP_SLOTS, HEARTGUARD, ITEM_LIST, METALS, MONSTERS, SMITH_PIECES, SPELL_TABS, FIREMAKING, REGIONAL_CLOTHING, WARDROBE, MOUNTS, SHOPS, SKILLS, SKILL_NAMES, SLAYER_SETS, SLAYER_TASKS, SPELLS, TREES, WAYFARER_MARK, WAYFARER_REWARDS, XP_RATE, XP_TABLE, heavyStrength, isItem, item, levelForXp } from "../games/rarefriends-realm/data.ts";
 import { NPCS, QUESTS, MAX_QUEST_POINTS, PILGRIM_ALTARS, questPoints, onMonsterKilled, shopProblem } from "../games/rarefriends-realm/content.ts";
 import { ORDERS, ORDER_IDS, orderOf, orderPieces } from "../games/rarefriends-realm/knights.ts";
+import { signetCharges, signetTeleport } from "../games/rarefriends-realm/engine.ts";
+import { COFFER_TICKS } from "../games/rarefriends-realm/dungeons.ts";
+import { gloomAt, inDeadwood } from "../games/rarefriends-realm/world.ts";
 import { FLOOR_Y, H, MAINLAND, REGIONS, T, W, createWorld, floorAt, isUnderground, mainlandToWorld, objectAtTile, onLevel, realPoint, regionAt, terrainAt } from "../games/rarefriends-realm/world.ts";
 import { addXp, emptyToBank, fillFromBank, bankDeposit, bankInOrder, bankMove, bankTabs, bankWithdraw, bonuses, bagBones, combatLevel, count, dropItem, earlyXp, give, has, heft, level, maxHp, xpMultiplier, BONE_BAG, BONE_BAG_SIZE } from "../games/rarefriends-realm/state.ts";
 import game from "../games/rarefriends-realm/game.json" with { type: "json" };
@@ -595,7 +598,7 @@ test("A Friend's Feast from start to finish", () => {
   assert.equal(g.player.quests.friends_feast, 2);
   assert.equal(questPoints(g), 1);
   assert(level(g, "cooking") >= 10, "Quest XP");
-  assert.equal(QUESTS.length, 32); assert.equal(MAX_QUEST_POINTS, 51);
+  assert.equal(QUESTS.length, 34); assert.equal(MAX_QUEST_POINTS, 53);
 });
 
 test("Grumblin Trouble counts kills and pays out", () => {
@@ -847,7 +850,7 @@ test("The Heartguard: nine red-and-white pieces by Hitpoints level, each a hitpo
 test("The Old Friend stands behind every altar, and Dawnhold has its keep, towers and a taller chapel", () => {
   const g = newGame(), world = g.world;
   const altars = world.objects.filter(object => object.kind === "altar");
-  assert.equal(altars.length, 16, "the mainland's four, Gravesend's lantern altar, the catacombs' bone altar, the Ring chapel's, the five wayward chapels' and the four Orders'");
+  assert.equal(altars.length, 17, "the mainland's four, Gravesend's lantern altar, the catacombs' bone altar, the Ring chapel's, the five wayward chapels' and the five Orders'");
   for (const altar of altars) {
     assert(world.objects.some(object => (object.decor === "old_friend" || object.decor?.startsWith("god_")) && Math.abs(object.x - altar.x) <= 1 && Math.abs(object.y - altar.y) <= 2), `a statue of the Old Friend (or an Order's god) by the ${altar.name}`);
   }
@@ -1935,7 +1938,7 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   assert.equal(p.quests.dawn_against_hollow, 2); assert(has(p, "dawnplate_cuirass"));
   assert.equal(count(p, "hollow_essence"), 0);
   assert.equal(capeProblem(g, "dawnplate_cuirass"), null, "the armoury sells Dawnplate once earned");
-  assert.equal(QUESTS.length, 32); assert.equal(MAX_QUEST_POINTS, 51);
+  assert.equal(QUESTS.length, 34); assert.equal(MAX_QUEST_POINTS, 53);
 });
 
 test("Boots and gauntlets in every metal, smithed at the anvil; the clothier's shirts, dresses, trousers and skirts", () => {
@@ -2286,7 +2289,7 @@ test("The dungeon update: three dungeons under the lake, the library and the sto
   assert(p.inventory.filter(Boolean).length + count(p, "coins") > before, "something came out");
   g.messages.length = 0; menuFor(g, [{ kind: "object", id: coffer.id }], null)[0].run(g); run(g, 2);
   assert(g.messages.some(m => /not long ago/.test(m.text)), "empty for a while");
-  g.tick += 1600; g.messages.length = 0; menuFor(g, [{ kind: "object", id: coffer.id }], null)[0].run(g); run(g, 2);
+  g.tick += COFFER_TICKS + 10; g.messages.length = 0; menuFor(g, [{ kind: "object", id: coffer.id }], null)[0].run(g); run(g, 2);
   assert(g.messages.some(m => /coffer holds/.test(m.text)), "fills again after a while");
   // A vault archer shoots from three tiles away and stays where it is.
   const archer = g.monsters.find(m => m.def.id === "vault_archer");
@@ -2419,10 +2422,10 @@ test("The Root Cellars and the Mossy Undercroft: a dungeon for new heroes and on
 test("The four Orders and their gods, and the Deadwood Maidens: oaths open armouries, blessings count by the piece, the truce keeps spears down", () => {
   const g = newGame(), p = g.player, world = g.world;
   // Four Orders × three tiers × ten pieces, and a cape each; a hall each with its altar and its god's statue, small and large.
-  assert.equal(ITEM_LIST.filter(item => orderOf(item.id)).length, 4 * 3 * 10 + 4);
+  assert.equal(ITEM_LIST.filter(item => orderOf(item.id)).length, 5 * 3 * 10 + 5);
   for (const id of ORDER_IDS) {
     const order = ORDERS[id];
-    assert(world.objects.some(o => o.kind === "altar" && o.name === `${order.short} altar` && o.text === id), `${order.short} altar`);
+    assert(world.objects.some(o => o.kind === "altar" && o.name === `${order.name} altar` && o.text === id), `${order.short} altar`);
     assert.equal(world.objects.filter(o => o.decor === order.statue).length, 2, `${order.god}'s statues`);
     for (const npc of ["commander", "quartermaster", "guard"]) assert(g.npcs.some(entry => entry.id === `${id}_${npc}`), `${id} ${npc}`);
     assert(shopProblem(g, `${id}_armoury`), "closed before the oath");
@@ -2434,15 +2437,33 @@ test("The four Orders and their gods, and the Deadwood Maidens: oaths open armou
   const say = label => { while (g.dialogue && g.dialogue.index < g.dialogue.lines.length) continueDialogue(g); const index = g.dialogue.options.findIndex(option => option.label.startsWith(label)); assert(index >= 0, label); chooseOption(g, index); };
   const drain = () => { for (let i = 0; g.dialogue && i < 200; i++) { if (g.dialogue.index >= g.dialogue.lines.length && g.dialogue.options?.length) { g.dialogue = null; break; } continueDialogue(g); } };
   talk("diamond_commander"); say("I'll do it."); drain(); assert.equal(p.quests.oath_diamond, 1);
-  const altar = world.objects.find(o => o.name === "Diamond altar"); standBy(g, altar); setTarget(g, { kind: "object", id: altar.id, option: "Pray-at" }); run(g, 3); assert.equal(p.questData.prayed_diamond, 1, "knelt");
+  const altar = world.objects.find(o => o.name === "Order of the Diamond altar"); standBy(g, altar); setTarget(g, { kind: "object", id: altar.id, option: "Pray-at" }); run(g, 3); assert.equal(p.questData.prayed_diamond, 1, "knelt");
   give(p, "crystal_shard", 5); talk("diamond_commander"); drain(); assert.equal(p.quests.oath_diamond, 2); assert(has(p, "diamond_cape"), "the cape"); assert.equal(shopProblem(g, "diamond_armoury"), null, "the armoury opens");
   give(p, "coins", 500_000); assert.equal(buy(g, "diamond_armoury", "diamond_paladin_helm", 1), 1); assert.equal(buy(g, "diamond_armoury", "diamond_paladin_body", 1), 1);
   for (const id of ["diamond_paladin_helm", "diamond_paladin_body", "diamond_cape"]) equip(g, p.inventory.findIndex(slot => slot?.id === id));
   assert.equal(orderPieces(p.equipment, "diamond"), 3, "three pieces of the Diamond");
+  // The Ember's fortress: an island of ash in a moat of lava, a causeway to its gate; and the ring slot, with the Ringmaster's signet.
+  const emberAltar = world.objects.find(o => o.name === "Order of the Ember altar"); assert(emberAltar, "the Ember altar");
+  assert(world.tiles.some((tile, i) => tile === T.LAVA && Math.abs(i % W - emberAltar.x) < 16 && Math.abs(Math.floor(i / W) - emberAltar.y) < 16), "lava round the fortress");
+  assert(EQUIP_SLOTS.includes("ring") && ITEM_LIST.find(item => item.id === "ringmasters_signet").equip.slot === "ring");
+  p.stats.matches = 3; give(p, "bloodmark", 30); teleport(g, ARENA.lobby.x, ARENA.lobby.y); p.xp.strength = XP_TABLE[40];
+  talk("ringmaster"); say("About your signet"); say("I'll do it."); drain(); assert.equal(p.quests.ringmasters_signet, 1);
+  talk("ringmaster"); say("About your signet"); drain(); assert.equal(p.quests.ringmasters_signet, 2); assert(has(p, "ringmasters_signet"), "the signet");
+  equip(g, p.inventory.findIndex(slot => slot?.id === "ringmasters_signet")); assert.equal(p.equipment.ring, "ringmasters_signet"); assert.equal(bonuses(p).strength, bonuses({ ...p, equipment: {} }).strength + 4, "+4 Strength");
+  teleport(g, 300, 136); assert.equal(signetCharges(g), 3); signetTeleport(g); until(g, () => p.x === ARENA.lobby.x && p.y === ARENA.lobby.y, 20); assert.equal(signetCharges(g), 2, "one charge spent");
+  p.questData.signet_used = 3; g.messages.length = 0; signetTeleport(g); assert(g.messages.some(m => /signet is cold/.test(m.text)), "three a day");
   // The Maidens: hostile, then at truce (spears down, and no striking them).
   const maiden = g.monsters.find(m => m.def.id === "deadwood_maiden"); assert(maiden && MONSTERS.deadwood_maiden.aggressive && MONSTERS.deadwood_maiden.faction === "maidens");
   assert(shopProblem(g, "maidens_market"), "no market before the truce");
   p.quests.maidens_truce = 2; standNear(g, maiden.x, maiden.y, 2); p.combat = null; p.target = null; run(g, 12); assert(!maiden.target, "spears down");
   g.messages.length = 0; setTarget(g, { kind: "monster", uid: maiden.uid, option: "Attack" }); run(g, 6); assert(g.messages.some(m => /keep the truce/.test(m.text)) && p.combat === null, "no striking them");
   assert.equal(shopProblem(g, "maidens_market"), null); assert(SHOPS.maidens_market.stock.includes("rarite_ore") && SHOPS.maidens_market.stock.includes("vault_key"), "what's hard to find");
+});
+
+test("The Deadwood's eternal night, and coffers that fill once an hour", () => {
+  const g = newGame(), world = g.world;
+  assert.equal(COFFER_TICKS, 6000, "an hour of ticks");
+  assert(inDeadwood(world, 290, 60) && !inDeadwood(world, 121 + MAINLAND.x, 118 + MAINLAND.y), "the wood and the square");
+  assert.equal(gloomAt(world, 290, 60), 1, "deep in the wood it is full night"); assert.equal(gloomAt(world, 121 + MAINLAND.x, 118 + MAINLAND.y), 0, "no cloud over Friendhollow");
+  const edge = gloomAt(world, 300, 128); assert(edge >= 0 && edge < 1, `the cloud thins at the wood's edge (${edge})`);
 });

@@ -38,8 +38,8 @@ export const NPCS: Record<string, NpcDef> = {
   ring_quartermaster: { id: "ring_quartermaster", name: "The Pit Quartermaster", examine: "Takes bloodmarks and nothing else. Sells the Ring's own armour.", options: ["Talk-to", "Trade"], shop: "ring_pit", art: art(0, 707) },
   ring_champion: { id: "ring_champion", name: "Laurel Keeper Ismay", examine: "Keeps the Champions' Hall. Takes laurels, the coin of Friend Fights.", options: ["Talk-to", "Trade"], shop: "ring_champions", art: art(7, 708) },
   // The four Orders (2026-10): commanders, quartermasters and guards, all on the knights' stout frame.
-  ...Object.fromEntries(ORDER_IDS.flatMap(id => { const order = ORDERS[id], seed = { diamond: 800, ink: 810, sol: 820, hood: 830 }[id]; return [
-    [`${id}_commander`, { id: `${id}_commander`, name: { diamond: "Commander Isolde Vane", ink: "Commander Ottavio Inkwell", sol: "Commander Sunniva Brightmoor", hood: "Commander Robyn Greenleaf" }[id], examine: `Commander of the ${order.name}. Swears in those who prove their faith.`, options: ["Talk-to"], art: art(10, seed) }],
+  ...Object.fromEntries(ORDER_IDS.flatMap(id => { const order = ORDERS[id], seed = { diamond: 800, ink: 810, sol: 820, hood: 830, ember: 850 }[id]; return [
+    [`${id}_commander`, { id: `${id}_commander`, name: { diamond: "Commander Isolde Vane", ink: "Commander Ottavio Inkwell", sol: "Commander Sunniva Brightmoor", hood: "Commander Robyn Greenleaf", ember: "Commander Brannoch Ashward" }[id], examine: `Commander of the ${order.name}. Swears in those who prove their faith.`, options: ["Talk-to"], art: art(10, seed) }],
     [`${id}_quartermaster`, { id: `${id}_quartermaster`, name: `${order.short} quartermaster`, examine: `Keeps the ${order.name}'s armoury. Sells to the sworn.`, options: ["Talk-to", "Trade"], shop: `${id}_armoury`, art: art(10, seed + 1) }],
     [`${id}_guard`, { id: `${id}_guard`, name: `${order.short} knight`, examine: `A knight of the ${order.name}, in its colours.`, options: ["Talk-to"], art: art(10, seed + 2) }],
   ]; })),
@@ -423,6 +423,17 @@ export const QUESTS: readonly QuestDef[] = [
       return [`I swore the ${order.short} Oath. The ${order.name}'s armoury is open to me, and I wear its cape. QUEST COMPLETE!`];
     },
   }; }),
+  {
+    id: "ringmasters_signet", name: "The Ringmaster's Signet", points: 1, difficulty: "Intermediate", start: "Talk to Ringmaster Vell Harrow at the Rare Friends Ring after winning three matches.",
+    requirements: ["Three matches won in the Ring", "30 bloodmarks"], rewards: ["1 Quest Point", "Ringmaster's signet (a ring: +4 Strength, and three teleports to the Ring a day)", "2,000 Strength XP"],
+    journal: game => {
+      const s = stage(game, "ringmasters_signet"), p = game.player;
+      if (s === 0) return ["The Ringmaster gives his signet to fighters who keep coming back. Three matches won, he says, and he'll talk."];
+      if (s === 1) return ["The Ringmaster will stamp me a signet for thirty bloodmarks once I've won three matches: a ring that carries me to the Ring three times a day, and lends me the pit's strength.",
+        `${(p.stats.matches ?? 0) >= 3 ? "✓" : "•"} Matches won: ${Math.min(3, p.stats.matches ?? 0)}/3`, `${count(p, "bloodmark") >= 30 ? "✓" : "•"} Bloodmarks: ${Math.min(30, count(p, "bloodmark"))}/30`];
+      return ["The Ringmaster's signet is on my finger. Three times a day it carries me to the Ring. QUEST COMPLETE!"];
+    },
+  },
   {
     id: "maidens_truce", name: "The Maidens' Truce", points: 2, difficulty: "Intermediate", start: "Talk to Matriarch Ysolde Thornveil at the Deadwood Maidens' camp, in the east of the Deadwood.",
     requirements: ["Combat 50 recommended"], rewards: ["2 Quest Points", "Maiden's veil", "4,000 Faith XP", "2,000 Slayer XP", "The Maidens' market opens to you, and their spears stay down"],
@@ -1099,10 +1110,17 @@ function talkInner(game: Game, npcId: string): Dialogue {
         ...MATCHES.map(offer),
         { label: "I'll choose my own foes.", then: () => chooseFoes() },
         { label: "Tell me about Friend Fights.", then: () => chat(name, npcSays(name, "Two Friends in the courtyard, and nobody dies: that's a Friend Fight. Right-click a Friend in the Ring to challenge them. Every win pays two laurels, and the Champions' Hall takes nothing else.")) },
+        ...((player.stats.matches ?? 0) >= 3 || stage(game, "ringmasters_signet") > 0 ? [{ label: "About your signet.", then: () => fetchQuest(game, name, "ringmasters_signet", {
+          offer: ["Three matches won. You keep coming back; most don't. I stamp a signet for fighters like you: a ring that carries you here three times a day, and lends the hand that wears it some of the pit's strength.", "Thirty bloodmarks for the iron and the stamping."],
+          accept: "Thirty marks, and the signet's yours.", progress: "Thirty bloodmarks, and three matches won. The signet waits.",
+          have: () => (player.stats.matches ?? 0) >= 3 && count(player, "bloodmark") >= 30, take: () => take(player, "bloodmark", 30),
+          done: ["Stamped and warm. Rub it anywhere in the Realm and the Ring's magic brings you to the lobby; three times a day, and the day turns at midnight.", "Wear it on your hand, and swing harder for it."],
+          reward: () => { giveOrDrop(game, "ringmasters_signet"); addXp(game, "strength", 2000, { raw: true }); },
+        }) }] : []),
         { label: "Not today.", then: () => null },
       ]);
     }
-    case "diamond_commander": case "ink_commander": case "sol_commander": case "hood_commander": {
+    case "diamond_commander": case "ink_commander": case "sol_commander": case "hood_commander": case "ember_commander": {
       const order = ORDERS[npcId.split("_")[0] as keyof typeof ORDERS];
       if (level(game, "prayer") < 20 && stage(game, `oath_${order.id}`) === 0) return chat(name, npcSays(name, `${order.godText}`, "Grow in faith first (Faith 20), and we'll talk of oaths."));
       return fetchQuest(game, name, `oath_${order.id}`, {
@@ -1113,8 +1131,8 @@ function talkInner(game: Game, npcId: string): Dialogue {
         reward: () => { giveOrDrop(game, `${order.id}_cape`); addXp(game, "prayer", 3000, { raw: true }); },
       });
     }
-    case "diamond_quartermaster": case "ink_quartermaster": case "sol_quartermaster": case "hood_quartermaster": { const order = ORDERS[npcId.split("_")[0] as keyof typeof ORDERS]; return chat(name, npcSays(name, questDone(game, `oath_${order.id}`) ? `Oathbound, Knight and Paladin: helm, cuirass, greaves, gauntlets, boots, the kite and the aegis, the mace, the greatmace and the staff, all blessed at our altar. ${order.effect}` : `The ${order.name} arms its own. Swear the oath with the commander and I'll open the racks.`)); }
-    case "diamond_guard": case "ink_guard": case "sol_guard": case "hood_guard": { const order = ORDERS[npcId.split("_")[0] as keyof typeof ORDERS]; return chat(name, npcSays(name, `${order.godName}, keep you. The hall is open to those who come in peace; the oath is for those who stay.`)); }
+    case "diamond_quartermaster": case "ink_quartermaster": case "sol_quartermaster": case "hood_quartermaster": case "ember_quartermaster": { const order = ORDERS[npcId.split("_")[0] as keyof typeof ORDERS]; return chat(name, npcSays(name, questDone(game, `oath_${order.id}`) ? `Oathbound, Knight and Paladin: helm, cuirass, greaves, gauntlets, boots, the kite and the aegis, the mace, the greatmace and the staff, all blessed at our altar. ${order.effect}` : `The ${order.name} arms its own. Swear the oath with the commander and I'll open the racks.`)); }
+    case "diamond_guard": case "ink_guard": case "sol_guard": case "hood_guard": case "ember_guard": { const order = ORDERS[npcId.split("_")[0] as keyof typeof ORDERS]; return chat(name, npcSays(name, `${order.godName}, keep you. The hall is open to those who come in peace; the oath is for those who stay.`)); }
     case "ring_apothecary": return chat(name, npcSays(name, "Tonics, potions and something to eat between matches. Drink before you go in, not after you come out."));
     case "ring_chaplain": return chat(name, npcSays(name, "The Ringmaker fought by faith, they say. Faith potions, sigils for the holy spells, the Acolyte's vestments, maces and the aegis: all here."));
     case "ring_sigilist": return chat(name, npcSays(name, "Sigils for every element, and the elemental staffs. Mages win more matches than you'd think; the creatures can't dodge."));

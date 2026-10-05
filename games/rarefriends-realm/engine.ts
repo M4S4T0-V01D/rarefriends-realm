@@ -298,6 +298,7 @@ export function itemOptions(game: Game, slotIndex: number): ItemOption[] {
   if (slot.id === "glimmer_shard") out.push({ verb: "Look-at", run: g => message(g, "The shard hums. Old Glimmer will want it back.") });
   if (definition.tablet) out.push({ verb: "Break", run: g => breakTablet(g, slotIndex) });
   if (slot.id === "insight_lamp") out.push({ verb: "Rub", run: g => { g.ui.lamp = slotIndex; } });
+  if (slot.id === "ringmasters_signet") out.push({ verb: "Teleport", run: signetTeleport });
   if (slot.id === "slayer_gem") out.push({ verb: "Check", run: g => message(g, taskText(g)) });
   if (slot.id === SATCHEL) out.push({ verb: "Check", run: satchelCheck }, { verb: "Fill", run: satchelFill }, { verb: "Empty", run: satchelEmpty });
   if (slot.id === SIGIL_BAG) out.push({ verb: "Check", run: sigilBagCheck }, { verb: "Fill", run: sigilBagFill }, { verb: "Empty", run: sigilBagEmpty });
@@ -1594,7 +1595,7 @@ function killMonster(game: Game, monster: Monster) {
   slayerKill(game, monster.def.id);
 }
 /** Cindershell armour: dragonfire burns 15% less a piece, half in the full set. */
-export const fireFactor = (player: Player, game?: Game) => (fullSlayerSet(player, "cindershell") ? 0.5 : 1 - 0.15 * setPieces(player, "cindershell")) * (game && player.antifireUntil > game.tick ? 0.5 : 1);
+export const fireFactor = (player: Player, game?: Game) => (1 - 0.05 * orderPieces(player.equipment, "ember")) * (fullSlayerSet(player, "cindershell") ? 0.5 : 1 - 0.15 * setPieces(player, "cindershell")) * (game && player.antifireUntil > game.tick ? 0.5 : 1);
 /** Bramble armour: thorns. A creature that hits you in melee takes 1 damage back a piece. */
 export const thorns = (player: Player) => setPieces(player, "bramble");
 function damagePlayer(game: Game, damage: number, from: Monster | null) {
@@ -1844,7 +1845,26 @@ export function castSpell(game: Game, id: string): Selection {
   }
   return { kind: "spell", spell: spell.id };
 }
-const TELEPORT_NAMES: Record<string, string> = { hollow_square: "Friendhollow", emberforge: "Emberforge", oasis: "the Oasis", frostpeak: "Frostpeak", pier: "Pike's Pier", fernwick: "Fernwick", highcairn: "Highcairn", dawnhold: "Dawnhold", gravesend: "Gravesend", saltmarrow: "Saltmarrow", hollyhock: "Hollyhock", dyemoor: "Dyemoor", tallgrass: "Tallgrass", cragmaw: "Cragmaw", quillhaven: "Quillhaven", ashfall: "Ember Tamsin's camp at Ashfall" };
+/** The Ringmaster's signet: three teleports to the Ring's lobby a day (the day turns at midnight UTC). */
+export const SIGNET_PER_DAY = 3;
+export function signetCharges(game: Game) {
+  const day = Math.floor(Date.now() / 86_400_000);
+  if (game.player.questData.signet_day !== day) { game.player.questData.signet_day = day; game.player.questData.signet_used = 0; }
+  return SIGNET_PER_DAY - (game.player.questData.signet_used ?? 0);
+}
+export function signetTeleport(game: Game) {
+  const player = game.player;
+  if (!has(player, "ringmasters_signet") && player.equipment.ring !== "ringmasters_signet") return;
+  if (game.arena) { message(game, "The Ring's magic holds you until the match is done. No signet takes you out.", "warn"); return; }
+  if (isUnderground(player.y)) { message(game, "A dark force stops you from teleporting underground.", "warn"); return; }
+  if (player.combat !== null) { message(game, "You can't use the signet during combat.", "warn"); return; }
+  if (signetCharges(game) <= 0) { message(game, "The signet is cold. It carries you three times a day, and the day turns at midnight.", "warn"); return; }
+  player.questData.signet_used = (player.questData.signet_used ?? 0) + 1;
+  stopAll(game); closeInterfaces(game);
+  player.activity = { kind: "teleport", to: game.world.places.ring, timer: 3, spell: "tablet:ring" };
+  message(game, `The signet warms, and the Ring's magic folds the Realm around you… (${signetCharges(game)} left today)`); sound(game, "spell");
+}
+const TELEPORT_NAMES: Record<string, string> = { ring: "the Rare Friends Ring", hollow_square: "Friendhollow", emberforge: "Emberforge", oasis: "the Oasis", frostpeak: "Frostpeak", pier: "Pike's Pier", fernwick: "Fernwick", highcairn: "Highcairn", dawnhold: "Dawnhold", gravesend: "Gravesend", saltmarrow: "Saltmarrow", hollyhock: "Hollyhock", dyemoor: "Dyemoor", tallgrass: "Tallgrass", cragmaw: "Cragmaw", quillhaven: "Quillhaven", ashfall: "Ember Tamsin's camp at Ashfall" };
 const ELEMENT_COLORS: Record<string, string> = { wind: "#e6ecef", water: "#8fa3c9", earth: "#a89479", fire: "#e9a07a", hollow: "#6d6b67", moon: "#c6bed4", gold: "#e2d49e", home: "#e8d4c0", holy: "#f2e28f" };
 /** Faith spells spend faith as well as sigils. */
 function payFaith(game: Game, spell: Spell) { if (spell.faith) game.player.prayer = Math.max(0, game.player.prayer - spell.faith); }

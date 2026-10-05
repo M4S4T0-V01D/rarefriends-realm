@@ -585,8 +585,9 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
   chapel([282, 62], 13, 11, "The Deadwood chapel", "Deadwood altar", true);
   // ---------- 7e. The four Orders' halls, and the Deadwood Maidens' camp ----------
   /** Clear ground w × h (plus a margin) near a point, searched outward; the top-left corner, or null. */
-  const clearing = (near: readonly [number, number], w: number, h: number, allowSwamp = false): [number, number] | null => {
-    const landy = (tt: number) => [T.GRASS, T.DARK_GRASS, T.PATH, T.GRAVEL, T.SNOW, T.ASH, T.SAND, ...(allowSwamp ? [T.SWAMP] : [])].includes(tt as never);
+  const clearing = (near: readonly [number, number], w: number, h: number, allowSwamp = false, rough = false): [number, number] | null => {
+    // `rough` takes any dry ground at all (lava, cliffs and old walls included): the Ember's fortress repaints its whole island.
+    const landy = (tt: number) => rough ? tt !== T.VOID && !isWater(tt) : [T.GRASS, T.DARK_GRASS, T.PATH, T.GRAVEL, T.SNOW, T.ASH, T.SAND, ...(allowSwamp ? [T.SWAMP] : [])].includes(tt as never);
     const fits = (x0: number, y0: number) => { for (let y = y0 - 1; y <= y0 + h; y++) for (let x = x0 - 1; x <= x0 + w; x++) { if (!inBounds(x, y) || inMainland(x, y) || !landy(get(x, y))) return false; const o = ctx.objectAt[tileIndex(x, y)]; if (o >= 0 && !["decor", "tree", "herb"].includes(ctx.objects[o].kind)) return false; } return true; };
     for (let r = 0; r <= 36; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; const x0 = near[0] + dx - Math.floor(w / 2), y0 = near[1] + dy - Math.floor(h / 2); if (fits(x0, y0)) return [x0, y0]; }
     return null;
@@ -597,13 +598,23 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
    * commander and quartermaster inside, two guards and the god's statue before the door.
    */
   for (const id of ORDER_IDS) {
-    const order = ORDERS[id], at = clearing(order.near, 11, 8);
-    if (!at) continue;
+    const order = ORDERS[id], ember = id === "ember", found = ember ? clearing(order.near, 23, 20, false, true) : clearing(order.near, 11, 8);
+    if (!found) continue;
+    // The Ember's fortress sits on an island of ash inside a moat of lava, a causeway of blackened stone to its gate.
+    const at: [number, number] = ember ? [found[0] + 6, found[1] + 5] : found;
     const [x0, y0] = at, x1 = x0 + 10, y1 = y0 + 7, cx = x0 + 5;
+    if (ember) {
+      const [mx0, my0] = found, mx1 = mx0 + 22, my1 = my0 + 19;
+      razeArea(mx0 - 1, my0 - 1, mx1 + 1, my1 + 1);
+      for (let y = my0 - 1; y <= my1 + 1; y++) for (let x = mx0 - 1; x <= mx1 + 1; x++) { const edge = Math.min(x - mx0, mx1 - x, y - my0, my1 - y); put(x, y, edge < 0 ? T.ASH : edge < 2 ? T.LAVA : T.ASH); }
+      for (let y = my1 - 1; y <= my1; y++) for (let x = cx - 1; x <= cx + 1; x++) put(x, y, T.BRIDGE);
+      for (const [tx, ty] of [[mx0 + 2, my0 + 2], [mx1 - 2, my0 + 2], [mx0 + 2, my1 - 2], [mx1 - 2, my1 - 2]] as const) decor(tx, ty, "torch", true);
+      monsters("ash_drake", mx0 - 6, my0 - 6, mx1 + 6, my1 + 6, 4);
+    }
     razeArea(x0 - 1, y0 - 1, x1 + 1, y1 + 3);
     for (let y = y1 + 1; y <= y1 + 3; y++) for (let x = x0; x <= x1; x++) put(x, y, T.STONE);
-    t.building(x0, y0, x1, y1, "s", T.STONE, undefined, { name: `${order.short} Hall`, color: order.color, walls: "stone", chimney: true });
-    add({ kind: "altar", x: cx, y: y0 + 2, blocks: true, name: `${order.short} altar`, text: id }); decor(cx, y0 + 1, order.statue, true, `${order.god}, carved small for the altar`);
+    t.building(x0, y0, x1, y1, "s", T.STONE, undefined, ember ? { name: "Ember Fortress", color: order.dark, walls: "stone", roof: "flat", storeys: 2, tall: 8 } : { name: `${order.short} Hall`, color: order.color, walls: "stone", chimney: true });
+    add({ kind: "altar", x: cx, y: y0 + 2, blocks: true, name: `${order.name} altar`, text: id }); decor(cx, y0 + 1, order.statue, true, `${order.god}, carved small for the altar`);
     decor(x0 + 1, y0 + 2, "armour", true, "Weapon rack"); decor(x1 - 1, y0 + 2, "armour", true, "Weapon rack"); decor(x0 + 1, y1 - 1, "torch", true); decor(x1 - 1, y1 - 1, "torch", true);
     decor(cx - 3, y0 + 4, "bench", true); decor(cx + 3, y0 + 4, "bench", true); decor(x0 + 1, y0 + 4, "table", true, "The Order's ledger"); decor(x1 - 1, y0 + 4, "chest", true, `${order.short} strongbox`);
     npc(`${id}_commander`, cx - 1, y0 + 4); npc(`${id}_quartermaster`, cx + 2, y0 + 3);

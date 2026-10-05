@@ -66,7 +66,7 @@ function chordBed(chords: readonly (readonly number[])[], beatsPer: number, opti
   const notes: Note[] = [], bassVoice: Voice = typeof options.bass === "string" ? options.bass : "bass";
   chords.forEach((chord, bar) => {
     const start = bar * beatsPer, root = chord[0] + 48;
-    if (options.pad) for (const midi of chord.slice(2)) notes.push({ beat: start, voice: options.pad, midi: midi + 60, length: beatsPer, velocity: 0.35 });
+    if (options.pad) for (const midi of chord.slice(2)) notes.push({ beat: start, voice: options.pad, midi: midi + 60, length: beatsPer, velocity: 0.42 });
     if (options.bass !== false) {
       notes.push({ beat: start, voice: bassVoice, midi: root, length: 0.9, velocity: 0.9 });
       if (beatsPer === 3) for (const b of [1, 2]) for (const midi of chord.slice(2)) notes.push({ beat: start + b, voice: "pizz", midi: midi + 60, length: 0.4, velocity: 0.45 });
@@ -171,8 +171,18 @@ const STYLES: readonly Style[] = [
  */
 /** The Realm's music leans dark: the bright modes bend to their minor cousins, the tune sits an octave lower, a drone hums under every section and every band has a drummer. */
 const DARKER: Record<string, string> = { major: "dorian", lydian: "aeolian", mixolydian: "dorian" };
-const DARK_LEADS: Partial<Record<Voice, Voice>> = { glock: "harp", recorder: "flute", trumpet: "brass" };
-function composeTrack(style: Style): Track {
+const DARK_LEADS: Partial<Record<Voice, Voice>> = { glock: "harp", recorder: "flute", trumpet: "brass", bell: "harp", lute: "pluck" };
+/**
+ * The whole Realm's music leans on the Mossy Undercroft's sound now: a pad under every chord, a harp picking through
+ * it, the tune a little slower and the band a little calmer, so even the cheerful places are full and dark with a
+ * bright line over them. (The boss theme and the Ring keep their own drums.)
+ */
+function fuller(style: Style): Style {
+  const keep = style.id === "boss" || style.id === "friends_ring";
+  return { ...style, bed: style.bed ?? "pad", arp: style.arp ?? "harp", bpm: style.bpm > 84 ? Math.round(style.bpm * 0.92) : style.bpm, energy: keep ? style.energy : Math.min(style.energy, 0.62) };
+}
+function composeTrack(given: Style): Track {
+  const style = fuller(given);
   const random = mulberry(style.seed), scale = MODES[DARKER[style.mode] ?? style.mode], per = style.meter, bars = style.progression.length, loop = bars * per;
   const deg = (degree: number) => style.root + 12 * Math.floor(degree / 7) + scale[((degree % 7) + 7) % 7];
   const triad = (degree: number) => [deg(degree) % 12, deg(degree), deg(degree + 2), deg(degree + 4)];

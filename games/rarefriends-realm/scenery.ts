@@ -112,6 +112,13 @@ export function decorArt(kind: string, variant: number, frame = 0): HTMLCanvasEl
   switch (kind) {
     case "bush": return pixelArt(key, 20, 14, p => { canopy(p, random, 10, 8, 8, 5.5, "#a9b69e", 5); p.outline(); });
     // The gods of the four Orders, carved in stone and painted in their colours, on a plinth: Rare Friends of legend.
+    case "god_ember": return pixelArt(key, 26, 38, p => {
+      // A great iron brazier on a plinth, and the Ember's flame rising out of it.
+      p.rect(4, 31, 18, 6, "#b9b5ae"); p.rect(3, 34, 20, 3, "#8f8a83");
+      p.poly([[6, 30], [20, 30], [18, 22], [8, 22]], "#4a4038", INK); p.rect(7, 23, 12, 2, "#6b5b4d"); p.line(13, 30, 13, 26, "#2d2622");
+      p.poly([[8, 22], [18, 22], [16, 14], [20, 9], [15, 10], [13, 2], [11, 10], [6, 8], [10, 14]], "#ff6a2a", INK); p.poly([[10, 21], [16, 21], [15, 15], [13, 8], [11, 15]], "#ffd27a", null); p.poly([[12, 21], [14, 21], [13, 15]], "#ffffff", null);
+      p.outline();
+    });
     case "god_diamond": case "god_ink": case "god_sol": case "god_hood": return pixelArt(key, 26, 38, p => {
       const order = ORDERS[kind.slice(4) as keyof typeof ORDERS], color = order.color, accent = order.accent, dark = order.dark, STONE = "#b9b5ae", STONE_D = "#8f8a83";
       // The plinth.

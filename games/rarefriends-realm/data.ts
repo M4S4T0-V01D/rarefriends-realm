@@ -66,8 +66,8 @@ export const FAMILY_PERKS: readonly FamilyPerk[] = [
 import { APOTHECARY_ITEMS, type PotionEffect } from "./apothecary.ts";
 import { ORDER_IDS, orderGear, orderStock } from "./knights.ts";
 // ---------- Items ----------
-export type EquipSlot = "head" | "cape" | "neck" | "weapon" | "body" | "shield" | "legs" | "hands" | "feet" | "belt";
-export const EQUIP_SLOTS: readonly EquipSlot[] = ["head", "cape", "neck", "weapon", "body", "shield", "legs", "hands", "feet", "belt"];
+export type EquipSlot = "head" | "cape" | "neck" | "weapon" | "body" | "shield" | "legs" | "hands" | "feet" | "belt" | "ring";
+export const EQUIP_SLOTS: readonly EquipSlot[] = ["head", "cape", "neck", "weapon", "body", "shield", "legs", "hands", "feet", "belt", "ring"];
 export type Bonuses = { attack: number; strength: number; defence: number; ranged: number; magic: number; prayer: number };
 /** An item's picture: a shape in a colour; `kind` picks a variant of the shape (a fish's species, an ore's veins…). */
 export type Icon = { shape: IconShape; color: string; accent?: string; kind?: string };
@@ -76,7 +76,7 @@ export type IconShape =
   | "amulet" | "log" | "fish" | "ore" | "bar" | "bones" | "sigil" | "staff" | "net" | "rod" | "harpoon" | "pot" | "bucket" | "egg" | "flour"
   | "milk" | "tinderbox" | "hammer" | "knife" | "needle" | "thread" | "chisel" | "gem" | "hide" | "leather" | "meat" | "feather" | "bait"
   | "cake" | "bread" | "berries" | "key" | "wheat" | "lamp" | "scroll" | "silk" | "hood" | "bracer" | "burnt" | "hat" | "crown" | "orb" | "trophy"
-  | "bow" | "arrow" | "tablet" | "arrowheads" | "material" | "quiver" | "satchel" | "mask" | "stonebox" | "wool" | "string" | "shears" | "greatsword" | "battleaxe" | "warhammer" | "mace" | "flail" | "roundshield" | "aegis" | "spear" | "warbow" | "crossbow" | "bolts" | "limbs" | "stock" | "herb" | "mushroom" | "vial" | "mortar";
+  | "bow" | "arrow" | "tablet" | "arrowheads" | "material" | "quiver" | "satchel" | "mask" | "stonebox" | "wool" | "string" | "shears" | "greatsword" | "battleaxe" | "warhammer" | "mace" | "flail" | "roundshield" | "aegis" | "spear" | "warbow" | "crossbow" | "bolts" | "limbs" | "stock" | "herb" | "mushroom" | "vial" | "mortar" | "ring";
 export type Item = {
   id: string; name: string; examine: string; value: number; icon: Icon;
   stackable?: boolean; tradeable?: boolean;
@@ -463,6 +463,7 @@ const OTHER_GEAR: Item[] = [
   { id: "ringbreaker", name: "Ringbreaker", examine: "The Ring's own warhammer: a great hammer face on one side of the head, a block of iron on the other, and a spike rising from the middle like the haft carried on. Two hands. One blow in three throws what it hits back a step, and the recoil costs you a little blood.", value: 60_000, price: 45_000, weight: 11, icon: { shape: "warhammer", color: "#5a5e6b", accent: "#8a2f2b", kind: "ringbreaker" }, equip: { slot: "weapon", bonuses: { attack: 30, strength: 58 }, speed: 7, twoHanded: true, requires: { strength: 60, attack: 30, hitpoints: 40 } } },
   { id: "moss_key", name: "Moss key", examine: "A bronze key furred with moss, for the warden's door under the Mossy Ruins. It turns once.", value: 0, stackable: true, icon: { shape: "key", color: "#6f7a4a" } },
   { id: "mossguard_shield", name: "Mossguard shield", examine: "The Moss Warden's shield, stone under moss, lighter than it looks.", value: 9000, weight: 4, icon: { shape: "shield", color: "#6f7a4a", accent: "#c9d08a" }, equip: { slot: "shield", bonuses: { defence: 18, magic: 2 }, requires: { defence: 35 } } },
+  { id: "ringmasters_signet", name: "Ringmaster's signet", examine: "A heavy iron ring stamped with the Ring. Rub it and the Ring's magic carries you to its lobby, three times a day (the day turns at midnight, by the Realm's clock), and it lends the hand that wears it some of the pit's strength.", value: 20_000, weight: 0, tradeable: false, icon: { shape: "ring", color: "#5a5e6b", accent: "#8a2f2b" }, equip: { slot: "ring", bonuses: { strength: 4 }, requires: { strength: 30 } } },
   { id: "howling_cape", name: "Howling cape", examine: "A cape of grey wool from under the stones. In a wind it makes the noise The Wilds are afraid of.", value: 30_000, weight: 1, icon: { shape: "cape", color: "#4a4650", accent: "#b8b2a6" }, equip: { slot: "cape", bonuses: { defence: 9, ranged: 6, strength: 3 }, requires: { defence: 60 } } },
   { id: "drakehide_bracers", name: "Drakehide bracers", examine: "Scaled drakehide bracers.", value: 2500, icon: { shape: "bracer", color: "#6f8a5c" }, equip: { slot: "hands", bonuses: { ranged: 9, defence: 7 }, requires: { ranged: 50 } } },
   { id: "drakehide_chaps", name: "Drakehide chaps", examine: "Scaled drakehide chaps.", value: 5000, icon: { shape: "legs", color: "#6f8a5c" }, equip: { slot: "legs", bonuses: { ranged: 14, defence: 20 }, requires: { ranged: 50 } } },

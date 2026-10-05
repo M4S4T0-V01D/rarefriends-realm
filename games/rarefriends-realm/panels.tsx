@@ -27,7 +27,7 @@ import {
   weapon, xpMultiplier, wornWeight, type Game, type Message, type Recipe, type Slot,
 } from "./state.ts";
 import {
-  bestArrow, bowRange, emoteProblem, performEmote, applyReferral, shopBuys, buy, buyPrice, canCast, capeProblem, castSpell, rangedMaxHit, rubLamp, chooseOption, continueDialogue, dialogueAtOptions, itemOptions, playerMaxHit, recipeProblem, sell, sellPrice,
+  bestArrow, bowRange, emoteProblem, performEmote, signetTeleport, applyReferral, shopBuys, buy, buyPrice, canCast, capeProblem, castSpell, rangedMaxHit, rubLamp, chooseOption, continueDialogue, dialogueAtOptions, itemOptions, playerMaxHit, recipeProblem, sell, sellPrice,
   castOnItem, satchelCheck, satchelEmpty, satchelFill, setFollower, setPet, setStyle, startProduction, swapSlots, toggleRun, toggleSneak, togglePrayer, toggleWorn, unequip, useItemOnItem, type OwnedFriend, type Selection,
  beltCheck, beltFill, beltEmpty, sipBelt, toggleFollowerWorn } from "./engine.ts";
 import { friendRows, renderWorldMap } from "./render.ts";
@@ -361,10 +361,10 @@ let pressTimer: ReturnType<typeof setTimeout> | null = null;
 /** Touch: a long press opens the right-click menu. */
 export function longPress(action: () => void) { cancelLongPress(); pressTimer = setTimeout(() => { pressTimer = null; action(); }, 450); }
 export function cancelLongPress() { if (pressTimer) clearTimeout(pressTimer); pressTimer = null; }
-const SLOT_NAMES: Record<EquipSlot, string> = { head: "Head", cape: "Cape", neck: "Neck", weapon: "Weapon", body: "Body", shield: "Shield", legs: "Legs", hands: "Hands", feet: "Feet", belt: "Belt" };
+const SLOT_NAMES: Record<EquipSlot, string> = { head: "Head", cape: "Cape", neck: "Neck", weapon: "Weapon", body: "Body", shield: "Shield", legs: "Legs", hands: "Hands", feet: "Feet", belt: "Belt", ring: "Ring" };
 function EquipmentTab({ game, refresh, openCard, openMenu }: PanelProps) {
   const player = game.player, total = bonuses(player);
-  const layout: (EquipSlot | null)[] = [null, "head", null, "cape", "neck", null, "weapon", "body", "shield", null, "legs", "belt", "hands", "feet", null];
+  const layout: (EquipSlot | null)[] = [null, "head", null, "cape", "neck", "ring", "weapon", "body", "shield", null, "legs", "belt", "hands", "feet", null];
   return (
     <div className="realm-equipment">
       <div className="realm-equip-grid">
@@ -374,6 +374,7 @@ function EquipmentTab({ game, refresh, openCard, openMenu }: PanelProps) {
             {...rightClick(openMenu, () => { const id = player.equipment[slot]; return id ? [{ verb: "Remove", noun: item(id).name, tone: "item", run: () => { unequip(game, slot); refresh(); } },
               ...(id === SATCHEL ? [{ verb: "Check", noun: item(id).name, tone: "item" as const, run: () => { satchelCheck(game); refresh(); } }, { verb: "Fill", noun: item(id).name, tone: "item" as const, run: () => { satchelFill(game); refresh(); } },
                 { verb: "Empty", noun: item(id).name, tone: "item" as const, run: () => { satchelEmpty(game); refresh(); } }] : []),
+              ...(id === "ringmasters_signet" ? [{ verb: "Teleport", noun: item(id).name, tone: "item" as const, run: () => { signetTeleport(game); refresh(); } }] : []),
               ...(slot === "belt" ? [...(id === "apothecary_belt" ? [{ verb: "Sip", noun: item(id).name, tone: "item" as const, run: () => { sipBelt(game); refresh(); } }] : []), { verb: "Check", noun: item(id).name, tone: "item" as const, run: () => { beltCheck(game, id); refresh(); } }, { verb: "Fill", noun: item(id).name, tone: "item" as const, run: () => { beltFill(game, id); refresh(); } }, { verb: "Empty", noun: item(id).name, tone: "item" as const, run: () => { beltEmpty(game, id); refresh(); } }] : []), examine(game, id, refresh)] : []; })}>
             {player.equipment[slot] ? <ItemIcon slot={{ id: player.equipment[slot]!, n: 1 }} /> : <span className="realm-slot-label">{SLOT_NAMES[slot]}</span>}
           </button>

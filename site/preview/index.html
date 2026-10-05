@@ -239,7 +239,7 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
   </div>
   <div class="wrap trailer" id="trailer">
     <div class="frame">
-      <video id="trailer-video" src="media/update-ring.mp4" poster="media/update-ring-poster.jpg" autoplay muted playsinline controls preload="metadata"
+      <video id="trailer-video" src="media/update-orders.mp4" poster="media/update-orders-poster.jpg" autoplay muted playsinline controls preload="metadata"
         aria-label="RareFriends Realm update video: faith weapons against the Catacombs' dead, the Crystal Golem in the Deepglass Caverns, the Drowned Archive, the Howling King in the Howling Vault, the Rare Friends Ring from above, a match in its courtyard, and the Ring's shops"></video>
       <button class="btn primary sound" id="trailer-sound" type="button">🔊 Watch with sound</button>
       <button class="arrow prev" id="trailer-prev" type="button" aria-label="Previous video">‹</button>
@@ -498,6 +498,9 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
   // music player take turns.
   (() => {
     const VIDEOS = [
+      { src: "media/update-orders.mp4", poster: "media/update-orders-poster.jpg", title: "Four Orders, four gods, and the Deadwood Maidens", when: "October 2026",
+        note: "New this week: the Orders of the Diamond, the Ink, the Sol and the Hood, each serving a god of legend, with three tiers of blessed arms; five wayward chapels on the Pilgrim's Road; and the Deadwood Maidens, hostile until their truce. Every shot recorded straight from the game.",
+        label: "RareFriends Realm update video: the four Orders' halls with their gods' statues and knights in Diamond blue, Ink purple, Sol green and Hood lime, the ruined Deadwood chapel, and the Deadwood Maidens' camp" },
       { src: "media/update-ring.mp4", poster: "media/update-ring-poster.jpg", title: "The Rare Friends Ring, three dungeons and faith weapons", when: "October 2026",
         note: "New this week: faith weapons in every metal, three dungeons with keyed doors and coffers, and the Rare Friends Ring, an arena of brutality and death. Every shot recorded straight from the game, set to the Ring's own war march.",
         label: "RareFriends Realm update video: faith weapons against the Catacombs' dead, the Crystal Golem in the Deepglass Caverns, the Drowned Archive, the Howling King in the Howling Vault, the Rare Friends Ring from above, a match in its courtyard, and the Ring's shops" },
