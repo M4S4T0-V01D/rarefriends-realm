@@ -15,7 +15,7 @@ import { hiscores } from "./hiscores.ts";
 import { petArt } from "./petart.ts";
 import { MAX_QUEST_POINTS, NPCS, QUESTS, finalStage, questPoints, type QuestDef } from "./content.ts";
 import { friendSays, remember } from "./friend.ts";
-import { FELLOWSHIP_COST, FELLOWSHIP_RENAME_COST, NAME_MAX, RENAME_COST, TITLES, chooseTitle, cleanName, cleanTag, joinFellowship, leaveFellowship, nameFriend, profile, renameFellowship, setFellowshipLook, unlockedTitles } from "./presence.ts";
+import { FELLOWSHIP_COST, FELLOWSHIP_JOIN_COST, FELLOWSHIP_RENAME_COST, NAME_MAX, RENAME_COST, TITLES, chooseTitle, cleanName, cleanTag, joinFellowship, leaveFellowship, nameFriend, profile, renameFellowship, setFellowshipLook, unlockedTitles } from "./presence.ts";
 import { DEFAULT_FELLOWSHIP_COLORS, FELLOWSHIP_BANNERS, FELLOWSHIP_LOGOS, INVITE_HOURS, daysSince, previewArt } from "./cardstyle.ts";
 import { fellowsKnown, recruitText, renderFellowshipCard } from "./card.ts";
 import { completeTaskForRf, rerollTaskForRf } from "./slayer.ts";
@@ -724,10 +724,10 @@ export function ProductionBox({ game, refresh, openMenu }: { game: Game; refresh
 }
 
 // ---------- Modals ----------
-export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
+export function Modal({ title, onClose, children, wide, kind }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean; kind?: string }) {
   return (
     <div className="realm-scrim" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
-      <section className={`realm-modal${wide ? " wide" : ""}`} role="dialog" aria-modal="true" aria-label={title}>
+      <section className={`realm-modal${wide ? " wide" : ""}${kind ? ` ${kind}` : ""}`} role="dialog" aria-modal="true" aria-label={title}>
         <header><h2>{title}</h2><button type="button" onClick={onClose} aria-label="Close">✕</button></header>
         <div className="realm-modal-body">{children}</div>
       </section>
@@ -909,10 +909,10 @@ export function JoinModal({ game, refresh }: { game: Game; refresh: () => void }
   const colors = invite.colors ?? DEFAULT_FELLOWSHIP_COLORS, coins = count(game.player, "coins");
   return (
     <Modal title={`Join ${invite.name} [${invite.tag}]?`} onClose={close}>
-      <p className="realm-muted">A fellow sent you this link. Joining costs {FELLOWSHIP_COST.toLocaleString()} coins (the Realm's registrar) and puts [{invite.tag}] under your name; the fellowship's look comes with it.{game.player.fellowship ? ` You'd leave ${game.player.fellowship.name}.` : ""}</p>
+      <p className="realm-muted">A fellow sent you this link. Joining costs {FELLOWSHIP_JOIN_COST.toLocaleString()} coins (the Realm's registrar) and puts [{invite.tag}] under your name; the fellowship's look comes with it.{game.player.fellowship ? ` You'd leave ${game.player.fellowship.name}.` : ""}</p>
       <div className="realm-look-grid"><PixelIcon art={previewArt("logo", invite.logo ?? "shield", colors, 48, 48)} size={48} label="emblem" /><PixelIcon art={previewArt("banner", invite.banner ?? "plain", colors, 160, 36)} size={160} label="banner" /></div>
       <div className="realm-buttons">
-        <button type="button" className="realm-primary" disabled={coins < FELLOWSHIP_COST && !game.player.fellowship} onClick={() => { if (game.player.fellowship) game.player.fellowship = null; if (joinFellowship(game, invite.name, invite.tag, invite)) { remember(game, "first_fellowship"); friendSays(game, "fellowship"); } close(); }}>Join {invite.name}</button>
+        <button type="button" className="realm-primary" disabled={coins < FELLOWSHIP_JOIN_COST && !game.player.fellowship} onClick={() => { if (game.player.fellowship) game.player.fellowship = null; if (joinFellowship(game, invite.name, invite.tag, invite)) { remember(game, "first_fellowship"); friendSays(game, "fellowship"); } close(); }}>Join {invite.name}</button>
         <button type="button" className="realm-dark" onClick={close}>Not now</button>
       </div>
     </Modal>
@@ -927,7 +927,7 @@ export function FellowshipModal({ game, refresh, onRecruit, shareStatus }: { gam
   const colors: string[] = [...(fellowship.colors ?? DEFAULT_FELLOWSHIP_COLORS)]; while (colors.length < 4) colors.push(DEFAULT_FELLOWSHIP_COLORS[colors.length]);
   const set = (look: { logo?: string; banner?: string; colors?: string[] }) => { setFellowshipLook(game, look); refresh(); }, setColor = (index: number, value: string) => { const next = [...colors]; next[index] = value; set({ colors: next }); };
   return (
-    <Modal title={`${fellowship.name} [${fellowship.tag}]`} onClose={close} wide>
+    <Modal title={`${fellowship.name} [${fellowship.tag}]`} onClose={close} wide kind="fellowship">
       <p className="realm-muted">The tag is what the Realm knows your fellowship by and never changes. Everything else here is yours to set: it shows on your adventurer card and on anyone's who wears the same look. The site's fellowships folder can hold a drawn logo and banner instead (preview/fellowships/{fellowship.tag}/).</p>
       <h3>Name</h3>
       <div className="realm-fellowship-form">

@@ -591,7 +591,7 @@ test("A Friend's Feast from start to finish", () => {
   assert.equal(g.player.quests.friends_feast, 2);
   assert.equal(questPoints(g), 1);
   assert(level(g, "cooking") >= 10, "Quest XP");
-  assert.equal(QUESTS.length, 24); assert.equal(MAX_QUEST_POINTS, 38);
+  assert.equal(QUESTS.length, 27); assert.equal(MAX_QUEST_POINTS, 45);
 });
 
 test("Grumblin Trouble counts kills and pays out", () => {
@@ -1930,7 +1930,7 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   assert.equal(p.quests.dawn_against_hollow, 2); assert(has(p, "dawnplate_cuirass"));
   assert.equal(count(p, "hollow_essence"), 0);
   assert.equal(capeProblem(g, "dawnplate_cuirass"), null, "the armoury sells Dawnplate once earned");
-  assert.equal(QUESTS.length, 24); assert.equal(MAX_QUEST_POINTS, 38);
+  assert.equal(QUESTS.length, 27); assert.equal(MAX_QUEST_POINTS, 45);
 });
 
 test("Boots and gauntlets in every metal, smithed at the anvil; the clothier's shirts, dresses, trousers and skirts", () => {
@@ -2249,4 +2249,70 @@ test("Crypt bones from crypt skeletons, and the Order's lesser armour", async ()
   for (const id of ["acolyte_hood", "acolyte_vestment", "vigil_hauberk", "vigil_shield"]) assert(SHOPS.armoury.stock.includes(id), `${id} at the Order Armoury`);
   assert.equal(item("acolyte_vestment").equip.requires.prayer, 10); assert.equal(item("vigil_hauberk").equip.requires.defence, 30); assert(item("vigil_hauberk").equip.bonuses.prayer > 0);
   assert(item("vigil_hauberk").value < item("dawnplate_cuirass").value / 5, "far cheaper than Dawnplate");
+});
+
+test("The dungeon update: three dungeons under the lake, the library and the stones, keyed doors, coffers, archers, wraiths and quests", () => {
+  const g = newGame(), p = g.player, world = g.world;
+  // Regions, creatures and their doors exist and are placed.
+  for (const id of ["deepglass", "drowned_archive", "howling_vault"]) assert(REGIONS.find(region => region.id === id)?.underground, `${id} is underground`);
+  for (const id of ["cave_bat", "glass_crab", "crystal_golem", "drowned_scholar", "ink_wraith", "archivist_below", "grave_moth", "vault_archer", "vault_knight", "howling_king"]) assert(world.spawns.some(spawn => spawn.kind === "monster" && spawn.id === id), id);
+  assert.equal(regionAt(world, 430, 530).id, "deepglass"); assert.equal(regionAt(world, 490, 528).id, "drowned_archive"); assert.equal(regionAt(world, 300, 567).id, "howling_vault");
+  const doors = world.objects.filter(object => object.kind === "gate" && object.requires?.item);
+  assert.deepEqual(doors.map(door => door.requires.item).sort(), ["archive_key", "deepglass_key", "vault_key"]);
+  const coffers = world.objects.filter(object => object.decor === "chest" && / coffer$/.test(object.name));
+  assert(coffers.length >= 30, `coffers in every dungeon (${coffers.length})`);
+  for (const name of ["Deepglass coffer", "Archive coffer", "Vault coffer", "Crypt coffer", "Hollow coffer", "Catacomb coffer", "Wyrm coffer", "Barnacled coffer", "Miner's coffer"]) assert(coffers.some(coffer => coffer.name === name), name);
+  assert(SLAYER_TASKS.some(task => task.id === "vault_dead") && SLAYER_TASKS.some(task => task.id === "bats"));
+  // (Strong enough to walk the dungeons, weak enough that their creatures still take notice.)
+  for (const skill of ["attack", "strength", "defence", "hitpoints"]) p.xp[skill] = XP_TABLE[55];
+  p.hp = 990;
+  // A keyed door: locked without the key; the key turns once and breaks.
+  const door = doors.find(entry => entry.requires.item === "deepglass_key");
+  teleport(g, door.x - 1, door.y); g.messages.length = 0;
+  menuFor(g, [{ kind: "object", id: door.id }], null)[0].run(g); run(g, 3);
+  assert.equal(p.x, door.x - 1, "still outside"); assert(g.messages.some(m => /locked/.test(m.text)), "locked without the key");
+  give(p, "deepglass_key", 2); menuFor(g, [{ kind: "object", id: door.id }], null)[0].run(g); run(g, 3);
+  assert.equal(p.x, door.to.x, "through the crystal door"); assert.equal(count(p, "deepglass_key"), 1, "one key spent");
+  // Coffers: loot that belongs there, then empty for a while.
+  const coffer = coffers.find(entry => entry.name === "Deepglass coffer");
+  standBy(g, coffer); const before = p.inventory.filter(Boolean).length + count(p, "coins"); g.messages.length = 0;
+  menuFor(g, [{ kind: "object", id: coffer.id }], null)[0].run(g); run(g, 2);
+  assert.match(g.messages.find(m => /coffer holds/.test(m.text))?.text ?? "", /coffer holds/);
+  assert(p.inventory.filter(Boolean).length + count(p, "coins") > before, "something came out");
+  g.messages.length = 0; menuFor(g, [{ kind: "object", id: coffer.id }], null)[0].run(g); run(g, 2);
+  assert(g.messages.some(m => /not long ago/.test(m.text)), "empty for a while");
+  g.tick += 1600; g.messages.length = 0; menuFor(g, [{ kind: "object", id: coffer.id }], null)[0].run(g); run(g, 2);
+  assert(g.messages.some(m => /coffer holds/.test(m.text)), "fills again after a while");
+  // A vault archer shoots from three tiles away and stays where it is.
+  const archer = g.monsters.find(m => m.def.id === "vault_archer");
+  assert.equal(archer.def.ranged, 5);
+  for (const dx of [3, -3]) if (canWalk(g, archer.x + dx, archer.y)) { teleport(g, archer.x + dx, archer.y); break; }
+  const hpBefore = p.hp; p.combat = null; p.target = null;
+  until(g, () => p.hp < hpBefore, 60);
+  assert(Math.max(Math.abs(archer.x - p.x), Math.abs(archer.y - p.y)) >= 2, "it shot rather than closed in");
+  // An ink wraith's touch drains faith; the Archivist Below mends himself; the Howling King enrages.
+  const wraith = g.monsters.find(m => m.def.id === "ink_wraith");
+  p.combat = null; p.target = null; g.autoRetaliate = false;
+  standNear(g, wraith.x, wraith.y, 1); p.prayer = 60; p.hp = 990; p.prayers = [];
+  until(g, () => p.prayer < 60, 300); assert(p.prayer < 60, "faith drained");
+  const keeper = g.monsters.find(m => m.def.id === "archivist_below");
+  p.combat = null; p.target = null; standNear(g, keeper.x, keeper.y, 1); keeper.hp = 40; keeper.target = true; run(g, 6); assert(keeper.hp > 40, "the Archivist mends himself");
+  assert(MONSTERS.howling_king.enrage && MONSTERS.crystal_golem.enrage && MONSTERS.howling_king.drain.faith === 6);
+  // The quests: the fisher, Perrin and Fenn.
+  const talk = id => { const npc = g.npcs.find(entry => entry.id === id); standNear(g, npc.x, npc.y, 1); setTarget(g, { kind: "npc", uid: npc.uid, option: "Talk-to" }); until(g, () => g.dialogue !== null, 30); };
+  const say = label => { while (g.dialogue && g.dialogue.index < g.dialogue.lines.length) continueDialogue(g); const index = g.dialogue.options.findIndex(option => option.label.startsWith(label)); assert(index >= 0, label); chooseOption(g, index); };
+  const drain = () => { for (let i = 0; g.dialogue && i < 200; i++) { if (g.dialogue.index >= g.dialogue.lines.length && g.dialogue.options?.length) { g.dialogue = null; break; } continueDialogue(g); } };
+  p.combat = null; p.target = null; p.hp = 990;
+  talk("fisher"); say("I'll do it."); drain(); assert.equal(p.quests.deepglass_heart, 1);
+  for (let i = 0; i < 6; i++) onMonsterKilled(g, "glass_crab", 0, 0); onMonsterKilled(g, "crystal_golem", 0, 0); give(p, "crystal_shard", 3);
+  talk("fisher"); drain(); assert.equal(p.quests.deepglass_heart, 2); assert(has(p, "glass_charm") && count(p, "crystal_shard") === 0);
+  p.quests.quillhaven_folio = 2; p.xp.magic = XP_TABLE[90];
+  talk("quillhaven_archivist"); say("I'll do it."); drain(); assert.equal(p.quests.drowned_archive, 1); assert(has(p, "archive_key"), "Perrin's spare key");
+  give(p, "ink_page", 6); onMonsterKilled(g, "archivist_below", 0, 0);
+  talk("quillhaven_archivist"); drain(); assert.equal(p.quests.drowned_archive, 2); assert(has(p, "insight_lamp") && count(p, "ink_page") === 0);
+  p.quests.tallgrass_tracks = 2;
+  talk("tallgrass_huntmaster"); say("I'll do it."); drain(); assert.equal(p.quests.howling_vault, 1); assert(has(p, "vault_key"), "Fenn's key");
+  for (let i = 0; i < 6; i++) { onMonsterKilled(g, "vault_archer", 0, 0); onMonsterKilled(g, "vault_knight", 0, 0); } onMonsterKilled(g, "howling_king", 0, 0);
+  const coins = count(p, "coins"); talk("tallgrass_huntmaster"); drain(); assert.equal(p.quests.howling_vault, 2); assert.equal(count(p, "coins"), coins + 6000);
+  assert(QUESTS.some(q => q.id === "howling_vault") && questPoints(g) >= 7);
 });

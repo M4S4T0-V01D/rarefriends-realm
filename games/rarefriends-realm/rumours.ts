@@ -15,6 +15,7 @@ export const RUMOURS: Partial<Record<RegionId, readonly Rumour[]>> = {
     r("The Namekeeper's register goes back further than the town does. There are names in it in a hand nobody can read.", "true"),
     r("There's a door under the fountain. The water's to keep people from finding it.", "false"),
     r("Old Glimmer remembers when the Realm was new. Some say he remembers when it wasn't here at all."),
+    r("Glass Lake's gone cloudy on the east shore, and there's a crack in the rock there that wasn't there in spring. Something under it glows at night.", "true"),
   ],
   farmland: [
     r("The windmill turns on still days. The miller says it's the slope. There is no slope.", "false"),
@@ -79,6 +80,7 @@ export const RUMOURS: Partial<Record<RegionId, readonly Rumour[]>> = {
     r("The ring of standing stones in The Wilds: game won't cross it. Hunters won't either, after dark.", "true"),
     r("Fenn tracked a wolf to the Ironreach snow and found footprints beside its that weren't a wolf's. Or a man's.", "half"),
     r("Thornbacks weren't always thorned. Something in the thickets did that to them."),
+    r("The ring of stones has a hole in the middle now. Fenn says it was always there and the grass just grew over it. Fenn is lying.", "true"),
   ],
   cragmaw: [
     r("The deep mine's richest seam runs under an old machine. Gears the size of cartwheels, stopped. Nobody built it. Nobody knows what it did.", "true"),
@@ -90,6 +92,7 @@ export const RUMOURS: Partial<Record<RegionId, readonly Rumour[]>> = {
     r("The folio shows a city where Ashfall is. The folio also shows the Realm without a Deadwood. The folio is older than both.", "true"),
     r("The standing stones on the headland share a symbol with the ones in The Wilds and one in the Deadwood. Perrin has a map. He won't show it."),
     r("One text says the Friends did not come to this world. Another says they were made here. Perrin keeps them on opposite shelves.", "true"),
+    r("The bottom floor of the library flooded a hundred years ago and the first archivist went down to save the books. The trapdoor's still there. So is he.", "true"),
   ],
   westmarch: [r("Lonely house out in the Westmarch. Door open. Chest dusty. Nobody home. Nobody ever home.", "true")],
   ashfall: [r("Whoever built the ruins in Ashfall built them before the dragons came. Or built them for the dragons. The crater's older than either.", "half")],

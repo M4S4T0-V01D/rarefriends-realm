@@ -36,7 +36,9 @@ export function measure(rows: Mask) {
   // Four-legged (or more): three or more separate legs in one of the lowest rows.
   const runs = (row: string) => (row.match(/#+/g) ?? []).length;
   const quadruped = rows.slice(Math.max(top, bottom - 2), bottom + 1).some(row => runs(row) >= 3);
-  return { spans, top, crownTop, bottom, left, right, neck, headLeft, headRight, centre: (crownLeft + crownRight + 1) / 2, crownWidth: crownRight - crownLeft + 1, quadruped };
+  /** Long: wider than tall by a clear margin (the cat-like and beast-like Friends), whether or not the legs show as runs. */
+  const long = quadruped || right - left + 1 >= (bottom - top + 1) * 1.2;
+  return { spans, top, crownTop, bottom, left, right, neck, headLeft, headRight, centre: (crownLeft + crownRight + 1) / 2, crownWidth: crownRight - crownLeft + 1, quadruped, long };
 }
 /**
  * Your Friend's frame with its worn pieces, as a pixel canvas twice the sprite's resolution.
@@ -155,7 +157,7 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
     const emblem = skillEmblem(cape.mastery!.skill as Parameters<typeof skillEmblem>[0], size), ox = ex - Math.floor(emblem.w / 2), oy = ey - Math.floor(emblem.h / 2);
     for (let y = 0; y < emblem.h; y++) for (let x = 0; x < emblem.w; x++) { const c = emblem.get(x, y); if (c) p.set(ox + x, oy + y, c); }
   };
-  if (cape && !back && side) {
+  if (cape && !back && side && !m.long) {
     // Seen from the side the cape hangs down your back: it follows the back line of the body (shoulder to waist to
     // heel, so a long Friend's cape stays with its back instead of boxing in the whole silhouette) and trails behind.
     const dark = shadeHex(cape.color, -0.12), top = bodySpan(m.neck + 1), waist = bodySpan(Math.round(m.neck + (m.bottom - m.neck) * 0.6));
@@ -488,12 +490,25 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
     }
   }
 
+  if (cape && !back && side && m.long) {
+    // A four-legged Friend's cape lies over its back like a blanket and hangs down the flank nearest you (over the
+    // body and whatever it wears, not behind it), trailing a little past the rump.
+    const dark = shadeHex(cape.color, -0.12), ridge = Math.round(m.top + (m.bottom - m.top) * 0.2), span = bodySpan(ridge), topY = Y(ridge), hemY = Y(Math.round(m.top + (m.bottom - m.top) * 0.72));
+    const shoulder = side > 0 ? X(span.max) - 3 : X(span.min) + 4, rump = side > 0 ? X(span.min) - 1 : X(span.max) + 2, trail = rump - side * (5 + sway);
+    cloth([[shoulder, topY], [rump, topY], [trail, hemY], [shoulder - side * 2, hemY]]);
+    for (let fold = 1; fold < 4; fold++) { const t = fold / 4; p.line(shoulder + (rump - shoulder) * t, topY + 2, shoulder - side * 2 + (trail - shoulder + side * 2) * t, hemY - 1, dark); }
+    p.line(shoulder - side * 2, hemY - 1, trail, hemY - 1, capeTrim ?? dark);
+    if (capeTrim) p.line(shoulder, topY, rump, topY, capeTrim);
+  }
   if (weapon && side >= 0 && !held && !underCape) tip = drawHeld(p, weapon, hand.x, hand.y, dir, sway, turn);
   // The shield on the off arm: across your body facing left (that arm is towards you), at your side facing the camera
   // or away. (Facing right it's behind you, drawn before your Friend above; from behind under a cape, it went under it.)
-  if (shield && side <= 0 && !(cape && back)) drawShield(p, shield, side < 0 ? Math.round(cx) + 1 : front ? X(waistSpan.max) + 2 : X(waistSpan.min) - 1, waist, back, back);
+  if (shield && side <= 0 && !back) drawShield(p, shield, side < 0 ? Math.round(cx) + 1 : X(waistSpan.max) + 2, waist, false, false);
   // A tool at work or a weapon mid-swing goes over everything, so the motion reads.
   if (weapon && held && !underCape) tip = drawHeld(p, weapon, hand.x, hand.y, dir, sway, turn);
+  // From behind with no cape, the shield is slung across the back: its wooden side, whole, over everything, so it never
+  // looks half sunk into the body.
+  if (shield && back && !cape) { const row = m.long ? Math.round(m.top + (m.bottom - m.top) * 0.45) : Math.round((m.neck + m.bottom) / 2), span = bodySpan(row); drawShield(p, shield, Math.round((X(span.min) + X(span.max)) / 2), m.long ? Y(row) : waist, true, true); }
 
   // ---------- Edges: ink around the worn colours, then the white halo around everything (one sprite pixel) ----------
   const data = p.data, filled = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && data[y * W + x] !== 0;

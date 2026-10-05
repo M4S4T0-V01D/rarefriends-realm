@@ -65,7 +65,9 @@ export type RegionId =
   | "oasis" | "murkmire" | "mossy_ruins" | "crypt" | "hollow_depths" | "coast" | "wizards_tower" | "wyrmreach" | "fernwick" | "greyhorn" | "highcairn"
   // The wider world (2026-10): the lands around the mainland.
   | "deadwood" | "gravesend" | "westmarch" | "drakespine" | "ashfall" | "southshore" | "saltmarrow" | "thistle_vale" | "hollyhock" | "dyemoor"
-  | "the_wilds" | "tallgrass" | "ironreach" | "cragmaw" | "quillhaven" | "pale_isles" | "catacombs" | "sea_cave" | "wyrm_lair" | "deep_mine";
+  | "the_wilds" | "tallgrass" | "ironreach" | "cragmaw" | "quillhaven" | "pale_isles" | "catacombs" | "sea_cave" | "wyrm_lair" | "deep_mine"
+  // The dungeon update (2026-10): three more under the lake, the library and the stones.
+  | "deepglass" | "drowned_archive" | "howling_vault";
 export type Region = { id: RegionId; name: string; label: { x: number; y: number }; danger: number; underground?: boolean };
 const MAINLAND_REGIONS = new Set<RegionId>(["coast", "friendhollow", "farmland", "whisperwood", "ashen_hills", "emberforge", "frostpeak", "glass_lake", "pale_dunes", "oasis", "murkmire", "mossy_ruins",
   "wizards_tower", "wyrmreach", "fernwick", "greyhorn", "highcairn", "crypt", "hollow_depths"]);
@@ -110,6 +112,9 @@ export const REGIONS: readonly Region[] = [
   { id: "wyrm_lair", name: "The Wyrm's Lair", label: { x: 90, y: 566 }, danger: 6, underground: true },
   { id: "sea_cave", name: "Saltmarrow Sea Cave", label: { x: 630, y: 534 }, danger: 2, underground: true },
   { id: "deep_mine", name: "Cragmaw Deep Mine", label: { x: 630, y: 566 }, danger: 3, underground: true },
+  { id: "deepglass", name: "Deepglass Caverns", label: { x: 436, y: 534 }, danger: 2, underground: true },
+  { id: "drowned_archive", name: "The Drowned Archive", label: { x: 508, y: 534 }, danger: 4, underground: true },
+  { id: "howling_vault", name: "The Howling Vault", label: { x: 470, y: 566 }, danger: 6, underground: true },
 ];
 export const regionIndex = (id: RegionId) => REGIONS.findIndex(region => region.id === id);
 /** The mainland regions' labels were written in the mainland's own coordinates: move them with it (once, at load). */
@@ -766,8 +771,8 @@ function buildMainland(seed: number) {
     const town = ((x - HC.x) / 19) ** 2 + ((y - HC.y) / 15) ** 2, ramp = Math.min(1, (x - 232) / 16), m = (peaks(x, y) + 0.1) * ramp;
     lift[tileIndex(x, y)] = town < 1 ? 0 : Math.max(0, m - 0.3) * 2.6 * Math.min(1, town - 1);
     if (town < 1) { put(x, y, T.GRASS); clearAt(x, y); continue; }
-    if (m > 0.7 && y < 120) put(x, y, T.SNOW);
-    else if (m > 0.5) put(x, y, T.GRAVEL);
+    // The Greyhorn's tops are bare grey rock (the snow caps used to sit oddly over the slopes; the Ironreach keeps its snow).
+    if (m > 0.5) put(x, y, T.GRAVEL);
     else if (t === T.SNOW && m < 0.4) put(x, y, T.GRASS);
     // Broken crag lines along the ridges.
     if (Math.abs(m - 0.62) < 0.014 && noise2(x, y) > 0.42 && town > 1.8) put(x, y, T.CLIFF);

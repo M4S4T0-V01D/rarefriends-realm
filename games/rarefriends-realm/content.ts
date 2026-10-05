@@ -10,7 +10,7 @@ import { HOME_TIERS, buyHome, homeDeed } from "./housing.ts";
 import { friendSays, remember } from "./friend.ts";
 import { rumourAt } from "./rumours.ts";
 import {
-  addXp, count, give, giveOrDrop, has, level, message, sound, take, emit, BONE_BAG, ownsBoneBag, type Dialogue, type DialogueLine, type Game,
+  addXp, combatLevel, count, give, giveOrDrop, has, level, message, sound, take, emit, BONE_BAG, ownsBoneBag, type Dialogue, type DialogueLine, type Game,
 } from "./state.ts";
 
 // ---------- NPC definitions ----------
@@ -355,6 +355,41 @@ export const QUESTS: readonly QuestDef[] = [
       return ["Solenne stitched me a sigil satchel: purple, gold stars, and a hunger for sigils. My spells draw straight from it. QUEST COMPLETE!"];
     },
   },
+  // ---------- The dungeon update: what's under the lake, the library and the stones ----------
+  {
+    id: "deepglass_heart", name: "The Heart of the Lake", points: 2, difficulty: "Intermediate", start: "Talk to the Old fisher on the Friendhollow pier, with a combat level of 30 or so.",
+    requirements: ["Combat 30 recommended"], rewards: ["2 Quest Points", "Lakeglass charm", "3,000 Fishing XP", "2,500 Attack XP", "800 coins"],
+    journal: game => {
+      const s = stage(game, "deepglass_heart"), p = game.player;
+      if (s === 0) return ["The Old fisher says Glass Lake has gone cloudy on the east shore, and there's a crack in the rock there that glows at night."];
+      if (s === 1) return ["Through the crevice on the lake's east shore are the Deepglass Caverns. The fisher wants the glass crabs thinned, three crystal shards, and whatever is making the lake's heart beat put to rest.",
+        `${data(game, "dg_crabs") >= 6 ? "✓" : "•"} Glass crabs cracked: ${Math.min(6, data(game, "dg_crabs"))}/6`, `${count(p, "crystal_shard") >= 3 ? "✓" : "•"} Crystal shards: ${Math.min(3, count(p, "crystal_shard"))}/3`,
+        `${data(game, "dg_golem") >= 1 ? "✓" : "•"} The Crystal Golem laid to rest (behind the crystal door; its key comes from the crabs and the coffers)`];
+      return ["The lake runs clear again. The fisher strung a shard on a cord and called it a charm. QUEST COMPLETE!"];
+    },
+  },
+  {
+    id: "drowned_archive", name: "The Drowned Archive", points: 2, difficulty: "Intermediate", start: "Talk to Archivist Perrin Quill in Quillhaven after The Missing Folio, with Magic 40.",
+    requirements: ["Magic 40", "The Missing Folio"], rewards: ["2 Quest Points", "Lamp of insight", "5,000 Magic XP", "2,000 Sigilcraft XP", "1,500 coins"],
+    journal: game => {
+      const s = stage(game, "drowned_archive"), p = game.player;
+      if (s === 0) return ["Perrin says the library's bottom floor flooded a hundred years ago, and the first archivist went down to save the books and never came up. There's a trapdoor."];
+      if (s === 1) return ["Under the trapdoor is the Drowned Archive. Perrin wants six of the pages its drowned readers still carry, and the Archivist Below let go of his post. Perrin gave me the spare key to the sealed reading room.",
+        `${count(p, "ink_page") >= 6 ? "✓" : "•"} Ink-stained pages: ${Math.min(6, count(p, "ink_page"))}/6`, `${data(game, "da_archivist") >= 1 ? "✓" : "•"} The Archivist Below laid to rest`];
+      return ["Perrin dried the pages and read them, and went quiet for a long time. He gave me a lamp. The reading room is open now. QUEST COMPLETE!"];
+    },
+  },
+  {
+    id: "howling_vault", name: "What the Stones Keep", points: 3, difficulty: "Long", start: "Talk to Huntmaster Fenn in Tallgrass after Tracks in the Tallgrass, with a combat level of 70 or so.",
+    requirements: ["Combat 70 recommended", "Tracks in the Tallgrass"], rewards: ["3 Quest Points", "8,000 Attack XP", "4,000 Slayer XP", "6,000 coins"],
+    journal: game => {
+      const s = stage(game, "howling_vault");
+      if (s === 0) return ["Fenn says the ring of stones in The Wilds has a hole in the middle now, and the game won't go within a mile of it. He's stopped pretending it was always there."];
+      if (s === 1) return ["Under the stones are the Howling Vault: a gallery of the Wilds' old dead, and their lord at the end of it. Fenn gave me a vault key for the lord's door, and wants the galleries thinned and the lord put down for good.",
+        `${data(game, "hb_dead") >= 12 ? "✓" : "•"} Vault archers and knights laid low: ${Math.min(12, data(game, "hb_dead"))}/12`, `${data(game, "hb_lord") >= 1 ? "✓" : "•"} The Howling King laid to rest`];
+      return ["The howling under the stones has stopped. Fenn says the deer came back the same night. QUEST COMPLETE!"];
+    },
+  },
   // ---------- The quests of being known: long ones, for Presence, with gear only they give ----------
   {
     id: "name_worth_knowing", name: "A Name Worth Knowing", points: 2, difficulty: "Long", start: "Talk to Namekeeper Elian by the Friendhollow square, once your Presence is 20 and your Friend has a name.",
@@ -431,6 +466,11 @@ export function onMonsterKilled(game: Game, monsterId: string, x: number, y: num
     const n = player.questData[key] = (player.questData[key] ?? 0) + 1;
     if (n === goal) { message(game, done, "quest"); sound(game, "quest"); }
   };
+  if (monsterId === "glass_crab") tally("deepglass_heart", "dg_crabs", 6, "Six glass crabs cracked. The fisher wanted shards too, and the lake's heart stilled.");
+  if (monsterId === "crystal_golem") tally("deepglass_heart", "dg_golem", 1, "The Crystal Golem comes apart in a shower of glass. The lake's heart is still.");
+  if (monsterId === "archivist_below") tally("drowned_archive", "da_archivist", 1, "The Archivist Below closes his book at last. Perrin will want to hear it.");
+  if (monsterId === "vault_archer" || monsterId === "vault_knight") tally("howling_vault", "hb_dead", 12, "Twelve of the vault dead down. Only their lord is left to settle.");
+  if (monsterId === "howling_king") tally("howling_vault", "hb_lord", 1, "The Howling King falls, and the howling under the stones stops. Fenn should know.");
   if (monsterId === "skeleton") tally("gravesend_lanterns", "gs_skeletons", 8, "That's eight skeletons down. Mira will want her bones blessed now.");
   if (monsterId === "boar") tally("tallgrass_tracks", "tg_boars", 6, "Six boars. The Wilds will thank me, if not the boars.");
   if (monsterId === "wolf") tally("tallgrass_tracks", "tg_wolves", 3, "Three wolves. Fenn can count the rest himself.");
@@ -561,10 +601,10 @@ function orderDialogue(game: Game, npc: string, name: string): Dialogue {
   if (count(player, order.item) >= order.n) return chat(name, npcSays(name, `${orderText(order)}! ${patron.thanks}`), undefined, () => { fillOrder(game, npc); });
   return chat(name, npcSays(name, askText(npc, order), `I'll pay ${order.pay.toLocaleString()} coins, well over what any shop gives, and you'll be the better ${SKILL_NAMES[patron.skill].toLowerCase() === "wayfaring" ? "for it" : "at it"}.`));
 }
-function fetchQuest(game: Game, name: string, quest: string, q: { offer: string[]; accept: string; progress: string; have: () => boolean; take: () => void; done: string[]; reward: () => void }): Dialogue {
+function fetchQuest(game: Game, name: string, quest: string, q: { offer: string[]; accept: string; progress: string; have: () => boolean; take: () => void; done: string[]; reward: () => void; onAccept?: () => void }): Dialogue {
   const s = stage(game, quest), def = QUESTS.find(entry => entry.id === quest)!;
   if (s === 0) return chat(name, npcSays(name, ...q.offer), [
-    { label: "I'll do it.", then: () => chat(name, npcSays(name, q.accept), undefined, () => { game.player.quests[quest] = 1; message(game, `Quest started: ${def.name}.`, "quest"); sound(game, "quest"); }) },
+    { label: "I'll do it.", then: () => chat(name, npcSays(name, q.accept), undefined, () => { game.player.quests[quest] = 1; q.onAccept?.(); message(game, `Quest started: ${def.name}.`, "quest"); sound(game, "quest"); }) },
     { label: "Not today.", then: () => null },
   ]);
   if (s === 1) {
@@ -981,7 +1021,15 @@ function talkInner(game: Game, npcId: string): Dialogue {
       { label: "Nothing for now.", then: () => null },
     ]);
     case "witch": return chat(name, npcSays(name, "Heh heh. The stepping stones to the north need Wayfaring 20. The crypt's the other way. Mind the lurkers, dearie."));
-    case "fisher": return chat(name, npcSays(name, "Cages for inkcrabs, harpoons for sailfish, off the end of the pier. Inksharks in the deep bit, if you've the skill. And there's a deep spot up on the Frostpeak tarn."));
+    case "fisher":
+      if (stage(game, "deepglass_heart") > 0 || combatLevel(player) >= 30) return fetchQuest(game, name, "deepglass_heart", {
+        offer: ["Glass Lake's gone cloudy on the east shore. Never done that. There's a crack in the rock over there that wasn't there in spring, and it glows of a night.", "Something's in under the lake. Go down and see. Crack six of those glass crabs for me, bring me three shards of whatever's growing down there, and if the lake's got a heart, still it."],
+        accept: "East shore, by the dark grass. Mind the bats.", progress: "Six crabs, three shards, and the thing at the bottom. The lake's still cloudy.",
+        have: () => data(game, "dg_crabs") >= 6 && count(player, "crystal_shard") >= 3 && data(game, "dg_golem") >= 1, take: () => take(player, "crystal_shard", 3),
+        done: ["Clear as glass again. Look at that.", "Here. I strung one of your shards. The lake looks after its own; now it'll look after you."],
+        reward: () => { giveOrDrop(game, "glass_charm"); give(player, "coins", 800); addXp(game, "fishing", 3000, { raw: true }); addXp(game, "attack", 2500, { raw: true }); },
+      });
+      return chat(name, npcSays(name, "Cages for inkcrabs, harpoons for sailfish, off the end of the pier. Inksharks in the deep bit, if you've the skill. And there's a deep spot up on the Frostpeak tarn."));
     case "tanner": return chat(name, npcSays(name, "I'll tan cowhides into leather for 2 coins each. Then use a needle and thread on the leather to craft armour."), [
       { label: "Tan my hides.", then: () => { tanHides(game); return null; } },
       { label: "Trade.", then: () => { game.ui.shop = "crafting"; return null; } },
@@ -1039,7 +1087,16 @@ function talkInner(game: Game, npcId: string): Dialogue {
       done: ["Look at that. Look at it! That's a green with the moor in it.", "The first cloak out of the vat is yours, as promised. Wear it where people can see."],
       reward: () => { giveOrDrop(game, "dyemoor_cloak"); give(game.player, "coins", 400); addXp(game, "crafting", 2000, { raw: true }); },
     });
-    case "tallgrass_huntmaster": return fetchQuest(game, name, "tallgrass_tracks", {
+    case "tallgrass_huntmaster":
+      if (questDone(game, "tallgrass_tracks") && (stage(game, "howling_vault") > 0 || combatLevel(player) >= 70)) return fetchQuest(game, name, "howling_vault", {
+        offer: ["The ring of stones. I told everyone the hole in the middle was always there and the grass grew over it. It wasn't. It opened this spring, and nothing with four legs has gone near the stones since.", "There are steps going down. I went as far as the first gallery. The dead down there have bows, and armour, and the thing at the end of the gallery has a door with a lock. This key was on the first one I put down. Thin them, twelve at least, and put their lord down for good."],
+        accept: "Twelve of them, and the lord. Take the key; you'll want a few more before you're done, the knights carry them.", progress: "Twelve of the vault dead and their lord. The howling hasn't stopped.",
+        have: () => data(game, "hb_dead") >= 12 && data(game, "hb_lord") >= 1, take: () => {},
+        done: ["It stopped. The howling. The deer came back the same night, right up to the stones.", "I've nothing of theirs to give you that you won't have taken yourself. Have this, and the thanks of every living thing in The Wilds."],
+        reward: () => { give(player, "coins", 6000); addXp(game, "attack", 8000, { raw: true }); addXp(game, "slayer", 4000, { raw: true }); },
+        onAccept: () => giveOrDrop(game, "vault_key"),
+      });
+      return fetchQuest(game, name, "tallgrass_tracks", {
       offer: ["Tallgrass hunts The Wilds and The Wilds hunt back. This season the boars have torn up every trail and the wolves follow the boars.", "Thin them for me: six boars and three wolves, out in The Wilds east of here."],
       accept: "Six boars, three wolves. Watch the grass; it watches you.", progress: "Six boars and three wolves. I can hear the ones you haven't got yet.",
       have: () => data(game, "tg_boars") >= 6 && data(game, "tg_wolves") >= 3, take: () => {},
@@ -1054,7 +1111,15 @@ function talkInner(game: Game, npcId: string): Dialogue {
       reward: () => { giveOrDrop(game, "ironreach_greatcoat"); give(game.player, "coins", 800); addXp(game, "mining", 3500, { raw: true }); addXp(game, "smithing", 2000, { raw: true }); },
     });
     case "quillhaven_archivist":
-      if (questDone(game, "quillhaven_folio") && questDone(game, "name_worth_knowing") && (stage(game, "known_hall") > 0 || presenceLevel(player) >= 40)) return knownHall(game, name);
+      if (questDone(game, "quillhaven_folio") && questDone(game, "name_worth_knowing") && (stage(game, "known_hall") > 0 || presenceLevel(player) >= 40) && !questDone(game, "known_hall")) return knownHall(game, name);
+      if (questDone(game, "quillhaven_folio") && (stage(game, "drowned_archive") > 0 || level(game, "magic") >= 40)) return fetchQuest(game, name, "drowned_archive", {
+        offer: ["Shh. Since you're here: the library has three floors, and the bottom one flooded a hundred years ago. The first archivist went down to save the books. He didn't come up. We kept his post open.", "There's a trapdoor in the floor behind you. The readers down there still carry pages; I want six of them. And I want him to let go of his post. Here is the spare key to the sealed reading room; he will be in it."],
+        accept: "Six pages, and let him rest. Quietly, if you can.", progress: "Six pages from the drowned readers, and the Archivist Below at peace. The trapdoor is where it was.",
+        have: () => count(player, "ink_page") >= 6 && data(game, "da_archivist") >= 1, take: () => take(player, "ink_page", 6),
+        done: ["These are… these are the catalogue. He was still keeping the catalogue.", "Take this lamp. It was his. Rub it and learn something; he'd have wanted that."],
+        reward: () => { giveOrDrop(game, "insight_lamp"); give(player, "coins", 1500); addXp(game, "magic", 5000, { raw: true }); addXp(game, "sigilcraft", 2000, { raw: true }); },
+        onAccept: () => giveOrDrop(game, "archive_key"),
+      });
       return fetchQuest(game, name, "quillhaven_folio", {
       offer: ["Shh. This is a library. The Quillhaven folio is the oldest map of the Realm, and I am restoring it, and I have run out of ink.", "We grind sigils for ink here. Five thought sigils and two shade sigils, and the folio can be finished."],
       accept: "Five thought, two shade. Quietly.", progress: "Five thought sigils and two shade sigils. The folio waits.",

@@ -423,6 +423,24 @@ const OTHER_GEAR: Item[] = [
   { id: "cape_of_renown", name: "Cape of Renown", examine: "Gold on black, with the Realm's crown at the clasp. Presence grows a third faster in it.", value: 0, tradeable: false,
     icon: { shape: "cape", color: "#1c1b1f", accent: "#e2c46a", kind: "cross" }, equip: { slot: "cape", bonuses: { defence: 8, prayer: 4, attack: 2, strength: 2 }, requires: { presence: 60 } } },
   { id: "wyrmward_shield", name: "Wyrmward shield", examine: "King Hollis's gift. Dragonfire slides right off it.", value: 200, icon: { shape: "shield", color: "#c9c2b6", accent: "#cf6e6e" }, equip: { slot: "shield", bonuses: { defence: 8 } } },
+  // ---------- The dungeon update: keys, curios and what the three new bosses leave behind ----------
+  { id: "deepglass_key", name: "Deepglass key", examine: "A key of blue lake-glass. It will break in the lock it was made for.", value: 0, stackable: true, icon: { shape: "key", color: "#8fd3e8" } },
+  { id: "archive_key", name: "Archive key", examine: "An iron key gone green with the wet, for the sealed reading room under Quillhaven. One turn is all it has left.", value: 0, stackable: true, icon: { shape: "key", color: "#5e7a6a" } },
+  { id: "vault_key", name: "Vault key", examine: "A heavy bronze key from under the standing stones. It opens the Howling King's door, once.", value: 0, stackable: true, icon: { shape: "key", color: "#9a7a3e" } },
+  { id: "crystal_shard", name: "Crystal shard", examine: "A shard of Glass Lake's crystal, cold and faintly lit.", value: 400, stackable: true, icon: { shape: "gem", color: "#8fd3e8", accent: "#ffffff" } },
+  { id: "ink_page", name: "Ink-stained page", examine: "A page from the flooded floor of the Quillhaven library. The ink has run, but Perrin could read it.", value: 60, stackable: true, icon: { shape: "scroll", color: "#d9d2bf", accent: "#2c2a3e" } },
+  { id: "grave_dust", name: "Grave dust", examine: "Dust from under the standing stones. Apothecaries and the Order both want it, for different reasons.", value: 150, stackable: true, icon: { shape: "material", color: "#8a8577" } },
+  { id: "bat_wing", name: "Bat wing", examine: "A leathery wing from a cave bat.", value: 25, stackable: true, icon: { shape: "feather", color: "#3a3340" } },
+  { id: "glassbrand", name: "Glassbrand", examine: "A sabre of lake-glass from the Crystal Golem's heart. Light bends along its edge.", value: 24_000, weight: 3, icon: { shape: "sabre", color: "#9fd8ea", accent: "#ffffff" }, equip: { slot: "weapon", bonuses: { attack: 44, strength: 40, magic: 4 }, speed: 4, requires: { attack: 45 } } },
+  { id: "crystal_shield", name: "Crystal shield", examine: "A shield grown from the Crystal Golem's shell. Spells skid off it.", value: 18_000, weight: 4, icon: { shape: "shield", color: "#9fd8ea", accent: "#5f7f8f" }, equip: { slot: "shield", bonuses: { defence: 24, magic: 8 }, requires: { defence: 40 } } },
+  { id: "glass_charm", name: "Lakeglass charm", examine: "A charm of Glass Lake crystal on a cord. The Old fisher says the lake looks after its own.", value: 3000, icon: { shape: "amulet", color: "#8fd3e8", accent: "#ffffff" }, equip: { slot: "neck", bonuses: { magic: 4, defence: 3, prayer: 1 } } },
+  { id: "inkbound_tome", name: "Inkbound tome", examine: "The Archivist Below's own book, bound in something that was once a scholar. Held off-hand, it reads your spells back to you louder.", value: 30_000, weight: 1, icon: { shape: "tablet", color: "#2c2a3e", accent: "#b49ae0" }, equip: { slot: "shield", bonuses: { magic: 18, defence: 4 }, requires: { magic: 55 } } },
+  { id: "archivist_cowl", name: "Archivist's cowl", examine: "The cowl of the library's first keeper, dry for the first time in centuries.", value: 20_000, weight: 1, icon: { shape: "hood", color: "#2c2a3e", accent: "#8fa3c4" }, equip: { slot: "head", bonuses: { magic: 10, defence: 8 }, requires: { magic: 55 } } },
+  { id: "drowned_staff", name: "Drowned staff", examine: "A staff of black driftwood with ink still running down it.", value: 36_000, weight: 2, icon: { shape: "staff", color: "#2c2a3e", accent: "#5e7a6a" }, equip: { slot: "weapon", bonuses: { attack: 10, strength: 10, magic: 26 }, speed: 5, staff: true, requires: { magic: 60 } } },
+  { id: "vaultsteel_blade", name: "Vaultsteel blade", examine: "The Howling King's own greatsword, black and cold and heavier than it looks.", value: 90_000, weight: 9, icon: { shape: "greatsword", color: "#3a3740", accent: "#9a7a3e" }, equip: { slot: "weapon", bonuses: { attack: 56, strength: 60 }, speed: 6, twoHanded: true, requires: { attack: 75 } } },
+  { id: "vault_helm", name: "Vault helm", examine: "A horned helm from under the stones. Something in it still hates the sun.", value: 40_000, weight: 4, icon: { shape: "helm", color: "#3a3740", accent: "#9a7a3e" }, equip: { slot: "head", bonuses: { defence: 38, strength: 3 }, requires: { defence: 70 } } },
+  { id: "vault_plate", name: "Vault plate", examine: "Vaultsteel plate, dented by whatever killed its first owner. Nothing since has got through.", value: 80_000, weight: 12, icon: { shape: "body", color: "#3a3740", accent: "#9a7a3e" }, equip: { slot: "body", bonuses: { defence: 66, strength: 5 }, requires: { defence: 70 } } },
+  { id: "howling_cape", name: "Howling cape", examine: "A cape of grey wool from under the stones. In a wind it makes the noise The Wilds are afraid of.", value: 30_000, weight: 1, icon: { shape: "cape", color: "#4a4650", accent: "#b8b2a6" }, equip: { slot: "cape", bonuses: { defence: 9, ranged: 6, strength: 3 }, requires: { defence: 60 } } },
   { id: "drakehide_bracers", name: "Drakehide bracers", examine: "Scaled drakehide bracers.", value: 2500, icon: { shape: "bracer", color: "#6f8a5c" }, equip: { slot: "hands", bonuses: { ranged: 9, defence: 7 }, requires: { ranged: 50 } } },
   { id: "drakehide_chaps", name: "Drakehide chaps", examine: "Scaled drakehide chaps.", value: 5000, icon: { shape: "legs", color: "#6f8a5c" }, equip: { slot: "legs", bonuses: { ranged: 14, defence: 20 }, requires: { ranged: 50 } } },
   { id: "drakehide_vest", name: "Drakehide vest", examine: "Scaled drakehide. Light, and nearly fireproof.", value: 7500, icon: { shape: "body", color: "#6f8a5c" }, equip: { slot: "body", bonuses: { ranged: 22, defence: 32 }, requires: { ranged: 50 } } },
@@ -1034,6 +1052,14 @@ export type MonsterDef = {
   poison?: { damage: number; chance: number };
   /** How weapon poison takes: more than 1 for soft-bodied creatures, and none at all for the undead and stone (only wraith poison touches the undead). */
   poisonWeak?: number; poisonImmune?: boolean;
+  /** An archer: it shoots from this many tiles away rather than closing in. */
+  ranged?: number;
+  /** A wraith: each hit it lands drains this much faith (or run energy) as well. */
+  drain?: { faith?: number; energy?: number };
+  /** It mends itself this much every few ticks while below half health. */
+  heals?: number;
+  /** Below a third of its health it enrages: it hits half as hard again and faster. */
+  enrage?: boolean;
 };
 const coins = (min: number, max: number, chance: number): Drop => ({ item: "coins", min, max, chance });
 const one = (id: string, chance: number, min = 1, max = min): Drop => ({ item: id, min, max, chance });
@@ -1130,6 +1156,32 @@ Object.assign(MONSTERS, {
     always: [one("large_bones", 1, 2, 4), coins(4000, 12_000, 1), one("rarite_bar", 1, 1, 3)], drops: [one("colossus_ember", 1, 2, 4), one("ashenheart_sabre", 0.04), one("ashenheart_helm", 0.05), one("ashenheart_staff", 0.03), one("wyrm_heart", 0.3), one("rarite_helm", 0.12), one("drakehide_vest", 0.1), one("gloomfang_bow", 0.04), one("rough_rosestone", 0.25, 1, 3), one("insight_lamp", 0.2)],
     art: 109, ink: "#5a1f14" },
 } satisfies Record<string, MonsterDef>);
+// ---------- The dungeon update: what lives under the lake, the library and the stones ----------
+Object.assign(MONSTERS, {
+  cave_bat: { id: "cave_bat", poisonWeak: 1.5, name: "Cave bat", level: 9, hp: 12, attack: 8, strength: 6, defence: 5, attackBonus: 6, defenceBonus: 2, maxHit: 2, speed: 3, respawn: 20, wander: 6, aggressive: true,
+    examine: "A bat the size of a cat, and about as fond of you.", always: [one("bat_wing", 1)], drops: [coins(2, 14, 0.5), one("bones", 0.3), one("breeze_sigil", 0.15, 2, 5)], art: 129, ink: "#2b2630" },
+  glass_crab: { id: "glass_crab", poisonImmune: true, name: "Glass crab", level: 21, hp: 32, attack: 14, strength: 16, defence: 30, attackBonus: 8, defenceBonus: 40, maxHit: 4, speed: 5, respawn: 35, wander: 4, weakness: "earth",
+    examine: "A crab with a shell of lake-glass. You can see its insides working.", always: [one("crystal_shard", 0.35)], drops: [coins(12, 70, 0.6), one("bloom_sigil", 0.15, 2, 5), one("rough_sagestone", 0.03), one("deepglass_key", 0.04), one("tide_sigil", 0.12, 2, 4)], art: 130, ink: "#5f7f8f" },
+  crystal_golem: { id: "crystal_golem", poisonImmune: true, name: "The Crystal Golem", level: 55, hp: 140, attack: 46, strength: 50, defence: 48, magicDef: 10, attackBonus: 30, defenceBonus: 36, maxHit: 10, speed: 6, respawn: 120, wander: 2, size: 2, boss: true, aggressive: true, enrage: true, weakness: "earth",
+    examine: "The lake's own heart, walking. The light goes through it and comes out wrong.",
+    always: [one("crystal_shard", 1, 2, 4), coins(300, 900, 1)], drops: [one("glassbrand", 0.08), one("crystal_shield", 0.06), one("rough_sagestone", 0.3), one("glimmer_ore", 0.25, 1, 3), one("insight_lamp", 0.02), one("stone_sigil", 0.5, 6, 14), one("deepglass_key", 0.2)], art: 131, ink: "#7aa6b8" },
+  drowned_scholar: { id: "drowned_scholar", undead: true, poisonImmune: true, name: "Drowned scholar", level: 36, hp: 45, attack: 30, strength: 24, defence: 26, magicDef: 30, attackBonus: 20, defenceBonus: 18, maxHit: 6, speed: 5, respawn: 40, wander: 4, aggressive: true, attackStyle: "magic", weakness: "fire",
+    examine: "Still reading. Still wet. It hasn't noticed it drowned.", always: [one("bones", 1)], drops: [one("ink_page", 0.45), one("thought_sigil", 0.25, 3, 6), one("shade_sigil", 0.15, 2, 4), coins(30, 160, 0.6), one("archive_key", 0.03), one("grave_dust", 0.2)], art: 132, ink: "#3b4a5e" },
+  ink_wraith: { id: "ink_wraith", undead: true, poisonImmune: true, name: "Ink wraith", level: 52, hp: 62, attack: 44, strength: 40, defence: 38, magicDef: 45, attackBonus: 28, defenceBonus: 26, maxHit: 7, speed: 4, respawn: 50, wander: 5, aggressive: true, slayer: 40, weakness: "holy", drain: { faith: 4 },
+    examine: "What's left when the ink outlives the writer. Its touch takes your faith.", drops: [one("shade_sigil", 0.3, 4, 8), one("hollow_sigil", 0.15, 2, 5), one("grave_dust", 0.4, 1, 2), coins(60, 300, 0.6), one("archive_key", 0.05), one("rough_rosestone", 0.03), one("ink_page", 0.2)], art: 133, ink: "#1e1a2e" },
+  archivist_below: { id: "archivist_below", undead: true, poisonImmune: true, name: "The Archivist Below", level: 74, hp: 190, attack: 60, strength: 55, defence: 52, magicDef: 60, attackBonus: 40, defenceBonus: 40, maxHit: 12, speed: 5, respawn: 150, wander: 2, boss: true, aggressive: true, attackStyle: "magic", heals: 8, weakness: "fire",
+    examine: "The library's first keeper, who went down to the flooded floor and kept on keeping it.",
+    always: [one("ink_page", 1, 2, 2), one("grave_dust", 1, 2, 5), coins(600, 1600, 1)], drops: [one("inkbound_tome", 0.07), one("archivist_cowl", 0.06), one("drowned_staff", 0.05), one("thought_sigil", 0.6, 10, 25), one("insight_lamp", 0.03), one("hollow_essence", 0.1), one("archive_key", 0.25)], art: 134, ink: "#2c2a3e" },
+  grave_moth: { id: "grave_moth", poisonWeak: 1.5, name: "Grave moth", level: 33, hp: 30, attack: 28, strength: 22, defence: 20, attackBonus: 16, defenceBonus: 10, maxHit: 4, speed: 3, respawn: 30, wander: 6, aggressive: true, slayer: 20, weakness: "fire", poison: { damage: 2, chance: 0.3 },
+    examine: "A moth as broad as a shield, dusted with something you shouldn't breathe.", drops: [one("grave_dust", 0.5), one("bloom_sigil", 0.2, 2, 5), coins(20, 110, 0.5), one("bat_wing", 0.2), one("vault_key", 0.02)], art: 135, ink: "#6a6350" },
+  vault_archer: { id: "vault_archer", undead: true, poisonImmune: true, name: "Vault archer", level: 47, hp: 55, attack: 42, strength: 36, defence: 34, attackBonus: 26, defenceBonus: 22, maxHit: 7, speed: 5, respawn: 45, wander: 4, aggressive: true, slayer: 45, weakness: "holy", ranged: 5,
+    examine: "Buried with its bow. It still has the bow.", always: [one("large_bones", 1)], drops: [one("blackiron_arrow", 0.5, 10, 30), one("vault_key", 0.04), one("grave_dust", 0.3), one("moonsilver_ore", 0.15), coins(50, 240, 0.6), one("path_sigil", 0.1, 2, 5)], art: 136, ink: "#3f3b36" },
+  vault_knight: { id: "vault_knight", undead: true, poisonImmune: true, name: "Vault knight", level: 62, hp: 85, attack: 52, strength: 50, defence: 58, magicDef: 20, attackBonus: 32, defenceBonus: 45, maxHit: 9, speed: 6, respawn: 55, wander: 4, aggressive: true, slayer: 45, weakness: "holy",
+    examine: "Buried in its armour, under a stone with its name on. The name's worn off. The armour hasn't.", always: [one("large_bones", 1)], drops: [one("vault_key", 0.06), one("glimmer_cuirass", 0.02), one("rarite_ore", 0.05), one("grave_dust", 0.4, 1, 2), coins(80, 400, 0.65), one("vault_helm", 0.004), one("hollow_sigil", 0.12, 2, 5)], art: 137, ink: "#2f2d33" },
+  howling_king: { id: "howling_king", undead: true, poisonImmune: true, name: "The Howling King", level: 96, hp: 280, attack: 84, strength: 86, defence: 76, magicDef: 40, attackBonus: 60, defenceBonus: 70, maxHit: 19, speed: 5, respawn: 200, wander: 2, size: 2, boss: true, aggressive: true, enrage: true, weakness: "holy", drain: { faith: 6 },
+    examine: "The one the stones were raised for. The Wilds' game won't cross the ring because of what's under it.",
+    always: [one("large_bones", 1, 2, 3), coins(1200, 3600, 1), one("grave_dust", 1, 3, 8)], drops: [one("vaultsteel_blade", 0.08), one("vault_helm", 0.07), one("vault_plate", 0.05), one("howling_cape", 0.06), one("rarite_bar", 0.3, 1, 3), one("hollow_essence", 0.15), one("insight_lamp", 0.04), one("vault_key", 0.3)], art: 138, ink: "#1b1a20" },
+} satisfies Record<string, MonsterDef>);
 export function combatLevelOf(monster: MonsterDef) { return monster.level; }
 
 // ---------- Emotes ----------
@@ -1167,6 +1219,12 @@ export const SLAYER_TASKS = [
   { id: "weavers", name: "Hollow weavers", monsters: ["hollow_weaver"], min: 80, amount: [10, 25], slayer: 75 },
   { id: "sentinels", name: "hollow sentinels", monsters: ["hollow_sentinel"], min: 60, amount: [20, 40] },
   { id: "drakes", name: "drakes", monsters: ["ash_drake", "cinder_drake"], min: 70, amount: [10, 25] },
+  { id: "bats", name: "cave bats", monsters: ["cave_bat"], min: 5, amount: [15, 30] },
+  { id: "crabs", name: "glass crabs", monsters: ["glass_crab"], min: 18, amount: [15, 30] },
+  { id: "moths", name: "grave moths", monsters: ["grave_moth"], min: 28, amount: [15, 30], slayer: 20 },
+  { id: "drowned", name: "drowned scholars", monsters: ["drowned_scholar"], min: 32, amount: [15, 35] },
+  { id: "wraiths", name: "ink wraiths", monsters: ["ink_wraith"], min: 48, amount: [15, 30], slayer: 40 },
+  { id: "vault_dead", name: "the vault dead", monsters: ["vault_archer", "vault_knight"], min: 55, amount: [15, 35], slayer: 45 },
 ] as const;
 export type SlayerTask = typeof SLAYER_TASKS[number];
 /** What Slayer points buy from the Warden. */

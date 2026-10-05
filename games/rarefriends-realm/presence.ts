@@ -22,7 +22,7 @@ export function presenceXp(game: Game, amount: number) {
 export const presenceLevel = (player: Player) => levelForXp(player.xp.presence);
 
 // ---------- Names and fellowships ----------
-export const NAME_MIN = 2, NAME_MAX = 16, RENAME_COST = 1000, FELLOWSHIP_COST = 5000, FELLOWSHIP_RENAME_COST = 2500;
+export const NAME_MIN = 2, NAME_MAX = 16, RENAME_COST = 1000, FELLOWSHIP_COST = 5000, FELLOWSHIP_JOIN_COST = 500, FELLOWSHIP_RENAME_COST = 2500;
 /** A legal name: 2–16 characters of letters, digits, spaces, apostrophes, hyphens or underscores, trimmed, not only digits (that's the token's job). */
 export function cleanName(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
@@ -57,9 +57,11 @@ export function nameFriend(game: Game, raw: string, paid = false): boolean {
 export function joinFellowship(game: Game, rawName: string, rawTag: string, look?: { logo?: string; banner?: string; colors?: string[]; since?: number }): boolean {
   const player = game.player, name = cleanName(rawName), tag = cleanTag(rawTag);
   if (!name || !tag) { message(game, "A fellowship needs a name (2–16 characters) and a tag of 2–5 capitals or digits.", "warn"); return false; }
+  // Founding one costs the registrar's fee; joining one a fellow invited you to costs a tenth of it.
   if (!player.fellowship) {
-    if (count(player, "coins") < FELLOWSHIP_COST) { message(game, `Founding or joining a fellowship costs ${FELLOWSHIP_COST.toLocaleString()} coins (the Realm's registrar is not cheap).`, "warn"); return false; }
-    take(player, "coins", FELLOWSHIP_COST); presenceXp(game, 120);
+    const cost = look ? FELLOWSHIP_JOIN_COST : FELLOWSHIP_COST;
+    if (count(player, "coins") < cost) { message(game, `${look ? "Joining" : "Founding"} a fellowship costs ${cost.toLocaleString()} coins (the Realm's registrar is not cheap).`, "warn"); return false; }
+    take(player, "coins", cost); presenceXp(game, 120);
   }
   player.fellowship = { name, tag, since: look?.since ?? Math.floor(Date.now() / 86_400_000), ...(look?.logo ? { logo: look.logo } : {}), ...(look?.banner ? { banner: look.banner } : {}), ...(look?.colors ? { colors: look.colors } : {}) };
   message(game, `You stand with ${name} [${tag}].`, "quest"); sound(game, "quest");

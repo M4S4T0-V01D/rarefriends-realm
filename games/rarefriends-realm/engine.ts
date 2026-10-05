@@ -8,6 +8,7 @@ import {
   type EquipSlot, type MetalId, type Skill, type Spell, type SpotKind, type WardrobeId,
 } from "./data.ts";
 import { cleanDaily } from "./daily.ts";
+import { searchChest } from "./dungeons.ts";
 import { cleanOrders } from "./orders.ts";
 import { cleanCard, cleanFellowshipLook } from "./cardstyle.ts";
 import { applyHome, cleanHome, sleep } from "./housing.ts";
@@ -18,7 +19,7 @@ import { runDrain, slipChance } from "./wayfaring.ts";
 import { HERBS, brewRecipes, grindRecipes, herbDef, stillRecipes } from "./apothecary.ts";
 import { friendSays, friendTick, friendWorks, outfitRemark, remember } from "./friend.ts";
 import { presenceXp, cleanName, cleanTag, onAchievement as presenceAchievement, onBossFelled, onEmoteUsed, onFriendTime, onNpcTalked, onRareFind, onRegionEntered, onWorn } from "./presence.ts";
-import { NPCS, QUESTS, consecrateDawnstone, onAltarPrayed, examineItem, npcDef, onBonesOffered, onMonsterKilled, questDone, searchCryptChest, searchWell, talk, tanHides, useCryptAltar } from "./content.ts";
+import { NPCS, QUESTS, consecrateDawnstone, onAltarPrayed, examineItem, npcDef, onBonesOffered, onMonsterKilled, questDone, searchWell, talk, tanHides, useCryptAltar } from "./content.ts";
 import {
   BANK_SIZE, BANK_TABS, DAY_MS, SATCHEL, SATCHEL_SIZE, STONE_BOX, STONE_BOX_SIZE, BONE_BAG, BONE_BAG_SIZE, bagAdd, bagBones, bagTakeAll, hasBoneBag, SIGIL_BAG, BELTS, beltAdd, beltContents, beltDef, wornBelt, SIGIL_BAG_SIZE, hasSigilBag, isSigil, sigilBagAdd, sigilBagTotal, sigilStock, useSigils, setPieces, wayfarerPieces, fullSlayerSet, heartguardPieces, mixtureOn, compactBankTabs, hasSatchel, hasStoneBox, stock, useUp, INVENTORY_SIZE, REFERRAL_COINS, REFERRALS_PER_DAY, REFERRAL_TICKS, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
   level, maxHp, maxPrayer, message, prayerBoost, riding, sound, take, weapon, combatLevel, createGame,
@@ -917,6 +918,12 @@ function interactObject(game: Game, object: WorldObject, option: string, use?: n
       const questOk = !object.requires?.quest || (player.quests[object.requires.quest] ?? 0) >= 1;
       if (!questOk) { message(game, "The gate is sealed with shadow. Something must be done before it opens.", "warn"); return; }
       const through = player.x < object.x ? object.to! : { x: object.x - 1, y: object.y };
+      // A locked door: the key for it turns once and breaks (the dungeon's creatures and coffers hold more).
+      if (object.requires?.item) {
+        if (!has(player, object.requires.item)) { message(game, `${object.name} is locked. It wants a ${item(object.requires.item).name.toLowerCase()}, and the creatures and coffers down here have them.`, "warn"); return; }
+        take(player, object.requires.item, 1); sound(game, "click");
+        travel(game, through, `The ${item(object.requires.item).name.toLowerCase()} turns, and breaks in the lock. The door swings open.`); return;
+      }
       travel(game, through, "The shadow parts, and you pass through the gate."); return;
     }
     case "obstacle": {
@@ -952,7 +959,7 @@ function interactObject(game: Game, object: WorldObject, option: string, use?: n
       if (object.name.endsWith("(sleep)")) { sleep(game); return; }
       if (object.name.endsWith("(fill)") || object.name === "Water barrel") { fillVials(game); return; }
       if (object.name.endsWith("(furnish)")) { if (option === "Furnish") { game.ui.home = true; sound(game, "click"); } else message(game, "You warm your hands at the hearth. Home."); return; }
-      if (object.decor === "chest") searchCryptChest(game); return;
+      if (object.decor === "chest") searchChest(game, object); return;
     default: message(game, examineObject(game, object));
   }
 }
@@ -1620,17 +1627,24 @@ function monsterTick(game: Game, monster: Monster) {
   else if (wouldAttack && player.sneak) { if (spots(game, monster)) caughtSneaking(game, monster); else if (!game.sneakingPast.has(monster.uid)) game.sneakingPast.set(monster.uid, game.tick); }
   else if (wouldAttack) { game.sneakingPast.delete(monster.uid); monster.target = true; creature(game, monster, "aggro"); }
   else if (!monster.target && game.sneakingPast.has(monster.uid)) slippedPast(game, monster);
+  // It mends itself while it's hurt (the Archivist Below reads itself whole again).
+  if (monster.def.heals && monster.hp < monster.def.hp / 2 && game.tick % 5 === 0) monster.hp = Math.min(monster.def.hp, monster.hp + monster.def.heals);
   if (monster.target) {
     const leash = Math.max(Math.abs(monster.x - monster.spawn.x), Math.abs(monster.y - monster.spawn.y));
     if (!sameLayer || leash > monster.wander + 12 || chebyshev(monster, player) > 16) { monster.target = false; monster.retreat = 6; return; }
-    if (adjacentTo(player.x, player.y, monster.x, monster.y, footprint(monster))) {
+    // An archer shoots from where it stands once you're in its range; everything else closes in.
+    const reach = monster.def.ranged ?? 0, shooting = reach > 0 && chebyshev(monster, player) <= reach;
+    if (shooting || adjacentTo(player.x, player.y, monster.x, monster.y, footprint(monster))) {
       if (monster.attackTimer <= 0) {
-        monster.attackTimer = monster.def.speed;
+        // Below a third of its health an enraged thing hits half as hard again, and faster.
+        const enraged = !!monster.def.enrage && monster.hp <= monster.def.hp / 3;
+        monster.attackTimer = Math.max(2, monster.def.speed - (enraged ? 1 : 0));
         const boost = prayerBoost(player), style = STYLE_BONUS[player.style];
         const attack = (monster.def.attack * cursed(game, monster, "attack") + 9) * (monster.def.attackBonus + 64);
         const defence = (Math.floor(level(game, "defence") * (1 + boost.defence)) + style.defence + 8) * (bonuses(player).defence + 64);
-        let hit = game.rng() < hitChance(attack, defence) ? Math.floor(game.rng() * (Math.floor(monster.def.maxHit * cursed(game, monster, "strength")) + 1)) : 0;
+        let hit = game.rng() < hitChance(attack, defence) ? Math.floor(game.rng() * (Math.floor(monster.def.maxHit * cursed(game, monster, "strength") * (enraged ? 1.5 : 1)) + 1)) : 0;
         if (boost.protect) hit = Math.floor(hit * (monster.def.boss ? 0.4 : 0));
+        if (shooting && !adjacentTo(player.x, player.y, monster.x, monster.y, footprint(monster))) emit(game, { type: "projectile", projectile: { from: { x: monster.x, y: monster.y }, to: { x: player.x, y: player.y }, start: game.tick, end: game.tick + 1, color: "#8a7a5a", style: "arrow" } });
         // Dragonfire: a third of a dragon's attacks are breath, which only a Wyrmward shield turns aside.
         if (monster.def.breath && game.rng() < 0.33) {
           const shielded = player.equipment.shield === "wyrmward_shield";
@@ -1642,6 +1656,12 @@ function monsterTick(game: Game, monster: Monster) {
         creature(game, monster, "attack");
         damagePlayer(game, hit, monster);
         if (hit > 0 && monster.def.poison && game.rng() < monster.def.poison.chance) poisonPlayer(game, monster.def.poison.damage);
+        // A wraith's touch takes faith (or wind) with the blood.
+        if (hit > 0 && monster.def.drain) {
+          if (monster.def.drain.faith) player.prayer = Math.max(0, player.prayer - monster.def.drain.faith);
+          if (monster.def.drain.energy) player.energy = Math.max(0, player.energy - monster.def.drain.energy);
+          if (game.rng() < 0.3) message(game, `The ${monster.def.name.replace(/^The /, "").toLowerCase()}'s touch drains your ${monster.def.drain.faith ? "faith" : "strength to run"}.`, "warn");
+        }
       }
       return;
     }

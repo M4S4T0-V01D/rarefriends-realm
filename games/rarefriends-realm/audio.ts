@@ -156,6 +156,9 @@ const STYLES: readonly Style[] = [
   { id: "wyrm_lair", name: "The Wyrm's Lair", bpm: 84, root: 4, mode: "locrian", progression: [0, 1, 0, 6, 0, 1, 5, 4], meter: 4, lead: "brass", second: "strings", arp: null, bed: "pad", bass: "bass", kit: "boss", energy: 0.8, seed: 235 },
   { id: "sea_cave", name: "The Sea Cave", bpm: 74, root: 9, mode: "aeolian", progression: [0, 6, 0, 3, 0, 6, 5, 0], meter: 4, lead: "flute", second: "glock", arp: "harp", bed: "pad", bass: "pizz", kit: "heartbeat", energy: 0.4, seed: 237 },
   { id: "deep_mine", name: "The Deep Mine", bpm: 86, root: 2, mode: "dorian", progression: [0, 5, 0, 6, 0, 5, 3, 0], meter: 4, lead: "oboe", second: "bell", arp: "pizz", bed: null, bass: "bass", kit: "forge", energy: 0.55, seed: 239 },
+  { id: "deepglass", name: "Deepglass", bpm: 76, root: 9, mode: "lydian", progression: [0, 4, 5, 3, 0, 4, 1, 3], meter: 4, lead: "glock", second: "bell", arp: "harp", bed: "pad", bass: "pizz", kit: "heartbeat", energy: 0.4, seed: 241 },
+  { id: "drowned_archive", name: "The Drowned Archive", bpm: 66, root: 4, mode: "phrygian", progression: [0, 1, 0, 6, 0, 1, 5, 0], meter: 4, lead: "organ", second: "choir", arp: "harp", bed: "choir", bass: "bass", kit: "heartbeat", energy: 0.35, seed: 251 },
+  { id: "howling_vault", name: "The Howling Vault", bpm: 82, root: 7, mode: "harmonic", progression: [0, 6, 0, 5, 0, 6, 4, 0], meter: 4, lead: "brass", second: "choir", arp: null, bed: "choir", bass: "bass", kit: "march", energy: 0.6, seed: 257 },
 ];
 /**
  * An area track in four sections, written like a little folk tune: a two-bar motif that is repeated, sequenced and

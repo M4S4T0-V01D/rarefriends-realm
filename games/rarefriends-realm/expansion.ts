@@ -19,7 +19,7 @@ import { MONSTERS } from "./data.ts";
 import { ECO_REGIONS, HERBS } from "./apothecary.ts";
 import { buildVillages } from "./villages.ts";
 // REGIONS is read only inside buildExpansion (called from createWorld), never at load, since world.ts imports this module.
-import { MAINLAND_RECT, OVERWORLD_H, REGIONS, T, isWater, type DecorKind, type GenContext, type RegionId, type worldTools } from "./world.ts";
+import { MAINLAND_RECT, OVERWORLD_H, REGIONS, T, isWater, mainlandToWorld, type DecorKind, type GenContext, type RegionId, type worldTools } from "./world.ts";
 
 export type Tools = ReturnType<typeof worldTools>;
 type Pt = readonly [number, number];
@@ -455,12 +455,60 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
   }
   for (let x = 556; x <= 612; x += 8) decor(x, 556, "torch", true); decor(706, 574, "chest", true, "Foreman's chest");
   monsters("stone_golem", 548, 554, 710, 577, 10); monsters("ember_salamander", 616, 554, 710, 577, 5); monsters("gloom_hound", 656, 554, 710, 577, 4);
+  // ---------- 7b. The dungeon update: three more dungeons, and coffers in every one ----------
+  /** A dungeon coffer: random loot by the dungeon it's in (dungeons.ts), once in a while. Never where it would wall a passage. */
+  const coffers = (name: string, x0: number, y0: number, x1: number, y1: number, n: number, floor: number) =>
+    scatter(x0, y0, x1, y1, n, (x, y) => decor(x, y, "chest", true, name), (x, y) => get(x, y) === floor && ctx.objectAt[tileIndex(x, y)] < 0
+      && [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dy]) => get(x + dx, y + dy) === floor && ctx.objectAt[tileIndex(x + dx, y + dy)] < 0));
+  // The Deepglass Caverns, through a crevice on Glass Lake's east shore: crystal, lake-glass crabs, and the lake's heart.
+  dungeon("deepglass", [[404, 526, 424, 534], [422, 522, 450, 540], [408, 538, 440, 546], [448, 530, 453, 533], [454, 531, 455, 531], [456, 524, 470, 546]], T.STONE);
+  add({ kind: "ladder", x: 392, y: 326, blocks: true, name: "Crevice in the rock", action: "Climb-down", to: { x: 406, y: 530 } });
+  add({ kind: "ladder", x: 405, y: 530, blocks: true, name: "Crevice", action: "Climb-up", to: { x: 392, y: 327 } });
+  add({ kind: "gate", x: 454, y: 531, blocks: true, name: "Crystal door", action: "Unlock", to: { x: 456, y: 531 }, requires: { item: "deepglass_key" } });
+  for (const [kind, n, x0, x1] of [["gem", 5, 422, 450], ["glimmer", 4, 422, 450], ["moonsilver", 4, 404, 440]] as const) {
+    scatter(x0, 522, x1, 546, n, (x, y) => rock(x, y, kind), (x, y) => get(x, y) === T.STONE && ctx.objectAt[tileIndex(x, y)] < 0);
+  }
+  for (let x = 408; x <= 420; x += 6) decor(x, 526, "torch", true); for (let x = 426; x <= 446; x += 10) decor(x, 522, "pillar"); decor(412, 538, "boulder"); decor(436, 546, "rubble"); decor(463, 524, "pillar"); decor(468, 546, "boulder");
+  coffers("Deepglass coffer", 404, 522, 450, 546, 4, T.STONE); decor(468, 530, "chest", true, "The lake's hoard");
+  monsters("cave_bat", 404, 522, 450, 546, 10); monsters("glass_crab", 422, 522, 450, 546, 8); monsters("glass_crab", 408, 538, 440, 546, 4); monsters("cave_spider", 408, 538, 440, 546, 3);
+  monsters("crystal_golem", 463, 535, 463, 535, 1);
+  // The Drowned Archive, under a trapdoor in the Quillhaven library: the flooded bottom floor, its readers, and its keeper.
+  dungeon("drowned_archive", [[474, 524, 500, 532], [498, 528, 520, 531], [516, 522, 540, 540], [504, 531, 508, 534], [478, 534, 510, 546], [511, 545, 513, 545], [514, 542, 540, 547]], T.STONE);
+  for (let y = 522; y <= 540; y++) for (let x = 516; x <= 540; x++) if (get(x, y) === T.STONE && noise2(x * 1.7, y * 1.7) > 0.7 && y !== 529 && y !== 530 && x !== 516 && x !== 517) put(x, y, T.WATER);
+  add({ kind: "ladder", x: 475, y: 528, blocks: true, name: "Ladder", action: "Climb-up", to: { x: 642, y: 397 } });
+  add({ kind: "gate", x: 512, y: 545, blocks: true, name: "Sealed reading room", action: "Unlock", to: { x: 514, y: 545 }, requires: { item: "archive_key" } });
+  for (const sx of [478, 482, 486, 490, 494]) decor(sx, 524, "shelf", true, "Swollen bookshelves"); decor(488, 528, "table", true, "The reading table"); for (const sx of [482, 490, 498, 506]) decor(sx, 534, "shelf", true, "Drowned stacks");
+  for (let x = 476; x <= 496; x += 10) decor(x, 532, "torch", true); decor(520, 524, "pillar"); decor(536, 538, "pillar"); decor(530, 546, "torch", true);
+  for (const sx of [518, 526, 534]) decor(sx, 542, "shelf", true, "The sealed shelves"); decor(538, 544, "table", true, "The Archivist's lectern");
+  coffers("Archive coffer", 474, 522, 540, 540, 4, T.STONE); decor(539, 547, "chest", true, "The Archivist's chest");
+  monsters("drowned_scholar", 474, 522, 520, 546, 12); monsters("ink_wraith", 516, 522, 540, 540, 6); monsters("cave_bat", 474, 522, 540, 546, 4); monsters("cave_spider", 478, 534, 510, 546, 3);
+  monsters("archivist_below", 528, 545, 528, 545, 1);
+  // The Howling Vault, under the ring of standing stones in The Wilds: a long gallery of the Wilds' buried, and their lord.
+  dungeon("howling_vault", [[190, 566, 372, 569], [200, 562, 220, 565], [230, 562, 250, 565], [240, 570, 262, 577], [290, 562, 320, 565], [340, 570, 372, 577], [373, 567, 375, 567], [376, 560, 395, 577]], T.DUNGEON);
+  add({ kind: "ladder", x: 600, y: 450, blocks: true, name: "Vault mouth", action: "Climb-down", to: { x: 192, y: 567 } });
+  add({ kind: "ladder", x: 191, y: 567, blocks: true, name: "Vault steps", action: "Climb-up", to: { x: 600, y: 451 } });
+  add({ kind: "gate", x: 374, y: 567, blocks: true, name: "The Howling King's door", action: "Unlock", to: { x: 376, y: 567 }, requires: { item: "vault_key" } });
+  for (let x = 196; x <= 364; x += 12) decor(x, 566, x % 24 === 4 ? "torch" : "pillar", true);
+  for (const [x, y] of [[204, 562], [214, 565], [236, 562], [246, 565], [296, 562], [314, 565], [250, 576], [352, 576], [366, 571]] as const) decor(x, y, "tomb", true, "A vault tomb");
+  for (const [x, y] of [[208, 564], [244, 574], [300, 564], [346, 572], [360, 575]] as const) decor(x, y, "bones", false, "Old bones");
+  decor(380, 562, "pillar"); decor(392, 562, "pillar"); decor(380, 576, "pillar"); decor(392, 576, "pillar"); decor(392, 567, "statue", true, "The Howling King's seat"); decor(386, 563, "torch", true); decor(386, 575, "torch", true);
+  coffers("Vault coffer", 190, 562, 372, 577, 6, T.DUNGEON); decor(394, 575, "chest", true, "The Howling King's hoard");
+  monsters("grave_moth", 190, 562, 372, 577, 12); monsters("vault_archer", 230, 562, 320, 569, 8); monsters("vault_knight", 290, 562, 372, 577, 8); monsters("cave_bat", 190, 562, 372, 577, 4);
+  monsters("howling_king", 386, 568, 386, 568, 1);
+  // And coffers in every dungeon there was: the crypt, the Depths, the catacombs, the lair, the sea cave and the deep mine.
+  { const [cx0, cy0] = mainlandToWorld(24, 205), [cx1, cy1] = mainlandToWorld(68, 232); coffers("Crypt coffer", cx0, cy0, cx1, cy1, 3, T.DUNGEON); }
+  { const [hx0, hy0] = mainlandToWorld(84, 206), [hx1, hy1] = mainlandToWorld(176, 236); coffers("Hollow coffer", hx0, hy0, hx1, hy1, 4, T.DUNGEON); }
+  { const [tx0, ty0] = mainlandToWorld(178, 212), [tx1, ty1] = mainlandToWorld(214, 236); coffers("Hollow coffer", tx0, ty0, tx1, ty1, 2, T.STONE); }
+  coffers("Catacomb coffer", 20, 522, 170, 547, 4, T.DUNGEON); coffers("Wyrm coffer", 20, 554, 170, 577, 3, T.ASH); coffers("Barnacled coffer", 548, 522, 700, 546, 3, T.STONE); coffers("Miner's coffer", 548, 554, 710, 577, 3, T.DUNGEON);
   // Venomous creatures: adders in every bog, spiders in the dark places.
   monsters("marsh_adder", 20, 20, 500, 180, 10); monsters("marsh_adder", 200, 320, 240, 350, 3); monsters("marsh_adder", 236, 455, 272, 490, 4);
   monsters("cave_spider", 20, 522, 170, 547, 6); monsters("cave_spider", 548, 522, 700, 546, 6); monsters("cave_spider", 548, 554, 710, 577, 4);
+  monsters("cave_bat", 20, 522, 170, 547, 5); monsters("cave_bat", 548, 522, 700, 546, 4); monsters("cave_bat", 548, 554, 710, 577, 4);
   // The Namekeeper keeps his register at a table on the Friendhollow square's edge (an empty tile; nothing on the square moves).
   { const [nx, ny] = nearestLandAnywhere(...mainlandSquare(116, 118)); npc("namekeeper", nx, ny); decor(nx, ny - 1, "table", true, "The Register of Names"); }
   buildVillages(ctx, t);
+  // (After the villages are built: the library's floor is laid by then.) The trapdoor to the Drowned Archive.
+  add({ kind: "ladder", x: 643, y: 397, blocks: true, name: "Trapdoor", action: "Climb-down", to: { x: 476, y: 528 } });
   // Everywhere a walker can get to from the spawn (over walkable ground, round blocking objects, down ladders and over the ferry):
   // herbs only grow where someone can pick them.
   const walkable = new Uint8Array(W * ctx.H);
