@@ -4,6 +4,10 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 58, date: "2026-10-05", title: "A finer aegis, and shields that hang under your cape", items: [
+    "The aegis is drawn properly: a broad tower shield with a bevelled, riveted rim, a band across its lower third, and the sun of its blessing, a ringed gold disc with a pale heart and eight rays.",
+    "Seen from behind, a shield hangs under your cape instead of sitting on top of it: the cape falls over most of it and its wooden back peeks out beside the cape's edge. Without a cape you see the whole back, planks and straps.",
+  ] },
   { id: 57, date: "2026-10-05", title: "A smoother, faster Realm, and water barrels that work", items: [
     "The Realm draws about twice as fast on High graphics. The ground is painted once and slid under the camera as you walk instead of being redrawn every frame (only the water and lava move on it), scenery lays its own sprites again for its shadow and its light instead of drawing itself three times over, walls, roofs, cliffs and ridges are lit by their outlines, and the light field is worked out every other frame. Dense forests and towns that ran at twenty-odd frames a second now run at forty to sixty.",
     "Every water barrel in every village is a water barrel: right-click it to fill your vials. Friendhollow, Fernwick, Emberforge, Highcairn, Gravesend, Saltmarrow and the rest all have one by the well, the inn or the apothecary.",

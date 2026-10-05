@@ -257,6 +257,15 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
   if (cape && back) {
     const dark = shadeHex(cape.color, -0.12), top = capeTop, shoulders = [X(top.min) - 1, capeShoulder] as const;
     const hemL = X(m.left) - 3 + sway, hemR = capeHem;
+    // The shield hangs on the off arm under the cape: the cape falls over most of it and about a third shows past the
+    // cape's edge (the wooden back, full size, since from behind you see the whole of it). The cape widens towards the
+    // hem, so the edge is taken high on the shield: its upper corner peeks out beside the shoulder, its foot stays
+    // under. Only the rows the cape covers are painted, so a tall shield never shows above the collar or below the hem.
+    if (shield) {
+      const edge = shoulders[0] + (hemL - shoulders[0]) * (waist - 5 - (neckY - 1)) / Math.max(1, feet - neckY), part = new Pixels(p.w, p.h);
+      drawShield(part, shield, Math.round(edge + shieldHalf(shield) * (shield.style === "roundshield" ? 0.15 : 0.3)), waist, true, true);
+      for (let row = neckY; row <= feet - 2; row++) for (let col = 0; col < p.w; col++) { const v = part.get(col, row); if (v) p.set(col, row, v); }
+    }
     cloth([[shoulders[0], neckY - 1], [shoulders[1], neckY - 1], [hemR, feet - 1], [hemL, feet - 1]]);
     for (let fold = 1; fold < 5; fold++) { const t = fold / 5; p.line(shoulders[0] + (shoulders[1] - shoulders[0]) * t, neckY + 1, hemL + (hemR - hemL) * t, feet - 2, dark); }
     p.rect(shoulders[0], neckY - 1, shoulders[1] - shoulders[0], 2, shadeHex(cape.color, 0.08));
@@ -442,8 +451,8 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
 
   if (weapon && side >= 0 && !held && !underCape) tip = drawHeld(p, weapon, hand.x, hand.y, dir, sway, turn);
   // The shield on the off arm: across your body facing left (that arm is towards you), at your side facing the camera
-  // or away. (Facing right it's behind you, drawn before your Friend above.)
-  if (shield && side <= 0) drawShield(p, shield, side < 0 ? Math.round(cx) + 1 : front ? X(waistSpan.max) + 2 : X(waistSpan.min) - 1, waist, back);
+  // or away. (Facing right it's behind you, drawn before your Friend above; from behind under a cape, it went under it.)
+  if (shield && side <= 0 && !(cape && back)) drawShield(p, shield, side < 0 ? Math.round(cx) + 1 : front ? X(waistSpan.max) + 2 : X(waistSpan.min) - 1, waist, back, back);
   // A tool at work or a weapon mid-swing goes over everything, so the motion reads.
   if (weapon && held && !underCape) tip = drawHeld(p, weapon, hand.x, hand.y, dir, sway, turn);
 
@@ -713,27 +722,70 @@ function drawSatchel(p: Pixels, piece: Piece, x: number, y: number, half: number
   if (full) { p.rect(x - half, y, half * 2, Math.round(h * 0.45), dark); p.rect(x - 1, y + Math.round(h * 0.45) - 1, 2, 2, "#c9a24a"); }
   else { p.disc(x, y - 1, 1.5, 1.2, coal, null); p.line(x - half, y + 2, x + half - 1, y + 2, dark); }
 }
-/** A heater shield centred on (x, y) in fine pixels: rim, boss and cross in its accent; from behind, its wooden back and strap. */
-function drawShield(p: Pixels, piece: Piece, x: number, y: number, rear: boolean) {
-  const color = piece.color, dark = shadeHex(color, -0.2), light = shadeHex(color, 0.18), hw = rear ? 3 : 5;
+/** Half the width of a shield's face in fine pixels: the kite, the broad round shield and the tower-like aegis. */
+function shieldHalf(piece: Piece) { return piece.style === "roundshield" ? 7 : piece.style === "aegis" ? 6 : 5; }
+/**
+ * A shield centred on (x, y) in fine pixels. The kite: rim, boss and cross in its accent. The round shield: a boss and
+ * a studded rim. The aegis: a tall tower shield with the sun of its blessing. `rear` shows the wooden back and its
+ * straps instead: edge-on (just the rim peeking past you) unless `wide`, the whole back as seen from behind.
+ */
+function drawShield(p: Pixels, piece: Piece, x: number, y: number, rear: boolean, wide = false) {
+  const color = piece.color, dark = shadeHex(color, -0.2), light = shadeHex(color, 0.18), hw = rear && !wide ? 3 : shieldHalf(piece);
+  const wood = "#7a5b40", grain = "#5e4532", strap = "#4a3a2e";
   if (piece.style === "roundshield") {
     // A big round shield: a boss in the middle and a rim, nearly the width of the body.
-    const r = rear ? 4 : 7;
-    if (rear) { p.disc(x, y, r, r, "#7a5b40", null); p.line(x - r + 1, y, x + r - 1, y, "#4a3a2e"); return; }
+    const r = rear && !wide ? 4 : 7;
+    if (rear) {
+      p.disc(x, y, r, r, wood, wide ? dark : null);
+      if (wide) { p.line(x - 1, y - 5, x - 1, y + 4, grain); p.line(x + 2, y - 5, x + 2, y + 4, grain); p.line(x - r + 2, y - 2, x + r - 3, y - 2, strap); p.line(x - r + 2, y + 2, x + r - 3, y + 2, strap); }
+      else p.line(x - r + 1, y, x + r - 1, y, strap);
+      return;
+    }
     p.disc(x, y, r, r, color, null); p.disc(x, y, r - 1.5, r - 1.5, color, dark); p.disc(x, y, 2, 2, piece.trim ?? light, null);
     for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; p.set(Math.round(x + Math.cos(a) * (r - 2)), Math.round(y + Math.sin(a) * (r - 2)), dark); }
     p.line(x - r + 1, y - 2, x - 2, y - r + 1, light); return;
   }
   if (piece.style === "aegis") {
-    // The aegis: a tall tower shield, square at the foot, with a sun disc and its rays in the blessing's gold.
-    const tall: [number, number][] = [[x - hw, y - 8], [x + hw, y - 8], [x + hw, y + 8], [x - hw, y + 8]];
-    if (rear) { p.poly(tall, "#7a5b40", null); return; }
-    p.poly(tall, color, null); p.line(x - hw, y - 8, x + hw, y - 8, light); p.line(x - hw, y - 8, x - hw, y + 8, light); p.line(x + hw, y - 7, x + hw, y + 8, dark); p.line(x - hw + 1, y + 8, x + hw, y + 8, dark);
-    const gold = piece.trim ?? "#e2c46a"; p.disc(x, y - 1, 2.6, 2.6, gold, null); for (const [dx, dy] of [[0, -5], [0, 4], [-4, -1], [4, -1], [-3, -4], [3, -4], [-3, 2], [3, 2]]) p.set(x + dx, y - 1 + dy, gold);
+    // The aegis: a tall tower shield, square at the foot and broader than the kite. Its face is a bevelled plate with a
+    // riveted rim and a band across the lower third; above the band, the sun of the blessing in gold: a ringed disc
+    // with a pale heart and eight rays, the four straight ones longer and tipped in light.
+    const top = y - 9, bottom = y + 8, face: [number, number][] = [[x - hw, top], [x + hw, top], [x + hw, bottom + 1], [x - hw, bottom + 1]];
+    if (rear) {
+      p.poly(face, wood, null);
+      if (wide) {
+        // Three planks, two straps, and the metal rim showing at the top and the outer edge.
+        for (const dx of [-2, 2]) p.line(x + dx, top + 1, x + dx, bottom, grain);
+        p.line(x - hw + 1, y - 4, x + hw - 2, y - 4, strap); p.line(x - hw + 1, y + 3, x + hw - 2, y + 3, strap);
+        p.line(x - hw, top, x + hw - 1, top, dark); p.line(x - hw, top, x - hw, bottom, dark);
+      }
+      return;
+    }
+    const gold = piece.trim ?? "#e2c46a", deepGold = shadeHex(gold, -0.35), paleGold = shadeHex(gold, 0.45), band = shadeHex(color, -0.1);
+    p.poly(face, color, null);
+    // The lower third, a shade darker below a raised band; the band's edges lit above and shaded below.
+    p.rect(x - hw + 1, y + 4, hw * 2 - 2, bottom - y - 4, band);
+    p.line(x - hw + 1, y + 3, x + hw - 2, y + 3, light); p.line(x - hw + 1, y + 4, x + hw - 2, y + 4, dark);
+    // The bevelled rim: lit along the top and the left, shaded down the right and along the foot, and rivets at the corners.
+    p.line(x - hw, top, x + hw - 1, top, light); p.line(x - hw, top, x - hw, bottom, light);
+    p.line(x + hw - 1, top + 1, x + hw - 1, bottom, dark); p.line(x - hw + 1, bottom, x + hw - 1, bottom, dark);
+    for (const [rx, ry] of [[x - hw + 1, top + 1], [x + hw - 2, top + 1], [x - hw + 1, bottom - 1], [x + hw - 2, bottom - 1]]) p.set(rx, ry, dark);
+    p.set(x + hw - 2, top + 1, light); p.set(x - hw + 1, bottom - 1, light);
+    // The sun, centred on the upper field.
+    const sy = y - 3;
+    p.disc(x, sy, 3.6, 3.6, gold, deepGold); p.disc(x, sy, 1.6, 1.6, paleGold, null);
+    // Straight rays, two long, tipped pale; slanting rays, one short.
+    p.line(x - 1, sy - 6, x, sy - 6, paleGold); p.line(x - 1, sy - 5, x, sy - 5, gold);
+    p.line(x - 1, sy + 5, x, sy + 5, gold); p.line(x - 1, sy + 6, x, sy + 6, paleGold);
+    p.set(x - 5, sy - 1, gold); p.set(x - 5, sy, gold); p.set(x + 4, sy - 1, gold); p.set(x + 4, sy, gold);
+    for (const [dx, dy] of [[-4, -4], [3, -4], [-4, 3], [3, 3]]) p.set(x + dx, sy + dy, gold);
     return;
   }
   const outline: [number, number][] = [[x - hw, y - 6], [x + hw, y - 6], [x + hw, y + 1], [x, y + 7], [x - hw, y + 1]];
-  if (rear) { p.poly(outline, "#7a5b40", null); p.line(x - hw + 1, y - 2, x + hw - 1, y - 2, "#4a3a2e"); p.line(x - hw, y - 6, x + hw, y - 6, dark); return; }
+  if (rear) {
+    p.poly(outline, wood, null); p.line(x - hw + 1, y - 2, x + hw - 1, y - 2, strap); p.line(x - hw, y - 6, x + hw, y - 6, dark);
+    if (wide) { p.line(x - 1, y - 5, x - 1, y + 5, grain); p.line(x + 2, y - 5, x + 2, y + 4, grain); p.line(x - hw, y - 6, x - hw, y + 1, dark); }
+    return;
+  }
   p.poly(outline, color, null);
   p.line(x - hw, y - 6, x + hw, y - 6, light); p.line(x - hw, y - 6, x - hw, y + 1, light);
   p.line(x + hw, y - 5, x + hw, y + 1, dark); p.line(x + hw, y + 1, x, y + 7, dark);
