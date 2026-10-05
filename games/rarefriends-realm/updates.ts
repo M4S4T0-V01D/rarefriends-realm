@@ -4,6 +4,10 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 59, date: "2026-10-05", title: "Heavier weapons, and armour you can tell apart", items: [
+    "Maces, flails, battleaxes and war hammers are drawn properly in the hand: a flanged mace head with a boss of gold, a flail's spiked ball on a chain of links, a double-bitted battleaxe with a spike above the haft, and a war hammer's block head with a spike behind. All of them with wrapped grips, capped butts and metal langets.",
+    "Every metal's helm and cuirass has its own make now, not just its colour: blackiron is riveted, ashsteel banded with a knob on the crown, moonsilver wears a crescent, glimmer a gold circlet and sunburst, rarite a plume and a cut gem, frostsilver spikes of ice and chevrons of frost, gloomsteel a spike on the crown and on each pauldron, wyrmscale a fin and scales, hollowsteel a crown of pale points and a hollow ring, cindersteel a crest of flame over ember cracks, and ashenheart a split crest over a burning heart.",
+  ] },
   { id: 58, date: "2026-10-05", title: "A finer aegis, and shields that hang under your cape", items: [
     "The aegis is drawn properly: a broad tower shield with a bevelled, riveted rim, a band across its lower third, and the sun of its blessing, a ringed gold disc with a pale heart and eight rays.",
     "Seen from behind, a shield hangs under your cape instead of sitting on top of it: the cape falls over most of it and its wooden back peeks out beside the cape's edge. Without a cape you see the whole back, planks and straps.",

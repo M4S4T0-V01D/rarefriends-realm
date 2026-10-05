@@ -4,7 +4,7 @@
  * animated: capes and scarves sway as you walk, wings flap, halos bob. The figure then gets one ink edge around the
  * worn pieces and the canonical white halo around everything.
  */
-import { WARDROBE, isItem, item, type WardrobeId } from "./data.ts";
+import { METALS, WARDROBE, isItem, item, type WardrobeId } from "./data.ts";
 import { Pixels, shadeHex } from "./pixel.ts";
 import { itemArt, skillEmblem } from "./icons.ts";
 import type { Facing } from "./state.ts";
@@ -43,6 +43,8 @@ export function measure(rows: Mask) {
  * `phase` (0–3) animates cloth and wings; pass the walk frame so they sway with the stride.
  */
 type Piece = { id: string; kind: string; color: string; trim?: string; pattern?: ClothPattern; style?: string; mastery?: { skill: string; trimmed: boolean } };
+/** The metal a forged piece (`pewter_helm`, `wyrmscale_cuirass`…) is smithed from, or none for leather, cloth and the rest. */
+const metalOf = (id: string) => METALS.find(metal => id.startsWith(`${metal.id}_`))?.id;
 /**
  * Something held and moving (a weapon mid-swing, an axe chopping, a rod cast out, a fish over the fire): the item and its
  * angle from the resting pose, in radians, positive swinging forward (the way you face).
@@ -366,10 +368,47 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
           }
         }
         for (let y = 0; y < p.h; y++) for (let x = 0; x < p.w; x++) { const v = helm.get(x, y); if (v) p.set(x, y, v); }
-        const l = hl, r = hr;
+        const l = hl, r = hr, metal = metalOf(piece.id), dome = top - 3;
         if (isItem(piece.id) && item(piece.id).icon.kind === "horned") {
           // Curled horns sweeping out and up from the sides.
           for (const s2 of side ? [side] : [-1, 1]) { const hx = s2 < 0 ? l : r; p.polyline([[hx, top + 1], [hx + s2 * 4, top - 1], [hx + s2 * 5, top - 5], [hx + s2 * 3, top - 7]], piece.trim ?? "#e8dcc0", 2); }
+          break;
+        }
+        // Each metal's helm has its own make, like its cuirass.
+        if (metal === "blackiron") {
+          // Blackiron: studs round the rim.
+          const [a, b] = rowSpan(rim); for (let x = a + 1; x < b; x += 3) p.set(x, rim, light);
+        } else if (metal === "ashsteel") {
+          // Ashsteel: a knob on the crown.
+          p.rect(mid - 1, dome - 2, 2, 2, color); p.set(mid - 1, dome - 2, light); p.line(mid - 2, dome, mid + 1, dome, dark);
+        } else if (metal === "moonsilver" && !back) {
+          // Moonsilver: a crescent on the brow.
+          const bx = mid + side * 2; for (const [dx, dy] of [[-2, -1], [-1, -2], [0, -2], [1, -2], [2, -1]]) p.set(bx + dx, top + dy, light);
+        } else if (metal === "glimmer") {
+          // Glimmer: a gold circlet round the brow.
+          const [a, b] = rowSpan(top + 1); p.line(a, top + 1, b, top + 1, "#e2c46a");
+        } else if (metal === "rarite") {
+          // Rarite: a plume from the crown, trailing behind you.
+          const pale = shadeHex(color, 0.3); p.line(mid, dome - 1, mid - side * 2, dome - 5, pale, 2); p.set(mid - side * 3, dome - 6, "#ffffff");
+        } else if (metal === "frostsilver") {
+          // Frostsilver: spikes of ice at the temples.
+          for (const s2 of side ? [side] : [-1, 1]) { const hx = s2 < 0 ? l : r; p.line(hx, top + 1, hx + s2 * 2, top - 3, piece.trim ?? light, 2); p.set(hx + s2 * 2, top - 4, "#ffffff"); }
+        } else if (metal === "gloomsteel") {
+          // Gloomsteel: a single spike from the crown.
+          p.poly([[mid - 1, dome], [mid + 1, dome], [mid, dome - 6]], dark, null); p.set(mid, dome - 6, piece.trim ?? light);
+        } else if (metal === "wyrmscale") {
+          // Wyrmscale: a fin of points along the crown.
+          for (const x of side ? [mid - side * 3, mid, mid + side * 3] : [mid - 3, mid, mid + 3]) p.poly([[x - 1, dome], [x + 1, dome], [x, dome - 3]], piece.trim ?? dark, null);
+        } else if (metal === "hollowsteel") {
+          // Hollowsteel: a crown of pale points.
+          for (let x = l + 2; x <= r - 2; x += 3) p.line(x, dome - 1, x, dome - 2, piece.trim ?? light);
+        } else if (metal === "cindersteel") {
+          // Cindersteel: a crest of flame, flickering.
+          const ember = piece.trim ?? light;
+          p.poly([[cx - 1, dome], [cx + 1, dome], [cx + 2, dome - 5], [cx - 2, dome - 4]], ember, null); p.set(cx - 3, dome - 3, ember); p.set(cx + 3, dome - 6, ember); p.set(cx, dome - 7, ember);
+        } else if (metal === "ashenheart") {
+          // Ashenheart: a tall crest, split by a dark seam.
+          p.poly([[cx - 1, dome], [cx + 1, dome], [cx + 2, dome - 5], [cx - 2, dome - 4]], piece.trim ?? light, null); p.line(cx, dome - 1, cx, dome - 4, dark);
         } else if (piece.trim) p.poly([[cx - 1, top - 3], [cx + 1, top - 3], [cx + 2, top - 8], [cx - 2, top - 7]], piece.trim, null);
         break;
       }
@@ -500,14 +539,60 @@ function drawArmour(p: Pixels, piece: Piece, m: ReturnType<typeof measure>, X: (
   const mid = Math.round(cx) + (side ? side * 2 : 0);
   if (plate) {
     // The breastplate's ridge (or the back plate's seam), a belt, and rounded plates on the shoulders.
+    const metal = metalOf(piece.id), gold = "#e2c46a";
     if (!back) { p.line(mid, top + 2, mid, bottom - 2, trim ?? light); p.line(mid + 1, top + 3, mid + 1, bottom - 2, dark); }
     else p.line(mid, top + 2, mid, bottom - 2, dark);
     p.line(X(bodySpan(bottomRow).min), bottom, X(bodySpan(bottomRow).max) + 1, bottom, trim ?? darker);
     p.line(X(bodySpan(bottomRow).min), bottom - 1, X(bodySpan(bottomRow).max) + 1, bottom - 1, darker);
-    const shoulders = bodySpan(m.neck + 1), pad = (x: number) => { if (m.quadruped) return; p.disc(x, neckY + 1, 3, 2.2, color, null); p.line(x - 2, neckY, x + 2, neckY, light); p.line(x - 2, neckY + 3, x + 2, neckY + 3, trim ?? darker); };
-    if (side <= 0 || back) pad(X(shoulders.min));
-    if (side >= 0 || back) pad(X(shoulders.max) + 1);
-    if (side) pad(Math.round(cx) + side);
+    // Each metal's cuirass has its own make, so the tiers tell apart at a glance and not only by colour. The edge of
+    // the plate at a row, for rivets, lames and scales; the chest, for an emblem (facing you).
+    const edge = (y: number) => { const span = bodySpan(Math.min(m.bottom, Math.max(m.neck, Math.floor((y - Y(0)) / 2)))); return [X(span.min), X(span.max) + 1] as const; };
+    const cy = Math.round((top + bottom) / 2), front = !side && !back;
+    if (metal === "blackiron") {
+      // Blackiron: riveted, a row of studs along the collar and above the belt.
+      for (const y of [top + 1, bottom - 3]) { const [l, r] = edge(y); for (let x = l + 1; x < r; x += 3) p.set(x, y, darker); }
+    } else if (metal === "ashsteel") {
+      // Ashsteel: lamellar, overlapping bands across the chest.
+      for (let y = top + 3; y < bottom - 2; y += 3) { const [l, r] = edge(y); p.line(l, y, r, y, dark); p.line(l + 1, y + 1, r - 1, y + 1, light); }
+    } else if (metal === "moonsilver" && front) {
+      // Moonsilver: a crescent moon on the breast.
+      p.disc(mid, cy, 2.8, 2.8, light, null); p.disc(mid + 1.2, cy - 0.8, 2.4, 2.4, color, null);
+    } else if (metal === "glimmer") {
+      // Glimmer: gold-edged, a sunburst on the breast.
+      for (const y of [top, bottom]) { const [l, r] = edge(y); p.line(l, y, r, y, gold); }
+      if (front) { p.disc(mid, cy, 1.6, 1.6, gold, null); for (const [dx, dy] of [[0, -3], [0, 3], [-3, 0], [3, 0]]) p.set(mid + dx, cy + dy, gold); }
+    } else if (metal === "rarite" && front) {
+      // Rarite: a cut-gem lozenge on the breast.
+      p.poly([[mid, cy - 3], [mid + 3, cy], [mid, cy + 3], [mid - 3, cy]], shadeHex(color, 0.3), null); p.set(mid, cy, dark); p.set(mid - 1, cy - 1, "#ffffff");
+    } else if (metal === "frostsilver" && !back) {
+      // Frostsilver: chevrons of frost down the chest, in its glow.
+      const ice = trim ?? light;
+      for (const y of [cy - 2, cy + 2]) { p.line(mid - 3, y - 2, mid, y + 1, ice); p.line(mid, y + 1, mid + 3, y - 2, ice); }
+    } else if (metal === "wyrmscale") {
+      // Wyrmscale: scaled, rows of overlapping scales.
+      for (let y = top + 2; y < bottom - 1; y += 2) { const [l, r] = edge(y); for (let x = l + 1 + ((y - top) / 2 % 2 ? 1 : 0); x < r; x += 3) { p.set(x, y, dark); p.set(x + 1, y, light); } }
+    } else if (metal === "hollowsteel" && front) {
+      // Hollowsteel: a hollow ring on the breast, dark at its heart.
+      p.disc(mid, cy, 2.8, 2.8, dark, null); p.disc(mid, cy, 1.4, 1.4, "#2a2733", null); p.set(mid - 2, cy - 2, trim ?? light);
+    } else if (metal === "cindersteel" && front) {
+      // Cindersteel: ember cracks glowing across the breast.
+      const ember = trim ?? light;
+      p.line(mid - 3, cy + 3, mid - 1, cy, ember); p.line(mid - 1, cy, mid + 1, cy - 3, ember); p.line(mid + 1, cy - 1, mid + 3, cy + 2, ember); p.set(mid - 4, cy + 4, ember);
+    } else if (metal === "ashenheart" && front) {
+      // Ashenheart: a burning heart on the breast, cracked down its middle.
+      const heart = trim ?? light;
+      p.disc(mid - 1, cy - 1, 1.6, 1.6, heart, null); p.disc(mid + 1, cy - 1, 1.6, 1.6, heart, null); p.poly([[mid - 3, cy - 1], [mid + 3, cy - 1], [mid, cy + 3]], heart, null);
+      p.line(mid, cy - 1, mid, cy + 2, darker);
+    }
+    const shoulders = bodySpan(m.neck + 1), pad = (x: number, out: number) => {
+      if (m.quadruped) return;
+      p.disc(x, neckY + 1, 3, 2.2, color, null); p.line(x - 2, neckY, x + 2, neckY, light); p.line(x - 2, neckY + 3, x + 2, neckY + 3, trim ?? darker);
+      // Gloomsteel's pauldrons carry a spike each, out and up.
+      if (metal === "gloomsteel" && out) { p.poly([[x + out, neckY], [x + out * 2, neckY + 1], [x + out * 5, neckY - 4]], dark, null); p.set(x + out * 5, neckY - 4, trim ?? light); }
+    };
+    if (side <= 0 || back) pad(X(shoulders.min), -1);
+    if (side >= 0 || back) pad(X(shoulders.max) + 1, 1);
+    if (side) pad(Math.round(cx) + side, 0);
   } else if (shirt) {
     // A laced collar at the throat, a placket down the front (a seam behind), and a tunic's belt and longer hem.
     if (!back) { p.poly([[mid - 2, top], [mid + 2, top], [mid, top + 3]], darker, null); p.set(mid - 1, top + 3, trim ?? light); p.set(mid + 1, top + 4, trim ?? light); p.line(mid, top + 4, mid, bottom - 1, dark); }
@@ -577,31 +662,61 @@ function drawWeapon(p: Pixels, piece: Piece, x: number, y: number, dir: number, 
     case "sword": blade(15); break;
     case "greatsword": blade(21); break;
     case "mace": {
-      // A short haft in the hand, a round flanged head a little above it.
-      const head = { x: x + dir * (4 + lean), y: y - 9 }; tip = head;
-      p.line(x - dir, y + 3, head.x, head.y + 2, wood, 2); p.disc(head.x, head.y, 3.5, 3.5, metal, null); p.disc(head.x, head.y, 1.4, 1.4, piece.trim ?? light, null);
-      for (const [dx, dy] of [[-4, 0], [4, 0], [0, -4], [0, 4]]) p.set(head.x + dx, head.y + dy, dark);
+      // A short haft with a wrapped grip and a capped pommel, a collar, and a flanged head above: six ridges from a boss
+      // in the blessing's gold, lit along the top.
+      const head = { x: x + dir * (4 + lean), y: y - 10 }; tip = head;
+      p.line(x - dir, y + 4, head.x, head.y + 3, wood, 2);
+      for (let k = 0; k < 3; k++) p.set(x - dir + dir * Math.round(k * 0.6), y + 3 - k * 2, "#5a4030");
+      p.rect(x - dir - 1, y + 4, 3, 2, dark); p.rect(head.x - 2, head.y + 4, 4, 2, dark);
+      p.disc(head.x, head.y, 4.2, 4.2, metal, null);
+      for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + Math.PI / 6, c = Math.cos(a), s = Math.sin(a); p.line(head.x + c * 1.5, head.y + s * 1.5, head.x + c * 4.5, head.y + s * 4.5, dark); p.set(head.x + c * 5, head.y + s * 5, metal); }
+      p.set(head.x - 1, head.y - 4, light); p.set(head.x - 2, head.y - 3, light); p.set(head.x - 3, head.y - 2, light);
+      p.disc(head.x, head.y, 1.4, 1.4, gold, null);
       break;
     }
     case "flail": {
-      // A haft held two-handed, the chain and its spiked ball swinging out ahead.
-      const top = { x: x + dir * (5 + lean), y: y - 16 }, ball = { x: top.x + dir * 5, y: top.y - 2 + sway }; tip = ball;
-      p.line(x - dir * 2, y + 6, top.x, top.y, wood, 2); p.line(top.x, top.y, ball.x - dir, ball.y + 1, "#8b8e92", 1);
-      p.disc(ball.x, ball.y, 3, 3, metal, null); for (const [dx, dy] of [[-4, 0], [4, 0], [0, -4], [0, 4], [-3, -3], [3, 3], [3, -3], [-3, 3]]) p.set(ball.x + dx, ball.y + dy, dark);
-      p.set(ball.x, ball.y, piece.trim ?? light);
+      // A haft held two-handed with a wrapped grip and a metal cap, a chain of links swinging out ahead, and a spiked
+      // ball at its end: eight spikes, lit along the top, a stud of gold at its heart.
+      const top = { x: x + dir * (5 + lean), y: y - 16 }, ball = { x: top.x + dir * 6, y: top.y - 3 + sway }; tip = ball;
+      p.line(x - dir * 2, y + 6, top.x, top.y, wood, 2); p.line(x - dir * 2, y + 5, top.x - dir, top.y + 1, woodLight);
+      for (let k = 0; k < 4; k++) p.set(x - dir * 2 + dir * Math.round(k * 0.7), y + 5 - k * 2, "#5a4030");
+      p.rect(x - dir * 2 - 1, y + 6, 3, 2, dark); p.rect(top.x - 1, top.y - 1, 3, 3, dark); p.set(top.x, top.y - 2, "#8b8e92");
+      for (let i = 0; i <= 6; i++) { const t = i / 6; p.set(top.x + (ball.x - top.x) * t, top.y - 2 + (ball.y + 2 - top.y) * t, i % 2 ? "#5e6165" : "#a3a6aa"); }
+      p.disc(ball.x, ball.y, 3.6, 3.6, metal, null);
+      for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2, c = Math.cos(a), s = Math.sin(a); p.line(ball.x + c * 3.5, ball.y + s * 3.5, ball.x + c * 5.5, ball.y + s * 5.5, dark); p.set(ball.x + c * 5.5, ball.y + s * 5.5, light); }
+      p.set(ball.x - 1, ball.y - 3, light); p.set(ball.x - 2, ball.y - 2, light); p.set(ball.x - 3, ball.y - 1, light);
+      p.set(ball.x, ball.y, gold);
       break;
     }
     case "battleaxe": case "warhammer": {
-      // A long haft held two-handed across the body, the head high over the shoulder.
+      // A long haft held two-handed across the body, wrapped at the grip, capped at the butt, with metal langets running
+      // up to the head high over the shoulder.
       const top = { x: x + dir * (5 + lean), y: y - 18 }; tip = top;
       p.line(x - dir * 2, y + 6, top.x, top.y, wood, 2); p.line(x - dir * 2, y + 5, top.x - dir, top.y + 1, woodLight);
+      for (let k = 0; k < 4; k++) p.set(x - dir * 2 + dir * Math.round(k * 0.7), y + 5 - k * 2, "#5a4030");
+      p.rect(x - dir * 2 - 1, y + 6, 3, 2, dark);
+      p.line(top.x - dir * 1.5, top.y + 9, top.x - dir * 0.5, top.y + 3, dark); p.line(top.x + dir * 0.5, top.y + 9, top.x + dir * 1.5, top.y + 3, dark);
       if (shape === "battleaxe") {
-        p.poly([[top.x, top.y - 3], [top.x + dir * 6, top.y - 5], [top.x + dir * 7, top.y + 3], [top.x, top.y + 2]], metal, null);
-        p.poly([[top.x, top.y - 2], [top.x - dir * 4, top.y - 4], [top.x - dir * 5, top.y + 2], [top.x, top.y + 1]], dark, null);
-        p.line(top.x + dir * 6, top.y - 4, top.x + dir * 7, top.y + 2, piece.trim ?? light);
+        // A double-bitted head: a broad crescent blade forward, a smaller one behind, a spike above the haft. The socket
+        // is shaded where the haft passes through, and the edges are bevelled in light (or the metal's glow).
+        const edge = piece.trim ?? light;
+        p.poly([[top.x, top.y - 4], [top.x + dir * 5, top.y - 6], [top.x + dir * 8, top.y - 3], [top.x + dir * 8, top.y + 2], [top.x + dir * 5, top.y + 5], [top.x, top.y + 3]], metal, null);
+        p.poly([[top.x, top.y - 3], [top.x - dir * 4, top.y - 5], [top.x - dir * 6, top.y - 2], [top.x - dir * 6, top.y + 1], [top.x - dir * 4, top.y + 4], [top.x, top.y + 2]], dark, null);
+        p.line(top.x + dir * 7, top.y - 4, top.x + dir * 8, top.y + 1, edge); p.line(top.x + dir * 5, top.y - 5, top.x + dir * 7, top.y - 4, edge);
+        p.line(top.x - dir * 5, top.y - 3, top.x - dir * 6, top.y, light);
+        p.line(top.x + dir * 2, top.y - 3, top.x + dir * 2, top.y + 2, dark); p.line(top.x + dir * 3, top.y - 4, top.x + dir * 3, top.y + 3, light);
+        p.line(top.x, top.y - 4, top.x, top.y - 8, metal); p.set(top.x, top.y - 8, light);
       } else {
-        p.rect(Math.min(top.x - dir * 3, top.x + dir * 5), top.y - 3, 8, 6, metal); p.line(top.x - dir * 3, top.y - 3, top.x + dir * 4, top.y - 3, piece.trim ?? light);
-        p.line(top.x - dir * 3, top.y, top.x - dir * 6, top.y, dark, 2);
+        // A heavy block head: a square face forward with a bevelled rim, a long spike behind, a short one above, and a
+        // dark band where the haft is seated.
+        const edge = piece.trim ?? light, x0 = Math.min(top.x - dir * 3, top.x + dir * 6);
+        p.rect(x0, top.y - 3, 9, 7, metal);
+        p.line(x0, top.y - 3, x0 + 8, top.y - 3, light); p.line(x0, top.y + 3, x0 + 8, top.y + 3, dark);
+        p.line(top.x + dir * 5, top.y - 3, top.x + dir * 5, top.y + 3, edge); p.line(top.x + dir * 4, top.y - 2, top.x + dir * 4, top.y + 2, dark);
+        p.line(top.x - dir * 3, top.y - 2, top.x - dir * 3, top.y + 2, dark);
+        p.line(top.x, top.y - 3, top.x, top.y + 3, dark); p.line(top.x + dir, top.y - 3, top.x + dir, top.y + 3, dark);
+        p.poly([[top.x - dir * 3, top.y - 2], [top.x - dir * 8, top.y], [top.x - dir * 3, top.y + 2]], dark, null); p.set(top.x - dir * 8, top.y, light);
+        p.poly([[top.x - dir, top.y - 3], [top.x, top.y - 7], [top.x + dir, top.y - 3]], metal, null); p.set(top.x, top.y - 7, light);
       }
       break;
     }
