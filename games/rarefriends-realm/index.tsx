@@ -124,7 +124,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const [netState, setNetState] = useState<NetState>(players.current.state), [whisper, setWhisper] = useState<{ text: string; at: number } | null>(null);
   const lastMinimapPoint = useRef<React.MouseEvent<HTMLCanvasElement> | null>(null);
   const [snapshot, setSnapshot] = useState<GameSnapshot | null>(null), [busy, setBusy] = useState(false), [casketError, setCasketError] = useState(""), [reveal, setReveal] = useState<CasketResult[] | null>(null);
-  const [size, setSize] = useState({ width: 960, height: 640, scale: 1 }), [sideOpen, setSideOpen] = useState(true), [fullscreen, setFullscreen] = useState(false), [shareStatus, setShareStatus] = useState(""), [cardUrl, setCardUrl] = useState<string | null>(null);
+  const [size, setSize] = useState({ width: 960, height: 640, scale: 1 }), [sideOpen, setSideOpen] = useState(true), [fullscreen, setFullscreen] = useState(false), [pip, setPip] = useState(false), [shareStatus, setShareStatus] = useState(""), [cardUrl, setCardUrl] = useState<string | null>(null);
   const pendingSave = useRef<unknown>(null), cardBlob = useRef<Blob | null>(null), resizeRef = useRef<() => void>(() => {}), saveNow = useRef<(claim?: boolean) => void>(() => {});
   /** Logged out: back on the title screen with the adventure saved. */
   const [loggedOut, setLoggedOut] = useState(false);
@@ -367,8 +367,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     if (!node || !ctx) return;
     let frame = 0, lastHud = 0, dropId = 0, lastFrame = 0;
     tickAt.current = performance.now();
-    const loop = (now: number) => {
-      frame = requestAnimationFrame(loop);
+    const loop = (now: number, viaTimer = false) => {
+      if (!viaTimer) frame = requestAnimationFrame(loop);
       const state = game.current;
       if (!state) return;
       const { paused: isPaused, phase: current } = live.current;
@@ -526,9 +526,11 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       }
     };
     frame = requestAnimationFrame(loop);
+    // In the background (a hidden tab) frames stop, so a picture-in-picture window keeps going on a timer instead.
+    const timer = setInterval(() => { if (document.hidden && document.pictureInPictureElement) loop(performance.now(), true); }, 50);
     const stop = () => { held.current.clear(); if (game.current) setHeld(game.current, null); };
     window.addEventListener("blur", stop); document.addEventListener("visibilitychange", stop);
-    return () => { cancelAnimationFrame(frame); window.removeEventListener("blur", stop); document.removeEventListener("visibilitychange", stop); };
+    return () => { cancelAnimationFrame(frame); clearInterval(timer); window.removeEventListener("blur", stop); document.removeEventListener("visibilitychange", stop); };
   }, [phase, reducedMotion, refresh]);
   useEffect(() => { if (paused && game.current) { held.current.clear(); setHeld(game.current, null); setMenu(null); } }, [paused]);
   useEffect(() => { if (!toast) return; const timer = setTimeout(() => setToast(null), 3400); return () => clearTimeout(timer); }, [toast]);
@@ -792,6 +794,24 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     // The fellowship's logo and background come from the site's fellowships folder; draw at once and again when they arrive.
     if (state.player.fellowship) fellowshipArt(state.player.fellowship.tag).then(paint, () => paint(null)); else paint(null);
   };
+  // ---------- Picture in picture: the game canvas mirrored into a floating window (view only; the game keeps running here) ----------
+  const pipVideo = useRef<HTMLVideoElement>(null);
+  const togglePip = async () => {
+    const video = pipVideo.current, view = canvas.current, state = game.current;
+    if (!video || !view) return;
+    try {
+      if (document.pictureInPictureElement) { await document.exitPictureInPicture(); setPip(false); return; }
+      const source = view as HTMLCanvasElement & { captureStream?: (fps?: number) => MediaStream };
+      if (!source.captureStream || !("requestPictureInPicture" in video)) throw new Error("unsupported");
+      video.srcObject = source.captureStream(30); await video.play(); await video.requestPictureInPicture(); setPip(true);
+    } catch { if (state) { message(state, "Picture in picture isn't available in this browser.", "warn"); refresh(); } }
+  };
+  useEffect(() => {
+    const video = pipVideo.current; if (!video) return;
+    const on = () => setPip(true), off = () => { setPip(false); const stream = video.srcObject as MediaStream | null; stream?.getTracks().forEach(track => track.stop()); video.srcObject = null; };
+    video.addEventListener("enterpictureinpicture", on); video.addEventListener("leavepictureinpicture", off);
+    return () => { video.removeEventListener("enterpictureinpicture", on); video.removeEventListener("leavepictureinpicture", off); };
+  }, []);
   const openCard = () => {
     const state = game.current;
     if (!state) return;
@@ -843,6 +863,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
                 {...rightClick((x, y, entries) => setMenu({ x, y, entries }), () => [{ verb: "Walk here", noun: "", run: () => { const at = lastMinimapPoint.current; if (at) onMinimap(at); } }])}
                 onMouseDown={event => { lastMinimapPoint.current = { clientX: event.clientX, clientY: event.clientY } as React.MouseEvent<HTMLCanvasElement>; }} aria-label="Minimap: click to walk, scroll to zoom"
                 onWheel={event => { miniZoom.current = Math.max(1.6, Math.min(7, miniZoom.current * (event.deltaY < 0 ? 1.15 : 0.87))); }} />
+              <button type="button" className="realm-pip" title={pip ? "Close the picture-in-picture window" : "Picture in picture: the Realm in a floating window"} aria-label={pip ? "Close picture in picture" : "Picture in picture"} aria-pressed={pip} onClick={() => void togglePip()}>▣</button>
+              <video ref={pipVideo} className="realm-pip-video" muted playsInline aria-hidden="true" />
               <button type="button" className="realm-fullscreen" title={fullscreen ? "Leave full screen" : "Full screen"} aria-label={fullscreen ? "Leave full screen" : "Full screen"} aria-pressed={fullscreen}
                 onClick={() => window.parent.postMessage({ type: FULLSCREEN_REQUEST }, "*")}>{fullscreen ? "↙" : "↗"}</button>
               <button type="button" ref={compass} className="realm-compass" title="Face north" aria-label="Compass: face north"
@@ -876,7 +898,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
             refresh={refresh} roster={roster} rosterState={rosterState} friendSprites={followerSprites.current} loadFriend={loadFriendSprite}
             net={netState} onSocial={(op, id) => window.parent.postMessage({ type: NET_SOCIAL, op, id }, "*")} onWhisper={id => setWhisper({ text: `@${id} `, at: performance.now() })}
             onOnline={on => window.parent.postMessage({ type: NET_ONLINE, on }, "*")} backupStatus={backupStatus} openGuide={skill => setGuide({ skill })}
-            onLogout={logOut} fullscreen={fullscreen} onFullscreen={() => window.parent.postMessage({ type: FULLSCREEN_REQUEST }, "*")}
+            onLogout={logOut} fullscreen={fullscreen} onFullscreen={() => window.parent.postMessage({ type: FULLSCREEN_REQUEST }, "*")} pip={pip} onPip={() => void togglePip()}
             onExportSave={action => { const state = game.current; if (state) void makeSaveCode(state).then(text => window.parent.postMessage({ type: SAVE_EXPORT, action, text }, "*")); }}
             onRestoreSave={async code => { const state = game.current; if (!state) return "The game isn't ready."; const error = await restoreSaveCode(state, code);
               if (!error) {

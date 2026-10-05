@@ -132,6 +132,8 @@ export type PanelProps = {
   onLogout?: () => void;
   /** Full screen, through the host page (the sandbox cannot ask for it itself). */
   fullscreen?: boolean; onFullscreen?: () => void;
+  /** Picture in picture: the game canvas in a floating window. */
+  pip?: boolean; onPip?: () => void;
   onExportSave?: (action: "copy" | "download") => void; onRestoreSave?: (code: string) => Promise<string | null>; backupStatus?: string;
   net?: NetState; onSocial?: (op: "add" | "remove" | "ignore" | "unignore", id: number) => void; onWhisper?: (id: number) => void; onOnline?: (on: boolean) => void;
 };
@@ -551,7 +553,7 @@ function Slider({ label, min, max, value, unit = "", onChange }: { label: string
     </label>
   );
 }
-function SettingsTab({ game, settings, setSettings, trackName, trackId, playTrack, openHelp, saved, refresh, openMenu, net, onOnline, onExportSave, onRestoreSave, backupStatus, onLogout, fullscreen, onFullscreen }: PanelProps) {
+function SettingsTab({ game, settings, setSettings, trackName, trackId, playTrack, openHelp, saved, refresh, openMenu, net, onOnline, onExportSave, onRestoreSave, backupStatus, onLogout, fullscreen, onFullscreen, pip, onPip }: PanelProps) {
   const set = (patch: Partial<Settings>) => setSettings({ ...settings, ...patch });
   const [code, setCode] = useState(""), [confirming, setConfirming] = useState(false), [restoreNote, setRestoreNote] = useState("");
   const unlocked = game.player.music;
@@ -576,6 +578,10 @@ function SettingsTab({ game, settings, setSettings, trackName, trackId, playTrac
       {onFullscreen && <div className="realm-graphics" role="group" aria-label="Full screen">
         <span>Full screen:</span><button type="button" aria-checked={!!fullscreen} role="radio" onClick={() => { if (!fullscreen) onFullscreen(); }}>On</button><button type="button" aria-checked={!fullscreen} role="radio" onClick={() => { if (fullscreen) onFullscreen(); }}>Off</button>
         <small className="realm-muted"> or the ↗ on the minimap</small>
+      </div>}
+      {onPip && <div className="realm-graphics" role="group" aria-label="Picture in picture">
+        <span>Picture in picture:</span><button type="button" aria-checked={!!pip} role="radio" onClick={() => { if (!pip) onPip(); }}>Open</button><button type="button" aria-checked={!pip} role="radio" onClick={() => { if (pip) onPip(); }}>Closed</button>
+        <small className="realm-muted"> a floating window of the Realm (view only), or the ▣ on the minimap</small>
       </div>}
       <div className="realm-graphics" role="radiogroup" aria-label="Graphics">
         <span>Graphics:</span>{(["high", "low"] as const).map(level => <button key={level} type="button" role="radio" aria-checked={(settings.graphics ?? "high") === level} onClick={() => set({ graphics: level })}
