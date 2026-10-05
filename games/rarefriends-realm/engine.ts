@@ -201,7 +201,7 @@ function objectOptions(game: Game, object: WorldObject): string[] {
     case "tanning": return ["Tan"];
     case "well": return ["Search"];
     case "sigil_altar": return ["Craft-sigil"];
-    case "decor": return object.name.endsWith("(sleep)") ? ["Sleep"] : object.name.endsWith("(fill)") ? ["Fill vials"] : object.name.endsWith("(furnish)") ? ["Warm-up", "Furnish"] : object.decor === "chest" && !object.name.startsWith("Chest") ? ["Search"] : [];
+    case "decor": return object.name.endsWith("(sleep)") ? ["Sleep"] : object.name.endsWith("(fill)") || object.name === "Water barrel" ? ["Fill vials"] : object.name.endsWith("(furnish)") ? ["Warm-up", "Furnish"] : object.decor === "chest" && !object.name.startsWith("Chest") ? ["Search"] : [];
     default: return [];
   }
 }
@@ -950,7 +950,7 @@ function interactObject(game: Game, object: WorldObject, option: string, use?: n
     case "well": searchWell(game); return;
     case "decor":
       if (object.name.endsWith("(sleep)")) { sleep(game); return; }
-      if (object.name.endsWith("(fill)")) { fillVials(game); return; }
+      if (object.name.endsWith("(fill)") || object.name === "Water barrel") { fillVials(game); return; }
       if (object.name.endsWith("(furnish)")) { if (option === "Furnish") { game.ui.home = true; sound(game, "click"); } else message(game, "You warm your hands at the hearth. Home."); return; }
       if (object.decor === "chest") searchCryptChest(game); return;
     default: message(game, examineObject(game, object));

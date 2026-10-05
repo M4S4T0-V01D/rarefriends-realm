@@ -25,7 +25,7 @@ export function buildVillages(ctx: GenContext, t: Tools) {
     fillRect(cx - square, cy - Math.ceil(square * 0.75), cx + square, cy + Math.ceil(square * 0.75), paving === T.WOOD ? T.COBBLE : paving);
   };
   /** A water barrel: empty vials fill at it, for free. Placed after the ground is levelled. */
-  const barrel = (x: number, y: number) => { clearAt(x, y); decor(x, y, "barrel", true, "Water barrel (fill)"); };
+  const barrel = (x: number, y: number) => { clearAt(x, y); decor(x, y, "barrel", true, "Water barrel"); };
   const sign = (x: number, y: number, label: string, text: string, icon?: string) => add({ kind: "sign", x, y, blocks: true, name: label, text, icon });
   const lamps = (points: readonly (readonly [number, number])[], kind: "lamp" | "torch" = "lamp") => { for (const [x, y] of points) decor(x, y, kind); };
 

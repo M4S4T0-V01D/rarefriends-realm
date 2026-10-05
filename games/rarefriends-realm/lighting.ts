@@ -168,6 +168,8 @@ function staticFor(world: World, colors: Record<number, string>) {
 export type Projector = (x: number, y: number) => { x: number; y: number };
 export class LightField {
   sky!: Sky; lights: PointLight[] = [];
+  /** The world it was last built for. */
+  world: World | null = null;
   private s!: Static;
   private x0 = 0; private y0 = 0; private gw = 0; private gh = 0; private S = 2;
   private data = new Float32Array(0);
@@ -204,7 +206,7 @@ export class LightField {
 
   /** Rebuild for the tiles x0–x1, y0–y1 with `samples` per tile edge. */
   build(world: World, colors: Record<number, string>, sky: Sky, lights: PointLight[], x0: number, y0: number, x1: number, y1: number, samples: number) {
-    this.sky = sky; this.lights = lights; this.s = staticFor(world, colors); this.sunCache.clear();
+    this.sky = sky; this.lights = lights; this.world = world; this.s = staticFor(world, colors); this.sunCache.clear();
     const S = this.S = samples; this.x0 = x0; this.y0 = y0;
     const gw = this.gw = (x1 - x0 + 1) * S, gh = this.gh = (y1 - y0 + 1) * S, n = gw * gh;
     if (this.data.length < n * 3) this.data = new Float32Array(n * 3);
@@ -269,6 +271,21 @@ export class LightField {
     }
     return out;
   }
+  /** The light the map lays on the ground at (x, y), as `build` worked it out (before the sun's shadows go over it). */
+  ground(x: number, y: number): RGB {
+    const st = this.s, { ambient, sun } = this.sky, emitK = 0.3 + 0.7 * this.sky.night;
+    const ao = this.bilinear(st.ao, x, y, 1), roof = this.bilinear(st.roofed, x, y, 0), ax = this.albedoAt(x, y), open = 1 - roof;
+    const out: RGB = [0, 0, 0];
+    for (let c = 0; c < 3; c++) out[c] = ambient[c] * ao + sun[c] * open * (1 + 0.2 * ax[c] * ao) + this.emitAt(x, y, c) * emitK;
+    for (const light of this.lights) {
+      const dx = x - light.x, dy = y - light.y, dist2 = dx * dx + dy * dy, bounceR = light.r * 1.6;
+      if (dist2 > bounceR * bounceR) continue;
+      const direct = falloff(dist2, light.r, light.h), seen = direct > 0.002 ? this.transmit(light, x, y, 0) : 0, around = this.albedoAt(light.x, light.y);
+      const soft = 1 - dist2 / (bounceR * bounceR), b = soft * soft * light.k * (0.3 + 0.7 * Math.sqrt(seen)), a = direct * seen * light.k;
+      for (let c = 0; c < 3; c++) out[c] += light.rgb[c] * (a + around[c] * BOUNCE * b);
+    }
+    return out;
+  }
   /** The open sky's light, for things up in the air (haze, fog, roofs). */
   skyLight(): RGB { const { ambient, sun } = this.sky; return [ambient[0] + sun[0], ambient[1] + sun[1], ambient[2] + sun[2]]; }
 
@@ -285,10 +302,11 @@ export class LightField {
       // Flat enough to draw as one parallelogram? (The fourth corner's height is predicted by the other three.)
       if (size > 1 && !coarse) {
         const a = heights(tx0, ty0), b = heights(tx0 + n, ty0), c = heights(tx0, ty0 + m), d = heights(tx0 + n, ty0 + m);
-        let flat = Math.abs(a + d - b - c) < 1.5;
+        // (The light is soft and laid at half resolution: a few world pixels off on a slope never shows.)
+        let flat = Math.abs(a + d - b - c) < 3;
         if (flat) for (let k = 1; k < Math.max(n, m) && flat; k++) {
           const u = Math.min(k, n), v = Math.min(k, m);
-          if (Math.abs(heights(tx0 + u, ty0 + v) - (a + (b - a) * u / n + (c - a) * v / m)) > 1.5) flat = false;
+          if (Math.abs(heights(tx0 + u, ty0 + v) - (a + (b - a) * u / n + (c - a) * v / m)) > 3) flat = false;
         }
         if (!flat) { const half = size / 2; for (let v = 0; v < m; v += half) for (let u = 0; u < n; u += half) patch(ti + u, tj + v, half); return; }
       }

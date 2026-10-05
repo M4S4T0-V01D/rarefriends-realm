@@ -116,12 +116,84 @@ export function pixelArt(key: string, w: number, h: number, paint: (p: Pixels) =
   cache.set(key, canvas);
   return canvas;
 }
+/** One pixel-art draw as it landed on screen, so the same sprite can be laid again (as a shadow, or a hole in the light). */
+export type SpriteDraw = { art: HTMLCanvasElement; x: number; y: number; w: number; h: number; alpha: number };
+let recording: SpriteDraw[] | null = null;
+/** Every drawPixels call is noted in `list` until recording stops (null). */
+export function recordSprites(list: SpriteDraw[] | null) { recording = list; }
+/**
+ * Art scaled up once and kept, so a frame's hundreds of sprites are plain copies (a scaled draw costs more wherever the
+ * canvas is drawn in software). A size is only kept once it's been asked for in two frames (zooming asks for a new size
+ * every frame), and a frame makes a few at most, so settling after a zoom never hitches.
+ */
+const scaled = new WeakMap<HTMLCanvasElement, { last: number; copies: Map<number, HTMLCanvasElement> }>();
+let scaledThisFrame = 0;
+const SCALED_PER_FRAME = 48, SCALED_PER_ART = 2;
+/** Call once a frame: lets a few more scaled copies be made. */
+export function beginSprites() { scaledThisFrame = 0; }
+function scaledArt(art: HTMLCanvasElement, w: number, h: number): HTMLCanvasElement {
+  if (w === art.width && h === art.height) return art;
+  const key = w * 65536 + h;
+  let entry = scaled.get(art);
+  if (!entry) { entry = { last: key, copies: new Map() }; scaled.set(art, entry); return art; }
+  const copy = entry.copies.get(key);
+  if (copy) return copy;
+  if (entry.last !== key || scaledThisFrame >= SCALED_PER_FRAME) { entry.last = key; return art; }
+  scaledThisFrame++;
+  const canvas = document.createElement("canvas"); canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext("2d")!; ctx.imageSmoothingEnabled = false; ctx.drawImage(art, 0, 0, w, h);
+  if (entry.copies.size >= SCALED_PER_ART) entry.copies.delete(entry.copies.keys().next().value!);
+  entry.copies.set(key, canvas);
+  return canvas;
+}
 /** Draw pixel art with its bottom-centre on (x, y), `scale` screen pixels per art pixel. */
 export function drawPixels(ctx: CanvasRenderingContext2D, art: HTMLCanvasElement, x: number, y: number, scale: number, alpha = 1, anchorY = 1) {
-  const w = art.width * scale, h = art.height * scale;
-  const smoothing = ctx.imageSmoothingEnabled;
-  ctx.imageSmoothingEnabled = false; ctx.globalAlpha = alpha;
-  ctx.drawImage(art, Math.round(x - w / 2), Math.round(y - h * anchorY), Math.round(w), Math.round(h));
-  ctx.globalAlpha = 1; ctx.imageSmoothingEnabled = smoothing;
+  const w = art.width * scale, h = art.height * scale, dx = Math.round(x - w / 2), dy = Math.round(y - h * anchorY), dw = Math.round(w), dh = Math.round(h);
+  ctx.imageSmoothingEnabled = false;
+  if (alpha !== 1) ctx.globalAlpha = alpha;
+  ctx.drawImage(scaledArt(art, dw, dh), dx, dy, dw, dh);
+  if (alpha !== 1) ctx.globalAlpha = 1;
+  if (recording) recording.push({ art, x: dx, y: dy, w: dw, h: dh, alpha });
   return { x: x - w / 2, y: y - h * anchorY, w, h };
+}
+/**
+ * A sprite's silhouette in one flat colour (its light, or how clear of the haze it is), kept by art, size and colour:
+ * laid over the light buffer with one draw, it puts the sprite's own light where the sprite is, as cutting a hole and
+ * filling it would, without the change of composite mode each sprite would otherwise cost. Colours are quantised by
+ * the caller, so a frame of scenery under one sky shares a handful of them.
+ */
+const tints = new Map<string, HTMLCanvasElement>();
+const artIds = new WeakMap<HTMLCanvasElement, number>();
+let nextArtId = 1;
+const TINTS_MAX = 1200;
+export function tintedSprite(art: HTMLCanvasElement, w: number, h: number, css: string): HTMLCanvasElement {
+  let id = artIds.get(art);
+  if (!id) { id = nextArtId++; artIds.set(art, id); }
+  const key = `${id}:${w}:${h}:${css}`;
+  let canvas = tints.get(key);
+  if (canvas) { tints.delete(key); tints.set(key, canvas); return canvas; }
+  canvas = document.createElement("canvas"); canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext("2d")!; ctx.imageSmoothingEnabled = false; ctx.drawImage(art, 0, 0, w, h);
+  ctx.globalCompositeOperation = "source-in"; ctx.fillStyle = css; ctx.fillRect(0, 0, w, h);
+  if (tints.size >= TINTS_MAX) tints.delete(tints.keys().next().value!);
+  tints.set(key, canvas);
+  return canvas;
+}
+/** Lay recorded sprites again as flat silhouettes of one colour (source-over). */
+export function stampSprites(ctx: CanvasRenderingContext2D, list: readonly SpriteDraw[], css: string) {
+  ctx.imageSmoothingEnabled = false;
+  for (const s of list) {
+    if (s.alpha !== 1) ctx.globalAlpha = s.alpha;
+    ctx.drawImage(tintedSprite(s.art, s.w, s.h, css), s.x, s.y);
+    if (s.alpha !== 1) ctx.globalAlpha = 1;
+  }
+}
+/** Lay recorded sprites again on another canvas (the same art at the same places). */
+export function replaySprites(ctx: CanvasRenderingContext2D, list: readonly SpriteDraw[]) {
+  ctx.imageSmoothingEnabled = false;
+  for (const s of list) {
+    if (s.alpha !== 1) ctx.globalAlpha = s.alpha;
+    ctx.drawImage(scaledArt(s.art, s.w, s.h), s.x, s.y, s.w, s.h);
+    if (s.alpha !== 1) ctx.globalAlpha = 1;
+  }
 }

@@ -2167,7 +2167,7 @@ test("Belts at the waist, barrels that fill vials, a follower in your wardrobe, 
   p.inventory.fill(null); give(p, "apothecary_belt"); equip(g, p.inventory.findIndex(slot => slot?.id === "apothecary_belt")); give(p, "healing_tonic", 3); give(p, "clean_feverleaf", 5); beltFill(g, "apothecary_belt");
   assert.equal(beltContents(p, "apothecary_belt").healing_tonic, 3); p.hp = 1; sipBelt(g); assert(p.hp > 1, "a sip heals"); assert.equal(beltContents(p, "apothecary_belt").healing_tonic, 2); assert(has(p, "vial"), "the vial comes back");
   // Barrels in every village fill vials (into the belt first).
-  const barrels = w.objects.filter(object => object.name === "Water barrel (fill)"); assert(barrels.length >= 7, `a barrel in every village (${barrels.length})`);
+  const barrels = w.objects.filter(object => object.name === "Water barrel"); assert(barrels.length >= 20, `water barrels in every town and village (${barrels.length})`); assert(barrels.some(b => regionAt(w, b.x, b.y).id === "friendhollow"), "one in Friendhollow");
   give(p, "vial", 5); standBy(g, barrels[0]); setTarget(g, { kind: "object", id: barrels[0].id, option: "Fill vials" }); until(g, () => !has(p, "vial"), 40);
   assert.equal(beltContents(p, "apothecary_belt").vial_of_water, 6, "filled, onto the belt"); assert(SHOPS.gravesend_general.stock.includes("vial_of_water") && SHOPS.general.stock.includes("vial") && SHOPS.saltmarrow_fish.stock.includes("vial_of_water"));
   // The follower in your wardrobe.

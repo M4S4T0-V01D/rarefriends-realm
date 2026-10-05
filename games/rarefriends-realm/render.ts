@@ -17,6 +17,7 @@ import { emoteMotion, emoteParticles, type Motion } from "./emotes.ts";
 import { drawPixels, pixelArt, shadeHex } from "./pixel.ts";
 import { TEX_PER_HEIGHT, TEX_PER_TILE, beginTextures, groundTexture, textureStats, shingleTexture, texturedQuad, texturedTriangle, wallTexture, PANE, type GroundStyle, type WallStyle } from "./textures.ts";
 import { campfireLogs, decorArt, fireArt, rockArt, treeArt , herbArt } from "./scenery.ts";
+import { beginSprites, recordSprites, replaySprites, stampSprites, type SpriteDraw } from "./pixel.ts";
 import { spellArt } from "./spellart.ts";
 import { SADDLE, mountArt, type MountView } from "./mountart.ts";
 import { petArt } from "./petart.ts";
@@ -98,6 +99,7 @@ const hexA = (hex: string, alpha: number) => { const n = parseInt(hex.slice(1, 7
  * of the buffer and fills the hole with the light where it stands; the buffer is then multiplied over the frame once.
  */
 const field = new LightField();
+let fieldKeyPrev = "", fieldFrame = 0;
 let lightBuffer: HTMLCanvasElement | null = null, shadowBuffer: HTMLCanvasElement | null = null;
 /**
  * The distance haze, the same way: how clearly each pixel is seen (white clear, grey hazy), laid on the land by its
@@ -351,33 +353,46 @@ function groundTile(ctx: CanvasRenderingContext2D, scene: Scene, x: number, y: n
   ctx.strokeStyle = "rgba(22,22,22,0.55)"; ctx.lineWidth = Math.max(0.8, z); ctx.stroke(edges);
   return corners;
 }
-function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, x0: number, y0: number, x1: number, y1: number) {
-  const { camera, game, now } = scene, world = game.world, z = camera.zoom, hw = TILE_W / 2 * z, hh = hw * camera.pitch;
-  const t = scene.reducedMotion ? 0 : now / 1000;
+/**
+ * The ground: fills, pixel textures, inked edges and contours (`still`), and the water and lava that move (`motion`).
+ * Tiles are culled to the view plus `pad` screen pixels; `from`–`to` is the slice of the back-to-front order to draw
+ * (the terrain cache paints itself over a few frames).
+ */
+function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, camera: Camera, x0: number, y0: number, x1: number, y1: number, pad = 0, mode: "all" | "still" | "motion" = "all", from = 0, to = 1) {
+  const { game, now } = scene, world = game.world, z = camera.zoom, hw = TILE_W / 2 * z, hh = hw * camera.pitch;
+  const animate = !scene.reducedMotion, t = animate ? now / 1000 : 0;
+  if (mode === "motion" && !animate) return;
   // Screen offsets of half a tile along world x and y: tile corners are centre ± ex ± ey at any camera angle.
   const flat = (dx: number, dy: number) => { const { rx, ry } = rotate(camera, dx, dy); return { x: (rx - ry) * TILE_W / 2 * z, y: (rx + ry) * TILE_W / 2 * camera.pitch * z }; };
   const o = { x: 0, y: 0 }, px = flat(0.5, 0), py = flat(0, 0.5);
   const ex = { x: px.x - o.x, y: px.y - o.y }, ey = { x: py.x - o.x, y: py.y - o.y }, ls = liftScale(camera);
   // Inked edges and contour lines go into two paths, stroked once. Texture is left off tiles too small or far to show it.
   const edges = new Path2D(), contours = new Path2D(), small = hh < 5, near = scene.low ? 16 : 34;
-  for (const packed of terrainOrder(camera, x0, y0, x1, y1)) {
-    const x = x0 + packed % (x1 - x0 + 1), y = y0 + Math.floor(packed / (x1 - x0 + 1));
+  const order = terrainOrder(camera, x0, y0, x1, y1), kEnd = Math.round(order.length * to);
+  for (let k = Math.round(order.length * from); k < kEnd; k++) {
+    const packed = order[k], x = x0 + packed % (x1 - x0 + 1), y = y0 + Math.floor(packed / (x1 - x0 + 1));
     if (!inBounds(x, y)) continue;
     const terrain = world.tiles[y * W + x];
     if (terrain === T.VOID) continue;
+    // Water and lava move: the cached ground leaves them to the frame.
+    const moving = animate && (terrain === T.WATER || terrain === T.DEEP || terrain === T.LAVA);
+    if (mode === "motion" && !moving) continue;
     const { x: sx, y: sy } = toScreen(camera, x, y);
-    if (sx < -hw * 2 || sx > VIEW.width + hw * 2 || sy < -hh * 2 || sy > VIEW.height + hh * 4) continue;
+    if (sx < -hw * 2 - pad || sx > VIEW.width + hw * 2 + pad || sy < -hh * 2 - pad || sy > VIEW.height + hh * 4 + pad) continue;
     // Corner heights lift each corner off the tile centre; slopes facing the north-west light are brighter.
     const hA = cornerHeight(world, x, y), hB = cornerHeight(world, x + 1, y), hC = cornerHeight(world, x + 1, y + 1), hD = cornerHeight(world, x, y + 1), hMid = (hA + hB + hC + hD) / 4;
     const slope = Math.max(-0.22, Math.min(0.22, ((hA + hD) - (hB + hC) + (hA + hB) - (hD + hC)) * 0.011));
     const variation = (hash(x, y) - 0.5) * 0.035 + slope, lifted = ls * z;
     const ax = sx - ex.x - ey.x, ay = sy - ex.y - ey.y - (hA - hMid) * lifted, bx = sx + ex.x - ey.x, by = sy + ex.y - ey.y - (hB - hMid) * lifted;
     const cx = sx + ex.x + ey.x, cy = sy + ex.y + ey.y - (hC - hMid) * lifted, dx = sx - ex.x + ey.x, dy = sy - ex.y + ey.y - (hD - hMid) * lifted;
-    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.lineTo(cx, cy); ctx.lineTo(dx, dy); ctx.closePath();
-    ctx.fillStyle = terrainFill(terrain, variation); ctx.fill();
+    if (mode !== "motion") {
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.lineTo(cx, cy); ctx.lineTo(dx, dy); ctx.closePath();
+      ctx.fillStyle = terrainFill(terrain, variation); ctx.fill();
+    }
     // Texture details.
     const h = hash(y, x), detailed = !small && Math.abs(x - camera.x) + Math.abs(y - camera.y) < near, style = GROUND_STYLE[terrain];
-    if (detailed && texturesOn && style) {
+    if (detailed && (mode === "still" ? moving : mode === "motion" ? !moving : false)) { /* the other pass draws it */ }
+    else if (detailed && texturesOn && style) {
       // Pixel texture mapped onto the tile (corners a, b along x, d along y), in the same style as the buildings.
       texturedQuad(ctx, groundTexture(style, TERRAIN_COLORS[terrain], Math.floor(h * 4)), { x: ax, y: ay }, { x: bx, y: by }, { x: dx, y: dy }, TEX_PER_TILE, TEX_PER_TILE);
     } else if (detailed) {
@@ -418,6 +433,7 @@ function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, x0: number, y0
         case T.CARPET: ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.beginPath(); ctx.moveTo(sx, sy - hh * 0.6); ctx.lineTo(sx + hw * 0.6, sy); ctx.lineTo(sx, sy + hh * 0.6); ctx.lineTo(sx - hw * 0.6, sy); ctx.closePath(); ctx.stroke(); break;
       }
     }
+    if (mode === "motion") continue;
     // Inked edges where the terrain class changes.
     const mine = EDGE_CLASS[terrain];
     const edge = (nx: number, ny: number, ax: number, ay: number, bx: number, by: number) => {
@@ -445,8 +461,94 @@ function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, x0: number, y0
       }
     }
   }
+  if (mode === "motion") return;
   ctx.strokeStyle = "rgba(22,22,22,0.16)"; ctx.lineWidth = 1; ctx.stroke(contours);
   ctx.strokeStyle = "rgba(22,22,22,0.55)"; ctx.lineWidth = Math.max(0.8, z); ctx.stroke(edges);
+}
+
+// ---------- Terrain cache ----------
+/**
+ * The ground doesn't change from frame to frame while you walk: the camera only slides. So the still parts of the
+ * terrain (fills, textures, edges, contours) are painted once onto a canvas a little bigger than the view, and each
+ * frame that canvas is laid down at the camera's offset; only the water and lava are drawn live over it. When the
+ * camera turns, zooms or tilts the ground is drawn straight to the frame as before. A slide past a third of the
+ * margin starts a fresh canvas, painted a quarter per frame so there's no hitch, and swapped in when it's done.
+ */
+const TERRAIN_PAD = 160;
+const TERRAIN_STEPS = 4;
+type GroundSnap = { camera: Camera; key: string; world: World };
+type GroundCanvas = { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; snap: GroundSnap; range: [number, number, number, number]; step: number };
+let groundReady: GroundCanvas | null = null, groundBuild: GroundCanvas | null = null, groundKeyPrev = "";
+/** Canvases not in use (two at most: the one shown and the one being painted swap over and over). */
+const groundSpare: [HTMLCanvasElement, CanvasRenderingContext2D][] = [];
+const groundCanvas = (): [HTMLCanvasElement, CanvasRenderingContext2D] => {
+  const spare = groundSpare.pop();
+  if (spare) return spare;
+  const canvas = document.createElement("canvas"), ctx = canvas.getContext("2d")!;
+  return [canvas, ctx];
+};
+const dropGround = (ground: GroundCanvas | null) => { if (ground && groundSpare.length < 2) groundSpare.push([ground.canvas, ground.ctx]); };
+/** The tiles the view (plus `pad` screen pixels) can see, clamped to `reach` tiles from the camera. */
+function tileRange(camera: Camera, reach: number, pad = 0): [number, number, number, number] {
+  const corners = [toTile(camera, -pad, -pad, false), toTile(camera, VIEW.width + pad, -pad, false), toTile(camera, -pad, VIEW.height + pad, false), toTile(camera, VIEW.width + pad, VIEW.height + pad, false)];
+  const cx = Math.round(camera.x), cy = Math.round(camera.y);
+  const x0 = Math.max(cx - reach, Math.min(...corners.map(c => c.x)) - 2), x1 = Math.min(cx + reach, Math.max(...corners.map(c => c.x)) + 3);
+  const y0 = Math.max(cy - reach, Math.min(...corners.map(c => c.y)) - 2), y1 = Math.min(cy + reach, Math.max(...corners.map(c => c.y)) + 3);
+  return [x0, y0, x1, y1];
+}
+/** Where a point painted at the snapshot's camera lands now: the camera's slide (and its rise) on screen. */
+function groundShift(now: Camera, snap: Camera) {
+  const { rx, ry } = rotate(now, snap.x - now.x, snap.y - now.y), half = TILE_W / 2 * now.zoom;
+  return { dx: (rx - ry) * half, dy: (rx + ry) * half * now.pitch + ((now.base ?? 0) - (snap.base ?? 0)) * liftScale(now) * now.zoom };
+}
+function startGround(scene: Scene, snap: GroundSnap, reach: number): GroundCanvas {
+  const [canvas, ctx] = groundCanvas();
+  const w = VIEW.width + TERRAIN_PAD * 2, h = VIEW.height + TERRAIN_PAD * 2;
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, w, h); ctx.setTransform(1, 0, 0, 1, TERRAIN_PAD, TERRAIN_PAD);
+  return { canvas, ctx, snap, range: tileRange(snap.camera, reach, TERRAIN_PAD), step: 0 };
+}
+/** Paint the next slice of a ground canvas; true when it's complete. */
+function paintGround(scene: Scene, build: GroundCanvas, steps: number) {
+  const [x0, y0, x1, y1] = build.range;
+  beginTextures(build.ctx);
+  while (steps-- > 0 && build.step < TERRAIN_STEPS) { drawTerrain(build.ctx, scene, build.snap.camera, x0, y0, x1, y1, TERRAIN_PAD, "still", build.step / TERRAIN_STEPS, (build.step + 1) / TERRAIN_STEPS); build.step++; }
+  return build.step >= TERRAIN_STEPS;
+}
+/** The ground for this frame: from the cache where it can be, drawn fresh where it can't. */
+function drawGround(target: CanvasRenderingContext2D, scene: Scene, x0: number, y0: number, x1: number, y1: number, reach: number) {
+  const { camera, game } = scene, world = game.world;
+  const key = `${camera.angle.toFixed(4)}|${camera.zoom.toFixed(3)}|${camera.pitch.toFixed(3)}|${VIEW.width}x${VIEW.height}|${scene.low ? 1 : 0}${texturesOn ? 1 : 0}${scene.reducedMotion ? 1 : 0}|${game.worldVersion ?? 0}|${viewFloor ? `${viewFloor.complex}:${viewFloor.level}` : ""}`;
+  const snapOf = (): GroundSnap => ({ camera: { ...camera }, key, world });
+  const usable = (ground: GroundCanvas | null) => {
+    if (!ground || ground.snap.key !== key || ground.snap.world !== world) return null;
+    const { dx, dy } = groundShift(camera, ground.snap.camera);
+    return Math.abs(dx) <= TERRAIN_PAD && Math.abs(dy) <= TERRAIN_PAD ? { dx, dy } : null;
+  };
+  // A build under way carries on while it's still wanted (one slice a frame), and takes over once it's whole.
+  if (groundBuild && (groundBuild.snap.key !== key || groundBuild.snap.world !== world)) { dropGround(groundBuild); groundBuild = null; }
+  if (groundBuild && paintGround(scene, groundBuild, 1)) { dropGround(groundReady); groundReady = groundBuild; groundBuild = null; }
+  let fit = usable(groundReady);
+  if (!fit) {
+    if (key !== groundKeyPrev) {
+      // Turning, zooming or tilting: straight to the frame, as every frame would differ.
+      groundKeyPrev = key; dropGround(groundReady); dropGround(groundBuild); groundReady = groundBuild = null;
+      drawTerrain(target, scene, camera, x0, y0, x1, y1); RENDER_PROFILE.groundCached = 0; return;
+    }
+    // Settled, but nothing cached yet: paint the canvas a slice a frame (drawing straight to the frame meanwhile), so
+    // the frames after a turn or a zoom carry a quarter of the work each rather than one of them all of it.
+    if (!groundBuild) { groundBuild = startGround(scene, snapOf(), reach); if (paintGround(scene, groundBuild, 1)) { dropGround(groundReady); groundReady = groundBuild; groundBuild = null; } }
+    fit = usable(groundReady);
+    if (!fit) { drawTerrain(target, scene, camera, x0, y0, x1, y1); RENDER_PROFILE.groundCached = 0; return; }
+  }
+  groundKeyPrev = key;
+  beginTextures(target);
+  target.imageSmoothingEnabled = false;
+  target.drawImage(groundReady!.canvas, Math.round(fit.dx) - TERRAIN_PAD, Math.round(fit.dy) - TERRAIN_PAD);
+  drawTerrain(target, scene, camera, x0, y0, x1, y1, 0, "motion");
+  RENDER_PROFILE.groundCached = 1;
+  // Slid a good way: start on a canvas centred where the camera is now.
+  if (!groundBuild && (Math.abs(fit.dx) > TERRAIN_PAD / 3 || Math.abs(fit.dy) > TERRAIN_PAD / 3)) groundBuild = startGround(scene, snapOf(), reach);
 }
 
 // ---------- Footprints ----------
@@ -1102,7 +1204,7 @@ function crouched<T>(ctx: CanvasRenderingContext2D, on: boolean, x: number, feet
 let windowGlow = 0;
 const emitted: [number, number][][] = [];
 /** Paint what a drawable gave off (lit glass, flames) into the light buffer: it shines instead of taking the dark. */
-function paintEmitted(lb: CanvasRenderingContext2D, light: RGB, strength: number) {
+function paintEmitted(lb: CanvasRenderingContext2D, light: RGB, strength: number, emitted: readonly [number, number][][]) {
   if (!emitted.length) return;
   lb.globalCompositeOperation = "source-over";
   lb.fillStyle = rgbCss([light[0] + (1 - light[0]) * strength, light[1] + (0.95 - light[1]) * strength, light[2] + (0.84 - light[2]) * strength]);
@@ -1367,6 +1469,10 @@ type Drawable = {
   hull?: () => [number, number][] | null;
   /** Scenery (trees, rocks, decorations) isn't checked for hills in front of it: there's too much of it to be worth it. */
   scenery?: boolean;
+  /** Drawn as pixel art alone: its shadow and its hole in the light are the same sprites laid again, not a second drawing. */
+  sprite?: boolean;
+  /** Set by the frame's draw: off screen (skipped), its screen box, the sprites it laid, and the glow it gave off. */
+  skip?: boolean; box?: [number, number, number, number]; sprites?: SpriteDraw[] | null; emitted?: [number, number][][] | null; tag?: string;
 };
 let lastHits: Hit[] = [];
 /** Picks under a point, topmost first, from the last frame. */
@@ -1415,13 +1521,9 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   updateEffects(game, camera, dt, scene.reducedMotion || low, 34 / Math.max(0.5, z));
   if (underground) { ctx.fillStyle = "#0e0e10"; ctx.fillRect(0, 0, VIEW.width, VIEW.height); }
   else { const sky = ctx.createLinearGradient(0, 0, 0, VIEW.height); sky.addColorStop(0, "#b9c7d6"); sky.addColorStop(1, "#dcdfda"); ctx.fillStyle = sky; ctx.fillRect(0, 0, VIEW.width, VIEW.height); }
-  // Visible tile bounds.
-  const corners = [toTile(camera, 0, 0, false), toTile(camera, VIEW.width, 0, false), toTile(camera, 0, VIEW.height, false), toTile(camera, VIEW.width, VIEW.height, false)];
-  // Low camera angles see a long way: draw out to DRAW_DISTANCE and let the haze take the rest.
-  const cx = Math.round(camera.x), cy = Math.round(camera.y);
-  const x0 = Math.max(cx - reach, Math.min(...corners.map(c => c.x)) - 2), x1 = Math.min(cx + reach, Math.max(...corners.map(c => c.x)) + 3);
-  const y0 = Math.max(cy - reach, Math.min(...corners.map(c => c.y)) - 2), y1 = Math.min(cy + reach, Math.max(...corners.map(c => c.y)) + 3);
-  lap("setup"); drawTerrain(ctx, scene, x0, y0, x1, y1); lap("terrain"); RENDER_PROFILE.groundQuads = textureStats.frame;
+  // Visible tile bounds. Low camera angles see a long way: draw out to DRAW_DISTANCE and let the haze take the rest.
+  const [x0, y0, x1, y1] = tileRange(camera, reach);
+  lap("setup"); drawGround(ctx, scene, x0, y0, x1, y1, reach); lap("terrain"); RENDER_PROFILE.groundQuads = textureStats.frame;
   // The sky's light for the time of day and the weather; the sun's share of it decides how dark shadows are.
   const weather = scene.weather ?? null, sky = skyFor(scene.time, weather, underground), lit = true;
   windowGlow = underground ? 0 : Math.max(0, Math.min(1, (sky.night - 0.3) / 0.45));
@@ -1532,7 +1634,8 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     const fountainMaster = object.kind === "fountain" && objectAtTile(world, x - 1, y)?.kind !== "fountain" && objectAtTile(world, x, y - 1)?.kind !== "fountain";
     const d = fountainMaster ? depth(x + 0.5, y + 0.5) + 0.3 : depth(x, y) + (object.kind === "wheat" || object.kind === "spot" ? -0.4 : 0);
     const flat = object.kind === "spot" || (object.kind === "decor" && FLAT_DECOR.has(object.decor!));
-    drawables.push({ depth: d, at: { x, y }, cast: !flat, scenery: object.kind === "tree" || object.kind === "rock" || object.kind === "decor" || object.kind === "spot", size: object.decor === "windmill" ? [320, 140, 40] : object.kind === "tree" ? [260, 110, 40] : [200, 110, 40], draw: () => {
+    const sprite = object.kind === "tree" || object.kind === "rock" || (object.kind === "decor" && object.decor !== "banner");
+    drawables.push({ depth: d, at: { x, y }, cast: !flat, sprite, scenery: object.kind === "tree" || object.kind === "rock" || object.kind === "decor" || object.kind === "spot", size: object.decor === "windmill" ? [320, 140, 40] : object.kind === "tree" ? [260, 110, 40] : [200, 110, 40], draw: () => {
       let rect: { x: number; y: number; w: number; h: number };
       const tall = object.kind === "tree" || (object.kind === "decor" && (["pine", "windmill", "palm", "pillar", "tent", "crypt", "obelisk"].includes(object.decor!) || (object.decor === "ruin_wall" && (object.height ?? 0) > 34)));
       // Anything tall in front of your Friend that covers it on screen turns see-through (works at any angle and zoom).
@@ -1583,7 +1686,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
         continue;
       }
       if (storey.level !== level) continue;
-      drawables.push({ depth: depth(x, y) - 0.45, at: { x, y, h: 4 }, size: [20, 52, 30], draw: () => floorTile(ctx, camera, x, y, terrain) });
+      drawables.push({ depth: depth(x, y) - 0.45, at: { x, y, h: 4 }, size: [20, 52, 30], tag: "floor", draw: () => floorTile(ctx, camera, x, y, terrain) });
       object(x, y);
     }
   }
@@ -1641,7 +1744,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   for (const npc of game.npcs) {
     if (!shown(npc.x, npc.y)) continue;
     const at = interpolate(npc, game, alpha);
-    drawables.push({ depth: depth(at.x, at.y) + 0.1, at, cast: true, size: [170, 90, 30], draw: () => drawNpc(ctx, scene, npc, at, hits) });
+    drawables.push({ depth: depth(at.x, at.y) + 0.1, at, cast: true, size: [170, 90, 30], tag: "npc", draw: () => drawNpc(ctx, scene, npc, at, hits) });
   }
   // Monsters.
   for (const monster of game.monsters) {
@@ -1824,7 +1927,13 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   const LS = low ? 0.25 : 0.5, bufs = buffers(target, LS), ls = liftScale(camera);
   // Low keeps High's light (a coarser field, drawn in bigger patches) and the buildings' shadows, without the
   // silhouettes every sprite throws, the far haze and the cloud shadows.
-  field.build(world, TERRAIN_COLORS, sky, lights, x0, y0, x1, Math.min(y1, FLOOR_Y - 1), low ? 1 : 2);
+  // The field changes slowly (the sky drifts, flames flicker): it's rebuilt when the view, the lights, the sky or the
+  // world changed, and otherwise every other frame.
+  // (Its range snaps outward to a 4-tile grid, so a walk doesn't change it every step.)
+  const fx0 = Math.floor(x0 / 4) * 4, fy0 = Math.floor(y0 / 4) * 4, fx1 = Math.ceil((x1 + 1) / 4) * 4 - 1, fy1 = Math.min(FLOOR_Y - 1, Math.ceil((y1 + 1) / 4) * 4 - 1);
+  const fieldKey = `${fx0},${fy0},${fx1},${fy1},${lights.length},${low ? 1 : 0},${game.worldVersion ?? 0},${Math.round((sky.sun[0] + sky.sun[1] + sky.sun[2] + sky.ambient[0] + sky.ambient[1] + sky.ambient[2]) * 40)},${Math.round(sky.night * 40)}`;
+  fieldFrame++;
+  if (fieldKey !== fieldKeyPrev || field.world !== world || (fieldFrame & 1) === 0) { field.build(world, TERRAIN_COLORS, sky, lights, fx0, fy0, fx1, fy1, low ? 1 : 2); fieldKeyPrev = fieldKey; }
   lap("light field");
   // The ground's light: the sky where there's no ground, the light map laid on the land, then the sun's shadows.
   const lb = bufs.light;
@@ -1832,6 +1941,52 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   lb.fillStyle = rgbCss(field.skyLight()), lb.fillRect(0, 0, VIEW.width, VIEW.height);
   field.drawGround(lb, (x, y) => toScreen(camera, x, y), (i, j) => cornerHeight(world, i, j), low);
   lap("light map");
+  // ---------- Objects, each in the light where it stands ----------
+  const lightOn = (drawable: Drawable): RGB | null => {
+    const at = drawable.at;
+    if (lit && drawable.light) return drawable.light.map(v => Math.min(1, v)) as RGB;
+    if (!lit || !at) return null;
+    const real = at.y >= FLOOR_Y - 0.5 ? realPoint(world, at.x, at.y) : at, light = field.at(real.x, real.y, at.h ?? 16), min = drawable.min ?? 0;
+    return [Math.min(1, Math.max(min, light[0])), Math.min(1, Math.max(min, light[1])), Math.min(1, Math.max(min, light[2]))];
+  };
+  const rectOf = (drawable: Drawable): [number, number, number, number] => {
+    if (drawable.rect) return drawable.rect();
+    const at = drawable.at!, s = toScreen(camera, at.x, at.y), [up, side, down] = drawable.size ?? [240, 120, 40];
+    return [s.x - side * z, s.y - up * z * Math.max(1, ls), s.x + side * z, s.y + down * z];
+  };
+  // The hover outline is UI: never dimmed.
+  if (scene.hoverTile && !floor) { const hover = scene.hoverTile, s = toScreen(camera, hover.x, hover.y);
+    drawables.unshift({ depth: -Infinity, light: [1, 1, 1], rect: () => [s.x - 50 * z, s.y - 30 * z, s.x + 50 * z, s.y + 30 * z], draw: () => tileOutline(hover.x, hover.y, "rgba(22,22,22,0.35)") }); }
+  uiQueue = []; uiTarget = target;
+  // Last of all, over the land: particles and birds in the light where you are, then the ground fog in the sky's (a fog
+  // bank at night is a dim blue, not a white glow). Sparks and fireflies give their own light, later.
+  const screen = (): [number, number, number, number] => [0, 0, VIEW.width, VIEW.height];
+  drawables.push({ depth: Infinity, at: { x: here.x, y: here.y, h: 40 }, rect: screen, draw: () => drawEffects(ctx, project, world, now, z, "lit") });
+  if (weather && weather.fog > 0.02) drawables.push({ depth: Infinity, light: field.skyLight().map(v => v * 1.08) as RGB, rect: screen, draw: () => {
+    if (weather && weather.fog > 0.02 && !scene.reducedMotion && !low) drawFog(ctx, camera, weather.fog, now);
+    else if (weather && weather.fog > 0.02) { ctx.fillStyle = `rgba(232,235,238,${(weather.fog * 0.25).toFixed(3)})`; ctx.fillRect(0, 0, VIEW.width, VIEW.height); }
+  } });
+  // ---------- The frame: everything in depth order ----------
+  // Whatever falls wholly off the screen is skipped (the view's tile range is a box around a turned screen). Pixel-art
+  // scenery notes the sprites it lays, so its shadow and its hole in the light are those sprites again, not a redraw.
+  beginSprites();
+  const kinds: Record<string, number> = { n_sprite: 0, n_hull: 0, n_floor: 0, n_npc: 0, n_at: 0, n_rect: 0 };
+  for (const drawable of drawables) {
+    drawable.skip = false; drawable.sprites = null; drawable.emitted = null;
+    if (drawable.at && drawable.depth !== Infinity) {
+      const box = rectOf(drawable), margin = 48 * z;
+      if (box[2] < -margin || box[0] > VIEW.width + margin || box[3] < -margin || box[1] > VIEW.height + margin) { drawable.skip = true; continue; }
+      drawable.box = box;
+    }
+    emitted.length = 0;
+    const rec: SpriteDraw[] | null = drawable.sprite ? [] : null;
+    kinds[drawable.sprite ? "n_sprite" : drawable.hull ? "n_hull" : drawable.tag ? `n_${drawable.tag}` : drawable.at ? "n_at" : "n_rect"]++;
+    recordSprites(rec); drawable.draw(); recordSprites(null);
+    if (rec && rec.length) drawable.sprites = rec;
+    if (emitted.length) drawable.emitted = emitted.slice();
+  }
+  for (const [k, v] of Object.entries(kinds)) RENDER_PROFILE[k] = (RENDER_PROFILE[k] ?? v) * 0.9 + v * 0.1;
+  lap("draw");
   const sunPower = (sky.sun[0] + sky.sun[1] + sky.sun[2]) / 3;
   if (sunPower > 0.02 && !floor) {
     const sb = bufs.shadow, reach = Math.min(4, 1 / sky.tanE) / 32;
@@ -1861,7 +2016,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
         if (!drawable.cast || !drawable.at || Math.abs(drawable.at.x - camera.x) + Math.abs(drawable.at.y - camera.y) > SHADOW_REACH) continue;
         const foot = toScreen(camera, drawable.at.x, drawable.at.y), count = hits.length;
         sb.setTransform(LS * px, LS * py, -LS * kx, -LS * ky, LS * (foot.x - foot.x * px + foot.y * kx), LS * (foot.y - foot.x * py + foot.y * ky));
-        drawable.draw();
+        if (drawable.sprites) replaySprites(sb, drawable.sprites); else drawable.draw();
         hits.length = count;
       }
       ctx = target; texturesOn = saved; bare = false; hush.on = false; uiMuted = false;
@@ -1889,71 +2044,76 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     target.drawImage(lb.canvas, 0, 0, VIEW.width, VIEW.height); target.restore();
   };
   lb.setTransform(LS, 0, 0, LS, 0, 0); lb.imageSmoothingEnabled = false;
-  // The hover outline is UI: never dimmed.
-  if (scene.hoverTile && !floor) { const hover = scene.hoverTile, s = toScreen(camera, hover.x, hover.y);
-    drawables.unshift({ depth: -Infinity, light: [1, 1, 1], rect: () => [s.x - 50 * z, s.y - 30 * z, s.x + 50 * z, s.y + 30 * z], draw: () => tileOutline(hover.x, hover.y, "rgba(22,22,22,0.35)") }); }
 
-  // ---------- Objects, each in the light where it stands ----------
-  const lightOn = (drawable: Drawable): RGB | null => {
-    const at = drawable.at;
-    if (lit && drawable.light) return drawable.light.map(v => Math.min(1, v)) as RGB;
-    if (!lit || !at) return null;
-    const real = at.y >= FLOOR_Y - 0.5 ? realPoint(world, at.x, at.y) : at, light = field.at(real.x, real.y, at.h ?? 16), min = drawable.min ?? 0;
-    return [Math.min(1, Math.max(min, light[0])), Math.min(1, Math.max(min, light[1])), Math.min(1, Math.max(min, light[2]))];
-  };
-  const rectOf = (drawable: Drawable): [number, number, number, number] => {
-    if (drawable.rect) return drawable.rect();
-    const at = drawable.at!, s = toScreen(camera, at.x, at.y), [up, side, down] = drawable.size ?? [240, 120, 40];
-    return [s.x - side * z, s.y - up * z * Math.max(1, ls), s.x + side * z, s.y + down * z];
-  };
-  uiQueue = []; uiTarget = target;
-  // Last of all, over the land: particles and birds in the light where you are, then the ground fog in the sky's (a fog
-  // bank at night is a dim blue, not a white glow). Sparks and fireflies give their own light, later.
-  const screen = (): [number, number, number, number] => [0, 0, VIEW.width, VIEW.height];
-  drawables.push({ depth: Infinity, at: { x: here.x, y: here.y, h: 40 }, rect: screen, draw: () => drawEffects(ctx, project, world, now, z, "lit") });
-  if (weather && weather.fog > 0.02) drawables.push({ depth: Infinity, light: field.skyLight().map(v => v * 1.08) as RGB, rect: screen, draw: () => {
-    if (weather && weather.fog > 0.02 && !scene.reducedMotion && !low) drawFog(ctx, camera, weather.fog, now);
-    else if (weather && weather.fog > 0.02) { ctx.fillStyle = `rgba(232,235,238,${(weather.fog * 0.25).toFixed(3)})`; ctx.fillRect(0, 0, VIEW.width, VIEW.height); }
-  } });
   lap("ground light");
-  const litBy = drawables.map(lightOn);
+  const litBy = drawables.map(drawable => drawable.skip ? null : lightOn(drawable));
   lap("light samples");
+  // ---------- Each thing in the light where it stands ----------
+  let tLight = 0, tHaze = 0, cuts = 0;
+  /**
+   * Whether the ground's light behind a sprite (at its feet, and behind its top) is within a shade of the sprite's own:
+   * then the light map lights it right as it is, and it needs no hole of its own.
+   */
+  const litAlike = (drawable: Drawable, light: RGB) => {
+    const at = drawable.at!, real = at.y >= FLOOR_Y - 0.5 ? realPoint(world, at.x, at.y) : at;
+    const near = (x: number, y: number) => { const g = field.ground(x, y); return Math.abs(Math.min(1, g[0]) - light[0]) < 0.06 && Math.abs(Math.min(1, g[1]) - light[1]) < 0.06 && Math.abs(Math.min(1, g[2]) - light[2]) < 0.06; };
+    if (!near(real.x, real.y)) return false;
+    const top = drawable.sprites![0], behind = toTile(camera, top.x + top.w / 2, top.y, false);
+    return near(behind.x, behind.y);
+  };
   drawables.forEach((drawable, index) => {
-    // The view's tile range is a box around a turned screen: whatever falls wholly off the screen is skipped.
-    if (drawable.at && drawable.depth !== Infinity) {
-      const [rx0, ry0, rx1, ry1] = rectOf(drawable), margin = 48 * z;
-      if (rx1 < -margin || rx0 > VIEW.width + margin || ry1 < -margin || ry0 > VIEW.height + margin) return;
-    }
-    emitted.length = 0;
-    drawable.draw();
-    if (!lit) return;
+    if (drawable.skip || !lit) return;
+    const glow = drawable.emitted;
     if (low) {
       // Low lights walls, roofs and cliffs by their outlines (one fill each); everything else takes the light behind it.
       const hull = drawable.hull?.();
       if (hull && hull.length > 2) { lb.fillStyle = rgbCss(litBy[index] ?? [1, 1, 1]); lb.beginPath(); hull.forEach(([hx, hy], i) => i ? lb.lineTo(hx, hy) : lb.moveTo(hx, hy)); lb.closePath(); lb.fill(); }
-      paintEmitted(lb, litBy[index] ?? [1, 1, 1], Math.max(0.35, windowGlow));
+      if (glow) paintEmitted(lb, litBy[index] ?? [1, 1, 1], Math.max(0.35, windowGlow), glow);
       return;
     }
     // The same drawing again, as a hole in the light buffer, filled with this thing's light.
-    const light = litBy[index] ?? [1, 1, 1] as RGB, rect = drawable.rect || drawable.at ? rectOf(drawable) : screen();
+    const light = litBy[index] ?? [1, 1, 1] as RGB, rect = drawable.box ?? (drawable.rect || drawable.at ? rectOf(drawable) : screen());
     const count = hits.length, saved = texturesOn;
-    ctx = lb; lb.globalCompositeOperation = "destination-out"; texturesOn = false; bare = true; hush.on = true; uiMuted = true;
-    drawable.draw();
-    hits.length = count; texturesOn = saved; bare = false; hush.on = false; uiMuted = false; ctx = target;
-    lb.globalAlpha = 1; lb.globalCompositeOperation = "destination-over"; lb.fillStyle = rgbCss(light); lb.fillRect(rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1]);
-    lb.globalCompositeOperation = "source-over";
-    paintEmitted(lb, light, Math.max(0.35, windowGlow));
+    const t1 = performance.now();
+    // Walls, roofs, cliffs and ridge tiles are their outlines on screen: one fill of their light each.
+    const hull = drawable.sprites ? null : drawable.hull?.();
+    if (drawable.sprites && drawable.at && !glow && litAlike(drawable, light)) { /* the light behind it is its own already */ }
+    else if (hull && hull.length > 2) {
+      lb.globalCompositeOperation = "source-over"; lb.fillStyle = rgbCss(light); lb.beginPath(); hull.forEach(([hx, hy], i) => i ? lb.lineTo(hx, hy) : lb.moveTo(hx, hy)); lb.closePath(); lb.fill();
+    }
+    else if (drawable.sprites) {
+      // Pixel art: its silhouette in its light, laid over the buffer (the light is quantised, so sprites share tints).
+      lb.globalCompositeOperation = "source-over";
+      stampSprites(lb, drawable.sprites, `rgb(${Math.round(light[0] * 25) * 10},${Math.round(light[1] * 25) * 10},${Math.round(light[2] * 25) * 10})`);
+      cuts++;
+    } else {
+      lb.globalCompositeOperation = "destination-out";
+      ctx = lb; texturesOn = false; bare = true; hush.on = true; uiMuted = true;
+      drawable.draw();
+      hits.length = count; texturesOn = saved; bare = false; hush.on = false; uiMuted = false; ctx = target;
+      lb.globalAlpha = 1; lb.globalCompositeOperation = "destination-over"; lb.fillStyle = rgbCss(light); lb.fillRect(rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1]);
+      lb.globalCompositeOperation = "source-over";
+    }
+    if (glow) paintEmitted(lb, light, Math.max(0.35, windowGlow), glow);
+    tLight += performance.now() - t1; const t2 = performance.now();
     // And into the haze, at its own distance (near things over far land stay clear).
     if (hazy && rect[1] < hazeBottom) {
       const at = drawable.at && drawable.at.y < FLOOR_Y - 0.5 ? drawable.at : here, far = Math.hypot(at.x - here.x, at.y - here.y);
       const t = Math.max(0, Math.min(1, (far - HAZE_START) / (DRAW_DISTANCE - 4 - HAZE_START))), clear = Math.round(255 * (1 - 0.97 * t * t * (3 - 2 * t)));
-      texturesOn = false; bare = true; hush.on = true; uiMuted = true; ctx = hb; hb.globalCompositeOperation = "destination-out";
-      drawable.draw();
-      hits.length = count; texturesOn = saved; bare = false; hush.on = false; uiMuted = false; ctx = target;
-      hb.globalAlpha = 1; hb.globalCompositeOperation = "destination-over"; hb.fillStyle = `rgb(${clear},${clear},${clear})`; hb.fillRect(rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1]);
-      hb.globalCompositeOperation = "source-over";
+      if (hull && hull.length > 2) { hb.globalCompositeOperation = "source-over"; hb.fillStyle = `rgb(${clear},${clear},${clear})`; hb.beginPath(); hull.forEach(([hx, hy], i) => i ? hb.lineTo(hx, hy) : hb.moveTo(hx, hy)); hb.closePath(); hb.fill(); }
+      else if (drawable.sprites) { const c = Math.round(clear / 15) * 15; hb.globalCompositeOperation = "source-over"; stampSprites(hb, drawable.sprites, `rgb(${c},${c},${c})`); }
+      else {
+        hb.globalCompositeOperation = "destination-out";
+        texturesOn = false; bare = true; hush.on = true; uiMuted = true; ctx = hb;
+        drawable.draw();
+        hits.length = count; texturesOn = saved; bare = false; hush.on = false; uiMuted = false; ctx = target;
+        hb.globalAlpha = 1; hb.globalCompositeOperation = "destination-over"; hb.fillStyle = `rgb(${clear},${clear},${clear})`; hb.fillRect(rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1]);
+        hb.globalCompositeOperation = "source-over";
+      }
     }
+    tHaze += performance.now() - t2;
   });
+  for (const [k, v] of [["obj_light", tLight], ["obj_haze", tHaze], ["obj_cuts", cuts]] as const) RENDER_PROFILE[k] = (RENDER_PROFILE[k] ?? v) * 0.9 + v * 0.1;
   // Anything that strayed outside its bounds is left as it is; then the light goes over the frame.
   if (lit && !low) { lb.globalCompositeOperation = "destination-over"; lb.fillStyle = "#fff"; lb.fillRect(0, 0, VIEW.width, VIEW.height); lb.globalCompositeOperation = "source-over"; }
   if (hazy) {
