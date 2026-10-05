@@ -6,6 +6,7 @@ export type Update = { id: number; date: string; title: string; items: readonly 
 export const UPDATES: readonly Update[] = [
   { id: 56, date: "2026-10-06", title: "Crypt bones, and the Order's armour for everyone", items: [
     "Crypt skeletons drop crypt bones: grey and cracked, worth twice a plain bone's Faith and a little over half a large one's (9 Faith buried, more on an altar).",
+    "The aegis is a tower shield now, square at the foot, so the Realm has three shield shapes: the kite, the round shield and the aegis.",
     "The Order Armoury at Dawnhold sells two sets below Dawnplate now. The Acolyte's vestments (hood, vestment, leggings, gloves, sandals: cloth, cheap, Faith 10) once you've kept the Dawn Vigil, and the Vigil's mail (helm, hauberk, greaves, gauntlets, boots, shield: Defence 30 and Faith 30) once the Dawnstone is home. Both carry a faith bonus. Three pieces of either give you a style of your own on the Presence profile.",
   ] },
   { id: 55, date: "2026-10-06", title: "Round shields and the aegis, and the weight of what you wear", items: [

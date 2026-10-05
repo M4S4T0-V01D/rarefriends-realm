@@ -155,7 +155,7 @@ export const SMITH_PIECES = [
   { piece: "mace", name: "mace", bars: 2, offset: 6, shape: "mace", slot: "weapon", att: 7, str: 9, def: 0, speed: 4, faith: 3 },
   { piece: "flail", name: "flail", bars: 3, offset: 12, shape: "flail", slot: "weapon", att: 7, str: 15, def: 0, speed: 5, twoHanded: true, strength: 4, faith: 7 },
   // Shields beyond the kite: a round shield, bigger and heavier (Strength to carry, the best defence a metal gives), and
-  // the aegis, a faith shield blessed at Dawnhold (Faith to carry, a faith bonus, and it turns a little of the undead's bite).
+  // the aegis, a tall tower shield square at the foot, blessed at Dawnhold (Faith to carry, a faith bonus).
   { piece: "roundshield", name: "round shield", bars: 4, offset: 14, shape: "roundshield", slot: "shield", att: 0, str: 0, def: 17, speed: 0, strength: 5 },
   { piece: "aegis", name: "aegis", bars: 3, offset: 13, shape: "aegis", slot: "shield", att: 0, str: 0, def: 13, speed: 0, faith: 5 },
 ] as const;

@@ -335,8 +335,8 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
         part(p, disc(16, 16, 4), accent ?? shadeHex(color, 0.25), "metal"); for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; dot(p, Math.round(16 + Math.cos(a) * 12.6), Math.round(16 + Math.sin(a) * 12.6), INK); }
         line(p, [[7, 11], [11, 7]], shadeHex(color, 0.3)); break;
       case "aegis":
-        // A tall faith shield with a sun disc and rays.
-        part(p, poly([[6, 2], [26, 2], [26, 17], [16, 30], [6, 17]]), color, metal ? "metal" : "wood");
+        // A tall tower shield, square at the foot, with a sun disc and rays: the third of the Realm's three shield shapes.
+        part(p, poly([[6, 2], [26, 2], [26, 30], [6, 30]]), color, metal ? "metal" : "wood"); line(p, [[6, 30], [26, 30]], shadeHex(color, -0.3));
         part(p, disc(16, 13, 4.5), accent ?? "#e2c46a", "glow"); for (const [ax, ay, bx, by] of [[16, 4, 16, 7], [16, 19, 16, 22], [7, 13, 10, 13], [22, 13, 25, 13], [10, 7, 12, 9], [22, 7, 20, 9], [10, 19, 12, 17], [22, 19, 20, 17]]) line(p, [[ax, ay], [bx, by]], accent ?? "#e2c46a", 2);
         line(p, [[6, 2], [26, 2]], shadeHex(color, 0.3)); break;
       case "boots":

@@ -725,10 +725,10 @@ function drawShield(p: Pixels, piece: Piece, x: number, y: number, rear: boolean
     p.line(x - r + 1, y - 2, x - 2, y - r + 1, light); return;
   }
   if (piece.style === "aegis") {
-    // The aegis: a tall shield with a sun disc, its rays in the blessing's gold.
-    const tall: [number, number][] = [[x - hw, y - 8], [x + hw, y - 8], [x + hw, y + 2], [x, y + 8], [x - hw, y + 2]];
+    // The aegis: a tall tower shield, square at the foot, with a sun disc and its rays in the blessing's gold.
+    const tall: [number, number][] = [[x - hw, y - 8], [x + hw, y - 8], [x + hw, y + 8], [x - hw, y + 8]];
     if (rear) { p.poly(tall, "#7a5b40", null); return; }
-    p.poly(tall, color, null); p.line(x - hw, y - 8, x + hw, y - 8, light); p.line(x + hw, y - 7, x + hw, y + 2, dark); p.line(x + hw, y + 2, x, y + 8, dark);
+    p.poly(tall, color, null); p.line(x - hw, y - 8, x + hw, y - 8, light); p.line(x - hw, y - 8, x - hw, y + 8, light); p.line(x + hw, y - 7, x + hw, y + 8, dark); p.line(x - hw + 1, y + 8, x + hw, y + 8, dark);
     const gold = piece.trim ?? "#e2c46a"; p.disc(x, y - 1, 2.6, 2.6, gold, null); for (const [dx, dy] of [[0, -5], [0, 4], [-4, -1], [4, -1], [-3, -4], [3, -4], [-3, 2], [3, 2]]) p.set(x + dx, y - 1 + dy, gold);
     return;
   }
