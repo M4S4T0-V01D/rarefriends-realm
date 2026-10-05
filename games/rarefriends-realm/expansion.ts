@@ -551,6 +551,37 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
   warn(441, 475, "swamp_lurker", "swamp lurker", "toppled"); warn(642, 197, "stone_golem", "stone golem", "whole"); warn(393, 328, "glass_crab", "glass crab", "broken"); warn(638, 401, "drowned_scholar", "drowned scholar", "buried");
   warn(602, 452, "vault_knight", "vault knight", "toppled"); warn(598, 452, "vault_archer", "vault archer", "whole");
   warn(cellarMouth[0] + 2, cellarMouth[1] + 1, "ink_rat", "giant rat", "broken"); warn(mossyMouth[0] - 2, mossyMouth[1] + 2, "moss_warden", "moss warden", "buried");
+  // ---------- 7d. Wayward chapels: the Pilgrim's Road runs further now ----------
+  /**
+   * A chapel on free ground near a point, found by searching outward: stone walls, a gable roof (or none, with the
+   * walls knocked down, for a ruin), the altar at the north end under an Old Friend, benches and torches. Returns
+   * where it stood, or null if no clear ground was found.
+   */
+  const chapel = (near: readonly [number, number], w: number, h: number, name: string, altarName: string, ruined = false) => {
+    const landy = (tt: number) => [T.GRASS, T.DARK_GRASS, T.PATH, T.GRAVEL, T.SNOW, T.ASH, T.SAND].includes(tt as never);
+    const fits = (x0: number, y0: number) => { for (let y = y0 - 1; y <= y0 + h; y++) for (let x = x0 - 1; x <= x0 + w; x++) { if (!inBounds(x, y) || inMainland(x, y) || !landy(get(x, y))) return false; const o = ctx.objectAt[tileIndex(x, y)]; if (o >= 0 && !["decor", "tree", "herb"].includes(ctx.objects[o].kind)) return false; } return true; };
+    let at: [number, number] | null = null;
+    for (let r = 0; r <= 30 && !at; r++) for (let dy = -r; dy <= r && !at; dy++) for (let dx = -r; dx <= r && !at; dx++) { if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; const x0 = near[0] + dx - Math.floor(w / 2), y0 = near[1] + dy - Math.floor(h / 2); if (fits(x0, y0)) at = [x0, y0]; }
+    if (!at) return null;
+    const [x0, y0] = at, x1 = x0 + w - 1, y1 = y0 + h - 1, cx = Math.floor((x0 + x1) / 2);
+    for (let y = y0 - 1; y <= y1 + 1; y++) for (let x = x0 - 1; x <= x1 + 1; x++) { clearAt(x, y); for (let i = ctx.spawns.length - 1; i >= 0; i--) if (ctx.spawns[i].x === x && ctx.spawns[i].y === y) ctx.spawns.splice(i, 1); }
+    t.building(x0, y0, x1, y1, "s", T.STONE, undefined, { name, color: "#6d6b67", walls: "stone", roof: ruined ? "none" : "gable" });
+    if (ruined) {
+      for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { if (get(x, y) === T.WALL && noise2(x * 1.7, y * 1.7) > 0.5 && !(y === y0 && Math.abs(x - cx) <= 2)) put(x, y, T.GRAVEL); else if (get(x, y) === T.STONE && noise2(x * 2.1, y * 2.1) > 0.7) put(x, y, T.GRAVEL); }
+      scatter(x0 + 1, y0 + 3, x1 - 1, y1 - 1, 5, (x, y) => decor(x, y, "rubble", false), (x, y) => (get(x, y) === T.STONE || get(x, y) === T.GRAVEL) && ctx.objectAt[tileIndex(x, y)] < 0 && x !== cx);
+      scatter(x0 + 1, y0 + 3, x1 - 1, y1 - 1, 3, (x, y) => decor(x, y, "bones", false, "Old bones"), (x, y) => (get(x, y) === T.STONE || get(x, y) === T.GRAVEL) && ctx.objectAt[tileIndex(x, y)] < 0 && x !== cx);
+      for (const [dx, dy] of [[-2, 2], [3, 3], [-3, h + 2], [w + 2, -1]] as const) { const gx = x0 + dx, gy = y0 + dy; if (inBounds(gx, gy) && landy(get(gx, gy)) && ctx.objectAt[tileIndex(gx, gy)] < 0) decor(gx, gy, "grave", true); }
+    }
+    add({ kind: "altar", x: cx, y: y0 + 2, blocks: true, name: altarName }); decor(cx, y0 + 1, "old_friend", true, ruined ? "The Old Friend, weathered to a shape" : "The Old Friend");
+    for (const bx of [cx - 2, cx + 2]) for (let by = y0 + 4; by <= y1 - 2; by += 2) if (get(bx, by) === T.STONE && ctx.objectAt[tileIndex(bx, by)] < 0) decor(bx, by, "bench", true);
+    for (const [tx, ty] of [[x0 + 1, y0 + 1], [x1 - 1, y0 + 1]] as const) if (get(tx, ty) === T.STONE && ctx.objectAt[tileIndex(tx, ty)] < 0) decor(tx, ty, "torch", true);
+    return at;
+  };
+  chapel([128, 300], 7, 7, "Wayward chapel", "Wayward altar");
+  chapel([80, 180], 7, 7, "Drakespine chapel", "Drakespine altar");
+  chapel([620, 262], 7, 7, "Ironreach chapel", "Ironreach altar");
+  chapel([570, 420], 7, 7, "Wilds chapel", "Wilds altar");
+  chapel([282, 62], 13, 11, "The Deadwood chapel", "Deadwood altar", true);
   // ---------- 7c. The Rare Friends Ring: a round building west of the Deadwood, across the river, built by a Hoverer ----------
   {
     const { x: cx, y: cy, outer, inner } = ARENA, dist = (x: number, y: number) => Math.hypot(x - cx, y - cy);

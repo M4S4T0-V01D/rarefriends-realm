@@ -227,11 +227,11 @@ export const QUESTS: readonly QuestDef[] = [
     },
   },
   {
-    id: "pilgrims_road", name: "The Pilgrim's Road", points: 1, difficulty: "Intermediate", start: "Talk to Sister Maren in the Dawnhold chapel after The Dawn Vigil.", requirements: ["The Dawn Vigil", "Faith 35"], rewards: ["1 Quest Point", "Dawnplate greaves and boots", "4,000 Faith XP"],
+    id: "pilgrims_road", name: "The Pilgrim's Road", points: 1, difficulty: "Intermediate", start: "Talk to Sister Maren in the Dawnhold chapel after The Dawn Vigil.", requirements: ["The Dawn Vigil", "Faith 35"], rewards: ["1 Quest Point", "Dawnplate greaves and boots", "9,000 Faith XP", "2,500 Wayfaring XP"],
     journal: game => {
       const s = stage(game, "pilgrims_road");
       if (s === 0) return ["Sister Maren, the Order's chaplain, sends squires on a pilgrimage once their faith has grown (Faith 35)."];
-      if (s === 1) return ["Sister Maren asked me to pray at the three old altars of the Realm:",
+      if (s === 1) return ["Sister Maren asked me to pray at the three old altars of the Realm, and at the five wayward chapels the Order raised in the far places:",
         ...PILGRIM_ALTARS.map(([key, , where]) => `${data(game, key) ? "✓" : "•"} ${where}`), PILGRIM_ALTARS.every(([key]) => data(game, key)) ? "Then return to her." : ""].filter(Boolean);
       return ["I walked the Pilgrim's Road and prayed at every old altar of the Realm. QUEST COMPLETE!"];
     },
@@ -444,7 +444,9 @@ export function finalStage(quest: string) { return quest === "hollow_whispers" ?
 /** Bones to offer at the Dawnhold chapel for the Dawn Vigil. */
 const VIGIL_BONES = 8;
 /** The Pilgrim's Road: the old altars to pray at ([quest flag, altar name, where it is]). */
-const PILGRIM_ALTARS = [["pilgrim_chapel", "Altar", "The Friendhollow chapel, west of the fountain"], ["pilgrim_shrine", "Mountain shrine", "The mountain shrine in Highcairn"], ["pilgrim_crypt", "Crypt altar", "The crypt altar in Murkmire"]] as const;
+export const PILGRIM_ALTARS = [["pilgrim_chapel", "Altar", "The Friendhollow chapel, west of the fountain"], ["pilgrim_shrine", "Mountain shrine", "The mountain shrine in Highcairn"], ["pilgrim_crypt", "Crypt altar", "The crypt altar in Murkmire"],
+  ["pilgrim_westmarch", "Wayward altar", "The wayward chapel out in the Westmarch"], ["pilgrim_drakespine", "Drakespine altar", "The chapel on the Drakespine, in dragon country"], ["pilgrim_ironreach", "Ironreach altar", "The chapel in the Ironreach snows"],
+  ["pilgrim_wilds", "Wilds altar", "The chapel in The Wilds"], ["pilgrim_deadwood", "Deadwood altar", "The great ruined chapel in the Deadwood"]] as const;
 /** Skeletons to lay to rest (The Restless Crypt) and sentinels to destroy (Dawn Against the Hollow), with a faith weapon. */
 const CRYPT_REST = 12, SENTINELS = 5;
 const faithArmed = (game: Game) => !!(game.player.equipment.weapon && item(game.player.equipment.weapon).equip?.holy);
@@ -968,14 +970,14 @@ function talkInner(game: Game, npcId: string): Dialogue {
         "It holds sixty bones of any kind and catches the ones you pick up. Use it on an altar and every bone inside is offered at once."), undefined, () => {
         giveOrDrop(game, BONE_BAG); message(game, "Sister Maren gives you an ossuary bag.", "quest"); sound(game, "quest");
       });
-      if (road === 0 && questDone(game, "dawn_vigil")) return chat(name, npcSays(name, "Every knight of the Dawn walks the Pilgrim's Road once: three old altars, one prayer at each."), level(game, "prayer") < 35
+      if (road === 0 && questDone(game, "dawn_vigil")) return chat(name, npcSays(name, "Every knight of the Dawn walks the Pilgrim's Road once: the three old altars of the Realm, and the five wayward chapels the Order raised in the far places, one prayer at each."), level(game, "prayer") < 35
         ? [{ label: "I'll walk it.", then: () => chat(name, npcSays(name, "Not yet. The road is long for a young faith (Faith 35)."))}, lesson, bye]
-        : [{ label: "I'll walk it.", then: () => chat(name, npcSays(name, "The chapel in Friendhollow, the mountain shrine here in Highcairn, and the old crypt altar in Murkmire. Kneel at each, then come back to me."), undefined, () => {
+        : [{ label: "I'll walk it.", then: () => chat(name, npcSays(name, "The chapel in Friendhollow, the mountain shrine here in Highcairn, and the old crypt altar in Murkmire. Then the wayward chapels: one out in the Westmarch, one on the Drakespine among the dragons, one in the Ironreach snows, one in The Wilds, and the great ruined one in the Deadwood. Kneel at each, then come back to me."), undefined, () => {
           p.quests.pilgrims_road = 1; message(game, "Quest started: The Pilgrim's Road.", "quest"); }) }, lesson, bye]);
       if (road === 1) {
         if (!PILGRIM_ALTARS.every(([key]) => data(game, key))) return chat(name, npcSays(name, `Still ${PILGRIM_ALTARS.filter(([key]) => !data(game, key)).map(([, altar]) => altar.toLowerCase()).join(", ")} to pray at. The road waits.`));
         return chat(name, npcSays(name, "You've the look of someone who's walked a long way to kneel. Good. These are yours: gold for the legs and feet that carried you."), undefined, () => {
-          giveOrDrop(game, "dawnplate_greaves"); giveOrDrop(game, "dawnplate_boots"); addXp(game, "prayer", 4000, { raw: true });
+          giveOrDrop(game, "dawnplate_greaves"); giveOrDrop(game, "dawnplate_boots"); addXp(game, "prayer", 9000, { raw: true }); addXp(game, "agility", 2500, { raw: true });
           completeQuest(game, "pilgrims_road");
         });
       }

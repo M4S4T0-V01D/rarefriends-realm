@@ -20,7 +20,7 @@ import { cleanPresence } from "../games/rarefriends-realm/net.ts";
 import { buySlayerReward, longTasks, slayerXpBoost, eligibleTasks } from "../games/rarefriends-realm/slayer.ts";
 import { currentTask, slayerPoints } from "../games/rarefriends-realm/slayer.ts";
 import { COURSES, HEARTGUARD, ITEM_LIST, METALS, MONSTERS, SMITH_PIECES, SPELL_TABS, FIREMAKING, REGIONAL_CLOTHING, WARDROBE, MOUNTS, SHOPS, SKILLS, SKILL_NAMES, SLAYER_SETS, SLAYER_TASKS, SPELLS, TREES, WAYFARER_MARK, WAYFARER_REWARDS, XP_RATE, XP_TABLE, heavyStrength, isItem, item, levelForXp } from "../games/rarefriends-realm/data.ts";
-import { NPCS, QUESTS, MAX_QUEST_POINTS, questPoints, onMonsterKilled } from "../games/rarefriends-realm/content.ts";
+import { NPCS, QUESTS, MAX_QUEST_POINTS, PILGRIM_ALTARS, questPoints, onMonsterKilled } from "../games/rarefriends-realm/content.ts";
 import { FLOOR_Y, H, MAINLAND, REGIONS, T, W, createWorld, floorAt, isUnderground, mainlandToWorld, objectAtTile, onLevel, realPoint, regionAt, terrainAt } from "../games/rarefriends-realm/world.ts";
 import { addXp, emptyToBank, fillFromBank, bankDeposit, bankInOrder, bankMove, bankTabs, bankWithdraw, bonuses, bagBones, combatLevel, count, dropItem, earlyXp, give, has, heft, level, maxHp, xpMultiplier, BONE_BAG, BONE_BAG_SIZE } from "../games/rarefriends-realm/state.ts";
 import game from "../games/rarefriends-realm/game.json" with { type: "json" };
@@ -846,7 +846,7 @@ test("The Heartguard: nine red-and-white pieces by Hitpoints level, each a hitpo
 test("The Old Friend stands behind every altar, and Dawnhold has its keep, towers and a taller chapel", () => {
   const g = newGame(), world = g.world;
   const altars = world.objects.filter(object => object.kind === "altar");
-  assert.equal(altars.length, 7, "the mainland's four, Gravesend's lantern altar, the catacombs' bone altar and the Ring chapel's");
+  assert.equal(altars.length, 12, "the mainland's four, Gravesend's lantern altar, the catacombs' bone altar, the Ring chapel's and the five wayward chapels'");
   for (const altar of altars) {
     assert(world.objects.some(object => object.decor === "old_friend" && Math.abs(object.x - altar.x) <= 1 && Math.abs(object.y - altar.y) <= 2), `a statue of the Old Friend by the ${altar.name}`);
   }
@@ -1908,10 +1908,11 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   const pray = name => { const altar = g.world.objects.find(object => object.kind === "altar" && object.name === name); standBy(g, altar); setTarget(g, { kind: "object", id: altar.id, option: "Pray-at" }); run(g, 3); };
   p.quests.dawn_vigil = 2; p.quests.greyhorn_light = 3; p.xp.prayer = XP_TABLE[60]; give(p, BONE_BAG); // (a squire with the vigil's bag already; without it Sister Maren hands one over first)
   assert(capeProblem(g, "dawnplate_greaves"), "Dawnplate is earned first");
-  // The Pilgrim's Road: pray at the three old altars.
+  // The Pilgrim's Road: pray at the three old altars and the five wayward chapels.
   talkTo("chaplain");
   assert.equal(p.quests.pilgrims_road, 1);
-  for (const altar of ["Altar", "Mountain shrine", "Crypt altar"]) pray(altar);
+  assert.equal(PILGRIM_ALTARS.length, 8); for (const [, altar] of PILGRIM_ALTARS) assert(g.world.objects.some(object => object.kind === "altar" && object.name === altar), altar);
+  for (const [, altar] of PILGRIM_ALTARS) pray(altar);
   talkTo("chaplain");
   assert.equal(p.quests.pilgrims_road, 2); assert(has(p, "dawnplate_greaves") && has(p, "dawnplate_boots"));
   // The Restless Crypt: only kills with a faith weapon count.

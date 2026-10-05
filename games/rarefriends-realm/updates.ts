@@ -4,6 +4,10 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 64, date: "2026-10-05", title: "The Pilgrim's Road runs further", items: [
+    "Five wayward chapels of the Order stand in the far places now: one out in the Westmarch, one on the Drakespine among the dragons, one in the Ironreach snows, one in The Wilds, and a great ruined one in the Deadwood, its roof gone and its walls down, graves at its feet. Each has an altar under an Old Friend.",
+    "The Pilgrim's Road takes in all of them: eight altars now, three old and five wayward, and Sister Maren's thanks have grown to match (9,000 Faith XP and 2,500 Wayfaring XP with the Dawnplate greaves and boots).",
+  ] },
   { id: 63, date: "2026-10-05", title: "Two dungeons for the rest of us, and capes and shields that sit right", items: [
     "The Root Cellars, under a cellar door in the grass past the Hollow Farms mill: a dungeon for new heroes (combat 3 to 15). Rats, bats, grumblins and spiders among the barrels and hay, coffers, and the Rat King at the end: rats knotted together into one furious thing, the first boss a hero meets. Nothing locked.",
     "The Mossy Undercroft, down a stair in the Mossy Ruins: the vaults under the ruins, for the middle levels (25 to 45). Bandits, the dead, thornbacks and grave moths among the moss and rubble, coffers, and the Moss Warden behind a door that takes a moss key (dropped down there, found in the coffers), mending itself with the damp. It drops the Mossguard shield.",
