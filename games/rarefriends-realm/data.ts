@@ -75,10 +75,12 @@ export type IconShape =
   | "amulet" | "log" | "fish" | "ore" | "bar" | "bones" | "sigil" | "staff" | "net" | "rod" | "harpoon" | "pot" | "bucket" | "egg" | "flour"
   | "milk" | "tinderbox" | "hammer" | "knife" | "needle" | "thread" | "chisel" | "gem" | "hide" | "leather" | "meat" | "feather" | "bait"
   | "cake" | "bread" | "berries" | "key" | "wheat" | "lamp" | "scroll" | "silk" | "hood" | "bracer" | "burnt" | "hat" | "crown" | "orb" | "trophy"
-  | "bow" | "arrow" | "tablet" | "arrowheads" | "material" | "quiver" | "satchel" | "mask" | "stonebox" | "wool" | "string" | "shears" | "greatsword" | "battleaxe" | "warhammer" | "spear" | "warbow" | "crossbow" | "bolts" | "limbs" | "stock" | "herb" | "mushroom" | "vial" | "mortar";
+  | "bow" | "arrow" | "tablet" | "arrowheads" | "material" | "quiver" | "satchel" | "mask" | "stonebox" | "wool" | "string" | "shears" | "greatsword" | "battleaxe" | "warhammer" | "mace" | "flail" | "spear" | "warbow" | "crossbow" | "bolts" | "limbs" | "stock" | "herb" | "mushroom" | "vial" | "mortar";
 export type Item = {
   id: string; name: string; examine: string; value: number; icon: Icon;
   stackable?: boolean; tradeable?: boolean;
+  /** Food that does more than heal: a skill boost that wears off a point a minute. */
+  food?: Partial<Record<Skill, number>>;
   equip?: { slot: EquipSlot; bonuses: Partial<Bonuses>; requires?: Partial<Record<Skill, number>>; speed?: number; twoHanded?: boolean; staff?: boolean;
     /** A bow or crossbow: its reach, the extra punch it gives each shot, and whether it fires bolts (crossbows) or arrows. */
     bow?: { range: number; strength?: number; bolts?: boolean };
@@ -146,6 +148,10 @@ export const SMITH_PIECES = [
   { piece: "greatsword", name: "greatsword", bars: 3, offset: 10, shape: "greatsword", slot: "weapon", att: 10, str: 13, def: 0, speed: 5, twoHanded: true, strength: 2 },
   { piece: "battleaxe", name: "battleaxe", bars: 3, offset: 9, shape: "battleaxe", slot: "weapon", att: 8, str: 14, def: 0, speed: 5, twoHanded: true, strength: 4 },
   { piece: "warhammer", name: "war hammer", bars: 3, offset: 11, shape: "warhammer", slot: "weapon", att: 6, str: 16, def: 0, speed: 5, twoHanded: true, strength: 6 },
+  // Faith weapons: blessed at the Dawnhold chapel, so they take Faith to wield (the metal's level and 3, or 7 for the
+  // two-handed flail), hurt the undead more, give a little Faith XP a hit, and carry a faith bonus. Sold with the swords.
+  { piece: "mace", name: "mace", bars: 2, offset: 6, shape: "mace", slot: "weapon", att: 7, str: 9, def: 0, speed: 4, faith: 3 },
+  { piece: "flail", name: "flail", bars: 3, offset: 12, shape: "flail", slot: "weapon", att: 7, str: 15, def: 0, speed: 5, twoHanded: true, strength: 4, faith: 7 },
 ] as const;
 /** The Strength a metal's heavy weapon (greatsword, battleaxe, war hammer) takes to wield. */
 export function heavyStrength(metal: MetalId, piece: SmithPiece) {
@@ -354,14 +360,16 @@ function metalGear(): Item[] {
       const requires: Partial<Record<Skill, number>> = {};
       if (metal.level > 1) requires[requireSkill] = metal.level;
       if (heavy) requires.strength = heavy;
+      const faith = "faith" in piece ? metal.level + piece.faith : 0;
+      if (faith) { requires.prayer = faith; bonuses.prayer = Math.round(2 + tier * 0.7); }
       out.push({
-        id, name, examine: isTool ? `A ${piece.name} made of ${metal.id}.` : heavy ? `A ${metal.id} ${piece.name}. Two hands and Strength ${heavy} to swing it, and it hits harder the stronger you are.` : `A ${metal.id} ${piece.name}.`,
+        id, name, examine: isTool ? `A ${piece.name} made of ${metal.id}.` : faith ? `A ${metal.id} ${piece.name}, blessed at Dawnhold. Faith ${faith} to wield${heavy ? `, Strength ${heavy} and two hands` : ""}; it hurts the undead more and gives a little Faith with every hit.` : heavy ? `A ${metal.id} ${piece.name}. Two hands and Strength ${heavy} to swing it, and it hits harder the stronger you are.` : `A ${metal.id} ${piece.name}.`,
         value: Math.round(metal.value * piece.bars * 1.6 + 10),
-        icon: { shape: piece.shape as IconShape, color: metal.color, accent: FORGE_GLOW[metal.id] },
+        icon: { shape: piece.shape as IconShape, color: metal.color, accent: faith ? DAWN_GOLD : FORGE_GLOW[metal.id] },
         equip: {
           slot: piece.slot as EquipSlot, bonuses,
           requires: Object.keys(requires).length ? requires : undefined,
-          speed: piece.speed || undefined, twoHanded: "twoHanded" in piece ? piece.twoHanded : undefined,
+          speed: piece.speed || undefined, twoHanded: "twoHanded" in piece ? piece.twoHanded : undefined, holy: faith ? true : undefined,
         },
         tool: isTool ? { kind: piece.piece as "axe" | "pickaxe", tier, level: metal.level } : undefined,
       });
@@ -1243,6 +1251,8 @@ for (const shop of Object.values(SHOPS)) {
 const addStock = (ids: readonly string[], items: readonly string[]) => { for (const id of ids) { const shop = SHOPS[id]; if (!shop) continue; const stock = [...shop.stock]; for (const item of items) if (!stock.includes(item)) stock.push(item); (shop as { stock: readonly string[] }).stock = stock; } };
 addStock(["hollyhock_herbs", "mender"], ["apothecary_belt"]);
 addStock(["war_bows", "archery", "tallgrass_hunting"], ["fletchers_belt"]);
+// Faith weapons sell beside the swords and war hammers of their metal.
+for (const shop of Object.values(SHOPS)) { const stock = [...shop.stock]; for (const id of shop.stock) { const m = id.match(/^([a-z]+)_(sword|warhammer)$/); if (!m) continue; const holy = `${m[1]}_${m[2] === "sword" ? "mace" : "flail"}`; if (isItem(holy) && !stock.includes(holy)) stock.push(holy); } (shop as { stock: readonly string[] }).stock = stock; }
 addStock(["general", "general_ember", "general_frost", "general_oasis", "general_highcairn", "gravesend_general", "saltmarrow_fish", "hollyhock_herbs", "dyemoor_tailor", "tallgrass_hunting", "cragmaw_ore", "quillhaven_sigils", "kettle", "frost", "wizards", "ashfall_trader"], ["vial_of_water", "vial"]);
 // ---------- Pets ----------
 /** Little companions found by chance while you train (1 in `odds` per action, luckier at higher levels). */
@@ -1355,3 +1365,10 @@ const WEAKNESS: Record<string, MonsterDef["weakness"]> = {
   skeleton: "holy", shade: "holy", cairn_wight: "holy", hollow_sentinel: "holy", hollow_king: "holy", hollow_weaver: "holy", gloom_hound: "holy",
 };
 for (const [id, weakness] of Object.entries(WEAKNESS)) if (MONSTERS[id]) (MONSTERS[id] as { weakness?: MonsterDef["weakness"] }).weakness = weakness;
+/** What a good meal does for you: every meat and fish lends a skill a little, wearing off a point a minute. */
+const FOOD_EFFECTS: Record<string, Partial<Record<Skill, number>>> = {
+  cooked_chicken: { attack: 1 }, cooked_meat: { strength: 2 }, bread: { defence: 1 }, cake: { defence: 2, hitpoints: 0 }, sweetberry: { ranged: 1 }, waybread: { agility: 3 },
+  minnows: { fishing: 1 }, perch: { fishing: 2 }, carp: { cooking: 2 }, char: { woodcutting: 2, fishing: 1 }, grayling: { agility: 2, ranged: 2 },
+  inkcrab: { defence: 3, mining: 2 }, sailfish: { strength: 3, attack: 2 }, inkshark: { attack: 4, strength: 4, defence: 2 },
+};
+for (const [id, food] of Object.entries(FOOD_EFFECTS)) { const entry = ITEM_LIST.find(item => item.id === id); if (entry) (entry as { food?: Partial<Record<Skill, number>> }).food = Object.fromEntries(Object.entries(food).filter(([, n]) => n)); }

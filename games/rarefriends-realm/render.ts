@@ -16,7 +16,7 @@ import type { Strike, Weather } from "./weather.ts";
 import { emoteMotion, emoteParticles, type Motion } from "./emotes.ts";
 import { drawPixels, pixelArt, shadeHex } from "./pixel.ts";
 import { TEX_PER_HEIGHT, TEX_PER_TILE, beginTextures, groundTexture, textureStats, shingleTexture, texturedQuad, texturedTriangle, wallTexture, PANE, type GroundStyle, type WallStyle } from "./textures.ts";
-import { campfireLogs, decorArt, fireArt, rockArt, treeArt } from "./scenery.ts";
+import { campfireLogs, decorArt, fireArt, rockArt, treeArt , herbArt } from "./scenery.ts";
 import { spellArt } from "./spellart.ts";
 import { SADDLE, mountArt, type MountView } from "./mountart.ts";
 import { petArt } from "./petart.ts";
@@ -849,14 +849,10 @@ function drawStation(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldO
     case "herb": {
       // A herb patch: a tuft of leaves (or caps) in the herb's colour, with a flower on the uncommon ones; picked bare, just stalks.
       const def = herbDef(object.herb!), color = def?.color ?? "#7fa86a", accent = def?.accent ?? "#e2d49e", bare = game.depleted.has(object.id);
-      if (bare) { ctx.strokeStyle = "#8a7563"; ctx.lineWidth = 1; for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.moveTo(sx + i * 4 * z, sy); ctx.lineTo(sx + i * 4 * z, sy - 3 * z); ctx.stroke(); } return hit(8, 16); }
-      if (def?.shape === "mushroom") {
-        for (const [dx, h, r] of [[-5, 7, 4], [3, 10, 5], [7, 5, 3]] as const) { ctx.fillStyle = "#e8e4dc"; ctx.fillRect(sx + dx * z - 1 * z, sy - h * z, 2 * z, h * z); ellipse(ctx, sx + dx * z, sy - h * z, r * z, r * 0.6 * z, color, INK, 1); }
-      } else {
-        for (let i = -2; i <= 2; i++) { const sway = Math.sin(now / 900 + i + ox) * 1.5 * z; ctx.strokeStyle = color; ctx.lineWidth = 2 * z; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(sx + i * 3 * z, sy); ctx.lineTo(sx + i * 4 * z + sway, sy - (9 + (i % 2) * 3) * z); ctx.stroke(); ctx.lineCap = "butt"; }
-        if (def && def.rarity !== "common") ellipse(ctx, sx + 2 * z, sy - 13 * z, 3 * z, 3 * z, accent, INK, 1);
-      }
-      return hit(16, 22);
+      // The pixel-art patch (the leaves bob as the wind moves them), drawn like the trees and bushes.
+      const art = herbArt(def?.shape ?? "herb", color, accent, Math.floor(hash(ox, oy) * 4), !!def && def.rarity !== "common", bare), bob = scene.reducedMotion || bare ? 0 : Math.sin(now / 900 + ox) * 0.6 * z;
+      ellipse(ctx, sx, sy + 1 * z, 12 * z, 4 * z, "rgba(22,22,22,0.12)", null);
+      return drawPixels(ctx, art, sx, sy + 2 * z + bob, ART * z);
     }
     case "still": {
       // A copper still: a round pot on a brick hearth, a tall neck, a pipe coiling down to a flask.

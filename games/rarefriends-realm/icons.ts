@@ -217,6 +217,17 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
         part(p, poly([[20, 2], [13, 1], [10, 8], [15, 12], [20, 8]]), color, "metal");
         part(p, poly([[24, 7], [31, 8], [30, 16], [24, 16], [21, 11]]), color, "metal");
         line(p, [[11, 4], [13, 9]], accent ?? shadeHex(color, 0.3)); line(p, [[30, 10], [29, 15]], accent ?? shadeHex(color, 0.3)); break;
+      case "mace":
+        // A short haft and a flanged round head, a sun disc stamped on it.
+        part(p, stroke([[8, 29], [19, 12]], 3), WOOD_C, "wood"); dot(p, 9, 27, DARK_WOOD);
+        part(p, disc(21, 9, 7), color, "metal"); for (const [dx, dy] of [[-7, 0], [7, 0], [0, -7], [0, 7], [-5, -5], [5, 5], [-5, 5], [5, -5]]) part(p, disc(21 + dx, 9 + dy, 2), shadeHex(color, -0.1), "metal");
+        part(p, disc(21, 9, 2.6), accent ?? "#e2c46a", "glow"); break;
+      case "flail":
+        // A long haft, a chain, and a spiked ball swinging free.
+        part(p, stroke([[5, 30], [16, 14]], 3), WOOD_C, "wood"); line(p, [[8, 26], [10, 23]], DARK_WOOD);
+        line(p, [[16, 14], [19, 10], [22, 9], [25, 7]], "#8b8e92", 2);
+        part(p, disc(26, 5, 5), color, "metal"); for (const [dx, dy] of [[-5, 0], [5, 0], [0, -5], [0, 5], [-4, -4], [4, 4], [4, -4], [-4, 4]]) part(p, disc(26 + dx, 5 + dy, 1.5), shadeHex(color, -0.1), "metal");
+        dot(p, 26, 5, accent ?? "#e2c46a"); break;
       case "warhammer":
         // A long haft and a heavy block head with a spike.
         part(p, stroke([[6, 30], [21, 7]], 3), WOOD_C, "wood"); line(p, [[9, 25], [11, 22]], DARK_WOOD);

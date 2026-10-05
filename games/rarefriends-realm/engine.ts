@@ -521,7 +521,10 @@ export function eat(game: Game, slotIndex: number) {
   if (energy) player.energy = Math.min(100, player.energy + energy);
   if (slot.id === "cake") { player.inventory[slotIndex] = null; } else take(player, slot.id);
   player.eatTimer = 3; if (player.combat !== null) player.attackTimer = Math.max(player.attackTimer, 3);
-  message(game, `You eat the ${item(slot.id).name.toLowerCase()}.${energy ? " The spring comes back into your step." : player.hp > before ? " It heals some health." : ""}`); sound(game, "eat");
+  // A good meal lends a skill a little for a while (a point wears off every minute).
+  const lent: string[] = [];
+  for (const [skill, amount] of Object.entries(item(slot.id).food ?? {}) as [Skill, number][]) { if (!amount) continue; player.boosts[skill] = Math.max(player.boosts[skill] ?? 0, amount); lent.push(`+${amount} ${SKILL_NAMES[skill]}`); }
+  message(game, `You eat the ${item(slot.id).name.toLowerCase()}.${energy ? " The spring comes back into your step." : player.hp > before ? " It heals some health." : ""}${lent.length ? ` ${lent.join(", ")} for a while.` : ""}`); sound(game, "eat");
 }
 /** Wightbone armour: 10% more Faith XP from bones a piece, 40% in the full set. */
 export const boneBoost = (player: Player, game?: Game) => (1 + (fullSlayerSet(player, "wightbone") ? 0.4 : 0.1 * setPieces(player, "wightbone"))) * (game && mixtureOn(game, 0) ? 2 : 1);

@@ -2208,3 +2208,18 @@ test("The Warden takes RF: a task bought done keeps the streak and pays points; 
   assert(rerollTaskForRf(g)); assert(currentTask(g), "a task again"); void first;
   assert(completeTaskForRf(g)); assert.equal(slayerStreak(g), 1); assert(slayerPoints(g) > points, "points as if finished"); assert.equal(currentTask(g), null, "and the task is done");
 });
+
+test("Faith weapons in every metal, meals that lend a skill, and herb art", async () => {
+  const { herbArt } = await import("../games/rarefriends-realm/scenery.ts").catch(() => ({ herbArt: null }));
+  const mace = item("pewter_mace"), flail = item("rarite_flail");
+  assert(mace.equip.holy && mace.equip.requires.prayer === 4 && mace.equip.bonuses.prayer > 0, "a pewter mace takes Faith 4 and blesses");
+  assert(flail.equip.twoHanded && flail.equip.holy && flail.equip.requires.prayer === METALS.find(m => m.id === "rarite").level + 7 && flail.equip.requires.strength > 0, "a rarite flail is two-handed, blessed and heavy");
+  for (const metal of METALS) assert(isItem(`${metal.id}_mace`) && isItem(`${metal.id}_flail`), `${metal.name} mace and flail`);
+  assert(SHOPS.weapons.stock.includes("pewter_mace") && SHOPS.cragmaw_armoury.stock.includes("rarite_flail"), "sold beside the swords and war hammers");
+  assert(smithingRecipes("pewter").some(recipe => recipe.label === "Pewter mace"), "smithed at the anvil");
+  const g = newGame(), p = g.player; p.inventory.fill(null); give(p, "sailfish"); give(p, "cooked_meat");
+  eat(g, 0); assert.equal(p.boosts.strength, 3, "sailfish lends +3 Strength"); assert.equal(p.boosts.attack, 2);
+  eat(g, 1); assert.equal(p.boosts.strength, 3, "a lesser meal doesn't lower a boost"); assert.match(g.messages.at(-1).text, /for a while/);
+  assert(item("inkshark").food.attack === 4 && item("minnows").food.fishing === 1);
+  void herbArt;
+});

@@ -4,6 +4,11 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 53, date: "2026-10-06", title: "Herbs you can see, faith weapons in every metal, and meals that lend a hand", items: [
+    "Herb patches are drawn like the trees and bushes now: a mound of leaves in the herb's colour on a ring of dark soil, a flower or seed-head on the uncommon ones, mushrooms as a cluster of stems and caps, and a few stalks once picked. Easy to spot in the foliage.",
+    "Faith weapons in every metal: a mace (one hand) and a flail (two hands) from pewter to ashenheart, blessed at Dawnhold. They take Faith to wield (the metal's level and 3, or 7 for the flail), hurt the undead more, give Faith XP with every hit, carry a faith bonus, and are smithed at the anvil or bought wherever that metal's swords and war hammers are.",
+    "Meals lend a hand: every meat and fish gives a skill a little for a while (chicken +1 Attack, meat +2 Strength, carp +2 Cooking, char +2 Woodcutting, grayling +2 Wayfaring and Ranged, inkcrab +3 Defence and +2 Mining, sailfish +3 Strength, inkshark +4 Attack and Strength…), wearing off a point a minute like a potion.",
+  ] },
   { id: 52, date: "2026-10-06", title: "The Faith spellbook, wards, weaknesses, a follower on your card, and helmets that sit right", items: [
     "A Faith tab in the spellbook: spells cast at a Faith level that spend faith as well as sigils. Smites (Holy Dart, Smite, Radiance, Banishment) hit the undead half as hard again (Banishment twice), Mend, Greater Mend and Renewal heal, Ward of Light and Sanctuary turn blows aside, and Blessing restores your run energy and cures poison. A holy weapon autocasts them like a staff.",
     "A Wards tab for the Realm's own magic: Stone Skin, Tide Shield, Storm Cloak and Hollow Veil steel your defence or turn a share of every blow aside for a while.",

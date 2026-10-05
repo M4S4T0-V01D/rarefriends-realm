@@ -567,6 +567,21 @@ function drawWeapon(p: Pixels, piece: Piece, x: number, y: number, dir: number, 
   switch (shape) {
     case "sword": blade(15); break;
     case "greatsword": blade(21); break;
+    case "mace": {
+      // A short haft in the hand, a round flanged head a little above it.
+      const head = { x: x + dir * (4 + lean), y: y - 9 }; tip = head;
+      p.line(x - dir, y + 3, head.x, head.y + 2, wood, 2); p.disc(head.x, head.y, 3.5, 3.5, metal, null); p.disc(head.x, head.y, 1.4, 1.4, piece.trim ?? light, null);
+      for (const [dx, dy] of [[-4, 0], [4, 0], [0, -4], [0, 4]]) p.set(head.x + dx, head.y + dy, dark);
+      break;
+    }
+    case "flail": {
+      // A haft held two-handed, the chain and its spiked ball swinging out ahead.
+      const top = { x: x + dir * (5 + lean), y: y - 16 }, ball = { x: top.x + dir * 5, y: top.y - 2 + sway }; tip = ball;
+      p.line(x - dir * 2, y + 6, top.x, top.y, wood, 2); p.line(top.x, top.y, ball.x - dir, ball.y + 1, "#8b8e92", 1);
+      p.disc(ball.x, ball.y, 3, 3, metal, null); for (const [dx, dy] of [[-4, 0], [4, 0], [0, -4], [0, 4], [-3, -3], [3, 3], [3, -3], [-3, 3]]) p.set(ball.x + dx, ball.y + dy, dark);
+      p.set(ball.x, ball.y, piece.trim ?? light);
+      break;
+    }
     case "battleaxe": case "warhammer": {
       // A long haft held two-handed across the body, the head high over the shoulder.
       const top = { x: x + dir * (5 + lean), y: y - 18 }; tip = top;

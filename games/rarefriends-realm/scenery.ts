@@ -37,6 +37,32 @@ function canopy(p: Pixels, random: () => number, cx: number, cy: number, rx: num
   for (let i = 0; i < 9; i++) { const x = Math.round(cx - rx * 0.5 + random() * rx * 0.7), y = Math.round(cy - ry * 0.6 + random() * ry * 0.6); if (p.get(x, y)) { p.set(x, y, light); p.set(x + 1, y, light); } }
   for (let i = 0; i < 7; i++) { const x = Math.round(cx - rx * 0.6 + random() * rx * 1.2), y = Math.round(cy - ry * 0.3 + random() * ry * 1.0); if (p.get(x, y)) p.set(x, y, shadeHex(color, -0.25)); }
 }
+/**
+ * A herb patch in the same hand as the trees and bushes: a low mound of leaves in the herb's colour with a lit top and
+ * a shaded foot, a flower or seed-head in its accent on the uncommon ones, and a thin ring of dark soil so it reads
+ * against grass. Mushrooms are a cluster of stems and caps. Picked bare: a few stalks on the soil.
+ */
+export function herbArt(shape: string, color: string, accent: string, variant: number, rare: boolean, bare: boolean): HTMLCanvasElement {
+  return pixelArt(`herb:${shape}:${color}:${accent}:${variant}:${rare}:${bare}`, 26, 22, p => {
+    const random = rng(variant * 977 + 13), soil = "#6a5440";
+    p.disc(13, 18, 11, 3.2, soil, null); p.dither("#5a4634", (x, y) => (x + y) % 3 === 0 ? 0.5 : 0, soil);
+    if (bare) { for (const dx of [-5, -1, 3, 6]) p.line(13 + dx, 17, 13 + dx + (dx < 0 ? -1 : 1), 12, "#8a7563"); p.outline(); return; }
+    if (shape === "mushroom") {
+      for (const [cx, h, r] of [[7, 8, 4], [14, 12, 5.5], [20, 6, 3.5]] as const) {
+        p.rect(cx - 1, 18 - h, 3, h, "#e8e4dc"); p.line(cx - 1, 18 - h, cx - 1, 17, "#c9c2b4");
+        p.disc(cx, 18 - h, r, r * 0.62, color, INK, shadeHex(color, -0.2));
+        for (let i = 0; i < 3; i++) p.set(Math.round(cx - r * 0.5 + random() * r), Math.round(18 - h - random() * r * 0.4), accent);
+      }
+      p.outline(); return;
+    }
+    canopy(p, random, 13, 11, 10, 6.5, color, 6);
+    // Leaf tips poking out of the mound, and a few stems showing between them.
+    for (let i = 0; i < 6; i++) { const a = Math.PI + random() * Math.PI, x = Math.round(13 + Math.cos(a) * 9), y = Math.round(11 + Math.sin(a) * 6); p.poly([[x, y], [x + Math.round(Math.cos(a) * 3), y + Math.round(Math.sin(a) * 3) - 2], [x + 1, y]], shadeHex(color, 0.12), null); }
+    for (let i = 0; i < 3; i++) { const x = Math.round(8 + random() * 10); p.line(x, 14, x + (random() < 0.5 ? -1 : 1), 17, shadeHex(color, -0.3)); }
+    if (rare) { p.line(13, 11, 14, 4, shadeHex(color, -0.2)); p.disc(14, 4, 2.6, 2.6, accent, INK); p.set(14, 4, shadeHex(accent, -0.3)); p.disc(8, 7, 1.6, 1.6, accent, INK); }
+    p.outline();
+  });
+}
 export function treeArt(kind: string, variant: number, depleted: boolean): HTMLCanvasElement {
   const style = TREES[kind] ?? TREES.tree;
   if (depleted) return pixelArt(`stump:${kind}`, 14, 9, p => {

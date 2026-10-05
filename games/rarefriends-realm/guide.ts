@@ -45,6 +45,7 @@ export function skillGuide(skill: Skill): GuideEntry[] {
     case "prayer":
       for (const prayer of PRAYERS) add(prayer.level, prayer.name, prayer.description);
       for (const spell of SPELLS) if (spell.skill === "prayer") out.push({ level: spell.level, name: `Spell: ${spell.name}`, detail: `${spell.description} (Faith tab of the spellbook)`, spell: spell.id });
+      out.push(...gear("prayer"));
       for (const bones of ITEM_LIST.filter(entry => entry.bones)) add(1, `Bury ${bones.name.toLowerCase()}`, `${bones.bones} Faith XP (twice that offered on an altar, three times in the Dawnhold chapel)`, bones.id);
       // The Order of the Dawn's faith weapons: a little Faith XP with each hit, and they hurt the undead more.
       for (const weapon of ITEM_LIST.filter(entry => entry.equip?.holy)) add(weapon.equip!.requires?.prayer ?? 1, weapon.name, "Faith weapon: Faith XP with every hit, and it hurts the undead more", weapon.id);
