@@ -64,6 +64,7 @@ export const FAMILY_PERKS: readonly FamilyPerk[] = [
 ];
 
 import { APOTHECARY_ITEMS, type PotionEffect } from "./apothecary.ts";
+import { ORDER_IDS, orderGear, orderStock } from "./knights.ts";
 // ---------- Items ----------
 export type EquipSlot = "head" | "cape" | "neck" | "weapon" | "body" | "shield" | "legs" | "hands" | "feet" | "belt";
 export const EQUIP_SLOTS: readonly EquipSlot[] = ["head", "cape", "neck", "weapon", "body", "shield", "legs", "hands", "feet", "belt"];
@@ -691,6 +692,12 @@ export const TAILOR_STOCK = TAILORING.map(entry => entry.id);
 /** A region's clothes: [id, name, slot shape/kind, colour, accent, examine]. Sold by the village clothier and worn by its people. */
 export type RegionalSet = { region: string; shop: string; pieces: readonly { id: string; name: string; slot: EquipSlot; shape: IconShape; kind?: string; color: string; accent: string; examine: string; value: number }[] };
 export const REGIONAL_CLOTHING: readonly RegionalSet[] = [
+  { region: "maidens", shop: "maidens_market", pieces: [
+    { id: "maiden_veil", name: "Maiden's veil", slot: "head", shape: "hood", color: "#3a3330", accent: "#9a2f2b", examine: "A dark veil edged in red, as the Deadwood Maidens wear against the dust of the dead.", value: 400 },
+    { id: "maiden_mail", name: "Maiden's mail", slot: "body", shape: "body", kind: "tunic", color: "#3a3330", accent: "#9a2f2b", examine: "A short mail shirt under a dark tabard, red at the hem.", value: 1200 },
+    { id: "maiden_skirt", name: "Maiden's skirt", slot: "legs", shape: "legs", color: "#2b2624", accent: "#9a2f2b", examine: "A split riding skirt of dark wool.", value: 700 },
+    { id: "maiden_boots", name: "Maiden's boots", slot: "feet", shape: "boots", color: "#2b2624", accent: "#9a2f2b", examine: "Soft boots for quiet feet in dead leaves.", value: 300 },
+  ] },
   { region: "gravesend", shop: "gravesend_clothier", pieces: [
     { id: "mourners_hood", name: "Mourner's hood", slot: "head", shape: "hood", color: "#3b3a40", accent: "#d9d2bf", examine: "A deep charcoal hood, bone-white at the hem. Gravesend wears it for everyone the Deadwood took.", value: 90 },
     { id: "gravesend_coat", name: "Gravesend coat", slot: "body", shape: "body", kind: "tunic", color: "#3b3a40", accent: "#d9d2bf", examine: "A long dark coat with bone buttons.", value: 180 },
@@ -820,7 +827,7 @@ const ORDER_ARMOUR: Item[] = [
 export const DAWNPLATE_QUEST: Record<string, string> = { dawnplate_greaves: "pilgrims_road", dawnplate_boots: "pilgrims_road", dawnplate_helm: "restless_crypt",
   dawnplate_shield: "restless_crypt", dawnplate_gauntlets: "restless_crypt", dawnplate_cuirass: "dawn_against_hollow" };
 
-export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...ORDER_ARMOUR, ...slayerGear(), ...heartguardGear(), ...REGIONAL_ITEMS, ...APOTHECARY_ITEMS]);
+export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...ORDER_ARMOUR, ...orderGear(), ...slayerGear(), ...heartguardGear(), ...REGIONAL_ITEMS, ...APOTHECARY_ITEMS]);
 const ITEM_MAP = new Map(ITEM_LIST.map(item => [item.id, item]));
 export function item(id: string): Item {
   const found = ITEM_MAP.get(id);
@@ -1084,6 +1091,8 @@ export type MonsterDef = {
   enrage?: boolean;
   /** Met only in the Rare Friends Ring (summoned for a match), never placed in the world. */
   arenaOnly?: boolean;
+  /** A people, not a beast: hostile until their quest is done, then at peace with you (and not to be attacked). */
+  faction?: string;
 };
 const coins = (min: number, max: number, chance: number): Drop => ({ item: "coins", min, max, chance });
 const one = (id: string, chance: number, min = 1, max = min): Drop => ({ item: id, min, max, chance });
@@ -1233,6 +1242,12 @@ Object.assign(MONSTERS, {
   moss_warden: { id: "moss_warden", poisonImmune: true, name: "The Moss Warden", level: 45, hp: 120, attack: 40, strength: 38, defence: 48, magicDef: 20, attackBonus: 26, defenceBonus: 36, maxHit: 8, speed: 5, respawn: 120, wander: 2, boss: true, aggressive: true, heals: 4, weakness: "fire",
     examine: "A warden of the old vaults under the Mossy Ruins, stone under a century of moss, mending itself with the damp.", always: [one("large_bones", 1), coins(200, 700, 1)], drops: [one("mossguard_shield", 0.08), one("moss_key", 0.3), one("rough_sagestone", 0.2), one("rough_rosestone", 0.08), one("glimmer_ore", 0.3, 1, 3), one("stone_sigil", 0.5, 6, 14), one("insight_lamp", 0.02)], art: 148, ink: "#4f5e3e" },
 } satisfies Record<string, MonsterDef>);
+// ---------- The Deadwood Maidens: a people of the east Deadwood, hostile until their truce is kept ----------
+Object.assign(MONSTERS, {
+  deadwood_maiden: { id: "deadwood_maiden", name: "Deadwood maiden", level: 58, hp: 70, attack: 52, strength: 46, defence: 50, magicDef: 30, attackBonus: 34, defenceBonus: 30, maxHit: 9, speed: 4, respawn: 60, wander: 3, aggressive: true, faction: "maidens", ranged: 3, weakness: "fire",
+    examine: "A spearwoman of the Deadwood Maidens, who hold the east of the wood against the dead and against everyone else. Keep the truce and she keeps hers.",
+    drops: [coins(40, 200, 0.6), one("blackiron_arrow", 0.3, 8, 20), one("grave_dust", 0.3), one("deadwood_logs", 0.4, 1, 3), one("bloom_sigil", 0.2, 3, 6)], art: 149, ink: "#3a3330" },
+} satisfies Record<string, MonsterDef>);
 export function combatLevelOf(monster: MonsterDef) { return monster.level; }
 
 // ---------- Emotes ----------
@@ -1314,6 +1329,12 @@ export type ShopDef = { id: string; name: string; stock: readonly string[]; gene
   /** What it's paid in when not coins (the Ring's bloodmarks and laurels): an item id. Such shops buy nothing back. */
   currency?: string };
 export const SHOPS: Record<string, ShopDef> = {
+  // The four Orders' quartermasters (open once their oath is sworn), and the Deadwood Maidens' market (once the truce is kept).
+  diamond_armoury: { id: "diamond_armoury", name: "The Diamond Armoury", buys: ["weapon", "armour"], rate: 0.5, stock: orderStock("diamond") },
+  ink_armoury: { id: "ink_armoury", name: "The Ink Armoury", buys: ["weapon", "armour"], rate: 0.5, stock: orderStock("ink") },
+  sol_armoury: { id: "sol_armoury", name: "The Sol Armoury", buys: ["weapon", "armour"], rate: 0.5, stock: orderStock("sol") },
+  hood_armoury: { id: "hood_armoury", name: "The Hood Armoury", buys: ["weapon", "armour"], rate: 0.5, stock: orderStock("hood") },
+  maidens_market: { id: "maidens_market", name: "The Maidens' Market", buys: ["bones", "logs"], rate: 0.6, stock: ["rarite_ore", "hollow_essence", "gloom_shard", "wyrm_scale", "cinder_core", "crystal_shard", "grave_dust", "ink_page", "hollow_sigil", "star_sigil", "path_sigil", "shade_sigil", "vault_key", "archive_key", "deepglass_key", "moss_key", "antidote", "deadwood_logs", "maiden_veil", "maiden_mail", "maiden_skirt", "maiden_boots"] },
   // The Rare Friends Ring's concourse: everything a fighter needs, and two shops that take only what the Ring pays out.
   ring_potions: { id: "ring_potions", name: "The Ring Apothecary", buys: ["food"], rate: 0.5, stock: ["healing_tonic", "saltwort_tonic", "attack_potion", "strength_potion", "defence_potion", "ranged_potion", "magic_potion", "faith_potion", "energy_draught", "antidote", "bread", "cooked_meat", "sailfish"] },
   ring_faith: { id: "ring_faith", name: "The Ring Chapel Stores", buys: ["bones"], rate: 0.5, stock: ["faith_potion", "star_sigil", "bloom_sigil", "shade_sigil", "acolyte_hood", "acolyte_vestment", "acolyte_leggings", "acolyte_gloves", "acolyte_sandals", "pewter_mace", "blackiron_mace", "ashsteel_mace", "pewter_aegis", "blackiron_aegis"] },

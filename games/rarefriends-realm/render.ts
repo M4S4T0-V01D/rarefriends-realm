@@ -2433,6 +2433,13 @@ function drawNpc(ctx: CanvasRenderingContext2D, scene: Scene, npc: Npc, at: { x:
 }
 /** What some NPCs wear, composited into their sprite like your own gear: the King's regalia, and the guards' helms, battleaxes and red capes. */
 const NPC_WEAR: Record<string, readonly string[]> = {
+  // The four Orders: commanders in Paladin plate, quartermasters and guards in Knight.
+  ...Object.fromEntries((["diamond", "ink", "sol", "hood"] as const).flatMap(order => [
+    [`${order}_commander`, [`${order}_paladin_helm`, `${order}_paladin_body`, `${order}_paladin_legs`, `${order}_paladin_boots`, `${order}_cape`, `${order}_paladin_mace`]],
+    [`${order}_quartermaster`, [`${order}_knight_body`, `${order}_knight_legs`, `${order}_knight_boots`, `${order}_cape`]],
+    [`${order}_guard`, [`${order}_knight_helm`, `${order}_knight_body`, `${order}_knight_legs`, `${order}_knight_boots`, `${order}_knight_kite`, `${order}_knight_mace`]],
+  ])),
+  maiden_matriarch: ["maiden_veil", "maiden_mail", "maiden_skirt", "maiden_boots", "vigil_spear"], maiden_trader: ["maiden_veil", "maiden_mail", "maiden_skirt", "maiden_boots"],
   king: ["paper_crown", "blue_cape"],
   guard: ["blackiron_helm", "blackiron_cuirass", "crimson_cape", "blackiron_battleaxe"],
   royal_guard: ["ashsteel_helm", "ashsteel_cuirass", "ashsteel_greaves", "crimson_cape", "ashsteel_battleaxe"],

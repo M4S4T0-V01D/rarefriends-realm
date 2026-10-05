@@ -10,6 +10,7 @@ import { HOME_TIERS, buyHome, homeDeed } from "./housing.ts";
 import { friendSays, remember } from "./friend.ts";
 import { rumourAt } from "./rumours.ts";
 import { FOE_GROUPS, MATCHES, customMatch, entryFee, startMatch } from "./arena.ts";
+import { ORDERS, ORDER_IDS } from "./knights.ts";
 import {
   addXp, combatLevel, count, give, giveOrDrop, has, level, message, sound, take, emit, BONE_BAG, ownsBoneBag, type Dialogue, type DialogueLine, type Game,
 } from "./state.ts";
@@ -36,6 +37,16 @@ export const NPCS: Record<string, NpcDef> = {
   ring_armourer: { id: "ring_armourer", name: "Gorm Ironhand", examine: "Metal armour and blades, for coin.", options: ["Talk-to", "Trade"], shop: "ring_armour", art: art(6, 706) },
   ring_quartermaster: { id: "ring_quartermaster", name: "The Pit Quartermaster", examine: "Takes bloodmarks and nothing else. Sells the Ring's own armour.", options: ["Talk-to", "Trade"], shop: "ring_pit", art: art(0, 707) },
   ring_champion: { id: "ring_champion", name: "Laurel Keeper Ismay", examine: "Keeps the Champions' Hall. Takes laurels, the coin of Friend Fights.", options: ["Talk-to", "Trade"], shop: "ring_champions", art: art(7, 708) },
+  // The four Orders (2026-10): commanders, quartermasters and guards, all on the knights' stout frame.
+  ...Object.fromEntries(ORDER_IDS.flatMap(id => { const order = ORDERS[id], seed = { diamond: 800, ink: 810, sol: 820, hood: 830 }[id]; return [
+    [`${id}_commander`, { id: `${id}_commander`, name: { diamond: "Commander Isolde Vane", ink: "Commander Ottavio Inkwell", sol: "Commander Sunniva Brightmoor", hood: "Commander Robyn Greenleaf" }[id], examine: `Commander of the ${order.name}. Swears in those who prove their faith.`, options: ["Talk-to"], art: art(10, seed) }],
+    [`${id}_quartermaster`, { id: `${id}_quartermaster`, name: `${order.short} quartermaster`, examine: `Keeps the ${order.name}'s armoury. Sells to the sworn.`, options: ["Talk-to", "Trade"], shop: `${id}_armoury`, art: art(10, seed + 1) }],
+    [`${id}_guard`, { id: `${id}_guard`, name: `${order.short} knight`, examine: `A knight of the ${order.name}, in its colours.`, options: ["Talk-to"], art: art(10, seed + 2) }],
+  ]; })),
+  // The Deadwood Maidens (2026-10): hostile until the truce, then the best market in the Realm for what's hard to find.
+  maiden_matriarch: { id: "maiden_matriarch", name: "Matriarch Ysolde Thornveil", examine: "Leads the Deadwood Maidens. Has buried more of the dead than Gravesend has.", options: ["Talk-to"], art: art(3, 840) },
+  maiden_trader: { id: "maiden_trader", name: "Wren of the Maidens", examine: "Keeps the Maidens' market: what the Deadwood gives up, and what they take from its dead.", options: ["Talk-to", "Trade"], shop: "maidens_market", art: art(3, 841) },
+  maidens_villager: { id: "maidens_villager", name: "Deadwood Maiden", examine: "A Maiden off watch. Still armed.", options: ["Talk-to"], art: art(9, 842) },
   mender: { id: "mender", name: "Mender Hale", examine: "The chapel's mender. Her hands are always clean and her apron never is.", options: ["Talk-to", "Trade"], shop: "mender", art: art(3, 318) },
   // The wider world's villages (2026-10). Each village's people wear its own clothes (NPC_WEAR / regionalLook in render.ts).
   gravesend_keeper: { id: "gravesend_keeper", name: "Warden Mira Thorne", examine: "Gravesend's gravekeeper. She knows every name on every stone.", options: ["Talk-to"], art: art(2, 501) },
@@ -400,6 +411,29 @@ export const QUESTS: readonly QuestDef[] = [
       return ["The howling under the stones has stopped. Fenn says the deer came back the same night. QUEST COMPLETE!"];
     },
   },
+  // ---------- The oaths of the four Orders, and the Maidens' truce ----------
+  ...ORDER_IDS.map(id => { const order = ORDERS[id]; return {
+    id: `oath_${id}`, name: `The ${order.short} Oath`, points: 1, difficulty: "Intermediate" as const, start: `Talk to the commander in the ${order.short} Hall, with Faith 20.`,
+    requirements: ["Faith 20", `${order.oath.n.toLocaleString()} ${order.oath.item === "coins" ? "coins" : order.oath.item.replace(/_/g, " ")}`], rewards: ["1 Quest Point", `${order.short} cape`, "3,000 Faith XP", `The ${order.name}'s armoury opens to you`],
+    journal: (game: Game) => {
+      const s = stage(game, `oath_${id}`), p = game.player;
+      if (s === 0) return [`The ${order.name} serves ${order.godName}. Its commander swears in those who prove their faith.`];
+      if (s === 1) return [`To swear the ${order.short} Oath I must pray at the ${order.short} altar and bring ${order.oath.text}.`,
+        `${data(game, `prayed_${id}`) ? "✓" : "•"} Prayed at the ${order.short} altar`, `${count(p, order.oath.item) >= order.oath.n ? "✓" : "•"} ${order.oath.item === "coins" ? "Coins" : order.oath.item.replace(/_/g, " ")}: ${Math.min(order.oath.n, count(p, order.oath.item)).toLocaleString()}/${order.oath.n.toLocaleString()}`];
+      return [`I swore the ${order.short} Oath. The ${order.name}'s armoury is open to me, and I wear its cape. QUEST COMPLETE!`];
+    },
+  }; }),
+  {
+    id: "maidens_truce", name: "The Maidens' Truce", points: 2, difficulty: "Intermediate", start: "Talk to Matriarch Ysolde Thornveil at the Deadwood Maidens' camp, in the east of the Deadwood.",
+    requirements: ["Combat 50 recommended"], rewards: ["2 Quest Points", "Maiden's veil", "4,000 Faith XP", "2,000 Slayer XP", "The Maidens' market opens to you, and their spears stay down"],
+    journal: game => {
+      const s = stage(game, "maidens_truce"), p = game.player;
+      if (s === 0) return ["The Deadwood Maidens hold the east of the wood against the dead and against everyone else. Their matriarch will talk, if nobody else will."];
+      if (s === 1) return ["The matriarch will keep a truce with me if I prove I fight the dead and not the living: ten of the Deadwood's dead put down in the east of the wood, twelve grave dust for their hearth, and four crypt bones for their shrine.",
+        `${data(game, "mt_dead") >= 10 ? "✓" : "•"} The dead put down in the east Deadwood: ${Math.min(10, data(game, "mt_dead"))}/10`, `${count(p, "grave_dust") >= 12 ? "✓" : "•"} Grave dust: ${Math.min(12, count(p, "grave_dust"))}/12`, `${count(p, "crypt_bones") >= 4 ? "✓" : "•"} Crypt bones: ${Math.min(4, count(p, "crypt_bones"))}/4`];
+      return ["The Maidens keep the truce. Their spears stay down for me, and Wren's market is open. QUEST COMPLETE!"];
+    },
+  },
   // ---------- The quests of being known: long ones, for Presence, with gear only they give ----------
   {
     id: "name_worth_knowing", name: "A Name Worth Knowing", points: 2, difficulty: "Long", start: "Talk to Namekeeper Elian by the Friendhollow square, once your Presence is 20 and your Friend has a name.",
@@ -478,6 +512,7 @@ export function onMonsterKilled(game: Game, monsterId: string, x: number, y: num
     const n = player.questData[key] = (player.questData[key] ?? 0) + 1;
     if (n === goal) { message(game, done, "quest"); sound(game, "quest"); }
   };
+  if ((monsterId === "skeleton" || monsterId === "shade" || monsterId === "cairn_wight") && x >= 335 && x <= 440 && y < 115) tally("maidens_truce", "mt_dead", 10, "Ten of the Deadwood's dead put down in the east. The matriarch wanted dust and bones besides.");
   if (monsterId === "glass_crab") tally("deepglass_heart", "dg_crabs", 6, "Six glass crabs cracked. The fisher wanted shards too, and the lake's heart stilled.");
   if (monsterId === "crystal_golem") tally("deepglass_heart", "dg_golem", 1, "The Crystal Golem comes apart in a shower of glass. The lake's heart is still.");
   if (monsterId === "archivist_below") tally("drowned_archive", "da_archivist", 1, "The Archivist Below closes his book at last. Perrin will want to hear it.");
@@ -527,6 +562,13 @@ export function searchWell(game: Game) {
   } else message(game, "The well is deep and cold. You see your Friend's reflection.");
 }
 /** The crypt: searching the old chest and blessing the altar. */
+/** Why a shop won't sell to you (the Orders' armouries before the oath, the Maidens' market before the truce), or null. */
+export function shopProblem(game: Game, shopId: string): string | null {
+  const order = ORDER_IDS.find(id => shopId === `${id}_armoury`);
+  if (order && !questDone(game, `oath_${order}`)) return `The quartermaster won't sell to one who hasn't sworn the ${ORDERS[order].short} Oath. The commander will hear you.`;
+  if (shopId === "maidens_market" && !questDone(game, "maidens_truce")) return "Wren's hand stays on her spear. The Maidens trade with those who keep the truce; speak to the matriarch.";
+  return null;
+}
 export function searchCryptChest(game: Game) {
   if (stage(game, "hollow_whispers") === 1 && !has(game.player, "crypt_key")) {
     giveOrDrop(game, "crypt_key"); game.player.quests.hollow_whispers = 2;
@@ -540,7 +582,8 @@ export function onBonesOffered(game: Game, chapel: boolean) {
   if (n === VIGIL_BONES) { message(game, "The chapel candles all flare at once. The vigil is kept: I should tell Grandmaster Aldric.", "quest"); sound(game, "quest"); }
 }
 /** Praying at an altar: the Pilgrim's Road counts the old altars of the Realm. */
-export function onAltarPrayed(game: Game, altar: { name: string }) {
+export function onAltarPrayed(game: Game, altar: { name: string; text?: string }) {
+  if (altar.text && (ORDER_IDS as readonly string[]).includes(altar.text) && !data(game, `prayed_${altar.text}`)) { game.player.questData[`prayed_${altar.text}`] = 1; if (stage(game, `oath_${altar.text}`) === 1) { message(game, `You kneel at the ${ORDERS[altar.text as keyof typeof ORDERS].short} altar. The oath wants its gift too.`, "quest"); } }
   if (stage(game, "pilgrims_road") !== 1) return;
   const stop = PILGRIM_ALTARS.find(([, name]) => name === altar.name);
   if (!stop || data(game, stop[0])) return;
@@ -1033,6 +1076,15 @@ function talkInner(game: Game, npcId: string): Dialogue {
       { label: "Nothing for now.", then: () => null },
     ]);
     case "witch": return chat(name, npcSays(name, "Heh heh. The stepping stones to the north need Wayfaring 20. The crypt's the other way. Mind the lurkers, dearie."));
+    case "maiden_matriarch": return fetchQuest(game, name, "maidens_truce", {
+      offer: ["Stop there. The Maidens hold the east of the wood, and we hold it against everyone: the dead, the Order, the Ring's bravos, you. I'll talk, because nobody else here will.", "Prove you fight the dead and not the living. Put ten of the Deadwood's dead down in the east of the wood, bring twelve grave dust for our hearth and four crypt bones for the shrine. Then there's a truce, and Wren's market is yours."],
+      accept: "Ten of the dead, twelve dust, four crypt bones. My spearwomen will let you pass while you're at it. Don't make me regret it.", progress: "Ten of the dead in the east, twelve grave dust, four crypt bones. The truce waits on you.",
+      have: () => data(game, "mt_dead") >= 10 && count(player, "grave_dust") >= 12 && count(player, "crypt_bones") >= 4, take: () => { take(player, "grave_dust", 12); take(player, "crypt_bones", 4); },
+      done: ["The hearth burns the dust, the shrine takes the bones, and the Maidens keep a truce with you. Spears down, all of you.", "Wear this. It says you're one of ours, as far as anyone out here is concerned. Wren will sell you what the wood gives up."],
+      reward: () => { giveOrDrop(game, "maiden_veil"); addXp(game, "prayer", 4000, { raw: true }); addXp(game, "slayer", 2000, { raw: true }); },
+    });
+    case "maiden_trader": return chat(name, npcSays(name, questDone(game, "maidens_truce") ? "Rarite from the Vault's dead, essence from the Hollow, shards, scales, cores, dust, keys to every locked door we've found. The wood gives it up; we sell it." : "Not to you. Not yet. The matriarch decides who we trade with."));
+    case "maidens_villager": return chat(name, npcSays(name, questDone(game, "maidens_truce") ? "Truce-keeper. Mind the dead past the fence; they don't keep it." : "Keep walking. The matriarch said you could pass, not stay."));
     case "ringmaster": {
       if (game.arena) return chat(name, npcSays(name, "A match is on. Finish it, or walk out of the Ring to give it up."));
       const offer = (match: { id: string; name: string; level: number; coins: number; marks: number }) => ({ label: `${match.name} (level ${match.level}: pays ${match.coins.toLocaleString()} coins and ${match.marks} bloodmarks; ${entryFee(match.coins).toLocaleString()} to enter)`, then: () => { startMatch(game, match.id); return null; } });
@@ -1050,6 +1102,19 @@ function talkInner(game: Game, npcId: string): Dialogue {
         { label: "Not today.", then: () => null },
       ]);
     }
+    case "diamond_commander": case "ink_commander": case "sol_commander": case "hood_commander": {
+      const order = ORDERS[npcId.split("_")[0] as keyof typeof ORDERS];
+      if (level(game, "prayer") < 20 && stage(game, `oath_${order.id}`) === 0) return chat(name, npcSays(name, `${order.godText}`, "Grow in faith first (Faith 20), and we'll talk of oaths."));
+      return fetchQuest(game, name, `oath_${order.id}`, {
+        offer: [order.godText, `To swear the ${order.short} Oath, kneel at our altar, and bring ${order.oath.text}.`],
+        accept: `Kneel at the altar, and bring what the oath asks. The quartermaster sells to the sworn.`, progress: `The altar, and ${order.oath.text}. The oath waits.`,
+        have: () => data(game, `prayed_${order.id}`) >= 1 && count(player, order.oath.item) >= order.oath.n, take: () => take(player, order.oath.item, order.oath.n),
+        done: [`Sworn. You are of the ${order.name} now, and ${order.godName} knows your name.`, `Wear our cape, and buy what you can carry. ${order.effect}`],
+        reward: () => { giveOrDrop(game, `${order.id}_cape`); addXp(game, "prayer", 3000, { raw: true }); },
+      });
+    }
+    case "diamond_quartermaster": case "ink_quartermaster": case "sol_quartermaster": case "hood_quartermaster": { const order = ORDERS[npcId.split("_")[0] as keyof typeof ORDERS]; return chat(name, npcSays(name, questDone(game, `oath_${order.id}`) ? `Oathbound, Knight and Paladin: helm, cuirass, greaves, gauntlets, boots, the kite and the aegis, the mace, the greatmace and the staff, all blessed at our altar. ${order.effect}` : `The ${order.name} arms its own. Swear the oath with the commander and I'll open the racks.`)); }
+    case "diamond_guard": case "ink_guard": case "sol_guard": case "hood_guard": { const order = ORDERS[npcId.split("_")[0] as keyof typeof ORDERS]; return chat(name, npcSays(name, `${order.godName}, keep you. The hall is open to those who come in peace; the oath is for those who stay.`)); }
     case "ring_apothecary": return chat(name, npcSays(name, "Tonics, potions and something to eat between matches. Drink before you go in, not after you come out."));
     case "ring_chaplain": return chat(name, npcSays(name, "The Ringmaker fought by faith, they say. Faith potions, sigils for the holy spells, the Acolyte's vestments, maces and the aegis: all here."));
     case "ring_sigilist": return chat(name, npcSays(name, "Sigils for every element, and the elemental staffs. Mages win more matches than you'd think; the creatures can't dodge."));

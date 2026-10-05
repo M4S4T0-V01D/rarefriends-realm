@@ -20,6 +20,7 @@ import { ECO_REGIONS, HERBS } from "./apothecary.ts";
 import { buildVillages } from "./villages.ts";
 // REGIONS is read only inside buildExpansion (called from createWorld), never at load, since world.ts imports this module.
 import { ARENA, MAINLAND_RECT, OVERWORLD_H, REGIONS, T, isWater, mainlandToWorld, type DecorKind, type GenContext, type RegionId, type worldTools } from "./world.ts";
+import { ORDERS, ORDER_IDS } from "./knights.ts";
 
 export type Tools = ReturnType<typeof worldTools>;
 type Pt = readonly [number, number];
@@ -582,6 +583,50 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
   chapel([620, 262], 7, 7, "Ironreach chapel", "Ironreach altar");
   chapel([570, 420], 7, 7, "Wilds chapel", "Wilds altar");
   chapel([282, 62], 13, 11, "The Deadwood chapel", "Deadwood altar", true);
+  // ---------- 7e. The four Orders' halls, and the Deadwood Maidens' camp ----------
+  /** Clear ground w × h (plus a margin) near a point, searched outward; the top-left corner, or null. */
+  const clearing = (near: readonly [number, number], w: number, h: number, allowSwamp = false): [number, number] | null => {
+    const landy = (tt: number) => [T.GRASS, T.DARK_GRASS, T.PATH, T.GRAVEL, T.SNOW, T.ASH, T.SAND, ...(allowSwamp ? [T.SWAMP] : [])].includes(tt as never);
+    const fits = (x0: number, y0: number) => { for (let y = y0 - 1; y <= y0 + h; y++) for (let x = x0 - 1; x <= x0 + w; x++) { if (!inBounds(x, y) || inMainland(x, y) || !landy(get(x, y))) return false; const o = ctx.objectAt[tileIndex(x, y)]; if (o >= 0 && !["decor", "tree", "herb"].includes(ctx.objects[o].kind)) return false; } return true; };
+    for (let r = 0; r <= 36; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; const x0 = near[0] + dx - Math.floor(w / 2), y0 = near[1] + dy - Math.floor(h / 2); if (fits(x0, y0)) return [x0, y0]; }
+    return null;
+  };
+  const razeArea = (x0: number, y0: number, x1: number, y1: number) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { clearAt(x, y); for (let i = ctx.spawns.length - 1; i >= 0; i--) if (ctx.spawns[i].x === x && ctx.spawns[i].y === y) ctx.spawns.splice(i, 1); } };
+  /**
+   * An Order's hall: stone, a gable roof in the Order's colour, the altar at the north end, racks and benches, the
+   * commander and quartermaster inside, two guards and the god's statue before the door.
+   */
+  for (const id of ORDER_IDS) {
+    const order = ORDERS[id], at = clearing(order.near, 11, 8);
+    if (!at) continue;
+    const [x0, y0] = at, x1 = x0 + 10, y1 = y0 + 7, cx = x0 + 5;
+    razeArea(x0 - 1, y0 - 1, x1 + 1, y1 + 3);
+    for (let y = y1 + 1; y <= y1 + 3; y++) for (let x = x0; x <= x1; x++) put(x, y, T.STONE);
+    t.building(x0, y0, x1, y1, "s", T.STONE, undefined, { name: `${order.short} Hall`, color: order.color, walls: "stone", chimney: true });
+    add({ kind: "altar", x: cx, y: y0 + 2, blocks: true, name: `${order.short} altar`, text: id }); decor(cx, y0 + 1, order.statue, true, `${order.god}, carved small for the altar`);
+    decor(x0 + 1, y0 + 2, "armour", true, "Weapon rack"); decor(x1 - 1, y0 + 2, "armour", true, "Weapon rack"); decor(x0 + 1, y1 - 1, "torch", true); decor(x1 - 1, y1 - 1, "torch", true);
+    decor(cx - 3, y0 + 4, "bench", true); decor(cx + 3, y0 + 4, "bench", true); decor(x0 + 1, y0 + 4, "table", true, "The Order's ledger"); decor(x1 - 1, y0 + 4, "chest", true, `${order.short} strongbox`);
+    npc(`${id}_commander`, cx - 1, y0 + 4); npc(`${id}_quartermaster`, cx + 2, y0 + 3);
+    decor(cx, y1 + 3, order.statue, true, `${order.god}, god of the ${order.name}`); npc(`${id}_guard`, cx - 3, y1 + 2); npc(`${id}_guard`, cx + 3, y1 + 2);
+    decor(x0, y1 + 2, "banner", true, `The ${order.name}'s banner`); decor(x1, y1 + 2, "banner", true, `The ${order.name}'s banner`);
+  }
+  // The Deadwood Maidens' camp in the east of the wood: tents round a hearth behind a fence of stakes, their spearwomen
+  // on watch at the edge. Hostile, until the truce is kept.
+  {
+    const at = clearing([392, 64], 17, 13, true);
+    if (at) {
+      const [x0, y0] = at, x1 = x0 + 16, y1 = y0 + 12, cx = x0 + 8, cy = y0 + 6;
+      razeArea(x0 - 2, y0 - 2, x1 + 2, y1 + 2);
+      for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (get(x, y) === T.SWAMP) put(x, y, T.DARK_GRASS);
+      for (let x = x0; x <= x1; x++) { if (Math.abs(x - cx) > 1) { decor(x, y0, "fence", true, "Stake fence"); decor(x, y1, "fence", true, "Stake fence"); } }
+      for (let y = y0 + 1; y < y1; y++) { if (Math.abs(y - cy) > 1) { decor(x0, y, "fence", true, "Stake fence"); decor(x1, y, "fence", true, "Stake fence"); } }
+      decor(cx, cy, "hearth", true, "The Maidens' hearth"); for (const [dx, dy] of [[-5, -3], [5, -3], [-5, 3], [5, 3]] as const) decor(cx + dx, cy + dy, "tent", true, "A Maiden's tent");
+      decor(cx - 2, cy - 4, "table", true, "The Maidens' market"); decor(cx - 3, cy - 4, "crate", true); decor(cx + 3, cy + 4, "logpile", true); decor(cx, y0 + 1, "banner", true, "The Maidens' banner, red on black");
+      decor(cx + 3, cy - 4, "obelisk", true, "A standing stone the Maidens pray at"); decor(cx - 3, cy + 4, "bones", false, "Trophies of the dead");
+      npc("maiden_matriarch", cx + 1, cy - 1); npc("maiden_trader", cx - 2, cy - 3); for (const [dx, dy] of [[-3, 1], [3, 1], [-1, 3], [2, -2]] as const) npc("maidens_villager", cx + dx, cy + dy);
+      for (const [dx, dy] of [[-9, -2], [-9, 2], [9, -2], [9, 2], [-4, -8], [4, -8], [-4, 8], [4, 8]] as const) { const gx = cx + dx, gy = cy + dy; if (inBounds(gx, gy) && [T.GRASS, T.DARK_GRASS, T.PATH, T.SWAMP].includes(get(gx, gy) as never)) monsters("deadwood_maiden", gx, gy, gx, gy, 1); }
+    }
+  }
   // ---------- 7c. The Rare Friends Ring: a round building west of the Deadwood, across the river, built by a Hoverer ----------
   {
     const { x: cx, y: cy, outer, inner } = ARENA, dist = (x: number, y: number) => Math.hypot(x - cx, y - cy);

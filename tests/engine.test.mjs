@@ -20,7 +20,8 @@ import { cleanPresence } from "../games/rarefriends-realm/net.ts";
 import { buySlayerReward, longTasks, slayerXpBoost, eligibleTasks } from "../games/rarefriends-realm/slayer.ts";
 import { currentTask, slayerPoints } from "../games/rarefriends-realm/slayer.ts";
 import { COURSES, HEARTGUARD, ITEM_LIST, METALS, MONSTERS, SMITH_PIECES, SPELL_TABS, FIREMAKING, REGIONAL_CLOTHING, WARDROBE, MOUNTS, SHOPS, SKILLS, SKILL_NAMES, SLAYER_SETS, SLAYER_TASKS, SPELLS, TREES, WAYFARER_MARK, WAYFARER_REWARDS, XP_RATE, XP_TABLE, heavyStrength, isItem, item, levelForXp } from "../games/rarefriends-realm/data.ts";
-import { NPCS, QUESTS, MAX_QUEST_POINTS, PILGRIM_ALTARS, questPoints, onMonsterKilled } from "../games/rarefriends-realm/content.ts";
+import { NPCS, QUESTS, MAX_QUEST_POINTS, PILGRIM_ALTARS, questPoints, onMonsterKilled, shopProblem } from "../games/rarefriends-realm/content.ts";
+import { ORDERS, ORDER_IDS, orderOf, orderPieces } from "../games/rarefriends-realm/knights.ts";
 import { FLOOR_Y, H, MAINLAND, REGIONS, T, W, createWorld, floorAt, isUnderground, mainlandToWorld, objectAtTile, onLevel, realPoint, regionAt, terrainAt } from "../games/rarefriends-realm/world.ts";
 import { addXp, emptyToBank, fillFromBank, bankDeposit, bankInOrder, bankMove, bankTabs, bankWithdraw, bonuses, bagBones, combatLevel, count, dropItem, earlyXp, give, has, heft, level, maxHp, xpMultiplier, BONE_BAG, BONE_BAG_SIZE } from "../games/rarefriends-realm/state.ts";
 import game from "../games/rarefriends-realm/game.json" with { type: "json" };
@@ -594,7 +595,7 @@ test("A Friend's Feast from start to finish", () => {
   assert.equal(g.player.quests.friends_feast, 2);
   assert.equal(questPoints(g), 1);
   assert(level(g, "cooking") >= 10, "Quest XP");
-  assert.equal(QUESTS.length, 27); assert.equal(MAX_QUEST_POINTS, 45);
+  assert.equal(QUESTS.length, 32); assert.equal(MAX_QUEST_POINTS, 51);
 });
 
 test("Grumblin Trouble counts kills and pays out", () => {
@@ -846,9 +847,9 @@ test("The Heartguard: nine red-and-white pieces by Hitpoints level, each a hitpo
 test("The Old Friend stands behind every altar, and Dawnhold has its keep, towers and a taller chapel", () => {
   const g = newGame(), world = g.world;
   const altars = world.objects.filter(object => object.kind === "altar");
-  assert.equal(altars.length, 12, "the mainland's four, Gravesend's lantern altar, the catacombs' bone altar, the Ring chapel's and the five wayward chapels'");
+  assert.equal(altars.length, 16, "the mainland's four, Gravesend's lantern altar, the catacombs' bone altar, the Ring chapel's, the five wayward chapels' and the four Orders'");
   for (const altar of altars) {
-    assert(world.objects.some(object => object.decor === "old_friend" && Math.abs(object.x - altar.x) <= 1 && Math.abs(object.y - altar.y) <= 2), `a statue of the Old Friend by the ${altar.name}`);
+    assert(world.objects.some(object => (object.decor === "old_friend" || object.decor?.startsWith("god_")) && Math.abs(object.x - altar.x) <= 1 && Math.abs(object.y - altar.y) <= 2), `a statue of the Old Friend (or an Order's god) by the ${altar.name}`);
   }
   assert(world.objects.find(object => object.decor === "old_friend").name === "Statue of the Old Friend");
   const named = name => world.buildings.filter(building => building.name === name);
@@ -1934,7 +1935,7 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   assert.equal(p.quests.dawn_against_hollow, 2); assert(has(p, "dawnplate_cuirass"));
   assert.equal(count(p, "hollow_essence"), 0);
   assert.equal(capeProblem(g, "dawnplate_cuirass"), null, "the armoury sells Dawnplate once earned");
-  assert.equal(QUESTS.length, 27); assert.equal(MAX_QUEST_POINTS, 45);
+  assert.equal(QUESTS.length, 32); assert.equal(MAX_QUEST_POINTS, 51);
 });
 
 test("Boots and gauntlets in every metal, smithed at the anvil; the clothier's shirts, dresses, trousers and skirts", () => {
@@ -2413,4 +2414,35 @@ test("The Root Cellars and the Mossy Undercroft: a dungeon for new heroes and on
   assert(g.monsters.some(m => m.def.id === "rat_king") && g.monsters.some(m => m.def.id === "moss_warden"), "both bosses placed");
   assert(MONSTERS.rat_king.level < 20 && MONSTERS.rat_king.boss && MONSTERS.moss_warden.heals && MONSTERS.moss_warden.level < 50);
   assert(world.objects.some(o => o.decor === "monument" && o.monster === "moss_warden"), "a warning at the mossy stair");
+});
+
+test("The four Orders and their gods, and the Deadwood Maidens: oaths open armouries, blessings count by the piece, the truce keeps spears down", () => {
+  const g = newGame(), p = g.player, world = g.world;
+  // Four Orders × three tiers × ten pieces, and a cape each; a hall each with its altar and its god's statue, small and large.
+  assert.equal(ITEM_LIST.filter(item => orderOf(item.id)).length, 4 * 3 * 10 + 4);
+  for (const id of ORDER_IDS) {
+    const order = ORDERS[id];
+    assert(world.objects.some(o => o.kind === "altar" && o.name === `${order.short} altar` && o.text === id), `${order.short} altar`);
+    assert.equal(world.objects.filter(o => o.decor === order.statue).length, 2, `${order.god}'s statues`);
+    for (const npc of ["commander", "quartermaster", "guard"]) assert(g.npcs.some(entry => entry.id === `${id}_${npc}`), `${id} ${npc}`);
+    assert(shopProblem(g, `${id}_armoury`), "closed before the oath");
+  }
+  assert(ITEM_LIST.find(item => item.id === "diamond_paladin_body").equip.holy && ITEM_LIST.find(item => item.id === "ink_oath_staff").equip.staff && ITEM_LIST.find(item => item.id === "hood_knight_greatmace").equip.twoHanded, "blessed, a staff, two-handed");
+  // The Diamond Oath: kneel at the altar, bring the shards, wear the cape, and the armoury opens.
+  p.xp.prayer = XP_TABLE[70]; p.xp.defence = XP_TABLE[70]; p.hp = 99;
+  const talk = id => { const npc = g.npcs.find(entry => entry.id === id); standNear(g, npc.x, npc.y, 1); setTarget(g, { kind: "npc", uid: npc.uid, option: "Talk-to" }); until(g, () => g.dialogue !== null, 30); };
+  const say = label => { while (g.dialogue && g.dialogue.index < g.dialogue.lines.length) continueDialogue(g); const index = g.dialogue.options.findIndex(option => option.label.startsWith(label)); assert(index >= 0, label); chooseOption(g, index); };
+  const drain = () => { for (let i = 0; g.dialogue && i < 200; i++) { if (g.dialogue.index >= g.dialogue.lines.length && g.dialogue.options?.length) { g.dialogue = null; break; } continueDialogue(g); } };
+  talk("diamond_commander"); say("I'll do it."); drain(); assert.equal(p.quests.oath_diamond, 1);
+  const altar = world.objects.find(o => o.name === "Diamond altar"); standBy(g, altar); setTarget(g, { kind: "object", id: altar.id, option: "Pray-at" }); run(g, 3); assert.equal(p.questData.prayed_diamond, 1, "knelt");
+  give(p, "crystal_shard", 5); talk("diamond_commander"); drain(); assert.equal(p.quests.oath_diamond, 2); assert(has(p, "diamond_cape"), "the cape"); assert.equal(shopProblem(g, "diamond_armoury"), null, "the armoury opens");
+  give(p, "coins", 500_000); assert.equal(buy(g, "diamond_armoury", "diamond_paladin_helm", 1), 1); assert.equal(buy(g, "diamond_armoury", "diamond_paladin_body", 1), 1);
+  for (const id of ["diamond_paladin_helm", "diamond_paladin_body", "diamond_cape"]) equip(g, p.inventory.findIndex(slot => slot?.id === id));
+  assert.equal(orderPieces(p.equipment, "diamond"), 3, "three pieces of the Diamond");
+  // The Maidens: hostile, then at truce (spears down, and no striking them).
+  const maiden = g.monsters.find(m => m.def.id === "deadwood_maiden"); assert(maiden && MONSTERS.deadwood_maiden.aggressive && MONSTERS.deadwood_maiden.faction === "maidens");
+  assert(shopProblem(g, "maidens_market"), "no market before the truce");
+  p.quests.maidens_truce = 2; standNear(g, maiden.x, maiden.y, 2); p.combat = null; p.target = null; run(g, 12); assert(!maiden.target, "spears down");
+  g.messages.length = 0; setTarget(g, { kind: "monster", uid: maiden.uid, option: "Attack" }); run(g, 6); assert(g.messages.some(m => /keep the truce/.test(m.text)) && p.combat === null, "no striking them");
+  assert.equal(shopProblem(g, "maidens_market"), null); assert(SHOPS.maidens_market.stock.includes("rarite_ore") && SHOPS.maidens_market.stock.includes("vault_key"), "what's hard to find");
 });

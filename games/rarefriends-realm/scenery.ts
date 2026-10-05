@@ -3,6 +3,7 @@
  * an ink silhouette, then scaled up without smoothing. Variants come from a seed, so every tree is a little different.
  */
 import { INK, Pixels, pixelArt, shadeHex } from "./pixel.ts";
+import { ORDERS } from "./knights.ts";
 
 function rng(seed: number) {
   return () => {
@@ -110,6 +111,35 @@ export function decorArt(kind: string, variant: number, frame = 0): HTMLCanvasEl
   const random = rng(variant * 71 + frame);
   switch (kind) {
     case "bush": return pixelArt(key, 20, 14, p => { canopy(p, random, 10, 8, 8, 5.5, "#a9b69e", 5); p.outline(); });
+    // The gods of the four Orders, carved in stone and painted in their colours, on a plinth: Rare Friends of legend.
+    case "god_diamond": case "god_ink": case "god_sol": case "god_hood": return pixelArt(key, 26, 38, p => {
+      const order = ORDERS[kind.slice(4) as keyof typeof ORDERS], color = order.color, accent = order.accent, dark = order.dark, STONE = "#b9b5ae", STONE_D = "#8f8a83";
+      // The plinth.
+      p.rect(4, 31, 18, 6, STONE); p.rect(3, 34, 20, 3, STONE_D); p.line(4, 31, 21, 31, "#d7d4cd");
+      if (kind === "god_diamond") {
+        // A diamond standing on its point, two eyes in its upper half, and a little base where the point meets the plinth.
+        p.poly([[13, 3], [23, 15], [13, 30], [3, 15]], color, INK); p.poly([[13, 3], [23, 15], [13, 15]], shadeHex(color, 0.18), null); p.poly([[3, 15], [13, 15], [13, 30]], dark, null);
+        p.line(3, 15, 23, 15, accent); p.line(13, 3, 13, 30, shadeHex(color, -0.25));
+        p.set(10, 10, INK); p.set(16, 10, INK); p.set(10, 9, accent); p.set(16, 9, accent);
+      } else if (kind === "god_ink") {
+        // A squid: a tall mantle with two big eyes, and a crown of arms curling down round the plinth.
+        p.disc(13, 12, 7, 9, color, INK); p.disc(13, 8, 4, 3, shadeHex(color, 0.2), null);
+        p.disc(10, 13, 1.8, 1.8, accent, INK); p.disc(16, 13, 1.8, 1.8, accent, INK); p.set(10, 13, INK); p.set(16, 13, INK);
+        for (const [x0, x1] of [[6, 3], [9, 7], [13, 13], [17, 19], [20, 23]] as const) { p.line(x0, 20, x1, 30, dark, 2); p.set(x1, 30, accent); }
+      } else if (kind === "god_sol") {
+        // A sun of every colour: rays round a disc with a face that can't decide what it is.
+        const rays = ["#ff5f5f", "#ffb347", "#f7f06d", "#14f195", "#4fc3f7", "#9945ff", "#ff7ad9", "#ffffff"];
+        for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; p.line(13 + Math.cos(a) * 6, 15 + Math.sin(a) * 6, 13 + Math.cos(a) * 12, 15 + Math.sin(a) * 12, rays[i], 2); }
+        p.disc(13, 15, 6.5, 6.5, color, INK); p.disc(13, 15, 4, 4, shadeHex(color, 0.25), null);
+        p.set(11, 13, INK); p.set(15, 14, INK); p.line(11, 17, 15, 17, INK); p.set(16, 16, accent); p.set(10, 16, accent);
+      } else {
+        // A hooded figure, hood deep over the face, a bow over one shoulder.
+        p.poly([[13, 2], [21, 12], [21, 30], [5, 30], [5, 12]], color, INK); p.poly([[13, 2], [21, 12], [13, 12], [5, 12]], shadeHex(color, 0.12), null);
+        p.poly([[8, 12], [18, 12], [16, 20], [10, 20]], accent, null); p.set(11, 15, "#ffffff"); p.set(15, 15, "#ffffff");
+        p.line(4, 6, 22, 28, "#6b4a2c", 2); p.line(4, 6, 22, 28, dark, 1);
+      }
+      p.outline();
+    });
     case "flowers": return pixelArt(key, 20, 12, p => {
       for (let i = 0; i < 5; i++) { const x = 3 + Math.floor(random() * 14), y = 5 + Math.floor(random() * 5), c = [COLORS.rose, COLORS.butter, COLORS.lavender, "#ffffff"][Math.floor(random() * 4)];
         p.line(x, y, x, y + 3, "#8e9887"); p.rect(x - 1, y - 1, 3, 2, c); p.set(x, y - 2, c); p.set(x, y - 1, "#e2c46a"); }

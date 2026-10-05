@@ -10,6 +10,7 @@ import {
 import { cleanDaily } from "./daily.ts";
 import { searchChest } from "./dungeons.ts";
 import { arenaRevive, arenaTick } from "./arena.ts";
+import { orderPieces } from "./knights.ts";
 import { cleanOrders } from "./orders.ts";
 import { cleanCard, cleanFellowshipLook } from "./cardstyle.ts";
 import { applyHome, cleanHome, sleep } from "./housing.ts";
@@ -20,7 +21,7 @@ import { runDrain, slipChance } from "./wayfaring.ts";
 import { HERBS, brewRecipes, grindRecipes, herbDef, stillRecipes } from "./apothecary.ts";
 import { friendSays, friendTick, friendWorks, outfitRemark, remember } from "./friend.ts";
 import { presenceXp, cleanName, cleanTag, onAchievement as presenceAchievement, onBossFelled, onEmoteUsed, onFriendTime, onNpcTalked, onRareFind, onRegionEntered, onWorn } from "./presence.ts";
-import { NPCS, QUESTS, consecrateDawnstone, onAltarPrayed, examineItem, npcDef, onBonesOffered, onMonsterKilled, questDone, searchWell, talk, tanHides, useCryptAltar } from "./content.ts";
+import { NPCS, QUESTS, consecrateDawnstone, onAltarPrayed, examineItem, npcDef, onBonesOffered, onMonsterKilled, questDone, searchWell, shopProblem, talk, tanHides, useCryptAltar } from "./content.ts";
 import {
   BANK_SIZE, BANK_TABS, DAY_MS, SATCHEL, SATCHEL_SIZE, STONE_BOX, STONE_BOX_SIZE, BONE_BAG, BONE_BAG_SIZE, bagAdd, bagBones, bagTakeAll, hasBoneBag, SIGIL_BAG, BELTS, beltAdd, beltContents, beltDef, wornBelt, SIGIL_BAG_SIZE, hasSigilBag, isSigil, sigilBagAdd, sigilBagTotal, sigilStock, useSigils, setPieces, wayfarerPieces, fullSlayerSet, heartguardPieces, mixtureOn, compactBankTabs, hasSatchel, hasStoneBox, stock, useUp, INVENTORY_SIZE, REFERRAL_COINS, REFERRALS_PER_DAY, REFERRAL_TICKS, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
   level, maxHp, maxPrayer, message, prayerBoost, riding, sound, take, weapon, combatLevel, createGame,
@@ -1011,7 +1012,7 @@ function interactNpc(game: Game, uid: number, option: string, use?: number) {
     message(game, "Nothing interesting happens."); return;
   }
   if (option === "Talk-to") { game.dialogue = talk(game, npc.id); sound(game, "click"); return; }
-  if (option === "Trade" && def.shop) { game.ui.shop = def.shop; sound(game, "click"); friendSays(game, "shop"); return; }
+  if (option === "Trade" && def.shop) { const problem = shopProblem(game, def.shop); if (problem) { message(game, problem, "warn"); return; } game.ui.shop = def.shop; sound(game, "click"); friendSays(game, "shop"); return; }
   if (option === "Talk-to" || option === "Assignment") onNpcTalked(game, npc.id);
   if (option === "Bank") { game.ui.bank = true; sound(game, "click"); return; }
   if (option === "Caskets") { game.ui.shop = "__caskets"; sound(game, "click"); return; }
@@ -1026,7 +1027,7 @@ function pickpocket(game: Game, npc: Npc, pick: NonNullable<ReturnType<typeof np
   const player = game.player, thieving = level(game, "thieving");
   if (thieving < pick.level) { message(game, `You need a Stealth level of ${pick.level} to pickpocket this.`, "warn"); return; }
   if (!freeSlots(player) && !has(player, "coins")) { message(game, "Your inventory is too full.", "warn"); return; }
-  const mask = player.familyId === 1 ? 0.1 : 0, chance = Math.min(0.95, 0.55 + (thieving - pick.level) * 0.02 + mask);
+  const mask = player.familyId === 1 ? 0.1 : 0, chance = Math.min(0.95, 0.55 + (thieving - pick.level) * 0.02 + mask + 0.02 * orderPieces(player.equipment, "hood"));
   message(game, `You attempt to pick the ${npcDef(npc.id).name.toLowerCase()}'s pocket.`);
   if (game.rng() < chance) {
     const silver = Math.min(RELICS[1].max, player.relics[1] ?? 0) * RELICS[1].coinsPer + (riding(player)?.coins ?? 0);
@@ -1390,7 +1391,7 @@ function obstacleTick(game: Game, activity: Extract<Activity, { kind: "obstacle"
 }
 
 /** Hollowthread robes: an 8% chance a piece that a spell keeps its sigils, 30% in the full set. */
-export const sigilSave = (player: Player, game?: Game) => Math.max(fullSlayerSet(player, "hollowthread") ? 0.3 : 0.08 * setPieces(player, "hollowthread"), game && mixtureOn(game, 8) ? 0.5 : 0);
+export const sigilSave = (player: Player, game?: Game) => Math.min(0.9, Math.max(fullSlayerSet(player, "hollowthread") ? 0.3 : 0.08 * setPieces(player, "hollowthread"), game && mixtureOn(game, 8) ? 0.5 : 0) + 0.05 * orderPieces(player.equipment, "ink"));
 // ---------- Combat ----------
 const STYLE_BONUS: Record<CombatStyle, { attack: number; strength: number; defence: number }> = {
   accurate: { attack: 3, strength: 0, defence: 0 }, aggressive: { attack: 0, strength: 3, defence: 0 },
@@ -1443,7 +1444,7 @@ function playerCombat(game: Game) {
   }
   player.path = []; face(game, monster.x, monster.y);
   if (player.attackTimer > 0) return;
-  const unwoundable = slayerProblem(game, monster.def.id);
+  const unwoundable = slayerProblem(game, monster.def.id) ?? (monster.def.faction && questDone(game, `${monster.def.faction}_truce`) ? "They keep the truce with you, and you keep it with them." : null);
   if (unwoundable) { message(game, unwoundable, "warn"); player.combat = null; player.queuedSpell = null; return; }
   // A sneak attack: striking a monster that hasn't noticed you, from sneaking, lands harder and truer (more with Stealth).
   if (player.sneak && !monster.target) {
@@ -1479,7 +1480,7 @@ function playerCombat(game: Game) {
     }
     const hit = game.rng() < hitChance(accuracy, defence) ? Math.floor(game.rng() * (Math.floor(spell.maxHit! * boost) + 1)) : -1;
     addXp(game, castSkill, spell.xp);
-    if (hit > 0) { addXp(game, castSkill, hit * 2); addXp(game, "hitpoints", hit * 1.33); if (holy) addXp(game, "prayer", hit * FAITH_PER_HIT); }
+    if (hit > 0) { addXp(game, castSkill, hit * 2); addXp(game, "hitpoints", hit * 1.33); if (holy) addXp(game, "prayer", hit * FAITH_PER_HIT * (1 + 0.04 * orderPieces(player.equipment, "sol"))); }
     damageMonster(game, monster, Math.max(0, hit), hit < 0);
     player.queuedSpell = null;
     if (!player.autocast) player.combat = null;
@@ -1495,7 +1496,7 @@ function playerCombat(game: Game) {
     else if (player.style === "defensive") addXp(game, "defence", xp);
     else { addXp(game, "attack", xp / 3); addXp(game, "strength", xp / 3); addXp(game, "defence", xp / 3); }
     addXp(game, "hitpoints", damage * 1.33);
-    if (holy) addXp(game, "prayer", damage * FAITH_PER_HIT);
+    if (holy) addXp(game, "prayer", damage * FAITH_PER_HIT * (1 + 0.04 * orderPieces(player.equipment, "sol")));
   }
   emit(game, { type: "swing", weapon: weaponSound(player.equipment.weapon), tick: game.tick });
   sound(game, hit > 0 ? "hit" : "miss");
@@ -1510,8 +1511,8 @@ function playerCombat(game: Game) {
       message(game, `The Ringbreaker throws the ${monster.def.name.replace(/^The /, "").toLowerCase()} back a step. The recoil takes ${recoil} of your health.`);
     }
   }
-  // The Lopsided elixir: one blow in five lands twice.
-  if (hit > 0 && mixtureOn(game, 4) && game.rng() < 0.2 && monster.hp > 0) { damageMonster(game, monster, hit, false, true); message(game, "Your blow lands twice."); }
+  // The Lopsided elixir: one blow in five lands twice. The Order of the Sol's weird luck: 1% a piece.
+  if (hit > 0 && monster.hp > 0 && ((mixtureOn(game, 4) && game.rng() < 0.2) || game.rng() < 0.01 * orderPieces(player.equipment, "sol"))) { damageMonster(game, monster, hit, false, true); message(game, "Your blow lands twice."); }
 }
 // ---------- Ranged ----------
 /** The best arrows in your pack that your Ranged level can use. */
@@ -1571,7 +1572,7 @@ function killMonster(game: Game, monster: Monster) {
   player.kills++; player.killLog[monster.def.id] = (player.killLog[monster.def.id] ?? 0) + 1; sound(game, "kill"); creature(game, monster, "death");
   if (monster.def.boss || monster.def.worldBoss) { onBossFelled(game, !!monster.def.worldBoss); friendSays(game, "boss"); remember(game, "first_boss"); player.stats.bosses = (player.stats.bosses ?? 0) + 1; }
   if (monster.def.breath) remember(game, "first_dragon");
-  const at = { x: monster.x, y: monster.y }, silver = Math.min(RELICS[1].max, player.relics[1] ?? 0) * RELICS[1].coinsPer + (riding(player)?.coins ?? 0);
+  const at = { x: monster.x, y: monster.y }, silver = Math.min(RELICS[1].max, player.relics[1] ?? 0) * RELICS[1].coinsPer + (riding(player)?.coins ?? 0) + 0.04 * orderPieces(player.equipment, "hood");
   const roll = (drop: { item: string; min: number; max: number }) => {
     const n = drop.min + Math.floor(game.rng() * (drop.max - drop.min + 1));
     dropItem(game, drop.item, drop.item === "coins" ? Math.round(n * (1 + silver)) : n, at.x, at.y);
@@ -1599,6 +1600,8 @@ export const thorns = (player: Player) => setPieces(player, "bramble");
 function damagePlayer(game: Game, damage: number, from: Monster | null) {
   const player = game.player;
   if (player.ward?.reduce && game.tick < player.wardUntil && damage > 0) damage = Math.max(0, Math.round(damage * (1 - player.ward.reduce)));
+  // The Order of the Diamond's steadfast blessing: 2% of a creature's blow turned aside for every piece worn.
+  if (from && damage > 0) { const diamond = orderPieces(player.equipment, "diamond"); if (diamond) damage = Math.max(0, Math.round(damage * (1 - 0.02 * diamond))); }
   player.hp = Math.max(0, player.hp - damage);
   emit(game, { type: "hit", on: "player", damage, tick: game.tick });
   if (damage > 0) sound(game, "hurt");
@@ -1645,7 +1648,10 @@ function monsterTick(game: Game, monster: Monster) {
   const stealth = level(game, "thieving"), reach = player.sneak ? 4 : stealth >= 80 ? 2 : stealth >= 50 ? 3 : 4;
   // A creature summoned for a match always comes for you, however strong you are.
   if (monster.arena && !monster.target && sameLayer) monster.target = true;
-  const wouldAttack = !monster.target && monster.def.aggressive && sameLayer && chebyshev(monster, player) <= reach && combatLevel(player) <= monster.def.level * 2;
+  // A people at truce with you keep their spears down.
+  const truce = !!monster.def.faction && questDone(game, `${monster.def.faction}_truce`);
+  if (truce && monster.target) { monster.target = false; monster.retreat = 2; }
+  const wouldAttack = !truce && !monster.target && monster.def.aggressive && sameLayer && chebyshev(monster, player) <= reach && combatLevel(player) <= monster.def.level * 2;
   if (wouldAttack && veiled(game)) { /* It looks straight through you. */ }
   else if (wouldAttack && player.sneak) { if (spots(game, monster)) caughtSneaking(game, monster); else if (!game.sneakingPast.has(monster.uid)) game.sneakingPast.set(monster.uid, game.tick); }
   else if (wouldAttack) { game.sneakingPast.delete(monster.uid); monster.target = true; creature(game, monster, "aggro"); }
