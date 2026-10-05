@@ -1080,6 +1080,8 @@ export type MonsterDef = {
   heals?: number;
   /** Below a third of its health it enrages: it hits half as hard again and faster. */
   enrage?: boolean;
+  /** Met only in the Rare Friends Ring (summoned for a match), never placed in the world. */
+  arenaOnly?: boolean;
 };
 const coins = (min: number, max: number, chance: number): Drop => ({ item: "coins", min, max, chance });
 const one = (id: string, chance: number, min = 1, max = min): Drop => ({ item: id, min, max, chance });
@@ -1201,6 +1203,26 @@ Object.assign(MONSTERS, {
   howling_king: { id: "howling_king", undead: true, poisonImmune: true, name: "The Howling King", level: 96, hp: 280, attack: 84, strength: 86, defence: 76, magicDef: 40, attackBonus: 60, defenceBonus: 70, maxHit: 19, speed: 5, respawn: 200, wander: 2, size: 2, boss: true, aggressive: true, enrage: true, weakness: "holy", drain: { faith: 6 },
     examine: "The one the stones were raised for. The Wilds' game won't cross the ring because of what's under it.",
     always: [one("large_bones", 1, 2, 3), coins(1200, 3600, 1), one("grave_dust", 1, 3, 8)], drops: [one("vaultsteel_blade", 0.08), one("vault_helm", 0.07), one("vault_plate", 0.05), one("howling_cape", 0.06), one("rarite_bar", 0.3, 1, 3), one("hollow_essence", 0.15), one("insight_lamp", 0.04), one("vault_key", 0.3)], art: 138, ink: "#1b1a20" },
+} satisfies Record<string, MonsterDef>);
+// ---------- The Ring's guards, and the Seven: revenant and skeletal knights of the ages before the Ringmaker ----------
+const SEVEN_DROPS = (extra: Drop[]): Drop[] => [coins(400, 1400, 0.8), one("rarite_bar", 0.25, 1, 2), one("hollow_essence", 0.2), one("insight_lamp", 0.04), one("grave_dust", 0.6, 2, 5), one("star_sigil", 0.4, 6, 14), ...extra];
+Object.assign(MONSTERS, {
+  stone_knight: { id: "stone_knight", poisonImmune: true, name: "Stone knight", level: 70, hp: 110, attack: 55, strength: 50, defence: 72, magicDef: 30, attackBonus: 30, defenceBonus: 60, maxHit: 10, speed: 6, respawn: 80, wander: 1, weakness: "earth",
+    examine: "A knight of stone from ages before the Ringmaker, set to guard the Ring. It stands until a blade is drawn on it.", drops: [coins(100, 400, 0.7), one("stone_sigil", 0.3, 4, 10), one("glimmer_ore", 0.2, 1, 2), one("rough_sagestone", 0.05), one("rough_rosestone", 0.03), one("ringsteel_helm", 0.005)], art: 139, ink: "#6f6b66" },
+  revenant_warden: { id: "revenant_warden", undead: true, poisonImmune: true, arenaOnly: true, name: "Revenant warden", level: 98, hp: 160, attack: 80, strength: 74, defence: 86, magicDef: 40, attackBonus: 50, defenceBonus: 70, maxHit: 15, speed: 5, respawn: 999, wander: 2, aggressive: true, weakness: "holy",
+    examine: "The first of the Seven: a warden of the old kings, sword and shield, who never left his post.", always: [one("large_bones", 1)], drops: SEVEN_DROPS([one("vault_helm", 0.03)]), art: 140, ink: "#3a3a44" },
+  revenant_lancer: { id: "revenant_lancer", undead: true, poisonImmune: true, arenaOnly: true, name: "Revenant lancer", level: 102, hp: 150, attack: 86, strength: 80, defence: 70, magicDef: 35, attackBonus: 56, defenceBonus: 50, maxHit: 17, speed: 5, respawn: 999, wander: 2, aggressive: true, weakness: "holy", ranged: 2,
+    examine: "The second of the Seven: a lancer whose spear reaches two tiles, as it did on the field where he fell.", always: [one("large_bones", 1)], drops: SEVEN_DROPS([one("vault_plate", 0.02)]), art: 141, ink: "#403a3a" },
+  revenant_hexer: { id: "revenant_hexer", undead: true, poisonImmune: true, arenaOnly: true, name: "Revenant hexer", level: 100, hp: 140, attack: 78, strength: 70, defence: 64, magicDef: 90, attackBonus: 48, defenceBonus: 44, maxHit: 16, speed: 5, respawn: 999, wander: 2, aggressive: true, attackStyle: "magic", weakness: "holy", drain: { faith: 6 },
+    examine: "The third of the Seven: a hexer of the old court. Its curses take your faith with your blood.", always: [one("large_bones", 1)], drops: SEVEN_DROPS([one("drowned_staff", 0.02), one("thought_sigil", 0.6, 10, 25)]), art: 142, ink: "#2e2a3e" },
+  skeletal_champion: { id: "skeletal_champion", undead: true, poisonImmune: true, arenaOnly: true, name: "Skeletal champion", level: 105, hp: 180, attack: 92, strength: 90, defence: 76, magicDef: 30, attackBonus: 60, defenceBonus: 56, maxHit: 20, speed: 6, respawn: 999, wander: 2, aggressive: true, weakness: "holy", enrage: true,
+    examine: "The fourth of the Seven: a champion with a greatsword as long as you are, who fights harder the nearer he is to a second death.", always: [one("large_bones", 1)], drops: SEVEN_DROPS([one("vaultsteel_blade", 0.03)]), art: 143, ink: "#44403c" },
+  skeletal_bowmaster: { id: "skeletal_bowmaster", undead: true, poisonImmune: true, arenaOnly: true, name: "Skeletal bowmaster", level: 99, hp: 140, attack: 88, strength: 72, defence: 60, magicDef: 30, attackBonus: 58, defenceBonus: 40, maxHit: 16, speed: 4, respawn: 999, wander: 2, aggressive: true, weakness: "holy", ranged: 6,
+    examine: "The fifth of the Seven: a bowmaster who shoots from across the courtyard and never misses twice.", always: [one("large_bones", 1)], drops: SEVEN_DROPS([one("blackiron_arrow", 0.8, 20, 60), one("howling_cape", 0.02)]), art: 144, ink: "#3c3a36" },
+  bone_juggernaut: { id: "bone_juggernaut", undead: true, poisonImmune: true, arenaOnly: true, name: "Bone juggernaut", level: 110, hp: 320, attack: 84, strength: 96, defence: 96, magicDef: 50, attackBonus: 50, defenceBonus: 80, maxHit: 22, speed: 7, respawn: 999, wander: 2, aggressive: true, weakness: "holy", size: 2, heals: 6,
+    examine: "The sixth of the Seven: a juggernaut of many knights' bones, knitting itself back together as you cut it.", always: [one("large_bones", 1, 2, 3)], drops: SEVEN_DROPS([one("rarite_bar", 0.5, 2, 4), one("wildfur_helm", 0.01)]), art: 145, ink: "#2f2d2b" },
+  revenant_king: { id: "revenant_king", undead: true, poisonImmune: true, arenaOnly: true, name: "The Revenant King", level: 120, hp: 400, attack: 100, strength: 100, defence: 92, magicDef: 70, attackBonus: 70, defenceBonus: 80, maxHit: 24, speed: 5, respawn: 999, wander: 2, aggressive: true, boss: true, weakness: "holy", size: 2, enrage: true, drain: { faith: 8 }, heals: 5,
+    examine: "The last of the Seven: the king the others followed, crowned in the ages before the Ringmaker. He enrages, he drains, he mends. The Ring's hardest fight.", always: [one("large_bones", 1, 2, 4), coins(2000, 6000, 1)], drops: SEVEN_DROPS([one("vaultsteel_blade", 0.06), one("vault_plate", 0.05), one("wildfur_plate", 0.015), one("gilded_skull_mask", 0.03)]), art: 146, ink: "#26242c" },
 } satisfies Record<string, MonsterDef>);
 export function combatLevelOf(monster: MonsterDef) { return monster.level; }
 

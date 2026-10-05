@@ -116,7 +116,7 @@ test("the world is large, deterministic and every landmark is reachable on foot"
     assert(ok(spawn.x, spawn.y) || [[0, 1], [1, 0], [0, -1], [-1, 0]].some(([dx, dy]) => ok(spawn.x + dx, spawn.y + dy)), `NPC ${spawn.id} at ${spawn.x},${spawn.y}`);
   }
   for (const id of Object.keys(NPCS)) assert(world.spawns.some(spawn => spawn.kind === "npc" && spawn.id === id), `NPC ${id} is placed`);
-  for (const id of Object.keys(MONSTERS).filter(id => !MONSTERS[id].worldBoss)) assert(world.spawns.some(spawn => spawn.kind === "monster" && spawn.id === id), `Monster ${id} is placed`);
+  for (const id of Object.keys(MONSTERS).filter(id => !MONSTERS[id].worldBoss && !MONSTERS[id].arenaOnly)) assert(world.spawns.some(spawn => spawn.kind === "monster" && spawn.id === id), `Monster ${id} is placed`);
   for (const region of REGIONS) if (region.id !== "coast") assert(world.region.includes(REGIONS.indexOf(region)), `${region.name} exists`);
   assert.equal(regionAt(world, world.places.spawn.x, world.places.spawn.y).id, "friendhollow");
   // The throne room lies behind the Hollow gate: the king is reachable from its far side.
@@ -2309,8 +2309,8 @@ test("The dungeon update: three dungeons under the lake, the library and the sto
   const drain = () => { for (let i = 0; g.dialogue && i < 200; i++) { if (g.dialogue.index >= g.dialogue.lines.length && g.dialogue.options?.length) { g.dialogue = null; break; } continueDialogue(g); } };
   p.combat = null; p.target = null; p.hp = 990;
   talk("fisher"); say("I'll do it."); drain(); assert.equal(p.quests.deepglass_heart, 1);
-  for (let i = 0; i < 6; i++) onMonsterKilled(g, "glass_crab", 0, 0); onMonsterKilled(g, "crystal_golem", 0, 0); give(p, "crystal_shard", 3);
-  talk("fisher"); drain(); assert.equal(p.quests.deepglass_heart, 2); assert(has(p, "glass_charm") && count(p, "crystal_shard") === 0);
+  for (let i = 0; i < 6; i++) onMonsterKilled(g, "glass_crab", 0, 0); onMonsterKilled(g, "crystal_golem", 0, 0); give(p, "crystal_shard", 3); const shards = count(p, "crystal_shard");
+  talk("fisher"); drain(); assert.equal(p.quests.deepglass_heart, 2); assert(has(p, "glass_charm") && count(p, "crystal_shard") === shards - 3);
   p.quests.quillhaven_folio = 2; p.xp.magic = XP_TABLE[90];
   talk("quillhaven_archivist"); say("I'll do it."); drain(); assert.equal(p.quests.drowned_archive, 1); assert(has(p, "archive_key"), "Perrin's spare key");
   give(p, "ink_page", 6); onMonsterKilled(g, "archivist_below", 0, 0);
@@ -2330,6 +2330,12 @@ test("The Rare Friends Ring: matches for coins and bloodmarks, your own foes, re
   const gates = world.objects.filter(object => object.name === "Arena gate"); assert.equal(gates.length, 4, "four arena gates");
   assert(world.objects.filter(object => object.decor === "ruin_wall" && inArena(object.x, object.y)).length >= 10, "ruined walls in the courtyard");
   assert(world.objects.some(object => object.decor === "target" && inRingBuilding(object.x, object.y)) && world.objects.some(object => object.decor === "throne" && inRingBuilding(object.x, object.y)), "stalls on the concourse");
+  // The Seven's statues round the courtyard, stone knights on guard, and statues of what waits below at every dungeon's mouth.
+  const seven = world.objects.filter(object => object.decor === "monument" && inArena(object.x, object.y)); assert.equal(seven.length, 7, "seven statues");
+  assert(seven.some(o => o.state === "toppled") && seven.some(o => o.state === "broken") && seven.some(o => o.state === "buried") && seven.some(o => o.monster === "revenant_king"), "in every state");
+  assert(world.objects.filter(object => object.decor === "monument" && !inRingBuilding(object.x, object.y)).length >= 9, "statues at the dungeon mouths");
+  assert(g.monsters.filter(m => m.def.id === "stone_knight").length >= 5 && !MONSTERS.stone_knight.aggressive, "stone knights on guard, attackable, not aggressive");
+  assert(MATCHES.some(match => match.id === "the_seven" && match.waves.length === 7) && MONSTERS.revenant_king.arenaOnly && MONSTERS.revenant_king.boss, "the Seven are the hardest match");
   assert(world.objects.filter(object => object.decor === "bones" && inArena(object.x, object.y)).length >= 20, "bones across the arena");
   assert(world.tiles.some((tile, i) => tile === T.LAVA && inArena(i % W, Math.floor(i / W))), "a little volcano");
   for (const skill of ["attack", "strength", "defence", "hitpoints"]) p.xp[skill] = XP_TABLE[80];
@@ -2384,5 +2390,5 @@ test("The Rare Friends Ring: matches for coins and bloodmarks, your own foes, re
   for (const golem of g.monsters.filter(m => m.arena && !m.dead)) { if (knocked()) break; standNear(g, golem.x, golem.y, 1); setTarget(g, { kind: "monster", uid: golem.uid, option: "Attack" }); until(g, () => knocked() || golem.dead, 600); }
   assert(knocked(), "the hammer knocks back");
   teleport(g, ARENA.x, ARENA.y + ARENA.outer + 8); run(g, 2);
-  assert(MATCHES.length === 8 && FOE_GROUPS.every(group => group.foes.every(foe => MONSTERS[foe])));
+  assert(MATCHES.length === 9 && FOE_GROUPS.every(group => group.foes.every(foe => MONSTERS[foe])));
 });

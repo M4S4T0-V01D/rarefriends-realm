@@ -1031,6 +1031,34 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
       case "cactus": ctx.fillStyle = "#a9b59c"; ctx.strokeStyle = INK; ctx.lineWidth = 1; ctx.fillRect(sx - 4 * z, sy - 30 * z, 8 * z, 30 * z); ctx.strokeRect(sx - 4 * z, sy - 30 * z, 8 * z, 30 * z); ctx.fillRect(sx + 4 * z, sy - 20 * z, 7 * z, 4 * z); ctx.fillRect(sx + 8 * z, sy - 28 * z, 4 * z, 10 * z); ctx.strokeRect(sx + 8 * z, sy - 28 * z, 4 * z, 10 * z); return hit(34, 24);
       case "pine": for (let i = 0; i < 3; i++) poly(ctx, [[sx, sy - (58 - i * 14) * z], [sx + (18 - i) * z, sy - (22 - i * 14) * z + 6 * z], [sx - (18 - i) * z, sy - (22 - i * 14) * z + 6 * z]], i === 0 ? "#f3f2ee" : shade("#9aa594", i * 0.04)); return hit(60, 36);
       case "dead_tree": ctx.strokeStyle = "#3b3a38"; ctx.lineWidth = 3 * z; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx, sy - 34 * z); ctx.moveTo(sx, sy - 22 * z); ctx.lineTo(sx - 12 * z, sy - 34 * z); ctx.moveTo(sx, sy - 28 * z); ctx.lineTo(sx + 10 * z, sy - 40 * z); ctx.stroke(); return hit(42, 30);
+      case "monument": {
+        // A creature carved in stone: whole on a plinth, toppled and lying, broken off at the waist, or sunk to the chest.
+        const def = MONSTERS[object.monster ?? ""], state = object.state ?? "whole", STONE = "#8f8a83";
+        if (!def) return hit(20);
+        const rows = creatureSprite(def.art).idle, big = (def.size ?? 1) > 1, px = (big ? 3 : 2.4) * z, hh = rows.length;
+        if (state === "toppled") {
+          const lying = rows[0].split("").map((_, x) => rows.map(row => row[x]).reverse().join(""));
+          ellipse(ctx, sx, sy + 1 * z, 20 * z, 7 * z, "rgba(22,22,22,0.14)", null);
+          drawPixels(ctx, decorArt("rubble", 1)!, sx - 14 * z, sy + 2 * z, ART * z);
+          drawMask(ctx, lying, sx, sy + 2 * z, px, STONE);
+          return hit(hh * px / z * 0.6, 40);
+        }
+        if (state === "buried") {
+          const cut = Math.round(hh * 0.55), top = rows.slice(0, cut);
+          ellipse(ctx, sx, sy + 1 * z, 14 * z, 5 * z, "rgba(60,50,40,0.28)", null);
+          drawMask(ctx, top, sx, sy + 2 * z, px, STONE);
+          return hit(cut * px / z, 30);
+        }
+        box(ctx, camera, ox, oy, 0.9, 0.9, 6, "#d7d4cd", "#c8c5be", "#b9b5ae");
+        if (state === "broken") {
+          const cut = Math.round(hh * 0.4), stump = rows.map((row, i) => i < cut ? ".".repeat(row.length) : row);
+          drawMask(ctx, stump, sx, sy - 6 * z, px, STONE);
+          drawPixels(ctx, decorArt("rubble", 0)!, sx + 12 * z, sy + 3 * z, ART * z);
+          return hit((hh - cut) * px / z + 12, 30);
+        }
+        drawMask(ctx, rows, sx, sy - 6 * z, px, STONE);
+        return hit(hh * px / z + 12, 30);
+      }
       case "statue": box(ctx, camera, ox, oy, 0.8, 0.8, 12, "#d7d4cd", "#c8c5be", "#b9b5ae");
         if (scene.friend) drawMask(ctx, friendRows(scene.friend, "down", false, 0), sx, sy - 12 * z, 3.4 * z, "#8f8a83"); return hit(70, 50);
       case "old_friend": {

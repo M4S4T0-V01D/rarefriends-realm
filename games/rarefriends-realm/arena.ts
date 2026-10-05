@@ -18,7 +18,8 @@ export const MATCHES: readonly MatchDef[] = [
   { id: "highland_host", name: "The Highland Host", level: 55, text: "Golems, wights and yetis down from the Greyhorn.", waves: [["stone_golem", 3], ["cairn_wight", 2], ["frost_yeti", 2]], coins: 3000, marks: 25 },
   { id: "drake_pit", name: "The Drake Pit", level: 75, text: "Drakes and salamanders. Bring a Wyrmward shield.", waves: [["ash_drake", 2], ["ember_salamander", 2], ["cinder_drake", 1]], coins: 6000, marks: 40 },
   { id: "vault_dead", name: "The Vault's Dead", level: 80, text: "Knights and archers from under the stones.", waves: [["vault_knight", 4], ["vault_archer", 3]], coins: 7000, marks: 45 },
-  { id: "hollow_court", name: "The Hollow Court", level: 90, text: "Sentinels and weavers of the Hollow. The Ring's hardest match.", waves: [["hollow_sentinel", 4], ["hollow_weaver", 2]], coins: 10_000, marks: 60 },
+  { id: "hollow_court", name: "The Hollow Court", level: 90, text: "Sentinels and weavers of the Hollow.", waves: [["hollow_sentinel", 4], ["hollow_weaver", 2]], coins: 10_000, marks: 60 },
+  { id: "the_seven", name: "The Seven", level: 115, text: "The revenant and skeletal knights whose statues ring the courtyard: all seven at once, their king last. The Ring's hardest fight.", waves: [["revenant_warden", 1], ["revenant_lancer", 1], ["revenant_hexer", 1], ["skeletal_champion", 1], ["skeletal_bowmaster", 1], ["bone_juggernaut", 1], ["revenant_king", 1]], coins: 24_000, marks: 150 },
 ];
 export const matchDef = (id: string) => MATCHES.find(match => match.id === id) ?? null;
 /** The entry fee: a quarter of the coins a match pays. The bloodmarks make it worth it, if you live. */

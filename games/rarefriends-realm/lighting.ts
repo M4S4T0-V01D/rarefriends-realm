@@ -81,7 +81,7 @@ export const resetLighting = (world: World) => { statics.delete(world); };
 /** Heights of things that stand on a tile, by kind (world px, and how much light gets through). */
 const DECOR_OCCLUDERS: Record<string, [number, number]> = {
   pine: [96, 0.6], palm: [80, 0.35], dead_tree: [70, 0.3], cactus: [30, 0.7], pillar: [64, 1], windmill: [120, 1], tent: [40, 1], ruin_wall: [40, 1], crypt: [44, 1], obelisk: [60, 0.9], tomb: [12, 0.8], hearth: [18, 1],
-  statue: [52, 1], snowman: [24, 1], armour: [34, 1], shelf: [38, 1], throne: [30, 1], crate: [16, 1], barrel: [18, 1], hay: [16, 1], logpile: [16, 1],
+  statue: [52, 1], monument: [48, 1], snowman: [24, 1], armour: [34, 1], shelf: [38, 1], throne: [30, 1], crate: [16, 1], barrel: [18, 1], hay: [16, 1], logpile: [16, 1],
   bush: [16, 0.6], chest: [12, 1], boulder: [22, 1], grave: [14, 1], fence: [12, 0.4], target: [26, 0.8], boat: [12, 1],
 };
 const STATION_HEIGHT: Record<string, number> = { furnace: 40, range: 30, anvil: 14, bank: 40, altar: 22, sigil_altar: 26, spinning_wheel: 24, loom: 30, coop: 34 };

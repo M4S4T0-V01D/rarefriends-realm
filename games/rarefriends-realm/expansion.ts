@@ -509,6 +509,16 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
   buildVillages(ctx, t);
   // (After the villages are built: the library's floor is laid by then.) The trapdoor to the Drowned Archive.
   add({ kind: "ladder", x: 643, y: 397, blocks: true, name: "Trapdoor", action: "Climb-down", to: { x: 476, y: 528 } });
+  // Statues at every dungeon's mouth of what waits below, a warning to whoever reads stone: some whole, some toppled,
+  // broken or half sunk in the ground.
+  const warn = (x: number, y: number, id: string, who: string, state: "whole" | "toppled" | "broken" | "buried") => {
+    const tt = get(x, y); if (tt === T.WALL || tt === T.VOID || isWater(tt) || ctx.spawns.some(spawn => spawn.x === x && spawn.y === y)) return;
+    const o = ctx.objectAt[tileIndex(x, y)]; if (o >= 0 && ctx.objects[o].kind !== "decor" && ctx.objects[o].kind !== "tree") return;
+    clearAt(x, y); add({ kind: "decor", decor: "monument", x, y, blocks: state !== "buried", name: `Statue of a ${who}${state === "whole" ? "" : ` (${state})`}`, monster: id, state });
+  };
+  warn(227, 337, "skeleton", "skeleton", "toppled"); warn(309, 347, "hollow_sentinel", "hollow sentinel", "broken"); warn(336, 52, "shade", "shade", "whole"); warn(72, 71, "ash_drake", "drake", "buried");
+  warn(441, 475, "swamp_lurker", "swamp lurker", "toppled"); warn(642, 197, "stone_golem", "stone golem", "whole"); warn(393, 328, "glass_crab", "glass crab", "broken"); warn(638, 401, "drowned_scholar", "drowned scholar", "buried");
+  warn(602, 452, "vault_knight", "vault knight", "toppled"); warn(598, 452, "vault_archer", "vault archer", "whole");
   // ---------- 7c. The Rare Friends Ring: a round building west of the Deadwood, across the river, built by a Hoverer ----------
   {
     const { x: cx, y: cy, outer, inner } = ARENA, dist = (x: number, y: number) => Math.hypot(x - cx, y - cy);
@@ -578,6 +588,16 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
     for (const [x, y] of [[cx - 10, cy + 6], [cx - 9, cy + 6], [cx - 8, cy + 6], [cx - 8, cy + 7], [cx + 2, cy + 11], [cx + 3, cy + 11], [cx + 4, cy + 11], [cx - 12, cy - 2], [cx - 12, cy - 1], [cx - 11, cy - 3], [cx + 6, cy - 12], [cx + 7, cy - 12], [cx + 1, cy - 11], [cx - 5, cy + 12], [cx - 4, cy + 12]] as const) {
       if (dist(x, y) < inner - 1.5 && get(x, y) !== T.LAVA && get(x, y) !== T.CLIFF) { clearAt(x, y); decor(x, y, "ruin_wall", true, "Ruined wall"); }
     }
+    // Statues of the Seven along the courtyard's rim, between the gates: the knights the Ring's hardest match summons.
+    const SEVEN: readonly [string, string, "whole" | "toppled" | "broken" | "buried"][] = [["revenant_warden", "Revenant warden", "whole"], ["revenant_lancer", "Revenant lancer", "broken"], ["revenant_hexer", "Revenant hexer", "whole"], ["skeletal_champion", "Skeletal champion", "toppled"], ["skeletal_bowmaster", "Skeletal bowmaster", "whole"], ["bone_juggernaut", "Bone juggernaut", "buried"], ["revenant_king", "The Revenant King", "whole"]];
+    SEVEN.forEach(([id, who, state], k) => {
+      const a = (20 + k * 50) * Math.PI / 180 + (k >= 4 ? Math.PI / 9 : 0), [x, y] = on(a, inner - 2.5);
+      if (get(x, y) === T.LAVA || get(x, y) === T.CLIFF) return;
+      clearAt(x, y); add({ kind: "decor", decor: "monument", x, y, blocks: state !== "buried", name: `Statue of the ${who.replace(/^The /, "")}${state === "whole" ? "" : ` (${state})`}`, monster: id, state });
+    });
+    // The Ring's guards: stone knights from the ages before the Ringmaker, at the gate and by every arena gate.
+    for (const [gx, gy] of [[cx - 3, cy + outer + 2], [cx + 3, cy + outer + 2]] as const) { put(gx, gy, T.STONE); clearAt(gx, gy); monsters("stone_knight", gx, gy, gx, gy, 1); }
+    for (const [gx, gy] of [[cx - 3, cy + inner + 3], [cx + 3, cy - inner - 3], [cx + inner + 3, cy + 3], [cx - inner - 3, cy - 3]] as const) if (get(gx, gy) === T.STONE) { clearAt(gx, gy); monsters("stone_knight", gx, gy, gx, gy, 1); }
     // A road from the Deadwood's bridge to the gate (a ruin in its way is cleared: nobody builds a road through a wall).
     road([[249, 103], [236, 101], [222, 100], [cx, cy + outer + 3]]);
     for (let y = 95; y <= 112; y++) for (let x = 205; x <= 252; x++) { const o = ctx.objectAt[tileIndex(x, y)]; if (get(x, y) === T.PATH && o >= 0 && ctx.objects[o].decor === "ruin_wall") clearAt(x, y); }
