@@ -4,6 +4,11 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 72, date: "2026-10-06", title: "The City of Raria, made beautiful", items: [
+    "Raria's capital looks like a capital now. Each of the four gates stands between two tall gatehouse towers, with a cobbled forecourt and lamps outside it.",
+    "The houses are no longer one dark block repeated: dusk violet, slate, plum and lavender roofs over timber and stone, one storey and two, with a plot left open in every few for a garden.",
+    "Clipped yews line the four boulevards, the empty paving between the offices has become pocket gardens with a tree, flower beds and a bench, or a well square, and the palace has a proper parterre: yews down the avenue, hedged beds of violet and white, trees on its flanks and a gravel walk.",
+  ] },
   { id: 71, date: "2026-10-06", title: "A weapon shop in the Ring", items: [
     "Hilde Edgewright has opened Edgewright's Blades in the Ring, off the concourse between the Champions' Hall and Vane's Sigil Study: daggers, swords and sabres, greatswords, battleaxes and war hammers, and the blessed maces and flails, pewter to glimmer, for coin. Racks of blades on every wall, a grindstone, a straw dummy to try an edge on.",
   ] },

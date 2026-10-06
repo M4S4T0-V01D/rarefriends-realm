@@ -180,19 +180,33 @@ export function buildFarWest(ctx: GenContext, t: Tools, places: World["places"])
   // ---------- 5. The city of Raria: walls, gates, the palace in the exact centre, and every office of the Law round it ----------
   {
     const { x0, y0, x1, y1 } = RARIA_CITY;
+    /** The roofs of Raria: dusk violet, slate, plum, lavender, blue slate and violet-grey, so a street isn't one dark slab. */
+    const ROOFS = ["#5b4a78", "#6e6a82", "#7d5a6e", "#8c7aa6", "#4a5468", "#6a5a8a"] as const;
     ground(cx, cy, (x1 - x0) / 2 + 3, (y1 - y0) / 2 + 3, null);
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { put(x, y, x === x0 || x === x1 || y === y0 || y === y1 ? T.WALL : T.COBBLE); lift[tileIndex(x, y)] = 0; }
     for (let d = -1; d <= 1; d++) { put(cx + d, y0, T.COBBLE); put(cx + d, y1, T.COBBLE); put(x0, cy + d, T.COBBLE); put(x1, cy + d, T.COBBLE); }
     // Towers on the wall: corner and mid-wall turrets (round, cone-roofed), the wall itself running between.
     for (const [tx, ty] of [[x0, y0], [x1 - 4, y0], [x0, y1 - 4], [x1 - 4, y1 - 4], [cx - 30, y0], [cx + 26, y0], [cx - 30, y1 - 4], [cx + 26, y1 - 4]] as const)
       building(tx, ty, tx + 4, ty + 4, "s", T.STONE, undefined, { name: "A tower of Raria's wall", color: "#3b2a52", walls: "stone", roof: "cone", round: true, tall: 14, spire: 10 });
+    // Gatehouses: a taller round tower either side of each of the four gates, standing out from the wall.
+    const gateTower = (tx: number, ty: number, door: "n" | "s" | "e" | "w") => building(tx, ty, tx + 4, ty + 4, door, T.STONE, undefined, { name: "A gatehouse tower", color: "#5b4a78", walls: "stone", roof: "cone", round: true, tall: 20, spire: 14 });
+    for (const tx of [cx - 7, cx + 3]) { gateTower(tx, y0 - 1, "s"); gateTower(tx, y1 - 3, "n"); }
+    for (const ty of [cy - 7, cy + 3]) { gateTower(x0 - 1, ty, "e"); gateTower(x1 - 3, ty, "w"); }
     // The palace gardens round the palace: clipped grass, hedges, flowers, four statues of the Wise Friend, a fountain.
-    for (let y = cy - 20; y <= cy + 18; y++) for (let x = cx - 25; x <= cx + 25; x++) { const edge = Math.min(x - (cx - 25), cx + 25 - x, y - (cy - 20), cy + 18 - y); put(x, y, edge === 0 ? T.STONE : edge <= 2 ? T.COBBLE : T.GRASS); }
+    for (let y = cy - 20; y <= cy + 18; y++) for (let x = cx - 25; x <= cx + 25; x++) { const edge = Math.min(x - (cx - 25), cx + 25 - x, y - (cy - 20), cy + 18 - y); put(x, y, edge === 0 ? T.STONE : edge <= 2 ? T.COBBLE : edge === 3 ? T.GRAVEL : T.DARK_GRASS); }
     for (let x = cx - 22; x <= cx + 22; x += 3) { if (Math.abs(x - cx) > 2) { put2(x, cy - 17, "bush", "A hedge, clipped to the inch"); put2(x, cy + 15, "bush", "A hedge, clipped to the inch"); } }
     for (const [dx, dy] of [[-20, -14], [20, -14], [-20, 12], [20, 12]] as const) decor(cx + dx, cy + dy, "wise_friend", true, "The Wise Friend in the palace gardens: ivory, blindfolded, the book open. Citizens bow to it on their way to anything.");
     for (const [dx, dy] of [[-16, -6], [16, -6], [-16, 6], [16, 6], [-8, 14], [8, 14], [-8, -15], [8, -15]] as const) decor(cx + dx, cy + dy, "flowers", false, "A garden bed: violet and white, and nothing else");
     add({ kind: "fountain", x: cx, y: cy + 13, blocks: true, name: "The Fountain of the Law" });
     for (let y = cy + 9; y <= cy + 18; y++) for (const dx of [-1, 0, 1]) if (get(cx + dx, y) !== T.STONE || y > cy + 16) put(cx + dx, y, T.COBBLE);
+    // The parterre: clipped yews in pairs down the avenue, beds of violet and white either side, hedges round the beds,
+    // trees on the flanks, and a gravel walk round the palace.
+    const garden = (x: number, y: number, place: () => void) => { if (!occupied(x, y) && get(x, y) !== T.WALL && get(x, y) !== T.COBBLE) place(); };
+    for (const dy of [10, 16]) for (const dx of [-3, 3]) garden(cx + dx, cy + dy, () => tree(cx + dx, cy + dy, "yew"));
+    for (let y = cy + 10; y <= cy + 16; y++) for (const side of [-1, 1]) for (let k = 6; k <= 12; k++) { const x = cx + side * k; if (y === cy + 10 || y === cy + 16 || k === 6 || k === 12) garden(x, y, () => decor(x, y, "bush", true, "A hedge, clipped to the inch")); else if ((x + y) % 2 === 0) garden(x, y, () => decor(x, y, "flowers", false, "A garden bed: violet and white, and nothing else")); }
+    for (let x = cx - 22; x <= cx + 22; x += 4) if (Math.abs(x - cx) > 3) garden(x, cy - 19, () => tree(x, cy - 19, "yew"));
+    for (const side of [-1, 1]) for (const dy of [-8, -2, 4]) { const x = cx + side * 21; garden(x, cy + dy, () => tree(x, cy + dy, dy === -2 ? "maple" : "yew")); }
+    for (let y = cy - 12; y <= cy + 8; y++) for (const x of [cx - 17, cx + 17]) if (get(x, y) === T.DARK_GRASS && !occupied(x, y)) put(x, y, T.GRAVEL);
     // The palace: three storeys and a tower's height, the throne room on the ground floor, pillars carved with the Law.
     building(cx - 12, cy - 11, cx + 12, cy + 7, "s", T.CARPET, undefined, { name: "The Palace of Raria", color: "#3b2a52", walls: "stone", roof: "flat", storeys: 3, tall: 14 });
     for (const [tx, ty] of [[cx - 15, cy - 13], [cx + 12, cy - 13], [cx - 15, cy + 5], [cx + 12, cy + 5]] as const) building(tx, ty, tx + 3, ty + 3, "s", T.STONE, undefined, { name: "A tower of the palace", color: "#2a2238", walls: "stone", roof: "cone", round: true, tall: 26, spire: 16 });
@@ -236,18 +250,21 @@ export function buildFarWest(ctx: GenContext, t: Tools, places: World["places"])
     for (let hy = cy - 30; hy <= cy + 26; hy += 9) for (let hx = x0 + 4; hx <= x0 + 28; hx += 9) {
       if (Math.abs(hy + 2 - cy) <= 3) continue;
       const door = hy < cy ? "s" : "n";
-      building(hx, hy, hx + 6, hy + 5, door, T.WOOD, undefined, { name: "A Rarian house", color: "#3b2a52", walls: "stone" });
+      const look = (hx * 7 + hy * 13) % 6;
+      building(hx, hy, hx + 6, hy + 5, door, T.WOOD, undefined, { name: "A Rarian house", color: ROOFS[look], walls: look % 2 ? "timber" : "stone", storeys: look % 3 === 0 ? 2 : 1, chimney: look !== 4 });
       decor(hx + 1, door === "s" ? hy + 1 : hy + 4, "bed"); decor(hx + 5, door === "s" ? hy + 1 : hy + 4, "shelf", true, "The Book of the Law, and nothing else");
     }
     // The boulevards from the four gates to the gardens, paved in pale stone; and every block the offices left empty, filled with houses.
     for (let d = y0 + 1; d < y1; d++) for (const dx of [-2, -1, 0, 1, 2]) if (get(cx + dx, d) === T.COBBLE) put(cx + dx, d, T.STONE);
     for (let d = x0 + 1; d < x1; d++) for (const dy of [-2, -1, 0, 1, 2]) if (get(d, cy + dy) === T.COBBLE) put(d, cy + dy, T.STONE);
     const blockFree = (bx0: number, by0: number, bx1: number, by1: number) => { for (let y = by0 - 1; y <= by1 + 1; y++) for (let x = bx0 - 1; x <= bx1 + 1; x++) if (get(x, y) !== T.COBBLE || occupied(x, y)) return false; return true; };
-    let houses = 0;
+    let houses = 0, plots = 0;
     for (let hy = y0 + 3; hy + 5 < y1 - 1; hy += 8) for (let hx = x0 + 3; hx + 6 < x1 - 1; hx += 9) {
       if (!blockFree(hx, hy, hx + 6, hy + 5)) continue;
-      const door = hy + 2 < cy ? "s" : "n", kind = houses % 7;
-      building(hx, hy, hx + 6, hy + 5, door, T.WOOD, undefined, { name: kind === 3 ? "A Rarian chapel-house" : kind === 5 ? "A Rarian workshop" : "A Rarian house", color: ["#3b2a52", "#4a3560", "#2a2238", "#efe6c8"][houses % 4], walls: "stone", chimney: kind !== 3 });
+      // Every seventh plot is left open, for the pocket gardens laid below.
+      if (plots++ % 7 === 6) continue;
+      const door = hy + 2 < cy ? "s" : "n", kind = houses % 7, look = (hx * 7 + hy * 13 + houses) % 6;
+      building(hx, hy, hx + 6, hy + 5, door, T.WOOD, undefined, { name: kind === 3 ? "A Rarian chapel-house" : kind === 5 ? "A Rarian workshop" : "A Rarian house", color: kind === 3 ? "#efe6c8" : ROOFS[look], walls: kind === 5 || look % 2 === 0 ? "stone" : "timber", storeys: kind === 3 || look % 3 === 0 ? 2 : 1, chimney: kind !== 3 });
       const inner = door === "s" ? hy + 1 : hy + 4;
       if (kind === 3) { decor(hx + 3, inner, "wise_friend", true, "A small Wise Friend in a household chapel"); decor(hx + 1, inner, "bench"); }
       else if (kind === 5) { decor(hx + 1, inner, "table", true, "A workbench, every tool in its outline"); decor(hx + 5, inner, "crate", true, "Work for the Crown, inspected"); }
@@ -260,9 +277,47 @@ export function buildFarWest(ctx: GenContext, t: Tools, places: World["places"])
     for (const [dx, dy] of [[-28, -24], [28, 24], [-6, 45], [6, -45]] as const) npcAt("rrr_soldier", cx + dx, cy + dy, 6);
     for (const [x, y] of [[x0 + 28, y0 + 22], [x1 - 2, cy - 5], [x0 + 2, cy + 5], [cx - 26, y1 - 6], [x1 - 30, y1 - 24], [cx + 27, y0 + 22], [x0 + 3, y0 + 26]] as const) monsterAt("royal_ranger", x, y, 0);
     decor(x0 + 29, y0 + 21, "pillar", true, "A pillar at the chapel's corner. There is a Ranger behind it. There is always a Ranger behind it.");
-    for (const dx of [-3, 3]) { decor(cx + dx, y0 + 1, "banner_rrr"); decor(cx + dx, y1 - 1, "banner_rrr"); } for (const dy of [-3, 3]) { decor(x0 + 1, cy + dy, "banner_rrr"); decor(x1 - 1, cy + dy, "banner_rrr"); }
+    for (const dx of [-2, 2]) { decor(cx + dx, y0 + 1, "banner_rrr"); decor(cx + dx, y1 - 1, "banner_rrr"); } for (const dy of [-2, 2]) { decor(x0 + 1, cy + dy, "banner_rrr"); decor(x1 - 1, cy + dy, "banner_rrr"); }
     sign(cx + 3, y1 + 2, "Raria", "RARIA. Her Radiance's city. The Law is kept here; keep it. Writs are shown at the gate. Weapons are carried, not drawn. The Wise Friend sees, and so do the Rangers.", "rarian_mantle");
     sign(x1 + 2, cy + 3, "The Crown Road", "EAST: the Crown Road across the Crownlands, past Candlemere, to Lawgate on the eastern march. NORTH: Vesperholm and the Order's abbey. SOUTH: Greyford, the Greyfields, and BarkReach beyond.");
+    // Clipped yews in planters down both sides of the four boulevards (outside the palace gardens), every eight tiles.
+    // (Only out on the street: an office's stone floor is not a boulevard.)
+    const indoors = (x: number, y: number) => ctx.buildings.some(b => x >= b.x0 && x <= b.x1 && y >= b.y0 && y <= b.y1);
+    const planter = (x: number, y: number) => { if (get(x, y) !== T.STONE || occupied(x, y) || indoors(x, y)) return; put(x, y, T.DARK_GRASS); tree(x, y, "yew"); };
+    for (let d = 6; d <= 58; d += 8) for (const sgn of [-1, 1]) {
+      if (cy + sgn * d > y0 + 3 && cy + sgn * d < y1 - 3 && (sgn > 0 ? cy + d > cy + 19 : cy - d < cy - 21)) { planter(cx - 2, cy + sgn * d); planter(cx + 2, cy + sgn * d); }
+      // (Not through the market, whose tables line the east boulevard.)
+      if (cx + sgn * d > x0 + 3 && cx + sgn * d < x1 - 3 && Math.abs(d) > 26 && !(sgn > 0 && cx + d >= x1 - 28)) { planter(cx + sgn * d, cy - 2); planter(cx + sgn * d, cy + 2); }
+    }
+    // Pocket gardens: every block of open paving left over becomes a little green (a tree, beds, a bench) or a well
+    // square, so the city isn't a plain of cobbles between its offices.
+    const open = (bx0: number, by0: number, bx1: number, by1: number) => { for (let y = by0; y <= by1; y++) for (let x = bx0; x <= bx1; x++) if (get(x, y) !== T.COBBLE || occupied(x, y) || indoors(x, y)) return false; return true; };
+    let greens = 0;
+    for (let gy = y0 + 2; gy + 6 < y1 - 1; gy++) for (let gx = x0 + 2; gx + 6 < x1 - 1; gx++) {
+      if (!open(gx, gy, gx + 6, gy + 6)) continue;
+      const mx = gx + 3, my = gy + 3;
+      if (greens % 4 === 3) {
+        for (let y = my - 1; y <= my + 1; y++) for (let x = mx - 1; x <= mx + 1; x++) put(x, y, T.STONE);
+        add({ kind: "well", x: mx, y: my, blocks: true, name: "A city well, its rope regulation length" }); decor(mx - 2, my + 2, "bench", true, "A bench, swept"); decor(mx + 2, my - 2, "lamp");
+      } else {
+        for (let y = my - 2; y <= my + 2; y++) for (let x = mx - 2; x <= mx + 2; x++) put(x, y, Math.max(Math.abs(x - mx), Math.abs(y - my)) === 2 ? T.GRAVEL : T.DARK_GRASS);
+        tree(mx, my, (["maple", "oak", "tree"] as const)[greens % 3]);
+        for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) decor(mx + dx, my + dy, "flowers", false, "A garden bed: violet and white, and nothing else");
+        decor(mx, my + 2, "bench", true, "A bench in a pocket garden, facing the tree"); decor(mx - 2, my - 2, "lamp");
+      }
+      greens++;
+      gx += 6;
+    }
+    // The market's goods: crates and barrels behind the tables, a well at its heart.
+    for (let dy = -6; dy <= 6; dy += 6) { put2(x1 - 23, cy + dy + 1, "crate", "The market's stock, inspected"); put2(x1 - 11, cy + dy + 1, "barrel"); }
+    { const [wx, wy] = nearFree(x1 - 18, cy - 3, 2); add({ kind: "well", x: wx, y: wy, blocks: true, name: "The market well" }); }
+    // Forecourts before the four gates: cobbles, a lamp either side, the road running through.
+    const forecourt = (fx0: number, fy0: number, fx1: number, fy1: number, lamps: readonly [number, number][]) => {
+      for (let y = fy0; y <= fy1; y++) for (let x = fx0; x <= fx1; x++) { if (!inBounds(x, y) || get(x, y) === T.WALL || isWater(get(x, y))) continue; clearAt(x, y); put(x, y, T.COBBLE); }
+      for (const [lx, ly] of lamps) if (!occupied(lx, ly)) decor(lx, ly, "lamp");
+    };
+    forecourt(cx - 4, y1 + 1, cx + 4, y1 + 4, [[cx - 4, y1 + 2], [cx + 4, y1 + 2]]); forecourt(cx - 4, y0 - 4, cx + 4, y0 - 1, [[cx - 4, y0 - 2], [cx + 4, y0 - 2]]);
+    forecourt(x1 + 1, cy - 4, x1 + 4, cy + 4, [[x1 + 2, cy - 4], [x1 + 2, cy + 4]]); forecourt(x0 - 4, cy - 4, x0 - 1, cy + 4, [[x0 - 2, cy - 4], [x0 - 2, cy + 4]]);
     // Outside: the Dusk's cemetery north-west of the wall, the Queen's orchard south-east, the farms.
     for (let gy = y0 - 4; gy >= y0 - 12; gy -= 2) for (let gx = x0 + 6; gx <= x0 + 36; gx += 3) { const [fx, fy] = nearFree(gx, gy, 1); clearAt(fx, fy); put(fx, fy, T.DARK_GRASS); decor(fx, fy, "grave"); }
     put2(x0 + 21, y0 - 14, "god_dusk", "The Wise Friend, hooded, over the Dusk's cemetery: every grave the same, every name in the Ledger"); put2(x0 + 18, y0 - 14, "torch"); put2(x0 + 24, y0 - 14, "torch");

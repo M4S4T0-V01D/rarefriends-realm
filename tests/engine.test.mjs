@@ -2497,6 +2497,14 @@ test("Return of Raria: the far west, the Burned, sealed Order looks, Adventurer 
   const palace = world.buildings.find(b => b.name === "The Palace of Raria"); assert(palace, "the palace");
   const { RARIA_CITY } = await import("../games/rarefriends-realm/farwest.ts");
   const walls = []; for (let x = 60; x < 360; x++) if (terrainAt(world, x, RARIA_CITY.y - 30) === T.WALL) walls.push(x);
+  // The capital, dressed: gatehouse towers at all four gates, yews down the boulevards and pocket gardens, wells in
+  // the squares, none of it indoors, and no street a single dark roof colour.
+  const R = RARIA_CITY, inCity = o => o.x > R.x0 && o.x < R.x1 && o.y > R.y0 && o.y < R.y1, indoors = o => world.buildings.some(b => o.x > b.x0 && o.x < b.x1 && o.y > b.y0 && o.y < b.y1);
+  assert.equal(world.buildings.filter(b => b.name === "A gatehouse tower").length, 8, "two gatehouse towers at each gate");
+  const cityTrees = world.objects.filter(o => o.kind === "tree" && inCity(o)), wells = world.objects.filter(o => o.kind === "well" && inCity(o));
+  assert(cityTrees.length >= 40 && wells.length >= 6, `trees (${cityTrees.length}) and wells (${wells.length}) in the city`);
+  assert(![...cityTrees, ...wells].some(indoors), "nothing planted indoors");
+  assert(new Set(world.buildings.filter(b => b.name === "A Rarian house").map(b => b.color)).size >= 5, "houses under more than one roof colour");
   assert(walls[walls.length - 1] - walls[0] >= 100, `a great walled city (${walls[walls.length - 1] - walls[0]} tiles across)`);
   // The far west is a continent: Raria's lands and BarkReach dwarf the mainland.
   const landOf = ids => { const set = new Set(ids.map(id => REGIONS.findIndex(r => r.id === id))); let n = 0; for (let i = 0; i < world.region.length; i++) if (set.has(world.region[i]) && ![T.WATER, T.DEEP, T.VOID].includes(world.tiles[i])) n++; return n; };
