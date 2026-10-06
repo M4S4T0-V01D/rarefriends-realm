@@ -701,6 +701,115 @@ function drawWindmill(ctx: CanvasRenderingContext2D, scene: Scene, ox: number, o
   return { x: hub.x - L - 10 * z, y: hub.y - L - 50 * z, w: (L + 10 * z) * 2, h: L * 2 + 130 * z };
 }
 /** A brick smelting furnace: a plinth, a squat tapering kiln, a chimney with smoke, and an arched mouth full of fire facing you. */
+/**
+ * The side of a box (w × d tiles, centred on the tile) that faces the camera most, as a drawing frame: at(u, lift) is a
+ * point on that side, u running across it from −½ to ½, at a height above the ground. Long sides are preferred, so a
+ * bookcase shows its shelves rather than its end.
+ */
+function faceFrame(camera: Camera, ox: number, oy: number, w: number, d: number) {
+  let best = -Infinity, pick: readonly [number, number] = [0, 1];
+  for (const n of [[0, 1], [0, -1], [1, 0], [-1, 0]] as const) { const { rx, ry } = rotate(camera, n[0], n[1]); const score = (rx + ry) * (n[1] !== 0 ? w : d); if (score > best) { best = score; pick = n; } }
+  const [nx, ny] = pick, half = ny !== 0 ? d / 2 : w / 2, width = ny !== 0 ? w : d, fx = ox + nx * (half + 0.005), fy = oy + ny * (half + 0.005), tx = -ny, ty = nx;
+  return { width, nx, ny, at: (u: number, lift: number) => { const p = toScreen(camera, fx + tx * u * width, fy + ty * u * width, lift); return [p.x, p.y] as const; } };
+}
+const quad = (at: (u: number, lift: number) => readonly [number, number], u0: number, u1: number, l0: number, l1: number) => [at(u0, l0), at(u1, l0), at(u1, l1), at(u0, l1)] as const;
+const BOOK_COLORS = ["#8a2f2b", "#3d4f9c", "#2f7d68", "#c9a84a", "#6b2fbf", "#4a3a2c", "#b87333", "#efe6c8", "#5a4a6e", "#9a2f2b"];
+/** A bookcase (or a dresser of bottles, or a cabinet of sigils): a dark frame, shelves, and what's on them, deterministic per tile. */
+function drawShelf(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObject) {
+  const { camera, now } = scene, z = camera.zoom, ox = object.x, oy = object.y, name = object.name ?? "";
+  const kind = /sigil|rune|glyph|orb/i.test(name) ? "sigils" : /tonic|tincture|potion|bottle|jar|herb|remed|apothec|draught|ink\b/i.test(name) ? "bottles" : /clothes|veil|cloth|wear|tabard|hide|fur/i.test(name) ? "cloth" : /bow|arrow|shaft/i.test(name) ? "bows" : "books";
+  const wood = /law|ledger|register|book of/i.test(name) ? "#3b2a52" : "#6b4a2c";
+  box(ctx, camera, ox, oy, 0.86, 0.3, 38, shade(wood, 0.12), shade(wood, -0.05), shade(wood, -0.15));
+  const f = faceFrame(camera, ox, oy, 0.86, 0.3), at = f.at;
+  poly(ctx, quad(at, -0.44, 0.44, 2, 36), shade(wood, -0.35), null);
+  for (const lift of [2, 13, 24, 35]) poly(ctx, quad(at, -0.45, 0.45, lift - 0.8, lift + 1.2), shade(wood, 0.25), INK, 0.6);
+  for (const u of [-0.45, 0.45]) poly(ctx, quad(at, u - 0.035, u + 0.035, 0, 37), shade(wood, 0.05), INK, 0.6);
+  for (let row = 0; row < 3; row++) {
+    const base = 3.2 + row * 11, seed = (i: number) => hash(ox * 31 + row * 7 + i, oy * 17 + i * 3);
+    let u = -0.4, i = 0;
+    while (u < 0.38 && i < 14) {
+      const r = seed(i);
+      if (kind === "books") {
+        const w = 0.045 + r * 0.05, h = 6 + Math.floor(seed(i + 20) * 3.5), color = BOOK_COLORS[Math.floor(seed(i + 40) * BOOK_COLORS.length)];
+        if (r < 0.08) { u += 0.06; i++; continue; }
+        poly(ctx, quad(at, u, Math.min(0.4, u + w), base, base + h), color, INK, 0.5);
+        if (w > 0.07) poly(ctx, quad(at, u + w * 0.2, u + w * 0.8, base + h * 0.7, base + h * 0.78), "#e2c46a", null);
+        u += w + 0.008;
+      } else if (kind === "bottles") {
+        const w = 0.07, h = 4 + Math.floor(r * 4), color = ["#7fbf8f", "#c96f6f", "#8fa3c9", "#e2c46a", "#b39ad8", "#9fd6d0"][Math.floor(seed(i + 9) * 6)];
+        poly(ctx, quad(at, u, u + w, base, base + h), color, INK, 0.5); poly(ctx, quad(at, u + w * 0.3, u + w * 0.7, base + h, base + h + 2), shade(color, -0.2), INK, 0.5);
+        poly(ctx, quad(at, u + w * 0.15, u + w * 0.3, base + 1, base + h - 1), "rgba(255,255,255,0.55)", null);
+        u += w + 0.04 + r * 0.04;
+      } else if (kind === "sigils") {
+        const color = ["#cfc7e6", "#e2d49e", "#9fb4d0", "#d99a82", "#9fbf9a", "#b9a8c9", "#d0b27c"][Math.floor(r * 7)], [cxp, cyp] = at(u + 0.04, base + 4);
+        const pulse = scene.reducedMotion ? 0.6 : 0.5 + 0.5 * Math.sin(now / 400 + ox + row * 2 + i);
+        ellipse(ctx, cxp, cyp, 5.5 * z, 4.5 * z, `rgba(${parseInt(color.slice(1, 3), 16)},${parseInt(color.slice(3, 5), 16)},${parseInt(color.slice(5, 7), 16)},${0.3 + pulse * 0.35})`, null);
+        poly(ctx, [at(u + 0.04, base + 0.5), at(u + 0.085, base + 4), at(u + 0.04, base + 7.5), at(u - 0.005, base + 4)], color, INK, 0.8);
+        poly(ctx, [at(u + 0.04, base + 2.5), at(u + 0.06, base + 4), at(u + 0.04, base + 5.5), at(u + 0.02, base + 4)], "#ffffff", null);
+        u += 0.11;
+      } else if (kind === "cloth") {
+        const color = BOOK_COLORS[Math.floor(r * BOOK_COLORS.length)], w = 0.14;
+        for (let k = 0; k < 3; k++) poly(ctx, quad(at, u, u + w, base + k * 2, base + k * 2 + 2), shade(color, k * 0.08), INK, 0.5);
+        u += w + 0.04;
+      } else {
+        // A bow standing in the rack: a curved stave and its string.
+        const stave = BOOK_COLORS[[6, 5, 3, 0][Math.floor(r * 4)]], arc = [0, 2.2, 4.5, 6.8, 9].map((l, k) => at(u + [0, 0.03, 0.045, 0.03, 0][k], base + l));
+        ctx.strokeStyle = INK; ctx.lineWidth = 3.2 * z; ctx.beginPath(); arc.forEach(([x, y], k) => k ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke();
+        ctx.strokeStyle = stave; ctx.lineWidth = 1.8 * z; ctx.stroke();
+        ctx.strokeStyle = "#efede7"; ctx.lineWidth = 0.7 * z; ctx.beginPath(); ctx.moveTo(arc[0][0], arc[0][1]); ctx.lineTo(arc[4][0], arc[4][1]); ctx.stroke();
+        u += 0.11;
+      }
+      i++;
+    }
+  }
+  // A carved crest along the top.
+  poly(ctx, quad(at, -0.36, 0.36, 37, 39.5), shade(wood, 0.18), INK, 0.6);
+}
+/** A table on four legs, with something on it. */
+function drawTable(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObject) {
+  const { camera } = scene, z = camera.zoom, ox = object.x, oy = object.y, top = "#c9ad8c";
+  for (const [dx, dy] of [[-0.34, -0.24], [0.34, -0.24], [-0.34, 0.24], [0.34, 0.24]] as const) box(ctx, camera, ox + dx, oy + dy, 0.07, 0.07, 10, "#7a6553", "#6b5848", "#5a4a3c");
+  box(ctx, camera, ox, oy, 0.84, 0.62, 2.5, top, "#9c8672", "#8a7563", 10);
+  const r = hash(ox * 3, oy * 5), s = toScreen(camera, ox, oy, 12.5);
+  if (r < 0.33) { ellipse(ctx, s.x - 4 * z, s.y, 3.6 * z, 1.8 * z, "#efede7", INK, 0.6); ellipse(ctx, s.x + 5 * z, s.y - 1 * z, 1.6 * z, 1.6 * z, "#8a5a3c", INK, 0.6); }
+  else if (r < 0.66) { box(ctx, camera, ox - 0.1, oy, 0.22, 0.16, 2, "#3d4f9c", "#2f3d7a", "#26315f", 12.5); box(ctx, camera, ox + 0.15, oy + 0.05, 0.16, 0.12, 1.5, "#efe6c8", "#d8cfb6", "#c4bba2", 12.5); }
+  else { ellipse(ctx, s.x, s.y - 2 * z, 2.4 * z, 3 * z, "#b39ad8", INK, 0.6); ellipse(ctx, s.x + 6 * z, s.y, 2 * z, 1.2 * z, "#e2c46a", INK, 0.6); }
+}
+/** An anvil on its block: a squat waist, a flat face with a horn out to one side. */
+function drawAnvil(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObject) {
+  const { camera } = scene, z = camera.zoom, ox = object.x, oy = object.y;
+  box(ctx, camera, ox, oy, 0.46, 0.46, 7, "#8a7563", "#7a6553", "#6b5848");
+  box(ctx, camera, ox, oy, 0.3, 0.24, 5, "#5a5856", "#4a4846", "#3e3c3a", 7);
+  box(ctx, camera, ox, oy, 0.56, 0.3, 5, "#9ea3ad", "#7a7772", "#65625e", 12);
+  const a = toScreen(camera, ox + 0.28, oy - 0.1, 17), b = toScreen(camera, ox + 0.28, oy + 0.1, 17), c = toScreen(camera, ox + 0.28, oy, 12.5), tip = toScreen(camera, ox + 0.5, oy, 16);
+  poly(ctx, [[a.x, a.y], [b.x, b.y], [tip.x, tip.y]], "#b4b8bf", INK, 0.8); poly(ctx, [[b.x, b.y], [c.x, c.y], [tip.x, tip.y]], "#7a7772", INK, 0.8);
+  const hl = toScreen(camera, ox - 0.1, oy, 17); ctx.strokeStyle = "rgba(255,255,255,0.6)"; ctx.lineWidth = z; ctx.beginPath(); ctx.moveTo(hl.x - 6 * z, hl.y); ctx.lineTo(hl.x + 4 * z, hl.y - 1 * z); ctx.stroke();
+}
+/** A cooking range: a brick stove with a fire mouth, an iron top, a pot that steams, and a stovepipe. */
+function drawRange(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObject, flicker: number) {
+  const { camera, now } = scene, z = camera.zoom, ox = object.x, oy = object.y;
+  box(ctx, camera, ox, oy, 0.84, 0.72, 17, "#8f6a5a", "#9a7766", "#7d5b4c", 0, INK, "brick");
+  box(ctx, camera, ox, oy, 0.9, 0.78, 3, "#3e3c3a", "#4a4846", "#2f2d2b", 17);
+  const f = faceFrame(camera, ox, oy, 0.84, 0.72), at = f.at;
+  const arch: (readonly [number, number])[] = [at(-0.2, 2), at(-0.2, 9)];
+  for (let i = 1; i < 6; i++) { const a = Math.PI - i * Math.PI / 6; arch.push(at(Math.cos(a) * 0.2, 9 + Math.sin(a) * 4)); }
+  arch.push(at(0.2, 9), at(0.2, 2));
+  poly(ctx, arch, "#1e1412", INK, 1);
+  const [mx, my] = at(0, 4), glow = ctx.createRadialGradient(mx, my, 0, mx, my, 12 * z);
+  glow.addColorStop(0, `rgba(255,190,110,${0.8 + flicker * 0.2})`); glow.addColorStop(1, "rgba(200,70,40,0)");
+  ctx.save(); ctx.beginPath(); arch.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.clip();
+  ctx.fillStyle = glow; ctx.fillRect(mx - 14 * z, my - 16 * z, 28 * z, 20 * z);
+  drawPixels(ctx, fireArt(scene.reducedMotion ? 0 : Math.floor(now / 110 + ox * 3) % 8, 7, 9, 2), mx, my + 4 * z, ART * z * 0.7);
+  ctx.restore();
+  poly(ctx, quad(at, -0.3, 0.3, 12.5, 14), "#5a5856", INK, 0.6);
+  // The pot on the hob, and its steam; a kettle beside it; the stovepipe at the back.
+  const pot = toScreen(camera, ox - 0.12, oy, 20);
+  ellipse(ctx, pot.x, pot.y + 2 * z, 7 * z, 5.5 * z, "#3a3836", INK, 1); ellipse(ctx, pot.x, pot.y - 1 * z, 6 * z, 2.4 * z, "#c9a84a", INK, 0.8);
+  const kettle = toScreen(camera, ox + 0.22, oy + 0.1, 20); ellipse(ctx, kettle.x, kettle.y, 3.5 * z, 3 * z, "#8b8e92", INK, 0.8);
+  const px = ox - f.nx * 0.28 + (f.ny !== 0 ? 0.28 : 0), py = oy - f.ny * 0.25 + (f.nx !== 0 ? 0.25 : 0);
+  box(ctx, camera, px, py, 0.12, 0.12, 24, "#3e3c3a", "#4a4846", "#2f2d2b", 20);
+  if (!scene.reducedMotion) for (let i = 0; i < 3; i++) { const k = ((now / 1500) + i / 3 + hash(ox, oy)) % 1; ellipse(ctx, pot.x + Math.sin(k * 6 + i) * 3 * z, pot.y - 4 * z - k * 22 * z, (2 + k * 4) * z, (1.5 + k * 3) * z, `rgba(240,240,240,${0.5 * (1 - k)})`, null); }
+}
 function drawFurnace(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObject, flicker: number, hit: (h: number, w?: number) => { x: number; y: number; w: number; h: number }) {
   const { camera, now } = scene, z = camera.zoom, ox = object.x, oy = object.y, stone = "#8f8a83";
   box(ctx, camera, ox, oy, 0.96, 0.96, 7, "#6d6b67", "#7a7772", "#65625e", 0, INK, "brick");
@@ -871,9 +980,9 @@ function drawStation(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldO
   const flicker = scene.reducedMotion ? 0.5 : (Math.sin(now / 90 + ox) + 1) / 2;
   const hit = (h: number, w = 40) => ({ x: sx - w / 2 * z, y: sy - h * z, w: w * z, h: (h + 12) * z });
   switch (object.kind) {
-    case "range": box(ctx, camera, ox, oy, 0.8, 0.7, 20, "#57555a", "#6d6b67", "#5a5856"); ellipse(ctx, sx, sy - 22 * z, 6 * z, 3 * z, `rgba(227,165,140,${0.6 + flicker * 0.4})`, INK); return hit(30);
+    case "range": drawRange(ctx, scene, object, flicker); return hit(44);
     case "furnace": return drawFurnace(ctx, scene, object, flicker, hit);
-    case "anvil": box(ctx, camera, ox, oy, 0.3, 0.3, 12, "#6d6b67", "#57555a", "#4a4846"); box(ctx, camera, ox, oy, 0.7, 0.35, 6, "#8b8e92", "#6d6b67", "#5a5856", 12); return hit(24);
+    case "anvil": drawAnvil(ctx, scene, object); return hit(24);
     case "bank": return drawBankBooth(ctx, scene, object, hit);
     case "wheel": {
       // A spinning wheel: a stool-like frame, a big spoked wheel, and the spindle with a hank of wool.
@@ -1119,8 +1228,8 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
         ctx.stroke(); return hit(16, 20);
       }
       case "reeds": ctx.strokeStyle = "#8e9887"; ctx.lineWidth = 1.2 * z; ctx.beginPath(); for (let i = -2; i <= 2; i++) { ctx.moveTo(sx + i * 3 * z, sy); ctx.lineTo(sx + i * 4 * z + Math.sin(now / 600 + i) * 2 * z, sy - (12 + (i % 2) * 4) * z); } ctx.stroke(); return hit(16, 20);
-      case "table": box(ctx, camera, ox, oy, 0.8, 0.6, 12, "#cdb9a0", "#9c8672", "#8a7563"); return hit(18);
-      case "shelf": box(ctx, camera, ox, oy, 0.8, 0.25, 34, "#b89c86", "#9c8672", "#8a7563"); for (let i = 0; i < 3; i++) ellipse(ctx, sx + (i - 1) * 7 * z, sy - (12 + i * 8) * z, 2.5 * z, 3 * z, [C.rose, C.blue, C.butter][i]); return hit(40);
+      case "table": drawTable(ctx, scene, object); return hit(18);
+      case "shelf": drawShelf(ctx, scene, object); return hit(44);
       case "pillar": box(ctx, camera, ox, oy, 0.45, 0.45, 50, "#d7d4cd", "#c8c5be", "#b9b5ae"); return hit(56, 26);
       case "rubble": for (let i = 0; i < 3; i++) box(ctx, camera, ox + (hash(ox + i, oy) - 0.5) * 0.5, oy + (hash(ox, oy + i) - 0.5) * 0.5, 0.25, 0.25, 6, "#c8c5be", "#a9a59e", "#9a968f"); return hit(12);
       case "snowman": ellipse(ctx, sx, sy - 9 * z, 11 * z, 9 * z, "#fff"); ellipse(ctx, sx, sy - 24 * z, 8 * z, 7 * z, "#fff"); ellipse(ctx, sx - 3 * z, sy - 25 * z, 1.2 * z, 1.2 * z, INK, null); ellipse(ctx, sx + 3 * z, sy - 25 * z, 1.2 * z, 1.2 * z, INK, null); return hit(34, 26);

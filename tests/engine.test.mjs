@@ -2344,7 +2344,15 @@ test("The Rare Friends Ring: matches for coins and bloodmarks, your own foes, re
   const orrin = g.npcs.find(npc => npc.id === "ring_chaplain"); assert(orrin && inChapel(orrin), "Chaplain Orrin keeps the chapel");
   assert(world.objects.filter(object => object.decor === "lamp" && object.y > ARENA.y + ARENA.outer && Math.abs(object.x - ARENA.x) <= 5).length === 4, "lamps on the forecourt");
   assert(world.objects.filter(object => object.decor === "ruin_wall" && inArena(object.x, object.y)).length >= 10, "ruined walls in the courtyard");
-  assert(world.objects.some(object => object.decor === "target" && inRingBuilding(object.x, object.y)) && world.objects.some(object => object.decor === "throne" && inRingBuilding(object.x, object.y)), "stalls on the concourse");
+  // Every shop has its own room off the concourse, its keeper inside, its furniture its own.
+  for (const [keeper, hall] of [["ring_champion", "The Champions' Hall"], ["ring_armourer", "The Ring Armoury"], ["ring_sigilist", "Vane's Sigil Study"], ["ring_apothecary", "Mallow's Infirmary"], ["ring_fletcher", "Arrowyn's Fletchery"], ["ring_quartermaster", "The Pit Quartermaster's Den"]]) {
+    const b = world.buildings.find(entry => entry.name === hall), npc = g.npcs.find(entry => entry.id === keeper);
+    assert(b && npc && npc.x > b.x0 && npc.x < b.x1 && npc.y > b.y0 && npc.y < b.y1, `${keeper} keeps ${hall}`);
+    assert(Math.hypot((b.x0 + b.x1) / 2 - ARENA.x, (b.y0 + b.y1) / 2 - ARENA.y) < ARENA.outer + 14, `${hall} stands against the Ring`);
+  }
+  const champions = world.buildings.find(entry => entry.name === "The Champions' Hall");
+  assert(world.objects.some(o => o.decor === "throne" && o.x >= champions.x0 && o.x <= champions.x1 && o.y >= champions.y0 && o.y <= champions.y1), "the Champion's seat");
+  assert(world.objects.some(o => o.kind === "anvil" && inRingBuilding(o.x - 8, o.y)) || world.objects.some(o => o.kind === "anvil" && Math.hypot(o.x - ARENA.x, o.y - ARENA.y) < ARENA.outer + 14), "the armoury's anvil");
   // The Seven's statues round the courtyard, stone knights on guard, and statues of what waits below at every dungeon's mouth.
   const seven = world.objects.filter(object => object.decor === "monument" && inArena(object.x, object.y)); assert.equal(seven.length, 7, "seven statues");
   assert(seven.some(o => o.state === "toppled") && seven.some(o => o.state === "broken") && seven.some(o => o.state === "buried") && seven.some(o => o.monster === "revenant_king"), "in every state");
@@ -2541,4 +2549,16 @@ test("Return of Raria: the far west, the Burned, sealed Order looks, Adventurer 
   const before = newGame(); restore(before, { ...serialize(g), world: 2, x: 300, y: 136 }); assert.deepEqual([before.player.x, before.player.y], [300 + WEST_DX, 136], "old saves move with the world");
   assert.equal(regionAt(before.world, before.player.x, before.player.y).id, "gravesend", "still in Gravesend");
   setLaw(g, false); assert(!p.rarian && p.prayers.length === 0, "set down, and the old book opens");
+});
+
+test("Feedback: an X post tagging the Realm and its maker, and a GitHub issue with what we need to act on it", async () => {
+  const { feedbackPost, feedbackIssue, FEEDBACK_REPO } = await import("../games/rarefriends-realm/feedback.ts");
+  const g = newGame(); g.player.name = "Tester";
+  const long = "The ".repeat(200), post = feedbackPost("Bug", long);
+  assert(post.length <= 280, `fits a post (${post.length})`);
+  for (const tag of ["@M4S4T0_V01D", "@RareFriendsNFT", "#RareFriends", "#RareFriendsRealm"]) assert(post.includes(tag), tag);
+  const issue = feedbackIssue(g, "Idea", "More fish in Candlemere's lake\nand a boat.", true, true);
+  assert.equal(issue.title, "[Idea] More fish in Candlemere's lake"); assert.match(issue.body, /Friend: #7730 \(Tester\)/); assert.match(issue.body, /Region: /); assert.match(issue.body, /posted on X/);
+  assert.doesNotMatch(feedbackIssue(g, "Bug", "x", false, false).body, /Friend:/, "details only when asked");
+  assert.equal(FEEDBACK_REPO, "M4S4T0-V01D/rarefriends-realm");
 });

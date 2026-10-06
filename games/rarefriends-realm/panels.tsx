@@ -17,6 +17,7 @@ import { MAX_QUEST_POINTS, NPCS, QUESTS, finalStage, questDone, questPoints, typ
 import { CARDS, CARD_KINDS, CARD_KIND_NAMES, cardFound, cardsFound, orderOpen, type CardDef } from "./codex.ts";
 import { decorArt } from "./scenery.ts";
 import { setLaw } from "./state.ts";
+import { FEEDBACK_KINDS, FEEDBACK_MAX, feedbackPost, type FeedbackKind } from "./feedback.ts";
 import { friendSays, remember } from "./friend.ts";
 import { FELLOWSHIP_COST, FELLOWSHIP_JOIN_COST, FELLOWSHIP_RENAME_COST, NAME_MAX, RENAME_COST, TITLES, chooseTitle, cleanName, cleanTag, joinFellowship, leaveFellowship, nameFriend, profile, renameFellowship, setFellowshipLook, unlockedTitles } from "./presence.ts";
 import { DEFAULT_FELLOWSHIP_COLORS, FELLOWSHIP_BANNERS, FELLOWSHIP_LOGOS, INVITE_HOURS, daysSince, previewArt } from "./cardstyle.ts";
@@ -130,7 +131,7 @@ export type PanelProps = {
   game: Game; tab: Tab; setTab: (tab: Tab) => void; selection: Selection; setSelection: (selection: Selection) => void;
   openMenu: (x: number, y: number, entries: MenuEntry[]) => void; refresh: () => void; roster: readonly OwnedFriend[]; rosterState: "waiting" | "ready" | "none";
   friendSprites: ReadonlyMap<number, GenerationSprites>; loadFriend: (id: number) => void; settings: Settings; setSettings: (settings: Settings) => void;
-  friend: GenerationSprites | null; trackName: string; trackId: string; playTrack: (id: string) => void; openCard: () => void; openCards?: () => void; openHelp: () => void; paused: boolean; saved: string; relicCounts: readonly number[]; openCaskets: () => void;
+  friend: GenerationSprites | null; trackName: string; trackId: string; playTrack: (id: string) => void; openCard: () => void; openCards?: () => void; openFeedback?: () => void; openHelp: () => void; paused: boolean; saved: string; relicCounts: readonly number[]; openCaskets: () => void;
   /** Playing together: who's around, and the friends list. */
   /** The skill guide (a skill) or the recipe book (null). */
   openGuide?: (skill: Skill | null) => void;
@@ -594,7 +595,7 @@ function Slider({ label, min, max, value, unit = "", onChange }: { label: string
     </label>
   );
 }
-function SettingsTab({ game, settings, setSettings, trackName, trackId, playTrack, openHelp, saved, refresh, openMenu, net, onOnline, onExportSave, onRestoreSave, backupStatus, onLogout, fullscreen, onFullscreen, pip, onPip }: PanelProps) {
+function SettingsTab({ game, settings, setSettings, trackName, trackId, playTrack, openHelp, openFeedback, saved, refresh, openMenu, net, onOnline, onExportSave, onRestoreSave, backupStatus, onLogout, fullscreen, onFullscreen, pip, onPip }: PanelProps) {
   const set = (patch: Partial<Settings>) => setSettings({ ...settings, ...patch });
   const [code, setCode] = useState(""), [confirming, setConfirming] = useState(false), [restoreNote, setRestoreNote] = useState("");
   const unlocked = game.player.music;
@@ -652,6 +653,7 @@ function SettingsTab({ game, settings, setSettings, trackName, trackId, playTrac
       }}>{confirming ? "Yes, restore it" : "Restore"}</button>}
       {restoreNote && <p className="realm-note" role="status">{restoreNote}</p>}
       <button type="button" className="realm-wide realm-dark" onClick={openHelp}>Controls and tips</button>
+      {openFeedback && <button type="button" className="realm-wide" onClick={openFeedback}>💬 Send feedback: a bug, an idea, anything</button>}
     </div>
   );
 }
@@ -1252,9 +1254,34 @@ export function WorldMapModal({ game, onClose, onTravel }: { game: Game; onClose
     </Modal>
   );
 }
-export function HelpModal({ onClose }: { onClose: () => void }) {
+/** The feedback window: what kind, what happened, whether to include where you are; sent as a GitHub issue and an X post. */
+export function FeedbackModal({ onClose, onSend, status }: { onClose: () => void; onSend: (target: "both" | "github" | "x", kind: FeedbackKind, text: string, details: boolean) => void; status: string }) {
+  const [kind, setKind] = useState<FeedbackKind>("Bug"), [text, setText] = useState(""), [details, setDetails] = useState(true);
+  const ready = text.trim().length >= 4;
+  return (
+    <Modal title="Send feedback" onClose={onClose} kind="feedback">
+      <p className="realm-muted">Tell us what's broken, what you'd love, or what feels off. It goes to the Realm's GitHub as an issue we work from, and to X tagging @M4S4T0_V01D and @RareFriendsNFT.</p>
+      <div className="realm-graphics realm-card-row" role="radiogroup" aria-label="Kind of feedback">
+        {FEEDBACK_KINDS.map(entry => <button key={entry} type="button" role="radio" aria-checked={kind === entry} onClick={() => setKind(entry)}>{entry}</button>)}
+      </div>
+      <textarea className="realm-feedback-text" value={text} maxLength={FEEDBACK_MAX} rows={6} placeholder={kind === "Bug" ? "What happened, and what you were doing when it did…" : kind === "Idea" ? "What would make the Realm better…" : kind === "Balance" ? "What's too easy, too hard, too slow or too rich…" : "Anything at all…"}
+        onChange={event => setText(event.target.value)} onKeyDown={event => event.stopPropagation()} aria-label="Your feedback" />
+      <small className="realm-muted">{text.length}/{FEEDBACK_MAX}</small>
+      <label className="realm-check"><input type="checkbox" checked={details} onChange={event => setDetails(event.target.checked)} /> Include where I am, my levels and my browser (helps with bugs)</label>
+      {ready && <p className="realm-note">On X: “{feedbackPost(kind, text)}”</p>}
+      <div className="realm-buttons">
+        <button type="button" className="realm-primary" disabled={!ready} onClick={() => onSend("both", kind, text, details)}>Send to GitHub and X</button>
+        <button type="button" disabled={!ready} onClick={() => onSend("github", kind, text, details)}>GitHub only</button>
+        <button type="button" disabled={!ready} onClick={() => onSend("x", kind, text, details)}>X only</button>
+      </div>
+      {status && <p className="realm-note" role="status">{status}</p>}
+    </Modal>
+  );
+}
+export function HelpModal({ onClose, onFeedback }: { onClose: () => void; onFeedback?: () => void }) {
   return (
     <Modal title="Controls and tips" onClose={onClose}>
+      {onFeedback && <button type="button" className="realm-wide" onClick={onFeedback}>💬 Found a bug, or have an idea? Send feedback</button>}
       <ul className="realm-help">
         <li><b>Left-click</b> does the first option (shown top-left). <b>Right-click</b> (or long-press) for every option.</li>
         <li><b>WASD</b> walks. <b>← →</b> turn the camera, <b>↑ ↓</b> tilt it from overhead right down to ground level; or <b>drag with the scroll wheel held</b>. Scroll zooms in close (up to 3×). Click the <b>compass</b> to face north.</li>

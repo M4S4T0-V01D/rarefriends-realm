@@ -722,19 +722,77 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
     // The people of the Ring, around the concourse; the lobby is the south of it, by the Ringmaster.
     const on = (a: number, r: number): [number, number] => [Math.round(cx + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r)];
     const stand = (id: string, a: number, r = 20) => { const [x, y] = on(a, r); clearAt(x, y); put(x, y, T.STONE); npc(id, x, y); };
-    stand("ringmaster", Math.PI / 2 + 0.1); stand("ring_apothecary", Math.PI / 3); stand("ring_sigilist", Math.PI / 6); stand("ring_fletcher", Math.PI * 5 / 6);
-    stand("ring_armourer", 0); stand("ring_quartermaster", Math.PI); stand("ring_champion", Math.PI * 3 / 2);
-    // Each shop's stall round its keeper: a counter either side along the concourse, and its wares behind.
-    const stall = (a: number, left: DecorKind, right: DecorKind, back: DecorKind | null, backName?: string) => {
-      const [lx, ly] = on(a - 0.12, 20), [rx, ry] = on(a + 0.12, 20), [bx, by] = on(a, 22.5);
-      for (const [x, y, kind, name] of [[lx, ly, left, undefined], [rx, ry, right, undefined], ...(back ? [[bx, by, back, backName] as const] : [])] as const) {
-        if (get(x, y) !== T.STONE) continue;
-        clearAt(x, y); decor(x, y, kind, true, name);
+    stand("ringmaster", Math.PI / 2 + 0.1);
+    // Each shop has its own room off the concourse, like the chapel: a hall built outside the outer wall with a passage
+    // through it, furnished for what it sells and the tier it serves. The Champions' Hall (laurels, the Ring's best) is
+    // gilded; the Pit Quartermaster's den (bloodmarks: Wildfur, Ringsteel, Pitfighter) is a fighter's store of bones and
+    // racks; the armoury has its anvil and forge; the sigilist's study its cabinets; the infirmary its beds and still;
+    // the fletchery its racks and targets.
+    const room = (a: number, w: number, h: number, name: string, color: string, floor: number, keeper: string, sign: [string, string, string], furnish: (x0: number, y0: number, x1: number, y1: number, door: "n" | "s" | "e" | "w") => void) => {
+      const reach = outer + 1.5 + Math.hypot(w, h) / 2, [rcx, rcy] = on(a, reach), x0 = Math.round(rcx - w / 2), y0 = Math.round(rcy - h / 2), x1 = x0 + w - 1, y1 = y0 + h - 1;
+      const vx = cx - (x0 + x1) / 2, vy = cy - (y0 + y1) / 2, door: "n" | "s" | "e" | "w" = Math.abs(vx) > Math.abs(vy) ? (vx < 0 ? "w" : "e") : (vy < 0 ? "n" : "s");
+      const along = door === "n" || door === "s" ? Math.max(x0 + 1, Math.min(x1 - 2, Math.round(cx - 0.5))) : Math.max(y0 + 1, Math.min(y1 - 2, Math.round(cy - 0.5)));
+      for (let y = y0 - 1; y <= y1 + 1; y++) for (let x = x0 - 1; x <= x1 + 1; x++) { clearAt(x, y); setRegion(x, y, "friends_ring"); if (get(x, y) === T.WATER || get(x, y) === T.DEEP || get(x, y) === T.LAVA) put(x, y, T.GRASS); for (let i = ctx.spawns.length - 1; i >= 0; i--) if (ctx.spawns[i].x === x && ctx.spawns[i].y === y) ctx.spawns.splice(i, 1); }
+      building(x0, y0, x1, y1, door, floor, along, { name, color, walls: "stone", storeys: 1, tall: 4 });
+      // The passage: two tiles wide, from the door straight through the outer wall to the concourse.
+      const [sx, sy] = door === "n" ? [0, -1] : door === "s" ? [0, 1] : door === "e" ? [1, 0] : [-1, 0];
+      const lanes = door === "n" || door === "s" ? [[along, door === "n" ? y0 : y1], [along + 1, door === "n" ? y0 : y1]] : [[door === "w" ? x0 : x1, along], [door === "w" ? x0 : x1, along + 1]];
+      for (const [lx, ly] of lanes) for (let k = 1; k < 20; k++) {
+        const x = lx + sx * k, y = ly + sy * k, d = dist(x, y);
+        if (d < outer - 1.2 && get(x, y) === T.STONE && k > 1) break;
+        clearAt(x, y); setRegion(x, y, "friends_ring"); put(x, y, T.STONE);
       }
+      const [ix, iy] = [Math.round((x0 + x1) / 2), Math.round((y0 + y1) / 2)];
+      npc(keeper, ix, iy);
+      // The shop's sign, out on the concourse at the passage's mouth.
+      const [mx, my] = lanes[0], [gx, gy] = [mx + sx * 6 - (door === "n" || door === "s" ? 1 : 0), my + sy * 6 - (door === "e" || door === "w" ? 1 : 0)];
+      if (get(gx, gy) === T.STONE && ctx.objectAt[tileIndex(gx, gy)] < 0 && dist(gx, gy) < outer - 1.2) add({ kind: "sign", x: gx, y: gy, blocks: true, name: sign[0], text: sign[1], icon: sign[2] });
+      furnish(x0, y0, x1, y1, door);
     };
-    stall(Math.PI / 3, "table", "barrel", "shelf", "Tonics and tinctures");
-    stall(Math.PI / 6, "shelf", "table", "crate", "Sigil crates"); stall(Math.PI * 5 / 6, "crate", "table", "target", "Practice target");
-    stall(0, "armour", "table", "armour", "A suit of glimmer, on a stand"); stall(Math.PI, "armour", "chest", "banner", "The Pit's banner"); stall(Math.PI * 3 / 2, "banner", "banner", "throne", "The Champion's seat");
+    const free = (x: number, y: number) => ctx.objectAt[tileIndex(x, y)] < 0 && !ctx.spawns.some(spawn => spawn.x === x && spawn.y === y) && get(x, y) !== T.WALL;
+    const put1 = (x: number, y: number, kind: DecorKind, name?: string, blocks = true) => { if (free(x, y)) decor(x, y, kind, blocks, name); };
+    // North: the Champions' Hall, the Ring's best, paid in laurels: marble, a carpet to the Champion's seat, gold, trophies.
+    room(Math.PI * 3 / 2, 15, 9, "The Champions' Hall", "#e2c46a", T.STONE, "ring_champion", ["The Champions' Hall", "THE CHAMPIONS' HALL. Laurels only. Laurels are won in Friend Fights, not bought.", "laurel"], (x0, y0, x1, y1) => {
+      const mid = Math.round((x0 + x1) / 2);
+      for (let y = y0 + 1; y < y1; y++) { put(mid, y, T.CARPET); put(mid + 1, y, T.CARPET); }
+      put1(mid, y0 + 1, "throne", "The Champion's seat, gilded, with a laurel carved over it");
+      for (const x of [x0 + 2, x1 - 2]) { put1(x, y0 + 1, "statue", "A champion of the Ring, in gilded stone"); put1(x, y1 - 2, "statue", "A champion of the Ring, in gilded stone"); }
+      for (const x of [x0 + 4, x1 - 4]) { put1(x, y0 + 1, "banner", "The champions' banner, gold on black"); put1(x, y0 + 3, "pillar", "A marble pillar, a champion's name cut into it"); put1(x, y1 - 2, "pillar", "A marble pillar, a champion's name cut into it"); }
+      put1(x0 + 1, y0 + 4, "shelf", "Trophies of the Ring: laurels, belts and broken blades"); put1(x1 - 1, y0 + 4, "shelf", "Trophies of the Ring: laurels, belts and broken blades");
+      put1(x0 + 1, y1 - 1, "chest", "The laurel strongbox"); put1(x1 - 1, y1 - 1, "chest", "The laurel strongbox"); for (const x of [x0 + 1, x1 - 1]) put1(x, y0 + 1, "lamp");
+    });
+    // East: the Ring Armoury, coin-paid metal: an anvil and a forge that work, armour on stands, blades on racks.
+    room(0, 11, 9, "The Ring Armoury", "#6d6b67", T.STONE, "ring_armourer", ["The Ring Armoury", "THE RING ARMOURY. Metal armour and blades, pewter to rarite, for coin. Gorm Ironhand, smith.", "rarite_cuirass"], (x0, y0, x1, y1) => {
+      add({ kind: "anvil", x: x1 - 2, y: y0 + 2, blocks: true, name: "Anvil" }); add({ kind: "furnace", x: x1 - 2, y: y1 - 2, blocks: true, name: "Furnace" });
+      for (let x = x0 + 1; x <= x0 + 6; x += 2) { put1(x, y0 + 1, "armour", "A suit of Ring armour on a stand"); put1(x, y1 - 1, "armour", "Blades on a rack, edges out"); }
+      put1(x0 + 1, y0 + 4, "table", "The armourer's bench"); put1(x1 - 1, y0 + 4, "crate", "Ingots, sorted by metal"); put1(x1 - 4, y0 + 1, "barrel", "Quench barrel"); put1(x1 - 1, y1 - 1, "torch");
+    });
+    // North-east: Thessaly Vane's sigil study: cabinets of glowing sigils, spellbooks, a carpet, a staff rack.
+    room(Math.PI * 11 / 6, 11, 9, "Vane's Sigil Study", "#6f7ea6", T.CARPET, "ring_sigilist", ["Vane's Sigil Study", "VANE'S SIGIL STUDY. Sigils of every kind and staffs to cast them with. Mind the cabinets; they hum.", "ember_staff"], (x0, y0, x1, y1) => {
+      for (let x = x0 + 1, k = 0; x <= x1 - 1; x += 2, k++) put1(x, y0 + 1, "shelf", k % 2 === 0 ? "A cabinet of sigils, every drawer glowing" : "Spellbooks, and the notes in their margins");
+      put1(x0 + 1, y1 - 1, "shelf", "A cabinet of sigils, every drawer glowing"); put1(x1 - 1, y1 - 1, "shelf", "Spellbooks, and the notes in their margins");
+      put1(x0 + 3, y0 + 4, "table", "A reading desk, a sigil half-pressed on it"); put1(x1 - 3, y0 + 4, "crate", "Sigil crates"); put1(x0 + 1, y0 + 4, "armour", "A rack of staffs, each tipped with its element"); put1(x1 - 1, y0 + 4, "torch");
+    });
+    // South-east: Sister Mallow's infirmary: beds for the beaten, shelves of tonics, a still for essences, flowers.
+    room(Math.PI / 6, 11, 9, "Mallow's Infirmary", "#8fbf9a", T.WOOD, "ring_apothecary", ["Mallow's Infirmary", "MALLOW'S INFIRMARY. Potions, tonics and bandages. Lie down if you're bleeding. Sit up if you're paying.", "healing_tonic"], (x0, y0, x1, y1) => {
+      for (const x of [x0 + 1, x0 + 3]) { put1(x, y0 + 1, "bed", "An infirmary bed, the sheets boiled white"); put1(x, y1 - 2, "bed", "An infirmary bed, the sheets boiled white"); }
+      for (const x of [x1 - 1, x1 - 3]) put1(x, y0 + 1, "shelf", "Tonics and tinctures, labelled in a careful hand");
+      add({ kind: "still", x: x1 - 2, y: y1 - 2, blocks: true, name: "Copper still" });
+      put1(x1 - 4, y1 - 1, "table", "Bandages, rolled, and a basin"); put1(x0 + 5, y0 + 1, "barrel", "Clean water"); put1(x0 + 1, y1 - 1, "flowers", "Herbs drying in bunches", false); put1(x1 - 1, y1 - 1, "lamp");
+    });
+    // South-west: Brisk Arrowyn's fletchery: racks of bows, shafts by the bundle, logs to carve, a target to try them on.
+    room(Math.PI * 5 / 6, 11, 9, "Arrowyn's Fletchery", "#9c8672", T.WOOD, "ring_fletcher", ["Arrowyn's Fletchery", "ARROWYN'S FLETCHERY. Bows, arrows, quivers and hides. Try before you buy; the target's at the back.", "yew_bow"], (x0, y0, x1, y1) => {
+      for (const x of [x0 + 1, x0 + 3, x0 + 5]) put1(x, y0 + 1, "shelf", "Bows on the rack, strung and unstrung");
+      put1(x1 - 1, y0 + 1, "target", "A practice target, well shot"); put1(x1 - 1, y1 - 1, "target", "A practice target, well shot");
+      put1(x0 + 1, y1 - 1, "logpile", "Staves of yew and willow, seasoning"); put1(x0 + 3, y1 - 1, "crate", "Arrow shafts, by the bundle"); put1(x0 + 1, y0 + 4, "table", "A fletching bench: feathers, glue, a knife"); put1(x1 - 3, y0 + 4, "hay", "Straw butts");
+    });
+    // North-west: the Pit Quartermaster's den, bloodmarks only: the pit's three tiers on stands, bones, chains of trophies, a pit fire.
+    room(Math.PI * 5 / 4, 11, 9, "The Pit Quartermaster's Den", "#5a1f2e", T.STONE, "ring_quartermaster", ["The Pit Quartermaster", "THE PIT. Bloodmarks only. Wildfur, Ringsteel, Pitfighter, and the Ringbreaker for those who've bled enough.", "bloodmark"], (x0, y0, x1, y1) => {
+      for (let y = y0 + 1; y < y1; y++) for (let x = x0 + 1; x < x1; x++) if ((x * 7 + y * 3) % 5 === 0 && free(x, y)) put(x, y, T.GRAVEL);
+      put1(x0 + 1, y0 + 1, "armour", "Wildfur, on a stand: the pit's first tier, hide and fang"); put1(x0 + 3, y0 + 1, "armour", "Ringsteel, on a stand: the pit's second tier"); put1(x0 + 5, y0 + 1, "armour", "Pitfighter plate, on a stand: the pit's third tier, dented on purpose");
+      put1(x1 - 1, y0 + 1, "chest", "The bloodmark chest, chained"); put1(x1 - 1, y1 - 1, "hearth", "The pit fire"); put1(x0 + 1, y1 - 1, "bones", "Trophies of the pit", false); put1(x0 + 3, y1 - 1, "bones", "Trophies of the pit", false);
+      put1(x1 - 3, y0 + 1, "banner", "The Pit's banner, red on black"); put1(x0 + 1, y0 + 4, "stake", "A rack of pit weapons: clubs, hooks, a net"); put1(x1 - 1, y0 + 4, "torch");
+    });
     // The Ring's chapel, built against the west wall with its door into the concourse: white stone under a gabled roof
     // with a round bell tower at its north-west corner (open from the nave), an altar with the Old Friend behind it at
     // the west end, pews either side of a carpeted aisle, torches and the Ring's banners. Chaplain Orrin keeps it, and

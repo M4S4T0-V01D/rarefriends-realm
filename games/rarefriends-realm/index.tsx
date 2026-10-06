@@ -15,7 +15,7 @@ import {
 } from "./engine.ts";
 import { PITCH, RENDER_PROFILE, VIEW, ZOOM, addPrint, daylight, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
 import {
-  BankModal, CardsModal, ChatBox, ContextMenu, DailyModal, FellowshipModal, HomeModal, JoinModal, RfActionModal, FirstStepsCard, GuideModal, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, NamingModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
+  BankModal, CardsModal, FeedbackModal, ChatBox, ContextMenu, DailyModal, FellowshipModal, HomeModal, JoinModal, RfActionModal, FirstStepsCard, GuideModal, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, NamingModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
   cancelLongPress, longPress, rightClick, type MenuEntry, type Settings, type Tab,
 } from "./panels.tsx";
 import { REGULAR_SPRITES } from "./regulars.ts";
@@ -25,9 +25,10 @@ import { Trades } from "./trade.ts";
 import { FELLOW_RANGE, PARTY_RANGE, Party, nearby } from "./party.ts";
 import { makeSaveCode, restoreSaveCode } from "./savecode.ts";
 import { strikeAt, weatherAt, type Weather } from "./weather.ts";
-import { FULLSCREEN_REQUEST, FULLSCREEN_STATE, JOIN_INVITE, TEXT_COPY, TEXT_COPY_RESULT, HOST_HELLO, HOST_STATE, SAVE_ELSEWHERE, SAVE_EXPORT, SAVE_EXPORT_RESULT, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, parseRoster, type ShareAction, type ShareOutcome } from "./roster.ts";
+import { FEEDBACK_REQUEST, FEEDBACK_RESULT, FULLSCREEN_REQUEST, FULLSCREEN_STATE, JOIN_INVITE, TEXT_COPY, TEXT_COPY_RESULT, HOST_HELLO, HOST_STATE, SAVE_ELSEWHERE, SAVE_EXPORT, SAVE_EXPORT_RESULT, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, parseRoster, type ShareAction, type ShareOutcome } from "./roster.ts";
 import { RealmAudio, trackFor, trackById, type SfxName, type TrackId } from "./audio.ts";
 import { recruitText, renderCard, renderFellowshipCard, shareText } from "./card.ts";
+import { feedbackIssue, feedbackPost, type FeedbackKind } from "./feedback.ts";
 import { CARD_CATEGORY_NAMES, CARD_COLOR_KEYS, CARD_COLOR_NAMES, CARD_OPTIONS, cardRequirement, cardUnlocked, fellowshipArt, parseInvite, type CardCategory } from "./cardstyle.ts";
 import { dailyWaiting, rollDaily, streakStatus } from "./daily.ts";
 import { FIRST_STEPS, currentStep, skipFirstSteps } from "./firststeps.ts";
@@ -55,7 +56,7 @@ import "./style.css";
 export const RF_DISPLAY_DECIMALS = 15;
 const rf = (value: bigint) => `${formatGameAmount(value, RF_DISPLAY_DECIMALS)} RF`;
 type Phase = "loading" | "title" | "playing" | "failed";
-type Modal = "caskets" | "map" | "card" | "cards" | "help" | null;
+type Modal = "caskets" | "map" | "card" | "cards" | "help" | "feedback" | null;
 type XpDrop = { id: number; skill: Skill; amount: number; at: number };
 type CasketResult = { play: bigint; outcomeId: number; wardrobe: string | null; coins: number; redeemed: boolean };
 const CANONICAL = new Map<number, GenerationSprites>(REGULAR_SPRITES.map(sprites => [Number(sprites.tokenId), sprites]));
@@ -131,7 +132,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const [netState, setNetState] = useState<NetState>(players.current.state), [whisper, setWhisper] = useState<{ text: string; at: number } | null>(null);
   const lastMinimapPoint = useRef<React.MouseEvent<HTMLCanvasElement> | null>(null);
   const [snapshot, setSnapshot] = useState<GameSnapshot | null>(null), [busy, setBusy] = useState(false), [casketError, setCasketError] = useState(""), [reveal, setReveal] = useState<CasketResult[] | null>(null);
-  const [size, setSize] = useState({ width: 960, height: 640, scale: 1 }), [sideOpen, setSideOpen] = useState(true), [fullscreen, setFullscreen] = useState(false), [pip, setPip] = useState(false), [shareStatus, setShareStatus] = useState(""), [cardUrl, setCardUrl] = useState<string | null>(null);
+  const [size, setSize] = useState({ width: 960, height: 640, scale: 1 }), [sideOpen, setSideOpen] = useState(true), [fullscreen, setFullscreen] = useState(false), [pip, setPip] = useState(false), [shareStatus, setShareStatus] = useState(""), [feedbackStatus, setFeedbackStatus] = useState(""), [cardUrl, setCardUrl] = useState<string | null>(null);
   const pendingSave = useRef<unknown>(null), cardBlob = useRef<Blob | null>(null), resizeRef = useRef<() => void>(() => {}), saveNow = useRef<(claim?: boolean) => void>(() => {});
   /** Logged out: back on the title screen with the adventure saved. */
   const [loggedOut, setLoggedOut] = useState(false);
@@ -221,6 +222,11 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         const invite = parseInvite(event.data.token), state = game.current;
         if (invite && state && state.player.fellowship?.tag !== invite.tag) { state.ui.join = invite; refresh(); }
         return;
+      }
+      if (event.data?.type === FEEDBACK_RESULT) {
+        const messages: Record<string, string> = { both: "Thank you! Your issue is open on GitHub (press Submit new issue there) and your post is ready on X (press Post).", github: "Thank you! Your issue is open on GitHub: press Submit new issue there.",
+          x: "Thank you! Your post is ready on X: press Post.", "x-blocked": "Your issue is open on GitHub (press Submit new issue there). Your browser held back the X tab: press X only to post it too.", failed: "Your browser blocked the new tab. Allow pop-ups for the Realm and try again." };
+        setFeedbackStatus(messages[event.data.result as string] ?? messages.failed); return;
       }
       if (event.data?.type === SHARE_RESULT) {
         const messages: Record<ShareOutcome, string> = {
@@ -858,6 +864,14 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     if (!state || !blob) return;
     shareBlob(action, blob, shareText(state), `rarefriends-realm-${state.player.friendId}.png`);
   };
+  /** Player feedback through the host: a GitHub issue with the details, and an X post tagging the Realm's maker. */
+  const sendFeedback = (target: "both" | "github" | "x", kind: FeedbackKind, text: string, details: boolean) => {
+    const state = game.current; if (!state) return;
+    if (hosted !== "linked") { setFeedbackStatus("Feedback needs the Realm's own host page (the Pages link)."); return; }
+    const issue = feedbackIssue(state, kind, text, details, target !== "github");
+    window.parent.postMessage({ type: FEEDBACK_REQUEST, target, post: feedbackPost(kind, text), title: issue.title, body: issue.body }, "*");
+    setFeedbackStatus("Opening…");
+  };
   const copyText = (text: string) => { if (hosted !== "linked") { setShareStatus("Copying needs the Realm's own host page."); return; } window.parent.postMessage({ type: TEXT_COPY, text }, "*"); setShareStatus("Working…"); };
   /** The fellowship's recruitment card and post, shared through the host. */
   const recruit = (action: ShareAction | "copy-text") => {
@@ -912,6 +926,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
                 {...rightClick((x, y, entries) => setMenu({ x, y, entries }), () => ([["North", 0], ["East", -Math.PI / 2], ["South", Math.PI], ["West", Math.PI / 2]] as const).map(([name, turn]) => ({ verb: `Look ${name}`, noun: "", run: () => {
                   const from = cameraGoal.current?.angle ?? camera.current.angle, goal = NORTH + turn; cameraGoal.current = { angle: goal + Math.round((from - goal) / (Math.PI * 2)) * Math.PI * 2, pitch: cameraGoal.current?.pitch ?? camera.current.pitch }; } })))}
                 onClick={() => { const from = cameraGoal.current?.angle ?? camera.current.angle; cameraGoal.current = { angle: NORTH + Math.round((from - NORTH) / (Math.PI * 2)) * Math.PI * 2, pitch: cameraGoal.current?.pitch ?? camera.current.pitch }; }}><i aria-hidden="true">▲</i><b>N</b></button>
+              <button type="button" className="realm-feedback-btn" aria-label="Send feedback" title="Send feedback: a bug, an idea, anything" onClick={() => { setFeedbackStatus(""); setModal("feedback"); }}>💬</button>
               <button type="button" className="realm-logout-btn" aria-label="Save and log out" title="Save and log out" onClick={logOut}
                 {...rightClick((x, y, entries) => setMenu({ x, y, entries }), () => [{ verb: "Save-and-log-out", noun: "", run: logOut }])}>⏻</button>
               <button type="button" className="realm-daily-btn" aria-label={`Daily streak and updates${dailyWaiting(state, Date.now()) || state.player.seenUpdate < LATEST_UPDATE ? " (something new)" : ""}`} title="Daily streak and updates"
@@ -948,7 +963,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
                 if (linked.current) saveNow.current(true);
                 else message(state, "Saves aren't connected yet, so this restore isn't saved: keep playing in this tab and it saves once they connect. If Settings still says saves are off, reload the page and restore the code again.", "info");
               } return error; }} settings={settings} setSettings={setSettings}
-            friend={friend.current} trackName={audio.current?.trackName ?? ""} trackId={audio.current?.trackId ?? ""} playTrack={id => { audio.current?.play(id as TrackId); audio.current?.unlock(); setSettings({ ...settings, autoMusic: false }); }} openCard={openCard} openCards={() => setModal("cards")} openHelp={() => setModal("help")} paused={paused} saved={savedText}
+            friend={friend.current} trackName={audio.current?.trackName ?? ""} trackId={audio.current?.trackId ?? ""} playTrack={id => { audio.current?.play(id as TrackId); audio.current?.unlock(); setSettings({ ...settings, autoMusic: false }); }} openCard={openCard} openCards={() => setModal("cards")} openFeedback={() => { setFeedbackStatus(""); setModal("feedback"); }} openHelp={() => setModal("help")} paused={paused} saved={savedText}
             relicCounts={snapshot?.inventory.map(Number) ?? [0, 0, 0, 0]} openCaskets={() => setModal("caskets")} />
           {selection && <div className="realm-selection" role="status">{selection.kind === "item" ? `Use ${player.inventory[selection.slot] ? itemName(player.inventory[selection.slot]!.id) : "item"} ->` : `Cast ${SPELLS.find(spell => spell.id === selection.spell)?.name ?? "spell"} ->`} pick a target <button type="button" onClick={() => setSelection(null)}>Cancel</button></div>}
 
@@ -1032,8 +1047,9 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
             </Modal>
           )}
           {modal === "cards" && <CardsModal game={state} onClose={() => setModal(null)} />}
+          {modal === "feedback" && <FeedbackModal onClose={() => setModal(null)} onSend={sendFeedback} status={feedbackStatus} />}
           {modal === "map" && <WorldMapModal game={state} onClose={() => setModal(null)} onTravel={(x, y) => { setModal(null); walkTo(state, x, y); marker.current = { x, y, at: performance.now(), red: false }; refresh(); }} />}
-          {modal === "help" && <HelpModal onClose={() => setModal(null)} />}
+          {modal === "help" && <HelpModal onClose={() => setModal(null)} onFeedback={() => { setFeedbackStatus(""); setModal("feedback"); }} />}
           {dailyTab && <DailyModal game={state} tab={dailyTab} onTab={setDailyTab} onClose={() => setDailyTab(null)} refresh={refresh} openMenu={(x, y, entries) => setMenu({ x, y, entries })}
             onRf={(caskets, after) => void casket(() => client.buy(BigInt(caskets)), () => { after(); audio.current?.sfx("coins"); })} rfPrice={caskets => rf(definition.price * BigInt(caskets))} rfBusy={busy || paused} />}
           {modal === "card" && (
@@ -1098,7 +1114,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
               <button type="button" onClick={() => setModal("help")}>How to play</button>
             </div>
             <p className="realm-title-foot">Now playing: {trackById("theme").name} · Simulated $RAREFRIENDS · Saves per wallet on this device</p>
-            {modal === "help" && <HelpModal onClose={() => setModal(null)} />}
+            {modal === "help" && <HelpModal onClose={() => setModal(null)} onFeedback={() => { setFeedbackStatus(""); setModal("feedback"); }} />}
           </div>
         )}
         {(phase === "loading" || phase === "failed") && (

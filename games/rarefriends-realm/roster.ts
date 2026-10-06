@@ -47,6 +47,12 @@ export const TEXT_COPY_RESULT = "rarefriends-realm:copy-text-result";
 export const FULLSCREEN_REQUEST = "rarefriends-realm:fullscreen";
 export const FULLSCREEN_STATE = "rarefriends-realm:fullscreen-state";
 export const SHARE_REQUEST = "rarefriends-realm:share";
+/** Player feedback: on a click the game sends FEEDBACK_REQUEST (which to open, the X post text, a GitHub issue's title and body); the host opens them and replies with FEEDBACK_RESULT. */
+export const FEEDBACK_REQUEST = "rarefriends-realm:feedback";
+export const FEEDBACK_RESULT = "rarefriends-realm:feedback-result";
+export type FeedbackTarget = "both" | "github" | "x";
+/** What opened: both, one, the issue but not the post (a browser that allows one new tab per click), or nothing. */
+export type FeedbackOutcome = "both" | "github" | "x" | "x-blocked" | "failed";
 export const SHARE_RESULT = "rarefriends-realm:share-result";
 export type ShareAction = "post" | "copy" | "save";
 /**

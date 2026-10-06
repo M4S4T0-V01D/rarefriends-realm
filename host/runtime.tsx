@@ -24,11 +24,12 @@ import { GENERATION_SPRITE_MANIFEST } from "@rarefriends/friendsdk/sprites";
 import { createClient, http } from "viem";
 import { getBlockNumber, getChainId, getLogs, readContract } from "viem/actions";
 import {
-  FULLSCREEN_REQUEST, FULLSCREEN_STATE, JOIN_INVITE, TEXT_COPY, TEXT_COPY_RESULT, HOST_HELLO, HOST_STATE, SAVE_ELSEWHERE, SAVE_EXPORT, SAVE_EXPORT_RESULT, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, type ShareAction, type ShareOutcome,
+  FEEDBACK_REQUEST, FEEDBACK_RESULT, FULLSCREEN_REQUEST, FULLSCREEN_STATE, JOIN_INVITE, TEXT_COPY, TEXT_COPY_RESULT, HOST_HELLO, HOST_STATE, SAVE_ELSEWHERE, SAVE_EXPORT, SAVE_EXPORT_RESULT, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, type FeedbackOutcome, type FeedbackTarget, type ShareAction, type ShareOutcome,
 } from "../games/rarefriends-realm/roster.ts";
 import { NET_ACT, NET_CHAT, NET_ONLINE, NET_PRESENCE, NET_SOCIAL } from "../games/rarefriends-realm/net.ts";
 import { NetHub } from "./net.ts";
 import gameJson from "../games/rarefriends-realm/game.json";
+import { FEEDBACK_REPO } from "../games/rarefriends-realm/feedback.ts";
 import "@rarefriends/friendsdk/frame.css";
 import "@rarefriends/friendsdk/runtime.css";
 
@@ -155,6 +156,17 @@ function RealmHost() {
         const target = frame?.closest<HTMLElement>(".rf-game-frame") ?? frame?.parentElement ?? document.documentElement;
         if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
         else void target.requestFullscreen?.().catch(() => undefined);
+      }
+      else if (event.data?.type === FEEDBACK_REQUEST && ["both", "github", "x"].includes(event.data.target) && typeof event.data.post === "string" && event.data.post.length <= 600
+        && typeof event.data.title === "string" && event.data.title.length <= 200 && typeof event.data.body === "string" && event.data.body.length <= 6000) {
+        // Player feedback, on the player's click: the GitHub issue first (it holds the details), then the X post. Some
+        // browsers allow one new tab per click; the game offers the post on its own if the second is refused.
+        const source = event.source as Window, target = event.data.target as FeedbackTarget;
+        const open = (url: string) => { const opened = window.open(url, "_blank"); if (opened) { try { opened.opener = null; } catch { /* cross-origin already */ } } return !!opened; };
+        const github = target !== "x" && open(`https://github.com/${FEEDBACK_REPO}/issues/new?${new URLSearchParams({ title: event.data.title, body: event.data.body, labels: "player-feedback" })}`);
+        const x = target !== "github" && open(`https://x.com/intent/post?text=${encodeURIComponent(event.data.post)}`);
+        const result: FeedbackOutcome = target === "both" ? (github && x ? "both" : github ? "x-blocked" : x ? "x" : "failed") : target === "github" ? (github ? "github" : "failed") : (x ? "x" : "failed");
+        source.postMessage({ type: FEEDBACK_RESULT, result }, "*");
       }
       else if (event.data?.type === SHARE_REQUEST && ["post", "copy", "save"].includes(event.data.action) && event.data.image instanceof Blob
         && event.data.image.type === "image/png" && event.data.image.size < 5_000_000 && typeof event.data.text === "string" && event.data.text.length <= 1000) {

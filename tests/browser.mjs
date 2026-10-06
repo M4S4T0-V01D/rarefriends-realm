@@ -376,6 +376,20 @@ try {
   (await import("node:fs")).writeFileSync("./artifacts/adventurer-card.png", Buffer.from(card.data, "base64"));
   await game.getByRole("button", { name: "Close" }).click();
 
+  // ---------- Feedback: the button on the minimap ring opens a GitHub issue and an X post, through the host ----------
+  await page.evaluate(() => { window.__shared.opened = []; });
+  await game.getByRole("button", { name: "Send feedback" }).first().click();
+  await game.getByRole("radio", { name: "Bug" }).click();
+  await game.getByRole("textbox", { name: "Your feedback" }).fill("The fishing spot by the bridge won't let me fish.");
+  await game.getByRole("button", { name: "Send to GitHub and X" }).click();
+  await page.waitForFunction(() => window.__shared.opened.length >= 2);
+  const [issueUrl, postUrl] = await page.evaluate(() => window.__shared.opened);
+  const issue = new URL(issueUrl), post = new URL(postUrl).searchParams.get("text");
+  assert.equal(issue.origin + issue.pathname, "https://github.com/M4S4T0-V01D/rarefriends-realm/issues/new");
+  assert.match(issue.searchParams.get("title"), /^\[Bug\] The fishing spot/); assert.match(issue.searchParams.get("body"), /Friend: #7730/); assert.equal(issue.searchParams.get("labels"), "player-feedback");
+  for (const tag of ["@M4S4T0_V01D", "@RareFriendsNFT", "#RareFriends", "#RareFriendsRealm"]) assert.ok(post.includes(tag), `feedback post tags ${tag}`);
+  await game.getByRole("button", { name: "Close" }).click();
+
   // ---------- Performance: frame cost at busy scenes, High against Low (Settings → Graphics) ----------
   {
     const rows = [];

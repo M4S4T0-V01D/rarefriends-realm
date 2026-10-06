@@ -496,3 +496,8 @@
 .realm-codex-art img, .realm-codex-art canvas { image-rendering: pixelated; max-height: 60px; }
 .realm-codex-card b { font-size: 11px; line-height: 1.2; } .realm-codex-card small { font-size: 10px; color: var(--muted); line-height: 1.25; }
 .realm-codex-detail { margin: 8px 0 0; padding: 8px 10px; border: 2px solid var(--ink); border-radius: 6px; background: #fff; }
+
+/* ---------- Feedback: the button on the minimap ring and its window ---------- */
+.realm-feedback-btn { position: absolute; right: -4px; top: 68px; z-index: 3; width: 28px; height: 28px; padding: 0 !important; min-height: 0 !important; display: grid; place-items: center; font-size: 14px; border-radius: 50%; background: var(--paper) !important; border: 2px solid var(--ink) !important; box-shadow: 2px 2px 0 #000; }
+.realm-feedback-btn:hover { background: #fff !important; }
+.realm-feedback-text { width: 100%; min-height: 110px; margin: 6px 0 2px; padding: 8px; border: 2px solid var(--ink); border-radius: 4px; font: 13px/1.4 ui-monospace, Menlo, Consolas, monospace; resize: vertical; background: #fff; color: var(--ink); user-select: text; -webkit-user-select: text; }
