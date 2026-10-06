@@ -800,6 +800,15 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
       put1(x1 - 1, y0 + 1, "target", "A practice target, well shot"); put1(x1 - 1, y1 - 1, "target", "A practice target, well shot");
       put1(x0 + 1, y1 - 1, "logpile", "Staves of yew and willow, seasoning"); put1(x0 + 3, y1 - 1, "crate", "Arrow shafts, by the bundle"); put1(x0 + 1, y0 + 4, "table", "A fletching bench: feathers, glue, a knife"); put1(x1 - 3, y0 + 4, "hay", "Straw butts");
     });
+    // North-north-east: Hilde Edgewright's blade shop, coin-paid weapons: racks of blades on every wall, the two-handers
+    // on stands, a grindstone, a straw dummy to try an edge on, and an anvil to put one back.
+    room(Math.PI * 5 / 3, 11, 9, "Edgewright's Blades", "#8a5e52", T.STONE, "ring_weaponsmith", ["Edgewright's Blades", "EDGEWRIGHT'S BLADES. Daggers to war hammers, pewter to glimmer, for coin. Every edge honed twice.", "glimmer_greatsword"], (x0, y0, x1, y1) => {
+      for (const x of [x0 + 1, x0 + 3, x0 + 5, x1 - 1]) put1(x, y0 + 1, "armour", x === x1 - 1 ? "Greatswords on a stand, taller than you" : "Blades on a rack, edges out");
+      for (const x of [x0 + 1, x0 + 3]) put1(x, y1 - 1, "armour", "Battleaxes and war hammers, hung by their heads");
+      add({ kind: "anvil", x: x1 - 2, y: y1 - 2, blocks: true, name: "Anvil" }); put1(x1 - 4, y1 - 1, "table", "A grindstone on its trestle, the stone worn hollow");
+      put1(x0 + 1, y0 + 4, "table", "A whetting bench: stones, oil, a rag"); put1(x1 - 1, y0 + 4, "target", "A straw dummy, cut a hundred ways");
+      put1(x1 - 3, y0 + 1, "barrel", "Quench barrel"); put1(x0 + 5, y1 - 1, "crate", "Hilts and crossguards, unsorted"); put1(x1 - 1, y1 - 1, "torch");
+    });
     // North-west: the Pit Quartermaster's den, bloodmarks only: the pit's three tiers on stands, bones, chains of trophies, a pit fire.
     room(Math.PI * 5 / 4, 11, 9, "The Pit Quartermaster's Den", "#5a1f2e", T.STONE, "ring_quartermaster", ["The Pit Quartermaster", "THE PIT. Bloodmarks only. Wildfur, Ringsteel, Pitfighter, and the Ringbreaker for those who've bled enough.", "bloodmark"], (x0, y0, x1, y1) => {
       for (let y = y0 + 1; y < y1; y++) for (let x = x0 + 1; x < x1; x++) if ((x * 7 + y * 3) % 5 === 0 && free(x, y)) put(x, y, T.GRAVEL);

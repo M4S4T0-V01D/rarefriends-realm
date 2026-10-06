@@ -4,6 +4,9 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 71, date: "2026-10-06", title: "A weapon shop in the Ring", items: [
+    "Hilde Edgewright has opened Edgewright's Blades in the Ring, off the concourse between the Champions' Hall and Vane's Sigil Study: daggers, swords and sabres, greatswords, battleaxes and war hammers, and the blessed maces and flails, pewter to glimmer, for coin. Racks of blades on every wall, a grindstone, a straw dummy to try an edge on.",
+  ] },
   { id: 70, date: "2026-10-06", title: "Snow that stays solid, hallways to the Ring's shops, real palisades, and Wood's End's fort", items: [
     "Snow on the mountains no longer looks see-through: the ground's inked edges and contour lines used to be drawn after all of the land, so the hills behind drew their lines straight across any snowfield (or rise) in front of them. They're laid back to front with the ground now. Snow itself has more body, too: a cool off-white with blue-grey drifts, wind-cut crests and glints, so its slopes show. Frostpeak's snow stays as it was.",
     "Every shop at the Rare Friends Ring is reached by a walled, roofed hallway from the concourse to its door: from the arena to the counter you never step outside the Ring.",

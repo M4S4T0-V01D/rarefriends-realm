@@ -2331,7 +2331,7 @@ test("The dungeon update: three dungeons under the lake, the library and the sto
 test("The Rare Friends Ring: matches for coins and bloodmarks, your own foes, revival in the lobby, the Ringbreaker, Wildfur and the Ring's shops", () => {
   const g = newGame(), p = g.player, world = g.world;
   assert.equal(regionAt(world, ARENA.x, ARENA.y).id, "friends_ring"); assert(inArena(ARENA.x, ARENA.y + 5) && !inArena(ARENA.x, ARENA.y + 20) && inRing(ARENA.x + 3, ARENA.y + 3), "the courtyard is a duelling ring");
-  for (const id of ["ringmaster", "ring_apothecary", "ring_chaplain", "ring_sigilist", "ring_fletcher", "ring_armourer", "ring_quartermaster", "ring_champion"]) assert(g.npcs.some(npc => npc.id === id), id);
+  for (const id of ["ringmaster", "ring_apothecary", "ring_chaplain", "ring_sigilist", "ring_fletcher", "ring_armourer", "ring_quartermaster", "ring_champion", "ring_weaponsmith"]) assert(g.npcs.some(npc => npc.id === id), id);
   assert(world.objects.some(object => object.kind === "fountain" && object.name === "Blood fountain"), "the fountain runs red");
   const gates = world.objects.filter(object => object.name === "Arena gate"); assert.equal(gates.length, 4, "four arena gates");
   assert(gates.every(gate => gate.look === "gate" && (gate.axis === "ew") === (gate.x === ARENA.x)), "iron gates set along the courtyard wall, not ladders");
@@ -2345,7 +2345,7 @@ test("The Rare Friends Ring: matches for coins and bloodmarks, your own foes, re
   assert(world.objects.filter(object => object.decor === "lamp" && object.y > ARENA.y + ARENA.outer && Math.abs(object.x - ARENA.x) <= 5).length === 4, "lamps on the forecourt");
   assert(world.objects.filter(object => object.decor === "ruin_wall" && inArena(object.x, object.y)).length >= 10, "ruined walls in the courtyard");
   // Every shop has its own room off the concourse, its keeper inside, its furniture its own.
-  for (const [keeper, hall] of [["ring_champion", "The Champions' Hall"], ["ring_armourer", "The Ring Armoury"], ["ring_sigilist", "Vane's Sigil Study"], ["ring_apothecary", "Mallow's Infirmary"], ["ring_fletcher", "Arrowyn's Fletchery"], ["ring_quartermaster", "The Pit Quartermaster's Den"]]) {
+  for (const [keeper, hall] of [["ring_champion", "The Champions' Hall"], ["ring_armourer", "The Ring Armoury"], ["ring_sigilist", "Vane's Sigil Study"], ["ring_apothecary", "Mallow's Infirmary"], ["ring_fletcher", "Arrowyn's Fletchery"], ["ring_quartermaster", "The Pit Quartermaster's Den"], ["ring_weaponsmith", "Edgewright's Blades"]]) {
     const b = world.buildings.find(entry => entry.name === hall), npc = g.npcs.find(entry => entry.id === keeper);
     assert(b && npc && npc.x > b.x0 && npc.x < b.x1 && npc.y > b.y0 && npc.y < b.y1, `${keeper} keeps ${hall}`);
     assert(Math.hypot((b.x0 + b.x1) / 2 - ARENA.x, (b.y0 + b.y1) / 2 - ARENA.y) < ARENA.outer + 14, `${hall} stands against the Ring`);

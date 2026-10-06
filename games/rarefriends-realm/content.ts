@@ -36,6 +36,7 @@ export const NPCS: Record<string, NpcDef> = {
   ring_sigilist: { id: "ring_sigilist", name: "Thessaly Vane", examine: "Sigils and staffs for the Ring's mages.", options: ["Talk-to", "Trade"], shop: "ring_mage", art: art(5, 704) },
   ring_fletcher: { id: "ring_fletcher", name: "Brisk Arrowyn", examine: "Bows and arrows for the Ring's archers.", options: ["Talk-to", "Trade"], shop: "ring_range", art: art(4, 705) },
   ring_armourer: { id: "ring_armourer", name: "Gorm Ironhand", examine: "Metal armour and blades, for coin.", options: ["Talk-to", "Trade"], shop: "ring_armour", art: art(6, 706) },
+  ring_weaponsmith: { id: "ring_weaponsmith", name: "Hilde Edgewright", examine: "Sharpens everything twice. Sells it once.", options: ["Talk-to", "Trade"], shop: "ring_weapons", art: art(1, 709) },
   ring_quartermaster: { id: "ring_quartermaster", name: "The Pit Quartermaster", examine: "Takes bloodmarks and nothing else. Sells the Ring's own armour.", options: ["Talk-to", "Trade"], shop: "ring_pit", art: art(0, 707) },
   ring_champion: { id: "ring_champion", name: "Laurel Keeper Ismay", examine: "Keeps the Champions' Hall. Takes laurels, the coin of Friend Fights.", options: ["Talk-to", "Trade"], shop: "ring_champions", art: art(7, 708) },
   // The four Orders (2026-10): commanders, quartermasters and guards, all on the knights' stout frame.
@@ -1148,6 +1149,7 @@ function talkInner(game: Game, npcId: string): Dialogue {
     case "ring_sigilist": return chat(name, npcSays(name, "Sigils for every element, and the elemental staffs. Mages win more matches than you'd think; the creatures can't dodge."));
     case "ring_fletcher": return chat(name, npcSays(name, "Bows and arrows, and the hunter's leathers. The archers in the Vault's Dead match are the only ones who'll shoot back."));
     case "ring_armourer": return chat(name, npcSays(name, "Pewter to glimmer, helm to boots, for coin. The Quartermaster across the way sells the Ring's own, for bloodmarks."));
+    case "ring_weaponsmith": return chat(name, npcSays(name, "Daggers, swords and sabres for the quick; greatswords, battleaxes and war hammers for the strong. Pewter to glimmer, every one of them honed.", "Maces and flails too, from Dawnhold. The chaplain blesses them; I only sharpen."));
     case "ring_quartermaster": return chat(name, npcSays(name, "Bloodmarks. Nothing else. Pitfighter for the new, ringsteel for the proven, Wildfur for the ones who fight hardest when they're nearly done. Skull masks for everyone."));
     case "ring_champion": return chat(name, npcSays(name, "Laurels, won from other Friends in the courtyard. The crown, the cape, the gauntlets and the gilded mask: the Hall sells them for nothing else."));
     case "fisher":
