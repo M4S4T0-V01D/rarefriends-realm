@@ -2496,7 +2496,8 @@ test("Return of Raria: the far west, the Burned, sealed Order looks, Adventurer 
   }
   const palace = world.buildings.find(b => b.name === "The Palace of Raria"); assert(palace, "the palace");
   const { RARIA_CITY } = await import("../games/rarefriends-realm/farwest.ts");
-  const walls = []; for (let x = 60; x < 360; x++) if (terrainAt(world, x, RARIA_CITY.y - 30) === T.WALL) walls.push(x);
+  // (Across the city's own span: the villages round it have walls of their own now.)
+  const walls = []; for (let x = RARIA_CITY.x0 - 6; x <= RARIA_CITY.x1 + 6; x++) if (terrainAt(world, x, RARIA_CITY.y - 30) === T.WALL) walls.push(x);
   // The capital, dressed: gatehouse towers at all four gates, yews down the boulevards and pocket gardens, wells in
   // the squares, none of it indoors, and no street a single dark roof colour.
   const R = RARIA_CITY, inCity = o => o.x > R.x0 && o.x < R.x1 && o.y > R.y0 && o.y < R.y1, indoors = o => world.buildings.some(b => o.x > b.x0 && o.x < b.x1 && o.y > b.y0 && o.y < b.y1);
@@ -2656,4 +2657,48 @@ test("Adaptive resolution: High drops to 1× after three slow seconds on a sharp
   for (let i = 0; i < 40; i++) assert.equal(adapt(a, 16.7, 4, 2), null, "after two drops it stays at 1×");
   const b = newAdaptive(); adapt(b, 30, 12, 2); adapt(b, 15, 12, 2); adapt(b, 30, 12, 2);
   assert.equal(adapt(b, 30, 12, 2), null, "a fast second in between starts the count again");
+});
+
+test("Townscape: homes in every village (with their doors reachable), L-shaped and hipped and two-storey buildings, shop and bank fronts, Raria's grand halls", async () => {
+  const { walkable } = await import("../games/rarefriends-realm/world.ts");
+  const { dressWorld } = await import("../games/rarefriends-realm/facades.ts");
+  const g = newGame(), world = dressWorld(g.world), Wd = world.tiles.length / 620;
+  // Homes: three for nearly every village, a bed in each, a door you can walk to from the village.
+  const homes = world.buildings.filter(b => / home$/.test(b.name)), villages = new Map();
+  for (const b of homes) { const parts = b.complex ? world.buildings.filter(o => o.complex === b.complex) : [b]; if (parts[0] !== b) continue; villages.set(b.name, [...(villages.get(b.name) ?? []), parts]); }
+  assert(villages.size >= 18, `homes in ${villages.size} villages`);
+  assert([...villages.values()].filter(list => list.length >= 3).length >= 15, "three homes in most of them");
+  const reach = (fromX, fromY, radius) => {
+    const seen = new Set([fromY * Wd + fromX]), queue = [[fromX, fromY]];
+    while (queue.length) { const [x, y] = queue.shift(); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy, k = ny * Wd + nx; if (seen.has(k) || Math.abs(nx - fromX) > radius || Math.abs(ny - fromY) > radius || !walkable(world, nx, ny)) continue; seen.add(k); queue.push([nx, ny]); } }
+    return seen;
+  };
+  for (const [name, list] of villages) for (const parts of list) {
+    const x0 = Math.min(...parts.map(p => p.x0)), y0 = Math.min(...parts.map(p => p.y0)), x1 = Math.max(...parts.map(p => p.x1)), y1 = Math.max(...parts.map(p => p.y1));
+    const beds = world.objects.filter(o => o.decor === "bed" && o.x > x0 && o.x < x1 && o.y > y0 && o.y < y1 && o.name !== "__removed");
+    assert(beds.length >= 1, `${name} at ${x0},${y0} has a bed`);
+    // From the bed, out of the door and well away: a door, and open ground round the house.
+    const reached = reach(beds[0].x, beds[0].y, 40);
+    assert([...reached].some(k => { const x = k % Wd, y = (k - x) / Wd; return x < x0 - 1 || x > x1 + 1 || y < y0 - 1 || y > y1 + 1; }), `${name} at ${x0},${y0}: out of the door`);
+    assert(reached.size > (x1 - x0 + 5) * (y1 - y0 + 5), `${name} at ${x0},${y0}: and all round the house`);
+  }
+  // Shapes and roofs.
+  const ls = new Set(world.buildings.filter(b => b.complex?.includes("@")).map(b => b.complex));
+  assert(ls.size >= 30, `L-shaped buildings (${ls.size})`);
+  for (const complex of ls) { const parts = world.buildings.filter(b => b.complex === complex); assert.equal(parts.length, 2, `${complex}: two parts`); }
+  assert(world.buildings.filter(b => b.hip).length >= 80, "hipped roofs");
+  assert(world.buildings.filter(b => b.storeys === 2).length >= 60, "two-storey buildings");
+  assert(world.buildings.filter(b => b.storeys === 3 && b.roof === "cone" && !b.round && !b.keep).length >= 8, "tower-houses");
+  // Fronts: every bank's, and the shops'.
+  const bankHouses = world.buildings.filter(b => world.objects.some(o => o.kind === "bank" && o.x > b.x0 && o.x < b.x1 && o.y > b.y0 && o.y < b.y1));
+  assert(bankHouses.length >= 8 && bankHouses.every(b => b.facade === "bank" && b.walls === "marble"), "every bank is a marble bank");
+  const shops = world.buildings.filter(b => b.facade === "shop");
+  assert(shops.length >= 30 && shops.filter(b => b.sign).length >= 25, `shops with awnings and signs (${shops.length})`);
+  assert(world.buildings.some(b => b.facade === "inn"), "inns hang out a tankard");
+  // Raria's halls of state.
+  for (const name of ["The Office of Conduct", "The Office of Sigils", "The Sumptuary Office", "The Chapel of the Law", "The Hall of the Order of Dusk", "The Crown Bank"]) {
+    const b = world.buildings.find(o => o.name === name);
+    assert(b && (b.storeys ?? 1) >= 3 && (b.facade === "civic" || b.facade === "bank"), `${name} is grand`);
+  }
+  assert(world.buildings.filter(b => b.keep?.dome).length >= 3, "domes over Raria");
 });

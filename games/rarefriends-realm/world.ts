@@ -7,6 +7,7 @@
 import type { RockKind, SpotKind, TreeKind } from "./data.ts";
 import { buildExpansion } from "./expansion.ts";
 import { buildFarWest } from "./farwest.ts";
+import { growVillages, varyBuildings } from "./townscape.ts";
 
 /**
  * The far west (Return of Raria): the world grew by WEST_DX columns on its west side for a second continent, Raria and
@@ -191,12 +192,24 @@ export type Building = {
   storeys?: number; complex?: string;
   /** Extra wall height (pixels) seen only from outside, above the top storey (a tower taller than its floors), and a cone roof's height. */
   tall?: number; spire?: number;
-  /** A keep rising out of a cone roof's cut-off top (a palace): its width in tiles (odd), its storeys of wall, and its own spire's height. */
-  keep?: { size: number; storeys: number; spire: number };
+  /**
+   * A keep rising out of a cone roof's cut-off top (a palace): its width in tiles (odd), its storeys of wall, and its own
+   * spire's height; or, with `dome`, a drum under a gilded dome (a hall of state).
+   */
+  keep?: { size: number; storeys: number; spire: number; dome?: boolean };
   /** A round tower: its cone roof is eight-sided, fitted to the round wall. */
   round?: boolean;
-  /** What the walls are made of: stone brick, half-timbered plaster, or planks. */
-  walls?: "stone" | "timber" | "plank";
+  /** A pitched roof hipped at both ends (sloping on all four sides) instead of gabled. */
+  hip?: boolean;
+  /** What the walls are made of: stone brick, half-timbered plaster, planks, or pale dressed marble. */
+  walls?: "stone" | "timber" | "plank" | "marble";
+  /**
+   * What its front says it is (render.ts draws it): a shop's striped awning and hanging sign (`sign`, an item id for its
+   * board), an inn's sign, a bank's columns and gilded pediment, a hall of state's columns and pediment. Set when the
+   * world is dressed (facades.ts) unless a builder set it.
+   */
+  facade?: "shop" | "inn" | "bank" | "civic";
+  sign?: string;
 };
 /** An upper storey: the real rectangle it covers and where its tiles are stored (real + (dx, dy)). */
 export type Floor = { complex: string; level: number; x0: number; y0: number; x1: number; y1: number; dx: number; dy: number };
@@ -1279,6 +1292,9 @@ export function generateWorld(seed = WORLD_SEED): { world: World; lift: Float32A
   // The far west: a second continent, Raria and BarkReach.
   const ctx: GenContext = { W, H, tiles, region, objectAt, lift, objects, spawns, buildings, doorways: [], ramparts: [], random: mulberry(seed + 9191), noise: makeNoise(seed + 71, 11), noise2: makeNoise(seed + 83, 4) };
   buildFarWest(ctx, worldTools(ctx), places, floors);
+  // Homes for the villages, then every ordinary building given a shape and a roof of its own (townscape.ts).
+  growVillages(ctx, worldTools(ctx), places);
+  varyBuildings(ctx, worldTools(ctx));
   for (const object of objects) if (object.name === "__removed") object.blocks = false;
   const buildingAt = new Uint16Array(W * H);
   buildings.forEach((b, index) => { if (b.roof === "none") return; for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) buildingAt[y * W + x] = index + 1; });

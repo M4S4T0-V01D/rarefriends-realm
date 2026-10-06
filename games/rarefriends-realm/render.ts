@@ -5,6 +5,7 @@
 import type { GenerationSprites } from "@rarefriends/friendsdk/sprites";
 import { MONSTERS, COURSES, ROCKS, isItem, item, levelForXp, mountDef, petDef, regionalSetOf, type Coat, type Icon } from "./data.ts";
 import { herbDef } from "./apothecary.ts";
+import { doorwaysOf, dressWorld } from "./facades.ts";
 const isPet = (id: string) => !!petDef(id);
 import { NPCS } from "./content.ts";
 import { TICK_MS, attackSpeed, riding, type Facing, type Game, type Monster, type Npc, type Projectile } from "./state.ts";
@@ -1468,7 +1469,9 @@ function roofGeometry(building: Building) {
   const alongX = X1 - X0 >= Y1 - Y0, half = (alongX ? Y1 - Y0 : X1 - X0) / 2, rise = building.roof === "cone" ? building.spire ?? 118 : Math.max(20, Math.min(48, half * 11));
   const base = WALL_H * (building.storeys ?? 1) + (building.tall ?? 0), top = base + rise, mid = alongX ? (Y0 + Y1) / 2 : (X0 + X1) / 2;
   const A: RoofVertex = [X0, Y0, base], B: RoofVertex = [X1, Y0, base], C: RoofVertex = [X1, Y1, base], D: RoofVertex = [X0, Y1, base];
-  const R0: RoofVertex = alongX ? [X0, mid, top] : [mid, Y0, top], R1: RoofVertex = alongX ? [X1, mid, top] : [mid, Y1, top];
+  // A hipped roof's ridge stops short of the ends by half the span (a square one comes to a point).
+  const inset = building.hip ? Math.min(half, (alongX ? X1 - X0 : Y1 - Y0) / 2) : 0;
+  const R0: RoofVertex = alongX ? [X0 + inset, mid, top] : [mid, Y0 + inset, top], R1: RoofVertex = alongX ? [X1 - inset, mid, top] : [mid, Y1 - inset, top];
   const apex: RoofVertex = [(X0 + X1) / 2, (Y0 + Y1) / 2, top];
   return { A, B, C, D, R0, R1, apex, alongX, base, top, X0, X1, Y0, Y1 };
 }
@@ -1483,6 +1486,63 @@ const rampartAt = (world: World, x: number, y: number) => {
   for (const r of world.ramparts ?? []) if (x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1 && (x === r.x0 || x === r.x1 || y === r.y0 || y === r.y1)) return r.storeys;
   return 0;
 };
+/**
+ * A gilded dome on a drum (a hall of state): a hemisphere of `radius` tiles standing at `base`, in facets (ribbed, lit
+ * on the side towards the light), with a little lantern and a gold ball on top.
+ */
+function drawDome(ctx: CanvasRenderingContext2D, camera: Camera, cx: number, cy: number, radius: number, base: number, now: number, reduced: boolean) {
+  const RINGS = 5, SEGMENTS = 14, HEIGHT = radius * 32 * 0.95, P = ([x, y, h]: RoofVertex) => { const s = toScreen(camera, x, y, h); return [s.x, s.y] as const; };
+  const ring = (k: number): RoofVertex[] => {
+    const phi = k / RINGS * Math.PI / 2, r = radius * Math.cos(phi), h = base + HEIGHT * Math.sin(phi);
+    return Array.from({ length: SEGMENTS }, (_, i) => { const a = i / SEGMENTS * Math.PI * 2; return [cx + Math.cos(a) * r, cy + Math.sin(a) * r, h] as RoofVertex; });
+  };
+  const rings = Array.from({ length: RINGS + 1 }, (_, k) => ring(k));
+  const faces: { points: RoofVertex[]; depth: number; fill: string }[] = [];
+  for (let k = 0; k < RINGS; k++) for (let i = 0; i < SEGMENTS; i++) {
+    const a = rings[k][i], b = rings[k][(i + 1) % SEGMENTS], c = rings[k + 1][(i + 1) % SEGMENTS], d = rings[k + 1][i];
+    const mx = (a[0] + b[0]) / 2 - cx, my = (a[1] + b[1]) / 2 - cy, { rx, ry } = rotate(camera, mx, my);
+    // Facing the camera (else hidden behind the near side); lit to the left like the walls, and brighter towards the top.
+    if (rx + ry < -0.05 * radius && k < RINGS - 1) continue;
+    const light = (rx - ry < 0 ? 0.1 : -0.06) + k * 0.025;
+    faces.push({ points: [a, b, c, d], depth: depthOf(camera, cx + mx, cy + my) + k * 0.001, fill: shadeHex("#c9a24a", light) });
+  }
+  faces.sort((p, q) => p.depth - q.depth);
+  for (const face of faces) poly(ctx, face.points.map(P), face.fill, "rgba(60,40,10,0.55)", 0.8);
+  // Ribs from the drum to the crown, on the near side.
+  ctx.strokeStyle = "rgba(90,60,18,0.6)"; ctx.lineWidth = 1;
+  for (let i = 0; i < SEGMENTS; i += 2) {
+    const { rx, ry } = rotate(camera, Math.cos(i / SEGMENTS * Math.PI * 2), Math.sin(i / SEGMENTS * Math.PI * 2));
+    if (rx + ry < 0) continue;
+    ctx.beginPath(); rings.forEach((r, k) => { const [x, y] = P(r[i]); if (k) ctx.lineTo(x, y); else ctx.moveTo(x, y); }); ctx.stroke();
+  }
+  // The lantern: a little white drum with a gold cap, and a ball.
+  const top = base + HEIGHT;
+  box(ctx, camera, cx, cy, 0.5, 0.5, 12, "#eee8db", "#e0d8c7", "#cbc2af", top - 2, INK, null);
+  const capBase = top + 10, cap = P([cx, cy, capBase + 10]);
+  poly(ctx, [P([cx - 0.32, cy - 0.32, capBase]), P([cx + 0.32, cy - 0.32, capBase]), P([cx + 0.32, cy + 0.32, capBase]), P([cx - 0.32, cy + 0.32, capBase])], "#c9a24a", INK, 1);
+  const glint = reduced ? 0 : Math.sin(now / 700) * 0.5 + 0.5;
+  poly(ctx, [P([cx - 0.3, cy + 0.3, capBase]), P([cx + 0.3, cy + 0.3, capBase]), cap], shadeHex("#c9a24a", 0.08), INK, 1);
+  ellipse(ctx, cap[0], cap[1] - 4 * camera.zoom, 3.2 * camera.zoom, 3.2 * camera.zoom, `rgb(${232 + glint * 20},${196 + glint * 30},${92 + glint * 40})`, INK, 1);
+}
+/** A shop's awning colours: red, green, blue, plum, ochre and teal, each with cream. */
+const AWNINGS = [["#c0504a", "#f1e6d0"], ["#4f8a5a", "#efe6c8"], ["#4a6aa8", "#f0ecdf"], ["#8a5aa8", "#efe3c4"], ["#c8862e", "#fbefd6"], ["#3f8a8a", "#eef0e6"]] as const;
+/** A doorway (one or more open tiles side by side in one wall): where its wall's outer face is, which way is out, and its span along the wall. */
+type DoorGroup = { nx: number; ny: number; face: number; lo: number; hi: number };
+const frontDoorCache = new WeakMap<Building, DoorGroup[]>();
+/** A building's front doors, grouped into doorways (cached: the world doesn't change shape). */
+function frontDoors(world: World, building: Building): DoorGroup[] {
+  const cached = frontDoorCache.get(building);
+  if (cached) return cached;
+  const groups: DoorGroup[] = [];
+  for (const d of doorwaysOf(world, building)) {
+    const along = d.ny !== 0 ? d.x : d.y, face = d.ny !== 0 ? d.y + d.ny * 0.5 : d.x + d.nx * 0.5;
+    const group = groups.find(g => g.nx === d.nx && g.ny === d.ny && g.face === face && along >= g.lo - 0.5 && along <= g.hi + 0.5);
+    if (group) { group.lo = Math.min(group.lo, along - 0.5); group.hi = Math.max(group.hi, along + 0.5); }
+    else groups.push({ nx: d.nx, ny: d.ny, face, lo: along - 0.5, hi: along + 0.5 });
+  }
+  frontDoorCache.set(building, groups);
+  return groups;
+}
 /** Whether a tile lies on a building's outline. */
 const edgeOf = (building: Building, x: number, y: number) => x === building.x0 || x === building.x1 || y === building.y0 || y === building.y1;
 /** How far a palace's keep and its spire rise above the top of its roof. */
@@ -1528,6 +1588,7 @@ function drawKeepRoof(ctx: CanvasRenderingContext2D, camera: Camera, building: B
   // A string course and a parapet with merlons round the keep's top, then the spire, overhanging the walls a little.
   const crown = g.top + keep.storeys * WALL_H;
   box(ctx, camera, cx, cy, keep.size + 0.2, keep.size + 0.2, 5, "#b9b4ab", "#aaa59c", "#968f87", crown, INK, null);
+  if (keep.dome) { drawDome(ctx, camera, cx, cy, half + 0.1, crown + 5, now, reduced); return; }
   const o = half + 0.25, eave: RoofVertex[] = [[cx - o, cy - o, crown + 5], [cx + o, cy - o, crown + 5], [cx + o, cy + o, crown + 5], [cx - o, cy + o, crown + 5]];
   const peak: RoofVertex = [cx, cy, crown + 5 + keep.spire];
   slope(eave, [peak, peak, peak, peak], building.color);
@@ -1606,13 +1667,15 @@ function drawRoof(ctx: CanvasRenderingContext2D, camera: Camera, building: Build
     ctx.globalAlpha = 1;
     return;
   }
-  const color = building.color, gable = building.walls === "stone" ? "#b9b4ab" : "#e6dcc6";
+  const color = building.color, gable = building.walls === "stone" ? "#b9b4ab" : building.walls === "marble" ? "#eee8db" : "#e6dcc6";
+  // The ends: gable walls, or on a hipped roof more slopes of shingle.
+  const endA = building.hip ? shadeHex(color, 0.02) : gable, endB = building.hip ? shadeHex(color, -0.1) : shade(gable, -0.08);
   // (The second slope, on the high-x / high-y side, is the one a chimney stands on.)
   const faces: { points: RoofVertex[]; fill: string; slope?: [RoofVertex, RoofVertex, RoofVertex, RoofVertex]; chimney?: boolean }[] = g.alongX
     ? [{ points: [g.A, g.B, g.R1, g.R0], fill: shade(color, 0.07), slope: [g.A, g.B, g.R1, g.R0] }, { points: [g.D, g.C, g.R1, g.R0], fill: shade(color, -0.07), slope: [g.D, g.C, g.R1, g.R0], chimney: true },
-      { points: [g.A, g.D, g.R0], fill: gable }, { points: [g.B, g.C, g.R1], fill: shade(gable, -0.08) }]
+      { points: [g.A, g.D, g.R0], fill: endA }, { points: [g.B, g.C, g.R1], fill: endB }]
     : [{ points: [g.A, g.D, g.R1, g.R0], fill: shade(color, 0.07), slope: [g.A, g.D, g.R1, g.R0] }, { points: [g.B, g.C, g.R1, g.R0], fill: shade(color, -0.07), slope: [g.B, g.C, g.R1, g.R0], chimney: true },
-      { points: [g.A, g.B, g.R0], fill: gable }, { points: [g.D, g.C, g.R1], fill: shade(gable, -0.08) }];
+      { points: [g.A, g.B, g.R0], fill: endA }, { points: [g.D, g.C, g.R1], fill: endB }];
   // A chimney rises out of its slope: it starts where the roof meets its downhill side (not down at the eaves, where it
   // would show through the roof), and is drawn straight after its own slope so nearer roof faces cover its foot.
   let slopesDrawn = 0, ridgeDrawn = false;
@@ -1637,8 +1700,20 @@ function drawRoof(ctx: CanvasRenderingContext2D, camera: Camera, building: Build
     if (!texturesOn) { poly(ctx, face.points.map(P), face.fill, INK, 1.2); if (face.chimney) chimney(); continue; }
     if (face.slope) {
       // Shingles run along the ridge, from the ridge down to the eave.
-      const [e0, , r1, r0] = face.slope;
-      texturedQuad(ctx, shingleTexture(shadeHex(color, rotateLit(camera, e0, r0) ? 0.06 : -0.08), Math.round(span * TEX_PER_TILE), Math.round(slopeRows)), at(r0), at(r1), at(e0), span * TEX_PER_TILE, slopeRows);
+      const [e0, e1, r1, r0] = face.slope, shingles = shingleTexture(shadeHex(color, rotateLit(camera, e0, r0) ? 0.06 : -0.08), Math.round(span * TEX_PER_TILE), Math.round(slopeRows));
+      if (!building.hip) texturedQuad(ctx, shingles, at(r0), at(r1), at(e0), span * TEX_PER_TILE, slopeRows);
+      else {
+        // Hipped: the slope narrows to the ridge, so lay the shingles over the whole eave's width and clip to the slope.
+        const up = [(r0[0] + r1[0] - e0[0] - e1[0]) / 2, (r0[1] + r1[1] - e0[1] - e1[1]) / 2, (r0[2] + r1[2] - e0[2] - e1[2]) / 2];
+        const lift = (v: RoofVertex): RoofVertex => [v[0] + up[0], v[1] + up[1], v[2] + up[2]];
+        ctx.save(); ctx.beginPath(); face.points.map(P).forEach(([px, py], i) => i ? ctx.lineTo(px, py) : ctx.moveTo(px, py)); ctx.closePath(); ctx.clip();
+        texturedQuad(ctx, shingles, at(lift(e0)), at(lift(e1)), at(e0), span * TEX_PER_TILE, slopeRows);
+        ctx.restore();
+      }
+    } else if (building.hip) {
+      // A hipped end: shingles, from its eave up to the ridge's end.
+      const [a, b, c] = face.points.map(at), endSpan = Math.hypot(face.points[1][0] - face.points[0][0], face.points[1][1] - face.points[0][1]);
+      texturedTriangle(ctx, shingleTexture(face.fill, Math.round(endSpan * TEX_PER_TILE), Math.round(slopeRows)), a, b, c, endSpan * TEX_PER_TILE, slopeRows);
     } else {
       const [a, b, c] = face.points.map(at);
       texturedTriangle(ctx, wallTexture(building.walls === "stone" ? "brick" : building.walls === "plank" ? "plank" : "timber", face.fill.startsWith("#") ? face.fill : gable), a, b, c, across * TEX_PER_TILE, (g.top - g.base) * TEX_PER_HEIGHT);
@@ -1760,6 +1835,8 @@ let profileAt = 0;
 const lap = (name: string) => { const t = performance.now(); RENDER_PROFILE[name] = (RENDER_PROFILE[name] ?? 0) * 0.95 + (t - profileAt) * 0.05; profileAt = t; };
 export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   profileAt = performance.now();
+  // (The first time a world is drawn, its buildings get their fronts: banks, shops, inns.)
+  dressWorld(scene.game.world);
   // What everything draws on: the frame, or (while objects cut their light, or cast their shadows) a light buffer.
   let ctx = target;
   const { game, camera, now } = scene, world = game.world, z = camera.zoom;
@@ -1824,7 +1901,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     drawables.push({ depth: d, at: { x, y, h: 20 }, size: [(cut ? 9 : dungeon ? 34 : storeys * WALL_H + tall) + 24, 52, 30],
       exact: true, hull: () => near ? null : boxHull(camera, x, y, 1, 1, cut ? 9 : dungeon ? 34 : battlement ? 22 : storeys * WALL_H + tall), draw: () => {
       ctx.globalAlpha = near ? 0.3 : 1;
-      const [top, left, right] = dungeon ? ["#4a4950", "#3a3940", "#2f2e35"] : timber ? ["#8a6a50", "#e6dcc6", "#cfc4ab"] : style === "plank" ? ["#8a6a50", "#b89c7e", "#9c8266"] : ["#b9b4ab", "#a39e95", "#8f8a82"];
+      const [top, left, right] = dungeon ? ["#4a4950", "#3a3940", "#2f2e35"] : timber ? ["#8a6a50", "#e6dcc6", "#cfc4ab"] : style === "plank" ? ["#8a6a50", "#b89c7e", "#9c8266"] : style === "marble" ? ["#eee8db", "#e0d8c7", "#cbc2af"] : ["#b9b4ab", "#a39e95", "#8f8a82"];
       const plain: WallStyle = dungeon ? "dungeon" : timber ? "timber" : style === "plank" ? "plank" : "brick";
       // At night most windows glow with the lamps inside.
       const glazed = (k: number): WallStyle => windowGlow > 0.02 && hash(x * 5 + 3, y + k * 11) < 0.8 ? (timber ? "timber_window_lit" : "window_lit") : timber ? "timber_window" : "window";
@@ -2096,6 +2173,104 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     drawables.push({ depth: front, at: { x: (building.x0 + building.x1) / 2, y: (building.y0 + building.y1) / 2, h: (building.storeys ?? 1) * WALL_H + 24 }, rect: () => roofRect(building),
       hull: () => (roofAlpha.get(index) ?? 0) > 0.95 ? roofHull(camera, building) : null, draw: () => { const next = fade(); if (next > 0.02) drawRoof(ctx, camera, building, next, now, scene.reducedMotion); } });
   });
+  // ---------- Fronts: shops' awnings and signs, inns' signs, banks' and halls' columns and pediments ----------
+  if (!underground && level === 0) for (const building of world.buildings) {
+    if (!building.facade || building.x1 < x0 - 4 || building.x0 > x1 + 4 || building.y1 < y0 - 4 || building.y0 > y1 + 4) continue;
+    const doors = frontDoors(world, building);
+    if (!doors.length) continue;
+    if (building.facade === "shop" || building.facade === "inn") for (const group of doors) shopFront(building, group);
+    else grandFront(building, doors[0]);
+  }
+  /**
+   * A shop's front at one doorway: a striped awning over it (shops), and an iron bracket beside it with a hanging board
+   * painted with what's sold there (an inn's with a tankard). The awning turns see-through when you stand under it.
+   */
+  function shopFront(building: Building, group: DoorGroup) {
+    const { nx, ny, lo: dlo, hi: dhi, face } = group, alongX = ny !== 0, min = (alongX ? building.x0 : building.y0) - 0.5, max = (alongX ? building.x1 : building.y1) + 0.5;
+    const pt = (a: number, out: number, h: number): RoofVertex => alongX ? [a, face + ny * out, h] : [face + nx * out, a, h];
+    const P = (v: RoofVertex) => { const q = toScreen(camera, v[0], v[1], v[2]); return [q.x, q.y] as const; };
+    const lo = Math.max(min + 0.2, dlo - 0.75), hi = Math.min(max - 0.2, dhi + 0.75), mid = (lo + hi) / 2;
+    const [ax, ay] = alongX ? [mid, face + ny * 0.9] : [face + nx * 0.9, mid];
+    const palette = AWNINGS[Math.floor(hash(building.x0, building.y0 + 3) * AWNINGS.length)];
+    if (building.facade === "shop") drawables.push({ depth: depth(ax, ay) + 0.05, at: { x: ax, y: ay, h: 34 }, size: [70, 80, 30], draw: () => {
+      const HT = WALL_H * 0.95, HB = WALL_H * 0.6, D = 0.72, n = Math.max(3, Math.round((hi - lo) / 0.36));
+      ctx.globalAlpha = Math.hypot(pp.x - ax, pp.y - ay) < 1.6 ? 0.4 : 1;
+      // The cheeks at the ends, then the stripes, then the scalloped valance along the front.
+      for (const a of [lo, hi]) poly(ctx, [P(pt(a, 0, HT)), P(pt(a, D, HB)), P(pt(a, 0, HB))], shadeHex(palette[0], -0.18), INK, 1);
+      for (let i = 0; i < n; i++) {
+        const a0 = lo + (hi - lo) * i / n, a1 = lo + (hi - lo) * (i + 1) / n, fill = palette[i % 2];
+        poly(ctx, [P(pt(a0, 0, HT)), P(pt(a1, 0, HT)), P(pt(a1, D, HB)), P(pt(a0, D, HB))], fill, null);
+        poly(ctx, [P(pt(a0, D, HB)), P(pt(a1, D, HB)), P(pt((a0 + a1) / 2, D, HB - 5))], shadeHex(fill, -0.1), null);
+      }
+      poly(ctx, [P(pt(lo, 0, HT)), P(pt(hi, 0, HT)), P(pt(hi, D, HB)), P(pt(lo, D, HB))], null, INK, 1.2);
+      ctx.globalAlpha = 1;
+    } });
+    // The sign, beside the door on whichever side has wall to hang it from.
+    const at = dhi + 1.1 < max - 0.3 ? dhi + 1.1 : dlo - 1.1;
+    if (at < min + 0.3) return;
+    const [sx, sy] = alongX ? [at, face + ny * 0.4] : [face + nx * 0.4, at];
+    drawables.push({ depth: depth(sx, sy) + 0.05, at: { x: sx, y: sy, h: 40 }, size: [70, 40, 20], draw: () => {
+      const HS = WALL_H * 1.08;
+      ctx.strokeStyle = "#2e2823"; ctx.lineWidth = Math.max(1, 1.6 * z);
+      const [b0x, b0y] = P(pt(at, 0, HS)), [b1x, b1y] = P(pt(at, 0.66, HS)), [b2x, b2y] = P(pt(at, 0, HS - 10));
+      ctx.beginPath(); ctx.moveTo(b0x, b0y); ctx.lineTo(b1x, b1y); ctx.moveTo(b2x, b2y); ctx.lineTo(...P(pt(at, 0.42, HS))); ctx.stroke();
+      const board = [P(pt(at, 0.14, HS - 3)), P(pt(at, 0.6, HS - 3)), P(pt(at, 0.6, HS - 19)), P(pt(at, 0.14, HS - 19))];
+      for (const [hx, hy] of [board[0], board[1]]) { ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx, hy - 3 * z); ctx.stroke(); }
+      poly(ctx, board, building.facade === "inn" ? "#6b4a2c" : palette[0], INK, 1.2);
+      const cxs = board.reduce((sum, p) => sum + p[0], 0) / 4, cys = board.reduce((sum, p) => sum + p[1], 0) / 4;
+      // What's sold, on a little plaque that always faces you (an inn: a tankard).
+      ellipse(ctx, cxs, cys, 8 * z, 8 * z, "#efe6cf", INK, 1);
+      if (building.facade === "inn") {
+        poly(ctx, [[cxs - 3.5 * z, cys - 4 * z], [cxs + 2.5 * z, cys - 4 * z], [cxs + 2.5 * z, cys + 4 * z], [cxs - 3.5 * z, cys + 4 * z]], "#c9a24a", INK, 1);
+        ctx.beginPath(); ctx.arc(cxs + 3.2 * z, cys, 2.4 * z, -Math.PI / 2, Math.PI / 2); ctx.strokeStyle = INK; ctx.lineWidth = 1.2; ctx.stroke();
+        ellipse(ctx, cxs - 0.5 * z, cys - 4.5 * z, 3.6 * z, 1.6 * z, "#fbf6e6", null);
+      } else if (building.sign && isItem(building.sign)) drawIcon(ctx, item(building.sign).icon, cxs, cys, 13 * z);
+    } });
+  }
+  /**
+   * A bank's or a hall of state's front: marble columns along the wall with the door, a band of entablature over them,
+   * and a pediment on top (a gold coin in a bank's, a gilded sun in a hall's), standing in front of the roof.
+   */
+  function grandFront(building: Building, door: DoorGroup) {
+    const { nx, ny, face } = door, alongX = ny !== 0, min = (alongX ? building.x0 : building.y0) - 0.5, max = (alongX ? building.x1 : building.y1) + 0.5;
+    const H = WALL_H * (building.storeys ?? 1) + (building.tall ?? 0), length = max - min, mid = (min + max) / 2;
+    const pt = (a: number, out: number, h: number): RoofVertex => alongX ? [a, face + ny * out, h] : [face + nx * out, a, h];
+    const P = (v: RoofVertex) => { const q = toScreen(camera, v[0], v[1], v[2]); return [q.x, q.y] as const; };
+    const [fx, fy] = alongX ? [mid, face] : [face, mid], facing = depth(fx + nx, fy + ny) > depth(fx, fy);
+    const marble = ["#eee8db", "#e0d8c7", "#cbc2af"] as const;
+    // Columns at the joints between wall tiles, except across the doorway.
+    for (let a = Math.ceil(min + 0.5) + 0.5; a <= max - 1; a++) {
+      if (a > door.lo && a < door.hi) continue;
+      const [cx, cy] = alongX ? [a, face + ny * 0.3] : [face + nx * 0.3, a];
+      drawables.push({ depth: depth(cx, cy), at: { x: cx, y: cy, h: H / 2 }, size: [H + 30, 30, 20], draw: () => {
+        box(ctx, camera, cx, cy, 0.4, 0.4, 5, ...marble, 0, INK, null);
+        box(ctx, camera, cx, cy, 0.26, 0.26, H - 10, ...marble, 5, INK, null);
+        box(ctx, camera, cx, cy, 0.42, 0.42, 5, ...marble, H - 5, INK, null);
+      } });
+    }
+    const roofFront = Math.max(depth(building.x0, building.y0), depth(building.x1, building.y0), depth(building.x0, building.y1), depth(building.x1, building.y1)) + 0.5;
+    drawables.push({ depth: facing ? roofFront + 0.02 : depth(fx, fy) - 0.2, at: { x: fx, y: fy, h: H + 20 }, rect: () => {
+      const a = P(pt(min, 0.6, H)), b = P(pt(max, 0.6, H)), c = P(pt(mid, 0.6, H + 60));
+      return [Math.min(a[0], b[0]) - 10, Math.min(a[1], b[1], c[1]) - 10, Math.max(a[0], b[0]) + 10, Math.max(a[1], b[1]) + 10];
+    }, draw: () => {
+      const E = 7, rise = Math.min(42, 10 + length * 2.4), base = H + E;
+      // The entablature: a band of marble the length of the front, then the pediment's triangle and its tympanum.
+      const [bx, by] = alongX ? [mid, face + ny * 0.3] : [face + nx * 0.3, mid];
+      box(ctx, camera, bx, by, alongX ? length : 0.6, alongX ? 0.6 : length, E, ...marble, H, INK, null);
+      const left = P(pt(min + 0.05, 0.6, base)), right = P(pt(max - 0.05, 0.6, base)), apex = P(pt(mid, 0.6, base + rise));
+      poly(ctx, [left, right, apex], marble[1], INK, 1.4);
+      const inset = (p: readonly [number, number], k: number) => [p[0] + ((left[0] + right[0] + apex[0]) / 3 - p[0]) * k, p[1] + ((left[1] + right[1] + apex[1]) / 3 - p[1]) * k] as [number, number];
+      poly(ctx, [inset(left, 0.22), inset(right, 0.22), inset(apex, 0.3)], marble[2], "rgba(22,22,22,0.4)", 1);
+      const cxs = (left[0] + right[0] + apex[0]) / 3, cys = (left[1] + right[1] + apex[1]) / 3 + 2 * z, r = Math.min(9, rise * 0.22) * z;
+      if (building.facade === "bank") {
+        ellipse(ctx, cxs, cys, r, r, "#e2b84a", INK, 1.2); ellipse(ctx, cxs, cys, r * 0.62, r * 0.62, null, "#9a7424", 1.2);
+      } else {
+        ctx.strokeStyle = "#c9a24a"; ctx.lineWidth = Math.max(1, 1.4 * z); ctx.beginPath();
+        for (let i = 0; i < 12; i++) { const t = i / 12 * Math.PI * 2; ctx.moveTo(cxs + Math.cos(t) * r * 0.7, cys + Math.sin(t) * r * 0.7); ctx.lineTo(cxs + Math.cos(t) * r * 1.3, cys + Math.sin(t) * r * 1.3); }
+        ctx.stroke(); ellipse(ctx, cxs, cys, r * 0.62, r * 0.62, "#e2b84a", INK, 1);
+      }
+    } });
+  }
   const veilTarget = veiled(game) ? 1 : 0;
   veilShown = scene.reducedMotion ? veilTarget : veilShown + (veilTarget - veilShown) * Math.min(1, dt * (veilTarget ? 1.4 : 8));
   drawables.push({ depth: playerDepth + 0.15, at: pp, cast: true, size: [200, 120, 40], draw: () => {
@@ -2963,6 +3138,7 @@ export function mapIcons(world: World): MapIcon[] {
 }
 /** The minimap: the world turned to match the camera (45° plus its rotation), centred on the player. */
 export function renderMinimap(ctx: CanvasRenderingContext2D, game: Game, size: number, scale: number, angle: number, peers: readonly PeerView[] = [], guideTarget: { x: number; y: number } | null = null) {
+  dressWorld(game.world);
   const world = game.world, image = worldImage(world), player = realPoint(world, game.player.x, game.player.y);
   ctx.save(); ctx.clearRect(0, 0, size, size);
   ctx.beginPath(); ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2); ctx.clip();
@@ -3008,6 +3184,7 @@ let iconsCache: MapIcon[] | null = null;
 const ICON_FILLS: Record<string, string> = { "◈": "#c6bed4", "$": "#f2d56b", "!": "#f5e04a", "¤": "#ffffff", "◆": "#e7a9b0", "♜": "#c6bed4", "▼": "#b7b2aa", "⛏": "#d8c4a8", "≈": "#9fc1e6", "♨": "#f0b48a", "▲": "#f0b48a", "⚒": "#c8c5be", "✚": "#ffffff", "✋": "#e8d4c0", "➶": "#b4d3a0", "♞": "#e2b56a" };
 /** The world map: the whole Realm turned to match the camera, with labels. Returns the transform for clicks. */
 export function renderWorldMap(ctx: CanvasRenderingContext2D, game: Game, width: number, height: number, focus: { x: number; y: number; zoom: number }, underground: boolean) {
+  dressWorld(game.world);
   const world = game.world, image = worldImage(world), player = realPoint(world, game.player.x, game.player.y);
   ctx.save(); ctx.fillStyle = "#1a1a1d"; ctx.fillRect(0, 0, width, height);
   ctx.translate(width / 2, height / 2); ctx.rotate(Math.PI / 4); ctx.scale(focus.zoom, focus.zoom); ctx.translate(-focus.x, -focus.y);

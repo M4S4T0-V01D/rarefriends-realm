@@ -4,6 +4,13 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 76, date: "2026-10-06", title: "Every street its own: new homes, shop fronts, banks and Raria's halls of state", items: [
+    "Every village has grown. Nearly all of them have three new homes on their edges, from Fernwick and Highcairn to Saltmarrow, the Oasis, Greyford and Stag's Rest. Each has its door towards the square, and a bed, a table and a hearth inside. Most are L-shaped, with a little yard in the corner.",
+    "Buildings no longer all look alike. Across the Realm many are L-shaped now, some rise a second storey, some small homes are tall narrow tower-houses, and roofs are gabled, hipped or pyramids. Every building keeps its doors, counters and people where they were.",
+    "Shops look like shops. A striped awning hangs over the door, and beside it an iron bracket holds a sign painted with what's sold there. Inns hang out a tankard.",
+    "Banks have a look of their own: pale marble under a slate roof, with a row of columns across the front and a gold coin in the pediment over them.",
+    "Raria's halls of state are built to be seen. The Office of Conduct, the Office of Sigils, the Sumptuary Office, the Chapel of the Law and the Hall of the Order of Dusk rise three storeys, in marble, behind colonnades and gilded pediments. The Office of Conduct, the Hall of Dusk and the Crown Bank stand under golden domes, and the Chapel's spire climbs higher. The palace has a colonnade of its own, and the Regiment's barracks are battlemented.",
+  ] },
   { id: 75, date: "2026-10-06", title: "A faster Realm: quicker to start, smoother zoomed out", items: [
     "The Realm starts much sooner. The world used to be built from scratch every time you opened the game, a second or two of waiting on most computers and longer on phones. It now arrives ready-made and unpacks in about a tenth of a second.",
     "Walking zoomed out on High graphics is smoother, about a quarter less work every frame, so towns like Friendhollow and Raria hold their frame rate far better. Distant haze is only worked out where there's hazy ground behind something, Friends and creatures are lit like the scenery, and lanterns no longer cut their own holes in the light.",
