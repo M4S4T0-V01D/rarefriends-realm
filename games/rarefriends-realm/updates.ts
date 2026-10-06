@@ -4,6 +4,11 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 73, date: "2026-10-06", title: "The Palace of Raria rises five storeys under a spire", items: [
+    "The palace in the heart of Raria is five storeys tall now, and you can see it from across the city: a great hall of stone under a hipped roof, a keep rising from its middle, and a tall slate spire with the royal pennant on top. Its four corner towers stand taller than its eaves.",
+    "Every floor is real and can be walked. Take the Palace staircase from the throne room up through the Council Chamber with its war map, the Library of the Law, and the Queen's chapel, to the gallery under the spire where the regalia of Raria are kept.",
+    "The avenue to the palace door is four tiles wide, and so is the door. A tall building's doorway is one storey high now, with the wall carried on above it, so doors in the castle and keeps no longer look like slots cut to the roof.",
+  ] },
   { id: 72, date: "2026-10-06", title: "The City of Raria, made beautiful", items: [
     "Raria's capital looks like a capital now. Each of the four gates stands between two tall gatehouse towers, with a cobbled forecourt and lamps outside it.",
     "The houses are no longer one dark block repeated: dusk violet, slate, plum and lavender roofs over timber and stone, one storey and two, with a plot left open in every few for a garden.",

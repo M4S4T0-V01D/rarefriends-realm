@@ -1460,9 +1460,61 @@ function rotateLit(camera: Camera, e0: RoofVertex, r0: RoofVertex) {
   const { rx, ry } = rotate(camera, e0[0] - r0[0], e0[1] - r0[1]);
   return rx - ry < 0;
 }
+/** Whether a tile lies on a building's outline. */
+const edgeOf = (building: Building, x: number, y: number) => x === building.x0 || x === building.x1 || y === building.y0 || y === building.y1;
+/** How far a palace's keep and its spire rise above the top of its roof. */
+const keepHeight = (building: Building) => building.keep ? building.keep.storeys * WALL_H + building.keep.spire : 0;
+/** A palace roof: hipped slopes up to a keep in the middle, storeys of windowed stone, then a tall spire with a pennant. */
+function drawKeepRoof(ctx: CanvasRenderingContext2D, camera: Camera, building: Building, g: ReturnType<typeof roofGeometry>, now: number, reduced: boolean) {
+  const keep = building.keep!, P = ([x, y, h]: RoofVertex) => { const s = toScreen(camera, x, y, h); return [s.x, s.y] as const; };
+  const cx = g.apex[0], cy = g.apex[1], half = keep.size / 2;
+  const inner: RoofVertex[] = [[cx - half, cy - half, g.top], [cx + half, cy - half, g.top], [cx + half, cy + half, g.top], [cx - half, cy + half, g.top]];
+  const ring = [g.A, g.B, g.C, g.D];
+  const slope = (outer: RoofVertex[], top: RoofVertex[], color: string) => {
+    const faces = outer.map((a, i) => {
+      const b = outer[(i + 1) % outer.length], { rx, ry } = rotate(camera, a[1] - b[1], b[0] - a[0]);
+      return { points: [a, b, top[(i + 1) % top.length], top[i]], fill: shadeHex(color, rx - ry < 0 ? 0.06 : -0.08) };
+    });
+    const centre = (points: RoofVertex[]) => depthOf(camera, (points[0][0] + points[1][0]) / 2, (points[0][1] + points[1][1]) / 2);
+    faces.sort((a, b) => centre(a.points) - centre(b.points));
+    for (const face of faces) {
+      const [a, b, c, d] = face.points.map(P).map(([x, y]) => ({ x, y }));
+      const side = Math.hypot(face.points[1][0] - face.points[0][0], face.points[1][1] - face.points[0][1]);
+      const run = Math.hypot((face.points[0][0] + face.points[1][0] - face.points[2][0] - face.points[3][0]) / 2, (face.points[0][1] + face.points[1][1] - face.points[2][1] - face.points[3][1]) / 2);
+      const slant = Math.hypot(run * TEX_PER_TILE, (face.points[2][2] - face.points[0][2]) * TEX_PER_HEIGHT);
+      if (texturesOn) {
+        // Clip to the slope, and lay the shingles over the parallelogram from its eave up to its top edge.
+        const up = { x: (c.x + d.x - a.x - b.x) / 2, y: (c.y + d.y - a.y - b.y) / 2 };
+        ctx.save(); ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.lineTo(d.x, d.y); ctx.closePath(); ctx.clip();
+        texturedQuad(ctx, shingleTexture(face.fill, Math.round(side * TEX_PER_TILE), Math.round(slant)), { x: a.x + up.x, y: a.y + up.y }, { x: b.x + up.x, y: b.y + up.y }, a, side * TEX_PER_TILE, slant);
+        ctx.restore();
+      }
+      poly(ctx, face.points.map(P), texturesOn ? null : face.fill, INK, 1.2);
+    }
+  };
+  slope(ring, inner, building.color);
+  // The keep: a ring of stone tiles, storey on storey, the far ones first; faces turned inwards are never seen.
+  const tiles: [number, number][] = [];
+  for (let i = 0; i < keep.size; i++) for (let j = 0; j < keep.size; j++) if (i === 0 || j === 0 || i === keep.size - 1 || j === keep.size - 1) tiles.push([cx - half + 0.5 + i, cy - half + 0.5 + j]);
+  tiles.sort((a, b) => depthOf(camera, a[0], a[1]) - depthOf(camera, b[0], b[1]));
+  const within = (x: number, y: number) => Math.abs(x - cx) < half && Math.abs(y - cy) < half;
+  for (let k = 0; k < keep.storeys; k++) for (const [x, y] of tiles) {
+    const lit = windowGlow > 0.02 && hash(x * 5 + 3, y + k * 11) < 0.8, pattern: WallStyle = hash(x, y + k * 7) < 0.45 ? (lit ? "window_lit" : "window") : "brick";
+    box(ctx, camera, x, y, 1, 1, WALL_H, "#b9b4ab", "#a39e95", "#8f8a82", g.top + k * WALL_H, INK, pattern, (nx, ny) => within(x + nx, y + ny));
+  }
+  // A string course and a parapet with merlons round the keep's top, then the spire, overhanging the walls a little.
+  const crown = g.top + keep.storeys * WALL_H;
+  box(ctx, camera, cx, cy, keep.size + 0.2, keep.size + 0.2, 5, "#b9b4ab", "#aaa59c", "#968f87", crown, INK, null);
+  const o = half + 0.25, eave: RoofVertex[] = [[cx - o, cy - o, crown + 5], [cx + o, cy - o, crown + 5], [cx + o, cy + o, crown + 5], [cx - o, cy + o, crown + 5]];
+  const peak: RoofVertex = [cx, cy, crown + 5 + keep.spire];
+  slope(eave, [peak, peak, peak, peak], building.color);
+  const [px, py] = P(peak), [qx, qy] = P([cx, cy, peak[2] + 26]), wave = reduced ? 0 : Math.sin(now / 260 + g.X0) * 2;
+  ctx.strokeStyle = INK; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(qx, qy); ctx.stroke();
+  poly(ctx, [[qx, qy], [qx + 18 * camera.zoom, qy + 4 * camera.zoom + wave], [qx, qy + 9 * camera.zoom]], C.butter, INK, 1);
+}
 function roofHull(camera: Camera, building: Building) {
   const g = roofGeometry(building), points = building.roof === "flat" ? [g.A, g.B, g.C, g.D].map(([x, y]) => [x, y, g.base + 12] as RoofVertex).concat([g.A, g.B, g.C, g.D])
-    : building.roof === "cone" ? [g.A, g.B, g.C, g.D, [g.apex[0], g.apex[1], g.top + 22] as RoofVertex] : [g.A, g.B, g.C, g.D, g.R0, g.R1];
+    : building.roof === "cone" ? [g.A, g.B, g.C, g.D, [g.apex[0], g.apex[1], g.top + 22 + keepHeight(building)] as RoofVertex] : [g.A, g.B, g.C, g.D, g.R0, g.R1];
   const screen = points.map(([x, y, h]) => { const s = toScreen(camera, x, y, h); return [s.x, s.y] as [number, number]; });
   // Convex hull (monotone chain).
   screen.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
@@ -1505,6 +1557,7 @@ function drawRoof(ctx: CanvasRenderingContext2D, camera: Camera, building: Build
     ctx.globalAlpha = 1;
     return;
   }
+  if (building.roof === "cone" && building.keep) { drawKeepRoof(ctx, camera, building, g, now, reduced); ctx.globalAlpha = 1; return; }
   if (building.roof === "cone") {
     // A pointed tower roof: four slates to a peak, with a pennant.
     // Lit faces are lighter; each is tiled in shingles.
@@ -1845,6 +1898,14 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       wall(x, y, mine ? 1 : building?.storeys ?? 1, cut, near, !!owner && !cut, false, building?.walls ?? "stone", mine ? 0 : building?.tall ?? 0, joined);
       // Walls not under a roof cast their own shadows (a building's are cast whole).
       if (!building || building.roof === "none") blockers.push([x, y, (building?.storeys ?? 1) * WALL_H]);
+    } else if (y < FLOOR_Y && !isUnderground(y) && world.buildingAt[y * W + x] && (world.buildings[world.buildingAt[y * W + x] - 1].storeys ?? 1) > 1 && edgeOf(world.buildings[world.buildingAt[y * W + x] - 1], x, y)
+      && !(inside !== null && complexAt(world, x, y) === inside) && !(Math.abs(x - pp.x) + Math.abs(y - pp.y) < 7 && depth(x, y) > playerDepth + 0.5 && !floor)) {
+      // A doorway in a tall building is one storey high: the wall carries on above it.
+      const building = world.buildings[world.buildingAt[y * W + x] - 1], h = ((building.storeys ?? 1) - 1) * WALL_H + (building.tall ?? 0);
+      drawables.push({ depth: depth(x, y), at: { x, y, h: WALL_H + 20 }, size: [h + WALL_H + 24, 52, 30], exact: true, hull: () => boxHull(camera, x, y, 1, 1, h, WALL_H), draw: () => {
+        box(ctx, camera, x, y, 1, 1, 6, "#b9b4ab", "#b3ada4", "#9d978e", WALL_H, INK, null);
+        box(ctx, camera, x, y, 1, 1, h - 6, "#b9b4ab", "#a39e95", "#8f8a82", WALL_H + 6, INK, hash(x, y + 5) < 0.4 ? (windowGlow > 0.02 ? "window_lit" : "window") : "brick");
+      } });
     } else if (terrain === T.CLIFF) { drawables.push({ depth: depth(x, y), at: { x, y }, size: [60, 52, 30], exact: true, hull: () => boxHull(camera, x, y, 1, 1, 22 + hash(x, y) * 10), draw: () => box(ctx, camera, x, y, 1, 1, 22 + hash(x, y) * 10, "#a39e96", "#8f8a83", "#7c7771") }); blockers.push([x, y, 28]); }
     if (!covered(x, y)) object(x, y);
   }
@@ -2188,6 +2249,8 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     if (!underground) for (const building of world.buildings) {
       if (building.roof === "none" || building.x1 < x0 - 12 || building.x0 > x1 + 12 || building.y1 < y0 - 12 || building.y0 > y1 + 12) continue;
       shadowBox(building.x0 - 0.5, building.y0 - 0.5, building.x1 + 0.5, building.y1 + 0.5, (building.storeys ?? 1) * WALL_H + (building.tall ?? 0) + (building.roof === "flat" ? 0 : 26) + (building.spire ?? 0) * 0.35);
+      // A palace's keep and spire throw their own, longer shadow.
+      if (building.keep) { const kx = (building.x0 + building.x1) / 2, ky = (building.y0 + building.y1) / 2, kh = building.keep.size / 2; shadowBox(kx - kh, ky - kh, kx + kh, ky + kh, (building.storeys ?? 1) * WALL_H + (building.spire ?? 0) + building.keep.storeys * WALL_H + building.keep.spire * 0.35); }
     }
     for (const [bx, by, height] of blockers) shadowBox(bx - 0.5, by - 0.5, bx + 0.5, by + 0.5, height);
     // Everything else throws its own silhouette: drawn again, squashed flat onto the ground and slanted away from the sun.

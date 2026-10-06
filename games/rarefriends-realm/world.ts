@@ -191,6 +191,8 @@ export type Building = {
   storeys?: number; complex?: string;
   /** Extra wall height (pixels) seen only from outside, above the top storey (a tower taller than its floors), and a cone roof's height. */
   tall?: number; spire?: number;
+  /** A keep rising out of a cone roof's cut-off top (a palace): its width in tiles (odd), its storeys of wall, and its own spire's height. */
+  keep?: { size: number; storeys: number; spire: number };
   /** A round tower: its cone roof is eight-sided, fitted to the round wall. */
   round?: boolean;
   /** What the walls are made of: stone brick, half-timbered plaster, or planks. */
@@ -1268,7 +1270,7 @@ export function createWorld(seed = 20260927): World {
   const places = Object.fromEntries(Object.entries(old.places).map(([key, at]) => [key, { x: at.x + WEST_DX, y: at.y }])) as World["places"];
   // The far west: a second continent, Raria and BarkReach.
   const ctx: GenContext = { W, H, tiles, region, objectAt, lift, objects, spawns, buildings, doorways: [], random: mulberry(seed + 9191), noise: makeNoise(seed + 71, 11), noise2: makeNoise(seed + 83, 4) };
-  buildFarWest(ctx, worldTools(ctx), places);
+  buildFarWest(ctx, worldTools(ctx), places, floors);
   for (const object of objects) if (object.name === "__removed") object.blocks = false;
   const buildingAt = new Uint8Array(W * H);
   buildings.forEach((b, index) => { if (b.roof === "none") return; for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) buildingAt[y * W + x] = index + 1; });

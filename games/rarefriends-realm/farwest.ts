@@ -9,7 +9,7 @@
  * west end. Between them lie the Greyfields, where the Regiment's Fort Ordinance and the Federation's forward camp face
  * each other across a battlefield, and the roads east to Deep Westmarch and the Free Marches.
  */
-import { OVERWORLD_H, T, WEST_DX, isWater, regionIndex, type DecorKind, type GenContext, type RegionId, type World, type worldTools } from "./world.ts";
+import { FLOOR_Y, OVERWORLD_H, T, WEST_DX, isWater, regionIndex, type DecorKind, type Floor, type GenContext, type RegionId, type World, type worldTools } from "./world.ts";
 import type { RockKind, TreeKind } from "./data.ts";
 
 type Tools = ReturnType<typeof worldTools>;
@@ -32,7 +32,7 @@ export const FAR_PLACES = {
   sawyers_rest: [230, 405], antler_lodge: [128, 380], stags_rest: [302, 455], woods_end: [388, 420], barkholm: [96, 452], hidden_glade: [56, 404], blind_shrine: [44, 58], elder: [52, 446],
 } as const;
 
-export function buildFarWest(ctx: GenContext, t: Tools, places: World["places"]) {
+export function buildFarWest(ctx: GenContext, t: Tools, places: World["places"], floors: Floor[]) {
   const { get, put, add, decor, npc, building, clearAt, fillRect, monsters, monster, tree, rock, scatter, inBounds, tileIndex, shoreSpots, road, river } = t;
   const OH = OVERWORLD_H, X1 = WEST_DX + 90, W = ctx.W, random = ctx.random;
   const n1 = makeNoise(7001, 26), n2 = makeNoise(7002, 9), n3 = makeNoise(7003, 4), rn = makeNoise(7004, 16);
@@ -198,7 +198,8 @@ export function buildFarWest(ctx: GenContext, t: Tools, places: World["places"])
     for (const [dx, dy] of [[-20, -14], [20, -14], [-20, 12], [20, 12]] as const) decor(cx + dx, cy + dy, "wise_friend", true, "The Wise Friend in the palace gardens: ivory, blindfolded, the book open. Citizens bow to it on their way to anything.");
     for (const [dx, dy] of [[-16, -6], [16, -6], [-16, 6], [16, 6], [-8, 14], [8, 14], [-8, -15], [8, -15]] as const) decor(cx + dx, cy + dy, "flowers", false, "A garden bed: violet and white, and nothing else");
     add({ kind: "fountain", x: cx, y: cy + 13, blocks: true, name: "The Fountain of the Law" });
-    for (let y = cy + 9; y <= cy + 18; y++) for (const dx of [-1, 0, 1]) if (get(cx + dx, y) !== T.STONE || y > cy + 16) put(cx + dx, y, T.COBBLE);
+    // The avenue to the palace door: four tiles wide, centred on the door.
+    for (let y = cy + 8; y <= cy + 18; y++) for (const dx of [-1, 0, 1, 2]) if (get(cx + dx, y) !== T.STONE || y > cy + 16) put(cx + dx, y, T.COBBLE);
     // The parterre: clipped yews in pairs down the avenue, beds of violet and white either side, hedges round the beds,
     // trees on the flanks, and a gravel walk round the palace.
     const garden = (x: number, y: number, place: () => void) => { if (!occupied(x, y) && get(x, y) !== T.WALL && get(x, y) !== T.COBBLE) place(); };
@@ -207,9 +208,45 @@ export function buildFarWest(ctx: GenContext, t: Tools, places: World["places"])
     for (let x = cx - 22; x <= cx + 22; x += 4) if (Math.abs(x - cx) > 3) garden(x, cy - 19, () => tree(x, cy - 19, "yew"));
     for (const side of [-1, 1]) for (const dy of [-8, -2, 4]) { const x = cx + side * 21; garden(x, cy + dy, () => tree(x, cy + dy, dy === -2 ? "maple" : "yew")); }
     for (let y = cy - 12; y <= cy + 8; y++) for (const x of [cx - 17, cx + 17]) if (get(x, y) === T.DARK_GRASS && !occupied(x, y)) put(x, y, T.GRAVEL);
-    // The palace: three storeys and a tower's height, the throne room on the ground floor, pillars carved with the Law.
-    building(cx - 12, cy - 11, cx + 12, cy + 7, "s", T.CARPET, undefined, { name: "The Palace of Raria", color: "#3b2a52", walls: "stone", roof: "flat", storeys: 3, tall: 14 });
-    for (const [tx, ty] of [[cx - 15, cy - 13], [cx + 12, cy - 13], [cx - 15, cy + 5], [cx + 12, cy + 5]] as const) building(tx, ty, tx + 3, ty + 3, "s", T.STONE, undefined, { name: "A tower of the palace", color: "#2a2238", walls: "stone", roof: "cone", round: true, tall: 26, spire: 16 });
+    // The palace: five storeys under a spire, the throne room on the ground floor, four more floors up the stairs, round
+    // towers at the corners taller still, every one with its own spire.
+    const PX0 = cx - 12, PY0 = cy - 11, PX1 = cx + 12, PY1 = cy + 7, PALACE = "raria_palace", LEVELS = 4;
+    building(PX0, PY0, PX1, PY1, "s", T.CARPET, undefined, { name: "The Palace of Raria", color: "#3b2a52", walls: "stone", roof: "cone", storeys: LEVELS + 1, spire: 64, keep: { size: 5, storeys: 4, spire: 360 }, complex: PALACE });
+    for (const dx of [-1, 2]) { put(cx + dx, PY1, T.CARPET); ctx.doorways.push([cx + dx, PY1]); }
+    for (const [tx, ty] of [[cx - 15, cy - 13], [cx + 12, cy - 13], [cx - 15, cy + 5], [cx + 12, cy + 5]] as const) building(tx, ty, tx + 3, ty + 3, "s", T.STONE, undefined, { name: "A tower of the palace", color: "#2a2238", walls: "stone", roof: "cone", round: true, tall: (LEVELS + 1) * 42 + 90, spire: 90 });
+    // The upper floors, stored in the storey rows like the castle's: two side by side, two rows down.
+    const PALACE_FLOORS: Floor[] = Array.from({ length: LEVELS }, (_, i) => ({ complex: PALACE, level: i + 1, x0: PX0, y0: PY0, x1: PX1, y1: PY1, dx: 2 + (i % 2) * 28 - PX0, dy: FLOOR_Y + 1 + Math.floor(i / 2) * 20 - PY0 }));
+    floors.push(...PALACE_FLOORS);
+    const pAt = (level: number, col: number, row: number) => ({ x: PX0 + col + (level ? PALACE_FLOORS[level - 1].dx : 0), y: PY0 + row + (level ? PALACE_FLOORS[level - 1].dy : 0) });
+    for (let level = 1; level <= LEVELS; level++) for (let row = 0; row <= PY1 - PY0; row++) for (let col = 0; col <= PX1 - PX0; col++) {
+      const { x, y } = pAt(level, col, row), edge = col === 0 || row === 0 || col === PX1 - PX0 || row === PY1 - PY0;
+      put(x, y, edge ? T.WALL : level === LEVELS ? T.STONE : T.CARPET); t.setRegion(x, y, "raria");
+    }
+    // Stairs between floors, alternating corners up the palace: north-east from the throne room, then north-west, and so on.
+    const corner = (level: number) => level % 2 === 0 ? PX1 - PX0 - 1 : 1, inward = (col: number) => col === 1 ? 2 : col - 1;
+    for (let level = 0; level < LEVELS; level++) {
+      const col = corner(level);
+      add({ kind: "ladder", look: "stairs", ...pAt(level, col, 1), blocks: true, name: "Palace staircase", action: "Climb-up", to: pAt(level + 1, inward(col), 2) });
+      add({ kind: "ladder", look: "stairs", ...pAt(level + 1, col, 1), blocks: true, name: "Palace staircase", action: "Climb-down", to: pAt(level, inward(col), 2) });
+    }
+    const up = (level: number, col: number, row: number, kind: DecorKind, name?: string, blocks = true) => { const p = pAt(level, col, row); decor(p.x, p.y, kind, blocks, name); };
+    // The first floor: the Council Chamber, the long table where the Crown's ministers sit, and the war map.
+    for (let col = 6; col <= 18; col += 2) up(1, col, 9, "table", "The council table, every place set with a copy of the Law");
+    for (let col = 6; col <= 18; col += 2) { up(1, col, 8, "bench", "A minister's seat"); up(1, col, 10, "bench", "A minister's seat"); }
+    up(1, 12, 4, "throne", "The Queen's chair at the head of the council"); up(1, 3, 15, "table", "The war map: Raria, the Greyfields, and the Federation's camps in red"); up(1, 21, 15, "shelf", "Ledgers of the Crown, bound in violet");
+    for (const col of [4, 20]) { up(1, col, 3, "banner_rrr"); up(1, col, 17, "banner_rrr"); } for (const col of [8, 16]) up(1, col, 14, "lamp");
+    // The second floor: the Library of the Law, shelf after shelf of it.
+    for (let row = 4; row <= 14; row += 5) for (let col = 4; col <= 20; col += 2) if (col !== 12) up(2, col, row, "shelf", row === 9 ? "The Law, annotated by every Keeper before the Queen" : "The Law, in every edition the Crown has allowed");
+    up(2, 12, 9, "table", "A reading desk, the Law open at the First Law"); up(2, 12, 15, "lamp"); up(2, 3, 16, "chest", "The Library's locked case");
+    // The third floor: the Queen's chapel, the Wise Friend over a carpet of violet, and the Order of Dusk's watch.
+    up(3, 12, 2, "wise_friend", "The Wise Friend in the Queen's own chapel: silver, blindfolded, the book open at a page nobody else may read");
+    for (let row = 6; row <= 14; row += 2) { up(3, 9, row, "bench", "A pew of the Queen's chapel"); up(3, 15, row, "bench", "A pew of the Queen's chapel"); }
+    for (const col of [6, 18]) { up(3, col, 3, "torch"); up(3, col, 15, "torch"); } up(3, 4, 9, "banner_dusk"); up(3, 20, 9, "banner_dusk");
+    // The top floor, under the spire: the Crown's gallery, the regalia under guard, and the city laid out below the windows.
+    up(4, 12, 9, "chest", "The regalia of Raria: the crown, the closed eye in gold, the Keeper's book. Under guard. Always."); up(4, 12, 7, "throne", "The Crown's seat under the spire, where the Queen sits to look over Raria");
+    for (const [col, row] of [[6, 4], [18, 4], [6, 14], [18, 14]] as const) up(4, col, row, "pillar", "A pillar of the gallery, rising into the spire");
+    for (const col of [3, 21]) up(4, col, 9, "banner_rrr"); up(4, 9, 15, "statue", "A Queen of Raria before Rara, in white stone"); up(4, 15, 15, "statue", "A Queen of Raria before that one, in white stone");
+    for (const [level, col, row] of [[1, 3, 4], [2, 21, 13], [3, 21, 13], [4, 4, 4], [4, 20, 14]] as const) { const p = pAt(level, col, row); monster("royal_ranger", p.x, p.y, 0); }
     decor(cx, cy - 10, "throne", true, "The Throne of Raria: dusk violet, silver, and a closed eye above it"); npc("queen_rara", cx, cy - 8); npc("king_pell", cx + 2, cy - 8);
     for (const dx of [-9, -5, 5, 9]) for (const dy of [-7, -2, 3]) decor(cx + dx, cy + dy, "pillar", true, "A pillar of the palace, the Law carved up it line by line");
     for (const dx of [-10, 10]) { decor(cx + dx, cy - 10, "banner_rrr"); decor(cx + dx, cy + 6, "banner_rrr"); }

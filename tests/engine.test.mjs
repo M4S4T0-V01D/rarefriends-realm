@@ -2570,3 +2570,22 @@ test("Feedback: an X post tagging the Realm and its maker, and a GitHub issue wi
   assert.doesNotMatch(feedbackIssue(g, "Bug", "x", false, false).body, /Friend:/, "details only when asked");
   assert.equal(FEEDBACK_REPO, "M4S4T0-V01D/rarefriends-realm");
 });
+
+test("The Palace of Raria: five floors under a spire, a four-wide door, and stairs to the top", async () => {
+  const { RARIA_CITY } = await import("../games/rarefriends-realm/farwest.ts");
+  const g = newGame(), world = g.world, palace = world.buildings.find(b => b.name === "The Palace of Raria");
+  assert(palace && palace.storeys >= 5 && palace.roof === "cone" && palace.keep?.storeys >= 3 && palace.keep.spire >= 200, "five storeys, a keep and a spire");
+  const levels = world.floors.filter(f => f.complex === palace.complex).map(f => f.level).sort();
+  assert.deepEqual(levels, [1, 2, 3, 4], "four floors above the throne room");
+  const door = [-1, 0, 1, 2].map(dx => terrainAt(world, RARIA_CITY.x + dx, palace.y1));
+  assert(door.every(t => t !== T.WALL), "a door four tiles wide");
+  for (const dx of [-1, 0, 1, 2]) assert.notEqual(terrainAt(world, RARIA_CITY.x + dx, palace.y1 + 2), T.WALL, "a four-wide avenue to it");
+  // Climb from the throne room to the top floor by the stairs alone.
+  let at = world.objects.find(o => o.name === "Palace staircase" && o.action === "Climb-up" && o.x >= palace.x0 && o.x <= palace.x1 && o.y >= palace.y0 && o.y <= palace.y1), level = 0;
+  while (at) {
+    const floor = floorAt(world, at.to.x, at.to.y); level = floor ? floor.level : 0;
+    at = world.objects.find(o => o.name === "Palace staircase" && o.action === "Climb-up" && Math.abs(o.x - at.to.x) + Math.abs(o.y - at.to.y) < 30 && floorAt(world, o.x, o.y)?.level === level);
+  }
+  assert.equal(level, 4, "the stairs reach the fifth floor");
+  assert(world.objects.some(o => o.name?.startsWith("The regalia of Raria") && floorAt(world, o.x, o.y)?.level === 4), "the regalia under the spire");
+});
