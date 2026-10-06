@@ -4,6 +4,10 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 81, date: "2026-10-06", title: "The Wise Friend, carved properly", items: [
+    "Raria's statues of the Wise Friend have been carved again, larger and finer. It's a Rare Friend in ivory on a stepped plinth with a band of gold, a mantle on its shoulders trimmed in gold, and a gold circlet. Its eyes are bound with a violet blindfold, knotted at the side, and the book of the Law lies open in its hands. Behind its head, a gilded disc holds the open eye that sees for it.",
+    "The Order of Dusk carves the same Friend in dark violet stone, hooded deep, a censer smoking at the foot of its plinth. You'll find both in the palace gardens, the Cathedral, the Chapel of the Law, the Hall of Dusk and Raria's household chapels.",
+  ] },
   { id: 80, date: "2026-10-06", title: "Bars in every town: drinks, a job board, a quiet trader and a quest each", items: [
     "Every town and city has a bar now, each its own: the Sleepy Friend in Friendhollow, the Seventh Prayer in Raria, the Crooked Vat in Dyemoor, the Obedient Hound in Lawgate, the Stone Kettle in Highcairn and the new Free Pour in Freehold.",
     "The barkeep sells food, drink and potions for people on the road: stew, bread and ale, healing tonics, energy draughts and antidotes, and the house's own drink. That's Sleepy stout, Lawful small beer, Madder wine, Hound's bite, Cairn porter or Free cider, each healing a little and lending a skill a point or two for a while.",

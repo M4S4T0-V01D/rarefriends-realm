@@ -239,6 +239,16 @@ function ellipse(ctx: CanvasRenderingContext2D, x: number, y: number, rx: number
 }
 /** The Old Friend's likeness (a procedural Friend, the same for every altar) and the long carved beard laid over its face. */
 const OLD_FRIEND = friendSprite(5, 7730);
+/** The Wise Friend (Raria's): a Mask-family Rare Friend, and where its eyes are (for the blindfold). */
+const WISE_FRIEND = friendSprite(1, 4242);
+const WISE_EYES = (() => {
+  const rows = WISE_FRIEND.idle;
+  for (let row = 0; row < rows.length; row++) {
+    const line = rows[row], first = line.indexOf("#"), last = line.lastIndexOf("#");
+    if (first >= 0 && line.slice(first, last + 1).includes(".")) return { row, x0: first, x1: last };
+  }
+  return { row: 5, x0: 3, x1: 12 };
+})();
 const OLD_FRIEND_BEARD: Mask = Object.freeze([
   "................", "................", "................", "................", "................", "................", "................", "................",
   ".....######.....", "....########....", "....########....", ".....######.....", "......####......", ".......##.......", "................", "................",
@@ -1150,7 +1160,9 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
   const hit = (height: number, w = 36) => ({ x: sx - w / 2 * z, y: sy - height * z, w: w * z, h: (height + 10) * z });
   const frame = object.decor === "torch" ? Math.floor(now / 160 + ox) % 2 : object.decor === "reeds" ? Math.floor(now / 900 + ox) % 2 : 0;
   if (object.decor === "banner") return drawFriendBanner(ctx, scene, object, sx, sy, hit, alpha);
-  const art = scene.reducedMotion || object.decor !== "torch" ? decorArt(object.decor!, Math.floor(h * 3), frame) : decorArt("torch", 0, frame);
+  // (The Wise Friend's statues are carved in the world, below, not stood up as a picture.)
+  const carvedStatue = object.decor === "wise_friend" || object.decor === "god_dusk";
+  const art = carvedStatue ? null : scene.reducedMotion || object.decor !== "torch" ? decorArt(object.decor!, Math.floor(h * 3), frame) : decorArt("torch", 0, frame);
   if (art) {
     if (object.decor === "torch" || object.decor === "lamp") ellipse(ctx, sx, sy - (object.decor === "lamp" ? 54 : 36) * z, 16 * z, 11 * z, `rgba(242,220,160,${0.16 + Math.sin(now / 300 + ox) * 0.04})`, null);
     else ellipse(ctx, sx, sy + 1 * z, art.width * z * 0.8, 4 * z, "rgba(22,22,22,0.12)", null);
@@ -1204,6 +1216,68 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
       }
       case "statue": box(ctx, camera, ox, oy, 0.8, 0.8, 12, "#d7d4cd", "#c8c5be", "#b9b5ae");
         if (scene.friend) drawMask(ctx, friendRows(scene.friend, "down", false, 0), sx, sy - 12 * z, 3.4 * z, "#8f8a83"); return hit(70, 50);
+      case "wise_friend": case "god_dusk": {
+        // The Wise Friend, as Raria carves it: a Rare Friend in ivory on a stepped plinth, a mantle on its shoulders and a
+        // circlet of gold, blindfolded, the book of the Law open in its hands, and behind its head the open eye that
+        // sees for it. The Order of Dusk carves it in dark stone, hooded, a censer smoking at its feet.
+        const dusk = object.decor === "god_dusk";
+        const stone = dusk ? ["#5e5174", "#4b405f", "#3b3150"] : ["#efeadc", "#ddd6c4", "#c7bfab"];
+        const plinth = dusk ? ["#4a3f5c", "#3b3150", "#2e2640"] : ["#d8d2c2", "#c4bdab", "#aea795"];
+        box(ctx, camera, ox, oy, 1.0, 1.0, 8, plinth[0], plinth[1], plinth[2], 0, INK, "brick");
+        box(ctx, camera, ox, oy, 0.8, 0.8, 9, plinth[0], plinth[1], plinth[2], 8, INK, "brick");
+        box(ctx, camera, ox, oy, 0.86, 0.86, 3, shadeHex(plinth[0], 0.04), plinth[1], plinth[2], 17, INK, null);
+        // A band of gold round the plinth, the First Law cut in it.
+        box(ctx, camera, ox, oy, 0.81, 0.81, 2, "#e2b84a", "#c9a24a", "#a8862e", 12, null, null);
+        const foot = toScreen(camera, ox, oy, 20), px = 4 * z, rows = WISE_FRIEND.idle, w = rows[0].length * px, height = rows.length * px;
+        const left = foot.x - w / 2, topY = foot.y - height + px, at = (col: number, row: number) => [left + col * px, topY + row * px] as const;
+        // The eye behind the head: a gilded disc, an almond eye open on it.
+        const [ex, ey] = at(8, 3.5);
+        ellipse(ctx, ex, ey, 7.5 * px, 7.5 * px, dusk ? "rgba(138,106,176,0.4)" : "rgba(226,184,74,0.5)", dusk ? "#6a5a86" : "#b8902e", 1.6);
+        for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2; ctx.strokeStyle = dusk ? "rgba(138,106,176,0.6)" : "rgba(201,162,74,0.75)"; ctx.lineWidth = 1.2 * z; ctx.beginPath(); ctx.moveTo(ex + Math.cos(a) * 7.8 * px, ey + Math.sin(a) * 7.8 * px); ctx.lineTo(ex + Math.cos(a) * 9 * px, ey + Math.sin(a) * 9 * px); ctx.stroke(); }
+        // The open eye, high on the disc: the Wise Friend's eyes are bound, and it sees all the same.
+        { const eyeY = ey - 5.4 * px, eyeW = 2.6 * px;
+          poly(ctx, [[ex - eyeW, eyeY], [ex - eyeW * 0.5, eyeY - eyeW * 0.42], [ex + eyeW * 0.5, eyeY - eyeW * 0.42], [ex + eyeW, eyeY], [ex + eyeW * 0.5, eyeY + eyeW * 0.42], [ex - eyeW * 0.5, eyeY + eyeW * 0.42]], dusk ? "#c6bed4" : "#fbf6e6", dusk ? "#6a5a86" : "#9a7424", 1.2);
+          ellipse(ctx, ex, eyeY, eyeW * 0.34, eyeW * 0.34, dusk ? "#3b2a52" : "#4a6aa8", INK, 1); }
+        // The mantle: falling from the shoulders to the plinth, behind the body.
+        poly(ctx, [at(1.5, 6), at(14.5, 6), at(16, 16), at(0, 16)], stone[1], INK, 1.2);
+        poly(ctx, [at(1.5, 6), at(4, 6), at(3, 16), at(0, 16)], stone[2], null);
+        ctx.strokeStyle = dusk ? "#8a6ab0" : "#c9a24a"; ctx.lineWidth = Math.max(1, 1.2 * z); ctx.beginPath();
+        for (const [a, b] of [[at(14.5, 6), at(16, 16)], [at(1.5, 6), at(0, 16)], [at(0, 15.6), at(16, 15.6)]] as const) { ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); }
+        ctx.stroke();
+        // The Friend itself.
+        drawMask(ctx, rows, foot.x, foot.y, px, stone[0]);
+        // Carved round: the side away from the light in shadow.
+        ctx.save(); ctx.beginPath(); ctx.rect(foot.x + px * 0.5, topY - px * 2, w, height + px * 2); ctx.clip();
+        drawMask(ctx, rows, foot.x, foot.y, px, stone[1]); ctx.restore();
+        // The blindfold across its eyes, knotted at the side, its tails falling.
+        const [bx0, by0] = at(WISE_EYES.x0 - 0.4, WISE_EYES.row - 0.2), [bx1] = at(WISE_EYES.x1 + 1.4, WISE_EYES.row);
+        poly(ctx, [[bx0, by0], [bx1, by0], [bx1, by0 + px * 1.6], [bx0, by0 + px * 1.6]], dusk ? "#2a2238" : "#3b2a52", INK, 1);
+        poly(ctx, [[bx1, by0 + px * 0.4], [bx1 + px * 1.4, by0 + px * 2.6], [bx1 + px * 0.8, by0 + px * 2.9], [bx1 - px * 0.2, by0 + px * 1.2]], dusk ? "#2a2238" : "#3b2a52", INK, 1);
+        if (dusk) {
+          // The hood, deep over the head.
+          poly(ctx, [at(8, -1.6), at(14.5, 4.5), at(14.5, 8), at(12.5, 6), at(3.5, 6), at(1.5, 8), at(1.5, 4.5)], "#3b3150", INK, 1.3);
+          poly(ctx, [at(8, -1.6), at(14.5, 4.5), at(14.5, 8), at(12.5, 6), at(8, 3)], "#2e2640", null);
+        } else {
+          // The circlet: a band of gold with three points.
+          const [cx0, cy0] = at(5, 1.2), [cx1] = at(11, 1.2);
+          ctx.strokeStyle = "#c9a24a"; ctx.lineWidth = Math.max(1.5, 1.4 * z); ctx.beginPath(); ctx.moveTo(cx0, cy0); ctx.lineTo(cx1, cy0); ctx.stroke();
+          for (const col of [6, 8, 10]) { const [qx, qy] = at(col, 1.2); poly(ctx, [[qx - px * 0.5, qy], [qx, qy - px * 1.3], [qx + px * 0.5, qy]], "#e2b84a", INK, 0.8); }
+        }
+        // The book of the Law, open in its hands.
+        const [kx, ky] = at(8, 10.4);
+        poly(ctx, [[kx - 3.6 * px, ky - 0.6 * px], [kx, ky + 0.4 * px], [kx, ky + 3 * px], [kx - 3.6 * px, ky + 2 * px]], "#f7f3e8", INK, 1);
+        poly(ctx, [[kx + 3.6 * px, ky - 0.6 * px], [kx, ky + 0.4 * px], [kx, ky + 3 * px], [kx + 3.6 * px, ky + 2 * px]], "#efe9da", INK, 1);
+        ctx.strokeStyle = "rgba(60,50,40,0.55)"; ctx.lineWidth = 0.8 * z; ctx.beginPath();
+        for (const k of [0.9, 1.5, 2.1]) { ctx.moveTo(kx - 3 * px, ky - 0.2 * px + k * px * 0.85); ctx.lineTo(kx - 0.6 * px, ky + 0.6 * px + k * px * 0.85); ctx.moveTo(kx + 0.6 * px, ky + 0.6 * px + k * px * 0.85); ctx.lineTo(kx + 3 * px, ky - 0.2 * px + k * px * 0.85); }
+        ctx.stroke();
+        if (dusk) {
+          // A censer on its chain at the foot of the plinth, smoking.
+          const c = toScreen(camera, ox + 0.42, oy + 0.42, 22);
+          ellipse(ctx, c.x, c.y, 2.6 * z, 2 * z, "#c9a24a", INK, 1);
+          if (!bare && !scene.reducedMotion && Math.random() < 0.04) puff(ox + 0.42, oy + 0.42, 28);
+        }
+        return hit(110, 64);
+      }
       case "old_friend": {
         // The Old Friend, the one every altar is raised to: a bearded Rare Friend carved in pale stone on a stepped plinth, a sun disc behind its head.
         box(ctx, camera, ox, oy, 0.9, 0.9, 8, "#cfcbc3", "#bdb9b1", "#aaa69e"); box(ctx, camera, ox, oy, 0.7, 0.7, 16, "#d7d4cd", "#c8c5be", "#b9b5ae");
@@ -2011,7 +2085,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     const sprite = object.kind === "tree" || object.kind === "rock" || (object.kind === "decor" && object.decor !== "banner");
     drawables.push({ depth: d, at: { x, y }, cast: !flat, sprite, scenery: object.kind === "tree" || object.kind === "rock" || object.kind === "decor" || object.kind === "spot", size: object.decor === "windmill" ? [320, 140, 40] : object.kind === "tree" ? [260, 110, 40] : [200, 110, 40], draw: () => {
       let rect: { x: number; y: number; w: number; h: number };
-      const tall = object.kind === "tree" || (object.kind === "decor" && (["pine", "windmill", "palm", "pillar", "tent", "crypt", "obelisk", "canopy"].includes(object.decor!) || (object.decor === "ruin_wall" && (object.height ?? 0) > 34)));
+      const tall = object.kind === "tree" || (object.kind === "decor" && (["pine", "windmill", "palm", "pillar", "tent", "crypt", "obelisk", "canopy", "wise_friend", "god_dusk"].includes(object.decor!) || (object.decor === "ruin_wall" && (object.height ?? 0) > 34)));
       // Anything tall in front of your Friend that covers it on screen turns see-through (works at any angle and zoom).
       const fade = tall && d > playerDepth + 0.3 && coversPlayer(x, y) ? 0.35 : 1;
       if (object.kind === "tree") rect = drawTree(ctx, scene, object, game.depleted.has(object.id), fade, scene.reducedMotion ? 0 : treeShake(game, object.id, now));
