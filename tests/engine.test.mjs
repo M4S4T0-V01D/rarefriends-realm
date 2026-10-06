@@ -2662,7 +2662,7 @@ test("Adaptive resolution: High drops to 1× after three slow seconds on a sharp
 test("Townscape: homes in every village (with their doors reachable), L-shaped and hipped and two-storey buildings, shop and bank fronts, Raria's grand halls", async () => {
   const { walkable } = await import("../games/rarefriends-realm/world.ts");
   const { dressWorld } = await import("../games/rarefriends-realm/facades.ts");
-  const g = newGame(), world = dressWorld(g.world), Wd = world.tiles.length / 620;
+  const g = newGame(), world = dressWorld(g.world), Wd = world.tiles.length / 640;
   // Homes: three for nearly every village, a bed in each, a door you can walk to from the village.
   const homes = world.buildings.filter(b => / home$/.test(b.name)), villages = new Map();
   for (const b of homes) { const parts = b.complex ? world.buildings.filter(o => o.complex === b.complex) : [b]; if (parts[0] !== b) continue; villages.set(b.name, [...(villages.get(b.name) ?? []), parts]); }
@@ -2701,4 +2701,26 @@ test("Townscape: homes in every village (with their doors reachable), L-shaped a
     assert(b && (b.storeys ?? 1) >= 3 && (b.facade === "civic" || b.facade === "bank"), `${name} is grand`);
   }
   assert(world.buildings.filter(b => b.keep?.dome).length >= 3, "domes over Raria");
+});
+
+test("The Ring is roofed and battlemented, with stairs to a walk round the top, the old arcades half-fallen, and the pit open to the sky", async () => {
+  const { ARENA, floorAt, walkable } = await import("../games/rarefriends-realm/world.ts");
+  const g = newGame(), world = g.world, Wd = world.tiles.length / 640;
+  const roof = world.buildings.filter(b => b.complex === "friends_ring");
+  assert(roof.length >= 40 && roof.every(b => b.roof === "flat"), "the concourse is roofed, flat and battlemented");
+  // The pit is open: nothing over the courtyard.
+  for (let y = ARENA.y - 10; y <= ARENA.y + 10; y++) for (let x = ARENA.x - 10; x <= ARENA.x + 10; x++) assert.equal(world.buildingAt[y * Wd + x], 0, `the pit is open at ${x},${y}`);
+  // Two staircases up, each landing on the walk, each with one down.
+  const ups = world.objects.filter(o => o.name === "Ring stairs" && o.action === "Climb-up"), downs = world.objects.filter(o => o.name === "Ring stairs" && o.action === "Climb-down");
+  assert.equal(ups.length, 2, "two staircases"); assert.equal(downs.length, 2, "and two ways down");
+  for (const s of [...ups, ...downs]) assert(walkable(world, s.to.x, s.to.y), `stairs at ${s.x},${s.y} land on open floor`);
+  for (const s of ups) assert.equal(floorAt(world, s.to.x, s.to.y)?.complex, "friends_ring", "up onto the Ring's walk");
+  const walk = world.floors.find(f => f.complex === "friends_ring");
+  const onWalk = o => o.x >= walk.x0 + walk.dx && o.x <= walk.x1 + walk.dx && o.y >= walk.y0 + walk.dy && o.y <= walk.y1 + walk.dy && o.name !== "__removed";
+  assert(world.objects.filter(o => onWalk(o) && o.decor === "canopy").length >= 30, "stretches of the old roof still standing");
+  assert(world.objects.filter(o => onWalk(o) && o.decor === "ruin_wall").length >= 2 && world.objects.some(o => onWalk(o) && o.decor === "rubble"), "and fallen ones");
+  // The whole walk is one: from one landing you can walk to the other.
+  const [a, b] = ups.map(s => s.to), seen = new Set([a.y * Wd + a.x]), queue = [[a.x, a.y]];
+  while (queue.length) { const [x, y] = queue.pop(); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const k = (y + dy) * Wd + x + dx; if (!seen.has(k) && walkable(world, x + dx, y + dy)) { seen.add(k); queue.push([x + dx, y + dy]); } } }
+  assert(seen.has(b.y * Wd + b.x), "all the way round the walk, landing to landing");
 });

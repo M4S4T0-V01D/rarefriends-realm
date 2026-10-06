@@ -485,7 +485,7 @@
 .realm-rarian .realm-info small, .realm-rarian .realm-info em { color: #b9aed0; }
 
 /* ---------- Return of Raria: the Adventurer Cards collection ---------- */
-.realm-codex-bar { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 8px; }
+.realm-codex-bar { display: flex; flex-direction: column; gap: 2px; margin: 0 0 8px; max-width: 280px; }
 .realm-codex-bar button { padding: 3px 8px !important; min-height: 0 !important; font-size: 11px; }
 .realm-codex-bar button[aria-pressed="true"] { background: var(--ink) !important; color: var(--paper) !important; }
 .realm-codex { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; overflow-y: auto; max-height: min(60vh, 520px); padding: 2px 4px 4px 2px; }
@@ -501,3 +501,9 @@
 .realm-feedback-btn { position: absolute; right: -4px; top: 68px; z-index: 3; width: 28px; height: 28px; padding: 0 !important; min-height: 0 !important; display: grid; place-items: center; font-size: 14px; border-radius: 50%; background: var(--paper) !important; border: 2px solid var(--ink) !important; box-shadow: 2px 2px 0 #000; }
 .realm-feedback-btn:hover { background: #fff !important; }
 .realm-feedback-text { width: 100%; min-height: 110px; margin: 6px 0 2px; padding: 8px; border: 2px solid var(--ink); border-radius: 4px; font: 13px/1.4 ui-monospace, Menlo, Consolas, monospace; resize: vertical; background: #fff; color: var(--ink); user-select: text; -webkit-user-select: text; }
+
+/* The Adventurer card's styles: a grid of labelled dropdowns. */
+.realm-card-selects { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px 10px; margin: 6px 0 10px; }
+.realm-card-select { display: flex; flex-direction: column; gap: 2px; font-size: 11px; font-weight: 600; }
+.realm-card-select select { font: inherit; font-weight: 400; font-size: 12px; padding: 3px 4px; border: 1.5px solid #000; border-radius: 4px; background: #fff; color: #161616; max-width: 100%; }
+.realm-card-select option:disabled { color: #8a8580; }

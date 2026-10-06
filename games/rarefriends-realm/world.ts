@@ -8,6 +8,7 @@ import type { RockKind, SpotKind, TreeKind } from "./data.ts";
 import { buildExpansion } from "./expansion.ts";
 import { buildFarWest } from "./farwest.ts";
 import { growVillages, varyBuildings } from "./townscape.ts";
+import { roofRing } from "./ringroof.ts";
 
 /**
  * The far west (Return of Raria): the world grew by WEST_DX columns on its west side for a second continent, Raria and
@@ -16,7 +17,7 @@ import { growVillages, varyBuildings } from "./townscape.ts";
  * world coordinates.
  */
 export const WEST_DX = 440, LEGACY_W = 720;
-export const W = LEGACY_W + WEST_DX, H = 620;
+export const W = LEGACY_W + WEST_DX, H = 640;
 /** The overworld is rows 0–519; rows 520–579 are the dungeons (reached by ladders, never seen from above); rows from FLOOR_Y hold upper storeys. */
 export const OVERWORLD_H = 520, DUNGEON_Y = 520, FLOOR_Y = 580;
 /**
@@ -69,7 +70,7 @@ export type DecorKind =
   | "throne" | "armour" | "logpile" | "stump" | "target" | "ruin_wall" | "old_friend" | "tomb" | "crypt" | "obelisk" | "bones" | "hearth" | "monument"
   | "god_diamond" | "god_ink" | "god_sol" | "god_hood" | "god_ember"
   // Return of Raria: the Wise Friend and the Order of Dusk's god, and the things factions leave about.
-  | "god_dusk" | "wise_friend" | "bell" | "cannon" | "device" | "wagon" | "watchtower" | "stake" | "plaque" | "banner_fff" | "banner_rrr" | "banner_hollowmere"
+  | "god_dusk" | "wise_friend" | "bell" | "canopy" | "cannon" | "device" | "wagon" | "watchtower" | "stake" | "plaque" | "banner_fff" | "banner_rrr" | "banner_hollowmere"
   | "banner_diamond" | "banner_ink" | "banner_sol" | "banner_hood" | "banner_ember" | "banner_dusk";
 /** A monument's state: whole on its plinth, toppled and lying, broken off at the waist, or sunk to the chest in the ground. */
 export type MonumentState = "whole" | "toppled" | "broken" | "buried";
@@ -1292,6 +1293,8 @@ export function generateWorld(seed = WORLD_SEED): { world: World; lift: Float32A
   // The far west: a second continent, Raria and BarkReach.
   const ctx: GenContext = { W, H, tiles, region, objectAt, lift, objects, spawns, buildings, doorways: [], ramparts: [], random: mulberry(seed + 9191), noise: makeNoise(seed + 71, 11), noise2: makeNoise(seed + 83, 4) };
   buildFarWest(ctx, worldTools(ctx), places, floors);
+  // The Ring's roof and the walk on top of it (ringroof.ts).
+  roofRing(ctx, worldTools(ctx), floors);
   // Homes for the villages, then every ordinary building given a shape and a roof of its own (townscape.ts).
   growVillages(ctx, worldTools(ctx), places);
   varyBuildings(ctx, worldTools(ctx));
@@ -1337,7 +1340,7 @@ const ROOF_COLORS = ["#c99a96", "#9aab92", "#8f9cb2", "#cdb98a", "#a996b5"];
 const TREE_NAMES: Record<TreeKind, string> = { tree: "Tree", oak: "Oak", willow: "Willow", maple: "Maple tree", yew: "Yew", ashwood: "Ashwood", palm: "Palm tree", pine: "Pine tree", deadwood: "Dead tree", redwood: "Redwood", ironbark: "Ironbark" };
 const DECOR_NAMES: Record<DecorKind, string> = {
   monument: "Statue", god_diamond: "Statue of the Good Friend", god_ink: "Statue of the Squid Friend", god_sol: "Statue of the Weird Friend", god_hood: "Statue of the Hood Friend", god_ember: "The Ember, in its brazier",
-  god_dusk: "Statue of the Wise Friend, blindfolded", wise_friend: "The Wise Friend", bell: "Great bell", cannon: "Magical cannon", device: "Federation device", wagon: "Supply wagon", watchtower: "Watchtower", stake: "Stake wall", plaque: "Inscribed plaque", banner_fff: "The Federation's banner", banner_rrr: "The Regiment's banner", banner_hollowmere: "Hollowmere's banner", banner_diamond: "The Order of the Diamond's banner", banner_ink: "The Order of the Ink's banner", banner_sol: "The Order of the Sol's banner", banner_hood: "The Order of the Hood's banner", banner_ember: "The Order of the Ember's banner", banner_dusk: "The Order of Dusk's banner",
+  god_dusk: "Statue of the Wise Friend, blindfolded", wise_friend: "The Wise Friend", bell: "Great bell", canopy: "Old roofing", cannon: "Magical cannon", device: "Federation device", wagon: "Supply wagon", watchtower: "Watchtower", stake: "Stake wall", plaque: "Inscribed plaque", banner_fff: "The Federation's banner", banner_rrr: "The Regiment's banner", banner_hollowmere: "Hollowmere's banner", banner_diamond: "The Order of the Diamond's banner", banner_ink: "The Order of the Ink's banner", banner_sol: "The Order of the Sol's banner", banner_hood: "The Order of the Hood's banner", banner_ember: "The Order of the Ember's banner", banner_dusk: "The Order of Dusk's banner",
   flowers: "Flowers", bush: "Bush", boulder: "Boulder", lamp: "Lamp post", bench: "Bench", crate: "Crate", barrel: "Water barrel", tent: "Tent",
   cactus: "Cactus", pine: "Pine tree", dead_tree: "Dead tree", statue: "Statue", grave: "Grave", fence: "Fence", reeds: "Reeds", table: "Table",
   bed: "Bed", shelf: "Shelves", pillar: "Pillar", rubble: "Rubble", snowman: "Snow Friend", lily: "Lily pad", banner: "Banner", torch: "Torch",

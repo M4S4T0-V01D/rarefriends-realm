@@ -1071,13 +1071,17 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
               </div>
               {shareStatus && <p className="realm-note" role="status">{shareStatus}</p>}
               <div className="realm-card-styles">
-                {(Object.keys(CARD_OPTIONS) as CardCategory[]).map(category => (
-                  <div key={category} className="realm-graphics realm-card-row" role="radiogroup" aria-label={CARD_CATEGORY_NAMES[category]}>
-                    <span>{CARD_CATEGORY_NAMES[category]}:</span>
-                    {CARD_OPTIONS[category].map(option => { const open = cardUnlocked(state, option), need = cardRequirement(option);
-                      return <button key={option.id} type="button" role="radio" aria-checked={(player.card[category] ?? "") === option.id || (!CARD_OPTIONS[category].some(entry => entry.id === player.card[category]) && option === CARD_OPTIONS[category][0])} disabled={!open}
-                        title={open ? option.text ?? option.name : `Locked: ${need}`} onClick={() => { player.card[category] = option.id; drawCard(state); refresh(); }}>{open ? option.name : `🔒 ${option.name}`}</button>; })}
-                  </div>))}
+                {/* One dropdown a style (there are too many styles for rows of buttons): locked ones show what opens them. */}
+                <div className="realm-card-selects">
+                  {(Object.keys(CARD_OPTIONS) as CardCategory[]).map(category => {
+                    const current = CARD_OPTIONS[category].some(entry => entry.id === player.card[category]) ? player.card[category]! : CARD_OPTIONS[category][0].id;
+                    return <label key={category} className="realm-card-select"><span>{CARD_CATEGORY_NAMES[category]}</span>
+                      <select value={current} onChange={event => { player.card[category] = event.target.value; drawCard(state); refresh(); }}>
+                        {CARD_OPTIONS[category].map(option => { const open = cardUnlocked(state, option);
+                          return <option key={option.id} value={option.id} disabled={!open} title={open ? option.text ?? option.name : `Locked: ${cardRequirement(option)}`}>{open ? option.name : `🔒 ${option.name} (${cardRequirement(option)})`}</option>; })}
+                      </select></label>;
+                  })}
+                </div>
                 <div className="realm-graphics realm-card-row" aria-label="Custom colours">
                   <span>Your colours:</span>
                   {CARD_COLOR_KEYS.map(key => <label key={key} className="realm-color">{CARD_COLOR_NAMES[key].replace(" colour", "")} <input type="color" value={player.card[key] ?? ({ bgColor: "#efede7", frameColor: "#d8b6b4", accentColor: "#e2c46a", bannerColor: "#2a2a30", inkColor: "#161616" } as Record<string, string>)[key]} aria-label={CARD_COLOR_NAMES[key]}

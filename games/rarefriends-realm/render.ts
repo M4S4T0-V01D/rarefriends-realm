@@ -1197,6 +1197,11 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
         return hit(84, 56);
       }
       case "grave": box(ctx, camera, ox, oy, 0.3, 0.6, 18, "#c8c5be", "#a9a59e", "#9a968f"); return hit(24, 24);
+      case "canopy": {
+        // A slab of the old roof over the Ring's walk, up on its pillars; it turns see-through over you.
+        box(ctx, camera, ox, oy, 1.02, 1.02, 7, "#b3a798", "#a09486", "#8b8073", 46, INK, "brick");
+        return hit(56, 40);
+      }
       case "bell": {
         // A great bell in its frame: two oak posts and a beam, the bronze bell hung from it, swaying a little.
         const swing = scene.reducedMotion ? 0 : Math.sin(now / 1100 + ox) * 0.07;
@@ -1973,7 +1978,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     const sprite = object.kind === "tree" || object.kind === "rock" || (object.kind === "decor" && object.decor !== "banner");
     drawables.push({ depth: d, at: { x, y }, cast: !flat, sprite, scenery: object.kind === "tree" || object.kind === "rock" || object.kind === "decor" || object.kind === "spot", size: object.decor === "windmill" ? [320, 140, 40] : object.kind === "tree" ? [260, 110, 40] : [200, 110, 40], draw: () => {
       let rect: { x: number; y: number; w: number; h: number };
-      const tall = object.kind === "tree" || (object.kind === "decor" && (["pine", "windmill", "palm", "pillar", "tent", "crypt", "obelisk"].includes(object.decor!) || (object.decor === "ruin_wall" && (object.height ?? 0) > 34)));
+      const tall = object.kind === "tree" || (object.kind === "decor" && (["pine", "windmill", "palm", "pillar", "tent", "crypt", "obelisk", "canopy"].includes(object.decor!) || (object.decor === "ruin_wall" && (object.height ?? 0) > 34)));
       // Anything tall in front of your Friend that covers it on screen turns see-through (works at any angle and zoom).
       const fade = tall && d > playerDepth + 0.3 && coversPlayer(x, y) ? 0.35 : 1;
       if (object.kind === "tree") rect = drawTree(ctx, scene, object, game.depleted.has(object.id), fade, scene.reducedMotion ? 0 : treeShake(game, object.id, now));

@@ -34,7 +34,8 @@ export function dressWorld(world: World): World {
     return null;
   };
   for (const b of world.buildings) {
-    if (b.facade || b.roof === "none" || b.y0 >= 520) continue;
+    // (Not a building made of thin strips, like the Ring's roof: it has no front.)
+    if (b.facade || b.roof === "none" || b.y0 >= 520 || b.x1 - b.x0 < 3 || b.y1 - b.y0 < 3) continue;
     const front = facadeOf(b);
     if (!front) continue;
     // A building of parts (an L) wears its front on every part.

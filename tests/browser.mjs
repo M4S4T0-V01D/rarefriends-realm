@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { FLOOR_Y, H, mainlandToWorld } from "../games/rarefriends-realm/world.ts";
 // Page-side functions below are serialized into the frame, so they carry these as literals: storeys start at row 580 (FLOOR_Y) and the castle's ground floor lies west of column 765 (mainland 140).
 if (FLOOR_Y !== 580 || mainlandToWorld(140, 0)[0] !== 765) throw new Error("world constants changed: update the literals in browser.mjs");
-if (H !== 620) throw new Error("world height changed: update the 620 in browser.mjs");
+if (H !== 640) throw new Error("world height changed: update the 640 in browser.mjs");
 import { execFileSync } from "node:child_process";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -449,7 +449,7 @@ try {
       const g = window.__realm.game(), w = g.world, storey = o => w.floors.find(f => o.x >= f.x0 + f.dx && o.x <= f.x1 + f.dx && o.y >= f.y0 + f.dy && o.y <= f.y1 + f.dy && o.y >= 580)?.level ?? 0;
       const castle = o => storey(o) ? w.floors.some(f => f.complex === "castle" && o.x >= f.x0 + f.dx && o.x <= f.x1 + f.dx && o.y >= f.y0 + f.dy && o.y <= f.y1 + f.dy) : o.x < 765;
       const stairs = w.objects.filter(o => o.look === "stairs" && o.action === action && storey(o) === level && castle(o)).sort((a, b) => b.x - a.x)[0];
-      const WW = w.tiles.length / 620, open = (x, y) => { const t = w.tiles[y * WW + x], id = w.objectAt[y * WW + x]; return t !== 0 && t !== 16 && (id < 0 || !w.objects[id].blocks); };
+      const WW = w.tiles.length / 640, open = (x, y) => { const t = w.tiles[y * WW + x], id = w.objectAt[y * WW + x]; return t !== 0 && t !== 16 && (id < 0 || !w.objects[id].blocks); };
       const [dx, dy] = [[0, 1], [1, 0], [-1, 0], [0, -1]].find(([dx, dy]) => open(stairs.x + dx, stairs.y + dy));
       return { stairs, stand: { x: stairs.x + dx, y: stairs.y + dy } };
     }, [level, action]);

@@ -4,6 +4,12 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 77, date: "2026-10-06", title: "A roof on the Ring, and the Adventurer card's styles in dropdowns", items: [
+    "The Rare Friends Ring has a roof. The concourse is roofed over in stone and battlemented all round, inside and out, while the pit stays open to the sky. Under the roof the concourse is lit by lanterns.",
+    "Two staircases off the concourse climb to a walk round the top of the Ring, behind the parapet, looking straight down into the pit, with braziers, the Ring's banners and benches for watching a fight.",
+    "The walk was roofed all the way round once. Three stretches of that old roof still stand on their pillars; towards their ends it has fallen in, a slab left here and there, rubble and the stumps of pillars where it came down.",
+    "The Adventurer card's styles are dropdowns now, one for each (layout, background, frame and the rest), instead of rows and rows of buttons. Locked styles show what opens them. The Adventurer Cards page chooses which cards to show from a dropdown too.",
+  ] },
   { id: 76, date: "2026-10-06", title: "Every street its own: new homes, shop fronts, banks and Raria's halls of state", items: [
     "Every village has grown. Nearly all of them have three new homes on their edges, from Fernwick and Highcairn to Saltmarrow, the Oasis, Greyford and Stag's Rest. Each has its door towards the square, and a bed, a table and a hearth inside. Most are L-shaped, with a little yard in the corner.",
     "Buildings no longer all look alike. Across the Realm many are L-shaped now, some rise a second storey, some small homes are tall narrow tower-houses, and roofs are gabled, hipped or pyramids. Every building keeps its doors, counters and people where they were.",

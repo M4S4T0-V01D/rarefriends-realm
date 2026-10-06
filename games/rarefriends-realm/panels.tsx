@@ -777,10 +777,12 @@ export function CardsModal({ game, onClose }: { game: Game; onClose: () => void 
   const locked = (card: CardDef) => !!card.order && !orderOpen(game, card.order);
   return (
     <Modal title={`Adventurer Cards · ${cardsFound(game)} / ${CARDS.length}`} onClose={onClose} wide>
-      <div className="realm-codex-bar" role="group" aria-label="Kinds of card">
-        <button type="button" aria-pressed={kind === "all"} onClick={() => setKind("all")}>All</button>
-        {CARD_KINDS.filter(entry => CARDS.some(card => card.kind === entry)).map(entry => <button key={entry} type="button" aria-pressed={kind === entry} onClick={() => setKind(entry)}>{CARD_KIND_NAMES[entry]} {CARDS.filter(card => card.kind === entry && cardFound(game, card.id)).length}/{CARDS.filter(card => card.kind === entry).length}</button>)}
-      </div>
+      <label className="realm-card-select realm-codex-bar"><span>Show</span>
+        <select value={kind} aria-label="Kinds of card" onChange={event => setKind(event.target.value as typeof kind)}>
+          <option value="all">All cards · {cardsFound(game)} / {CARDS.length}</option>
+          {CARD_KINDS.filter(entry => CARDS.some(card => card.kind === entry)).map(entry => <option key={entry} value={entry}>{CARD_KIND_NAMES[entry]} · {CARDS.filter(card => card.kind === entry && cardFound(game, card.id)).length} / {CARDS.filter(card => card.kind === entry).length}</option>)}
+        </select>
+      </label>
       <div className="realm-codex">
         {shown.map(card => { const found = cardFound(game, card.id);
           return <button key={card.id} type="button" className="realm-codex-card" data-found={found} data-faction={card.faction ?? (card.order === "dusk" ? "raria" : undefined)} onClick={() => setChosen(card.id)} aria-label={found ? card.name : "An undiscovered card"}>
