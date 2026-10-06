@@ -20,7 +20,7 @@ import { runDrain, slipChance } from "./wayfaring.ts";
 import { HERBS, brewRecipes, grindRecipes, herbDef, stillRecipes } from "./apothecary.ts";
 import { friendSays, friendTick, friendWorks, outfitRemark, remember } from "./friend.ts";
 import { presenceXp, cleanName, cleanTag, onAchievement as presenceAchievement, onBossFelled, onEmoteUsed, onFriendTime, onNpcTalked, onRareFind, onRegionEntered, onWorn } from "./presence.ts";
-import { NPCS, QUESTS, consecrateDawnstone, onAltarPrayed, examineItem, npcDef, onBonesOffered, onMonsterKilled, questDone, searchWell, shopProblem, talk, tanHides, useCryptAltar } from "./content.ts";
+import { NPCS, QUESTS, readJobBoard, consecrateDawnstone, onAltarPrayed, examineItem, npcDef, onBonesOffered, onMonsterKilled, questDone, searchWell, shopProblem, talk, tanHides, useCryptAltar } from "./content.ts";
 import { onWestTick, westTruce } from "./raria.ts";
 import { codexTick } from "./codex.ts";
 import {
@@ -202,6 +202,7 @@ function objectOptions(game: Game, object: WorldObject): string[] {
     case "coop": return ["Take-egg"];
     case "casket": return ["Open-caskets"];
     case "sign": return ["Read"];
+    case "board": return ["Read"];
     case "tanning": return ["Tan"];
     case "well": return ["Search"];
     case "sigil_altar": return ["Craft-sigil"];
@@ -289,7 +290,7 @@ export function itemOptions(game: Game, slotIndex: number): ItemOption[] {
   const slot = game.player.inventory[slotIndex];
   if (!slot) return [];
   const definition = item(slot.id), out: ItemOption[] = [];
-  if (definition.heal) out.push({ verb: "Eat", run: g => eat(g, slotIndex) });
+  if (definition.heal) out.push({ verb: definition.drink ? "Drink" : "Eat", run: g => eat(g, slotIndex) });
   if (definition.bones) out.push({ verb: "Bury", run: g => bury(g, slotIndex) });
   if (herbDef(slot.id)) out.push({ verb: "Clean", run: g => cleanHerb(g, slotIndex) });
   if (definition.potion?.poison) out.push({ verb: "Coat-weapon", run: g => coatWeapon(g, slotIndex) });
@@ -530,7 +531,7 @@ export function eat(game: Game, slotIndex: number) {
   // A good meal lends a skill a little for a while (a point wears off every minute).
   const lent: string[] = [];
   for (const [skill, amount] of Object.entries(item(slot.id).food ?? {}) as [Skill, number][]) { if (!amount) continue; player.boosts[skill] = Math.max(player.boosts[skill] ?? 0, amount); lent.push(`+${amount} ${SKILL_NAMES[skill]}`); }
-  message(game, `You eat the ${item(slot.id).name.toLowerCase()}.${energy ? " The spring comes back into your step." : player.hp > before ? " It heals some health." : ""}${lent.length ? ` ${lent.join(", ")} for a while.` : ""}`); sound(game, "eat");
+  message(game, `You ${item(slot.id).drink ? "drink" : "eat"} the ${item(slot.id).name.toLowerCase()}.${energy ? " The spring comes back into your step." : player.hp > before ? " It heals some health." : ""}${lent.length ? ` ${lent.join(", ")} for a while.` : ""}`); sound(game, "eat");
 }
 /** Wightbone armour: 10% more Faith XP from bones a piece, 40% in the full set. */
 export const boneBoost = (player: Player, game?: Game) => (1 + (fullSlayerSet(player, "wightbone") ? 0.4 : 0.1 * setPieces(player, "wightbone"))) * (game && mixtureOn(game, 0) ? 2 : 1);
@@ -1036,6 +1037,7 @@ function interactObject(game: Game, object: WorldObject, option: string, use?: n
       give(player, "egg"); message(game, "You take an egg from the coop."); sound(game, "pickup"); return;
     case "casket": game.ui.shop = "__caskets"; sound(game, "click"); return;
     case "sign": message(game, object.text ?? "The sign is blank.", "info"); return;
+    case "board": game.dialogue = readJobBoard(game, object.text ?? ""); return;
     case "tanning": tanHides(game); return;
     case "well": searchWell(game); return;
     case "decor":
@@ -1102,7 +1104,7 @@ function pickpocket(game: Game, npc: Npc, pick: NonNullable<ReturnType<typeof np
   const player = game.player, thieving = level(game, "thieving");
   if (thieving < pick.level) { message(game, `You need a Stealth level of ${pick.level} to pickpocket this.`, "warn"); return; }
   if (!freeSlots(player) && !has(player, "coins")) { message(game, "Your inventory is too full.", "warn"); return; }
-  const mask = player.familyId === 1 ? 0.1 : 0, chance = Math.min(0.95, 0.55 + (thieving - pick.level) * 0.02 + mask + 0.02 * orderPieces(player.equipment, "hood"));
+  const mask = player.familyId === 1 ? 0.1 : 0, chance = Math.min(0.95, 0.55 + (thieving - pick.level) * 0.02 + mask + 0.02 * orderPieces(player.equipment, "hood") + (player.equipment.hands === "sleight_gloves" ? 0.06 : 0));
   message(game, `You attempt to pick the ${npcDef(npc.id).name.toLowerCase()}'s pocket.`);
   if (game.rng() < chance) {
     const silver = Math.min(RELICS[1].max, player.relics[1] ?? 0) * RELICS[1].coinsPer + (riding(player)?.coins ?? 0);
@@ -1223,7 +1225,7 @@ function drainRun(game: Game) {
 export const VEIL_HOOD = "veilweave_hood";
 /** Sneaking walks (never runs) and spends run energy faster than running; the better your Stealth, the softer it goes. */
 function drainSneak(game: Game) {
-  const player = game.player, cost = Math.max(0.35, 1.1 - level(game, "thieving") * 0.0077) * (player.familyId === 5 ? 0.6 : 1) * (fullSlayerSet(player, "stalker") ? 2 / 3 : 1);
+  const player = game.player, cost = Math.max(0.35, 1.1 - level(game, "thieving") * 0.0077) * (player.familyId === 5 ? 0.6 : 1) * (fullSlayerSet(player, "stalker") ? 2 / 3 : 1) * (player.equipment.feet === "softsole_boots" ? 0.6 : 1);
   player.energy = Math.max(0, player.energy - cost);
   if (player.energy <= 0) { player.sneak = false; message(game, "You're too tired to keep sneaking.", "warn"); }
 }

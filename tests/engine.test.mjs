@@ -20,7 +20,7 @@ import { cleanPresence } from "../games/rarefriends-realm/net.ts";
 import { buySlayerReward, longTasks, slayerXpBoost, eligibleTasks } from "../games/rarefriends-realm/slayer.ts";
 import { currentTask, slayerPoints } from "../games/rarefriends-realm/slayer.ts";
 import { COURSES, EQUIP_SLOTS, HEARTGUARD, ITEM_LIST, METALS, MONSTERS, SMITH_PIECES, SPELL_TABS, FIREMAKING, REGIONAL_CLOTHING, WARDROBE, MOUNTS, SHOPS, SKILLS, SKILL_NAMES, SLAYER_SETS, SLAYER_TASKS, SPELLS, TREES, WAYFARER_MARK, WAYFARER_REWARDS, XP_RATE, XP_TABLE, heavyStrength, isItem, item, levelForXp } from "../games/rarefriends-realm/data.ts";
-import { NPCS, QUESTS, MAX_QUEST_POINTS, PILGRIM_ALTARS, questPoints, onMonsterKilled, shopProblem } from "../games/rarefriends-realm/content.ts";
+import { NPCS, QUESTS, MAX_QUEST_POINTS, PILGRIM_ALTARS, questPoints, onMonsterKilled, shopProblem, readJobBoard } from "../games/rarefriends-realm/content.ts";
 import { ORDERS, ORDER_IDS, orderOf, orderPieces } from "../games/rarefriends-realm/knights.ts";
 import { signetCharges, signetTeleport } from "../games/rarefriends-realm/engine.ts";
 import { COFFER_TICKS } from "../games/rarefriends-realm/dungeons.ts";
@@ -598,7 +598,7 @@ test("A Friend's Feast from start to finish", () => {
   assert.equal(g.player.quests.friends_feast, 2);
   assert.equal(questPoints(g), 1);
   assert(level(g, "cooking") >= 10, "Quest XP");
-  assert.equal(QUESTS.length, 49); assert.equal(MAX_QUEST_POINTS, 87);
+  assert.equal(QUESTS.length, 55); assert.equal(MAX_QUEST_POINTS, 93);
 });
 
 test("Grumblin Trouble counts kills and pays out", () => {
@@ -1938,7 +1938,7 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   assert.equal(p.quests.dawn_against_hollow, 2); assert(has(p, "dawnplate_cuirass"));
   assert.equal(count(p, "hollow_essence"), 0);
   assert.equal(capeProblem(g, "dawnplate_cuirass"), null, "the armoury sells Dawnplate once earned");
-  assert.equal(QUESTS.length, 49); assert.equal(MAX_QUEST_POINTS, 87);
+  assert.equal(QUESTS.length, 55); assert.equal(MAX_QUEST_POINTS, 93);
 });
 
 test("Boots and gauntlets in every metal, smithed at the anvil; the clothier's shirts, dresses, trousers and skirts", () => {
@@ -2778,4 +2778,59 @@ test("Craftwork: a carving gouge carves logs into figures that help everyone nea
   // They crumble away when their time is up.
   run(g, 260);
   assert.equal(g.carvings.length, 0, "all crumbled away"); assert(g.messages.some(m => /crumbles away/.test(m.text)), "and you hear about it");
+});
+
+test("Bars: one in every town, each with a barkeep's quest, a quiet trader, house drinks, and a job board of bounties and errands", async () => {
+  const { BARS, boardJobs, currentJob } = await import("../games/rarefriends-realm/bars.ts");
+  const { BAR_SITES } = await import("../games/rarefriends-realm/barfit.ts");
+  const { MONSTERS, SHOPS, isItem, item } = await import("../games/rarefriends-realm/data.ts");
+  const { FACTION_MONSTERS } = await import("../games/rarefriends-realm/factions.ts");
+  const g = newGame(), world = g.world, p = g.player;
+  assert.deepEqual(BAR_SITES.map(s => [s.bar, s.keeper, s.fence]), BARS.map(b => [b.id, b.keeper, b.fence]), "the fitting and the bars agree");
+  for (const bar of BARS) {
+    const b = world.buildings.find(entry => entry.name === bar.name);
+    assert(b, `${bar.name} stands in ${bar.town}`);
+    const inside = s => s.x > b.x0 && s.x < b.x1 && s.y > b.y0 && s.y < b.y1;
+    assert(world.spawns.some(s => s.id === bar.keeper && inside(s)), `${bar.name}: its barkeep behind the bar`);
+    assert(world.spawns.some(s => s.id === bar.fence && inside(s)), `${bar.name}: a quiet trader at a table`);
+    assert(world.objects.some(o => o.kind === "board" && o.text === bar.id && inside(o)), `${bar.name}: a job board`);
+    assert(SHOPS[NPCS[bar.keeper].shop].stock.includes(bar.drink) && SHOPS[NPCS[bar.keeper].shop].stock.includes("ale"), `${bar.name} pours its own`);
+    assert.equal(NPCS[bar.fence].shop, "fence");
+    for (const id of bar.kills) assert(MONSTERS[id] ?? FACTION_MONSTERS[id], `${bar.name}: ${id} is a creature`);
+    for (const [id] of bar.fetch) assert(isItem(id), `${bar.name}: ${id} is an item`);
+    assert(QUESTS.some(q => q.id === bar.quest), `${bar.name} has a quest`);
+  }
+  for (const id of SHOPS.fence.stock) assert(isItem(id), id);
+  // A drink is drunk.
+  give(p, "madder_wine"); const wine = p.inventory.findIndex(s => s?.id === "madder_wine");
+  assert(itemOptions(g, wine).some(o => o.verb === "Drink")); p.hp = 5; itemOptions(g, wine).find(o => o.verb === "Drink").run(g);
+  assert(g.messages.some(m => /You drink the madder wine/.test(m.text)) && p.boosts.magic === 2, "a drink heals and lends a point");
+  // The board: take a bounty, kill for it, collect.
+  const vat = BARS.findIndex(b => b.id === "vat"), jobs = boardJobs(g, vat);
+  assert.equal(jobs.length, 3); assert.equal(jobs.filter(j => j.kind === "kill").length, 2); assert.equal(jobs.filter(j => j.kind === "fetch").length, 1);
+  let d = readJobBoard(g, "vat"); const take = d.options.findIndex(o => /Put down/.test(o.label)); d.options[take].then();
+  const job = currentJob(g); assert(job && job.job.kind === "kill", "a bounty taken");
+  const target = BARS[vat].kills[job.job.target];
+  for (let i = 0; i < job.job.count; i++) onMonsterKilled(g, target, 0, 0);
+  assert.equal(currentJob(g).done, job.job.count, "every kill counted");
+  const coins = count(p, "coins"); d = readJobBoard(g, "vat"); d.options.find(o => /Collect/.test(o.label)).then();
+  assert.equal(count(p, "coins"), coins + job.job.reward, "paid at the board"); assert.equal(currentJob(g), null); assert.equal(p.questData.jobs_done, 1);
+  // An errand: hand the goods in.
+  const errand = boardJobs(g, vat).find(j => j.kind === "fetch"), [wanted] = BARS[vat].fetch[errand.target];
+  d = readJobBoard(g, "vat"); d.options.find(o => /^Bring/.test(o.label)).then();
+  for (let i = 0; i < errand.count; i++) give(p, wanted);
+  d = readJobBoard(g, "vat"); d.options.find(o => /Hand it in/.test(o.label)).then();
+  assert.equal(count(p, wanted), 0); assert.equal(p.questData.jobs_done, 2, "errand handed in");
+  // A job from one bar isn't handed in at another.
+  d = readJobBoard(g, "vat"); d.options[0].then(); d = readJobBoard(g, "kettle"); assert(/already/.test(d.lines[0].text), "one job at a time, from one bar");
+  // The barkeep's quest.
+  const { talk } = await import("../games/rarefriends-realm/content.ts");
+  let t = talk(g, "vat_keeper"); t.options.find(o => /do it/.test(o.label)).then().onEnd?.();
+  assert.equal(p.quests.bar_vat, 1, "quest started");
+  for (let i = 0; i < 12; i++) give(p, "sweetberry"); for (let i = 0; i < 4; i++) give(p, "willow_logs");
+  t = talk(g, "vat_keeper"); t.onEnd?.();
+  assert(p.quests.bar_vat >= 2 && has(p, "madder_wine"), "quest done, wine poured");
+  // The quiet trader's gear works.
+  const { successChance } = await import("../games/rarefriends-realm/engine.ts"); void successChance;
+  assert(item("softsole_boots").equip.slot === "feet" && item("sleight_gloves").equip.slot === "hands");
 });

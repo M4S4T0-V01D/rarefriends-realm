@@ -9,6 +9,7 @@ import { buildExpansion } from "./expansion.ts";
 import { buildFarWest } from "./farwest.ts";
 import { growVillages, varyBuildings } from "./townscape.ts";
 import { roofRing } from "./ringroof.ts";
+import { fitBars } from "./barfit.ts";
 
 /**
  * The far west (Return of Raria): the world grew by WEST_DX columns on its west side for a second continent, Raria and
@@ -64,7 +65,7 @@ export const inRingBuilding = (x: number, y: number) => arenaDistance(x, y) <= A
 export const inRing = (x: number, y: number) => (x >= RING.x0 && x <= RING.x1 && y >= RING.y0 && y <= RING.y1) || inArena(x, y);
 
 export type ObjectKind =
-  | "tree" | "stump" | "rock" | "spot" | "range" | "furnace" | "anvil" | "bank" | "altar" | "ladder" | "stall" | "obstacle"
+  | "tree" | "stump" | "rock" | "spot" | "range" | "furnace" | "anvil" | "bank" | "altar" | "ladder" | "stall" | "obstacle" | "board"
   | "fountain" | "mill" | "dairy_cow" | "wheat" | "coop" | "gate" | "casket" | "decor" | "sign" | "tanning" | "well" | "sigil_altar" | "wheel" | "herb" | "still";
 export type DecorKind =
   | "flowers" | "bush" | "boulder" | "lamp" | "bench" | "crate" | "barrel" | "tent" | "cactus" | "pine" | "dead_tree" | "statue"
@@ -1297,6 +1298,8 @@ export function generateWorld(seed = WORLD_SEED): { world: World; lift: Float32A
   buildFarWest(ctx, worldTools(ctx), places, floors);
   // The Ring's roof and the walk on top of it (ringroof.ts).
   roofRing(ctx, worldTools(ctx), floors);
+  // The bars fitted out: counters, barkeeps, quiet traders and job boards (barfit.ts, bars.ts).
+  fitBars(ctx, worldTools(ctx));
   // Homes for the villages, then every ordinary building given a shape and a roof of its own (townscape.ts).
   growVillages(ctx, worldTools(ctx), places);
   varyBuildings(ctx, worldTools(ctx));

@@ -12,6 +12,9 @@ import { rumourAt } from "./rumours.ts";
 import { FOE_GROUPS, MATCHES, customMatch, entryFee, startMatch } from "./arena.ts";
 import { ORDERS, ORDER_IDS } from "./knights.ts";
 import { WEST_NPCS, WEST_QUESTS, onWestAltar, onWestKill, talkWest, westShopProblem } from "./raria.ts";
+import { BAR_NPCS, BAR_QUEST_DEFS, jobBoard, onBountyKill, talkBar } from "./bars.ts";
+/** A bar's job board (bars.ts), for the engine (which reaches the bars through here, so they load after this module). */
+export const readJobBoard = (game: Game, barId: string) => jobBoard(game, barId);
 import {
   addXp, combatLevel, count, give, giveOrDrop, has, level, message, sound, take, emit, BONE_BAG, ownsBoneBag, type Dialogue, type DialogueLine, type Game,
 } from "./state.ts";
@@ -50,6 +53,7 @@ export const NPCS: Record<string, NpcDef> = {
   maiden_trader: { id: "maiden_trader", name: "Wren of the Maidens", examine: "Keeps the Maidens' market: what the Deadwood gives up, and what they take from its dead.", options: ["Talk-to", "Trade"], shop: "maidens_market", art: art(3, 841) },
   maidens_villager: { id: "maidens_villager", name: "Deadwood Maiden", examine: "A Maiden off watch. Still armed.", options: ["Talk-to"], art: art(9, 842) },
   ...WEST_NPCS,
+  ...BAR_NPCS,
   mender: { id: "mender", name: "Mender Hale", examine: "The chapel's mender. Her hands are always clean and her apron never is.", options: ["Talk-to", "Trade"], shop: "mender", art: art(3, 318) },
   // The wider world's villages (2026-10). Each village's people wear its own clothes (NPC_WEAR / regionalLook in render.ts).
   gravesend_keeper: { id: "gravesend_keeper", name: "Warden Mira Thorne", examine: "Gravesend's gravekeeper. She knows every name on every stone.", options: ["Talk-to"], art: art(2, 501) },
@@ -454,6 +458,7 @@ export const QUESTS: readonly QuestDef[] = [
   },
   // ---------- Return of Raria: Hollowmere's watch, the Federation, BarkReach and Raria ----------
   ...WEST_QUESTS,
+  ...BAR_QUEST_DEFS,
   // ---------- The quests of being known: long ones, for Presence, with gear only they give ----------
   {
     id: "name_worth_knowing", name: "A Name Worth Knowing", points: 2, difficulty: "Long", start: "Talk to Namekeeper Elian by the Friendhollow square, once your Presence is 20 and your Friend has a name.",
@@ -526,7 +531,7 @@ export function chat(npc: string, lines: DialogueLine[], options?: Dialogue["opt
 /** Pickpocket and quest hooks the engine calls. */
 export function onMonsterKilled(game: Game, monsterId: string, x: number, y: number) {
   const player = game.player;
-  onWestKill(game, monsterId);
+  onWestKill(game, monsterId); onBountyKill(game, monsterId);
   // The wider world's village quests count their kills wherever they fall.
   const tally = (quest: string, key: string, goal: number, done: string) => {
     if (stage(game, quest) !== 1) return;
@@ -726,8 +731,10 @@ export function talk(game: Game, npcId: string): Dialogue {
   }
   return dialogue;
 }
-function talkInner(game: Game, npcId: string): Dialogue {
+function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
   const player = game.player, def = NPCS[npcId.split(":")[0]], name = def.name;
+  // The bars' people: barkeeps with their quests (until they're done), the quiet traders.
+  if (!everyday) { const bar = talkBar(game, npcId, name, () => talkInner(game, npcId, true)); if (bar) return bar; }
   const west = talkWest(game, npcId, name); if (west) return west;
   switch (npcId) {
     case "slayer_master:assignment": case "slayer_master": {
@@ -1299,6 +1306,8 @@ function talkInner(game: Game, npcId: string): Dialogue {
     case "hollyhock_clothier": return chat(name, npcSays(name, "Hats with a brim, aprons with pockets, and a leaf on everything. Gardening clothes, dear, but pretty."));
     case "hollyhock_villager": return chat(name, npcSays(name, (["Mother Yarrow can tell what a plant is by the smell of the soil it grew in.", "Everything in the vale grows twice as fast. Nobody knows why. Nobody asks.", "The river's the Thistle. It runs down to Dyemoor and turns blue there.", "Mind the spiders in the hedges."] as const)[Math.floor(game.rng() * 4)]));
     case "dyemoor_clothier": return chat(name, npcSays(name, "Frocks, turbans, trousers and cloaks in the moor's own indigo and madder. Nobody in the Realm dresses like Dyemoor. Nobody dares."));
+    case "vat_keeper": return chat(name, npcSays(name, (["Madder wine, from a crooked vat, by a crooked woman. Everything here's red, love. Even the wine.", "The board's by the door: bounties from the moor and errands for the guild. Pays in coin, not in colours."] as const)[game.tick % 2]));
+    case "freepour_keeper": return chat(name, npcSays(name, (["The Federation says drink should be free. I agree. I also say it should be paid for. We're working it out.", "The board's got work on it: wolves, lurkers, and things the fortress wants brought. Real work. For coin."] as const)[game.tick % 2]));
     case "dyemoor_guildmistress": return chat(name, npcSays(name, "The Dyers' Guild keeps the colours of the Realm. Every red you've ever admired was boiled in our vats. Buy a pot of dye from Master Vell at the Dyeworks and use it on anything of cloth or leather you wear; a pot of lye washes it out again."));
     case "dyemoor_wardrober": return chat(name, npcSays(name, "Gravesend's mourning coats, Saltmarrow's oilskins, the hunters' longcoats, the Quillhaven caps: every village's clothes, on one rail. Dye them how you like afterwards; everyone does."));
     case "dyemoor_loomkeeper": return chat(name, npcSays(name, "Rarian violet, Federation plaid and BarkReach leather, carried over the mountains. Wear the Rarian ones in Raria and they'll still ask for your writ."));

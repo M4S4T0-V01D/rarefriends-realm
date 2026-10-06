@@ -146,6 +146,10 @@ export function buildWest(ctx: GenContext, t: Tools) {
     building(cx + 33, cy - 4, cx + 39, cy + 1, "s", T.STONE, undefined, { name: "The Free Bank (no fees)", color: "#8f9cb2", walls: "stone" }); for (const bx of [cx + 34, cx + 36, cx + 38]) add({ kind: "bank", x: bx, y: cy - 3, blocks: true, name: "Bank booth" }); npc("banker", cx + 36, cy - 1);
     building(cx + 24, cy + 12, cx + 30, cy + 17, "n", T.WOOD, undefined, { name: "A Freehold cottage", color: "#b87333", walls: "timber", chimney: true }); decor(cx + 25, cy + 16, "bed"); decor(cx + 29, cy + 16, "device", true, "A device for keeping the kettle warm, which also tells the time");
     building(cx + 33, cy + 12, cx + 39, cy + 17, "n", T.WOOD, undefined, { name: "A Freehold cottage", color: "#4fa58a", walls: "plank", chimney: true }); decor(cx + 34, cy + 16, "bed"); decor(cx + 38, cy + 16, "shelf");
+    // The Free Pour, Freehold's bar (fitted out with everything else: barfit.ts).
+    ground(cx + 46, cy + 7, 5, 5, T.PATH, 2);
+    building(cx + 42, cy + 4, cx + 49, cy + 10, "w", T.WOOD, undefined, { name: "The Free Pour", color: "#2f7d68", walls: "timber", chimney: true });
+    sign(cx + 41, cy + 9, "The Free Pour", "THE FREE POUR. Cider, ale, stew and work on the board. The cider is free. Please pay for it.");
     add({ kind: "range", x: cx + 31, y: cy + 6, blocks: true, name: "Cooking fire" }); decor(cx + 28, cy + 5, "bench"); decor(cx + 34, cy + 5, "bench"); decor(cx + 31, cy + 3, "banner_fff"); decor(cx + 31, cy + 9, "lamp");
     for (const [dx, dy] of [[26, 7], [36, 8], [30, 10], [34, 3], [27, 3]] as const) npc("fff_villager", cx + dx, cy + dy, 3);
     sign(cx + 31, cy + 12, "Freehold", "FREEHOLD. Nobody's village. The bank is free. The fire is free. The fish are free if you catch them. The Federation's shops are through the gate; the Gate-Warden decides who the Federation knows.", "fff_cap");

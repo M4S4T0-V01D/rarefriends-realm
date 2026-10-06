@@ -994,6 +994,22 @@ function drawStation(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldO
   const hit = (h: number, w = 40) => ({ x: sx - w / 2 * z, y: sy - h * z, w: w * z, h: (h + 12) * z });
   switch (object.kind) {
     case "range": drawRange(ctx, scene, object, flicker); return hit(44);
+    case "board": {
+      // A bar's job board: a wooden board on two legs, notices pinned all over it, the odd one curling.
+      for (const side of [-0.38, 0.38]) box(ctx, camera, ox + side, oy, 0.1, 0.1, 30, "#6b4a2c", "#7a5636", "#5f4128");
+      box(ctx, camera, ox, oy, 0.92, 0.12, 22, "#8a6a4a", "#9c7a58", "#7a5a40", 16, INK, "plank");
+      const face = (u: number, h: number) => { const p = toScreen(camera, ox + u, oy, h); return [p.x, p.y] as [number, number]; };
+      const notes: [number, number, string][] = [[-0.3, 33, "#f1ead6"], [-0.05, 31, "#efe0b0"], [0.22, 34, "#f3eee2"], [-0.22, 23, "#e9dcc0"], [0.12, 24, "#f1ead6"], [0.33, 25, "#ead6d0"]];
+      for (const [u, h, paper] of notes) {
+        const a = face(u - 0.09, h + 4), b = face(u + 0.09, h + 4), c = face(u + 0.09, h - 3), d = face(u - 0.09, h - 3);
+        poly(ctx, [a, b, c, d], paper, "rgba(22,22,22,0.5)", 0.8);
+        ctx.fillStyle = "#a8403a"; ctx.fillRect((a[0] + b[0]) / 2 - 0.8 * z, (a[1] + b[1]) / 2 - 0.4 * z, 1.6 * z, 1.6 * z);
+        ctx.strokeStyle = "rgba(60,50,40,0.5)"; ctx.lineWidth = 0.7 * z; ctx.beginPath();
+        for (const k of [0.3, 0.55, 0.8]) { const l = [a[0] + (d[0] - a[0]) * k, a[1] + (d[1] - a[1]) * k], r = [b[0] + (c[0] - b[0]) * k - 1.5 * z, b[1] + (c[1] - b[1]) * k]; ctx.moveTo(l[0] + 1 * z, l[1]); ctx.lineTo(r[0], r[1]); }
+        ctx.stroke();
+      }
+      return hit(44);
+    }
     case "furnace": return drawFurnace(ctx, scene, object, flicker, hit);
     case "anvil": drawAnvil(ctx, scene, object); return hit(24);
     case "bank": return drawBankBooth(ctx, scene, object, hit);

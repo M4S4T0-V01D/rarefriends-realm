@@ -4,6 +4,13 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 80, date: "2026-10-06", title: "Bars in every town: drinks, a job board, a quiet trader and a quest each", items: [
+    "Every town and city has a bar now, each its own: the Sleepy Friend in Friendhollow, the Seventh Prayer in Raria, the Crooked Vat in Dyemoor, the Obedient Hound in Lawgate, the Stone Kettle in Highcairn and the new Free Pour in Freehold.",
+    "The barkeep sells food, drink and potions for people on the road: stew, bread and ale, healing tonics, energy draughts and antidotes, and the house's own drink. That's Sleepy stout, Lawful small beer, Madder wine, Hound's bite, Cairn porter or Free cider, each healing a little and lending a skill a point or two for a while.",
+    "Every bar has a job board by the door: two bounties on creatures from round about and an errand for goods the town needs, paid in coin (and Slayer and Presence XP) at that board. Take one job at a time; finish one and fresh notices go up.",
+    "In the corner of every bar a quiet trader sits at a table, selling what a Stealth adventurer wants: sleight gloves (surer pickpocketing), softsole boots (sneaking costs much less run energy), stealth draughts and the veilweave hood.",
+    "Each barkeep has a quest: Last Orders (Friendhollow), The Seventh Toast (Raria), A Crooked Vintage (Dyemoor), The Hound's Bite (Lawgate), Kettle Black (Highcairn) and Free Cider (Freehold). That's six more quest points.",
+  ] },
   { id: 79, date: "2026-10-06", title: "Craftwork: woodcarving, and carvings that help you fight", items: [
     "Crafting is Craftwork now: everything it did (leather, gems, string, amulets, crossbows) and new work besides: dyeing in Dyemoor, and woodcarving.",
     "Woodcarving: buy a carving gouge (Tessa's tannery, or any general store) and use it on two logs to carve a figure from them. Every wood carves its own, from a Hearthwood figure from plain logs (Craftwork 3) to an Ashwood seer (72).",

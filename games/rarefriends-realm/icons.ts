@@ -474,6 +474,17 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
       case "thread":
         part(p, box(8, 7, 16, 3), WOOD_C, "wood"); part(p, box(8, 23, 16, 3), WOOD_C, "wood"); part(p, box(10, 10, 12, 13), color, "cloth");
         for (const y of [13, 16, 19]) line(p, [[10, y], [21, y + 1]], shadeHex(color, -0.15)); break;
+      case "mug":
+        // A tankard: a barrel-sided mug with a handle and a head of foam.
+        part(p, poly([[8, 10], [21, 10], [21, 28], [8, 28]]), color, "wood");
+        line(p, [[8, 16], [21, 16]], shadeHex(color, -0.25)); line(p, [[8, 23], [21, 23]], shadeHex(color, -0.25));
+        part(p, stroke([[21, 13], [26, 14], [26, 22], [21, 23]], 3), shadeHex(color, -0.15), "wood");
+        part(p, poly([[7, 10], [10, 6], [15, 8], [19, 5], [22, 9], [22, 11], [7, 11]]), accent ?? "#f2ead6", "cloth"); break;
+      case "bottle":
+        // A bottle: a round body, a long neck, a cork, a label.
+        part(p, poly([[14, 3], [18, 3], [18, 11], [22, 15], [22, 28], [10, 28], [10, 15], [14, 11]]), color, "gem");
+        part(p, poly([[14, 1], [18, 1], [18, 4], [14, 4]]), "#a8805a", "wood");
+        part(p, poly([[11, 18], [21, 18], [21, 24], [11, 24]]), accent ?? "#efe3c4", "cloth"); break;
       case "gouge":
         // A woodcarver's gouge: a turned handle and a curved, hollow blade.
         part(p, stroke([[5, 29], [14, 20]], 5), WOOD_C, "wood"); part(p, poly([[13, 17], [22, 8], [27, 7], [28, 12], [19, 21], [16, 20]]), color, "metal");

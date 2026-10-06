@@ -73,7 +73,7 @@ export type Bonuses = { attack: number; strength: number; defence: number; range
 /** An item's picture: a shape in a colour; `kind` picks a variant of the shape (a fish's species, an ore's veins…). */
 export type Icon = { shape: IconShape; color: string; accent?: string; kind?: string };
 export type IconShape =
-  | "gouge" | "carving" | "drumstick" | "steak" | "coins" | "axe" | "pickaxe" | "sword" | "dagger" | "sabre" | "helm" | "body" | "legs" | "shield" | "boots" | "gloves" | "cape"
+  | "gouge" | "carving" | "mug" | "bottle" | "drumstick" | "steak" | "coins" | "axe" | "pickaxe" | "sword" | "dagger" | "sabre" | "helm" | "body" | "legs" | "shield" | "boots" | "gloves" | "cape"
   | "amulet" | "log" | "fish" | "ore" | "bar" | "bones" | "sigil" | "staff" | "net" | "rod" | "harpoon" | "pot" | "bucket" | "egg" | "flour"
   | "milk" | "tinderbox" | "hammer" | "knife" | "needle" | "thread" | "chisel" | "gem" | "hide" | "leather" | "meat" | "feather" | "bait"
   | "cake" | "bread" | "berries" | "key" | "wheat" | "lamp" | "scroll" | "silk" | "hood" | "bracer" | "burnt" | "hat" | "crown" | "orb" | "trophy"
@@ -91,6 +91,8 @@ export type Item = {
     /** A faith weapon (the Order of the Dawn's): each hit gives a little Faith XP, and it hurts the undead more. */
     holy?: boolean };
   heal?: number; bones?: number; tool?: { kind: "axe" | "pickaxe"; tier: number; level: number };
+  /** Drunk, not eaten (the bars' ales and wines). */
+  drink?: boolean;
   /** Run energy restored when eaten (waybread). */
   energy?: number;
   /** A drink (Apothecary): what it does. */
@@ -887,6 +889,27 @@ const CARVING_ITEMS: Item[] = [
   ...CARVINGS.map(c => ({ id: c.id, name: c.name, examine: `A figure carved from ${c.log.replace("_logs", "").replace(/^logs$/, "plain")} wood. Set it down and, near it, ${c.text}. It lasts about ${Math.round(c.ticks * 0.6 / 60 * 10) / 10} minutes, then crumbles.`, value: Math.round(15 + c.level * 3), icon: { shape: "carving" as const, color: c.color, accent: shadeColor(c.color) } })),
 ];
 function shadeColor(hex: string) { const n = parseInt(hex.slice(1), 16), f = (v: number) => Math.max(0, Math.min(255, Math.round(v * 0.68))); return `#${[(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v => f(v).toString(16).padStart(2, "0")).join("")}`; }
+/** The bars' drinks and stew, and the quiet traders' Stealth gear (bars.ts). */
+/** The drinks (and the stew every barkeep keeps hot). A drink heals a little and lends a skill a point or two. */
+const BAR_ITEMS: Item[] = [
+  { id: "ale", name: "Ale", examine: "A tankard of the Realm's ordinary ale. Heals 2, and +1 Strength for a while.", value: 4, heal: 2, food: { strength: 1 }, drink: true, icon: { shape: "mug", color: "#c98a3a", accent: "#f2ead6" } },
+  { id: "barkeeps_stew", name: "Barkeep's stew", examine: "Whatever was going, stewed all day. Heals 12.", value: 30, heal: 12, icon: { shape: "pot", color: "#8a5a3a", accent: "#c9a074" } },
+  { id: "sleepy_stout", name: "Sleepy stout", examine: "The Sleepy Friend's own: dark, thick and dangerous before noon. Heals 4, +2 Strength.", value: 12, heal: 4, food: { strength: 2 }, drink: true, icon: { shape: "mug", color: "#3b2a1e", accent: "#e8dcc4" } },
+  { id: "lawful_beer", name: "Lawful small beer", examine: "The Seventh Prayer's: one measure, brewed to the Law's strength exactly. Heals 3, +2 Defence.", value: 12, heal: 3, food: { defence: 2 }, drink: true, icon: { shape: "mug", color: "#d9c27a", accent: "#f7f2e2" } },
+  { id: "madder_wine", name: "Madder wine", examine: "The Crooked Vat's: red as the vats, and it goes to your head. Heals 4, +2 Magic.", value: 14, heal: 4, food: { magic: 2 }, drink: true, icon: { shape: "bottle", color: "#8a2a2a", accent: "#d9b84a" } },
+  { id: "hounds_bite", name: "Hound's bite", examine: "The Obedient Hound's whiskey, smoked over pine. Heals 3, +2 Attack.", value: 14, heal: 3, food: { attack: 2 }, drink: true, icon: { shape: "bottle", color: "#a8742e", accent: "#4a3560" } },
+  { id: "cairn_porter", name: "Cairn porter", examine: "The Stone Kettle's porter, for miners. Heals 4, +3 Mining.", value: 12, heal: 4, food: { mining: 3 }, drink: true, icon: { shape: "mug", color: "#4a3a2c", accent: "#e8dcc4" } },
+  { id: "free_cider", name: "Free cider", examine: "The Free Pour's cider: the Federation insists it's free; the barkeep insists on payment. Heals 4, +2 Ranged.", value: 12, heal: 4, food: { ranged: 2 }, drink: true, icon: { shape: "bottle", color: "#c9b04a", accent: "#2f7d68" } },
+  // The quiet traders' goods.
+  { id: "sleight_gloves", name: "Sleight gloves", examine: "Thin black gloves with nothing in the fingertips. Pickpocketing in them is a little surer.", value: 1800, icon: { shape: "gloves", color: "#2a2830", accent: "#5a566a" },
+    equip: { slot: "hands", bonuses: { attack: 1, defence: 1 }, requires: { thieving: 20 } } },
+  { id: "softsole_boots", name: "Softsole boots", examine: "Boots that make no sound at all. Sneaking in them costs much less run energy.", value: 2600, icon: { shape: "boots", color: "#3a3640", accent: "#6a6680" },
+    equip: { slot: "feet", bonuses: { defence: 2 }, requires: { thieving: 30 } } },
+];
+
+/** A bar's shop: the house drink and ale, stew and bread, and potions for the road (bars.ts has the bars). */
+const barStock = (drink: string) => [drink, "ale", "barkeeps_stew", "bread", "cake", "cooked_meat", "healing_tonic", "energy_draught", "antidote", "strength_potion", "defence_potion"];
+
 /**
  * Dyemoor's dyes. A pot of dye used on cloth or leather clothing (a hood, a hat, a coat, a tunic, trousers or a skirt,
  * gloves, boots, a cape) dyes it: the same piece, in the dye's colour, its trim kept. Lye washes the dye out again.
@@ -928,7 +951,7 @@ function dyedItem(id: string): Item | undefined {
   DYED.set(id, made);
   return made;
 }
-export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...DYE_POTS, ...CARVING_ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...ORDER_ARMOUR, ...orderGear(), ...slayerGear(), ...heartguardGear(), ...REGIONAL_ITEMS, ...APOTHECARY_ITEMS, ...factionGear()]);
+export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...DYE_POTS, ...CARVING_ITEMS, ...BAR_ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...ORDER_ARMOUR, ...orderGear(), ...slayerGear(), ...heartguardGear(), ...REGIONAL_ITEMS, ...APOTHECARY_ITEMS, ...factionGear()]);
 const ITEM_MAP = new Map(ITEM_LIST.map(item => [item.id, item]));
 export function item(id: string): Item {
   const found = ITEM_MAP.get(id) ?? dyedItem(id);
@@ -1488,7 +1511,12 @@ export const SHOPS: Record<string, ShopDef> = {
   raria_armoury: { id: "raria_armoury", name: "The Regimental Stores", buys: ["weapon", "armour"], rate: 0.5, stock: ["rrr_helm", "rrr_cuirass", "rrr_greaves", "rrr_gauntlets", "rrr_boots", "rrr_heater", "rrr_banner", "rarian_sword", "rarian_greatsword", "rarian_spear", "rarian_halberd", "rarian_dagger", "rarian_crossbow", "rarian_bow", "moonsilver_bolts", "moonsilver_arrow"] },
   raria_faith: { id: "raria_faith", name: "The Chapel of the Law's Stores", buys: ["bones"], rate: 0.5, stock: ["wise_cowl", "wise_vestment", "wise_skirts", "wise_sandals", "wise_pavise", "rarian_mace", "faith_banner", "ritual_scroll_case", "law_book", "faith_potion", "law_sigil"] },
   raria_mage: { id: "raria_mage", name: "The Office of Sigils", buys: ["sigil", "magic"], rate: 0.5, stock: ["rarian_staff", "sigil_frame", "law_sigil", "dusk_sigil", "crown_sigil", "thought_sigil", "stone_sigil", "ember_sigil", "shade_sigil", "tide_sigil", "path_sigil"] },
-  raria_inn: { id: "raria_inn", name: "The Seventh Prayer", buys: ["food"], rate: 0.5, stock: ["bread", "cake", "cooked_chicken", "cooked_meat", "bucket_of_milk", "egg"] },
+  raria_inn: { id: "raria_inn", name: "The Seventh Prayer", buys: ["food"], rate: 0.5, stock: [...barStock("lawful_beer"), "cooked_chicken", "bucket_of_milk", "egg"] },
+  // The bars (bars.ts): each barkeep's, and the quiet traders' (the same goods in every bar).
+  bar_vat: { id: "bar_vat", name: "The Crooked Vat", buys: ["food"], rate: 0.5, stock: barStock("madder_wine") },
+  bar_hound: { id: "bar_hound", name: "The Obedient Hound", buys: ["food"], rate: 0.5, stock: barStock("hounds_bite") },
+  bar_freepour: { id: "bar_freepour", name: "The Free Pour", buys: ["food"], rate: 0.5, stock: barStock("free_cider") },
+  fence: { id: "fence", name: "The quiet trader", buys: ["other"], rate: 0.6, stock: ["sleight_gloves", "softsole_boots", "stealth_draught", "veilweave_hood", "weak_poison", "antidote"] },
   vesper_reliquary: { id: "vesper_reliquary", name: "The Abbey Reliquary", buys: ["bones"], rate: 0.6, stock: ["dusk_sigil", "law_sigil", "shade_sigil", "wise_cowl", "wise_vestment", "wise_skirts", "wise_sandals", "law_book", "ritual_scroll_case", "faith_potion"] },
   raria_clothier: { id: "raria_clothier", name: "The Sumptuary Office", buys: [], rate: 0.5, stock: ["rarian_veil", "rarian_tabard", "rarian_skirts", "rarian_slippers", "rarian_mantle"] },
   raria_general: { id: "raria_general", name: "The Provisioner of the Crown", general: true, buys: ["food", "other", "fish"], rate: 0.5, stock: ["bread", "cake", "pot", "bucket", "tinderbox", "knife", "hammer", "vial"] },
@@ -1560,7 +1588,7 @@ export const SHOPS: Record<string, ShopDef> = {
     "pewter_crossbow", "blackiron_crossbow", "ashsteel_crossbow", "pewter_bolts", "blackiron_bolts", "ashsteel_bolts",
     "hunter_coif", "hunter_vest", "hunter_chaps", "hunter_bracers", "feather"] },
   general_highcairn: { id: "general_highcairn", name: "Highcairn Stores", general: true, stock: ["shears", "pot", "bucket", "tinderbox", "hammer", "knife", "chisel", "needle", "thread", "bread", "cooked_meat", "fishing_rod", "feather"] },
-  kettle: { id: "kettle", name: "The Stone Kettle", buys: ["fish", "food"], rate: 0.55, stock: ["bread", "cake", "cooked_meat", "char", "grayling", "sailfish"] },
+  kettle: { id: "kettle", name: "The Stone Kettle", buys: ["fish", "food"], rate: 0.55, stock: [...barStock("cairn_porter"), "char", "grayling", "sailfish"] },
   cairn_forge: { id: "cairn_forge", name: "Highcairn Forge", buys: ["ore", "bar", "weapon", "armour"], rate: 0.6, stock: ["hammer", "moonsilver_pickaxe", "glimmer_pickaxe", "rarite_pickaxe", "inkcoal", "moonsilver_bar", "glimmer_bar", "glimmer_helm", "glimmer_gauntlets", "glimmer_boots", "glimmer_shield", "rarite_helm", "rarite_gauntlets", "rarite_boots", "inkcoal_satchel"] },
   heft: { id: "heft", name: "Heft & Haft", buys: ["weapon"], rate: 0.55, stock: ["pewter_greatsword", "pewter_battleaxe", "pewter_warhammer", "blackiron_greatsword", "blackiron_battleaxe", "blackiron_warhammer",
     "ashsteel_greatsword", "ashsteel_battleaxe", "ashsteel_warhammer", "moonsilver_greatsword", "moonsilver_battleaxe", "moonsilver_warhammer", "glimmer_greatsword"] },
@@ -1570,7 +1598,7 @@ export const SHOPS: Record<string, ShopDef> = {
     "moonsilver_crossbow", "wooden_stock", "oak_stock", "willow_stock", "pewter_bolts", "blackiron_bolts", "ashsteel_bolts", "moonsilver_bolts", "pewter_arrow", "blackiron_arrow", "ashsteel_arrow", "feather", "knife"] },
   timber: { id: "timber", name: "Fernwick Timber Yard", buys: ["logs"], rate: 0.75, stock: ["pewter_axe", "blackiron_axe", "ashsteel_axe", "moonsilver_axe", "knife", "tinderbox", "logs", "oak_logs", "willow_logs", "bread", "cooked_meat"] },
   slayer: { id: "slayer", name: "The Warden's Lodge", stock: ["slayer_gem", "inkcrab", "sailfish", "tablet_hollow_square", "blackiron_arrow", "ashsteel_arrow", "leather_boots"] },
-  inn: { id: "inn", name: "The Sleepy Friend", buys: ["fish", "food"], rate: 0.55, stock: ["bread", "cake", "cooked_meat", "cooked_chicken", "carp", "grayling"] },
+  inn: { id: "inn", name: "The Sleepy Friend", buys: ["fish", "food"], rate: 0.55, stock: [...barStock("sleepy_stout"), "cooked_chicken", "carp", "grayling"] },
   wizards: { id: "wizards", name: "The Tower Stores", buys: ["sigil", "magic"], rate: 0.6, stock: ["sigil_box", "breeze_sigil", "tide_sigil", "stone_sigil", "ember_sigil", "thought_sigil", "shade_sigil", "star_sigil",
     "staff", "breeze_staff", "tide_staff", "stone_staff", "ember_staff", "scholar_hat", "scholar_robe", "scholar_skirt", "tablet_hollow_square"] },
   bones: { id: "bones", name: "Bone Collector", buys: ["bones", "hide"], rate: 0.65, stock: ["bones", "large_bones"] },
