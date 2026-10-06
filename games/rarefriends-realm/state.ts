@@ -1,6 +1,7 @@
 /**
  * Game state and the small helpers every system shares: inventory, bank, equipment, experience and messages.
  */
+import { unbakeWorld } from "./bake.ts";
 import {
   EQUIP_SLOTS, FAMILY_NAMES, MAX_XP, MONSTERS, mountDef, PRAYERS, RELICS, SKILLS, SKILL_NAMES, WAYFARER_SET, XP_RATE, XP_TABLE, item, levelForXp,
   type Bonuses, type EquipSlot, type Item, type MonsterDef, type Skill, type SpotKind, type WardrobeId,
@@ -216,8 +217,19 @@ export function mulberry(seed: number) {
 }
 
 let sharedWorld: World | null = null;
-/** The world is immutable after generation, so every game shares one copy. */
-export function realmWorld(): World { return sharedWorld ??= createWorld(); }
+/**
+ * The world is immutable after generation, so every game shares one copy: unbaked from the build's bake when there is
+ * one (much quicker than generating it: see bake.ts), generated otherwise.
+ */
+export function realmWorld(): World {
+  if (sharedWorld) return sharedWorld;
+  const holder = globalThis as { __REALM_WORLD__?: string }, baked = holder.__REALM_WORLD__;
+  if (baked) {
+    try { sharedWorld = unbakeWorld(baked); } catch { sharedWorld = null; }
+    delete holder.__REALM_WORLD__;
+  }
+  return sharedWorld ??= createWorld();
+}
 
 export function createPlayer(world: World, familyId: number, friendId: number): Player {
   const spawn = world.places.spawn, xp = Object.fromEntries(SKILLS.map(skill => [skill, 0])) as Record<Skill, number>;

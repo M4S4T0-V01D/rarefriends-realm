@@ -181,6 +181,19 @@ export class LightField {
   private s!: Static;
   private x0 = 0; private y0 = 0; private gw = 0; private gh = 0; private S = 2;
   private data = new Float32Array(0);
+  /**
+   * What the sky's light at each cell is made of, for the range last built: ambient occlusion, how open it is to the
+   * sun (with the ground's bounce), and what the ground itself gives off. It only changes when the range or the world
+   * does, so a rebuild is a few multiply-adds a cell, however often the sky or the flames change.
+   */
+  private base = { key: "", st: null as Static | null, ao: new Float32Array(0), open: new Float32Array(0), emit: new Float32Array(0) };
+  /**
+   * Each point light's reach over the cells (direct light, as seen past what's in the way, and its bounce), for the range
+   * last built. Flames flicker in brightness only, so a light that hasn't moved is just rescaled; one that has (a
+   * carried lantern, a spell) is worked out afresh, and one gone from view is forgotten.
+   */
+  private shapes = new Map<string, { used: number; cells: Int32Array; direct: Float32Array; bounce: Float32Array }>();
+  private builds = 0;
   readonly canvas: HTMLCanvasElement;
   private image: ImageData | null = null;
   private sunCache = new Map<number, number>();
@@ -219,36 +232,61 @@ export class LightField {
     const gw = this.gw = (x1 - x0 + 1) * S, gh = this.gh = (y1 - y0 + 1) * S, n = gw * gh;
     if (this.data.length < n * 3) this.data = new Float32Array(n * 3);
     const d = this.data, { ambient, sun } = sky, st = this.s, emitK = 0.3 + 0.7 * sky.night;
-    // Sky, bounced sun and lava, sampled bilinearly from the per-tile grids.
-    for (let j = 0; j < gh; j++) {
-      const wy = y0 - 0.5 + (j + 0.5) / S;
-      for (let i = 0; i < gw; i++) {
-        const wx = x0 - 0.5 + (i + 0.5) / S, o = (j * gw + i) * 3;
-        const ao = this.bilinear(st.ao, wx, wy, 1), roof = this.bilinear(st.roofed, wx, wy, 0);
-        const ax = this.albedoAt(wx, wy), open = 1 - roof;
-        for (let c = 0; c < 3; c++) {
-          d[o + c] = ambient[c] * ao + sun[c] * open * (1 + 0.2 * ax[c] * ao) + this.emitAt(wx, wy, c) * emitK;
+    // Sky, bounced sun and lava, sampled bilinearly from the per-tile grids (the samples kept per range: see `base`).
+    const base = this.base, key = `${x0},${y0},${gw},${gh},${S}`;
+    if (base.key !== key || base.st !== st) {
+      if (base.ao.length < n) { base.ao = new Float32Array(n); base.open = new Float32Array(n * 3); base.emit = new Float32Array(n * 3); }
+      for (let j = 0; j < gh; j++) {
+        const wy = y0 - 0.5 + (j + 0.5) / S;
+        for (let i = 0; i < gw; i++) {
+          const wx = x0 - 0.5 + (i + 0.5) / S, k = j * gw + i, o = k * 3;
+          const ao = this.bilinear(st.ao, wx, wy, 1), roof = this.bilinear(st.roofed, wx, wy, 0);
+          const ax = this.albedoAt(wx, wy), open = 1 - roof;
+          base.ao[k] = ao;
+          for (let c = 0; c < 3; c++) { base.open[o + c] = open * (1 + 0.2 * ax[c] * ao); base.emit[o + c] = this.emitAt(wx, wy, c); }
         }
       }
+      base.key = key; base.st = st; this.shapes.clear();
+    }
+    const bao = base.ao, bopen = base.open, bemit = base.emit;
+    for (let k = 0; k < n; k++) {
+      const ao = bao[k], o = k * 3;
+      d[o] = ambient[0] * ao + sun[0] * bopen[o] + bemit[o] * emitK;
+      d[o + 1] = ambient[1] * ao + sun[1] * bopen[o + 1] + bemit[o + 1] * emitK;
+      d[o + 2] = ambient[2] * ao + sun[2] * bopen[o + 2] + bemit[o + 2] * emitK;
     }
     // Point lights: direct (shadowed by what's in the way) and one bounce.
+    const build = ++this.builds;
     for (const light of lights) {
-      const r = light.r, bounceR = r * 1.6, around = this.albedoAt(light.x, light.y);
+      const r = light.r, bounceR = r * 1.6, around = this.albedoAt(light.x, light.y), k = light.k;
       const bounce: RGB = [light.rgb[0] * around[0] * BOUNCE, light.rgb[1] * around[1] * BOUNCE, light.rgb[2] * around[2] * BOUNCE];
-      const i0 = Math.max(0, Math.floor((light.x - bounceR - x0 + 0.5) * S)), i1 = Math.min(gw - 1, Math.ceil((light.x + bounceR - x0 + 0.5) * S));
-      const j0 = Math.max(0, Math.floor((light.y - bounceR - y0 + 0.5) * S)), j1 = Math.min(gh - 1, Math.ceil((light.y + bounceR - y0 + 0.5) * S));
-      for (let j = j0; j <= j1; j++) {
-        const wy = y0 - 0.5 + (j + 0.5) / S;
-        for (let i = i0; i <= i1; i++) {
-          const wx = x0 - 0.5 + (i + 0.5) / S, dx = wx - light.x, dy = wy - light.y, dist2 = dx * dx + dy * dy;
-          if (dist2 > bounceR * bounceR) continue;
-          const o = (j * gw + i) * 3, direct = falloff(dist2, r, light.h), seen = direct > 0.002 ? this.transmit(light, wx, wy, 0) : 0;
-          const soft = (1 - dist2 / (bounceR * bounceR)), b = soft * soft * light.k * (0.3 + 0.7 * Math.sqrt(seen));
-          const a = direct * seen * light.k;
-          d[o] += light.rgb[0] * a + bounce[0] * b; d[o + 1] += light.rgb[1] * a + bounce[1] * b; d[o + 2] += light.rgb[2] * a + bounce[2] * b;
+      const shapeKey = `${light.x},${light.y},${light.h},${r}`;
+      let shape = this.shapes.get(shapeKey);
+      if (!shape) {
+        const cells: number[] = [], direct: number[] = [], bounced: number[] = [];
+        const i0 = Math.max(0, Math.floor((light.x - bounceR - x0 + 0.5) * S)), i1 = Math.min(gw - 1, Math.ceil((light.x + bounceR - x0 + 0.5) * S));
+        const j0 = Math.max(0, Math.floor((light.y - bounceR - y0 + 0.5) * S)), j1 = Math.min(gh - 1, Math.ceil((light.y + bounceR - y0 + 0.5) * S));
+        for (let j = j0; j <= j1; j++) {
+          const wy = y0 - 0.5 + (j + 0.5) / S;
+          for (let i = i0; i <= i1; i++) {
+            const wx = x0 - 0.5 + (i + 0.5) / S, dx = wx - light.x, dy = wy - light.y, dist2 = dx * dx + dy * dy;
+            if (dist2 > bounceR * bounceR) continue;
+            const reach = falloff(dist2, r, light.h), seen = reach > 0.002 ? this.transmit(light, wx, wy, 0) : 0;
+            const soft = (1 - dist2 / (bounceR * bounceR));
+            cells.push(j * gw + i); direct.push(reach * seen); bounced.push(soft * soft * (0.3 + 0.7 * Math.sqrt(seen)));
+          }
         }
+        shape = { used: build, cells: Int32Array.from(cells), direct: Float32Array.from(direct), bounce: Float32Array.from(bounced) };
+        this.shapes.set(shapeKey, shape);
+      }
+      shape.used = build;
+      const { cells, direct, bounce: bounced } = shape;
+      for (let c = 0; c < cells.length; c++) {
+        const o = cells[c] * 3, a = direct[c] * k, b = bounced[c] * k;
+        d[o] += light.rgb[0] * a + bounce[0] * b; d[o + 1] += light.rgb[1] * a + bounce[1] * b; d[o + 2] += light.rgb[2] * a + bounce[2] * b;
       }
     }
+    for (const [shapeKey, shape] of this.shapes) if (shape.used !== build) this.shapes.delete(shapeKey);
     // To the canvas, for projecting onto the ground.
     if (this.canvas.width !== gw || this.canvas.height !== gh) { this.canvas.width = gw; this.canvas.height = gh; this.image = null; }
     const ctx = this.canvas.getContext("2d")!;

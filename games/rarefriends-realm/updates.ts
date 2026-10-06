@@ -4,6 +4,12 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 75, date: "2026-10-06", title: "A faster Realm: quicker to start, smoother zoomed out", items: [
+    "The Realm starts much sooner. The world used to be built from scratch every time you opened the game, a second or two of waiting on most computers and longer on phones. It now arrives ready-made and unpacks in about a tenth of a second.",
+    "Walking zoomed out on High graphics is smoother, about a quarter less work every frame, so towns like Friendhollow and Raria hold their frame rate far better. Distant haze is only worked out where there's hazy ground behind something, Friends and creatures are lit like the scenery, and lanterns no longer cut their own holes in the light.",
+    "Light from lamps, torches and fires is worked out once and only brightened and dimmed as the flames flicker, instead of being traced again every other frame. The sky's light is kept between frames too.",
+    "On a sharp, high-resolution screen, High graphics now lowers its own resolution if your computer can't keep up, before anything else changes, and raises it again when there's room. The game's picture is also drawn opaque, which is cheaper to put on screen.",
+  ] },
   { id: 74, date: "2026-10-06", title: "Raria's high walls and the Cathedral of the Wise Friend", items: [
     "Raria's city wall stands three storeys high now, with a wall-walk and battlements all the way round. Every tower on it, and the gatehouse towers either side of the four gates, rises well above the wall under a taller spire.",
     "The Cathedral of the Wise Friend stands on the west side of the city, north of the west boulevard and apart from the palace, in the palace's own violet stone. Inside the great nave a carpet runs up the aisle between pillars and pews to the Wise Friend and the Queen's seat.",

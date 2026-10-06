@@ -1257,7 +1257,11 @@ function buildMainland(seed: number) {
   return { tiles, region, objects, objectAt, spawns, places, lift, buildings, floors, W, H };
 }
 
-export function createWorld(seed = 20260927): World {
+/** The Realm's seed: every player's world is generated (or baked) from it. */
+export const WORLD_SEED = 20260927;
+export function createWorld(seed = WORLD_SEED): World { return generateWorld(seed).world; }
+/** The world, and the hill lift it was raised with (which, with the tiles, is all its heights need: see `bakeWorld`). */
+export function generateWorld(seed = WORLD_SEED): { world: World; lift: Float32Array } {
   const old = buildLegacyWorld(seed), LW = LEGACY_W;
   const tiles = new Uint8Array(W * H).fill(T.DEEP), region = new Uint8Array(W * H), objects: WorldObject[] = [], spawns: SpawnDef[] = [];
   const objectAt = new Int32Array(W * H).fill(-1), lift = new Float32Array(W * H), buildings: Building[] = [...old.buildings.map(b => ({ ...b, x0: b.x0 + WEST_DX, x1: b.x1 + WEST_DX }))];
@@ -1278,7 +1282,7 @@ export function createWorld(seed = 20260927): World {
   for (const object of objects) if (object.name === "__removed") object.blocks = false;
   const buildingAt = new Uint16Array(W * H);
   buildings.forEach((b, index) => { if (b.roof === "none") return; for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) buildingAt[y * W + x] = index + 1; });
-  return { tiles, region, objects, objectAt, spawns, places, heights: buildHeights(tiles, seed, lift), buildings, buildingAt, floors, ramparts: ctx.ramparts };
+  return { world: { tiles, region, objects, objectAt, spawns, places, heights: buildHeights(tiles, seed, lift), buildings, buildingAt, floors, ramparts: ctx.ramparts }, lift };
 }
 /** The world as it was before the far west: the mainland set into the wider world, and the wider world built round it, LEGACY_W wide. */
 function buildLegacyWorld(seed: number) {
@@ -1348,41 +1352,60 @@ const FLAT = new Set<number>([T.LAVA, T.VOID, T.WATER, T.DEEP, T.BRIDGE, T.COBBL
  * Rolling hills from two noise octaves, scaled by each terrain's relief, eased to flat ground near water, towns,
  * buildings and bridges (so shores and streets stay level), then blurred once for gentle slopes.
  */
-function buildHeights(tiles: Uint8Array, seed: number, lift?: Float32Array): Float32Array {
+export function buildHeights(tiles: Uint8Array, seed: number, lift?: Float32Array): Float32Array {
   const broad = makeNoise(seed + 21, 13), fine = makeNoise(seed + 33, 5);
   // Distance (in tiles, capped) from every tile to the nearest flat tile.
-  const distance = new Uint8Array(W * H).fill(255), queue: number[] = [];
-  for (let i = 0; i < W * H; i++) if (FLAT.has(tiles[i])) { distance[i] = 0; queue.push(i); }
-  for (let head = 0; head < queue.length; head++) {
+  const distance = new Uint8Array(W * H).fill(255), queue = new Int32Array(W * H);
+  let tail = 0;
+  for (let i = 0; i < W * H; i++) if (FLAT.has(tiles[i])) { distance[i] = 0; queue[tail++] = i; }
+  const visit = (next: number, d: number) => { if (distance[next] > d + 1) { distance[next] = d + 1; queue[tail++] = next; } };
+  for (let head = 0; head < tail; head++) {
     const index = queue[head], x = index % W, y = (index - x) / W, d = distance[index];
     if (d >= 6) continue;
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      const nx = x + dx, ny = y + dy;
-      if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
-      const next = ny * W + nx;
-      if (distance[next] > d + 1) { distance[next] = d + 1; queue.push(next); }
-    }
+    if (x + 1 < W) visit(index + 1, d);
+    if (x > 0) visit(index - 1, d);
+    if (y + 1 < H) visit(index + W, d);
+    if (y > 0) visit(index - W, d);
   }
+  // Relief per tile (its terrain's, raised by the lift), so each corner below just sums its four tiles.
+  const relief = new Float64Array(W * H);
+  for (let i = 0; i < W * H; i++) relief[i] = (RELIEF[tiles[i]] ?? 0) * (1 + (lift?.[i] ?? 0));
   const CW = W + 1, raw = new Float32Array(CW * (H + 1));
   for (let j = 0; j <= H; j++) for (let i = 0; i <= W; i++) {
-    let relief = 0, near = 255, count = 0;
-    for (const [tx, ty] of [[i - 1, j - 1], [i, j - 1], [i - 1, j], [i, j]]) {
+    let sum = 0, near = 255, count = 0;
+    // The four tiles round the corner, in the same order as ever (so the sums, and the heights, come out the same).
+    for (let k = 0; k < 4; k++) {
+      const tx = k & 1 ? i : i - 1, ty = k & 2 ? j : j - 1;
       if (tx < 0 || ty < 0 || tx >= W || ty >= H) { near = 0; continue; }
-      const t = tiles[ty * W + tx];
-      relief += (RELIEF[t] ?? 0) * (1 + (lift?.[ty * W + tx] ?? 0)); count++; near = Math.min(near, distance[ty * W + tx]);
+      const t = ty * W + tx;
+      sum += relief[t]; count++; if (distance[t] < near) near = distance[t];
     }
+    if (!count || sum === 0 || near === 0) continue;
     const ease = Math.min(1, near / 4), smooth = ease * ease * (3 - 2 * ease);
     // The hill noise is sampled in the mainland's own coordinates, so its relief is exactly what it always was (the wider world sees the same field, shifted).
     const shape = broad(i - MAINLAND.x, j - MAINLAND.y) * 0.75 + fine(i - MAINLAND.x, j - MAINLAND.y) * 0.25;
-    raw[j * CW + i] = count ? (relief / count) * (0.12 + 0.88 * Math.pow(Math.max(0, shape), 1.6)) * smooth : 0;
+    raw[j * CW + i] = (sum / count) * (0.12 + 0.88 * Math.pow(Math.max(0, shape), 1.6)) * smooth;
   }
   const heights = new Float32Array(raw.length);
   for (let j = 0; j <= H; j++) for (let i = 0; i <= W; i++) {
-    let sum = 0, n = 0;
-    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const x = i + di, y = j + dj; if (x >= 0 && y >= 0 && x <= W && y <= H) { sum += raw[y * CW + x]; n++; } }
-    heights[j * CW + i] = raw[j * CW + i] === 0 ? 0 : sum / n;
+    if (raw[j * CW + i] === 0) continue;
+    let total = 0, n = 0;
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const x = i + di, y = j + dj; if (x >= 0 && y >= 0 && x <= W && y <= H) { total += raw[y * CW + x]; n++; } }
+    heights[j * CW + i] = total / n;
   }
   return heights;
+}
+/** Which building (1 + its index, 0 for none) covers each tile: the last one listed wins where they overlap. */
+export function indexBuildings(buildings: readonly Building[]): Uint16Array {
+  const buildingAt = new Uint16Array(W * H);
+  buildings.forEach((b, index) => { if (b.roof === "none") return; for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) buildingAt[y * W + x] = index + 1; });
+  return buildingAt;
+}
+/** Which object stands on each tile (its index, −1 for none): the last placed wins, removed ones don't count. */
+export function indexObjects(objects: readonly WorldObject[]): Int32Array {
+  const objectAt = new Int32Array(W * H).fill(-1);
+  objects.forEach((o, index) => { if (o.name !== "__removed") objectAt[o.y * W + o.x] = index; });
+  return objectAt;
 }
 /** Ground height under any point (tile centres are at integer coordinates), by bilinear interpolation of the corners. */
 export function groundHeight(world: World, x: number, y: number): number {

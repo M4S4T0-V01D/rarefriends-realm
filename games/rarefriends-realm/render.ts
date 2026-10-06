@@ -17,7 +17,7 @@ import { emoteMotion, emoteParticles, type Motion } from "./emotes.ts";
 import { drawPixels, pixelArt, shadeHex } from "./pixel.ts";
 import { TEX_PER_HEIGHT, TEX_PER_TILE, beginTextures, groundTexture, textureStats, shingleTexture, texturedQuad, texturedTriangle, wallTexture, PANE, type GroundStyle, type WallStyle } from "./textures.ts";
 import { campfireLogs, decorArt, fireArt, rockArt, treeArt , herbArt } from "./scenery.ts";
-import { beginSprites, recordSprites, replaySprites, stampSprites, type SpriteDraw } from "./pixel.ts";
+import { beginSprites, recordSprites, noteSprite, replaySprites, stampSprites, type SpriteDraw } from "./pixel.ts";
 import { spellArt } from "./spellart.ts";
 import { SADDLE, mountArt, type MountView } from "./mountart.ts";
 import { petArt } from "./petart.ts";
@@ -213,6 +213,8 @@ function drawMask(ctx: CanvasRenderingContext2D, rows: Mask, x: number, y: numbe
   ctx.globalAlpha = alpha;
   ctx.drawImage(canvas, Math.round(x - w / 2), Math.round(y - h + px), Math.round(w), Math.round(h));
   ctx.globalAlpha = 1;
+  // (Noted like pixel art, so a Friend's light, haze and shadow are its silhouette laid again, not a whole redraw.)
+  noteSprite(canvas, Math.round(x - w / 2), Math.round(y - h + px), Math.round(w), Math.round(h), alpha);
   return { x: x - w / 2, y: y - h + px, w, h };
 }
 const FACES_LEFT = new Set([101, 102, 108, 115, 116, 118, 119, 121]);
@@ -1723,6 +1725,8 @@ type Drawable = {
   sprite?: boolean;
   /** Its hull is exactly what it draws (a box, a ground quad): High lights it by the hull too. */
   exact?: boolean;
+  /** It gives off its own light (a lantern): it takes the light round it and adds its glow, with no hole of its own. */
+  glows?: boolean;
   /** Set by the frame's draw: off screen (skipped), its screen box, the sprites it laid, and the glow it gave off. */
   skip?: boolean; box?: [number, number, number, number]; sprites?: SpriteDraw[] | null; emitted?: [number, number][][] | null; tag?: string;
 };
@@ -1844,7 +1848,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   const LAMP_H = 52, RAFTER_H = STOREY + 22;
   const roomLight = (x: number, y: number, big: boolean) => {
     glow(x, y, 40, big ? 240 : 190, "#f3b262", big ? 1.25 : 1.05, true);
-    drawables.push({ depth: depth(x, y) + 0.2, at: { x, y, h: LAMP_H }, size: [RAFTER_H + 24, 36, 12], draw: () => {
+    drawables.push({ depth: depth(x, y) + 0.2, at: { x, y, h: LAMP_H }, size: [RAFTER_H + 24, 36, 12], glows: true, draw: () => {
       const ceiling = toScreen(camera, x, y, RAFTER_H), flick = scene.reducedMotion ? 0 : Math.sin(now / 70 + x * 3.1 + y) * 0.5 * z;
       const lamp = toScreen(camera, x, y, LAMP_H), overMe = Math.abs(lamp.x - me.x) < 30 * z && lamp.y > me.y - 80 * z && lamp.y < me.y + 8 * z;
       if (overMe) ctx.globalAlpha = 0.25;
@@ -2009,14 +2013,14 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   for (const npc of game.npcs) {
     if (!shown(npc.x, npc.y)) continue;
     const at = interpolate(npc, game, alpha);
-    drawables.push({ depth: depth(at.x, at.y) + 0.1, at, cast: true, size: [170, 90, 30], tag: "npc", draw: () => drawNpc(ctx, scene, npc, at, hits) });
+    drawables.push({ depth: depth(at.x, at.y) + 0.1, at, cast: true, sprite: true, size: [170, 90, 30], tag: "npc", draw: () => drawNpc(ctx, scene, npc, at, hits) });
   }
   // Monsters.
   for (const monster of game.monsters) {
     if (monster.dead || !shown(monster.x, monster.y, 2)) continue;
     const at = interpolate(monster, game, alpha), size = monster.def.size ?? 1;
     const center = { x: at.x + (size - 1) / 2, y: at.y + (size - 1) / 2 };
-    drawables.push({ depth: depth(center.x, center.y) + (size - 1) / 2 + 0.1, at: center, cast: true, size: [80 + 90 * size, 40 + 50 * size, 20 + 10 * size], draw: () => drawMonster(ctx, scene, monster, at, hits) });
+    drawables.push({ depth: depth(center.x, center.y) + (size - 1) / 2 + 0.1, at: center, cast: true, sprite: true, size: [80 + 90 * size, 40 + 50 * size, 20 + 10 * size], draw: () => drawMonster(ctx, scene, monster, at, hits) });
   }
   // Other players, walking their own adventures through yours.
   const home = game.player.home ? homeRect(game.player.home.tier) : null;
@@ -2030,7 +2034,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       if (!def || !shown(foe.x, foe.y, 2)) continue;
       const ghost: Monster = { uid: foe.u, def, x: foe.x, y: foe.y, prev: { x: foe.x, y: foe.y }, spawn: { x: foe.x, y: foe.y }, hp: foe.hp, heading: { x: Math.sign(peer.x - foe.x) || 1, y: Math.sign(peer.y - foe.y) || 1 }, target: true, attackTimer: 0, respawnAt: 0, dead: false, wander: 0, moved: 0, retreat: 0, curses: {}, arena: true };
       const size = def.size ?? 1, center = { x: foe.x + (size - 1) / 2, y: foe.y + (size - 1) / 2 };
-      drawables.push({ depth: depth(center.x, center.y) + (size - 1) / 2 + 0.1, at: center, cast: true, size: [80 + 90 * size, 40 + 50 * size, 20 + 10 * size], draw: () => { const count = hits.length; drawMonster(ctx, scene, ghost, { x: foe.x, y: foe.y, moving: false }, hits); hits.length = count; } });
+      drawables.push({ depth: depth(center.x, center.y) + (size - 1) / 2 + 0.1, at: center, cast: true, sprite: true, size: [80 + 90 * size, 40 + 50 * size, 20 + 10 * size], draw: () => { const count = hits.length; drawMonster(ctx, scene, ghost, { x: foe.x, y: foe.y, moving: false }, hits); hits.length = count; } });
     }
   }
   // Your follower: an owned Friend walking the tiles you leave behind, animated like any NPC.
@@ -2083,8 +2087,9 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
         if (!own(x, y)) continue;
         const edge = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => !own(x + dx, y + dy) && complexAt(world, x + dx, y + dy) !== complex);
         const covered = (nx: number, ny: number) => own(x + nx, y + ny);
-        drawables.push({ depth: depth(x, y) + 0.45, at: { x, y, h: (building.storeys ?? 1) * WALL_H + 8 }, size: [(building.storeys ?? 1) * WALL_H + 40, 52, 30],
-          hull: () => alphaNow > 0.95 ? boxHull(camera, x, y, 1, 1, 5, (building.storeys ?? 1) * WALL_H) : null, draw: () => flatRoofTile(ctx, camera, building, x, y, edge, alphaNow, covered) });
+        // (A box: lit by its outline, slab and coping; the merlons on top take the light behind them.)
+        drawables.push({ depth: depth(x, y) + 0.45, at: { x, y, h: (building.storeys ?? 1) * WALL_H + 8 }, size: [(building.storeys ?? 1) * WALL_H + 40, 52, 30], exact: true,
+          hull: () => alphaNow > 0.95 ? boxHull(camera, x, y, 1, 1, edge ? 9 : 5, (building.storeys ?? 1) * WALL_H) : null, draw: () => flatRoofTile(ctx, camera, building, x, y, edge, alphaNow, covered) });
       }
       return;
     }
@@ -2206,7 +2211,9 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   const fx0 = Math.floor(x0 / 4) * 4, fy0 = Math.floor(y0 / 4) * 4, fx1 = Math.ceil((x1 + 1) / 4) * 4 - 1, fy1 = Math.min(FLOOR_Y - 1, Math.ceil((y1 + 1) / 4) * 4 - 1);
   const fieldKey = `${fx0},${fy0},${fx1},${fy1},${lights.length},${low ? 1 : 0},${game.worldVersion ?? 0},${Math.round((sky.sun[0] + sky.sun[1] + sky.sun[2] + sky.ambient[0] + sky.ambient[1] + sky.ambient[2]) * 40)},${Math.round(sky.night * 40)}`;
   fieldFrame++;
-  if (fieldKey !== fieldKeyPrev || field.world !== world || (fieldFrame & 1) === 0) { field.build(world, TERRAIN_COLORS, sky, lights, fx0, fy0, fx1, fy1, low ? 1 : 2); fieldKeyPrev = fieldKey; }
+  // (Flames flicker, so a field with point lights in it is rebuilt every other frame; one lit by the sky alone only
+  // drifts with the time of day, so every eighth.)
+  if (fieldKey !== fieldKeyPrev || field.world !== world || (lights.length > 0 ? (fieldFrame & 1) === 0 : (fieldFrame & 7) === 0)) { field.build(world, TERRAIN_COLORS, sky, lights, fx0, fy0, fx1, fy1, low ? 1 : 2); fieldKeyPrev = fieldKey; }
   lap("light field");
   // The ground's light: the sky where there's no ground, the light map laid on the land, then the sun's shadows.
   const lb = bufs.light;
@@ -2305,6 +2312,11 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   // The haze on the land (Low doesn't draw far enough to need it, and there's none underground).
   const hb = bufs.haze, hazy = !low && !underground && field.buildHaze(here.x, here.y, HAZE_START, DRAW_DISTANCE - 4);
   let hazeBottom = -Infinity;
+  /** Whether any of the ground behind the top of a screen rect is out in the haze. */
+  const overHaze = (rect: [number, number, number, number]) => {
+    for (const sx of [rect[0], (rect[0] + rect[2]) / 2, rect[2]]) { const t = toTile(camera, sx, rect[1], false); if (Math.hypot(t.x - here.x, t.y - here.y) > HAZE_START - 1) return true; }
+    return false;
+  };
   if (hazy) {
     hb.setTransform(LS, 0, 0, LS, 0, 0); hb.globalCompositeOperation = "source-over"; hb.imageSmoothingEnabled = true;
     hb.fillStyle = "#fff"; hb.fillRect(0, 0, VIEW.width, VIEW.height);
@@ -2337,6 +2349,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     }
     // The same drawing again, as a hole in the light buffer, filled with this thing's light.
     const light = litBy[index] ?? [1, 1, 1] as RGB, rect = drawable.box ?? (drawable.rect || drawable.at ? rectOf(drawable) : screen());
+    if (drawable.glows) { if (glow) paintEmitted(lb, light, Math.max(0.35, windowGlow), glow); return; }
     const count = hits.length, saved = texturesOn;
     const t1 = performance.now();
     // Walls, cliffs and ridge tiles are exactly their outlines on screen: one fill of their light each.
@@ -2360,7 +2373,9 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     if (glow) paintEmitted(lb, light, Math.max(0.35, windowGlow), glow);
     tLight += performance.now() - t1; const t2 = performance.now();
     // And into the haze, at its own distance (near things over far land stay clear).
-    if (hazy && rect[1] < hazeBottom) {
+    // (It only needs a haze of its own where it stands in front of hazy ground: zoomed out, the haze's ring can reach
+    // the bottom of the screen, but what's behind most things is still clear.)
+    if (hazy && rect[1] < hazeBottom && overHaze(rect)) {
       const at = drawable.at && drawable.at.y < FLOOR_Y - 0.5 ? drawable.at : here, far = Math.hypot(at.x - here.x, at.y - here.y);
       const t = Math.max(0, Math.min(1, (far - HAZE_START) / (DRAW_DISTANCE - 4 - HAZE_START))), clear = Math.round(255 * (1 - 0.97 * t * t * (3 - 2 * t)));
       if (hull && hull.length > 2) { hb.globalCompositeOperation = "source-over"; hb.fillStyle = `rgb(${clear},${clear},${clear})`; hb.beginPath(); hull.forEach(([hx, hy], i) => i ? hb.lineTo(hx, hy) : hb.moveTo(hx, hy)); hb.closePath(); hb.fill(); }
@@ -2377,6 +2392,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     tHaze += performance.now() - t2;
   });
   for (const [k, v] of [["obj_light", tLight], ["obj_haze", tHaze], ["obj_cuts", cuts]] as const) RENDER_PROFILE[k] = (RENDER_PROFILE[k] ?? v) * 0.9 + v * 0.1;
+  lap("obj_passes");
   // Anything that strayed outside its bounds is left as it is; then the light goes over the frame.
   if (lit && !low) { lb.globalCompositeOperation = "destination-over"; lb.fillStyle = "#fff"; lb.fillRect(0, 0, VIEW.width, VIEW.height); lb.globalCompositeOperation = "source-over"; }
   if (hazy) {
@@ -2390,7 +2406,9 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     tint.globalCompositeOperation = "multiply"; tint.fillStyle = rgbCss([207 / 255 * Math.min(1, sky[0] * 1.08), 215 / 255 * Math.min(1, sky[1] * 1.08), 220 / 255 * Math.min(1, sky[2] * 1.08)]); tint.fillRect(0, 0, tint.canvas.width, tint.canvas.height);
     tint.globalCompositeOperation = "source-over";
   }
+  lap("haze_comp");
   applyLight();
+  lap("apply_light");
   if (hazy) { target.save(); target.globalCompositeOperation = "lighter"; target.imageSmoothingEnabled = true; target.drawImage(bufs.hazeTint.canvas, 0, 0, VIEW.width, VIEW.height); target.restore(); }
   const overlays = uiQueue; uiQueue = null; uiTarget = null;
   lap("objects");

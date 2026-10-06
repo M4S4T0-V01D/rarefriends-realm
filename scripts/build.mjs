@@ -2,8 +2,9 @@
 // runtime page, then host/runtime.tsx replaces the runtime page's script with the save- and roster-aware host.
 import { context } from "esbuild";
 import { createRequire } from "node:module";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { buildGame } from "@rarefriends/friendsdk/build";
 import { createGameServer } from "@rarefriends/friendsdk/serve";
 
@@ -14,6 +15,16 @@ const args = process.argv.slice(2), option = name => { const index = args.indexO
 const dev = args.includes("--dev"), outdir = path.resolve(option("--outdir") ?? path.join(game, ".friendsdk"));
 
 const build = await buildGame(game, { outdir, watch: dev });
+// The world, baked in front of the game's script, so players don't wait for it to be generated (games/rarefriends-realm/
+// bake.ts). The dev server rebuilds the script as you edit, so it generates the world instead.
+if (!dev) {
+  const { generateWorld, WORLD_SEED } = await import(pathToFileURL(path.join(game, "world.ts")).href);
+  const { bakeWorld } = await import(pathToFileURL(path.join(game, "bake.ts")).href);
+  const { world, lift } = generateWorld(WORLD_SEED), script = path.join(outdir, "game.js");
+  // (In single quotes: JSON is full of double quotes, and escaping each one would add a sixth to the download.)
+  const literal = bakeWorld(world, lift, WORLD_SEED).replace(/[\\']/g, ch => `\\${ch}`).replace(/\n/g, "\\n").replace(/\r/g, "\\r");
+  await writeFile(script, `globalThis.__REALM_WORLD__='${literal}';\n${await readFile(script, "utf8")}`);
+}
 const host = await context({
   entryPoints: [path.join(root, "host/runtime.tsx")], outfile: path.join(outdir, "runtime.js"),
   bundle: true, format: "iife", platform: "browser", target: "es2022", jsx: "automatic", minify: true, logLevel: "warning",

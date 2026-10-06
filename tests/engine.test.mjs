@@ -2616,3 +2616,44 @@ test("The Palace of Raria: five floors under a spire, a four-wide door, and stai
   assert.equal(level, 4, "the stairs reach the fifth floor");
   assert(world.objects.some(o => o.name?.startsWith("The regalia of Raria") && floorAt(world, o.x, o.y)?.level === 4), "the regalia under the spire");
 });
+
+test("The baked world unbakes to the generated one: every tile, object, building and storey, and heights within a pixel", async () => {
+  const { generateWorld, WORLD_SEED, indexObjects, indexBuildings } = await import("../games/rarefriends-realm/world.ts");
+  const { bakeWorld, unbakeWorld } = await import("../games/rarefriends-realm/bake.ts");
+  const { world, lift } = generateWorld(WORLD_SEED);
+  // The maps the bake leaves out are rebuilt from the lists exactly.
+  assert.deepEqual(indexObjects(world.objects), world.objectAt, "the tile → object map rebuilds exactly");
+  assert.deepEqual(indexBuildings(world.buildings), world.buildingAt, "the tile → building map rebuilds exactly");
+  const t0 = performance.now(), text = bakeWorld(world, lift, WORLD_SEED), t1 = performance.now(), back = unbakeWorld(text), t2 = performance.now();
+  assert(back, "it unbakes");
+  for (const key of ["tiles", "region", "objectAt", "buildingAt"]) assert.deepEqual(back[key], world[key], `${key} survive the bake`);
+  // Plain data only: what JSON keeps is everything there was (no NaN, Infinity, functions or class instances).
+  const same = (a, b, path) => {
+    if (typeof a === "number") { assert(Object.is(a, b), `${path}: ${a} vs ${b}`); return; }
+    if (a === null || typeof a !== "object") { assert.equal(b, a, path); return; }
+    assert.equal(Array.isArray(b), Array.isArray(a), `${path}: array-ness`);
+    for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) { if (a[key] === undefined && b[key] === undefined) continue; same(a[key], b[key], `${path}.${key}`); }
+  };
+  for (const key of ["objects", "spawns", "places", "buildings", "floors", "ramparts"]) same(world[key], back[key], key);
+  let worst = 0; for (let i = 0; i < world.heights.length; i++) worst = Math.max(worst, Math.abs(world.heights[i] - back.heights[i]));
+  assert(worst < 0.5, `heights within half a pixel (worst ${worst})`);
+  console.log(`bake ${Math.round(t1 - t0)} ms, unbake ${Math.round(t2 - t1)} ms, ${Math.round(text.length / 1024)} KB`);
+  assert.equal(unbakeWorld(text.replace('"v":1', '"v":0')), null, "a bake from another version is refused");
+});
+
+test("Adaptive resolution: High drops to 1× after three slow seconds on a sharp screen, comes back with headroom, and gives up after two drops", async () => {
+  const { adapt, newAdaptive, HIGH_SCALE } = await import("../games/rarefriends-realm/adaptive.ts");
+  const a = newAdaptive();
+  assert.equal(adapt(a, 40, 20, 1), null, "nothing to lower on a 1× screen");
+  assert.equal(adapt(a, 30, 12, 2), null); assert.equal(adapt(a, 30, 12, 2), null);
+  assert.equal(adapt(a, 30, 12, 2), 1, "three slow seconds → 1×");
+  for (let i = 0; i < 5; i++) assert.equal(adapt(a, 10, 3, 2), null, "it settles before judging again");
+  for (let i = 0; i < 14; i++) assert.equal(adapt(a, 16.7, 4, 2), null);
+  assert.equal(adapt(a, 16.7, 4, 2), HIGH_SCALE, "fifteen easy seconds → back up");
+  for (let i = 0; i < 5; i++) adapt(a, 10, 3, 2);
+  adapt(a, 30, 12, 2); adapt(a, 30, 12, 2);
+  assert.equal(adapt(a, 30, 12, 2), 1, "slow again → down again");
+  for (let i = 0; i < 40; i++) assert.equal(adapt(a, 16.7, 4, 2), null, "after two drops it stays at 1×");
+  const b = newAdaptive(); adapt(b, 30, 12, 2); adapt(b, 15, 12, 2); adapt(b, 30, 12, 2);
+  assert.equal(adapt(b, 30, 12, 2), null, "a fast second in between starts the count again");
+});

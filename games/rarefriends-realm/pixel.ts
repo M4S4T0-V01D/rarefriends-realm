@@ -121,6 +121,8 @@ export type SpriteDraw = { art: HTMLCanvasElement; x: number; y: number; w: numb
 let recording: SpriteDraw[] | null = null;
 /** Every drawPixels call is noted in `list` until recording stops (null). */
 export function recordSprites(list: SpriteDraw[] | null) { recording = list; }
+/** Note a draw made some other way (a Friend's mask) as if it were pixel art, while recording. */
+export function noteSprite(art: HTMLCanvasElement, x: number, y: number, w: number, h: number, alpha = 1) { if (recording) recording.push({ art, x, y, w, h, alpha }); }
 /**
  * Art scaled up once and kept, so a frame's hundreds of sprites are plain copies (a scaled draw costs more wherever the
  * canvas is drawn in software). A size is only kept once it's been asked for in two frames (zooming asks for a new size

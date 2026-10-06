@@ -45,6 +45,7 @@ import { T, groundHeight, isUnderground, isWater, mainlandToWorld, realPoint, re
 const THRONE = { x: mainlandToWorld(177, 212)[0], y0: mainlandToWorld(177, 212)[1], y1: mainlandToWorld(177, 236)[1] };
 import { burst } from "./effects.ts";
 import { textureStats } from "./textures.ts";
+import { adapt, newAdaptive } from "./adaptive.ts";
 import "@rarefriends/friendsdk/frame.css";
 import "./style.css";
 
@@ -80,7 +81,8 @@ const perf = { ms: 0, frames: 0, interval: 16.7, lastFrame: 0 };
  * crisply either way, and 1.5× has about half the pixels of 2× to light and shade).
  */
 const isLow = (settings: Settings) => settings.graphics === "low";
-const HIGH_SCALE = 1.5;
+/** High's resolution, lowered when the machine can't keep up (see adaptive.ts). */
+const adaptive = newAdaptive();
 let fixedWeather: Weather | null = typeof navigator !== "undefined" && navigator.webdriver ? { rain: 0, storm: false, fog: 0 } : null;
 let lastThunder = -1;
 const timeOfDay = () => fixedTime ?? ((Date.now() / DAY_MS + 0.3) % 1);
@@ -163,7 +165,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       const view = canvas.current;
       // Low graphics draws at one pixel per CSS pixel (a sharp screen at 2× costs four times the pixels).
       const low = isLow(live.current.settings);
-      if (view) { const ratio = low ? 1 : Math.min(window.devicePixelRatio || 1, HIGH_SCALE); view.width = Math.round(logical.width * scale * ratio); view.height = Math.round(logical.height * scale * ratio); }
+      if (view) { const ratio = low ? 1 : Math.min(window.devicePixelRatio || 1, adaptive.cap); view.width = Math.round(logical.width * scale * ratio); view.height = Math.round(logical.height * scale * ratio); }
     };
     const observer = new ResizeObserver(measure); observer.observe(node); measure(); resizeRef.current = measure;
     return () => observer.disconnect();
@@ -342,7 +344,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         graphics: (level: "auto" | "high" | "low") => setSettings({ ...live.current.settings, graphics: level === "low" ? "low" : "high" }),
         /** How much your Friend talks (recordings keep it quiet). */
         speech: (level: "full" | "reduced" | "rare" | "off") => setSettings({ ...live.current.settings, friendSpeech: level }),
-        perf: () => ({ ms: Math.round(perf.ms * 100) / 100, fps: Math.round(1000 / perf.interval), quads: textureStats.last, parts: Object.fromEntries(Object.entries(RENDER_PROFILE).map(([k, v]) => [k, Math.round(v * 10) / 10])), low: isLow(live.current.settings) }),
+        perf: () => ({ ms: Math.round(perf.ms * 100) / 100, fps: Math.round(1000 / perf.interval), quads: textureStats.last, parts: Object.fromEntries(Object.entries(RENDER_PROFILE).map(([k, v]) => [k, Math.round(v * 10) / 10])), low: isLow(live.current.settings), scale: canvas.current ? Math.round(canvas.current.width / canvas.current.getBoundingClientRect().width * 100) / 100 : 0, cap: adaptive.cap }),
         boss: (ms: number | null) => { bossClock = ms === null ? null : () => ms; const state = game.current; if (state && ms !== null) { updateWorldBoss(state, ms); refresh(); } },
         view: (zoom: number, pitch: number, angle = 0) => { setSettings({ ...live.current.settings, zoom }); camera.current.pitch = pitch; camera.current.angle = angle; cameraGoal.current = null; },
         screenOf: (x: number, y: number) => {
@@ -386,9 +388,10 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   // ---------- The loop: game ticks, events, camera, drawing ----------
   useEffect(() => {
     if (phase !== "title" && phase !== "playing") return;
-    const node = canvas.current, ctx = node?.getContext("2d"), mini = minimap.current?.getContext("2d");
+    // The frame is opaque (the sky or the dark is painted under everything), which is cheaper to put on screen.
+    const node = canvas.current, ctx = node?.getContext("2d", { alpha: false }), mini = minimap.current?.getContext("2d");
     if (!node || !ctx) return;
-    let frame = 0, lastHud = 0, dropId = 0, lastFrame = 0;
+    let frame = 0, lastHud = 0, dropId = 0, lastFrame = 0, lastAdapt = 0;
     tickAt.current = performance.now();
     const loop = (now: number, viaTimer = false) => {
       if (!viaTimer) frame = requestAnimationFrame(loop);
@@ -545,6 +548,11 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       // The real frame rate (it counts the GPU's work too); hitches and hidden tabs are left out.
       const gap = now - perf.lastFrame; perf.lastFrame = now;
       if (gap > 0 && gap < 250 && document.visibilityState === "visible") perf.interval = perf.interval * 0.97 + gap * 0.03;
+      // Once a second, High checks it's keeping up, and draws fewer pixels if it isn't.
+      if (now - lastAdapt > 1000 && document.visibilityState === "visible") {
+        lastAdapt = now;
+        if (!isLow(live.current.settings) && adapt(adaptive, perf.interval, perf.ms, window.devicePixelRatio || 1) !== null) resizeRef.current?.();
+      }
       if (mini && current === "playing" && now - lastHud > 90) {
         lastHud = now; const size = mini.canvas.width;
         renderMinimap(mini, state, size, miniZoom.current * (size / 152), camera.current.angle, players.current.view(now), guideTarget);
