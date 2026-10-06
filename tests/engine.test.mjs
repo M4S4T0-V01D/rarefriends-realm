@@ -2571,6 +2571,33 @@ test("Feedback: an X post tagging the Realm and its maker, and a GitHub issue wi
   assert.equal(FEEDBACK_REPO, "M4S4T0-V01D/rarefriends-realm");
 });
 
+test("Raria's walls stand three storeys high under taller towers, and the Cathedral's bell tower is climbed to the Great Bell", async () => {
+  const { RARIA_CITY } = await import("../games/rarefriends-realm/farwest.ts");
+  const g = newGame(), world = g.world;
+  const rampart = world.ramparts?.find(r => r.x0 === RARIA_CITY.x0 && r.y1 === RARIA_CITY.y1);
+  assert(rampart && rampart.storeys >= 3, "the city wall is three storeys high");
+  const wallTop = rampart.storeys * 42 + 17;
+  const towers = world.buildings.filter(b => b.name === "A tower of Raria's wall" || b.name === "A gatehouse tower");
+  assert(towers.length >= 16 && towers.every(b => (b.storeys ?? 1) * 42 + (b.tall ?? 0) > wallTop + 20), "every wall tower stands above the wall");
+  const palace = world.buildings.find(b => b.name === "The Palace of Raria"), nave = world.buildings.find(b => b.name === "The Cathedral of the Wise Friend");
+  const bells = world.buildings.find(b => b.name === "The Bell Tower of the Cathedral");
+  assert(nave && bells && nave.color === palace.color && bells.color === palace.color, "the cathedral in the palace's colours");
+  assert(nave.x1 < palace.x0 && (nave.x1 - nave.x0 + 1) * (nave.y1 - nave.y0 + 1) >= 400, "a great nave of its own, apart from the palace");
+  assert((bells.storeys ?? 1) >= 8 && bells.roof === "cone" && (bells.spire ?? 0) >= 250, "a bell tower eight storeys high under a spire");
+  // From the tower's door, climb ladder after ladder to the belfry.
+  let at = world.objects.find(o => o.name === "Bell tower ladder" && o.action === "Climb-up" && o.y < 520), level = 0, climbs = 0;
+  while (at) {
+    climbs++; level = floorAt(world, at.to.x, at.to.y)?.level ?? 0;
+    const here = level;
+    at = world.objects.find(o => o.name === "Bell tower ladder" && o.action === "Climb-up" && floorAt(world, o.x, o.y)?.level === here && floorAt(world, o.x, o.y)?.complex === bells.complex);
+  }
+  assert.equal(level, 7, "the ladders reach the top floor of the tower");
+  assert.equal(climbs, 7, "seven ladders, floor by floor");
+  assert(world.objects.some(o => o.decor === "bell" && floorAt(world, o.x, o.y)?.level === 7 && floorAt(world, o.x, o.y)?.complex === bells.complex), "the Great Bell at the top");
+  // Every ladder lands on open floor.
+  for (const o of world.objects.filter(o => o.name === "Bell tower ladder")) assert(canWalk(g, o.to.x, o.to.y), `ladder at ${o.x},${o.y} lands on open floor`);
+});
+
 test("The Palace of Raria: five floors under a spire, a four-wide door, and stairs to the top", async () => {
   const { RARIA_CITY } = await import("../games/rarefriends-realm/farwest.ts");
   const g = newGame(), world = g.world, palace = world.buildings.find(b => b.name === "The Palace of Raria");

@@ -68,7 +68,7 @@ export type DecorKind =
   | "throne" | "armour" | "logpile" | "stump" | "target" | "ruin_wall" | "old_friend" | "tomb" | "crypt" | "obelisk" | "bones" | "hearth" | "monument"
   | "god_diamond" | "god_ink" | "god_sol" | "god_hood" | "god_ember"
   // Return of Raria: the Wise Friend and the Order of Dusk's god, and the things factions leave about.
-  | "god_dusk" | "wise_friend" | "cannon" | "device" | "wagon" | "watchtower" | "stake" | "plaque" | "banner_fff" | "banner_rrr" | "banner_hollowmere"
+  | "god_dusk" | "wise_friend" | "bell" | "cannon" | "device" | "wagon" | "watchtower" | "stake" | "plaque" | "banner_fff" | "banner_rrr" | "banner_hollowmere"
   | "banner_diamond" | "banner_ink" | "banner_sol" | "banner_hood" | "banner_ember" | "banner_dusk";
 /** A monument's state: whole on its plinth, toppled and lying, broken off at the waist, or sunk to the chest in the ground. */
 export type MonumentState = "whole" | "toppled" | "broken" | "buried";
@@ -200,12 +200,16 @@ export type Building = {
 };
 /** An upper storey: the real rectangle it covers and where its tiles are stored (real + (dx, dy)). */
 export type Floor = { complex: string; level: number; x0: number; y0: number; x1: number; y1: number; dx: number; dy: number };
+/** A city wall standing taller than a storey: the outline of the rectangle, `storeys` high, battlemented. */
+export type Rampart = { x0: number; y0: number; x1: number; y1: number; storeys: number };
 export type World = {
   tiles: Uint8Array; region: Uint8Array; objects: WorldObject[]; objectAt: Int32Array; spawns: SpawnDef[];
   buildings: Building[];
   floors: Floor[];
   /** 1 + the index of the (outermost) building covering each tile, or 0. */
-  buildingAt: Uint8Array;
+  buildingAt: Uint16Array;
+  /** City walls taller than a storey: the outline of each rectangle is drawn `storeys` high, with battlements. */
+  ramparts?: Rampart[];
   /** Ground height (world pixels) at every tile corner: (W + 1) × (H + 1), corner (i, j) sits at (i − ½, j − ½). */
   heights: Float32Array;
   places: Record<"spawn" | "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier" | "crypt" | "depths" | "king" | "fernwick" | "highcairn" | "dawnhold" | "gravesend" | "saltmarrow" | "hollyhock" | "dyemoor" | "tallgrass" | "cragmaw" | "quillhaven" | "raria" | "fff_fortress" | "barkreach" | "ashfall" | "ring", { x: number; y: number }>;
@@ -237,7 +241,7 @@ export const inBounds = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y
 /** Everything a world generator needs: the arrays it paints into and the dice it rolls. */
 export type GenContext = {
   W: number; H: number; tiles: Uint8Array; region: Uint8Array; objectAt: Int32Array; lift: Float32Array;
-  objects: WorldObject[]; spawns: SpawnDef[]; buildings: Building[]; doorways: [number, number][];
+  objects: WorldObject[]; spawns: SpawnDef[]; buildings: Building[]; doorways: [number, number][]; ramparts?: Rampart[];
   random: () => number; noise: (x: number, y: number) => number; noise2: (x: number, y: number) => number;
 };
 /** The painting, placing and building helpers, bound to a context (the mainland's own arrays, or the whole world's). */
@@ -1160,7 +1164,7 @@ function buildMainland(seed: number) {
     spawn: { x: 121, y: 123 }, hollow_square: { x: 121, y: 122 }, emberforge: { x: 162, y: 49 }, oasis: { x: 186, y: 115 },
     frostpeak: { x: 195, y: 34 }, pier: { x: 178, y: 150 }, crypt: { x: 40, y: 180 }, depths: { x: 122, y: 188 }, king: { x: 198, y: 224 },
   };
-  const buildingAt = new Uint8Array(W * H);
+  const buildingAt = new Uint16Array(W * H);
   buildings.forEach((b, index) => { if (b.roof === "none") return; for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) buildingAt[y * W + x] = index + 1; });
   // Shop and bank signs: a hanging board outside each door, painted with what's sold inside, so they're easy to tell apart.
   const SIGNS: Record<string, [string, string]> = {
@@ -1269,12 +1273,12 @@ export function createWorld(seed = 20260927): World {
   const floors: Floor[] = old.floors.map(f => ({ ...f, x0: f.x0 + WEST_DX, x1: f.x1 + WEST_DX }));
   const places = Object.fromEntries(Object.entries(old.places).map(([key, at]) => [key, { x: at.x + WEST_DX, y: at.y }])) as World["places"];
   // The far west: a second continent, Raria and BarkReach.
-  const ctx: GenContext = { W, H, tiles, region, objectAt, lift, objects, spawns, buildings, doorways: [], random: mulberry(seed + 9191), noise: makeNoise(seed + 71, 11), noise2: makeNoise(seed + 83, 4) };
+  const ctx: GenContext = { W, H, tiles, region, objectAt, lift, objects, spawns, buildings, doorways: [], ramparts: [], random: mulberry(seed + 9191), noise: makeNoise(seed + 71, 11), noise2: makeNoise(seed + 83, 4) };
   buildFarWest(ctx, worldTools(ctx), places, floors);
   for (const object of objects) if (object.name === "__removed") object.blocks = false;
-  const buildingAt = new Uint8Array(W * H);
+  const buildingAt = new Uint16Array(W * H);
   buildings.forEach((b, index) => { if (b.roof === "none") return; for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) buildingAt[y * W + x] = index + 1; });
-  return { tiles, region, objects, objectAt, spawns, places, heights: buildHeights(tiles, seed, lift), buildings, buildingAt, floors };
+  return { tiles, region, objects, objectAt, spawns, places, heights: buildHeights(tiles, seed, lift), buildings, buildingAt, floors, ramparts: ctx.ramparts };
 }
 /** The world as it was before the far west: the mainland set into the wider world, and the wider world built round it, LEGACY_W wide. */
 function buildLegacyWorld(seed: number) {
@@ -1313,7 +1317,7 @@ const ROOF_COLORS = ["#c99a96", "#9aab92", "#8f9cb2", "#cdb98a", "#a996b5"];
 const TREE_NAMES: Record<TreeKind, string> = { tree: "Tree", oak: "Oak", willow: "Willow", maple: "Maple tree", yew: "Yew", ashwood: "Ashwood", palm: "Palm tree", pine: "Pine tree", deadwood: "Dead tree", redwood: "Redwood", ironbark: "Ironbark" };
 const DECOR_NAMES: Record<DecorKind, string> = {
   monument: "Statue", god_diamond: "Statue of the Good Friend", god_ink: "Statue of the Squid Friend", god_sol: "Statue of the Weird Friend", god_hood: "Statue of the Hood Friend", god_ember: "The Ember, in its brazier",
-  god_dusk: "Statue of the Wise Friend, blindfolded", wise_friend: "The Wise Friend", cannon: "Magical cannon", device: "Federation device", wagon: "Supply wagon", watchtower: "Watchtower", stake: "Stake wall", plaque: "Inscribed plaque", banner_fff: "The Federation's banner", banner_rrr: "The Regiment's banner", banner_hollowmere: "Hollowmere's banner", banner_diamond: "The Order of the Diamond's banner", banner_ink: "The Order of the Ink's banner", banner_sol: "The Order of the Sol's banner", banner_hood: "The Order of the Hood's banner", banner_ember: "The Order of the Ember's banner", banner_dusk: "The Order of Dusk's banner",
+  god_dusk: "Statue of the Wise Friend, blindfolded", wise_friend: "The Wise Friend", bell: "Great bell", cannon: "Magical cannon", device: "Federation device", wagon: "Supply wagon", watchtower: "Watchtower", stake: "Stake wall", plaque: "Inscribed plaque", banner_fff: "The Federation's banner", banner_rrr: "The Regiment's banner", banner_hollowmere: "Hollowmere's banner", banner_diamond: "The Order of the Diamond's banner", banner_ink: "The Order of the Ink's banner", banner_sol: "The Order of the Sol's banner", banner_hood: "The Order of the Hood's banner", banner_ember: "The Order of the Ember's banner", banner_dusk: "The Order of Dusk's banner",
   flowers: "Flowers", bush: "Bush", boulder: "Boulder", lamp: "Lamp post", bench: "Bench", crate: "Crate", barrel: "Water barrel", tent: "Tent",
   cactus: "Cactus", pine: "Pine tree", dead_tree: "Dead tree", statue: "Statue", grave: "Grave", fence: "Fence", reeds: "Reeds", table: "Table",
   bed: "Bed", shelf: "Shelves", pillar: "Pillar", rubble: "Rubble", snowman: "Snow Friend", lily: "Lily pad", banner: "Banner", torch: "Torch",

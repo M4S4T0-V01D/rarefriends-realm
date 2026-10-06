@@ -185,11 +185,14 @@ export function buildFarWest(ctx: GenContext, t: Tools, places: World["places"],
     ground(cx, cy, (x1 - x0) / 2 + 3, (y1 - y0) / 2 + 3, null);
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { put(x, y, x === x0 || x === x1 || y === y0 || y === y1 ? T.WALL : T.COBBLE); lift[tileIndex(x, y)] = 0; }
     for (let d = -1; d <= 1; d++) { put(cx + d, y0, T.COBBLE); put(cx + d, y1, T.COBBLE); put(x0, cy + d, T.COBBLE); put(x1, cy + d, T.COBBLE); }
+    // The wall itself stands three storeys high, battlemented; its towers rise well above it.
+    const RAMPART = 3;
+    ctx.ramparts?.push({ x0, y0, x1, y1, storeys: RAMPART });
     // Towers on the wall: corner and mid-wall turrets (round, cone-roofed), the wall itself running between.
     for (const [tx, ty] of [[x0, y0], [x1 - 4, y0], [x0, y1 - 4], [x1 - 4, y1 - 4], [cx - 30, y0], [cx + 26, y0], [cx - 30, y1 - 4], [cx + 26, y1 - 4]] as const)
-      building(tx, ty, tx + 4, ty + 4, "s", T.STONE, undefined, { name: "A tower of Raria's wall", color: "#3b2a52", walls: "stone", roof: "cone", round: true, tall: 14, spire: 10 });
+      building(tx, ty, tx + 4, ty + 4, "s", T.STONE, undefined, { name: "A tower of Raria's wall", color: "#3b2a52", walls: "stone", roof: "cone", round: true, tall: RAMPART * 42 + 70, spire: 50 });
     // Gatehouses: a taller round tower either side of each of the four gates, standing out from the wall.
-    const gateTower = (tx: number, ty: number, door: "n" | "s" | "e" | "w") => building(tx, ty, tx + 4, ty + 4, door, T.STONE, undefined, { name: "A gatehouse tower", color: "#5b4a78", walls: "stone", roof: "cone", round: true, tall: 20, spire: 14 });
+    const gateTower = (tx: number, ty: number, door: "n" | "s" | "e" | "w") => building(tx, ty, tx + 4, ty + 4, door, T.STONE, undefined, { name: "A gatehouse tower", color: "#5b4a78", walls: "stone", roof: "cone", round: true, tall: RAMPART * 42 + 110, spire: 60 });
     for (const tx of [cx - 7, cx + 3]) { gateTower(tx, y0 - 1, "s"); gateTower(tx, y1 - 3, "n"); }
     for (const ty of [cy - 7, cy + 3]) { gateTower(x0 - 1, ty, "e"); gateTower(x1 - 3, ty, "w"); }
     // The palace gardens round the palace: clipped grass, hedges, flowers, four statues of the Wise Friend, a fountain.
@@ -283,9 +286,54 @@ export function buildFarWest(ctx: GenContext, t: Tools, places: World["places"],
     building(x0 + 34, y1 - 20, x0 + 46, y1 - 8, "n", T.STONE, undefined, { name: "The Regimental Stores", color: "#9ea3ad", walls: "stone" }); npc("raria_armourer", x0 + 40, y1 - 14); for (const dx of [36, 39, 42, 45]) decor(x0 + dx, y1 - 18, "armour", true, "Rarian steel, blessed before issue");
     building(cx + 12, y1 - 20, cx + 26, y1 - 8, "n", T.STONE, undefined, { name: "The Rangers' Gallery", color: "#2a2238", walls: "stone" }); monster("royal_ranger", cx + 19, y1 - 14, 0); decor(cx + 14, y1 - 18, "armour", true, "Dusk-black longbows. Nobody is allowed to count them."); decor(cx + 24, y1 - 18, "target", true, "A target with one arrow in it, through the centre, through the one before");
     for (const x of [x1 - 24, x1 - 20, x1 - 16, x1 - 12, x1 - 8]) decor(x, y1 - 20, "target", true, "A Regiment target, every arrow in the same hole"); for (const x of [x1 - 22, x1 - 14, x1 - 6]) decor(x, y1 - 10, "stake", true, "Practice stakes"); npc("rrr_soldier", x1 - 16, y1 - 14, 3); npc("rrr_soldier", x1 - 10, y1 - 14, 3);
-    // West: the residential quarter, every house the same, and the Book of the Law in each.
+    // West, north of the boulevard: the Cathedral of the Wise Friend, in the palace's violet stone and as tall as it: a
+    // nave of four storeys, and beside it a bell tower of eight, climbed by ladders all the way up to the Great Bell.
+    {
+      const NX0 = x0 + 12, NX1 = x0 + 33, NY0 = cy - 29, NY1 = cy - 6, mx = Math.floor((NX0 + NX1) / 2);
+      building(NX0, NY0, NX1, NY1, "s", T.STONE, undefined, { name: "The Cathedral of the Wise Friend", color: "#3b2a52", walls: "stone", roof: "gable", storeys: 4, tall: 24 });
+      for (const dx of [-1, 2]) { put(mx + dx, NY1, T.STONE); ctx.doorways.push([mx + dx, NY1]); }
+      // The nave: a carpet up the aisle to the Wise Friend, pillars down both sides, pews between, candles and banners.
+      for (let y = NY0 + 1; y < NY1; y++) for (let x = mx - 1; x <= mx + 2; x++) put(x, y, T.CARPET);
+      for (let y = NY0 + 4; y <= NY1 - 3; y += 4) for (const x of [NX0 + 4, NX1 - 4]) decor(x, y, "pillar", true, "A pillar of the nave, violet stone, carved with the First Law all the way up");
+      for (let y = NY0 + 8; y <= NY1 - 3; y += 2) for (const x of [mx - 5, mx - 4, mx - 3, mx + 4, mx + 5, mx + 6]) if (!occupied(x, y)) decor(x, y, "bench", true, "A pew of the Cathedral, every one facing the Wise Friend");
+      decor(mx, NY0 + 2, "wise_friend", true, "The Wise Friend of the Cathedral: twice a man's height, ivory, blindfolded, the book open at the First Law");
+      decor(mx + 1, NY0 + 2, "throne", true, "The Queen's seat in the Cathedral, beside the Wise Friend and a step below it");
+      for (const x of [mx - 3, mx + 4]) { decor(x, NY0 + 2, "torch"); decor(x, NY0 + 5, "lamp"); }
+      for (const x of [NX0 + 2, NX1 - 2]) { decor(x, NY0 + 2, "banner_dusk"); decor(x, NY1 - 2, "banner_rrr"); decor(x, NY0 + 12, "torch"); }
+      decor(NX0 + 2, NY0 + 7, "shelf", true, "Hymnals of the Law: every verse a Law, every Law a verse"); decor(NX1 - 2, NY0 + 7, "chest", true, "The Cathedral's plate, locked");
+      npcAt("raria_villager", mx - 6, NY0 + 14, 3); npcAt("raria_villager", mx + 6, NY0 + 18, 3);
+      npc("rrr_soldier", mx - 2, NY1 + 1, 1); npc("rrr_soldier", mx + 3, NY1 + 1, 1);
+      for (let y = NY1 + 1; y <= cy - 3; y++) for (let x = NX0 - 9; x <= NX1; x++) if (get(x, y) === T.COBBLE && !occupied(x, y)) put(x, y, T.STONE);
+      // The bell tower: eight storeys and a spire, its door on the cathedral's square, ladders from floor to floor.
+      const BELLS = "raria_bells", LEVELS_B = 7, TX0 = NX0 - 8, TY0 = cy - 16, TX1 = TX0 + 6, TY1 = TY0 + 6;
+      building(TX0, TY0, TX1, TY1, "s", T.STONE, undefined, { name: "The Bell Tower of the Cathedral", color: "#3b2a52", walls: "stone", roof: "cone", storeys: LEVELS_B + 1, tall: 60, spire: 300, complex: BELLS });
+      for (let y = TY1 + 1; y <= cy - 3; y++) for (const x of [TX0 + 3, TX0 + 4]) { clearAt(x, y); put(x, y, T.STONE); }
+      const TOWER_FLOORS: Floor[] = Array.from({ length: LEVELS_B }, (_, i) => ({ complex: BELLS, level: i + 1, x0: TX0, y0: TY0, x1: TX1, y1: TY1, dx: 60 + i * 9 - TX0, dy: FLOOR_Y + 2 - TY0 }));
+      floors.push(...TOWER_FLOORS);
+      const bAt = (level: number, col: number, row: number) => ({ x: TX0 + col + (level ? TOWER_FLOORS[level - 1].dx : 0), y: TY0 + row + (level ? TOWER_FLOORS[level - 1].dy : 0) });
+      for (let level = 1; level <= LEVELS_B; level++) for (let row = 0; row <= TY1 - TY0; row++) for (let col = 0; col <= TX1 - TX0; col++) {
+        const { x, y } = bAt(level, col, row), edge = col === 0 || row === 0 || col === TX1 - TX0 || row === TY1 - TY0;
+        put(x, y, edge ? T.WALL : T.STONE); t.setRegion(x, y, "raria");
+      }
+      // Ladders zig-zag up the tower: east corner, west corner, east again, each landing a step in from its ladder.
+      const bCorner = (level: number) => level % 2 === 0 ? TX1 - TX0 - 1 : 1, bInward = (col: number) => col === 1 ? 2 : col - 1;
+      for (let level = 0; level < LEVELS_B; level++) {
+        const col = bCorner(level);
+        add({ kind: "ladder", ...bAt(level, col, 1), blocks: true, name: "Bell tower ladder", action: "Climb-up", to: bAt(level + 1, bInward(col), 2) });
+        add({ kind: "ladder", ...bAt(level + 1, col, 1), blocks: true, name: "Bell tower ladder", action: "Climb-down", to: bAt(level, bInward(col), 2) });
+      }
+      const inTower = (level: number, col: number, row: number, kind: DecorKind, name?: string, blocks = true) => { const p = bAt(level, col, row); decor(p.x, p.y, kind, blocks, name); };
+      inTower(0, 1, 5, "torch"); inTower(0, 5, 5, "plaque", "THE BELL TOWER OF THE CATHEDRAL. Eight storeys. The Great Bell rings the hours of the Law. Climb quietly.");
+      for (let level = 1; level < LEVELS_B; level++) { inTower(level, level % 2 ? 5 : 1, 5, "torch"); if (level % 3 === 0) inTower(level, 3, 4, "crate", "Bell rope, coiled, and spare clappers"); }
+      inTower(3, 1, 4, "bench", "A bench for the bell-ringers to get their breath");
+      // The belfry: the Great Bell of Raria, and the whole city below.
+      inTower(LEVELS_B, 3, 4, "bell", "The Great Bell of Raria: bronze, taller than you, cast with the First Law round its lip. It rings the hours, and once more for every Name struck from the Ledger.");
+      inTower(LEVELS_B, 1, 5, "banner_rrr"); inTower(LEVELS_B, 5, 5, "banner_dusk");
+    }
+    // West: the residential quarter, every house the same, and the Book of the Law in each (south of the boulevard:
+    // the cathedral stands north of it).
     for (let hy = cy - 30; hy <= cy + 26; hy += 9) for (let hx = x0 + 4; hx <= x0 + 28; hx += 9) {
-      if (Math.abs(hy + 2 - cy) <= 3) continue;
+      if (Math.abs(hy + 2 - cy) <= 3 || hy < cy) continue;
       const door = hy < cy ? "s" : "n";
       const look = (hx * 7 + hy * 13) % 6;
       building(hx, hy, hx + 6, hy + 5, door, T.WOOD, undefined, { name: "A Rarian house", color: ROOFS[look], walls: look % 2 ? "timber" : "stone", storeys: look % 3 === 0 ? 2 : 1, chimney: look !== 4 });

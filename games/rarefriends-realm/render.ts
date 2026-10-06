@@ -1194,6 +1194,22 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
         return hit(84, 56);
       }
       case "grave": box(ctx, camera, ox, oy, 0.3, 0.6, 18, "#c8c5be", "#a9a59e", "#9a968f"); return hit(24, 24);
+      case "bell": {
+        // A great bell in its frame: two oak posts and a beam, the bronze bell hung from it, swaying a little.
+        const swing = scene.reducedMotion ? 0 : Math.sin(now / 1100 + ox) * 0.07;
+        for (const side of [-0.46, 0.46]) box(ctx, camera, ox + side, oy, 0.14, 0.14, 66, "#6b4a2c", "#7a5636", "#5f4128");
+        const pivot = toScreen(camera, ox, oy, 62);
+        ctx.save(); ctx.translate(pivot.x, pivot.y); ctx.rotate(swing);
+        const b = (px: number, py: number) => [px * z, py * z] as [number, number];
+        poly(ctx, [b(-4, 2), b(4, 2), b(7, 8), b(9, 26), b(17, 40), b(-17, 40), b(-9, 26), b(-7, 8)], "#b08d4a", INK, 1.4);
+        poly(ctx, [b(-4, 2), b(0, 2), b(-2, 8), b(-4, 26), b(-11, 39), b(-17, 40), b(-9, 26), b(-7, 8)], "#c9a85e", null);
+        ellipse(ctx, 0, 40 * z, 17 * z, 4 * z, "#7d6230", INK);
+        ellipse(ctx, 0, 44 * z, 3.5 * z, 3.5 * z, "#4a3a22", INK);
+        ctx.strokeStyle = INK; ctx.lineWidth = 1 * z; ctx.beginPath(); ctx.moveTo(-9 * z, 26 * z); ctx.lineTo(9 * z, 26 * z); ctx.stroke();
+        ctx.restore();
+        box(ctx, camera, ox, oy, 1.1, 0.18, 8, "#7a5636", "#6b4a2c", "#5f4128", 62);
+        return hit(74, 44);
+      }
       case "hearth": {
         // A stone hearth: a low block of masonry with a fire burning in its mouth and a warm glow on the floor.
         box(ctx, camera, ox, oy, 0.9, 0.55, 16, "#9f9a92", "#8a857d", "#767169", 0, INK, "brick");
@@ -1460,6 +1476,11 @@ function rotateLit(camera: Camera, e0: RoofVertex, r0: RoofVertex) {
   const { rx, ry } = rotate(camera, e0[0] - r0[0], e0[1] - r0[1]);
   return rx - ry < 0;
 }
+/** How many storeys high a city's rampart stands at a wall tile (0 when the wall is no rampart's). */
+const rampartAt = (world: World, x: number, y: number) => {
+  for (const r of world.ramparts ?? []) if (x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1 && (x === r.x0 || x === r.x1 || y === r.y0 || y === r.y1)) return r.storeys;
+  return 0;
+};
 /** Whether a tile lies on a building's outline. */
 const edgeOf = (building: Building, x: number, y: number) => x === building.x0 || x === building.x1 || y === building.y0 || y === building.y1;
 /** How far a palace's keep and its spire rise above the top of its roof. */
@@ -1788,7 +1809,8 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   // Hover highlight and click marker.
   const tileOutline = (tx: number, ty: number, color: string) => { const c = (dx: number, dy: number) => { const s = toScreen(camera, tx + dx, ty + dy); return [s.x, s.y] as const; }; poly(ctx, [c(-0.5, -0.5), c(0.5, -0.5), c(0.5, 0.5), c(-0.5, 0.5)], null, color, 1.5); };
   /** A wall tile: storeys of brick (with windows on buildings), cut low when it stands between you and the camera inside. */
-  const wall = (x: number, y: number, storeys: number, cut: boolean, near: boolean, windows: boolean, battlement = false, style: Building["walls"] = "stone", tall = 0, joined?: (nx: number, ny: number) => boolean) => {
+  const wall = (x: number, y: number, storeys: number, cut: boolean, near: boolean, windows: boolean, battlement = false, style: Building["walls"] = "stone", tall = 0, joined?: (nx: number, ny: number) => boolean, crown = false) => {
+    if (crown) tall += 17;
     const d = depth(x, y), dungeon = isUnderground(y), timber = style === "timber";
     // Under a roof you can see, a wall's inward faces can't be seen: skip them (they're half the work).
     const owner = !dungeon && inBounds(x, y) ? world.buildingAt[y * W + x] : 0, roofed = owner > 0 && (roofAlpha.get(owner - 1) ?? 0) > 0.95 && !cut;
@@ -1808,7 +1830,9 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       else {
         for (let k = 0; k < storeys; k++) box(ctx, camera, x, y, 1, 1, WALL_H, top, left, right, k * WALL_H, INK, windows && hash(x, y + k * 7) < 0.34 ? glazed(k) : plain, hidden);
         // A tower taller than its floors: more wall above, with a string course of stone between.
-        if (tall) { box(ctx, camera, x, y, 1.04, 1.04, 4, top, shadeHex(left, 0.06), shadeHex(right, 0.06), storeys * WALL_H, INK, null, hidden); box(ctx, camera, x, y, 1, 1, tall - 4, top, left, right, storeys * WALL_H + 4, INK, windows && hash(x, y + 91) < 0.28 ? glazed(storeys) : plain, hidden); }
+        // A rampart: a wall-walk's coping, and a merlon on every other tile.
+        if (crown) { box(ctx, camera, x, y, 1.06, 1.06, 5, top, shadeHex(left, 0.06), shadeHex(right, 0.06), storeys * WALL_H, INK, "brick", hidden); if ((Math.round(x) + Math.round(y)) % 2 === 0) box(ctx, camera, x, y, 0.62, 0.62, 12, top, left, right, storeys * WALL_H + 5, INK, "brick"); }
+        else if (tall) { box(ctx, camera, x, y, 1.04, 1.04, 4, top, shadeHex(left, 0.06), shadeHex(right, 0.06), storeys * WALL_H, INK, null, hidden); box(ctx, camera, x, y, 1, 1, tall - 4, top, left, right, storeys * WALL_H + 4, INK, windows && hash(x, y + 91) < 0.28 ? glazed(storeys) : plain, hidden); }
       }
       ctx.globalAlpha = 1;
     } });
@@ -1895,9 +1919,11 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
         return inBounds(tx, ty) && world.tiles[ty * W + tx] === T.WALL && world.buildingAt[ty * W + tx] === owner && !(inside !== null && complexAt(world, tx, ty) === inside) && !faded(tx, ty);
       };
       // Tall buildings show every storey from outside; inside, only the storey you're on (and the ones below).
-      wall(x, y, mine ? 1 : building?.storeys ?? 1, cut, near, !!owner && !cut, false, building?.walls ?? "stone", mine ? 0 : building?.tall ?? 0, joined);
+      // A city's rampart stands storeys high, battlemented, wherever no building owns the wall.
+      const rampart = building || mine ? 0 : rampartAt(world, x, y);
+      wall(x, y, mine ? 1 : building?.storeys ?? (rampart || 1), cut, near, !!owner && !cut, false, building?.walls ?? "stone", mine ? 0 : building?.tall ?? 0, joined, rampart > 0);
       // Walls not under a roof cast their own shadows (a building's are cast whole).
-      if (!building || building.roof === "none") blockers.push([x, y, (building?.storeys ?? 1) * WALL_H]);
+      if (!building || building.roof === "none") blockers.push([x, y, (building?.storeys ?? (rampart || 1)) * WALL_H]);
     } else if (y < FLOOR_Y && !isUnderground(y) && world.buildingAt[y * W + x] && (world.buildings[world.buildingAt[y * W + x] - 1].storeys ?? 1) > 1 && edgeOf(world.buildings[world.buildingAt[y * W + x] - 1], x, y)
       && !(inside !== null && complexAt(world, x, y) === inside) && !(Math.abs(x - pp.x) + Math.abs(y - pp.y) < 7 && depth(x, y) > playerDepth + 0.5 && !floor)) {
       // A doorway in a tall building is one storey high: the wall carries on above it.

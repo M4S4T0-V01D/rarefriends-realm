@@ -4,6 +4,11 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 74, date: "2026-10-06", title: "Raria's high walls and the Cathedral of the Wise Friend", items: [
+    "Raria's city wall stands three storeys high now, with a wall-walk and battlements all the way round. Every tower on it, and the gatehouse towers either side of the four gates, rises well above the wall under a taller spire.",
+    "The Cathedral of the Wise Friend stands on the west side of the city, north of the west boulevard and apart from the palace, in the palace's own violet stone. Inside the great nave a carpet runs up the aisle between pillars and pews to the Wise Friend and the Queen's seat.",
+    "Beside it rises the Bell Tower: eight storeys under a tall slate spire. Climb its ladders floor by floor, all the way to the belfry, where the Great Bell of Raria hangs over the whole city.",
+  ] },
   { id: 73, date: "2026-10-06", title: "The Palace of Raria rises five storeys under a spire", items: [
     "The palace in the heart of Raria is five storeys tall now, and you can see it from across the city: a great hall of stone under a hipped roof, a keep rising from its middle, and a tall slate spire with the royal pennant on top. Its four corner towers stand taller than its eaves.",
     "Every floor is real and can be walked. Take the Palace staircase from the throne room up through the Council Chamber with its war map, the Library of the Law, and the Queen's chapel, to the gallery under the spire where the regalia of Raria are kept.",
