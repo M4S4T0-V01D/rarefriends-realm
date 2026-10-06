@@ -148,7 +148,7 @@ export const WEST_QUESTS: readonly QuestDef[] = [
   },
   {
     id: "fff_truce", name: "The Gate Question", points: 2, difficulty: "Intermediate", start: "Talk to Gate-Warden Pip Quarrel at the gate of the FFF Fortress, in the Free Marches.",
-    requirements: ["Combat 45 recommended"], rewards: ["2 Quest Points", "FFF artisan's cape", "2,000 Crafting XP", "The Federation knows your name: its shops open, and its pickets stand down"],
+    requirements: ["Combat 45 recommended"], rewards: ["2 Quest Points", "FFF artisan's cape", "2,000 Craftwork XP", "The Federation knows your name: its shops open, and its pickets stand down"],
     journal: game => {
       const s = stage(game, "fff_truce"), p = game.player;
       if (s === 0) return ["The Free Friends Federation keeps to itself behind a palisade in the Free Marches. The Gate-Warden asks everyone three questions and is sorry about it."];

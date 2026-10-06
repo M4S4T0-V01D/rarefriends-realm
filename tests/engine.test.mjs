@@ -2749,3 +2749,33 @@ test("Dyemoor is a dyers' town of brick, with its clothiers and Counting House, 
   assert(has(p, "dyemoor_cloak") && !has(p, "dyemoor_cloak~woad"), "lye washes it out");
   assert(!isItem("dyemoor_cloak~nonsense") && !isItem("bronze_plate~woad"), "only real dyes on dyeable things");
 });
+
+test("Craftwork: a carving gouge carves logs into figures that help everyone near them for a while, then crumble", async () => {
+  const { carvingEffect, carvingRecipes } = await import("../games/rarefriends-realm/engine.ts");
+  const { CARVINGS, SKILL_NAMES, SHOPS } = await import("../games/rarefriends-realm/data.ts");
+  assert.equal(SKILL_NAMES.crafting, "Craftwork", "the skill is Craftwork");
+  assert(SHOPS.crafting.stock.includes("carving_gouge") && SHOPS.general.stock.includes("carving_gouge"), "gouges in the shops");
+  assert.equal(new Set(CARVINGS.map(c => c.log)).size, CARVINGS.length, "every wood its own carving");
+  assert(!CARVINGS.some(c => /totem/i.test(c.name)), "no totems");
+  const g = newGame(), p = g.player, slot = id => p.inventory.findIndex(s => s?.id === id);
+  p.xp.crafting = XP_TABLE[60];
+  give(p, "carving_gouge"); give(p, "oak_logs"); give(p, "oak_logs"); give(p, "knife");
+  // The knife won't do; the gouge will.
+  useItemOnItem(g, slot("knife"), slot("oak_logs")); assert(!g.ui.production?.recipes.some(r => r.label === "Oak bulwark"), "not with a knife");
+  g.ui.production = null; useItemOnItem(g, slot("carving_gouge"), slot("oak_logs"));
+  assert(g.ui.production?.recipes.some(r => r.label === "Oak bulwark"), "the gouge offers an oak bulwark");
+  startProduction(g, carvingRecipes("oak_logs")[0], 1); run(g, 8);
+  assert(has(p, "carving_oak") && !has(p, "oak_logs"), "two oak logs carved into a bulwark");
+  // Set it down: near it, 12% less damage taken; away from it, nothing.
+  itemOptions(g, slot("carving_oak")).find(o => o.verb === "Set-down").run(g);
+  assert.equal(g.carvings.length, 1); assert.equal(carvingEffect(g).taken, 0.12, "sheltered near it");
+  const home = { x: p.x, y: p.y }; p.x += 10; tick(g); assert.equal(carvingEffect(g).taken, 0, "nothing far from it"); p.x = home.x; tick(g);
+  // Different kinds add up; the same kind doesn't; three at most.
+  const place = id => { p.x = home.x + g.carvings.length; give(p, id); itemOptions(g, slot(id)).find(o => o.verb === "Set-down").run(g); };
+  place("carving_oak"); place("carving_willow"); p.x = home.x; tick(g);
+  const e = carvingEffect(g); assert.equal(e.taken, 0.12, "two bulwarks don't stack"); assert.equal(e.faith, 0.4, "a willow vigil slows Faith's drain");
+  place("carving_maple"); assert.equal(g.carvings.length, 3, "three at most: the oldest crumbled");
+  // They crumble away when their time is up.
+  run(g, 260);
+  assert.equal(g.carvings.length, 0, "all crumbled away"); assert(g.messages.some(m => /crumbles away/.test(m.text)), "and you hear about it");
+});

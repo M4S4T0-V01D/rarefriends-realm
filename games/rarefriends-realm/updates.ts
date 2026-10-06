@@ -4,6 +4,12 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 79, date: "2026-10-06", title: "Craftwork: woodcarving, and carvings that help you fight", items: [
+    "Crafting is Craftwork now: everything it did (leather, gems, string, amulets, crossbows) and new work besides: dyeing in Dyemoor, and woodcarving.",
+    "Woodcarving: buy a carving gouge (Tessa's tannery, or any general store) and use it on two logs to carve a figure from them. Every wood carves its own, from a Hearthwood figure from plain logs (Craftwork 3) to an Ashwood seer (72).",
+    "Set a carving down and, for a few minutes, it helps you while you fight within four tiles of it. Then it cracks, shakes and crumbles to dust. Oak, yew and ironbark take the edge off blows. Willow and ashwood make your Faith drain slower. Maple and ironbark add to your damage, pine to your aim, and ashwood to your spells. Hearthwood, palm and redwood close your wounds faster (palm restores run energy too), and deadwood puts creatures off their stroke.",
+    "Different carvings add up, though two of the same kind don't, and you can keep three set down at once. The ones helping you are listed at the top of the screen, each with what it does and how long it has left. They're in the Craftwork skill guide and the recipe book too.",
+  ] },
   { id: 78, date: "2026-10-06", title: "Dyemoor, the dyers' town, and dyeing your clothes", items: [
     "Dyemoor has grown into a town of its own, the richest south of the mainland. Its square of dark red brick lies round the Three-Colour Fountain, with the Dyers' Guildhall under its golden dome on the north side, between the Dyeworks and the Dyemoor Counting House (a bank). Townhouses stand on the west, the Crooked Vat on the east street, and cloth dries on lines down to the shore.",
     "Four clothiers keep the Realm's clothes. Marigold's sells the moor's own. The Wide Wardrobe has every village's clothes on one rail. The Far Loom brings Rarian, Federation and BarkReach cloth over the mountains. The Madder Rose sells everyday shirts, tunics, dresses, skirts, trousers and hats. Bolts & Thread still sells thread, wool and silk.",

@@ -173,10 +173,12 @@ export type SoundName =
   | "whinny" | "hoof" | "rare" | "duel";
 export type Message = { text: string; tone: "game" | "info" | "warn" | "quest" | "level" | "npc" | "public" | "private"; tick: number };
 
+/** A Craftwork carving set down in the world: what it is, where, and when it crumbles (not saved: it'd crumble anyway). */
+export type Carving = { uid: number; id: string; x: number; y: number; placed: number; until: number };
 export type Game = {
   /** Bumped whenever the world is rebuilt in part (a home painted in), so renderers drop their caches. */
   worldVersion?: number;
-  world: World; tick: number; player: Player; monsters: Monster[]; npcs: Npc[]; ground: GroundItem[]; fires: Fire[];
+  world: World; tick: number; player: Player; monsters: Monster[]; npcs: Npc[]; ground: GroundItem[]; fires: Fire[]; carvings: Carving[];
   /** What you've sold to each shop that it doesn't normally stock (you can buy it back until you leave). */
   shopStock: Record<string, Slot[]>;
   /** A match under way in the Rare Friends Ring: which, and the creatures summoned for it. */
@@ -251,7 +253,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
 export function createGame(options: { familyId: number; friendId: number; rng?: () => number; world?: World }): Game {
   const world = options.world ?? realmWorld(), rng = options.rng ?? Math.random;
   const game: Game = {
-    world, tick: 0, player: createPlayer(world, options.familyId, options.friendId), monsters: [], npcs: [], ground: [], fires: [], shopStock: {},
+    world, tick: 0, player: createPlayer(world, options.familyId, options.friendId), monsters: [], npcs: [], ground: [], fires: [], carvings: [], shopStock: {},
     depleted: new Map(), herbPicks: new Map(), ambient: { night: false, rain: false }, friendSpeech: "full", sneakingPast: new Map(), sneakPaid: new Map(), messages: [], events: [], rng, nextUid: 1, dialogue: null, ui: { shop: null, bank: false, production: null, lamp: null, naming: null },
     held: null, autoRetaliate: true, playTicks: 0, overheads: new Map(), pet: null, trail: [], arena: null,
   };

@@ -4,11 +4,11 @@
  */
 import {
   BOWS, COOKING, CRAFTING, CROSSBOWS, STOCKS, WAR_BOWS, FIREMAKING, FISHING_SPOTS, FLETCH_ARROWS, FLETCH_BOWS, GEM_CUTTING, ITEM_LIST, METALS, MONSTERS, PRAYERS, ROCKS, SIGILCRAFT,
-  SKILL_NAMES, SLAYER_SETS, SLAYER_TASKS, COURSES, WAYFARER_REWARDS, FAMILY_NAMES, SMELTING, SPELLS, TREES, sigilsPerStone, item, type Skill,
+  SKILL_NAMES, SLAYER_SETS, SLAYER_TASKS, COURSES, WAYFARER_REWARDS, FAMILY_NAMES, SMELTING, SPELLS, TREES, sigilsPerStone, item, type Skill, CARVINGS,
 } from "./data.ts";
 import { ESSENCES, HERBS, MIXTURES, POTIONS } from "./apothecary.ts";
 import { NPCS } from "./content.ts";
-import { AMULETS, STALLS, amuletRecipe, arrowRecipe, boltRecipe, craftingRecipes, crossbowRecipe, spinningRecipes, stringingRecipe, fletchingRecipes, headlessRecipe, smeltingRecipes, smithingRecipes } from "./engine.ts";
+import { AMULETS, STALLS, amuletRecipe, carvingRecipes, arrowRecipe, boltRecipe, craftingRecipes, crossbowRecipe, spinningRecipes, stringingRecipe, fletchingRecipes, headlessRecipe, smeltingRecipes, smithingRecipes } from "./engine.ts";
 import type { Recipe } from "./state.ts";
 
 export type GuideEntry = { level: number; name: string; detail: string; icon?: string; spell?: string };
@@ -77,6 +77,8 @@ export function skillGuide(skill: Skill): GuideEntry[] {
       for (const entry of CRAFTING) add(entry.level, item(entry.product).name, `${entry.xp} XP · ${entry.leather} ${entry.hide ? item(entry.hide).name.toLowerCase() : "leather"}`, entry.product);
       for (const [rough, cut] of Object.entries(GEM_CUTTING)) add(cut.level, item(cut.cut).name, `${cut.xp} XP · cut with a chisel`, rough);
       add(1, "String", "5 XP · wool at a spinning wheel (the farmhouse, Tessa's tannery)", "string");
+      add(1, "Dyeing", "14 XP · a pot of dye (the Dyeworks, Dyemoor) on cloth or leather clothing; lye washes it out", "dye_madder");
+      for (const carving of CARVINGS) add(carving.level, carving.name, `${carving.xp} XP · a carving gouge on two ${item(carving.log).name.toLowerCase()}. Set it down: near it, ${carving.text}, for ${Math.round(carving.ticks * 0.6 / 60 * 10) / 10} min`, carving.id);
       for (const entry of AMULETS) add(entry.level, item(entry.amulet).name, `${entry.xp} XP · a string on a cut ${entry.gem}`, entry.amulet);
       for (const bow of CROSSBOWS) add(bow.craft, item(`${bow.metal}_crossbow`).name, `${bow.xp} XP · ${item(`${bow.metal}_limbs`).name.toLowerCase()} on ${/^[aeiou]/i.test(item(bow.stock).name) ? "an" : "a"} ${item(bow.stock).name.toLowerCase()}`, `${bow.metal}_crossbow`);
       break;
@@ -157,6 +159,7 @@ export function recipeBook(): BookRecipe[] {
     ...METALS.flatMap(metal => smithingRecipes(metal.id)).map(at("Anvil (hammer)")),
     ...Object.entries(COOKING).map(([raw, cook]): BookRecipe => ({ skill: "cooking", label: item(cook.cooked).name, level: cook.level, xp: cook.xp, ticks: 3, inputs: { [raw]: 1 }, outputs: { [cook.cooked]: 1 }, where: "Range or fire" })),
     ...craftingRecipes().map(at("Anywhere (needle and thread)")),
+    ...CARVINGS.flatMap(carving => carvingRecipes(carving.log)).map(at("Anywhere (carving gouge on logs)")),
     ...Object.entries(GEM_CUTTING).map(([rough, cut]): BookRecipe => ({ skill: "crafting", label: item(cut.cut).name, level: cut.level, xp: cut.xp, ticks: 2, inputs: { [rough]: 1 }, outputs: { [cut.cut]: 1 }, tools: ["chisel"], where: "Anywhere (chisel)" })),
     ...fletchingRecipes("logs").slice(0, 1).map(at("Anywhere (knife on logs)")),
     ...FLETCH_BOWS.map(bow => fletchingRecipes(bow.log)[1]).map(at("Anywhere (knife on logs)")),

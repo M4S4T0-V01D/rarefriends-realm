@@ -474,6 +474,19 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
       case "thread":
         part(p, box(8, 7, 16, 3), WOOD_C, "wood"); part(p, box(8, 23, 16, 3), WOOD_C, "wood"); part(p, box(10, 10, 12, 13), color, "cloth");
         for (const y of [13, 16, 19]) line(p, [[10, y], [21, y + 1]], shadeHex(color, -0.15)); break;
+      case "gouge":
+        // A woodcarver's gouge: a turned handle and a curved, hollow blade.
+        part(p, stroke([[5, 29], [14, 20]], 5), WOOD_C, "wood"); part(p, poly([[13, 17], [22, 8], [27, 7], [28, 12], [19, 21], [16, 20]]), color, "metal");
+        line(p, [[22, 9], [26, 9], [26, 11]], shadeHex(color, -0.35)); break;
+      case "carving": {
+        // A carved figure: a round head on a tapered body, a face cut in, rings carved round its middle.
+        const dark = accent ?? shadeHex(color, -0.3);
+        part(p, poly([[10, 29], [22, 29], [21, 14], [11, 14]]), color, "wood");
+        part(p, poly([[11, 14], [21, 14], [22, 9], [19, 4], [13, 4], [10, 9]]), shadeHex(color, 0.08), "wood");
+        line(p, [[13, 9], [14, 9]], dark); line(p, [[18, 9], [19, 9]], dark); line(p, [[14, 12], [18, 12]], dark);
+        line(p, [[11, 19], [21, 19]], dark); line(p, [[11, 24], [21, 24]], dark);
+        break;
+      }
       case "chisel":
         part(p, stroke([[6, 28], [16, 18]], 4), WOOD_C, "wood"); part(p, poly([[15, 16], [26, 5], [29, 8], [18, 19]]), color, "metal"); break;
       case "gem":

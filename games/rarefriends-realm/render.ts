@@ -16,6 +16,7 @@ import type { PeerView } from "./social.ts";
 import type { Strike, Weather } from "./weather.ts";
 import { emoteMotion, emoteParticles, type Motion } from "./emotes.ts";
 import { drawPixels, pixelArt, shadeHex } from "./pixel.ts";
+import { CARVINGS, CARVING_REACH } from "./data.ts";
 import { TEX_PER_HEIGHT, TEX_PER_TILE, beginTextures, groundTexture, textureStats, shingleTexture, texturedQuad, texturedTriangle, wallTexture, PANE, type GroundStyle, type WallStyle } from "./textures.ts";
 import { campfireLogs, decorArt, fireArt, rockArt, treeArt , herbArt } from "./scenery.ts";
 import { beginSprites, recordSprites, noteSprite, replaySprites, stampSprites, type SpriteDraw } from "./pixel.ts";
@@ -1548,6 +1549,22 @@ function frontDoors(world: World, building: Building): DoorGroup[] {
   frontDoorCache.set(building, groups);
   return groups;
 }
+/** Carvings drawn lately (to crumble the ones that go), and a frame count. */
+const seenCarvings = new Map<number, { x: number; y: number; color: string; frame: number }>();
+let frameNo = 0;
+/** A carved figure in a wood's colour: a head with a face cut in, a body ringed with carving, on a little plinth; cracked near its end. */
+function carvingArt(color: string, cracked: boolean): HTMLCanvasElement {
+  return pixelArt(`carving:${color}:${cracked ? 1 : 0}`, 12, 22, p => {
+    const dark = shadeHex(color, -0.3), light = shadeHex(color, 0.14);
+    p.rect(1, 19, 10, 3, shadeHex(color, -0.18)); p.rect(1, 19, 10, 1, shadeHex(color, -0.05));
+    p.poly([[2, 19], [10, 19], [9, 9], [3, 9]], color, INK);
+    p.disc(6, 6, 4, 4.4, light, INK);
+    p.set(4, 6, dark); p.set(8, 6, dark); p.rect(5, 8, 3, 1, dark);
+    for (const y of [12, 15, 17]) p.rect(3, y, 7, 1, dark);
+    p.rect(4, 10, 1, 8, light);
+    if (cracked) { p.line(7, 2, 5, 9, INK); p.line(5, 9, 8, 14, INK); p.line(4, 15, 3, 19, INK); }
+  });
+}
 /** Whether a tile lies on a building's outline. */
 const edgeOf = (building: Building, x: number, y: number) => x === building.x0 || x === building.x1 || y === building.y0 || y === building.y1;
 /** How far a palace's keep and its spire rise above the top of its roof. */
@@ -2041,6 +2058,33 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       object(x, y);
     }
   }
+  // Craftwork's carvings: a figure on a faint ring of its wood's colour showing how far it reaches; it shakes and cracks as it
+  // nears its end, and crumbles to dust when it goes.
+  for (const carving of game.carvings) {
+    if (!shown(carving.x, carving.y)) continue;
+    const def = CARVINGS.find(entry => entry.id === carving.id);
+    if (!def) continue;
+    seenCarvings.set(carving.uid, { x: carving.x, y: carving.y, color: def.color, frame: frameNo });
+    const age = (game.tick + alpha - carving.placed) / Math.max(1, carving.until - carving.placed), fading = Math.max(0, (age - 0.85) / 0.15);
+    drawables.push({ depth: depth(carving.x, carving.y) - 0.35, at: { x: carving.x, y: carving.y, h: 2 }, size: [30, 140, 70], scenery: true, draw: () => {
+      // The reach, as a ring of light on the ground.
+      ctx.save(); ctx.globalAlpha = 0.5 * (1 - fading * 0.7) * (scene.reducedMotion ? 1 : 0.85 + Math.sin(now / 500 + carving.uid) * 0.15);
+      ctx.strokeStyle = shadeHex(def.color, 0.25); ctx.lineWidth = 2.5 * z; ctx.setLineDash([6 * z, 4 * z]); ctx.beginPath();
+      for (let i = 0; i <= 40; i++) { const a = i / 40 * Math.PI * 2, q = toScreen(camera, carving.x + Math.cos(a) * CARVING_REACH, carving.y + Math.sin(a) * CARVING_REACH); if (i) ctx.lineTo(q.x, q.y); else ctx.moveTo(q.x, q.y); }
+      ctx.stroke(); ctx.restore();
+    } });
+    drawables.push({ depth: depth(carving.x, carving.y), at: { x: carving.x, y: carving.y }, cast: true, sprite: true, size: [80, 40, 20], draw: () => {
+      const s = toScreen(camera, carving.x, carving.y), shake = fading && !scene.reducedMotion ? Math.sin(now / 40 + carving.uid) * 1.4 * fading * z : 0;
+      drawPixels(ctx, carvingArt(def.color, fading > 0.4), s.x + shake, s.y + 2 * z, ART * z * 1.3);
+    } });
+  }
+  // Carvings gone since last frame crumble into dust where they stood.
+  for (const [uid, seen] of seenCarvings) {
+    if (game.carvings.some(carving => carving.uid === uid)) continue;
+    if (seen.frame >= frameNo - 2) { burst("dust", seen.x, seen.y, 14, 14, seen.color, { speed: 0.9, up: 30, life: 1.2, size: 3 }); burst("chip", seen.x, seen.y, 20, 8, shadeHex(seen.color, -0.2), { speed: 1.4, up: 60, life: 0.9, size: 2 }); }
+    seenCarvings.delete(uid);
+  }
+  frameNo++;
   // Fires.
   for (const fire of game.fires) {
     if (!shown(fire.x, fire.y)) continue;

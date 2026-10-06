@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState, type CSSProperties, type MouseEvent
 import type { GenerationSprites } from "@rarefriends/friendsdk/sprites";
 import { SPELL_TABS, RARIAN_SPELL_TABS, spellInBook, MONSTERS, type Spell, ITEM_LIST, isItem,
   EMOTES, EQUIP_SLOTS, FAMILY_NAMES, FAMILY_PERKS, PRAYERS, RELICS, SHOPS, SKILLS, SKILL_ICONS, SKILL_NAMES, SPELLS, WARDROBE, XP_TABLE, item, levelForXp,
-  type EquipSlot, type Skill, mountDef, PETS,
+  type EquipSlot, type Skill, mountDef, PETS, CARVINGS, CARVING_REACH,
 } from "./data.ts";
 import { mountArt } from "./mountart.ts";
 import { CHEST_REWARD, DAY_MS, challengeProgress, challengeReward, challengeText, claimChallenge, claimChest, claimStreak, completeDaily, dailyWaiting, rerollDaily, rewardText, rollDaily, streakReward, streakStatus } from "./daily.ts";
@@ -1296,6 +1296,17 @@ export function HelpModal({ onClose, onFeedback }: { onClose: () => void; onFeed
         <li>Your adventure saves automatically for this wallet on this device.</li>
       </ul>
     </Modal>
+  );
+}
+/** The carvings helping you (Craftwork): the ones you're standing near, what each does and how long it has left. */
+export function CarvingBuffs({ game }: { game: Game }) {
+  const player = game.player, near = game.carvings.filter(carving => Math.hypot(player.x - carving.x, player.y - carving.y) <= CARVING_REACH);
+  if (!near.length) return null;
+  return (
+    <ul className="realm-carvings" aria-label="Carvings near you">
+      {near.map(carving => { const def = CARVINGS.find(entry => entry.id === carving.id)!, left = Math.max(0, Math.ceil((carving.until - game.tick) * 0.6));
+        return <li key={carving.uid} style={{ borderColor: def.color }}><PixelIcon art={itemArt(item(def.id).icon)} size={16} /><span><b>{def.name}</b> {def.text}</span><i>{Math.floor(left / 60)}:{String(left % 60).padStart(2, "0")}</i></li>; })}
+    </ul>
   );
 }
 export function Orbs({ game, onRun, onSneak, onRide, onMap, onZoom, onRotate, openMenu }: { game: Game; onRun: () => void; onSneak: () => void; onRide?: (id?: string) => void; onMap: () => void; onZoom: (delta: number) => void; onRotate: (delta: number) => void; openMenu?: OpenMenu }) {

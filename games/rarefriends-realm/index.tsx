@@ -15,7 +15,7 @@ import {
 } from "./engine.ts";
 import { PITCH, RENDER_PROFILE, VIEW, ZOOM, addPrint, daylight, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
 import {
-  BankModal, CardsModal, FeedbackModal, ChatBox, ContextMenu, DailyModal, FellowshipModal, HomeModal, JoinModal, RfActionModal, FirstStepsCard, GuideModal, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, NamingModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
+  BankModal, CardsModal, CarvingBuffs, FeedbackModal, ChatBox, ContextMenu, DailyModal, FellowshipModal, HomeModal, JoinModal, RfActionModal, FirstStepsCard, GuideModal, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, NamingModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
   cancelLongPress, longPress, rightClick, type MenuEntry, type Settings, type Tab,
 } from "./panels.tsx";
 import { REGULAR_SPRITES } from "./regulars.ts";
@@ -918,6 +918,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
 
         {phase === "playing" && state && player && <>
           <div className="realm-hover" aria-hidden="true">{hover}</div>
+          <CarvingBuffs game={state} />
           <div className="realm-topright">
             <Orbs game={state} openMenu={(x, y, entries) => setMenu({ x, y, entries })} onRun={() => { toggleRun(state); refresh(); }} onSneak={() => { toggleSneak(state); refresh(); }} onRide={id => { toggleMount(state, id); refresh(); }} onMap={() => setModal("map")} onZoom={delta => setSettings({ ...settings, zoom: Math.max(ZOOM.min, Math.min(ZOOM.max, settings.zoom * (delta > 0 ? 1.15 : 0.87))) })}
               onRotate={delta => { const from = cameraGoal.current?.angle ?? camera.current.angle; cameraGoal.current = { angle: from + delta, pitch: cameraGoal.current?.pitch ?? camera.current.pitch }; }} />

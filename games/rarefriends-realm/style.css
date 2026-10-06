@@ -507,3 +507,8 @@
 .realm-card-select { display: flex; flex-direction: column; gap: 2px; font-size: 11px; font-weight: 600; }
 .realm-card-select select { font: inherit; font-weight: 400; font-size: 12px; padding: 3px 4px; border: 1.5px solid #000; border-radius: 4px; background: #fff; color: #161616; max-width: 100%; }
 .realm-card-select option:disabled { color: #8a8580; }
+
+/* Carvings helping you (Craftwork), under the hover text. */
+.realm-carvings { position: absolute; top: 30px; left: 8px; z-index: 4; list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; pointer-events: none; max-width: 300px; }
+.realm-carvings li { display: flex; align-items: center; gap: 6px; background: rgba(250, 248, 242, 0.92); border: 1.5px solid #000; border-left-width: 5px; border-radius: 4px; padding: 2px 6px; font-size: 11px; line-height: 1.25; }
+.realm-carvings li span { flex: 1; } .realm-carvings li i { font-style: normal; font-variant-numeric: tabular-nums; color: #5a564f; }

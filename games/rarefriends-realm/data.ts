@@ -12,7 +12,7 @@ export type Skill = typeof SKILLS[number];
 export const SKILL_NAMES: Record<Skill, string> = {
   attack: "Attack", strength: "Strength", defence: "Defence", ranged: "Ranged", hitpoints: "Hitpoints", magic: "Magic", prayer: "Faith",
   woodcutting: "Woodcutting", fishing: "Fishing", cooking: "Cooking", firemaking: "Firemaking", mining: "Mining",
-  smithing: "Smithing", crafting: "Crafting", thieving: "Stealth", agility: "Wayfaring", slayer: "Slayer",
+  smithing: "Smithing", crafting: "Craftwork", thieving: "Stealth", agility: "Wayfaring", slayer: "Slayer",
   sigilcraft: "Sigilcraft", fletching: "Fletching", apothecary: "Apothecary", presence: "Presence",
 };
 /** Each skill's colour: its mastery cape, and its trim. */
@@ -73,7 +73,7 @@ export type Bonuses = { attack: number; strength: number; defence: number; range
 /** An item's picture: a shape in a colour; `kind` picks a variant of the shape (a fish's species, an ore's veins…). */
 export type Icon = { shape: IconShape; color: string; accent?: string; kind?: string };
 export type IconShape =
-  | "drumstick" | "steak" | "coins" | "axe" | "pickaxe" | "sword" | "dagger" | "sabre" | "helm" | "body" | "legs" | "shield" | "boots" | "gloves" | "cape"
+  | "gouge" | "carving" | "drumstick" | "steak" | "coins" | "axe" | "pickaxe" | "sword" | "dagger" | "sabre" | "helm" | "body" | "legs" | "shield" | "boots" | "gloves" | "cape"
   | "amulet" | "log" | "fish" | "ore" | "bar" | "bones" | "sigil" | "staff" | "net" | "rod" | "harpoon" | "pot" | "bucket" | "egg" | "flour"
   | "milk" | "tinderbox" | "hammer" | "knife" | "needle" | "thread" | "chisel" | "gem" | "hide" | "leather" | "meat" | "feather" | "bait"
   | "cake" | "bread" | "berries" | "key" | "wheat" | "lamp" | "scroll" | "silk" | "hood" | "bracer" | "burnt" | "hat" | "crown" | "orb" | "trophy"
@@ -856,6 +856,38 @@ export const DAWNPLATE_QUEST: Record<string, string> = { dawnplate_greaves: "pil
   dawnplate_shield: "restless_crypt", dawnplate_gauntlets: "restless_crypt", dawnplate_cuirass: "dawn_against_hollow" };
 
 /**
+ * Craftwork's woodcarving. A carving gouge on two logs carves a figure from them, each wood its own, to set down
+ * where you stand: for a while everyone fighting near it (four tiles) is helped the way that wood helps, then it
+ * crumbles away. The effects of different carvings add up; two of the same kind don't. You can keep three set down
+ * at once (a fourth crumbles the oldest).
+ * - regen: hitpoints come back this many times as fast; energy: run energy comes back this many times as fast;
+ * - taken: this share less damage taken; dealt: this share more damage dealt (and its accuracy); magic: this share more
+ *   with spells; accuracy: this share more accurate; faith: the Law's commandments drain this share slower;
+ * - foes: creatures' blows land this share less often.
+ */
+export type CarvingEffect = { regen?: number; energy?: number; taken?: number; dealt?: number; magic?: number; accuracy?: number; faith?: number; foes?: number };
+export const CARVINGS = [
+  { id: "carving_hearth", log: "logs", name: "Hearthwood figure", level: 3, xp: 22, ticks: 120, color: "#b49a80", effect: { regen: 2 }, text: "wounds close twice as fast" },
+  { id: "carving_oak", log: "oak_logs", name: "Oak bulwark", level: 15, xp: 42, ticks: 150, color: "#b59c7d", effect: { taken: 0.12 }, text: "12% less damage taken" },
+  { id: "carving_palm", log: "palm_logs", name: "Palm wellspring", level: 25, xp: 60, ticks: 160, color: "#c9a874", effect: { energy: 2.5, regen: 1.5 }, text: "run energy and hitpoints come back faster" },
+  { id: "carving_willow", log: "willow_logs", name: "Willow vigil", level: 30, xp: 72, ticks: 180, color: "#a8a070", effect: { faith: 0.4 }, text: "Faith drains 40% slower" },
+  { id: "carving_pine", log: "pine_logs", name: "Pine sentinel", level: 35, xp: 84, ticks: 180, color: "#8e7a58", effect: { accuracy: 0.12 }, text: "12% more accurate" },
+  { id: "carving_maple", log: "maple_logs", name: "Maple fury", level: 45, xp: 104, ticks: 200, color: "#b97a4a", effect: { dealt: 0.1 }, text: "10% more damage dealt" },
+  { id: "carving_redwood", log: "redwood_logs", name: "Redwood hearth", level: 52, xp: 128, ticks: 220, color: "#9a3e2e", effect: { regen: 3, taken: 0.06 }, text: "wounds close three times as fast, and 6% less damage taken" },
+  { id: "carving_deadwood", log: "deadwood_logs", name: "Deadwood dread", level: 55, xp: 138, ticks: 220, color: "#6e6a62", effect: { foes: 0.2 }, text: "creatures' blows land 20% less often" },
+  { id: "carving_yew", log: "yew_logs", name: "Yew warden", level: 60, xp: 165, ticks: 240, color: "#8a5a3a", effect: { taken: 0.2 }, text: "20% less damage taken" },
+  { id: "carving_ironbark", log: "ironbark_logs", name: "Ironbark rampart", level: 68, xp: 215, ticks: 280, color: "#7a7d80", effect: { taken: 0.22, dealt: 0.05 }, text: "22% less damage taken, 5% more dealt" },
+  { id: "carving_ash", log: "ash_logs", name: "Ashwood seer", level: 72, xp: 240, ticks: 300, color: "#c9c2b4", effect: { faith: 0.3, magic: 0.15 }, text: "Faith drains 30% slower, 15% more damage with spells" },
+] as const satisfies readonly { id: string; log: string; name: string; level: number; xp: number; ticks: number; color: string; effect: CarvingEffect; text: string }[];
+export type CarvingId = typeof CARVINGS[number]["id"];
+/** How far a carving's help reaches (tiles), and how many you can keep set down. */
+export const CARVING_REACH = 4, CARVINGS_AT_ONCE = 3;
+const CARVING_ITEMS: Item[] = [
+  { id: "carving_gouge", name: "Carving gouge", examine: "A curved woodcarver's gouge. Use it on logs to carve them (Craftwork).", value: 24, icon: { shape: "gouge", color: "#a9acb0" } },
+  ...CARVINGS.map(c => ({ id: c.id, name: c.name, examine: `A figure carved from ${c.log.replace("_logs", "").replace(/^logs$/, "plain")} wood. Set it down and, near it, ${c.text}. It lasts about ${Math.round(c.ticks * 0.6 / 60 * 10) / 10} minutes, then crumbles.`, value: Math.round(15 + c.level * 3), icon: { shape: "carving" as const, color: c.color, accent: shadeColor(c.color) } })),
+];
+function shadeColor(hex: string) { const n = parseInt(hex.slice(1), 16), f = (v: number) => Math.max(0, Math.min(255, Math.round(v * 0.68))); return `#${[(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v => f(v).toString(16).padStart(2, "0")).join("")}`; }
+/**
  * Dyemoor's dyes. A pot of dye used on cloth or leather clothing (a hood, a hat, a coat, a tunic, trousers or a skirt,
  * gloves, boots, a cape) dyes it: the same piece, in the dye's colour, its trim kept. Lye washes the dye out again.
  * A dyed piece is an item of its own, `<piece>~<dye>`, made on demand by `item()` (so it can be worn, banked, traded
@@ -896,7 +928,7 @@ function dyedItem(id: string): Item | undefined {
   DYED.set(id, made);
   return made;
 }
-export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...DYE_POTS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...ORDER_ARMOUR, ...orderGear(), ...slayerGear(), ...heartguardGear(), ...REGIONAL_ITEMS, ...APOTHECARY_ITEMS, ...factionGear()]);
+export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...DYE_POTS, ...CARVING_ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...ORDER_ARMOUR, ...orderGear(), ...slayerGear(), ...heartguardGear(), ...REGIONAL_ITEMS, ...APOTHECARY_ITEMS, ...factionGear()]);
 const ITEM_MAP = new Map(ITEM_LIST.map(item => [item.id, item]));
 export function item(id: string): Item {
   const found = ITEM_MAP.get(id) ?? dyedItem(id);
@@ -1516,7 +1548,7 @@ export const SHOPS: Record<string, ShopDef> = {
   armoury: { id: "armoury", name: "The Order Armoury", buys: ["weapon"], rate: 0.5, stock: [...ARMOURY_FIRST, ...ARMOURY_LATER, ...Object.keys(DAWNPLATE_QUEST)] },
   clothier: { id: "clothier", name: "Ribbon & Rye Clothiers", buys: ["armour"], rate: 0.5, stock: CLOTHIER_STOCK },
   tailor: { id: "tailor", name: "Threadneedle Tailors", buys: ["armour"], rate: 0.5, stock: ["team_cape", ...TAILOR_STOCK, "scholar_hat"] },
-  crafting: { id: "crafting", name: "Tessa's Tannery", buys: ["hide"], rate: 0.6, stock: ["needle", "thread", "chisel", "leather", "leather_gloves", "leather_boots"] },
+  crafting: { id: "crafting", name: "Tessa's Tannery", buys: ["hide"], rate: 0.6, stock: ["needle", "thread", "chisel", "carving_gouge", "leather", "leather_gloves", "leather_boots"] },
   oasis: { id: "oasis", name: "Oasis Bazaar", buys: ["gem", "jewellery", "food"], rate: 0.7, stock: ["cake", "bread", "inkshark", "sailfish", "silk", "rough_moonstone", "friends_charm", "moonstone_pendant"] },
   frost: { id: "frost", name: "Frostpeak Outfitters", stock: ["inkcrab", "sailfish", "glimmer_pickaxe", "glimmer_axe", "glimmer_sabre", "glimmer_helm", "glimmer_gauntlets", "glimmer_boots", "glimmer_shield", "hollow_sigil", "path_sigil", "frosthide_coif", "frosthide_bracers", "glimmer_arrow",
     "rarite_pickaxe", "rarite_axe", "frostsilver_pickaxe", "frostsilver_axe", "frostsilver_sword", "frostsilver_helm", "frostsilver_gauntlets", "frostsilver_boots", "frostsilver_shield", "frostsilver_arrow", "frostsilver_bolts"] },
@@ -1563,6 +1595,8 @@ addStock(["war_bows", "archery", "tallgrass_hunting"], ["fletchers_belt"]);
 // Faith weapons sell beside the swords and war hammers of their metal.
 for (const shop of Object.values(SHOPS)) { const stock = [...shop.stock]; for (const id of shop.stock) { const m = id.match(/^([a-z]+)_(sword|warhammer)$/); if (!m) continue; const holy = `${m[1]}_${m[2] === "sword" ? "mace" : "flail"}`; if (isItem(holy) && !stock.includes(holy)) stock.push(holy); } (shop as { stock: readonly string[] }).stock = stock; }
 addStock(["general", "general_ember", "general_frost", "general_oasis", "general_highcairn", "gravesend_general", "saltmarrow_fish", "hollyhock_herbs", "dyemoor_tailor", "tallgrass_hunting", "cragmaw_ore", "quillhaven_sigils", "kettle", "frost", "wizards", "ashfall_trader"], ["vial_of_water", "vial"]);
+// Craftwork: a carving gouge in every general store (and Tessa's), and the logs to carve at BarkReach's trading post.
+addStock(["general", "general_ember", "general_frost", "general_oasis", "general_highcairn", "gravesend_general"], ["carving_gouge"]);
 // ---------- Pets ----------
 /** Little companions found by chance while you train (1 in `odds` per action, luckier at higher levels). */
 export type PetDef = { id: string; name: string; from: string; odds: number; text: string };

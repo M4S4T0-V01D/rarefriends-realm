@@ -5,7 +5,7 @@
 import {
   ARMOURY_FIRST, ARMOURY_LATER, DAWNPLATE_QUEST, COOKING, CRAFTING, CROSSBOWS, FORGED_STAFF_MAGIC, LIMBS_OFFSET, metalLevel, STOCKS, WAR_BOWS, EMOTES, EQUIP_SLOTS, MOUNTS, PETS, mountDef, FLETCH_ARROWS, FLETCH_BOWS, SIGILCRAFT, STAFF_SIGILS, itemCategory, sigilsPerStone, FAMILY_NAMES, FIREMAKING, FISHING_SPOTS, GEM_CUTTING, METALS, MONSTERS, PRAYERS, RELICS, RF_BUNDLES, ROCKS, SHOPS, SHOP_BUY,
   FLETCH_WANDS, SHOP_SELL, SKILLS, SKILL_NAMES, SMELTING, SMITH_PIECES, SMITH_XP, SPELLS, TREES, WARDROBE, XP_TABLE, isItem, item, levelForXp, smithLevel, COURSES, WAYFARER_MARK, WAYFARER_REWARDS,
-  type EquipSlot, type MetalId, type Skill, type Spell, type SpotKind, type WardrobeId, DYES, baseOf, dyeOf, dyeable } from "./data.ts";
+  type EquipSlot, type MetalId, type Skill, type Spell, type SpotKind, type WardrobeId, DYES, baseOf, dyeOf, dyeable, CARVINGS, CARVING_REACH, CARVINGS_AT_ONCE, type CarvingEffect } from "./data.ts";
 import { cleanDaily } from "./daily.ts";
 import { searchChest } from "./dungeons.ts";
 import { arenaRevive, arenaTick } from "./arena.ts";
@@ -296,6 +296,7 @@ export function itemOptions(game: Game, slotIndex: number): ItemOption[] {
   else if (definition.potion) out.push({ verb: "Drink", run: g => drink(g, slotIndex) });
   if (definition.equip) out.push({ verb: definition.equip.slot === "weapon" || definition.equip.slot === "shield" ? "Wield" : "Wear", run: g => equip(g, slotIndex) });
   if (FIREMAKING[slot.id]) out.push({ verb: "Light", run: g => lightFire(g, slotIndex) });
+  if (CARVINGS.some(carving => carving.id === slot.id)) out.push({ verb: "Set-down", run: g => setCarving(g, slotIndex) });
   if (slot.id === "glimmer_shard") out.push({ verb: "Look-at", run: g => message(g, "The shard hums. Old Glimmer will want it back.") });
   if (definition.tablet) out.push({ verb: "Break", run: g => breakTablet(g, slotIndex) });
   if (slot.id === "insight_lamp") out.push({ verb: "Rub", run: g => { g.ui.lamp = slotIndex; } });
@@ -621,6 +622,12 @@ export function useItemOnItem(game: Game, a: number, b: number) {
     const logs = first.id === "tinderbox" ? b : a;
     if (FIREMAKING[player.inventory[logs]!.id]) { lightFire(game, logs); return; }
   }
+  // Craftwork: a carving gouge on logs carves a figure from two of them.
+  if (first.id === "carving_gouge" || second.id === "carving_gouge") {
+    const recipes = carvingRecipes(other("carving_gouge").id);
+    if (recipes.length) { game.ui.production = { title: "What would you like to carve?", recipes }; return; }
+    message(game, "The gouge is for carving logs."); return;
+  }
   if (first.id === "needle" || second.id === "needle") {
     if (other("needle").id === "leather" || other("needle").id === "drakehide") { openCrafting(game); return; }
   }
@@ -689,6 +696,52 @@ export function dyeRecipe(pot: string, cloth: string): Recipe | string {
   if (!dye) return "That isn't a dye.";
   if (current?.id === dye.id) return `It's ${dye.name.toLowerCase()} already.`;
   return { skill: "crafting", label: `Dye the ${item(base).name.toLowerCase()} ${dye.name.toLowerCase()}`, level: 1, xp: 14, ticks: 2, inputs: { [pot]: 1, [cloth]: 1 }, outputs: { [`${base}~${dye.id}`]: 1 } };
+}
+
+// ---------- Craftwork: carvings ----------
+/** What a log can be carved into with a gouge (two logs a figure). */
+export function carvingRecipes(log: string): Recipe[] {
+  return CARVINGS.filter(carving => carving.log === log).map(carving => ({ skill: "crafting" as const, label: carving.name, level: carving.level, xp: carving.xp, ticks: 4, inputs: { [log]: 2 }, outputs: { [carving.id]: 1 }, tools: ["carving_gouge"] }));
+}
+/** Set a carving down where you stand: it helps everyone near it until it crumbles. You keep three at most. */
+export function setCarving(game: Game, slotIndex: number) {
+  const player = game.player, slot = player.inventory[slotIndex], def = CARVINGS.find(carving => carving.id === slot?.id);
+  if (!slot || !def) return;
+  if (game.carvings.some(carving => carving.x === player.x && carving.y === player.y)) { message(game, "There's a carving standing here already.", "warn"); return; }
+  if (isWater(terrainAt(game.world, player.x, player.y))) { message(game, "It would only float away.", "warn"); return; }
+  take(player, def.id, 1);
+  if (game.carvings.length >= CARVINGS_AT_ONCE) crumble(game, game.carvings[0]);
+  game.carvings.push({ uid: game.nextUid++, id: def.id, x: player.x, y: player.y, placed: game.tick, until: game.tick + def.ticks });
+  message(game, `You set the ${def.name.toLowerCase()} down. Near it, ${def.text}.`); sound(game, "pickup");
+}
+function crumble(game: Game, carving: Game["carvings"][number]) {
+  game.carvings = game.carvings.filter(entry => entry !== carving);
+  const def = CARVINGS.find(entry => entry.id === carving.id);
+  if (def && Math.hypot(game.player.x - carving.x, game.player.y - carving.y) < 30) message(game, `Your ${def.name.toLowerCase()} crumbles away.`);
+}
+const NO_CARVINGS: Required<CarvingEffect> = { regen: 1, energy: 1, taken: 0, dealt: 0, magic: 0, accuracy: 0, faith: 0, foes: 0 };
+let carvedTick = -1, carvedGame: Game | null = null, carvedAt = "", carved: Required<CarvingEffect> = NO_CARVINGS;
+/**
+ * The help you're getting from carvings near you (within CARVING_REACH): each kind counts once, and the kinds add up
+ * (healing and run energy the fastest of them; damage taken, Faith's drain and creatures' aim each to at most 45% off).
+ */
+export function carvingEffect(game: Game): Required<CarvingEffect> {
+  const player = game.player, key = `${player.x},${player.y},${game.carvings.length}`;
+  if (carvedGame === game && carvedTick === game.tick && carvedAt === key) return carved;
+  carvedGame = game; carvedTick = game.tick; carvedAt = key;
+  if (!game.carvings.length) return carved = NO_CARVINGS;
+  const near = new Map<string, CarvingEffect>();
+  for (const carving of game.carvings) if (Math.hypot(player.x - carving.x, player.y - carving.y) <= CARVING_REACH) near.set(carving.id, CARVINGS.find(entry => entry.id === carving.id)?.effect ?? {});
+  if (!near.size) return carved = NO_CARVINGS;
+  const total = { ...NO_CARVINGS };
+  for (const effect of near.values()) {
+    total.regen = Math.max(total.regen, effect.regen ?? 1); total.energy = Math.max(total.energy, effect.energy ?? 1);
+    total.taken += effect.taken ?? 0; total.dealt += effect.dealt ?? 0; total.magic += effect.magic ?? 0; total.accuracy += effect.accuracy ?? 0;
+    total.faith += effect.faith ?? 0; total.foes += effect.foes ?? 0;
+  }
+  total.taken = Math.min(0.45, total.taken); total.faith = Math.min(0.6, total.faith); total.foes = Math.min(0.45, total.foes);
+  total.dealt = Math.min(0.3, total.dealt); total.magic = Math.min(0.3, total.magic); total.accuracy = Math.min(0.3, total.accuracy);
+  return carved = total;
 }
 
 // ---------- Firemaking ----------
@@ -1431,7 +1484,7 @@ export function playerMaxHit(game: Game) {
 }
 export function playerAccuracy(game: Game, monster: Monster, factor = 1) {
   const player = game.player, boost = prayerBoost(player), style = STYLE_BONUS[player.style];
-  const attack = (Math.floor(level(game, "attack") * (1 + boost.attack)) + style.attack + 8) * (bonuses(player).attack + 64) * factor;
+  const attack = (Math.floor(level(game, "attack") * (1 + boost.attack)) + style.attack + 8) * (bonuses(player).attack + 64) * factor * (1 + carvingEffect(game).accuracy);
   const defence = (monster.def.defence * cursed(game, monster, "defence") + 9) * (monster.def.defenceBonus + 64);
   return hitChance(attack, defence);
 }
@@ -1458,7 +1511,7 @@ function playerCombat(game: Game) {
   const spellId = player.queuedSpell ?? player.autocast, spell = spellId ? SPELLS.find(entry => entry.id === spellId && entry.target === "monster") ?? null : null;
   // A faith weapon hurts the undead more (more accurate, harder hitting).
   const holy = !!weapon(player)?.equip?.holy, range = spell ? 0 : bowRange(game);
-  let boost = slayerBoost(game, monster.def.id) * (holy && monster.def.undead ? 1.2 : 1);
+  let boost = slayerBoost(game, monster.def.id) * (holy && monster.def.undead ? 1.2 : 1) * (1 + carvingEffect(game).dealt);
   const within = (x: number, y: number) => spell ? chebyshev({ x, y }, monster) <= 8 && chebyshev({ x, y }, monster) >= 1
     : range ? reachGap({ x, y }, monster.x, monster.y, footprint(monster)) >= 1 && reachGap({ x, y }, monster.x, monster.y, footprint(monster)) <= range
     : adjacentTo(x, y, monster.x, monster.y, footprint(monster));
@@ -1503,7 +1556,7 @@ function playerCombat(game: Game) {
       else if (spell.curse) { monster.curses[spell.curse.stat] = game.tick + 100; message(game, `You ${spell.name.toLowerCase()} the ${monster.def.name.toLowerCase()}.`); }
       return;
     }
-    const hit = game.rng() < hitChance(accuracy, defence) ? Math.floor(game.rng() * (Math.floor(spell.maxHit! * boost) + 1)) : -1;
+    const hit = game.rng() < hitChance(accuracy * (1 + carvingEffect(game).accuracy), defence) ? Math.floor(game.rng() * (Math.floor(spell.maxHit! * boost * (1 + carvingEffect(game).magic)) + 1)) : -1;
     addXp(game, castSkill, spell.xp);
     if (hit > 0) { addXp(game, castSkill, hit * 2); addXp(game, "hitpoints", hit * 1.33); if (holy) addXp(game, "prayer", hit * FAITH_PER_HIT * (1 + 0.04 * orderPieces(player.equipment, "sol"))); }
     damageMonster(game, monster, Math.max(0, hit), hit < 0);
@@ -1562,7 +1615,7 @@ function rangedAttack(game: Game, monster: Monster, boost: number) {
   if (!arrow) { message(game, bolts ? "You have no bolts you can use. Fletch & Feather in Friendhollow and Hazel in Fernwick sell them." : "You have no arrows you can use. Fletch & Feather in Friendhollow sells them.", "warn"); player.combat = null; return; }
   take(player, arrow.id, 1);
   player.attackTimer = Math.max(2, attackSpeed(player) - (player.style === "aggressive" ? 1 : 0));
-  const accuracy = (level(game, "ranged") + (player.style === "accurate" ? 3 : 0) + 8) * (bonuses(player).ranged + 64) * boost;
+  const accuracy = (level(game, "ranged") + (player.style === "accurate" ? 3 : 0) + 8) * (bonuses(player).ranged + 64) * boost * (1 + carvingEffect(game).accuracy);
   const defence = (monster.def.defence * cursed(game, monster, "defence") + 9) * (monster.def.defenceBonus + 64);
   const hit = game.rng() < hitChance(accuracy, defence) ? Math.floor(game.rng() * (Math.floor(rangedMaxHit(game, arrow.strength) * boost) + 1)) : -1;
   const damage = Math.max(0, Math.min(hit, monster.hp));
@@ -1625,6 +1678,8 @@ export const thorns = (player: Player) => setPieces(player, "bramble");
 function damagePlayer(game: Game, damage: number, from: Monster | null) {
   const player = game.player;
   if (player.ward?.reduce && game.tick < player.wardUntil && damage > 0) damage = Math.max(0, Math.round(damage * (1 - player.ward.reduce)));
+  // A carving's shelter (an oak bulwark, a yew warden…).
+  if (damage > 0 && game.carvings.length) { const taken = carvingEffect(game).taken; if (taken) damage = Math.max(0, Math.round(damage * (1 - taken))); }
   // The Order of the Diamond's steadfast blessing: 2% of a creature's blow turned aside for every piece worn.
   if (from && damage > 0) { const diamond = orderPieces(player.equipment, "diamond"); if (diamond) damage = Math.max(0, Math.round(damage * (1 - 0.02 * diamond))); }
   player.hp = Math.max(0, player.hp - damage);
@@ -1696,7 +1751,8 @@ function monsterTick(game: Game, monster: Monster) {
         const boost = prayerBoost(player), style = STYLE_BONUS[player.style];
         const attack = (monster.def.attack * cursed(game, monster, "attack") + 9) * (monster.def.attackBonus + 64);
         const defence = (Math.floor(level(game, "defence") * (1 + boost.defence)) + style.defence + 8) * (bonuses(player).defence + 64);
-        let hit = game.rng() < hitChance(attack, defence) ? Math.floor(game.rng() * (Math.floor(monster.def.maxHit * cursed(game, monster, "strength") * (enraged ? 1.5 : 1)) + 1)) : 0;
+        // (A deadwood dread near you puts creatures off their stroke.)
+        let hit = game.rng() < hitChance(attack * (1 - carvingEffect(game).foes), defence) ? Math.floor(game.rng() * (Math.floor(monster.def.maxHit * cursed(game, monster, "strength") * (enraged ? 1.5 : 1)) + 1)) : 0;
         if (boost.protect) hit = Math.floor(hit * (monster.def.boss ? 0.4 : 0));
         if (shooting && !adjacentTo(player.x, player.y, monster.x, monster.y, footprint(monster))) emit(game, { type: "projectile", projectile: { from: { x: monster.x, y: monster.y }, to: { x: player.x, y: player.y }, start: game.tick, end: game.tick + 1, color: "#8a7a5a", style: "arrow" } });
         // Dragonfire: a third of a dragon's attacks are breath, which only a Wyrmward shield turns aside.
@@ -1794,9 +1850,10 @@ function upkeep(game: Game) {
   const player = game.player;
   for (const [id, until] of game.depleted) if (game.tick >= until) game.depleted.delete(id);
   if (game.fires.length) game.fires = game.fires.filter(fire => fire.expires > game.tick);
+  for (const carving of game.carvings) if (carving.until <= game.tick) crumble(game, carving);
   if (game.ground.length) game.ground = game.ground.filter(entry => entry.expires > game.tick);
   // Hitpoints regenerate slowly; Cellular Friends regrow twice as fast, and every Heartguard piece quickens it by 6% (the Hearth cordial, three times as fast).
-  if (++player.regenTimer >= Math.round(regenTicks(player) / (mixtureOn(game, 2) ? 3 : 1))) { player.regenTimer = 0; if (player.hp < maxHp(player)) player.hp++; }
+  if (++player.regenTimer >= Math.round(regenTicks(player) / (mixtureOn(game, 2) ? 3 : 1) / carvingEffect(game).regen)) { player.regenTimer = 0; if (player.hp < maxHp(player)) player.hp++; }
   // Poison on you: four doses, ten ticks apart; an antidote ends it.
   if (player.poison && --player.poison.timer <= 0) {
     player.poison.timer = 10; player.poison.left--;
@@ -1823,12 +1880,12 @@ function upkeep(game: Game) {
     const resist = 1 + bonuses(player).prayer / 30;
     // The Order of Dusk's quiet: each piece worn makes the Law's commandments drain 5% slower.
     const dusk = player.rarian ? 1 - 0.05 * Math.min(10, orderPieces(player.equipment, "dusk")) : 1;
-    const drain = player.prayers.reduce((sum, id) => sum + (PRAYERS.find(prayer => prayer.id === id)?.drain ?? 0), 0) / resist * dusk;
+    const drain = player.prayers.reduce((sum, id) => sum + (PRAYERS.find(prayer => prayer.id === id)?.drain ?? 0), 0) / resist * dusk * (1 - carvingEffect(game).faith);
     player.prayer = Math.max(0, player.prayer - drain);
     if (player.prayer <= 0) { player.prayers = []; message(game, "You have run out of faith. Pray at an altar to restore it.", "warn"); }
   }
   const moving = player.path.length > 0 || !!game.held, spending = moving && (player.run || player.sneak);
-  if (!spending || player.mount) player.energy = Math.min(100, player.energy + (0.25 + level(game, "agility") / 110) * (player.equipment.feet === "wayfarer_boots" ? 1.5 : 1) * (player.tonicUntil > game.tick ? 2 : 1));
+  if (!spending || player.mount) player.energy = Math.min(100, player.energy + (0.25 + level(game, "agility") / 110) * (player.equipment.feet === "wayfarer_boots" ? 1.5 : 1) * (player.tonicUntil > game.tick ? 2 : 1) * carvingEffect(game).energy);
 }
 
 // ---------- Prayer, magic, style ----------

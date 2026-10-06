@@ -211,7 +211,7 @@ export const QUESTS: readonly QuestDef[] = [
     },
   },
   {
-    id: "hazels_quiver", name: "Hazel's Quiver", points: 1, difficulty: "Novice", start: "Talk to Hazel the war-bowyer in Fernwick, in the heart of Whisperwood.", requirements: ["Woodcutting 15 (oak logs)", "Able to defeat the Grumblin chief"], rewards: ["1 Quest Point", "Hazel's quiver (wear it on your back)", "1,500 Ranged XP", "1,000 Fletching XP", "500 Crafting XP"],
+    id: "hazels_quiver", name: "Hazel's Quiver", points: 1, difficulty: "Novice", start: "Talk to Hazel the war-bowyer in Fernwick, in the heart of Whisperwood.", requirements: ["Woodcutting 15 (oak logs)", "Able to defeat the Grumblin chief"], rewards: ["1 Quest Point", "Hazel's quiver (wear it on your back)", "1,500 Ranged XP", "1,000 Fletching XP", "500 Craftwork XP"],
     journal: game => {
       const s = stage(game, "hazels_quiver"), p = game.player;
       if (s === 0) return ["Hazel, the war-bowyer in the woodcutters' village of Fernwick, looks like she's lost something."];
@@ -319,8 +319,8 @@ export const QUESTS: readonly QuestDef[] = [
     },
   },
   {
-    id: "dyemoor_dye", name: "A Dye to Remember", points: 1, difficulty: "Novice", start: "Talk to Master Dyer Indigo Vell in Dyemoor, on the river south of the mainland.", requirements: ["Crafting 10 recommended"],
-    rewards: ["1 Quest Point", "Dyemoor cloak", "2,000 Crafting XP", "400 coins"],
+    id: "dyemoor_dye", name: "A Dye to Remember", points: 1, difficulty: "Novice", start: "Talk to Master Dyer Indigo Vell in Dyemoor, on the river south of the mainland.", requirements: ["Craftwork 10 recommended"],
+    rewards: ["1 Quest Point", "Dyemoor cloak", "2,000 Craftwork XP", "400 coins"],
     journal: game => {
       const s = stage(game, "dyemoor_dye");
       if (s === 0) return ["Master Dyer Indigo Vell of Dyemoor is trying for a colour nobody has made."];
@@ -970,7 +970,7 @@ function talkInner(game: Game, npcId: string): Dialogue {
         } }]
         : owned ? [] : [{ label: "I lost the quiver.", then: () => chat(name, npcSays(name, "Lost it? Lucky for you I kept the pattern. Here, and try to keep this one."), undefined, () => giveOrDrop(game, "hazels_quiver")) }];
       return chat(name, npcSays(name, "War bows! Nobody else strings them: they take two logs and arms like mine. Slower than a plain bow, but every arrow lands like a hammer, and they reach a tile further.",
-      "Crossbows are the other road: limbs from the anvil, a stock from your knife, and a steady hand (Crafting) to fit them. They fire bolts, not arrows, and leave a hand free for a shield."), [
+      "Crossbows are the other road: limbs from the anvil, a stock from your knife, and a steady hand (Craftwork) to fit them. They fire bolts, not arrows, and leave a hand free for a shield."), [
       ...quest,
       { label: "Show me the war bows.", then: () => { game.ui.shop = "war_bows"; return null; } },
       { label: "Which limbs fit which stock?", then: () => chat(name, npcSays(name, "Pewter on a plain wooden stock. Blackiron and ashsteel on oak. Moonsilver on willow, glimmer on maple, rarite on yew. Carve the stock with a knife on the logs, then use the limbs on it.")) },
