@@ -40,17 +40,17 @@ const TERRAIN_COLORS: Record<number, string> = {
   [T.GRASS]: "#cdd3c3", [T.DARK_GRASS]: "#bcc4b1", [T.PATH]: "#dcd0b8", [T.COBBLE]: "#d7d4cd", [T.SAND]: "#e8dfc6", [T.WATER]: "#b1c0cf",
   [T.DEEP]: "#95a7bb", [T.SWAMP]: "#adb29c", [T.SNOW]: "#d3dbe5", [T.STONE]: "#c8c5be", [T.WOOD]: "#cdb9a0", [T.GRAVEL]: "#bfb8ad",
   [T.DUNGEON]: "#5d5c63", [T.BRIDGE]: "#ab9278", [T.CLIFF]: "#8f8a83", [T.WALL]: "#a9a59e", [T.FARMLAND]: "#bca787", [T.ICE]: "#dfe7ec", [T.CARPET]: "#c9a3a3",
-  [T.ASH]: "#8e8a86", [T.LAVA]: "#d98a5c",
+  [T.ASH]: "#8e8a86", [T.LAVA]: "#d98a5c", [T.BRICK]: "#9a4e42",
 };
 /** Pixel ground textures by terrain (water and lava keep their animated detail instead). */
 const GROUND_STYLE: Partial<Record<number, GroundStyle>> = {
   [T.GRASS]: "grass", [T.DARK_GRASS]: "lush", [T.PATH]: "dirt", [T.GRAVEL]: "gravel", [T.COBBLE]: "cobble", [T.STONE]: "flag", [T.SAND]: "sand", [T.SNOW]: "snow",
-  [T.WOOD]: "plank", [T.BRIDGE]: "plank", [T.FARMLAND]: "furrow", [T.DUNGEON]: "dungeon", [T.ICE]: "ice", [T.CARPET]: "carpet", [T.ASH]: "ash", [T.SWAMP]: "swamp",
+  [T.WOOD]: "plank", [T.BRIDGE]: "plank", [T.FARMLAND]: "furrow", [T.DUNGEON]: "dungeon", [T.ICE]: "ice", [T.CARPET]: "carpet", [T.ASH]: "ash", [T.SWAMP]: "swamp", [T.BRICK]: "brick",
 };
 /** Terrain classes for inked edges: a line is drawn where the class changes. */
 const EDGE_CLASS: Record<number, number> = {
   [T.GRASS]: 1, [T.DARK_GRASS]: 1, [T.PATH]: 2, [T.COBBLE]: 3, [T.SAND]: 4, [T.WATER]: 5, [T.DEEP]: 5, [T.SWAMP]: 6, [T.SNOW]: 7,
-  [T.STONE]: 8, [T.WOOD]: 9, [T.GRAVEL]: 10, [T.DUNGEON]: 11, [T.BRIDGE]: 12, [T.CLIFF]: 13, [T.WALL]: 14, [T.FARMLAND]: 15, [T.ICE]: 16, [T.CARPET]: 17, [T.ASH]: 18, [T.LAVA]: 19,
+  [T.STONE]: 8, [T.WOOD]: 9, [T.GRAVEL]: 10, [T.DUNGEON]: 11, [T.BRIDGE]: 12, [T.CLIFF]: 13, [T.WALL]: 14, [T.FARMLAND]: 15, [T.ICE]: 16, [T.CARPET]: 17, [T.ASH]: 18, [T.LAVA]: 19, [T.BRICK]: 20,
 };
 
 /** The camera: a point in tiles, zoom, rotation (radians, 0 = the classic view) and pitch (screen squash, 0.5 = classic). */
@@ -421,7 +421,7 @@ function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, camera: Camera
         case T.PATH: case T.SAND: case T.GRAVEL: case T.SNOW:
           if (h < 0.6) { ctx.fillRect(sx + (h - 0.3) * hw, sy + (hash(x, y + 5) - 0.5) * hh, 1.5 * z, 1.5 * z); ctx.fillRect(sx - (h - 0.2) * hw * 0.8, sy - (hash(x + 9, y) - 0.5) * hh * 0.8, 1.2 * z, 1.2 * z); }
           break;
-        case T.COBBLE: case T.STONE:
+        case T.COBBLE: case T.STONE: case T.BRICK:
           ctx.beginPath(); ctx.moveTo(sx - hw / 2, sy - hh / 2); ctx.lineTo(sx + hw / 2, sy + hh / 2); ctx.moveTo(sx + hw / 2, sy - hh / 2); ctx.lineTo(sx - hw / 2, sy + hh / 2); ctx.stroke();
           break;
         case T.WOOD: case T.BRIDGE:
@@ -3089,7 +3089,7 @@ const MAP_COLORS: Record<number, [number, number, number]> = {
   [T.VOID]: [14, 14, 16], [T.GRASS]: [150, 178, 122], [T.DARK_GRASS]: [118, 150, 98], [T.PATH]: [214, 186, 136], [T.COBBLE]: [196, 190, 178], [T.SAND]: [232, 212, 158],
   [T.WATER]: [96, 142, 196], [T.DEEP]: [66, 108, 170], [T.SWAMP]: [118, 130, 94], [T.SNOW]: [246, 246, 242], [T.STONE]: [176, 172, 164], [T.WOOD]: [184, 146, 104],
   [T.GRAVEL]: [168, 158, 142], [T.DUNGEON]: [84, 82, 92], [T.BRIDGE]: [150, 108, 70], [T.CLIFF]: [96, 90, 82], [T.WALL]: [34, 32, 30], [T.FARMLAND]: [176, 142, 90],
-  [T.ICE]: [204, 224, 238], [T.CARPET]: [196, 118, 118], [T.ASH]: [112, 106, 102], [T.LAVA]: [226, 112, 64],
+  [T.ICE]: [204, 224, 238], [T.CARPET]: [196, 118, 118], [T.ASH]: [112, 106, 102], [T.LAVA]: [226, 112, 64], [T.BRICK]: [150, 72, 60],
 };
 let mapImage: HTMLCanvasElement | null = null;
 /** The whole world, one pixel per tile (built once). */

@@ -4,6 +4,11 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 78, date: "2026-10-06", title: "Dyemoor, the dyers' town, and dyeing your clothes", items: [
+    "Dyemoor has grown into a town of its own, the richest south of the mainland. Its square of dark red brick lies round the Three-Colour Fountain, with the Dyers' Guildhall under its golden dome on the north side, between the Dyeworks and the Dyemoor Counting House (a bank). Townhouses stand on the west, the Crooked Vat on the east street, and cloth dries on lines down to the shore.",
+    "Four clothiers keep the Realm's clothes. Marigold's sells the moor's own. The Wide Wardrobe has every village's clothes on one rail. The Far Loom brings Rarian, Federation and BarkReach cloth over the mountains. The Madder Rose sells everyday shirts, tunics, dresses, skirts, trousers and hats. Bolts & Thread still sells thread, wool and silk.",
+    "Dyeing: buy a pot of dye from Master Dyer Vell at the Dyeworks (twelve colours, from madder red and woad blue to sable black and chalk white) and use it on anything of cloth or leather you wear: hoods and hats, coats, tunics, dresses, trousers, skirts, gloves, boots and capes. It keeps its trim and its stats, and it stays dyed when you bank, trade or wear it. A pot of lye washes the dye out again.",
+  ] },
   { id: 77, date: "2026-10-06", title: "A roof on the Ring, and the Adventurer card's styles in dropdowns", items: [
     "The Rare Friends Ring has a roof. The concourse is roofed over in stone and battlemented all round, inside and out, while the pit stays open to the sky. Under the roof the concourse is lit by lanterns.",
     "Two staircases off the concourse climb to a walk round the top of the Ring, behind the parapet, looking straight down into the pit, with braziers, the Ring's banners and benches for watching a fight.",

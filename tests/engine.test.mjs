@@ -2724,3 +2724,28 @@ test("The Ring is roofed and battlemented, with stairs to a walk round the top, 
   while (queue.length) { const [x, y] = queue.pop(); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const k = (y + dy) * Wd + x + dx; if (!seen.has(k) && walkable(world, x + dx, y + dy)) { seen.add(k); queue.push([x + dx, y + dy]); } } }
   assert(seen.has(b.y * Wd + b.x), "all the way round the walk, landing to landing");
 });
+
+test("Dyemoor is a dyers' town of brick, with its clothiers and Counting House, and its dyes dye clothes that stay dyed through a save", async () => {
+  const { T, terrainAt } = await import("../games/rarefriends-realm/world.ts");
+  const { item, isItem, dyeable, SHOPS } = await import("../games/rarefriends-realm/data.ts");
+  const g = newGame(), world = g.world, p = g.player, at = world.places.dyemoor;
+  // The town: a brick square, the guildhall, the bank and four clothiers.
+  let brick = 0; for (let y = at.y - 12; y <= at.y + 5; y++) for (let x = at.x - 22; x <= at.x + 22; x++) if (terrainAt(world, x, y) === T.BRICK) brick++;
+  assert(brick >= 250, `a square of brick (${brick} tiles)`);
+  for (const name of ["The Dyers' Guildhall", "Dyemoor Counting House", "Marigold's", "The Wide Wardrobe", "The Far Loom", "The Madder Rose", "The Dyeworks", "Dyemoor Bolts & Thread", "The Crooked Vat"]) assert(world.buildings.some(b => b.name === name), name);
+  for (const shop of ["dyemoor_dyes", "dyemoor_wardrobe", "dyemoor_farloom", "dyemoor_madder"]) assert(world.spawns.some(s => s.kind === "npc" && Math.abs(s.x - at.x) < 30 && Math.abs(s.y - at.y) < 25 && (s.id === { dyemoor_dyes: "dyemoor_dyer", dyemoor_wardrobe: "dyemoor_wardrober", dyemoor_farloom: "dyemoor_loomkeeper", dyemoor_madder: "dyemoor_rosekeeper" }[shop])), `${shop} is kept in town`);
+  assert(SHOPS.dyemoor_wardrobe.stock.length >= 25 && SHOPS.dyemoor_madder.stock.length >= 25 && SHOPS.dyemoor_farloom.stock.length >= 10, "the world's clothes on the rails");
+  assert(!SHOPS.dyemoor_farloom.stock.includes("rarian_mantle"), "earned clothes aren't for sale");
+  // Dyeing: a pot of woad on a Dyemoor cloak makes a woad-blue cloak, worn and saved as such; lye washes it back.
+  assert(dyeable("dyemoor_cloak") && !dyeable("bronze_plate") && !dyeable("knife"), "cloth dyes, metal doesn't");
+  give(p, "dyemoor_cloak"); give(p, "dye_woad"); give(p, "dye_lye");
+  const slot = id => p.inventory.findIndex(s => s?.id === id);
+  useItemOnItem(g, slot("dye_woad"), slot("dyemoor_cloak")); run(g, 6);
+  assert(has(p, "dyemoor_cloak~woad") && !has(p, "dye_woad") && !has(p, "dyemoor_cloak"), "dyed woad blue");
+  assert.equal(item("dyemoor_cloak~woad").icon.color, "#4a6aa8"); assert.equal(item("dyemoor_cloak~woad").equip.slot, "cape");
+  equip(g, slot("dyemoor_cloak~woad")); assert.equal(p.equipment.cape, "dyemoor_cloak~woad", "worn");
+  const back = newGame(); assert(restore(back, JSON.parse(JSON.stringify(serialize(g)))), "restored"); assert.equal(back.player.equipment.cape, "dyemoor_cloak~woad", "still woad blue after a save");
+  unequip(g, "cape"); useItemOnItem(g, slot("dye_lye"), slot("dyemoor_cloak~woad")); run(g, 6);
+  assert(has(p, "dyemoor_cloak") && !has(p, "dyemoor_cloak~woad"), "lye washes it out");
+  assert(!isItem("dyemoor_cloak~nonsense") && !isItem("bronze_plate~woad"), "only real dyes on dyeable things");
+});

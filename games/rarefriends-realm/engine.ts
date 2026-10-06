@@ -5,8 +5,7 @@
 import {
   ARMOURY_FIRST, ARMOURY_LATER, DAWNPLATE_QUEST, COOKING, CRAFTING, CROSSBOWS, FORGED_STAFF_MAGIC, LIMBS_OFFSET, metalLevel, STOCKS, WAR_BOWS, EMOTES, EQUIP_SLOTS, MOUNTS, PETS, mountDef, FLETCH_ARROWS, FLETCH_BOWS, SIGILCRAFT, STAFF_SIGILS, itemCategory, sigilsPerStone, FAMILY_NAMES, FIREMAKING, FISHING_SPOTS, GEM_CUTTING, METALS, MONSTERS, PRAYERS, RELICS, RF_BUNDLES, ROCKS, SHOPS, SHOP_BUY,
   FLETCH_WANDS, SHOP_SELL, SKILLS, SKILL_NAMES, SMELTING, SMITH_PIECES, SMITH_XP, SPELLS, TREES, WARDROBE, XP_TABLE, isItem, item, levelForXp, smithLevel, COURSES, WAYFARER_MARK, WAYFARER_REWARDS,
-  type EquipSlot, type MetalId, type Skill, type Spell, type SpotKind, type WardrobeId,
-} from "./data.ts";
+  type EquipSlot, type MetalId, type Skill, type Spell, type SpotKind, type WardrobeId, DYES, baseOf, dyeOf, dyeable } from "./data.ts";
 import { cleanDaily } from "./daily.ts";
 import { searchChest } from "./dungeons.ts";
 import { arenaRevive, arenaTick } from "./arena.ts";
@@ -669,11 +668,31 @@ export function useItemOnItem(game: Game, a: number, b: number) {
     if (GEM_CUTTING[gem]) { const cut = GEM_CUTTING[gem]; startProduction(game, { skill: "crafting", label: item(cut.cut).name, level: cut.level, xp: cut.xp, ticks: 2, inputs: { [gem]: 1 }, outputs: { [cut.cut]: 1 }, tools: ["chisel"] }, 28); return; }
   }
   if (pair("grain", "pot")) { message(game, "You need to grind the grain at the mill first."); return; }
+  // Dyemoor's dyes: a pot of dye on cloth or leather clothing dyes it; lye washes it back.
+  const pot = [first.id, second.id].find(id => id.startsWith("dye_"));
+  if (pot) {
+    const cloth = other(pot).id, recipe = dyeRecipe(pot, cloth);
+    if (typeof recipe === "string") { message(game, recipe, "warn"); return; }
+    startProduction(game, recipe, 1); return;
+  }
   message(game, "Nothing interesting happens.");
+}
+/** Dyeing (Craftwork): a pot of dye and a piece of clothing make the piece in the dye's colour (lye: its own again), or why not. */
+export function dyeRecipe(pot: string, cloth: string): Recipe | string {
+  if (!dyeable(cloth)) return "Only cloth and leather clothing takes a dye: hoods and hats, coats, tunics and dresses, trousers and skirts, gloves, boots and capes.";
+  const base = baseOf(cloth), current = dyeOf(cloth);
+  if (pot === "dye_lye") {
+    if (!current) return "That's the colour it was made in already.";
+    return { skill: "crafting", label: `Wash the dye out of the ${item(base).name.toLowerCase()}`, level: 1, xp: 6, ticks: 2, inputs: { [pot]: 1, [cloth]: 1 }, outputs: { [base]: 1 } };
+  }
+  const dye = DYES.find(entry => `dye_${entry.id}` === pot);
+  if (!dye) return "That isn't a dye.";
+  if (current?.id === dye.id) return `It's ${dye.name.toLowerCase()} already.`;
+  return { skill: "crafting", label: `Dye the ${item(base).name.toLowerCase()} ${dye.name.toLowerCase()}`, level: 1, xp: 14, ticks: 2, inputs: { [pot]: 1, [cloth]: 1 }, outputs: { [`${base}~${dye.id}`]: 1 } };
 }
 
 // ---------- Firemaking ----------
-const NO_FIRE = new Set<number>([T.WOOD, T.STONE, T.CARPET, T.BRIDGE, T.WALL, T.COBBLE]);
+const NO_FIRE = new Set<number>([T.WOOD, T.STONE, T.CARPET, T.BRIDGE, T.WALL, T.COBBLE, T.BRICK]);
 export function lightFire(game: Game, slotIndex: number) {
   const player = game.player, slot = player.inventory[slotIndex];
   if (!slot || !FIREMAKING[slot.id]) return;

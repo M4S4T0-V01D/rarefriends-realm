@@ -113,7 +113,7 @@ export function texturedTriangle(ctx: CanvasRenderingContext2D, texture: HTMLCan
 }
 
 // ---------- Ground ----------
-export type GroundStyle = "grass" | "lush" | "dirt" | "gravel" | "cobble" | "flag" | "sand" | "snow" | "plank" | "furrow" | "dungeon" | "ice" | "carpet" | "ash" | "swamp";
+export type GroundStyle = "grass" | "lush" | "dirt" | "gravel" | "cobble" | "flag" | "sand" | "snow" | "plank" | "furrow" | "dungeon" | "ice" | "carpet" | "ash" | "swamp" | "brick";
 /**
  * A ground tile's detail, 16 × 16, on a transparent background: the tile's own shaded fill shows through, and the
  * texture adds the pixels (blades, pebbles, setts, planks) in tones of the ground's colour. Each tile draws one of four
@@ -154,6 +154,17 @@ export function groundTexture(style: GroundStyle, color: string, variant: number
           p.rect(x, y, 4, 1, tone(-0.16)); p.rect(x + 3, y, 1, 4, tone(-0.16));
           p.rect(x, y + 1, 3, 3, sett); p.rect(x, y + 1, 2, 1, shadeHex(sett, 0.07)); p.set(x, y + 2, shadeHex(sett, 0.04)); p.set(x + 2, y + 3, shadeHex(sett, -0.08));
         }
+        break;
+      }
+      case "brick": {
+        // Bricks in a running bond, four courses to the tile: each brick its own shade of red, a lit top edge, and dark
+        // mortar between (a little soot and wear here and there).
+        for (let row = 0; row < 4; row++) for (let col = -1; col < 3; col++) {
+          const x = col * 6 + (row % 2 ? 3 : 0), y = row * 4, t = (noise(col + 17, row + variant * 4, 7) - 0.5) * 0.14, brick = tone(t);
+          p.rect(x, y, 6, 1, tone(-0.22)); p.rect(x + 5, y, 1, 4, tone(-0.22));
+          p.rect(x, y + 1, 5, 3, brick); p.rect(x, y + 1, 5, 1, shadeHex(brick, 0.06)); p.set(x + 4, y + 3, shadeHex(brick, -0.08));
+        }
+        speckle(3, -0.2, 21);
         break;
       }
       case "flag": case "dungeon": {

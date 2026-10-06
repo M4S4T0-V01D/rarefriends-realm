@@ -106,24 +106,69 @@ export function buildVillages(ctx: GenContext, t: Tools) {
     barrel(x - 2, y + 3);
   }
 
-  // ---------- Dyemoor: the dyers' village on the Thistle ----------
+  // ---------- Dyemoor: the dyers' town on the Thistle ----------
+  // The Realm's clothiers and dyers, and the richest small town south of the mainland: a square of dark red brick round
+  // the Three-Colour Fountain; the Dyers' Guildhall under its dome on the north side between the Dyeworks and the
+  // Counting House; four clothiers and the thread shop round the square; the Crooked Vat on the east street; tall
+  // townhouses on the west; cloth drying on lines down to the shore.
   {
     const { x, y } = site("dyemoor");
-    ground(x, y, 12, 9, T.COBBLE, 4);
-    building(x - 11, y - 8, x - 4, y - 3, "s", T.WOOD, undefined, { name: "The Dyeworks", color: "#6e4a8a", chimney: true });
-    npc("dyemoor_dyer", x - 7, y - 5); decor(x - 10, y - 7, "barrel", true, "Indigo vat"); decor(x - 8, y - 7, "barrel", true, "Madder vat"); decor(x - 6, y - 7, "barrel", true, "Woad vat"); decor(x - 5, y - 4, "table");
-    building(x + 2, y - 8, x + 9, y - 3, "s", T.WOOD, undefined, { name: "Marigold's", color: "#a8403a" });
-    npc("dyemoor_clothier", x + 5, y - 5); decor(x + 3, y - 7, "shelf"); decor(x + 8, y - 7, "shelf"); decor(x + 8, y - 4, "crate");
-    building(x - 11, y + 3, x - 4, y + 8, "n", T.WOOD, undefined, { name: "Dyemoor Bolts & Thread", color: "#3f3f7a", walls: "plank" });
-    npc("dyemoor_tailor", x - 7, y + 6); decor(x - 10, y + 7, "shelf"); decor(x - 5, y + 7, "crate"); add({ kind: "wheel", x: x - 5, y: y + 4, blocks: true, name: "Spinning wheel" });
-    building(x + 3, y + 3, x + 9, y + 8, "n", T.WOOD, undefined, { name: "Cottage", color: "#e2c46a", chimney: true });
-    decor(x + 4, y + 7, "bed"); decor(x + 8, y + 7, "table");
-    // Cloth drying on lines down to the river, and the river itself running blue below the vats.
-    for (const [dx, dy] of [[-2, 10], [0, 10], [2, 10], [4, 10]] as const) decor(x + dx, y + dy, "banner", true, "Drying cloth");
-    for (const [dx, dy] of [[-2, 0], [2, 1], [0, -1]] as const) npc("dyemoor_villager", x + dx, y + dy, 3);
-    lamps([[x - 4, y - 1], [x + 4, y - 1], [x - 4, y + 1], [x + 4, y + 1]]);
-    sign(x + 1, y - 10, "Signpost", "Dyemoor. West up the river: Hollyhock. North: the crossroads for Southshore, Saltmarrow and the mainland. The river runs blue below the vats; that's normal.");
-    sign(x + 8, y - 9, "Marigold's", "Marigold's.", "moorland_frock"); sign(x - 9, y + 9, "Dyemoor Bolts & Thread", "Dyemoor Bolts & Thread.", "thread");
+    // The town's ground: level, cleared, the moor's own. (The river and the sea stay where they are.)
+    for (let i = ctx.spawns.length - 1; i >= 0; i--) { const s = ctx.spawns[i]; if (Math.abs(s.x - x) <= 29 && s.y >= y - 22 && s.y <= y + 11) ctx.spawns.splice(i, 1); }
+    for (let yy = y - 22; yy <= y + 11; yy++) for (let xx = x - 29; xx <= x + 29; xx++) {
+      if (inMainland(xx, yy)) continue;
+      const tt = get(xx, yy);
+      if (isWater(tt)) continue;
+      clearAt(xx, yy); t.setRegion(xx, yy, "dyemoor");
+      if (tt === T.CLIFF || tt === T.LAVA || tt === T.SWAMP || tt === T.VOID) put(xx, yy, T.GRASS);
+    }
+    // Brick: the square, the streets round it and the road through the town.
+    for (let yy = y - 11; yy <= y + 4; yy++) for (let xx = x - 21; xx <= x + 21; xx++) if (!isWater(get(xx, yy))) put(xx, yy, T.BRICK);
+    for (let yy = y - 21; yy <= y - 11; yy++) for (const xx of [x - 9, x - 8, x + 9, x + 10]) if (!isWater(get(xx, yy))) put(xx, yy, T.BRICK);
+    for (let xx = x + 21; xx <= x + 29; xx++) for (const yy of [y - 11, y - 10]) if (!isWater(get(xx, yy))) put(xx, yy, T.BRICK);
+    // North: the Dyeworks, the Guildhall and (east of it, on the road) nothing but the street.
+    building(x - 21, y - 20, x - 11, y - 12, "s", T.WOOD, undefined, { name: "The Dyeworks", color: "#6e4a8a", walls: "stone", storeys: 2, chimney: true });
+    npc("dyemoor_dyer", x - 16, y - 15);
+    for (const [dx, name] of [[-20, "Indigo vat"], [-18, "Madder vat"], [-14, "Woad vat"], [-12, "Weld vat"]] as const) decor(x + dx, y - 19, "barrel", true, name);
+    decor(x - 20, y - 14, "shelf", true, "Bolts of cloth, waiting for the vats"); decor(x - 12, y - 14, "table", true, "A dyer's bench: mordants, ladles and one stained apron");
+    for (const [dx, name] of [[-20, "A dye vat, steaming madder"], [-18, "A dye vat of woad, skimmed"], [-14, "A dye vat of weld"], [-12, "A dye vat of indigo, the dark one"]] as const) decor(x + dx, y - 10, "barrel", true, name);
+    building(x - 7, y - 20, x + 7, y - 12, "s", T.CARPET, undefined, { name: "The Dyers' Guildhall", color: "#7a2e2a", walls: "marble", roof: "cone", storeys: 3, spire: 34, keep: { size: 5, storeys: 1, spire: 100, dome: true }, facade: "civic" });
+    npc("dyemoor_guildmistress", x, y - 17);
+    for (let dx = -4; dx <= 4; dx += 2) decor(x + dx, y - 15, "table", true, "The guild's long table, every place set with a swatch book");
+    decor(x - 6, y - 19, "shelf", true, "The guild's ledgers: every colour, every recipe, every debt"); decor(x + 6, y - 19, "shelf", true, "Swatches of cloth, a thousand reds");
+    decor(x - 5, y - 13, "banner", true, "The Dyers' Guild's banner"); decor(x + 5, y - 13, "banner", true, "The Dyers' Guild's banner"); decor(x, y - 19, "throne", true, "The Guildmistress's chair");
+    // East: the Counting House (the guild's money is kept here) and Marigold's; past them, the Crooked Vat.
+    building(x + 12, y - 9, x + 20, y - 3, "w", T.STONE, undefined, { name: "Dyemoor Counting House", color: "#3d4a5c", walls: "marble" });
+    for (const by of [y - 8, y - 6, y - 4]) add({ kind: "bank", x: x + 19, y: by, blocks: true, name: "Bank booth" });
+    npc("banker", x + 17, y - 6); decor(x + 13, y - 8, "chest", true, "The guild's strongbox"); decor(x + 13, y - 4, "lamp");
+    building(x + 12, y - 1, x + 20, y + 5, "w", T.WOOD, undefined, { name: "Marigold's", color: "#a8403a", walls: "timber", storeys: 2 });
+    npc("dyemoor_clothier", x + 17, y + 2); decor(x + 19, y, "shelf", true, "Folded cloth in the moor's colours"); decor(x + 19, y + 4, "shelf", true, "Turbans and frocks on a rail of cloth"); decor(x + 14, y + 4, "crate");
+    building(x + 22, y - 9, x + 29, y - 2, "w", T.WOOD, undefined, { name: "The Crooked Vat", color: "#4a2b3a", walls: "timber", chimney: true });
+    // West: the thread shop and the Far Loom; townhouses beyond them.
+    building(x - 20, y - 9, x - 12, y - 3, "e", T.WOOD, undefined, { name: "Dyemoor Bolts & Thread", color: "#3f3f7a", walls: "plank" });
+    npc("dyemoor_tailor", x - 16, y - 6); decor(x - 19, y - 8, "shelf", true, "Thread and cloth by the bolt"); decor(x - 19, y - 4, "crate"); add({ kind: "wheel", x: x - 14, y: y - 8, blocks: true, name: "Spinning wheel" });
+    building(x - 20, y - 1, x - 12, y + 5, "e", T.WOOD, undefined, { name: "The Far Loom", color: "#5b4a78", walls: "timber", storeys: 2 });
+    npc("dyemoor_loomkeeper", x - 16, y + 2); decor(x - 19, y, "shelf", true, "Rarian cloth, folded to the Law's inch"); decor(x - 19, y + 4, "shelf", true, "Federation plaid and BarkReach leather on a rail of cloth"); decor(x - 13, y + 4, "crate", true, "Bales from over the mountains");
+    for (const [ty, door] of [[y - 9, "e"], [y - 1, "e"]] as const) {
+      building(x - 29, ty, x - 23, ty + 6, door, T.WOOD, undefined, { name: "A Dyemoor townhouse", color: ty < y ? "#7a2e2a" : "#3f5f9a", walls: ty < y ? "stone" : "timber", storeys: 2, chimney: true, hip: ty < y });
+      decor(x - 28, ty + 1, "bed"); decor(x - 28, ty + 5, "shelf", true, "Swatch books and a good china set"); decor(x - 25, ty + 1, "table");
+    }
+    // South: the Wide Wardrobe and the Madder Rose, between the square and the shore.
+    building(x - 10, y + 5, x - 2, y + 10, "n", T.WOOD, undefined, { name: "The Wide Wardrobe", color: "#6e6a82", walls: "timber" });
+    npc("dyemoor_wardrober", x - 6, y + 8); decor(x - 9, y + 9, "shelf", true, "Every village's clothes on one rail of cloth"); decor(x - 3, y + 9, "shelf", true, "Coats and capes from the four corners, cloth and leather"); decor(x - 9, y + 6, "crate");
+    building(x + 2, y + 5, x + 10, y + 10, "n", T.WOOD, undefined, { name: "The Madder Rose", color: "#d48a9a", walls: "timber", hip: true });
+    npc("dyemoor_rosekeeper", x + 6, y + 8); decor(x + 3, y + 9, "shelf", true, "Shirts and dresses, folded cloth in every colour"); decor(x + 9, y + 9, "shelf", true, "Hats and trousers on a rail of cloth"); decor(x + 9, y + 6, "crate");
+    // The square: the Three-Colour Fountain, lamps, benches and beds of madder flowers; townsfolk about their business.
+    for (const [fx, fy] of [[x - 1, y - 4], [x, y - 4], [x - 1, y - 3], [x, y - 3]] as const) add({ kind: "fountain", x: fx, y: fy, blocks: true, name: "The Three-Colour Fountain" });
+    lamps([[x - 9, y - 9], [x + 9, y - 9], [x - 9, y + 2], [x + 9, y + 2], [x - 4, y - 10], [x + 4, y - 10], [x + 21, y - 8], [x - 21, y - 8]]);
+    for (const [dx, dy] of [[-4, -1], [4, -1], [-4, -6], [4, -6]] as const) decor(x + dx, y + dy, "bench", true, "A bench on the square, where the dyers eat their lunch");
+    for (const [dx, dy] of [[-6, -3], [6, -3], [-2, 1], [2, 1], [-6, -7], [6, -7]] as const) decor(x + dx, y + dy, "flowers", false, "A bed of madder flowers: the red comes from the roots");
+    for (const [dx, dy] of [[-3, -5], [3, 0], [-7, 1], [7, -8], [12, -10], [-14, 3]] as const) npc("dyemoor_villager", x + dx, y + dy, 3);
+    // Cloth drying on lines by the shore, every colour the guild has.
+    for (const [dx, dy] of [[-20, 7], [-18, 7], [-16, 7], [-14, 7]] as const) if (!isWater(get(x + dx, y + dy))) { clearAt(x + dx, y + dy); decor(x + dx, y + dy, "banner", true, "Drying cloth, still dripping colour"); }
+    sign(x + 1, y - 22, "Signpost", "Dyemoor, the dyers' town. West up the river: Hollyhock. North: the crossroads for Southshore, Saltmarrow and the mainland. The river runs blue below the vats; that's normal.");
+    sign(x + 21, y - 1, "The Crooked Vat", "The Crooked Vat. Ale, food and a board of work for anyone who wants it.");
+    sign(x + 21, y + 1, "Marigold's", "Marigold's.", "moorland_frock"); sign(x - 11, y - 10, "Dyemoor Bolts & Thread", "Dyemoor Bolts & Thread.", "thread");
     barrel(x - 2, y + 3);
   }
 

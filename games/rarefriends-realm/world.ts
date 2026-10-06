@@ -40,9 +40,11 @@ export const STOREY = 42;
 export const T = {
   VOID: 0, GRASS: 1, DARK_GRASS: 2, PATH: 3, COBBLE: 4, SAND: 5, WATER: 6, DEEP: 7, SWAMP: 8, SNOW: 9,
   STONE: 10, WOOD: 11, GRAVEL: 12, DUNGEON: 13, BRIDGE: 14, CLIFF: 15, WALL: 16, FARMLAND: 17, ICE: 18, CARPET: 19, ASH: 20, LAVA: 21,
+  /** Brick paving: dark red, laid in a running bond (Dyemoor's square). */
+  BRICK: 22,
 } as const;
 export type Terrain = typeof T[keyof typeof T];
-const WALKABLE = new Set<number>([T.GRASS, T.DARK_GRASS, T.PATH, T.COBBLE, T.SAND, T.SWAMP, T.SNOW, T.STONE, T.WOOD, T.GRAVEL, T.DUNGEON, T.BRIDGE, T.FARMLAND, T.ICE, T.CARPET, T.ASH]);
+const WALKABLE = new Set<number>([T.GRASS, T.DARK_GRASS, T.PATH, T.COBBLE, T.SAND, T.SWAMP, T.SNOW, T.STONE, T.WOOD, T.GRAVEL, T.DUNGEON, T.BRIDGE, T.FARMLAND, T.ICE, T.CARPET, T.ASH, T.BRICK]);
 export const isWater = (terrain: number) => terrain === T.WATER || terrain === T.DEEP;
 /** The sparring ring east of Market Street: inside it, players may duel each other (safely: nobody dies or loses items). */
 export const RING = { x0: 138 + MAINLAND.x + WEST_DX, y0: 144 + MAINLAND.y, x1: 144 + MAINLAND.x + WEST_DX, y1: 149 + MAINLAND.y };
@@ -1366,7 +1368,7 @@ export function walkable(world: World, x: number, y: number) {
 const RELIEF: Record<number, number> = {
   [T.ASH]: 62, [T.GRASS]: 46, [T.DARK_GRASS]: 58, [T.PATH]: 26, [T.SAND]: 38, [T.SWAMP]: 10, [T.SNOW]: 84, [T.GRAVEL]: 60, [T.CLIFF]: 90, [T.FARMLAND]: 6,
 };
-const FLAT = new Set<number>([T.LAVA, T.VOID, T.WATER, T.DEEP, T.BRIDGE, T.COBBLE, T.WOOD, T.STONE, T.CARPET, T.WALL, T.DUNGEON, T.ICE]);
+const FLAT = new Set<number>([T.LAVA, T.VOID, T.WATER, T.DEEP, T.BRIDGE, T.COBBLE, T.WOOD, T.STONE, T.CARPET, T.WALL, T.DUNGEON, T.ICE, T.BRICK]);
 /**
  * Rolling hills from two noise octaves, scaled by each terrain's relief, eased to flat ground near water, towns,
  * buildings and bridges (so shores and streets stay level), then blurred once for gentle slopes.

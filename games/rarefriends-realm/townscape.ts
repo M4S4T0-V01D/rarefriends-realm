@@ -41,7 +41,7 @@ const FAR_VILLAGES: readonly (readonly [keyof typeof FAR_PLACES, string])[] = [
 let grounds: { open: Set<number>; walkable: Set<number> } | null = null;
 const ground = () => grounds ??= {
   open: new Set<number>([T.GRASS, T.DARK_GRASS, T.SAND, T.SNOW, T.GRAVEL, T.ASH]),
-  walkable: new Set<number>([T.GRASS, T.DARK_GRASS, T.PATH, T.COBBLE, T.SAND, T.SNOW, T.STONE, T.GRAVEL, T.FARMLAND, T.ASH, T.WOOD, T.BRIDGE, T.ICE]),
+  walkable: new Set<number>([T.GRASS, T.DARK_GRASS, T.PATH, T.COBBLE, T.SAND, T.SNOW, T.STONE, T.GRAVEL, T.FARMLAND, T.ASH, T.WOOD, T.BRIDGE, T.ICE, T.BRICK]),
 };
 /** Home roofs: thatch, slate, terracotta, moss, plum and pine. */
 const HOME_ROOFS = ["#c9a96a", "#6e6a82", "#b8705a", "#8a9a6a", "#7d5a6e", "#5a6e5a", "#a07850", "#56607a"] as const;

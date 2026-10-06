@@ -855,14 +855,55 @@ const ORDER_ARMOUR: Item[] = [
 export const DAWNPLATE_QUEST: Record<string, string> = { dawnplate_greaves: "pilgrims_road", dawnplate_boots: "pilgrims_road", dawnplate_helm: "restless_crypt",
   dawnplate_shield: "restless_crypt", dawnplate_gauntlets: "restless_crypt", dawnplate_cuirass: "dawn_against_hollow" };
 
-export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...ORDER_ARMOUR, ...orderGear(), ...slayerGear(), ...heartguardGear(), ...REGIONAL_ITEMS, ...APOTHECARY_ITEMS, ...factionGear()]);
+/**
+ * Dyemoor's dyes. A pot of dye used on cloth or leather clothing (a hood, a hat, a coat, a tunic, trousers or a skirt,
+ * gloves, boots, a cape) dyes it: the same piece, in the dye's colour, its trim kept. Lye washes the dye out again.
+ * A dyed piece is an item of its own, `<piece>~<dye>`, made on demand by `item()` (so it can be worn, banked, traded
+ * and saved like any other).
+ */
+export const DYES = [
+  { id: "madder", name: "Madder red", color: "#a8403a" }, { id: "woad", name: "Woad blue", color: "#4a6aa8" }, { id: "indigo", name: "Indigo", color: "#2f3a6e" },
+  { id: "weld", name: "Weld yellow", color: "#d9b84a" }, { id: "saffron", name: "Saffron", color: "#d07a2a" }, { id: "rose", name: "Rose", color: "#d48a9a" },
+  { id: "lichen", name: "Lichen purple", color: "#6e4a8a" }, { id: "moss", name: "Moss green", color: "#4f7a4a" }, { id: "teal", name: "Kingfisher teal", color: "#3f8a8a" },
+  { id: "walnut", name: "Walnut brown", color: "#6b4a2c" }, { id: "sable", name: "Sable black", color: "#2a2830" }, { id: "chalk", name: "Chalk white", color: "#ece6d8" },
+] as const;
+export type DyeId = typeof DYES[number]["id"];
+const DYE_POTS: Item[] = [
+  ...DYES.map(dye => ({ id: `dye_${dye.id}`, name: `Pot of ${dye.name.toLowerCase()} dye`, examine: `${dye.name}, from the Dyeworks at Dyemoor. Use it on cloth or leather clothing to dye it.`, value: 60, icon: { shape: "pot" as const, color: dye.color, accent: "#6b4a2c" } })),
+  { id: "dye_lye", name: "Pot of lye", examine: "Washes the dye out of anything you've dyed, back to the colour it was made in.", value: 30, icon: { shape: "pot", color: "#dcd8c8", accent: "#6b4a2c" } },
+];
+/** Whether a piece of clothing can be dyed: cloth or leather worn on the head, body, legs, hands, feet or back (not metal, not a mastery cape). */
+const DYE_SHAPES = new Set<IconShape>(["hood", "hat", "body", "legs", "gloves", "boots", "cape", "bracer"]);
+export function dyeable(id: string): boolean {
+  const base = baseOf(id), found = ITEM_MAP.get(base);
+  if (!found?.equip || !DYE_SHAPES.has(found.icon.shape) || found.mastery || ["quiver", "satchel"].includes(found.icon.shape)) return false;
+  if (METALS.some(metal => base.startsWith(`${metal.id}_`)) || /_(plate|cuirass|chainbody|helm|greaves)$|oath|knight|paladin|hauberk|_mail|dawnplate|vigil|heartguard/.test(base)) return false;
+  return true;
+}
+/** The undyed piece a (maybe dyed) item is. */
+export const baseOf = (id: string) => id.includes("~") ? id.slice(0, id.indexOf("~")) : id;
+/** The dye on an item, if it's been dyed. */
+export const dyeOf = (id: string) => id.includes("~") ? DYES.find(dye => dye.id === id.slice(id.indexOf("~") + 1)) ?? null : null;
+const DYED = new Map<string, Item>();
+function dyedItem(id: string): Item | undefined {
+  const known = DYED.get(id);
+  if (known) return known;
+  const tilde = id.indexOf("~");
+  if (tilde < 0) return undefined;
+  const base = ITEM_MAP.get(id.slice(0, tilde)), dye = DYES.find(entry => entry.id === id.slice(tilde + 1));
+  if (!base || !dye || !dyeable(base.id)) return undefined;
+  const made: Item = { ...base, id, name: `${base.name} (${dye.name.toLowerCase()})`, examine: `${base.examine} Dyed ${dye.name.toLowerCase()} at Dyemoor.`, icon: { ...base.icon, color: dye.color } };
+  DYED.set(id, made);
+  return made;
+}
+export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...DYE_POTS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...ORDER_ARMOUR, ...orderGear(), ...slayerGear(), ...heartguardGear(), ...REGIONAL_ITEMS, ...APOTHECARY_ITEMS, ...factionGear()]);
 const ITEM_MAP = new Map(ITEM_LIST.map(item => [item.id, item]));
 export function item(id: string): Item {
-  const found = ITEM_MAP.get(id);
+  const found = ITEM_MAP.get(id) ?? dyedItem(id);
   if (!found) throw new Error(`Unknown item ${id}`);
   return found;
 }
-export const isItem = (id: unknown): id is string => typeof id === "string" && ITEM_MAP.has(id);
+export const isItem = (id: unknown): id is string => typeof id === "string" && (ITEM_MAP.has(id) || !!dyedItem(id));
 
 // ---------- Gathering ----------
 export type TreeKind = "tree" | "oak" | "willow" | "maple" | "yew" | "ashwood" | "palm" | "pine" | "deadwood" | "redwood" | "ironbark";
@@ -1400,6 +1441,8 @@ export function itemCategory(id: string): Category {
 export type ShopDef = { id: string; name: string; stock: readonly string[]; general?: boolean; buys?: readonly Category[]; rate?: number;
   /** What it's paid in when not coins (the Ring's bloodmarks and laurels): an item id. Such shops buy nothing back. */
   currency?: string };
+/** Clothes that are only had by earning them (quest rewards, the rarest drops): never on a clothier's rail. */
+const QUEST_CLOTHES = new Set(["maiden_veil", "rarian_mantle", "scorched_cloak"]);
 export const SHOPS: Record<string, ShopDef> = {
   // The four Orders' quartermasters (open once their oath is sworn), and the Deadwood Maidens' market (once the truce is kept).
   diamond_armoury: { id: "diamond_armoury", name: "The Diamond Armoury", buys: ["weapon", "armour"], rate: 0.5, stock: orderStock("diamond") },
@@ -1441,6 +1484,13 @@ export const SHOPS: Record<string, ShopDef> = {
   saltmarrow_clothier: { id: "saltmarrow_clothier", name: "The Oilskin Locker", buys: ["other"], rate: 0.5, stock: REGIONAL_CLOTHING.find(set => set.region === "saltmarrow")!.pieces.map(piece => piece.id) },
   hollyhock_herbs: { id: "hollyhock_herbs", name: "Mother Yarrow's Bench", buys: ["other"], rate: 0.6, stock: ["vial_of_water", "vial", "mortar", "feverleaf", "saltwort", "healing_tonic", "antidote"] },
   hollyhock_clothier: { id: "hollyhock_clothier", name: "Petal & Pocket", buys: ["other"], rate: 0.5, stock: REGIONAL_CLOTHING.find(set => set.region === "hollyhock")!.pieces.map(piece => piece.id) },
+  // Dyemoor, the dyers' town: the dyes themselves, and three more clothiers selling what the rest of the Realm wears.
+  dyemoor_dyes: { id: "dyemoor_dyes", name: "The Dyeworks: dyes", buys: ["other"], rate: 0.4, stock: [...DYES.map(dye => `dye_${dye.id}`), "dye_lye"] },
+  dyemoor_wardrobe: { id: "dyemoor_wardrobe", name: "The Wide Wardrobe", buys: ["other"], rate: 0.5,
+    stock: REGIONAL_CLOTHING.filter(set => ["maidens", "gravesend", "saltmarrow", "hollyhock", "tallgrass", "cragmaw", "quillhaven", "ashfall"].includes(set.region)).flatMap(set => set.pieces.map(piece => piece.id)).filter(id => !QUEST_CLOTHES.has(id)) },
+  dyemoor_farloom: { id: "dyemoor_farloom", name: "The Far Loom", buys: ["other"], rate: 0.5,
+    stock: REGIONAL_CLOTHING.filter(set => ["raria", "fff", "barkreach"].includes(set.region)).flatMap(set => set.pieces.map(piece => piece.id)).filter(id => !QUEST_CLOTHES.has(id)) },
+  dyemoor_madder: { id: "dyemoor_madder", name: "The Madder Rose", buys: ["other"], rate: 0.5, stock: CLOTHING.map(entry => entry.id).filter(id => /_(shirt|tunic|dress|trousers|skirt|wide_hat|feathered_cap|wizard_hat)$/.test(id)) },
   dyemoor_clothier: { id: "dyemoor_clothier", name: "The Dyeworks", buys: ["other"], rate: 0.5, stock: REGIONAL_CLOTHING.find(set => set.region === "dyemoor")!.pieces.map(piece => piece.id) },
   tallgrass_clothier: { id: "tallgrass_clothier", name: "Hide & Seek Outfitters", buys: ["other"], rate: 0.5, stock: REGIONAL_CLOTHING.find(set => set.region === "tallgrass")!.pieces.map(piece => piece.id) },
   cragmaw_clothier: { id: "cragmaw_clothier", name: "The Warm Hearth", buys: ["other"], rate: 0.5, stock: REGIONAL_CLOTHING.find(set => set.region === "cragmaw")!.pieces.map(piece => piece.id) },
