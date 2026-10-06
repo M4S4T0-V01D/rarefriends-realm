@@ -35,6 +35,9 @@ img { max-width: 100%; height: auto; display: block; }
 .btn:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 #000; }
 .btn:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; }
 .btn.primary { background: var(--gold); color: var(--ink); font-size: 17px; padding: 15px 28px; }
+.btn.gl { background: #3b2f5c; color: #f2e9ff; font-size: 17px; padding: 15px 24px; }
+.btn.gl .badge { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; background: var(--gold); color: var(--ink); border: 1px solid #000; padding: 1px 6px; }
+.gl-note { max-width: 640px; margin: 16px auto 0; font-size: 14px; opacity: .9; }
 
 /* Bands with the Realm behind them: each section carries its own backdrop layers, painted with the game's own pixel
    art (scripts/preview-backdrops.mjs), slid at their own pace as you scroll. The castle wall behind the trailer, the
@@ -235,17 +238,17 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
   <div class="bg castle" data-speed=".22" aria-hidden="true"><span class="torch" style="left: 7%; top: 56%"><i></i></span><span class="torch" style="left: 93%; top: 56%"><i></i></span><span class="torch small" style="left: 24%; top: 40%"><i></i></span><span class="torch small" style="left: 76%; top: 40%"><i></i></span></div>
   <div class="wrap bar">
     <a class="logo" href="#"><i>⚔</i> RareFriends Realm</a>
-    <nav aria-label="Sections"><a href="#trailer">Trailer</a><a href="#new">What's new</a><a href="./lore.html">Lore</a><a href="#explore">Explore</a><a href="#skills">Skills &amp; quests</a><a href="#music-section">Soundtrack</a><a href="#caskets">Caskets</a><a href="./guides.html">Skill guides</a><a href="#play">Play</a></nav>
+    <nav aria-label="Sections"><a href="#trailer">Trailer</a><a href="#new">What's new</a><a href="./lore.html">Lore</a><a href="#explore">Explore</a><a href="#skills">Skills &amp; quests</a><a href="#music-section">Soundtrack</a><a href="#caskets">Caskets</a><a href="./guides.html">Skill guides</a><a href="#play">Play</a><a href="https://m4s4t0-v01d.github.io/realm-gl/">Play (WebGL)</a></nav>
   </div>
   <div class="wrap trailer" id="trailer">
     <div class="frame">
-      <video id="trailer-video" src="media/update-raria.mp4" poster="media/update-raria-poster.jpg" autoplay muted playsinline controls preload="metadata"
-        aria-label="RareFriends Realm update video: faith weapons against the Catacombs' dead, the Crystal Golem in the Deepglass Caverns, the Drowned Archive, the Howling King in the Howling Vault, the Rare Friends Ring from above, a match in its courtyard, and the Ring's shops"></video>
+      <video id="trailer-video" src="media/update-webgl.mp4" poster="media/update-webgl-poster.jpg" autoplay muted playsinline controls preload="metadata"
+        aria-label="Realm WebGL beta video: ground blending at Fernwick, Friendhollow's roofs zooming out, Raria's palace and keep, Frostpeak in the snow, a lamplit evening in the square, and the graphics settings for nerds"></video>
       <button class="btn primary sound" id="trailer-sound" type="button">🔊 Watch with sound</button>
       <button class="arrow prev" id="trailer-prev" type="button" aria-label="Previous video">‹</button>
       <button class="arrow next" id="trailer-next" type="button" aria-label="Next video">›</button>
     </div>
-    <p><span class="count" id="trailer-count">1 / 6</span><b id="trailer-title">The Rare Friends Ring, three dungeons and faith weapons</b> <span id="trailer-note">New this week: faith weapons in every metal, three dungeons with keyed doors and coffers, and the Rare Friends Ring, an arena of brutality and death. Every shot recorded straight from the game, set to the Ring's own war march.</span></p>
+    <p><span class="count" id="trailer-count">1 / 6</span><b id="trailer-title">Realm WebGL: the same Realm on your graphics card</b> <span id="trailer-note">In beta: ground that blends, shingled roofs at every zoom, every tree and Friend lit where it stands, and graphics settings for nerds.</span></p>
     <div class="reel" id="trailer-reel" aria-label="Up next"></div>
   </div>
   <div class="wrap hero">
@@ -255,6 +258,7 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
       <p class="lead">An old-school adventure starring the Rare Friend you own, shared with everyone online. Chop, fish, mine, smith and fight across a hand-built 2.5D island lit by a real sun, lamps and fire, join the Order of the Dawn, ride horses and unicorns, duel your friends, bring down a world boss together, and end the Hollow King's reign.</p>
       <div class="cta">
         <a class="btn primary" href="../">⚔ Play the Realm</a>
+        <a class="btn gl" href="https://m4s4t0-v01d.github.io/realm-gl/" title="The same Realm, drawn on your graphics card: the WebGL build, in testing">✦ Play (WebGL) <span class="badge">beta</span></a>
         <button class="btn" type="button" data-track="theme">♪ Hear the main theme</button>
       </div>
       <small>Needs a browser wallet on Robinhood mainnet holding a hardwired Rare Friends Generations NFT. $RAREFRIENDS is simulated: no contracts, signatures or transactions.</small>
@@ -505,7 +509,9 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
     <h2>Enter the Realm</h2>
     <p>Connect a browser wallet on Robinhood mainnet holding a hardwired Rare Friends Generations NFT, pick your Friend and press Begin. On phones, use a wallet app's in-app browser in landscape.</p>
     <a class="btn primary" href="../">⚔ Play the Realm</a>
+    <a class="btn gl" href="https://m4s4t0-v01d.github.io/realm-gl/" title="The same Realm, drawn on your graphics card: the WebGL build, in testing">✦ Play (WebGL) <span class="badge">beta</span></a>
     <a class="btn" href="https://github.com/M4S4T0-V01D/rarefriends-realm">Source code</a>
+    <p class="gl-note">New: <b>Realm WebGL</b> is the same game, drawn on your graphics card (a save code from one works in the other): ground that blends, shingled roofs at every zoom, every sprite lit where it stands, and a graphics screen for nerds. It's in beta, so tell us what you find.</p>
   </div>
 </section>
 
@@ -520,6 +526,9 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
   // music player take turns.
   (() => {
     const VIDEOS = [
+      { src: "media/update-webgl.mp4", poster: "media/update-webgl-poster.jpg", title: "Realm WebGL: the same Realm on your graphics card", when: "October 2026",
+        note: "In beta: the WebGL build of the Realm, with ground that blends from grass to sand and path to snow, shingled roofs and bricks at every zoom, every tree and Friend lit where it stands, and graphics settings for nerds. Play it from the purple Play (WebGL) button.",
+        label: "Realm WebGL beta video: ground blending at Fernwick, Friendhollow's roofs zooming out, Raria's palace and keep, Frostpeak in the snow, a lamplit evening in the square, and the graphics settings for nerds" },
       { src: "media/update-raria.mp4", poster: "media/update-raria-poster.jpg", title: "Return of Raria", when: "October 2026",
         note: "New this week: the Kingdom of Raria behind the Drakespine, Queen Rara and her Royal Rangers, the Rare Realm Regiment in Deep Westmarch, the Free Friends Federation and its fortress, BarkReach, the Burned of Ashfall, the Wise Friend's Law over Magic and Faith, and Adventurer Cards. Every shot recorded straight from the game.",
         label: "RareFriends Realm update video: the walled city of Raria and its palace, Queen Rara and King Pell on the throne, Royal Rangers, the Rare Realm Regiment's camp, the Free Friends Federation's Great Hall with its devices and cannon, BarkReach's redwoods, the Burned in Ashfall, the Rarian Magic and Faith tabs, and the Adventurer Cards" },
