@@ -168,11 +168,24 @@ export function groundTexture(style: GroundStyle, color: string, variant: number
         if (style === "dungeon") speckle(3, 0, 12), [0, 1, 2].forEach(i => p.set(Math.floor(r(i, 13) * S), Math.floor(r(i, 14) * S), "#6f7a62"));
         break;
       }
-      case "sand": case "snow": {
-        // Wind ripples (lit crest, shadowed trough) and grains or glints.
-        const lit = style === "snow" ? "#ffffff" : tone(0.05), shadow = style === "snow" ? "#dde3ea" : tone(-0.07);
+      case "snow": {
+        // Snow with body: soft blue-grey drifts in the hollows, wind-cut crests lit white, packed patches and the odd
+        // glint, so a snowfield reads as ground with shape (slope shading shows on its cool off-white base) and never as
+        // a blank hole in the land.
+        for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+          const n = noise(x >> 1, y >> 1, variant + 21);
+          if (n > 0.58 && BAYER[y & 3][x & 3] < 3) p.set(x, y, "#b4c0cf"); else if (n < 0.26 && BAYER[y & 3][x & 3] < 2) p.set(x, y, "#eef2f6");
+        }
+        for (let k = 0; k < 2; k++) { const y0 = 3 + k * 7 + (variant % 3); for (let x = 0; x < S; x++) { const y = y0 + Math.round(Math.sin((x + variant * 5) * 0.4) * 1.5); if (noise(x, k + 4, variant) > 0.3) { p.set(x, y, "#f4f7fa"); p.set(x, y + 1, "#a9b6c6"); } } }
+        for (let i = 0; i < 3; i++) { const x = Math.floor(r(i, 31) * S), y = Math.floor(r(i, 32) * S); p.set(x, y, "#ffffff"); p.set(x + 1, y, "#e3eefa"); }
+        speckle(4, -0.12, 9);
+        break;
+      }
+      case "sand": {
+        // Wind ripples (lit crest, shadowed trough) and grains.
+        const lit = tone(0.05), shadow = tone(-0.07);
         for (let k = 0; k < 3; k++) { const y0 = 2 + k * 5 + (variant % 2); for (let x = 0; x < S; x++) { const y = y0 + Math.round(Math.sin((x + variant * 3) * 0.5) * 1.2); if (noise(x, k, variant) > 0.25) { p.set(x, y, lit); p.set(x, y + 1, shadow); } } }
-        speckle(style === "snow" ? 3 : 5, style === "snow" ? 0.05 : -0.1, 4);
+        speckle(5, -0.1, 4);
         break;
       }
       case "plank": {

@@ -239,3 +239,17 @@ export const FACTION_MONSTERS: Record<string, MonsterDef> = {
     always: [one("bones", 1)], drops: [coins(30, 180, 0.7), one("blackiron_sword", 0.05), one("crimson_cape", 0.03), one("blackiron_helm", 0.03), one("bread", 0.3), one("hollowmere_report", 0.0), one("path_sigil", 0.04, 1, 2)].filter(drop => drop.chance > 0) },
   ...BURNED,
 };
+/**
+ * Every creature of the west has a weakness, and most a way of fighting of their own: the Regiment's officers and
+ * the great beasts enrage when hurt, wardens and the Royal Rangers mend themselves, the light-armoured take poison
+ * badly. (The Burned are already weak to water, the Dusk's wraiths and the Greyfields' dead to holy light, the
+ * lurkers and the Elder to fire, the Silent watchers to earth.)
+ */
+const TRAITS: Record<string, Partial<MonsterDef>> = {
+  rrr_scout: { weakness: "wind", poisonWeak: 1.2 }, rrr_archer: { weakness: "wind" }, rrr_footman: { weakness: "earth" }, rrr_halberdier: { weakness: "earth", enrage: true },
+  rrr_captain: { weakness: "water", enrage: true, heals: 3 }, royal_ranger: { weakness: "fire", heals: 6 }, crown_hound: { weakness: "fire", poisonWeak: 1.3, enrage: true },
+  fff_picket: { weakness: "fire" }, fff_warden: { weakness: "water", heals: 4, drain: { energy: 6 } },
+  greatstag: { weakness: "fire", enrage: true }, timber_thief: { weakness: "water", poisonWeak: 1.4 }, deserter: { weakness: "wind" }, admiral_peck: { weakness: "fire" },
+  greyfield_revenant: { enrage: true }, ironbark_treant: { heals: 6, enrage: true }, peak_watcher: { heals: 2 }, dusk_wraith: { poisonImmune: true },
+};
+for (const [id, traits] of Object.entries(TRAITS)) if (FACTION_MONSTERS[id]) Object.assign(FACTION_MONSTERS[id], traits);

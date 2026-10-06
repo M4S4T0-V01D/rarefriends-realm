@@ -380,11 +380,31 @@ export function buildFarWest(ctx: GenContext, t: Tools, places: World["places"])
     ground(hx, hy, 6, 5, null);
     decor(hx, hy, "hearth", true, "The hunters' fire, a greatstag haunch over it"); decor(hx - 4, hy - 3, "tent", true, "A hunter's tent, hides drying on the ropes"); decor(hx + 4, hy - 3, "tent", true, "A hunter's tent"); decor(hx - 3, hy + 3, "crate", true, "Hides, salted"); decor(hx + 3, hy + 3, "hay", true, "Antler, a cartload");
     npc("barkreach_hunter", hx - 1, hy - 2, 2); npc("barkreach_hunter", hx + 2, hy + 2, 2); add({ kind: "range", x: hx - 2, y: hy + 1, blocks: true, name: "Hunters' fire" });
-    // Wood's End: the trading post at the wood's eastern edge, where the Federation's road comes in.
-    const [ex, ey] = FAR_PLACES.woods_end;
-    ground(ex, ey, 6, 4, T.PATH, 1);
-    building(ex - 3, ey - 5, ex + 3, ey, "s", T.WOOD, undefined, { name: "The Wood's End trading post", color: "#8a3a2a", walls: "plank", chimney: true }); npc("barkreach_trader", ex, ey - 3); decor(ex - 2, ey - 4, "crate"); decor(ex + 2, ey - 4, "barrel");
-    sign(ex, ey + 3, "Wood's End", "WOOD'S END. West: BarkReach, Sawyer's Rest and the rangers. East: the Federation's road to the Free Marches. North: the Greyfields, where you do not want to be. The Regiment's scouts have been seen in the wood. The rangers have seen them back.", "redwood_bow");
+    // Wood's End: a little wooden fort in the wood where the Federation's road comes in: a stake palisade with gates on the
+    // road, two watchtowers, the trading post, a storehouse, the rangers' bunkhouse, a fire, a wagon and the post's guards.
+    const [ex, ey] = FAR_PLACES.woods_end, fx0 = ex - 11, fy0 = ey - 9, fx1 = ex + 11, fy1 = ey + 8;
+    ground(ex, ey, 14, 12, null);
+    for (let y = fy0; y <= fy1; y++) for (let x = fx0; x <= fx1; x++) { const tt = get(x, y); if (tt !== T.PATH) put(x, y, (x * 7 + y * 3) % 5 === 0 ? T.GRAVEL : T.DARK_GRASS); }
+    road([[ex - 16, ey + 7], [ex - 11, ey + 3], [ex + 11, ey + 3], [ex + 16, ey - 7]], 2.2);
+    const gate = (x: number, y: number) => (x === fx0 || x === fx1) && y >= ey + 2 && y <= ey + 4;
+    for (let x = fx0; x <= fx1; x += 2) { decor(x, fy0, "stake", true, "Wood's End's palisade: sharpened redwood, lashed with rope"); decor(x, fy1, "stake", true, "Wood's End's palisade: sharpened redwood, lashed with rope"); }
+    for (let y = fy0 + 2; y < fy1; y += 2) for (const x of [fx0, fx1]) if (!gate(x, y) && !gate(x, y - 1) && !gate(x, y + 1)) decor(x, y, "stake", true, "Wood's End's palisade: sharpened redwood, lashed with rope");
+    for (const x of [fx0, fx1]) { decor(x, ey + 1, "stake", true, "A gatepost of the palisade"); decor(x, ey + 5, "stake", true, "A gatepost of the palisade"); }
+    building(ex - 5, fy0 + 1, ex + 5, ey - 2, "s", T.WOOD, ex, { name: "The Wood's End trading post", color: "#8a3a2a", walls: "plank", chimney: true, storeys: 2, tall: 4 });
+    npc("barkreach_trader", ex, ey - 5);
+    decor(ex - 4, fy0 + 2, "shelf", true, "Jars of resin, pickled greatstag and wood-honey"); decor(ex - 2, fy0 + 2, "shelf", true, "Hides, folded, and woollens for the winter wood"); decor(ex + 2, fy0 + 2, "shelf", true, "Bows and shafts for trade");
+    decor(ex + 4, fy0 + 2, "chest", true, "The post's strongbox"); decor(ex - 4, ey - 4, "crate", true, "Rope, string and nails"); decor(ex + 4, ey - 4, "barrel", true, "Salt"); decor(ex + 2, ey - 4, "table", true, "The trader's counter and ledger");
+    building(ex + 7, fy0 + 1, fx1 - 1, ey - 3, "s", T.WOOD, undefined, { name: "The Wood's End storehouse", color: "#5a3a2a", walls: "plank" });
+    decor(ex + 8, fy0 + 2, "logpile", true, "Redwood, waiting for a wagon"); decor(ex + 9, ey - 4, "crate", true, "Antler and hides, bound for the Federation"); decor(ex + 9, fy0 + 2, "barrel");
+    building(fx0 + 1, fy0 + 1, ex - 7, ey - 3, "s", T.WOOD, undefined, { name: "The rangers' bunkhouse", color: "#4a3a2c", walls: "plank", chimney: true });
+    decor(fx0 + 2, fy0 + 2, "bed"); decor(ex - 8, fy0 + 2, "bed"); decor(fx0 + 2, ey - 4, "armour", true, "Bows and quivers, hung by the door");
+    decor(ex, ey + 6, "hearth", true, "The fort's fire, a kettle on it"); decor(ex - 3, ey + 6, "bench"); decor(ex + 3, ey + 6, "bench"); decor(ex - 7, ey + 6, "wagon", true, "A trader's wagon, unhitched");
+    decor(ex + 7, ey + 6, "hay", true, "Hay for the wagon horses"); decor(ex + 9, ey + 6, "logpile", true, "Firewood"); decor(ex - 9, ey + 6, "crate", true, "Arrows by the thousand");
+    decor(fx0 + 1, fy1 - 1, "watchtower", true, "A Wood's End watchtower, looking west into the wood"); decor(fx1 - 1, fy1 - 1, "watchtower", true, "A Wood's End watchtower, looking east down the Federation's road");
+    for (const [lx, ly] of [[ex - 6, ey + 1], [ex + 6, ey + 1], [fx0 + 2, ey + 5], [fx1 - 2, ey + 5]] as const) decor(lx, ly, "lamp");
+    decor(ex - 1, ey - 1, "banner", true, "Wood's End's banner: an antler on green"); decor(ex + 2, ey - 1, "banner", true, "Wood's End's banner: an antler on green");
+    npc("barkreach_ranger", fx0 + 2, ey + 1, 1); npc("barkreach_ranger", fx1 - 2, ey + 1, 1); npc("barkreach_villager", ex - 2, ey + 5, 3); npc("barkreach_hunter", ex + 4, ey + 5, 2);
+    sign(fx0 - 2, ey + 2, "Wood's End", "WOOD'S END. A fort in the wood, and the only roof between the Federation and Sawyer's Rest. The post buys logs and hides and sells food, arrows, string and tools. West: the Stag's Rest and Sawyer's Rest. East: the Federation's road to the Free Marches. The Regiment's scouts have been seen in the wood. The rangers have seen them back.", "redwood_bow");
     // Barkholm: a village of the wood's own people in the west, by the Hush.
     const [vx, vy] = FAR_PLACES.barkholm;
     ground(vx, vy, 10, 7, T.PATH, 2);

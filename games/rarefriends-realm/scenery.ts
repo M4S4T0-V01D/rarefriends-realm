@@ -197,8 +197,7 @@ export function decorArt(kind: string, variant: number, frame = 0): HTMLCanvasEl
       p.poly([[1, 10], [25, 10], [13, 2]], "#6f5d4c", INK); p.line(22, 55, 20, 24, "#cdb9a0"); for (let y = 26; y < 54; y += 4) p.line(19, y, 23, y, "#cdb9a0");
       p.outline();
     });
-    // A stretch of stake wall: five sharpened logs, pale at the cut points, lashed with a rope across.
-    case "stake": return pixelArt(key, 26, 22, p => { for (let i = 0; i < 5; i++) { const x = 1 + i * 5, top = 2 + (i % 2) * 3; p.rect(x, top + 4, 4, 20 - top - 4, i % 2 ? BARK_DARK : BARK); p.poly([[x, top + 4], [x + 2, top], [x + 4, top + 4]], "#cdb9a0", null); p.line(x + 1, top + 6, x + 1, 19, shadeHex(BARK, 0.12)); } p.line(0, 14, 25, 13, "#e8d4c0"); p.line(0, 15, 25, 14, "#9c8672"); p.outline(); });
+    // (The stake wall is drawn in the world by render.ts, log by log, so it keeps its line when the camera turns.)
     case "plaque": return pixelArt(key, 16, 14, p => { p.rect(2, 6, 12, 7, "#8f8a83"); p.rect(1, 1, 14, 6, "#d7d4cd"); p.rect(2, 2, 12, 4, "#c8c5be"); for (let y = 2; y <= 5; y += 1) p.line(3, y, 12 - (y % 2), y, "#8f8a83"); p.outline(); });
     // Faction banners: the Federation's verdigris with FFF in brass, the Regiment's violet with the closed eye, Hollowmere's crimson with the crown.
     // Each Order's banner in its own colours, with its sign: the Diamond's diamond, the Ink's arms, the Sol's sun, the Hood's hood, the Ember's flame, the Dusk's closed eye.

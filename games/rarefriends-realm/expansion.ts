@@ -737,11 +737,25 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
       // The passage: two tiles wide, from the door straight through the outer wall to the concourse.
       const [sx, sy] = door === "n" ? [0, -1] : door === "s" ? [0, 1] : door === "e" ? [1, 0] : [-1, 0];
       const lanes = door === "n" || door === "s" ? [[along, door === "n" ? y0 : y1], [along + 1, door === "n" ? y0 : y1]] : [[door === "w" ? x0 : x1, along], [door === "w" ? x0 : x1, along + 1]];
+      let reachK = 1;
       for (const [lx, ly] of lanes) for (let k = 1; k < 20; k++) {
         const x = lx + sx * k, y = ly + sy * k, d = dist(x, y);
         if (d < outer - 1.2 && get(x, y) === T.STONE && k > 1) break;
-        clearAt(x, y); setRegion(x, y, "friends_ring"); put(x, y, T.STONE);
+        clearAt(x, y); setRegion(x, y, "friends_ring"); put(x, y, T.STONE); reachK = Math.max(reachK, k);
       }
+      // The hallway: walls either side of the passage from the Ring's outer wall to the shop's door, and a roof over it,
+      // so from the concourse to the counter you never step outside.
+      const [px, py] = door === "n" || door === "s" ? [1, 0] : [0, 1];
+      let hx0 = Infinity, hy0 = Infinity, hx1 = -Infinity, hy1 = -Infinity;
+      for (let k = 0; k <= reachK; k++) {
+        const ax = lanes[0][0] + sx * k, ay = lanes[0][1] + sy * k;
+        if (k > 0 && dist(ax, ay) < outer - 0.8 && dist(ax + px, ay + py) < outer - 0.8) break;
+        for (const [wx, wy] of [[ax - px, ay - py], [ax + px * 2, ay + py * 2]] as const) {
+          if (k === 0 || dist(wx, wy) >= outer - 0.8) { clearAt(wx, wy); setRegion(wx, wy, "friends_ring"); put(wx, wy, T.WALL); }
+          hx0 = Math.min(hx0, wx); hy0 = Math.min(hy0, wy); hx1 = Math.max(hx1, wx); hy1 = Math.max(hy1, wy);
+        }
+      }
+      if (Number.isFinite(hx0)) ctx.buildings.push({ x0: hx0, y0: hy0, x1: hx1, y1: hy1, roof: "flat", color, chimney: false, name: `The hall to ${name}`, walls: "stone" });
       const [ix, iy] = [Math.round((x0 + x1) / 2), Math.round((y0 + y1) / 2)];
       npc(keeper, ix, iy);
       // The shop's sign, out on the concourse at the passage's mouth.

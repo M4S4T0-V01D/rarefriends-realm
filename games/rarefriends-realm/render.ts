@@ -37,7 +37,7 @@ const C = {
 };
 const TERRAIN_COLORS: Record<number, string> = {
   [T.GRASS]: "#cdd3c3", [T.DARK_GRASS]: "#bcc4b1", [T.PATH]: "#dcd0b8", [T.COBBLE]: "#d7d4cd", [T.SAND]: "#e8dfc6", [T.WATER]: "#b1c0cf",
-  [T.DEEP]: "#95a7bb", [T.SWAMP]: "#adb29c", [T.SNOW]: "#f3f2ee", [T.STONE]: "#c8c5be", [T.WOOD]: "#cdb9a0", [T.GRAVEL]: "#bfb8ad",
+  [T.DEEP]: "#95a7bb", [T.SWAMP]: "#adb29c", [T.SNOW]: "#d3dbe5", [T.STONE]: "#c8c5be", [T.WOOD]: "#cdb9a0", [T.GRAVEL]: "#bfb8ad",
   [T.DUNGEON]: "#5d5c63", [T.BRIDGE]: "#ab9278", [T.CLIFF]: "#8f8a83", [T.WALL]: "#a9a59e", [T.FARMLAND]: "#bca787", [T.ICE]: "#dfe7ec", [T.CARPET]: "#c9a3a3",
   [T.ASH]: "#8e8a86", [T.LAVA]: "#d98a5c",
 };
@@ -366,11 +366,21 @@ function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, camera: Camera
   const flat = (dx: number, dy: number) => { const { rx, ry } = rotate(camera, dx, dy); return { x: (rx - ry) * TILE_W / 2 * z, y: (rx + ry) * TILE_W / 2 * camera.pitch * z }; };
   const o = { x: 0, y: 0 }, px = flat(0.5, 0), py = flat(0, 0.5);
   const ex = { x: px.x - o.x, y: px.y - o.y }, ey = { x: py.x - o.x, y: py.y - o.y }, ls = liftScale(camera);
-  // Inked edges and contour lines go into two paths, stroked once. Texture is left off tiles too small or far to show it.
-  const edges = new Path2D(), contours = new Path2D(), small = hh < 5, near = scene.low ? 16 : 34;
+  // Inked edges and contour lines go into two paths, stroked once per depth row as the ground is laid back to front:
+  // stroked all at the end they showed through any rising ground nearer the camera (worst on white snow, where the
+  // hills behind drew their lines straight across the snowfield). Texture is left off tiles too small or far to show it.
+  let edges = new Path2D(), contours = new Path2D(), pending = false, row = -1;
+  const small = hh < 5, near = scene.low ? 16 : 34;
+  const flush = () => {
+    if (!pending) return;
+    ctx.strokeStyle = "rgba(22,22,22,0.16)"; ctx.lineWidth = 1; ctx.stroke(contours);
+    ctx.strokeStyle = "rgba(22,22,22,0.55)"; ctx.lineWidth = Math.max(0.8, z); ctx.stroke(edges);
+    edges = new Path2D(); contours = new Path2D(); pending = false;
+  };
   const order = terrainOrder(camera, x0, y0, x1, y1), kEnd = Math.round(order.length * to);
   for (let k = Math.round(order.length * from); k < kEnd; k++) {
     const packed = order[k], x = x0 + packed % (x1 - x0 + 1), y = y0 + Math.floor(packed / (x1 - x0 + 1));
+    if (mode !== "motion" && orderKeys[packed] !== row) { flush(); row = orderKeys[packed]; }
     if (!inBounds(x, y)) continue;
     const terrain = world.tiles[y * W + x];
     if (terrain === T.VOID) continue;
@@ -440,7 +450,7 @@ function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, camera: Camera
     const edge = (nx: number, ny: number, ax: number, ay: number, bx: number, by: number) => {
       const other = inBounds(nx, ny) ? world.tiles[ny * W + nx] : T.VOID;
       if (other === T.VOID || EDGE_CLASS[other] === mine || other === T.WALL || other === T.CLIFF) return;
-      edges.moveTo(ax, ay); edges.lineTo(bx, by);
+      edges.moveTo(ax, ay); edges.lineTo(bx, by); pending = true;
     };
     edge(x, y - 1, ax, ay, bx, by);
     edge(x + 1, y, bx, by, cx, cy);
@@ -457,14 +467,13 @@ function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, camera: Camera
             const h0 = hs[e], h1 = hs[(e + 1) % 4];
             if ((h0 < at) !== (h1 < at)) { const t = (at - h0) / (h1 - h0), [x0, y0] = pts[e], [x1, y1] = pts[(e + 1) % 4]; cross.push([x0 + (x1 - x0) * t, y0 + (y1 - y0) * t]); }
           }
-          for (let k = 0; k + 1 < cross.length; k += 2) { contours.moveTo(cross[k][0], cross[k][1]); contours.lineTo(cross[k + 1][0], cross[k + 1][1]); }
+          for (let k = 0; k + 1 < cross.length; k += 2) { contours.moveTo(cross[k][0], cross[k][1]); contours.lineTo(cross[k + 1][0], cross[k + 1][1]); pending = true; }
         }
       }
     }
   }
   if (mode === "motion") return;
-  ctx.strokeStyle = "rgba(22,22,22,0.16)"; ctx.lineWidth = 1; ctx.stroke(contours);
-  ctx.strokeStyle = "rgba(22,22,22,0.55)"; ctx.lineWidth = Math.max(0.8, z); ctx.stroke(edges);
+  flush();
 }
 
 // ---------- Terrain cache ----------
@@ -1220,6 +1229,28 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
         poly(ctx, [[a.x, a.y], [b.x, b.y], [tip.x, tip.y]], "#a9a59e"); poly(ctx, [[b.x, b.y], [c.x, c.y], [tip.x, tip.y]], "#8f8a82");
         ctx.strokeStyle = "#6f6b64"; ctx.lineWidth = Math.max(1, z); for (let i = 0; i < 4; i++) { const s = toScreen(camera, ox, oy + 0.16, 14 + i * 7); ctx.beginPath(); ctx.moveTo(s.x - 3 * z, s.y); ctx.lineTo(s.x + 3 * z, s.y); ctx.stroke(); }
         return hit(62, 26);
+      }
+      case "stake": {
+        // A palisade standing in the world (not a picture turned to face you): sharpened logs from this stake to the next
+        // along the line (up to two tiles east or south), lashed with rope, each log a little different.
+        const world = scene.game.world, isStake = (dx: number, dy: number) => objectAtTile(world, ox + dx, oy + dy)?.decor === "stake";
+        const links = ([[1, 0], [2, 0], [0, 1], [0, 2]] as const).filter(([dx, dy]) => isStake(dx, dy) && !(dx === 2 && isStake(1, 0)) && !(dy === 2 && isStake(0, 1)));
+        const joined = links.length > 0 || isStake(-1, 0) || isStake(-2, 0) || isStake(0, -1) || isStake(0, -2);
+        const logs: [number, number][] = [[ox, oy]];
+        for (const [dx, dy] of links) { const len = Math.abs(dx + dy); for (let k = 1; k < len * 3; k++) logs.push([ox + dx * k / (len * 3), oy + dy * k / (len * 3)]); }
+        if (!joined) logs.push([ox - 0.28, oy + 0.08], [ox + 0.28, oy - 0.06]);
+        logs.sort((a, b) => { const ra = rotate(camera, a[0], a[1]), rb = rotate(camera, b[0], b[1]); return (ra.rx + ra.ry) - (rb.rx + rb.ry); });
+        const w = 6 * z;
+        for (const [px, py] of logs) {
+          const r = hash(Math.round(px * 8), Math.round(py * 8)), h = 21 + r * 7, base = toScreen(camera, px, py, 0), top = toScreen(camera, px, py, h), bark = r < 0.33 ? "#7a6553" : r < 0.66 ? "#8a7563" : "#6f5d4c";
+          poly(ctx, [[base.x - w / 2, base.y], [base.x + w / 2, base.y], [top.x + w / 2, top.y], [top.x - w / 2, top.y]], bark, INK, 0.8);
+          poly(ctx, [[top.x - w / 2, top.y], [top.x + w / 2, top.y], [top.x, top.y - 7 * z]], "#d8c4a4", INK, 0.8);
+          for (const ring of [0.3, 0.62]) { const yy = base.y + (top.y - base.y) * ring; ctx.strokeStyle = "rgba(22,22,22,0.35)"; ctx.lineWidth = 0.8 * z; ctx.beginPath(); ctx.moveTo(base.x - w / 2 + (top.x - base.x) * ring, yy); ctx.lineTo(base.x + w / 2 + (top.x - base.x) * ring, yy); ctx.stroke(); }
+          ctx.strokeStyle = "rgba(255,255,255,0.18)"; ctx.lineWidth = 0.8 * z; ctx.beginPath(); ctx.moveTo(base.x - w * 0.2, base.y - 2 * z); ctx.lineTo(top.x - w * 0.2, top.y + 1 * z); ctx.stroke();
+        }
+        ctx.lineWidth = 1.4 * z; ctx.strokeStyle = "#e8d4b0";
+        for (const [dx, dy] of links) for (const lift of [8, 15]) { const a = toScreen(camera, ox, oy, lift), b = toScreen(camera, ox + dx, oy + dy, lift); ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
+        return hit(34, 34);
       }
       case "fence": {
         const world = scene.game.world, same = (dx: number, dy: number) => objectAtTile(world, ox + dx, oy + dy)?.decor === "fence";
