@@ -30,7 +30,7 @@ import {
   type Activity, type CombatStyle, type Dialogue, type Game, type Monster, type Npc, type Player, type Point, type Recipe, type Slot, type BankSlot, type Target,
  type WorkOrder,
 } from "./state.ts";
-import { FLOOR_Y, MAINLAND, T, W, H, inArena, inBounds, inRingBuilding, isUnderground, isWater, mainlandToWorld, objectAtTile, realPoint, regionAt, terrainAt, tileIndex, walkable, type WorldObject } from "./world.ts";
+import { FLOOR_Y, MAINLAND, T, W, WEST_DX, H, inArena, inBounds, inRingBuilding, isUnderground, isWater, mainlandToWorld, objectAtTile, realPoint, regionAt, terrainAt, tileIndex, walkable, type WorldObject } from "./world.ts";
 
 export { createGame };
 
@@ -2324,7 +2324,7 @@ export type SaveData = {
 export function serialize(game: Game): SaveData {
   const player = game.player;
   return {
-    v: 1, world: 2, friendId: player.friendId, x: player.x, y: player.y, run: player.run, energy: Math.round(player.energy), xp: { ...player.xp }, hp: player.hp, prayer: Math.round(player.prayer * 10) / 10,
+    v: 1, world: 3, friendId: player.friendId, x: player.x, y: player.y, run: player.run, energy: Math.round(player.energy), xp: { ...player.xp }, hp: player.hp, prayer: Math.round(player.prayer * 10) / 10,
     inventory: player.inventory.map(slot => slot ? { ...slot } : null), equipment: { ...player.equipment } as Record<string, string>, bank: player.bank.map(slot => ({ ...slot })),
     style: player.style, autocast: player.autocast, quests: { ...player.quests }, questData: { ...player.questData }, wardrobe: [...player.wardrobe], worn: [...player.worn],
     follower: player.follower, followerGeneration: player.followerGeneration, kills: player.kills, deaths: player.deaths, tutorial: player.tutorial, guide: player.guide, created: player.created,
@@ -2396,7 +2396,9 @@ export function restore(game: Game, raw: unknown): boolean {
   player.bank = bank; compactBankTabs(player);
   // Saves from before the wider world kept positions in the mainland's own coordinates: move them with it.
   let x = int(save.x, 0, W - 1, -1), y = int(save.y, 0, H - 1, -1);
-  if (save.world !== 2 && x >= 0 && x < MAINLAND.w && y >= 0 && y < MAINLAND.h + MAINLAND.dungeonRows + MAINLAND.floorRows) [x, y] = mainlandToWorld(x, y);
+  // 3: the far west grew the world WEST_DX columns on its west side; 2: the wider world before it; older: the mainland's own frame.
+  if (save.world === 2) x += WEST_DX;
+  else if (save.world !== 3 && x >= 0 && x < MAINLAND.w && y >= 0 && y < MAINLAND.h + MAINLAND.dungeonRows + MAINLAND.floorRows) [x, y] = mainlandToWorld(x, y);
   if (inBounds(x, y) && walkable(game.world, x, y)) { player.x = x; player.y = y; player.prev = { x, y }; }
   player.run = !!save.run; player.energy = int(save.energy, 0, 100, 100);
   player.style = (["accurate", "aggressive", "defensive", "controlled"] as const).includes(save.style as CombatStyle) ? save.style as CombatStyle : "accurate";

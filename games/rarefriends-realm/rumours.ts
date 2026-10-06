@@ -113,6 +113,38 @@ export const RUMOURS: Partial<Record<RegionId, readonly Rumour[]>> = {
     r("There's a hollow in the cliffs west of the checkpoint with one way in. Someone keeps flowers there.", "true"),
     r("The Federation pays for Regiment dispatches. The Regiment pays for Federation devices. Some of us just sell rope.", "half"),
   ],
+  raria_march: [
+    r("Lawgate's Governor keeps the oldest roll of the march in a drawer. It has Lawgate on it, and a blank where Hollowmere should be.", "true"),
+    r("The Crown Road is eleven days to the capital by cart. The Regiment does it in seven. The Rangers do it in three, and nobody sees them on it.", "half"),
+    r("The Spine Watch had a tower. Then the Federation's cannon fired. Now it has a story.", "true"),
+  ],
+  crownlands: [
+    r("The Crownlands feed the capital, the capital feeds the Law, and the Law feeds us. Mostly bread.", "half"),
+    r("Candlemere's tithe is short again. The reeve hasn't slept. The Assessor's clerk comes at the turn of the month.", "true"),
+    r("My family farmed this field before the Law was written down. The chaplain says that isn't possible.", "true"),
+    r("The Federation came through with a device that milked the cows. The Regiment took it. The cows miss it.", "true"),
+  ],
+  vesperwold: [
+    r("Be indoors for the last bell. Whatever's in the wood after it, the Order doesn't see it, so it doesn't have to write it down.", "true"),
+    r("The Rangers' Hold is in the north of the wold. Nobody visits. Everybody has been seen.", "true"),
+    r("The abbey's copies of the Law are read aloud once a year. The reading takes nine days.", "half"),
+  ],
+  silent_peaks: [
+    r("The stone watchers in the peaks move when nobody's looking. They're carved blindfolded, like the Wise Friend.", "true"),
+    r("There's a shrine up there older than Raria. The hermit says the eyes under the blindfold are carved open.", "true"),
+    r("Moonsilver in the scree, glimmer by the tarn, rarite if you climb high enough and come back down.", "true"),
+  ],
+  heartwood: [
+    r("The Ironbark Elder walks. Every lurker in BarkReach grew from its fallen bark. The rangers leave it offerings and a wide path.", "true"),
+    r("Barkholm refused the Crown's tithe twice. The first collector got lost for a month. The second got lost for good.", "half"),
+    r("There's a glade with cliffs all round and a statue in it, sunk to the chest. Raria says it never put it there.", "true"),
+  ],
+  greyfields: [
+    r("Two years of fighting and neither side's losing. That's the trouble.", "true"),
+    r("The dead in the Greyfields don't remember whose side they were on. They just keep at it.", "true"),
+    r("The Federation's cannon at Freecamp is called 'Second Opinion'. The Regiment's war table has it marked in red.", "true"),
+    r("The cairn on the battlefield has FFF scratched on one side and RRR on the other. Nobody owns up to either.", "true"),
+  ],
   free_marches: [
     r("The Federation has a cannon. Nine feet of copper. It fired once, and something on the Drakespine isn't there any more.", "true"),
     r("Fellow Free has fourteen devices running in his hall. He says one is for later. Nobody knows when later is.", "true"),

@@ -2455,6 +2455,10 @@ const NPC_WEAR: Record<string, readonly string[]> = {
   barkreach_foreman: ["woodsman_cap", "woodsman_jerkin", "woodsman_breeches", "woodsman_boots", "moonsilver_axe"], barkreach_bowyer: ["woodsman_cap", "woodsman_jerkin", "redwood_bow"], barkreach_outfitter: ["woodsman_jerkin", "woodsman_breeches"],
   barkreach_ranger: ["woodsman_cap", "woodsman_jerkin", "woodsman_breeches", "ironbark_bow"], barkreach_hunter: ["woodsman_cap", "woodsman_jerkin", "woodsman_boots", "redwood_war_bow"],
   hollowmere_officer: ["moonsilver_helm", "moonsilver_cuirass", "hollowmere_cape", "moonsilver_greatsword"], hollowmere_soldier: ["blackiron_helm", "blackiron_cuirass", "hollowmere_cape", "blackiron_battleaxe"], hollowmere_lieutenant: ["ashsteel_helm", "ashsteel_cuirass", "hollowmere_cape", "ashsteel_greatsword"],
+  lawgate_governor: ["royal_circlet", "rarian_tabard", "rarian_mantle", "law_book"], lawgate_innkeeper: ["rarian_veil", "rarian_tabard"], raria_innkeeper: ["rarian_veil", "rarian_tabard", "rarian_skirts"],
+  vesper_abbess: ["dusk_paladin_helm", "dusk_paladin_body", "dusk_cape", "dusk_lantern"], ranger_warden: ["ranger_royal_hood", "ranger_royal_coat", "ranger_royal_leggings", "rangers_longbow"],
+  candlemere_reeve: ["rarian_tabard", "felt_wide_hat", "law_book"], candlemere_trader: ["rarian_veil", "rarian_tabard"], crownlands_villager: ["straw_wide_hat", "rarian_tabard"], greyford_warden: ["rrr_helm", "rrr_cuirass", "rarian_tabard", "rarian_halberd"],
+  antler_captain: ["woodsman_cap", "woodsman_jerkin", "woodsman_breeches", "woodsman_boots", "ironbark_war_bow"], barkholm_elder: ["woodsman_jerkin", "leather_hood"], peak_hermit: ["wise_cowl", "wise_vestment"],
   hollowmere_scout: ["hollowmere_cape", "willow_bow"], hollowmere_messenger: ["hollowmere_cape"], west_watcher: ["pilgrim_cape"],
   king: ["paper_crown", "blue_cape"],
   guard: ["blackiron_helm", "blackiron_cuirass", "crimson_cape", "blackiron_battleaxe"],
@@ -2621,7 +2625,7 @@ function skillcapeRays(ctx: CanvasRenderingContext2D, x: number, y: number, z: n
 }
 function questMarkerFor(game: Game, npcId: string): string | null {
   const q = game.player.quests;
-  const starts: Record<string, string> = { hollowmere_officer: "west_watch", raria_gate_captain: "rrr_truce", fff_gatewarden: "fff_truce", barkreach_foreman: "barkreach_heartwood", fff_ranger_captain: "fff_rangers", fff_wizard_arguing: "fff_toaster", cook: "friends_feast", captain: "grumblin_trouble", smith: "cold_forge", priest: "hollow_whispers", glimmer: "lost_glimmer", hazel: "hazels_quiver",
+  const starts: Record<string, string> = { candlemere_reeve: "candlemere_tithe", antler_captain: "heartwood_elder", hollowmere_officer: "west_watch", raria_gate_captain: "rrr_truce", fff_gatewarden: "fff_truce", barkreach_foreman: "barkreach_heartwood", fff_ranger_captain: "fff_rangers", fff_wizard_arguing: "fff_toaster", cook: "friends_feast", captain: "grumblin_trouble", smith: "cold_forge", priest: "hollow_whispers", glimmer: "lost_glimmer", hazel: "hazels_quiver",
     gravesend_keeper: "gravesend_lanterns", saltmarrow_harbour: "saltmarrow_tithe", hollyhock_apothecary: "hollyhock_errand", dyemoor_dyer: "dyemoor_dye", tallgrass_huntmaster: "tallgrass_tracks", cragmaw_foreman: "cragmaw_shaft", quillhaven_archivist: "quillhaven_folio", ashfall_trader: "ashfall_embers" };
   const quest = starts[npcId];
   if (quest && !q[quest]) return C.butter;

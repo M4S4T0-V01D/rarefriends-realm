@@ -6,8 +6,16 @@
  */
 import type { RockKind, SpotKind, TreeKind } from "./data.ts";
 import { buildExpansion } from "./expansion.ts";
+import { buildFarWest } from "./farwest.ts";
 
-export const W = 720, H = 620;
+/**
+ * The far west (Return of Raria): the world grew by WEST_DX columns on its west side for a second continent, Raria and
+ * BarkReach. Everything that existed before is generated exactly as it always was, in the legacy frame (LEGACY_W wide),
+ * and set into the world WEST_DX columns east. Generation code works in the legacy frame; everything at runtime is in
+ * world coordinates.
+ */
+export const WEST_DX = 440, LEGACY_W = 720;
+export const W = LEGACY_W + WEST_DX, H = 620;
 /** The overworld is rows 0–519; rows 520–579 are the dungeons (reached by ladders, never seen from above); rows from FLOOR_Y hold upper storeys. */
 export const OVERWORLD_H = 520, DUNGEON_Y = 520, FLOOR_Y = 580;
 /**
@@ -15,13 +23,15 @@ export const OVERWORLD_H = 520, DUNGEON_Y = 520, FLOOR_Y = 580;
  * Its content is generated in its own coordinates and set in here, so nothing on it moves relative to anything else.
  */
 export const MAINLAND = { x: 185, y: 160, w: 350, h: 200, dungeonRows: 40, floorRows: 40 } as const;
-/** A mainland coordinate (overworld, dungeon row or storey row) in world coordinates. */
-export function mainlandToWorld(x: number, y: number): [number, number] {
+/** A mainland coordinate (overworld, dungeon row or storey row) in the legacy frame (generation code only). */
+export function legacyMainlandToWorld(x: number, y: number): [number, number] {
   if (y >= MAINLAND.h + MAINLAND.dungeonRows) return [x + MAINLAND.x, FLOOR_Y + (y - MAINLAND.h - MAINLAND.dungeonRows)];
   if (y >= MAINLAND.h) return [x + MAINLAND.x, DUNGEON_Y + (y - MAINLAND.h)];
   return [x + MAINLAND.x, y + MAINLAND.y];
 }
-/** The mainland's overworld rectangle in world coordinates (inclusive). */
+/** A mainland coordinate in world coordinates. */
+export function mainlandToWorld(x: number, y: number): [number, number] { const [lx, ly] = legacyMainlandToWorld(x, y); return [lx + WEST_DX, ly]; }
+/** The mainland's overworld rectangle in the legacy frame (inclusive; generation code only). */
 export const MAINLAND_RECT = { x0: MAINLAND.x, y0: MAINLAND.y, x1: MAINLAND.x + MAINLAND.w - 1, y1: MAINLAND.y + MAINLAND.h - 1 } as const;
 /** One storey, in world pixels (the height of a wall). */
 export const STOREY = 42;
@@ -33,13 +43,15 @@ export type Terrain = typeof T[keyof typeof T];
 const WALKABLE = new Set<number>([T.GRASS, T.DARK_GRASS, T.PATH, T.COBBLE, T.SAND, T.SWAMP, T.SNOW, T.STONE, T.WOOD, T.GRAVEL, T.DUNGEON, T.BRIDGE, T.FARMLAND, T.ICE, T.CARPET, T.ASH]);
 export const isWater = (terrain: number) => terrain === T.WATER || terrain === T.DEEP;
 /** The sparring ring east of Market Street: inside it, players may duel each other (safely: nobody dies or loses items). */
-export const RING = { x0: 138 + MAINLAND.x, y0: 144 + MAINLAND.y, x1: 144 + MAINLAND.x, y1: 149 + MAINLAND.y };
+export const RING = { x0: 138 + MAINLAND.x + WEST_DX, y0: 144 + MAINLAND.y, x1: 144 + MAINLAND.x + WEST_DX, y1: 149 + MAINLAND.y };
 /**
  * The Rare Friends Ring, west of the Deadwood across the river: a round building (a Hoverer's shape) whose covered ring
  * holds the lobby and shops, and whose open courtyard is the arena. Fights happen inside `inner`; the lobby is on the
  * south of the concourse.
  */
-export const ARENA = { x: 214, y: 72, outer: 24, inner: 16, lobby: { x: 214, y: 92 } } as const;
+/** The Rare Friends Ring, in the legacy frame (generation) and in world coordinates (everything else). */
+export const ARENA_LEGACY = { x: 214, y: 72, outer: 24, inner: 16, lobby: { x: 214, y: 92 } } as const;
+export const ARENA = { ...ARENA_LEGACY, x: ARENA_LEGACY.x + WEST_DX, lobby: { x: ARENA_LEGACY.lobby.x + WEST_DX, y: ARENA_LEGACY.lobby.y } } as const;
 export const arenaDistance = (x: number, y: number) => Math.hypot(x - ARENA.x, y - ARENA.y);
 /** Inside the Ring's courtyard, where matches are fought and Friends may duel. */
 export const inArena = (x: number, y: number) => arenaDistance(x, y) < ARENA.inner;
@@ -94,8 +106,12 @@ export type RegionId =
   // Two more dungeons (2026-10): one for new heroes, one for the middle levels.
   | "root_cellars" | "mossy_undercroft"
   // Return of Raria (2026-10): the far west.
-  | "deep_westmarch" | "free_marches" | "barkreach" | "raria";
-export type Region = { id: RegionId; name: string; label: { x: number; y: number }; danger: number; underground?: boolean };
+  | "deep_westmarch" | "free_marches" | "barkreach" | "raria"
+  // The far west (the second continent): Raria's lands, BarkReach's deep wood, and the war between; Raria's eastern march by the Spine.
+  | "raria_march" | "crownlands" | "vesperwold" | "silent_peaks" | "heartwood" | "greyfields";
+export type Region = { id: RegionId; name: string; label: { x: number; y: number }; danger: number; underground?: boolean;
+  /** A far-west region (Return of Raria): its label is already in world coordinates. */
+  far?: boolean };
 const MAINLAND_REGIONS = new Set<RegionId>(["coast", "friendhollow", "farmland", "whisperwood", "ashen_hills", "emberforge", "frostpeak", "glass_lake", "pale_dunes", "oasis", "murkmire", "mossy_ruins",
   "wizards_tower", "wyrmreach", "fernwick", "greyhorn", "highcairn", "crypt", "hollow_depths"]);
 export const REGIONS: readonly Region[] = [
@@ -148,13 +164,20 @@ export const REGIONS: readonly Region[] = [
   // Return of Raria: Deep Westmarch (the border), the Free Marches (the Federation's), BarkReach (the wood) and Raria (the kingdom beyond the Drakespine).
   { id: "deep_westmarch", name: "Deep Westmarch", label: { x: 44, y: 296 }, danger: 3 },
   { id: "free_marches", name: "The Free Marches", label: { x: 42, y: 390 }, danger: 2 },
-  { id: "barkreach", name: "BarkReach", label: { x: 112, y: 372 }, danger: 2 },
-  { id: "raria", name: "Raria", label: { x: 26, y: 180 }, danger: 1 },
+  { id: "barkreach", name: "BarkReach", label: { x: 230, y: 420 }, danger: 2, far: true },
+  { id: "raria", name: "Raria", label: { x: 205, y: 180 }, danger: 1, far: true },
+  { id: "raria_march", name: "Raria's Eastern March", label: { x: 26, y: 200 }, danger: 2 },
+  { id: "crownlands", name: "The Crownlands", label: { x: 330, y: 190 }, danger: 1, far: true },
+  { id: "vesperwold", name: "The Vesperwold", label: { x: 210, y: 70 }, danger: 3, far: true },
+  { id: "silent_peaks", name: "The Silent Peaks", label: { x: 60, y: 90 }, danger: 4, far: true },
+  { id: "heartwood", name: "The Heartwood", label: { x: 70, y: 410 }, danger: 4, far: true },
+  { id: "greyfields", name: "The Greyfields", label: { x: 300, y: 320 }, danger: 3, far: true },
 ];
 export const regionIndex = (id: RegionId) => REGIONS.findIndex(region => region.id === id);
 /** The mainland regions' labels were written in the mainland's own coordinates: move them with it (once, at load). */
 for (const region of REGIONS as Region[]) {
   if (MAINLAND_REGIONS.has(region.id)) { const [x, y] = mainlandToWorld(region.label.x, region.label.y); region.label = { x, y }; }
+  else if (!region.far) region.label = { x: region.label.x + WEST_DX, y: region.label.y };
 }
 export const isUnderground = (y: number) => y >= DUNGEON_Y && y < FLOOR_Y;
 
@@ -1229,7 +1252,31 @@ function buildMainland(seed: number) {
 }
 
 export function createWorld(seed = 20260927): World {
-  const main = buildMainland(seed);
+  const old = buildLegacyWorld(seed), LW = LEGACY_W;
+  const tiles = new Uint8Array(W * H).fill(T.DEEP), region = new Uint8Array(W * H), objects: WorldObject[] = [], spawns: SpawnDef[] = [];
+  const objectAt = new Int32Array(W * H).fill(-1), lift = new Float32Array(W * H), buildings: Building[] = [...old.buildings.map(b => ({ ...b, x0: b.x0 + WEST_DX, x1: b.x1 + WEST_DX }))];
+  for (let y = OVERWORLD_H; y < H; y++) for (let x = 0; x < W; x++) tiles[y * W + x] = T.VOID;
+  // Everything that was: every row (overworld, dungeons, storeys) moves WEST_DX columns east, nothing else changes.
+  for (let y = 0; y < H; y++) for (let x = 0; x < LW; x++) { const from = y * LW + x, to = y * W + x + WEST_DX; tiles[to] = old.tiles[from]; region[to] = old.region[from]; lift[to] = old.lift[from]; }
+  for (const object of old.objects) {
+    const moved: WorldObject = { ...object, x: object.x + WEST_DX, ...(object.to ? { to: { x: object.to.x + WEST_DX, y: object.to.y } } : {}) };
+    objects.push(moved);
+  }
+  for (let i = 0; i < old.objectAt.length; i++) if (old.objectAt[i] >= 0) { const x = i % LW, y = (i - x) / LW; objectAt[y * W + x + WEST_DX] = old.objectAt[i]; }
+  for (const spawn of old.spawns) spawns.push({ ...spawn, x: spawn.x + WEST_DX });
+  const floors: Floor[] = old.floors.map(f => ({ ...f, x0: f.x0 + WEST_DX, x1: f.x1 + WEST_DX }));
+  const places = Object.fromEntries(Object.entries(old.places).map(([key, at]) => [key, { x: at.x + WEST_DX, y: at.y }])) as World["places"];
+  // The far west: a second continent, Raria and BarkReach.
+  const ctx: GenContext = { W, H, tiles, region, objectAt, lift, objects, spawns, buildings, doorways: [], random: mulberry(seed + 9191), noise: makeNoise(seed + 71, 11), noise2: makeNoise(seed + 83, 4) };
+  buildFarWest(ctx, worldTools(ctx), places);
+  for (const object of objects) if (object.name === "__removed") object.blocks = false;
+  const buildingAt = new Uint8Array(W * H);
+  buildings.forEach((b, index) => { if (b.roof === "none") return; for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) buildingAt[y * W + x] = index + 1; });
+  return { tiles, region, objects, objectAt, spawns, places, heights: buildHeights(tiles, seed, lift), buildings, buildingAt, floors };
+}
+/** The world as it was before the far west: the mainland set into the wider world, and the wider world built round it, LEGACY_W wide. */
+function buildLegacyWorld(seed: number) {
+  const W = LEGACY_W, main = buildMainland(seed), mainlandToWorld = legacyMainlandToWorld, ARENA = ARENA_LEGACY;
   const tiles = new Uint8Array(W * H).fill(T.DEEP), region = new Uint8Array(W * H), objects: WorldObject[] = [], spawns: SpawnDef[] = [];
   const objectAt = new Int32Array(W * H).fill(-1), lift = new Float32Array(W * H), buildings: Building[] = [], floors: Floor[] = [];
   for (let y = OVERWORLD_H; y < H; y++) for (let x = 0; x < W; x++) tiles[y * W + x] = T.VOID;
@@ -1255,10 +1302,7 @@ export function createWorld(seed = 20260927): World {
   // The wider world around it.
   const ctx: GenContext = { W, H, tiles, region, objectAt, lift, objects, spawns, buildings, doorways: [], random: mulberry(seed + 4242), noise: makeNoise(seed + 11, 9), noise2: makeNoise(seed + 19, 4) };
   buildExpansion(ctx, worldTools(ctx), seed);
-  for (const object of objects) if (object.name === "__removed") object.blocks = false;
-  const buildingAt = new Uint8Array(W * H);
-  buildings.forEach((b, index) => { if (b.roof === "none") return; for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) buildingAt[y * W + x] = index + 1; });
-  return { tiles, region, objects, objectAt, spawns, places, heights: buildHeights(tiles, seed, lift), buildings, buildingAt, floors };
+  return { tiles, region, objects, objectAt, spawns, places, lift, buildings, floors };
 }
 const i2 = (random: () => number) => random() > 0.5;
 const SIDES = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;

@@ -4,11 +4,11 @@
  * simulated RF through a Rare Casket, like the market. Every Friend sees its own home there: the world is yours.
  */
 import { count, maxHp, maxPrayer, message, sound, take, type Game, type Home } from "./state.ts";
-import { T, W, type Building, type DecorKind, type World, type WorldObject } from "./world.ts";
+import { T, W, WEST_DX, type Building, type DecorKind, type World, type WorldObject } from "./world.ts";
 import { presenceLevel, presenceXp } from "./presence.ts";
 
 /** The plot: the cottage's top-left corner; it grows down and to the right with each tier. */
-export const HOME_PLOT = { x: 142, y: 266 } as const;
+export const HOME_PLOT = { x: 142 + WEST_DX, y: 266 } as const;
 export const HOME_TIERS = [
   { tier: 1, name: "Cottage", coins: 25_000, presence: 15, w: 9, h: 7, rested: 0.05 },
   { tier: 2, name: "House", coins: 60_000, presence: 30, w: 11, h: 9, rested: 0.07 },

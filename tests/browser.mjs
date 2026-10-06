@@ -5,8 +5,8 @@
 // wallet and ownership gate.
 import assert from "node:assert/strict";
 import { FLOOR_Y, H, mainlandToWorld } from "../games/rarefriends-realm/world.ts";
-// Page-side functions below are serialized into the frame, so they carry these as literals: storeys start at row 580 (FLOOR_Y) and the castle's ground floor lies west of column 325 (mainland 140).
-if (FLOOR_Y !== 580 || mainlandToWorld(140, 0)[0] !== 325) throw new Error("world constants changed: update the literals in browser.mjs");
+// Page-side functions below are serialized into the frame, so they carry these as literals: storeys start at row 580 (FLOOR_Y) and the castle's ground floor lies west of column 765 (mainland 140).
+if (FLOOR_Y !== 580 || mainlandToWorld(140, 0)[0] !== 765) throw new Error("world constants changed: update the literals in browser.mjs");
 if (H !== 620) throw new Error("world height changed: update the 620 in browser.mjs");
 import { execFileSync } from "node:child_process";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
@@ -433,7 +433,7 @@ try {
   const clickStairs = async (level, action) => {
     const { stairs, stand } = await frame().evaluate(([level, action]) => {
       const g = window.__realm.game(), w = g.world, storey = o => w.floors.find(f => o.x >= f.x0 + f.dx && o.x <= f.x1 + f.dx && o.y >= f.y0 + f.dy && o.y <= f.y1 + f.dy && o.y >= 580)?.level ?? 0;
-      const castle = o => storey(o) ? w.floors.some(f => f.complex === "castle" && o.x >= f.x0 + f.dx && o.x <= f.x1 + f.dx && o.y >= f.y0 + f.dy && o.y <= f.y1 + f.dy) : o.x < 325;
+      const castle = o => storey(o) ? w.floors.some(f => f.complex === "castle" && o.x >= f.x0 + f.dx && o.x <= f.x1 + f.dx && o.y >= f.y0 + f.dy && o.y <= f.y1 + f.dy) : o.x < 765;
       const stairs = w.objects.filter(o => o.look === "stairs" && o.action === action && storey(o) === level && castle(o)).sort((a, b) => b.x - a.x)[0];
       const WW = w.tiles.length / 620, open = (x, y) => { const t = w.tiles[y * WW + x], id = w.objectAt[y * WW + x]; return t !== 0 && t !== 16 && (id < 0 || !w.objects[id].blocks); };
       const [dx, dy] = [[0, 1], [1, 0], [-1, 0], [0, -1]].find(([dx, dy]) => open(stairs.x + dx, stairs.y + dy));
@@ -457,7 +457,7 @@ try {
   await page.waitForTimeout(1500); await shot("castle-throne");
   await state(() => window.__realm.view(0.8, 0.5, 0));
   await clickStairs(1, "Climb-up");
-  await until(() => window.__realm.game().player.x >= 327, 15_000); // the roof storey is stored 30 tiles east of the castle (mainland 142 → world 327)
+  await until(() => window.__realm.game().player.x >= 767, 15_000); // the roof storey is stored 30 tiles east of the castle (mainland 142 → world 767)
   assert.equal(await levelNow(), 2, "…and on up to the roof");
   await teleportM(151, 253);
   await state(() => window.__realm.view(0.7, 0.24, 0.2));
@@ -526,7 +526,7 @@ try {
   assert.equal(await realm.getAttribute("data-region"), "hollow_depths");
 
   // ---------- Saved per wallet: reload and continue ----------
-  await teleport(121, 123);
+  await teleport(561, 123);
   await page.waitForTimeout(6000);
   const key = `rarefriends-realm:save:v1:${OWNER.toLowerCase()}:7730`;
   const saved = JSON.parse(await page.evaluate(name => localStorage.getItem(name), key));

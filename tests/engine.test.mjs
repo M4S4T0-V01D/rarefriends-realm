@@ -25,7 +25,7 @@ import { ORDERS, ORDER_IDS, orderOf, orderPieces } from "../games/rarefriends-re
 import { signetCharges, signetTeleport } from "../games/rarefriends-realm/engine.ts";
 import { COFFER_TICKS } from "../games/rarefriends-realm/dungeons.ts";
 import { gloomAt, inDeadwood } from "../games/rarefriends-realm/world.ts";
-import { FLOOR_Y, H, MAINLAND, REGIONS, T, W, createWorld, floorAt, isUnderground, mainlandToWorld, objectAtTile, onLevel, realPoint, regionAt, terrainAt } from "../games/rarefriends-realm/world.ts";
+import { FLOOR_Y, H, MAINLAND, REGIONS, T, W, WEST_DX, createWorld, floorAt, isUnderground, mainlandToWorld, objectAtTile, onLevel, realPoint, regionAt, terrainAt } from "../games/rarefriends-realm/world.ts";
 import { addXp, emptyToBank, fillFromBank, bankDeposit, bankInOrder, bankMove, bankTabs, bankWithdraw, bonuses, bagBones, combatLevel, count, dropItem, earlyXp, give, has, heft, level, maxHp, xpMultiplier, BONE_BAG, BONE_BAG_SIZE } from "../games/rarefriends-realm/state.ts";
 import game from "../games/rarefriends-realm/game.json" with { type: "json" };
 
@@ -598,7 +598,7 @@ test("A Friend's Feast from start to finish", () => {
   assert.equal(g.player.quests.friends_feast, 2);
   assert.equal(questPoints(g), 1);
   assert(level(g, "cooking") >= 10, "Quest XP");
-  assert.equal(QUESTS.length, 47); assert.equal(MAX_QUEST_POINTS, 82);
+  assert.equal(QUESTS.length, 49); assert.equal(MAX_QUEST_POINTS, 87);
 });
 
 test("Grumblin Trouble counts kills and pays out", () => {
@@ -850,7 +850,7 @@ test("The Heartguard: nine red-and-white pieces by Hitpoints level, each a hitpo
 test("The Old Friend stands behind every altar, and Dawnhold has its keep, towers and a taller chapel", () => {
   const g = newGame(), world = g.world;
   const altars = world.objects.filter(object => object.kind === "altar");
-  assert.equal(altars.length, 19, "the mainland's four, Gravesend's lantern altar, the catacombs' bone altar, the Ring chapel's, the five wayward chapels', the six Orders' and Raria's Wise Friend altar");
+  assert.equal(altars.length, 21, "the mainland's four, Gravesend's lantern altar, the catacombs' bone altar, the Ring chapel's, the five wayward chapels', the six Orders', and Raria's three Wise Friend altars (the capital, Lawgate, Vesperholm)");
   for (const altar of altars) {
     assert(world.objects.some(object => (object.decor === "old_friend" || object.decor === "wise_friend" || object.decor?.startsWith("god_")) && Math.abs(object.x - altar.x) <= 1 && Math.abs(object.y - altar.y) <= 2), `a statue of the Old Friend (or an Order's god) by the ${altar.name}`);
   }
@@ -1938,7 +1938,7 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   assert.equal(p.quests.dawn_against_hollow, 2); assert(has(p, "dawnplate_cuirass"));
   assert.equal(count(p, "hollow_essence"), 0);
   assert.equal(capeProblem(g, "dawnplate_cuirass"), null, "the armoury sells Dawnplate once earned");
-  assert.equal(QUESTS.length, 47); assert.equal(MAX_QUEST_POINTS, 82);
+  assert.equal(QUESTS.length, 49); assert.equal(MAX_QUEST_POINTS, 87);
 });
 
 test("Boots and gauntlets in every metal, smithed at the anvil; the clothier's shirts, dresses, trousers and skirts", () => {
@@ -2265,7 +2265,7 @@ test("The dungeon update: three dungeons under the lake, the library and the sto
   // Regions, creatures and their doors exist and are placed.
   for (const id of ["deepglass", "drowned_archive", "howling_vault"]) assert(REGIONS.find(region => region.id === id)?.underground, `${id} is underground`);
   for (const id of ["cave_bat", "glass_crab", "crystal_golem", "drowned_scholar", "ink_wraith", "archivist_below", "grave_moth", "vault_archer", "vault_knight", "howling_king"]) assert(world.spawns.some(spawn => spawn.kind === "monster" && spawn.id === id), id);
-  assert.equal(regionAt(world, 430, 530).id, "deepglass"); assert.equal(regionAt(world, 490, 528).id, "drowned_archive"); assert.equal(regionAt(world, 300, 567).id, "howling_vault");
+  assert.equal(regionAt(world, 430 + WEST_DX, 530).id, "deepglass"); assert.equal(regionAt(world, 490 + WEST_DX, 528).id, "drowned_archive"); assert.equal(regionAt(world, 300 + WEST_DX, 567).id, "howling_vault");
   const doors = world.objects.filter(object => object.kind === "gate" && object.requires?.item);
   assert.deepEqual(doors.map(door => door.requires.item).sort(), ["archive_key", "deepglass_key", "moss_key", "vault_key"]);
   const coffers = world.objects.filter(object => object.decor === "chest" && / coffer$/.test(object.name));
@@ -2411,7 +2411,7 @@ test("The Rare Friends Ring: matches for coins and bloodmarks, your own foes, re
 test("The Root Cellars and the Mossy Undercroft: a dungeon for new heroes and one for the middle levels", () => {
   const g = newGame(), world = g.world;
   assert(REGIONS.find(region => region.id === "root_cellars")?.underground && REGIONS.find(region => region.id === "mossy_undercroft")?.underground);
-  assert.equal(regionAt(world, 420, 560).id, "root_cellars"); assert.equal(regionAt(world, 490, 560).id, "mossy_undercroft");
+  assert.equal(regionAt(world, 420 + WEST_DX, 560).id, "root_cellars"); assert.equal(regionAt(world, 490 + WEST_DX, 560).id, "mossy_undercroft");
   assert(world.objects.some(o => o.name === "Cellar door" && o.to) && world.objects.some(o => o.name === "Mossy stair" && o.action === "Climb-down"), "both mouths");
   assert(world.objects.some(o => o.kind === "gate" && o.requires?.item === "moss_key"), "the warden's door takes a moss key");
   assert(world.objects.filter(o => o.name === "Cellar coffer").length >= 3 && world.objects.filter(o => o.name === "Undercroft coffer").length >= 3, "coffers in both");
@@ -2427,7 +2427,7 @@ test("The four Orders and their gods, and the Deadwood Maidens: oaths open armou
   for (const id of ORDER_IDS) {
     const order = ORDERS[id];
     assert(world.objects.some(o => o.kind === "altar" && o.name === `${order.name} altar` && o.text === id), `${order.short} altar`);
-    assert.equal(world.objects.filter(o => o.decor === order.statue).length, 2, `${order.god}'s statues`);
+    assert(world.objects.filter(o => o.decor === order.statue).length >= 2, `${order.god}'s statues`);
     for (const npc of [order.leader, `${id}_quartermaster`, `${id}_guard`]) assert(g.npcs.some(entry => entry.id === npc), `${id} ${npc}`);
     assert(shopProblem(g, `${id}_armoury`), "closed before the oath");
   }
@@ -2464,9 +2464,10 @@ test("The four Orders and their gods, and the Deadwood Maidens: oaths open armou
 test("The Deadwood's eternal night, and coffers that fill once an hour", () => {
   const g = newGame(), world = g.world;
   assert.equal(COFFER_TICKS, 6000, "an hour of ticks");
-  assert(inDeadwood(world, 290, 60) && !inDeadwood(world, 121 + MAINLAND.x, 118 + MAINLAND.y), "the wood and the square");
-  assert.equal(gloomAt(world, 290, 60), 1, "deep in the wood it is full night"); assert.equal(gloomAt(world, 121 + MAINLAND.x, 118 + MAINLAND.y), 0, "no cloud over Friendhollow");
-  const edge = gloomAt(world, 300, 128); assert(edge >= 0 && edge < 1, `the cloud thins at the wood's edge (${edge})`);
+  const [sqx, sqy] = M(121, 118);
+  assert(inDeadwood(world, 290 + WEST_DX, 60) && !inDeadwood(world, sqx, sqy), "the wood and the square");
+  assert.equal(gloomAt(world, 290 + WEST_DX, 60), 1, "deep in the wood it is full night"); assert.equal(gloomAt(world, sqx, sqy), 0, "no cloud over Friendhollow");
+  const edge = gloomAt(world, 300 + WEST_DX, 128); assert(edge >= 0 && edge < 1, `the cloud thins at the wood's edge (${edge})`);
 });
 
 test("Return of Raria: the far west, the Burned, sealed Order looks, Adventurer Cards, the Regiment's writ and the Wise Friend's Law, all saved", async () => {
@@ -2486,7 +2487,14 @@ test("Return of Raria: the far west, the Burned, sealed Order looks, Adventurer 
     assert(land > 800, `${id} has land (${land})`);
   }
   const palace = world.buildings.find(b => b.name === "The Palace of Raria"); assert(palace, "the palace");
-  const walls = []; for (let x = 0; x < 60; x++) if (terrainAt(world, x, 212) === T.WALL) walls.push(x);
+  const { RARIA_CITY } = await import("../games/rarefriends-realm/farwest.ts");
+  const walls = []; for (let x = 60; x < 360; x++) if (terrainAt(world, x, RARIA_CITY.y - 30) === T.WALL) walls.push(x);
+  assert(walls[walls.length - 1] - walls[0] >= 100, `a great walled city (${walls[walls.length - 1] - walls[0]} tiles across)`);
+  // The far west is a continent: Raria's lands and BarkReach dwarf the mainland.
+  const landOf = ids => { const set = new Set(ids.map(id => REGIONS.findIndex(r => r.id === id))); let n = 0; for (let i = 0; i < world.region.length; i++) if (set.has(world.region[i]) && ![T.WATER, T.DEEP, T.VOID].includes(world.tiles[i])) n++; return n; };
+  assert(landOf(["raria", "crownlands", "vesperwold", "silent_peaks"]) > 50000, `Raria is massive (${landOf(["raria", "crownlands", "vesperwold", "silent_peaks"])})`);
+  assert(landOf(["barkreach", "heartwood"]) > 30000, `BarkReach is a great wood (${landOf(["barkreach", "heartwood"])})`);
+  for (const [, at] of Object.entries((await import("../games/rarefriends-realm/farwest.ts")).FAR_PLACES)) assert(at[0] < WEST_DX, `${at} is on the far-west continent`);
   assert(Math.abs((palace.x0 + palace.x1) / 2 - (walls[0] + walls[walls.length - 1]) / 2) <= 1, "the palace is in the direct centre of the city");
   for (const name of ["The Great Hall of the Federation", "The Wizard Tower", "The Library", "The Enchanted Forge", "The Experimental Laboratory", "The Strange Device Room", "The Storage Vaults", "The Artisan Workshops", "The Heartwood Yard", "The Antler Lodge", "The Hall of the Order of Dusk", "The Chapel of the Law", "The Office of Conduct", "The Regimental Barracks"])
     assert(world.buildings.some(b => b.name === name), name);
@@ -2509,7 +2517,7 @@ test("Return of Raria: the far west, the Burned, sealed Order looks, Adventurer 
   assert(CARDS.length >= 120, `${CARDS.length} cards`);
   const fresh = newGame(); codexTick(fresh); assert(!cardFound(fresh, "order_diamond") && !cardFound(fresh, "region_raria") && !cardFound(fresh, "person_queen_rara"), "nothing given");
   codexTick(g); assert(cardFound(g, "order_diamond") && cardFound(g, "leader_diamond"), "the Diamond's cards after meeting its commander");
-  teleport(g, 26, 228); run(g, 30); assert(cardFound(g, "region_raria"), "walk into Raria, find its card");
+  teleport(g, world.places.raria.x, world.places.raria.y); run(g, 30); assert(cardFound(g, "region_raria"), "walk into Raria, find its card");
   // The Regiment: a checkpoint, a captain who writes writs; carrying one keeps the Regiment's halberds down.
   const scout = g.monsters.find(m => m.def.id === "rrr_scout"); assert(scout && MONSTERS.rrr_scout.faction === "rrr");
   talkTo("raria_gate_captain"); const captain = g.npcs.find(entry => entry.id === "raria_gate_captain"); standNear(g, captain.x, captain.y, 1);
@@ -2529,5 +2537,8 @@ test("Return of Raria: the far west, the Burned, sealed Order looks, Adventurer 
   const back = newGame(); restore(back, serialize(g));
   assert(back.player.rarian && back.player.cards.order_diamond && back.player.cards.region_raria && back.player.questData.met_diamond === 1 && back.player.quests.rrr_truce === 1 && has(back.player, "writ_of_passage"), "all of it persists");
   assert(unlocked(back, facet), "the Diamond's layout stays open after a reload");
+  // A save from before the far west (world 2) lands where it was: the same spot, WEST_DX columns further east in the wider world.
+  const before = newGame(); restore(before, { ...serialize(g), world: 2, x: 300, y: 136 }); assert.deepEqual([before.player.x, before.player.y], [300 + WEST_DX, 136], "old saves move with the world");
+  assert.equal(regionAt(before.world, before.player.x, before.player.y).id, "gravesend", "still in Gravesend");
   setLaw(g, false); assert(!p.rarian && p.prayers.length === 0, "set down, and the old book opens");
 });

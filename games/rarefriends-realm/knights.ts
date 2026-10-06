@@ -52,7 +52,7 @@ export const ORDERS: Record<OrderId, OrderDef> = {
   dusk: { id: "dusk", name: "Order of Dusk", short: "Dusk", god: "The Wise Friend", godName: "the Wise Friend", godText: "The Order of Dusk serves the Wise Friend as Raria reads it: a Rare Friend of legend carved seated and blindfolded, a book open on its knees, who gave the Law and closed its eyes so as never to see it broken. The Order keeps the last hour of the day in silence, and its vows in the dark.",
     color: "#2a2238", accent: "#8a6ab0", dark: "#16111f", body: "robe", head: "hood", statue: "god_dusk",
     effect: "The Dusk's quiet: every piece worn makes the commandments of the Law drain 5% slower and the rites of the Wise Friend cost 4% less faith (a full set, 40% and 32%).", each: "−5% commandment drain, −4% rite cost",
-    near: [26, 212], oath: { item: "dusk_sigil", n: 8, text: "eight dusk sigils, pressed at the Dusk altar in the last hour of the day (any hour will do; the Prior does not check)" }, city: true, after: "wise_friends_law",
+    near: [199, 136], oath: { item: "dusk_sigil", n: 8, text: "eight dusk sigils, pressed at the Dusk altar in the last hour of the day (any hour will do; the Prior does not check)" }, city: true, after: "wise_friends_law",
     tiers: { oath: "Novice", knight: "Vesper", paladin: "Nocturne" }, pieces: { helm: "cowl", body: "vestment", legs: "skirts", gloves: "wraps", boots: "sandals", kite: "pavise", aegis: "aegis", mace: "censer-mace", greatmace: "great censer", staff: "crook" },
     leader: "dusk_prior", leaderName: "Prior Vesperine Caul" },
 };

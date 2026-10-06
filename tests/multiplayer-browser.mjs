@@ -3,6 +3,8 @@
 // add each other as friends and earn the party bonus together. Automated test only.
 import assert from "node:assert/strict";
 import { mainlandToWorld } from "../games/rarefriends-realm/world.ts";
+// Page-side checks carry world columns as literals (the square at 746, the Sparring Ring at 766): mainland x + MAINLAND.x + WEST_DX.
+if (mainlandToWorld(121, 0)[0] !== 746) throw new Error("world constants changed: update the literals in multiplayer-browser.mjs");
 import { execFileSync } from "node:child_process";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -96,8 +98,8 @@ try {
   await a.until(() => window.__realm.net() === "online", "going online");
   await b.until(() => window.__realm.net() === "online", "going online");
   await a.teleport(121, 123); await b.teleport(123, 124);
-  await a.until(() => window.__realm.peers().some(peer => peer.id === 3412 && peer.x === 308), "seeing #3412", process.env.REAL_RELAYS ? 90_000 : 20_000);
-  await b.until(() => window.__realm.peers().some(peer => peer.id === 7730 && peer.x === 306), "seeing #7730");
+  await a.until(() => window.__realm.peers().some(peer => peer.id === 3412 && peer.x === 748), "seeing #3412", process.env.REAL_RELAYS ? 90_000 : 20_000);
+  await b.until(() => window.__realm.peers().some(peer => peer.id === 7730 && peer.x === 746), "seeing #7730");
   if (process.env.REAL_RELAYS) {
     // And they can talk: a public line from A reaches B.
     const input = a.game.getByRole("textbox", { name: "Say something" }); await input.click(); await input.fill("hello over the relays"); await input.press("Enter");
@@ -107,8 +109,8 @@ try {
     console.log(`PASS real relays${process.env.NO_DIRECT ? " (no direct links: the relay path alone)" : ""}: both players met and chatted`); process.exit(0);
   }
   // B walks; A sees it move.
-  await b.frame().evaluate(() => { const g = window.__realm.game(); g.player.path = [{ x: 309, y: 284 }, { x: 310, y: 284 }, { x: 311, y: 284 }]; });
-  await a.until(() => window.__realm.peers().some(peer => peer.id === 3412 && peer.x === 311), "#3412 walking");
+  await b.frame().evaluate(() => { const g = window.__realm.game(); g.player.path = [{ x: 749, y: 284 }, { x: 750, y: 284 }, { x: 751, y: 284 }]; });
+  await a.until(() => window.__realm.peers().some(peer => peer.id === 3412 && peer.x === 751), "#3412 walking");
 
   // A right-clicks B: the player menu, and Add-friend.
   const at = await a.frame().evaluate(() => { const peer = window.__realm.peers().find(entry => entry.id === 3412); return window.__realm.screenOf(peer.x, peer.y); });
@@ -194,8 +196,8 @@ try {
   await a.teleport(139, 146); await b.teleport(141, 146);
   await b.frame().evaluate(() => { const p = window.__realm.game().player; p.hp = 2; p.inventory = p.inventory.map(slot => slot?.id === "coins" ? slot : null); window.__realm.refresh(); });
   await a.frame().evaluate(() => { const p = window.__realm.game().player; for (const s of ["attack", "strength"]) p.xp[s] = 200_000; });
-  await a.until(() => window.__realm.peers().some(peer => peer.id === 3412 && peer.x === 326 && peer.y === 306), "B in the ring");
-  const ringAt = await a.frame().evaluate(() => window.__realm.screenOf(326, 306)), ringBox = await a.page.locator("iframe").boundingBox();
+  await a.until(() => window.__realm.peers().some(peer => peer.id === 3412 && peer.x === 766 && peer.y === 306), "B in the ring");
+  const ringAt = await a.frame().evaluate(() => window.__realm.screenOf(766, 306)), ringBox = await a.page.locator("iframe").boundingBox();
   await a.page.mouse.click(ringBox.x + ringAt.x, ringBox.y + ringAt.y - 20, { button: "right" });
   await a.game.getByRole("menuitem", { name: /^Fight .*#3412/ }).click();
   await a.until(() => (window.__realm.game().player.stats.duelsWon ?? 0) >= 1, "A winning the duel", 40_000);

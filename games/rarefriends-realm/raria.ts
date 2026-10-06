@@ -9,6 +9,7 @@
  * machine.
  */
 import { ORDERS } from "./knights.ts";
+import { WEST_DX } from "./world.ts";
 import { addXp, combatLevel, count, give, giveOrDrop, has, level, message, setLaw, sound, take, type Dialogue, type Game } from "./state.ts";
 import { chat, completeQuest, data, fetchQuest, npcSays, questDone, stage, type NpcDef, type QuestDef } from "./content.ts";
 
@@ -59,6 +60,19 @@ export const WEST_NPCS: Record<string, NpcDef> = {
   raria_clothier: { id: "raria_clothier", name: "Sumptuary Officer Delphine Rook", examine: "Decides what Rarians wear, which is violet, and sells it to them.", options: ["Talk-to", "Trade"], shop: "raria_clothier", art: art(3, 953) },
   raria_provisioner: { id: "raria_provisioner", name: "Provisioner of the Crown", examine: "Sells bread, one kind, at one price.", options: ["Talk-to", "Trade"], shop: "raria_general", art: art(0, 954) },
   raria_villager: { id: "raria_villager", name: "Rarian citizen", examine: "A citizen of Raria, in violet, polite, and already walking away.", options: ["Talk-to"], art: art(9, 955) },
+  // The far west's towns: Lawgate on the eastern march, the capital's inn, Vesperholm, the Rangers' Hold, Candlemere, Greyford, BarkReach's lodge and village, the Silent Peaks.
+  lawgate_governor: { id: "lawgate_governor", name: "Governor Ancel Marrowby", examine: "Governor of Lawgate and Raria's eastern march. Keeps a chair lower than a throne by exactly the regulation height.", options: ["Talk-to"], art: art(10, 960) },
+  lawgate_innkeeper: { id: "lawgate_innkeeper", name: "Hester Vane, of the Obedient Hound", examine: "Keeps Lawgate's inn. Pours exactly one measure.", options: ["Talk-to", "Trade"], shop: "raria_inn", art: art(9, 961) },
+  raria_innkeeper: { id: "raria_innkeeper", name: "Mother Constance", examine: "Keeps the Seventh Prayer, the capital's inn. Everyone eats what she serves, at the hour she serves it.", options: ["Talk-to", "Trade"], shop: "raria_inn", art: art(3, 962) },
+  vesper_abbess: { id: "vesper_abbess", name: "Abbess Ilse Nocturne", examine: "Abbess of Vesperholm and the Order of Dusk's eldest. Rings the last bell herself.", options: ["Talk-to", "Trade"], shop: "vesper_reliquary", art: art(10, 963) },
+  ranger_warden: { id: "ranger_warden", name: "Ranger-Warden Sable", examine: "Warden of the Rangers' Hold. A Royal Ranger who is permitted to speak, which she does as little as possible.", options: ["Talk-to"], art: art(9, 964) },
+  candlemere_reeve: { id: "candlemere_reeve", name: "Reeve Odo Tallow", examine: "Candlemere's reeve. Collects the Crown's tithe and apologises to nobody for it, except quietly, to his wife.", options: ["Talk-to"], art: art(9, 965) },
+  candlemere_trader: { id: "candlemere_trader", name: "Wynne of the Stores", examine: "Keeps the Candlemere stores. Sells one of everything the Law permits.", options: ["Talk-to", "Trade"], shop: "raria_general", art: art(3, 966) },
+  crownlands_villager: { id: "crownlands_villager", name: "Crownlands farmer", examine: "A farmer of the Crownlands. Grows what the Crown asks, and some of what it doesn't.", options: ["Talk-to"], art: art(9, 967) },
+  greyford_warden: { id: "greyford_warden", name: "Warden Piers Holloway", examine: "Keeps the Ford Inn and the ford itself for the Crown. Has watched the Greyfields from his window for two years.", options: ["Talk-to"], art: art(10, 968) },
+  antler_captain: { id: "antler_captain", name: "Ranger-Captain Holt Ashgrove", examine: "Captain of the Antler Lodge. Has walked every path in BarkReach, and one in the Heartwood he won't walk again.", options: ["Talk-to"], art: art(9, 969) },
+  barkholm_elder: { id: "barkholm_elder", name: "Elder Mossa Rootwell", examine: "Barkholm's eldest. Older than the Crown's tithe rolls, and says so.", options: ["Talk-to"], art: art(5, 970) },
+  peak_hermit: { id: "peak_hermit", name: "The Blind Hermit", examine: "A hermit at the Blind Shrine, blindfolded like the statue. Walks the scree without a stick.", options: ["Talk-to"], art: art(5, 971) },
   raria_citizen_merrow: { id: "raria_citizen_merrow", name: "Tam Merrow", examine: "A Rarian citizen who, the Ledger says, has prayed four times this week instead of seven.", options: ["Talk-to"], art: art(9, 956) },
 };
 
@@ -192,6 +206,28 @@ export const WEST_QUESTS: readonly QuestDef[] = [
     },
   },
   {
+    id: "candlemere_tithe", name: "The Candlemere Tithe", points: 2, difficulty: "Intermediate", start: "Talk to Reeve Odo Tallow in Candlemere, in the Crownlands, after Papers of Passage.",
+    requirements: ["Papers of Passage"], rewards: ["2 Quest Points", "10 crown sigils", "5,000 coins", "3,000 Cooking XP", "The reeve's gratitude, which is entered in the Ledger"],
+    journal: game => {
+      const s = stage(game, "candlemere_tithe"), p = game.player;
+      if (s === 0) return ["The Crown's tithe from Candlemere is short, and the reeve answers for it. He'd take help, from someone who isn't from Candlemere."];
+      if (s === 1) return ["The reeve needs the tithe made up before the Assessor's clerk comes: grain, eggs and meat, which the farms couldn't spare.",
+        `${count(p, "grain") >= 15 ? "✓" : "•"} Grain: ${Math.min(15, count(p, "grain"))}/15`, `${count(p, "egg") >= 5 ? "✓" : "•"} Eggs: ${Math.min(5, count(p, "egg"))}/5`, `${count(p, "cooked_meat") >= 5 ? "✓" : "•"} Cooked meat: ${Math.min(5, count(p, "cooked_meat"))}/5`];
+      return ["The tithe is made up and the reeve is in the Ledger as 'reliable', which he says is the best thing a Rarian can be, and doesn't look happy about. QUEST COMPLETE!"];
+    },
+  },
+  {
+    id: "heartwood_elder", name: "The Ironbark Elder", points: 3, difficulty: "Long", start: "Talk to Ranger-Captain Holt Ashgrove at the Antler Lodge in BarkReach, with a combat level of 85 or so.",
+    requirements: ["Combat 85 recommended"], rewards: ["3 Quest Points", "Ironbark war bow", "8,000 Ranged XP", "4,000 Woodcutting XP"],
+    journal: game => {
+      const s = stage(game, "heartwood_elder");
+      if (s === 0) return ["The Antler Lodge's captain won't walk one path in the Heartwood. At its end is the oldest ironbark in the wood, and it walks."];
+      if (s === 1) return ["The Ironbark Elder walks the deepest Heartwood, and every lurker in BarkReach grows from its fallen bark. The captain wants it brought down and its heartwood brought back.",
+        `${data(game, "he_elder") >= 1 ? "✓" : "•"} The Ironbark Elder brought down`, `${has(game.player, "heartwood") ? "✓" : "•"} Its heartwood, to the captain`];
+      return ["The Elder is down. The captain cut a war bow from its heart and gave it me, and went to look at the path he wouldn't walk. QUEST COMPLETE!"];
+    },
+  },
+  {
     id: "barkreach_heartwood", name: "Heartwood", points: 2, difficulty: "Intermediate", start: "Talk to Foreman Greta Sawyer at the Heartwood Yard in Sawyer's Rest, BarkReach, with Woodcutting 68.",
     requirements: ["Woodcutting 68"], rewards: ["2 Quest Points", "Woodsman's bow", "6,000 Woodcutting XP", "3,000 Fletching XP"],
     journal: game => {
@@ -218,6 +254,7 @@ export function onWestKill(game: Game, monsterId: string) {
   if (monsterId === "rrr_captain") { tally("fff_cannon", "fc_captain", 1, "The captain is down. Fellow Free will call that finished.", 2); carry("fff_sabotage", "rrr_dispatch", "The captain's case holds a Regiment dispatch: camp positions, in a careful hand. The Archwizard wants it."); }
   if (monsterId === "rrr_scout") tally("fff_rangers", "fr_scouts", 8, "Eight Regiment scouts out of the wood. The Ranger-Captain wanted antler besides.");
   if (monsterId === "rrr_footman") tally("fff_sabotage", "fs_footmen", 6, "Six footmen. The Archwizard wanted the dispatch too.");
+  if (monsterId === "ironbark_treant") tally("heartwood_elder", "he_elder", 1, "The Ironbark Elder comes down like a felled tower. Its heartwood is yours; the captain will want it.");
   if (monsterId === "bark_lurker") carry("barkreach_heartwood", "heartwood", "The lurker comes apart round a grey heart of ironbark, cut out whole. The foreman wanted this.");
 }
 /** Praying at the Wise Friend's altar in the Chapel of the Law. */
@@ -227,7 +264,7 @@ export function onWestAltar(game: Game, altar: { name: string; text?: string }) 
 /** Standing in the Great Hall of the Federation with the Colonel's tally to make. */
 export function onWestTick(game: Game) {
   const p = game.player;
-  if (stage(game, "cog_federation") === 1 && !data(game, "ef_counted") && p.x >= 31 && p.x <= 49 && p.y >= 392 && p.y <= 402) {
+  if (stage(game, "cog_federation") === 1 && !data(game, "ef_counted") && p.x >= 31 + WEST_DX && p.x <= 49 + WEST_DX && p.y >= 392 && p.y <= 402) {
     p.questData.ef_counted = 1; giveOrDrop(game, "federation_tally"); message(game, "You count what's running in the Great Hall. Fourteen devices, one cannon, one knight asleep, one chicken. You write it down. Nobody stops you, which is its own answer.", "quest"); sound(game, "quest");
   }
 }
@@ -236,6 +273,7 @@ export function westShopProblem(game: Game, shopId: string): string | null {
   if (shopId.startsWith("fff_") && !KNOWS_FFF(game)) return "The Federation trades with people it knows. The Gate-Warden decides who it knows.";
   if (shopId.startsWith("raria_") && !KNOWS_RARIA(game)) return "The Office of Conduct hasn't registered you. Nothing in Raria is sold to a name that isn't in the Ledger.";
   if (shopId === "dusk_armoury" && !questDone(game, "oath_dusk")) return "The Dusk's quartermaster sells to the sworn. Prior Caul hears oaths.";
+  if (shopId === "vesper_reliquary" && !KNOWS_RARIA(game)) return "The abbey's reliquary serves names in the Ledger. The Office of Conduct in Raria registers them.";
   return null;
 }
 /** The Regiment honours the writ, not you: its truce holds while you carry one, and for good once you're in the Ledger. */
@@ -543,6 +581,54 @@ export function talkWest(game: Game, npcId: string, name: string): Dialogue | nu
     case "raria_provisioner": return chat(name, npcSays(name, KNOWS_RARIA(game) ? "Bread. One kind. One price. Also pots, buckets, rope, a knife, and the other things the Law permits a kitchen." : "The Provisioner serves the Ledger."), KNOWS_RARIA(game) ? [
       { label: "Show me.", then: () => { game.ui.shop = "raria_general"; return null; } }, { label: "Maybe later.", then: () => null }] : undefined);
     case "raria_villager": return chat(name, npcSays(name, pick(game, ["Good day. The Law be kept. Excuse me.", "Seven prayers, one chapel, one kind of bread. It's a good city. Everyone says so, and everyone's right, and I have to go.", "Raria has always been here. Her Radiance says so. The stones say so. I was born here. I think.", "There's a Ranger behind that pillar. There's always a Ranger behind that pillar. It's a comfort.", "The Federation? A disease, Her Radiance says. My brother went to look. He hasn't come back. He writes. He sounds well. I don't read the letters twice.", "The Wise Friend closed its eyes so as never to see the Law broken. I don't break it. I don't think about it. Those are the same thing, the chaplain says."])));
+    // ---------- The far west's towns ----------
+    case "lawgate_governor": return chat(name, npcSays(name, pick(game, ["Lawgate. The eastern march. Beyond that wall is the Spine, and beyond the Spine is Hollowmere, who keep asking where we came from as though we owe them an answer.",
+      "How far does Raria go? West to the sea. North to the Silent Peaks. South to BarkReach's wood, which pays its tithe in arguments. Eleven days by cart along the Crown Road, less by the Summons, which the Law teaches.",
+      "Hollowmere sends scouts. I send them home with a writ and a map. They never believe the map.", "The Crown Road is safe. The Crown is safe. The Greyfields are the Regiment's concern, and the Federation's, and nobody's in particular."])), [
+      { label: "Where did Raria come from?", then: () => chat(name, npcSays(name, "From Raria. Where else? My grandfather governed this march, and his. Hollowmere's maps are short a kingdom; that is a fault in the maps.", "...The oldest roll in my office has Lawgate on it and a blank where Hollowmere should be. I keep it in a drawer. I don't know why I keep it in a drawer.")) },
+      { label: "Goodbye.", then: () => null }]);
+    case "lawgate_innkeeper": case "raria_innkeeper": return chat(name, npcSays(name, KNOWS_RARIA(game) ? pick(game, ["One measure. One loaf. One bed, made at the hour. Welcome.", "Bread, cake, chicken, meat, milk, eggs. All inspected. All good.", "The Seventh Prayer is the last of the day. We close after it. Everyone does."]) : "The inn serves names in the Ledger. Register at the Office of Conduct in the capital, or the Governor will."), KNOWS_RARIA(game) ? [
+      { label: "Show me.", then: () => { game.ui.shop = "raria_inn"; return null; } }, { label: "Maybe later.", then: () => null }] : undefined);
+    case "vesper_abbess": return chat(name, npcSays(name, pick(game, ["Vesperholm rings the last bell of the day for all Raria. When it rings, the Order keeps what the Law forbids to be seen. The wraiths in the wood are what was seen anyway.",
+      "The Prior keeps the Law in the city. I keep it here, where it is quieter, and where the wood keeps things too.", "The Blind Shrine in the Silent Peaks is older than this abbey, older than the Law as we write it. We do not go there. The hermit does.",
+      "Sigils, vestments, the Book and its scroll case: the abbey's reliquary serves the received."])), KNOWS_RARIA(game) ? [
+      { label: "Show me.", then: () => { game.ui.shop = "vesper_reliquary"; return null; } }, { label: "Maybe later.", then: () => null }] : undefined);
+    case "ranger_warden": return chat(name, npcSays(name, pick(game, ["...", "You found the Hold. That was the test. You may leave now; that is the next one.", "We guard the royal family. All of it. Everywhere. That includes the places you are standing.", "Do not draw on a Ranger. It is not forbidden. It is simply never done twice."])));
+    case "candlemere_reeve": {
+      if (!KNOWS_RARIA(game) && stage(game, "candlemere_tithe") === 0) return chat(name, npcSays(name, "You're not in the Ledger. I can't take help from a name that isn't written; the Assessor would ask whose it was. The Office of Conduct in the capital, first."));
+      return fetchQuest(game, name, "candlemere_tithe", {
+        offer: ["The tithe is short. Three farms couldn't make it up after the frost, and the Assessor's clerk comes at the turn of the month, and the reeve answers for the tithe. That's me.", "Fifteen grain, five eggs, five cooked meat. You're not from Candlemere; nobody will ask whose farm it came from."],
+        accept: "Fifteen grain, five eggs, five cooked meat. Before the clerk.", progress: "Fifteen grain, five eggs, five cooked meat. The clerk comes at the turn of the month.",
+        have: () => count(player, "grain") >= 15 && count(player, "egg") >= 5 && count(player, "cooked_meat") >= 5, take: () => { take(player, "grain", 15); take(player, "egg", 5); take(player, "cooked_meat", 5); },
+        done: ["Made up. The roll balances. The clerk will write 'Candlemere: reliable', and Candlemere will be.", "Take these: crown sigils from the tithe chest, and coin. The Ledger will have your name next to mine. I'm sorry about that. I'm grateful about the rest."],
+        reward: () => { give(player, "crown_sigil", 10); give(player, "coins", 5000); addXp(game, "cooking", 3000, { raw: true }); },
+      });
+    }
+    case "candlemere_trader": return chat(name, npcSays(name, KNOWS_RARIA(game) ? "One of everything the Law permits a kitchen: bread, pots, buckets, a knife. Fishing on the lake is permitted, with thanks." : "The stores serve the Ledger. You'll want the capital's Office of Conduct."), KNOWS_RARIA(game) ? [
+      { label: "Show me.", then: () => { game.ui.shop = "raria_general"; return null; } }, { label: "Maybe later.", then: () => null }] : undefined);
+    case "crownlands_villager": return chat(name, npcSays(name, pick(game, ["The Crownlands feed the capital. The capital feeds the Law. The Law feeds us, the chaplain says, though it's mostly bread.",
+      "My family's farmed this field since before the Law was written down. The Law says that's not possible. I don't argue with the Law; I farm.", "Hollowmere? East, past Lawgate and the Spine. They say we appeared. We say they never looked.",
+      "The Federation's people came through once with a device that milked the cows. The Regiment took the device. The cows miss it."])));
+    case "greyford_warden": return chat(name, npcSays(name, pick(game, ["From my window: the Greyfields, Fort Ordinance to the east, the Federation's camp past it, and the dead between them who haven't stopped. Two years of that.",
+      "The South Road crosses the Vesper here and goes on into BarkReach. The wood pays its tithe in arguments; the Regiment collects in patrols.", "The Federation fight like lunatics and build like saints. The Regiment fight like a clock. Neither of them is losing. That's the trouble.",
+      "Fort Ordinance asks for a writ. The Federation asks three questions. The revenants ask nothing at all."])));
+    case "antler_captain": {
+      if (combat(game) < 85 && stage(game, "heartwood_elder") === 0) return chat(name, npcSays(name, "There's a path in the Heartwood I won't walk again. At the end of it is the oldest ironbark in the wood, and it walks. Come back when you could walk it with me (combat 85 or so)."));
+      return fetchQuest(game, name, "heartwood_elder", {
+        offer: ["There's a path in the Heartwood I won't walk again. At its end is the Ironbark Elder: the oldest tree in BarkReach, and it walks. Every lurker in the wood grew from its fallen bark.", "Bring it down and bring me its heartwood. I'll cut you a bow the Regiment would trade a captain for."],
+        accept: "The deepest Heartwood, west, past the Hush. Fire bites it; nothing else much does.", progress: "The Elder, and its heartwood. West, past the Hush.",
+        have: () => data(game, "he_elder") >= 1 && has(player, "heartwood"), take: () => take(player, "heartwood", 1),
+        done: ["The Elder's heart. Grey as stone and warm as bread.", "Here: a war bow from it. The lurkers will thin now. I'll go and look at that path."],
+        reward: () => { giveOrDrop(game, "ironbark_war_bow"); addXp(game, "ranged", 8000, { raw: true }); addXp(game, "woodcutting", 4000, { raw: true }); },
+      });
+    }
+    case "barkholm_elder": return chat(name, npcSays(name, pick(game, ["Barkholm. The wood's own village. The Crown has asked for a tithe here twice. The wood answered both times: the first collector got lost for a month, the second got lost for good.",
+      "Raria says it was always here. So does the wood. They don't mean the same thing.", "There's a statue in the Heartwood, sunk to the chest, blindfolded. My grandmother's grandmother left it flowers. It was old then.",
+      "The Federation sends rangers through. Polite. Strange. They fixed our saw with a device and now it sings."])));
+    case "peak_hermit": return chat(name, npcSays(name, pick(game, ["You climbed. Sit. The statue is blindfolded; look closer, under the cloth. The eyes are carved open.",
+      "Raria says the Wise Friend closed its eyes so as never to see the Law broken. The mountain says it was carved with them open, and somebody came later with a blindfold.",
+      "Hollowmere asks where Raria came from. Raria asks nothing at all. I ask who closed the eyes, and when, and what they were looking at.",
+      "The watchers in the peaks walk when no one looks. They're carved like the statue. I think they're looking for whoever put the blindfold on."])));
     default: return null;
   }
 }

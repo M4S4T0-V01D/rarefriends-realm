@@ -20,7 +20,7 @@ import { ECO_REGIONS, HERBS } from "./apothecary.ts";
 import { buildVillages } from "./villages.ts";
 import { buildWest } from "./west.ts";
 // REGIONS is read only inside buildExpansion (called from createWorld), never at load, since world.ts imports this module.
-import { ARENA, MAINLAND_RECT, OVERWORLD_H, REGIONS, T, isWater, mainlandToWorld, type DecorKind, type GenContext, type RegionId, type worldTools } from "./world.ts";
+import { ARENA_LEGACY as ARENA, MAINLAND_RECT, OVERWORLD_H, REGIONS, T, isWater, legacyMainlandToWorld as mainlandToWorld, type DecorKind, type GenContext, type RegionId, type worldTools } from "./world.ts";
 import { ORDERS, ORDER_IDS } from "./knights.ts";
 
 export type Tools = ReturnType<typeof worldTools>;
@@ -140,8 +140,8 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
   regionBlob(574, 420, 68, 42, "the_wilds"); regionBlob(556, 404, 13, 11, "tallgrass");
   regionBlob(646, 404, 28, 24, "quillhaven");
   regionBlob(96, 500, 26, 14, "pale_isles");
-  // Return of Raria (painted last, so the wood takes the vale's and Westmarch's overlap): the border, the Federation's marches, the wood, and the kingdom.
-  regionBlob(40, 300, 46, 48, "deep_westmarch"); regionBlob(44, 354, 30, 12, "deep_westmarch"); regionBlob(44, 400, 48, 46, "free_marches"); regionBlob(112, 378, 40, 26, "barkreach"); regionBlob(26, 212, 28, 58, "raria");  // (the other islets stay "coast": no ferry calls there, so nothing to gather grows on them)
+  // Return of Raria: the border, the Federation's marches, Westmarch's southern woods, and Raria's eastern march (the kingdom itself is on the far-west continent).
+  regionBlob(40, 300, 46, 48, "deep_westmarch"); regionBlob(44, 354, 30, 12, "deep_westmarch"); regionBlob(44, 400, 48, 46, "free_marches"); regionBlob(112, 378, 40, 26, "westmarch"); regionBlob(26, 212, 28, 58, "raria_march");  // (the other islets stay "coast": no ferry calls there, so nothing to gather grows on them)
   // The sea keeps "coast" (set above); the mainland's own tiles are never re-regioned.
   const REGION_ORDER = REGIONS.map(region => region.id), regionIs = (x: number, y: number, id: RegionId) => REGION_ORDER[ctx.region[tileIndex(x, y)]] === id;
   const onLand = (tt: number) => tt === T.GRASS || tt === T.DARK_GRASS;
@@ -166,14 +166,13 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
       lift[tileIndex(x, y)] = Math.max(0, m - 0.35) * 2.2 * (0.4 + toTip);
     }
   }
-  // Return of Raria. Deep Westmarch: heather, scrub, rocky outcrops and old battle-ground; the Free Marches: a wet green with the Federation's own gravel; BarkReach: deep wood, dark grass under it, a river through it; Raria: swept ground, farmed in strips round the city, gravel on the heights by the Spine.
+  // Return of Raria. Deep Westmarch: heather, scrub, rocky outcrops and old battle-ground; the Free Marches: a wet green with the Federation's own gravel; Raria's march: swept ground, farmed in strips round Lawgate, gravel on the heights by the Spine.
   for (let y = 140; y < 460; y++) for (let x = 0; x < 180; x++) {
     if (inMainland(x, y)) continue;
     const tt = get(x, y); if (!onLand(tt)) continue;
     if (regionIs(x, y, "deep_westmarch")) { const m = ridge(x * 1.1, y * 1.1); if (m > 0.74) paint(x, y, T.CLIFF); else if (m > 0.6) paint(x, y, T.GRAVEL); else if (noise2(x, y) > 0.55) paint(x, y, T.DARK_GRASS); lift[tileIndex(x, y)] = Math.max(0, m - 0.5) * 1.4; }
     if (regionIs(x, y, "free_marches")) { if (ridge(x, y) < 0.26) paint(x, y, T.SWAMP); else if (noise2(x, y) > 0.5) paint(x, y, T.DARK_GRASS); }
-    if (regionIs(x, y, "barkreach")) { if (noise2(x * 1.3, y * 1.3) > 0.35) paint(x, y, T.DARK_GRASS); }
-    if (regionIs(x, y, "raria")) { const m = ridge(x * 0.9, y * 0.9), toSpine = Math.max(0, (x - 36) / 16); if (m > 0.72 && toSpine > 0.3) paint(x, y, T.GRAVEL); else if (y > 236 && y < 262 && noise(x * 2, y) > 0.5) paint(x, y, T.FARMLAND); lift[tileIndex(x, y)] = Math.max(0, m - 0.55) * toSpine; }
+    if (regionIs(x, y, "raria_march")) { const m = ridge(x * 0.9, y * 0.9), toSpine = Math.max(0, (x - 36) / 16); if (m > 0.72 && toSpine > 0.3) paint(x, y, T.GRAVEL); else if (y > 236 && y < 262 && noise(x * 2, y) > 0.5) paint(x, y, T.FARMLAND); lift[tileIndex(x, y)] = Math.max(0, m - 0.55) * toSpine; }
   }
   // Ashfall: ash fields, lava, cliffs ringing it so the passes matter, and a crater at the far tip.
   for (let y = 20; y < 170; y++) for (let x = 0; x < 150; x++) {
