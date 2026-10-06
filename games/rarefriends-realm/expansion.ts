@@ -18,6 +18,7 @@
 import { MONSTERS } from "./data.ts";
 import { ECO_REGIONS, HERBS } from "./apothecary.ts";
 import { buildVillages } from "./villages.ts";
+import { buildWest } from "./west.ts";
 // REGIONS is read only inside buildExpansion (called from createWorld), never at load, since world.ts imports this module.
 import { ARENA, MAINLAND_RECT, OVERWORLD_H, REGIONS, T, isWater, mainlandToWorld, type DecorKind, type GenContext, type RegionId, type worldTools } from "./world.ts";
 import { ORDERS, ORDER_IDS } from "./knights.ts";
@@ -87,6 +88,8 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
   landBlob(330, 72, 175, 64, 0.6); landBlob(300, 150, 70, 30, 0.4); landBlob(430, 150, 40, 24, 0.5);
   // West: Westmarch, off the Whisperwood shore, narrowing into the Drakespine peninsula and swelling again at Ashfall.
   landBlob(140, 300, 70, 56, 0.5); landBlob(180, 250, 30, 40, 0.4); landBlob(88, 232, 34, 42, 0.5); landBlob(72, 170, 26, 40, 0.5); landBlob(70, 92, 58, 56, 0.55);
+  // Return of Raria: the far west. Deep Westmarch runs to the world's edge; the Free Marches lie south-west of it, BarkReach between Westmarch and the Thistle Vale, and Raria behind the Drakespine.
+  landBlob(40, 300, 42, 46, 0.45); landBlob(44, 398, 46, 44, 0.5); landBlob(112, 378, 42, 26, 0.5); landBlob(26, 214, 26, 58, 0.4); landBlob(46, 352, 26, 14, 0.4);
   // South: Southshore along the whole south coast, the Thistle Vale valley in the south-west, headlands and bays.
   landBlob(350, 410, 190, 52, 0.7); landBlob(170, 440, 80, 44, 0.5); landBlob(430, 460, 40, 24, 0.6); landBlob(250, 465, 36, 22, 0.5);
   // East: Ironreach, off the Greyhorn shore; The Wilds and Tallgrass to the south-east; Quillhaven's headland.
@@ -136,7 +139,9 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
   regionBlob(632, 202, 14, 12, "cragmaw");
   regionBlob(574, 420, 68, 42, "the_wilds"); regionBlob(556, 404, 13, 11, "tallgrass");
   regionBlob(646, 404, 28, 24, "quillhaven");
-  regionBlob(96, 500, 26, 14, "pale_isles");  // (the other islets stay "coast": no ferry calls there, so nothing to gather grows on them)
+  regionBlob(96, 500, 26, 14, "pale_isles");
+  // Return of Raria (painted last, so the wood takes the vale's and Westmarch's overlap): the border, the Federation's marches, the wood, and the kingdom.
+  regionBlob(40, 300, 46, 48, "deep_westmarch"); regionBlob(44, 354, 30, 12, "deep_westmarch"); regionBlob(44, 400, 48, 46, "free_marches"); regionBlob(112, 378, 40, 26, "barkreach"); regionBlob(26, 212, 28, 58, "raria");  // (the other islets stay "coast": no ferry calls there, so nothing to gather grows on them)
   // The sea keeps "coast" (set above); the mainland's own tiles are never re-regioned.
   const REGION_ORDER = REGIONS.map(region => region.id), regionIs = (x: number, y: number, id: RegionId) => REGION_ORDER[ctx.region[tileIndex(x, y)]] === id;
   const onLand = (tt: number) => tt === T.GRASS || tt === T.DARK_GRASS;
@@ -160,6 +165,15 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
       if (m > 0.72) paint(x, y, T.CLIFF); else if (m > 0.5 || noise(x, y) > 0.7) paint(x, y, T.GRAVEL);
       lift[tileIndex(x, y)] = Math.max(0, m - 0.35) * 2.2 * (0.4 + toTip);
     }
+  }
+  // Return of Raria. Deep Westmarch: heather, scrub, rocky outcrops and old battle-ground; the Free Marches: a wet green with the Federation's own gravel; BarkReach: deep wood, dark grass under it, a river through it; Raria: swept ground, farmed in strips round the city, gravel on the heights by the Spine.
+  for (let y = 140; y < 460; y++) for (let x = 0; x < 180; x++) {
+    if (inMainland(x, y)) continue;
+    const tt = get(x, y); if (!onLand(tt)) continue;
+    if (regionIs(x, y, "deep_westmarch")) { const m = ridge(x * 1.1, y * 1.1); if (m > 0.74) paint(x, y, T.CLIFF); else if (m > 0.6) paint(x, y, T.GRAVEL); else if (noise2(x, y) > 0.55) paint(x, y, T.DARK_GRASS); lift[tileIndex(x, y)] = Math.max(0, m - 0.5) * 1.4; }
+    if (regionIs(x, y, "free_marches")) { if (ridge(x, y) < 0.26) paint(x, y, T.SWAMP); else if (noise2(x, y) > 0.5) paint(x, y, T.DARK_GRASS); }
+    if (regionIs(x, y, "barkreach")) { if (noise2(x * 1.3, y * 1.3) > 0.35) paint(x, y, T.DARK_GRASS); }
+    if (regionIs(x, y, "raria")) { const m = ridge(x * 0.9, y * 0.9), toSpine = Math.max(0, (x - 36) / 16); if (m > 0.72 && toSpine > 0.3) paint(x, y, T.GRAVEL); else if (y > 236 && y < 262 && noise(x * 2, y) > 0.5) paint(x, y, T.FARMLAND); lift[tileIndex(x, y)] = Math.max(0, m - 0.55) * toSpine; }
   }
   // Ashfall: ash fields, lava, cliffs ringing it so the passes matter, and a crater at the far tip.
   for (let y = 20; y < 170; y++) for (let x = 0; x < 150; x++) {
@@ -208,6 +222,12 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
   road([[300, 126], [270, 112], [246, 100], [214, 92], [196, 70]], 2.2, T.GRAVEL);        // a woodsmen's track west over the black river
   road([W0, [170, 262], [140, 292], [112, 290]]);                                        // Westmarch
   road([[112, 290], [96, 262], [86, 230], [78, 196], [72, 160], [72, 128]], 2.2, T.GRAVEL);  // up the Drakespine
+  // Return of Raria: the West Road on from Westmarch's end into Deep Westmarch, forking to Raria's gate in the north and the Free Marches in the south; the wood road down to BarkReach and on to the Thistle Vale.
+  road([[112, 290], [92, 298], [72, 302], [52, 296], [34, 284], [24, 266], [26, 248]]);                      // the West Road to Raria's south gate
+  road([[72, 302], [64, 322], [54, 344], [46, 362], [40, 380]]);                                            // south to the FFF Fortress
+  road([[92, 298], [100, 322], [108, 346], [112, 362], [118, 382], [128, 400], [120, 414]], 2.2, T.GRAVEL);  // the wood road through BarkReach
+  road([[40, 380], [60, 384], [84, 380], [100, 376], [112, 378]], 2.2, T.GRAVEL);                           // the Federation's road east into the wood
+  road([[26, 248], [26, 200], [30, 178], [40, 164]], 2.2, T.GRAVEL);                                         // Raria's north road, up towards the Spine
   road([S0, [312, 380], [320, 400]]);                                                    // to the southern crossroads
   road([[320, 400], [300, 440], [262, 462], [254, 472]]);                                // Dyemoor
   road([[262, 462], [220, 448], [176, 450], [160, 450]]);                                // Hollyhock
@@ -539,6 +559,7 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
   // The Namekeeper keeps his register at a table on the Friendhollow square's edge (an empty tile; nothing on the square moves).
   { const [nx, ny] = nearestLandAnywhere(...mainlandSquare(116, 118)); npc("namekeeper", nx, ny); decor(nx, ny - 1, "table", true, "The Register of Names"); }
   buildVillages(ctx, t);
+  buildWest(ctx, t);
   // (After the villages are built: the library's floor is laid by then.) The trapdoor to the Drowned Archive.
   add({ kind: "ladder", x: 643, y: 397, blocks: true, name: "Trapdoor", action: "Climb-down", to: { x: 476, y: 528 } });
   // Statues at every dungeon's mouth of what waits below, a warning to whoever reads stone: some whole, some toppled,
@@ -598,7 +619,8 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
    * commander and quartermaster inside, two guards and the god's statue before the door.
    */
   for (const id of ORDER_IDS) {
-    const order = ORDERS[id], ember = id === "ember", found = ember ? clearing(order.near, 23, 20, false, true) : clearing(order.near, 11, 8);
+    const order = ORDERS[id], ember = id === "ember"; if (order.city) continue;
+    const found = ember ? clearing(order.near, 23, 20, false, true) : clearing(order.near, 11, 8);
     if (!found) continue;
     // The Ember's fortress sits on an island of ash inside a moat of lava, a causeway of blackened stone to its gate.
     const at: [number, number] = ember ? [found[0] + 6, found[1] + 5] : found;
@@ -611,15 +633,20 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
       for (const [tx, ty] of [[mx0 + 2, my0 + 2], [mx1 - 2, my0 + 2], [mx0 + 2, my1 - 2], [mx1 - 2, my1 - 2]] as const) decor(tx, ty, "torch", true);
       monsters("ash_drake", mx0 - 6, my0 - 6, mx1 + 6, my1 + 6, 4);
     }
-    razeArea(x0 - 1, y0 - 1, x1 + 1, y1 + 3);
-    for (let y = y1 + 1; y <= y1 + 3; y++) for (let x = x0; x <= x1; x++) put(x, y, T.STONE);
+    razeArea(x0 - 1, y0 - 1, x1 + 1, y1 + 6);
+    for (let y = y1 + 1; y <= y1 + 6; y++) for (let x = x0; x <= x1; x++) put(x, y, y <= y1 + 3 || Math.abs(x - cx) <= 3 ? T.STONE : get(x, y));
     t.building(x0, y0, x1, y1, "s", T.STONE, undefined, ember ? { name: "Ember Fortress", color: order.dark, walls: "stone", roof: "flat", storeys: 2, tall: 8 } : { name: `${order.short} Hall`, color: order.color, walls: "stone", chimney: true });
     add({ kind: "altar", x: cx, y: y0 + 2, blocks: true, name: `${order.name} altar`, text: id }); decor(cx, y0 + 1, order.statue, true, `${order.god}, carved small for the altar`);
     decor(x0 + 1, y0 + 2, "armour", true, "Weapon rack"); decor(x1 - 1, y0 + 2, "armour", true, "Weapon rack"); decor(x0 + 1, y1 - 1, "torch", true); decor(x1 - 1, y1 - 1, "torch", true);
     decor(cx - 3, y0 + 4, "bench", true); decor(cx + 3, y0 + 4, "bench", true); decor(x0 + 1, y0 + 4, "table", true, "The Order's ledger"); decor(x1 - 1, y0 + 4, "chest", true, `${order.short} strongbox`);
     npc(`${id}_commander`, cx - 1, y0 + 4); npc(`${id}_quartermaster`, cx + 2, y0 + 3);
     decor(cx, y1 + 3, order.statue, true, `${order.god}, god of the ${order.name}`); npc(`${id}_guard`, cx - 3, y1 + 2); npc(`${id}_guard`, cx + 3, y1 + 2);
-    decor(x0, y1 + 2, "banner", true, `The ${order.name}'s banner`); decor(x1, y1 + 2, "banner", true, `The ${order.name}'s banner`);
+    // The statue as a landmark: braziers either side of it, the Order's plaque before it, offerings at its foot, and its banners flanking the way in.
+    decor(cx - 2, y1 + 4, "torch", true, `A brazier of the ${order.name}, lit`); decor(cx + 2, y1 + 4, "torch", true, `A brazier of the ${order.name}, lit`);
+    decor(cx, y1 + 5, "plaque", true, { diamond: "A plaque: 'THE GOOD FRIEND KEPT EVERY PROMISE. SO DO WE.' Under it, the Diamond's oath, cut deep.", ink: "A plaque: 'WHAT IS WRITTEN IS KEPT.' Under it, a line in a script nobody else in the Realm can read.", sol: "A plaque, cut at a slant: 'THE WEIRD FRIEND LAUGHED AT THE HOLLOW AND LIVED.' Somebody has added a smiling face.", hood: "A plaque: 'TAKEN FROM THE HOARD, GIVEN TO THE VILLAGES.' Under it, a ledger of favours, still being added to.", ember: "A plaque of black iron: 'THE FIRE HAS NOT GONE OUT. IT WILL NOT GO OUT.'", dusk: "A plaque." }[id]);
+    decor(cx - 1, y1 + 4, "flowers", false, `Offerings at the foot of ${order.godName}'s statue`); decor(cx + 1, y1 + 4, "flowers", false, `Offerings: ${({ diamond: "crystal shards, left in a row", ink: "folded pages and a quill", sol: "a little of everything, in no order", hood: "coins, which go to the villages by morning", ember: "ash hearts, still warm", dusk: "nothing" } as Record<string, string>)[id]}`);
+    decor(cx - 4, y1 + 5, `banner_${id}`, true, `The ${order.name}'s banner`); decor(cx + 4, y1 + 5, `banner_${id}`, true, `The ${order.name}'s banner`);
+    decor(x0, y1 + 2, `banner_${id}`, true, `The ${order.name}'s banner`); decor(x1, y1 + 2, `banner_${id}`, true, `The ${order.name}'s banner`);
   }
   // The Deadwood Maidens' camp in the east of the wood: tents round a hearth behind a fence of stakes, their spearwomen
   // on watch at the edge. Hostile, until the truce is kept.

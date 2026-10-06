@@ -598,7 +598,7 @@ test("A Friend's Feast from start to finish", () => {
   assert.equal(g.player.quests.friends_feast, 2);
   assert.equal(questPoints(g), 1);
   assert(level(g, "cooking") >= 10, "Quest XP");
-  assert.equal(QUESTS.length, 34); assert.equal(MAX_QUEST_POINTS, 53);
+  assert.equal(QUESTS.length, 47); assert.equal(MAX_QUEST_POINTS, 82);
 });
 
 test("Grumblin Trouble counts kills and pays out", () => {
@@ -850,9 +850,9 @@ test("The Heartguard: nine red-and-white pieces by Hitpoints level, each a hitpo
 test("The Old Friend stands behind every altar, and Dawnhold has its keep, towers and a taller chapel", () => {
   const g = newGame(), world = g.world;
   const altars = world.objects.filter(object => object.kind === "altar");
-  assert.equal(altars.length, 17, "the mainland's four, Gravesend's lantern altar, the catacombs' bone altar, the Ring chapel's, the five wayward chapels' and the five Orders'");
+  assert.equal(altars.length, 19, "the mainland's four, Gravesend's lantern altar, the catacombs' bone altar, the Ring chapel's, the five wayward chapels', the six Orders' and Raria's Wise Friend altar");
   for (const altar of altars) {
-    assert(world.objects.some(object => (object.decor === "old_friend" || object.decor?.startsWith("god_")) && Math.abs(object.x - altar.x) <= 1 && Math.abs(object.y - altar.y) <= 2), `a statue of the Old Friend (or an Order's god) by the ${altar.name}`);
+    assert(world.objects.some(object => (object.decor === "old_friend" || object.decor === "wise_friend" || object.decor?.startsWith("god_")) && Math.abs(object.x - altar.x) <= 1 && Math.abs(object.y - altar.y) <= 2), `a statue of the Old Friend (or an Order's god) by the ${altar.name}`);
   }
   assert(world.objects.find(object => object.decor === "old_friend").name === "Statue of the Old Friend");
   const named = name => world.buildings.filter(building => building.name === name);
@@ -1325,7 +1325,7 @@ test("Crossbows and war bows: parts from the anvil and the knife, fitted with Cr
   assert.equal(bowRange(g), 8, "a war bow reaches a tile further");
   // War bows are sold only in Fernwick.
   const sellers = Object.values(SHOPS).filter(shop => shop.stock.some(id => id.endsWith("war_bow"))).map(shop => shop.id);
-  assert.deepEqual(sellers, ["war_bows"]);
+  assert.deepEqual(sellers, ["barkreach_fletcher", "war_bows"]);
 });
 
 test("Hazel's Quiver: the Grumblin chief has it, Hazel mends it, and it calls shots home", () => {
@@ -1456,7 +1456,7 @@ test("Sigilcraft: mine sigil stones in the Wizards' Tower, press them at an alta
   assert.equal(count(p, "breeze_sigil") - before, stones); assert(p.xp.sigilcraft > 0);
   const hollow = world.objects.find(object => object.kind === "sigil_altar" && object.sigil === "hollow_sigil");
   give(p, "sigil_stone"); assert.equal(craftSigils(g, hollow), 0, "Hollow needs Sigilcraft 65");
-  assert.equal(world.objects.filter(object => object.kind === "sigil_altar").length, 12, "eleven on the mainland and Quillhaven's thought altar");
+  assert.equal(world.objects.filter(object => object.kind === "sigil_altar").length, 15, "eleven on the mainland, Quillhaven's thought altar, and Raria's law, dusk and crown altars");
 });
 
 test("Dragons breathe fire; the King's Wyrmward shield turns it aside", () => {
@@ -1938,7 +1938,7 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   assert.equal(p.quests.dawn_against_hollow, 2); assert(has(p, "dawnplate_cuirass"));
   assert.equal(count(p, "hollow_essence"), 0);
   assert.equal(capeProblem(g, "dawnplate_cuirass"), null, "the armoury sells Dawnplate once earned");
-  assert.equal(QUESTS.length, 34); assert.equal(MAX_QUEST_POINTS, 53);
+  assert.equal(QUESTS.length, 47); assert.equal(MAX_QUEST_POINTS, 82);
 });
 
 test("Boots and gauntlets in every metal, smithed at the anvil; the clothier's shirts, dresses, trousers and skirts", () => {
@@ -2053,7 +2053,8 @@ test("Townsfolk bodies, the worn ossuary bag, and the adventurer card's styles",
   setTarget(g, { kind: "object", id: altar.id, option: "Pray-at" }); until(g, () => bagBones(p) === 0, 40); assert.equal(bagBones(p), 0, "praying offers the worn bag"); assert(p.xp.prayer > faith);
   // Card styles: locked until earned, cleaned on load, saved.
   assert.deepEqual(cardStyle(g), DEFAULT_CARD);
-  for (const [category, options] of Object.entries(CARD_OPTIONS)) for (const option of options) assert(cardUnlocked(g, option), `${category} ${option.id} is free`);
+  // Every style is free, except the Orders' and factions' own: those wait until you've met their leader in the world.
+  for (const [category, options] of Object.entries(CARD_OPTIONS)) for (const option of options) assert.equal(cardUnlocked(g, option), !option.order, `${category} ${option.id} is ${option.order ? "locked until its leader is met" : "free"}`);
   p.card.bg = "night"; assert.equal(cardStyle(g).bg, "night"); p.card.frame = "dawn"; assert.equal(cardStyle(g).frame, "dawn"); p.card.banner = "zigzag"; assert.equal(cardStyle(g).banner, "zigzag");
   assert(CARD_OPTIONS.bg.length >= 18 && CARD_OPTIONS.frame.length >= 18 && CARD_OPTIONS.banner.length >= 19 && CARD_OPTIONS.layout.some(option => option.id === "centre"));
   assert.deepEqual(cleanCard({ bg: "night", frame: "nope", layout: "banner", extra: 1 }), { ...DEFAULT_CARD, bg: "night", layout: "banner" });
@@ -2422,12 +2423,12 @@ test("The Root Cellars and the Mossy Undercroft: a dungeon for new heroes and on
 test("The four Orders and their gods, and the Deadwood Maidens: oaths open armouries, blessings count by the piece, the truce keeps spears down", () => {
   const g = newGame(), p = g.player, world = g.world;
   // Four Orders × three tiers × ten pieces, and a cape each; a hall each with its altar and its god's statue, small and large.
-  assert.equal(ITEM_LIST.filter(item => orderOf(item.id)).length, 5 * 3 * 10 + 5);
+  assert.equal(ITEM_LIST.filter(item => orderOf(item.id)).length, 6 * 3 * 10 + 6);
   for (const id of ORDER_IDS) {
     const order = ORDERS[id];
     assert(world.objects.some(o => o.kind === "altar" && o.name === `${order.name} altar` && o.text === id), `${order.short} altar`);
     assert.equal(world.objects.filter(o => o.decor === order.statue).length, 2, `${order.god}'s statues`);
-    for (const npc of ["commander", "quartermaster", "guard"]) assert(g.npcs.some(entry => entry.id === `${id}_${npc}`), `${id} ${npc}`);
+    for (const npc of [order.leader, `${id}_quartermaster`, `${id}_guard`]) assert(g.npcs.some(entry => entry.id === npc), `${id} ${npc}`);
     assert(shopProblem(g, `${id}_armoury`), "closed before the oath");
   }
   assert(ITEM_LIST.find(item => item.id === "diamond_paladin_body").equip.holy && ITEM_LIST.find(item => item.id === "ink_oath_staff").equip.staff && ITEM_LIST.find(item => item.id === "hood_knight_greatmace").equip.twoHanded, "blessed, a staff, two-handed");
@@ -2466,4 +2467,67 @@ test("The Deadwood's eternal night, and coffers that fill once an hour", () => {
   assert(inDeadwood(world, 290, 60) && !inDeadwood(world, 121 + MAINLAND.x, 118 + MAINLAND.y), "the wood and the square");
   assert.equal(gloomAt(world, 290, 60), 1, "deep in the wood it is full night"); assert.equal(gloomAt(world, 121 + MAINLAND.x, 118 + MAINLAND.y), 0, "no cloud over Friendhollow");
   const edge = gloomAt(world, 300, 128); assert(edge >= 0 && edge < 1, `the cloud thins at the wood's edge (${edge})`);
+});
+
+test("Return of Raria: the far west, the Burned, sealed Order looks, Adventurer Cards, the Regiment's writ and the Wise Friend's Law, all saved", async () => {
+  const { CARDS, cardFound, codexTick } = await import("../games/rarefriends-realm/codex.ts");
+  const { BURNED_BUILDS } = await import("../games/rarefriends-realm/factions.ts");
+  const { CARD_OPTIONS: OPTIONS, cardUnlocked: unlocked } = await import("../games/rarefriends-realm/cardstyle.ts");
+  const { setLaw } = await import("../games/rarefriends-realm/state.ts");
+  const { SPELLS, PRAYERS, spellInBook, RARIAN_SPELL_TABS } = await import("../games/rarefriends-realm/data.ts");
+  const g = newGame(), p = g.player, world = g.world;
+  // The Vigil Aegis, by name, an aegis to look at.
+  assert.equal(item("vigil_shield").name, "Vigil Aegis"); assert.equal(item("vigil_shield").icon.shape, "aegis");
+  assert(!ITEM_LIST.some(entry => /vigil shield/i.test(entry.name) || /vigil shield/i.test(entry.examine)), "no Vigil Shield left anywhere");
+  // The far west: four regions with land in them, Raria's palace in the middle of its walls, the Federation's fortress, BarkReach's camps.
+  for (const id of ["deep_westmarch", "free_marches", "barkreach", "raria"]) {
+    const index = REGIONS.findIndex(region => region.id === id); let land = 0;
+    for (let i = 0; i < world.region.length; i++) if (world.region[i] === index && ![T.WATER, T.DEEP, T.VOID].includes(world.tiles[i])) land++;
+    assert(land > 800, `${id} has land (${land})`);
+  }
+  const palace = world.buildings.find(b => b.name === "The Palace of Raria"); assert(palace, "the palace");
+  const walls = []; for (let x = 0; x < 60; x++) if (terrainAt(world, x, 212) === T.WALL) walls.push(x);
+  assert(Math.abs((palace.x0 + palace.x1) / 2 - (walls[0] + walls[walls.length - 1]) / 2) <= 1, "the palace is in the direct centre of the city");
+  for (const name of ["The Great Hall of the Federation", "The Wizard Tower", "The Library", "The Enchanted Forge", "The Experimental Laboratory", "The Strange Device Room", "The Storage Vaults", "The Artisan Workshops", "The Heartwood Yard", "The Antler Lodge", "The Hall of the Order of Dusk", "The Chapel of the Law", "The Office of Conduct", "The Regimental Barracks"])
+    assert(world.buildings.some(b => b.name === name), name);
+  for (const id of ["queen_rara", "king_pell", "fellow_free", "dusk_prior", "raria_gate_captain", "hollowmere_officer", "fff_gatewarden"]) assert(g.npcs.some(npc => npc.id === id), `${id} is placed`);
+  assert(g.monsters.filter(m => m.def.id === "royal_ranger").length >= 6 && MONSTERS.royal_ranger.level >= 150, "Royal Rangers everywhere, and nobody to mess with");
+  // The Burned: every villager build and a knight, levels 54 to 69, faded red, round the Ember Fortress, and better drops the higher they are.
+  assert.equal(BURNED_BUILDS.length, 10);
+  const burned = BURNED_BUILDS.map(build => MONSTERS[`burned_${build}`]);
+  assert.equal(Math.min(...burned.map(m => m.level)), 54); assert.equal(Math.max(...burned.map(m => m.level)), 69);
+  assert(burned.every(m => m.undead && m.ink === "#6e2a24" && m.aggressive), "faded red undead");
+  const heart = m => m.drops.find(d => d.item === "ash_heart").chance; assert(heart(MONSTERS.burned_knight) > heart(MONSTERS.burned_slim) * 3, "drops climb with the level");
+  const ember = world.objects.find(o => o.name === "Order of the Ember altar");
+  for (const m of burned) assert(g.monsters.some(x => x.def === m && Math.hypot(x.x - ember.x, x.y - ember.y) < 50), `${m.name} walks the ash near the fortress`);
+  // Order looks are sealed until the leader is met; meeting the commander opens them, and that's saved.
+  const facet = OPTIONS.layout.find(o => o.id === "facet"); assert(facet && !unlocked(g, facet), "the Diamond's layout starts sealed");
+  assert(OPTIONS.layout.length >= 17 && OPTIONS.bg.length >= 27 && OPTIONS.frame.length >= 27, "many more looks");
+  const talkTo = id => { const npc = g.npcs.find(entry => entry.id === id); standNear(g, npc.x, npc.y, 1); setTarget(g, { kind: "npc", uid: npc.uid, option: "Talk-to" }); until(g, () => g.dialogue !== null, 30); g.dialogue = null; };
+  talkTo("diamond_commander"); assert(unlocked(g, facet), "met the Diamond's commander");
+  // Adventurer Cards: found by doing, not given; an Order's cards stay sealed until its leader is met.
+  assert(CARDS.length >= 120, `${CARDS.length} cards`);
+  const fresh = newGame(); codexTick(fresh); assert(!cardFound(fresh, "order_diamond") && !cardFound(fresh, "region_raria") && !cardFound(fresh, "person_queen_rara"), "nothing given");
+  codexTick(g); assert(cardFound(g, "order_diamond") && cardFound(g, "leader_diamond"), "the Diamond's cards after meeting its commander");
+  teleport(g, 26, 228); run(g, 30); assert(cardFound(g, "region_raria"), "walk into Raria, find its card");
+  // The Regiment: a checkpoint, a captain who writes writs; carrying one keeps the Regiment's halberds down.
+  const scout = g.monsters.find(m => m.def.id === "rrr_scout"); assert(scout && MONSTERS.rrr_scout.faction === "rrr");
+  talkTo("raria_gate_captain"); const captain = g.npcs.find(entry => entry.id === "raria_gate_captain"); standNear(g, captain.x, captain.y, 1);
+  setTarget(g, { kind: "npc", uid: captain.uid, option: "Talk-to" }); until(g, () => g.dialogue !== null, 30);
+  while (g.dialogue && g.dialogue.index < g.dialogue.lines.length) continueDialogue(g); chooseOption(g, g.dialogue.options.findIndex(o => o.label.startsWith("I'll do it."))); while (g.dialogue) continueDialogue(g);
+  assert.equal(p.quests.rrr_truce, 1); assert(has(p, "writ_of_passage") && has(p, "sealed_dispatch"), "a writ and a dispatch");
+  standNear(g, scout.x, scout.y, 2); p.combat = null; run(g, 12); assert(!scout.target, "the Regiment honours the writ");
+  // The Wise Friend's Law: Raria's Magic and Faith in place of the Old Friend's, a real swap, and the way back.
+  assert(SPELLS.filter(s => s.rarian).length >= 12 && PRAYERS.filter(pr => pr.rarian).length >= 8 && RARIAN_SPELL_TABS.length === 6);
+  assert(!spellInBook(SPELLS.find(s => s.id === "edict_of_silence"), false) && spellInBook(SPELLS.find(s => s.id === "edict_of_silence"), true), "Raria's edicts only in the Law's book");
+  assert(!spellInBook(SPELLS.find(s => s.id === "holy_dart"), true) && spellInBook(SPELLS.find(s => s.id === "ember_dart"), true), "the old light closed, common magic kept");
+  p.xp.prayer = XP_TABLE[60]; p.xp.magic = XP_TABLE[60]; p.prayer = 60; give(p, "law_sigil", 20); give(p, "thought_sigil", 10);
+  assert(canCast(g, SPELLS.find(s => s.id === "edict_of_silence")), "not before the Law");
+  setLaw(g, true); assert(p.rarian && !canCast(g, SPELLS.find(s => s.id === "edict_of_silence")), "castable under the Law");
+  togglePrayer(g, "first_law"); assert(p.prayers.includes("first_law")); togglePrayer(g, "paper_shield"); assert(!p.prayers.includes("paper_shield"), "the old prayers are closed while the Law is kept");
+  // Everything saved: cards, the Law, the meeting, the quest, the writ.
+  const back = newGame(); restore(back, serialize(g));
+  assert(back.player.rarian && back.player.cards.order_diamond && back.player.cards.region_raria && back.player.questData.met_diamond === 1 && back.player.quests.rrr_truce === 1 && has(back.player, "writ_of_passage"), "all of it persists");
+  assert(unlocked(back, facet), "the Diamond's layout stays open after a reload");
+  setLaw(g, false); assert(!p.rarian && p.prayers.length === 0, "set down, and the old book opens");
 });

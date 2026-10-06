@@ -54,7 +54,10 @@ export type DecorKind =
   | "flowers" | "bush" | "boulder" | "lamp" | "bench" | "crate" | "barrel" | "tent" | "cactus" | "pine" | "dead_tree" | "statue"
   | "grave" | "fence" | "reeds" | "table" | "bed" | "shelf" | "pillar" | "rubble" | "snowman" | "lily" | "banner" | "torch" | "palm" | "hay" | "windmill" | "boat" | "chest"
   | "throne" | "armour" | "logpile" | "stump" | "target" | "ruin_wall" | "old_friend" | "tomb" | "crypt" | "obelisk" | "bones" | "hearth" | "monument"
-  | "god_diamond" | "god_ink" | "god_sol" | "god_hood" | "god_ember";
+  | "god_diamond" | "god_ink" | "god_sol" | "god_hood" | "god_ember"
+  // Return of Raria: the Wise Friend and the Order of Dusk's god, and the things factions leave about.
+  | "god_dusk" | "wise_friend" | "cannon" | "device" | "wagon" | "watchtower" | "stake" | "plaque" | "banner_fff" | "banner_rrr" | "banner_hollowmere"
+  | "banner_diamond" | "banner_ink" | "banner_sol" | "banner_hood" | "banner_ember" | "banner_dusk";
 /** A monument's state: whole on its plinth, toppled and lying, broken off at the waist, or sunk to the chest in the ground. */
 export type MonumentState = "whole" | "toppled" | "broken" | "buried";
 export type WorldObject = {
@@ -89,7 +92,9 @@ export type RegionId =
   // The Rare Friends Ring (2026-10): the arena west of the Deadwood.
   | "friends_ring"
   // Two more dungeons (2026-10): one for new heroes, one for the middle levels.
-  | "root_cellars" | "mossy_undercroft";
+  | "root_cellars" | "mossy_undercroft"
+  // Return of Raria (2026-10): the far west.
+  | "deep_westmarch" | "free_marches" | "barkreach" | "raria";
 export type Region = { id: RegionId; name: string; label: { x: number; y: number }; danger: number; underground?: boolean };
 const MAINLAND_REGIONS = new Set<RegionId>(["coast", "friendhollow", "farmland", "whisperwood", "ashen_hills", "emberforge", "frostpeak", "glass_lake", "pale_dunes", "oasis", "murkmire", "mossy_ruins",
   "wizards_tower", "wyrmreach", "fernwick", "greyhorn", "highcairn", "crypt", "hollow_depths"]);
@@ -140,6 +145,11 @@ export const REGIONS: readonly Region[] = [
   { id: "friends_ring", name: "The Rare Friends Ring", label: { x: 214, y: 72 }, danger: 0 },
   { id: "root_cellars", name: "The Root Cellars", label: { x: 436, y: 566 }, danger: 1, underground: true },
   { id: "mossy_undercroft", name: "The Mossy Undercroft", label: { x: 508, y: 566 }, danger: 2, underground: true },
+  // Return of Raria: Deep Westmarch (the border), the Free Marches (the Federation's), BarkReach (the wood) and Raria (the kingdom beyond the Drakespine).
+  { id: "deep_westmarch", name: "Deep Westmarch", label: { x: 44, y: 296 }, danger: 3 },
+  { id: "free_marches", name: "The Free Marches", label: { x: 42, y: 390 }, danger: 2 },
+  { id: "barkreach", name: "BarkReach", label: { x: 112, y: 372 }, danger: 2 },
+  { id: "raria", name: "Raria", label: { x: 26, y: 180 }, danger: 1 },
 ];
 export const regionIndex = (id: RegionId) => REGIONS.findIndex(region => region.id === id);
 /** The mainland regions' labels were written in the mainland's own coordinates: move them with it (once, at load). */
@@ -173,7 +183,7 @@ export type World = {
   buildingAt: Uint8Array;
   /** Ground height (world pixels) at every tile corner: (W + 1) × (H + 1), corner (i, j) sits at (i − ½, j − ½). */
   heights: Float32Array;
-  places: Record<"spawn" | "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier" | "crypt" | "depths" | "king" | "fernwick" | "highcairn" | "dawnhold" | "gravesend" | "saltmarrow" | "hollyhock" | "dyemoor" | "tallgrass" | "cragmaw" | "quillhaven" | "ashfall" | "ring", { x: number; y: number }>;
+  places: Record<"spawn" | "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier" | "crypt" | "depths" | "king" | "fernwick" | "highcairn" | "dawnhold" | "gravesend" | "saltmarrow" | "hollyhock" | "dyemoor" | "tallgrass" | "cragmaw" | "quillhaven" | "raria" | "fff_fortress" | "barkreach" | "ashfall" | "ring", { x: number; y: number }>;
 };
 
 function mulberry(seed: number) {
@@ -1241,7 +1251,7 @@ export function createWorld(seed = 20260927): World {
   const places = Object.fromEntries(Object.entries(main.places).map(([key, at]) => { const [x, y] = mainlandToWorld(at.x, at.y); return [key, { x, y }]; })) as World["places"];
   // Where the wider world's glides land (and two mainland towns that never had one): a village square, a courtyard, a camp.
   const m = (x: number, y: number) => { const [wx, wy] = mainlandToWorld(x, y); return { x: wx, y: wy }; };
-  Object.assign(places, { fernwick: m(36, 72), highcairn: m(282, 84), dawnhold: m(316, 82), gravesend: { x: 300, y: 136 }, ring: { x: ARENA.lobby.x, y: ARENA.lobby.y }, saltmarrow: { x: 424, y: 466 }, hollyhock: { x: 160, y: 452 }, dyemoor: { x: 254, y: 470 }, tallgrass: { x: 556, y: 402 }, cragmaw: { x: 632, y: 204 }, quillhaven: { x: 646, y: 404 }, ashfall: { x: 72, y: 128 } });
+  Object.assign(places, { fernwick: m(36, 72), highcairn: m(282, 84), dawnhold: m(316, 82), gravesend: { x: 300, y: 136 }, ring: { x: ARENA.lobby.x, y: ARENA.lobby.y }, raria: { x: 26, y: 228 }, fff_fortress: { x: 40, y: 418 }, barkreach: { x: 112, y: 382 }, saltmarrow: { x: 424, y: 466 }, hollyhock: { x: 160, y: 452 }, dyemoor: { x: 254, y: 470 }, tallgrass: { x: 556, y: 402 }, cragmaw: { x: 632, y: 204 }, quillhaven: { x: 646, y: 404 }, ashfall: { x: 72, y: 128 } });
   // The wider world around it.
   const ctx: GenContext = { W, H, tiles, region, objectAt, lift, objects, spawns, buildings, doorways: [], random: mulberry(seed + 4242), noise: makeNoise(seed + 11, 9), noise2: makeNoise(seed + 19, 4) };
   buildExpansion(ctx, worldTools(ctx), seed);
@@ -1254,9 +1264,10 @@ const i2 = (random: () => number) => random() > 0.5;
 const SIDES = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
 /** Faded roof tiles in the Rare Friends accents. */
 const ROOF_COLORS = ["#c99a96", "#9aab92", "#8f9cb2", "#cdb98a", "#a996b5"];
-const TREE_NAMES: Record<TreeKind, string> = { tree: "Tree", oak: "Oak", willow: "Willow", maple: "Maple tree", yew: "Yew", ashwood: "Ashwood", palm: "Palm tree", pine: "Pine tree", deadwood: "Dead tree" };
+const TREE_NAMES: Record<TreeKind, string> = { tree: "Tree", oak: "Oak", willow: "Willow", maple: "Maple tree", yew: "Yew", ashwood: "Ashwood", palm: "Palm tree", pine: "Pine tree", deadwood: "Dead tree", redwood: "Redwood", ironbark: "Ironbark" };
 const DECOR_NAMES: Record<DecorKind, string> = {
   monument: "Statue", god_diamond: "Statue of the Good Friend", god_ink: "Statue of the Squid Friend", god_sol: "Statue of the Weird Friend", god_hood: "Statue of the Hood Friend", god_ember: "The Ember, in its brazier",
+  god_dusk: "Statue of the Wise Friend, blindfolded", wise_friend: "The Wise Friend", cannon: "Magical cannon", device: "Federation device", wagon: "Supply wagon", watchtower: "Watchtower", stake: "Stake wall", plaque: "Inscribed plaque", banner_fff: "The Federation's banner", banner_rrr: "The Regiment's banner", banner_hollowmere: "Hollowmere's banner", banner_diamond: "The Order of the Diamond's banner", banner_ink: "The Order of the Ink's banner", banner_sol: "The Order of the Sol's banner", banner_hood: "The Order of the Hood's banner", banner_ember: "The Order of the Ember's banner", banner_dusk: "The Order of Dusk's banner",
   flowers: "Flowers", bush: "Bush", boulder: "Boulder", lamp: "Lamp post", bench: "Bench", crate: "Crate", barrel: "Water barrel", tent: "Tent",
   cactus: "Cactus", pine: "Pine tree", dead_tree: "Dead tree", statue: "Statue", grave: "Grave", fence: "Fence", reeds: "Reeds", table: "Table",
   bed: "Bed", shelf: "Shelves", pillar: "Pillar", rubble: "Rubble", snowman: "Snow Friend", lily: "Lily pad", banner: "Banner", torch: "Torch",

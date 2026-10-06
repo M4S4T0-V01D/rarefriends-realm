@@ -15,7 +15,7 @@ import {
 } from "./engine.ts";
 import { PITCH, RENDER_PROFILE, VIEW, ZOOM, addPrint, daylight, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
 import {
-  BankModal, ChatBox, ContextMenu, DailyModal, FellowshipModal, HomeModal, JoinModal, RfActionModal, FirstStepsCard, GuideModal, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, NamingModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
+  BankModal, CardsModal, ChatBox, ContextMenu, DailyModal, FellowshipModal, HomeModal, JoinModal, RfActionModal, FirstStepsCard, GuideModal, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, NamingModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
   cancelLongPress, longPress, rightClick, type MenuEntry, type Settings, type Tab,
 } from "./panels.tsx";
 import { REGULAR_SPRITES } from "./regulars.ts";
@@ -55,7 +55,7 @@ import "./style.css";
 export const RF_DISPLAY_DECIMALS = 15;
 const rf = (value: bigint) => `${formatGameAmount(value, RF_DISPLAY_DECIMALS)} RF`;
 type Phase = "loading" | "title" | "playing" | "failed";
-type Modal = "caskets" | "map" | "card" | "help" | null;
+type Modal = "caskets" | "map" | "card" | "cards" | "help" | null;
 type XpDrop = { id: number; skill: Skill; amount: number; at: number };
 type CasketResult = { play: bigint; outcomeId: number; wardrobe: string | null; coins: number; redeemed: boolean };
 const CANONICAL = new Map<number, GenerationSprites>(REGULAR_SPRITES.map(sprites => [Number(sprites.tokenId), sprites]));
@@ -334,6 +334,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         weather: (value: Weather | null) => { fixedWeather = value; },
         fireworks: () => { const state = game.current; if (state) celebrate(state.player.x, state.player.y, ["#e7a9b0", "#ebc26b", "#9fc6f0", "#b4d4a0"]); },
         graphics: (level: "auto" | "high" | "low") => setSettings({ ...live.current.settings, graphics: level === "low" ? "low" : "high" }),
+        /** How much your Friend talks (recordings keep it quiet). */
+        speech: (level: "full" | "reduced" | "rare" | "off") => setSettings({ ...live.current.settings, friendSpeech: level }),
         perf: () => ({ ms: Math.round(perf.ms * 100) / 100, fps: Math.round(1000 / perf.interval), quads: textureStats.last, parts: Object.fromEntries(Object.entries(RENDER_PROFILE).map(([k, v]) => [k, Math.round(v * 10) / 10])), low: isLow(live.current.settings) }),
         boss: (ms: number | null) => { bossClock = ms === null ? null : () => ms; const state = game.current; if (state && ms !== null) { updateWorldBoss(state, ms); refresh(); } },
         view: (zoom: number, pitch: number, angle = 0) => { setSettings({ ...live.current.settings, zoom }); camera.current.pitch = pitch; camera.current.angle = angle; cameraGoal.current = null; },
@@ -946,7 +948,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
                 if (linked.current) saveNow.current(true);
                 else message(state, "Saves aren't connected yet, so this restore isn't saved: keep playing in this tab and it saves once they connect. If Settings still says saves are off, reload the page and restore the code again.", "info");
               } return error; }} settings={settings} setSettings={setSettings}
-            friend={friend.current} trackName={audio.current?.trackName ?? ""} trackId={audio.current?.trackId ?? ""} playTrack={id => { audio.current?.play(id as TrackId); audio.current?.unlock(); setSettings({ ...settings, autoMusic: false }); }} openCard={openCard} openHelp={() => setModal("help")} paused={paused} saved={savedText}
+            friend={friend.current} trackName={audio.current?.trackName ?? ""} trackId={audio.current?.trackId ?? ""} playTrack={id => { audio.current?.play(id as TrackId); audio.current?.unlock(); setSettings({ ...settings, autoMusic: false }); }} openCard={openCard} openCards={() => setModal("cards")} openHelp={() => setModal("help")} paused={paused} saved={savedText}
             relicCounts={snapshot?.inventory.map(Number) ?? [0, 0, 0, 0]} openCaskets={() => setModal("caskets")} />
           {selection && <div className="realm-selection" role="status">{selection.kind === "item" ? `Use ${player.inventory[selection.slot] ? itemName(player.inventory[selection.slot]!.id) : "item"} ->` : `Cast ${SPELLS.find(spell => spell.id === selection.spell)?.name ?? "spell"} ->`} pick a target <button type="button" onClick={() => setSelection(null)}>Cancel</button></div>}
 
@@ -1029,6 +1031,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
                 <button type="button" disabled={busy || paused || !snapshot || snapshot.inventory[index] === 0n} onClick={() => void casket(() => client.redeem(index + 1, 1n))}>Redeem · {rf(outcome.reward)}</button></li>)}</ul>
             </Modal>
           )}
+          {modal === "cards" && <CardsModal game={state} onClose={() => setModal(null)} />}
           {modal === "map" && <WorldMapModal game={state} onClose={() => setModal(null)} onTravel={(x, y) => { setModal(null); walkTo(state, x, y); marker.current = { x, y, at: performance.now(), red: false }; refresh(); }} />}
           {modal === "help" && <HelpModal onClose={() => setModal(null)} />}
           {dailyTab && <DailyModal game={state} tab={dailyTab} onTab={setDailyTab} onClose={() => setDailyTab(null)} refresh={refresh} openMenu={(x, y, entries) => setMenu({ x, y, entries })}
@@ -1040,6 +1043,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
                 <button type="button" className="realm-primary" onClick={() => share("post")}>Post to X</button>
                 <button type="button" onClick={() => share("copy")}>Copy picture</button>
                 <button type="button" onClick={() => share("save")}>Save picture</button>
+                <button type="button" onClick={() => setModal("cards")}>Adventurer Cards</button>
               </div>
               {shareStatus && <p className="realm-note" role="status">{shareStatus}</p>}
               <div className="realm-card-styles">

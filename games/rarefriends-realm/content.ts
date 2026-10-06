@@ -11,6 +11,7 @@ import { friendSays, remember } from "./friend.ts";
 import { rumourAt } from "./rumours.ts";
 import { FOE_GROUPS, MATCHES, customMatch, entryFee, startMatch } from "./arena.ts";
 import { ORDERS, ORDER_IDS } from "./knights.ts";
+import { WEST_NPCS, WEST_QUESTS, onWestAltar, onWestKill, talkWest, westShopProblem } from "./raria.ts";
 import {
   addXp, combatLevel, count, give, giveOrDrop, has, level, message, sound, take, emit, BONE_BAG, ownsBoneBag, type Dialogue, type DialogueLine, type Game,
 } from "./state.ts";
@@ -38,8 +39,8 @@ export const NPCS: Record<string, NpcDef> = {
   ring_quartermaster: { id: "ring_quartermaster", name: "The Pit Quartermaster", examine: "Takes bloodmarks and nothing else. Sells the Ring's own armour.", options: ["Talk-to", "Trade"], shop: "ring_pit", art: art(0, 707) },
   ring_champion: { id: "ring_champion", name: "Laurel Keeper Ismay", examine: "Keeps the Champions' Hall. Takes laurels, the coin of Friend Fights.", options: ["Talk-to", "Trade"], shop: "ring_champions", art: art(7, 708) },
   // The four Orders (2026-10): commanders, quartermasters and guards, all on the knights' stout frame.
-  ...Object.fromEntries(ORDER_IDS.flatMap(id => { const order = ORDERS[id], seed = { diamond: 800, ink: 810, sol: 820, hood: 830, ember: 850 }[id]; return [
-    [`${id}_commander`, { id: `${id}_commander`, name: { diamond: "Commander Isolde Vane", ink: "Commander Ottavio Inkwell", sol: "Commander Sunniva Brightmoor", hood: "Commander Robyn Greenleaf", ember: "Commander Brannoch Ashward" }[id], examine: `Commander of the ${order.name}. Swears in those who prove their faith.`, options: ["Talk-to"], art: art(10, seed) }],
+  ...Object.fromEntries(ORDER_IDS.filter(id => !ORDERS[id].city).flatMap(id => { const order = ORDERS[id], seed = ({ diamond: 800, ink: 810, sol: 820, hood: 830, ember: 850 } as Record<string, number>)[id] ?? 860; return [
+    [`${id}_commander`, { id: `${id}_commander`, name: order.leaderName, examine: `Commander of the ${order.name}. Swears in those who prove their faith.`, options: ["Talk-to"], art: art(10, seed) }],
     [`${id}_quartermaster`, { id: `${id}_quartermaster`, name: `${order.short} quartermaster`, examine: `Keeps the ${order.name}'s armoury. Sells to the sworn.`, options: ["Talk-to", "Trade"], shop: `${id}_armoury`, art: art(10, seed + 1) }],
     [`${id}_guard`, { id: `${id}_guard`, name: `${order.short} knight`, examine: `A knight of the ${order.name}, in its colours.`, options: ["Talk-to"], art: art(10, seed + 2) }],
   ]; })),
@@ -47,6 +48,7 @@ export const NPCS: Record<string, NpcDef> = {
   maiden_matriarch: { id: "maiden_matriarch", name: "Matriarch Ysolde Thornveil", examine: "Leads the Deadwood Maidens. Has buried more of the dead than Gravesend has.", options: ["Talk-to"], art: art(3, 840) },
   maiden_trader: { id: "maiden_trader", name: "Wren of the Maidens", examine: "Keeps the Maidens' market: what the Deadwood gives up, and what they take from its dead.", options: ["Talk-to", "Trade"], shop: "maidens_market", art: art(3, 841) },
   maidens_villager: { id: "maidens_villager", name: "Deadwood Maiden", examine: "A Maiden off watch. Still armed.", options: ["Talk-to"], art: art(9, 842) },
+  ...WEST_NPCS,
   mender: { id: "mender", name: "Mender Hale", examine: "The chapel's mender. Her hands are always clean and her apron never is.", options: ["Talk-to", "Trade"], shop: "mender", art: art(3, 318) },
   // The wider world's villages (2026-10). Each village's people wear its own clothes (NPC_WEAR / regionalLook in render.ts).
   gravesend_keeper: { id: "gravesend_keeper", name: "Warden Mira Thorne", examine: "Gravesend's gravekeeper. She knows every name on every stone.", options: ["Talk-to"], art: art(2, 501) },
@@ -144,8 +146,8 @@ export const npcDef = (id: string) => NPCS[id];
 
 // ---------- Quests ----------
 export type QuestDef = { id: string; name: string; points: number; difficulty: string; start: string; requirements: string[]; rewards: string[]; journal: (game: Game) => string[] };
-const stage = (game: Game, quest: string) => game.player.quests[quest] ?? 0;
-const data = (game: Game, key: string) => game.player.questData[key] ?? 0;
+export const stage = (game: Game, quest: string) => game.player.quests[quest] ?? 0;
+export const data = (game: Game, key: string) => game.player.questData[key] ?? 0;
 export const QUESTS: readonly QuestDef[] = [
   {
     id: "friends_feast", name: "A Friend's Feast", points: 1, difficulty: "Novice", start: "Talk to Cook Mabel in the castle kitchen.", requirements: [], rewards: ["1 Quest Point", "1,500 Cooking XP", "300 coins", "2 cakes"],
@@ -445,6 +447,8 @@ export const QUESTS: readonly QuestDef[] = [
       return ["The Maidens keep the truce. Their spears stay down for me, and Wren's market is open. QUEST COMPLETE!"];
     },
   },
+  // ---------- Return of Raria: Hollowmere's watch, the Federation, BarkReach and Raria ----------
+  ...WEST_QUESTS,
   // ---------- The quests of being known: long ones, for Presence, with gear only they give ----------
   {
     id: "name_worth_knowing", name: "A Name Worth Knowing", points: 2, difficulty: "Long", start: "Talk to Namekeeper Elian by the Friendhollow square, once your Presence is 20 and your Friend has a name.",
@@ -498,7 +502,7 @@ const faithArmed = (game: Game) => !!(game.player.equipment.weapon && item(game.
 export const questDone = (game: Game, quest: string) => stage(game, quest) >= finalStage(quest);
 export const MAX_QUEST_POINTS = QUESTS.reduce((sum, quest) => sum + quest.points, 0);
 
-function completeQuest(game: Game, quest: string) {
+export function completeQuest(game: Game, quest: string) {
   game.player.quests[quest] = finalStage(quest);
   const definition = QUESTS.find(entry => entry.id === quest)!;
   message(game, `Congratulations! Quest complete: ${definition.name}. Rewards: ${definition.rewards.join(", ")}.`, "quest");
@@ -508,15 +512,16 @@ function completeQuest(game: Game, quest: string) {
 }
 
 // ---------- Dialogue helpers ----------
-const npcSays = (npc: string, ...texts: string[]): DialogueLine[] => texts.map(text => ({ who: "npc", text, npc }));
-const playerSays = (...texts: string[]): DialogueLine[] => texts.map(text => ({ who: "player", text }));
-function chat(npc: string, lines: DialogueLine[], options?: Dialogue["options"], onEnd?: () => void): Dialogue {
+export const npcSays = (npc: string, ...texts: string[]): DialogueLine[] => texts.map(text => ({ who: "npc", text, npc }));
+export const playerSays = (...texts: string[]): DialogueLine[] => texts.map(text => ({ who: "player", text }));
+export function chat(npc: string, lines: DialogueLine[], options?: Dialogue["options"], onEnd?: () => void): Dialogue {
   return { npc, lines, index: 0, options, onEnd };
 }
 
 /** Pickpocket and quest hooks the engine calls. */
 export function onMonsterKilled(game: Game, monsterId: string, x: number, y: number) {
   const player = game.player;
+  onWestKill(game, monsterId);
   // The wider world's village quests count their kills wherever they fall.
   const tally = (quest: string, key: string, goal: number, done: string) => {
     if (stage(game, quest) !== 1) return;
@@ -575,6 +580,7 @@ export function searchWell(game: Game) {
 /** The crypt: searching the old chest and blessing the altar. */
 /** Why a shop won't sell to you (the Orders' armouries before the oath, the Maidens' market before the truce), or null. */
 export function shopProblem(game: Game, shopId: string): string | null {
+  const west = westShopProblem(game, shopId); if (west) return west;
   const order = ORDER_IDS.find(id => shopId === `${id}_armoury`);
   if (order && !questDone(game, `oath_${order}`)) return `The quartermaster won't sell to one who hasn't sworn the ${ORDERS[order].short} Oath. The commander will hear you.`;
   if (shopId === "maidens_market" && !questDone(game, "maidens_truce")) return "Wren's hand stays on her spear. The Maidens trade with those who keep the truce; speak to the matriarch.";
@@ -594,6 +600,7 @@ export function onBonesOffered(game: Game, chapel: boolean) {
 }
 /** Praying at an altar: the Pilgrim's Road counts the old altars of the Realm. */
 export function onAltarPrayed(game: Game, altar: { name: string; text?: string }) {
+  onWestAltar(game, altar);
   if (altar.text && (ORDER_IDS as readonly string[]).includes(altar.text) && !data(game, `prayed_${altar.text}`)) { game.player.questData[`prayed_${altar.text}`] = 1; if (stage(game, `oath_${altar.text}`) === 1) { message(game, `You kneel at the ${ORDERS[altar.text as keyof typeof ORDERS].short} altar. The oath wants its gift too.`, "quest"); } }
   if (stage(game, "pilgrims_road") !== 1) return;
   const stop = PILGRIM_ALTARS.find(([, name]) => name === altar.name);
@@ -667,7 +674,7 @@ function orderDialogue(game: Game, npc: string, name: string): Dialogue {
   if (count(player, order.item) >= order.n) return chat(name, npcSays(name, `${orderText(order)}! ${patron.thanks}`), undefined, () => { fillOrder(game, npc); });
   return chat(name, npcSays(name, askText(npc, order), `I'll pay ${order.pay.toLocaleString()} coins, well over what any shop gives, and you'll be the better ${SKILL_NAMES[patron.skill].toLowerCase() === "wayfaring" ? "for it" : "at it"}.`));
 }
-function fetchQuest(game: Game, name: string, quest: string, q: { offer: string[]; accept: string; progress: string; have: () => boolean; take: () => void; done: string[]; reward: () => void; onAccept?: () => void }): Dialogue {
+export function fetchQuest(game: Game, name: string, quest: string, q: { offer: string[]; accept: string; progress: string; have: () => boolean; take: () => void; done: string[]; reward: () => void; onAccept?: () => void }): Dialogue {
   const s = stage(game, quest), def = QUESTS.find(entry => entry.id === quest)!;
   if (s === 0) return chat(name, npcSays(name, ...q.offer), [
     { label: "I'll do it.", then: () => chat(name, npcSays(name, q.accept), undefined, () => { game.player.quests[quest] = 1; q.onAccept?.(); message(game, `Quest started: ${def.name}.`, "quest"); sound(game, "quest"); }) },
@@ -716,6 +723,7 @@ export function talk(game: Game, npcId: string): Dialogue {
 }
 function talkInner(game: Game, npcId: string): Dialogue {
   const player = game.player, def = NPCS[npcId.split(":")[0]], name = def.name;
+  const west = talkWest(game, npcId, name); if (west) return west;
   switch (npcId) {
     case "slayer_master:assignment": case "slayer_master": {
       const task = currentTask(game);
@@ -1122,6 +1130,8 @@ function talkInner(game: Game, npcId: string): Dialogue {
     }
     case "diamond_commander": case "ink_commander": case "sol_commander": case "hood_commander": case "ember_commander": {
       const order = ORDERS[npcId.split("_")[0] as keyof typeof ORDERS];
+      // Meeting the Order's leader opens its content: its cards, its card looks. Persisted.
+      player.questData[`met_${order.id}`] = 1;
       if (level(game, "prayer") < 20 && stage(game, `oath_${order.id}`) === 0) return chat(name, npcSays(name, `${order.godText}`, "Grow in faith first (Faith 20), and we'll talk of oaths."));
       return fetchQuest(game, name, `oath_${order.id}`, {
         offer: [order.godText, `To swear the ${order.short} Oath, kneel at our altar, and bring ${order.oath.text}.`],
@@ -1159,7 +1169,7 @@ function talkInner(game: Game, npcId: string): Dialogue {
     case "royal_guard": return chat(name, npcSays(name, (["The King is receiving visitors. Mind your manners.", "The view from the roof? Best in the Realm. Stairs in the north-east tower.", "No running in the throne room."] as const)[Math.floor(game.rng() * 3)]));
     case "king": {
       const talk: Dialogue["options"] = [
-        { label: "Who are you?", then: () => chat(name, npcSays(name, "Hollis, King of Friendhollow, by the grace of the First Friend and a very close vote.", "This was a hall, once. Then it grew towers. Then it grew me.")) },
+        { label: "Who are you?", then: () => chat(name, npcSays(name, "Hollis, King of Hollowmere, by the grace of the First Friend and a very close vote. Friendhollow's the town; Hollowmere's the kingdom, from the coast to Westwatch. Nobody calls it that but the clerks and the soldiers.", "This was a hall, once. Then it grew towers. Then it grew me.")) },
         { label: "Tell me about the Realm.", then: () => chat(name, npcSays(name, "North: the Ashen Hills and the Emberforge. East: the Oasis and Glass Lake. South: the Mossy Ruins, and under them...",
           questDone(game, "hollow_king") ? "Nothing, now. You saw to that." : "Something hollow that wants a throne. Old Glimmer, by the fountain, knows more than I do.")) },
         { label: "Can I help the kingdom?", then: () => chat(name, npcSays(name, QUESTS.every(quest => questDone(game, quest.id)) ? "You already have, in every way I can think of. Rest a while." :
@@ -1168,6 +1178,8 @@ function talkInner(game: Game, npcId: string): Dialogue {
           if (has(player, "wyrmward_shield") || player.equipment.shield === "wyrmward_shield") return chat(name, npcSays(name, "You already carry one of my shields. Keep it between you and the fire."));
           return chat(name, npcSays(name, "Dragons! Then take this. A Wyrmward shield: it turns their breath to a warm breeze. Mostly."), undefined, () => { giveOrDrop(game, "wyrmward_shield"); message(game, "King Hollis hands you a Wyrmward shield.", "quest"); });
         } },
+        { label: "What is Raria?", then: () => chat(name, npcSays(name, "I wish I knew. My grandfather's maps show nothing past the Drakespine but drakes. My captain's map shows a city. Nobody saw them build it, nobody saw them march in, and their soldiers were dug in before we knew their name.",
+          "The castle was built facing west. Against something. The masons' book says only 'against the return'. I used to think that was poetry.", questDone(game, "west_watch") ? "You've walked out there. You've seen it. Tell me: does it look new to you?" : "Captain Ashby by the square wants someone to walk west and look. I'd take it as a kindness.")) },
         ...(questDone(game, "known_hall") && (stage(game, "the_remembered") > 0 || presenceLevel(player) >= 60) ? [{ label: stage(game, "the_remembered") === 0 ? "They say the Realm forgets." : "About being remembered…", then: () => theRemembered(game, name) }] : []),
         { label: "Goodbye, Your Majesty.", then: () => null },
       ];

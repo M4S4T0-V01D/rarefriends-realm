@@ -1,7 +1,7 @@
 /** The Realm's interface: side tabs, chat and dialogue, bank, shops, production, map and more. */
 import React, { useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import type { GenerationSprites } from "@rarefriends/friendsdk/sprites";
-import { SPELL_TABS, type Spell, ITEM_LIST, isItem,
+import { SPELL_TABS, RARIAN_SPELL_TABS, spellInBook, MONSTERS, type Spell, ITEM_LIST, isItem,
   EMOTES, EQUIP_SLOTS, FAMILY_NAMES, FAMILY_PERKS, PRAYERS, RELICS, SHOPS, SKILLS, SKILL_ICONS, SKILL_NAMES, SPELLS, WARDROBE, XP_TABLE, item, levelForXp,
   type EquipSlot, type Skill, mountDef, PETS,
 } from "./data.ts";
@@ -13,7 +13,10 @@ import { bossWindow } from "./worldboss.ts";
 import { ACHIEVEMENTS, achieved } from "./achievements.ts";
 import { hiscores } from "./hiscores.ts";
 import { petArt } from "./petart.ts";
-import { MAX_QUEST_POINTS, NPCS, QUESTS, finalStage, questPoints, type QuestDef } from "./content.ts";
+import { MAX_QUEST_POINTS, NPCS, QUESTS, finalStage, questDone, questPoints, type QuestDef } from "./content.ts";
+import { CARDS, CARD_KINDS, CARD_KIND_NAMES, cardFound, cardsFound, orderOpen, type CardDef } from "./codex.ts";
+import { decorArt } from "./scenery.ts";
+import { setLaw } from "./state.ts";
 import { friendSays, remember } from "./friend.ts";
 import { FELLOWSHIP_COST, FELLOWSHIP_JOIN_COST, FELLOWSHIP_RENAME_COST, NAME_MAX, RENAME_COST, TITLES, chooseTitle, cleanName, cleanTag, joinFellowship, leaveFellowship, nameFriend, profile, renameFellowship, setFellowshipLook, unlockedTitles } from "./presence.ts";
 import { DEFAULT_FELLOWSHIP_COLORS, FELLOWSHIP_BANNERS, FELLOWSHIP_LOGOS, INVITE_HOURS, daysSince, previewArt } from "./cardstyle.ts";
@@ -36,7 +39,7 @@ import type { NetState } from "./net.ts";
 import type { TradeView } from "./trade.ts";
 import { recipeBook, skillGuide } from "./guide.ts";
 import { artUrl, emoteArt, itemArt, orbArt, prayerArt, skillArt, spellArt, tabArt, type TabIcon } from "./icons.ts";
-import { friendSprite } from "./sprites.ts";
+import { creatureSprite, friendSprite } from "./sprites.ts";
 import { figureArt } from "./wardrobe.ts";
 import { TRACKS } from "./audio.ts";
 
@@ -127,7 +130,7 @@ export type PanelProps = {
   game: Game; tab: Tab; setTab: (tab: Tab) => void; selection: Selection; setSelection: (selection: Selection) => void;
   openMenu: (x: number, y: number, entries: MenuEntry[]) => void; refresh: () => void; roster: readonly OwnedFriend[]; rosterState: "waiting" | "ready" | "none";
   friendSprites: ReadonlyMap<number, GenerationSprites>; loadFriend: (id: number) => void; settings: Settings; setSettings: (settings: Settings) => void;
-  friend: GenerationSprites | null; trackName: string; trackId: string; playTrack: (id: string) => void; openCard: () => void; openHelp: () => void; paused: boolean; saved: string; relicCounts: readonly number[]; openCaskets: () => void;
+  friend: GenerationSprites | null; trackName: string; trackId: string; playTrack: (id: string) => void; openCard: () => void; openCards?: () => void; openHelp: () => void; paused: boolean; saved: string; relicCounts: readonly number[]; openCaskets: () => void;
   /** Playing together: who's around, and the friends list. */
   /** The skill guide (a skill) or the recipe book (null). */
   openGuide?: (skill: Skill | null) => void;
@@ -362,7 +365,7 @@ let pressTimer: ReturnType<typeof setTimeout> | null = null;
 export function longPress(action: () => void) { cancelLongPress(); pressTimer = setTimeout(() => { pressTimer = null; action(); }, 450); }
 export function cancelLongPress() { if (pressTimer) clearTimeout(pressTimer); pressTimer = null; }
 const SLOT_NAMES: Record<EquipSlot, string> = { head: "Head", cape: "Cape", neck: "Neck", weapon: "Weapon", body: "Body", shield: "Shield", legs: "Legs", hands: "Hands", feet: "Feet", belt: "Belt", ring: "Ring" };
-function EquipmentTab({ game, refresh, openCard, openMenu }: PanelProps) {
+function EquipmentTab({ game, refresh, openCard, openCards, openMenu }: PanelProps) {
   const player = game.player, total = bonuses(player);
   const layout: (EquipSlot | null)[] = [null, "head", null, "cape", "neck", "ring", "weapon", "body", "shield", null, "legs", "belt", "hands", "feet", null];
   return (
@@ -388,39 +391,59 @@ function EquipmentTab({ game, refresh, openCard, openMenu }: PanelProps) {
       </dl>
       {heft(player) > 0 && <p className="realm-note">Heft: your Strength adds <b>+{heft(player)}</b> to your two-handed weapon's strength bonus (1% for every two levels).</p>}
       <button type="button" className="realm-wide" onClick={openCard}>Adventurer card · Share on X</button>
+      {openCards && <button type="button" className="realm-wide" onClick={openCards}>Adventurer Cards · {cardsFound(game)}/{CARDS.length} found</button>}
     </div>
   );
 }
 const signed = (n: number) => (n >= 0 ? `+${n}` : String(n));
-function PrayerTab({ game, refresh, openMenu }: PanelProps) {
-  const player = game.player, level = levelForXp(player.xp.prayer), [hover, setHover] = useState<string | null>(null);
+/** The Wise Friend's Law over a tab (Return of Raria): the closed eye, the doctrine, and the way back to the old book. */
+function LawHeader({ game, refresh, faith }: { game: Game; refresh: () => void; faith: boolean }) {
+  const player = game.player, received = questDone(game, "wise_friends_law");
+  if (!player.rarian) return received ? <button type="button" className="realm-law-keep" onClick={() => { setLaw(game, true); refresh(); }}>Keep the Wise Friend's Law</button> : null;
   return (
-    <div>
-      <p className="realm-muted">Faith: <b>{Math.ceil(player.prayer)}</b> / {maxPrayer(player)} · Bonus {signed(bonuses(player).prayer)}</p>
+    <div className="realm-law-head">
+      <span className="realm-law-eye" aria-hidden="true" />
+      <b>{faith ? "The Commandments of the Law" : "The Book of the Law"}</b>
+      <small>{faith ? "Obey, and be wise. The Law is kept here in place of prayer; the rites stand in place of the light." : "Edicts, judgements, vigils, offices and summons: magic as Raria keeps it, a rite with a staff in it."}</small>
+      <button type="button" onClick={() => { setLaw(game, false); refresh(); }}>Set down the Law</button>
+    </div>
+  );
+}
+function PrayerTab({ game, refresh, openMenu }: PanelProps) {
+  const player = game.player, level = levelForXp(player.xp.prayer), [hover, setHover] = useState<string | null>(null), rarian = player.rarian;
+  const prayers = PRAYERS.filter(prayer => !!prayer.rarian === rarian);
+  return (
+    <div className={rarian ? "realm-rarian" : undefined}>
+      <LawHeader game={game} refresh={refresh} faith />
+      <p className="realm-muted">{rarian ? "Devotion" : "Faith"}: <b>{Math.ceil(player.prayer)}</b> / {maxPrayer(player)} · Bonus {signed(bonuses(player).prayer)}</p>
       <div className="realm-icon-grid prayers">
-        {PRAYERS.map(prayer => (
+        {prayers.map(prayer => (
           <button key={prayer.id} type="button" aria-pressed={player.prayers.includes(prayer.id)} disabled={level < prayer.level} aria-label={`${prayer.name} (level ${prayer.level}): ${prayer.description}`}
             onMouseEnter={() => setHover(prayer.id)} onFocus={() => setHover(prayer.id)} onClick={() => { togglePrayer(game, prayer.id); refresh(); }}
-            {...rightClick(openMenu, () => [{ verb: player.prayers.includes(prayer.id) ? "Deactivate" : "Activate", noun: prayer.name, run: () => { togglePrayer(game, prayer.id); refresh(); } }, { verb: "Examine", noun: prayer.name, run: () => { message(game, `${prayer.name}: ${prayer.description} (level ${prayer.level}).`); refresh(); } }])}>
+            {...rightClick(openMenu, () => [{ verb: player.prayers.includes(prayer.id) ? (rarian ? "Release" : "Deactivate") : (rarian ? "Keep" : "Activate"), noun: prayer.name, run: () => { togglePrayer(game, prayer.id); refresh(); } }, { verb: "Examine", noun: prayer.name, run: () => { message(game, `${prayer.name}: ${prayer.description} (level ${prayer.level}).`); refresh(); } }])}>
             <PixelIcon art={prayerArt(prayer.id)} size={36} />
           </button>
         ))}
       </div>
-      <InfoCard>{(() => { const prayer = PRAYERS.find(entry => entry.id === hover); return prayer ? <><b>{prayer.name}</b> <small>Level {prayer.level}</small><p>{prayer.description}. Drains {Math.round(prayer.drain * 100) / 100} points a tick.</p></> : <p>Recharge at any altar. Bury bones to train Prayer.</p>; })()}</InfoCard>
+      <InfoCard>{(() => { const prayer = prayers.find(entry => entry.id === hover); return prayer ? <><b>{prayer.name}</b> <small>Level {prayer.level}</small><p>{prayer.description}. Drains {Math.round(prayer.drain * 100) / 100} points a tick.</p></>
+        : rarian ? <p>The Law is kept at the Wise Friend's altar in Raria, and at any altar besides: the Law uses what works. The Order of Dusk's gear slows the drain of every commandment.</p> : <p>Recharge at any altar. Bury bones to train Prayer.</p>; })()}</InfoCard>
     </div>
   );
 }
 const TARGET_HINT: Record<string, string> = { monster: "Cast on a monster", item: "Cast on an item in your pack", ground: "Cast on an item on the ground", self: "Casts straight away" };
 function MagicTab({ game, refresh, setSelection, selection, openMenu }: PanelProps) {
-  const player = game.player, staff = isStaffEquipped(player), [hover, setHover] = useState<string | null>(null), [tab, setTab] = useState(SPELL_TABS[0].id);
+  const player = game.player, staff = isStaffEquipped(player), [hover, setHover] = useState<string | null>(null), [tab, setTab] = useState(SPELL_TABS[0].id), rarian = player.rarian;
+  const TABS = rarian ? RARIAN_SPELL_TABS : SPELL_TABS, BOOK = SPELLS.filter(spell => spellInBook(spell, rarian));
   const levelFor = (spell: Spell) => levelForXp(player.xp[spell.skill ?? "magic"]);
-  const shown = SPELLS.find(spell => spell.id === (hover ?? (selection?.kind === "spell" ? selection.spell : player.autocast)));
-  const kinds = SPELL_TABS.find(entry => entry.id === tab)?.kinds ?? SPELL_TABS[0].kinds, spells = SPELLS.filter(spell => kinds.includes(spell.kind));
+  const shown = BOOK.find(spell => spell.id === (hover ?? (selection?.kind === "spell" ? selection.spell : player.autocast)));
+  // Raria's own edicts and rites come first in their tabs: the book is theirs now.
+  const kinds = TABS.find(entry => entry.id === tab)?.kinds ?? TABS[0].kinds, spells = BOOK.filter(spell => kinds.includes(spell.kind)).sort((a, b) => rarian ? Number(!!b.rarian) - Number(!!a.rarian) : 0);
   const learnt = (spell: Spell) => !spell.quest || (player.quests[spell.quest] ?? 0) >= 2;
   return (
-    <div>
-      <div className="realm-graphics realm-magic-tabs" role="tablist" aria-label="Spellbook">
-        {SPELL_TABS.map(entry => <button key={entry.id} type="button" role="tab" aria-selected={tab === entry.id} aria-checked={tab === entry.id} onClick={() => setTab(entry.id)}>{entry.name}<small>{SPELLS.filter(spell => entry.kinds.includes(spell.kind) && levelFor(spell) >= spell.level && learnt(spell)).length}/{SPELLS.filter(spell => entry.kinds.includes(spell.kind)).length}</small></button>)}
+    <div className={rarian ? "realm-rarian" : undefined}>
+      <LawHeader game={game} refresh={refresh} faith={false} />
+      <div className="realm-graphics realm-magic-tabs" role="tablist" aria-label={rarian ? "The Book of the Law" : "Spellbook"}>
+        {TABS.map(entry => <button key={entry.id} type="button" role="tab" aria-selected={tab === entry.id} aria-checked={tab === entry.id} onClick={() => setTab(entry.id)}>{entry.name}<small>{BOOK.filter(spell => entry.kinds.includes(spell.kind) && levelFor(spell) >= spell.level && learnt(spell)).length}/{BOOK.filter(spell => entry.kinds.includes(spell.kind)).length}</small></button>)}
       </div>
       <div className="realm-icon-grid spells">
         {spells.map(spell => {
@@ -447,7 +470,7 @@ function MagicTab({ game, refresh, setSelection, selection, openMenu }: PanelPro
           <div className="realm-sigils">{Object.entries(shown.sigils).map(([sigil, n]) => { const have = count(player, sigil) + (sigil === "breeze_sigil" && player.equipment.weapon === "breeze_staff" ? 999 : 0);
             return <span key={sigil} data-short={have < n}><ItemIcon slot={{ id: sigil, n: 1 }} size={26} bare />{n}<small>/{have > 998 ? "∞" : have}</small></span>; })}
             {!Object.keys(shown.sigils).length && <span>Free</span>}</div>
-        </> : <p>Magic level <b>{levelForXp(player.xp.magic)}</b>, Faith <b>{levelForXp(player.xp.prayer)}</b>. Hover a spell for details. Darts, lances and bursts, wards, curses, Gilded Touch, Forgeheart, Far Reach, Bonebloom, teleports, and the Faith tab's light.</p>}
+        </> : rarian ? <p>Magic level <b>{levelForXp(player.xp.magic)}</b>, Devotion <b>{levelForXp(player.xp.prayer)}</b>. The Book of the Law: Raria's edicts, judgements, vigils, the Office of Tithes and the Summons to Raria, the Realm's common magic beside them, and the Wise Friend's rites in place of the old light. Law, dusk and crown sigils are pressed in Raria.</p> : <p>Magic level <b>{levelForXp(player.xp.magic)}</b>, Faith <b>{levelForXp(player.xp.prayer)}</b>. Hover a spell for details. Darts, lances and bursts, wards, curses, Gilded Touch, Forgeheart, Far Reach, Bonebloom, teleports, and the Faith tab's light.</p>}
       </InfoCard>
     </div>
   );
@@ -725,6 +748,49 @@ export function ProductionBox({ game, refresh, openMenu }: { game: Game; refresh
 }
 
 // ---------- Modals ----------
+/** A card's picture: an item's icon, a person or creature drawn from its sprite, a statue or landmark's art, or a colour. */
+function CardArt({ card }: { card: CardDef }) {
+  const ref = useRef<HTMLCanvasElement>(null), art = card.art;
+  useEffect(() => {
+    const canvas = ref.current, ctx = canvas?.getContext("2d"); if (!canvas || !ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.imageSmoothingEnabled = false;
+    let picture: HTMLCanvasElement | null = null;
+    if (art.npc && NPCS[art.npc]) { const def = NPCS[art.npc]; if ("family" in def.art) picture = figureArt(friendSprite(def.art.family, def.art.seed).idle, [], "down"); }
+    else if (art.monster && MONSTERS[art.monster]) {
+      const rows = creatureSprite(MONSTERS[art.monster].art).idle, c = document.createElement("canvas"); c.width = rows[0].length; c.height = rows.length; const cc = c.getContext("2d")!;
+      cc.fillStyle = MONSTERS[art.monster].ink ?? "#efede7"; rows.forEach((row, y) => { for (let x = 0; x < row.length; x++) if (row[x] !== ".") cc.fillRect(x, y, 1, 1); }); picture = c;
+    } else if (art.decor) picture = decorArt(art.decor, 0);
+    if (!picture) return;
+    const scale = Math.max(1, Math.floor(Math.min(canvas.width / picture.width, canvas.height / picture.height)));
+    ctx.drawImage(picture, Math.round((canvas.width - picture.width * scale) / 2), Math.round((canvas.height - picture.height * scale) / 2), picture.width * scale, picture.height * scale);
+  }, [card.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (art.item && isItem(art.item)) return <ItemIcon slot={{ id: art.item, n: 1 }} size={56} bare />;
+  if (art.color) return <span style={{ display: "block", width: "100%", height: "100%", background: `linear-gradient(135deg, ${art.color}, #161616)` }} />;
+  return <canvas ref={ref} width={96} height={60} />;
+}
+/** The Adventurer Cards (Return of Raria): every card the world hides, found by walking, meeting, fighting and holding. */
+export function CardsModal({ game, onClose }: { game: Game; onClose: () => void }) {
+  const [kind, setKind] = useState<string>("all"), [chosen, setChosen] = useState<string | null>(null);
+  const shown = CARDS.filter(card => kind === "all" || card.kind === kind).map((card, index) => ({ card, index })).sort((a, b) => Number(cardFound(game, b.card.id)) - Number(cardFound(game, a.card.id)) || a.index - b.index).map(entry => entry.card), pick = CARDS.find(card => card.id === chosen);
+  const locked = (card: CardDef) => !!card.order && !orderOpen(game, card.order);
+  return (
+    <Modal title={`Adventurer Cards · ${cardsFound(game)} / ${CARDS.length}`} onClose={onClose} wide>
+      <div className="realm-codex-bar" role="group" aria-label="Kinds of card">
+        <button type="button" aria-pressed={kind === "all"} onClick={() => setKind("all")}>All</button>
+        {CARD_KINDS.filter(entry => CARDS.some(card => card.kind === entry)).map(entry => <button key={entry} type="button" aria-pressed={kind === entry} onClick={() => setKind(entry)}>{CARD_KIND_NAMES[entry]} {CARDS.filter(card => card.kind === entry && cardFound(game, card.id)).length}/{CARDS.filter(card => card.kind === entry).length}</button>)}
+      </div>
+      <div className="realm-codex">
+        {shown.map(card => { const found = cardFound(game, card.id);
+          return <button key={card.id} type="button" className="realm-codex-card" data-found={found} data-faction={card.faction ?? (card.order === "dusk" ? "raria" : undefined)} onClick={() => setChosen(card.id)} aria-label={found ? card.name : "An undiscovered card"}>
+            <span className="realm-codex-art">{found ? <CardArt card={card} /> : <span aria-hidden="true" style={{ fontSize: 26, color: "#6d6b67" }}>?</span>}</span>
+            <span><b>{found ? card.name : locked(card) ? "A sealed card" : "Undiscovered"}</b><br /><small>{found ? CARD_KIND_NAMES[card.kind] : locked(card) ? "Belongs to an Order you haven't met." : card.hint}</small></span>
+          </button>; })}
+      </div>
+      {pick && <div className="realm-codex-detail" role="status">{cardFound(game, pick.id) ? <><b>{pick.name}</b> <small>· {CARD_KIND_NAMES[pick.kind]}</small><p>{pick.text}</p></> : <p>{locked(pick) ? "Sealed: meet the Order's leader in the world first." : `Undiscovered. ${pick.hint}`}</p>}</div>}
+      <p className="realm-muted">Cards are found in the world, not given: walk into a region, meet someone, put a creature down, hold a thing, stand before a statue, finish a quest. An Order's cards stay sealed until you've met its leader.</p>
+    </Modal>
+  );
+}
 export function Modal({ title, onClose, children, wide, kind }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean; kind?: string }) {
   return (
     <div className="realm-scrim" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>

@@ -9,6 +9,8 @@ import { friendRows } from "./render.ts";
 import { figureArt } from "./wardrobe.ts";
 import { DEFAULT_FELLOWSHIP_COLORS, GAME_URL, cardStyle, daysSince, drawBanner, drawEmblem, inviteLink, isDarkColor, type FellowshipArt } from "./cardstyle.ts";
 import { titleName } from "./presence.ts";
+import { CARDS, cardsFound } from "./codex.ts";
+import { LAYOUT_DARK, LAYOUT_GEOMETRY, LAYOUT_SKILLS, layoutOver, layoutUnder, paintNewBackground, paintNewFrame } from "./cardlook.ts";
 
 export const CARD: { readonly width: number; readonly height: number } = { width: 1200, height: 675 };
 const INK = "#161616", PAPER = "#efede7", BUTTER = "#e2d7ad", GOLD = "#e2c46a";
@@ -38,6 +40,7 @@ const dots = (ctx: CanvasRenderingContext2D, count: number, seed: number, color:
 };
 function paintBackground(ctx: CanvasRenderingContext2D, bg: string): boolean {
   const W = CARD.width, H = CARD.height;
+  const fresh = paintNewBackground(ctx, bg); if (fresh !== null) return fresh;
   const simple = BG_SIMPLE[bg];
   if (simple) { ctx.fillStyle = simple.base; ctx.fillRect(0, 0, W, H); ctx.strokeStyle = simple.dark ? "rgba(255,255,255,0.06)" : "rgba(22,22,22,0.06)"; ctx.lineWidth = 1; for (let x = -H; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + H * 2, H); ctx.stroke(); } if (simple.dots) dots(ctx, 160, 17, simple.dots, 2.5); return simple.dark; }
   switch (bg) {
@@ -58,6 +61,7 @@ function paintBackground(ctx: CanvasRenderingContext2D, bg: string): boolean {
 function paintFrame(ctx: CanvasRenderingContext2D, frame: string, x: number, y: number, w: number, h: number, fellow?: { logo?: string; banner?: string } | null, colors: readonly string[] = DEFAULT_FELLOWSHIP_COLORS) {
   ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
   if (frame === "fellowship") { drawBanner(ctx, fellow?.banner ?? "plain", x, y, w, h, colors); ctx.globalAlpha = 0.28; drawEmblem(ctx, fellow?.logo ?? "shield", x + w / 2 - w * 0.36, y + h / 2 - w * 0.36, w * 0.72, colors); ctx.globalAlpha = 1; ctx.restore(); return; }
+  if (paintNewFrame(ctx, frame, x, y, w, h)) { ctx.restore(); return; }
   ctx.fillStyle = FRAMES[frame] ?? FRAMES.rose; ctx.fillRect(x, y, w, h);
   if (frame === "sunset") { const g = ctx.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, "#f6d27a"); g.addColorStop(0.6, "#f0a050"); g.addColorStop(1, "#7a3b5c"); ctx.fillStyle = g; ctx.fillRect(x, y, w, h); }
   if (frame === "dawn") { ctx.strokeStyle = "rgba(226,196,106,0.55)"; ctx.lineWidth = 8; for (let a = 0; a < 12; a++) { ctx.beginPath(); ctx.moveTo(x + w / 2, y + h * 0.35); ctx.lineTo(x + w / 2 + Math.cos(a / 12 * Math.PI * 2) * w, y + h * 0.35 + Math.sin(a / 12 * Math.PI * 2) * w); ctx.stroke(); } ctx.lineWidth = 1; }
@@ -75,9 +79,12 @@ export function renderCard(game: Game, friend: GenerationSprites | null, fellows
   const ctx = canvas.getContext("2d")!, player = game.player, style = cardStyle(game), FONT = FONTS[style.font] ?? FONTS.mono;
   let dark = paintBackground(ctx, style.bg);
   if (style.bgColor) { ctx.fillStyle = style.bgColor; ctx.fillRect(0, 0, CARD.width, CARD.height); dark = isDarkColor(style.bgColor); ctx.strokeStyle = dark ? "rgba(255,255,255,0.06)" : "rgba(22,22,22,0.06)"; ctx.lineWidth = 1; for (let x = -CARD.height; x < CARD.width; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + CARD.height * 2, CARD.height); ctx.stroke(); } }
+  // A layout of the far west paints its own page: its ground, its structure, and (below) its ornaments.
+  if (LAYOUT_GEOMETRY[style.layout] && !style.bgColor) { layoutUnder(ctx, style.layout); dark = LAYOUT_DARK[style.layout] ?? dark; }
   const inks = INKS[style.ink] ?? INKS.ink, TEXT = style.inkColor ?? (dark ? inks.light : inks.dark), MUTED = style.inkColor ? `${style.inkColor}b3` : dark ? "rgba(239,237,231,0.7)" : "#6d6b67";
   const fellow = player.fellowship, colors: string[] = fellow?.colors ?? DEFAULT_FELLOWSHIP_COLORS;
-  const banner = style.layout === "banner", ledger = style.layout === "ledger", poster = style.layout === "poster", centre = style.layout === "centre";
+  const geometry = LAYOUT_GEOMETRY[style.layout] ?? style.layout, skin = LAYOUT_SKILLS[style.layout] ?? style.skills;
+  const banner = geometry === "banner", ledger = geometry === "ledger", poster = geometry === "poster", centre = geometry === "centre";
   // Where things go: the portrait box and the skills block.
   const portrait = banner ? { x: 48, y: 48, w: 300, h: 300 } : ledger ? { x: 732, y: 48, w: 420, h: 520 } : poster ? { x: 48, y: 48, w: 520, h: 520 } : centre ? { x: 390, y: 48, w: 420, h: 520 } : { x: 48, y: 48, w: 420, h: 520 };
   const skills = banner ? { x: 48, y: 372, cols: 7, cellW: 158, maxH: 200 } : ledger ? { x: 60, y: 142, cols: 3, cellW: 206, maxH: 340 } : poster ? { x: 610, y: 142, cols: 3, cellW: 180, maxH: 340 } : { x: 530, y: 142, cols: 3, cellW: 206, maxH: 340 };
@@ -164,22 +171,23 @@ export function renderCard(game: Game, friend: GenerationSprites | null, fellows
   const rows = centre ? 6 : Math.ceil(SKILLS.length / skills.cols), cellH = Math.min(58, Math.floor(skills.maxH / rows)), box = cellH - 8;
   SKILLS.forEach((skill: Skill, index) => {
     const { x, y } = cellAt(index, cellH), level = levelForXp(player.xp[skill]), w = skills.cellW - 12;
-    const fill = style.skills === "dark" ? (level >= 99 ? "#3a3220" : INK) : style.skills === "gilded" ? (level >= 99 ? GOLD : "#fff6d6") : level >= 99 ? BUTTER : level >= 10 ? (dark ? "rgba(255,255,255,0.9)" : "#fff") : (dark ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.55)");
-    ctx.fillStyle = style.skills === "outline" ? "rgba(0,0,0,0)" : style.skills === "stripes" ? (index % 2 ? (dark ? "rgba(255,255,255,0.75)" : "#fff") : (dark ? "rgba(255,255,255,0.45)" : "#eae7df")) : style.skills === "soft" ? (dark ? "rgba(255,255,255,0.85)" : "#f7f5f0") : fill;
-    ctx.strokeStyle = style.skills === "gilded" ? "#8a6a10" : style.skills === "outline" ? TEXT : style.skills === "soft" ? "rgba(22,22,22,0.25)" : INK; ctx.lineWidth = style.skills === "soft" ? 1 : 2;
-    if (style.skills === "pills" || style.skills === "soft") { ctx.beginPath(); ctx.roundRect(x, y, w, box, style.skills === "pills" ? box / 2 : 8); ctx.fill(); ctx.stroke(); } else { ctx.fillRect(x, y, w, box); ctx.strokeRect(x, y, w, box); }
-    const text = style.skills === "dark" ? PAPER : style.skills === "outline" ? TEXT : INK;
-    ctx.fillStyle = text; ctx.font = `${skills.cols === 7 ? 13 : 16}px ${FONT}`; ctx.textBaseline = "middle"; ctx.fillText(SKILL_NAMES[skill], x + (style.skills === "pills" ? 16 : 10), y + box / 2 + 1);
-    ctx.font = `bold ${skills.cols === 7 ? 18 : 21}px ${FONT}`; ctx.textAlign = "right"; ctx.fillText(String(level), x + w - (style.skills === "pills" ? 16 : 12), y + box / 2 + 1); ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+    const fill = skin === "dark" ? (level >= 99 ? "#3a3220" : INK) : skin === "gilded" ? (level >= 99 ? GOLD : "#fff6d6") : level >= 99 ? BUTTER : level >= 10 ? (dark ? "rgba(255,255,255,0.9)" : "#fff") : (dark ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.55)");
+    ctx.fillStyle = skin === "outline" ? "rgba(0,0,0,0)" : skin === "stripes" ? (index % 2 ? (dark ? "rgba(255,255,255,0.75)" : "#fff") : (dark ? "rgba(255,255,255,0.45)" : "#eae7df")) : skin === "soft" ? (dark ? "rgba(255,255,255,0.85)" : "#f7f5f0") : fill;
+    ctx.strokeStyle = skin === "gilded" ? "#8a6a10" : skin === "outline" ? TEXT : skin === "soft" ? "rgba(22,22,22,0.25)" : INK; ctx.lineWidth = skin === "soft" ? 1 : 2;
+    if (skin === "pills" || skin === "soft") { ctx.beginPath(); ctx.roundRect(x, y, w, box, skin === "pills" ? box / 2 : 8); ctx.fill(); ctx.stroke(); } else { ctx.fillRect(x, y, w, box); ctx.strokeRect(x, y, w, box); }
+    const text = skin === "dark" ? PAPER : skin === "outline" ? TEXT : INK;
+    ctx.fillStyle = text; ctx.font = `${skills.cols === 7 ? 13 : 16}px ${FONT}`; ctx.textBaseline = "middle"; ctx.fillText(SKILL_NAMES[skill], x + (skin === "pills" ? 16 : 10), y + box / 2 + 1);
+    ctx.font = `bold ${skills.cols === 7 ? 18 : 21}px ${FONT}`; ctx.textAlign = "right"; ctx.fillText(String(level), x + w - (skin === "pills" ? 16 : 12), y + box / 2 + 1); ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
   });
   const qp = questPoints(game), below = skills.y + rows * cellH + 34;
   ctx.font = `bold 22px ${FONT}`; ctx.fillStyle = TEXT; ctx.fillText(`Quest points ${qp}/${MAX_QUEST_POINTS}`, skills.x, below);
   ctx.font = `18px ${FONT}`; ctx.fillStyle = MUTED;
   const line2 = `${player.kills.toLocaleString()} monster${player.kills === 1 ? "" : "s"} defeated · ${player.wardrobe.length}/${WARDROBE.length} wardrobe pieces`;
-  const line3 = `🏆 ${achieved(game)}/${ACHIEVEMENTS.length} achievements · ${player.pets.length} pet${player.pets.length === 1 ? "" : "s"} · ${player.stats.duelsWon ?? 0} duel win${(player.stats.duelsWon ?? 0) === 1 ? "" : "s"} · Presence ${levelForXp(player.xp.presence)}`;
+  const line3 = `🏆 ${achieved(game)}/${ACHIEVEMENTS.length} achievements · 🂠 ${cardsFound(game)}/${CARDS.length} cards · ${player.pets.length} pet${player.pets.length === 1 ? "" : "s"} · ${player.stats.duelsWon ?? 0} duel win${(player.stats.duelsWon ?? 0) === 1 ? "" : "s"} · Presence ${levelForXp(player.xp.presence)}`;
   if (banner) { ctx.fillText(`${line2} · ${line3}`, skills.x + 300, below); }
   else if (centre) { ctx.font = `16px ${FONT}`; [`${player.kills.toLocaleString()} monster${player.kills === 1 ? "" : "s"} defeated`, `${player.wardrobe.length}/${WARDROBE.length} wardrobe pieces`, `🏆 ${achieved(game)}/${ACHIEVEMENTS.length} achievements · ${player.pets.length} pet${player.pets.length === 1 ? "" : "s"}`, `${player.stats.duelsWon ?? 0} duel win${(player.stats.duelsWon ?? 0) === 1 ? "" : "s"} · Presence ${levelForXp(player.xp.presence)}`].forEach((line, i) => ctx.fillText(line, 830, below - 6 + i * 20)); }
   else { ctx.fillText(line2, skills.x, below + 30); ctx.fillText(line3, skills.x, below + 58); }
+  layoutOver(ctx, style.layout);
   // Footer.
   ctx.fillStyle = INK; ctx.fillRect(0, CARD.height - 72, CARD.width, 72);
   ctx.fillStyle = PAPER; ctx.font = `bold 26px ${FONT}`; ctx.fillText("⚔ RareFriends Realm", 40, CARD.height - 26);

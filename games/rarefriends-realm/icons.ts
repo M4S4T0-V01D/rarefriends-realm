@@ -986,7 +986,7 @@ const ORB_PAINTERS: Record<OrbIcon, Painter> = {
 export const orbArt = (orb: OrbIcon) => icon16(`orb:${orb}`, ORB_PAINTERS[orb]);
 
 // ---------- Spell and prayer icons (generated from their element) ----------
-const ELEMENT_COLORS: Record<string, string> = { wind: "#e6ecef", water: "#8fa3c9", earth: "#a89479", fire: "#e9a07a", hollow: "#6d6b67", moon: "#c6bed4", gold: "#e2d49e", home: "#e8d4c0", holy: "#f2e28f" };
+const ELEMENT_COLORS: Record<string, string> = { wind: "#e6ecef", water: "#8fa3c9", earth: "#a89479", fire: "#e9a07a", hollow: "#6d6b67", moon: "#c6bed4", gold: "#e2d49e", home: "#e8d4c0", holy: "#f2e28f", law: "#cfc7e6", dusk: "#8a6ab0" };
 /** Spell icon: an element orb with a shape by kind (bolt, strike, blast, curse, teleport, alchemy, utility). */
 export function spellArt(id: string, element: string, kind: string): HTMLCanvasElement {
   const color = ELEMENT_COLORS[element] ?? "#c7d3dc";
@@ -1017,6 +1017,9 @@ const PRAYER_KIND: Record<string, [string, string]> = {
   warm_heart: ["strength", ROSE], bright_heart: ["strength", "#cf8e8e"], burning_heart: ["strength", "#cf6e6e"],
   clear_ink: ["eye", "#c7d3dc"], sharp_ink: ["eye", "#afbccb"], perfect_ink: ["eye", "#8fa3c9"],
   quiet_mind: ["star", "#c6bed4"], deep_mind: ["star", "#b3a6d0"], friends_ward: ["protect", GOLD],
+  // The Wise Friend's commandments: a closed eye over a tablet of the Law, each in its own colour.
+  first_law: ["law", "#cfc7e6"], second_law: ["law", "#b98ab0"], third_law: ["law", "#9ea3ad"], fourth_law: ["law", "#8a6ab0"],
+  queens_peace: ["law", "#c9a84a"], keepers_silence: ["law_protect", "#d8d6e4"], wise_hand: ["law", "#e6c46a"], dusk_mantle: ["law", "#5a4a6e"],
 };
 export function prayerArt(id: string): HTMLCanvasElement {
   const [kind, color] = PRAYER_KIND[id] ?? ["star", PAPER];
@@ -1025,6 +1028,11 @@ export function prayerArt(id: string): HTMLCanvasElement {
     else if (kind === "strength") { p.poly([[4, 9], [9, 4], [14, 6], [14, 12], [9, 15], [5, 13]], color); p.line(7, 8, 11, 8, INK); }
     else if (kind === "eye") { p.disc(9, 9, 7, 4, "#ffffff"); p.disc(9, 9, 2.5, 2.5, color); p.set(9, 9, INK); }
     else if (kind === "protect") { p.poly([[3, 3], [15, 3], [15, 9], [9, 16], [3, 9]], color); p.line(5, 12, 13, 4, INK, 2); p.line(5, 4, 13, 12, INK, 2); }
+    else if (kind === "law" || kind === "law_protect") {
+      // A tablet of the Law with a closed eye over it.
+      p.poly([[4, 6], [14, 6], [14, 17], [4, 17]], kind === "law_protect" ? "#3b2a52" : color, INK); for (const y of [9, 11, 13, 15]) p.line(6, y, 12, y, kind === "law_protect" ? color : "#3b2a52");
+      p.disc(9, 4, 5, 2.4, "#2a2238", INK); p.line(5, 4, 13, 4, color); p.set(7, 5, color); p.set(9, 6, color); p.set(11, 5, color);
+    }
     else p.poly([[9, 1], [11, 7], [17, 9], [11, 11], [9, 17], [7, 11], [1, 9], [7, 7]], color);
     p.halo();
   });

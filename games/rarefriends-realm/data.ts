@@ -65,6 +65,7 @@ export const FAMILY_PERKS: readonly FamilyPerk[] = [
 
 import { APOTHECARY_ITEMS, type PotionEffect } from "./apothecary.ts";
 import { ORDER_IDS, orderGear, orderStock } from "./knights.ts";
+import { FACTION_MONSTERS, factionGear } from "./factions.ts";
 // ---------- Items ----------
 export type EquipSlot = "head" | "cape" | "neck" | "weapon" | "body" | "shield" | "legs" | "hands" | "feet" | "belt" | "ring";
 export const EQUIP_SLOTS: readonly EquipSlot[] = ["head", "cape", "neck", "weapon", "body", "shield", "legs", "hands", "feet", "belt", "ring"];
@@ -264,7 +265,9 @@ const ITEMS: Item[] = [
     ["ember_sigil", "Ember sigil", "#d99a82"], ["thought_sigil", "Thought sigil", "#d6c58f"], ["storm_sigil", "Storm sigil", "#d0b27c"],
     ["path_sigil", "Path sigil", "#8fa0c9"], ["hollow_sigil", "Hollow sigil", "#6d6b67"], ["bloom_sigil", "Bloom sigil", "#9fbf9a"],
     ["star_sigil", "Star sigil", "#e2d49e"], ["shade_sigil", "Shade sigil", "#b9a8c9"],
-  ] as const).map(([id, name, color]) => ({ id, name, examine: "Used for magic spells.", value: { path_sigil: 60, hollow_sigil: 70, storm_sigil: 35, bloom_sigil: 45, star_sigil: 25, shade_sigil: 4, thought_sigil: 3 }[id as string] ?? 2, stackable: true, icon: { shape: "sigil" as const, color, kind: id.replace("_sigil", "") } })),
+    // Raria's sigils (Return of Raria): pressed at the Law altar, the Dusk altar and the Crown altar in the city.
+    ["law_sigil", "Law sigil", "#cfc7e6"], ["dusk_sigil", "Dusk sigil", "#6b5a8a"], ["crown_sigil", "Crown sigil", "#e6c46a"],
+  ] as const).map(([id, name, color]) => ({ id, name, examine: "Used for magic spells.", value: { path_sigil: 60, hollow_sigil: 70, storm_sigil: 35, bloom_sigil: 45, star_sigil: 25, shade_sigil: 4, thought_sigil: 3, law_sigil: 30, dusk_sigil: 55, crown_sigil: 80 }[id as string] ?? 2, stackable: true, icon: { shape: "sigil" as const, color, kind: id.replace("_sigil", "") } })),
   { id: "sweetberry", name: "Sweetberries", examine: "A handful of pale berries. They used to be a bone.", value: 2, heal: 2, icon: { shape: "berries", color: "#c6bed4" } },
   // Stealth loot (pickpocketing and stalls)
   { id: "silk", name: "Silk", examine: "It's a sheet of silk.", value: 30, icon: { shape: "silk", color: "#e9e1ef" } },
@@ -490,6 +493,8 @@ export const BOWS = [
   { id: "pine_bow", name: "Pine bow", level: 35, ranged: 36, value: 1000, color: "#8a6446" },
   { id: "yew_bow", name: "Yew bow", level: 40, ranged: 47, value: 1600, color: "#7d6b5c" },
   { id: "ashwood_bow", name: "Ashwood bow", level: 50, ranged: 69, value: 3200, color: "#d6d3cc" },
+  { id: "redwood_bow", name: "Redwood bow", level: 55, ranged: 78, value: 5200, color: "#8a3a2a" },
+  { id: "ironbark_bow", name: "Ironbark bow", level: 65, ranged: 94, value: 12000, color: "#6d6b67" },
   { id: "gloomfang_bow", name: "Gloomfang bow", level: 60, ranged: 88, value: 40000, color: "#4a4458" },
 ] as const;
 /** War bows: a heavier bow from two logs of each wood. Slower to draw than the plain bow, but every arrow lands harder, and it reaches a tile further. */
@@ -500,6 +505,8 @@ export const WAR_BOWS = [
   { id: "maple_war_bow", name: "Maple war bow", log: "maple_logs", level: 35, ranged: 36, strength: 26, fletch: 55, xp: 105, value: 1700, color: "#c49a74" },
   { id: "yew_war_bow", name: "Yew war bow", log: "yew_logs", level: 45, ranged: 56, strength: 32, fletch: 70, xp: 140, value: 4200, color: "#7d6b5c" },
   { id: "ashwood_war_bow", name: "Ashwood war bow", log: "ash_logs", level: 55, ranged: 80, strength: 38, fletch: 85, xp: 175, value: 8400, color: "#d6d3cc" },
+  { id: "redwood_war_bow", name: "Redwood war bow", log: "redwood_logs", level: 60, ranged: 86, strength: 40, fletch: 88, xp: 190, value: 11000, color: "#8a3a2a" },
+  { id: "ironbark_war_bow", name: "Ironbark war bow", log: "ironbark_logs", level: 70, ranged: 100, strength: 46, fletch: 93, xp: 240, value: 24000, color: "#6d6b67" },
 ] as const;
 /** Crossbow stocks, carved from logs with a knife (Fletching). */
 export const STOCKS = [
@@ -747,6 +754,26 @@ export const REGIONAL_CLOTHING: readonly RegionalSet[] = [
     { id: "scorched_trousers", name: "Scorched trousers", slot: "legs", shape: "legs", kind: "trousers", color: "#5a4230", accent: "#3b3a38", examine: "Singed at every hem. Fashionable, in Ashfall.", value: 240 },
     { id: "scorched_cloak", name: "Scorched cloak", slot: "cape", shape: "cape", color: "#8a3f2e", accent: "#f0a050", examine: "A dramatic red cloak burnt ragged at the edge. It has met a dragon.", value: 900 },
   ] },
+  // Return of Raria: what the far west wears.
+  { region: "raria", shop: "raria_clothier", pieces: [
+    { id: "rarian_veil", name: "Rarian veil", slot: "head", shape: "hood", color: "#3b2a52", accent: "#d8d6e4", examine: "A dusk-violet veil with a silver edge, worn by Rarian citizens in the street. It covers the hair; the Law says the hair is nobody's business.", value: 500 },
+    { id: "rarian_tabard", name: "Rarian tabard", slot: "body", shape: "body", kind: "tunic", color: "#3b2a52", accent: "#d8d6e4", examine: "A violet tabard with the closed eye in silver on the breast, as every Rarian wears on the Wise Friend's days, which is all of them.", value: 1400 },
+    { id: "rarian_skirts", name: "Rarian skirts", slot: "legs", shape: "legs", color: "#2a2238", accent: "#d8d6e4", examine: "Long dusk skirts, silver at the hem, cut to kneel in.", value: 800 },
+    { id: "rarian_slippers", name: "Rarian slippers", slot: "feet", shape: "boots", color: "#2a2238", accent: "#d8d6e4", examine: "Soft violet slippers. Raria's streets are swept twice a day.", value: 300 },
+    { id: "rarian_mantle", name: "Rarian mantle", slot: "cape", shape: "cape", kind: "eye", color: "#3b2a52", accent: "#d8d6e4", examine: "A violet mantle with the Wise Friend's closed eye in silver on the back. Worn to chapel, which is daily.", value: 1200 },
+  ] },
+  { region: "fff", shop: "fff_outfitter", pieces: [
+    { id: "fff_cap", name: "Federation cap", slot: "head", shape: "hat", color: "#2f7d68", accent: "#d9a93f", examine: "A verdigris cap with a brass FFF pin, worn at whatever angle the wearer likes, which is the point.", value: 400 },
+    { id: "fff_tunic", name: "Federation tunic", slot: "body", shape: "body", kind: "tunic", color: "#2f7d68", accent: "#b87333", examine: "A green tunic with copper buttons, none of which match, all of which work.", value: 1200 },
+    { id: "fff_trousers", name: "Patched trousers", slot: "legs", shape: "legs", color: "#6b4a2c", accent: "#4fa58a", examine: "Brown trousers patched in verdigris leather at the knee, the Federation's uniform insofar as it has one.", value: 700 },
+    { id: "fff_workboots", name: "Federation workboots", slot: "feet", shape: "boots", color: "#4a3a2c", accent: "#b87333", examine: "Copper-toed boots. Two of the artisans have lost a toe to a device; nobody else will.", value: 400 },
+  ] },
+  { region: "barkreach", shop: "barkreach_outfitter", pieces: [
+    { id: "woodsman_cap", name: "Woodsman's cap", slot: "head", shape: "hat", color: "#5a3a2a", accent: "#8a3a2a", examine: "A redwood-dyed leather cap with a greatstag's antler tip for a pin, as BarkReach's loggers wear.", value: 400 },
+    { id: "woodsman_jerkin", name: "Woodsman's jerkin", slot: "body", shape: "body", kind: "tunic", color: "#5a3a2a", accent: "#d8cfb6", examine: "A thick leather jerkin, resin-stained, with an axe loop at the hip.", value: 1100 },
+    { id: "woodsman_breeches", name: "Woodsman's breeches", slot: "legs", shape: "legs", color: "#4a3a2c", accent: "#8a3a2a", examine: "Heavy breeches for BarkReach's brambles.", value: 700 },
+    { id: "woodsman_boots", name: "Woodsman's boots", slot: "feet", shape: "boots", color: "#3a2a1c", accent: "#8a3a2a", examine: "Hobnailed boots. The redwoods are slippery when it rains, which is always.", value: 400 },
+  ] },
 ];
 const REGIONAL_ITEMS: Item[] = REGIONAL_CLOTHING.flatMap(set => set.pieces.map((piece): Item => ({
   id: piece.id, name: piece.name, examine: piece.examine, value: piece.value, icon: { shape: piece.shape, color: piece.color, accent: piece.accent, ...(piece.kind ? { kind: piece.kind } : {}) },
@@ -822,13 +849,13 @@ const ORDER_ARMOUR: Item[] = [
   { id: "vigil_greaves", name: "Vigil greaves", examine: "Mail greaves of pale steel.", value: 4800, icon: { shape: "legs", color: "#cfd3d8", accent: DAWN_GOLD }, equip: { slot: "legs", bonuses: { defence: 31, magic: -3, prayer: 3 }, requires: { defence: 30, prayer: 30 } } },
   { id: "vigil_gauntlets", name: "Vigil gauntlets", examine: "Mail gauntlets, gold at the cuff.", value: 2400, icon: { shape: "gloves", color: "#cfd3d8", accent: DAWN_GOLD }, equip: { slot: "hands", bonuses: { attack: 2, defence: 8, prayer: 2 }, requires: { defence: 30, prayer: 30 } } },
   { id: "vigil_boots", name: "Vigil boots", examine: "Steel-toed boots for the long watch.", value: 2400, icon: { shape: "boots", color: "#cfd3d8", accent: DAWN_GOLD }, equip: { slot: "feet", bonuses: { defence: 8, prayer: 2 }, requires: { defence: 30, prayer: 30 } } },
-  { id: "vigil_shield", name: "Vigil shield", examine: "A pale steel heater shield with the Order's sun, for those who keep the watch.", value: 4800, icon: { shape: "shield", color: "#cfd3d8", accent: DAWN_GOLD }, equip: { slot: "shield", bonuses: { defence: 34, prayer: 3 }, requires: { defence: 30, prayer: 30 } } },
+  { id: "vigil_shield", name: "Vigil Aegis", examine: "The Vigil Aegis: a tall pale-steel shield with the Order's sun blazed across it, carried by those who keep the watch. There is only one pattern of it, and every one is blessed at the Dawnhold altar by name.", value: 4800, icon: { shape: "aegis", color: "#cfd3d8", accent: DAWN_GOLD }, equip: { slot: "shield", bonuses: { defence: 34, prayer: 3 }, requires: { defence: 30, prayer: 30 } } },
 ];
 /** Dawnplate, sold once the quest that awards each piece is done. */
 export const DAWNPLATE_QUEST: Record<string, string> = { dawnplate_greaves: "pilgrims_road", dawnplate_boots: "pilgrims_road", dawnplate_helm: "restless_crypt",
   dawnplate_shield: "restless_crypt", dawnplate_gauntlets: "restless_crypt", dawnplate_cuirass: "dawn_against_hollow" };
 
-export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...ORDER_ARMOUR, ...orderGear(), ...slayerGear(), ...heartguardGear(), ...REGIONAL_ITEMS, ...APOTHECARY_ITEMS]);
+export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...ORDER_ARMOUR, ...orderGear(), ...slayerGear(), ...heartguardGear(), ...REGIONAL_ITEMS, ...APOTHECARY_ITEMS, ...factionGear()]);
 const ITEM_MAP = new Map(ITEM_LIST.map(item => [item.id, item]));
 export function item(id: string): Item {
   const found = ITEM_MAP.get(id);
@@ -838,7 +865,7 @@ export function item(id: string): Item {
 export const isItem = (id: unknown): id is string => typeof id === "string" && ITEM_MAP.has(id);
 
 // ---------- Gathering ----------
-export type TreeKind = "tree" | "oak" | "willow" | "maple" | "yew" | "ashwood" | "palm" | "pine" | "deadwood";
+export type TreeKind = "tree" | "oak" | "willow" | "maple" | "yew" | "ashwood" | "palm" | "pine" | "deadwood" | "redwood" | "ironbark";
 export const TREES: Record<TreeKind, { name: string; level: number; xp: number; log: string; low: number; high: number; deplete: number; respawn: number }> = {
   tree: { name: "Tree", level: 1, xp: 25, log: "logs", low: 64, high: 200, deplete: 1, respawn: 12 },
   oak: { name: "Oak tree", level: 15, xp: 37.5, log: "oak_logs", low: 32, high: 100, deplete: 1 / 8, respawn: 14 },
@@ -850,6 +877,9 @@ export const TREES: Record<TreeKind, { name: string; level: number; xp: number; 
   palm: { name: "Palm tree", level: 25, xp: 55, log: "palm_logs", low: 20, high: 60, deplete: 1 / 8, respawn: 30 },
   pine: { name: "Pine tree", level: 35, xp: 80, log: "pine_logs", low: 14, high: 45, deplete: 1 / 8, respawn: 40 },
   deadwood: { name: "Dead tree", level: 55, xp: 150, log: "deadwood_logs", low: 6, high: 18, deplete: 1 / 8, respawn: 90 },
+  // BarkReach (Return of Raria): red-hearted redwoods and the grey ironbarks an axe bounces off.
+  redwood: { name: "Redwood tree", level: 52, xp: 135, log: "redwood_logs", low: 6, high: 20, deplete: 1 / 8, respawn: 80 },
+  ironbark: { name: "Ironbark tree", level: 68, xp: 230, log: "ironbark_logs", low: 3, high: 10, deplete: 1 / 10, respawn: 140 },
 };
 export type RockKind = "pewter" | "clay" | "blackiron" | "inkcoal" | "moonsilver" | "glimmer" | "rarite" | "gem" | "sigil";
 export const ROCKS: Record<RockKind, { name: string; level: number; xp: number; ore: string; low: number; high: number; respawn: number; color: string }> = {
@@ -891,7 +921,7 @@ export const COOKING: Record<string, { cooked: string; level: number; xp: number
 export const FIREMAKING: Record<string, { level: number; xp: number }> = {
   logs: { level: 1, xp: 40 }, oak_logs: { level: 15, xp: 60 }, willow_logs: { level: 30, xp: 90 },
   maple_logs: { level: 45, xp: 135 }, yew_logs: { level: 60, xp: 202.5 }, ash_logs: { level: 70, xp: 280 },
-  palm_logs: { level: 25, xp: 80 }, pine_logs: { level: 35, xp: 110 }, deadwood_logs: { level: 55, xp: 180 },
+  palm_logs: { level: 25, xp: 80 }, pine_logs: { level: 35, xp: 110 }, deadwood_logs: { level: 55, xp: 180 }, redwood_logs: { level: 52, xp: 170 }, ironbark_logs: { level: 68, xp: 260 },
 };
 /** Smelting: ores in, bar out. Blackiron has a 50% success rate without a ring (like the classic furnace). */
 export const SMELTING: Record<MetalId, { level: number; xp: number; ores: Readonly<Record<string, number>>; chance?: number }> = {
@@ -936,6 +966,7 @@ export const FLETCH_BOWS = [
   { log: "willow_logs", bow: "willow_bow", level: 35, xp: 33 }, { log: "maple_logs", bow: "maple_bow", level: 50, xp: 50 },
   { log: "yew_logs", bow: "yew_bow", level: 65, xp: 67.5 }, { log: "ash_logs", bow: "ashwood_bow", level: 80, xp: 83 },
   { log: "palm_logs", bow: "palm_bow", level: 40, xp: 40 }, { log: "pine_logs", bow: "pine_bow", level: 52, xp: 55 },
+  { log: "redwood_logs", bow: "redwood_bow", level: 70, xp: 95 }, { log: "ironbark_logs", bow: "ironbark_bow", level: 85, xp: 125 },
 ] as const;
 /** Wands: a magic weapon fletched from a log that holds a charge (deadwood). One-handed, a staff for autocasting, no sigils of its own. */
 export const FLETCH_WANDS = [{ log: "deadwood_logs", wand: "deadwood_wand", level: 58, xp: 70 }] as const;
@@ -949,6 +980,7 @@ export const SIGILCRAFT = [
   { sigil: "breeze_sigil", level: 1, xp: 5 }, { sigil: "thought_sigil", level: 2, xp: 5.5 }, { sigil: "tide_sigil", level: 5, xp: 6 },
   { sigil: "stone_sigil", level: 9, xp: 6.5 }, { sigil: "ember_sigil", level: 14, xp: 7 }, { sigil: "shade_sigil", level: 20, xp: 7.5 },
   { sigil: "star_sigil", level: 27, xp: 8 }, { sigil: "storm_sigil", level: 35, xp: 8.5 }, { sigil: "bloom_sigil", level: 44, xp: 9 },
+  { sigil: "law_sigil", level: 38, xp: 8.7 }, { sigil: "dusk_sigil", level: 52, xp: 9.3 }, { sigil: "crown_sigil", level: 60, xp: 9.6 },
   { sigil: "path_sigil", level: 54, xp: 9.5 }, { sigil: "hollow_sigil", level: 65, xp: 10.5 },
 ] as const;
 /** Sigils per stone at your Sigilcraft level: one more for every 11 levels past the altar's. */
@@ -969,6 +1001,8 @@ export type Spell = {
   maxHit?: number; teleport?: TeleportPlace; curse?: { stat: "attack" | "strength" | "defence"; amount: number };
   /** A spell learnt by deed: castable only once this quest is complete. */
   quest?: string;
+  /** Raria's own (Return of Raria): an edict, judgement, vigil, office, summons or rite of the Wise Friend, castable only while you keep the Law. */
+  rarian?: boolean;
   /** Faith spells: the level is a Faith level and each cast spends this much faith. */
   skill?: "prayer"; faith?: number;
   /** A ward on yourself: more defence (a fraction of your bonus plus a flat amount), less damage taken (a fraction), for so many ticks. */
@@ -978,7 +1012,7 @@ export type Spell = {
   description: string;
 };
 /** Everywhere a teleport can land (the keys of World["places"] that spells use). */
-export type TeleportPlace = "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier" | "fernwick" | "highcairn" | "dawnhold" | "gravesend" | "saltmarrow" | "hollyhock" | "dyemoor" | "tallgrass" | "cragmaw" | "quillhaven" | "ashfall";
+export type TeleportPlace = "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier" | "fernwick" | "highcairn" | "dawnhold" | "gravesend" | "saltmarrow" | "hollyhock" | "dyemoor" | "tallgrass" | "cragmaw" | "quillhaven" | "ashfall" | "raria" | "fff_fortress" | "barkreach";
 /** The spellbook's tabs: which kinds go where. */
 export const SPELL_TABS: readonly { id: string; name: string; kinds: readonly SpellKind[] }[] = [
   { id: "combat", name: "Combat", kinds: ["strike", "bolt", "blast"] }, { id: "curses", name: "Curses", kinds: ["curse", "bind"] },
@@ -986,6 +1020,15 @@ export const SPELL_TABS: readonly { id: string; name: string; kinds: readonly Sp
   { id: "utility", name: "Utility", kinds: ["alchemy", "superheat", "grab", "enchant", "bloom"] }, { id: "teleports", name: "Teleports", kinds: ["teleport"] },
   { id: "faith", name: "Faith", kinds: ["smite", "mend", "aegis", "bless"] },
 ];
+/** The same book under the Wise Friend's Law (Return of Raria): Raria's names for the tabs, its own spells among the Realm's, and its rites in place of the Old Friend's light. */
+export const RARIAN_SPELL_TABS: readonly { id: string; name: string; kinds: readonly SpellKind[] }[] = [
+  { id: "combat", name: "Edicts", kinds: ["strike", "bolt", "blast"] }, { id: "curses", name: "Judgements", kinds: ["curse", "bind"] },
+  { id: "wards", name: "Vigils", kinds: ["ward"] },
+  { id: "utility", name: "Offices", kinds: ["alchemy", "superheat", "grab", "enchant", "bloom"] }, { id: "teleports", name: "Summons", kinds: ["teleport"] },
+  { id: "faith", name: "Rites", kinds: ["smite", "mend", "aegis", "bless"] },
+];
+/** Whether a spell belongs in the book you keep: the Realm's common magic is in both; the Old Friend's light only in the old book, Raria's edicts and rites only in the Law's. */
+export const spellInBook = (spell: Spell, rarian: boolean) => rarian ? !(spell.skill === "prayer" && !spell.rarian) : !spell.rarian;
 /** The Realm's spellbook, in level order: combat, curses, utility and teleports. */
 export const SPELLS: readonly Spell[] = [
   { id: "home", name: "Homeward", level: 1, xp: 0, sigils: {}, kind: "teleport", element: "home", target: "self", teleport: "hollow_square", description: "Return to Friendhollow. Slow to cast, free, and not in combat." },
@@ -1041,9 +1084,26 @@ export const SPELLS: readonly Spell[] = [
   { id: "blessing", name: "Blessing", level: 50, xp: 60, sigils: { star_sigil: 2, path_sigil: 1 }, kind: "bless", element: "holy", target: "self", skill: "prayer", faith: 4, heal: { now: 6, energy: 100, cure: true }, description: "Run energy restored, poison cured, and a little healing. Costs 4 faith." },
   { id: "radiance", name: "Radiance", level: 60, xp: 44, sigils: { star_sigil: 3, ember_sigil: 2 }, kind: "smite", element: "holy", target: "monster", skill: "prayer", faith: 3, maxHit: 24, description: "A burst of the Old Friend's light (max hit 24, half as much again against the undead). Costs 3 faith a cast." },
   { id: "renewal", name: "Renewal", level: 70, xp: 84, sigils: { star_sigil: 3, bloom_sigil: 1 }, kind: "mend", element: "holy", target: "self", skill: "prayer", faith: 6, heal: { now: 5, perTick: 3, ticks: 20 }, description: "Heals 5 now and 3 a tick for twenty ticks. Costs 6 faith." },
+  // ---------- The Wise Friend's Law (Return of Raria): Raria's edicts, judgements, vigils, offices, summons and rites ----------
+  { id: "edict_of_silence", name: "Edict of Silence", level: 20, xp: 20, sigils: { law_sigil: 2, thought_sigil: 1 }, kind: "strike", element: "law", target: "monster", maxHit: 12, rarian: true, description: "A Rarian edict spoken at a creature: a bolt of grey law that strikes it quiet (max hit 12)." },
+  { id: "edict_of_ash", name: "Edict of Ash", level: 42, xp: 36, sigils: { law_sigil: 3, ember_sigil: 2 }, kind: "bolt", element: "fire", target: "monster", maxHit: 20, rarian: true, description: "The Law's sentence for what will not obey: fire, pronounced (max hit 20)." },
+  { id: "edict_of_dusk", name: "Edict of Dusk", level: 64, xp: 52, sigils: { law_sigil: 3, dusk_sigil: 2 }, kind: "blast", element: "dusk", target: "monster", maxHit: 30, rarian: true, description: "The Order of Dusk's edict: a burst of violet dark that takes the light out of a creature (max hit 30)." },
+  { id: "judgement_of_weakness", name: "Judgement of Weakness", level: 30, xp: 26, sigils: { law_sigil: 2, shade_sigil: 1 }, kind: "curse", element: "law", target: "monster", curse: { stat: "strength", amount: 0.1 }, rarian: true, description: "A judgement read over a creature: its strength is found wanting (−10%)." },
+  { id: "judgement_of_stillness", name: "Judgement of Stillness", level: 50, xp: 40, sigils: { law_sigil: 3, dusk_sigil: 1 }, kind: "bind", element: "dusk", target: "monster", rarian: true, description: "The Law holds a creature where it stands for a time." },
+  { id: "vigil_of_law", name: "Vigil of the Law", level: 25, xp: 32, sigils: { law_sigil: 2, stone_sigil: 1 }, kind: "ward", element: "law", target: "self", ward: { defence: 0.2, flat: 10, ticks: 100 }, rarian: true, description: "A Rarian vigil kept over yourself: +20% defence bonus and +10 for a minute and a half." },
+  { id: "vigil_of_dusk", name: "Vigil of Dusk", level: 55, xp: 58, sigils: { dusk_sigil: 2, law_sigil: 2 }, kind: "ward", element: "dusk", target: "self", ward: { reduce: 0.3, ticks: 80 }, rarian: true, description: "The Order of Dusk's vigil: a third of the damage you take is turned aside for eighty ticks." },
+  { id: "office_of_tithes", name: "Office of Tithes", level: 40, xp: 48, sigils: { law_sigil: 2, ember_sigil: 1 }, kind: "alchemy", element: "law", target: "item", rarian: true, description: "The Crown's office: an item in your pack is assessed and turned to coin, the tithe already taken." },
+  { id: "summons_to_raria", name: "Summons to Raria", level: 35, xp: 38, sigils: { law_sigil: 2, path_sigil: 1 }, kind: "teleport", element: "law", target: "self", teleport: "raria", rarian: true, description: "The Law summons you to Raria's square, before the palace." },
+  { id: "rite_of_censure", name: "Rite of Censure", level: 20, xp: 16, sigils: { dusk_sigil: 1, law_sigil: 1 }, kind: "smite", element: "dusk", target: "monster", skill: "prayer", faith: 2, maxHit: 12, rarian: true, description: "A rite of the Wise Friend spoken against a creature (max hit 12, half as much again against the undead). Costs 2 faith." },
+  { id: "rite_of_mending", name: "Rite of Mending", level: 32, xp: 38, sigils: { law_sigil: 2, tide_sigil: 1 }, kind: "mend", element: "law", target: "self", skill: "prayer", faith: 4, heal: { now: 22 }, rarian: true, description: "The Law mends what obeys it: heals 22 at once. Costs 4 faith." },
+  { id: "rite_of_the_keeper", name: "Rite of the Keeper", level: 48, xp: 56, sigils: { dusk_sigil: 2, stone_sigil: 1 }, kind: "aegis", element: "dusk", target: "self", skill: "prayer", faith: 6, ward: { defence: 0.25, flat: 10, reduce: 0.2, ticks: 120 }, rarian: true, description: "The Keeper's own rite: +25% defence bonus, +10, and a fifth of damage turned aside for two minutes. Costs 6 faith." },
+  { id: "rite_of_obedience", name: "Rite of Obedience", level: 55, xp: 62, sigils: { law_sigil: 2, dusk_sigil: 1 }, kind: "bless", element: "law", target: "self", skill: "prayer", faith: 4, heal: { now: 8, energy: 25, cure: true }, rarian: true, description: "Obedience is rewarded: 8 health, a quarter of your run energy, and any poison cleared. Costs 4 faith." },
+  { id: "rite_of_dusk", name: "Rite of Dusk", level: 72, xp: 58, sigils: { dusk_sigil: 3, law_sigil: 2 }, kind: "smite", element: "dusk", target: "monster", skill: "prayer", faith: 4, maxHit: 30, rarian: true, description: "The last rite of the Order of Dusk, pronounced over a creature (max hit 30, half as much again against the undead). Costs 4 faith." },
   { id: "banishment", name: "Banishment", level: 80, xp: 60, sigils: { star_sigil: 4, hollow_sigil: 1 }, kind: "smite", element: "holy", target: "monster", skill: "prayer", faith: 5, maxHit: 32, description: "Light that unmakes (max hit 32, twice that against the undead). Costs 5 faith a cast." },
 ];
-export type Prayer = { id: string; name: string; level: number; drain: number; effect: Partial<{ attack: number; strength: number; defence: number; magic: number; protect: boolean }>; description: string };
+export type Prayer = { id: string; name: string; level: number; drain: number; effect: Partial<{ attack: number; strength: number; defence: number; magic: number; protect: boolean }>; description: string;
+  /** A commandment of the Wise Friend's Law (Return of Raria): kept only while you keep the Law, in place of the Old Friend's prayers. */
+  rarian?: boolean };
 export const PRAYERS: readonly Prayer[] = [
   { id: "paper_shield", name: "Paper Shield", level: 1, drain: 1 / 12, effect: { defence: 0.05 }, description: "+5% Defence" },
   { id: "warm_heart", name: "Warm Heart", level: 4, drain: 1 / 12, effect: { strength: 0.05 }, description: "+5% Strength" },
@@ -1057,6 +1117,15 @@ export const PRAYERS: readonly Prayer[] = [
   { id: "burning_heart", name: "Burning Heart", level: 31, drain: 1 / 3, effect: { strength: 0.15 }, description: "+15% Strength" },
   { id: "perfect_ink", name: "Perfect Ink", level: 34, drain: 1 / 3, effect: { attack: 0.15 }, description: "+15% Attack" },
   { id: "friends_ward", name: "Friend's Ward", level: 37, drain: 1 / 3, effect: { protect: true }, description: "Blocks most melee damage" },
+  // ---------- The Wise Friend's commandments (Return of Raria): kept in place of the prayers while you keep the Law ----------
+  { id: "first_law", name: "The First Law: Obey", level: 1, drain: 1 / 10, effect: { defence: 0.08 }, description: "+8% Defence", rarian: true },
+  { id: "second_law", name: "The Second Law: Endure", level: 8, drain: 1 / 10, effect: { strength: 0.08 }, description: "+8% Strength", rarian: true },
+  { id: "third_law", name: "The Third Law: Strike True", level: 14, drain: 1 / 10, effect: { attack: 0.08 }, description: "+8% Attack", rarian: true },
+  { id: "fourth_law", name: "The Fourth Law: Know", level: 22, drain: 1 / 10, effect: { magic: 0.08 }, description: "+8% Magic", rarian: true },
+  { id: "queens_peace", name: "The Queen's Peace", level: 33, drain: 1 / 4, effect: { defence: 0.18 }, description: "+18% Defence", rarian: true },
+  { id: "keepers_silence", name: "The Keeper's Silence", level: 40, drain: 1 / 3, effect: { protect: true }, description: "Blocks most melee damage", rarian: true },
+  { id: "wise_hand", name: "The Wise Hand", level: 52, drain: 2 / 5, effect: { attack: 0.18, strength: 0.18 }, description: "+18% Attack and Strength", rarian: true },
+  { id: "dusk_mantle", name: "The Mantle of Dusk", level: 70, drain: 1 / 2, effect: { attack: 0.15, strength: 0.15, defence: 0.15, magic: 0.15 }, description: "+15% Attack, Strength, Defence and Magic", rarian: true },
 ];
 
 // ---------- Monsters ----------
@@ -1098,6 +1167,8 @@ export type MonsterDef = {
 const coins = (min: number, max: number, chance: number): Drop => ({ item: "coins", min, max, chance });
 const one = (id: string, chance: number, min = 1, max = min): Drop => ({ item: id, min, max, chance });
 export const MONSTERS: Record<string, MonsterDef> = {
+  // Return of Raria: the Regiment, the Federation's pickets, the Royal Rangers, BarkReach's wild things, the deserters and the Burned.
+  ...FACTION_MONSTERS,
   chicken: { id: "chicken", name: "Chicken", level: 1, hp: 3, attack: 1, strength: 1, defence: 1, attackBonus: 0, defenceBonus: 0, maxHit: 1, speed: 4, respawn: 20, wander: 4, examine: "Yep, definitely a chicken.",
     always: [one("bones", 1), one("raw_chicken", 1)], drops: [one("feather", 0.6, 5, 15)], art: 100 },
   cow: { id: "cow", name: "Cow", level: 2, hp: 8, attack: 1, strength: 1, defence: 1, attackBonus: 0, defenceBonus: 0, maxHit: 1, speed: 4, respawn: 25, wander: 5, examine: "Converts grass to beef.",
@@ -1332,9 +1403,26 @@ export type ShopDef = { id: string; name: string; stock: readonly string[]; gene
 export const SHOPS: Record<string, ShopDef> = {
   // The four Orders' quartermasters (open once their oath is sworn), and the Deadwood Maidens' market (once the truce is kept).
   diamond_armoury: { id: "diamond_armoury", name: "The Diamond Armoury", buys: ["weapon", "armour"], rate: 0.5, stock: orderStock("diamond") },
+  // Return of Raria: the Federation's shops at the FFF Fortress (open once the Federation knows your name), Raria's (once you hold a writ), the Order of Dusk's, and BarkReach's.
+  fff_armoury: { id: "fff_armoury", name: "The Federation Armoury", buys: ["weapon", "armour", "bow", "arrow"], rate: 0.55, stock: ["fff_sword", "fff_greatsword", "fff_glaive", "fff_mace", "fff_tower_shield", "fff_heater", "fff_helm", "fff_cuirass", "fff_greaves", "fff_gauntlets", "fff_boots", "fff_warcaster_plate", "fff_skirmisher_jerkin",
+    "fff_longbow", "fff_repeater", "fff_arcane_bow", "fff_ranger_hood", "fff_ranger_jerkin", "fff_ranger_chaps", "fff_ranger_bracers", "fff_broadheads", "fff_bolts", "fff_cape_knight", "fff_cape_ranger"] },
+  fff_arcanum: { id: "fff_arcanum", name: "The Wizard Tower's Arcanum", buys: ["magic", "sigil"], rate: 0.55, stock: ["fff_wizard_robe", "fff_reinforced_robe", "fff_battle_robe", "fff_mage_coat", "fff_wizard_hat", "fff_hood", "fff_spellward", "fff_arcane_shield", "fff_staff", "fff_wand", "fff_spellbook", "fff_cape_magical", "fff_device_pack", "fff_tinker_ring", "fff_focus_amulet", "fff_cape_wizard",
+    "breeze_sigil", "thought_sigil", "tide_sigil", "stone_sigil", "ember_sigil", "storm_sigil", "star_sigil", "shade_sigil", "bloom_sigil"] },
+  fff_workshop: { id: "fff_workshop", name: "The Artisan Workshops", buys: ["ore", "bar", "logs", "gem", "other"], rate: 0.6, stock: ["fff_tinker_hammer", "fff_goggles", "fff_apron", "fff_cape_artisan", "hammer", "knife", "chisel", "needle", "thread", "tinderbox", "inkcoal", "moonsilver_bar", "ashsteel_bar", "blackiron_bar", "moonsilver_limbs", "ashsteel_limbs", "ashwood_stock", "pine_logs", "ash_logs", "stag_antler", "vial"] },
+  fff_outfitter: { id: "fff_outfitter", name: "Free Clothes", buys: [], rate: 0.5, stock: ["fff_cap", "fff_tunic", "fff_trousers", "fff_workboots"] },
+  raria_armoury: { id: "raria_armoury", name: "The Regimental Stores", buys: ["weapon", "armour"], rate: 0.5, stock: ["rrr_helm", "rrr_cuirass", "rrr_greaves", "rrr_gauntlets", "rrr_boots", "rrr_heater", "rrr_banner", "rarian_sword", "rarian_greatsword", "rarian_spear", "rarian_halberd", "rarian_dagger", "rarian_crossbow", "rarian_bow", "moonsilver_bolts", "moonsilver_arrow"] },
+  raria_faith: { id: "raria_faith", name: "The Chapel of the Law's Stores", buys: ["bones"], rate: 0.5, stock: ["wise_cowl", "wise_vestment", "wise_skirts", "wise_sandals", "wise_pavise", "rarian_mace", "faith_banner", "ritual_scroll_case", "law_book", "faith_potion", "law_sigil"] },
+  raria_mage: { id: "raria_mage", name: "The Office of Sigils", buys: ["sigil", "magic"], rate: 0.5, stock: ["rarian_staff", "sigil_frame", "law_sigil", "dusk_sigil", "crown_sigil", "thought_sigil", "stone_sigil", "ember_sigil", "shade_sigil", "tide_sigil", "path_sigil"] },
+  raria_clothier: { id: "raria_clothier", name: "The Sumptuary Office", buys: [], rate: 0.5, stock: ["rarian_veil", "rarian_tabard", "rarian_skirts", "rarian_slippers", "rarian_mantle"] },
+  raria_general: { id: "raria_general", name: "The Provisioner of the Crown", general: true, buys: ["food", "other", "fish"], rate: 0.5, stock: ["bread", "cake", "pot", "bucket", "tinderbox", "knife", "hammer", "vial"] },
+  dusk_armoury: { id: "dusk_armoury", name: "The Dusk Armoury", buys: ["weapon", "armour"], rate: 0.5, stock: orderStock("dusk") },
+  barkreach_fletcher: { id: "barkreach_fletcher", name: "The Antler and Bow", buys: ["bow", "arrow", "logs"], rate: 0.55, stock: ["redwood_bow", "ironbark_bow", "redwood_war_bow", "broadhead_arrow", "arrow_shaft", "feather", "string", "redwood_logs", "ironbark_logs", "stag_antler"] },
+  barkreach_lumber: { id: "barkreach_lumber", name: "The Heartwood Yard", buys: ["logs"], rate: 0.7, stock: ["pewter_axe", "blackiron_axe", "ashsteel_axe", "moonsilver_axe", "redwood_logs", "ironbark_logs", "logs", "oak_logs", "tinderbox"] },
+  barkreach_outfitter: { id: "barkreach_outfitter", name: "Resin and Hide", buys: ["hide"], rate: 0.5, stock: ["woodsman_cap", "woodsman_jerkin", "woodsman_breeches", "woodsman_boots", "cowhide", "leather"] },
   ink_armoury: { id: "ink_armoury", name: "The Ink Armoury", buys: ["weapon", "armour"], rate: 0.5, stock: orderStock("ink") },
   sol_armoury: { id: "sol_armoury", name: "The Sol Armoury", buys: ["weapon", "armour"], rate: 0.5, stock: orderStock("sol") },
   hood_armoury: { id: "hood_armoury", name: "The Hood Armoury", buys: ["weapon", "armour"], rate: 0.5, stock: orderStock("hood") },
+  ember_armoury: { id: "ember_armoury", name: "The Ember Armoury", buys: ["weapon", "armour"], rate: 0.5, stock: orderStock("ember") },
   maidens_market: { id: "maidens_market", name: "The Maidens' Market", buys: ["bones", "logs"], rate: 0.6, stock: ["rarite_ore", "hollow_essence", "gloom_shard", "wyrm_scale", "cinder_core", "crystal_shard", "grave_dust", "ink_page", "hollow_sigil", "star_sigil", "path_sigil", "shade_sigil", "vault_key", "archive_key", "deepglass_key", "moss_key", "antidote", "deadwood_logs", "maiden_veil", "maiden_mail", "maiden_skirt", "maiden_boots"] },
   // The Rare Friends Ring's concourse: everything a fighter needs, and two shops that take only what the Ring pays out.
   ring_potions: { id: "ring_potions", name: "The Ring Apothecary", buys: ["food"], rate: 0.5, stock: ["healing_tonic", "saltwort_tonic", "attack_potion", "strength_potion", "defence_potion", "ranged_potion", "magic_potion", "faith_potion", "energy_draught", "antidote", "bread", "cooked_meat", "sailfish"] },

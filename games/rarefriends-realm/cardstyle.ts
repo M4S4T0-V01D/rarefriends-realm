@@ -4,6 +4,7 @@
  */
 import type { Game } from "./state.ts";
 import { levelForXp } from "./data.ts";
+import { ORDERS, metOrder, type OrderId } from "./knights.ts";
 
 export type CardCategory = "bg" | "frame" | "skills" | "font" | "ink" | "layout" | "banner";
 /** The presets by category, plus any custom colours (hex) that override the ink, the background and the backdrop. */
@@ -11,7 +12,8 @@ export type CardStyle = Record<CardCategory, string> & { inkColor?: string; bgCo
 export const CARD_COLOR_KEYS = ["inkColor", "bgColor", "frameColor", "accentColor", "bannerColor"] as const;
 export const CARD_COLOR_NAMES: Record<typeof CARD_COLOR_KEYS[number], string> = { inkColor: "Ink colour", bgColor: "Background colour", frameColor: "Backdrop colour", accentColor: "Accent colour", bannerColor: "Banner colour" };
 export const isHexColor = (value: unknown): value is string => typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value);
-export type CardOption = { id: string; name: string; presence?: number; quest?: string; achievements?: number; text?: string };
+/** An option's lock: Presence, a quest, achievements, or (Return of Raria) an Order or faction whose leader you must have met in the world. */
+export type CardOption = { id: string; name: string; presence?: number; quest?: string; achievements?: number; text?: string; order?: OrderId | "fff" | "raria" | "hollowmere" };
 export const DEFAULT_CARD: CardStyle = { bg: "paper", frame: "rose", skills: "boxes", font: "mono", ink: "ink", layout: "classic", banner: "auto" };
 export const CARD_CATEGORY_NAMES: Record<CardCategory, string> = { bg: "Card background", frame: "Behind your Friend", skills: "Skills panel", font: "Lettering", ink: "Ink", layout: "Layout", banner: "Header banner" };
 export const CARD_OPTIONS: Record<CardCategory, readonly CardOption[]> = {
@@ -19,28 +21,50 @@ export const CARD_OPTIONS: Record<CardCategory, readonly CardOption[]> = {
     { id: "paper", name: "Paper", text: "The Realm's own paper and grid." }, { id: "parchment", name: "Parchment" }, { id: "rose", name: "Rose" }, { id: "sage", name: "Sage" }, { id: "sky", name: "Sky" },
     { id: "lavender", name: "Lavender" }, { id: "snow", name: "Snow" }, { id: "slate", name: "Slate" }, { id: "night", name: "Starry night" }, { id: "ocean", name: "Ocean" }, { id: "forest", name: "Forest" },
     { id: "ember", name: "Ember" }, { id: "dusk", name: "Dusk" }, { id: "deadwood", name: "Deadwood" }, { id: "ashfall", name: "Ashfall" }, { id: "gold", name: "Gilt" }, { id: "ink", name: "Ink" }, { id: "void", name: "The Hollow" },
+    // Return of Raria: stone, brutal black, glyphs, the far west's colours, and each Order's own ground (its leader met first).
+    { id: "stone", name: "Ancient stone", text: "A tablet of old grey stone, cracked." }, { id: "brutal", name: "Brutalist", text: "Heavy black blocks and one white line." }, { id: "glyphs", name: "Glyphs", text: "A ring of magic glyphs on dark violet." },
+    { id: "copper", name: "Copper", text: "The Federation's copper and verdigris.", order: "fff" }, { id: "violet", name: "Dusk violet", text: "Raria's violet, the closed eye faint in it.", order: "raria" }, { id: "crimson", name: "Hollowmere crimson", text: "The kingdom's crimson and gold.", order: "hollowmere" },
+    { id: "facets", name: "Facets", text: "The Diamond's blue, faceted.", order: "diamond" }, { id: "pages", name: "Pages", text: "The Ink's purple over written pages.", order: "ink" }, { id: "prism", name: "Prism", text: "The Sol's every colour at once.", order: "sol" },
+    { id: "greenwood", name: "Greenwood", text: "The Hood's leaves in the sun.", order: "hood" }, { id: "forge", name: "Forge", text: "The Ember's iron and fire.", order: "ember" }, { id: "vespers", name: "Vespers", text: "The Dusk's violet dark, a censer's smoke in it.", order: "dusk" },
   ],
   frame: [
     { id: "rose", name: "Rose" }, { id: "sage", name: "Sage" }, { id: "sky", name: "Sky" }, { id: "sunset", name: "Sunset" }, { id: "lavender", name: "Lavender" }, { id: "snow", name: "Snow" }, { id: "gold", name: "Gold" },
     { id: "ember", name: "Ember" }, { id: "ocean", name: "Ocean" }, { id: "forest", name: "Forest" }, { id: "slate", name: "Slate" }, { id: "night", name: "Night" }, { id: "dawn", name: "Dawn" }, { id: "hollow", name: "Hollow" },
     { id: "starry", name: "Starry" }, { id: "renown", name: "Renown" }, { id: "plain", name: "Plain" }, { id: "fellowship", name: "Fellowship", text: "Your fellowship's banner and emblem behind your Friend." },
+    // Return of Raria: the far west's halls behind your Friend, and each Order's (its leader met first).
+    { id: "palace", name: "Raria's palace", text: "The throne room of Raria: pillars, the closed eye, violet and silver.", order: "raria" }, { id: "fortress", name: "The Great Hall", text: "The Federation's Great Hall: devices, swords from the ceiling, the cannon.", order: "fff" }, { id: "hollowmere", name: "Hollowmere", text: "The kingdom's crimson banners and the castle wall.", order: "hollowmere" },
+    { id: "diamond_hall", name: "Diamond Hall", text: "The Order of the Diamond's hall and god.", order: "diamond" }, { id: "ink_hall", name: "Ink Hall", text: "The Order of the Ink's hall and god.", order: "ink" }, { id: "sol_hall", name: "Sol Hall", text: "The Order of the Sol's hall and god.", order: "sol" },
+    { id: "hood_hall", name: "Hood Hall", text: "The Order of the Hood's hall and god.", order: "hood" }, { id: "ember_hall", name: "Ember Fortress", text: "The Order of the Ember's brazier and lava.", order: "ember" }, { id: "dusk_hall", name: "Dusk Hall", text: "The Order of Dusk's dark hall and hooded god.", order: "dusk" },
   ],
   skills: [{ id: "boxes", name: "Boxes" }, { id: "pills", name: "Pills" }, { id: "outline", name: "Outline" }, { id: "soft", name: "Soft" }, { id: "stripes", name: "Stripes" }, { id: "dark", name: "Ink" }, { id: "gilded", name: "Gilded" }],
   font: [{ id: "mono", name: "Mono" }, { id: "serif", name: "Serif" }, { id: "sans", name: "Sans" }, { id: "rounded", name: "Rounded" }, { id: "slab", name: "Slab" }, { id: "narrow", name: "Narrow" }, { id: "cursive", name: "Script" }, { id: "display", name: "Display" }],
   ink: [{ id: "ink", name: "Ink" }, { id: "navy", name: "Navy" }, { id: "wine", name: "Wine" }, { id: "forest", name: "Forest" }, { id: "plum", name: "Plum" }, { id: "ember", name: "Ember" }, { id: "teal", name: "Teal" }, { id: "rose", name: "Rose" }, { id: "slate", name: "Slate" }, { id: "gilt", name: "Gold" }],
-  layout: [{ id: "classic", name: "Classic" }, { id: "ledger", name: "Ledger", text: "Skills on the left, your Friend on the right." }, { id: "poster", name: "Poster", text: "A big portrait, the skills beside it." }, { id: "centre", name: "Centre", text: "Your Friend in the middle, skills either side." }, { id: "banner", name: "Banner", text: "Your Friend up top, every skill in a wide row." }],
+  layout: [{ id: "classic", name: "Classic" }, { id: "ledger", name: "Ledger", text: "Skills on the left, your Friend on the right." }, { id: "poster", name: "Poster", text: "A big portrait, the skills beside it." }, { id: "centre", name: "Centre", text: "Your Friend in the middle, skills either side." }, { id: "banner", name: "Banner", text: "Your Friend up top, every skill in a wide row." },
+    // Return of Raria: layouts that change the whole page, and each Order's and faction's own (its leader met first).
+    { id: "minimal", name: "Minimal", text: "Nothing but the lines: thin rules, small type, lots of air." }, { id: "ancient", name: "Ancient", text: "A stone tablet: chiselled panels, a cracked edge, the skills in columns." }, { id: "brutalist", name: "Brutalist", text: "Heavy black blocks, one white rule, the portrait boxed hard." },
+    { id: "facet", name: "Facet", text: "The Diamond's: ornate gilt corners, a faceted frame, the skills as cut stones.", order: "diamond" }, { id: "folio", name: "Folio", text: "The Ink's: a scriptorium page with ruled lines, drop capitals and a purple seal.", order: "ink" },
+    { id: "prism", name: "Prism", text: "The Sol's: tilted panels, rays of every colour, nothing quite square.", order: "sol" }, { id: "greenwood", name: "Greenwood", text: "The Hood's: a forest edge, a hood's silhouette, leaves at the margins.", order: "hood" },
+    { id: "forge", name: "Forge", text: "The Ember's: riveted iron plates, embers rising, the skills stamped in metal.", order: "ember" }, { id: "vespers", name: "Vespers", text: "The Dusk's: a ceremonial arch, candles, violet drapes, the closed eye.", order: "dusk" },
+    { id: "workshop", name: "Workshop", text: "The Federation's: copper panels, gears, red string, FFF across the band.", order: "fff" }, { id: "edict", name: "Edict", text: "Raria's: a military writ, stencilled bars, the Regiment's eye and seal.", order: "raria" },
+    { id: "garrison", name: "Garrison", text: "Hollowmere's: crimson banners, the crown, a castle wall behind the skills.", order: "hollowmere" },
+  ],
   banner: [{ id: "auto", name: "Auto", text: "Your fellowship's banner if you have one, a plain bar otherwise." }, { id: "none", name: "None" }, { id: "fellowship", name: "Fellowship" },
     ...["plain", "split", "stripes", "chevrons", "checks", "stars", "flames", "waves", "diagonal", "quarters", "border", "dots", "zigzag", "sunburst", "cross", "fade"].map(id => ({ id, name: id[0].toUpperCase() + id.slice(1), text: "Your own banner, in your banner and accent colours." }))],
 };
 /** Every style is free: the card is the player's. (The checks stay for any option that names a condition.) */
 export function cardUnlocked(game: Game, option: CardOption): boolean {
   const player = game.player;
+  if (option.order === "fff" && !((player.questData.met_fff ?? 0) >= 1)) return false;
+  if (option.order === "raria" && !((player.questData.met_raria ?? 0) >= 1)) return false;
+  if (option.order === "hollowmere" && !player.talked.hollowmere_officer) return false;
+  if (option.order && option.order in ORDERS && !metOrder(player.questData, option.order as OrderId)) return false;
   if (option.presence && levelForXp(player.xp.presence) < option.presence) return false;
   if (option.quest && (player.quests[option.quest] ?? 0) < 2) return false;
   if (option.achievements && Object.keys(player.achievements).length < option.achievements) return false;
   return true;
 }
-export const cardRequirement = (option: CardOption) => option.presence ? `Presence ${option.presence}` : option.quest ? option.text ?? option.quest : option.achievements ? `${option.achievements} achievements` : "";
+export const cardRequirement = (option: CardOption) => option.presence ? `Presence ${option.presence}` : option.quest ? option.text ?? option.quest : option.achievements ? `${option.achievements} achievements`
+  : option.order === "fff" ? "Meet Fellow Free at the FFF Fortress" : option.order === "raria" ? "Be received by Queen Rara in Raria" : option.order === "hollowmere" ? "Speak with Captain Ashby of the Hollowmere garrison" : option.order ? `Meet ${ORDERS[option.order as OrderId].leaderName} of the ${ORDERS[option.order as OrderId].name}` : "";
 /** The style you'll actually get: anything you've picked but no longer qualify for falls back to the default. */
 export function cardStyle(game: Game): CardStyle {
   const picked = game.player.card, out: CardStyle = { ...DEFAULT_CARD };

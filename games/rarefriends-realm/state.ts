@@ -116,6 +116,8 @@ export type Player = {
   orders: Record<string, WorkOrder>;
   /** The adventurer card's chosen style (background, frame, skills panel, font, ink, layout). */
   card: Record<string, string>;
+  /** Return of Raria: the Adventurer Cards you've found (card id → the UTC day), and whether you keep the Wise Friend's Law (Raria's Magic and Faith in place of the Old Friend's). */
+  cards: Record<string, number>; rarian: boolean;
   /** Your home, if you hold a deed, and the ticks of Well Rested left after sleeping in it. */
   home: Home | null; restedTicks: number;
   /** A level-up to celebrate (not saved): other players see its fireworks while it lasts. */
@@ -229,7 +231,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
     style: "accurate", autocast: null, prayers: [], target: null, activity: null, combat: null,
     attackTimer: 0, eatTimer: 0, stunned: 0, regenTimer: 0, quests: {}, questData: {},
     wardrobe: [], worn: [], follower: null, courseStep: -1, kills: 0, deaths: 0, overhead: null, music: ["theme"],
-    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, boneBag: {}, sigilBag: {}, belts: {}, followerWorn: [], orders: {}, card: { bg: "paper", frame: "rose", skills: "boxes", font: "mono", ink: "ink", layout: "classic" }, home: null, restedTicks: 0, ward: null, wardUntil: 0, renew: 0, renewUntil: 0, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, friendVillage: null, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false, rerolls: 0 }, seenUpdate: LATEST_UPDATE,
+    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, boneBag: {}, sigilBag: {}, belts: {}, followerWorn: [], orders: {}, card: { bg: "paper", frame: "rose", skills: "boxes", font: "mono", ink: "ink", layout: "classic" }, cards: {}, rarian: false, home: null, restedTicks: 0, ward: null, wardUntil: 0, renew: 0, renewUntil: 0, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, friendVillage: null, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false, rerolls: 0 }, seenUpdate: LATEST_UPDATE,
     lastHitBy: null, created: Date.now(), queuedSpell: null, castTimer: 0,
   };
 }
@@ -467,6 +469,14 @@ export const slayerSetWorn = (player: Player, set: string) => setPieces(player, 
 export const fullSlayerSet = (player: Player, set: string) => setPieces(player, set) >= 3;
 // ---------- The ossuary bag ----------
 export const BONE_BAG = "bone_bag", BONE_BAG_SIZE = 60;
+/** Keep (or set down) the Wise Friend's Law (Return of Raria): Raria's Magic and Faith in place of the Old Friend's. Active prayers end either way; the old book is closed, not lost. */
+export function setLaw(game: Game, keep: boolean) {
+  const player = game.player;
+  if (player.rarian === keep) return;
+  player.rarian = keep; player.prayers = []; if (player.autocast) player.autocast = null;
+  message(game, keep ? "You keep the Wise Friend's Law. Your Magic is Raria's edicts now, and your Faith its commandments and rites; the Old Friend's book is closed." : "You set the Law down. The Old Friend's book opens again, and Raria's closes.", "quest");
+  sound(game, "quest");
+}
 /** Worn on the back or carried in your pack, the ossuary bag catches the bones you pick up and empties itself onto an altar. */
 export const hasBoneBag = (player: Player) => has(player, BONE_BAG) || player.equipment.cape === BONE_BAG;
 /** You own one at all (worn, in your pack or the bank): Sister Maren hands one over otherwise. */

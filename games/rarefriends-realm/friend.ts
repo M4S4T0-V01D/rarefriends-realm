@@ -125,7 +125,7 @@ export function friendTick(game: Game) {
     }
     if (best && best.id !== p.friendSeen) {
       p.friendSeen = best.id;
-      const def = MONSTERS[best.id], kills = p.killLog[best.id] ?? 0, name = def.name.toLowerCase();
+      const def = MONSTERS[best.id], kills = p.killLog[best.id] ?? 0, name = def.name.toLowerCase().replace(/\b(rrr|fff)\b/g, word => word.toUpperCase()).replace(/\braria\b/g, "Raria");
       if (def.breath) { if (remember(game, "first_dragon") || kills < 3) friendSays(game, "dragon"); else friendSays(game, "dragon_again"); }
       else if (def.undead) friendSays(game, "undead");
       else if (kills >= 50) friendSays(game, "creature_again", name, kills);

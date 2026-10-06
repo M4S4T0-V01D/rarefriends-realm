@@ -2435,12 +2435,27 @@ function drawNpc(ctx: CanvasRenderingContext2D, scene: Scene, npc: Npc, at: { x:
 /** What some NPCs wear, composited into their sprite like your own gear: the King's regalia, and the guards' helms, battleaxes and red capes. */
 const NPC_WEAR: Record<string, readonly string[]> = {
   // The four Orders: commanders in Paladin plate, quartermasters and guards in Knight.
-  ...Object.fromEntries((["diamond", "ink", "sol", "hood", "ember"] as const).flatMap(order => [
+  ...Object.fromEntries((["diamond", "ink", "sol", "hood", "ember", "dusk"] as const).flatMap(order => [
     [`${order}_commander`, [`${order}_paladin_helm`, `${order}_paladin_body`, `${order}_paladin_legs`, `${order}_paladin_boots`, `${order}_cape`, `${order}_paladin_mace`]],
     [`${order}_quartermaster`, [`${order}_knight_body`, `${order}_knight_legs`, `${order}_knight_boots`, `${order}_cape`]],
     [`${order}_guard`, [`${order}_knight_helm`, `${order}_knight_body`, `${order}_knight_legs`, `${order}_knight_boots`, `${order}_knight_kite`, `${order}_knight_mace`]],
   ])),
   maiden_matriarch: ["maiden_veil", "maiden_mail", "maiden_skirt", "maiden_boots", "vigil_spear"], maiden_trader: ["maiden_veil", "maiden_mail", "maiden_skirt", "maiden_boots"],
+  // Return of Raria: the royal household, the Regiment, the Order of Dusk's prior, the Federation, BarkReach and Hollowmere's soldiers.
+  queen_rara: ["royal_circlet", "ceremonial_standard", "rarian_skirts"], king_pell: ["royal_circlet", "law_book", "rarian_tabard"],
+  dusk_prior: ["dusk_paladin_helm", "dusk_paladin_body", "dusk_paladin_legs", "dusk_cape", "dusk_paladin_staff", "dusk_lantern"],
+  raria_gate_captain: ["rrr_helm", "rrr_cuirass", "rrr_greaves", "rrr_boots", "rrr_banner", "rarian_halberd"], rrr_officer: ["rrr_helm", "rrr_cuirass", "rrr_greaves", "rrr_boots", "rrr_banner", "rarian_greatsword"],
+  rrr_soldier: ["rrr_helm", "rrr_cuirass", "rrr_greaves", "rrr_boots", "rrr_heater", "rarian_spear"], raria_clerk: ["rarian_veil", "rarian_tabard", "law_book"], raria_assessor: ["rarian_veil", "rarian_tabard", "rarian_skirts", "law_book"],
+  raria_chaplain: ["wise_cowl", "wise_vestment", "wise_skirts", "faith_banner"], raria_sigilist: ["wise_cowl", "rarian_tabard", "sigil_frame", "rarian_staff"], raria_armourer: ["rrr_cuirass", "rrr_gauntlets", "rarian_tabard"],
+  raria_clothier: ["rarian_veil", "rarian_tabard", "rarian_skirts", "rarian_mantle"], raria_provisioner: ["rarian_veil", "rarian_tabard"],
+  fellow_free: ["fff_wizard_hat", "fff_mage_coat", "fff_cape_elite", "fff_staff"], fff_gatewarden: ["fff_hood", "fff_reinforced_robe", "fff_cape_wizard", "fff_wand", "fff_spellward"],
+  fff_archwizard: ["fff_wizard_hat", "fff_wizard_robe", "fff_cape_wizard", "fff_staff"], fff_ranger_captain: ["fff_ranger_hood", "fff_ranger_jerkin", "fff_ranger_chaps", "fff_cape_ranger", "fff_longbow"],
+  fff_artificer: ["fff_goggles", "fff_apron", "fff_cape_artisan", "fff_tinker_hammer"], fff_armourer: ["fff_helm", "fff_cuirass", "fff_cape_knight", "fff_sword", "fff_heater"], fff_librarian: ["fff_hood", "fff_mage_coat", "fff_cape_wizard", "fff_spellbook"],
+  fff_outfitter: ["fff_cap", "fff_tunic", "fff_cape_artisan"], fff_knight_asleep: ["fff_helm", "fff_cuirass", "fff_cape_knight"], fff_wizard_arguing: ["fff_wizard_hat", "fff_battle_robe", "fff_cape_wizard", "fff_wand"], fff_ranger: ["fff_ranger_hood", "fff_ranger_jerkin", "fff_cape_ranger", "fff_longbow"],
+  barkreach_foreman: ["woodsman_cap", "woodsman_jerkin", "woodsman_breeches", "woodsman_boots", "moonsilver_axe"], barkreach_bowyer: ["woodsman_cap", "woodsman_jerkin", "redwood_bow"], barkreach_outfitter: ["woodsman_jerkin", "woodsman_breeches"],
+  barkreach_ranger: ["woodsman_cap", "woodsman_jerkin", "woodsman_breeches", "ironbark_bow"], barkreach_hunter: ["woodsman_cap", "woodsman_jerkin", "woodsman_boots", "redwood_war_bow"],
+  hollowmere_officer: ["moonsilver_helm", "moonsilver_cuirass", "hollowmere_cape", "moonsilver_greatsword"], hollowmere_soldier: ["blackiron_helm", "blackiron_cuirass", "hollowmere_cape", "blackiron_battleaxe"], hollowmere_lieutenant: ["ashsteel_helm", "ashsteel_cuirass", "hollowmere_cape", "ashsteel_greatsword"],
+  hollowmere_scout: ["hollowmere_cape", "willow_bow"], hollowmere_messenger: ["hollowmere_cape"], west_watcher: ["pilgrim_cape"],
   king: ["paper_crown", "blue_cape"],
   guard: ["blackiron_helm", "blackiron_cuirass", "crimson_cape", "blackiron_battleaxe"],
   royal_guard: ["ashsteel_helm", "ashsteel_cuirass", "ashsteel_greaves", "crimson_cape", "ashsteel_battleaxe"],
@@ -2606,7 +2621,7 @@ function skillcapeRays(ctx: CanvasRenderingContext2D, x: number, y: number, z: n
 }
 function questMarkerFor(game: Game, npcId: string): string | null {
   const q = game.player.quests;
-  const starts: Record<string, string> = { cook: "friends_feast", captain: "grumblin_trouble", smith: "cold_forge", priest: "hollow_whispers", glimmer: "lost_glimmer", hazel: "hazels_quiver",
+  const starts: Record<string, string> = { hollowmere_officer: "west_watch", raria_gate_captain: "rrr_truce", fff_gatewarden: "fff_truce", barkreach_foreman: "barkreach_heartwood", fff_ranger_captain: "fff_rangers", fff_wizard_arguing: "fff_toaster", cook: "friends_feast", captain: "grumblin_trouble", smith: "cold_forge", priest: "hollow_whispers", glimmer: "lost_glimmer", hazel: "hazels_quiver",
     gravesend_keeper: "gravesend_lanterns", saltmarrow_harbour: "saltmarrow_tithe", hollyhock_apothecary: "hollyhock_errand", dyemoor_dyer: "dyemoor_dye", tallgrass_huntmaster: "tallgrass_tracks", cragmaw_foreman: "cragmaw_shaft", quillhaven_archivist: "quillhaven_folio", ashfall_trader: "ashfall_embers" };
   const quest = starts[npcId];
   if (quest && !q[quest]) return C.butter;

@@ -461,3 +461,38 @@
 /* An item being dragged (inventory and bank): follows the pointer, never blocks it. */
 .realm-drag-ghost { position: fixed; z-index: 1000; pointer-events: none; opacity: 0.85; filter: drop-shadow(2px 3px 0 rgba(0,0,0,0.35)); }
 .realm-inventory .realm-slot[data-over] { outline: 2px solid var(--gold, #c9a24a); outline-offset: -2px; }
+
+/* ---------- Return of Raria: the Wise Friend's Law over Magic and Faith ---------- */
+.realm-law-keep { width: 100%; margin: 0 0 6px; padding: 5px 8px; border: 1.5px solid #3b2a52; background: #e6e2ee; color: #3b2a52; font-weight: 700; border-radius: 4px; }
+.realm-rarian { position: relative; margin: -6px; padding: 8px; border: 2px solid #8a6ab0; border-radius: 3px; color: #d8d6e4;
+  background: radial-gradient(ellipse at 50% 0%, rgba(138,106,176,0.32), transparent 60%), repeating-linear-gradient(90deg, rgba(216,214,228,0.035) 0 1px, transparent 1px 22px), linear-gradient(#231a33, #120d1a);
+  box-shadow: inset 0 0 0 3px #16111f, inset 0 0 0 4px rgba(201,168,74,0.6); }
+.realm-rarian::before, .realm-rarian::after { content: ""; position: absolute; width: 14px; height: 14px; border: 2px solid #c9a84a; pointer-events: none; }
+.realm-rarian::before { left: 3px; top: 3px; border-right: 0; border-bottom: 0; } .realm-rarian::after { right: 3px; bottom: 3px; border-left: 0; border-top: 0; }
+.realm-rarian .realm-muted { color: #b9aed0; } .realm-rarian b { color: #f0eaff; }
+.realm-law-head { display: grid; justify-items: center; gap: 2px; margin: 0 0 6px; padding: 4px 4px 6px; text-align: center; border-bottom: 1px solid rgba(201,168,74,0.5); }
+.realm-law-head b { font-family: Georgia, "Times New Roman", serif; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: #e6c46a; }
+.realm-law-head small { font-size: 10px; color: #b9aed0; font-style: italic; }
+.realm-law-head button { margin-top: 3px; padding: 1px 8px; font-size: 10px; border: 1px solid #8a6ab0; background: #2a2238; color: #d8d6e4; border-radius: 10px; }
+.realm-law-eye { width: 34px; height: 14px; border: 2px solid #c9a84a; border-radius: 50% / 100% 100% 0 0; border-bottom-color: transparent; position: relative; }
+.realm-law-eye::after { content: ""; position: absolute; left: 3px; right: 3px; top: 6px; height: 6px; border-bottom: 2px solid #c9a84a; border-radius: 0 0 50% 50%; }
+.realm-rarian .realm-icon-grid button { border: 1px solid #8a6ab0; border-radius: 0; clip-path: polygon(50% 0, 100% 18%, 100% 82%, 50% 100%, 0 82%, 0 18%); background: radial-gradient(#3b2a52, #16111f); }
+.realm-rarian .realm-icon-grid button:hover:not(:disabled) { background: radial-gradient(#5a4a6e, #2a2238); }
+.realm-rarian .realm-icon-grid button[aria-pressed="true"] { background: radial-gradient(#c9a84a, #4a2b3a); }
+.realm-rarian .realm-magic-tabs button { border-color: #8a6ab0; background: #2a2238; color: #d8d6e4; font-family: Georgia, "Times New Roman", serif; font-style: italic; }
+.realm-rarian .realm-magic-tabs button[aria-selected="true"] { background: #c9a84a; color: #16111f; }
+.realm-rarian .realm-info { background: #1e1629; color: #d8d6e4; border-color: #8a6ab0; font-family: Georgia, "Times New Roman", serif; }
+.realm-rarian .realm-info small, .realm-rarian .realm-info em { color: #b9aed0; }
+
+/* ---------- Return of Raria: the Adventurer Cards collection ---------- */
+.realm-codex-bar { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 8px; }
+.realm-codex-bar button { padding: 3px 8px !important; min-height: 0 !important; font-size: 11px; }
+.realm-codex-bar button[aria-pressed="true"] { background: var(--ink) !important; color: var(--paper) !important; }
+.realm-codex { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; overflow-y: auto; max-height: min(60vh, 520px); padding: 2px 4px 4px 2px; }
+.realm-codex-card { display: grid; grid-template-rows: auto 1fr; gap: 4px; padding: 6px; min-height: 150px; border: 2px solid var(--ink); border-radius: 6px; background: #fff; box-shadow: 2px 2px 0 var(--ink); text-align: left; }
+.realm-codex-card[data-found="false"] { background: repeating-linear-gradient(45deg, #e7e4dc 0 6px, #dedad1 6px 12px); box-shadow: none; opacity: .8; }
+.realm-codex-card[data-faction="raria"] { border-color: #3b2a52; } .realm-codex-card[data-faction="fff"] { border-color: #2f7d68; } .realm-codex-card[data-faction="hollowmere"] { border-color: #8a2f2b; }
+.realm-codex-art { height: 64px; display: grid; place-items: center; border-radius: 4px; background: #2f2d2b; overflow: hidden; }
+.realm-codex-art img, .realm-codex-art canvas { image-rendering: pixelated; max-height: 60px; }
+.realm-codex-card b { font-size: 11px; line-height: 1.2; } .realm-codex-card small { font-size: 10px; color: var(--muted); line-height: 1.25; }
+.realm-codex-detail { margin: 8px 0 0; padding: 8px 10px; border: 2px solid var(--ink); border-radius: 6px; background: #fff; }

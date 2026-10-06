@@ -51,7 +51,7 @@ try {
     const playing = await level();
     assert.ok(playing > 0.03, `${name}: main theme too quiet (${playing})`);
     // The jukebox has every track; switching plays the new one.
-    assert.equal(await page.locator("#jukebox button").count(), 47);
+    assert.equal(await page.locator("#jukebox button").count(), 51);
     const forge = page.locator('#jukebox button[data-track="emberforge"]');
     await forge.scrollIntoViewIfNeeded(); await (touch ? forge.tap() : forge.click());
     await page.waitForTimeout(2500); await level(); await page.waitForTimeout(2000);
@@ -74,10 +74,10 @@ try {
     assert.equal(await trailer.evaluate(video => video.muted), false, `${name}: unmuted`);
     assert.equal(await sound.isHidden(), true);
     // The video carousel: the newest update first, the reel of what's next under it, and "next" moving on to the trailer.
-    assert.match(await trailer.getAttribute("src"), /update-orders\.mp4$/, `${name}: the newest update plays first`);
-    assert.equal(await page.locator("#trailer-reel button").count(), 6, `${name}: the reel shows the other six videos`);
+    assert.match(await trailer.getAttribute("src"), /update-raria\.mp4$/, `${name}: the newest update plays first`);
+    assert.equal(await page.locator("#trailer-reel button").count(), 7, `${name}: the reel shows the other seven videos`);
     await page.locator("#trailer-next").click();
-    assert.match(await trailer.getAttribute("src"), /update-ring\.mp4$/, `${name}: next plays the update before it`);
+    assert.match(await trailer.getAttribute("src"), /update-orders\.mp4$/, `${name}: next plays the update before it`);
     assert.equal(await trailer.evaluate(video => video.muted), false, `${name}: sound stays on from one video to the next`);
     // The picture galleries: every figure of the two grids in a filmstrip, the stage showing the one chosen, wrapping round.
     const galleries = page.locator(".gallery");

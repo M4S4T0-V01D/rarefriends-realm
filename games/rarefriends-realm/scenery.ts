@@ -19,6 +19,8 @@ const TREES: Record<string, TreeStyle> = {
   tree: { canopy: "#b3c1a6", shape: "round", w: 26, h: 38 }, oak: { canopy: "#a2b096", shape: "broad", w: 32, h: 40 },
   willow: { canopy: "#c2cbab", shape: "willow", w: 32, h: 40 }, maple: { canopy: "#d9b39a", shape: "broad", w: 30, h: 42 },
   yew: { canopy: "#8a9583", shape: "cone", w: 24, h: 46 }, ashwood: { canopy: "#e0e3e8", shape: "pale", w: 28, h: 44 },
+  // BarkReach (Return of Raria): tall red-canopied redwoods, and the grey, broad ironbarks.
+  redwood: { canopy: "#9a4a3a", shape: "cone", w: 26, h: 50 }, ironbark: { canopy: "#7d8a7a", shape: "broad", w: 34, h: 44 },
 };
 function trunk(p: Pixels, cx: number, bottom: number, height: number, width = 4) {
   p.rect(cx - width / 2, bottom - height, width, height, BARK);
@@ -119,32 +121,104 @@ export function decorArt(kind: string, variant: number, frame = 0): HTMLCanvasEl
       p.poly([[8, 22], [18, 22], [16, 14], [20, 9], [15, 10], [13, 2], [11, 10], [6, 8], [10, 14]], "#ff6a2a", INK); p.poly([[10, 21], [16, 21], [15, 15], [13, 8], [11, 15]], "#ffd27a", null); p.poly([[12, 21], [14, 21], [13, 15]], "#ffffff", null);
       p.outline();
     });
-    case "god_diamond": case "god_ink": case "god_sol": case "god_hood": return pixelArt(key, 26, 38, p => {
-      const order = ORDERS[kind.slice(4) as keyof typeof ORDERS], color = order.color, accent = order.accent, dark = order.dark, STONE = "#b9b5ae", STONE_D = "#8f8a83";
-      // The plinth.
-      p.rect(4, 31, 18, 6, STONE); p.rect(3, 34, 20, 3, STONE_D); p.line(4, 31, 21, 31, "#d7d4cd");
+    case "god_diamond": case "god_ink": case "god_sol": case "god_hood": return pixelArt(key, 30, 44, p => {
+      const order = ORDERS[kind.slice(4) as keyof typeof ORDERS], color = order.color, accent = order.accent, dark = order.dark, STONE = "#b9b5ae", STONE_D = "#8f8a83", STONE_L = "#d7d4cd";
+      // A stepped plinth with the Order's colour inlaid along its face, and a plaque.
+      p.rect(3, 37, 24, 6, STONE); p.rect(2, 40, 26, 3, STONE_D); p.line(3, 37, 26, 37, STONE_L); p.rect(6, 34, 18, 3, STONE); p.line(6, 34, 23, 34, STONE_L); p.rect(8, 38, 14, 2, color); p.rect(11, 41, 8, 1, accent);
       if (kind === "god_diamond") {
-        // A diamond standing on its point, two eyes in its upper half, and a little base where the point meets the plinth.
-        p.poly([[13, 3], [23, 15], [13, 30], [3, 15]], color, INK); p.poly([[13, 3], [23, 15], [13, 15]], shadeHex(color, 0.18), null); p.poly([[3, 15], [13, 15], [13, 30]], dark, null);
-        p.line(3, 15, 23, 15, accent); p.line(13, 3, 13, 30, shadeHex(color, -0.25));
-        p.set(10, 10, INK); p.set(16, 10, INK); p.set(10, 9, accent); p.set(16, 9, accent);
+        // The Good Friend: a diamond standing on its point, faceted, a sword held upright before it in two small hands, a halo of six points: the promise kept.
+        for (let i = 0; i < 6; i++) { const a = -Math.PI / 2 + i * Math.PI / 3; p.line(15 + Math.cos(a) * 11, 17 + Math.sin(a) * 11, 15 + Math.cos(a) * 14, 17 + Math.sin(a) * 14, accent, 1); }
+        p.poly([[15, 3], [27, 17], [15, 34], [3, 17]], color, INK); p.poly([[15, 3], [27, 17], [15, 17]], shadeHex(color, 0.22), null); p.poly([[3, 17], [15, 17], [15, 34]], dark, null);
+        p.poly([[9, 10], [21, 10], [15, 17]], shadeHex(color, 0.4), null); p.line(3, 17, 27, 17, accent); p.line(15, 3, 15, 34, shadeHex(color, -0.3)); p.line(9, 10, 21, 10, shadeHex(color, 0.5));
+        p.set(11, 13, INK); p.set(19, 13, INK); p.set(11, 12, accent); p.set(19, 12, accent); p.line(13, 20, 17, 20, INK);
+        p.line(15, 22, 15, 33, STONE_L, 2); p.rect(12, 24, 7, 2, accent); p.rect(14, 22, 3, 2, dark); p.set(12, 27, dark); p.set(18, 27, dark);
       } else if (kind === "god_ink") {
-        // A squid: a tall mantle with two big eyes, and a crown of arms curling down round the plinth.
-        p.disc(13, 12, 7, 9, color, INK); p.disc(13, 8, 4, 3, shadeHex(color, 0.2), null);
-        p.disc(10, 13, 1.8, 1.8, accent, INK); p.disc(16, 13, 1.8, 1.8, accent, INK); p.set(10, 13, INK); p.set(16, 13, INK);
-        for (const [x0, x1] of [[6, 3], [9, 7], [13, 13], [17, 19], [20, 23]] as const) { p.line(x0, 20, x1, 30, dark, 2); p.set(x1, 30, accent); }
+        // The Squid Friend: a tall mantle, two great eyes, a crown of arms curling down round an open book held in two of them, a quill in a third.
+        p.disc(15, 13, 8, 10, color, INK); p.disc(15, 8, 5, 4, shadeHex(color, 0.2), null); p.disc(15, 5, 3, 2, shadeHex(color, 0.35), null);
+        p.disc(11, 14, 2.2, 2.2, accent, INK); p.disc(19, 14, 2.2, 2.2, accent, INK); p.set(11, 14, INK); p.set(19, 14, INK); p.set(12, 13, "#ffffff"); p.set(20, 13, "#ffffff");
+        for (const [x0, x1] of [[7, 3], [10, 8], [15, 15], [20, 22], [23, 27]] as const) { p.line(x0, 22, x1, 33, dark, 2); p.set(x1, 33, accent); }
+        p.rect(9, 26, 12, 6, "#f3eee2"); p.line(15, 26, 15, 31, STONE_D); p.rect(9, 26, 12, 1, STONE_D); for (let y = 28; y <= 30; y++) { p.line(10, y, 13, y, dark); p.line(17, y, 20, y, dark); }
+        p.line(24, 20, 27, 15, "#f3eee2", 1); p.line(26, 16, 27, 14, accent);
       } else if (kind === "god_sol") {
-        // A sun of every colour: rays round a disc with a face that can't decide what it is.
-        const rays = ["#ff5f5f", "#ffb347", "#f7f06d", "#14f195", "#4fc3f7", "#9945ff", "#ff7ad9", "#ffffff"];
-        for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; p.line(13 + Math.cos(a) * 6, 15 + Math.sin(a) * 6, 13 + Math.cos(a) * 12, 15 + Math.sin(a) * 12, rays[i], 2); }
-        p.disc(13, 15, 6.5, 6.5, color, INK); p.disc(13, 15, 4, 4, shadeHex(color, 0.25), null);
-        p.set(11, 13, INK); p.set(15, 14, INK); p.line(11, 17, 15, 17, INK); p.set(16, 16, accent); p.set(10, 16, accent);
+        // The Weird Friend: a sun of every colour, its rays each a different hue, a face that will not settle, and a prism at its feet throwing the colours on the plinth.
+        const rays = ["#ff5f5f", "#ffb347", "#f7f06d", "#14f195", "#4fc3f7", "#9945ff", "#ff7ad9", "#ffffff", "#ffd27a", "#62e6c0", "#c58cff", "#ff9bd2"];
+        for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6, r0 = i % 2 ? 7 : 8, r1 = i % 2 ? 12 : 15; p.line(15 + Math.cos(a) * r0, 15 + Math.sin(a) * r0, 15 + Math.cos(a) * r1, 15 + Math.sin(a) * r1, rays[i], 2); }
+        p.disc(15, 15, 7.5, 7.5, color, INK); p.disc(15, 15, 5, 5, shadeHex(color, 0.25), null); p.disc(13, 13, 2, 2, "#ffffff", null);
+        p.set(12, 13, INK); p.set(17, 14, INK); p.set(17, 13, accent); p.line(12, 18, 17, 18, INK); p.set(18, 17, INK); p.set(11, 17, accent); p.set(19, 16, accent);
+        p.poly([[11, 33], [19, 33], [15, 26]], "#e8e4d6", INK); for (let i = 0; i < 5; i++) p.set(20 + i, 30 + (i % 2), rays[i]); for (let i = 0; i < 5; i++) p.set(9 - i, 30 + (i % 2), rays[6 + i]);
       } else {
-        // A hooded figure, hood deep over the face, a bow over one shoulder.
-        p.poly([[13, 2], [21, 12], [21, 30], [5, 30], [5, 12]], color, INK); p.poly([[13, 2], [21, 12], [13, 12], [5, 12]], shadeHex(color, 0.12), null);
-        p.poly([[8, 12], [18, 12], [16, 20], [10, 20]], accent, null); p.set(11, 15, "#ffffff"); p.set(15, 15, "#ffffff");
-        p.line(4, 6, 22, 28, "#6b4a2c", 2); p.line(4, 6, 22, 28, dark, 1);
+        // The Hood Friend: a deep hood over a face you can't see, a bow across the back, a sack of coins open at its feet and one hand out, giving.
+        p.poly([[15, 2], [24, 13], [24, 33], [6, 33], [6, 13]], color, INK); p.poly([[15, 2], [24, 13], [15, 13], [6, 13]], shadeHex(color, 0.12), null);
+        p.poly([[9, 13], [21, 13], [19, 22], [11, 22]], accent, null); p.set(12, 16, "#ffffff"); p.set(18, 16, "#ffffff"); p.set(13, 17, "#ffffff"); p.set(19, 17, "#ffffff");
+        p.line(4, 7, 26, 31, "#6b4a2c", 2); p.line(4, 7, 26, 31, dark, 1); p.line(5, 9, 25, 30, "#e2d49e", 1);
+        p.poly([[25, 22], [29, 24], [28, 28], [24, 27]], shadeHex(color, 0.3), INK); p.set(27, 25, "#e2d49e"); p.set(26, 26, "#e2d49e");
+        p.disc(7, 31, 3.5, 2.5, "#8a7563", INK); p.set(6, 29, "#e2d49e"); p.set(8, 29, "#e2d49e"); p.set(7, 28, "#e2d49e");
       }
+      p.outline();
+    });
+    // The Wise Friend as Raria carves it: seated on a stepped plinth, blindfolded, a book open on its knees, a ring of six lamps about it; and the Order of Dusk's god, the same figure hooded, in violet, a censer at its feet.
+    case "wise_friend": case "god_dusk": return pixelArt(key, 32, 46, p => {
+      const dusk = kind === "god_dusk", STONE = dusk ? "#5a4a6e" : "#d7d4cd", STONE_D = dusk ? "#3b2a52" : "#b9b5ae", ROBE = dusk ? "#2a2238" : "#e8e4d6", TRIM = dusk ? "#8a6ab0" : "#3b2a52", GOLD = "#c9a84a";
+      p.rect(2, 39, 28, 6, STONE); p.rect(1, 42, 30, 3, STONE_D); p.rect(5, 36, 22, 3, STONE); p.line(5, 36, 26, 36, "#ffffff"); p.rect(8, 40, 16, 2, TRIM);
+      // The seated body: a broad robe to the plinth, knees forward, the book on them.
+      p.poly([[16, 6], [25, 14], [27, 36], [5, 36], [7, 14]], ROBE, INK); p.poly([[7, 14], [16, 6], [16, 36], [5, 36]], shadeHex(ROBE, -0.1), null);
+      p.rect(8, 26, 16, 7, shadeHex(ROBE, 0.06)); p.line(8, 26, 23, 26, TRIM); p.rect(10, 28, 12, 5, "#f3eee2"); p.line(16, 28, 16, 32, STONE_D); for (let y = 29; y <= 31; y++) { p.line(11, y, 14, y, TRIM); p.line(18, y, 21, y, TRIM); }
+      // The head: a round head on a short neck, the blindfold across it, a thin crown of points.
+      p.disc(16, 8, 5.5, 5.5, ROBE, INK); if (dusk) p.poly([[16, 1], [23, 9], [16, 14], [9, 9]], shadeHex(ROBE, -0.15), INK);
+      p.rect(10, 7, 12, 3, TRIM); p.line(10, 8, 21, 8, shadeHex(TRIM, -0.3)); p.line(14, 11, 18, 11, INK);
+      for (const x of [11, 14, 17, 20]) p.set(x, 2, GOLD); p.line(10, 3, 21, 3, GOLD);
+      // The hands on the book, and what stands about it: lamps for the Wise Friend, a censer for the Dusk.
+      p.rect(9, 27, 3, 2, ROBE); p.rect(20, 27, 3, 2, ROBE);
+      if (!dusk) { for (const [x, y] of [[3, 20], [29, 20], [3, 30], [29, 30]] as const) { p.rect(x - 1, y, 3, 6, STONE_D); p.rect(x - 1, y - 3, 3, 3, "#f4ecc8"); p.set(x, y - 2, "#ffffff"); } }
+      else { p.rect(13, 37, 6, 2, GOLD); p.line(16, 33, 16, 37, GOLD); p.disc(16, 35, 2.5, 1.5, "#8a6ab0", null); p.set(15, 33, "#c6bed4"); p.set(17, 32, "#c6bed4"); }
+      p.outline();
+    });
+    // The Federation's cannon: copper, on a wheeled carriage, a verdigris crystal in the breech, and a device, which is a box of brass gears and a glass bulb that is on.
+    case "cannon": return pixelArt(key, 34, 22, p => {
+      p.disc(8, 17, 4.5, 4.5, "#6b4a2c", INK); p.disc(8, 17, 1.5, 1.5, "#b87333", null); p.disc(24, 17, 4.5, 4.5, "#6b4a2c", INK); p.disc(24, 17, 1.5, 1.5, "#b87333", null);
+      p.poly([[4, 14], [28, 14], [26, 10], [6, 10]], "#8a5a3c", INK);
+      p.poly([[2, 9], [30, 4], [33, 7], [5, 13]], "#b87333", INK); p.line(3, 10, 30, 5, "#d9a93f"); p.disc(6, 11, 2, 2, "#4fa58a", INK); p.set(6, 10, "#ffffff"); p.line(30, 4, 33, 7, "#4a3a2c");
+      p.outline();
+    });
+    case "device": return pixelArt(key, 18, 24, p => {
+      p.rect(2, 10, 14, 12, "#8a5a3c"); p.rect(3, 11, 12, 10, "#b87333"); for (const [x, y] of [[5, 13], [10, 14], [7, 18]] as const) { p.disc(x, y, 2, 2, "#d9a93f", INK); p.set(x, y, "#8a5a3c"); }
+      p.rect(7, 4, 4, 6, "#4fa58a"); p.disc(9, 4, 3.5, 3.5, "#bfe8d8", INK); p.disc(9, 4, 1.5, 1.5, "#ffffff", null); p.rect(12, 2, 1, 8, "#4a3a2c"); p.set(13, 1, "#ffffff");
+      p.outline();
+    });
+    // A supply wagon, canvas over hoops, and a watchtower: timber legs, a platform, a roof, a ladder up one side.
+    case "wagon": return pixelArt(key, 34, 24, p => {
+      p.disc(8, 19, 4.5, 4.5, "#6b4a2c", INK); p.disc(26, 19, 4.5, 4.5, "#6b4a2c", INK); p.set(8, 19, "#cdb9a0"); p.set(26, 19, "#cdb9a0");
+      p.rect(3, 12, 28, 5, "#9c8672"); p.line(3, 16, 30, 16, "#6b4a2c"); p.poly([[4, 12], [30, 12], [28, 2], [6, 2]], "#e8e4d6", INK); for (const x of [10, 17, 24]) p.line(x, 3, x, 11, "#cdb9a0");
+      p.outline();
+    });
+    case "watchtower": return pixelArt(key, 26, 56, p => {
+      p.line(4, 55, 8, 20, BARK, 2); p.line(22, 55, 18, 20, BARK, 2); p.line(6, 40, 20, 40, BARK_DARK); p.line(5, 48, 21, 48, BARK_DARK); p.line(8, 30, 18, 30, BARK_DARK);
+      p.rect(2, 18, 22, 4, "#9c8672"); p.rect(3, 12, 20, 6, "#cdb9a0"); for (let x = 3; x < 23; x += 3) p.rect(x, 10, 2, 3, "#9c8672");
+      p.poly([[1, 10], [25, 10], [13, 2]], "#6f5d4c", INK); p.line(22, 55, 20, 24, "#cdb9a0"); for (let y = 26; y < 54; y += 4) p.line(19, y, 23, y, "#cdb9a0");
+      p.outline();
+    });
+    // A stretch of stake wall: five sharpened logs, pale at the cut points, lashed with a rope across.
+    case "stake": return pixelArt(key, 26, 22, p => { for (let i = 0; i < 5; i++) { const x = 1 + i * 5, top = 2 + (i % 2) * 3; p.rect(x, top + 4, 4, 20 - top - 4, i % 2 ? BARK_DARK : BARK); p.poly([[x, top + 4], [x + 2, top], [x + 4, top + 4]], "#cdb9a0", null); p.line(x + 1, top + 6, x + 1, 19, shadeHex(BARK, 0.12)); } p.line(0, 14, 25, 13, "#e8d4c0"); p.line(0, 15, 25, 14, "#9c8672"); p.outline(); });
+    case "plaque": return pixelArt(key, 16, 14, p => { p.rect(2, 6, 12, 7, "#8f8a83"); p.rect(1, 1, 14, 6, "#d7d4cd"); p.rect(2, 2, 12, 4, "#c8c5be"); for (let y = 2; y <= 5; y += 1) p.line(3, y, 12 - (y % 2), y, "#8f8a83"); p.outline(); });
+    // Faction banners: the Federation's verdigris with FFF in brass, the Regiment's violet with the closed eye, Hollowmere's crimson with the crown.
+    // Each Order's banner in its own colours, with its sign: the Diamond's diamond, the Ink's arms, the Sol's sun, the Hood's hood, the Ember's flame, the Dusk's closed eye.
+    case "banner_diamond": case "banner_ink": case "banner_sol": case "banner_hood": case "banner_ember": case "banner_dusk": return pixelArt(key, 14, 30, p => {
+      const order = ORDERS[kind.slice(7) as keyof typeof ORDERS], field = order.color, mark = order.accent, dark = order.dark;
+      p.rect(1, 1, 2, 28, "#3b3a38"); p.rect(0, 1, 4, 1, "#c9a84a"); p.poly([[3, 2], [13, 3], [13, 20], [8, 17], [3, 20]], field, null); p.line(3, 19, 8, 16, dark); p.line(8, 16, 13, 19, dark);
+      if (kind === "banner_diamond") p.poly([[8, 5], [11, 9], [8, 14], [5, 9]], mark, null);
+      else if (kind === "banner_ink") { p.disc(8, 8, 2.5, 2.5, mark, null); for (const x of [5, 7, 9, 11]) p.line(8, 10, x, 14, mark); }
+      else if (kind === "banner_sol") { const rays = ["#ff5f5f", "#f7f06d", "#4fc3f7", "#9945ff"]; for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; p.set(8 + Math.round(Math.cos(a) * 4), 10 + Math.round(Math.sin(a) * 4), rays[i % 4]); } p.disc(8, 10, 2.2, 2.2, mark, null); }
+      else if (kind === "banner_hood") { p.poly([[8, 5], [11, 9], [11, 14], [5, 14], [5, 9]], mark, null); p.rect(7, 9, 3, 3, field); }
+      else if (kind === "banner_ember") p.poly([[6, 14], [10, 14], [11, 10], [9, 8], [8, 4], [7, 8], [5, 10]], mark, null);
+      else { p.line(5, 9, 11, 9, mark); p.line(5, 9, 8, 11, mark); p.line(8, 11, 11, 9, mark); p.set(6, 12, mark); p.set(8, 13, mark); p.set(10, 12, mark); }
+      p.outline();
+    });
+    case "banner_fff": case "banner_rrr": case "banner_hollowmere": return pixelArt(key, 14, 30, p => {
+      const field = kind === "banner_fff" ? "#2f7d68" : kind === "banner_rrr" ? "#3b2a52" : "#8a2f2b", mark = kind === "banner_fff" ? "#d9a93f" : kind === "banner_rrr" ? "#d8d6e4" : "#e2c46a";
+      p.rect(1, 1, 2, 28, "#3b3a38"); p.poly([[3, 2], [13, 3], [13, 19], [8, 16], [3, 19]], field, null);
+      if (kind === "banner_fff") { for (const x of [4, 7, 10]) { p.rect(x, 6, 1, 6, mark); p.rect(x, 6, 2, 1, mark); p.rect(x, 8, 2, 1, mark); } }
+      else if (kind === "banner_rrr") { p.disc(8, 9, 3.5, 2.5, mark, null); p.line(5, 9, 11, 9, field); p.set(8, 7, field); }
+      else { p.rect(5, 7, 6, 4, mark); for (const x of [5, 7, 9]) p.set(x, 6, mark); p.set(6, 11, mark); p.set(9, 11, mark); }
       p.outline();
     });
     case "flowers": return pixelArt(key, 20, 12, p => {
