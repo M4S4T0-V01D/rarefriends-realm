@@ -4,6 +4,11 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 82, date: "2026-10-07", title: "Hold to walk, a bridge to Barkholm's far bank, and a bank at the Ring", items: [
+    "Hold to walk: press the left mouse button on the ground and keep it held, and your Friend keeps walking towards the pointer. Steer with the mouse, and let go to stop. A quick click still walks to the spot, and holding after clicking a creature, a person or a tree never walks you away from it.",
+    "Barkholm's new homes on the far bank of the Hush can be reached at last: a gravel lane runs west from the village over a plank bridge to a glade among the ironbarks, where they stand. Villages only ever grow where their people can walk now.",
+    "The Rare Friends Ring has a bank. The Ring's Bank opens off the concourse beside the gate, in marble, with three booths and a banker, so you can bank a purse between matches.",
+  ] },
   { id: 81, date: "2026-10-06", title: "The Wise Friend, carved properly", items: [
     "Raria's statues of the Wise Friend have been carved again, larger and finer. It's a Rare Friend in ivory on a stepped plinth with a band of gold, a mantle on its shoulders trimmed in gold, and a gold circlet. Its eyes are bound with a violet blindfold, knotted at the side, and the book of the Law lies open in its hands. Behind its head, a gilded disc holds the open eye that sees for it.",
     "The Order of Dusk carves the same Friend in dark violet stone, hooded deep, a censer smoking at the foot of its plinth. You'll find both in the palace gardens, the Cathedral, the Chapel of the Law, the Hall of Dusk and Raria's household chapels.",
