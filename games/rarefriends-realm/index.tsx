@@ -13,10 +13,11 @@ import { TICK_MS, attackSpeed, combatLevel, createGame, giveOrDrop, message, tot
 import {
   chooseOption, closeInterfaces, collectFromCasket, creditReferral, emoteProblem, performEmote, syncMonster, continueDialogue, grantBundle, menuFor, tailorChoices, unlockMusic, restore, serialize, setFollower, setHeld, setRelics, tick, toggleRun, toggleSneak, toggleMount, grantMount, walkTo, type OwnedFriend, type Selection,
 } from "./engine.ts";
+import { LANGUAGES, languageOf, setLanguage } from "./i18n.ts";
 import { PITCH, RENDER_PROFILE, VIEW, ZOOM, addPrint, daylight, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
 import {
   BankModal, CardsModal, CarvingBuffs, FeedbackModal, ChatBox, ContextMenu, DailyModal, FellowshipModal, HomeModal, JoinModal, RfActionModal, FirstStepsCard, GuideModal, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, NamingModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
-  cancelLongPress, longPress, rightClick, type MenuEntry, type Settings, type Tab,
+  cancelLongPress, longPress, rightClick, LanguagePicker, type MenuEntry, type Settings, type Tab,
 } from "./panels.tsx";
 import { REGULAR_SPRITES } from "./regulars.ts";
 import { NET_ACT, NET_ACT_IN, NET_CHAT, NET_CHAT_IN, NET_ONLINE, NET_PRESENCE, NET_SOCIAL, NET_STATE, cleanAct, cleanChat, cleanId, cleanPresence, type Act, type NetState, type Presence } from "./net.ts";
@@ -102,6 +103,7 @@ function loadSettings(): Settings {
       graphics: raw.graphics === "low" ? "low" : "high",
       friendSpeech: (["full", "reduced", "rare", "off"] as const).find(level => level === raw.friendSpeech) ?? "full",
       nameplates: (["full", "name", "off"] as const).find(level => level === raw.nameplates) ?? "full",
+      language: typeof raw.language === "string" && (raw.language === "auto" || LANGUAGES.some(lang => lang.id === raw.language)) ? raw.language : "auto",
     };
   } catch { return DEFAULT_SETTINGS; }
 }
@@ -170,6 +172,9 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     const observer = new ResizeObserver(measure); observer.observe(node); measure(); resizeRef.current = measure;
     return () => observer.disconnect();
   }, [phase, settings.graphics]);
+
+  // ---------- Language: the whole interface, translated where it's shown (i18n.ts) ----------
+  useEffect(() => { if (root.current) setLanguage(root.current, languageOf(settings.language)); }, [settings.language, phase]);
 
   // ---------- Audio ----------
   const setSettings = useCallback((next: Settings) => {
@@ -1156,6 +1161,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
                 ? <button type="button" onClick={() => { const next = { ...settings, music: !settings.music }; setSettings(next); }} aria-pressed={settings.music}>{settings.music ? "♪ Music on" : "♪ Music off"}</button>
                 : <button type="button" onClick={() => setSettings({ ...settings })}>♪ Start the music</button>}
               <button type="button" onClick={() => setModal("help")}>How to play</button>
+              <LanguagePicker value={settings.language} onChange={language => setSettings({ ...settings, language })} />
             </div>
             <p className="realm-title-foot">Now playing: {trackById("theme").name} · Simulated $RAREFRIENDS · Saves per wallet on this device</p>
             {modal === "help" && <HelpModal onClose={() => setModal(null)} onFeedback={() => { setFeedbackStatus(""); setModal("feedback"); }} />}
