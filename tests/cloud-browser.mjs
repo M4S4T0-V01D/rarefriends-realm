@@ -18,6 +18,8 @@ import { GENERATION_SPRITE_MANIFEST } from "@rarefriends/friendsdk/sprites";
 import { createArtworkFixture, installFixture } from "../node_modules/@rarefriends/friendsdk/scripts/browser-fixture.mjs";
 import { createApp, chainFor } from "../cloud/src/worker.ts";
 import { CLOUD_URL } from "../host/cloud.ts";
+// REALM_RENDERER=webgl runs all of it in the WebGL rendering mode (the address chooses it, as the old WebGL address does).
+const RENDERER_PATH = process.env.REALM_RENDERER === "webgl" ? "/?renderer=webgl" : "/";
 
 const COLLECTION = "0x14C49e6118F46525dE9ab41a51cBAA3c6EBF181D";
 const ABI = parseAbi([
@@ -106,7 +108,7 @@ try {
     const state = (fn, arg) => frame().evaluate(fn, arg);
     const until = async (fn, timeout = 30_000, what = String(fn)) => { const end = Date.now() + timeout; while (Date.now() < end) { if (await fn()) return; await page.waitForTimeout(200); } assert.fail(`${name}: timed out waiting for ${what}`); };
     const enter = async () => {
-      await page.goto(origin);
+      await page.goto(`${origin}${RENDERER_PATH}`);
       await page.getByRole("button", { name: /^Connect (wallet|Browser wallet)$/ }).click();
       await page.getByRole("button", { name: /^Friend #7730\b/ }).click({ timeout: 15_000 }).catch(async error => { console.log("fixture errors", fixture.errors, await page.locator("body").innerText()); throw error; });
       await game.locator('.realm-game[data-phase="title"]').waitFor();

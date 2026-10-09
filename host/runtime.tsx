@@ -28,7 +28,7 @@ import { GENERATION_SPRITE_MANIFEST } from "@rarefriends/friendsdk/sprites";
 import { createClient, http } from "viem";
 import { getBlockNumber, getChainId, getLogs, readContract } from "viem/actions";
 import {
-  CLOUD_ACTION, CLOUD_STATE, type CloudAction, FEEDBACK_REQUEST, FEEDBACK_RESULT, FULLSCREEN_REQUEST, FULLSCREEN_STATE, JOIN_INVITE, TEXT_COPY, TEXT_COPY_RESULT, HOST_HELLO, HOST_STATE, SAVE_ELSEWHERE, SAVE_EXPORT, SAVE_EXPORT_RESULT, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, type FeedbackOutcome, type FeedbackTarget, type ShareAction, type ShareOutcome,
+  CLOUD_ACTION, CLOUD_STATE, type CloudAction, SETTINGS_STATE, SETTINGS_WRITE, parseRenderer, FEEDBACK_REQUEST, FEEDBACK_RESULT, FULLSCREEN_REQUEST, FULLSCREEN_STATE, JOIN_INVITE, TEXT_COPY, TEXT_COPY_RESULT, HOST_HELLO, HOST_STATE, SAVE_ELSEWHERE, SAVE_EXPORT, SAVE_EXPORT_RESULT, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, type FeedbackOutcome, type FeedbackTarget, type ShareAction, type ShareOutcome,
 } from "../games/rarefriends-realm/roster.ts";
 import { CloudSync } from "./cloud.ts";
 import { NET_ACT, NET_CHAT, NET_ONLINE, NET_PRESENCE, NET_SOCIAL } from "../games/rarefriends-realm/net.ts";
@@ -62,6 +62,13 @@ function readSave(account: string, friend: string | null): unknown {
 function writeSave(account: string, friend: string, save: unknown) {
   try { const raw = JSON.stringify(save); if (raw.length < 200_000) localStorage.setItem(saveKey(account, friend), raw); } catch { /* Storage full or blocked: play continues unsaved. */ }
 }
+
+/** The game's settings, kept for this browser (the sandbox has no storage): whatever it last sent, checked again on load. */
+const SETTINGS_KEY = "rarefriends-realm:settings:v1";
+function readSettings(): unknown { try { const raw = localStorage.getItem(SETTINGS_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; } }
+function writeSettings(settings: unknown) { try { const raw = JSON.stringify(settings); if (raw.length < 8_000) localStorage.setItem(SETTINGS_KEY, raw); } catch { /* storage blocked */ } }
+/** This visit's rendering mode from the address (`?renderer=webgl`, as the old WebGL address sends), or null. */
+const addressRenderer = () => parseRenderer(new URLSearchParams(window.location.search).get("renderer"));
 
 function download(image: Blob, filename: string) {
   const url = URL.createObjectURL(image), link = document.createElement("a");
@@ -151,6 +158,8 @@ function RealmHost() {
       if (!event.source || !frames().includes(event.source as Window)) return;
       if (event.data?.type === HOST_HELLO) {
         friend = /^[0-9]{1,15}$/.test(String(event.data.friend)) ? String(event.data.friend) : null; claim(); ensureCloud(); send(event.source as Window); sync();
+        // The settings this browser kept, and the address's rendering mode for this visit.
+        (event.source as Window).postMessage({ type: SETTINGS_STATE, settings: readSettings(), renderer: addressRenderer() }, "*");
         // A fellowship invitation in the page's link (?join=…) goes to the game once it's listening.
         const join = new URLSearchParams(window.location.search).get("join");
         if (join && /^[A-Za-z0-9_-]{8,600}$/.test(join)) (event.source as Window).postMessage({ type: JOIN_INVITE, token: join }, "*");
@@ -177,6 +186,7 @@ function RealmHost() {
           if (event.data.save && typeof event.data.save === "object") cloud?.queue(event.data.save, event.data.important === true, event.data.claim === true ? importHash : null);
         }
       }
+      else if (event.data?.type === SETTINGS_WRITE && event.data.settings && typeof event.data.settings === "object") writeSettings(event.data.settings);
       else if (event.data?.type === CLOUD_ACTION && cloud) {
         // The player's choices about cloud saves, from the game's buttons.
         const action = event.data.action as CloudAction;

@@ -5,6 +5,8 @@
 .realm-game * { box-sizing: border-box; }
 .realm-stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; overflow: hidden; }
 .realm-view { position: absolute; inset: 0; display: block; touch-action: none; cursor: default; outline: none; image-rendering: pixelated; }
+/* The GPU's picture, under the top canvas (which carries names, bars and the rest over it). */
+.realm-gl { position: absolute; inset: 0; display: block; pointer-events: none; image-rendering: pixelated; }
 .realm-game button { font: inherit; color: inherit; cursor: pointer; }
 .realm-game button:focus-visible, .realm-game input:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
 .realm-game button:disabled { cursor: default; }
@@ -512,6 +514,13 @@
 .realm-carvings { position: absolute; top: 30px; left: 8px; z-index: 4; list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; pointer-events: none; max-width: 300px; }
 .realm-carvings li { display: flex; align-items: center; gap: 6px; background: rgba(250, 248, 242, 0.92); border: 1.5px solid #000; border-left-width: 5px; border-radius: 4px; padding: 2px 6px; font-size: 11px; line-height: 1.25; }
 .realm-carvings li span { flex: 1; } .realm-carvings li i { font-style: normal; font-variant-numeric: tabular-nums; color: #5a564f; }
+
+/* Custom graphics, for nerds: the knobs in columns. */
+.realm-nerd-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 4px 18px; }
+.realm-nerd-grid h3 { margin: 8px 0 2px; }
+.realm-nerd-check { align-items: flex-start; }
+.realm-nerd-check small { display: block; }
+.realm-nerds .realm-range b { color: #7a5612; }
 
 /* The language picker (Settings, and the title screen). */
 .realm-language { display: flex; align-items: center; gap: 6px; margin: 4px 0 8px; }

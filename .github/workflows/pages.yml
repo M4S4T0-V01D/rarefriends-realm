@@ -24,6 +24,8 @@ jobs:
       - run: npm run check
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
+      # The same game in the WebGL rendering mode: the tour, playing together and cloud saves.
+      - run: npm run test:browser:webgl
       - run: npm run build
       - run: touch games/rarefriends-realm/.friendsdk/.nojekyll
       # Preview page for sharing: /preview/ with the screenshots from docs/ and the soundtrack jukebox.

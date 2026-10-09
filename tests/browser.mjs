@@ -18,6 +18,8 @@ import { createGameServer } from "@rarefriends/friendsdk/serve";
 import { FAMILIES_REGISTRY_ABI, GENERATION_SPRITE_MANIFEST } from "@rarefriends/friendsdk/sprites";
 import { installFixture, OWNER } from "../node_modules/@rarefriends/friendsdk/scripts/browser-fixture.mjs";
 import { REGULAR_SPRITES } from "../games/rarefriends-realm/regulars.ts";
+// REALM_RENDERER=webgl runs all of it in the WebGL rendering mode (the address chooses it, as the old WebGL address does).
+const RENDERER_PATH = process.env.REALM_RENDERER === "webgl" ? "/?renderer=webgl" : "/";
 
 const COLLECTION = "0x14C49e6118F46525dE9ab41a51cBAA3c6EBF181D";
 const ABI = parseAbi([
@@ -92,7 +94,7 @@ try {
   /** Mainland places named in the mainland's own coordinates (the world puts the mainland at MAINLAND.x/y). */
   const teleportM = (mx, my) => teleport(...mainlandToWorld(mx, my));
   const enter = async () => {
-    await page.goto(origin);
+    await page.goto(`${origin}${RENDERER_PATH}`);
     await page.getByRole("button", { name: /^Connect (wallet|Browser wallet)$/ }).click();
     await page.getByRole("button", { name: /^Friend #7730\b/ }).click();
     await game.locator('.realm-game[data-phase="title"]').waitFor();
@@ -450,8 +452,12 @@ try {
     }
     await frame().evaluate(() => { window.__realm.graphics("high"); window.__realm.time(0.5); window.__realm.weather({ rain: 0, storm: false, fog: 0 }); });
     console.log("Frame cost (ms to draw a frame, headless software rendering):\n" + rows.map(row => `  ${row.name}: High ${row.high.toFixed(1)} · Low ${row.low.toFixed(1)}`).join("\n"));
+    // With WebGL, High's extras (every sprite's shadow, the haze, finer light) cost the GPU almost nothing, so Low only
+    // has to be no dearer than High; on the canvas renderer it has to be clearly cheaper.
+    const webgl = await frame().evaluate(() => (window.__realm.perf().parts.gl_sprites ?? 0) > 0);
     for (const row of rows) {
-      assert.ok(row.low < row.high * 0.75, `${row.name}: Low is clearly cheaper than High`);
+      if (webgl) assert.ok(row.low < row.high * 1.15, `${row.name}: Low is no dearer than High`);
+      else assert.ok(row.low < row.high * 0.75, `${row.name}: Low is clearly cheaper than High`);
       // Headless software rendering on a shared CI runner measures slower than a desktop (about 16 ms where this machine sees 12); 20 still catches a real regression.
       assert.ok(row.low < 20, `${row.name}: Low draws inside a 50 fps budget even without a GPU (${row.low.toFixed(1)} ms)`);
     }
@@ -614,7 +620,7 @@ try {
   const older = await context.newPage();
   older.on("pageerror", error => errors.push(error.message));
   await installFixture(older, origin, { artworkCall });
-  await older.goto(origin);
+  await older.goto(`${origin}${RENDERER_PATH}`);
   await older.getByRole("button", { name: /^Connect (wallet|Browser wallet)$/ }).click();
   await older.getByRole("button", { name: /^Friend #7730\b/ }).click();
   await older.frameLocator("iframe").locator('.realm-game[data-hosted="linked"]').waitFor();
@@ -637,7 +643,7 @@ try {
   const handset = await phone.newPage();
   handset.on("pageerror", error => errors.push(error.message));
   await installFixture(handset, origin, { artworkCall });
-  await handset.goto(origin);
+  await handset.goto(`${origin}${RENDERER_PATH}`);
   await handset.getByRole("button", { name: /^Connect (wallet|Browser wallet)$/ }).tap();
   await handset.getByRole("button", { name: /^Friend #7730\b/ }).tap();
   const small = handset.frameLocator("iframe");

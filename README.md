@@ -254,6 +254,52 @@ roster contains the Friend the runtime just verified. Saves are validated on loa
 approvals; the one wallet prompt is the optional cloud sign-in, a plain message the page checks word for word before
 the wallet sees it (`tests/preview-bundle.test.mjs` keeps the published build to that). Under the plain SDK CLI (`npx friendsdk dev` / `test`), the game runs without these extras.
 
+## Rendering modes: Normal and WebGL
+
+There is one game with two ways of drawing it. The choice is in **Settings → Rendering mode**:
+
+- **Normal** is the default. It is the canvas renderer the Realm has always had.
+- **WebGL** draws the same world on the graphics card (`gl.ts`): blended ground, shingled roofs, and every sprite lit where it stands.
+
+Everything else is shared, untouched by the choice:
+
+- the game state and rules (`engine.ts`, `state.ts`, the content files)
+- the character, saves (browser and cloud) and imports
+- multiplayer (`host/net.ts`), settings, input, audio and translations
+
+**How the renderers fit together.** The renderer only reads the game state.
+
+- `render.ts` `renderScene` draws a frame.
+- With a `RealmGL` passed in, it sends the ground, walls, roofs and sprites to the GPU, and draws everything else on a transparent layer over the GPU's picture.
+- Without one, it is the canvas renderer, unchanged.
+
+Normal mode never creates a WebGL context. A frozen-clock pixel comparison of eight scenes against the build before the merge (`tests/parity-browser.mjs`) shows Normal unchanged. The only differences are those a build has with itself from run to run: people walking, and the Friend's random remarks.
+
+**Switching is a change of view, never of game.**
+
+1. The save is written first.
+2. The draw loop is torn down.
+3. The canvases are made anew. A 2D canvas can't change its transparency, and WebGL needs its own canvas.
+4. In Normal, the old GPU context is released (`RealmGL.dispose`). In WebGL, a new GPU renderer is made.
+
+The game object itself is never touched. If WebGL2 isn't available, or its context is lost mid-game, the Realm says so and carries on in Normal.
+
+**Settings are kept by the host page.** The sandbox has no storage of its own, so the host keeps them per browser (`rarefriends-realm:settings:v1`; `SETTINGS_WRITE` / `SETTINGS_STATE` in `roster.ts`). Before this, settings started afresh every visit. The rendering mode is a per-device choice, because a phone without WebGL2 shouldn't inherit a desktop's.
+
+**Addresses.**
+
+- The plain address opens the Realm in the player's chosen mode (Normal by default).
+- `?renderer=webgl` or `?renderer=normal` chooses for that visit only.
+- The old WebGL address (`m4s4t0-v01d.github.io/realm-gl/`) forwards here with `?renderer=webgl`, keeping any invitation in its address. Both are on the same origin, so saves and cloud sign-ins are already shared.
+
+**Tests.**
+
+- `tests/renderer-browser.mjs`:
+  - switching both ways and ten times quickly (one draw loop, the same character)
+  - WebGL play, and the choice remembered across a reload
+  - a lost GPU, a device without WebGL, and the address
+- `npm run test:browser:webgl` runs the whole game tour, multiplayer and cloud saves in WebGL mode.
+
 ## Playing together
 
 The game frame keeps the SDK's restrictive CSP and never touches the network. The trusted host page connects players

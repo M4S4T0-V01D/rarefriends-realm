@@ -15,6 +15,8 @@ import { createGameServer } from "@rarefriends/friendsdk/serve";
 import { FAMILIES_REGISTRY_ABI, GENERATION_SPRITE_MANIFEST } from "@rarefriends/friendsdk/sprites";
 import { installFixture, OWNER } from "../node_modules/@rarefriends/friendsdk/scripts/browser-fixture.mjs";
 import { REGULAR_SPRITES } from "../games/rarefriends-realm/regulars.ts";
+// REALM_RENDERER=webgl runs all of it in the WebGL rendering mode (the address chooses it, as the old WebGL address does).
+const RENDERER_PATH = process.env.REALM_RENDERER === "webgl" ? "/?renderer=webgl" : "/";
 
 const COLLECTION = "0x14C49e6118F46525dE9ab41a51cBAA3c6EBF181D";
 const ABI = parseAbi([
@@ -77,7 +79,7 @@ try {
       }
       return route.fallback();
     });
-    await page.goto(origin);
+    await page.goto(`${origin}${RENDERER_PATH}`);
     await page.getByRole("button", { name: /^Connect (wallet|Browser wallet)$/ }).click();
     await page.getByRole("button", { name: new RegExp(`^Friend #${friendId}\\b`) }).click();
     const game = page.frameLocator("iframe");

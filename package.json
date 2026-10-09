@@ -15,7 +15,8 @@
     "check": "friendsdk check ./games/rarefriends-realm",
     "typecheck": "tsc -p tsconfig.json",
     "test": "node --test tests/*.test.mjs",
-    "test:browser": "node tests/browser.mjs && node tests/multiplayer-browser.mjs && node tests/cloud-browser.mjs && node tests/preview-browser.mjs",
+    "test:browser": "node tests/browser.mjs && node tests/multiplayer-browser.mjs && node tests/cloud-browser.mjs && node tests/renderer-browser.mjs && node tests/preview-browser.mjs",
+    "test:browser:webgl": "REALM_RENDERER=webgl node tests/browser.mjs && REALM_RENDERER=webgl node tests/multiplayer-browser.mjs && REALM_RENDERER=webgl node tests/cloud-browser.mjs",
     "build:preview": "node scripts/build-preview.mjs"
   },
   "dependencies": {

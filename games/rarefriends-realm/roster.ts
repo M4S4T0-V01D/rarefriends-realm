@@ -111,3 +111,15 @@ export function parseCloudState(raw: unknown): CloudState | null {
     importable: save(s.importable), lost: s.lost === true, imported: s.imported === true, duplicate: s.duplicate === true,
   };
 }
+
+/**
+ * Settings, kept by the host page (the sandbox has no storage of its own): the game sends SETTINGS_WRITE when they
+ * change; on HOST_HELLO the host answers SETTINGS_STATE with what it kept for this browser, and `renderer` when the
+ * page's address chose one for this visit (`?renderer=webgl` or `normal`, as the old WebGL address does). The game
+ * checks every field before using it.
+ */
+export const SETTINGS_WRITE = "rarefriends-realm:settings";
+export const SETTINGS_STATE = "rarefriends-realm:settings-state";
+export type RendererMode = "normal" | "webgl";
+export const parseRenderer = (value: unknown): RendererMode | null => value === "normal" || value === "webgl" ? value : null;
+

@@ -18,10 +18,10 @@ import { logoSvg } from "./logo.ts";
 
 /** The Realm's logo on the title screen: the castle shield and RAREFRIENDS REALM, in pixels (logo.ts). */
 const TITLE_LOGO = logoSvg("horizontal");
-import { PITCH, RENDER_PROFILE, VIEW, ZOOM, addPrint, daylight, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
+import { HIGH_QUALITY, PITCH, RENDER_PROFILE, VIEW, ZOOM, addPrint, daylight, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
 import {
   BankModal, CardsModal, CarvingBuffs, FeedbackModal, ChatBox, ContextMenu, DailyModal, FellowshipModal, HomeModal, JoinModal, RfActionModal, FirstStepsCard, GuideModal, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, NamingModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
-  cancelLongPress, longPress, rightClick, LanguagePicker, type MenuEntry, type Settings, type Tab,
+  cancelLongPress, longPress, rightClick, NerdSettings, LanguagePicker, customFrom, type CustomGraphics, type MenuEntry, type Settings, type Tab,
 } from "./panels.tsx";
 import { REGULAR_SPRITES } from "./regulars.ts";
 import { NET_ACT, NET_ACT_IN, NET_CHAT, NET_CHAT_IN, NET_ONLINE, NET_PRESENCE, NET_SOCIAL, NET_STATE, cleanAct, cleanChat, cleanId, cleanPresence, type Act, type NetState, type Presence } from "./net.ts";
@@ -30,7 +30,7 @@ import { Trades } from "./trade.ts";
 import { FELLOW_RANGE, PARTY_RANGE, Party, nearby } from "./party.ts";
 import { makeSaveCode, restoreSaveCode } from "./savecode.ts";
 import { strikeAt, weatherAt, type Weather } from "./weather.ts";
-import { CLOUD_ACTION, CLOUD_STATE, FEEDBACK_REQUEST, FEEDBACK_RESULT, FULLSCREEN_REQUEST, FULLSCREEN_STATE, JOIN_INVITE, TEXT_COPY, TEXT_COPY_RESULT, HOST_HELLO, HOST_STATE, SAVE_ELSEWHERE, SAVE_EXPORT, SAVE_EXPORT_RESULT, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, parseCloudState, parseRoster, type CloudAction, type CloudState, type ShareAction, type ShareOutcome } from "./roster.ts";
+import { SETTINGS_STATE, SETTINGS_WRITE, parseRenderer, type RendererMode, CLOUD_ACTION, CLOUD_STATE, FEEDBACK_REQUEST, FEEDBACK_RESULT, FULLSCREEN_REQUEST, FULLSCREEN_STATE, JOIN_INVITE, TEXT_COPY, TEXT_COPY_RESULT, HOST_HELLO, HOST_STATE, SAVE_ELSEWHERE, SAVE_EXPORT, SAVE_EXPORT_RESULT, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, parseCloudState, parseRoster, type CloudAction, type CloudState, type ShareAction, type ShareOutcome } from "./roster.ts";
 import { CloudControls, CloudDialogs, type SaveSummary } from "./cloudui.tsx";
 import { RealmAudio, trackFor, trackById, type SfxName, type TrackId } from "./audio.ts";
 import { recruitText, renderCard, renderFellowshipCard, shareText } from "./card.ts";
@@ -52,6 +52,7 @@ const THRONE = { x: mainlandToWorld(177, 212)[0], y0: mainlandToWorld(177, 212)[
 import { burst } from "./effects.ts";
 import { textureStats } from "./textures.ts";
 import { adapt, newAdaptive } from "./adaptive.ts";
+import { RealmGL } from "./gl.ts";
 import "@rarefriends/friendsdk/frame.css";
 import "./style.css";
 
@@ -63,7 +64,7 @@ import "./style.css";
 export const RF_DISPLAY_DECIMALS = 15;
 const rf = (value: bigint) => `${formatGameAmount(value, RF_DISPLAY_DECIMALS)} RF`;
 type Phase = "loading" | "title" | "playing" | "failed";
-type Modal = "caskets" | "map" | "card" | "cards" | "help" | "feedback" | null;
+type Modal = "caskets" | "map" | "card" | "cards" | "help" | "feedback" | "nerds" | null;
 type XpDrop = { id: number; skill: Skill; amount: number; at: number };
 type CasketResult = { play: bigint; outcomeId: number; wardrobe: string | null; coins: number; redeemed: boolean };
 const CANONICAL = new Map<number, GenerationSprites>(REGULAR_SPRITES.map(sprites => [Number(sprites.tokenId), sprites]));
@@ -87,17 +88,41 @@ const perf = { ms: 0, frames: 0, interval: 16.7, lastFrame: 0 };
  * crisply either way, and 1.5× has about half the pixels of 2× to light and shade).
  */
 const isLow = (settings: Settings) => settings.graphics === "low";
+/** With WebGL, Low draws the world (and the canvas layer over it) at three quarters of the screen's pixels, scaled up crisply; the interface stays sharp. */
+const LOW_WORLD_SCALE = 0.75;
+/** Custom graphics' knobs, when they're in use. */
+const customOf = (settings: Settings) => settings.graphics === "custom" ? settings.custom ?? customFrom(HIGH_QUALITY) : null;
+/** Custom graphics as saved, checked knob by knob (anything missing or odd is High's). */
+function cleanCustom(raw: unknown): CustomGraphics {
+  const base = customFrom(HIGH_QUALITY), out = { ...base } as Record<string, unknown>, given = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const range: Record<string, [number, number]> = { drawDistance: [24, 110], lightScale: [0.25, 1], rain: [0, 1], resolution: [0.5, 2], smoothing: [0, 1] };
+  for (const [key, value] of Object.entries(base)) {
+    const v = given[key];
+    if (typeof value === "boolean" && typeof v === "boolean") out[key] = v;
+    else if (typeof value === "number" && typeof v === "number" && Number.isFinite(v)) out[key] = Math.max(range[key]?.[0] ?? -Infinity, Math.min(range[key]?.[1] ?? Infinity, v));
+  }
+  return out as CustomGraphics;
+}
 /** High's resolution, lowered when the machine can't keep up (see adaptive.ts). */
 const adaptive = newAdaptive();
 let fixedWeather: Weather | null = typeof navigator !== "undefined" && navigator.webdriver ? { rain: 0, storm: false, fog: 0 } : null;
 let lastThunder = -1;
 const timeOfDay = () => fixedTime ?? ((Date.now() / DAY_MS + 0.3) % 1);
 const DEFAULT_SETTINGS: Settings = { music: true, sfx: true, musicVolume: 0.7, sfxVolume: 0.8, zoom: 0.8, shiftDrop: false, autoMusic: true, dayNight: true };
-/** Settings are kept in this browser (so High stays High next time); anything missing or odd falls back to the default. */
+/**
+ * Settings are kept in this browser (so High stays High next time): by the host page, since the sandbox has no storage
+ * (SETTINGS_WRITE / SETTINGS_STATE), and in this frame's own storage where it has some (the plain SDK runner). Anything
+ * missing or odd falls back to the default.
+ */
 const SETTINGS_KEY = "realm-settings";
+/** Draw loops running now (exactly one while the game is up, however often the renderer is switched): for the tests. */
+const loopCount = { n: 0 };
 function loadSettings(): Settings {
-  try {
-    const raw = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? "null") as Record<string, unknown> | null;
+  try { return parseSettings(JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? "null")); } catch { return DEFAULT_SETTINGS; }
+}
+function parseSettings(given: unknown): Settings {
+  {
+    const raw = given as Record<string, unknown> | null;
     if (!raw || typeof raw !== "object") return DEFAULT_SETTINGS;
     const flag = (key: keyof Settings) => typeof raw[key] === "boolean" ? raw[key] as boolean : DEFAULT_SETTINGS[key] as boolean;
     const unit = (key: "musicVolume" | "sfxVolume") => typeof raw[key] === "number" && Number.isFinite(raw[key]) ? Math.max(0, Math.min(1, raw[key] as number)) : DEFAULT_SETTINGS[key];
@@ -105,18 +130,24 @@ function loadSettings(): Settings {
       music: flag("music"), sfx: flag("sfx"), musicVolume: unit("musicVolume"), sfxVolume: unit("sfxVolume"), shiftDrop: flag("shiftDrop"), autoMusic: flag("autoMusic"),
       zoom: typeof raw.zoom === "number" && Number.isFinite(raw.zoom) ? Math.max(ZOOM.min, Math.min(ZOOM.max, raw.zoom)) : DEFAULT_SETTINGS.zoom,
       dayNight: typeof raw.dayNight === "boolean" ? raw.dayNight : true, weather: typeof raw.weather === "boolean" ? raw.weather : undefined,
-      graphics: raw.graphics === "low" ? "low" : "high",
+      graphics: raw.graphics === "low" ? "low" : raw.graphics === "custom" ? "custom" : "high", custom: raw.custom ? cleanCustom(raw.custom) : undefined,
       friendSpeech: (["full", "reduced", "rare", "off"] as const).find(level => level === raw.friendSpeech) ?? "full",
       nameplates: (["full", "name", "off"] as const).find(level => level === raw.nameplates) ?? "full",
       language: typeof raw.language === "string" && (raw.language === "auto" || LANGUAGES.some(lang => lang.id === raw.language)) ? raw.language : "auto",
+      renderer: parseRenderer(raw.renderer) ?? "normal",
     };
-  } catch { return DEFAULT_SETTINGS; }
+  }
 }
-function saveSettings(settings: Settings) { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch { /* storage blocked: settings last for this visit */ } }
+function saveSettings(settings: Settings) {
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch { /* storage blocked: the host page keeps them */ }
+  window.parent.postMessage({ type: SETTINGS_WRITE, settings }, "*");
+}
 
 /** RareFriends Realm. The SDK runtime supplies wallet connection, the verified owned Friend and the fixed (simulated) RF client. */
 export default function RareFriendsRealm({ friendId, client, paused }: GameComponentProps) {
   const root = useRef<HTMLDivElement>(null), stage = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null), minimap = useRef<HTMLCanvasElement>(null);
+  /** The GPU's canvas, under the top one (gl.ts), and its renderer (null without WebGL2: the canvas renderer draws alone). */
+  const glCanvas = useRef<HTMLCanvasElement>(null), glr = useRef<RealmGL | null | undefined>(undefined);
   const game = useRef<Game | null>(null), friend = useRef<GenerationSprites | null>(null), audio = useRef<RealmAudio | null>(null);
   const followerSprites = useRef(new Map<number, GenerationSprites>()), loadingSprites = useRef(new Set<number>());
   const camera = useRef<Camera>({ x: mainlandToWorld(121, 121)[0], y: mainlandToWorld(121, 121)[1], zoom: DEFAULT_SETTINGS.zoom, angle: 0, pitch: PITCH.classic }), cameraGoal = useRef<{ angle: number; pitch: number } | null>(null),
@@ -130,7 +161,13 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const [dailyTab, setDailyTab] = useState<DailyTab | null>(null);
   const [hover, setHover] = useState(""), [toast, setToast] = useState<{ title: string; sub?: string } | null>(null), [drops, setDrops] = useState<XpDrop[]>([]);
   const [levelUps, setLevelUps] = useState<{ skill: Skill; level: number }[]>([]), [quest, setQuest] = useState<string | null>(null), [dead, setDead] = useState(false);
-  const [settings, setSettingsState] = useState<Settings>(loadSettings), [roster, setRoster] = useState<OwnedFriend[]>([]), [rosterState, setRosterState] = useState<"waiting" | "ready" | "none">("waiting");
+  const [settings, setSettingsState] = useState<Settings>(loadSettings);
+  // Rendering mode: the setting, unless this visit's address chose one (?renderer=…, as the old WebGL address does).
+  const [rendererOverride, setRendererOverride] = useState<RendererMode | null>(null), [renderNotice, setRenderNotice] = useState<null | "unavailable" | "lost">(null);
+  const [webglSupported, setWebglSupported] = useState<boolean | null>(null);
+  const mode: RendererMode = rendererOverride ?? settings.renderer ?? "normal", modeRef = useRef(mode); modeRef.current = mode;
+  const glFor = useRef<HTMLCanvasElement | null>(null), glFailed = useRef<(why: "unavailable" | "lost") => void>(() => {}), chooseRenderer = useRef<(next: RendererMode) => void>(() => {});
+  const [roster, setRoster] = useState<OwnedFriend[]>([]), [rosterState, setRosterState] = useState<"waiting" | "ready" | "none">("waiting");
   const [hosted, setHosted] = useState<"waiting" | "linked" | "none" | "elsewhere">("waiting"), [hasSave, setHasSave] = useState<{ total: number; combat: number; qp: number; where: string } | null>(null);
   const [tailorPick, setTailorPick] = useState(""), [backupStatus, setBackupStatus] = useState(""), [guide, setGuide] = useState<{ skill: Skill | null } | null>(null);
   // Playing together: other players (from the host), who you're following, and a whisper to start in the chat box.
@@ -173,11 +210,13 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       const view = canvas.current;
       // Low graphics draws at one pixel per CSS pixel (a sharp screen at 2× costs four times the pixels).
       const low = isLow(live.current.settings);
-      if (view) { const ratio = low ? 1 : Math.min(window.devicePixelRatio || 1, adaptive.cap); view.width = Math.round(logical.width * scale * ratio); view.height = Math.round(logical.height * scale * ratio); }
+      const custom = customOf(live.current.settings);
+      if (view) { const ratio = custom ? Math.max(0.5, Math.min(2, custom.resolution * (custom.adaptive ? Math.min(1, adaptive.cap / 1.5) : 1))) : low ? 1 : Math.min(window.devicePixelRatio || 1, adaptive.cap); view.width = Math.round(logical.width * scale * ratio); view.height = Math.round(logical.height * scale * ratio); }
+      if (view && glCanvas.current) { const k = low ? LOW_WORLD_SCALE : 1; glCanvas.current.width = Math.round(view.width * k); glCanvas.current.height = Math.round(view.height * k); }
     };
     const observer = new ResizeObserver(measure); observer.observe(node); measure(); resizeRef.current = measure;
     return () => observer.disconnect();
-  }, [phase, settings.graphics]);
+  }, [phase, settings.graphics, settings.custom?.resolution, settings.custom?.adaptive, mode]);
 
   // ---------- Language: the whole interface, translated where it's shown (i18n.ts) ----------
   useEffect(() => { if (root.current) setLanguage(root.current, languageOf(settings.language)); }, [settings.language, phase]);
@@ -190,6 +229,23 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     const player = audio.current;
     if (player) { player.setMusic(next.music); player.setSfx(next.sfx); player.setVolumes(next.musicVolume, next.sfxVolume); player.unlock(); }
   }, []);
+  // ---------- Rendering mode: switching is a change of view, never of game ----------
+  chooseRenderer.current = next => {
+    if (next === modeRef.current && !rendererOverride) return;
+    // The adventure is saved first; the game itself (state, position, inventory) stays exactly as it is, and only the
+    // picture is made again: the draw loop restarts on fresh canvases (see the loop's effect), the old GPU let go.
+    saveNow.current();
+    if (document.pictureInPictureElement) void document.exitPictureInPicture().catch(() => undefined);
+    setRenderNotice(null); setRendererOverride(null);
+    setSettings({ ...live.current.settings, renderer: next });
+  };
+  glFailed.current = why => {
+    setRendererOverride(null); setRenderNotice(why);
+    if (live.current.settings.renderer === "webgl") setSettings({ ...live.current.settings, renderer: "normal" });
+    if (why === "unavailable") setWebglSupported(false);
+  };
+  // Whether this device can run WebGL at all, asked once when Settings is first opened (it costs a throwaway context).
+  useEffect(() => { if (tab === "settings" && sideOpen && webglSupported === null) setWebglSupported(RealmGL.supported()); }, [tab, sideOpen, webglSupported]);
   useEffect(() => {
     const wake = () => {
       const player = audio.current, s = live.current.settings;
@@ -353,6 +409,12 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         }
         setCloud(next); return;
       }
+      if (event.data?.type === SETTINGS_STATE) {
+        if (event.data.settings && typeof event.data.settings === "object") setSettings(parseSettings(event.data.settings));
+        const forced = parseRenderer(event.data.renderer);
+        if (forced) setRendererOverride(forced);
+        return;
+      }
       if (event.data?.type !== HOST_STATE) return;
       if (game.current) applyHost(event.data); else pendingSave.current = event.data;
     };
@@ -378,6 +440,11 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         weather: (value: Weather | null) => { fixedWeather = value; },
         fireworks: () => { const state = game.current; if (state) celebrate(state.player.x, state.player.y, ["#e7a9b0", "#ebc26b", "#9fc6f0", "#b4d4a0"]); },
         graphics: (level: "auto" | "high" | "low") => setSettings({ ...live.current.settings, graphics: level === "low" ? "low" : "high" }),
+        /** Rendering mode: switch as Settings does, and what's running (the mode, a live GPU renderer, how many draw loops). */
+        renderer: (next: RendererMode) => chooseRenderer.current(next),
+        rendering: () => ({ mode: modeRef.current, gl: !!glr.current, loops: loopCount.n, alpha: (canvas.current?.getContext("2d")?.getContextAttributes().alpha ?? null) }),
+        /** Make the GPU lose its context, as a driver reset would. */
+        loseGl: () => { (glr.current as unknown as { gl?: WebGL2RenderingContext } | undefined)?.gl?.getExtension("WEBGL_lose_context")?.loseContext(); },
         /** Show the game in a language (an id from LANGUAGES, or "auto"), as the Settings picker does. */
         language: (id: string) => setSettings({ ...live.current.settings, language: id }),
         /** How much your Friend talks (recordings keep it quiet). */
@@ -429,9 +496,25 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   // ---------- The loop: game ticks, events, camera, drawing ----------
   useEffect(() => {
     if (phase !== "title" && phase !== "playing") return;
-    // The frame is opaque (the sky or the dark is painted under everything), which is cheaper to put on screen.
-    const node = canvas.current, ctx = node?.getContext("2d", { alpha: false }), mini = minimap.current?.getContext("2d");
+    // Rendering mode. WebGL: a GPU renderer on its own canvas (made when first wanted, or after a switch made the canvas
+    // anew); Normal: any GPU renderer is let go at once. Either way the game, its state and its save are untouched.
+    const wantGl = mode === "webgl";
+    if (glr.current && (!wantGl || glFor.current !== glCanvas.current)) { glr.current.dispose(); glr.current = undefined; glFor.current = null; }
+    if (wantGl && !glr.current && glCanvas.current) {
+      glr.current = RealmGL.create(glCanvas.current, navigator.webdriver); glFor.current = glCanvas.current;
+      // No WebGL2 here (or it wouldn't start): say so, and carry on in Normal.
+      if (!glr.current) { glr.current = undefined; glFor.current = null; queueMicrotask(() => glFailed.current("unavailable")); return; }
+    }
+    // The frame is opaque in Normal (the sky or the dark is painted under everything), which is cheaper to put on screen;
+    // with WebGL the top canvas is see-through (names and bars over the GPU's picture).
+    const gpu = wantGl ? glr.current ?? null : null, node = canvas.current, ctx = node?.getContext("2d", { alpha: !!gpu }), mini = minimap.current?.getContext("2d");
     if (!node || !ctx) return;
+    loopCount.n++;
+    // A GPU that goes away mid-game (driver reset, too many tabs): back to Normal, nothing else changes.
+    const glNode = gpu ? glCanvas.current : null, lost = (event: Event) => { event.preventDefault(); glFailed.current("lost"); };
+    glNode?.addEventListener("webglcontextlost", lost);
+    // The world's layer for the GPU to lay over its picture (everything the canvas renderer still draws), off screen.
+    const layer = gpu ? document.createElement("canvas") : null, layerCtx = layer?.getContext("2d") ?? null;
     let frame = 0, lastHud = 0, dropId = 0, lastFrame = 0, lastAdapt = 0;
     tickAt.current = performance.now();
     const loop = (now: number, viaTimer = false) => {
@@ -562,14 +645,25 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         const alpha = Math.min(1, (now - tickAt.current) / TICK_MS), moved = player.moved === state.tick;
         // Follow where you really are (upstairs, the storey's tiles stand over the building).
         const { x: tx, y: ty } = realPoint(state.world, moved ? player.prev.x + (player.x - player.prev.x) * alpha : player.x, moved ? player.prev.y + (player.y - player.prev.y) * alpha : player.y);
-        camera.current.x += (tx - camera.current.x) * 0.35; camera.current.y += (ty - camera.current.y) * 0.35; camera.current.zoom = live.current.settings.zoom;
+        // The camera eases after you by time, not by frame, so it feels the same at any frame rate (Custom: how loosely).
+        const loose = customOf(live.current.settings)?.smoothing ?? 0.72, follow = 1 - Math.pow(1 - Math.max(0.05, 1 - loose * 0.9), Math.max(0.001, dt) * 60);
+        camera.current.x += (tx - camera.current.x) * follow; camera.current.y += (ty - camera.current.y) * follow; camera.current.zoom = live.current.settings.zoom;
       }
       const ratio = node.width / VIEW.width;
       ctx.setTransform(ratio, 0, 0, ratio, 0, 0); ctx.imageSmoothingEnabled = false;
+      const custom = customOf(live.current.settings), useGl = !!gpu;
+      if (glCanvas.current) glCanvas.current.style.visibility = useGl ? "" : "hidden";
+      if (layer && layerCtx && useGl) {
+        const k = isLow(live.current.settings) ? LOW_WORLD_SCALE : 1, lw = Math.round(node.width * k), lh = Math.round(node.height * k);
+        if (layer.width !== lw || layer.height !== lh) { layer.width = lw; layer.height = lh; }
+        layerCtx.setTransform(ratio * k, 0, 0, ratio * k, 0, 0); layerCtx.imageSmoothingEnabled = false;
+        ctx.clearRect(0, 0, VIEW.width, VIEW.height);
+      }
       const drawStart = performance.now();
       const step = current === "playing" ? currentStep(state) : null, guideTarget = step?.target?.(state) ?? null;
-      renderScene(ctx, {
-        guideTarget,
+      renderScene(useGl && layerCtx ? layerCtx : ctx, {
+        gl: useGl ? gpu : null, ui: useGl && layerCtx ? ctx : undefined,
+        guideTarget, quality: custom ?? undefined,
         low: isLow(live.current.settings), nameplates: live.current.settings.nameplates ?? "full",
         game: state, now, tickAt: tickAt.current, camera: camera.current, friend: friend.current,
         follower: player.follower !== null ? followerSprites.current.get(player.follower) ?? null : null, canonical: CANONICAL,
@@ -592,13 +686,19 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       });
       // Frame cost, for the performance check.
       const cost = performance.now() - drawStart; perf.ms = perf.frames++ ? perf.ms * 0.95 + cost * 0.05 : cost;
+      // Custom graphics' frame-rate readout, top centre.
+      if (custom?.fps && current === "playing") {
+        const text = `${Math.round(1000 / Math.max(1, perf.interval))} fps · ${perf.ms.toFixed(1)} ms · ${useGl ? `WebGL · ${RENDER_PROFILE.gl_sprites ?? 0} sprites · ${RENDER_PROFILE.gl_boxes ?? 0} boxes` : "canvas"} · ${(node.width / VIEW.width).toFixed(2)}×`;
+        ctx.save(); ctx.font = "bold 11px monospace"; const w = ctx.measureText(text).width + 12;
+        ctx.fillStyle = "rgba(22,22,22,0.78)"; ctx.fillRect(VIEW.width / 2 - w / 2, 4, w, 18); ctx.fillStyle = "#e8e5de"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(text, VIEW.width / 2, 13.5); ctx.restore();
+      }
       // The real frame rate (it counts the GPU's work too); hitches and hidden tabs are left out.
       const gap = now - perf.lastFrame; perf.lastFrame = now;
       if (gap > 0 && gap < 250 && document.visibilityState === "visible") perf.interval = perf.interval * 0.97 + gap * 0.03;
       // Once a second, High checks it's keeping up, and draws fewer pixels if it isn't.
       if (now - lastAdapt > 1000 && document.visibilityState === "visible") {
         lastAdapt = now;
-        if (!isLow(live.current.settings) && adapt(adaptive, perf.interval, perf.ms, window.devicePixelRatio || 1) !== null) resizeRef.current?.();
+        if (!isLow(live.current.settings) && (custom?.adaptive ?? true) && adapt(adaptive, perf.interval, perf.ms, window.devicePixelRatio || 1) !== null) resizeRef.current?.();
       }
       if (mini && current === "playing" && now - lastHud > 90) {
         lastHud = now; const size = mini.canvas.width;
@@ -610,8 +710,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     const timer = setInterval(() => { if (document.hidden && document.pictureInPictureElement) loop(performance.now(), true); }, 50);
     const stop = () => { held.current.clear(); mouseWalk.current = null; if (game.current) setHeld(game.current, null); };
     window.addEventListener("blur", stop); document.addEventListener("visibilitychange", stop);
-    return () => { cancelAnimationFrame(frame); clearInterval(timer); window.removeEventListener("blur", stop); document.removeEventListener("visibilitychange", stop); };
-  }, [phase, reducedMotion, refresh]);
+    return () => { loopCount.n--; glNode?.removeEventListener("webglcontextlost", lost); cancelAnimationFrame(frame); clearInterval(timer); window.removeEventListener("blur", stop); document.removeEventListener("visibilitychange", stop); };
+  }, [phase, reducedMotion, refresh, mode]);
   useEffect(() => { if (paused && game.current) { held.current.clear(); setHeld(game.current, null); setMenu(null); } }, [paused]);
   useEffect(() => { if (!toast) return; const timer = setTimeout(() => setToast(null), 3400); return () => clearTimeout(timer); }, [toast]);
   // Level-up messages step aside on their own after a few seconds, so long skilling sessions don't pile them up.
@@ -993,7 +1093,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       data-total={player ? totalLevel(player) : 0} data-hp={player?.hp ?? 0} data-quests={state ? questPoints(state) : 0} data-hosted={hosted}
       onContextMenu={event => event.preventDefault()}>
       <div ref={stage} className="realm-stage" style={{ width: size.width, height: size.height, left: `calc(50% - ${size.width * size.scale / 2}px)`, top: `calc(50% - ${size.height * size.scale / 2}px)`, transform: `scale(${size.scale})`, "--toolbar": `${Math.ceil(54 / size.scale)}px` } as CSSProperties}>
-        <canvas ref={canvas} className="realm-view" tabIndex={0} aria-label="The Realm. Left-click to act, right-click for options, WASD to walk."
+        {mode === "webgl" && <canvas key="gl" ref={glCanvas} className="realm-gl" aria-hidden="true" style={{ width: size.width, height: size.height }} />}
+        <canvas key={`view-${mode}`} ref={canvas} className="realm-view" data-renderer={mode} tabIndex={0} aria-label="The Realm. Left-click to act, right-click for options, WASD to walk."
           style={{ width: size.width, height: size.height }}
           onPointerMove={onPointerMove} onPointerDown={onPointerDown} onPointerUp={onPointerUp} onPointerCancel={() => { cancelLongPress(); orbit.current = null; endMouseWalk(); }}
           onMouseDown={event => { if (event.button === 1) event.preventDefault(); }} onAuxClick={event => event.preventDefault()}
@@ -1052,6 +1153,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
             onLogout={logOut} fullscreen={fullscreen} onFullscreen={() => window.parent.postMessage({ type: FULLSCREEN_REQUEST }, "*")} pip={pip} onPip={() => void togglePip()}
             onExportSave={action => { const state = game.current; if (state) void makeSaveCode(state).then(text => window.parent.postMessage({ type: SAVE_EXPORT, action, text }, "*")); }}
             cloud={<CloudControls cloud={cloud} onAction={cloudAction} />}
+            renderer={mode} onRenderer={next => chooseRenderer.current(next)} webglSupported={webglSupported}
             onRestoreSave={async code => { const state = game.current; if (!state) return "The game isn't ready."; const error = await restoreSaveCode(state, code);
               if (!error) {
                 const at = realPoint(state.world, state.player.x, state.player.y); camera.current.x = at.x; camera.current.y = at.y; message(state, "Your adventure has been restored from a save code.", "info");
@@ -1060,7 +1162,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
                 if (linked.current) saveNow.current(true, hash);
                 else message(state, "Saves aren't connected yet, so this restore isn't saved: keep playing in this tab and it saves once they connect. If Settings still says saves are off, reload the page and restore the code again.", "info");
               } return error; }} settings={settings} setSettings={setSettings}
-            friend={friend.current} trackName={audio.current?.trackName ?? ""} trackId={audio.current?.trackId ?? ""} playTrack={id => { audio.current?.play(id as TrackId); audio.current?.unlock(); setSettings({ ...settings, autoMusic: false }); }} openCard={openCard} openCards={() => setModal("cards")} openFeedback={() => { setFeedbackStatus(""); setModal("feedback"); }} openHelp={() => setModal("help")} paused={paused} saved={savedText}
+            friend={friend.current} trackName={audio.current?.trackName ?? ""} trackId={audio.current?.trackId ?? ""} playTrack={id => { audio.current?.play(id as TrackId); audio.current?.unlock(); setSettings({ ...settings, autoMusic: false }); }} openCard={openCard} openCards={() => setModal("cards")} openFeedback={() => { setFeedbackStatus(""); setModal("feedback"); }} openHelp={() => setModal("help")} openNerds={() => setModal("nerds")} paused={paused} saved={savedText}
             relicCounts={snapshot?.inventory.map(Number) ?? [0, 0, 0, 0]} openCaskets={() => setModal("caskets")} />
           {selection && <div className="realm-selection" role="status">{selection.kind === "item" ? `Use ${player.inventory[selection.slot] ? itemName(player.inventory[selection.slot]!.id) : "item"} ->` : `Cast ${SPELLS.find(spell => spell.id === selection.spell)?.name ?? "spell"} ->`} pick a target <button type="button" onClick={() => setSelection(null)}>Cancel</button></div>}
 
@@ -1144,6 +1246,14 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
             </Modal>
           )}
           {modal === "cards" && <CardsModal game={state} onClose={() => setModal(null)} />}
+          {modal === "nerds" && <NerdSettings settings={settings} setSettings={setSettings} onClose={() => setModal(null)} webgl={mode === "webgl" && !!glr.current} />}
+          {renderNotice && (
+            <Modal title={renderNotice === "lost" ? "WebGL stopped" : "WebGL isn't available"} onClose={() => setRenderNotice(null)}>
+              <p>{renderNotice === "lost" ? "Your graphics card stopped drawing for the Realm (its WebGL context was lost), so the Realm went back to Normal rendering. Nothing else changed: you're right where you were." : "This device or browser can't run WebGL2, so the Realm is using Normal rendering. Your character, progress and saves are exactly the same in both."}</p>
+              <p className="realm-muted">You can try WebGL again any time in Settings → Rendering mode.</p>
+              <div className="realm-buttons center"><button type="button" className="realm-primary" onClick={() => setRenderNotice(null)}>Continue in Normal</button></div>
+            </Modal>
+          )}
           {modal === "feedback" && <FeedbackModal onClose={() => setModal(null)} onSend={sendFeedback} status={feedbackStatus} />}
           {modal === "map" && <WorldMapModal game={state} onClose={() => setModal(null)} onTravel={(x, y) => { setModal(null); walkTo(state, x, y); marker.current = { x, y, at: performance.now(), red: false }; refresh(); }} />}
           {modal === "help" && <HelpModal onClose={() => setModal(null)} onFeedback={() => { setFeedbackStatus(""); setModal("feedback"); }} />}

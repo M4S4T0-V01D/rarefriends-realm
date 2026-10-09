@@ -4,6 +4,12 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 93, date: "2026-10-09", title: "WebGL, inside the Realm", items: [
+    "The WebGL renderer is part of the Realm now. Settings → Rendering mode switches between Normal (the Realm as it has always been drawn, and still the default) and WebGL (the same world on your graphics card: blended ground, shingled roofs and every sprite lit where it stands).",
+    "It's one game: the same character, progress, saves and friends in either mode, and switching keeps you exactly where you are.",
+    "If your device can't run WebGL, or your graphics card stops mid-game, the Realm tells you and carries on in Normal. Nothing is lost.",
+    "Your settings are remembered in this browser now: rendering mode, graphics, language, sound and the rest (before, they started afresh every visit). The old WebGL address opens the Realm in WebGL.",
+  ] },
   { id: 92, date: "2026-10-09", title: "Your adventure, in the cloud", items: [
     "Cloud saves: verify your wallet once (Settings, or the title screen) and your adventure saves online by itself, every minute or so and after every level and quest, and follows your wallet to any device.",
     "Verifying is a message your wallet signs, never a transaction, and it costs nothing. No more save codes to keep: they still work, as an extra copy.",

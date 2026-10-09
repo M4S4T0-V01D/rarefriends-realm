@@ -17,6 +17,7 @@ import { petArt } from "./petart.ts";
 import { MAX_QUEST_POINTS, NPCS, QUESTS, finalStage, questDone, questPoints, type QuestDef } from "./content.ts";
 import { CARDS, CARD_KINDS, CARD_KIND_NAMES, cardFound, cardsFound, orderOpen, type CardDef } from "./codex.ts";
 import { decorArt } from "./scenery.ts";
+import { HIGH_QUALITY, LOW_QUALITY, type Quality } from "./render.ts";
 import { LANGUAGES } from "./i18n.ts";
 import { setLaw } from "./state.ts";
 import { FEEDBACK_KINDS, FEEDBACK_MAX, feedbackPost, type FeedbackKind } from "./feedback.ts";
@@ -127,15 +128,24 @@ export const TABS: readonly { id: Tab; label: string; glyph: string; key: string
   { id: "emotes", label: "Emotes", glyph: "☺", key: "F10" },
 ];
 export type Settings = { friendSpeech?: "full" | "reduced" | "rare" | "off"; /** Nameplates over players: name, tag and token id; the name alone; or nothing. */ nameplates?: "full" | "name" | "off"; music: boolean; sfx: boolean; musicVolume: number; sfxVolume: number; zoom: number; shiftDrop: boolean; autoMusic: boolean; dayNight?: boolean; weather?: boolean;
-  /** Graphics quality: high (the default) or low. */
-  graphics?: "high" | "low";
+  /** Graphics quality: high (the default), low, or custom (every knob set by hand: `custom`). */
+  graphics?: "high" | "low" | "custom"; custom?: CustomGraphics;
   /** The language the interface is shown in: "auto" (the browser's), or one of i18n.ts's. */
-  language?: string };
+  language?: string;
+  /** How the world is drawn: "normal" (the canvas renderer, the default) or "webgl" (the same world on the graphics card, gl.ts). */
+  renderer?: "normal" | "webgl" };
+/**
+ * Custom graphics, for nerds: what the renderer draws (render.ts `Quality`) and the screen around it: canvas pixels
+ * per screen pixel, whether that drops when the machine can't keep up, a frame-rate
+ * readout, and how softly the camera follows you (0 locked on, 1 very loose).
+ */
+export type CustomGraphics = Quality & { resolution: number; adaptive: boolean; fps: boolean; smoothing: number };
+export const customFrom = (base: Quality): CustomGraphics => ({ ...base, resolution: base === LOW_QUALITY ? 1 : 1.5, adaptive: base !== LOW_QUALITY, fps: false, smoothing: 0.72 });
 export type PanelProps = {
   game: Game; tab: Tab; setTab: (tab: Tab) => void; selection: Selection; setSelection: (selection: Selection) => void;
   openMenu: (x: number, y: number, entries: MenuEntry[]) => void; refresh: () => void; roster: readonly OwnedFriend[]; rosterState: "waiting" | "ready" | "none";
   friendSprites: ReadonlyMap<number, GenerationSprites>; loadFriend: (id: number) => void; settings: Settings; setSettings: (settings: Settings) => void;
-  friend: GenerationSprites | null; trackName: string; trackId: string; playTrack: (id: string) => void; openCard: () => void; openCards?: () => void; openFeedback?: () => void; openHelp: () => void; paused: boolean; saved: string; relicCounts: readonly number[]; openCaskets: () => void;
+  friend: GenerationSprites | null; trackName: string; trackId: string; playTrack: (id: string) => void; openCard: () => void; openCards?: () => void; openFeedback?: () => void; openHelp: () => void; openNerds?: () => void; paused: boolean; saved: string; relicCounts: readonly number[]; openCaskets: () => void;
   /** Playing together: who's around, and the friends list. */
   /** The skill guide (a skill) or the recipe book (null). */
   openGuide?: (skill: Skill | null) => void;
@@ -150,6 +160,8 @@ export type PanelProps = {
   onExportSave?: (action: "copy" | "download") => void; onRestoreSave?: (code: string) => Promise<string | null>; backupStatus?: string;
   /** Cloud saves: status and buttons (cloudui.tsx), shown in Settings. */
   cloud?: ReactNode;
+  /** Rendering mode: the one in use, choosing another, and whether this device can run WebGL at all (null: not known yet). */
+  renderer?: "normal" | "webgl"; onRenderer?: (mode: "normal" | "webgl") => void; webglSupported?: boolean | null;
   net?: NetState; onSocial?: (op: "add" | "remove" | "ignore" | "unignore", id: number) => void; onWhisper?: (id: number) => void; onOnline?: (on: boolean) => void;
 };
 export function SidePanel(props: PanelProps & { open: boolean; setOpen: (open: boolean) => void }) {
@@ -605,6 +617,57 @@ function FriendsTab({ game, refresh, roster, rosterState, friendSprites, loadFri
     </div>
   );
 }
+/**
+ * Custom graphics, every knob: the full settings screen for people who like knobs. Changes apply at once; the two
+ * buttons at the bottom start again from High's or Low's. (`webgl`: the WebGL renderer is the one drawing.)
+ */
+export function NerdSettings({ settings, setSettings, onClose, webgl }: { settings: Settings; setSettings: (settings: Settings) => void; onClose: () => void; webgl: boolean }) {
+  const c = settings.custom ?? customFrom(HIGH_QUALITY);
+  const set = (patch: Partial<CustomGraphics>) => setSettings({ ...settings, graphics: "custom", custom: { ...c, ...patch } });
+  const check = (key: { [K in keyof CustomGraphics]: CustomGraphics[K] extends boolean ? K : never }[keyof CustomGraphics], label: string, note?: string, disabled = false) => (
+    <label className="realm-check realm-nerd-check"><input type="checkbox" checked={c[key]} disabled={disabled} onChange={event => set({ [key]: event.target.checked } as Partial<CustomGraphics>)} /> <span>{label}{note && <small className="realm-muted"> {note}</small>}</span></label>
+  );
+  return (
+    <Modal title="Graphics settings (for nerds)" onClose={onClose} wide kind="realm-nerds">
+      <p className="realm-muted">Every knob the renderer has. Turn things off to go faster, up to make it prettier; it all applies straight away. The frame rate readout shows what each one costs.</p>
+      <div className="realm-nerd-grid">
+        <section><h3>Renderer</h3>
+          <p className="realm-muted">{webgl ? "Rendering mode: WebGL (choose it in Settings)." : "Rendering mode: Normal (choose it in Settings)."}</p>
+          <Slider label="Resolution" min={50} max={200} value={Math.round(c.resolution * 100)} unit="% of screen pixels" onChange={value => set({ resolution: value / 100 })} />
+          {check("adaptive", "Adaptive resolution", "drops the resolution while the game can't keep up")}
+          {check("fps", "Show frame rate", "frames a second and how long each one takes to draw")}
+        </section>
+        <section><h3>World</h3>
+          <Slider label="Draw distance" min={24} max={110} value={c.drawDistance} unit=" tiles" onChange={value => set({ drawDistance: value })} />
+          {check("textures", "Pixel textures", "bricks, shingles and the ground's pattern")}
+          {check("blend", "Blended ground", "grass, sand, paths and snow fade into each other (WebGL)", !webgl)}
+          {check("footprints", "Footprints")}
+          {check("haze", "Distance haze")}
+        </section>
+        <section><h3>Light and shadow</h3>
+          <Slider label="Light resolution" min={25} max={100} value={Math.round(c.lightScale * 100)} unit="%" onChange={value => set({ lightScale: value / 100 })} />
+          {check("shadows", "Shadows of buildings and walls")}
+          {check("spriteShadows", "Shadows of everything else", "trees, people, creatures")}
+          {check("clouds", "Cloud shadows")}
+        </section>
+        <section><h3>Weather and life</h3>
+          <Slider label="Rain" min={0} max={100} value={Math.round(c.rain * 100)} unit="%" onChange={value => set({ rain: value / 100 })} />
+          {check("fog", "Fog banks")}
+          {check("ambient", "Ambient life", "birds, falling leaves, sparks and smoke")}
+        </section>
+        <section><h3>Camera</h3>
+          <Slider label="Follow smoothing" min={0} max={100} value={Math.round(c.smoothing * 100)} unit="%" onChange={value => set({ smoothing: value / 100 })} />
+          <p className="realm-muted">0% stays locked on your Friend; higher drifts after you more softly.</p>
+        </section>
+      </div>
+      <div className="realm-buttons">
+        <button type="button" className="realm-dark" onClick={() => set(customFrom(HIGH_QUALITY))}>Start from High</button>
+        <button type="button" className="realm-dark" onClick={() => set(customFrom(LOW_QUALITY))}>Start from Low</button>
+        <button type="button" className="realm-primary" onClick={onClose}>Done</button>
+      </div>
+    </Modal>
+  );
+}
 /** Which language the Realm is shown in (each language by its own name; Auto is the browser's). */
 export function LanguagePicker({ value, onChange }: { value: string | undefined; onChange: (language: string) => void }) {
   return (
@@ -625,7 +688,7 @@ function Slider({ label, min, max, value, unit = "", onChange }: { label: string
     </label>
   );
 }
-function SettingsTab({ game, settings, setSettings, trackName, trackId, playTrack, openHelp, openFeedback, saved, refresh, openMenu, net, onOnline, onExportSave, onRestoreSave, backupStatus, onLogout, fullscreen, onFullscreen, pip, onPip, cloud }: PanelProps) {
+function SettingsTab({ game, settings, setSettings, trackName, trackId, playTrack, openHelp, openNerds, openFeedback, saved, refresh, openMenu, net, onOnline, onExportSave, onRestoreSave, backupStatus, onLogout, fullscreen, onFullscreen, pip, onPip, cloud, renderer, onRenderer, webglSupported }: PanelProps) {
   const set = (patch: Partial<Settings>) => setSettings({ ...settings, ...patch });
   const [code, setCode] = useState(""), [confirming, setConfirming] = useState(false), [restoreNote, setRestoreNote] = useState("");
   const unlocked = game.player.music;
@@ -656,10 +719,18 @@ function SettingsTab({ game, settings, setSettings, trackName, trackId, playTrac
         <span>Picture in picture:</span><button type="button" aria-checked={!!pip} role="radio" onClick={() => { if (!pip) onPip(); }}>Open</button><button type="button" aria-checked={!pip} role="radio" onClick={() => { if (pip) onPip(); }}>Closed</button>
         <small className="realm-muted"> a floating window of the Realm (view only), or the ▣ on the minimap</small>
       </div>}
-      <div className="realm-graphics" role="radiogroup" aria-label="Graphics">
-        <span>Graphics:</span>{(["high", "low"] as const).map(level => <button key={level} type="button" role="radio" aria-checked={(settings.graphics ?? "high") === level} onClick={() => set({ graphics: level })}
-          title={level === "high" ? "Pixel textures, ambient life, fog and footprints, sharp on high-DPI screens" : "Plain ground, no ambient life, lighter weather: smoothest on older devices"}>{level === "high" ? "High" : "Low"}</button>)}
+      <div className="realm-graphics realm-renderer" role="radiogroup" aria-label="Rendering mode">
+        <span>Rendering mode:</span>{(["normal", "webgl"] as const).map(mode => <button key={mode} type="button" role="radio" aria-checked={(renderer ?? "normal") === mode} disabled={mode === "webgl" && webglSupported === false}
+          onClick={() => onRenderer?.(mode)} title={mode === "normal" ? "The Realm as it has always been drawn: works everywhere, lightest on the battery" : "The same Realm drawn on your graphics card: blended ground, shingled roofs, every sprite lit where it stands"}>{mode === "normal" ? "Normal" : "WebGL"}</button>)}
       </div>
+      <p className="realm-muted realm-renderer-note">{(renderer ?? "normal") === "webgl" ? "WebGL: the same Realm drawn on your graphics card, with blended ground, shingled roofs and every sprite lit where it stands. Your character, progress and saves are exactly the same." : "Normal: the Realm as it has always been drawn. It works everywhere and is lightest on the battery. Your character, progress and saves are the same in both modes."}</p>
+      {webglSupported === false && <p className="realm-muted">This device doesn't support WebGL2, so the Realm stays on Normal.</p>}
+      <div className="realm-graphics" role="radiogroup" aria-label="Graphics">
+        <span>Graphics:</span>{(["high", "low", "custom"] as const).map(level => <button key={level} type="button" role="radio" aria-checked={(settings.graphics ?? "high") === level}
+          onClick={() => { if (level === "custom") { set({ graphics: "custom", custom: settings.custom ?? customFrom(settings.graphics === "low" ? LOW_QUALITY : HIGH_QUALITY) }); openNerds?.(); } else set({ graphics: level }); }}
+          title={level === "high" ? "Pixel textures, ambient life, fog and footprints, sharp on high-DPI screens" : level === "low" ? "Plain ground, no ambient life, lighter weather: smoothest on older devices" : "Set every knob yourself"}>{level === "high" ? "High" : level === "low" ? "Low" : "Custom"}</button>)}
+      </div>
+      {settings.graphics === "custom" && openNerds && <button type="button" className="realm-wide realm-dark" onClick={openNerds}>⚙ Graphics settings (for nerds)</button>}
       <label className="realm-check"><input type="checkbox" checked={settings.dayNight !== false} onChange={event => set({ dayNight: event.target.checked })} /> Day and night</label>
       <div className="realm-graphics" role="radiogroup" aria-label="Friend speech">
         <span>Friend speech:</span>{(["full", "reduced", "rare", "off"] as const).map(level => <button key={level} type="button" role="radio" aria-checked={(settings.friendSpeech ?? "full") === level} onClick={() => set({ friendSpeech: level })}

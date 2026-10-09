@@ -37,3 +37,16 @@ test("cloud saves are translated: panel, dialogs, chip, chat and title", () => {
   assert.equal(translate("The cloud has no save for Friend #7730, but this browser has one. Put it back in the cloud?", "es"), "La nube no tiene guardado del Friend #7730, pero este navegador sí. ¿Lo devolvemos a la nube?");
   assert.equal(translate("Total level 1234", "ko"), "총 레벨 1234");
 });
+
+test("rendering mode is translated: the Settings choice, its notes and the WebGL notices", () => {
+  const panels = read("panels.tsx"), index = read("index.tsx");
+  const blocks = [panels.slice(panels.indexOf('<div className="realm-graphics realm-renderer"'), panels.indexOf('<div className="realm-graphics" role="radiogroup" aria-label="Graphics">')),
+    index.slice(index.indexOf("{renderNotice && ("), index.indexOf("{renderNotice && (") + 1600)];
+  const all = blocks.flatMap(block => [...texts(block, text => /^[A-Z]/.test(text) && /[a-z]{3}/.test(text) && !/^(WebGL|realm-)$/.test(text))]).concat(["Normal", "Rendering mode"]);
+  assert.ok(all.length >= 10, `found the rendering-mode texts (${all.length})`);
+  for (const { id } of LANGUAGES.filter(language => language.dictionary)) {
+    const left = [...new Set(all.flatMap(text => untranslated(text, id)))];
+    assert.deepEqual(left.slice(0, 8), [], `${id}: still in English`);
+  }
+  assert.equal(translate("WebGL isn't available", "es"), "WebGL no está disponible");
+});
