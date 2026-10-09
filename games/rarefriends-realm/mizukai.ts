@@ -1,11 +1,11 @@
 /**
- * What Rises in the East: the people of the Palian Isles and what they ask of you.
+ * What Rises in the East: the people of the Mizukai Isles and what they ask of you.
  *
  * Kurohama's harbour folk, who meet every boat from the mainland; the Hall of Takamori, where Lord Naoharu rules
  * Hinode, his sister Lady Suzu does the ruling he doesn't notice, and Captain Ise keeps the peace with a bounty board;
  * Kumoyama's priestess and the Bureau of Seals' sealwright, between them the keepers of the Isles' faith and magic;
  * the islands' own people, each with their island's trouble. The quests run from Landfall (being presented at the Hall)
- * through the Rope and the Brush (the Palian tradition), out across the islands, into the old war with Josaki, and at
+ * through the Rope and the Brush (the Mizukai tradition), out across the islands, into the old war with Josaki, and at
  * last to Hakkotsu, where the sea has been keeping something.
  */
 import { addXp, combatLevel, count, giveOrDrop, has, level, message, sound, take, type Dialogue, type Game } from "./state.ts";
@@ -14,32 +14,32 @@ import { chat, completeQuest, data, fetchQuest, npcSays, questDone, stage, type 
 const art = (family: number, seed: number) => ({ family, seed });
 const person = (id: string, name: string, examine: string, seed: number, extra: Partial<NpcDef> = {}): NpcDef => ({ id, name, examine, options: ["Talk-to"], art: art(9, seed), ...extra });
 const boatman = (id: string, name: string, examine: string, seed: number): NpcDef => ({ id, name, examine, options: ["Talk-to", "Travel"], art: art(9, seed) });
-export const PALIAN_NPCS: Record<string, NpcDef> = {
+export const MIZUKAI_NPCS: Record<string, NpcDef> = {
   // Kurohama.
   kuro_harbourmaster: person("kuro_harbourmaster", "Harbourmaster Isamu Kaneda", "Keeper of Kurohama's harbour for thirty years. Meets every boat from the mainland, and remembers every face that got off one.", 1200),
-  kuro_innkeeper: person("kuro_innkeeper", "Mistress Chiyo", "Keeps the Sleeping Crane. Has heard every traveller's story, and believes about a third.", 1201, { options: ["Talk-to", "Trade"], shop: "palian_inn" }),
-  kuro_sealwright: person("kuro_sealwright", "Sealwright Ren Mizushiro", "Of the Bureau of Seals. Writes the spells of the Isles on paper, in ink, with a brush, very fast, and has never once spilt.", 1202, { options: ["Talk-to", "Trade"], shop: "palian_seals" }),
-  kuro_fishmonger: person("kuro_fishmonger", "Fishmonger Tetsu", "Sells what the sea gave this morning, and argues with it about the price.", 1203, { options: ["Talk-to", "Trade"], shop: "palian_fish" }),
-  kuro_merchant: person("kuro_merchant", "Okiku", "Keeps the general store. Knows where everything in it is, and most of what's in yours.", 1204, { options: ["Talk-to", "Trade"], shop: "palian_general" }),
-  kuro_clothier: person("kuro_clothier", "Sayo the clothier", "Dyes and sews the indigo Kurohama wears. Her own sleeves are spotless, which nobody understands.", 1205, { options: ["Talk-to", "Trade"], shop: "palian_clothier" }),
-  kuro_apothecary: person("kuro_apothecary", "Granny Ume", "The harbour's herbalist. Older than the Exchange, and kinder than the magistrate.", 1206, { options: ["Talk-to", "Trade"], shop: "palian_herbs" }),
-  kuro_smith: person("kuro_smith", "Smith Tamaki", "Master of the Ironsand Forge. Folds steel the way other people knit, and talks the whole time.", 1207, { options: ["Talk-to", "Trade"], shop: "palian_forge" }),
+  kuro_innkeeper: person("kuro_innkeeper", "Mistress Chiyo", "Keeps the Sleeping Crane. Has heard every traveller's story, and believes about a third.", 1201, { options: ["Talk-to", "Trade"], shop: "mizukai_inn" }),
+  kuro_sealwright: person("kuro_sealwright", "Sealwright Ren Mizushiro", "Of the Bureau of Seals. Writes the spells of the Isles on paper, in ink, with a brush, very fast, and has never once spilt.", 1202, { options: ["Talk-to", "Trade"], shop: "mizukai_seals" }),
+  kuro_fishmonger: person("kuro_fishmonger", "Fishmonger Tetsu", "Sells what the sea gave this morning, and argues with it about the price.", 1203, { options: ["Talk-to", "Trade"], shop: "mizukai_fish" }),
+  kuro_merchant: person("kuro_merchant", "Okiku", "Keeps the general store. Knows where everything in it is, and most of what's in yours.", 1204, { options: ["Talk-to", "Trade"], shop: "mizukai_general" }),
+  kuro_clothier: person("kuro_clothier", "Sayo the clothier", "Dyes and sews the indigo Kurohama wears. Her own sleeves are spotless, which nobody understands.", 1205, { options: ["Talk-to", "Trade"], shop: "mizukai_clothier" }),
+  kuro_apothecary: person("kuro_apothecary", "Granny Ume", "The harbour's herbalist. Older than the Exchange, and kinder than the magistrate.", 1206, { options: ["Talk-to", "Trade"], shop: "mizukai_herbs" }),
+  kuro_smith: person("kuro_smith", "Smith Tamaki", "Master of the Ironsand Forge. Folds steel the way other people knit, and talks the whole time.", 1207, { options: ["Talk-to", "Trade"], shop: "mizukai_forge" }),
   kuro_magistrate: person("kuro_magistrate", "Magistrate Sugimura", "The harbour's magistrate: the lord's law in Kurohama. Tired, fair, and buried in petitions.", 1208),
   kuro_dockhand: person("kuro_dockhand", "Dockhand Jiro", "Loads and unloads, and listens while he does. Knows which boats come in at night.", 1209),
-  palian_villager: person("palian_villager", "Kurohama local", "A Palian in indigo and straw, going about the day, polite and in a hurry.", 1210, { options: ["Talk-to", "Pickpocket"], pickpocket: { level: 30, xp: 46, coins: [20, 90], stun: 4, damage: 2, extra: [["rice_ball", 0.1], ["paper_seal", 0.08]] } }),
-  palian_guard: { id: "palian_guard", name: "Takamori foot soldier", examine: "One of the lord's foot soldiers, in a black war-hat with a spear. Watches the harbour road, and you.", options: ["Talk-to"], art: art(10, 1211) },
+  mizukai_villager: person("mizukai_villager", "Kurohama local", "A Mizukai islander in indigo and straw, going about the day, polite and in a hurry.", 1210, { options: ["Talk-to", "Pickpocket"], pickpocket: { level: 30, xp: 46, coins: [20, 90], stun: 4, damage: 2, extra: [["rice_ball", 0.1], ["paper_seal", 0.08]] } }),
+  mizukai_guard: { id: "mizukai_guard", name: "Takamori foot soldier", examine: "One of the lord's foot soldiers, in a black war-hat with a spear. Watches the harbour road, and you.", options: ["Talk-to"], art: art(10, 1211) },
   // The Hall of Takamori.
   lord_takamori: { id: "lord_takamori", name: "Lord Takamori Naoharu", examine: "Lord of Takamori and of Hinode. Young for it, and he knows it.", options: ["Talk-to"], art: art(10, 1220) },
   lady_suzu: person("lady_suzu", "Lady Suzu", "The lord's elder sister. Keeps the Hall's letters, its guests, and most of its decisions.", 1221),
   takamori_captain: { id: "takamori_captain", name: "Captain Hayato Ise", examine: "Captain of the lord's samurai. Keeps a bounty board and a very short list of people he trusts.", options: ["Talk-to"], art: art(10, 1222) },
-  palian_samurai: { id: "palian_samurai", name: "Takamori samurai", examine: "A samurai of the lord's household, the crane banner at his back. Courteous. Ready.", options: ["Talk-to", "Pickpocket"], art: art(10, 1223), pickpocket: { level: 58, xp: 120, coins: [80, 260], stun: 6, damage: 6, extra: [["spirit_seal", 0.08], ["rice_wine", 0.1]] } },
+  mizukai_samurai: { id: "mizukai_samurai", name: "Takamori samurai", examine: "A samurai of the lord's household, the crane banner at his back. Courteous. Ready.", options: ["Talk-to", "Pickpocket"], art: art(10, 1223), pickpocket: { level: 58, xp: 120, coins: [80, 260], stun: 6, damage: 6, extra: [["spirit_seal", 0.08], ["rice_wine", 0.1]] } },
   takamori_sensei: person("takamori_sensei", "Sensei Kaede", "Teaches the sword at the Takamori dojo. Says the cut is the last part of it.", 1224),
-  takamori_armourer: person("takamori_armourer", "Armourer Gonzaburo", "Laces armour for the lord's household. Counts every scale twice.", 1225, { options: ["Talk-to", "Trade"], shop: "palian_armour" }),
-  takamori_bowyer: person("takamori_bowyer", "Bowyer Asa", "Makes the tall bows of the Isles. Strings one by bracing it against her foot and the sky.", 1226, { options: ["Talk-to", "Trade"], shop: "palian_bows" }),
-  takamori_teahouse: person("takamori_teahouse", "Hostess Yae", "Keeps the Plum Teahouse by the castle gate. Pours, listens, remembers.", 1227, { options: ["Talk-to", "Trade"], shop: "palian_tea" }),
+  takamori_armourer: person("takamori_armourer", "Armourer Gonzaburo", "Laces armour for the lord's household. Counts every scale twice.", 1225, { options: ["Talk-to", "Trade"], shop: "mizukai_armour" }),
+  takamori_bowyer: person("takamori_bowyer", "Bowyer Asa", "Makes the tall bows of the Isles. Strings one by bracing it against her foot and the sky.", 1226, { options: ["Talk-to", "Trade"], shop: "mizukai_bows" }),
+  takamori_teahouse: person("takamori_teahouse", "Hostess Yae", "Keeps the Plum Teahouse by the castle gate. Pours, listens, remembers.", 1227, { options: ["Talk-to", "Trade"], shop: "mizukai_tea" }),
   // Kumoyama.
   kumo_priestess: person("kumo_priestess", "Head Priestess Mitsu", "Keeps the shrine on Mount Kumo. Has rung the morning bell every day for forty years, and been late once.", 1230),
-  kumo_attendant: person("kumo_attendant", "Shrine attendant Natsu", "Sells charms and folds fortunes at the shrine office. Folds them very small, so nobody reads them on the steps.", 1231, { options: ["Talk-to", "Trade"], shop: "palian_shrine" }),
+  kumo_attendant: person("kumo_attendant", "Shrine attendant Natsu", "Sells charms and folds fortunes at the shrine office. Folds them very small, so nobody reads them on the steps.", 1231, { options: ["Talk-to", "Trade"], shop: "mizukai_shrine" }),
   kumo_shrine_maiden: person("kumo_shrine_maiden", "Shrine maiden", "A shrine maiden of Kumoyama in white and vermilion, sweeping a path that is already clean.", 1232),
   // Hinode's villages and wild places.
   tanabe_headman: person("tanabe_headman", "Headman Sakuji", "Headman of Tanabe. Counts the rice, and the imps who steal it.", 1240),
@@ -54,7 +54,7 @@ export const PALIAN_NPCS: Record<string, NpcDef> = {
   kibi_teamaster: person("kibi_teamaster", "Tea-master Hanae", "Grows, picks, rolls and pours Kibi's tea. Has opinions about water.", 1252),
   kibi_picker: person("kibi_picker", "Tea picker", "Picks two leaves and a bud, all day, into a basket on her back.", 1253),
   hana_poet: person("hana_poet", "The poet Yugiri", "A poet who came to Hanazono to finish one poem, eleven years ago.", 1254),
-  hana_tea: person("hana_tea", "Hostess Momo", "Keeps the Blossom Teahouse. Sweeps the petals off the step, and they come back.", 1255, { options: ["Talk-to", "Trade"], shop: "palian_tea" }),
+  hana_tea: person("hana_tea", "Hostess Momo", "Keeps the Blossom Teahouse. Sweeps the petals off the step, and they come back.", 1255, { options: ["Talk-to", "Trade"], shop: "mizukai_tea" }),
   mori_maiden: person("mori_maiden", "Shrine maiden Kon", "Keeps the fox shrine on Morishima. Her eyes are a little too gold in the lantern light.", 1256),
   iwa_abbot: person("iwa_abbot", "Abbot Jikai", "Abbot of Iwaoka. Speaks rarely. Says more when he doesn't.", 1257),
   iwa_monk: person("iwa_monk", "Iwaoka monk", "A monk of the silent climb. Bows; says nothing.", 1258),
@@ -86,7 +86,7 @@ const say = (game: Game, text: string) => { message(game, text, "quest"); sound(
 const mark = (done: boolean, text: string) => `${done ? "✓" : "•"} ${text}`;
 const combat = (game: Game) => combatLevel(game.player);
 
-export const PALIAN_QUESTS: readonly QuestDef[] = [
+export const MIZUKAI_QUESTS: readonly QuestDef[] = [
   {
     id: "landfall", name: "Landfall at Kurohama", points: 1, difficulty: "Novice", start: "Talk to Harbourmaster Isamu Kaneda at the harbour office in Kurohama, on Hinode.",
     requirements: [], rewards: ["1 Quest Point", "1,500 coins", "2,000 Presence XP", "Boats to Kibi, Hanazono, Morishima, Iwaoka, Kusabana and Torojima"],
@@ -99,13 +99,13 @@ export const PALIAN_QUESTS: readonly QuestDef[] = [
   },
   {
     id: "rope_and_brush", name: "The Rope and the Brush", points: 3, difficulty: "Intermediate", start: "Talk to Head Priestess Mitsu at Kumoyama, after Landfall at Kurohama.",
-    requirements: ["Landfall at Kurohama", "Faith 20 and Magic 20 recommended"], rewards: ["3 Quest Points", "3,000 Faith XP", "3,000 Magic XP", "The Palian tradition: Palian Magic and Faith, kept from your spellbook or prayers anywhere", "A shrine robe"],
+    requirements: ["Landfall at Kurohama", "Faith 20 and Magic 20 recommended"], rewards: ["3 Quest Points", "3,000 Faith XP", "3,000 Magic XP", "The Mizukai tradition: Mizukai Magic and Faith, kept from your spellbook or prayers anywhere", "A shrine robe"],
     journal: game => {
       const s = stage(game, "rope_and_brush"), p = game.player;
       if (s === 0) return ["Head Priestess Mitsu says the shrine's rope is old and the Isles' spirits are restless. She and the Bureau of Seals keep the Isles' faith and magic between them."];
       if (s === 1) return ["The sacred rope must be renewed: rice straw from Tanabe for the rope, and a binding seal from the Bureau of Seals to tie into it.", mark(has(p, "rice_straw"), "Rice straw, from Headman Sakuji in Tanabe"), mark(has(p, "binding_seal"), "A binding seal, from Sealwright Ren in Kurohama"), "• Bring both to the Head Priestess"];
       if (s === 2) return ["The rope is tied. Now ring the bell at four shrines, so the Isles' Friends know the new rope is theirs:", mark(data(game, "rb_kumo") > 0, "Kumoyama, on Mount Kumo"), mark(data(game, "rb_harbour") > 0, "The Harbour Shrine in Kurohama"), mark(data(game, "rb_fox") > 0, "The fox shrine on Morishima"), mark(data(game, "rb_iwaoka") > 0, "The Hall of Silence on Iwaoka"), "• Then back to the Head Priestess"];
-      return ["The rope is new and the four shrines have rung. The priestess and the sealwright taught me the Palian way: I can keep it from my spellbook or my prayers, anywhere, and set it down again. QUEST COMPLETE!"];
+      return ["The rope is new and the four shrines have rung. The priestess and the sealwright taught me the Mizukai way: I can keep it from my spellbook or my prayers, anywhere, and set it down again. QUEST COMPLETE!"];
     },
   },
   {
@@ -254,8 +254,8 @@ export const PALIAN_QUESTS: readonly QuestDef[] = [
   },
 ];
 
-/** What the people of the Isles say, and the quests they give. Null for anyone who isn't Palian. */
-export function talkPalian(game: Game, npcId: string, name: string): Dialogue | null {
+/** What the people of the Isles say, and the quests they give. Null for anyone who isn't Mizukai. */
+export function talkMizukai(game: Game, npcId: string, name: string): Dialogue | null {
   const player = game.player;
   if (npcId.startsWith("boat_")) return chat(name, npcSays(name, BOAT_LINES[npcId] ?? "Where to?", "Show me where you want to go, and I'll tell you the fare. You pay when you board, not before."), [
     { label: "Where can you take me?", then: () => { game.ui.boat = npcId.slice(5); return null; } },
@@ -286,7 +286,7 @@ export function talkPalian(game: Game, npcId: string, name: string): Dialogue | 
         if (count(player, "paper_seal") >= 10) return chat(name, npcSays(name, "Ten seals back. Good: half the parasols in Hinode are seals somebody wrote badly and threw away. I'll use the paper. Hold still.", "There. A binding seal, for the shrine's rope. Don't read it. It doesn't like being read by people it isn't about."), undefined, () => { take(player, "paper_seal", 10); giveOrDrop(game, "binding_seal"); say(game, "Sealwright Ren writes you a binding seal."); });
         return chat(name, npcSays(name, "The priestess wants a binding seal. Of course she does. I'll write one, but the Bureau's out of good paper: bring me ten paper seals (the hopping parasols are made of them, the poor things, or Okiku sells them) and I'll use those."));
       }
-      if (stage(game, "rope_and_brush") >= 3) return chat(name, npcSays(name, pick(game, ["You keep the Palian way now: your spellbook is seals and bindings. Bring me spirit seals for the stronger ones.", "A seal is a promise written down. Magic is just making the world keep it.", "If a spell goes wrong, it was the brush. It's always the brush."])));
+      if (stage(game, "rope_and_brush") >= 3) return chat(name, npcSays(name, pick(game, ["You keep the Mizukai way now: your spellbook is seals and bindings. Bring me spirit seals for the stronger ones.", "A seal is a promise written down. Magic is just making the world keep it.", "If a spell goes wrong, it was the brush. It's always the brush."])));
       return chat(name, npcSays(name, pick(game, ["The Bureau of Seals. We write the Isles' magic: seals, bindings, wards. The mainland shouts its spells, I hear. We write ours down.", "Paper seals for the small work, spirit seals for the large. I sell both.", "The priestess and I keep the Isles' faith and magic between us. She'd say she keeps both and I keep the paperwork."])));
     }
     case "kuro_magistrate": {
@@ -324,8 +324,8 @@ export function talkPalian(game: Game, npcId: string, name: string): Dialogue | 
     case "kuro_merchant": return chat(name, npcSays(name, pick(game, ["Rice, soup, cucumbers, hats, nets, everything a traveller forgets, and paper seals, if you're learning.", "Cucumbers sell well in Tanabe. Not to the farmers.", "Mainland coins are good here. So are mainland manners, when people remember them."])));
     case "kuro_clothier": return chat(name, npcSays(name, pick(game, ["Indigo for the street, white for the shrine, black for the castle, and never wrap your kimono left over right unless someone's died.", "A haori with a crane on the back. For visiting. Everyone visits eventually.", "Straw sandals and split-toed socks. You'll walk quieter, I promise."])));
     case "kuro_apothecary": return chat(name, npcSays(name, pick(game, ["Tea leaf for faith, shiso for poison, moon mugwort for spirits, Kumo root for the long rites, and spirit bell for the things I won't brew myself.", "Mugwort smoke keeps the wayward ones off. Burn it in a vial and breathe it: five minutes of peace. Spirit incense, I call it. You can call it what you like.", "Kusabana has the best herbs. Midori grows them. She doesn't like visitors, but she likes people who bring her news."])));
-    case "palian_villager": return chat(name, npcSays(name, pick(game, ["Good day. You're from the mainland? It shows, in a good way. Mostly.", "The castle's up the Harbour Road; the shrine's up the Thousand Steps from the castle. Everyone gets lost the first time and blames the steps.", "If a parasol hops at you, it's lonely, not dangerous. Mostly.", "The lord is young. The lord's sister is not. That's why things work.", "Josaki? We don't talk about Josaki. My grandmother did, once, and then she went quiet for a week.", "The sun comes up over the sea out there, every morning, first in the world. It's why the Isles are called what they're called, whatever your mainland calls them."])));
-    case "palian_guard": return chat(name, npcSays(name, pick(game, ["Harbour Road. Takamori's that way. Keep your sword sheathed and your voice down.", "The lord's foot soldiers. We hold the roads, the samurai hold the castle, and the captain holds us.", "Ogres on Ashigane, ghosts on Josaki, smugglers somewhere, and I get the harbour. I'm not complaining. I'm explaining."])));
+    case "mizukai_villager": return chat(name, npcSays(name, pick(game, ["Good day. You're from the mainland? It shows, in a good way. Mostly.", "The castle's up the Harbour Road; the shrine's up the Thousand Steps from the castle. Everyone gets lost the first time and blames the steps.", "If a parasol hops at you, it's lonely, not dangerous. Mostly.", "The lord is young. The lord's sister is not. That's why things work.", "Josaki? We don't talk about Josaki. My grandmother did, once, and then she went quiet for a week.", "The sun comes up over the sea out there, every morning, first in the world. It's why the Isles are called what they're called, whatever your mainland calls them."])));
+    case "mizukai_guard": return chat(name, npcSays(name, pick(game, ["Harbour Road. Takamori's that way. Keep your sword sheathed and your voice down.", "The lord's foot soldiers. We hold the roads, the samurai hold the castle, and the captain holds us.", "Ogres on Ashigane, ghosts on Josaki, smugglers somewhere, and I get the harbour. I'm not complaining. I'm explaining."])));
     // ---------- The Hall of Takamori ----------
     case "lady_suzu": {
       if (stage(game, "landfall") === 1 && !data(game, "ld_suzu")) {
@@ -339,7 +339,7 @@ export function talkPalian(game: Game, npcId: string, name: string): Dialogue | 
         take(player, "josaki_treaty", 1); giveOrDrop(game, "takamori_katana"); addXp(game, "attack", 8000, { raw: true }); addXp(game, "presence", 3000, { raw: true }); completeQuest(game, "josaki_truce");
       });
       if (stage(game, "josaki_truce") === 1) return chat(name, npcSays(name, "When you go to Josaki: the captain wants it cleared. I want to know why it was closed. If you find anything written, bring it to me, not him."));
-      return chat(name, npcSays(name, pick(game, ["My brother rules Hinode. I rule his correspondence. It's very nearly the same thing.", "The Hall receives petitioners from the hour of the snake. Before that, it receives tea.", "Josaki was our neighbour. Then it was our enemy. Then it was nothing at all, by order. I was eight. I remember the smoke.", "Our mother kept the Palian way at the shrine, and our father kept it at the Bureau. My brother keeps neither and worries about both."])));
+      return chat(name, npcSays(name, pick(game, ["My brother rules Hinode. I rule his correspondence. It's very nearly the same thing.", "The Hall receives petitioners from the hour of the snake. Before that, it receives tea.", "Josaki was our neighbour. Then it was our enemy. Then it was nothing at all, by order. I was eight. I remember the smoke.", "Our mother kept the Mizukai way at the shrine, and our father kept it at the Bureau. My brother keeps neither and worries about both."])));
     }
     case "lord_takamori": {
       if (questDone(game, "josaki_truce")) return chat(name, npcSays(name, pick(game, ["My sister read the treaty aloud. I let her. I should have read it myself, years ago. I didn't want to know what my father did.", "Josaki is open. Its dead are quiet. I'm told I should be relieved. I'm told a great many things.", "You have the clan's sword. Carry it better than we did."])));
@@ -368,7 +368,7 @@ export function talkPalian(game: Game, npcId: string, name: string): Dialogue | 
       }
       return chat(name, npcSays(name, pick(game, ["The board pays for horns, still: ash ogres come back like weeds.", "Josaki and Ashigane in one season. My grandfather would have made you a retainer. I'm only allowed to make you tea.", "If you see the Nightcall Chimera in Kurokage, don't fight it alone. Don't fight it with friends, either. Just don't."])));
     }
-    case "palian_samurai": return chat(name, npcSays(name, pick(game, ["The crane of Takamori. We serve the lord, and the lord's sister, and the captain, in an order that changes by the hour.", "A sword is drawn once. If you draw it twice, you weren't paying attention the first time.", "Josaki's samurai were the best swords in the Isles. Our grandfathers said so, after they'd killed them."])));
+    case "mizukai_samurai": return chat(name, npcSays(name, pick(game, ["The crane of Takamori. We serve the lord, and the lord's sister, and the captain, in an order that changes by the hour.", "A sword is drawn once. If you draw it twice, you weren't paying attention the first time.", "Josaki's samurai were the best swords in the Isles. Our grandfathers said so, after they'd killed them."])));
     case "takamori_sensei": return chat(name, npcSays(name, pick(game, ["The cut is the last part of the sword. Before it: the stance, the breath, the draw, the knowing. Most people practise the cut.", "A katana rewards speed; a nodachi rewards commitment; a naginata rewards distance. Pick the virtue you have, not the one you want.", "Strike the post. No: strike through the post. The post is not where you're aiming."])));
     case "takamori_teahouse": return chat(name, npcSays(name, pick(game, ["The Plum Teahouse. Tea, blossom cakes, rice wine for the samurai off duty. The plum tree died years ago; the name didn't.", "The lord takes his tea bitter. Lady Suzu takes hers stronger.", "Everyone in Takamori comes here eventually. That's how I know everything, and why I say nothing."])));
     case "takamori_armourer": return chat(name, npcSays(name, pick(game, ["Lacquered iron laced in silk. Light for what it stops. Takes an hour to lace and a lifetime to pay for.", "Ashigaru kit for the foot soldiers, samurai harness for the household. Josaki harness I don't sell: only the dead wear that, and the ones who took it off them."])));
@@ -377,9 +377,9 @@ export function talkPalian(game: Game, npcId: string, name: string): Dialogue | 
     case "kumo_priestess": {
       const s = stage(game, "rope_and_brush");
       if (!questDone(game, "landfall")) return chat(name, npcSays(name, "Welcome to Kumoyama. Ring once, bow twice, clap twice, bow once. Have you been presented at the Hall? The mountain doesn't mind, but the Hall does."));
-      if (s === 0) return chat(name, npcSays(name, "You paid your respects; the mountain noticed. It's restless. The rope round its heart is forty years old and the Isles' spirits are wandering out through the gaps: the parasols, the lanterns, worse.", "The Isles keep their faith and magic differently from your mainland: a rope and a brush. I keep the rope; the Bureau of Seals keeps the brush. Help me renew the rope and I'll teach you the Palian way. Bring rice straw from Tanabe for the rope, and a binding seal from Sealwright Ren for the knot."), [
+      if (s === 0) return chat(name, npcSays(name, "You paid your respects; the mountain noticed. It's restless. The rope round its heart is forty years old and the Isles' spirits are wandering out through the gaps: the parasols, the lanterns, worse.", "The Isles keep their faith and magic differently from your mainland: a rope and a brush. I keep the rope; the Bureau of Seals keeps the brush. Help me renew the rope and I'll teach you the Mizukai way. Bring rice straw from Tanabe for the rope, and a binding seal from Sealwright Ren for the knot."), [
         { label: "I'll help renew the rope.", then: () => chat(name, npcSays(name, "Headman Sakuji in Tanabe, and Ren in Kurohama. Go gently with Ren. She's very fast and very proud."), undefined, () => { player.quests.rope_and_brush = 1; say(game, "Quest started: The Rope and the Brush."); }) },
-        { label: "What is the Palian way?", then: () => chat(name, npcSays(name, "Your mainland prays to the Old Friend and casts with sigils. We keep faith with the Thousand Friends: the Friend of each place, each spring, each mountain. Our prayers are vows and blessings; our magic is seals, written. Learn ours and you can keep it beside your own, and change between them as you please, anywhere: the mountain isn't jealous.")) },
+        { label: "What is the Mizukai way?", then: () => chat(name, npcSays(name, "Your mainland prays to the Old Friend and casts with sigils. We keep faith with the Thousand Friends: the Friend of each place, each spring, each mountain. Our prayers are vows and blessings; our magic is seals, written. Learn ours and you can keep it beside your own, and change between them as you please, anywhere: the mountain isn't jealous.")) },
         { label: "Not now.", then: () => null },
       ]);
       if (s === 1) {
@@ -389,9 +389,9 @@ export function talkPalian(game: Game, npcId: string, name: string): Dialogue | 
         return chat(name, npcSays(name, "Rice straw from Headman Sakuji in Tanabe; a binding seal from Sealwright Ren in Kurohama."));
       }
       if (s === 2) {
-        if (data(game, "rb_kumo") && data(game, "rb_harbour") && data(game, "rb_fox") && data(game, "rb_iwaoka")) return chat(name, npcSays(name, "Four shrines rang. I heard the last one from here, which I didn't expect. The rope holds.", "Then here is the Palian way, as the shrine and the Bureau keep it together: vows and blessings for your Faith; seals, bindings and barriers for your Magic. Keep it from your spellbook or your prayers whenever you like, anywhere you are, and set it down whenever you like. The spells you learn are yours either way.", "Ren will teach you the seals as your Magic grows; I'll teach you the rites as your Faith does. Wear this. It suits you better than it suits the shrine's cupboard."), undefined, () => {
+        if (data(game, "rb_kumo") && data(game, "rb_harbour") && data(game, "rb_fox") && data(game, "rb_iwaoka")) return chat(name, npcSays(name, "Four shrines rang. I heard the last one from here, which I didn't expect. The rope holds.", "Then here is the Mizukai way, as the shrine and the Bureau keep it together: vows and blessings for your Faith; seals, bindings and barriers for your Magic. Keep it from your spellbook or your prayers whenever you like, anywhere you are, and set it down whenever you like. The spells you learn are yours either way.", "Ren will teach you the seals as your Magic grows; I'll teach you the rites as your Faith does. Wear this. It suits you better than it suits the shrine's cupboard."), undefined, () => {
           giveOrDrop(game, "shrine_robe"); addXp(game, "prayer", 3000, { raw: true }); addXp(game, "magic", 3000, { raw: true }); completeQuest(game, "rope_and_brush");
-          message(game, "The Palian way is open to you: keep it from the top of your spellbook or prayers, anywhere.", "quest");
+          message(game, "The Mizukai way is open to you: keep it from the top of your spellbook or prayers, anywhere.", "quest");
         });
         return chat(name, npcSays(name, "Pray at the four altars: here, the Harbour Shrine, the fox shrine on Morishima, the Hall of Silence on Iwaoka."));
       }
@@ -404,9 +404,9 @@ export function talkPalian(game: Game, npcId: string, name: string): Dialogue | 
         if (data(game, "mk_breaker")) return chat(name, npcSays(name, "Unmade? Then the mountain will sleep. I'll write the seals fresh tonight; Ren will complain about the paper.", "Take this wand. It was my teacher's. Wave it over a thing, and it's clean."), undefined, () => { giveOrDrop(game, "shrine_wand"); addXp(game, "prayer", 8000, { raw: true }); addXp(game, "magic", 4000, { raw: true }); completeQuest(game, "mountain_kept"); });
         return chat(name, npcSays(name, "The Hollow's mouth is above the pagoda, past the last gate. The Seal-Breaker is behind the sealed door."));
       }
-      return chat(name, npcSays(name, pick(game, ["Ring once, bow twice, clap twice, bow once. The order matters less than the meaning, but the meaning is easier with the order.", "The Thousand Friends: a Friend for the spring, for the mountain, for the harbour, for the tree. Your Old Friend is one of them, perhaps. He'd be welcome.", "Keep the Palian way when you like, set it down when you like. The vows and the seals don't mind which book they're in, as long as you keep your word."])));
+      return chat(name, npcSays(name, pick(game, ["Ring once, bow twice, clap twice, bow once. The order matters less than the meaning, but the meaning is easier with the order.", "The Thousand Friends: a Friend for the spring, for the mountain, for the harbour, for the tree. Your Old Friend is one of them, perhaps. He'd be welcome.", "Keep the Mizukai way when you like, set it down when you like. The vows and the seals don't mind which book they're in, as long as you keep your word."])));
     }
-    case "kumo_attendant": return chat(name, npcSays(name, pick(game, ["Charms for safe crossings, good harvests, passing examinations. The paper charm softens a spirit's blow. Most people buy it for the crossings.", "Your fortune? Tie it to the tree if it's bad. Keep it if it's good. Most people tie them all, to be safe.", "Paper seals and spirit seals: the Palian rites spend them, like your mainland's sigils."])));
+    case "kumo_attendant": return chat(name, npcSays(name, pick(game, ["Charms for safe crossings, good harvests, passing examinations. The paper charm softens a spirit's blow. Most people buy it for the crossings.", "Your fortune? Tie it to the tree if it's bad. Keep it if it's good. Most people tie them all, to be safe.", "Paper seals and spirit seals: the Mizukai rites spend them, like your mainland's sigils."])));
     case "kumo_shrine_maiden": return chat(name, npcSays(name, pick(game, ["The path's swept. It's always swept. The sweeping is the prayer.", "The pagoda has five roofs: earth, water, fire, wind, and the one nobody agrees on.", "Wash your hands at the spring. Left, then right, then rinse your mouth from your left hand. Don't drink from the ladle!"])));
     // ---------- Hinode's villages ----------
     case "tanabe_headman": {
@@ -531,7 +531,7 @@ export function talkPalian(game: Game, npcId: string, name: string): Dialogue | 
     case "kusa_herbalist": return chat(name, npcSays(name, pick(game, ["Take a leaf from a plant, not a plant from the island. Write that down.", "Spirit bell rings when nobody touches it. Pick it when it's quiet; it doesn't mind then.", "Granny Ume buys my mugwort. She says it's for incense. It's for incense and her knees.", "Moon mugwort, Kumo root, shiso, tea, spirit bell. The Isles' five. Your mainland has its own; these are ours."])));
     case "cove_boss": {
       if (questDone(game, "smugglers_cove") && data(game, "cv_choice") === 2) return chat(name, npcSays(name, pick(game, ["The ledger came back. With you attached. I like that in a ledger.", "What fell off a boat is for sale, friend. To you, at a friend's price.", "The magistrate's clerk sends his regards. He'd send more, but he's busy being nervous."])), [
-        { label: "What's for sale?", then: () => { game.ui.shop = "palian_cove"; return null; } },
+        { label: "What's for sale?", then: () => { game.ui.shop = "mizukai_cove"; return null; } },
         { label: "Goodbye.", then: () => null },
       ]);
       return chat(name, npcSays(name, pick(game, ["You're on my island. It isn't on any chart, so technically you're nowhere. Mind your step; nowhere has cliffs.", "Everything here fell off a boat. Including some of my people.", "The strongbox? What strongbox?"])));
@@ -560,7 +560,7 @@ const BOAT_LINES: Record<string, string> = {
 };
 
 /** Kills that count for the Isles' quests, and the things creatures carry for them. */
-export function onPalianKill(game: Game, monsterId: string) {
+export function onMizukaiKill(game: Game, monsterId: string) {
   const player = game.player;
   const tally = (quest: string, key: string, goal: number, done: string) => {
     if (stage(game, quest) !== 1) return;
@@ -580,8 +580,8 @@ export function onPalianKill(game: Game, monsterId: string) {
   if (monsterId === "starving_colossus" && stage(game, "sea_gave_back") === 1 && !has(player, "colossus_heart")) { flag(game, "sg_colossus"); giveOrDrop(game, "colossus_heart"); say(game, "The Starving Colossus kneels, and folds, and is bones. In its ribs is a bundle tied with straw rope: offerings, and names. Hundreds of names. The Lantern Keeper."); }
 }
 /** Prayers at the Isles' shrines (The Rope and the Brush; Landfall). */
-export function onPalianAltar(game: Game, altar: { name: string; text?: string }) {
-  if (altar.text !== "palian") return;
+export function onMizukaiAltar(game: Game, altar: { name: string; text?: string }) {
+  if (altar.text !== "mizukai") return;
   if (stage(game, "landfall") === 1 && altar.name === "Kumoyama altar" && !data(game, "ld_prayed")) { flag(game, "ld_prayed"); say(game, "You ring the bell, bow, clap, bow. The mountain has seen you. Back to the harbourmaster."); }
   if (stage(game, "rope_and_brush") === 2) {
     const key = ({ "Kumoyama altar": "rb_kumo", "Harbour shrine altar": "rb_harbour", "Fox shrine altar": "rb_fox", "Iwaoka altar": "rb_iwaoka" } as Record<string, string>)[altar.name];
@@ -589,14 +589,14 @@ export function onPalianAltar(game: Game, altar: { name: string; text?: string }
   }
 }
 /** Standing on Iwaoka's summit stone (The Silent Climb). */
-export function onPalianTick(game: Game) {
+export function onMizukaiTick(game: Game) {
   const p = game.player;
   if (stage(game, "silent_climb") === 1 && !data(game, "sc_summit") && Math.hypot(p.x - IWAOKA_SUMMIT.x, p.y - IWAOKA_SUMMIT.y) <= 3) { flag(game, "sc_summit"); say(game, "You touch the summit stone of Iwaoka. The wind stops, for exactly as long as you hold your breath."); }
 }
 /** Iwaoka's summit, where the abbot sends climbers (world coordinates). */
 export const IWAOKA_SUMMIT = { x: 1648, y: 104 } as const;
 /** Searching something on the Isles for a quest (the smugglers' strongbox): true if it was handled. */
-export function onPalianSearch(game: Game, name: string): boolean {
+export function onMizukaiSearch(game: Game, name: string): boolean {
   if (!name.startsWith("The smugglers' strongbox")) return false;
   const player = game.player;
   if (stage(game, "smugglers_cove") !== 1) { message(game, "The strongbox is locked, and you have no business with it."); return true; }
@@ -606,13 +606,13 @@ export function onPalianSearch(game: Game, name: string): boolean {
   return true;
 }
 /** A purse lifted from one of the Isles' people (Footsteps in the Bamboo). */
-export function onPalianPickpocket(game: Game, npcId: string) {
-  if (stage(game, "footsteps_bamboo") !== 1 || !["palian_villager", "tanabe_farmer", "palian_samurai"].includes(npcId)) return;
+export function onMizukaiPickpocket(game: Game, npcId: string) {
+  if (stage(game, "footsteps_bamboo") !== 1 || !["mizukai_villager", "tanabe_farmer", "mizukai_samurai"].includes(npcId)) return;
   const n = game.player.questData.fb_picks = (game.player.questData.fb_picks ?? 0) + 1;
   if (n === 5) say(game, "Five purses, and nobody the wiser. The Quiet Teacher will know.");
 }
 /** Why a shop of the Isles won't sell to you, or null. */
-export function palianShopProblem(game: Game, shopId: string): string | null {
-  if (shopId === "palian_cove" && !(questDone(game, "smugglers_cove") && data(game, "cv_choice") === 2)) return "Kuze only sells to friends of the cove.";
+export function mizukaiShopProblem(game: Game, shopId: string): string | null {
+  if (shopId === "mizukai_cove" && !(questDone(game, "smugglers_cove") && data(game, "cv_choice") === 2)) return "Kuze only sells to friends of the cove.";
   return null;
 }

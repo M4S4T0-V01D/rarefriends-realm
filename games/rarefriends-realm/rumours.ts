@@ -159,7 +159,7 @@ export const RUMOURS: Partial<Record<RegionId, readonly Rumour[]>> = {
     r("Ironbark grows a heart of grey wood. Lurkers grow round it. Nobody's sure which came first.", "half"),
     r("The Regiment's scouts count trees. Why would anyone count trees? Unless you meant to own them.", "true"),
   ],
-  // The Palian Isles: what Kurohama's people say over tea.
+  // The Mizukai Isles: what Kurohama's people say over tea.
   kurohama: [
     r("The harbourmaster's chart has a blank patch west of Ashigane. Every harbourmaster before him left it blank too. Nobody says why.", "true"),
     r("The Red Ogre of Ashigane hates the whole of Takamori for something the first lord did. Nobody remembers what. The ogre does.", "true"),

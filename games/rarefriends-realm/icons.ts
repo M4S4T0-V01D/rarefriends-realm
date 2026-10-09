@@ -1034,9 +1034,9 @@ export const orbArt = (orb: OrbIcon) => icon16(`orb:${orb}`, ORB_PAINTERS[orb]);
 
 // ---------- Spell and prayer icons (generated from their element) ----------
 const ELEMENT_COLORS: Record<string, string> = { wind: "#e6ecef", water: "#8fa3c9", earth: "#a89479", fire: "#e9a07a", hollow: "#6d6b67", moon: "#c6bed4", gold: "#e2d49e", home: "#e8d4c0", holy: "#f2e28f", law: "#cfc7e6", dusk: "#8a6ab0", paper: "#efe6d2" };
-/** The Palian Isles' spells: each a paper seal (an ofuda strip) with its own mark in red ink. */
-const PALIAN_SPELL_MARKS = new Set(["seal_strike", "withering_seal", "paper_wall", "spirit_sight", "ink_serpent", "binding_seal_spell", "mist_veil", "storm_seal", "true_name", "crossing_kurohama", "crossing_kumoyama", "purifying_rite", "talisman_of_mending", "blessing_of_journeys", "shrine_barrier", "pacify_spirit", "rite_of_rising_sun"]);
-function palianSpell(p: Pixels, id: string, kind: string, color: string) {
+/** The Mizukai Isles' spells: each a paper seal (an ofuda strip) with its own mark in red ink. */
+const MIZUKAI_SPELL_MARKS = new Set(["seal_strike", "withering_seal", "paper_wall", "spirit_sight", "ink_serpent", "binding_seal_spell", "mist_veil", "storm_seal", "true_name", "crossing_kurohama", "crossing_kumoyama", "purifying_rite", "talisman_of_mending", "blessing_of_journeys", "shrine_barrier", "pacify_spirit", "rite_of_rising_sun"]);
+function mizukaiSpell(p: Pixels, id: string, kind: string, color: string) {
   // A strip of seal paper, slightly turned, with a red border and a brushed mark; a coloured wisp of what it does behind.
   p.disc(13, 8, 6, 6, shadeHex(color, -0.05), null);
   p.poly([[5, 1], [12, 2], [11, 19], [4, 18]], "#f6efdf", INK); p.line(5, 3, 11, 3, "#b5452f"); p.line(5, 16, 10, 17, "#b5452f");
@@ -1060,7 +1060,7 @@ function palianSpell(p: Pixels, id: string, kind: string, color: string) {
 export function spellArt(id: string, element: string, kind: string): HTMLCanvasElement {
   const color = ELEMENT_COLORS[element] ?? "#c7d3dc";
   return pixelArt(`spell:${id}`, 20, 20, p => {
-    if (PALIAN_SPELL_MARKS.has(id)) { palianSpell(p, id, kind, color); p.halo(); return; }
+    if (MIZUKAI_SPELL_MARKS.has(id)) { mizukaiSpell(p, id, kind, color); p.halo(); return; }
     switch (kind) {
       case "strike": p.disc(10, 10, 5, 5, color, INK, shadeHex(color, -0.15)); p.line(3, 15, 7, 11, color, 2); break;
       case "bolt": p.poly([[11, 1], [5, 11], [9, 11], [7, 19], [15, 8], [11, 8], [13, 1]], color); break;
@@ -1090,7 +1090,7 @@ const PRAYER_KIND: Record<string, [string, string]> = {
   // The Wise Friend's commandments: a closed eye over a tablet of the Law, each in its own colour.
   first_law: ["law", "#cfc7e6"], second_law: ["law", "#b98ab0"], third_law: ["law", "#9ea3ad"], fourth_law: ["law", "#8a6ab0"],
   queens_peace: ["law", "#c9a84a"], keepers_silence: ["law_protect", "#d8d6e4"], wise_hand: ["law", "#e6c46a"], dusk_mantle: ["law", "#5a4a6e"],
-  // The Palian vows and blessings: a sacred rope, a stone lantern, a shrine bell, a paper charm, by what each keeps.
+  // The Mizukai vows and blessings: a sacred rope, a stone lantern, a shrine bell, a paper charm, by what each keeps.
   vow_of_cedar: ["rope", "#5f7d6a"], vow_of_stone_lantern: ["lantern", "#a39e96"], ancestors_watch: ["rope_protect", "#b5452f"],
   blessing_of_brush: ["charm", "#22252e"], blessing_of_drum: ["charm", "#b5452f"], blessing_of_still_water: ["charm", "#2f3a5e"], blessing_of_long_road: ["charm", "#c9a24a"], rising_sun: ["sun", "#e2573f"],
   salt_and_water: ["bowl", "#efe6d2"], lantern_ward: ["lantern", "#f2c46a"], friend_of_the_place: ["rope", "#c9a24a"], thousand_friends: ["sun", "#c9a24a"],

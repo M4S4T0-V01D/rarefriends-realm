@@ -599,7 +599,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           fireworks.current = fireworks.current.filter(entry => now - entry.at < 2400);
           // Area music and the region banner.
           const here = regionAt(state.world, state.player.x, state.player.y), throne = state.player.x >= THRONE.x && state.player.y >= THRONE.y0 && state.player.y <= THRONE.y1;
-          // (On the Palian Isles the music follows a crossing, a fight, and a fight with one of the great spirits.)
+          // (On the Mizukai Isles the music follows a crossing, a fight, and a fight with one of the great spirits.)
           const foe = state.player.combat !== null ? state.monsters.find(monster => monster.uid === state.player.combat && !monster.dead) : undefined;
           const track = trackById(trackFor(here.id, throne, { sea: atSea(state), fight: !!foe, spirit: !!foe?.def.spirit && !!foe.def.boss }));
           const key = `${here.id}:${throne}`;

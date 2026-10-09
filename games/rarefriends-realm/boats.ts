@@ -1,5 +1,5 @@
 /**
- * Boats between the Palian Isles (What Rises in the East): a boatman at every landing sells passage to every other
+ * Boats between the Mizukai Isles (What Rises in the East): a boatman at every landing sells passage to every other
  * landing you know of, for coins, and rows you there.
  *
  * Where you can go: the mainland ferry, Kurohama, Tanabe's landing and Shiogama from the start; the islands that want

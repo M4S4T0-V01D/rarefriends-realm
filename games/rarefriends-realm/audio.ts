@@ -7,8 +7,8 @@ import type { SoundName } from "./state.ts";
 import type { RegionId } from "./world.ts";
 
 export type TrackId = RegionId | "theme" | "boss"
-  // The Palian Isles' own pieces (What Rises in the East).
-  | "palian_sunrise" | "palian_harbour" | "palian_village" | "palian_shrine" | "palian_forest" | "palian_sea" | "palian_haunted" | "palian_battle" | "palian_spirit" | "palian_castle";
+  // The Mizukai Isles' own pieces (What Rises in the East).
+  | "mizukai_sunrise" | "mizukai_harbour" | "mizukai_village" | "mizukai_shrine" | "mizukai_forest" | "mizukai_sea" | "mizukai_haunted" | "mizukai_battle" | "mizukai_spirit" | "mizukai_castle";
 export type SfxName = SoundName | "slash" | "stab" | "crush" | "punch" | "step_grass" | "step_stone" | "step_wood" | "step_sand" | "step_snow" | "step_swamp"
   | "crackle" | "forge" | "water" | "bird" | "gull" | "frog" | "wind" | "drip" | "rain" | "thunder" | "pop" | "hoof" | "whinny" | "rare" | "duel";
 type VoiceKind = "cluck" | "moo" | "squeak" | "grumble" | "growl" | "rattle" | "gurgle" | "whisper" | "clank" | "rumble" | "roar" | "king";
@@ -27,7 +27,7 @@ const VOICES: Record<string, { kind: VoiceKind; f0: number; length: number; brig
 };
 /** General-MIDI-style instruments, like an old-school RPG soundtrack: bright leads up high, plucked strings, light drums. */
 type Voice = "lute" | "flute" | "recorder" | "oboe" | "trumpet" | "bell" | "glock" | "harp" | "pizz" | "strings" | "organ" | "pad" | "bass" | "brass" | "pluck" | "choir" | "drone"
-  // The Palian Isles: a plucked koto, a twanging shamisen, a breathy shakuhachi, the sho's held clusters, a temple bell.
+  // The Mizukai Isles: a plucked koto, a twanging shamisen, a breathy shakuhachi, the sho's held clusters, a temple bell.
   | "koto" | "shamisen" | "shakuhachi" | "sho" | "kane";
 type Drum = "kick" | "snare" | "hat" | "shaker" | "tom" | "clank" | "hand" | "rim" | "timpani" | "tambourine" | "deep" | "ride"
   // The Isles' drums: the great taiko, the tight shime-daiko, the wooden clappers.
@@ -282,7 +282,7 @@ function composeTrack(given: Style): Track {
   }
   return { id: style.id, name: style.name, bpm: style.bpm, beats: loop * 4, notes, hits };
 }
-// ---------- The Palian Isles (What Rises in the East): ten hand-written pieces for koto, shamisen, shakuhachi, sho, temple bell and taiko ----------
+// ---------- The Mizukai Isles (What Rises in the East): ten hand-written pieces for koto, shamisen, shakuhachi, sho, temple bell and taiko ----------
 /** A chord by name ("Dmaj9", "F#m7", "Asus4", "D/F#"): pitch classes from the root, the bass note last for a slash chord. */
 function chordTones(name: string): { root: number; tones: number[]; bass: number } {
   const [main, slash] = name.split("/"), match = /^([A-G])([#b]?)(.*)$/.exec(main)!, pc = (letter: string, accidental: string) => (N[letter] + (accidental === "#" ? 1 : accidental === "b" ? -1 : 0) + 12) % 12;
@@ -295,17 +295,17 @@ function chordTones(name: string): { root: number; tones: number[]; bass: number
   const bass = slash ? pc(slash[0], slash.slice(1)) : root;
   return { root, tones, bass };
 }
-type PalianKit = "calm" | "festival" | "temple" | "sea" | "haunted" | "battle" | "spirit" | "court" | "village";
-type PalianPiece = {
+type MizukaiKit = "calm" | "festival" | "temple" | "sea" | "haunted" | "battle" | "spirit" | "court" | "village";
+type MizukaiPiece = {
   id: TrackId; name: string; bpm: number; meter: 3 | 4;
   /** The tune's two eight-bar sections (tune() notation), and the chord under each bar of each. */
   a: string; b: string; chordsA: readonly string[]; chordsB: readonly string[];
   /** Who plays the tune each time through (A, B, A, B), and how far up or down. */
   voices: readonly [Voice, number][];
   /** The bed: the koto's broken chords, a shamisen's figure, the sho's held clusters. */
-  bed: "arp" | "roll" | "ostinato" | "sho"; sho?: boolean; bass: Voice; kit: PalianKit;
+  bed: "arp" | "roll" | "ostinato" | "sho"; sho?: boolean; bass: Voice; kit: MizukaiKit;
 };
-function composePalian(piece: PalianPiece): Track {
+function composeMizukai(piece: MizukaiPiece): Track {
   const per = piece.meter, bars = 8, section = bars * per, notes: Note[] = [], hits: Hit[] = [];
   const sections = [piece.a, piece.b, piece.a, piece.b], harmony = [piece.chordsA, piece.chordsB, piece.chordsA, piece.chordsB];
   sections.forEach((text, i) => {
@@ -350,69 +350,69 @@ function composePalian(piece: PalianPiece): Track {
   });
   return { id: piece.id, name: piece.name, bpm: piece.bpm, beats: section * 4, notes, hits };
 }
-const PALIAN_PIECES: readonly PalianPiece[] = [
-  { id: "palian_sunrise", name: "Hinode, Isle of Sunrise", bpm: 84, meter: 4, bed: "arp", bass: "pizz", kit: "calm", voices: [["shakuhachi", 0], ["shakuhachi", 0], ["koto", 12], ["shakuhachi", 0]],
+const MIZUKAI_PIECES: readonly MizukaiPiece[] = [
+  { id: "mizukai_sunrise", name: "Hinode, Isle of Sunrise", bpm: 84, meter: 4, bed: "arp", bass: "pizz", kit: "calm", voices: [["shakuhachi", 0], ["shakuhachi", 0], ["koto", 12], ["shakuhachi", 0]],
     a: "A4:1.5 B4:0.5 D5:2  E5:1 D5:0.5 B4:0.5 A4:2  B4:1 D5:1 E5:1 G5:1  E5:3 r:1  D5:1.5 E5:0.5 D5:1 B4:1  A4:1 G4:1 A4:2  B4:1 A4:0.5 G4:0.5 E4:1 G4:1  A4:4",
     b: "D5:1 E5:1 G5:2  A5:1.5 G5:0.5 E5:2  G5:1 E5:1 D5:1 E5:1  B4:3 r:1  D5:1 B4:0.5 A4:0.5 B4:1 D5:1  E5:2 D5:1 B4:1  A4:1 B4:1 D5:1 B4:1  D5:4",
     chordsA: ["Dmaj9", "Bm7", "Gmaj7", "A7sus4", "D/F#", "Em9", "Gmaj9", "Asus4"], chordsB: ["Bm9", "Gmaj7", "Em7", "F#m7", "Gmaj7", "A6", "Bm7", "Dadd9"] },
-  { id: "palian_harbour", name: "Kurohama Harbour", bpm: 116, meter: 4, bed: "roll", bass: "bass", kit: "festival", voices: [["shamisen", 0], ["koto", 0], ["shamisen", 0], ["koto", 12]],
+  { id: "mizukai_harbour", name: "Kurohama Harbour", bpm: 116, meter: 4, bed: "roll", bass: "bass", kit: "festival", voices: [["shamisen", 0], ["koto", 0], ["shamisen", 0], ["koto", 12]],
     a: "G4:0.5 A4:0.5 C5:1 D5:1 C5:1  A4:1 G4:1 E4:2  G4:0.5 A4:0.5 C5:0.5 D5:0.5 E5:1 D5:1  C5:1 D5:1 A4:2  E5:1 G5:0.5 E5:0.5 D5:1 C5:1  D5:1.5 C5:0.5 A4:2  C5:1 A4:0.5 G4:0.5 E4:1 G4:1  G4:3 r:1",
     b: "D5:1 E5:1 G5:1 E5:1  A5:1.5 G5:0.5 E5:1 D5:1  E5:0.5 D5:0.5 C5:1 D5:2  A4:1 C5:1 D5:2  G5:1 E5:1 D5:1 E5:1  C5:1 A4:1 C5:1 D5:1  E5:1 D5:0.5 C5:0.5 A4:1 C5:1  G4:4",
     chordsA: ["G", "Em7", "Cmaj7", "D", "Am7", "D7", "C", "Gadd9"], chordsB: ["Em7", "Am7", "Cmaj7", "D", "Em7", "Am7", "D7sus4", "G"] },
-  { id: "palian_village", name: "Under the Eaves", bpm: 92, meter: 3, bed: "arp", bass: "pizz", kit: "village", voices: [["koto", 0], ["shakuhachi", 0], ["shakuhachi", 0], ["koto", 0]],
+  { id: "mizukai_village", name: "Under the Eaves", bpm: 92, meter: 3, bed: "arp", bass: "pizz", kit: "village", voices: [["koto", 0], ["shakuhachi", 0], ["shakuhachi", 0], ["koto", 0]],
     a: "C5:1 D5:1 F5:1  G5:2 F5:1  D5:1 C5:1 A4:1  C5:3  F5:1 G5:1 A5:1  G5:1.5 F5:0.5 D5:1  F5:1 D5:1 C5:1  D5:3",
     b: "A5:1 G5:1 F5:1  G5:2 A5:1  C6:1.5 A5:0.5 G5:1  F5:3  D5:1 F5:1 G5:1  A5:1 G5:1 F5:1  D5:1 C5:1 D5:1  C5:3",
     chordsA: ["C", "Dm7", "F", "C", "F", "Gsus4", "Dm7", "G7sus4"], chordsB: ["Am7", "Gm7", "Fmaj7", "F", "Dm7", "Am7", "Gsus4", "C"] },
-  { id: "palian_shrine", name: "Kumoyama", bpm: 60, meter: 4, bed: "sho", bass: "pizz", kit: "temple", voices: [["shakuhachi", 0], ["shakuhachi", 0], ["koto", 0], ["shakuhachi", 0]],
+  { id: "mizukai_shrine", name: "Kumoyama", bpm: 60, meter: 4, bed: "sho", bass: "pizz", kit: "temple", voices: [["shakuhachi", 0], ["shakuhachi", 0], ["koto", 0], ["shakuhachi", 0]],
     a: "A4:3 Bb4:1  A4:2 G4:2  D5:3 Eb5:1  D5:4  G5:2 Eb5:1 D5:1  Bb4:2 A4:2  G4:1 A4:1 Bb4:1 A4:1  D4:4",
     b: "D5:2 Eb5:2  G5:3 A5:1  Bb5:2 A5:1 G5:1  Eb5:4  D5:1.5 Eb5:0.5 D5:2  Bb4:2 A4:2  G4:2 Eb4:2  D4:4",
     chordsA: ["Dsus4", "Gm9", "Ebmaj7", "Dsus4", "Gm7", "Ebmaj7", "Cm9", "Dsus4"], chordsB: ["Bbmaj7", "Ebmaj7", "Gm9", "Cm7", "Dsus4", "Gm7", "Ebmaj7", "Dsus4"] },
-  { id: "palian_forest", name: "The Old Cedars", bpm: 74, meter: 4, bed: "arp", bass: "pizz", kit: "calm", voices: [["koto", 0], ["shakuhachi", 0], ["shakuhachi", 0], ["koto", 0]],
+  { id: "mizukai_forest", name: "The Old Cedars", bpm: 74, meter: 4, bed: "arp", bass: "pizz", kit: "calm", voices: [["koto", 0], ["shakuhachi", 0], ["shakuhachi", 0], ["koto", 0]],
     a: "E5:1 F5:1 A5:2  B5:1.5 A5:0.5 F5:2  E5:1 C5:1 B4:1 C5:1  E5:4  A5:1 B5:1 C6:2  B5:1 A5:1 F5:2  E5:1.5 F5:0.5 E5:1 C5:1  B4:4",
     b: "A4:1 B4:1 C5:1 E5:1  F5:3 E5:1  C5:1 B4:1 A4:2  B4:4  C5:1 E5:1 F5:1 A5:1  B5:2 A5:1 F5:1  E5:1 F5:0.5 E5:0.5 C5:1 B4:1  A4:4",
     chordsA: ["Am(add9)", "Fmaj7", "Am7", "Esus4", "Fmaj7#11", "Dm9", "Am7", "Esus4"], chordsB: ["Am7", "Dm7", "Fmaj7", "E7sus4", "Am9", "Fmaj7", "Dm7", "Am(add9)"] },
-  { id: "palian_sea", name: "Crossing the Eastern Sea", bpm: 88, meter: 3, bed: "arp", bass: "pizz", kit: "sea", voices: [["shakuhachi", 0], ["koto", 0], ["shakuhachi", 0], ["koto", 0]],
+  { id: "mizukai_sea", name: "Crossing the Eastern Sea", bpm: 88, meter: 3, bed: "arp", bass: "pizz", kit: "sea", voices: [["shakuhachi", 0], ["koto", 0], ["shakuhachi", 0], ["koto", 0]],
     a: "E5:1.5 F#5:0.5 E5:1  D5:2 B4:1  A4:1 B4:1 D5:1  E5:3  F#5:1 A5:1 F#5:1  E5:1.5 D5:0.5 B4:1  D5:1 B4:1 A4:1  B4:3",
     b: "A5:2 F#5:1  E5:1 F#5:1 A5:1  B5:2 A5:1  F#5:3  E5:1 D5:1 E5:1  F#5:1.5 E5:0.5 D5:1  B4:1 D5:1 E5:1  A4:3",
     chordsA: ["A", "Bm7", "Dmaj7", "E", "F#m7", "Bm7", "Dmaj9", "Esus4"], chordsB: ["F#m7", "Dmaj7", "E6", "F#m", "Bm7", "Dmaj7", "Esus4", "Aadd9"] },
-  { id: "palian_haunted", name: "Lanterns of the Drowned", bpm: 66, meter: 4, bed: "roll", sho: true, bass: "pizz", kit: "haunted", voices: [["shamisen", -12], ["shakuhachi", 0], ["shamisen", -12], ["shakuhachi", 0]],
+  { id: "mizukai_haunted", name: "Lanterns of the Drowned", bpm: 66, meter: 4, bed: "roll", sho: true, bass: "pizz", kit: "haunted", voices: [["shamisen", -12], ["shakuhachi", 0], ["shamisen", -12], ["shakuhachi", 0]],
     a: "A4:2 Bb4:2  A4:3 r:1  E5:2 F5:1 E5:1  D5:4  F5:2 E5:1 Bb4:1  A4:4  D5:1 E5:1 F5:1 E5:1  A4:4",
     b: "Bb4:1 D5:1 E5:2  F5:3 E5:1  A5:2 Bb5:1 A5:1  E5:4  F5:1 E5:1 D5:1 Bb4:1  A4:2 Bb4:2  D5:1.5 E5:0.5 D5:1 Bb4:1  A4:4",
     chordsA: ["Am", "Bbmaj7", "Am7", "Dm9", "Bbmaj7", "Am", "Gm7", "Asus4"], chordsB: ["Bbmaj7", "Dm7", "Fmaj7", "Esus4", "Dm7", "Bbmaj7", "Gm7", "Am"] },
-  { id: "palian_battle", name: "Steel and Blossom", bpm: 138, meter: 4, bed: "roll", bass: "bass", kit: "battle", voices: [["shamisen", 0], ["koto", 0], ["shamisen", 0], ["koto", 12]],
+  { id: "mizukai_battle", name: "Steel and Blossom", bpm: 138, meter: 4, bed: "roll", bass: "bass", kit: "battle", voices: [["shamisen", 0], ["koto", 0], ["shamisen", 0], ["koto", 12]],
     a: "E4:0.5 E4:0.5 F4:0.5 E4:0.5 A4:1 B4:1  C5:0.5 B4:0.5 A4:1 F4:1 E4:1  E4:0.5 E4:0.5 F4:0.5 A4:0.5 B4:1 C5:1  E5:2 B4:2  C5:0.5 C5:0.5 B4:0.5 A4:0.5 F4:1 A4:1  B4:1 C5:1 E5:2  F5:0.5 E5:0.5 C5:0.5 B4:0.5 A4:1 F4:1  E4:4",
     b: "A4:1 A4:0.5 B4:0.5 C5:1 E5:1  F5:1.5 E5:0.5 C5:2  B4:1 C5:0.5 B4:0.5 A4:1 F4:1  E4:2 F4:2  A4:0.5 B4:0.5 C5:0.5 E5:0.5 F5:1 E5:1  C5:1 B4:1 A4:2  F4:1 A4:1 B4:1 C5:1  E5:4",
     chordsA: ["Em", "Fmaj7", "Am", "Esus4", "Fmaj7", "Am", "Fmaj7", "Esus4"], chordsB: ["Am", "Fmaj7", "Dm", "Esus4", "Am", "Fmaj7", "Dm7", "E7sus4"] },
-  { id: "palian_spirit", name: "The Great Spirit", bpm: 150, meter: 4, bed: "roll", sho: true, bass: "bass", kit: "spirit", voices: [["shamisen", 0], ["shakuhachi", 0], ["shamisen", 0], ["shakuhachi", 12]],
+  { id: "mizukai_spirit", name: "The Great Spirit", bpm: 150, meter: 4, bed: "roll", sho: true, bass: "bass", kit: "spirit", voices: [["shamisen", 0], ["shakuhachi", 0], ["shamisen", 0], ["shakuhachi", 12]],
     a: "C#5:1 D5:1 C#5:2  G#4:1 A4:1 G#4:2  F#4:0.5 G#4:0.5 A4:1 C#5:1 D5:1  C#5:4  F#5:1 G#5:1 A5:1 G#5:1  F#5:2 D5:2  C#5:1 D5:0.5 C#5:0.5 A4:1 G#4:1  C#4:4",
     b: "A4:1 C#5:1 D5:2  F#5:2 G#5:2  A5:1 G#5:1 F#5:1 D5:1  C#5:4  D5:1 C#5:1 A4:1 G#4:1  F#4:2 G#4:2  A4:1 G#4:0.5 A4:0.5 C#5:1 D5:1  C#5:4",
     chordsA: ["C#m", "Dmaj7", "C#m", "Amaj7", "Dmaj7", "F#m", "Dmaj7", "C#sus4"], chordsB: ["Amaj7", "Dmaj7", "F#m7", "C#sus4", "Dmaj7", "F#m", "Amaj7", "C#m"] },
-  { id: "palian_castle", name: "The Hall of Takamori", bpm: 76, meter: 4, bed: "sho", bass: "pizz", kit: "court", voices: [["oboe", 0], ["shakuhachi", 0], ["oboe", 0], ["koto", 12]],
+  { id: "mizukai_castle", name: "The Hall of Takamori", bpm: 76, meter: 4, bed: "sho", bass: "pizz", kit: "court", voices: [["oboe", 0], ["shakuhachi", 0], ["oboe", 0], ["koto", 12]],
     a: "B4:2 C#5:2  B4:1 A4:1 F#4:2  E4:1 F#4:1 A4:2  B4:4  C#5:2 E5:2  F#5:1 E5:1 C#5:2  B4:1 A4:1 B4:1 C#5:1  B4:4",
     b: "E5:2 F#5:2  A5:3 F#5:1  E5:1 C#5:1 B4:2  A4:4  B4:1 C#5:1 E5:2  F#5:2 E5:1 C#5:1  B4:2 A4:1 F#4:1  E4:4",
     chordsA: ["Esus4", "F#m7", "Asus2", "Bsus4", "Amaj7", "F#m7", "Bsus4", "Esus4"], chordsB: ["Amaj7", "F#m7", "C#m7", "Asus2", "Esus4", "F#m7", "Bsus4", "Esus4"] },
 ];
-/** Which Palian piece plays where. */
-const PALIAN_REGION_TRACK: Partial<Record<RegionId, TrackId>> = {
-  hinode: "palian_sunrise", kurohama: "palian_harbour", shiogama: "palian_harbour", smugglers_cove: "palian_harbour", takamori: "palian_castle",
-  kumoyama: "palian_shrine", iwaoka: "palian_shrine", old_cedars: "palian_forest", whispering_bamboo: "palian_forest", morishima: "palian_forest",
-  tanabe: "palian_village", yumoto: "palian_village", kibi: "palian_village", hanazono: "palian_village", kusabana: "palian_village",
-  kurokage: "palian_haunted", josaki: "palian_haunted", torojima: "palian_haunted", ashigane: "palian_haunted", hakkotsu: "palian_haunted",
-  kumo_hollow: "palian_haunted", ashigane_deeps: "palian_haunted", bone_shrine: "palian_haunted",
-  palian_sea: "palian_sea", three_stones: "palian_sea", turtle_rock: "palian_sea",
+/** Which Mizukai piece plays where. */
+const MIZUKAI_REGION_TRACK: Partial<Record<RegionId, TrackId>> = {
+  hinode: "mizukai_sunrise", kurohama: "mizukai_harbour", shiogama: "mizukai_harbour", smugglers_cove: "mizukai_harbour", takamori: "mizukai_castle",
+  kumoyama: "mizukai_shrine", iwaoka: "mizukai_shrine", old_cedars: "mizukai_forest", whispering_bamboo: "mizukai_forest", morishima: "mizukai_forest",
+  tanabe: "mizukai_village", yumoto: "mizukai_village", kibi: "mizukai_village", hanazono: "mizukai_village", kusabana: "mizukai_village",
+  kurokage: "mizukai_haunted", josaki: "mizukai_haunted", torojima: "mizukai_haunted", ashigane: "mizukai_haunted", hakkotsu: "mizukai_haunted",
+  kumo_hollow: "mizukai_haunted", ashigane_deeps: "mizukai_haunted", bone_shrine: "mizukai_haunted",
+  mizukai_sea: "mizukai_sea", three_stones: "mizukai_sea", turtle_rock: "mizukai_sea",
 };
 
-export const TRACKS: readonly Track[] = [themeTrack(), ...STYLES.map(composeTrack), ...PALIAN_PIECES.map(composePalian)];
-/** The Palian pieces (for tests). */
-export const PALIAN_TRACKS: readonly TrackId[] = PALIAN_PIECES.map(piece => piece.id);
+export const TRACKS: readonly Track[] = [themeTrack(), ...STYLES.map(composeTrack), ...MIZUKAI_PIECES.map(composeMizukai)];
+/** The Mizukai pieces (for tests). */
+export const MIZUKAI_TRACKS: readonly TrackId[] = MIZUKAI_PIECES.map(piece => piece.id);
 export const trackById = (id: TrackId) => TRACKS.find(track => track.id === id) ?? TRACKS[0];
 /** Which track plays where: each region has its own, and the Hollow King's throne room its boss theme. */
-export function trackFor(region: RegionId, nearBoss: boolean, palian: { sea?: boolean; fight?: boolean; spirit?: boolean } = {}): TrackId {
+export function trackFor(region: RegionId, nearBoss: boolean, mizukai: { sea?: boolean; fight?: boolean; spirit?: boolean } = {}): TrackId {
   if (nearBoss) return "boss";
-  // The Palian Isles: the place's own piece, the sea's on a crossing, and in a fight the battle (or, against one of the great spirits, theirs).
-  if (palian.sea) return "palian_sea";
-  const isles = PALIAN_REGION_TRACK[region];
-  if (isles) return palian.spirit ? "palian_spirit" : palian.fight ? "palian_battle" : isles;
+  // The Mizukai Isles: the place's own piece, the sea's on a crossing, and in a fight the battle (or, against one of the great spirits, theirs).
+  if (mizukai.sea) return "mizukai_sea";
+  const isles = MIZUKAI_REGION_TRACK[region];
+  if (isles) return mizukai.spirit ? "mizukai_spirit" : mizukai.fight ? "mizukai_battle" : isles;
   return region;
 }
 

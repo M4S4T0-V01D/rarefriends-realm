@@ -21,7 +21,7 @@ const TREES: Record<string, TreeStyle> = {
   yew: { canopy: "#8a9583", shape: "cone", w: 24, h: 46 }, ashwood: { canopy: "#e0e3e8", shape: "pale", w: 28, h: 44 },
   // BarkReach (Return of Raria): tall red-canopied redwoods, and the grey, broad ironbarks.
   redwood: { canopy: "#9a4a3a", shape: "cone", w: 26, h: 50 }, ironbark: { canopy: "#7d8a7a", shape: "broad", w: 34, h: 44 },
-  // The Palian Isles: the old cedars, the blossom trees, the bamboo.
+  // The Mizukai Isles: the old cedars, the blossom trees, the bamboo.
   cedar: { canopy: "#5f7d6a", shape: "cone", w: 28, h: 58 }, sakura: { canopy: "#efc3cf", shape: "blossom", w: 32, h: 40 }, bamboo: { canopy: "#8fb36a", shape: "bamboo", w: 26, h: 52 },
 };
 function trunk(p: Pixels, cx: number, bottom: number, height: number, width = 4) {
@@ -301,7 +301,7 @@ export function decorArt(kind: string, variant: number, frame = 0): HTMLCanvasEl
     case "rubble": return pixelArt(key, 18, 8, p => { for (let i = 0; i < 4; i++) { const x = 2 + random() * 12, y = 3 + random() * 3; p.poly([[x, y + 3], [x + 1, y], [x + 4, y], [x + 5, y + 3]], COLORS.stone, null); } p.outline(); });
     case "snowman": return pixelArt(key, 16, 22, p => { p.disc(8, 16, 6, 5, "#ffffff", null); p.disc(8, 7, 4.5, 4.5, "#ffffff", null); p.set(6, 6, INK); p.set(10, 6, INK); p.rect(8, 8, 3, 1, "#e9a07a"); p.rect(4, 11, 8, 1, COLORS.rose); p.dither("#dfe7ec", (x, y) => x > 9 ? 0.4 : 0, "#ffffff"); p.outline(); });
     case "chest": return pixelArt(key, 16, 13, p => { p.rect(1, 5, 14, 7, COLORS.wood); p.poly([[1, 5], [3, 1], [13, 1], [15, 5]], "#a88f74", null); p.rect(7, 5, 2, 3, "#e2d49e"); p.line(1, 8, 14, 8, "#7a6553"); p.outline(); });
-    // ---------- The Palian Isles (What Rises in the East) ----------
+    // ---------- The Mizukai Isles (What Rises in the East) ----------
     case "torii": return pixelArt(key, 36, 38, p => {
       // A shrine gate: two vermilion posts, a black-capped top beam swept up at the ends, a tie beam under it, and a plaque.
       const RED = variant === 2 ? "#8f6a4a" : "#c0473a", RED_D = shadeHex(RED, -0.2), BLACK = "#2a2626";
@@ -410,8 +410,8 @@ export function decorArt(kind: string, variant: number, frame = 0): HTMLCanvasEl
       for (const [x, y] of [[7, 15], [15, 16], [22, 14]] as const) p.disc(x, y, 1.5, 1.5, "#d9a93f", INK);
       p.outline();
     });
-    case "palian_boat": return pixelArt(key, 52, 26, p => {
-      // A Palian ferry: a long wooden hull with an upswept bow, a straw-roofed cabin amidships, a sculling oar at the stern.
+    case "mizukai_boat": return pixelArt(key, 52, 26, p => {
+      // A Mizukai ferry: a long wooden hull with an upswept bow, a straw-roofed cabin amidships, a sculling oar at the stern.
       const bob = frame % 2;
       p.poly([[2, 14 + bob], [6, 19 + bob], [44, 19 + bob], [50, 12 + bob], [46, 14 + bob], [6, 14 + bob]], "#7a5a44", INK); p.line(6, 16 + bob, 45, 16 + bob, "#9c7a58"); p.line(7, 18 + bob, 44, 18 + bob, "#5a4030");
       p.poly([[16, 14 + bob], [16, 9 + bob], [32, 9 + bob], [32, 14 + bob]], "#c9b8a6", INK); p.poly([[13, 9 + bob], [24, 4 + bob], [35, 9 + bob]], "#a8925f", INK); p.line(16, 7 + bob, 32, 7 + bob, "#c9b27a");

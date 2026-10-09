@@ -1,5 +1,5 @@
 /**
- * What Rises in the East: the Palian Isles, an archipelago east of the old east coast, built in world coordinates in
+ * What Rises in the East: the Mizukai Isles, an archipelago east of the old east coast, built in world coordinates in
  * the EAST_W columns the world grew by (see world.ts).
  *
  * Hinode, the Isle of Sunrise, is the heart of it: Kurohama's harbour on the west coast facing the mainland, the castle
@@ -10,11 +10,11 @@
  * Torojima's lanterns, Kusabana's herbs, Ashigane's fires, a cove that isn't on the charts, the Three Stones, Turtle
  * Rock, and far out to the south-east, Hakkotsu, the white island.
  *
- * Every inhabited island has a dock (a "Palian boat" object, `dock` = its id, `to` = where you stand on arrival):
+ * Every inhabited island has a dock (a "Mizukai boat" object, `dock` = its id, `to` = where you stand on arrival):
  * boats.ts sells passage between them.
  */
 import { EAST_X, OVERWORLD_H, T, isWater, regionIndex, type DecorKind, type Floor, type GenContext, type RegionId, type World, type worldTools } from "./world.ts";
-import { buildPalianTowns } from "./islestowns.ts";
+import { buildMizukaiTowns } from "./islestowns.ts";
 
 type Tools = ReturnType<typeof worldTools>;
 type Blob = readonly [cx: number, cy: number, rx: number, ry: number];
@@ -54,7 +54,7 @@ export const ISLANDS: readonly { id: RegionId; blobs: readonly Blob[]; wobble: n
  * shore (found by walking from the island's middle towards the sea) out over the water, so it always meets the land.
  */
 export const DOCKS: readonly { id: string; name: string; region: RegionId; from: readonly [number, number]; heading: readonly [number, number]; boatman: string }[] = [
-  { id: "eastport", name: "Eastport, on the mainland", region: "palian_sea", from: [1100, 404], heading: [1, 0], boatman: "boat_eastport" },
+  { id: "eastport", name: "Eastport, on the mainland", region: "mizukai_sea", from: [1100, 404], heading: [1, 0], boatman: "boat_eastport" },
   { id: "kurohama", name: "Kurohama harbour", region: "kurohama", from: [1352, 262], heading: [-1, 0], boatman: "boat_kurohama" },
   { id: "tanabe", name: "Tanabe landing", region: "tanabe", from: [1420, 336], heading: [0, 1], boatman: "boat_tanabe" },
   { id: "shiogama", name: "Shiogama", region: "shiogama", from: [1262, 300], heading: [0, 1], boatman: "boat_shiogama" },
@@ -72,20 +72,20 @@ export const DOCKS: readonly { id: string; name: string; region: RegionId; from:
   { id: "hakkotsu", name: "Hakkotsu", region: "hakkotsu", from: [1690, 486], heading: [-1, 0], boatman: "boat_hakkotsu" },
 ];
 /** Where Hinode's towns are (world coordinates). */
-export const PALIAN_PLACES = {
+export const MIZUKAI_PLACES = {
   kurohama: [1366, 262], takamori: [1452, 286], kumoyama: [1448, 214], tanabe: [1420, 326], yumoto: [1514, 206], kurokage: [1484, 140], isohama: [1494, 316],
 } as const;
 /**
- * The Palian dungeons in the dungeon strip (x ranges and rows; EAST_X is 1160 and DUNGEON_Y 520, written out because
+ * The Mizukai dungeons in the dungeon strip (x ranges and rows; EAST_X is 1160 and DUNGEON_Y 520, written out because
  * world.ts imports this module before it has set them).
  */
-export const PALIAN_DUNGEONS = {
+export const MIZUKAI_DUNGEONS = {
   kumo_hollow: { x0: 1174, x1: 1270, y0: 522, y1: 550 },
   ashigane_deeps: { x0: 1280, x1: 1390, y0: 522, y1: 550 },
   bone_shrine: { x0: 1400, x1: 1500, y0: 522, y1: 556 },
 } as const;
 /** Roof tiles of the Isles: slate blue-grey, charcoal, weathered copper, cypress bark, thatch. */
-export const PALIAN_ROOFS = { slate: "#56606e", charcoal: "#3f4651", copper: "#5d8a7c", bark: "#7a5a44", thatch: "#a8925f", vermilion: "#a5443a" } as const;
+export const MIZUKAI_ROOFS = { slate: "#56606e", charcoal: "#3f4651", copper: "#5d8a7c", bark: "#7a5a44", thatch: "#a8925f", vermilion: "#a5443a" } as const;
 
 export function buildIsles(ctx: GenContext, t: Tools, places: World["places"], floors: Floor[]) {
   const { get, put, add, decor, npc, clearAt, monster, inBounds, tileIndex, road, river } = t;
@@ -164,11 +164,11 @@ export function buildIsles(ctx: GenContext, t: Tools, places: World["places"], f
   };
   for (let y = 0; y < OH; y++) for (let x = EAST_X; x < W; x++) {
     const owner = at(x, y);
-    if (owner < 0) { if (isWater(get(x, y))) t.setRegion(x, y, "palian_sea"); continue; }
+    if (owner < 0) { if (isWater(get(x, y))) t.setRegion(x, y, "mizukai_sea"); continue; }
     const id = ISLANDS[owner].id;
     t.setRegion(x, y, id === "hinode" ? hinodeZone(x, y) : id);
   }
-  // (The mainland's own east coast keeps its regions: Eastport's pier is the Palian Sea's only on the water.)
+  // (The mainland's own east coast keeps its regions: Eastport's pier is the Mizukai Sea's only on the water.)
 
   // ---------- 3. Terrain: Mount Kumo, the cedar slopes, the terraces, the north cape, the islands' own ground ----------
   const lift = ctx.lift;
@@ -230,13 +230,13 @@ export function buildIsles(ctx: GenContext, t: Tools, places: World["places"], f
     for (let k = LENGTH + 1; k <= LENGTH + 3; k++) for (const s of [0, 1]) { const wx = shoreX + hx * k + side[0] * s, wy = shoreY + hy * k + side[1] * s; put(wx, wy, T.WATER); }
     const endX = shoreX + hx * LENGTH, endY = shoreY + hy * LENGTH;
     // The boat is moored beyond the pier's end; you stand at the end to board, and arrive there.
-    add({ kind: "dock", x: endX + hx, y: endY + hy, blocks: true, name: "Palian boat", dock: dock.id, to: { x: endX, y: endY } });
+    add({ kind: "dock", x: endX + hx, y: endY + hy, blocks: true, name: "Mizukai boat", dock: dock.id, to: { x: endX, y: endY } });
     for (const s of [-1, 2]) { const lx = shoreX + side[0] * s, ly = shoreY + side[1] * s; if (!occupied(lx, ly) && WALKABLE(get(lx, ly))) decor(lx, ly, dock.id === "eastport" ? "lamp" : "stone_lantern"); }
     npcAt(dock.boatman, shoreX - hx * 2 + side[0] * 2, shoreY - hy * 2 + side[1] * 2);
     if (dock.id !== "eastport") t.setRegion(endX, endY, dock.region);
   }
 
   const isle = { at, nearFree, put2, npcAt, monsterAt, sign, occupied, regionIs, WALKABLE };
-  buildPalianTowns(ctx, t, isle, places);
+  buildMizukaiTowns(ctx, t, isle, places);
   return isle;
 }

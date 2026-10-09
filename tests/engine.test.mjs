@@ -98,7 +98,7 @@ test("the world is large, deterministic and every landmark is reachable on foot"
   assert(world.objects.filter(object => object.kind === "rock").length > 60, "Plenty of rocks");
   assert(world.objects.filter(object => object.kind === "spot").length >= 15, "Fishing spots");
   // Walk from the spawn, and take every ladder and staircase you can reach (dungeons, the castle's storeys), and every
-  // boat between the Palian Isles once you can reach a landing (boats.ts: from any landing to every other).
+  // boat between the Mizukai Isles once you can reach a landing (boats.ts: from any landing to every other).
   const areas = [reachable(g, world.places.spawn)], taken = new Set();
   const ok = (x, y) => areas.some(seen => seen[y * W + x]);
   const beside = object => [[0, 1], [1, 0], [0, -1], [-1, 0]].some(([dx, dy]) => ok(object.x + dx, object.y + dy));
@@ -854,10 +854,10 @@ test("The Heartguard: nine red-and-white pieces by Hitpoints level, each a hitpo
 test("The Old Friend stands behind every altar, and Dawnhold has its keep, towers and a taller chapel", () => {
   const g = newGame(), world = g.world;
   const altars = world.objects.filter(object => object.kind === "altar");
-  assert.equal(altars.length, 25, "the mainland's four, Gravesend's lantern altar, the catacombs' bone altar, the Ring chapel's, the five wayward chapels', the six Orders', Raria's three Wise Friend altars (the capital, Lawgate, Vesperholm), and the Palian Isles' four shrines (Kumoyama, the Harbour Shrine, the fox shrine, Iwaoka)");
+  assert.equal(altars.length, 25, "the mainland's four, Gravesend's lantern altar, the catacombs' bone altar, the Ring chapel's, the five wayward chapels', the six Orders', Raria's three Wise Friend altars (the capital, Lawgate, Vesperholm), and the Mizukai Isles' four shrines (Kumoyama, the Harbour Shrine, the fox shrine, Iwaoka)");
   for (const altar of altars) {
-    // (A Palian shrine keeps the Friend of its place in a roped sacred stone, not a statue.)
-    assert(world.objects.some(object => (object.decor === "old_friend" || object.decor === "wise_friend" || object.decor?.startsWith("god_") || (altar.text === "palian" && object.decor === "sacred_rope")) && Math.abs(object.x - altar.x) <= 1 && Math.abs(object.y - altar.y) <= 2), `a statue of the Old Friend (or an Order's god, or a shrine's sacred stone) by the ${altar.name}`);
+    // (A Mizukai shrine keeps the Friend of its place in a roped sacred stone, not a statue.)
+    assert(world.objects.some(object => (object.decor === "old_friend" || object.decor === "wise_friend" || object.decor?.startsWith("god_") || (altar.text === "mizukai" && object.decor === "sacred_rope")) && Math.abs(object.x - altar.x) <= 1 && Math.abs(object.y - altar.y) <= 2), `a statue of the Old Friend (or an Order's god, or a shrine's sacred stone) by the ${altar.name}`);
   }
   assert(world.objects.find(object => object.decor === "old_friend").name === "Statue of the Old Friend");
   const named = name => world.buildings.filter(building => building.name === name);
@@ -2701,7 +2701,7 @@ test("Townscape: homes in every village (with their doors reachable), L-shaped a
   assert(world.buildings.filter(b => b.storeys === 3 && b.roof === "cone" && !b.round && !b.keep).length >= 8, "tower-houses");
   // Fronts: every bank's, and the shops'.
   const bankHouses = world.buildings.filter(b => world.objects.some(o => o.kind === "bank" && o.x > b.x0 && o.x < b.x1 && o.y > b.y0 && o.y < b.y1));
-  assert(bankHouses.length >= 8 && bankHouses.every(b => b.style === "palian" || (b.facade === "bank" && b.walls === "marble")), "every bank is a marble bank (the Isles' Exchange is built the Palian way)");
+  assert(bankHouses.length >= 8 && bankHouses.every(b => b.style === "mizukai" || (b.facade === "bank" && b.walls === "marble")), "every bank is a marble bank (the Isles' Exchange is built the Mizukai way)");
   const shops = world.buildings.filter(b => b.facade === "shop");
   assert(shops.length >= 30 && shops.filter(b => b.sign).length >= 25, `shops with awnings and signs (${shops.length})`);
   assert(world.buildings.some(b => b.facade === "inn"), "inns hang out a tankard");
@@ -2843,4 +2843,17 @@ test("Bars: one in every town, each with a barkeep's quest, a quiet trader, hous
   // The quiet trader's gear works.
   const { successChance } = await import("../games/rarefriends-realm/engine.ts"); void successChance;
   assert(item("softsole_boots").equip.slot === "feet" && item("sleight_gloves").equip.slot === "hands");
+});
+
+test("a save from the hours the Mizukai Isles had their first name comes back under the new names", () => {
+  const g = newGame(), p = g.player;
+  p.mizukai = true; p.equipment.head = "mizukai_kasa"; p.equipment.body = "mizukai_kimono"; p.visited.mizukai_sea = 1; p.inventory[0] = { id: "mizukai_longbow", n: 1 };
+  const old = JSON.parse(JSON.stringify(serialize(g)).replaceAll("mizukai", ["pal", "ian"].join("")));
+  assert.ok(JSON.stringify(old).includes(["pal", "ian_kasa"].join("")), "the old save really is in the old names");
+  const fresh = newGame();
+  assert.ok(restore(fresh, old));
+  assert.equal(fresh.player.mizukai, true, "the tradition is still kept");
+  assert.equal(fresh.player.equipment.head, "mizukai_kasa"); assert.equal(fresh.player.equipment.body, "mizukai_kimono");
+  assert.equal(fresh.player.inventory[0]?.id, "mizukai_longbow");
+  assert.equal(fresh.player.visited.mizukai_sea, 1);
 });

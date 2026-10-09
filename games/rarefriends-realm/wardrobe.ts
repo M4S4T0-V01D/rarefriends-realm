@@ -381,7 +381,7 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
         for (let y = 0; y < p.h; y++) for (let x = 0; x < p.w; x++) { const v = helm.get(x, y); if (v) p.set(x, y, v); }
         const l = hl, r = hr, metal = metalOf(piece.id), dome = top - 3;
         if (isItem(piece.id) && item(piece.id).icon.kind === "kabuto") {
-          // A Palian kabuto: a broad neck-guard flaring out below the bowl in lames, and two gilt horns rising from the brow.
+          // A Mizukai kabuto: a broad neck-guard flaring out below the bowl in lames, and two gilt horns rising from the brow.
           const [a, b] = rowSpan(rim), flare = side ? 2 : 3;
           for (let k = 0; k < 3; k++) { const y = rim + k - 1; p.line(a - flare - k + (side > 0 ? 2 : 0), y, b + flare + k - (side < 0 ? 2 : 0), y, k === 1 ? dark : color); }
           const gilt = piece.trim ?? "#c9a24a";
@@ -468,7 +468,7 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
           break;
         }
         if (piece.style === "kasa") {
-          // A Palian kasa: a wide, shallow cone of straw, its point over the crown, a darker band where it sits.
+          // A Mizukai kasa: a wide, shallow cone of straw, its point over the crown, a darker band where it sits.
           const brimY = top + 1, half = headHalf + 7;
           p.poly([[cx - half, brimY + 1], [cx + half, brimY + 1], [cx + 2, top - 7], [cx - 2, top - 7]], color, null);
           p.line(cx - half + 1, brimY, cx + half - 1, brimY, dark); for (let k = -half + 4; k < half - 2; k += 4) p.line(cx + k, brimY, cx + k * 0.3, top - 5, shadeHex(color, -0.1));

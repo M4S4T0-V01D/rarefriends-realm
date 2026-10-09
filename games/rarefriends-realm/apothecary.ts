@@ -11,7 +11,7 @@ import type { IconShape, Item, Skill } from "./data.ts";
 import type { Recipe } from "./state.ts";
 import type { RegionId } from "./world.ts";
 
-export type Ecosystem = "forest" | "swamp" | "mountain" | "deadwood" | "ashfall" | "coast" | "desert" | "palian";
+export type Ecosystem = "forest" | "swamp" | "mountain" | "deadwood" | "ashfall" | "coast" | "desert" | "mizukai";
 export type HerbDef = {
   id: string; name: string; eco: Ecosystem; level: number; xp: number; shape: IconShape; color: string; accent: string;
   /** How often it grows (how many patches per region), its respawn, and whether a patch gives several picks. */
@@ -26,7 +26,7 @@ export const ECO_REGIONS: Record<Ecosystem, readonly RegionId[]> = {
   ashfall: ["ashfall", "wyrmreach"],
   coast: ["coast", "saltmarrow", "pale_isles", "southshore"],
   desert: ["pale_dunes"],
-  palian: ["hinode", "kibi", "kusabana", "old_cedars", "whispering_bamboo", "morishima"],
+  mizukai: ["hinode", "kibi", "kusabana", "old_cedars", "whispering_bamboo", "morishima"],
 };
 export const HERBS: readonly HerbDef[] = [
   // Forest: healing herbs, roots, flowers and bark.
@@ -56,12 +56,12 @@ export const HERBS: readonly HerbDef[] = [
   { id: "pearlweed", name: "Pearlweed", eco: "coast", level: 65, xp: 76, shape: "herb", color: "#d9d4e6", accent: "#8fb3c9", rarity: "rare", respawn: 300, picks: 1, examine: "A pale weed with a pearl in every frond. The Pale Isles' own." },
   // Desert: drought plants and a rare medicinal rose.
   { id: "sunthorn", name: "Sunthorn", eco: "desert", level: 20, xp: 22, shape: "herb", color: "#a9b59c", accent: "#e2b84a", rarity: "common", respawn: 70, picks: 2, examine: "A cactus pad, spines and all. The juice keeps you walking." },
-  // The Palian Isles: Kibi's tea, the shrine's herbs, and the rare spirit bell that rings when nobody touches it.
-  { id: "tea_leaf", name: "Tea leaf", eco: "palian", level: 5, xp: 10, shape: "herb", color: "#6f9a4a", accent: "#c9d9a6", rarity: "common", respawn: 40, picks: 3, examine: "A young tea leaf from Kibi's bushes, two leaves and a bud." },
-  { id: "shiso", name: "Shiso", eco: "palian", level: 18, xp: 22, shape: "herb", color: "#7a3a4a", accent: "#c98f95", rarity: "common", respawn: 60, picks: 2, examine: "A purple-green leaf with a sharp, clean taste. It settles a poisoned stomach." },
-  { id: "moon_mugwort", name: "Moon mugwort", eco: "palian", level: 34, xp: 40, shape: "herb", color: "#a9b8a0", accent: "#efe6d2", rarity: "uncommon", respawn: 120, picks: 2, examine: "Silver-backed mugwort picked by moonlight. Burnt, its smoke keeps spirits at arm's length." },
-  { id: "kumo_root", name: "Kumo root", eco: "palian", level: 50, xp: 58, shape: "herb", color: "#8a6a4a", accent: "#e2d49e", rarity: "uncommon", respawn: 160, picks: 2, examine: "A gnarled mountain root the shrine priests chew before the long rites." },
-  { id: "spirit_bell", name: "Spirit bell", eco: "palian", level: 68, xp: 80, shape: "herb", color: "#d9d4e6", accent: "#b5452f", rarity: "rare", respawn: 300, picks: 1, examine: "A white bell-flower with a red throat. It rings when nobody touches it, and the foxes come to listen." },
+  // The Mizukai Isles: Kibi's tea, the shrine's herbs, and the rare spirit bell that rings when nobody touches it.
+  { id: "tea_leaf", name: "Tea leaf", eco: "mizukai", level: 5, xp: 10, shape: "herb", color: "#6f9a4a", accent: "#c9d9a6", rarity: "common", respawn: 40, picks: 3, examine: "A young tea leaf from Kibi's bushes, two leaves and a bud." },
+  { id: "shiso", name: "Shiso", eco: "mizukai", level: 18, xp: 22, shape: "herb", color: "#7a3a4a", accent: "#c98f95", rarity: "common", respawn: 60, picks: 2, examine: "A purple-green leaf with a sharp, clean taste. It settles a poisoned stomach." },
+  { id: "moon_mugwort", name: "Moon mugwort", eco: "mizukai", level: 34, xp: 40, shape: "herb", color: "#a9b8a0", accent: "#efe6d2", rarity: "uncommon", respawn: 120, picks: 2, examine: "Silver-backed mugwort picked by moonlight. Burnt, its smoke keeps spirits at arm's length." },
+  { id: "kumo_root", name: "Kumo root", eco: "mizukai", level: 50, xp: 58, shape: "herb", color: "#8a6a4a", accent: "#e2d49e", rarity: "uncommon", respawn: 160, picks: 2, examine: "A gnarled mountain root the shrine priests chew before the long rites." },
+  { id: "spirit_bell", name: "Spirit bell", eco: "mizukai", level: 68, xp: 80, shape: "herb", color: "#d9d4e6", accent: "#b5452f", rarity: "rare", respawn: 300, picks: 1, examine: "A white bell-flower with a red throat. It rings when nobody touches it, and the foxes come to listen." },
   { id: "dunerose", name: "Dunerose", eco: "desert", level: 48, xp: 52, shape: "herb", color: "#c98f95", accent: "#e2b84a", rarity: "rare", respawn: 240, picks: 1, examine: "A rose that blooms one morning a year in the dunes. Quiet, like the sand." },
 ];
 export const herbDef = (id: string) => HERBS.find(herb => herb.id === id);
@@ -83,7 +83,7 @@ export type PotionEffect = {
   boost?: Partial<Record<Skill, readonly [number, number]>>;
   /** Ticks of protection: antidote (cures too), antifire (dragonfire halved), stealth (harder to notice), tonic (run energy returns twice as fast). */
   antidote?: number; antifire?: number; stealth?: number; tonic?: number;
-  /** Ticks of a spirit ward (the Palian Isles): wayward spirits don't come for you, and strike a fifth more softly. */
+  /** Ticks of a spirit ward (the Mizukai Isles): wayward spirits don't come for you, and strike a fifth more softly. */
   spiritWard?: number;
   /** A weapon poison: coat your wielded melee weapon for this many hits; each poisoned hit does `damage` four times, every eight ticks. `weaken` also saps the creature's defence. */
   poison?: { damage: number; charges: number; weaken?: boolean };
@@ -108,7 +108,7 @@ export const POTIONS: readonly PotionDef[] = [
   { id: "strong_poison", name: "Strong poison", level: 46, xp: 110, inputs: { ground_blackgill: 1, vial_of_water: 1 }, color: "#3b3a40", accent: "#8a62c8", examine: "Ground blackgill. Coat a melee weapon: 25 poisoned hits of 4 damage, four times each.", effect: { poison: { damage: 4, charges: 25 } }, value: 300 },
   { id: "super_strength", name: "Skyroot draught", level: 58, xp: 140, inputs: { ground_skyroot: 1, vial_of_water: 1 }, color: "#4f7a4a", accent: "#8fa3c9", examine: "Ground skyroot. Boosts Strength by 5 + 15% of your level.", effect: { boost: { strength: [5, 0.15] } }, value: 400 },
   { id: "antifire_potion", name: "Antifire potion", level: 62, xp: 150, inputs: { clean_cinderbloom: 1, vial_of_water: 1 }, color: "#e3734f", accent: "#f2e28f", examine: "Cinderbloom. Dragonfire burns half as hard for five minutes (it stacks with a Wyrmward shield).", effect: { antifire: 500 }, value: 500 },
-  // The Palian Isles' brews.
+  // The Mizukai Isles' brews.
   { id: "kibi_tea", name: "Kibi tea", level: 6, xp: 24, inputs: { clean_tea_leaf: 1, vial_of_water: 1 }, color: "#8fb36a", examine: "Tea leaf steeped strong. Restores a tenth of your faith and 20 run energy.", effect: { faith: 0.1, energy: 20 }, value: 40 },
   { id: "shiso_tonic", name: "Shiso tonic", level: 20, xp: 56, inputs: { clean_shiso: 1, vial_of_water: 1 }, color: "#7a3a4a", accent: "#c98f95", examine: "Shiso in water. Cures poison, keeps it off for two minutes, and heals 5.", effect: { antidote: 200, heal: 5 }, value: 90 },
   { id: "spirit_incense", name: "Spirit incense", level: 36, xp: 88, inputs: { clean_moon_mugwort: 2, vial_of_water: 1 }, color: "#a9b8a0", accent: "#efe6d2", examine: "Mugwort smoke in a vial, to break and breathe. For five minutes wayward spirits don't come for you, and strike a fifth more softly.", effect: { spiritWard: 500 }, value: 200 },

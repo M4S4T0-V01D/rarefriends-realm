@@ -7,23 +7,23 @@
 
 ![Dusk over Friendhollow: long shadows across the square, a knight in gold Dawnplate, villagers in hats and capes, lamps coming on](docs/new-light-dusk.png)
 
-## New: What Rises in the East, the Palian Isles
+## New: What Rises in the East, the Mizukai Isles
 
-East of the old coast, where the sun comes up first, lie **the Palian Isles**: Hinode, the Isle of Sunrise, and thirteen
+East of the old coast, where the sun comes up first, lie **the Mizukai Isles**: Hinode, the Isle of Sunrise, and thirteen
 islands round it. Kurohama's black-sand harbour, the castle town of Takamori, the Thousand Steps up Mount Kumo to its
 shrine, Tanabe's rice terraces, the Yumoto springs, the Whispering Bamboo; the fox gates of Morishima, the Lantern Isle,
 the burned fortress of Josaki, the ogres of Ashigane and the white island, Hakkotsu. **Boats** run between every landing
-for coins: you see the fare before you board and pay once, in the same step that carries you. **Palian Faith and Magic**
+for coins: you see the fare before you board and pay once, in the same step that carries you. **Mizukai Faith and Magic**
 (vows, blessings, purification, spirit wards and rites; seals, bindings, barriers and crossings) can be kept in place of
 the Realm's from the top of the prayer or spell book, anywhere, and set down again, like Raria's Law. Sixteen quests,
-three dungeons, twenty-three original spirit creatures, katana, naginata and the tall Palian bow forged from tamahagane,
+three dungeons, twenty-three original spirit creatures, katana, naginata and the tall Mizukai bow forged from tamahagane,
 five new herbs, and ten new pieces of music for koto, shamisen, shakuhachi, sho, temple bell and taiko.
 
 | Dawn over Kurohama | The Hall of Takamori | The Thousand Steps |
 | --- | --- | --- |
-| ![Sunrise over Kurohama's stone quay: boats at the pier, paper lanterns, tiled roofs with upturned eaves](docs/new-palia-dawn.png) | ![Takamori's castle town: the five-roofed keep over a stone-walled bailey, samurai under the crane banner](docs/new-palia-takamori.png) | ![Vermilion gates climbing Mount Kumo to the shrine and its pagoda](docs/new-palia-steps.png) |
+| ![Sunrise over Kurohama's stone quay: boats at the pier, paper lanterns, tiled roofs with upturned eaves](docs/new-mizukai-dawn.png) | ![Takamori's castle town: the five-roofed keep over a stone-walled bailey, samurai under the crane banner](docs/new-mizukai-takamori.png) | ![Vermilion gates climbing Mount Kumo to the shrine and its pagoda](docs/new-mizukai-steps.png) |
 | **The fox gates of Morishima** | **The Lantern Isle at night** | **The ogres of Ashigane** |
-| ![A tunnel of vermilion shrine gates through Morishima's wood, foxfire vixens among them](docs/new-palia-gates.png) | ![Torojima at night: stone lanterns and graves, lantern-wights wandering](docs/new-palia-lanterns.png) | ![Ash and lava on Ashigane, a samurai fighting ash ogres](docs/new-palia-ogres.png) |
+| ![A tunnel of vermilion shrine gates through Morishima's wood, foxfire vixens among them](docs/new-mizukai-gates.png) | ![Torojima at night: stone lanterns and graves, lantern-wights wandering](docs/new-mizukai-lanterns.png) | ![Ash and lava on Ashigane, a samurai fighting ash ogres](docs/new-mizukai-ogres.png) |
 
 ## New: real lighting, the Order of the Dawn, and a Realm that dresses up
 

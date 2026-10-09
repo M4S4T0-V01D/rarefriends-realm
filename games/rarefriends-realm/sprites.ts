@@ -1849,7 +1849,7 @@ CREATURES[179] = c(`
 .#....#.#....#..
 ................`);
 
-// ---------- The Palian Isles (What Rises in the East): the wild, the wayward spirits, the Josaki dead, the ogres and the great ones ----------
+// ---------- The Mizukai Isles (What Rises in the East): the wild, the wayward spirits, the Josaki dead, the ogres and the great ones ----------
 // A snow monkey (200), sitting, red-faced, tail curled.
 CREATURES[200] = c(`
 ................

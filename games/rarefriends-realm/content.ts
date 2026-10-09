@@ -13,7 +13,7 @@ import { rumourAt } from "./rumours.ts";
 import { FOE_GROUPS, MATCHES, customMatch, entryFee, startMatch } from "./arena.ts";
 import { ORDERS, ORDER_IDS } from "./knights.ts";
 import { WEST_NPCS, WEST_QUESTS, onWestAltar, onWestKill, talkWest, westShopProblem } from "./raria.ts";
-import { PALIAN_NPCS, PALIAN_QUESTS, onPalianAltar, onPalianKill, palianShopProblem, talkPalian } from "./palia.ts";
+import { MIZUKAI_NPCS, MIZUKAI_QUESTS, onMizukaiAltar, onMizukaiKill, mizukaiShopProblem, talkMizukai } from "./mizukai.ts";
 import { BAR_NPCS, BAR_QUEST_DEFS, jobBoard, onBountyKill, talkBar } from "./bars.ts";
 /** A bar's job board (bars.ts), for the engine (which reaches the bars through here, so they load after this module). */
 export const readJobBoard = (game: Game, barId: string) => jobBoard(game, barId);
@@ -55,7 +55,7 @@ export const NPCS: Record<string, NpcDef> = {
   maiden_trader: { id: "maiden_trader", name: "Wren of the Maidens", examine: "Keeps the Maidens' market: what the Deadwood gives up, and what they take from its dead.", options: ["Talk-to", "Trade"], shop: "maidens_market", art: art(3, 841) },
   maidens_villager: { id: "maidens_villager", name: "Deadwood Maiden", examine: "A Maiden off watch. Still armed.", options: ["Talk-to"], art: art(9, 842) },
   ...WEST_NPCS,
-  ...PALIAN_NPCS,
+  ...MIZUKAI_NPCS,
   ...BAR_NPCS,
   mender: { id: "mender", name: "Mender Hale", examine: "The chapel's mender. Her hands are always clean and her apron never is.", options: ["Talk-to", "Trade"], shop: "mender", art: art(3, 318) },
   // The wider world's villages (2026-10). Each village's people wear its own clothes (NPC_WEAR / regionalLook in render.ts).
@@ -461,7 +461,7 @@ export const QUESTS: readonly QuestDef[] = [
   },
   // ---------- Return of Raria: Hollowmere's watch, the Federation, BarkReach and Raria ----------
   ...WEST_QUESTS,
-  ...PALIAN_QUESTS,
+  ...MIZUKAI_QUESTS,
   ...BAR_QUEST_DEFS,
   // ---------- The quests of being known: long ones, for Presence, with gear only they give ----------
   {
@@ -535,7 +535,7 @@ export function chat(npc: string, lines: DialogueLine[], options?: Dialogue["opt
 /** Pickpocket and quest hooks the engine calls. */
 export function onMonsterKilled(game: Game, monsterId: string, x: number, y: number) {
   const player = game.player;
-  onWestKill(game, monsterId); onPalianKill(game, monsterId); onBountyKill(game, monsterId);
+  onWestKill(game, monsterId); onMizukaiKill(game, monsterId); onBountyKill(game, monsterId);
   // The wider world's village quests count their kills wherever they fall.
   const tally = (quest: string, key: string, goal: number, done: string) => {
     if (stage(game, quest) !== 1) return;
@@ -595,7 +595,7 @@ export function searchWell(game: Game) {
 /** Why a shop won't sell to you (the Orders' armouries before the oath, the Maidens' market before the truce), or null. */
 export function shopProblem(game: Game, shopId: string): string | null {
   const west = westShopProblem(game, shopId); if (west) return west;
-  const palian = palianShopProblem(game, shopId); if (palian) return palian;
+  const mizukai = mizukaiShopProblem(game, shopId); if (mizukai) return mizukai;
   const order = ORDER_IDS.find(id => shopId === `${id}_armoury`);
   if (order && !questDone(game, `oath_${order}`)) return `The quartermaster won't sell to one who hasn't sworn the ${ORDERS[order].short} Oath. The commander will hear you.`;
   if (shopId === "maidens_market" && !questDone(game, "maidens_truce")) return "Wren's hand stays on her spear. The Maidens trade with those who keep the truce; speak to the matriarch.";
@@ -615,7 +615,7 @@ export function onBonesOffered(game: Game, chapel: boolean) {
 }
 /** Praying at an altar: the Pilgrim's Road counts the old altars of the Realm. */
 export function onAltarPrayed(game: Game, altar: { name: string; text?: string }) {
-  onWestAltar(game, altar); onPalianAltar(game, altar);
+  onWestAltar(game, altar); onMizukaiAltar(game, altar);
   if (altar.text && (ORDER_IDS as readonly string[]).includes(altar.text) && !data(game, `prayed_${altar.text}`)) { game.player.questData[`prayed_${altar.text}`] = 1; if (stage(game, `oath_${altar.text}`) === 1) { message(game, `You kneel at the ${ORDERS[altar.text as keyof typeof ORDERS].short} altar. The oath wants its gift too.`, "quest"); } }
   if (stage(game, "pilgrims_road") !== 1) return;
   const stop = PILGRIM_ALTARS.find(([, name]) => name === altar.name);
@@ -741,7 +741,7 @@ function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
   // The bars' people: barkeeps with their quests (until they're done), the quiet traders.
   if (!everyday) { const bar = talkBar(game, npcId, name, () => talkInner(game, npcId, true)); if (bar) return bar; }
   const west = talkWest(game, npcId, name); if (west) return west;
-  const palian = talkPalian(game, npcId, name); if (palian) return palian;
+  const mizukai = talkMizukai(game, npcId, name); if (mizukai) return mizukai;
   switch (npcId) {
     case "slayer_master:assignment": case "slayer_master": {
       const task = currentTask(game);

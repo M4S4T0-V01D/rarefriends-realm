@@ -1,18 +1,18 @@
 /**
- * What Rises in the East: what the Palian Isles make, carry and fight.
+ * What Rises in the East: what the Mizukai Isles make, carry and fight.
  *
- * Palian steel is tamahagane, folded from the black iron sand of Kurohama's beaches and the charcoal of the Old Cedars:
+ * Mizukai steel is tamahagane, folded from the black iron sand of Kurohama's beaches and the charcoal of the Old Cedars:
  * katanas, the long nodachi, naginata, yari and tanto, the tall laminated bow. Armour is lacquered plates laced in
  * silk: the foot soldiers' (ashigaru) light kit, the samurai's full harness, and the green-laced harness of the fallen
  * Josaki clan, taken from its dead. Shrine people wear white and vermilion; the Bureau of Seals' sealwrights wear
  * indigo; the Mistwalkers, who carry messages nobody else should read, wear nothing anyone remembers.
  *
- * The creatures are the Isles' wayward spirits (spirit: true, so the Palian rites and wards answer them) and the
+ * The creatures are the Isles' wayward spirits (spirit: true, so the Mizukai rites and wards answer them) and the
  * people and beasts who live among them. Every name is the Isles' own.
  */
 import type { Bonuses, Drop, EquipSlot, IconShape, Item, MonsterDef, Skill } from "./data.ts";
 
-export const PALIA = { indigo: "#2f3a5e", ink: "#22252e", vermilion: "#b5452f", ivory: "#efe6d2", gold: "#c9a24a", crimson: "#8f2b2b", cedar: "#7a5a44", sakura: "#e8b4c0", steel: "#b9bec6", lacquer: "#1f1d22", jade: "#4f7a64" } as const;
+export const MIZUKAI = { indigo: "#2f3a5e", ink: "#22252e", vermilion: "#b5452f", ivory: "#efe6d2", gold: "#c9a24a", crimson: "#8f2b2b", cedar: "#7a5a44", sakura: "#e8b4c0", steel: "#b9bec6", lacquer: "#1f1d22", jade: "#4f7a64" } as const;
 
 type GearDef = { id: string; name: string; slot: EquipSlot; shape: IconShape; kind?: string; color: string; accent?: string; bonuses: Partial<Bonuses>; requires?: Partial<Record<Skill, number>>;
   value: number; weight?: number; speed?: number; two?: boolean; staff?: boolean; bow?: { range: number; strength?: number }; holy?: boolean; examine: string; ammo?: { strength: number; level: number }; tradeable?: boolean };
@@ -22,10 +22,10 @@ const gear = (def: GearDef): Item => ({
   ...(def.ammo ? {} : { equip: { slot: def.slot, bonuses: def.bonuses, requires: def.requires, ...(def.speed ? { speed: def.speed } : {}), ...(def.two ? { twoHanded: true } : {}), ...(def.staff ? { staff: true } : {}), ...(def.bow ? { bow: def.bow } : {}), ...(def.holy ? { holy: true } : {}) } }),
 });
 const g = (id: string, name: string, slot: EquipSlot, shape: IconShape, bonuses: Partial<Bonuses>, requires: Partial<Record<Skill, number>>, value: number, examine: string, extra: Partial<GearDef> = {}): GearDef =>
-  ({ id, name, slot, shape, color: extra.color ?? PALIA.steel, accent: extra.accent ?? PALIA.lacquer, bonuses, requires, value, examine, ...extra });
-const P = PALIA;
+  ({ id, name, slot, shape, color: extra.color ?? MIZUKAI.steel, accent: extra.accent ?? MIZUKAI.lacquer, bonuses, requires, value, examine, ...extra });
+const P = MIZUKAI;
 
-export const PALIAN_GEAR: readonly GearDef[] = [
+export const MIZUKAI_GEAR: readonly GearDef[] = [
   // Blades: the katana in three grades, the clan swords, the long nodachi, the tanto; the polearms.
   g("kurohama_katana", "Kurohama katana", "weapon", "sword", { attack: 36, strength: 32 }, { attack: 40 }, 4200, "A harbour-forged katana: a curved, single-edged blade with a round iron guard and a grip wrapped in black cord. Light, quick, and sharper than it has any right to be.", { speed: 4, weight: 2, kind: "katana" }),
   g("tamahagane_katana", "Tamahagane katana", "weapon", "sword", { attack: 54, strength: 50 }, { attack: 60 }, 16000, "Folded tamahagane, the temper line running like a wave down the blade. The Ironsand Forge makes a few a season and argues about every one.", { speed: 4, weight: 2, kind: "katana", accent: P.gold }),
@@ -36,9 +36,9 @@ export const PALIAN_GEAR: readonly GearDef[] = [
   g("naginata", "Naginata", "weapon", "spear", { attack: 56, strength: 60 }, { attack: 55 }, 14000, "A long curved blade on a lacquered pole: the shrine guards' weapon, and the castle women's. It keeps a horseman honest.", { speed: 5, two: true, weight: 5, kind: "glaive", accent: P.vermilion }),
   g("yari", "Yari", "weapon", "spear", { attack: 48, strength: 46 }, { attack: 45 }, 8000, "A straight spear with a flat, three-sided head. The foot soldiers' weapon, and the reason they win.", { speed: 5, two: true, weight: 4, accent: P.lacquer }),
   // Bows: the tall laminated yumi, gripped below the middle; the short half-bow; arrows with long fletching.
-  g("palian_longbow", "Palian longbow", "weapon", "warbow", { ranged: 72 }, { ranged: 60 }, 15000, "A yumi of laminated bamboo and mulberry, taller than you, gripped a third of the way up. It is asymmetric on purpose and accurate by habit.", { speed: 5, two: true, bow: { range: 8, strength: 32 }, weight: 2, color: P.lacquer, accent: P.vermilion }),
-  g("half_bow", "Palian half-bow", "weapon", "bow", { ranged: 46 }, { ranged: 40 }, 5200, "A short bamboo bow for the deck of a boat or the window of a castle.", { speed: 4, two: true, bow: { range: 7 }, weight: 1, color: "#8a6a3a", accent: P.lacquer }),
-  g("palian_arrows", "Palian arrows", "weapon", "arrow", {}, {}, 50, "Cane-shafted arrows with long grey fletching and a broad, singing head.", { ammo: { strength: 42, level: 50 }, color: P.steel, accent: "#8f8f8f" }),
+  g("mizukai_longbow", "Mizukai longbow", "weapon", "warbow", { ranged: 72 }, { ranged: 60 }, 15000, "A yumi of laminated bamboo and mulberry, taller than you, gripped a third of the way up. It is asymmetric on purpose and accurate by habit.", { speed: 5, two: true, bow: { range: 8, strength: 32 }, weight: 2, color: P.lacquer, accent: P.vermilion }),
+  g("half_bow", "Mizukai half-bow", "weapon", "bow", { ranged: 46 }, { ranged: 40 }, 5200, "A short bamboo bow for the deck of a boat or the window of a castle.", { speed: 4, two: true, bow: { range: 7 }, weight: 1, color: "#8a6a3a", accent: P.lacquer }),
+  g("mizukai_arrows", "Mizukai arrows", "weapon", "arrow", {}, {}, 50, "Cane-shafted arrows with long grey fletching and a broad, singing head.", { ammo: { strength: 42, level: 50 }, color: P.steel, accent: "#8f8f8f" }),
   // Magic and faith: the sealwright's brush-staff, the shrine wand and bell.
   g("sealwright_staff", "Sealwright's brush-staff", "weapon", "staff", { attack: 4, strength: 2, magic: 18 }, { magic: 55 }, 15000, "A staff with a great brush for a head, the bristles stiff with old ink. Sealwrights write their spells; this is the pen.", { speed: 5, staff: true, weight: 2, color: P.cedar, accent: P.ink }),
   g("shrine_wand", "Shrine wand", "weapon", "staff", { magic: 12, prayer: 6 }, { magic: 35, prayer: 30 }, 9000, "A wand of white wood hung with zigzag paper streamers. Waved over a thing, it is made clean. Holy.", { speed: 4, staff: true, weight: 1, kind: "wand", color: P.ivory, accent: P.ivory, holy: true }),
@@ -75,20 +75,20 @@ export const PALIAN_GEAR: readonly GearDef[] = [
   g("straw_kasa", "Straw kasa", "head", "hat", { defence: 1 }, {}, 120, "A wide conical hat of woven straw. Rain, sun, and the curiosity of strangers run off it.", { weight: 1, kind: "kasa", color: "#c9b27a", accent: "#8a6a3a" }),
 ];
 
-/** The Palian gear as items. */
-export const palianGear = (): Item[] => PALIAN_GEAR.map(gear);
+/** The Mizukai gear as items. */
+export const mizukaiGear = (): Item[] => MIZUKAI_GEAR.map(gear);
 const coins = (min: number, max: number, chance: number): Drop => ({ item: "coins", min, max, chance });
 const one = (id: string, chance: number, min = 1, max = min): Drop => ({ item: id, min, max, chance });
 const item = (id: string, name: string, examine: string, value: number, shape: IconShape, color: string, accent?: string, extra: Partial<Item> = {}): Item => ({ id, name, examine, value, icon: { shape, color, accent }, ...extra });
 
 /** Everything else the Isles have: wood, iron sand, food and drink, paper seals, keys, and the quests' things. */
-export const PALIAN_ITEMS: readonly Item[] = [
+export const MIZUKAI_ITEMS: readonly Item[] = [
   item("bamboo_canes", "Bamboo canes", "Green canes, hollow and jointed. They burn fast and fletch light.", 40, "log", "#8fb36a", "#5f7a3a"),
   item("blossom_logs", "Blossom logs", "Wood from a blossom tree, pink at the heart. It burns sweet.", 160, "log", "#b07a6a", "#e8b4c0"),
   item("cedar_logs", "Cedar logs", "Red cedar from the Old Cedars, straight-grained and fragrant. Shrines are built of it, and nothing else.", 420, "log", "#8a4f36", "#c98a5a"),
   item("iron_sand", "Iron sand", "Black sand from Kurohama's beaches, heavy with iron. Smelted with charcoal, it becomes tamahagane.", 60, "ore", "#3b3a40", "#8f8f96", { stackable: true }),
-  item("tamahagane_bar", "Tamahagane", "A bloom of Palian steel, folded and hammered: hard at the edge, soft at the spine, if the smith is good.", 1400, "bar", "#7d8590", "#c9a24a"),
-  item("paper_seal", "Paper seal", "A strip of paper inked with a seal: the Isles' sigil. Palian spells and rites spend them.", 30, "sigil", "#efe6d2", "#b5452f", { stackable: true }),
+  item("tamahagane_bar", "Tamahagane", "A bloom of Mizukai steel, folded and hammered: hard at the edge, soft at the spine, if the smith is good.", 1400, "bar", "#7d8590", "#c9a24a"),
+  item("paper_seal", "Paper seal", "A strip of paper inked with a seal: the Isles' sigil. Mizukai spells and rites spend them.", 30, "sigil", "#efe6d2", "#b5452f", { stackable: true }),
   item("spirit_seal", "Spirit seal", "A seal written in the shrine's red ink on mulberry paper, folded twice. For the stronger rites.", 90, "sigil", "#e8d8b8", "#8f2b2b", { stackable: true }),
   item("rice", "Rice", "Short-grained Tanabe rice. Cook it on a range.", 6, "wheat", "#efe9dc", "#c9b27a"),
   item("rice_ball", "Rice ball", "Rice pressed round a salted plum, wrapped in seaweed. Heals 10.", 30, "bread", "#efe9dc", "#2f3a2e", { heal: 10 }),
@@ -125,7 +125,7 @@ export const PALIAN_ITEMS: readonly Item[] = [
 ];
 
 /** The Isles' creatures: the wild, the wayward spirits (spirit: true), the Josaki dead, the ogres, the smugglers, the great ones. */
-export const PALIAN_MONSTERS: Record<string, MonsterDef> = {
+export const MIZUKAI_MONSTERS: Record<string, MonsterDef> = {
   snow_monkey: { id: "snow_monkey", name: "Snow monkey", level: 5, hp: 10, attack: 4, strength: 4, defence: 4, attackBonus: 0, defenceBonus: 0, maxHit: 1, speed: 4, respawn: 25, wander: 5, art: 200, ink: "#8a7a6a",
     examine: "A red-faced monkey with frost on its eyebrows. It has never paid for a bath.", always: [one("bones", 1)], drops: [coins(2, 20, 0.4), one("monkey_pass", 0), one("cucumber", 0.1)].filter(d => d.chance > 0) },
   parasol_imp: { id: "parasol_imp", spirit: true, name: "Hopping parasol", level: 6, hp: 12, attack: 5, strength: 4, defence: 6, attackBonus: 0, defenceBonus: 2, maxHit: 1, speed: 4, respawn: 25, wander: 6, weakness: "fire", art: 201, ink: "#a5443a",

@@ -125,8 +125,8 @@ export type Player = {
   card: Record<string, string>;
   /** Return of Raria: the Adventurer Cards you've found (card id → the UTC day), and whether you keep the Wise Friend's Law (Raria's Magic and Faith in place of the Old Friend's). */
   cards: Record<string, number>; rarian: boolean;
-  /** Keeping the Palian way (What Rises in the East): the Isles' Magic and Faith in place of the Realm's (never both this and `rarian`). */
-  palian: boolean;
+  /** Keeping the Mizukai way (What Rises in the East): the Isles' Magic and Faith in place of the Realm's (never both this and `rarian`). */
+  mizukai: boolean;
   /** A spirit ward (spirit incense): wayward spirits don't come for you and strike softer until this tick. */
   spiritWardUntil: number;
   /** Your home, if you hold a deed, and the ticks of Well Rested left after sleeping in it. */
@@ -207,8 +207,8 @@ export type Game = {
   /** What the sky is doing (set by the page each frame; the engine only reads it) and how much your Friend talks. */
   ambient: { night: boolean; rain: boolean; storm?: boolean; fog?: boolean }; friendSpeech: "full" | "reduced" | "rare" | "off"; events: GameEvent[]; rng: () => number; nextUid: number;
   dialogue: Dialogue | null; ui: { shop: string | null; bank: boolean; production: ProductionMenu | null; lamp: number | null; naming: "first" | "rename" | null; fellowship?: boolean; home?: boolean; join?: Fellowship | null; /** A purchase with simulated RF waiting for the player's word: what it does and how many caskets it costs. */ rfAction?: { kind: "slayer-complete" | "slayer-reroll"; caskets: number; text: string } | null;
-    /** The boat list open at a Palian landing (What Rises in the East): the dock you're boarding at. */ boat?: string | null };
-  /** The last boat crossing between the Palian Isles (for the picture of it: boats.ts). */
+    /** The boat list open at a Mizukai landing (What Rises in the East): the dock you're boarding at. */ boat?: string | null };
+  /** The last boat crossing between the Mizukai Isles (for the picture of it: boats.ts). */
   voyage?: { from: string; to: string; tick: number } | null;
   held: { dx: number; dy: number } | null; autoRetaliate: boolean; playTicks: number;
   overheads: Map<number, { text: string; until: number }>;
@@ -270,7 +270,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
     style: "accurate", autocast: null, prayers: [], target: null, activity: null, combat: null,
     attackTimer: 0, eatTimer: 0, stunned: 0, regenTimer: 0, quests: {}, questData: {},
     wardrobe: [], worn: [], follower: null, courseStep: -1, kills: 0, deaths: 0, overhead: null, music: ["theme"],
-    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, boneBag: {}, sigilBag: {}, belts: {}, followerWorn: [], orders: {}, card: { bg: "paper", frame: "rose", skills: "boxes", font: "mono", ink: "ink", layout: "classic" }, cards: {}, rarian: false, palian: false, spiritWardUntil: 0, home: null, restedTicks: 0, ward: null, wardUntil: 0, renew: 0, renewUntil: 0, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, friendVillage: null, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, lore: {}, trail: null, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false, rerolls: 0 }, seenUpdate: LATEST_UPDATE,
+    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, boneBag: {}, sigilBag: {}, belts: {}, followerWorn: [], orders: {}, card: { bg: "paper", frame: "rose", skills: "boxes", font: "mono", ink: "ink", layout: "classic" }, cards: {}, rarian: false, mizukai: false, spiritWardUntil: 0, home: null, restedTicks: 0, ward: null, wardUntil: 0, renew: 0, renewUntil: 0, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, friendVillage: null, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, lore: {}, trail: null, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false, rerolls: 0 }, seenUpdate: LATEST_UPDATE,
     lastHitBy: null, created: Date.now(), queuedSpell: null, castTimer: 0,
   };
 }
@@ -508,20 +508,20 @@ export const slayerSetWorn = (player: Player, set: string) => setPieces(player, 
 export const fullSlayerSet = (player: Player, set: string) => setPieces(player, set) >= 3;
 // ---------- The ossuary bag ----------
 export const BONE_BAG = "bone_bag", BONE_BAG_SIZE = 60;
-/** The tradition you keep: the Realm's own, Raria's Law, or the Palian way. */
-export const traditionOf = (player: Player): Tradition => player.rarian ? "raria" : player.palian ? "palia" : "realm";
+/** The tradition you keep: the Realm's own, Raria's Law, or the Mizukai way. */
+export const traditionOf = (player: Player): Tradition => player.rarian ? "raria" : player.mizukai ? "mizukai" : "realm";
 /**
  * Keep a tradition (from the top of the spellbook or prayers, anywhere): the Realm's own (the Old Friend's book),
- * Raria's (the Wise Friend's Law) or the Palian Isles' (the rope and the brush). Only one at a time; active prayers and
+ * Raria's (the Wise Friend's Law) or the Mizukai Isles' (the rope and the brush). Only one at a time; active prayers and
  * autocast end when it changes. Nothing is learnt or lost by changing: the spells you can cast in each depend on your
  * levels and quests, not on which you keep.
  */
 export function setTradition(game: Game, tradition: Tradition) {
   const player = game.player;
   if (traditionOf(player) === tradition) return;
-  player.rarian = tradition === "raria"; player.palian = tradition === "palia"; player.prayers = []; if (player.autocast) player.autocast = null;
+  player.rarian = tradition === "raria"; player.mizukai = tradition === "mizukai"; player.prayers = []; if (player.autocast) player.autocast = null;
   message(game, tradition === "raria" ? "You keep the Wise Friend's Law. Your Magic is Raria's edicts now, and your Faith its commandments and rites; the Old Friend's book is closed."
-    : tradition === "palia" ? "You keep the Palian way. Your Magic is the Isles' seals and bindings now, and your Faith their vows, blessings and rites; the Old Friend's book is closed, not lost."
+    : tradition === "mizukai" ? "You keep the Mizukai way. Your Magic is the Isles' seals and bindings now, and your Faith their vows, blessings and rites; the Old Friend's book is closed, not lost."
     : "You open the Old Friend's book again. The Realm's own prayers and light are yours.", "quest");
   sound(game, "quest");
 }

@@ -1,5 +1,5 @@
 /**
- * The Palian Isles' towns, shrines, forests and dungeons (What Rises in the East), laid on the land isles.ts raised.
+ * The Mizukai Isles' towns, shrines, forests and dungeons (What Rises in the East), laid on the land isles.ts raised.
  *
  * Kurohama is the harbour city facing the mainland: the harbourmaster, the Exchange, the Sleeping Crane, the Bureau of
  * Seals, the Ironsand Forge, the magistrate, the market. Takamori is the castle town at the island's heart, the lord's
@@ -10,19 +10,19 @@
  */
 import { OVERWORLD_H, T, isWater, type Building, type DecorKind, type GenContext, type RegionId, type World, type worldTools } from "./world.ts";
 import type { RockKind, TreeKind } from "./data.ts";
-import { ISLANDS, PALIAN_DUNGEONS, PALIAN_PLACES, PALIAN_ROOFS, type buildIsles } from "./isles.ts";
+import { ISLANDS, MIZUKAI_DUNGEONS, MIZUKAI_PLACES, MIZUKAI_ROOFS, type buildIsles } from "./isles.ts";
 
 type Tools = ReturnType<typeof worldTools>;
 type Isle = ReturnType<typeof buildIsles>;
 
 
-export function buildPalianTowns(ctx: GenContext, t: Tools, isle: Isle, places: World["places"]) {
+export function buildMizukaiTowns(ctx: GenContext, t: Tools, isle: Isle, places: World["places"]) {
   const { get, put, add, decor, npc, building, clearAt, fillRect, tree, rock, herb, spot, inBounds, tileIndex, monsters, scatter } = t;
   const { at, nearFree, put2, npcAt, monsterAt, sign, occupied, regionIs, WALKABLE } = isle;
-  const R = PALIAN_ROOFS, random = ctx.random, pt = ([x, y]: [number, number]) => ({ x, y });
-  /** A Palian building: hipped roof of dark tile, white plaster between dark posts. */
+  const R = MIZUKAI_ROOFS, random = ctx.random, pt = ([x, y]: [number, number]) => ({ x, y });
+  /** A Mizukai building: hipped roof of dark tile, white plaster between dark posts. */
   const house = (x0: number, y0: number, x1: number, y1: number, door: "n" | "s" | "e" | "w", name: string, extra: Partial<Building> = {}, floor: number = T.WOOD) =>
-    building(x0, y0, x1, y1, door, floor, undefined, { name, style: "palian", walls: "palian", hip: true, color: R.slate, chimney: false, ...extra });
+    building(x0, y0, x1, y1, door, floor, undefined, { name, style: "mizukai", walls: "mizukai", hip: true, color: R.slate, chimney: false, ...extra });
   /** Clear a patch (objects, spawns), turn rough ground to grass, and pave a square of it. */
   const ground = (x0: number, y0: number, x1: number, y1: number, paving: number | null = null) => {
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
@@ -51,7 +51,7 @@ export function buildPalianTowns(ctx: GenContext, t: Tools, isle: Isle, places: 
 
   // ---------- Kurohama: the harbour city ----------
   {
-    const [cx, cy] = PALIAN_PLACES.kurohama;
+    const [cx, cy] = MIZUKAI_PLACES.kurohama;
     // The town is built out to a stone quay on the bay (made ground where the shallows were); the pier runs on out from it.
     const pier = (x: number, y: number) => get(x, y) === T.WOOD && x < cx - 16;
     for (let y = cy - 22; y <= cy + 24; y++) for (let x = cx - 16; x <= cx + 28; x++) {
@@ -68,12 +68,12 @@ export function buildPalianTowns(ctx: GenContext, t: Tools, isle: Isle, places: 
     house(cx - 3, cy - 12, cx + 4, cy - 3, "s", "The Kurohama Exchange", { color: R.charcoal, storeys: 2 }, T.STONE);
     for (const by of [cy - 10, cy - 8, cy - 6]) add({ kind: "bank", x: cx - 2, y: by, blocks: true, name: "Bank booth" }); npc("banker", cx, cy - 8);
     decor(cx + 3, cy - 11, "chest", true, "The Exchange's strongbox, iron-bound, two locks");
-    house(cx - 11, cy - 20, cx - 6, cy - 13, "s", "A harbour warehouse", { color: R.charcoal, walls: "palian" }); decor(cx - 10, cy - 19, "crate", true, "Bales from the mainland, waiting on the tide"); decor(cx - 7, cy - 19, "barrel");
+    house(cx - 11, cy - 20, cx - 6, cy - 13, "s", "A harbour warehouse", { color: R.charcoal, walls: "mizukai" }); decor(cx - 10, cy - 19, "crate", true, "Bales from the mainland, waiting on the tide"); decor(cx - 7, cy - 19, "barrel");
     house(cx - 3, cy - 21, cx + 3, cy - 15, "s", "A harbour warehouse", { color: R.charcoal }); decor(cx - 2, cy - 20, "crate", true, "Tea from Kibi, in cedar chests"); decor(cx + 2, cy - 20, "barrel");
     // North-east: the Sleeping Crane, the Bureau of Seals, homes.
     house(cx + 9, cy - 12, cx + 18, cy - 3, "s", "The Sleeping Crane", { storeys: 2, color: R.bark });
     npc("kuro_innkeeper", cx + 13, cy - 8); decor(cx + 10, cy - 11, "table"); decor(cx + 16, cy - 11, "table"); decor(cx + 10, cy - 5, "table"); add({ kind: "range", x: cx + 17, y: cy - 5, blocks: true, name: "Inn kitchen range" });
-    house(cx + 20, cy - 12, cx + 27, cy - 3, "s", "The Bureau of Seals", { color: R.charcoal, walls: "palian" });
+    house(cx + 20, cy - 12, cx + 27, cy - 3, "s", "The Bureau of Seals", { color: R.charcoal, walls: "mizukai" });
     npc("kuro_sealwright", cx + 23, cy - 7); decor(cx + 21, cy - 11, "shelf", true, "Seal paper in reams, ink in cakes, brushes by the hundred"); decor(cx + 26, cy - 11, "table", true, "A writing desk: a half-finished seal drying under a stone");
     house(cx + 9, cy - 21, cx + 14, cy - 15, "s", "A Kurohama house"); homeInside(cx + 9, cy - 21, cx + 14, cy - 15, "s");
     house(cx + 16, cy - 21, cx + 21, cy - 15, "s", "A Kurohama house", { color: R.charcoal }); homeInside(cx + 16, cy - 21, cx + 21, cy - 15, "s");
@@ -92,12 +92,12 @@ export function buildPalianTowns(ctx: GenContext, t: Tools, isle: Isle, places: 
     house(cx + 9, cy + 14, cx + 14, cy + 20, "n", "A Kurohama house"); homeInside(cx + 9, cy + 14, cx + 14, cy + 20, "n");
     // The harbour shrine: a gate, two lanterns, a little hall to the sea's Friend.
     house(cx + 19, cy + 15, cx + 24, cy + 20, "n", "The Harbour Shrine", { walls: "lacquer", color: R.copper });
-    add({ kind: "altar", x: cx + 21, y: cy + 18, blocks: true, name: "Harbour shrine altar", text: "palian" }); decor(cx + 21, cy + 17, "sacred_rope", true, "The harbour's sacred stone, roped, salt-white with spray. The sea's Friend is honoured here."); decor(cx + 23, cy + 17, "offering_box", true, "An offering box: coins for safe crossings, and a fish-hook or two");
+    add({ kind: "altar", x: cx + 21, y: cy + 18, blocks: true, name: "Harbour shrine altar", text: "mizukai" }); decor(cx + 21, cy + 17, "sacred_rope", true, "The harbour's sacred stone, roped, salt-white with spray. The sea's Friend is honoured here."); decor(cx + 23, cy + 17, "offering_box", true, "An offering box: coins for safe crossings, and a fish-hook or two");
     torii(cx + 21, cy + 13, "The harbour shrine's gate"); lanterns([[cx + 19, cy + 13], [cx + 24, cy + 13]]);
     // Lanterns down the harbour road, people on it, the dockhand on the quay, guards at the east end.
     for (let x = cx - 8; x <= cx + 26; x += 6) { if (!occupied(x, cy - 2)) decor(x, cy - 2, "paper_lantern"); if (!occupied(x + 3, cy + 2)) decor(x + 3, cy + 2, "paper_lantern"); }
-    for (const [dx, dy] of [[0, -14], [10, 0], [20, -1], [-4, 12], [6, 18], [16, 12], [24, -18]] as const) npcAt("palian_villager", cx + dx, cy + dy, 4);
-    npcAt("kuro_dockhand", cx - 13, cy - 8, 2); npcAt("palian_guard", cx + 28, cy - 3, 1); npcAt("palian_guard", cx + 28, cy + 3, 1);
+    for (const [dx, dy] of [[0, -14], [10, 0], [20, -1], [-4, 12], [6, 18], [16, 12], [24, -18]] as const) npcAt("mizukai_villager", cx + dx, cy + dy, 4);
+    npcAt("kuro_dockhand", cx - 13, cy - 8, 2); npcAt("mizukai_guard", cx + 28, cy - 3, 1); npcAt("mizukai_guard", cx + 28, cy + 3, 1);
     for (const [dx, dy] of [[-14, -16], [-14, -12], [-14, 12], [-14, 16]] as const) put2(cx + dx, cy + dy, (dx + dy) % 2 ? "crate" : "barrel");
     put2(cx - 13, cy + 20, "nets", "Nets drying on the quay"); put2(cx - 13, cy - 20, "nets", "Nets drying on the quay");
     sign(cx - 9, cy - 2, "Kurohama", "KUROHAMA, the black-sand harbour of Hinode. Boats to every island from the pier. The Harbour Road runs east to Takamori and the castle; the Thousand Steps climb from Takamori to Kumoyama. Mind the tide; mind the magistrate.", "katana");
@@ -107,14 +107,14 @@ export function buildPalianTowns(ctx: GenContext, t: Tools, isle: Isle, places: 
 
   // ---------- Takamori: the castle town ----------
   {
-    const [cx, cy] = PALIAN_PLACES.takamori;
+    const [cx, cy] = MIZUKAI_PLACES.takamori;
     ground(cx - 26, cy - 22, cx + 22, cy + 22, null); level(cx - 12, cy - 18, cx + 12, cy + 4);
     for (let y = cy - 22; y <= cy + 22; y++) for (let x = cx - 26; x <= cx + 22; x++) if (!isWater(get(x, y)) && get(x, y) !== T.STONE) put(x, y, ctx.noise2(x * 1.7, y * 1.7) > 0.72 ? T.GRASS : T.GRAVEL);
     // The bailey: a stone-walled square on its raised base, the gate on the south.
     const bx0 = cx - 11, by0 = cy - 17, bx1 = cx + 11, by1 = cy + 2;
     for (let y = by0; y <= by1; y++) for (let x = bx0; x <= bx1; x++) { put(x, y, x === bx0 || x === bx1 || y === by0 || y === by1 ? T.WALL : T.GRAVEL); ctx.lift[tileIndex(x, y)] += 0.35; }
     for (let d = -1; d <= 1; d++) put(cx + d, by1, T.STONE);
-    for (const [tx, ty] of [[bx0, by0], [bx1 - 3, by0], [bx0, by1 - 3], [bx1 - 3, by1 - 3]] as const) house(tx, ty, tx + 3, ty + 3, "s", "A corner tower of Takamori", { color: R.charcoal, storeys: 2, walls: "palian" }, T.STONE);
+    for (const [tx, ty] of [[bx0, by0], [bx1 - 3, by0], [bx0, by1 - 3], [bx1 - 3, by1 - 3]] as const) house(tx, ty, tx + 3, ty + 3, "s", "A corner tower of Takamori", { color: R.charcoal, storeys: 2, walls: "mizukai" }, T.STONE);
     // The lord's hall, the keep behind it, the garden either side.
     house(cx - 7, cy - 11, cx + 7, cy - 3, "s", "The Hall of Takamori", { color: R.charcoal, storeys: 2 }, T.CARPET);
     npc("lord_takamori", cx, cy - 9); npc("lady_suzu", cx + 3, cy - 8); decor(cx, cy - 10, "throne", true, "The lord's seat: a low dais, a lacquered armrest, a screen of painted cranes behind");
@@ -123,18 +123,18 @@ export function buildPalianTowns(ctx: GenContext, t: Tools, isle: Isle, places: 
     put2(cx, cy - 15, "castle_keep", "Takamori Keep: five roofs high on its stone base, white walls, black tile. The lord's banner on the top. Only the lord climbs it.");
     for (const [dx, dy] of [[-9, -14], [-9, -6], [9, -14], [9, -6]] as const) { const [tx, ty] = [cx + dx, cy + dy]; if (!occupied(tx, ty)) tree(tx, ty, dx < 0 ? "sakura" : "pine"); }
     lanterns([[cx - 3, cy - 1], [cx + 3, cy - 1], [cx - 3, cy - 14], [cx + 3, cy - 14]]);
-    npcAt("takamori_captain", cx - 2, cy); npcAt("palian_samurai", cx - 2, by1 + 1, 0); npcAt("palian_samurai", cx + 2, by1 + 1, 0); npcAt("palian_samurai", cx - 6, cy - 2, 3); npcAt("palian_samurai", cx + 6, cy - 2, 3);
+    npcAt("takamori_captain", cx - 2, cy); npcAt("mizukai_samurai", cx - 2, by1 + 1, 0); npcAt("mizukai_samurai", cx + 2, by1 + 1, 0); npcAt("mizukai_samurai", cx - 6, cy - 2, 3); npcAt("mizukai_samurai", cx + 6, cy - 2, 3);
     // Outside: the dojo west, the armourer and the bowyer east, the teahouse and houses south.
     house(cx - 24, cy + 4, cx - 14, cy + 12, "e", "The Takamori Dojo", { color: R.bark }, T.WOOD);
     npc("takamori_sensei", cx - 19, cy + 8); for (const dy of [5, 11]) decor(cx - 22, cy + dy, "target", true, "A straw practice post, cut almost through"); decor(cx - 16, cy + 5, "armour", true, "Practice armour, bamboo and leather");
     house(cx + 13, cy + 4, cx + 20, cy + 10, "w", "Gonzaburo's Armoury", { color: R.charcoal }, T.STONE); npc("takamori_armourer", cx + 16, cy + 7); decor(cx + 19, cy + 5, "armour", true, "Lacquered armour, laced and ready"); add({ kind: "anvil", x: cx + 19, y: cy + 9, blocks: true, name: "Anvil" });
     house(cx + 13, cy + 13, cx + 20, cy + 19, "w", "Asa's Bows", { color: R.bark }); npc("takamori_bowyer", cx + 16, cy + 16); decor(cx + 19, cy + 14, "shelf", true, "Long bows, taller than you, laminated bamboo, unstrung");
-    house(cx - 12, cy + 12, cx - 4, cy + 18, "n", "The Plum Teahouse", { color: R.thatch, walls: "palian" }); npc("takamori_teahouse", cx - 8, cy + 15); decor(cx - 11, cy + 17, "table"); decor(cx - 6, cy + 17, "table");
+    house(cx - 12, cy + 12, cx - 4, cy + 18, "n", "The Plum Teahouse", { color: R.thatch, walls: "mizukai" }); npc("takamori_teahouse", cx - 8, cy + 15); decor(cx - 11, cy + 17, "table"); decor(cx - 6, cy + 17, "table");
     house(cx - 2, cy + 12, cx + 4, cy + 18, "n", "A Takamori house"); homeInside(cx - 2, cy + 12, cx + 4, cy + 18, "n");
     house(cx + 5, cy + 13, cx + 10, cy + 19, "n", "A Takamori house", { color: R.charcoal }); homeInside(cx + 5, cy + 13, cx + 10, cy + 19, "n");
     house(cx - 24, cy - 12, cx - 17, cy - 6, "e", "A samurai's house", { color: R.charcoal }); homeInside(cx - 24, cy - 12, cx - 17, cy - 6, "e");
     house(cx - 24, cy - 3, cx - 17, cy + 2, "e", "A samurai's house"); homeInside(cx - 24, cy - 3, cx - 17, cy + 2, "e");
-    for (const [dx, dy] of [[-14, 0], [0, 8], [10, 2], [-6, 20], [18, -6]] as const) npcAt("palian_villager", cx + dx, cy + dy, 4);
+    for (const [dx, dy] of [[-14, 0], [0, 8], [10, 2], [-6, 20], [18, -6]] as const) npcAt("mizukai_villager", cx + dx, cy + dy, 4);
     lanterns([[cx - 3, cy + 4], [cx + 3, cy + 4], [cx - 13, cy + 3], [cx + 12, cy + 3]], "paper_lantern");
     sign(cx - 4, cy + 4, "Takamori", "TAKAMORI. Seat of the Takamori, lords of Hinode. The hall receives petitioners from the hour of the snake. Swords are worn, not drawn. The Thousand Steps to Kumoyama begin west of the walls.", "katana");
     add({ kind: "well", x: cx + 6, y: cy + 4, blocks: true, name: "The castle-town well" });
@@ -143,7 +143,7 @@ export function buildPalianTowns(ctx: GenContext, t: Tools, isle: Isle, places: 
 
   // ---------- Kumoyama: the shrine on Mount Kumo, the Thousand Steps, the pagoda, the sacred spring ----------
   {
-    const [cx, cy] = PALIAN_PLACES.kumoyama;
+    const [cx, cy] = MIZUKAI_PLACES.kumoyama;
     ground(cx - 12, cy - 10, cx + 13, cy + 8, null); level(cx - 12, cy - 10, cx + 13, cy + 8);
     for (let y = cy - 10; y <= cy + 8; y++) for (let x = cx - 12; x <= cx + 13; x++) put(x, y, Math.abs(x - cx) <= 1 ? T.STONE : T.GRAVEL);
     // The steps up from the castle town: shrine gates along the way, lanterns either side.
@@ -152,7 +152,7 @@ export function buildPalianTowns(ctx: GenContext, t: Tools, isle: Isle, places: 
     steps.forEach(([x, y], i) => { if (i % 9 === 4) torii(x, y, i < 20 ? "A gate on the Thousand Steps" : "A gate on the Thousand Steps, its paint worn by hands"); if (i % 6 === 1) lanterns([[x - 2, y], [x + 2, y]]); });
     // The main hall, the offering hall before it, the shrine office, the pagoda, the spring, the old cedar.
     house(cx - 5, cy - 9, cx + 5, cy - 3, "s", "The Main Hall of Kumoyama", { walls: "lacquer", color: R.copper, storeys: 2 }, T.WOOD);
-    add({ kind: "altar", x: cx, y: cy - 7, blocks: true, name: "Kumoyama altar", text: "palian" }); decor(cx, cy - 8, "sacred_rope", true, "The shrine's heart: a mirror, a rope, a sprig of evergreen. The Friend of the mountain is here, the priestess says, the way the wind is here.");
+    add({ kind: "altar", x: cx, y: cy - 7, blocks: true, name: "Kumoyama altar", text: "mizukai" }); decor(cx, cy - 8, "sacred_rope", true, "The shrine's heart: a mirror, a rope, a sprig of evergreen. The Friend of the mountain is here, the priestess says, the way the wind is here.");
     decor(cx - 4, cy - 8, "paper_lantern"); decor(cx + 4, cy - 8, "paper_lantern"); npc("kumo_priestess", cx - 2, cy - 5);
     decor(cx, cy - 1, "offering_box", true, "The offering box before the hall: a bell-rope above it to wake the Friend, and a box below for what you leave"); decor(cx - 2, cy - 1, "guardian", true, "A guardian lion-dog, mouth open: the first sound"); decor(cx + 2, cy - 1, "guardian", true, "A guardian lion-dog, mouth closed: the last sound");
     torii(cx, cy + 4, "The great gate of Kumoyama"); lanterns([[cx - 3, cy + 4], [cx + 3, cy + 4]]);
@@ -171,9 +171,9 @@ export function buildPalianTowns(ctx: GenContext, t: Tools, isle: Isle, places: 
 
   // ---------- Tanabe: the terraces ----------
   {
-    const [cx, cy] = PALIAN_PLACES.tanabe;
+    const [cx, cy] = MIZUKAI_PLACES.tanabe;
     ground(cx - 12, cy - 6, cx + 12, cy + 8, T.GRAVEL);
-    const farm = (x0: number, y0: number, door: "n" | "s" | "e" | "w", name: string) => { house(x0, y0, x0 + 6, y0 + 5, door, name, { color: R.thatch, walls: "palian" }); homeInside(x0, y0, x0 + 6, y0 + 5, door, "farm"); };
+    const farm = (x0: number, y0: number, door: "n" | "s" | "e" | "w", name: string) => { house(x0, y0, x0 + 6, y0 + 5, door, name, { color: R.thatch, walls: "mizukai" }); homeInside(x0, y0, x0 + 6, y0 + 5, door, "farm"); };
     farm(cx - 11, cy - 5, "s", "A Tanabe farmhouse"); farm(cx + 5, cy - 5, "s", "A Tanabe farmhouse"); farm(cx - 11, cy + 3, "n", "A Tanabe farmhouse");
     house(cx + 4, cy + 2, cx + 11, cy + 8, "n", "The headman's house", { color: R.thatch, storeys: 2 }); npc("tanabe_headman", cx + 7, cy + 5); decor(cx + 10, cy + 7, "crate", true, "The village's rice tax, counted twice");
     // The paddies: flooded terraces, a ditch of water between each, stepping down the slope.
@@ -198,7 +198,7 @@ export function buildPalianTowns(ctx: GenContext, t: Tools, isle: Isle, places: 
 
   // ---------- Yumoto: the hot springs ----------
   {
-    const [cx, cy] = PALIAN_PLACES.yumoto;
+    const [cx, cy] = MIZUKAI_PLACES.yumoto;
     ground(cx - 10, cy - 12, cx + 8, cy + 8, null);
     house(cx - 9, cy - 11, cx + 1, cy - 5, "s", "The Steaming Moon", { storeys: 2, color: R.bark }); npc("yumoto_host", cx - 4, cy - 8);
     decor(cx - 8, cy - 10, "bed", true, "A guest's futon, aired and folded"); decor(cx, cy - 10, "bed", true, "A guest's futon, aired and folded"); decor(cx - 7, cy - 6, "table", true, "Tea, and a cold towel");
@@ -211,7 +211,7 @@ export function buildPalianTowns(ctx: GenContext, t: Tools, isle: Isle, places: 
 
   // ---------- Isohama: the fishers of the south-east bay ----------
   {
-    const [cx, cy] = PALIAN_PLACES.isohama;
+    const [cx, cy] = MIZUKAI_PLACES.isohama;
     ground(cx - 7, cy - 5, cx + 7, cy + 5, null);
     const hut = (x0: number, y0: number, door: "n" | "s" | "e" | "w") => { house(x0, y0, x0 + 4, y0 + 4, door, "A fisher's hut", { color: R.thatch, walls: "plank" }); homeInside(x0, y0, x0 + 4, y0 + 4, door, "fisher"); };
     hut(cx - 7, cy - 5, "s"); hut(cx + 2, cy - 5, "s"); hut(cx - 3, cy + 2, "n");
@@ -223,10 +223,10 @@ export function buildPalianTowns(ctx: GenContext, t: Tools, isle: Isle, places: 
   // ---------- The Old Cedars, the Whispering Bamboo, Kurokage Wood ----------
   {
     house(1386, 192, 1391, 197, "s", "The woodsman's hut", { color: R.bark, walls: "plank" }); npc("cedar_woodsman", 1388, 199); decor(1387, 193, "bed"); decor(1390, 193, "logpile", true, "Cedar, split and stacked, enough for a winter and a shrine");
-    house(1530, 258, 1535, 263, "w", "A tea hut in the bamboo", { color: R.thatch, walls: "palian" }); npc("bamboo_teacher", 1532, 260); decor(1534, 259, "table", true, "A kettle, a bowl, a whisk, and nothing else");
+    house(1530, 258, 1535, 263, "w", "A tea hut in the bamboo", { color: R.thatch, walls: "mizukai" }); npc("bamboo_teacher", 1532, 260); decor(1534, 259, "table", true, "A kettle, a bowl, a whisk, and nothing else");
     for (const [x, y] of [[1527, 256], [1527, 265]] as const) lanterns([[x, y]]);
     // Kurokage: a shrine nobody keeps, its gate fallen.
-    const [kx, ky] = PALIAN_PLACES.kurokage;
+    const [kx, ky] = MIZUKAI_PLACES.kurokage;
     ground(kx - 4, ky - 4, kx + 4, ky + 4, T.GRAVEL);
     for (const [dx, dy] of [[-3, -3], [3, -3], [-3, 3]] as const) put2(kx + dx, ky + dy, "ruin_wall", "A shrine wall, black with moss");
     put2(kx, ky - 2, "sacred_rope", "A sacred rock, its rope rotted through. Something has gnawed it."); put2(kx + 2, ky + 3, "torii", "A shrine gate, fallen on its side. Nobody has stood it up."); put2(kx - 1, ky + 2, "stone_lantern", "A stone lantern, cold, its cap knocked off");
@@ -265,7 +265,7 @@ export function buildPalianTowns(ctx: GenContext, t: Tools, isle: Isle, places: 
   {
     const cx = 1452, cy = 454;
     ground(cx - 10, cy - 6, cx + 10, cy + 8, null);
-    house(cx - 6, cy - 4, cx + 4, cy + 2, "s", "The Poet's Villa", { color: R.bark, walls: "palian" }); npc("hana_poet", cx - 1, cy - 1); decor(cx - 5, cy - 3, "table", true, "A writing table: brush, inkstone, a poem with every line crossed out but the last"); decor(cx + 3, cy - 3, "shelf", true, "Poems in boxes, by season");
+    house(cx - 6, cy - 4, cx + 4, cy + 2, "s", "The Poet's Villa", { color: R.bark, walls: "mizukai" }); npc("hana_poet", cx - 1, cy - 1); decor(cx - 5, cy - 3, "table", true, "A writing table: brush, inkstone, a poem with every line crossed out but the last"); decor(cx + 3, cy - 3, "shelf", true, "Poems in boxes, by season");
     t.blob(cx + 6, cy + 6, 3, 2.2, T.WATER, 0.1, tt => !isWater(tt) && tt !== T.WALL); lanterns([[cx + 2, cy + 6], [cx + 10, cy + 6]]);
     house(cx - 9, cy + 4, cx - 3, cy + 9, "n", "The Blossom Teahouse", { color: R.thatch }); npc("hana_tea", cx - 6, cy + 6); decor(cx - 8, cy + 8, "table");
     scatter(cx - 34, cy - 22, cx + 34, cy + 18, 60, (x, y) => tree(x, y, "sakura"), (x, y) => at(x, y) >= 0 && (get(x, y) === T.GRASS || get(x, y) === T.DARK_GRASS) && !occupied(x, y) && !ctx.buildings.some(b => x >= b.x0 - 2 && x <= b.x1 + 2 && y >= b.y0 - 2 && y <= b.y1 + 2) && Math.hypot(x - cx, y - cy) > 7);
@@ -275,7 +275,7 @@ export function buildPalianTowns(ctx: GenContext, t: Tools, isle: Isle, places: 
   {
     const cx = 1612, cy = 410;
     ground(cx - 6, cy - 6, cx + 6, cy + 4, T.GRAVEL);
-    house(cx - 4, cy - 6, cx + 4, cy - 1, "s", "The Fox Shrine of Morishima", { walls: "lacquer", color: R.vermilion }); add({ kind: "altar", x: cx, y: cy - 4, blocks: true, name: "Fox shrine altar", text: "palian" }); decor(cx, cy - 5, "sacred_rope", true, "The fox shrine's stone, roped, a fox's paw-print worn into its top.");
+    house(cx - 4, cy - 6, cx + 4, cy - 1, "s", "The Fox Shrine of Morishima", { walls: "lacquer", color: R.vermilion }); add({ kind: "altar", x: cx, y: cy - 4, blocks: true, name: "Fox shrine altar", text: "mizukai" }); decor(cx, cy - 5, "sacred_rope", true, "The fox shrine's stone, roped, a fox's paw-print worn into its top.");
     decor(cx - 2, cy - 4, "guardian", true, "A stone fox with a key in its mouth"); decor(cx + 2, cy - 4, "guardian", true, "A stone fox with a jewel in its mouth");
     npc("mori_maiden", cx, cy + 1); decor(cx + 5, cy + 2, "wish_board", true, "Fox-faced plaques, each with a wish written on the back and a face drawn on the front, no two faces alike");
     // The gates: from the landing up through the wood, one every second step.
@@ -288,7 +288,7 @@ export function buildPalianTowns(ctx: GenContext, t: Tools, isle: Isle, places: 
   {
     const cx = 1640, cy = 100;
     ground(cx - 8, cy - 6, cx + 8, cy + 6, T.GRAVEL); level(cx - 8, cy - 6, cx + 8, cy + 6);
-    house(cx - 6, cy - 6, cx + 4, cy, "s", "The Hall of Silence", { walls: "lacquer", color: R.charcoal, storeys: 2 }, T.WOOD); add({ kind: "altar", x: cx - 1, y: cy - 4, blocks: true, name: "Iwaoka altar", text: "palian" }); decor(cx - 1, cy - 5, "sacred_rope", true, "Iwaoka's stone, roped, its moss left exactly as the mountain grew it."); npc("iwa_abbot", cx - 1, cy - 2);
+    house(cx - 6, cy - 6, cx + 4, cy, "s", "The Hall of Silence", { walls: "lacquer", color: R.charcoal, storeys: 2 }, T.WOOD); add({ kind: "altar", x: cx - 1, y: cy - 4, blocks: true, name: "Iwaoka altar", text: "mizukai" }); decor(cx - 1, cy - 5, "sacred_rope", true, "Iwaoka's stone, roped, its moss left exactly as the mountain grew it."); npc("iwa_abbot", cx - 1, cy - 2);
     house(cx + 2, cy + 2, cx + 8, cy + 6, "w", "The monks' quarters", { color: R.bark }); decor(cx + 7, cy + 3, "bed", true, "A monk's mat. That's all."); decor(cx + 7, cy + 5, "bed", true, "A monk's mat. That's all.");
     put2(cx - 7, cy + 3, "pagoda", "Iwaoka's pagoda, built of stone because the wind took the wooden one");
     for (const [dx, dy] of [[-4, 4], [0, 6], [4, -8]] as const) npcAt("iwa_monk", cx + dx, cy + dy, 2);
@@ -373,7 +373,7 @@ export function buildPalianTowns(ctx: GenContext, t: Tools, isle: Isle, places: 
   }
 
   // ---------- Vegetation: each place its own trees ----------
-  const nearAnyBuilding = (x: number, y: number, gap: number) => ctx.buildings.some(b => b.style === "palian" && x >= b.x0 - gap && x <= b.x1 + gap && y >= b.y0 - gap && y <= b.y1 + gap);
+  const nearAnyBuilding = (x: number, y: number, gap: number) => ctx.buildings.some(b => b.style === "mizukai" && x >= b.x0 - gap && x <= b.x1 + gap && y >= b.y0 - gap && y <= b.y1 + gap);
   const openGrass = (x: number, y: number) => (get(x, y) === T.GRASS || get(x, y) === T.DARK_GRASS || get(x, y) === T.SNOW && random() < 0.1) && !occupied(x, y) && !nearAnyBuilding(x, y, 2);
   const plant = (region: RegionId, density: number, pick: (x: number, y: number) => TreeKind | null) => {
     for (let y = 2; y < OVERWORLD_H - 2; y++) for (let x = 1162; x < ctx.W - 2; x++) {
@@ -429,7 +429,7 @@ export function buildPalianTowns(ctx: GenContext, t: Tools, isle: Isle, places: 
   const inside = (d: { x0: number; x1: number; y0: number; y1: number }, n: number, id: string) => scatter(d.x0, d.y0, d.x1, d.y1, n, (x, y) => t.monster(id, x, y), (x, y) => WALKABLE(get(x, y)) && !occupied(x, y));
   {
     // The Hollow under Kumo: a cave the mountain's spirits were sealed in, and the seals failing.
-    const d = PALIAN_DUNGEONS.kumo_hollow;
+    const d = MIZUKAI_DUNGEONS.kumo_hollow;
     dungeon("kumo_hollow", [[1174, 526, 1200, 534], [1198, 530, 1222, 533], [1218, 522, 1246, 540], [1226, 540, 1229, 544], [1206, 544, 1240, 550], [1247, 535, 1248, 535], [1250, 526, 1270, 548]], T.STONE);
     for (let y: number = d.y0; y <= d.y1; y++) for (let x: number = d.x0; x <= d.x1; x++) if (get(x, y) === T.STONE && ctx.noise2(x * 1.6, y * 1.6) > 0.66 && x !== 1247 && x !== 1248) put(x, y, T.DUNGEON);
     const [mx, my] = nearFree(1474, 182, 4);
