@@ -4,7 +4,7 @@
 import { unbakeWorld } from "./bake.ts";
 import {
   EQUIP_SLOTS, FAMILY_NAMES, MAX_XP, MONSTERS, mountDef, PRAYERS, RELICS, SKILLS, SKILL_NAMES, WAYFARER_SET, XP_RATE, XP_TABLE, item, levelForXp,
-  type Bonuses, type EquipSlot, type Item, type MonsterDef, type Skill, type SpotKind, type WardrobeId,
+  type Bonuses, type EquipSlot, type Item, type MonsterDef, type Skill, type SpotKind, type Tradition, type WardrobeId,
  isItem } from "./data.ts";
 import { createWorld, type World } from "./world.ts";
 import type { Daily } from "./daily.ts";
@@ -125,6 +125,10 @@ export type Player = {
   card: Record<string, string>;
   /** Return of Raria: the Adventurer Cards you've found (card id → the UTC day), and whether you keep the Wise Friend's Law (Raria's Magic and Faith in place of the Old Friend's). */
   cards: Record<string, number>; rarian: boolean;
+  /** Keeping the Palian way (What Rises in the East): the Isles' Magic and Faith in place of the Realm's (never both this and `rarian`). */
+  palian: boolean;
+  /** A spirit ward (spirit incense): wayward spirits don't come for you and strike softer until this tick. */
+  spiritWardUntil: number;
   /** Your home, if you hold a deed, and the ticks of Well Rested left after sleeping in it. */
   home: Home | null; restedTicks: number;
   /** A level-up to celebrate (not saved): other players see its fireworks while it lasts. */
@@ -148,7 +152,7 @@ export type Monster = {
   mine?: boolean;
   bornAt?: number;
   /** Curses and Bind: the tick each wears off. */
-  curses: Partial<Record<"attack" | "strength" | "defence" | "bound", number>>;
+  curses: Partial<Record<"attack" | "strength" | "defence" | "bound" | "pacified", number>>;
   /** Weapon poison on it: doses left, and ticks to the next. */
   poison?: { damage: number; left: number; timer: number } | null;
   /** Another creature it's fighting (the Realm's wars: skirmish.ts), by uid. */
@@ -202,7 +206,10 @@ export type Game = {
   depleted: Map<number, number>; herbPicks: Map<number, number>; messages: Message[];
   /** What the sky is doing (set by the page each frame; the engine only reads it) and how much your Friend talks. */
   ambient: { night: boolean; rain: boolean; storm?: boolean; fog?: boolean }; friendSpeech: "full" | "reduced" | "rare" | "off"; events: GameEvent[]; rng: () => number; nextUid: number;
-  dialogue: Dialogue | null; ui: { shop: string | null; bank: boolean; production: ProductionMenu | null; lamp: number | null; naming: "first" | "rename" | null; fellowship?: boolean; home?: boolean; join?: Fellowship | null; /** A purchase with simulated RF waiting for the player's word: what it does and how many caskets it costs. */ rfAction?: { kind: "slayer-complete" | "slayer-reroll"; caskets: number; text: string } | null };
+  dialogue: Dialogue | null; ui: { shop: string | null; bank: boolean; production: ProductionMenu | null; lamp: number | null; naming: "first" | "rename" | null; fellowship?: boolean; home?: boolean; join?: Fellowship | null; /** A purchase with simulated RF waiting for the player's word: what it does and how many caskets it costs. */ rfAction?: { kind: "slayer-complete" | "slayer-reroll"; caskets: number; text: string } | null;
+    /** The boat list open at a Palian landing (What Rises in the East): the dock you're boarding at. */ boat?: string | null };
+  /** The last boat crossing between the Palian Isles (for the picture of it: boats.ts). */
+  voyage?: { from: string; to: string; tick: number } | null;
   held: { dx: number; dy: number } | null; autoRetaliate: boolean; playTicks: number;
   overheads: Map<number, { text: string; until: number }>;
   /** Creatures' tracks lying round you (pursuance.ts), and the set you read last. */
@@ -263,7 +270,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
     style: "accurate", autocast: null, prayers: [], target: null, activity: null, combat: null,
     attackTimer: 0, eatTimer: 0, stunned: 0, regenTimer: 0, quests: {}, questData: {},
     wardrobe: [], worn: [], follower: null, courseStep: -1, kills: 0, deaths: 0, overhead: null, music: ["theme"],
-    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, boneBag: {}, sigilBag: {}, belts: {}, followerWorn: [], orders: {}, card: { bg: "paper", frame: "rose", skills: "boxes", font: "mono", ink: "ink", layout: "classic" }, cards: {}, rarian: false, home: null, restedTicks: 0, ward: null, wardUntil: 0, renew: 0, renewUntil: 0, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, friendVillage: null, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, lore: {}, trail: null, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false, rerolls: 0 }, seenUpdate: LATEST_UPDATE,
+    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, boneBag: {}, sigilBag: {}, belts: {}, followerWorn: [], orders: {}, card: { bg: "paper", frame: "rose", skills: "boxes", font: "mono", ink: "ink", layout: "classic" }, cards: {}, rarian: false, palian: false, spiritWardUntil: 0, home: null, restedTicks: 0, ward: null, wardUntil: 0, renew: 0, renewUntil: 0, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, friendVillage: null, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, lore: {}, trail: null, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false, rerolls: 0 }, seenUpdate: LATEST_UPDATE,
     lastHitBy: null, created: Date.now(), queuedSpell: null, castTimer: 0,
   };
 }
@@ -501,14 +508,25 @@ export const slayerSetWorn = (player: Player, set: string) => setPieces(player, 
 export const fullSlayerSet = (player: Player, set: string) => setPieces(player, set) >= 3;
 // ---------- The ossuary bag ----------
 export const BONE_BAG = "bone_bag", BONE_BAG_SIZE = 60;
-/** Keep (or set down) the Wise Friend's Law (Return of Raria): Raria's Magic and Faith in place of the Old Friend's. Active prayers end either way; the old book is closed, not lost. */
-export function setLaw(game: Game, keep: boolean) {
+/** The tradition you keep: the Realm's own, Raria's Law, or the Palian way. */
+export const traditionOf = (player: Player): Tradition => player.rarian ? "raria" : player.palian ? "palia" : "realm";
+/**
+ * Keep a tradition (from the top of the spellbook or prayers, anywhere): the Realm's own (the Old Friend's book),
+ * Raria's (the Wise Friend's Law) or the Palian Isles' (the rope and the brush). Only one at a time; active prayers and
+ * autocast end when it changes. Nothing is learnt or lost by changing: the spells you can cast in each depend on your
+ * levels and quests, not on which you keep.
+ */
+export function setTradition(game: Game, tradition: Tradition) {
   const player = game.player;
-  if (player.rarian === keep) return;
-  player.rarian = keep; player.prayers = []; if (player.autocast) player.autocast = null;
-  message(game, keep ? "You keep the Wise Friend's Law. Your Magic is Raria's edicts now, and your Faith its commandments and rites; the Old Friend's book is closed." : "You set the Law down. The Old Friend's book opens again, and Raria's closes.", "quest");
+  if (traditionOf(player) === tradition) return;
+  player.rarian = tradition === "raria"; player.palian = tradition === "palia"; player.prayers = []; if (player.autocast) player.autocast = null;
+  message(game, tradition === "raria" ? "You keep the Wise Friend's Law. Your Magic is Raria's edicts now, and your Faith its commandments and rites; the Old Friend's book is closed."
+    : tradition === "palia" ? "You keep the Palian way. Your Magic is the Isles' seals and bindings now, and your Faith their vows, blessings and rites; the Old Friend's book is closed, not lost."
+    : "You open the Old Friend's book again. The Realm's own prayers and light are yours.", "quest");
   sound(game, "quest");
 }
+/** Keep (or set down) the Wise Friend's Law (Return of Raria): Raria's Magic and Faith in place of the Old Friend's. */
+export function setLaw(game: Game, keep: boolean) { if (keep) setTradition(game, "raria"); else if (game.player.rarian) setTradition(game, "realm"); }
 /** Worn on the back or carried in your pack, the ossuary bag catches the bones you pick up and empties itself onto an altar. */
 export const hasBoneBag = (player: Player) => has(player, BONE_BAG) || player.equipment.cape === BONE_BAG;
 /** You own one at all (worn, in your pack or the bank): Sister Maren hands one over otherwise. */
@@ -632,10 +650,11 @@ export const isStaffEquipped = (player: Player) => !!weapon(player)?.equip?.staf
 export const attackSpeed = (player: Player) => weapon(player)?.equip?.speed ?? 4;
 /** Active prayer multipliers. */
 export function prayerBoost(player: Player) {
-  const boost = { attack: 0, strength: 0, defence: 0, magic: 0, protect: false };
+  const boost = { attack: 0, strength: 0, defence: 0, magic: 0, protect: false, spirit: 0, purify: false, journey: false };
   for (const id of player.prayers) {
     const prayer = PRAYERS.find(entry => entry.id === id);
     if (!prayer) continue;
+    boost.spirit = Math.max(boost.spirit, prayer.effect.spirit ?? 0); boost.purify ||= !!prayer.effect.purify; boost.journey ||= !!prayer.effect.journey;
     boost.attack = Math.max(boost.attack, prayer.effect.attack ?? 0);
     boost.strength = Math.max(boost.strength, prayer.effect.strength ?? 0);
     boost.defence = Math.max(boost.defence, prayer.effect.defence ?? 0);

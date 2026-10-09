@@ -6,7 +6,9 @@
 import type { SoundName } from "./state.ts";
 import type { RegionId } from "./world.ts";
 
-export type TrackId = RegionId | "theme" | "boss";
+export type TrackId = RegionId | "theme" | "boss"
+  // The Palian Isles' own pieces (What Rises in the East).
+  | "palian_sunrise" | "palian_harbour" | "palian_village" | "palian_shrine" | "palian_forest" | "palian_sea" | "palian_haunted" | "palian_battle" | "palian_spirit" | "palian_castle";
 export type SfxName = SoundName | "slash" | "stab" | "crush" | "punch" | "step_grass" | "step_stone" | "step_wood" | "step_sand" | "step_snow" | "step_swamp"
   | "crackle" | "forge" | "water" | "bird" | "gull" | "frog" | "wind" | "drip" | "rain" | "thunder" | "pop" | "hoof" | "whinny" | "rare" | "duel";
 type VoiceKind = "cluck" | "moo" | "squeak" | "grumble" | "growl" | "rattle" | "gurgle" | "whisper" | "clank" | "rumble" | "roar" | "king";
@@ -24,8 +26,12 @@ const VOICES: Record<string, { kind: VoiceKind; f0: number; length: number; brig
   gloom_hound: { kind: "growl", f0: 120, length: 0.6, bright: 1100, wobble: 22 },
 };
 /** General-MIDI-style instruments, like an old-school RPG soundtrack: bright leads up high, plucked strings, light drums. */
-type Voice = "lute" | "flute" | "recorder" | "oboe" | "trumpet" | "bell" | "glock" | "harp" | "pizz" | "strings" | "organ" | "pad" | "bass" | "brass" | "pluck" | "choir" | "drone";
-type Drum = "kick" | "snare" | "hat" | "shaker" | "tom" | "clank" | "hand" | "rim" | "timpani" | "tambourine" | "deep" | "ride";
+type Voice = "lute" | "flute" | "recorder" | "oboe" | "trumpet" | "bell" | "glock" | "harp" | "pizz" | "strings" | "organ" | "pad" | "bass" | "brass" | "pluck" | "choir" | "drone"
+  // The Palian Isles: a plucked koto, a twanging shamisen, a breathy shakuhachi, the sho's held clusters, a temple bell.
+  | "koto" | "shamisen" | "shakuhachi" | "sho" | "kane";
+type Drum = "kick" | "snare" | "hat" | "shaker" | "tom" | "clank" | "hand" | "rim" | "timpani" | "tambourine" | "deep" | "ride"
+  // The Isles' drums: the great taiko, the tight shime-daiko, the wooden clappers.
+  | "taiko" | "shime" | "clapper";
 type Note = { beat: number; voice: Voice; midi: number; length: number; velocity: number };
 type Hit = { beat: number; drum: Drum; velocity: number };
 export type Track = { id: TrackId; name: string; bpm: number; beats: number; notes: Note[]; hits: Hit[] };
@@ -276,10 +282,139 @@ function composeTrack(given: Style): Track {
   }
   return { id: style.id, name: style.name, bpm: style.bpm, beats: loop * 4, notes, hits };
 }
-export const TRACKS: readonly Track[] = [themeTrack(), ...STYLES.map(composeTrack)];
+// ---------- The Palian Isles (What Rises in the East): ten hand-written pieces for koto, shamisen, shakuhachi, sho, temple bell and taiko ----------
+/** A chord by name ("Dmaj9", "F#m7", "Asus4", "D/F#"): pitch classes from the root, the bass note last for a slash chord. */
+function chordTones(name: string): { root: number; tones: number[]; bass: number } {
+  const [main, slash] = name.split("/"), match = /^([A-G])([#b]?)(.*)$/.exec(main)!, pc = (letter: string, accidental: string) => (N[letter] + (accidental === "#" ? 1 : accidental === "b" ? -1 : 0) + 12) % 12;
+  const root = pc(match[1], match[2]), quality = match[3];
+  const SHAPES: Record<string, number[]> = {
+    "": [0, 4, 7], m: [0, 3, 7], maj7: [0, 4, 7, 11], 7: [0, 4, 7, 10], m7: [0, 3, 7, 10], maj9: [0, 4, 7, 11, 14], m9: [0, 3, 7, 10, 14], 9: [0, 4, 7, 10, 14], sus4: [0, 5, 7], sus2: [0, 2, 7],
+    "7sus4": [0, 5, 7, 10], add9: [0, 4, 7, 14], "m(add9)": [0, 3, 7, 14], 6: [0, 4, 7, 9], m6: [0, 3, 7, 9], "maj7#11": [0, 4, 7, 11, 18], "7b9": [0, 4, 7, 10, 13], dim: [0, 3, 6], "m7b5": [0, 3, 6, 10],
+  };
+  const tones = (SHAPES[quality] ?? SHAPES[""]).map(step => root + step);
+  const bass = slash ? pc(slash[0], slash.slice(1)) : root;
+  return { root, tones, bass };
+}
+type PalianKit = "calm" | "festival" | "temple" | "sea" | "haunted" | "battle" | "spirit" | "court" | "village";
+type PalianPiece = {
+  id: TrackId; name: string; bpm: number; meter: 3 | 4;
+  /** The tune's two eight-bar sections (tune() notation), and the chord under each bar of each. */
+  a: string; b: string; chordsA: readonly string[]; chordsB: readonly string[];
+  /** Who plays the tune each time through (A, B, A, B), and how far up or down. */
+  voices: readonly [Voice, number][];
+  /** The bed: the koto's broken chords, a shamisen's figure, the sho's held clusters. */
+  bed: "arp" | "roll" | "ostinato" | "sho"; sho?: boolean; bass: Voice; kit: PalianKit;
+};
+function composePalian(piece: PalianPiece): Track {
+  const per = piece.meter, bars = 8, section = bars * per, notes: Note[] = [], hits: Hit[] = [];
+  const sections = [piece.a, piece.b, piece.a, piece.b], harmony = [piece.chordsA, piece.chordsB, piece.chordsA, piece.chordsB];
+  sections.forEach((text, i) => {
+    const [voice, shift] = piece.voices[i % piece.voices.length], start = i * section;
+    // A grace note before the long notes, as the shakuhachi and koto both bend into them.
+    for (const note of tune(text, voice, start, 0.86)) {
+      if (note.length >= 1.4 && (voice === "shakuhachi" || voice === "koto") && note.midi > 50) notes.push({ beat: note.beat - 0.12, voice, midi: note.midi + shift - 1, length: 0.1, velocity: 0.45 });
+      notes.push({ ...note, midi: note.midi + shift });
+    }
+    // A low drone under each section (the key's root), and the deep drum marking each section's top, as under every area's tune.
+    notes.push({ beat: start, voice: "drone", midi: chordTones(harmony[i][0]).root + 36, length: section, velocity: 0.32 });
+    hits.push({ beat: start, drum: "deep", velocity: 0.4 });
+    harmony[i].forEach((name, bar) => {
+      const b0 = start + bar * per, { tones, bass } = chordTones(name), up = tones.map(tone => tone + 60), last = i === 3 && bar === bars - 1;
+      notes.push({ beat: b0, voice: piece.bass, midi: bass + 48, length: per - 0.2, velocity: 0.8 });
+      if (per === 4 && piece.kit !== "temple") notes.push({ beat: b0 + 2, voice: piece.bass, midi: bass + 55, length: 1.6, velocity: 0.55 });
+      if (piece.bed === "arp") {
+        const order = [0, 1, 2, 3, 2, 1, 3, 2].map(k => up[k % up.length] + (k >= up.length ? 12 : 0));
+        for (let step = 0; step < per * 2; step++) notes.push({ beat: b0 + step / 2, voice: "koto", midi: order[step % order.length], length: 0.45, velocity: 0.36 + (step % 2 === 0 ? 0.1 : 0) });
+      } else if (piece.bed === "roll") {
+        for (const beat of per === 4 ? [0, 2] : [0]) up.slice(0, 4).forEach((midi, k) => notes.push({ beat: b0 + beat + k * 0.07, voice: "koto", midi, length: 1.6, velocity: 0.4 - k * 0.04 }));
+      } else if (piece.bed === "ostinato") {
+        const figure = [bass + 48, bass + 55, bass + 60, bass + 55];
+        for (let step = 0; step < per * 2; step++) notes.push({ beat: b0 + step / 2, voice: "shamisen", midi: figure[step % 4], length: 0.3, velocity: 0.32 + (step % 4 === 0 ? 0.12 : 0) });
+      }
+      if (piece.bed === "sho" || piece.sho) notes.push({ beat: b0, voice: "sho", midi: up[0], length: per - 0.05, velocity: 0.5 });
+      if (piece.bed === "sho") up.slice(1).forEach((midi, k) => notes.push({ beat: b0 + 0.5 + k, voice: "koto", midi: midi + 12, length: 1, velocity: 0.22 }));
+      // The drums: each piece's own pattern, and a roll into the top of each section.
+      const fill = bar === bars - 1, k = piece.kit, hit = (beat: number, drum: Drum, velocity: number) => { if (beat < per) hits.push({ beat: b0 + beat, drum, velocity }); };
+      if (k === "calm") { if (bar % 2 === 0) hit(0, "taiko", 0.45); if (bar % 4 === 3) hit(per - 1, "clapper", 0.3); }
+      if (k === "village") { hit(0, "taiko", 0.4); hit(per === 3 ? 2 : 2, "shime", 0.25); if (bar % 2) hit(1, "clapper", 0.22); }
+      if (k === "festival") { hit(0, "taiko", 0.6); hit(1.5, "taiko", 0.35); hit(2, "taiko", 0.45); for (let e = 0; e < per * 2; e++) hit(e / 2, "shime", e % 2 ? 0.12 : 0.2); hit(1, "clapper", 0.25); hit(3, "clapper", 0.3); }
+      if (k === "temple") { if (bar % 4 === 0) notes.push({ beat: b0, voice: "kane", midi: tones[0] + 48, length: 4, velocity: 0.7 }); if (bar % 2 === 1) hit(0, "taiko", 0.3); }
+      if (k === "sea") { hit(0, "taiko", 0.38); hit(1.5, "taiko", 0.22); hit(1, "shaker", 0.12); hit(2, "shaker", 0.1); }
+      if (k === "haunted") { hit(0, "taiko", 0.4); hit(0.5, "taiko", 0.24); if (bar % 4 === 2) notes.push({ beat: b0 + 2, voice: "kane", midi: tones[0] + 48, length: 4, velocity: 0.45 }); if (bar % 2) hit(3, "clapper", 0.18); }
+      if (k === "court") { hit(0, "taiko", 0.5); hit(2, "taiko", 0.3); if (bar % 2 === 1) hit(3.5, "shime", 0.3); if (bar % 8 === 0) notes.push({ beat: b0, voice: "kane", midi: tones[0] + 48, length: 4, velocity: 0.5 }); }
+      if (k === "battle") { for (const [beat, v] of [[0, 0.7], [1, 0.45], [1.5, 0.4], [2, 0.6], [3, 0.5], [3.5, 0.4]] as const) hit(beat, "taiko", v); for (let e = 1; e < 8; e += 2) hit(e / 2, "shime", 0.2); hit(1, "clapper", 0.28); hit(3, "clapper", 0.32); }
+      if (k === "spirit") { for (const [beat, v] of [[0, 0.8], [0.75, 0.5], [1.5, 0.6], [2, 0.7], [2.75, 0.5], [3.5, 0.6]] as const) hit(beat, "taiko", v); for (let e = 0; e < 8; e++) hit(e / 2, "shime", e % 2 ? 0.18 : 0.26); if (bar % 2 === 0) notes.push({ beat: b0, voice: "kane", midi: tones[0] + 48, length: 2, velocity: 0.4 }); }
+      if (fill && k !== "temple" && k !== "calm") for (let e = 0; e < 4; e++) hit(per - 1 + e / 4, "shime", 0.2 + e * 0.08);
+      if (last) notes.push({ beat: b0 + per - 0.5, voice: "koto", midi: up[0] + 12, length: 0.5, velocity: 0.3 });
+    });
+  });
+  return { id: piece.id, name: piece.name, bpm: piece.bpm, beats: section * 4, notes, hits };
+}
+const PALIAN_PIECES: readonly PalianPiece[] = [
+  { id: "palian_sunrise", name: "Hinode, Isle of Sunrise", bpm: 84, meter: 4, bed: "arp", bass: "pizz", kit: "calm", voices: [["shakuhachi", 0], ["shakuhachi", 0], ["koto", 12], ["shakuhachi", 0]],
+    a: "A4:1.5 B4:0.5 D5:2  E5:1 D5:0.5 B4:0.5 A4:2  B4:1 D5:1 E5:1 G5:1  E5:3 r:1  D5:1.5 E5:0.5 D5:1 B4:1  A4:1 G4:1 A4:2  B4:1 A4:0.5 G4:0.5 E4:1 G4:1  A4:4",
+    b: "D5:1 E5:1 G5:2  A5:1.5 G5:0.5 E5:2  G5:1 E5:1 D5:1 E5:1  B4:3 r:1  D5:1 B4:0.5 A4:0.5 B4:1 D5:1  E5:2 D5:1 B4:1  A4:1 B4:1 D5:1 B4:1  D5:4",
+    chordsA: ["Dmaj9", "Bm7", "Gmaj7", "A7sus4", "D/F#", "Em9", "Gmaj9", "Asus4"], chordsB: ["Bm9", "Gmaj7", "Em7", "F#m7", "Gmaj7", "A6", "Bm7", "Dadd9"] },
+  { id: "palian_harbour", name: "Kurohama Harbour", bpm: 116, meter: 4, bed: "roll", bass: "bass", kit: "festival", voices: [["shamisen", 0], ["koto", 0], ["shamisen", 0], ["koto", 12]],
+    a: "G4:0.5 A4:0.5 C5:1 D5:1 C5:1  A4:1 G4:1 E4:2  G4:0.5 A4:0.5 C5:0.5 D5:0.5 E5:1 D5:1  C5:1 D5:1 A4:2  E5:1 G5:0.5 E5:0.5 D5:1 C5:1  D5:1.5 C5:0.5 A4:2  C5:1 A4:0.5 G4:0.5 E4:1 G4:1  G4:3 r:1",
+    b: "D5:1 E5:1 G5:1 E5:1  A5:1.5 G5:0.5 E5:1 D5:1  E5:0.5 D5:0.5 C5:1 D5:2  A4:1 C5:1 D5:2  G5:1 E5:1 D5:1 E5:1  C5:1 A4:1 C5:1 D5:1  E5:1 D5:0.5 C5:0.5 A4:1 C5:1  G4:4",
+    chordsA: ["G", "Em7", "Cmaj7", "D", "Am7", "D7", "C", "Gadd9"], chordsB: ["Em7", "Am7", "Cmaj7", "D", "Em7", "Am7", "D7sus4", "G"] },
+  { id: "palian_village", name: "Under the Eaves", bpm: 92, meter: 3, bed: "arp", bass: "pizz", kit: "village", voices: [["koto", 0], ["shakuhachi", 0], ["shakuhachi", 0], ["koto", 0]],
+    a: "C5:1 D5:1 F5:1  G5:2 F5:1  D5:1 C5:1 A4:1  C5:3  F5:1 G5:1 A5:1  G5:1.5 F5:0.5 D5:1  F5:1 D5:1 C5:1  D5:3",
+    b: "A5:1 G5:1 F5:1  G5:2 A5:1  C6:1.5 A5:0.5 G5:1  F5:3  D5:1 F5:1 G5:1  A5:1 G5:1 F5:1  D5:1 C5:1 D5:1  C5:3",
+    chordsA: ["C", "Dm7", "F", "C", "F", "Gsus4", "Dm7", "G7sus4"], chordsB: ["Am7", "Gm7", "Fmaj7", "F", "Dm7", "Am7", "Gsus4", "C"] },
+  { id: "palian_shrine", name: "Kumoyama", bpm: 60, meter: 4, bed: "sho", bass: "pizz", kit: "temple", voices: [["shakuhachi", 0], ["shakuhachi", 0], ["koto", 0], ["shakuhachi", 0]],
+    a: "A4:3 Bb4:1  A4:2 G4:2  D5:3 Eb5:1  D5:4  G5:2 Eb5:1 D5:1  Bb4:2 A4:2  G4:1 A4:1 Bb4:1 A4:1  D4:4",
+    b: "D5:2 Eb5:2  G5:3 A5:1  Bb5:2 A5:1 G5:1  Eb5:4  D5:1.5 Eb5:0.5 D5:2  Bb4:2 A4:2  G4:2 Eb4:2  D4:4",
+    chordsA: ["Dsus4", "Gm9", "Ebmaj7", "Dsus4", "Gm7", "Ebmaj7", "Cm9", "Dsus4"], chordsB: ["Bbmaj7", "Ebmaj7", "Gm9", "Cm7", "Dsus4", "Gm7", "Ebmaj7", "Dsus4"] },
+  { id: "palian_forest", name: "The Old Cedars", bpm: 74, meter: 4, bed: "arp", bass: "pizz", kit: "calm", voices: [["koto", 0], ["shakuhachi", 0], ["shakuhachi", 0], ["koto", 0]],
+    a: "E5:1 F5:1 A5:2  B5:1.5 A5:0.5 F5:2  E5:1 C5:1 B4:1 C5:1  E5:4  A5:1 B5:1 C6:2  B5:1 A5:1 F5:2  E5:1.5 F5:0.5 E5:1 C5:1  B4:4",
+    b: "A4:1 B4:1 C5:1 E5:1  F5:3 E5:1  C5:1 B4:1 A4:2  B4:4  C5:1 E5:1 F5:1 A5:1  B5:2 A5:1 F5:1  E5:1 F5:0.5 E5:0.5 C5:1 B4:1  A4:4",
+    chordsA: ["Am(add9)", "Fmaj7", "Am7", "Esus4", "Fmaj7#11", "Dm9", "Am7", "Esus4"], chordsB: ["Am7", "Dm7", "Fmaj7", "E7sus4", "Am9", "Fmaj7", "Dm7", "Am(add9)"] },
+  { id: "palian_sea", name: "Crossing the Eastern Sea", bpm: 88, meter: 3, bed: "arp", bass: "pizz", kit: "sea", voices: [["shakuhachi", 0], ["koto", 0], ["shakuhachi", 0], ["koto", 0]],
+    a: "E5:1.5 F#5:0.5 E5:1  D5:2 B4:1  A4:1 B4:1 D5:1  E5:3  F#5:1 A5:1 F#5:1  E5:1.5 D5:0.5 B4:1  D5:1 B4:1 A4:1  B4:3",
+    b: "A5:2 F#5:1  E5:1 F#5:1 A5:1  B5:2 A5:1  F#5:3  E5:1 D5:1 E5:1  F#5:1.5 E5:0.5 D5:1  B4:1 D5:1 E5:1  A4:3",
+    chordsA: ["A", "Bm7", "Dmaj7", "E", "F#m7", "Bm7", "Dmaj9", "Esus4"], chordsB: ["F#m7", "Dmaj7", "E6", "F#m", "Bm7", "Dmaj7", "Esus4", "Aadd9"] },
+  { id: "palian_haunted", name: "Lanterns of the Drowned", bpm: 66, meter: 4, bed: "roll", sho: true, bass: "pizz", kit: "haunted", voices: [["shamisen", -12], ["shakuhachi", 0], ["shamisen", -12], ["shakuhachi", 0]],
+    a: "A4:2 Bb4:2  A4:3 r:1  E5:2 F5:1 E5:1  D5:4  F5:2 E5:1 Bb4:1  A4:4  D5:1 E5:1 F5:1 E5:1  A4:4",
+    b: "Bb4:1 D5:1 E5:2  F5:3 E5:1  A5:2 Bb5:1 A5:1  E5:4  F5:1 E5:1 D5:1 Bb4:1  A4:2 Bb4:2  D5:1.5 E5:0.5 D5:1 Bb4:1  A4:4",
+    chordsA: ["Am", "Bbmaj7", "Am7", "Dm9", "Bbmaj7", "Am", "Gm7", "Asus4"], chordsB: ["Bbmaj7", "Dm7", "Fmaj7", "Esus4", "Dm7", "Bbmaj7", "Gm7", "Am"] },
+  { id: "palian_battle", name: "Steel and Blossom", bpm: 138, meter: 4, bed: "roll", bass: "bass", kit: "battle", voices: [["shamisen", 0], ["koto", 0], ["shamisen", 0], ["koto", 12]],
+    a: "E4:0.5 E4:0.5 F4:0.5 E4:0.5 A4:1 B4:1  C5:0.5 B4:0.5 A4:1 F4:1 E4:1  E4:0.5 E4:0.5 F4:0.5 A4:0.5 B4:1 C5:1  E5:2 B4:2  C5:0.5 C5:0.5 B4:0.5 A4:0.5 F4:1 A4:1  B4:1 C5:1 E5:2  F5:0.5 E5:0.5 C5:0.5 B4:0.5 A4:1 F4:1  E4:4",
+    b: "A4:1 A4:0.5 B4:0.5 C5:1 E5:1  F5:1.5 E5:0.5 C5:2  B4:1 C5:0.5 B4:0.5 A4:1 F4:1  E4:2 F4:2  A4:0.5 B4:0.5 C5:0.5 E5:0.5 F5:1 E5:1  C5:1 B4:1 A4:2  F4:1 A4:1 B4:1 C5:1  E5:4",
+    chordsA: ["Em", "Fmaj7", "Am", "Esus4", "Fmaj7", "Am", "Fmaj7", "Esus4"], chordsB: ["Am", "Fmaj7", "Dm", "Esus4", "Am", "Fmaj7", "Dm7", "E7sus4"] },
+  { id: "palian_spirit", name: "The Great Spirit", bpm: 150, meter: 4, bed: "roll", sho: true, bass: "bass", kit: "spirit", voices: [["shamisen", 0], ["shakuhachi", 0], ["shamisen", 0], ["shakuhachi", 12]],
+    a: "C#5:1 D5:1 C#5:2  G#4:1 A4:1 G#4:2  F#4:0.5 G#4:0.5 A4:1 C#5:1 D5:1  C#5:4  F#5:1 G#5:1 A5:1 G#5:1  F#5:2 D5:2  C#5:1 D5:0.5 C#5:0.5 A4:1 G#4:1  C#4:4",
+    b: "A4:1 C#5:1 D5:2  F#5:2 G#5:2  A5:1 G#5:1 F#5:1 D5:1  C#5:4  D5:1 C#5:1 A4:1 G#4:1  F#4:2 G#4:2  A4:1 G#4:0.5 A4:0.5 C#5:1 D5:1  C#5:4",
+    chordsA: ["C#m", "Dmaj7", "C#m", "Amaj7", "Dmaj7", "F#m", "Dmaj7", "C#sus4"], chordsB: ["Amaj7", "Dmaj7", "F#m7", "C#sus4", "Dmaj7", "F#m", "Amaj7", "C#m"] },
+  { id: "palian_castle", name: "The Hall of Takamori", bpm: 76, meter: 4, bed: "sho", bass: "pizz", kit: "court", voices: [["oboe", 0], ["shakuhachi", 0], ["oboe", 0], ["koto", 12]],
+    a: "B4:2 C#5:2  B4:1 A4:1 F#4:2  E4:1 F#4:1 A4:2  B4:4  C#5:2 E5:2  F#5:1 E5:1 C#5:2  B4:1 A4:1 B4:1 C#5:1  B4:4",
+    b: "E5:2 F#5:2  A5:3 F#5:1  E5:1 C#5:1 B4:2  A4:4  B4:1 C#5:1 E5:2  F#5:2 E5:1 C#5:1  B4:2 A4:1 F#4:1  E4:4",
+    chordsA: ["Esus4", "F#m7", "Asus2", "Bsus4", "Amaj7", "F#m7", "Bsus4", "Esus4"], chordsB: ["Amaj7", "F#m7", "C#m7", "Asus2", "Esus4", "F#m7", "Bsus4", "Esus4"] },
+];
+/** Which Palian piece plays where. */
+const PALIAN_REGION_TRACK: Partial<Record<RegionId, TrackId>> = {
+  hinode: "palian_sunrise", kurohama: "palian_harbour", shiogama: "palian_harbour", smugglers_cove: "palian_harbour", takamori: "palian_castle",
+  kumoyama: "palian_shrine", iwaoka: "palian_shrine", old_cedars: "palian_forest", whispering_bamboo: "palian_forest", morishima: "palian_forest",
+  tanabe: "palian_village", yumoto: "palian_village", kibi: "palian_village", hanazono: "palian_village", kusabana: "palian_village",
+  kurokage: "palian_haunted", josaki: "palian_haunted", torojima: "palian_haunted", ashigane: "palian_haunted", hakkotsu: "palian_haunted",
+  kumo_hollow: "palian_haunted", ashigane_deeps: "palian_haunted", bone_shrine: "palian_haunted",
+  palian_sea: "palian_sea", three_stones: "palian_sea", turtle_rock: "palian_sea",
+};
+
+export const TRACKS: readonly Track[] = [themeTrack(), ...STYLES.map(composeTrack), ...PALIAN_PIECES.map(composePalian)];
+/** The Palian pieces (for tests). */
+export const PALIAN_TRACKS: readonly TrackId[] = PALIAN_PIECES.map(piece => piece.id);
 export const trackById = (id: TrackId) => TRACKS.find(track => track.id === id) ?? TRACKS[0];
 /** Which track plays where: each region has its own, and the Hollow King's throne room its boss theme. */
-export function trackFor(region: RegionId, nearBoss: boolean): TrackId { return nearBoss ? "boss" : region; }
+export function trackFor(region: RegionId, nearBoss: boolean, palian: { sea?: boolean; fight?: boolean; spirit?: boolean } = {}): TrackId {
+  if (nearBoss) return "boss";
+  // The Palian Isles: the place's own piece, the sea's on a crossing, and in a fight the battle (or, against one of the great spirits, theirs).
+  if (palian.sea) return "palian_sea";
+  const isles = PALIAN_REGION_TRACK[region];
+  if (isles) return palian.spirit ? "palian_spirit" : palian.fight ? "palian_battle" : isles;
+  return region;
+}
 
 // ---------- Engine ----------
 export class RealmAudio {
@@ -445,6 +580,34 @@ export class RealmAudio {
       case "brass": { const filter = ctx.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.setValueAtTime(500, t); filter.frequency.linearRampToValueAtTime(2200, t + 0.08); filter.frequency.exponentialRampToValueAtTime(900, t + length); filter.connect(gain);
         this.osc("sawtooth", f, t, t + length + 0.3, filter); this.osc("sawtooth", f, t, t + length + 0.3, filter, 7);
         this.env(gain, t, 0.07 * v, 0.03, Math.max(0, length - 0.05), 0.18); break; }
+      case "koto": {
+        // A koto string: a bright pluck that bends a hair flat as it settles, rings, and dulls.
+        const filter = ctx.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.setValueAtTime(5200, t); filter.frequency.exponentialRampToValueAtTime(900, t + 0.6); filter.connect(gain);
+        const a = this.osc("triangle", f, t, t + 1.8, filter), b = this.osc("sawtooth", f, t, t + 0.5, filter, 3);
+        a.frequency.setValueAtTime(f * 1.008, t); a.frequency.exponentialRampToValueAtTime(f, t + 0.05); b.frequency.setValueAtTime(f * 1.008, t); b.frequency.exponentialRampToValueAtTime(f, t + 0.05);
+        this.osc("sine", f * 2, t, t + 0.5, filter);
+        this.env(gain, t, 0.085 * v, 0.002, 0, Math.min(1.6, length + 0.9)); break; }
+      case "shamisen": {
+        // A shamisen: the plectrum's click, a nasal twang through a narrow band, and the buzz of the open string (sawari).
+        const band = ctx.createBiquadFilter(); band.type = "bandpass"; band.frequency.setValueAtTime(Math.min(5000, f * 4), t); band.frequency.exponentialRampToValueAtTime(Math.min(3000, f * 2), t + 0.3); band.Q.value = 2.2; band.connect(gain);
+        this.osc("sawtooth", f, t, t + 0.6, band); this.osc("square", f * 1.003, t, t + 0.35, band);
+        this.noiseBurst(t, 0.025, 3200, 0.05 * v, gain, "bandpass", 3);
+        this.env(gain, t, 0.12 * v, 0.002, 0, Math.min(0.55, length + 0.25)); break; }
+      case "shakuhachi": {
+        // A shakuhachi: breath before the note, a scoop up into the pitch, a slow vibrato, and air all the way through.
+        const vibrato = ctx.createOscillator(), depth = ctx.createGain(); vibrato.frequency.value = 4.2; depth.gain.setValueAtTime(0, t); depth.gain.linearRampToValueAtTime(f * 0.009, t + Math.min(1, length * 0.6)); vibrato.connect(depth);
+        const o = this.osc("sine", f, t, t + length + 0.25, gain); o.frequency.setValueAtTime(f * 0.97, t); o.frequency.exponentialRampToValueAtTime(f, t + 0.12); depth.connect(o.frequency); vibrato.start(t); vibrato.stop(t + length + 0.25);
+        const breathy = ctx.createGain(); breathy.gain.value = 0.22; breathy.connect(gain); this.osc("triangle", f, t, t + length + 0.25, breathy);
+        this.noiseBurst(t - 0.03, 0.09, f * 2, 0.02 * v, gain, "bandpass", 1.5); this.noiseBurst(t, Math.max(0.1, length), f * 2.2, 0.006 * v, gain, "bandpass", 4);
+        this.env(gain, t, 0.1 * v, 0.06, Math.max(0, length - 0.1), 0.2); break; }
+      case "sho": {
+        // The sho's held cluster: the root, a fourth, a fifth, the octave and the ninth, swelling in and breathing.
+        const filter = ctx.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.value = 3800; filter.connect(gain);
+        for (const ratio of [1, 4 / 3, 1.5, 2, 2.25]) this.osc("triangle", f * ratio, t, t + length + 0.6, filter, (Math.random() - 0.5) * 6);
+        this.env(gain, t, 0.016 * v, Math.min(0.6, length / 3), Math.max(0, length - 0.6), 0.6); break; }
+      case "kane": { const mod = ctx.createOscillator(), depth = ctx.createGain(); mod.frequency.value = f * 2.76; depth.gain.setValueAtTime(f * 1.6, t); depth.gain.exponentialRampToValueAtTime(f * 0.05, t + 2.5);
+        mod.connect(depth); const o = this.osc("sine", f, t, t + 4, gain); depth.connect(o.frequency); mod.start(t); mod.stop(t + 4); this.osc("sine", f * 0.5, t, t + 4, gain);
+        this.env(gain, t, 0.06 * v, 0.004, 0, 3.6); break; }
       case "bass": {
         // A plucked bass (acoustic, MIDI-style) in the third octave: no sub-octave rumble.
         const filter = ctx.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.setValueAtTime(1600, t); filter.frequency.exponentialRampToValueAtTime(500, t + 0.3); filter.connect(gain);
@@ -476,6 +639,9 @@ export class RealmAudio {
       case "rim": this.thump(t, 900, 700, 0.03, 0.12 * v, bus); break;
       case "tom": this.thump(t, 180, 90, 0.25, 0.3 * v, bus); break;
       case "hand": this.thump(t, 320, 180, 0.12, 0.26 * v, bus); this.noiseBurst(t, 0.03, 2400, 0.05 * v, bus); break;
+      case "taiko": this.thump(t, 96, 44, 0.65, 0.42 * v, bus); this.noiseBurst(t, 0.12, 160, 0.06 * v, bus, "lowpass"); this.thump(t, 180, 90, 0.06, 0.08 * v, bus); break;
+      case "shime": this.thump(t, 460, 330, 0.07, 0.18 * v, bus); this.noiseBurst(t, 0.03, 2600, 0.05 * v, bus, "bandpass", 2); break;
+      case "clapper": this.thump(t, 1700, 1500, 0.025, 0.16 * v, bus); this.thump(t + 0.012, 1450, 1300, 0.02, 0.1 * v, bus); break;
       case "clank": { const ctx = this.ctx!, gain = ctx.createGain(); gain.connect(bus); for (const ratio of [1, 2.76, 5.4]) this.osc("square", 880 * ratio * (0.97 + Math.random() * 0.06), t, t + 0.4, gain);
         this.env(gain, t, 0.03 * v, 0.001, 0, 0.35); break; }
     }

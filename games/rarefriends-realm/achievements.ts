@@ -13,7 +13,11 @@ const skillAt = (game: Game, lvl: number) => SKILLS.some(skill => skill !== "hit
 const kills = (game: Game, ...ids: string[]) => ids.reduce((sum, id) => sum + (game.player.killLog[id] ?? 0), 0);
 const stat = (game: Game, key: string) => game.player.stats[key] ?? 0;
 const owns = (game: Game, test: (id: string) => boolean) => [...game.player.inventory.map(slot => slot?.id), ...game.player.bank.map(slot => slot.id), ...Object.values(game.player.equipment)].some(id => !!id && isItem(id) && test(id));
+/** The Palian Isles' islands, for setting foot on every one. */
+const PALIAN_ISLANDS = ["kurohama", "shiogama", "kibi", "hanazono", "morishima", "iwaoka", "josaki", "torojima", "kusabana", "ashigane", "smugglers_cove", "three_stones", "turtle_rock", "hakkotsu"] as const;
 export const ACHIEVEMENTS: readonly Achievement[] = [
+  { id: "island_hopper", group: "Collecting", icon: "⛵", name: "Island-hopper", text: "Sail between the Palian Isles ten times.", check: g => (g.player.stats.voyages ?? 0) >= 10 },
+  { id: "every_isle", group: "Collecting", icon: "⛩", name: "Every island", text: "Set foot on every one of the Palian Isles.", check: g => PALIAN_ISLANDS.every(id => !!g.player.visited[id]) },
   { id: "first_steps", group: "Skills", icon: "✦", name: "First steps", text: "Reach level 10 in any skill.", check: g => skillAt(g, 10) },
   { id: "seasoned", group: "Skills", icon: "✦", name: "Seasoned", text: "Reach level 50 in any skill.", check: g => skillAt(g, 50) },
   { id: "mastered", group: "Skills", icon: "★", name: "Mastered", text: "Reach level 99 in any skill.", check: g => skillAt(g, 99) },

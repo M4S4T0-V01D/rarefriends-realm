@@ -97,16 +97,19 @@ test("the world is large, deterministic and every landmark is reachable on foot"
   assert(world.objects.filter(object => object.kind === "tree").length > 400, "Plenty of trees");
   assert(world.objects.filter(object => object.kind === "rock").length > 60, "Plenty of rocks");
   assert(world.objects.filter(object => object.kind === "spot").length >= 15, "Fishing spots");
-  // Walk from the spawn, and take every ladder and staircase you can reach (dungeons, the castle's storeys).
+  // Walk from the spawn, and take every ladder and staircase you can reach (dungeons, the castle's storeys), and every
+  // boat between the Palian Isles once you can reach a landing (boats.ts: from any landing to every other).
   const areas = [reachable(g, world.places.spawn)], taken = new Set();
   const ok = (x, y) => areas.some(seen => seen[y * W + x]);
   const beside = object => [[0, 1], [1, 0], [0, -1], [-1, 0]].some(([dx, dy]) => ok(object.x + dx, object.y + dy));
+  const docks = world.objects.filter(object => object.kind === "dock");
   for (let grew = true; grew;) {
     grew = false;
     for (const ladder of world.objects.filter(object => object.kind === "ladder" && !taken.has(object.id) && beside(object))) {
       taken.add(ladder.id); grew = true;
       if (!ok(ladder.to.x, ladder.to.y)) areas.push(reachable(g, ladder.to));
     }
+    if (docks.some(dock => ok(dock.to.x, dock.to.y))) for (const dock of docks) if (!taken.has(dock.id)) { taken.add(dock.id); grew = true; if (!ok(dock.to.x, dock.to.y)) areas.push(reachable(g, dock.to)); }
   }
   const reach = object => object.blocks ? [[0, 1], [1, 0], [0, -1], [-1, 0]].some(([dx, dy]) => ok(object.x + dx, object.y + dy)) : ok(object.x, object.y) || [[0, 1], [1, 0], [0, -1], [-1, 0]].some(([dx, dy]) => ok(object.x + dx, object.y + dy));
   const interactive = world.objects.filter(object => object.kind !== "decor" && object.kind !== "stump" && object.name !== "__removed");
@@ -599,7 +602,7 @@ test("A Friend's Feast from start to finish", () => {
   assert.equal(g.player.quests.friends_feast, 2);
   assert.equal(questPoints(g), 1);
   assert(level(g, "cooking") >= 10, "Quest XP");
-  assert.equal(QUESTS.length, 55); assert.equal(MAX_QUEST_POINTS, 93);
+  assert.equal(QUESTS.length, 71); assert.equal(MAX_QUEST_POINTS, 126);
 });
 
 test("Grumblin Trouble counts kills and pays out", () => {
@@ -851,9 +854,10 @@ test("The Heartguard: nine red-and-white pieces by Hitpoints level, each a hitpo
 test("The Old Friend stands behind every altar, and Dawnhold has its keep, towers and a taller chapel", () => {
   const g = newGame(), world = g.world;
   const altars = world.objects.filter(object => object.kind === "altar");
-  assert.equal(altars.length, 21, "the mainland's four, Gravesend's lantern altar, the catacombs' bone altar, the Ring chapel's, the five wayward chapels', the six Orders', and Raria's three Wise Friend altars (the capital, Lawgate, Vesperholm)");
+  assert.equal(altars.length, 25, "the mainland's four, Gravesend's lantern altar, the catacombs' bone altar, the Ring chapel's, the five wayward chapels', the six Orders', Raria's three Wise Friend altars (the capital, Lawgate, Vesperholm), and the Palian Isles' four shrines (Kumoyama, the Harbour Shrine, the fox shrine, Iwaoka)");
   for (const altar of altars) {
-    assert(world.objects.some(object => (object.decor === "old_friend" || object.decor === "wise_friend" || object.decor?.startsWith("god_")) && Math.abs(object.x - altar.x) <= 1 && Math.abs(object.y - altar.y) <= 2), `a statue of the Old Friend (or an Order's god) by the ${altar.name}`);
+    // (A Palian shrine keeps the Friend of its place in a roped sacred stone, not a statue.)
+    assert(world.objects.some(object => (object.decor === "old_friend" || object.decor === "wise_friend" || object.decor?.startsWith("god_") || (altar.text === "palian" && object.decor === "sacred_rope")) && Math.abs(object.x - altar.x) <= 1 && Math.abs(object.y - altar.y) <= 2), `a statue of the Old Friend (or an Order's god, or a shrine's sacred stone) by the ${altar.name}`);
   }
   assert(world.objects.find(object => object.decor === "old_friend").name === "Statue of the Old Friend");
   const named = name => world.buildings.filter(building => building.name === name);
@@ -1018,7 +1022,7 @@ test("Presence: a name for your Friend (the token stays), fellowships, titles, a
   // Titles by Presence level and by deed; you can only wear one you've earned.
   assert(unlockedTitles(g).some(title => title.id === "newcomer")); assert(!unlockedTitles(g).some(title => title.id === "dragonfriend"));
   assert(!chooseTitle(g, "dragonfriend")); p.quests.ashfall_embers = 2; assert(chooseTitle(g, "dragonfriend")); assert.equal(profile(g).title, "Dragonfriend");
-  p.xp.presence = XP_TABLE[40]; assert(unlockedTitles(g).some(title => title.id === "adventurer")); assert.equal(TITLES.length, 15);
+  p.xp.presence = XP_TABLE[40]; assert(unlockedTitles(g).some(title => title.id === "adventurer")); assert.equal(TITLES.length, 20);
   // XP from living here: discovering a region, meeting someone, an emote, clothes worn for the first time, a quest.
   const before = p.xp.presence;
   teleport(g, ...M(34, 70)); run(g, 6); assert(p.visited.fernwick, "Fernwick discovered"); assert(p.xp.presence > before, "and worth Presence");
@@ -1944,7 +1948,7 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   assert.equal(p.quests.dawn_against_hollow, 2); assert(has(p, "dawnplate_cuirass"));
   assert.equal(count(p, "hollow_essence"), 0);
   assert.equal(capeProblem(g, "dawnplate_cuirass"), null, "the armoury sells Dawnplate once earned");
-  assert.equal(QUESTS.length, 55); assert.equal(MAX_QUEST_POINTS, 93);
+  assert.equal(QUESTS.length, 71); assert.equal(MAX_QUEST_POINTS, 126);
 });
 
 test("Boots and gauntlets in every metal, smithed at the anvil; the clothier's shirts, dresses, trousers and skirts", () => {
@@ -2273,7 +2277,7 @@ test("The dungeon update: three dungeons under the lake, the library and the sto
   for (const id of ["cave_bat", "glass_crab", "crystal_golem", "drowned_scholar", "ink_wraith", "archivist_below", "grave_moth", "vault_archer", "vault_knight", "howling_king"]) assert(world.spawns.some(spawn => spawn.kind === "monster" && spawn.id === id), id);
   assert.equal(regionAt(world, 430 + WEST_DX, 530).id, "deepglass"); assert.equal(regionAt(world, 490 + WEST_DX, 528).id, "drowned_archive"); assert.equal(regionAt(world, 300 + WEST_DX, 567).id, "howling_vault");
   const doors = world.objects.filter(object => object.kind === "gate" && object.requires?.item);
-  assert.deepEqual(doors.map(door => door.requires.item).sort(), ["archive_key", "deepglass_key", "moss_key", "vault_key"]);
+  assert.deepEqual(doors.map(door => door.requires.item).sort(), ["archive_key", "bone_shrine_key", "deepglass_key", "kumo_seal_key", "moss_key", "ogre_key", "vault_key"]);
   const coffers = world.objects.filter(object => object.decor === "chest" && / coffer$/.test(object.name));
   assert(coffers.length >= 30, `coffers in every dungeon (${coffers.length})`);
   for (const name of ["Deepglass coffer", "Archive coffer", "Vault coffer", "Crypt coffer", "Hollow coffer", "Catacomb coffer", "Wyrm coffer", "Barnacled coffer", "Miner's coffer"]) assert(coffers.some(coffer => coffer.name === name), name);
@@ -2550,8 +2554,8 @@ test("Return of Raria: the far west, the Burned, sealed Order looks, Adventurer 
   standNear(g, scout.x, scout.y, 2); p.combat = null; run(g, 12); assert(!scout.target, "the Regiment honours the writ");
   // The Wise Friend's Law: Raria's Magic and Faith in place of the Old Friend's, a real swap, and the way back.
   assert(SPELLS.filter(s => s.rarian).length >= 12 && PRAYERS.filter(pr => pr.rarian).length >= 8 && RARIAN_SPELL_TABS.length === 6);
-  assert(!spellInBook(SPELLS.find(s => s.id === "edict_of_silence"), false) && spellInBook(SPELLS.find(s => s.id === "edict_of_silence"), true), "Raria's edicts only in the Law's book");
-  assert(!spellInBook(SPELLS.find(s => s.id === "holy_dart"), true) && spellInBook(SPELLS.find(s => s.id === "ember_dart"), true), "the old light closed, common magic kept");
+  assert(!spellInBook(SPELLS.find(s => s.id === "edict_of_silence"), "realm") && spellInBook(SPELLS.find(s => s.id === "edict_of_silence"), "raria"), "Raria's edicts only in the Law's book");
+  assert(!spellInBook(SPELLS.find(s => s.id === "holy_dart"), "raria") && spellInBook(SPELLS.find(s => s.id === "ember_dart"), "raria"), "the old light closed, common magic kept");
   p.xp.prayer = XP_TABLE[60]; p.xp.magic = XP_TABLE[60]; p.prayer = 60; give(p, "law_sigil", 20); give(p, "thought_sigil", 10);
   assert(canCast(g, SPELLS.find(s => s.id === "edict_of_silence")), "not before the Law");
   setLaw(g, true); assert(p.rarian && !canCast(g, SPELLS.find(s => s.id === "edict_of_silence")), "castable under the Law");
@@ -2697,7 +2701,7 @@ test("Townscape: homes in every village (with their doors reachable), L-shaped a
   assert(world.buildings.filter(b => b.storeys === 3 && b.roof === "cone" && !b.round && !b.keep).length >= 8, "tower-houses");
   // Fronts: every bank's, and the shops'.
   const bankHouses = world.buildings.filter(b => world.objects.some(o => o.kind === "bank" && o.x > b.x0 && o.x < b.x1 && o.y > b.y0 && o.y < b.y1));
-  assert(bankHouses.length >= 8 && bankHouses.every(b => b.facade === "bank" && b.walls === "marble"), "every bank is a marble bank");
+  assert(bankHouses.length >= 8 && bankHouses.every(b => b.style === "palian" || (b.facade === "bank" && b.walls === "marble")), "every bank is a marble bank (the Isles' Exchange is built the Palian way)");
   const shops = world.buildings.filter(b => b.facade === "shop");
   assert(shops.length >= 30 && shops.filter(b => b.sign).length >= 25, `shops with awnings and signs (${shops.length})`);
   assert(world.buildings.some(b => b.facade === "inn"), "inns hang out a tankard");

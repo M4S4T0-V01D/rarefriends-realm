@@ -248,8 +248,8 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
   </div>
   <div class="wrap trailer" id="trailer">
     <div class="frame">
-      <video id="trailer-video" src="media/update-cloud.mp4" poster="media/update-cloud-poster.jpg" autoplay muted playsinline controls preload="metadata"
-        aria-label="RareFriends Realm cloud saves video: the title screen's Verify wallet button, the wallet's sign-in message saying it is not a transaction, the cloud saving, a second device continuing the same adventure, the two-versions question, importing an existing adventure, playing offline, and the cloud panel in every language"></video>
+      <video id="trailer-video" src="media/update-palia.mp4" poster="media/update-palia-poster.jpg" autoplay muted playsinline controls preload="metadata"
+        aria-label="RareFriends Realm Palian Isles video: sunrise over Kurohama's harbour, the title WHAT RISES IN THE EAST, the boat list with its fares and the crossing, the castle town of Takamori, the Thousand Steps to Kumoyama, foxfire vixens among Morishima's gates, river imps by Tanabe's paddies, Hanazono's blossom, the Whispering Bamboo, the Lantern Isle at night, ash ogres on Ashigane, Josaki's ronin, the Nightcall Chimera, and the Faith and Magic tabs switching to the Palian way"></video>
       <button class="btn primary sound" id="trailer-sound" type="button">🔊 Watch with sound</button>
       <button class="arrow prev" id="trailer-prev" type="button" aria-label="Previous video">‹</button>
       <button class="arrow next" id="trailer-next" type="button" aria-label="Next video">›</button>
@@ -532,6 +532,9 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
   // music player take turns.
   (() => {
     const VIDEOS = [
+      { src: "media/update-palia.mp4", poster: "media/update-palia-poster.jpg", title: "What rises in the east: the Palian Isles", when: "October 2026",
+        note: "New: the Palian Isles, east of the old coast where the sun comes up first. Hinode and thirteen islands, boats between them for coins, sixteen quests, three dungeons, spirit creatures of the Isles, katana and naginata, and Palian Faith and Magic you can keep in place of the Realm's anywhere. Every shot recorded straight from the game, with the update's own music.",
+        label: "RareFriends Realm Palian Isles video: sunrise over Kurohama's harbour, the title WHAT RISES IN THE EAST, the boat list with its fares and the crossing, the castle town of Takamori, the Thousand Steps to Kumoyama, foxfire vixens among Morishima's gates, river imps by Tanabe's paddies, Hanazono's blossom, the Whispering Bamboo, the Lantern Isle at night, ash ogres on Ashigane, Josaki's ronin, the Nightcall Chimera, and the Faith and Magic tabs switching to the Palian way" },
       { src: "media/update-cloud.mp4", poster: "media/update-cloud-poster.jpg", title: "Your adventure, in the cloud", when: "October 2026",
         note: "New: cloud saves. Verify your wallet once (a message it signs, never a transaction) and your adventure saves online by itself and follows your wallet to any device. Played before? Bring your adventure up once. Two devices at once? You choose which to keep. Offline? It keeps saving in your browser. Every screen recorded straight from the game.",
         label: "RareFriends Realm cloud saves video: the title screen's Verify wallet button, the wallet's sign-in message saying it is not a transaction, the cloud saving, a second device continuing the same adventure, the two-versions question, importing an existing adventure, playing offline, and the cloud panel in every language" },

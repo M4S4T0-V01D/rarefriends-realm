@@ -206,6 +206,13 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
         part(p, poly([[2, 13], [8, 7], [17, 4], [26, 6], [31, 12], [24, 9], [17, 8], [9, 10]]), color, "metal");
         if (accent) { line(p, [[9, 8], [17, 5], [25, 7]], accent); dot(p, 18, 6, accent); } break;
       case "sword":
+        if (icon.kind === "katana") {
+          // A katana: a slender curved blade with a wave of temper line, a round guard, a long cord-wrapped grip.
+          part(p, stroke([[10, 22], [16, 15], [22, 9], [27, 5], [30, 3]], 3), color, "metal");
+          line(p, [[12, 20], [17, 14], [23, 8], [28, 4]], shadeHex(color, 0.25));
+          part(p, disc(9, 23, 3.2, 3.2), accent ?? "#2a2626", "metal");
+          part(p, stroke([[2, 30], [8, 24]], 3), "#2a2626", "cloth"); for (const [x, y] of [[3, 29], [5, 27], [7, 25]] as Pt[]) dot(p, x, y, "#efe6d2"); break;
+        }
         part(p, all(stroke([[9, 23], [26, 6]], 4), poly([[25, 3], [29, 3], [29, 7]])), color, "metal");
         line(p, [[11, 21], [25, 7]], shadeHex(color, -0.18));
         if (accent) for (const [x, y] of [[14, 17], [18, 13], [22, 9]] as Pt[]) dot(p, x, y, accent);
@@ -264,6 +271,13 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
         part(p, all(stroke([[5, 20], [9, 26]], 3), stroke([[9, 26], [13, 26]], 2)), accent ? shadeHex(color, -0.3) : GOLD_C, "metal");
         if (accent) part(p, disc(8, 23, 1.6), accent, "gem"); part(p, stroke([[4, 29], [8, 25]], 3), DARK_WOOD, "wood"); break;
       case "helm":
+        if (icon.kind === "kabuto") {
+          // A kabuto: a round lacquered bowl, a neck-guard flaring in three lames, two gilt horns.
+          part(p, poly([[2, 26], [6, 20], [26, 20], [30, 26], [28, 28], [4, 28]]), shadeHex(color, -0.06), armour);
+          part(p, poly([[7, 21], [8, 12], [12, 7], [20, 7], [24, 12], [25, 21]]), color, armour); line(p, [[4, 24], [28, 24]], accent ?? GOLD_C);
+          for (const flip of [1, -1]) { const X = (x: number) => flip > 0 ? x : 32 - x; part(p, stroke([[X(15), 11], [X(11), 6], [X(8), 1]], 2), accent ?? GOLD_C, "metal"); }
+          line(p, [[12, 10], [20, 10]], light); break;
+        }
         if (icon.kind === "horned") for (const flip of [1, -1]) { const X = (x: number) => flip > 0 ? x : 32 - x; part(p, stroke([[X(8), 13], [X(3), 10], [X(2), 4], [X(5), 1]], 3), accent ?? "#e8dcc0", "stone"); }
         part(p, poly([[6, 27], [6, 14], [9, 8], [16, 4], [23, 8], [26, 14], [26, 27], [20, 27], [20, 21], [12, 21], [12, 27]]), color, armour);
         part(p, box(9, 15, 14, 3), INK, "flat", false);
@@ -281,6 +295,12 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
           part(p, box(3, 23, 26, 5), shadeHex(color, -0.08), "cloth");
           part(p, poly([[20, 12], [27, 3], [30, 2], [29, 6], [22, 14]]), accent ?? WHITE, "cloth");
           line(p, [[21, 13], [29, 3]], shadeHex(accent ?? WHITE, -0.25)); break;
+        }
+        if (icon.kind === "kasa") {
+          // A kasa: a wide, shallow cone of woven straw (or lacquered iron).
+          part(p, poly([[2, 23], [14, 8], [18, 8], [30, 23], [28, 25], [4, 25]]), color, metal ? "metal" : "cloth");
+          for (const x of [8, 13, 19, 24]) line(p, [[x, 24], [16, 9]], shadeHex(color, -0.14));
+          line(p, [[4, 24], [28, 24]], accent ?? DARK_WOOD, 2); break;
         }
         if (icon.kind === "wide") {
           // A wide brim and a round crown with a band.
@@ -1013,11 +1033,34 @@ const ORB_PAINTERS: Record<OrbIcon, Painter> = {
 export const orbArt = (orb: OrbIcon) => icon16(`orb:${orb}`, ORB_PAINTERS[orb]);
 
 // ---------- Spell and prayer icons (generated from their element) ----------
-const ELEMENT_COLORS: Record<string, string> = { wind: "#e6ecef", water: "#8fa3c9", earth: "#a89479", fire: "#e9a07a", hollow: "#6d6b67", moon: "#c6bed4", gold: "#e2d49e", home: "#e8d4c0", holy: "#f2e28f", law: "#cfc7e6", dusk: "#8a6ab0" };
+const ELEMENT_COLORS: Record<string, string> = { wind: "#e6ecef", water: "#8fa3c9", earth: "#a89479", fire: "#e9a07a", hollow: "#6d6b67", moon: "#c6bed4", gold: "#e2d49e", home: "#e8d4c0", holy: "#f2e28f", law: "#cfc7e6", dusk: "#8a6ab0", paper: "#efe6d2" };
+/** The Palian Isles' spells: each a paper seal (an ofuda strip) with its own mark in red ink. */
+const PALIAN_SPELL_MARKS = new Set(["seal_strike", "withering_seal", "paper_wall", "spirit_sight", "ink_serpent", "binding_seal_spell", "mist_veil", "storm_seal", "true_name", "crossing_kurohama", "crossing_kumoyama", "purifying_rite", "talisman_of_mending", "blessing_of_journeys", "shrine_barrier", "pacify_spirit", "rite_of_rising_sun"]);
+function palianSpell(p: Pixels, id: string, kind: string, color: string) {
+  // A strip of seal paper, slightly turned, with a red border and a brushed mark; a coloured wisp of what it does behind.
+  p.disc(13, 8, 6, 6, shadeHex(color, -0.05), null);
+  p.poly([[5, 1], [12, 2], [11, 19], [4, 18]], "#f6efdf", INK); p.line(5, 3, 11, 3, "#b5452f"); p.line(5, 16, 10, 17, "#b5452f");
+  const ink = "#22252e", red = "#b5452f";
+  switch (kind) {
+    case "strike": case "bolt": case "blast": p.line(8, 5, 8, 14, ink, 2); p.line(6, 8, 10, 8, ink); if (kind !== "strike") p.line(6, 12, 10, 11, ink); if (kind === "blast") p.disc(15, 14, 3, 3, color, INK); break;
+    case "curse": case "bind": p.disc(8, 10, 2.8, 2.8, red, null); p.line(5, 7, 11, 13, ink); if (kind === "bind") p.line(11, 7, 5, 13, ink); break;
+    case "ward": case "aegis": p.rect(6, 6, 4, 7, red); p.rect(7, 7, 2, 5, "#f6efdf"); break;
+    case "veil": for (const y of [6, 9, 12, 15]) p.line(5, y, 10, y - 1, "#8fa3c9"); break;
+    case "reveal": p.disc(8, 10, 3, 2, "#ffffff", ink); p.set(8, 10, red); break;
+    case "teleport": p.line(8, 5, 8, 14, ink); p.line(6, 11, 8, 14, ink); p.line(10, 11, 8, 14, ink); break;
+    case "smite": p.disc(8, 9, 2.5, 2.5, red, null); for (const [dx, dy] of [[0, -4], [0, 4], [-3, 0], [3, 0]]) p.set(8 + dx, 9 + dy, ink); break;
+    case "mend": p.line(8, 6, 8, 13, red, 2); p.line(5, 9, 11, 9, red, 2); break;
+    case "bless": p.line(5, 12, 8, 7, ink); p.line(8, 7, 11, 12, ink); p.line(6, 10, 10, 10, ink); break;
+    case "pacify": p.disc(8, 10, 3, 3, "#ffffff", ink); p.line(6, 10, 10, 10, ink); break;
+    default: p.line(8, 5, 8, 14, ink, 2);
+  }
+  if (id === "true_name") { p.line(5, 6, 10, 13, red); }
+}
 /** Spell icon: an element orb with a shape by kind (bolt, strike, blast, curse, teleport, alchemy, utility). */
 export function spellArt(id: string, element: string, kind: string): HTMLCanvasElement {
   const color = ELEMENT_COLORS[element] ?? "#c7d3dc";
   return pixelArt(`spell:${id}`, 20, 20, p => {
+    if (PALIAN_SPELL_MARKS.has(id)) { palianSpell(p, id, kind, color); p.halo(); return; }
     switch (kind) {
       case "strike": p.disc(10, 10, 5, 5, color, INK, shadeHex(color, -0.15)); p.line(3, 15, 7, 11, color, 2); break;
       case "bolt": p.poly([[11, 1], [5, 11], [9, 11], [7, 19], [15, 8], [11, 8], [13, 1]], color); break;
@@ -1047,6 +1090,10 @@ const PRAYER_KIND: Record<string, [string, string]> = {
   // The Wise Friend's commandments: a closed eye over a tablet of the Law, each in its own colour.
   first_law: ["law", "#cfc7e6"], second_law: ["law", "#b98ab0"], third_law: ["law", "#9ea3ad"], fourth_law: ["law", "#8a6ab0"],
   queens_peace: ["law", "#c9a84a"], keepers_silence: ["law_protect", "#d8d6e4"], wise_hand: ["law", "#e6c46a"], dusk_mantle: ["law", "#5a4a6e"],
+  // The Palian vows and blessings: a sacred rope, a stone lantern, a shrine bell, a paper charm, by what each keeps.
+  vow_of_cedar: ["rope", "#5f7d6a"], vow_of_stone_lantern: ["lantern", "#a39e96"], ancestors_watch: ["rope_protect", "#b5452f"],
+  blessing_of_brush: ["charm", "#22252e"], blessing_of_drum: ["charm", "#b5452f"], blessing_of_still_water: ["charm", "#2f3a5e"], blessing_of_long_road: ["charm", "#c9a24a"], rising_sun: ["sun", "#e2573f"],
+  salt_and_water: ["bowl", "#efe6d2"], lantern_ward: ["lantern", "#f2c46a"], friend_of_the_place: ["rope", "#c9a24a"], thousand_friends: ["sun", "#c9a24a"],
 };
 export function prayerArt(id: string): HTMLCanvasElement {
   const [kind, color] = PRAYER_KIND[id] ?? ["star", PAPER];
@@ -1060,6 +1107,16 @@ export function prayerArt(id: string): HTMLCanvasElement {
       p.poly([[4, 6], [14, 6], [14, 17], [4, 17]], kind === "law_protect" ? "#3b2a52" : color, INK); for (const y of [9, 11, 13, 15]) p.line(6, y, 12, y, kind === "law_protect" ? color : "#3b2a52");
       p.disc(9, 4, 5, 2.4, "#2a2238", INK); p.line(5, 4, 13, 4, color); p.set(7, 5, color); p.set(9, 6, color); p.set(11, 5, color);
     }
+    else if (kind === "rope" || kind === "rope_protect") {
+      // A sacred rope twisted across, white paper zigzags hanging from it.
+      p.rect(1, 5, 16, 3, "#c9b27a"); for (let x = 2; x < 17; x += 2) p.set(x, 6, "#8a6a3a"); p.disc(9, 6, 2, 2, color, INK);
+      for (const x of [4, 9, 14]) { p.line(x, 8, x + 1, 10, "#ffffff"); p.line(x + 1, 10, x, 12, "#ffffff"); p.line(x, 12, x + 1, 14, "#ffffff"); }
+      if (kind === "rope_protect") p.poly([[5, 11], [13, 11], [13, 14], [9, 17], [5, 14]], color);
+    }
+    else if (kind === "lantern") { p.rect(7, 13, 4, 4, "#8f8a83"); p.rect(5, 6, 8, 6, "#a39e96"); p.rect(7, 7, 4, 3, color); p.poly([[3, 6], [9, 2], [15, 6]], "#7d7870"); }
+    else if (kind === "charm") { p.poly([[5, 3], [13, 3], [14, 16], [4, 16]], "#e8d8b8", INK); p.rect(6, 5, 6, 9, color); p.line(9, 1, 9, 3, "#b5452f"); p.set(9, 9, "#f6efdf"); }
+    else if (kind === "bowl") { p.disc(9, 11, 7, 4, "#2f3a5e"); p.disc(9, 10, 5, 2, "#9fc3d9", null); for (const [x, y] of [[6, 5], [9, 3], [12, 5]]) p.set(x, y, "#ffffff"); }
+    else if (kind === "sun") { p.disc(9, 9, 5, 5, color, INK); for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; p.line(9 + Math.cos(a) * 6, 9 + Math.sin(a) * 6, 9 + Math.cos(a) * 8, 9 + Math.sin(a) * 8, color); } }
     else p.poly([[9, 1], [11, 7], [17, 9], [11, 11], [9, 17], [7, 11], [1, 9], [7, 7]], color);
     p.halo();
   });

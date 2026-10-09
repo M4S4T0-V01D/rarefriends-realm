@@ -66,6 +66,7 @@ export const FAMILY_PERKS: readonly FamilyPerk[] = [
 import { APOTHECARY_ITEMS, type PotionEffect } from "./apothecary.ts";
 import { ORDER_IDS, orderGear, orderStock } from "./knights.ts";
 import { FACTION_MONSTERS, factionGear } from "./factions.ts";
+import { PALIAN_ITEMS, PALIAN_MONSTERS, palianGear } from "./paliagear.ts";
 import { SOLDIERS } from "./skirmish.ts";
 // ---------- Items ----------
 export type EquipSlot = "head" | "cape" | "neck" | "weapon" | "body" | "shield" | "legs" | "hands" | "feet" | "belt" | "ring";
@@ -778,6 +779,14 @@ export const REGIONAL_CLOTHING: readonly RegionalSet[] = [
     { id: "woodsman_breeches", name: "Woodsman's breeches", slot: "legs", shape: "legs", color: "#4a3a2c", accent: "#8a3a2a", examine: "Heavy breeches for BarkReach's brambles.", value: 700 },
     { id: "woodsman_boots", name: "Woodsman's boots", slot: "feet", shape: "boots", color: "#3a2a1c", accent: "#8a3a2a", examine: "Hobnailed boots. The redwoods are slippery when it rains, which is always.", value: 400 },
   ] },
+  // The Palian Isles (What Rises in the East): what Kurohama and Takamori wear in the street.
+  { region: "palian", shop: "palian_clothier", pieces: [
+    { id: "palian_kasa", name: "Woven kasa", slot: "head", shape: "hat", kind: "kasa", color: "#c9b27a", accent: "#7a5a44", examine: "A wide conical hat of split bamboo, lacquered against the rain. Half the Isles wear one; the other half are under a roof.", value: 160 },
+    { id: "palian_kimono", name: "Indigo kimono", slot: "body", shape: "body", kind: "robe", color: "#2f3a5e", accent: "#efe6d2", examine: "A long indigo robe wrapped right over left, an ivory sash at the waist. Wrapped the other way, it's for funerals.", value: 600 },
+    { id: "palian_hakama", name: "Pleated hakama", slot: "legs", shape: "legs", kind: "skirt", color: "#4a4e5a", accent: "#22252e", examine: "Wide pleated trousers, grey as harbour slate. Seven pleats: five in front, two behind, each for a virtue.", value: 320 },
+    { id: "palian_haori", name: "Crane haori", slot: "cape", shape: "cape", kind: "crane", color: "#8f2b2b", accent: "#efe6d2", examine: "A short coat worn open over the kimono, a white crane on the back. For visiting, and being seen to visit.", value: 700 },
+    { id: "palian_sandals", name: "Straw sandals", slot: "feet", shape: "boots", color: "#c9b27a", accent: "#8f2b2b", examine: "Woven straw sandals with red thongs, worn with split-toed socks.", value: 90 },
+  ] },
 ];
 const REGIONAL_ITEMS: Item[] = REGIONAL_CLOTHING.flatMap(set => set.pieces.map((piece): Item => ({
   id: piece.id, name: piece.name, examine: piece.examine, value: piece.value, icon: { shape: piece.shape, color: piece.color, accent: piece.accent, ...(piece.kind ? { kind: piece.kind } : {}) },
@@ -953,7 +962,7 @@ function dyedItem(id: string): Item | undefined {
   DYED.set(id, made);
   return made;
 }
-export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...DYE_POTS, ...CARVING_ITEMS, ...BAR_ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...ORDER_ARMOUR, ...orderGear(), ...slayerGear(), ...heartguardGear(), ...REGIONAL_ITEMS, ...APOTHECARY_ITEMS, ...factionGear()]);
+export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...DYE_POTS, ...CARVING_ITEMS, ...BAR_ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...ORDER_ARMOUR, ...orderGear(), ...slayerGear(), ...heartguardGear(), ...REGIONAL_ITEMS, ...APOTHECARY_ITEMS, ...factionGear(), ...palianGear(), ...PALIAN_ITEMS]);
 const ITEM_MAP = new Map(ITEM_LIST.map(item => [item.id, item]));
 export function item(id: string): Item {
   const found = ITEM_MAP.get(id) ?? dyedItem(id);
@@ -963,7 +972,7 @@ export function item(id: string): Item {
 export const isItem = (id: unknown): id is string => typeof id === "string" && (ITEM_MAP.has(id) || !!dyedItem(id));
 
 // ---------- Gathering ----------
-export type TreeKind = "tree" | "oak" | "willow" | "maple" | "yew" | "ashwood" | "palm" | "pine" | "deadwood" | "redwood" | "ironbark";
+export type TreeKind = "tree" | "oak" | "willow" | "maple" | "yew" | "ashwood" | "palm" | "pine" | "deadwood" | "redwood" | "ironbark" | "cedar" | "sakura" | "bamboo";
 export const TREES: Record<TreeKind, { name: string; level: number; xp: number; log: string; low: number; high: number; deplete: number; respawn: number }> = {
   tree: { name: "Tree", level: 1, xp: 25, log: "logs", low: 64, high: 200, deplete: 1, respawn: 12 },
   oak: { name: "Oak tree", level: 15, xp: 37.5, log: "oak_logs", low: 32, high: 100, deplete: 1 / 8, respawn: 14 },
@@ -978,6 +987,10 @@ export const TREES: Record<TreeKind, { name: string; level: number; xp: number; 
   // BarkReach (Return of Raria): red-hearted redwoods and the grey ironbarks an axe bounces off.
   redwood: { name: "Redwood tree", level: 52, xp: 135, log: "redwood_logs", low: 6, high: 20, deplete: 1 / 8, respawn: 80 },
   ironbark: { name: "Ironbark tree", level: 68, xp: 230, log: "ironbark_logs", low: 3, high: 10, deplete: 1 / 10, respawn: 140 },
+  // The Palian Isles: bamboo that springs back in a day, blossom trees, and the old cedars that shrines are built from.
+  bamboo: { name: "Bamboo", level: 20, xp: 45, log: "bamboo_canes", low: 24, high: 70, deplete: 1 / 8, respawn: 20 },
+  sakura: { name: "Blossom tree", level: 40, xp: 90, log: "blossom_logs", low: 12, high: 36, deplete: 1 / 8, respawn: 45 },
+  cedar: { name: "Cedar", level: 62, xp: 190, log: "cedar_logs", low: 4, high: 12, deplete: 1 / 9, respawn: 110 },
 };
 export type RockKind = "pewter" | "clay" | "blackiron" | "inkcoal" | "moonsilver" | "glimmer" | "rarite" | "gem" | "sigil";
 export const ROCKS: Record<RockKind, { name: string; level: number; xp: number; ore: string; low: number; high: number; respawn: number; color: string }> = {
@@ -1008,6 +1021,7 @@ export const COOKING: Record<string, { cooked: string; level: number; xp: number
   raw_minnows: { cooked: "minnows", level: 1, xp: 30, stopBurn: 12 },
   raw_chicken: { cooked: "cooked_chicken", level: 1, xp: 30, stopBurn: 14 },
   raw_beef: { cooked: "cooked_meat", level: 1, xp: 30, stopBurn: 14 },
+  rice: { cooked: "rice_ball", level: 8, xp: 45, stopBurn: 30 },
   raw_perch: { cooked: "perch", level: 1, xp: 40, stopBurn: 22 },
   raw_carp: { cooked: "carp", level: 5, xp: 50, stopBurn: 32 },
   raw_char: { cooked: "char", level: 15, xp: 70, stopBurn: 44 },
@@ -1020,6 +1034,7 @@ export const FIREMAKING: Record<string, { level: number; xp: number }> = {
   logs: { level: 1, xp: 40 }, oak_logs: { level: 15, xp: 60 }, willow_logs: { level: 30, xp: 90 },
   maple_logs: { level: 45, xp: 135 }, yew_logs: { level: 60, xp: 202.5 }, ash_logs: { level: 70, xp: 280 },
   palm_logs: { level: 25, xp: 80 }, pine_logs: { level: 35, xp: 110 }, deadwood_logs: { level: 55, xp: 180 }, redwood_logs: { level: 52, xp: 170 }, ironbark_logs: { level: 68, xp: 260 },
+  bamboo_canes: { level: 20, xp: 70 }, blossom_logs: { level: 40, xp: 125 }, cedar_logs: { level: 62, xp: 220 },
 };
 /** Smelting: ores in, bar out. Blackiron has a 50% success rate without a ring (like the classic furnace). */
 export const SMELTING: Record<MetalId, { level: number; xp: number; ores: Readonly<Record<string, number>>; chance?: number }> = {
@@ -1092,7 +1107,9 @@ export const GEM_CUTTING: Record<string, { cut: string; level: number; xp: numbe
 };
 
 // ---------- Magic and prayer ----------
-export type SpellKind = "strike" | "bolt" | "blast" | "curse" | "bind" | "teleport" | "alchemy" | "superheat" | "grab" | "enchant" | "bloom" | "ward" | "smite" | "mend" | "aegis" | "bless";
+export type SpellKind = "strike" | "bolt" | "blast" | "curse" | "bind" | "teleport" | "alchemy" | "superheat" | "grab" | "enchant" | "bloom" | "ward" | "smite" | "mend" | "aegis" | "bless"
+  /** The Palian Isles: a mist that hides you (Mist Veil), a seal that shows a creature's nature (Spirit Sight), a rite that calms a wayward spirit. */
+  | "veil" | "reveal" | "pacify";
 export type SpellTarget = "monster" | "item" | "ground" | "self";
 export type Spell = {
   id: string; name: string; level: number; xp: number; sigils: Readonly<Record<string, number>>; kind: SpellKind; element: string; target: SpellTarget;
@@ -1101,6 +1118,8 @@ export type Spell = {
   quest?: string;
   /** Raria's own (Return of Raria): an edict, judgement, vigil, office, summons or rite of the Wise Friend, castable only while you keep the Law. */
   rarian?: boolean;
+  /** The Palian Isles' own (What Rises in the East): a seal, binding, barrier, art, crossing or rite, castable only while you keep the Palian way. */
+  palian?: boolean;
   /** Faith spells: the level is a Faith level and each cast spends this much faith. */
   skill?: "prayer"; faith?: number;
   /** A ward on yourself: more defence (a fraction of your bonus plus a flat amount), less damage taken (a fraction), for so many ticks. */
@@ -1110,23 +1129,41 @@ export type Spell = {
   description: string;
 };
 /** Everywhere a teleport can land (the keys of World["places"] that spells use). */
-export type TeleportPlace = "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier" | "fernwick" | "highcairn" | "dawnhold" | "gravesend" | "saltmarrow" | "hollyhock" | "dyemoor" | "tallgrass" | "cragmaw" | "quillhaven" | "ashfall" | "raria" | "fff_fortress" | "barkreach";
+export type TeleportPlace = "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier" | "fernwick" | "highcairn" | "dawnhold" | "gravesend" | "saltmarrow" | "hollyhock" | "dyemoor" | "tallgrass" | "cragmaw" | "quillhaven" | "ashfall" | "raria" | "fff_fortress" | "barkreach" | "kurohama" | "kumoyama";
 /** The spellbook's tabs: which kinds go where. */
 export const SPELL_TABS: readonly { id: string; name: string; kinds: readonly SpellKind[] }[] = [
   { id: "combat", name: "Combat", kinds: ["strike", "bolt", "blast"] }, { id: "curses", name: "Curses", kinds: ["curse", "bind"] },
-  { id: "wards", name: "Wards", kinds: ["ward"] },
-  { id: "utility", name: "Utility", kinds: ["alchemy", "superheat", "grab", "enchant", "bloom"] }, { id: "teleports", name: "Teleports", kinds: ["teleport"] },
-  { id: "faith", name: "Faith", kinds: ["smite", "mend", "aegis", "bless"] },
+  { id: "wards", name: "Wards", kinds: ["ward", "veil"] },
+  { id: "utility", name: "Utility", kinds: ["alchemy", "superheat", "grab", "enchant", "bloom", "reveal"] }, { id: "teleports", name: "Teleports", kinds: ["teleport"] },
+  { id: "faith", name: "Faith", kinds: ["smite", "mend", "aegis", "bless", "pacify"] },
 ];
 /** The same book under the Wise Friend's Law (Return of Raria): Raria's names for the tabs, its own spells among the Realm's, and its rites in place of the Old Friend's light. */
 export const RARIAN_SPELL_TABS: readonly { id: string; name: string; kinds: readonly SpellKind[] }[] = [
   { id: "combat", name: "Edicts", kinds: ["strike", "bolt", "blast"] }, { id: "curses", name: "Judgements", kinds: ["curse", "bind"] },
-  { id: "wards", name: "Vigils", kinds: ["ward"] },
-  { id: "utility", name: "Offices", kinds: ["alchemy", "superheat", "grab", "enchant", "bloom"] }, { id: "teleports", name: "Summons", kinds: ["teleport"] },
-  { id: "faith", name: "Rites", kinds: ["smite", "mend", "aegis", "bless"] },
+  { id: "wards", name: "Vigils", kinds: ["ward", "veil"] },
+  { id: "utility", name: "Offices", kinds: ["alchemy", "superheat", "grab", "enchant", "bloom", "reveal"] }, { id: "teleports", name: "Summons", kinds: ["teleport"] },
+  { id: "faith", name: "Rites", kinds: ["smite", "mend", "aegis", "bless", "pacify"] },
 ];
-/** Whether a spell belongs in the book you keep: the Realm's common magic is in both; the Old Friend's light only in the old book, Raria's edicts and rites only in the Law's. */
-export const spellInBook = (spell: Spell, rarian: boolean) => rarian ? !(spell.skill === "prayer" && !spell.rarian) : !spell.rarian;
+/** The same book kept the Palian way (What Rises in the East): seals, bindings, barriers, arts, crossings and the shrine's rites. */
+export const PALIAN_SPELL_TABS: readonly { id: string; name: string; kinds: readonly SpellKind[] }[] = [
+  { id: "combat", name: "Seals", kinds: ["strike", "bolt", "blast"] }, { id: "curses", name: "Bindings", kinds: ["curse", "bind"] },
+  { id: "wards", name: "Barriers", kinds: ["ward", "veil"] },
+  { id: "utility", name: "Arts", kinds: ["alchemy", "superheat", "grab", "enchant", "bloom", "reveal"] }, { id: "teleports", name: "Crossings", kinds: ["teleport"] },
+  { id: "faith", name: "Rites", kinds: ["smite", "mend", "aegis", "bless", "pacify"] },
+];
+/**
+ * The magical and faith traditions you can keep (switched from the top of your spellbook or prayers, anywhere): the
+ * Realm's own (the Old Friend's book), Raria's (the Wise Friend's Law), the Palian Isles' (the rope and the brush).
+ */
+export type Tradition = "realm" | "raria" | "palia";
+/**
+ * Whether a spell belongs in the book you keep: the Realm's common magic is in all of them; the Old Friend's light only
+ * in the old book; Raria's edicts and rites only in the Law's; the Isles' seals and rites only in the Palian way's.
+ */
+export const spellInBook = (spell: Spell, tradition: Tradition) =>
+  tradition === "raria" ? !spell.palian && !(spell.skill === "prayer" && !spell.rarian)
+  : tradition === "palia" ? !spell.rarian && !(spell.skill === "prayer" && !spell.palian)
+  : !spell.rarian && !spell.palian;
 /** The Realm's spellbook, in level order: combat, curses, utility and teleports. */
 export const SPELLS: readonly Spell[] = [
   { id: "home", name: "Homeward", level: 1, xp: 0, sigils: {}, kind: "teleport", element: "home", target: "self", teleport: "hollow_square", description: "Return to Friendhollow. Slow to cast, free, and not in combat." },
@@ -1196,12 +1233,37 @@ export const SPELLS: readonly Spell[] = [
   { id: "rite_of_mending", name: "Rite of Mending", level: 32, xp: 38, sigils: { law_sigil: 2, tide_sigil: 1 }, kind: "mend", element: "law", target: "self", skill: "prayer", faith: 4, heal: { now: 22 }, rarian: true, description: "The Law mends what obeys it: heals 22 at once. Costs 4 faith." },
   { id: "rite_of_the_keeper", name: "Rite of the Keeper", level: 48, xp: 56, sigils: { dusk_sigil: 2, stone_sigil: 1 }, kind: "aegis", element: "dusk", target: "self", skill: "prayer", faith: 6, ward: { defence: 0.25, flat: 10, reduce: 0.2, ticks: 120 }, rarian: true, description: "The Keeper's own rite: +25% defence bonus, +10, and a fifth of damage turned aside for two minutes. Costs 6 faith." },
   { id: "rite_of_obedience", name: "Rite of Obedience", level: 55, xp: 62, sigils: { law_sigil: 2, dusk_sigil: 1 }, kind: "bless", element: "law", target: "self", skill: "prayer", faith: 4, heal: { now: 8, energy: 25, cure: true }, rarian: true, description: "Obedience is rewarded: 8 health, a quarter of your run energy, and any poison cleared. Costs 4 faith." },
+  // The Palian Isles' seals, bindings, barriers, arts, crossings and rites (What Rises in the East): written, not spoken.
+  { id: "seal_strike", name: "Seal Strike", level: 15, xp: 18, sigils: { paper_seal: 2 }, kind: "strike", element: "paper", target: "monster", maxHit: 10, palian: true, description: "A paper seal thrown like a blade: it cuts true, and bites a wayward spirit harder (max hit 10)." },
+  { id: "withering_seal", name: "Withering Seal", level: 25, xp: 24, sigils: { paper_seal: 3 }, kind: "curse", element: "paper", target: "monster", curse: { stat: "defence", amount: 0.1 }, palian: true, description: "A seal stuck to a creature's hide: its guard is found wanting (−10% defence)." },
+  { id: "paper_wall", name: "Paper Wall", level: 30, xp: 34, sigils: { paper_seal: 3, stone_sigil: 1 }, kind: "ward", element: "paper", target: "self", ward: { defence: 0.2, flat: 8, ticks: 100 }, palian: true, description: "A wall of seals folded round you: +20% defence bonus and +8 for a minute." },
+  { id: "spirit_sight", name: "Spirit Sight", level: 20, xp: 26, sigils: { paper_seal: 2, thought_sigil: 1 }, kind: "reveal", element: "paper", target: "monster", palian: true, description: "A seal held up to the eye: you see what a creature is, what it's weak to and how it guards itself (your Pursuance journal learns it)." },
+  { id: "ink_serpent", name: "Ink Serpent", level: 35, xp: 32, sigils: { paper_seal: 3, tide_sigil: 2 }, kind: "bolt", element: "water", target: "monster", maxHit: 18, palian: true, description: "A brushstroke of ink that uncoils into a serpent of water (max hit 18)." },
+  { id: "binding_seal_spell", name: "Binding Seal", level: 40, xp: 36, sigils: { spirit_seal: 1, paper_seal: 2 }, kind: "bind", element: "paper", target: "monster", palian: true, description: "A seal that ties a creature's feet to its shadow for a time." },
+  { id: "mist_veil", name: "Mist Veil", level: 45, xp: 44, sigils: { paper_seal: 2, breeze_sigil: 2 }, kind: "veil", element: "wind", target: "self", palian: true, description: "A rain-mist written round you: for three minutes creatures are a third less likely to notice you sneaking, and the wayward spirits lose you." },
+  { id: "storm_seal", name: "Storm Seal", level: 60, xp: 50, sigils: { spirit_seal: 2, breeze_sigil: 3 }, kind: "blast", element: "wind", target: "monster", maxHit: 28, palian: true, description: "A seal that unfolds into a storm the size of a room (max hit 28)." },
+  { id: "true_name", name: "True Name", level: 70, xp: 60, sigils: { spirit_seal: 3, thought_sigil: 2 }, kind: "strike", element: "paper", target: "monster", maxHit: 24, palian: true, description: "A creature's true name, written and torn: half as hard again if you know its weakness (max hit 24)." },
+  { id: "crossing_kurohama", name: "Tide-path to Kurohama", level: 32, xp: 40, sigils: { paper_seal: 2, tide_sigil: 2 }, kind: "teleport", element: "water", target: "self", teleport: "kurohama", quest: "landfall", palian: true, description: "The tide carries you to Kurohama's quay. Learnt with Landfall at Kurohama." },
+  { id: "crossing_kumoyama", name: "Cloud-path to Kumoyama", level: 52, xp: 62, sigils: { spirit_seal: 1, breeze_sigil: 3 }, kind: "teleport", element: "wind", target: "self", teleport: "kumoyama", quest: "rope_and_brush", palian: true, description: "The mountain's cloud carries you to Kumoyama's gate. Learnt with The Rope and the Brush." },
+  { id: "purifying_rite", name: "Purifying Rite", level: 20, xp: 18, sigils: { paper_seal: 2 }, kind: "smite", element: "holy", target: "monster", skill: "prayer", faith: 2, maxHit: 12, palian: true, description: "A wand of streamers waved over a creature (max hit 12, twice that against a wayward spirit). Costs 2 faith." },
+  { id: "talisman_of_mending", name: "Talisman of Mending", level: 34, xp: 40, sigils: { paper_seal: 3 }, kind: "mend", element: "holy", target: "self", skill: "prayer", faith: 4, heal: { now: 14, perTick: 1, ticks: 20 }, palian: true, description: "A talisman pressed to the wound: heals 14 at once and 1 a tick for twenty ticks. Costs 4 faith." },
+  { id: "blessing_of_journeys", name: "Blessing of Journeys", level: 42, xp: 46, sigils: { paper_seal: 2, path_sigil: 1 }, kind: "bless", element: "holy", target: "self", skill: "prayer", faith: 3, heal: { now: 6, energy: 40, cure: true }, palian: true, description: "The road's blessing: 6 health, 40 run energy, and any poison cleared. Costs 3 faith." },
+  { id: "shrine_barrier", name: "Shrine Barrier", level: 50, xp: 58, sigils: { spirit_seal: 1, paper_seal: 2 }, kind: "aegis", element: "holy", target: "self", skill: "prayer", faith: 6, ward: { defence: 0.2, flat: 12, reduce: 0.2, ticks: 120 }, palian: true, description: "A shrine's sacred rope, stretched round you: +20% defence bonus, +12, and a fifth of damage turned aside for two minutes. Costs 6 faith." },
+  { id: "pacify_spirit", name: "Pacify Spirit", level: 58, xp: 54, sigils: { spirit_seal: 2 }, kind: "pacify", element: "holy", target: "monster", skill: "prayer", faith: 4, palian: true, description: "A rite of calming for a wayward spirit: it stops fighting and won't come for you for a minute. (Only spirits listen.) Costs 4 faith." },
+  { id: "rite_of_rising_sun", name: "Rite of the Rising Sun", level: 76, xp: 62, sigils: { spirit_seal: 3, star_sigil: 2 }, kind: "smite", element: "holy", target: "monster", skill: "prayer", faith: 5, maxHit: 32, palian: true, description: "The first light of the Isles, called down (max hit 32, half as hard again against a wayward spirit). Costs 5 faith." },
   { id: "rite_of_dusk", name: "Rite of Dusk", level: 72, xp: 58, sigils: { dusk_sigil: 3, law_sigil: 2 }, kind: "smite", element: "dusk", target: "monster", skill: "prayer", faith: 4, maxHit: 30, rarian: true, description: "The last rite of the Order of Dusk, pronounced over a creature (max hit 30, half as much again against the undead). Costs 4 faith." },
   { id: "banishment", name: "Banishment", level: 80, xp: 60, sigils: { star_sigil: 4, hollow_sigil: 1 }, kind: "smite", element: "holy", target: "monster", skill: "prayer", faith: 5, maxHit: 32, description: "Light that unmakes (max hit 32, twice that against the undead). Costs 5 faith a cast." },
 ];
-export type Prayer = { id: string; name: string; level: number; drain: number; effect: Partial<{ attack: number; strength: number; defence: number; magic: number; protect: boolean }>; description: string;
+export type Prayer = { id: string; name: string; level: number; drain: number;
+  /**
+   * What it does: more attack, strength, defence or magic; protection from melee; and the Palian Isles' own: wayward
+   * spirits strike this much softer (`spirit`), poison is kept off and cured (`purify`), running costs half (`journey`).
+   */
+  effect: Partial<{ attack: number; strength: number; defence: number; magic: number; protect: boolean; spirit: number; purify: boolean; journey: boolean }>; description: string;
   /** A commandment of the Wise Friend's Law (Return of Raria): kept only while you keep the Law, in place of the Old Friend's prayers. */
-  rarian?: boolean };
+  rarian?: boolean;
+  /** A vow or blessing of the Palian Isles: kept only while you keep the Palian way; and which part of the shrine's book it's in. */
+  palian?: boolean; section?: "protection" | "blessings" | "purification" | "spirits" | "rituals" };
 export const PRAYERS: readonly Prayer[] = [
   { id: "paper_shield", name: "Paper Shield", level: 1, drain: 1 / 12, effect: { defence: 0.05 }, description: "+5% Defence" },
   { id: "warm_heart", name: "Warm Heart", level: 4, drain: 1 / 12, effect: { strength: 0.05 }, description: "+5% Strength" },
@@ -1224,6 +1286,19 @@ export const PRAYERS: readonly Prayer[] = [
   { id: "keepers_silence", name: "The Keeper's Silence", level: 40, drain: 1 / 3, effect: { protect: true }, description: "Blocks most melee damage", rarian: true },
   { id: "wise_hand", name: "The Wise Hand", level: 52, drain: 2 / 5, effect: { attack: 0.18, strength: 0.18 }, description: "+18% Attack and Strength", rarian: true },
   { id: "dusk_mantle", name: "The Mantle of Dusk", level: 70, drain: 1 / 2, effect: { attack: 0.15, strength: 0.15, defence: 0.15, magic: 0.15 }, description: "+15% Attack, Strength, Defence and Magic", rarian: true },
+  // ---------- The Palian Isles' vows and blessings (What Rises in the East): kept in place of the prayers while you keep the Palian way ----------
+  { id: "vow_of_cedar", name: "Vow of the Cedar", level: 1, drain: 1 / 11, effect: { defence: 0.06 }, description: "+6% Defence", palian: true, section: "protection" },
+  { id: "blessing_of_brush", name: "Blessing of the Brush", level: 5, drain: 1 / 11, effect: { attack: 0.06 }, description: "+6% Attack", palian: true, section: "blessings" },
+  { id: "blessing_of_drum", name: "Blessing of the Drum", level: 8, drain: 1 / 11, effect: { strength: 0.06 }, description: "+6% Strength", palian: true, section: "blessings" },
+  { id: "blessing_of_still_water", name: "Blessing of Still Water", level: 11, drain: 1 / 11, effect: { magic: 0.06 }, description: "+6% Magic", palian: true, section: "blessings" },
+  { id: "vow_of_stone_lantern", name: "Vow of the Stone Lantern", level: 14, drain: 1 / 6, effect: { defence: 0.12 }, description: "+12% Defence", palian: true, section: "protection" },
+  { id: "salt_and_water", name: "Salt and Water", level: 20, drain: 1 / 6, effect: { purify: true }, description: "Poison is cured and kept off", palian: true, section: "purification" },
+  { id: "blessing_of_long_road", name: "Blessing of the Long Road", level: 24, drain: 1 / 8, effect: { journey: true }, description: "Running costs half the energy", palian: true, section: "blessings" },
+  { id: "lantern_ward", name: "Lantern Ward", level: 30, drain: 1 / 4, effect: { spirit: 0.3 }, description: "Wayward spirits strike 30% softer", palian: true, section: "spirits" },
+  { id: "ancestors_watch", name: "The Ancestors' Watch", level: 38, drain: 1 / 3, effect: { protect: true }, description: "Blocks most melee damage", palian: true, section: "protection" },
+  { id: "friend_of_the_place", name: "The Friend of the Place", level: 48, drain: 1 / 3, effect: { defence: 0.1, magic: 0.12, spirit: 0.15 }, description: "+10% Defence, +12% Magic, and spirits strike 15% softer", palian: true, section: "spirits" },
+  { id: "rising_sun", name: "Blessing of the Rising Sun", level: 60, drain: 2 / 5, effect: { attack: 0.14, strength: 0.14, defence: 0.14 }, description: "+14% Attack, Strength and Defence", palian: true, section: "rituals" },
+  { id: "thousand_friends", name: "Kagura of a Thousand Friends", level: 74, drain: 1 / 2, effect: { attack: 0.12, strength: 0.12, defence: 0.12, magic: 0.12, spirit: 0.2 }, description: "+12% Attack, Strength, Defence and Magic, and spirits strike 20% softer", palian: true, section: "rituals" },
 ];
 
 // ---------- Monsters ----------
@@ -1243,6 +1318,8 @@ export type MonsterDef = {
   slayer?: number;
   /** Undead (skeletons, shades, the Hollow): faith weapons hurt them more. */
   undead?: boolean;
+  /** A wayward spirit of the Palian Isles (a yokai): the Palian rites and wards answer it, and charms soften its blows. */
+  spirit?: boolean;
   /** Dragonfire: its top hit when it breathes (a Wyrmward shield turns it to a few points). */
   breath?: number;
   /** A venomous creature: each hit it lands may poison you (this much damage, four times, every ten ticks). */
@@ -1269,6 +1346,8 @@ export type MonsterDef = {
 const coins = (min: number, max: number, chance: number): Drop => ({ item: "coins", min, max, chance });
 const one = (id: string, chance: number, min = 1, max = min): Drop => ({ item: id, min, max, chance });
 export const MONSTERS: Record<string, MonsterDef> = {
+  // The Palian Isles: the wild, the wayward spirits, the Josaki dead, the ogres and the great ones.
+  ...PALIAN_MONSTERS,
   // Return of Raria: the Regiment, the Federation's pickets, the Royal Rangers, BarkReach's wild things, the deserters and the Burned.
   ...FACTION_MONSTERS,
   // Every soldier's fighting self, for when it draws steel (skirmish.ts).
@@ -1467,6 +1546,15 @@ export const SLAYER_TASKS = [
   { id: "drowned", name: "drowned scholars", monsters: ["drowned_scholar"], min: 32, amount: [15, 35] },
   { id: "wraiths", name: "ink wraiths", monsters: ["ink_wraith"], min: 48, amount: [15, 30], slayer: 40 },
   { id: "vault_dead", name: "the vault dead", monsters: ["vault_archer", "vault_knight"], min: 55, amount: [15, 35], slayer: 45 },
+  // The Palian Isles' wayward spirits and worse (What Rises in the East).
+  { id: "river_imps", name: "river imps", monsters: ["river_imp"], min: 15, amount: [12, 24], slayer: 10 },
+  { id: "lantern_wights", name: "lantern-wights", monsters: ["lantern_wight"], min: 28, amount: [15, 30], slayer: 25 },
+  { id: "foxfire_vixens", name: "foxfire vixens", monsters: ["foxfire_vixen"], min: 34, amount: [15, 30], slayer: 30 },
+  { id: "crow_hermits", name: "crow-masked hermits", monsters: ["crow_hermit"], min: 42, amount: [15, 30], slayer: 40 },
+  { id: "grudge_wraiths", name: "grudge wraiths", monsters: ["grudge_wraith"], min: 46, amount: [15, 30], slayer: 45 },
+  { id: "silk_widows", name: "silk widows", monsters: ["silk_widow"], min: 50, amount: [15, 30], slayer: 50 },
+  { id: "ash_ogres", name: "ash ogres", monsters: ["ash_ogre"], min: 58, amount: [15, 30], slayer: 55 },
+  { id: "sea_monks", name: "sea monks", monsters: ["sea_monk"], min: 68, amount: [10, 20], slayer: 65 },
 ] as const;
 export type SlayerTask = typeof SLAYER_TASKS[number];
 /** What Slayer points buy from the Warden. */
@@ -1507,6 +1595,18 @@ export type ShopDef = { id: string; name: string; stock: readonly string[]; gene
 /** Clothes that are only had by earning them (quest rewards, the rarest drops): never on a clothier's rail. */
 const QUEST_CLOTHES = new Set(["maiden_veil", "rarian_mantle", "scorched_cloak"]);
 export const SHOPS: Record<string, ShopDef> = {
+  // The Palian Isles: Kurohama's market, the Ironsand Forge, the Bureau of Seals, the shrine office, Takamori's armourer and bowyer, the teahouses.
+  palian_general: { id: "palian_general", name: "Okiku's General Store", general: true, buys: ["food", "logs", "other"], rate: 0.55, stock: ["rice", "rice_ball", "miso_soup", "cucumber", "straw_kasa", "vial", "tinderbox", "knife", "hammer", "bucket", "small_net", "fishing_rod", "fishing_bait", "pewter_axe", "pewter_pickaxe"] },
+  palian_fish: { id: "palian_fish", name: "The Kurohama Fish Market", buys: ["fish"], rate: 0.6, stock: ["grilled_eel", "raw_carp", "raw_perch", "small_net", "fishing_rod", "harpoon", "fishing_bait"] },
+  palian_inn: { id: "palian_inn", name: "The Sleeping Crane", buys: ["food"], rate: 0.5, stock: ["rice_ball", "miso_soup", "grilled_eel", "green_tea", "rice_wine", "sakura_mochi"] },
+  palian_forge: { id: "palian_forge", name: "The Ironsand Forge", buys: ["weapon", "armour", "ore", "bar"], rate: 0.5, stock: ["kurohama_katana", "tanto", "yari", "tamahagane_katana", "naginata", "iron_sand", "tamahagane_bar", "hammer", "ashigaru_hat", "ashigaru_do", "ashigaru_greaves"] },
+  palian_seals: { id: "palian_seals", name: "The Bureau of Seals", buys: ["other"], rate: 0.5, stock: ["paper_seal", "spirit_seal", "sealwright_hood", "sealwright_robe", "sealwright_staff", "path_sigil", "thought_sigil", "breeze_sigil"] },
+  palian_shrine: { id: "palian_shrine", name: "The Kumoyama Shrine Office", buys: ["other"], rate: 0.4, stock: ["paper_charm", "paper_seal", "spirit_seal", "shrine_hat", "shrine_robe", "shrine_hakama", "shrine_wand", "shrine_bell", "sakura_mochi"] },
+  palian_armour: { id: "palian_armour", name: "Gonzaburo's Armoury", buys: ["weapon", "armour"], rate: 0.5, stock: ["ashigaru_hat", "ashigaru_do", "ashigaru_greaves", "samurai_kabuto", "samurai_do", "samurai_haidate", "samurai_kote", "samurai_suneate", "tamahagane_nodachi"] },
+  palian_bows: { id: "palian_bows", name: "Asa's Bows", buys: ["bow", "arrow", "logs"], rate: 0.55, stock: ["half_bow", "palian_longbow", "palian_arrows", "pewter_arrow", "blackiron_arrow", "arrow_shaft", "feather", "string", "bamboo_canes"] },
+  palian_tea: { id: "palian_tea", name: "The Plum Teahouse", buys: ["food"], rate: 0.5, stock: ["green_tea", "sakura_mochi", "rice_ball", "miso_soup", "rice_wine"] },
+  palian_herbs: { id: "palian_herbs", name: "Granny Ume's Herbs", buys: ["other"], rate: 0.5, stock: ["vial", "vial_of_water", "mortar", "clean_tea_leaf", "clean_shiso", "kibi_tea", "shiso_tonic", "spirit_incense"] },
+  palian_cove: { id: "palian_cove", name: "What Fell Off a Boat", buys: ["other", "weapon", "armour"], rate: 0.65, stock: ["mistwalker_hood", "mistwalker_coat", "mistwalker_trousers", "rice_wine", "tanto", "half_bow", "palian_arrows"] },
   // The four Orders' quartermasters (open once their oath is sworn), and the Deadwood Maidens' market (once the truce is kept).
   diamond_armoury: { id: "diamond_armoury", name: "The Diamond Armoury", buys: ["weapon", "armour"], rate: 0.5, stock: orderStock("diamond") },
   // Return of Raria: the Federation's shops at the FFF Fortress (open once the Federation knows your name), Raria's (once you hold a writ), the Order of Dusk's, and BarkReach's.
@@ -1549,6 +1649,7 @@ export const SHOPS: Record<string, ShopDef> = {
   ring_champions: { id: "ring_champions", name: "The Champions' Hall", currency: "laurel", stock: ["duelists_gauntlets", "laurel_crown", "champions_cape", "gilded_skull_mask"] },
   // The wider world's villages: a clothier in each, and the shop its trade is built on.
   gravesend_clothier: { id: "gravesend_clothier", name: "Mira's Mourning Wear", buys: ["other"], rate: 0.5, stock: REGIONAL_CLOTHING.find(set => set.region === "gravesend")!.pieces.map(piece => piece.id) },
+  palian_clothier: { id: "palian_clothier", name: "Sayo's Clothier", buys: ["other"], rate: 0.5, stock: REGIONAL_CLOTHING.find(set => set.region === "palian")!.pieces.map(piece => piece.id) },
   saltmarrow_clothier: { id: "saltmarrow_clothier", name: "The Oilskin Locker", buys: ["other"], rate: 0.5, stock: REGIONAL_CLOTHING.find(set => set.region === "saltmarrow")!.pieces.map(piece => piece.id) },
   hollyhock_herbs: { id: "hollyhock_herbs", name: "Mother Yarrow's Bench", buys: ["other"], rate: 0.6, stock: ["vial_of_water", "vial", "mortar", "feverleaf", "saltwort", "healing_tonic", "antidote"] },
   hollyhock_clothier: { id: "hollyhock_clothier", name: "Petal & Pocket", buys: ["other"], rate: 0.5, stock: REGIONAL_CLOTHING.find(set => set.region === "hollyhock")!.pieces.map(piece => piece.id) },

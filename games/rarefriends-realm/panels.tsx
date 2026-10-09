@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { PursuanceJournal } from "./journal.tsx";
 import type { GenerationSprites } from "@rarefriends/friendsdk/sprites";
-import { SPELL_TABS, RARIAN_SPELL_TABS, spellInBook, MONSTERS, type Spell, ITEM_LIST, isItem,
+import { SPELL_TABS, RARIAN_SPELL_TABS, PALIAN_SPELL_TABS, spellInBook, MONSTERS, type Spell, type Prayer, type Tradition, ITEM_LIST, isItem,
   EMOTES, EQUIP_SLOTS, FAMILY_NAMES, FAMILY_PERKS, PRAYERS, RELICS, SHOPS, SKILLS, SKILL_ICONS, SKILL_NAMES, SPELLS, WARDROBE, XP_TABLE, item, levelForXp,
   type EquipSlot, type Skill, mountDef, PETS, CARVINGS, CARVING_REACH,
 } from "./data.ts";
@@ -19,7 +19,8 @@ import { CARDS, CARD_KINDS, CARD_KIND_NAMES, cardFound, cardsFound, orderOpen, t
 import { decorArt } from "./scenery.ts";
 import { HIGH_QUALITY, LOW_QUALITY, type Quality } from "./render.ts";
 import { LANGUAGES } from "./i18n.ts";
-import { setLaw } from "./state.ts";
+import { setTradition, traditionOf } from "./state.ts";
+import { routesFrom, DOCK_TEXT } from "./boats.ts";
 import { FEEDBACK_KINDS, FEEDBACK_MAX, feedbackPost, type FeedbackKind } from "./feedback.ts";
 import { friendSays, remember } from "./friend.ts";
 import { FELLOWSHIP_COST, FELLOWSHIP_JOIN_COST, FELLOWSHIP_RENAME_COST, NAME_MAX, RENAME_COST, TITLES, chooseTitle, cleanName, cleanTag, joinFellowship, leaveFellowship, nameFriend, profile, renameFellowship, setFellowshipLook, unlockedTitles } from "./presence.ts";
@@ -428,53 +429,88 @@ function EquipmentTab({ game, refresh, openCard, openCards, openMenu }: PanelPro
   );
 }
 const signed = (n: number) => (n >= 0 ? `+${n}` : String(n));
-/** The Wise Friend's Law over a tab (Return of Raria): the closed eye, the doctrine, and the way back to the old book. */
-function LawHeader({ game, refresh, faith }: { game: Game; refresh: () => void; faith: boolean }) {
-  const player = game.player, received = questDone(game, "wise_friends_law");
-  if (!player.rarian) return received ? <button type="button" className="realm-law-keep" onClick={() => { setLaw(game, true); refresh(); }}>Keep the Wise Friend's Law</button> : null;
+/** The traditions you could keep, and what each looks like at the top of the book. */
+const TRADITIONS: readonly { id: Tradition; name: string; emblem: string; faith: string; magic: string; blurb: string }[] = [
+  { id: "realm", name: "The Old Friend's Book", emblem: "realm", faith: "The Old Friend's Prayers", magic: "The Spellbook", blurb: "The Realm's own: sigils, the Old Friend's prayers and light." },
+  { id: "raria", name: "The Wise Friend's Law", emblem: "raria", faith: "The Commandments of the Law", magic: "The Book of the Law", blurb: "Raria's: edicts, judgements, vigils, commandments and rites." },
+  { id: "palia", name: "The Palian Way", emblem: "palia", faith: "The Shrine's Book of Vows", magic: "The Scroll of Seals", blurb: "The Isles': seals, bindings, barriers, vows, blessings and rites." },
+];
+/** Which traditions you've been given (the Realm's is always yours). */
+const traditionsKnown = (game: Game) => TRADITIONS.filter(entry => entry.id === "realm" || (entry.id === "raria" && questDone(game, "wise_friends_law")) || (entry.id === "palia" && questDone(game, "rope_and_brush")));
+/**
+ * The tradition over the Faith and Magic tabs, and the way to change it (Return of Raria; What Rises in the East): the
+ * one you keep, with its emblem and doctrine, and a deliberate choice of another, from anywhere. Changing never teaches
+ * or forgets a spell: it only changes which book is open.
+ */
+function TraditionHeader({ game, refresh, faith }: { game: Game; refresh: () => void; faith: boolean }) {
+  const player = game.player, known = traditionsKnown(game), kept = traditionOf(player), [choosing, setChoosing] = useState(false);
+  if (known.length < 2 && kept === "realm") return null;
+  const current = TRADITIONS.find(entry => entry.id === kept)!;
+  const chooser = choosing && (
+    <div className="realm-tradition-choice" role="radiogroup" aria-label="Keep a tradition">
+      {known.map(entry => (
+        <button key={entry.id} type="button" role="radio" aria-checked={entry.id === kept} className={`realm-tradition-card ${entry.id}`} onClick={() => { if (entry.id !== kept) setTradition(game, entry.id); setChoosing(false); refresh(); }}>
+          <span className={`realm-tradition-emblem ${entry.emblem}`} aria-hidden="true" /><b>{entry.name}</b><small>{entry.blurb}</small><em>{entry.id === kept ? "Kept" : "Keep this"}</em>
+        </button>
+      ))}
+    </div>
+  );
+  if (kept === "realm") return (
+    <div className="realm-tradition-keep">
+      {!choosing && <button type="button" className="realm-law-keep" onClick={() => setChoosing(true)}>Keep another tradition…</button>}
+      {chooser}
+    </div>
+  );
+  const head = kept === "raria"
+    ? <><span className="realm-law-eye" aria-hidden="true" /><b>{faith ? current.faith : current.magic}</b><small>{faith ? "Obey, and be wise. The Law is kept here in place of prayer; the rites stand in place of the light." : "Edicts, judgements, vigils, offices and summons: magic as Raria keeps it, a rite with a staff in it."}</small></>
+    : <><span className="realm-palian-seal" aria-hidden="true">{faith ? "誓" : "封"}</span><b>{faith ? current.faith : current.magic}</b><small>{faith ? "Vows of protection, blessings for the road and the fight, purification, the spirits' wards, the great rites: the Thousand Friends kept as the shrine keeps them." : "Seals, bindings, barriers, arts and crossings: magic as the Isles write it, with a brush, in ink, on paper."}</small></>;
   return (
-    <div className="realm-law-head">
-      <span className="realm-law-eye" aria-hidden="true" />
-      <b>{faith ? "The Commandments of the Law" : "The Book of the Law"}</b>
-      <small>{faith ? "Obey, and be wise. The Law is kept here in place of prayer; the rites stand in place of the light." : "Edicts, judgements, vigils, offices and summons: magic as Raria keeps it, a rite with a staff in it."}</small>
-      <button type="button" onClick={() => { setLaw(game, false); refresh(); }}>Set down the Law</button>
+    <div className={kept === "raria" ? "realm-law-head" : "realm-palian-head"}>
+      {head}
+      {!choosing && <button type="button" onClick={() => setChoosing(true)}>Change tradition…</button>}
+      {chooser}
     </div>
   );
 }
+/** The shrine's book of vows, in its parts. */
+const PALIAN_SECTIONS = [["protection", "Protection"], ["blessings", "Blessings"], ["purification", "Purification"], ["spirits", "Spirits"], ["rituals", "Rituals"]] as const;
 function PrayerTab({ game, refresh, openMenu }: PanelProps) {
-  const player = game.player, level = levelForXp(player.xp.prayer), [hover, setHover] = useState<string | null>(null), rarian = player.rarian;
-  const prayers = PRAYERS.filter(prayer => !!prayer.rarian === rarian);
+  const player = game.player, level = levelForXp(player.xp.prayer), [hover, setHover] = useState<string | null>(null), tradition = traditionOf(player), rarian = tradition === "raria", palian = tradition === "palia";
+  const prayers = PRAYERS.filter(prayer => rarian ? prayer.rarian : palian ? prayer.palian : !prayer.rarian && !prayer.palian);
+  const button = (prayer: Prayer) => (
+    <button key={prayer.id} type="button" aria-pressed={player.prayers.includes(prayer.id)} disabled={level < prayer.level} aria-label={`${prayer.name} (level ${prayer.level}): ${prayer.description}`}
+      onMouseEnter={() => setHover(prayer.id)} onFocus={() => setHover(prayer.id)} onClick={() => { togglePrayer(game, prayer.id); refresh(); }}
+      {...rightClick(openMenu, () => [{ verb: player.prayers.includes(prayer.id) ? (rarian ? "Release" : palian ? "Unbind" : "Deactivate") : (rarian ? "Keep" : palian ? "Vow" : "Activate"), noun: prayer.name, run: () => { togglePrayer(game, prayer.id); refresh(); } }, { verb: "Examine", noun: prayer.name, run: () => { message(game, `${prayer.name} (level ${prayer.level}): ${prayer.description}.`); refresh(); } }])}>
+      <PixelIcon art={prayerArt(prayer.id)} size={36} />
+    </button>
+  );
   return (
-    <div className={rarian ? "realm-rarian" : undefined}>
-      <LawHeader game={game} refresh={refresh} faith />
-      <p className="realm-muted">{rarian ? "Devotion" : "Faith"}: <b>{Math.ceil(player.prayer)}</b> / {maxPrayer(player)} · Bonus {signed(bonuses(player).prayer)}</p>
-      <div className="realm-icon-grid prayers">
-        {prayers.map(prayer => (
-          <button key={prayer.id} type="button" aria-pressed={player.prayers.includes(prayer.id)} disabled={level < prayer.level} aria-label={`${prayer.name} (level ${prayer.level}): ${prayer.description}`}
-            onMouseEnter={() => setHover(prayer.id)} onFocus={() => setHover(prayer.id)} onClick={() => { togglePrayer(game, prayer.id); refresh(); }}
-            {...rightClick(openMenu, () => [{ verb: player.prayers.includes(prayer.id) ? (rarian ? "Release" : "Deactivate") : (rarian ? "Keep" : "Activate"), noun: prayer.name, run: () => { togglePrayer(game, prayer.id); refresh(); } }, { verb: "Examine", noun: prayer.name, run: () => { message(game, `${prayer.name} (level ${prayer.level}): ${prayer.description}.`); refresh(); } }])}>
-            <PixelIcon art={prayerArt(prayer.id)} size={36} />
-          </button>
-        ))}
-      </div>
+    <div className={rarian ? "realm-rarian" : palian ? "realm-palian faith" : undefined}>
+      <TraditionHeader game={game} refresh={refresh} faith />
+      <p className="realm-muted">{rarian ? "Devotion" : palian ? "Devotion" : "Faith"}: <b>{Math.ceil(player.prayer)}</b> / {maxPrayer(player)} · Bonus {signed(bonuses(player).prayer)}</p>
+      {palian ? PALIAN_SECTIONS.map(([section, title]) => (
+        <section key={section} className="realm-palian-section"><h4>{title}</h4><div className="realm-icon-grid prayers">{prayers.filter(prayer => prayer.section === section).map(button)}</div></section>
+      )) : <div className="realm-icon-grid prayers">{prayers.map(button)}</div>}
       <InfoCard>{(() => { const prayer = prayers.find(entry => entry.id === hover); return prayer ? <><b>{prayer.name}</b> <small>{`Level ${prayer.level}`}</small><p>{`${prayer.description}. Drains ${Math.round(prayer.drain * 100) / 100} points a tick.`}</p></>
-        : rarian ? <p>The Law is kept at the Wise Friend's altar in Raria, and at any altar besides: the Law uses what works. The Order of Dusk's gear slows the drain of every commandment.</p> : <p>Recharge at any altar. Bury bones to train Prayer.</p>; })()}</InfoCard>
+        : rarian ? <p>The Law is kept at the Wise Friend's altar in Raria, and at any altar besides: the Law uses what works. The Order of Dusk's gear slows the drain of every commandment.</p>
+        : palian ? <p>Renew your devotion at any shrine or altar: ring once, bow twice, clap twice, bow once. Paper and spirit seals pay for the rites; the Bureau of Seals and the shrine office sell them.</p>
+        : <p>Recharge at any altar. Bury bones to train Prayer.</p>; })()}</InfoCard>
     </div>
   );
 }
 const TARGET_HINT: Record<string, string> = { monster: "Cast on a monster", item: "Cast on an item in your pack", ground: "Cast on an item on the ground", self: "Casts straight away" };
 function MagicTab({ game, refresh, setSelection, selection, openMenu }: PanelProps) {
-  const player = game.player, staff = isStaffEquipped(player), [hover, setHover] = useState<string | null>(null), [tab, setTab] = useState(SPELL_TABS[0].id), rarian = player.rarian;
-  const TABS = rarian ? RARIAN_SPELL_TABS : SPELL_TABS, BOOK = SPELLS.filter(spell => spellInBook(spell, rarian));
+  const player = game.player, staff = isStaffEquipped(player), [hover, setHover] = useState<string | null>(null), [tab, setTab] = useState(SPELL_TABS[0].id), tradition = traditionOf(player), rarian = tradition === "raria", palian = tradition === "palia";
+  const TABS = rarian ? RARIAN_SPELL_TABS : palian ? PALIAN_SPELL_TABS : SPELL_TABS, BOOK = SPELLS.filter(spell => spellInBook(spell, tradition));
   const levelFor = (spell: Spell) => levelForXp(player.xp[spell.skill ?? "magic"]);
   const shown = BOOK.find(spell => spell.id === (hover ?? (selection?.kind === "spell" ? selection.spell : player.autocast)));
   // Raria's own edicts and rites come first in their tabs: the book is theirs now.
-  const kinds = TABS.find(entry => entry.id === tab)?.kinds ?? TABS[0].kinds, spells = BOOK.filter(spell => kinds.includes(spell.kind)).sort((a, b) => rarian ? Number(!!b.rarian) - Number(!!a.rarian) : 0);
+  const kinds = TABS.find(entry => entry.id === tab)?.kinds ?? TABS[0].kinds, spells = BOOK.filter(spell => kinds.includes(spell.kind)).sort((a, b) => rarian ? Number(!!b.rarian) - Number(!!a.rarian) : palian ? Number(!!b.palian) - Number(!!a.palian) : 0);
   const learnt = (spell: Spell) => !spell.quest || (player.quests[spell.quest] ?? 0) >= 2;
   return (
-    <div className={rarian ? "realm-rarian" : undefined}>
-      <LawHeader game={game} refresh={refresh} faith={false} />
-      <div className="realm-graphics realm-magic-tabs" role="tablist" aria-label={rarian ? "The Book of the Law" : "Spellbook"}>
+    <div className={rarian ? "realm-rarian" : palian ? "realm-palian magic" : undefined}>
+      <TraditionHeader game={game} refresh={refresh} faith={false} />
+      <div className="realm-graphics realm-magic-tabs" role="tablist" aria-label={rarian ? "The Book of the Law" : palian ? "The Scroll of Seals" : "Spellbook"}>
         {TABS.map(entry => <button key={entry.id} type="button" role="tab" aria-selected={tab === entry.id} aria-checked={tab === entry.id} onClick={() => setTab(entry.id)}>{entry.name}<small>{BOOK.filter(spell => entry.kinds.includes(spell.kind) && levelFor(spell) >= spell.level && learnt(spell)).length}/{BOOK.filter(spell => entry.kinds.includes(spell.kind)).length}</small></button>)}
       </div>
       <div className="realm-icon-grid spells">
@@ -502,7 +538,7 @@ function MagicTab({ game, refresh, setSelection, selection, openMenu }: PanelPro
           <div className="realm-sigils">{Object.entries(shown.sigils).map(([sigil, n]) => { const have = count(player, sigil) + (sigil === "breeze_sigil" && player.equipment.weapon === "breeze_staff" ? 999 : 0);
             return <span key={sigil} data-short={have < n}><ItemIcon slot={{ id: sigil, n: 1 }} size={26} bare />{n}<small>/{have > 998 ? "∞" : have}</small></span>; })}
             {!Object.keys(shown.sigils).length && <span>Free</span>}</div>
-        </> : rarian ? <p>Magic level <b>{levelForXp(player.xp.magic)}</b>, Devotion <b>{levelForXp(player.xp.prayer)}</b>. The Book of the Law: Raria's edicts, judgements, vigils, the Office of Tithes and the Summons to Raria, the Realm's common magic beside them, and the Wise Friend's rites in place of the old light. Law, dusk and crown sigils are pressed in Raria.</p> : <p>Magic level <b>{levelForXp(player.xp.magic)}</b>, Faith <b>{levelForXp(player.xp.prayer)}</b>. Hover a spell for details. Darts, lances and bursts, wards, curses, Gilded Touch, Forgeheart, Far Reach, Bonebloom, teleports, and the Faith tab's light.</p>}
+        </> : palian ? <p>Magic level <b>{levelForXp(player.xp.magic)}</b>, Devotion <b>{levelForXp(player.xp.prayer)}</b>. The Scroll of Seals: the Isles' seals, bindings, barriers, Spirit Sight and the crossings, the Realm's common magic beside them, and the shrine's rites in place of the old light. The Isles' seals bite a wayward spirit harder. Paper and spirit seals are sold at the Bureau of Seals in Kurohama.</p> : rarian ? <p>Magic level <b>{levelForXp(player.xp.magic)}</b>, Devotion <b>{levelForXp(player.xp.prayer)}</b>. The Book of the Law: Raria's edicts, judgements, vigils, the Office of Tithes and the Summons to Raria, the Realm's common magic beside them, and the Wise Friend's rites in place of the old light. Law, dusk and crown sigils are pressed in Raria.</p> : <p>Magic level <b>{levelForXp(player.xp.magic)}</b>, Faith <b>{levelForXp(player.xp.prayer)}</b>. Hover a spell for details. Darts, lances and bursts, wards, curses, Gilded Touch, Forgeheart, Far Reach, Bonebloom, teleports, and the Faith tab's light.</p>}
       </InfoCard>
     </div>
   );
@@ -1072,6 +1108,43 @@ export function RfActionModal({ game, refresh, onRf, rfPrice, rfBusy }: { game: 
         <button type="button" className="realm-primary" disabled={rfBusy || !onRf} onClick={() => { const kind = action.kind; game.ui.rfAction = null; onRf?.(action.caskets, () => { if (kind === "slayer-complete") completeTaskForRf(game); else rerollTaskForRf(game); refresh(); }); refresh(); }}>Spend {action.caskets} casket{action.caskets === 1 ? "" : "s"}{rfPrice ? ` (${rfPrice(action.caskets)})` : ""}</button>
         <button type="button" className="realm-dark" onClick={close}>Not now</button>
       </div>
+    </Modal>
+  );
+}
+/**
+ * The boat list at a Palian landing (What Rises in the East): every landing, its fare and what it's like; the ones you
+ * can't go to yet, and why. Choosing one shows the fare again with the button that pays it, so nothing is spent by a
+ * stray click; the engine pays and sails in one step, so a double click sails once.
+ */
+export function BoatModal({ game, refresh, onSail }: { game: Game; refresh: () => void; onSail: (from: string, to: string) => void }) {
+  const from = game.ui.boat, [chosen, setChosen] = useState<string | null>(null);
+  if (!from) return null;
+  const close = () => { game.ui.boat = null; setChosen(null); refresh(); };
+  const routes = routesFrom(game, from), here = routes.find(route => route.here), pick = routes.find(route => route.id === chosen && route.open), coins = count(game.player, "coins");
+  return (
+    <Modal title="Boats from here" onClose={close} wide kind="realm-boats">
+      <p className="realm-muted">{here ? `${here.name}. ${DOCK_TEXT[from] ?? ""}` : ""} You have <b>{coins.toLocaleString()}</b> coins.</p>
+      {pick ? (
+        <div className="realm-boat-confirm">
+          <h3>{pick.name}</h3><p>{pick.text}</p>
+          <p className="realm-boat-fare">Fare: <b>{pick.fare.toLocaleString()} coins</b>{coins < pick.fare ? " (you can't afford it)" : ""}</p>
+          <div className="realm-buttons">
+            <button type="button" className="realm-primary" disabled={coins < pick.fare} onClick={() => { const to = pick.id; setChosen(null); onSail(from, to); }}>Pay {pick.fare.toLocaleString()} coins and sail</button>
+            <button type="button" className="realm-dark" onClick={() => setChosen(null)}>Back to the list</button>
+          </div>
+        </div>
+      ) : (
+        <ul className="realm-boat-list">
+          {routes.filter(route => !route.here).map(route => (
+            <li key={route.id} data-open={route.open}>
+              <button type="button" disabled={!route.open} onClick={() => setChosen(route.id)} aria-label={route.open ? `${route.name}: ${route.fare} coins` : `${route.name}: ${route.why ?? ""}`}>
+                <b>{route.name}</b><span className="realm-boat-fare">{route.open ? `${route.fare.toLocaleString()} coins` : "Not yet"}</span>
+                <small>{route.open ? route.text : route.why}</small>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </Modal>
   );
 }

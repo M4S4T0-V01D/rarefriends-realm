@@ -11,8 +11,9 @@ import { FAMILY_NAMES, FAMILY_PERKS, MOUNTS, RELICS, RF_BUNDLES, SKILL_COLORS, S
 import { QUESTS, questPoints, MAX_QUEST_POINTS } from "./content.ts";
 import { TICK_MS, attackSpeed, combatLevel, createGame, giveOrDrop, message, totalLevel, type Game, type Projectile } from "./state.ts";
 import {
-  chooseOption, closeInterfaces, collectFromCasket, creditReferral, emoteProblem, performEmote, syncMonster, continueDialogue, grantBundle, menuFor, tailorChoices, unlockMusic, restore, serialize, setFollower, setHeld, setRelics, tick, toggleRun, toggleSneak, toggleMount, grantMount, walkTo, type OwnedFriend, type Selection,
+  chooseOption, closeInterfaces, collectFromCasket, creditReferral, emoteProblem, performEmote, syncMonster, continueDialogue, grantBundle, menuFor, tailorChoices, unlockMusic, restore, serialize, setFollower, setHeld, setRelics, tick, toggleRun, toggleSneak, toggleMount, grantMount, walkTo, sailTo, atSea, type OwnedFriend, type Selection,
 } from "./engine.ts";
+import { DOCKS } from "./isles.ts";
 import { LANGUAGES, languageOf, setLanguage } from "./i18n.ts";
 import { logoSvg } from "./logo.ts";
 
@@ -20,7 +21,7 @@ import { logoSvg } from "./logo.ts";
 const TITLE_LOGO = logoSvg("horizontal");
 import { HIGH_QUALITY, PITCH, RENDER_PROFILE, VIEW, ZOOM, addPrint, daylight, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
 import {
-  BankModal, CardsModal, CarvingBuffs, FeedbackModal, ChatBox, ContextMenu, DailyModal, FellowshipModal, HomeModal, JoinModal, RfActionModal, FirstStepsCard, GuideModal, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, NamingModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
+  BankModal, BoatModal, CardsModal, CarvingBuffs, FeedbackModal, ChatBox, ContextMenu, DailyModal, FellowshipModal, HomeModal, JoinModal, RfActionModal, FirstStepsCard, GuideModal, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, NamingModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
   cancelLongPress, longPress, rightClick, NerdSettings, LanguagePicker, customFrom, type CustomGraphics, type MenuEntry, type Settings, type Tab,
 } from "./panels.tsx";
 import { REGULAR_SPRITES } from "./regulars.ts";
@@ -153,7 +154,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const camera = useRef<Camera>({ x: mainlandToWorld(121, 121)[0], y: mainlandToWorld(121, 121)[1], zoom: DEFAULT_SETTINGS.zoom, angle: 0, pitch: PITCH.classic }), cameraGoal = useRef<{ angle: number; pitch: number } | null>(null),
     compass = useRef<HTMLButtonElement>(null), orbit = useRef<{ x: number; y: number; angle: number; pitch: number } | null>(null), miniZoom = useRef(3.2), tickAt = useRef(0), hits = useRef<HitSplat[]>([]), fireworks = useRef<Firework[]>([]);
   const projectiles = useRef<Projectile[]>([]), marker = useRef<ClickMarker | null>(null), hoverTile = useRef<{ x: number; y: number } | null>(null), chat = useRef<{ text: string; until: number } | null>(null);
-  const held = useRef(new Set<string>()), linked = useRef(false), elsewhere = useRef(false), lastSave = useRef(""), region = useRef(""), epoch = useRef(0), pointer = useRef<{ x: number; y: number } | null>(null);
+  const held = useRef(new Set<string>()), linked = useRef(false), elsewhere = useRef(false), lastSave = useRef(""), region = useRef(""), playing = useRef(""), epoch = useRef(0), pointer = useRef<{ x: number; y: number } | null>(null);
   const [phase, setPhase] = useState<Phase>("loading"), [status, setStatus] = useState("Waking your Friend and unfolding the Realm…");
   const [, setVersion] = useState(0), [tab, setTab] = useState<Tab>("inventory"), [selection, setSelection] = useState<Selection>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; entries: MenuEntry[] } | null>(null), [modal, setModal] = useState<Modal>(null);
@@ -223,7 +224,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
 
   // ---------- Audio ----------
   const setSettings = useCallback((next: Settings) => {
-    if (next.autoMusic && !live.current.settings.autoMusic) region.current = ""; // back to the area's own track on the next tick
+    if (next.autoMusic && !live.current.settings.autoMusic) { region.current = ""; playing.current = ""; } // back to the area's own track on the next tick
     // Choosing a graphics level yourself: Auto measures afresh, and High or Low never change on their own.
     setSettingsState(next); saveSettings(next); camera.current.zoom = next.zoom;
     const player = audio.current;
@@ -598,13 +599,15 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           fireworks.current = fireworks.current.filter(entry => now - entry.at < 2400);
           // Area music and the region banner.
           const here = regionAt(state.world, state.player.x, state.player.y), throne = state.player.x >= THRONE.x && state.player.y >= THRONE.y0 && state.player.y <= THRONE.y1;
+          // (On the Palian Isles the music follows a crossing, a fight, and a fight with one of the great spirits.)
+          const foe = state.player.combat !== null ? state.monsters.find(monster => monster.uid === state.player.combat && !monster.dead) : undefined;
+          const track = trackById(trackFor(here.id, throne, { sea: atSea(state), fight: !!foe, spirit: !!foe?.def.spirit && !!foe.def.boss }));
           const key = `${here.id}:${throne}`;
-          if (key !== region.current) {
-            region.current = key;
-            const track = trackById(trackFor(here.id, throne));
+          if (key !== region.current) { region.current = key; setToast({ title: throne ? "The Throne Room" : here.name, sub: track.name }); }
+          if (track.id !== playing.current) {
+            playing.current = track.id;
             unlockMusic(state, track.id, track.name);
             if (live.current.settings.autoMusic) audio.current?.play(track.id);
-            setToast({ title: throne ? "The Throne Room" : here.name, sub: trackById(trackFor(here.id, throne)).name });
           }
           // Footsteps on whatever is underfoot (two when running).
           if (state.player.moved === state.tick) {
@@ -959,7 +962,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     if (!state) return;
     // A new Friend is asked for its name as it arrives (over the Realm, so nothing waits on it).
     if (!state.player.name && !hasSave) state.ui.naming = "first";
-    audio.current?.unlock(); setPhase("playing"); region.current = ""; tickAt.current = performance.now();
+    audio.current?.unlock(); setPhase("playing"); region.current = ""; playing.current = ""; tickAt.current = performance.now();
     const at = realPoint(state.world, state.player.x, state.player.y);
     camera.current = { x: at.x, y: at.y, zoom: settings.zoom, angle: 0, pitch: PITCH.classic };
     if (!hasSave) { state.dialogue = null; message(state, "Tip: talk to the Realm Guide by the fountain, or right-click anything to see what you can do.", "info"); }
@@ -1138,6 +1141,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           {phase === "playing" && currentStep(state) && <FirstStepsCard game={state} onSkip={() => { skipFirstSteps(state); refresh(); }} openMenu={(x, y, entries) => setMenu({ x, y, entries })} />}
           {toast && <div className="realm-toast" role="status"><b>{toast.title}</b>{toast.sub && <small>♪ {toast.sub}</small>}</div>}
           {dead && <div className="realm-dead" role="alert">Oh dear, you are dead!</div>}
+          {state && atSea(state) && state.voyage && <div className="realm-voyage" role="status" aria-live="polite"><div className="realm-voyage-sea" aria-hidden="true"><span className="realm-voyage-sun" /><span className="realm-voyage-boat" /></div><b>{DOCKS.find(dock => dock.id === state.voyage!.to)?.name}</b></div>}
 
           <div className="realm-bottom">
             {state.dialogue ? <DialogueBox game={state} sprites={friend.current} canonical={CANONICAL} refresh={refresh} />
@@ -1172,6 +1176,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           {guide && <GuideModal game={state} skill={guide.skill} onSkill={skill => setGuide({ skill })} onClose={() => setGuide(null)} />}
           <FellowshipModal key={`${state.ui.fellowship ? 1 : 0}:${state.player.fellowship?.name ?? ""}`} game={state} refresh={refresh} onRecruit={recruit} shareStatus={shareStatus} />
           <JoinModal game={state} refresh={refresh} />
+          <BoatModal game={state} refresh={refresh} onSail={(from, to) => { sailTo(state, from, to); refresh(); }} />
           <RfActionModal game={state} refresh={refresh} onRf={(caskets, after) => void casket(() => client.buy(BigInt(caskets)), () => { after(); audio.current?.sfx("coins"); })} rfPrice={caskets => rf(definition.price * BigInt(caskets))} rfBusy={busy || paused} />
           <HomeModal game={state} refresh={refresh} onRf={(caskets, after) => void casket(() => client.buy(BigInt(caskets)), () => { after(); audio.current?.sfx("coins"); })} rfPrice={caskets => rf(definition.price * BigInt(caskets))} rfBusy={busy || paused} />
           {(() => { const view = trades.current.view(); return view ? <TradeModal game={state} view={view} openMenu={(x, y, entries) => setMenu({ x, y, entries })}

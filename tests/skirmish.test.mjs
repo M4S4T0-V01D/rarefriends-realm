@@ -59,7 +59,8 @@ test("you can attack a soldier: it draws steel, its comrades rally, and it falls
   assert.ok((game.player.killLog.hollowmere_soldier ?? 0) >= 1);
   run(game, twin.def.respawn + 5);
   assert.ok(!npc.drawn && !game.monsters.includes(twin), "it's back at its post");
-  assert.equal(npc.x, npc.spawn.x); assert.equal(npc.y, npc.spawn.y);
+  // (Back at its post, and then free to stroll about it as it always does.)
+  assert.ok(Math.max(Math.abs(npc.x - npc.spawn.x), Math.abs(npc.y - npc.spawn.y)) <= Math.max(npc.wander, 0), "at its post");
 });
 
 test("soldiers draw on the wild and the dead that come near, and what they cut down leaves nothing", () => {

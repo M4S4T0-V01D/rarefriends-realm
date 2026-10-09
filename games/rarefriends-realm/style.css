@@ -486,6 +486,71 @@
 .realm-rarian .realm-info { background: #1e1629; color: #d8d6e4; border-color: #8a6ab0; font-family: Georgia, "Times New Roman", serif; }
 .realm-rarian .realm-info small, .realm-rarian .realm-info em { color: #b9aed0; }
 
+/* ---------- Choosing a tradition (Return of Raria; What Rises in the East) ---------- */
+.realm-tradition-keep { margin: 0 0 6px; }
+.realm-tradition-choice { display: grid; gap: 4px; margin: 4px 0 2px; width: 100%; }
+.realm-tradition-card { display: grid; grid-template-columns: 28px 1fr auto; grid-template-rows: auto auto; column-gap: 6px; align-items: center; text-align: left; padding: 4px 6px; border-radius: 4px; border: 1.5px solid #6d6b67; background: #f3efe6; color: #2a2626; font-size: 11px; cursor: pointer; }
+.realm-tradition-card b { grid-column: 2; font-size: 11.5px; } .realm-tradition-card small { grid-column: 2; grid-row: 2; font-size: 9.5px; opacity: .8; }
+.realm-tradition-card em { grid-column: 3; grid-row: 1 / span 2; font-style: normal; font-weight: 700; font-size: 10px; padding: 2px 6px; border-radius: 9px; background: #2a2626; color: #f3efe6; }
+.realm-tradition-card[aria-checked="true"] em { background: #c9a24a; color: #2a2626; }
+.realm-tradition-card.raria { background: #2a2238; color: #d8d6e4; border-color: #8a6ab0; } .realm-tradition-card.palia { background: #f4ecd9; color: #22252e; border-color: #b5452f; }
+.realm-tradition-card:hover { filter: brightness(1.06); }
+.realm-tradition-emblem { grid-row: 1 / span 2; width: 26px; height: 26px; border-radius: 50%; border: 2px solid currentColor; display: grid; place-items: center; }
+.realm-tradition-emblem.realm { background: radial-gradient(#f2e28f, #c9a24a); border-color: #6d6b67; }
+.realm-tradition-emblem.raria { background: radial-gradient(#3b2a52, #16111f); border-color: #c9a84a; box-shadow: inset 0 0 0 5px #3b2a52, inset 0 0 0 7px #c9a84a; }
+.realm-tradition-emblem.palia { border-radius: 4px; background: #b5452f; border-color: #8f2b2b; box-shadow: inset 0 0 0 3px #b5452f, inset 0 0 0 4px #efe6d2; }
+
+/* ---------- What Rises in the East: the Palian way over Faith (ivory shrine paper, indigo ink, a red seal) and Magic (indigo and charcoal, crimson, gold) ---------- */
+.realm-palian { position: relative; margin: -6px; padding: 8px; border-radius: 2px; }
+.realm-palian.faith { color: #22252e; border: 2px solid #b5452f;
+  background: radial-gradient(ellipse at 50% 0%, rgba(201,162,74,0.22), transparent 60%), repeating-linear-gradient(0deg, rgba(34,37,46,0.035) 0 1px, transparent 1px 18px), linear-gradient(#f6efdf, #ece1c8);
+  box-shadow: inset 0 0 0 3px #f6efdf, inset 0 0 0 4px rgba(181,69,47,0.55); }
+.realm-palian.magic { color: #e6dfcf; border: 2px solid #8f2b2b;
+  background: radial-gradient(ellipse at 50% 100%, rgba(143,43,43,0.28), transparent 60%), repeating-linear-gradient(90deg, rgba(239,230,210,0.03) 0 1px, transparent 1px 16px), linear-gradient(#232838, #14161e);
+  box-shadow: inset 0 0 0 3px #14161e, inset 0 0 0 4px rgba(201,162,74,0.55); }
+.realm-palian::before { content: ""; position: absolute; left: 50%; top: -1px; width: 46%; height: 3px; transform: translateX(-50%); background: repeating-linear-gradient(90deg, #c9a24a 0 6px, transparent 6px 9px); pointer-events: none; }
+.realm-palian.faith .realm-muted { color: #5a5550; } .realm-palian.faith b { color: #8f2b2b; }
+.realm-palian.magic .realm-muted { color: #b9b2a2; } .realm-palian.magic b { color: #f2d48a; }
+.realm-palian-head { display: grid; justify-items: center; gap: 2px; margin: 0 0 6px; padding: 2px 4px 6px; text-align: center; border-bottom: 1px solid rgba(201,162,74,0.55); }
+.realm-palian-head b { font-family: Georgia, "Times New Roman", serif; font-size: 13px; letter-spacing: .06em; font-variant: small-caps; }
+.realm-palian.faith .realm-palian-head b { color: #2f3a5e; } .realm-palian.magic .realm-palian-head b { color: #e2c46a; }
+.realm-palian-head small { font-size: 10px; font-style: italic; opacity: .85; }
+.realm-palian-head button { margin-top: 3px; padding: 1px 8px; font-size: 10px; border-radius: 10px; border: 1px solid #b5452f; background: transparent; color: inherit; }
+.realm-palian.magic .realm-palian-head button { border-color: #c9a24a; }
+.realm-palian-seal { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 3px; background: #b5452f; color: #f6efdf; font-size: 15px; line-height: 1; font-weight: 700; box-shadow: inset 0 0 0 2px #b5452f, inset 0 0 0 3px rgba(246,239,223,0.8); transform: rotate(-4deg); }
+.realm-palian-section { margin: 0 0 4px; } .realm-palian-section h4 { margin: 4px 0 2px; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: #8f2b2b; border-bottom: 1px dotted rgba(143,43,43,0.4); }
+.realm-palian-section .realm-icon-grid { min-height: 0; }
+.realm-palian.faith .realm-icon-grid button { border: 1px solid #c9a24a; border-radius: 2px; background: linear-gradient(#fbf6ea, #ede2c9); box-shadow: inset 0 -2px 0 rgba(181,69,47,0.25); }
+.realm-palian.faith .realm-icon-grid button:hover:not(:disabled) { background: linear-gradient(#fffaf0, #f2e6cb); }
+.realm-palian.faith .realm-icon-grid button[aria-pressed="true"] { background: radial-gradient(#f2c46a, #b5452f); border-color: #8f2b2b; }
+.realm-palian.magic .realm-icon-grid button { border: 1px solid #8f2b2b; border-radius: 1px; background: linear-gradient(#2f3a5e, #1b1f2c); clip-path: polygon(0 4%, 100% 0, 100% 96%, 0 100%); }
+.realm-palian.magic .realm-icon-grid button:hover:not(:disabled) { background: linear-gradient(#3e4b74, #23283a); }
+.realm-palian.magic .realm-icon-grid button[aria-pressed="true"] { background: linear-gradient(#c9a24a, #8f2b2b); }
+.realm-palian .realm-magic-tabs button { font-family: Georgia, "Times New Roman", serif; }
+.realm-palian.magic .realm-magic-tabs button { border-color: #8f2b2b; background: #1b1f2c; color: #e6dfcf; } .realm-palian.magic .realm-magic-tabs button[aria-selected="true"] { background: #b5452f; color: #f6efdf; }
+.realm-palian.faith .realm-magic-tabs button[aria-selected="true"] { background: #b5452f; color: #f6efdf; }
+.realm-palian.faith .realm-info { background: #fbf6ea; color: #22252e; border-color: #c9a24a; font-family: Georgia, "Times New Roman", serif; }
+.realm-palian.magic .realm-info { background: #1b1f2c; color: #e6dfcf; border-color: #8f2b2b; font-family: Georgia, "Times New Roman", serif; }
+.realm-palian .realm-info small, .realm-palian .realm-info em { opacity: .8; }
+
+/* ---------- What Rises in the East: the boat list, and the crossing ---------- */
+.realm-boat-list { list-style: none; margin: 6px 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 5px; max-height: 360px; overflow: auto; }
+.realm-boat-list button { width: 100%; display: grid; grid-template-columns: 1fr auto; gap: 1px 8px; text-align: left; padding: 5px 7px; border-radius: 4px; border: 1.5px solid #2f3a5e; background: #f4ecd9; color: #22252e; font-size: 11.5px; cursor: pointer; }
+.realm-boat-list button small { grid-column: 1 / span 2; font-size: 10px; opacity: .8; }
+.realm-boat-list button:hover:not(:disabled) { background: #fff7e6; }
+.realm-boat-list li[data-open="false"] button { border-style: dashed; border-color: #8f8a83; background: #ece6da; color: #6d6b67; cursor: not-allowed; }
+.realm-boat-fare { font-weight: 700; color: #8f2b2b; white-space: nowrap; }
+.realm-boat-confirm { padding: 6px 4px; } .realm-boat-confirm h3 { margin: 0 0 4px; color: #2f3a5e; } .realm-boat-confirm .realm-boat-fare { font-size: 14px; }
+.realm-voyage { position: absolute; inset: 0; display: grid; place-items: center; align-content: center; gap: 10px; pointer-events: none; background: linear-gradient(#f2c46a55, #2f3a5ecc 55%, #14161ecc); animation: realm-voyage 3.6s ease forwards; z-index: 6; }
+.realm-voyage b { color: #f6efdf; font-size: 22px; letter-spacing: .06em; text-shadow: 2px 2px 0 #14161e; }
+.realm-voyage-sea { position: relative; width: 320px; height: 90px; overflow: hidden; border-radius: 6px; background: repeating-linear-gradient(180deg, #2f4d6e 0 6px, #3b5f86 6px 12px); box-shadow: 0 0 0 2px #14161e; }
+.realm-voyage-sun { position: absolute; left: 50%; bottom: 40px; width: 46px; height: 46px; margin-left: -23px; border-radius: 50%; background: #e2573f; box-shadow: 0 0 30px #f2c46a; }
+.realm-voyage-boat { position: absolute; bottom: 22px; left: -60px; width: 56px; height: 18px; background: #7a5a44; clip-path: polygon(0 30%, 100% 0, 88% 100%, 8% 100%); animation: realm-sail 3.6s linear forwards; }
+.realm-voyage-boat::after { content: ""; position: absolute; left: 18px; top: -12px; width: 18px; height: 12px; background: #a8925f; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+@keyframes realm-voyage { 0% { opacity: 0; } 12% { opacity: 1; } 82% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes realm-sail { from { transform: translateX(0); } to { transform: translateX(440px); } }
+@media (prefers-reduced-motion: reduce) { .realm-voyage, .realm-voyage-boat { animation: none; } .realm-voyage-boat { left: 132px; } }
+
 /* ---------- Return of Raria: the Adventurer Cards collection ---------- */
 .realm-codex-bar { display: flex; flex-direction: column; gap: 2px; margin: 0 0 8px; max-width: 280px; }
 .realm-codex-bar button { padding: 3px 8px !important; min-height: 0 !important; font-size: 11px; }

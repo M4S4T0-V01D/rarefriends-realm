@@ -9,9 +9,11 @@ import { regionAt, type RegionId, type WorldObject } from "./world.ts";
 import { searchCryptChest } from "./content.ts";
 
 type Tier = "shallow" | "deep" | "dread";
-const TIER: Partial<Record<RegionId, Tier>> = { root_cellars: "shallow", mossy_undercroft: "shallow", crypt: "shallow", sea_cave: "shallow", deepglass: "shallow", hollow_depths: "deep", catacombs: "deep", deep_mine: "deep", drowned_archive: "deep", wyrm_lair: "dread", howling_vault: "dread" };
+const TIER: Partial<Record<RegionId, Tier>> = { root_cellars: "shallow", mossy_undercroft: "shallow", crypt: "shallow", sea_cave: "shallow", deepglass: "shallow", hollow_depths: "deep", catacombs: "deep", deep_mine: "deep", drowned_archive: "deep", wyrm_lair: "dread", howling_vault: "dread",
+  // The Palian Isles: the Hollow under Kumo, the Ashigane Deeps, the Bone Shrine under Hakkotsu, and the Three Stones' sunken chest.
+  kumo_hollow: "deep", ashigane_deeps: "dread", bone_shrine: "dread", three_stones: "shallow" };
 /** The key a dungeon's coffers can hold. */
-const KEYS: Partial<Record<RegionId, string>> = { mossy_undercroft: "moss_key", deepglass: "deepglass_key", drowned_archive: "archive_key", howling_vault: "vault_key" };
+const KEYS: Partial<Record<RegionId, string>> = { mossy_undercroft: "moss_key", deepglass: "deepglass_key", drowned_archive: "archive_key", howling_vault: "vault_key", kumo_hollow: "kumo_seal_key", ashigane_deeps: "ogre_key", bone_shrine: "bone_shrine_key" };
 /** Ticks before a coffer fills again for the one who searched it (an hour: coffers and hoards are not a living). */
 export const COFFER_TICKS = 6000;
 /** `chance` here is a weight, not a probability: the commons are drawn by weight. */

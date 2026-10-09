@@ -159,6 +159,29 @@ export const RUMOURS: Partial<Record<RegionId, readonly Rumour[]>> = {
     r("Ironbark grows a heart of grey wood. Lurkers grow round it. Nobody's sure which came first.", "half"),
     r("The Regiment's scouts count trees. Why would anyone count trees? Unless you meant to own them.", "true"),
   ],
+  // The Palian Isles: what Kurohama's people say over tea.
+  kurohama: [
+    r("The harbourmaster's chart has a blank patch west of Ashigane. Every harbourmaster before him left it blank too. Nobody says why.", "true"),
+    r("The Red Ogre of Ashigane hates the whole of Takamori for something the first lord did. Nobody remembers what. The ogre does.", "true"),
+    r("The Bureau of Seals writes a seal for every boat that leaves. The boats that came back without one, the sea kept something from.", "half"),
+    r("They say the lord's sister reads every letter in the Hall before the lord does. They say the lord prefers it.", "true"),
+    r("A fisher swore he saw a lantern walking on Torojima's shore with nobody holding it. The Keeper says she knows its name.", "true"),
+    r("Josaki's castle burned twenty years ago, the same night as the treaty was signed. People who say that out loud stop being invited to the Hall."),
+    r("The sea monks off the north cape ask for a bucket. Give one with a hole in the bottom and they'll bail all night and never sink you.", "true"),
+    r("The great spirit under Hakkotsu is made of everyone the sea took and nobody mourned. My grandmother said that to frighten me. It worked; it still does.", "true"),
+  ],
+  takamori: [
+    r("Lord Naoharu has held Hinode three years. His sister has held it longer, people say, and they don't mean the title.", "true"),
+    r("Captain Ise has a bounty on ogre horns. Somebody's grandfather made a living at it. Somebody's grandfather is buried on Ashigane.", "true"),
+    r("The dojo's sensei once cut a falling leaf in four before it reached the floor. She says it was three, and the fourth was the wind.", "half"),
+    r("The Takamori keep has five roofs. The fifth was added after Josaki burned. Nobody says what the fourth was for."),
+  ],
+  hinode: [
+    r("The sun comes up over Hinode first, before anywhere in the Realm. That's why it's the Isle of Sunrise. That, and the Hall likes the name.", "true"),
+    r("Parasols that hop are only lonely. Lanterns that walk are something else.", "true"),
+    r("Kurokage Wood has a cry like a thrush in the dark. The lord's foresters won't go past the stone after sunset, and they're paid to.", "true"),
+    r("The monkeys at Yumoto stole the bath-house pass again. The Steaming Moon has had that pass since three lords ago.", "true"),
+  ],
   raria: [
     r("Raria has always been here. Her Radiance says so. The stones say so. I was born here. I think.", "half"),
     r("Raria simply returned. That's the word the chaplain uses. Returned. He never says from where.", "true"),
@@ -172,7 +195,8 @@ export const RUMOURS: Partial<Record<RegionId, readonly Rumour[]>> = {
     r("The Burned walk the ash round the Ember Fortress, every kind of Friend that ever lived in a village. The Order of the Ember knows their numbers. They don't say them.", "true"),
     r("Water quenches the Burned. Nothing else does. The Order carries buckets on patrol and doesn't laugh about it.", "true")],
 };
-const REGION_KEY = (id: RegionId): RegionId => ({ farmland: "farmland", coast: "friendhollow", whisperwood: "fernwick", ashen_hills: "emberforge", greyhorn: "highcairn", pale_dunes: "oasis", murkmire: "farmland", glass_lake: "friendhollow", mossy_ruins: "friendhollow", deadwood: "gravesend", southshore: "saltmarrow", thistle_vale: "hollyhock", the_wilds: "tallgrass", ironreach: "cragmaw", drakespine: "ashfall", pale_isles: "saltmarrow" } as Partial<Record<RegionId, RegionId>>)[id] ?? id;
+const REGION_KEY = (id: RegionId): RegionId => ({ farmland: "farmland", coast: "friendhollow", whisperwood: "fernwick", ashen_hills: "emberforge", greyhorn: "highcairn", pale_dunes: "oasis", murkmire: "farmland", glass_lake: "friendhollow", mossy_ruins: "friendhollow", deadwood: "gravesend", southshore: "saltmarrow", thistle_vale: "hollyhock", the_wilds: "tallgrass", ironreach: "cragmaw", drakespine: "ashfall", pale_isles: "saltmarrow",
+  shiogama: "kurohama", kibi: "hinode", hanazono: "hinode", tanabe: "hinode", yumoto: "hinode", isohama: "hinode", morishima: "hinode", iwaoka: "hinode", torojima: "kurohama", kusabana: "hinode", old_cedars: "hinode", whispering_bamboo: "hinode", kumoyama: "takamori" } as Partial<Record<string, RegionId>>)[id] ?? id;
 /** A rumour from where the speaker lives (one you haven't heard, while there are any), and a little Presence for a new one. */
 export function rumourAt(game: Game, x: number, y: number): string {
   const region = REGION_KEY(regionAt(game.world, x, y).id), pool = RUMOURS[region] ?? RUMOURS.friendhollow!;

@@ -7,6 +7,7 @@
 import type { RockKind, SpotKind, TreeKind } from "./data.ts";
 import { buildExpansion } from "./expansion.ts";
 import { buildFarWest } from "./farwest.ts";
+import { buildIsles } from "./isles.ts";
 import { growVillages, varyBuildings } from "./townscape.ts";
 import { roofRing } from "./ringroof.ts";
 import { fitBars } from "./barfit.ts";
@@ -18,7 +19,12 @@ import { fitBars } from "./barfit.ts";
  * world coordinates.
  */
 export const WEST_DX = 440, LEGACY_W = 720;
-export const W = LEGACY_W + WEST_DX, H = 640;
+/**
+ * The Palian Isles (What Rises in the East): the world grew again, EAST_W columns on its east side, for the archipelago
+ * east of the old east coast. Nothing west of EAST_X moves.
+ */
+export const EAST_X = LEGACY_W + WEST_DX, EAST_W = 560;
+export const W = EAST_X + EAST_W, H = 640;
 /** The overworld is rows 0–519; rows 520–579 are the dungeons (reached by ladders, never seen from above); rows from FLOOR_Y hold upper storeys. */
 export const OVERWORLD_H = 520, DUNGEON_Y = 520, FLOOR_Y = 580;
 /**
@@ -66,7 +72,9 @@ export const inRing = (x: number, y: number) => (x >= RING.x0 && x <= RING.x1 &&
 
 export type ObjectKind =
   | "tree" | "stump" | "rock" | "spot" | "range" | "furnace" | "anvil" | "bank" | "altar" | "ladder" | "stall" | "obstacle" | "board"
-  | "fountain" | "mill" | "dairy_cow" | "wheat" | "coop" | "gate" | "casket" | "decor" | "sign" | "tanning" | "well" | "sigil_altar" | "wheel" | "herb" | "still";
+  | "fountain" | "mill" | "dairy_cow" | "wheat" | "coop" | "gate" | "casket" | "decor" | "sign" | "tanning" | "well" | "sigil_altar" | "wheel" | "herb" | "still"
+  /** A Palian boat at a dock (the Palian Isles): board it to buy passage to another island (boats.ts). */
+  | "dock";
 export type DecorKind =
   | "flowers" | "bush" | "boulder" | "lamp" | "bench" | "crate" | "barrel" | "tent" | "cactus" | "pine" | "dead_tree" | "statue"
   | "grave" | "fence" | "reeds" | "table" | "bed" | "shelf" | "pillar" | "rubble" | "snowman" | "lily" | "banner" | "torch" | "palm" | "hay" | "windmill" | "boat" | "chest"
@@ -74,7 +82,9 @@ export type DecorKind =
   | "god_diamond" | "god_ink" | "god_sol" | "god_hood" | "god_ember"
   // Return of Raria: the Wise Friend and the Order of Dusk's god, and the things factions leave about.
   | "god_dusk" | "wise_friend" | "bell" | "canopy" | "cannon" | "device" | "wagon" | "watchtower" | "stake" | "plaque" | "banner_fff" | "banner_rrr" | "banner_hollowmere"
-  | "banner_diamond" | "banner_ink" | "banner_sol" | "banner_hood" | "banner_ember" | "banner_dusk";
+  | "banner_diamond" | "banner_ink" | "banner_sol" | "banner_hood" | "banner_ember" | "banner_dusk"
+  // The Palian Isles: shrine gates, stone lanterns, pagodas, guardian lion-dogs, sacred ropes, the things of a harbour and a hot spring.
+  | "torii" | "stone_lantern" | "pagoda" | "guardian" | "sacred_rope" | "drying_rack" | "steam" | "castle_keep" | "offering_box" | "paper_lantern" | "wish_board" | "wayside_statue" | "nets";
 /** A monument's state: whole on its plinth, toppled and lying, broken off at the waist, or sunk to the chest in the ground. */
 export type MonumentState = "whole" | "toppled" | "broken" | "buried";
 export type WorldObject = {
@@ -95,6 +105,8 @@ export type WorldObject = {
   height?: number;
   /** A herb patch: which herb grows here (Apothecary). */
   herb?: string;
+  /** A Palian boat: which dock it serves (boats.ts DOCKS). Its `to` is where you stand to board it, and where you arrive. */
+  dock?: string;
 };
 export type StallKind = "bakery" | "silk" | "gem" | "fish";
 export type SpawnDef = { kind: "npc" | "monster"; id: string; x: number; y: number; wander?: number };
@@ -113,10 +125,16 @@ export type RegionId =
   // Return of Raria (2026-10): the far west.
   | "deep_westmarch" | "free_marches" | "barkreach" | "raria"
   // The far west (the second continent): Raria's lands, BarkReach's deep wood, and the war between; Raria's eastern march by the Spine.
-  | "raria_march" | "crownlands" | "vesperwold" | "silent_peaks" | "heartwood" | "greyfields";
+  | "raria_march" | "crownlands" | "vesperwold" | "silent_peaks" | "heartwood" | "greyfields"
+  // The Palian Isles (2026-10): Hinode, the Isle of Sunrise, its quarters and the islands round it, the sea between, and what lies under them.
+  | "hinode" | "kurohama" | "takamori" | "kumoyama" | "old_cedars" | "whispering_bamboo" | "tanabe" | "yumoto" | "kurokage"
+  | "shiogama" | "kibi" | "hanazono" | "morishima" | "iwaoka" | "josaki" | "torojima" | "kusabana" | "ashigane" | "smugglers_cove" | "hakkotsu" | "three_stones" | "turtle_rock" | "palian_sea"
+  | "kumo_hollow" | "ashigane_deeps" | "bone_shrine";
 export type Region = { id: RegionId; name: string; label: { x: number; y: number }; danger: number; underground?: boolean;
-  /** A far-west region (Return of Raria): its label is already in world coordinates. */
-  far?: boolean };
+  /** A far-west region (Return of Raria) or a Palian one: its label is already in world coordinates. */
+  far?: boolean;
+  /** One of the Palian Isles' (the archipelago east of the mainland). */
+  palian?: boolean };
 const MAINLAND_REGIONS = new Set<RegionId>(["coast", "friendhollow", "farmland", "whisperwood", "ashen_hills", "emberforge", "frostpeak", "glass_lake", "pale_dunes", "oasis", "murkmire", "mossy_ruins",
   "wizards_tower", "wyrmreach", "fernwick", "greyhorn", "highcairn", "crypt", "hollow_depths"]);
 export const REGIONS: readonly Region[] = [
@@ -155,7 +173,7 @@ export const REGIONS: readonly Region[] = [
   { id: "ironreach", name: "Ironreach", label: { x: 628, y: 250 }, danger: 3 },
   { id: "cragmaw", name: "Cragmaw", label: { x: 632, y: 196 }, danger: 0 },
   { id: "quillhaven", name: "Quillhaven", label: { x: 646, y: 396 }, danger: 0 },
-  { id: "pale_isles", name: "The Pale Isles", label: { x: 96, y: 500 }, danger: 2 },
+  { id: "pale_isles", name: "The Saltmarrow Skerries", label: { x: 96, y: 500 }, danger: 2 },
   { id: "catacombs", name: "Deadwood Catacombs", label: { x: 90, y: 534 }, danger: 4, underground: true },
   { id: "wyrm_lair", name: "The Wyrm's Lair", label: { x: 90, y: 566 }, danger: 6, underground: true },
   { id: "sea_cave", name: "Saltmarrow Sea Cave", label: { x: 630, y: 534 }, danger: 2, underground: true },
@@ -177,6 +195,18 @@ export const REGIONS: readonly Region[] = [
   { id: "silent_peaks", name: "The Silent Peaks", label: { x: 60, y: 90 }, danger: 4, far: true },
   { id: "heartwood", name: "The Heartwood", label: { x: 70, y: 410 }, danger: 4, far: true },
   { id: "greyfields", name: "The Greyfields", label: { x: 300, y: 320 }, danger: 3, far: true },
+  // The Palian Isles (labels in world coordinates): Hinode and its quarters, then the islands round it.
+  ...([
+    ["hinode", "Hinode, the Isle of Sunrise", 1500, 300, 1], ["kurohama", "Kurohama", 1356, 262, 0], ["takamori", "Takamori", 1452, 282, 0], ["kumoyama", "Mount Kumo", 1446, 196, 2],
+    ["old_cedars", "The Old Cedars", 1384, 196, 2], ["whispering_bamboo", "The Whispering Bamboo", 1528, 262, 1], ["tanabe", "Tanabe Terraces", 1420, 340, 0], ["yumoto", "Yumoto Springs", 1514, 206, 0],
+    ["kurokage", "Kurokage Wood", 1480, 140, 4], ["shiogama", "Shiogama", 1262, 300, 0], ["kibi", "Kibi", 1300, 450, 0], ["hanazono", "Hanazono", 1452, 452, 0],
+    ["morishima", "Morishima", 1600, 420, 2], ["iwaoka", "Iwaoka", 1640, 110, 3], ["josaki", "Josaki", 1626, 276, 4], ["torojima", "Torojima, the Lantern Isle", 1520, 40, 4],
+    ["kusabana", "Kusabana", 1696, 332, 1], ["ashigane", "Ashigane", 1290, 92, 5], ["smugglers_cove", "Smugglers' Cove", 1226, 176, 2], ["hakkotsu", "Hakkotsu", 1690, 486, 6],
+    ["three_stones", "The Three Stones", 1378, 488, 1], ["turtle_rock", "Turtle Rock", 1548, 372, 0], ["palian_sea", "The Palian Sea", 1240, 400, 0],
+  ] as const).map(([id, name, x, y, danger]) => ({ id, name, label: { x, y }, danger, far: true, palian: true }) as Region),
+  { id: "kumo_hollow", name: "The Hollow Under Kumo", label: { x: 1230, y: 534 }, danger: 3, underground: true, far: true, palian: true },
+  { id: "ashigane_deeps", name: "The Ashigane Deeps", label: { x: 1350, y: 534 }, danger: 5, underground: true, far: true, palian: true },
+  { id: "bone_shrine", name: "The Bone Shrine", label: { x: 1470, y: 534 }, danger: 6, underground: true, far: true, palian: true },
 ];
 export const regionIndex = (id: RegionId) => REGIONS.findIndex(region => region.id === id);
 /** The mainland regions' labels were written in the mainland's own coordinates: move them with it (once, at load). */
@@ -206,7 +236,13 @@ export type Building = {
   /** A pitched roof hipped at both ends (sloping on all four sides) instead of gabled. */
   hip?: boolean;
   /** What the walls are made of: stone brick, half-timbered plaster, planks, or pale dressed marble. */
-  walls?: "stone" | "timber" | "plank" | "marble";
+  walls?: "stone" | "timber" | "plank" | "marble" | "palian" | "lacquer";
+  /**
+   * A Palian building (the Palian Isles): a hipped roof of dark tile with a wide overhang, its eaves turned up at the
+   * corners and a ridge cap along the top; walls of white plaster between dark posts ("palian") or a shrine's vermilion
+   * ("lacquer").
+   */
+  style?: "palian";
   /**
    * What its front says it is (render.ts draws it): a shop's striped awning and hanging sign (`sign`, an item id for its
    * board), an inn's sign, a bank's columns and gilded pediment, a hall of state's columns and pediment. Set when the
@@ -229,7 +265,8 @@ export type World = {
   ramparts?: Rampart[];
   /** Ground height (world pixels) at every tile corner: (W + 1) × (H + 1), corner (i, j) sits at (i − ½, j − ½). */
   heights: Float32Array;
-  places: Record<"spawn" | "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier" | "crypt" | "depths" | "king" | "fernwick" | "highcairn" | "dawnhold" | "gravesend" | "saltmarrow" | "hollyhock" | "dyemoor" | "tallgrass" | "cragmaw" | "quillhaven" | "raria" | "fff_fortress" | "barkreach" | "ashfall" | "ring", { x: number; y: number }>;
+  places: Record<"spawn" | "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier" | "crypt" | "depths" | "king" | "fernwick" | "highcairn" | "dawnhold" | "gravesend" | "saltmarrow" | "hollyhock" | "dyemoor" | "tallgrass" | "cragmaw" | "quillhaven" | "raria" | "fff_fortress" | "barkreach" | "ashfall" | "ring"
+    | "kurohama" | "takamori" | "kumoyama" | "tanabe" | "yumoto", { x: number; y: number }>;
 };
 
 function mulberry(seed: number) {
@@ -1296,6 +1333,8 @@ export function generateWorld(seed = WORLD_SEED): { world: World; lift: Float32A
   // The far west: a second continent, Raria and BarkReach.
   const ctx: GenContext = { W, H, tiles, region, objectAt, lift, objects, spawns, buildings, doorways: [], ramparts: [], random: mulberry(seed + 9191), noise: makeNoise(seed + 71, 11), noise2: makeNoise(seed + 83, 4) };
   buildFarWest(ctx, worldTools(ctx), places, floors);
+  // The Palian Isles: the archipelago east of the old east coast (What Rises in the East).
+  buildIsles({ ...ctx, random: mulberry(seed + 7337), noise: makeNoise(seed + 97, 11), noise2: makeNoise(seed + 101, 4) }, worldTools({ ...ctx, random: mulberry(seed + 7337), noise: makeNoise(seed + 97, 11), noise2: makeNoise(seed + 101, 4) }), places, floors);
   // The Ring's roof and the walk on top of it (ringroof.ts).
   roofRing(ctx, worldTools(ctx), floors);
   // The bars fitted out: counters, barkeeps, quiet traders and job boards (barfit.ts, bars.ts).
@@ -1342,7 +1381,7 @@ const i2 = (random: () => number) => random() > 0.5;
 const SIDES = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
 /** Faded roof tiles in the Rare Friends accents. */
 const ROOF_COLORS = ["#c99a96", "#9aab92", "#8f9cb2", "#cdb98a", "#a996b5"];
-const TREE_NAMES: Record<TreeKind, string> = { tree: "Tree", oak: "Oak", willow: "Willow", maple: "Maple tree", yew: "Yew", ashwood: "Ashwood", palm: "Palm tree", pine: "Pine tree", deadwood: "Dead tree", redwood: "Redwood", ironbark: "Ironbark" };
+const TREE_NAMES: Record<TreeKind, string> = { tree: "Tree", oak: "Oak", willow: "Willow", maple: "Maple tree", yew: "Yew", ashwood: "Ashwood", palm: "Palm tree", pine: "Pine tree", deadwood: "Dead tree", redwood: "Redwood", ironbark: "Ironbark", cedar: "Cedar", sakura: "Blossom tree", bamboo: "Bamboo" };
 const DECOR_NAMES: Record<DecorKind, string> = {
   monument: "Statue", god_diamond: "Statue of the Good Friend", god_ink: "Statue of the Squid Friend", god_sol: "Statue of the Weird Friend", god_hood: "Statue of the Hood Friend", god_ember: "The Ember, in its brazier",
   god_dusk: "Statue of the Wise Friend, blindfolded", wise_friend: "The Wise Friend", bell: "Great bell", canopy: "Old roofing", cannon: "Magical cannon", device: "Federation device", wagon: "Supply wagon", watchtower: "Watchtower", stake: "Stake wall", plaque: "Inscribed plaque", banner_fff: "The Federation's banner", banner_rrr: "The Regiment's banner", banner_hollowmere: "Hollowmere's banner", banner_diamond: "The Order of the Diamond's banner", banner_ink: "The Order of the Ink's banner", banner_sol: "The Order of the Sol's banner", banner_hood: "The Order of the Hood's banner", banner_ember: "The Order of the Ember's banner", banner_dusk: "The Order of Dusk's banner",
@@ -1352,6 +1391,8 @@ const DECOR_NAMES: Record<DecorKind, string> = {
   palm: "Palm tree", hay: "Hay bales", windmill: "Windmill", boat: "Boat", chest: "Chest", throne: "Throne", armour: "Suit of armour",
   logpile: "Log pile", stump: "Chopping block", target: "Archery target", ruin_wall: "Crumbling wall", old_friend: "Statue of the Old Friend",
   tomb: "Stone tomb", crypt: "Crypt", obelisk: "Obelisk", bones: "Bones", hearth: "Hearth",
+  torii: "Shrine gate", stone_lantern: "Stone lantern", pagoda: "Pagoda", guardian: "Guardian lion-dog", sacred_rope: "Sacred rock", drying_rack: "Drying rack", steam: "Hot spring",
+  castle_keep: "Castle keep", offering_box: "Offering box", paper_lantern: "Paper lantern", wish_board: "Wish board", wayside_statue: "Wayside statue", nets: "Fishing nets",
 };
 
 export function terrainAt(world: World, x: number, y: number) { return inBounds(x, y) ? world.tiles[tileIndex(x, y)] : T.VOID; }

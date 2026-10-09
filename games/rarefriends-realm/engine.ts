@@ -22,9 +22,11 @@ import { friendSays, friendTick, friendWorks, outfitRemark, remember } from "./f
 import { presenceXp, cleanName, cleanTag, onAchievement as presenceAchievement, onBossFelled, onEmoteUsed, onFriendTime, onNpcTalked, onRareFind, onRegionEntered, onWorn } from "./presence.ts";
 import { NPCS, QUESTS, readJobBoard, consecrateDawnstone, onAltarPrayed, examineItem, npcDef, onBonesOffered, onMonsterKilled, questDone, searchWell, shopProblem, talk, tanHides, useCryptAltar } from "./content.ts";
 import { onWestTick, westTruce } from "./raria.ts";
+import { onPalianPickpocket, onPalianSearch, onPalianTick } from "./palia.ts";
+import { passage, VOYAGE_TICKS } from "./boats.ts";
 import { codexTick } from "./codex.ts";
 import { SOLDIERLY, SOLDIERS, TWIN_BASE, hostile, sideOf } from "./skirmish.ts";
-import { examineCreature, inspectTrack, knows, learnTrick, masteryBoost, maxHpOf, onAttacked, onKilled, onPoison, onWeakSpot, rollMarked, trackTick } from "./pursuance.ts";
+import { examineCreature, inspectTrack, knows, learn, learnTrick, masteryBoost, maxHpOf, onAttacked, onKilled, onPoison, onWeakSpot, rollMarked, trackTick } from "./pursuance.ts";
 import {
   BANK_SIZE, BANK_TABS, DAY_MS, SATCHEL, SATCHEL_SIZE, STONE_BOX, STONE_BOX_SIZE, BONE_BAG, BONE_BAG_SIZE, bagAdd, bagBones, bagTakeAll, hasBoneBag, SIGIL_BAG, BELTS, beltAdd, beltContents, beltDef, wornBelt, SIGIL_BAG_SIZE, hasSigilBag, isSigil, sigilBagAdd, sigilBagTotal, sigilStock, useSigils, setPieces, wayfarerPieces, fullSlayerSet, heartguardPieces, mixtureOn, compactBankTabs, hasSatchel, hasStoneBox, stock, useUp, INVENTORY_SIZE, REFERRAL_COINS, REFERRALS_PER_DAY, REFERRAL_TICKS, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
   level, maxHp, maxPrayer, message, prayerBoost, riding, sound, take, weapon, combatLevel, createGame,
@@ -199,6 +201,7 @@ function objectOptions(game: Game, object: WorldObject): string[] {
     case "anvil": return ["Smith"];
     case "bank": return ["Bank"];
     case "altar": return object.text === "crypt" ? ["Pray-at", "Search"] : ["Pray-at"];
+    case "dock": return ["Board"];
     case "ladder": case "obstacle": case "gate": return [object.action ?? "Use"];
     case "stall": return ["Steal-from"];
     case "mill": return ["Operate"];
@@ -496,6 +499,7 @@ export function applyPotion(game: Game, id: string) {
   if (effect.antifire) { player.antifireUntil = game.tick + effect.antifire; notes.push("shields you from dragonfire"); }
   if (effect.stealth) { player.stealthUntil = game.tick + effect.stealth; notes.push("softens your step"); }
   if (effect.tonic) { player.tonicUntil = game.tick + effect.tonic; notes.push("quickens your second wind"); }
+  if (effect.spiritWard) { player.spiritWardUntil = game.tick + effect.spiritWard; notes.push("keeps the wayward spirits at arm's length"); }
   if (effect.mixture) { player.stats.mixtures = (player.stats.mixtures ?? 0) + 1; friendSays(game, "mixture"); player.mixture = { family: effect.mixture.family, until: game.tick + effect.mixture.ticks }; notes.push(`your ${FAMILY_NAMES[player.familyId]} nature comes to the surface`); emit(game, { type: "cast", spell: "mixture", tick: game.tick }); presenceXp(game, 50); }
   message(game, `You drink the ${item(slot.id).name.toLowerCase()}. It ${notes.join(", ") || "tastes of very little"}.`); sound(game, "eat");
 }
@@ -524,7 +528,7 @@ function applyWeaponPoison(game: Game, monster: Monster) {
 /** A venomous creature's bite. */
 function poisonPlayer(game: Game, damage: number) {
   const player = game.player;
-  if (player.antidoteUntil > game.tick) return;
+  if (player.antidoteUntil > game.tick || prayerBoost(player).purify) return;
   if (!player.poison) message(game, "You've been poisoned! An antidote would cure it.", "warn");
   player.poison = { damage, left: 4, timer: 10 };
 }
@@ -789,11 +793,19 @@ export function startProduction(game: Game, recipe: Recipe, n: number) {
   game.player.activity = { kind: "produce", recipe, timer: 1, left: n }; friendWorks(game, recipe.skill);
 }
 export function smeltingRecipes(): Recipe[] {
-  return METALS.map(metal => {
+  return [...METALS.map(metal => {
     const smelt = SMELTING[metal.id];
     return { skill: "smithing", label: `${metal.name} bar`, level: smelt.level, xp: smelt.xp, ticks: 4, station: "furnace", inputs: smelt.ores, outputs: { [`${metal.id}_bar`]: 1 }, chance: smelt.chance } satisfies Recipe;
-  });
+  }),
+  // The Palian Isles' steel: black iron sand and charcoal, a bloom of tamahagane.
+  { skill: "smithing", label: "Tamahagane", level: 60, xp: 60, ticks: 6, station: "furnace", inputs: { iron_sand: 4, inkcoal: 2 }, outputs: { tamahagane_bar: 1 } } satisfies Recipe];
 }
+/** What a smith forges from tamahagane at an anvil (the Palian Isles): the blades, the polearms, the samurai's harness. */
+export const TAMAHAGANE_FORGE: readonly [string, number, number][] = [
+  ["tanto", 60, 1], ["kurohama_katana", 62, 2], ["yari", 63, 2], ["tamahagane_katana", 68, 3], ["naginata", 70, 3], ["tamahagane_nodachi", 74, 4],
+  ["samurai_kote", 64, 1], ["samurai_suneate", 64, 1], ["samurai_kabuto", 68, 2], ["samurai_haidate", 70, 3], ["samurai_do", 76, 5],
+];
+export const tamahaganeRecipes = (): Recipe[] => TAMAHAGANE_FORGE.map(([id, level, bars]) => ({ skill: "smithing", label: item(id).name, level, xp: 80 * bars, ticks: 6, station: "anvil", inputs: { tamahagane_bar: bars }, outputs: { [id]: 1 }, tools: ["hammer"] }));
 export function smithingRecipes(metal: MetalId): Recipe[] {
   const name = METALS.find(entry => entry.id === metal)!.name;
   return [...SMITH_PIECES.map(piece => ({
@@ -889,6 +901,7 @@ function openCrafting(game: Game) { game.ui.production = { title: "What would yo
 function openSmithing(game: Game) {
   const player = game.player, metals = METALS.filter(metal => has(player, `${metal.id}_bar`));
   if (!hasTool(player, "hammer")) { message(game, "You need a hammer to work the metal with.", "warn"); return; }
+  if (has(player, "tamahagane_bar") && (!metals.length || level(game, "smithing") >= 60)) { game.ui.production = { title: "What would you like to forge from tamahagane?", recipes: tamahaganeRecipes() }; return; }
   if (!metals.length) { message(game, "You should select an item from your inventory and use it on the anvil. You don't have any bars.", "warn"); return; }
   const metal = [...metals].sort((a, b) => b.tier - a.tier).find(entry => level(game, "smithing") >= SMELTING[entry.id].level) ?? metals[0];
   game.ui.production = { title: `What would you like to make with ${metal.name.toLowerCase()}?`, recipes: smithingRecipes(metal.id) };
@@ -1005,7 +1018,8 @@ function interactObject(game: Game, object: WorldObject, option: string, use?: n
       // An ossuary bag worn on the back empties itself onto the altar as you pray.
       if (player.equipment.cape === BONE_BAG && bagBones(player) > 0) offerBag(game, object.text === "dawn");
       if (player.prayer >= maxPrayer(player)) { message(game, "Your faith is already full."); return; }
-      player.prayer = maxPrayer(player); message(game, "You pray to the Old Friend. Your faith is restored."); sound(game, "pray"); return;
+      player.prayer = maxPrayer(player); message(game, object.text === "palian" ? "You ring the bell, bow twice, clap twice, bow once. Your faith is restored." : "You pray to the Old Friend. Your faith is restored."); sound(game, "pray"); return;
+    case "dock": game.ui.boat = object.dock ?? null; sound(game, "click"); return;
     case "ladder":
       // The Ring's arena gates: you step through to the tile across; barred from inside while a match is on.
       if (object.name === "Arena gate") {
@@ -1059,6 +1073,7 @@ function interactObject(game: Game, object: WorldObject, option: string, use?: n
       if (object.name.endsWith("(sleep)")) { sleep(game); return; }
       if (object.name.endsWith("(fill)") || object.name === "Water barrel") { fillVials(game); return; }
       if (object.name.endsWith("(furnish)")) { if (option === "Furnish") { game.ui.home = true; sound(game, "click"); } else message(game, "You warm your hands at the hearth. Home."); return; }
+      if (object.decor === "chest" && onPalianSearch(game, object.name)) return;
       if (object.decor === "chest") searchChest(game, object); return;
     default: message(game, examineObject(game, object));
   }
@@ -1107,6 +1122,7 @@ function interactNpc(game: Game, uid: number, option: string, use?: number) {
   if (option === "Trade" && def.shop) { const problem = shopProblem(game, def.shop); if (problem) { message(game, problem, "warn"); return; } game.ui.shop = def.shop; sound(game, "click"); friendSays(game, "shop"); return; }
   if (option === "Talk-to" || option === "Assignment") onNpcTalked(game, npc.id);
   if (option === "Bank") { game.ui.bank = true; sound(game, "click"); return; }
+  if (option === "Travel" && npc.id.startsWith("boat_")) { game.ui.boat = npc.id.slice(5); sound(game, "click"); return; }
   if (option === "Caskets") { game.ui.shop = "__caskets"; sound(game, "click"); return; }
   if (option === "Rare-market") { game.ui.shop = "__market"; sound(game, "click"); return; }
   if (option === "Stables") { game.ui.shop = "__stable"; sound(game, "click"); return; }
@@ -1127,6 +1143,7 @@ function pickpocket(game: Game, npc: Npc, pick: NonNullable<ReturnType<typeof np
     give(player, "coins", coins); addXp(game, "thieving", pick.xp); sound(game, "coins");
     for (const [id, p] of pick.extra ?? []) if (game.rng() < p && freeSlots(player)) give(player, id);
     message(game, `You pick the ${npcDef(npc.id).name.toLowerCase()}'s pocket.`);
+    onPalianPickpocket(game, npc.id);
   } else {
     const stun = player.familyId === 1 ? Math.ceil(pick.stun / 2) : pick.stun;
     player.stunned = stun; player.path = []; damagePlayer(game, 1 + Math.floor(game.rng() * pick.damage), null);
@@ -1234,7 +1251,7 @@ function movePlayer(game: Game) {
   if (player.sneak && (player.x !== start.x || player.y !== start.y)) drainSneak(game);
 }
 function drainRun(game: Game) {
-  const player = game.player, drain = mixtureOn(game, 5) ? 0 : runDrain(game);
+  const player = game.player, drain = mixtureOn(game, 5) ? 0 : runDrain(game) * (prayerBoost(game.player).journey ? 0.5 : 1);
   player.energy = Math.max(0, player.energy - drain);
   if (player.energy <= 0) { player.run = false; message(game, "You're out of run energy.", "warn"); friendSays(game, "tired"); }
 }
@@ -1267,6 +1284,36 @@ export function veiled(game: Game) {
   veilCache.set(game, { tick: game.tick, on });
   return on;
 }
+/** How much of a wayward spirit's blow gets through: the Palian wards, spirit incense, and the shrines' charms. */
+export function spiritShelter(game: Game) {
+  const player = game.player, amulet = player.equipment.neck;
+  let through = 1 - prayerBoost(player).spirit;
+  if (player.spiritWardUntil > game.tick) through *= 0.8;
+  if (amulet === "paper_charm" || amulet === "fox_charm" || amulet === "turtle_charm") through *= amulet === "paper_charm" ? 0.92 : 0.88;
+  return through;
+}
+/** Spirit Sight: everything about a creature your Pursuance journal could learn by eye, learnt at once. */
+function revealCreature(game: Game, monster: Monster) {
+  const id = monster.def.id, learnt = (["seen", "temper", "habitat", "weakness", "defences"] as const).filter(fact => learn(game, id, fact, true)).length;
+  message(game, learnt ? `The seal shows you the ${monster.def.name.toLowerCase()} as it is. Your journal fills in ${learnt} thing${learnt > 1 ? "s" : ""} about it.` : `The seal shows you nothing about the ${monster.def.name.toLowerCase()} you didn't know.`);
+}
+/**
+ * Sail between the Palian Isles: pay the fare and land at the other pier, in one step of the game (boats.ts says
+ * whether you can). Returns what's wrong, or null when you've sailed.
+ */
+export function sailTo(game: Game, from: string, to: string): string | null {
+  const ok = passage(game, from, to);
+  if ("problem" in ok) { message(game, ok.problem, "warn"); return ok.problem; }
+  const player = game.player;
+  take(player, "coins", ok.cost);
+  travel(game, ok.arrive, `You pay ${ok.cost.toLocaleString()} coins, and the boat carries you to ${ok.name}.`);
+  player.stats.voyages = (player.stats.voyages ?? 0) + 1;
+  game.voyage = { from, to, tick: game.tick }; game.ui.boat = null;
+  sound(game, "splash");
+  return null;
+}
+/** Whether the crossing is still being shown (the sea, the boat, the sea's music). */
+export const atSea = (game: Game) => !!game.voyage && game.tick - game.voyage.tick < VOYAGE_TICKS;
 /** Whether an aggressive monster in range notices you sneaking this tick: its level against your Stealth, how close you are, and whether you're moving. */
 function spots(game: Game, monster: Monster) {
   const player = game.player, gap = chebyshev(monster, player);
@@ -1519,7 +1566,9 @@ export function canCast(game: Game, spell: Spell) {
   if (spell.faith && game.player.prayer < faithCost(game, spell)) return `You need ${spell.faith} faith to cast this spell. Pray at an altar.`;
   if (spell.quest && !questDone(game, spell.quest)) return `You haven't learnt that glide yet: it comes with ${QUESTS.find(entry => entry.id === spell.quest)?.name ?? "a quest"}.`;
   if (spell.rarian && !game.player.rarian) return "That is Raria's: keep the Wise Friend's Law (Prior Caul, in Raria) to cast it.";
+  if (spell.palian && !game.player.palian) return "That is the Isles' own: keep the Palian way (the priestess at Kumoyama teaches it) to cast it.";
   if (!spell.rarian && spell.skill === "prayer" && game.player.rarian) return "You keep the Wise Friend's Law: its rites stand in place of the Old Friend's light until you set it down.";
+  if (!spell.palian && spell.skill === "prayer" && game.player.palian) return "You keep the Palian way: its rites stand in place of the Old Friend's light until you set it down.";
   for (const [sigil, n] of Object.entries(spellCost(game, spell))) if (sigilStock(game.player, sigil) < n) return "You do not have enough sigils to cast this spell.";
   return null;
 }
@@ -1563,6 +1612,10 @@ function playerCombat(game: Game) {
     if (monster.def.weakness === spell.element) { boost *= 1.33; onWeakSpot(game, monster); }
     // The Old Friend's light and the Wise Friend's rites both burn the dead (the Dusk's last rite as hard as Banishment).
     if ((spell.element === "holy" || (spell.rarian && spell.kind === "smite")) && monster.def.undead) boost *= spell.kind === "smite" && (spell.id === "banishment" || spell.id === "rite_of_dusk") ? 2 : 1.5;
+    // The Isles' seals and rites were written for the Isles' spirits: they bite a wayward one harder (the purifying rite twice as hard).
+    if (spell.palian && monster.def.spirit) boost *= spell.id === "purifying_rite" ? 2 : spell.kind === "smite" ? 1.5 : 1.15;
+    // A true name is stronger said by someone who knows what the creature fears.
+    if (spell.id === "true_name" && knows(game, monster.def.id, "weakness")) boost *= 1.5;
     const castSkill: Skill = spell.skill ?? "magic";
     const prayers = prayerBoost(player), accuracy = (Math.floor(level(game, castSkill) * (1 + prayers.magic)) + 8) * (bonuses(player).magic + bonuses(player).prayer * (castSkill === "prayer" ? 2 : 0) + 64) * (player.familyId === 8 ? 1.1 : 1) * boost;
     const defence = ((monster.def.magicDef ?? monster.def.defence) * cursed(game, monster, "defence") + 9) * (monster.def.defenceBonus + 64);
@@ -1574,6 +1627,11 @@ function playerCombat(game: Game) {
       if (game.rng() >= hitChance(accuracy, defence)) { message(game, "Your spell had no effect."); emit(game, { type: "hit", on: "monster", uid: monster.uid, damage: -1, tick: game.tick }); return; }
       addXp(game, castSkill, spell.xp);
       if (spell.kind === "bind") { monster.curses.bound = game.tick + 16; message(game, `The ${monster.def.name.toLowerCase()} is rooted to the spot.`); }
+      else if (spell.kind === "reveal") revealCreature(game, monster);
+      else if (spell.kind === "pacify") {
+        if (!monster.def.spirit || monster.def.boss) { message(game, monster.def.boss ? `The ${monster.def.name.toLowerCase()} is too great a spirit to be calmed.` : `The ${monster.def.name.toLowerCase()} isn't a spirit: it doesn't hear the rite.`); return; }
+        monster.curses.pacified = game.tick + 100; monster.target = false; monster.retreat = 4; message(game, `The ${monster.def.name.toLowerCase()} lowers its head and drifts away, calmed.`);
+      }
       else if (spell.curse) { monster.curses[spell.curse.stat] = game.tick + 100; message(game, `You ${spell.name.toLowerCase()} the ${monster.def.name.toLowerCase()}.`); }
       return;
     }
@@ -1710,6 +1768,8 @@ function damagePlayer(game: Game, damage: number, from: Monster | null) {
   if (damage > 0 && game.carvings.length) { const taken = carvingEffect(game).taken; if (taken) damage = Math.max(0, Math.round(damage * (1 - taken))); }
   // The Order of the Diamond's steadfast blessing: 2% of a creature's blow turned aside for every piece worn.
   if (from && damage > 0) { const diamond = orderPieces(player.equipment, "diamond"); if (diamond) damage = Math.max(0, Math.round(damage * (1 - 0.02 * diamond))); }
+  // A wayward spirit of the Isles strikes softer against the Palian wards, the spirit incense and the shrines' charms.
+  if (from?.def.spirit && damage > 0) damage = Math.max(0, Math.round(damage * spiritShelter(game)));
   player.hp = Math.max(0, player.hp - damage);
   emit(game, { type: "hit", on: "player", damage, tick: game.tick });
   if (damage > 0) sound(game, "hurt");
@@ -1762,7 +1822,10 @@ function monsterTick(game: Game, monster: Monster) {
   // A people at truce with you keep their spears down.
   const truce = !!monster.def.faction && (questDone(game, `${monster.def.faction}_truce`) || westTruce(game, monster.def.faction));
   if (truce && monster.target) { monster.target = false; monster.retreat = 2; }
-  const wouldAttack = !truce && !monster.target && monster.def.aggressive && sameLayer && chebyshev(monster, player) <= reach && combatLevel(player) <= monster.def.level * 2;
+  // A spirit calmed by the Palian rite, or kept off by spirit incense or a mist veil, doesn't come for you.
+  const calmed = (monster.curses.pacified ?? 0) > game.tick || (!!monster.def.spirit && (player.spiritWardUntil > game.tick));
+  if (calmed && monster.target && (monster.curses.pacified ?? 0) > game.tick) { monster.target = false; monster.retreat = 2; }
+  const wouldAttack = !truce && !calmed && !monster.target && monster.def.aggressive && sameLayer && chebyshev(monster, player) <= reach && combatLevel(player) <= monster.def.level * 2;
   if (wouldAttack && veiled(game)) { /* It looks straight through you. */ }
   else if (wouldAttack && player.sneak) { if (spots(game, monster)) caughtSneaking(game, monster); else if (!game.sneakingPast.has(monster.uid)) game.sneakingPast.set(monster.uid, game.tick); }
   else if (wouldAttack) { game.sneakingPast.delete(monster.uid); monster.target = true; creature(game, monster, "aggro"); }
@@ -2024,6 +2087,7 @@ function upkeep(game: Game) {
   onFriendTime(game);
   if (game.tick % 5 === 0 && player.hp > 0) friendTick(game);
   if (game.tick % 10 === 3) onWestTick(game);
+  if (game.tick % 5 === 1) onPalianTick(game);
   if (game.tick % 20 === 7) codexTick(game);
   if (game.tick % 50 === 0) friendMilestones(game);
   if (game.events.some(event => event.type === "level" && event.tick === game.tick && event.skill !== "presence")) friendSays(game, "levelup");
@@ -2049,6 +2113,8 @@ export function togglePrayer(game: Game, id: string) {
   if (level(game, "prayer") < prayer.level) { message(game, `You need a Faith level of ${prayer.level} to use ${prayer.name}.`, "warn"); return; }
   if (prayer.rarian && !player.rarian) { message(game, "That is a commandment of the Wise Friend's Law. Prior Caul in Raria keeps the Law for those who ask.", "warn"); return; }
   if (!prayer.rarian && player.rarian) { message(game, "You keep the Wise Friend's Law: its commandments stand in place of the old prayers until you set it down.", "warn"); return; }
+  if (prayer.palian && !player.palian) { message(game, "That is a vow of the Palian Isles. Keep the Palian way to make it.", "warn"); return; }
+  if (!prayer.palian && player.palian) { message(game, "You keep the Palian way: its vows and blessings stand in place of the old prayers until you set it down.", "warn"); return; }
   if (player.prayer < 1) { message(game, "You need to restore your faith at an altar.", "warn"); return; }
   // Only one prayer per stat: turn off overlapping ones.
   const keys = Object.keys(prayer.effect);
@@ -2067,7 +2133,7 @@ export function castSpell(game: Game, id: string): Selection {
   if (problem && spell.id !== "home") { message(game, problem, "warn"); return null; }
   if (spell.target === "self") {
     if (spell.kind === "bloom") { bonebloom(game, spell); return null; }
-    if (spell.ward || spell.heal) { castOnSelf(game, spell); return null; }
+    if (spell.ward || spell.heal || spell.kind === "veil") { castOnSelf(game, spell); return null; }
     if (isUnderground(player.y) && spell.id !== "home") { message(game, "A dark force stops you from teleporting underground.", "warn"); return null; }
     if (game.arena) { message(game, "The Ring's magic holds you until the match is done. No glide, no homeward, no second chances.", "warn"); return null; }
     if (player.combat !== null && spell.id === "home") { message(game, "You can't use Homeward during combat.", "warn"); return null; }
@@ -2104,7 +2170,7 @@ export function signetTeleport(game: Game) {
   player.activity = { kind: "teleport", to: game.world.places.ring, timer: 3, spell: "tablet:ring" };
   message(game, `The signet warms, and the Ring's magic folds the Realm around you… (${signetCharges(game)} left today)`); sound(game, "spell");
 }
-const TELEPORT_NAMES: Record<string, string> = { ring: "the Rare Friends Ring", raria: "Raria, before the palace", fff_fortress: "the FFF Fortress", barkreach: "BarkReach", hollow_square: "Friendhollow", emberforge: "Emberforge", oasis: "the Oasis", frostpeak: "Frostpeak", pier: "Pike's Pier", fernwick: "Fernwick", highcairn: "Highcairn", dawnhold: "Dawnhold", gravesend: "Gravesend", saltmarrow: "Saltmarrow", hollyhock: "Hollyhock", dyemoor: "Dyemoor", tallgrass: "Tallgrass", cragmaw: "Cragmaw", quillhaven: "Quillhaven", ashfall: "Ember Tamsin's camp at Ashfall" };
+const TELEPORT_NAMES: Record<string, string> = { kurohama: "Kurohama's quay", kumoyama: "the gate of Kumoyama", ring: "the Rare Friends Ring", raria: "Raria, before the palace", fff_fortress: "the FFF Fortress", barkreach: "BarkReach", hollow_square: "Friendhollow", emberforge: "Emberforge", oasis: "the Oasis", frostpeak: "Frostpeak", pier: "Pike's Pier", fernwick: "Fernwick", highcairn: "Highcairn", dawnhold: "Dawnhold", gravesend: "Gravesend", saltmarrow: "Saltmarrow", hollyhock: "Hollyhock", dyemoor: "Dyemoor", tallgrass: "Tallgrass", cragmaw: "Cragmaw", quillhaven: "Quillhaven", ashfall: "Ember Tamsin's camp at Ashfall" };
 const ELEMENT_COLORS: Record<string, string> = { wind: "#e6ecef", water: "#8fa3c9", earth: "#a89479", fire: "#e9a07a", hollow: "#6d6b67", moon: "#c6bed4", gold: "#e2d49e", home: "#e8d4c0", holy: "#f2e28f", law: "#cfc7e6", dusk: "#8a6ab0" };
 /** Faith spells spend faith as well as sigils. */
 /** Faith a spell costs: the Order of Dusk's gear takes 4% off a rite of the Wise Friend for every piece worn. */
@@ -2115,6 +2181,7 @@ function castOnSelf(game: Game, spell: Spell) {
   const player = game.player, notes: string[] = [];
   payRunes(game, spell); payFaith(game, spell);
   if (spell.ward) { player.ward = { defence: spell.ward.defence ?? 0, flat: spell.ward.flat ?? 0, reduce: spell.ward.reduce ?? 0 }; player.wardUntil = game.tick + spell.ward.ticks; notes.push(spell.ward.reduce ? `turns ${Math.round(spell.ward.reduce * 100)}% of every blow aside` : "steels your defence"); }
+  if (spell.kind === "veil") { player.stealthUntil = game.tick + 300; player.spiritWardUntil = Math.max(player.spiritWardUntil, game.tick + 300); notes.push("hides you in a rain-mist"); }
   if (spell.heal) {
     const before = player.hp;
     if (spell.heal.now) player.hp = Math.min(maxHp(player), player.hp + spell.heal.now);
@@ -2548,7 +2615,7 @@ export type SaveData = {
   met?: unknown; achievements?: Record<string, number>; pets?: string[]; petOut?: string | null; killLog?: Record<string, number>; lore?: Record<string, unknown>; stats?: Record<string, number>; referredBy?: number | null; referrals?: number[]; referralTimes?: number[]; boostTicks?: number; coalBag?: number; stoneBox?: number; boneBag?: Record<string, number>;
   boosts?: Record<string, number>; poison?: { damage: number; left: number; timer: number } | null; weaponPoison?: { weapon: string; damage: number; charges: number; weaken: boolean } | null;
   antidoteUntil?: number; antifireUntil?: number; stealthUntil?: number; tonicUntil?: number; mixture?: { family: number; until: number } | null;
-  firsts?: Record<string, number>; friendKinds?: Record<string, 1>; rumours?: Record<string, 1>; orders?: Record<string, WorkOrder>; card?: Record<string, string>; cards?: Record<string, number>; rarian?: boolean; home?: unknown; restedTicks?: number; sigilBag?: Record<string, number>; ward?: { defence: number; flat: number; reduce: number } | null; wardUntil?: number; renew?: number; renewUntil?: number; belts?: Record<string, Record<string, number>>; followerWorn?: string[];
+  firsts?: Record<string, number>; friendKinds?: Record<string, 1>; rumours?: Record<string, 1>; orders?: Record<string, WorkOrder>; card?: Record<string, string>; cards?: Record<string, number>; rarian?: boolean; palian?: boolean; spiritWardUntil?: number; home?: unknown; restedTicks?: number; sigilBag?: Record<string, number>; ward?: { defence: number; flat: number; reduce: number } | null; wardUntil?: number; renew?: number; renewUntil?: number; belts?: Record<string, Record<string, number>>; followerWorn?: string[];
   name?: string | null; fellowship?: { name: string; tag: string; logo?: string; banner?: string; colors?: string[] } | null; title?: string | null; visited?: Record<string, number>; regionTicks?: Record<string, number>; talked?: Record<string, 1>; emotesUsed?: Record<string, 1>; outfits?: Record<string, 1>; friendTicks?: number; mounts?: string[]; mount?: string | null; daily?: unknown; seenUpdate?: number;
 };
 export function serialize(game: Game): SaveData {
@@ -2561,7 +2628,7 @@ export function serialize(game: Game): SaveData {
     playTicks: game.playTicks, retaliate: game.autoRetaliate, music: [...player.music],
     referredBy: player.referredBy, referrals: [...player.referrals], referralTimes: [...player.referralTimes], boostTicks: player.boostTicks, coalBag: player.coalBag, stoneBox: player.stoneBox, boneBag: { ...player.boneBag }, boosts: { ...player.boosts }, poison: player.poison ? { ...player.poison } : null, weaponPoison: player.weaponPoison ? { ...player.weaponPoison } : null,
     antidoteUntil: Math.max(0, player.antidoteUntil - game.tick), antifireUntil: Math.max(0, player.antifireUntil - game.tick), stealthUntil: Math.max(0, player.stealthUntil - game.tick), tonicUntil: Math.max(0, player.tonicUntil - game.tick), mixture: player.mixture ? { family: player.mixture.family, until: Math.max(0, player.mixture.until - game.tick) } : null,
-    firsts: { ...player.firsts } as Record<string, number>, friendKinds: { ...player.friendKinds } as Record<string, 1>, rumours: { ...player.rumours } as Record<string, 1>, orders: { ...player.orders }, card: { ...player.card }, cards: { ...player.cards }, rarian: player.rarian, home: player.home ? { ...player.home, furniture: { ...player.home.furniture } } : null, restedTicks: player.restedTicks, sigilBag: { ...player.sigilBag }, ward: player.ward ? { ...player.ward } : null, wardUntil: Math.max(0, player.wardUntil - game.tick), renew: player.renew, renewUntil: Math.max(0, player.renewUntil - game.tick), belts: Object.fromEntries(Object.entries(player.belts).map(([id, contents]) => [id, { ...contents }])), followerWorn: [...player.followerWorn],
+    firsts: { ...player.firsts } as Record<string, number>, friendKinds: { ...player.friendKinds } as Record<string, 1>, rumours: { ...player.rumours } as Record<string, 1>, orders: { ...player.orders }, card: { ...player.card }, cards: { ...player.cards }, rarian: player.rarian, palian: player.palian, spiritWardUntil: Math.max(0, player.spiritWardUntil - game.tick), home: player.home ? { ...player.home, furniture: { ...player.home.furniture } } : null, restedTicks: player.restedTicks, sigilBag: { ...player.sigilBag }, ward: player.ward ? { ...player.ward } : null, wardUntil: Math.max(0, player.wardUntil - game.tick), renew: player.renew, renewUntil: Math.max(0, player.renewUntil - game.tick), belts: Object.fromEntries(Object.entries(player.belts).map(([id, contents]) => [id, { ...contents }])), followerWorn: [...player.followerWorn],
     name: player.name, fellowship: player.fellowship ? { ...player.fellowship } : null, title: player.title, visited: { ...player.visited } as Record<string, number>, regionTicks: { ...player.regionTicks } as Record<string, number>, talked: { ...player.talked } as Record<string, 1>, emotesUsed: { ...player.emotesUsed } as Record<string, 1>, outfits: { ...player.outfits } as Record<string, 1>, friendTicks: player.friendTicks, mounts: [...player.mounts], mount: player.mount, met: JSON.parse(JSON.stringify(player.met)), achievements: { ...player.achievements }, pets: [...player.pets], petOut: player.petOut, killLog: { ...player.killLog }, lore: Object.fromEntries(Object.entries(player.lore).map(([id, entry]) => [id, { ...entry, d: [...entry.d] }])), stats: { ...player.stats }, daily: JSON.parse(JSON.stringify(player.daily)), seenUpdate: player.seenUpdate,
   };
 }
@@ -2676,7 +2743,7 @@ export function restore(game: Game, raw: unknown): boolean {
   player.referralTimes = (Array.isArray(save.referralTimes) ? save.referralTimes : []).filter((at): at is number => typeof at === "number" && Number.isFinite(at) && at > 0).slice(-REFERRALS_PER_DAY);
   player.mounts = MOUNTS.filter(mount => Array.isArray(save.mounts) && save.mounts.includes(mount.id)).map(mount => mount.id);
   player.mount = typeof save.mount === "string" && player.mounts.includes(save.mount) ? save.mount : null;
-  player.daily = cleanDaily(save.daily, SKILLS); player.orders = cleanOrders(save.orders); player.card = cleanCard(save.card); player.cards = Object.fromEntries(Object.entries(save.cards && typeof save.cards === "object" ? save.cards : {}).filter(([id, day]) => /^[a-z0-9_]{1,40}$/.test(id) && typeof day === "number" && Number.isFinite(day)).slice(0, 2000).map(([id, day]) => [id, Math.max(0, Math.floor(day))])); player.rarian = save.rarian === true; player.home = cleanHome(save.home); player.restedTicks = int(save.restedTicks, 0, 100000, 0); applyHome(game);
+  player.daily = cleanDaily(save.daily, SKILLS); player.orders = cleanOrders(save.orders); player.card = cleanCard(save.card); player.cards = Object.fromEntries(Object.entries(save.cards && typeof save.cards === "object" ? save.cards : {}).filter(([id, day]) => /^[a-z0-9_]{1,40}$/.test(id) && typeof day === "number" && Number.isFinite(day)).slice(0, 2000).map(([id, day]) => [id, Math.max(0, Math.floor(day))])); player.rarian = save.rarian === true; player.palian = !player.rarian && save.palian === true; player.spiritWardUntil = game.tick + int(save.spiritWardUntil, 0, 1000, 0); player.home = cleanHome(save.home); player.restedTicks = int(save.restedTicks, 0, 100000, 0); applyHome(game);
   player.sigilBag = {}; for (const [id, n] of Object.entries(save.sigilBag ?? {})) if (isItem(id) && isSigil(id)) { const v = int(n, 0, SIGIL_BAG_SIZE, 0); if (v) player.sigilBag[id] = v; }
   player.ward = save.ward && typeof save.ward === "object" ? { defence: Math.max(0, Math.min(1, Number(save.ward.defence) || 0)), flat: int(save.ward.flat, 0, 100, 0), reduce: Math.max(0, Math.min(0.9, Number(save.ward.reduce) || 0)) } : null; player.wardUntil = game.tick + int(save.wardUntil, 0, 1000, 0); if (!int(save.wardUntil, 0, 1000, 0)) player.ward = null;
   player.renew = int(save.renew, 0, 50, 0); player.renewUntil = game.tick + int(save.renewUntil, 0, 1000, 0);

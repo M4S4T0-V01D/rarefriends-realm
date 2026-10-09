@@ -132,7 +132,7 @@ export function skillGuide(skill: Skill): GuideEntry[] {
       break;
     case "apothecary":
       add(1, "Pick herbs", "Every ecosystem grows its own: forest, swamp, mountain, the Deadwood, Ashfall, coast and desert. Pick (level by herb), then Clean.");
-      for (const herb of HERBS) add(herb.level, herb.name, `${herb.rarity[0].toUpperCase()}${herb.rarity.slice(1)} · ${herb.eco === "deadwood" ? "the Deadwood" : herb.eco === "ashfall" ? "Ashfall" : `${herb.eco} regions`} · ${herb.xp} XP a pick`, `clean_${herb.id}`);
+      for (const herb of HERBS) add(herb.level, herb.name, `${herb.rarity[0].toUpperCase()}${herb.rarity.slice(1)} · ${herb.eco === "deadwood" ? "the Deadwood" : herb.eco === "ashfall" ? "Ashfall" : herb.eco === "palian" ? "the Palian Isles" : `${herb.eco} regions`} · ${herb.xp} XP a pick`, `clean_${herb.id}`);
       add(10, "Grind", "A pestle and mortar on a clean herb grinds it for the stronger brews.", "mortar");
       for (const essence of ESSENCES) add(essence.level, essence.name, `Distil two ${item(`clean_${essence.herb}`).name.toLowerCase()} at the still in Hollyhock`, essence.id);
       for (const potion of POTIONS) add(potion.level, potion.name, `${potion.examine} (${Object.entries(potion.inputs).filter(([id]) => id !== "vial_of_water").map(([id, n]) => `${n} ${item(id).name.toLowerCase()}`).join(", ")}, in a vial of water)`, potion.id);

@@ -14,13 +14,15 @@ function rng(seed: number) {
   };
 }
 const BARK = "#8a7563", BARK_DARK = "#6f5d4c";
-type TreeStyle = { canopy: string; shape: "round" | "broad" | "willow" | "cone" | "pale"; w: number; h: number };
+type TreeStyle = { canopy: string; shape: "round" | "broad" | "willow" | "cone" | "pale" | "blossom" | "bamboo"; w: number; h: number };
 const TREES: Record<string, TreeStyle> = {
   tree: { canopy: "#b3c1a6", shape: "round", w: 26, h: 38 }, oak: { canopy: "#a2b096", shape: "broad", w: 32, h: 40 },
   willow: { canopy: "#c2cbab", shape: "willow", w: 32, h: 40 }, maple: { canopy: "#d9b39a", shape: "broad", w: 30, h: 42 },
   yew: { canopy: "#8a9583", shape: "cone", w: 24, h: 46 }, ashwood: { canopy: "#e0e3e8", shape: "pale", w: 28, h: 44 },
   // BarkReach (Return of Raria): tall red-canopied redwoods, and the grey, broad ironbarks.
   redwood: { canopy: "#9a4a3a", shape: "cone", w: 26, h: 50 }, ironbark: { canopy: "#7d8a7a", shape: "broad", w: 34, h: 44 },
+  // The Palian Isles: the old cedars, the blossom trees, the bamboo.
+  cedar: { canopy: "#5f7d6a", shape: "cone", w: 28, h: 58 }, sakura: { canopy: "#efc3cf", shape: "blossom", w: 32, h: 40 }, bamboo: { canopy: "#8fb36a", shape: "bamboo", w: 26, h: 52 },
 };
 function trunk(p: Pixels, cx: number, bottom: number, height: number, width = 4) {
   p.rect(cx - width / 2, bottom - height, width, height, BARK);
@@ -80,6 +82,20 @@ export function treeArt(kind: string, variant: number, depleted: boolean): HTMLC
         p.poly([[cx, top], [cx + half, base], [cx - half, base]], shadeHex(style.canopy, i * 0.02), null);
       }
       p.dither(shadeHex(style.canopy, -0.12), x => x > cx ? 0.45 : 0.05);
+    } else if (style.shape === "bamboo") {
+      // A clump of culms: straight green poles with darker joints, leaning a little, leaves in tufts at the joints.
+      for (let k = 0; k < 6; k++) {
+        const x0 = 4 + k * 3.4 + random() * 2, top = 4 + random() * 10, lean = (random() - 0.5) * 3, culm = k % 2 ? "#7fa35a" : "#9cc06a";
+        p.line(x0, bottom, x0 + lean, top, culm, 2);
+        for (let y = bottom - 6; y > top + 2; y -= 7) { const x = x0 + lean * (bottom - y) / (bottom - top); p.set(Math.round(x), y, "#4f6a34"); p.set(Math.round(x) + 1, y, "#4f6a34");
+          if (random() < 0.7) { const dir = random() < 0.5 ? -1 : 1; p.line(x, y, x + dir * 5, y - 2, style.canopy); p.line(x + dir * 2, y - 1, x + dir * 6, y + 1, shadeHex(style.canopy, -0.15)); } }
+      }
+    } else if (style.shape === "blossom") {
+      // A blossom tree: a dark crooked trunk forking low, a cloud of pink, and petals falling.
+      p.line(cx, bottom, cx - 1, bottom - 12, "#5a3f36", 3); p.line(cx - 1, bottom - 12, cx - 7, bottom - 20, "#5a3f36", 2); p.line(cx - 1, bottom - 12, cx + 6, bottom - 22, "#5a3f36", 2);
+      canopy(p, random, cx, 15, 14, 11, style.canopy, 9);
+      p.dither("#f8e1e7", (x, y) => y < 12 ? 0.35 : 0.08, style.canopy);
+      for (let i = 0; i < 6; i++) p.set(Math.round(cx - 12 + random() * 24), Math.round(28 + random() * 9), "#f3c8d4");
     } else if (style.shape === "willow") {
       trunk(p, cx, bottom, 16, 4);
       canopy(p, random, cx, 14, 13, 10, style.canopy, 8);
@@ -285,6 +301,124 @@ export function decorArt(kind: string, variant: number, frame = 0): HTMLCanvasEl
     case "rubble": return pixelArt(key, 18, 8, p => { for (let i = 0; i < 4; i++) { const x = 2 + random() * 12, y = 3 + random() * 3; p.poly([[x, y + 3], [x + 1, y], [x + 4, y], [x + 5, y + 3]], COLORS.stone, null); } p.outline(); });
     case "snowman": return pixelArt(key, 16, 22, p => { p.disc(8, 16, 6, 5, "#ffffff", null); p.disc(8, 7, 4.5, 4.5, "#ffffff", null); p.set(6, 6, INK); p.set(10, 6, INK); p.rect(8, 8, 3, 1, "#e9a07a"); p.rect(4, 11, 8, 1, COLORS.rose); p.dither("#dfe7ec", (x, y) => x > 9 ? 0.4 : 0, "#ffffff"); p.outline(); });
     case "chest": return pixelArt(key, 16, 13, p => { p.rect(1, 5, 14, 7, COLORS.wood); p.poly([[1, 5], [3, 1], [13, 1], [15, 5]], "#a88f74", null); p.rect(7, 5, 2, 3, "#e2d49e"); p.line(1, 8, 14, 8, "#7a6553"); p.outline(); });
+    // ---------- The Palian Isles (What Rises in the East) ----------
+    case "torii": return pixelArt(key, 36, 38, p => {
+      // A shrine gate: two vermilion posts, a black-capped top beam swept up at the ends, a tie beam under it, and a plaque.
+      const RED = variant === 2 ? "#8f6a4a" : "#c0473a", RED_D = shadeHex(RED, -0.2), BLACK = "#2a2626";
+      for (const x of [8, 26]) { p.rect(x, 9, 3, 28, RED); p.rect(x + 2, 9, 1, 28, RED_D); p.rect(x - 1, 35, 5, 2, BLACK); }
+      p.poly([[1, 4], [5, 6], [31, 6], [35, 4], [34, 8], [2, 8]], BLACK, INK); p.rect(3, 8, 30, 3, RED); p.line(3, 10, 32, 10, RED_D);
+      p.rect(5, 15, 26, 3, RED); p.line(5, 17, 30, 17, RED_D); p.rect(16, 10, 4, 6, BLACK); p.rect(17, 11, 2, 4, "#c9a24a");
+      p.outline();
+    });
+    case "stone_lantern": return pixelArt(key, 16, 30, p => {
+      // A stone lantern: a stepped base, a round post, the fire box with its window lit, a curled roof, a jewel on top.
+      const S = "#a39e96", S_L = "#c3beb6", S_D = "#7d7870";
+      p.rect(3, 26, 10, 3, S_D); p.rect(4, 24, 8, 2, S); p.rect(6, 15, 4, 9, S); p.line(6, 15, 6, 23, S_L); p.rect(3, 13, 10, 2, S_D);
+      p.rect(4, 8, 8, 5, S); p.rect(6, 9, 4, 3, variant === 1 ? "#3b3a38" : "#f2c46a"); p.set(7, 10, variant === 1 ? "#3b3a38" : "#fff2c0");
+      p.poly([[1, 8], [8, 3], [15, 8], [13, 9], [3, 9]], S_D, INK); p.line(3, 7, 8, 4, S_L); p.disc(8, 2, 1.6, 1.6, S, INK);
+      p.dither("#8e9d80", (x, y) => y > 22 && (x + y) % 5 === 0 ? 0.6 : 0, S_D);
+      p.outline();
+    });
+    case "pagoda": return pixelArt(key, 48, 112, p => {
+      // Five storeys, each a little narrower, each under a wide upswept roof of dark tile; a bronze spire of rings on top.
+      const WALL = "#c0473a", WALL_D = "#9a3a30", ROOF = "#3f4651", ROOF_L = "#56606e", BEAM = "#e6dcc6";
+      p.rect(8, 104, 32, 6, "#a39e96"); p.rect(6, 108, 36, 3, "#8f8a83");
+      for (let k = 0; k < 5; k++) {
+        const base = 104 - k * 18, half = 13 - k * 2, roofHalf = half + 8, cx = 24;
+        p.rect(cx - half, base - 12, half * 2, 12, WALL); p.rect(cx + half - 3, base - 12, 3, 12, WALL_D); p.line(cx - half, base - 7, cx + half - 1, base - 7, BEAM);
+        for (let x = cx - half + 2; x < cx + half - 2; x += 4) p.rect(x, base - 11, 2, 3, "#2a2626");
+        p.poly([[cx - roofHalf, base - 12], [cx - roofHalf + 3, base - 16], [cx + roofHalf - 3, base - 16], [cx + roofHalf, base - 12], [cx + roofHalf + 1, base - 14], [cx + roofHalf - 2, base - 18], [cx - roofHalf + 2, base - 18], [cx - roofHalf - 1, base - 14]], ROOF, INK);
+        p.line(cx - roofHalf + 3, base - 17, cx + roofHalf - 4, base - 17, ROOF_L);
+      }
+      p.rect(23, 3, 2, 14, "#b08a3a"); for (let y = 6; y <= 14; y += 2) p.line(21, y, 26, y, "#c9a24a"); p.disc(24, 2, 1.8, 1.8, "#e2c46a", INK);
+      p.outline();
+    });
+    case "castle_keep": return pixelArt(key, 76, 128, p => {
+      // A castle keep on a sloped stone base: three storeys of white plaster, black-tiled roofs with gables, gold fish on the ridge.
+      const PLASTER = "#efe9dc", PLASTER_D = "#d6cfbf", ROOF = "#2f343c", ROOF_L = "#4a515c", STONE = "#a39e96", STONE_D = "#7d7870", ruined = variant === 1;
+      p.poly([[4, 126], [72, 126], [64, 92], [12, 92]], STONE, INK);
+      for (let y = 96; y < 126; y += 5) for (let x = 8 + ((y / 5) % 2) * 4; x < 70; x += 8) p.rect(x, y, 6, 4, (x + y) % 3 ? STONE : STONE_D);
+      const storey = (y: number, half: number, h: number) => {
+        p.rect(38 - half, y - h, half * 2, h, ruined ? "#5a5550" : PLASTER); p.rect(38 + half - 4, y - h, 4, h, ruined ? "#45403c" : PLASTER_D);
+        for (let x = 38 - half + 4; x < 38 + half - 6; x += 8) p.rect(x, y - h + 4, 3, 4, "#2a2626");
+        p.poly([[38 - half - 8, y - h], [38 - half - 4, y - h - 6], [38 + half + 4, y - h - 6], [38 + half + 8, y - h], [38 + half + 9, y - h - 3], [38 + half + 3, y - h - 9], [38 - half - 3, y - h - 9], [38 - half - 9, y - h - 3]], ruined ? "#3a3632" : ROOF, INK);
+        p.line(38 - half - 3, y - h - 8, 38 + half + 2, y - h - 8, ROOF_L);
+      };
+      storey(92, 24, 16); storey(67, 18, 14); storey(44, 13, 13);
+      if (!ruined) { p.poly([[24, 22], [38, 10], [52, 22]], ROOF, INK); p.poly([[33, 22], [38, 16], [43, 22]], PLASTER, INK); p.line(26, 13, 50, 13, ROOF_L); p.rect(23, 9, 3, 4, "#c9a24a"); p.rect(50, 9, 3, 4, "#c9a24a"); p.line(38, 10, 38, 2, "#2a2626"); p.rect(39, 2, 8, 5, "#2f3a5e"); p.set(42, 4, "#efe6d2"); }
+      else { p.poly([[26, 22], [32, 14], [36, 20], [44, 12], [50, 22]], "#3a3632", INK); p.line(44, 12, 44, 3, "#2a2626"); p.rect(45, 3, 7, 6, "#4f7a64"); }
+      p.outline();
+    });
+    case "guardian": return pixelArt(key, 20, 24, p => {
+      // A guardian lion-dog seated on its plinth, curled mane, one paw on a ball (or, its mouth shut, a cub).
+      const S = "#b9b5ae", S_D = "#8f8a83", S_L = "#d7d4cd";
+      p.rect(2, 19, 16, 4, S_D); p.line(2, 19, 17, 19, S_L);
+      p.poly([[5, 19], [5, 12], [7, 7], [12, 5], [16, 8], [16, 19]], S, INK); p.disc(11, 7, 5, 4.5, S, INK, S_D);
+      for (const [x, y] of [[7, 4], [10, 3], [13, 4], [15, 6], [6, 7]] as const) p.disc(x, y, 1.6, 1.6, S_D, null);
+      p.set(9, 7, "#2a2626"); p.set(13, 7, "#2a2626"); p.line(9, 9, 13, 9, variant % 2 ? S_D : "#5a4a4a"); p.disc(15, 17, 2, 2, S_L, INK);
+      p.line(6, 13, 6, 18, S_L);
+      p.outline();
+    });
+    case "sacred_rope": return pixelArt(key, 28, 24, p => {
+      // A great rock with a twisted straw rope round its middle and white paper zigzags hanging from it.
+      p.poly([[3, 22], [2, 14], [6, 7], [14, 3], [22, 6], [26, 13], [25, 22]], "#8f8a83", INK); p.dither("#7d7870", (x, y) => (x + y) % 3 === 0 && x > 14 ? 0.7 : 0, "#8f8a83"); p.line(6, 9, 13, 5, "#b3aea6");
+      p.rect(2, 12, 24, 3, "#c9b27a"); for (let x = 3; x < 26; x += 2) p.set(x, 13, "#8a6a3a");
+      for (const x of [6, 13, 20]) { p.line(x, 15, x + 1, 17, "#ffffff"); p.line(x + 1, 17, x, 19, "#ffffff"); p.line(x, 19, x + 1, 21, "#ffffff"); }
+      p.outline();
+    });
+    case "drying_rack": return pixelArt(key, 26, 24, p => {
+      p.line(3, 23, 3, 6, BARK, 2); p.line(23, 23, 23, 6, BARK, 2); p.line(2, 6, 24, 6, BARK_DARK, 2);
+      for (const x of [6, 10, 14, 18]) { p.line(x, 7, x, 9, "#6f5d4c"); p.poly([[x - 2, 10], [x + 2, 10], [x + 1, 17], [x, 19], [x - 1, 17]], "#c9b8a6", INK); p.set(x, 12, "#8f7a6a"); }
+      p.outline();
+    });
+    case "steam": return pixelArt(key, 26, 30, p => {
+      // A hot spring's pool edged in stones, steam rising off it in curls.
+      p.disc(13, 25, 11, 4, "#7fa8c9", INK); p.disc(13, 25, 8, 2.5, "#a9cce3", null);
+      for (const [x, y] of [[2, 25], [24, 25], [6, 28], [20, 28], [13, 29]] as const) p.disc(x, y, 2, 1.5, "#a39e96", INK);
+      const drift = frame % 2 ? 1 : 0;
+      for (const [x, y, r] of [[9, 17, 3], [15, 13, 3.5], [11, 8, 3], [17, 5, 2.5]] as const) p.disc(x + drift, y, r, r * 0.8, "#eef2f4", null);
+      p.outline("#c9d2d8");
+    });
+    case "offering_box": return pixelArt(key, 20, 26, p => {
+      // An offering box with a slatted top, and above it the bell on its thick coloured rope.
+      p.rect(2, 16, 16, 9, "#7a5a44"); p.rect(2, 16, 16, 2, "#9c7a58"); for (let x = 3; x < 17; x += 2) p.line(x, 16, x, 18, "#4a3a2c"); p.rect(4, 20, 12, 2, "#c9a24a");
+      p.line(10, 1, 10, 6, "#2a2626"); p.disc(10, 7, 2.6, 2.4, "#c9a24a", INK); p.line(10, 9, 10, 15, "#c0473a", 2); p.line(11, 9, 11, 15, "#f2f0ea");
+      p.outline();
+    });
+    case "paper_lantern": return pixelArt(key, 14, 34, p => {
+      // A red paper lantern hung from a post, ribbed, with black caps.
+      p.line(4, 33, 4, 4, "#4a3a2c", 2); p.line(4, 4, 10, 4, "#4a3a2c"); p.line(10, 4, 10, 7, "#2a2626");
+      p.disc(10, 13, 4, 5.5, variant === 1 ? "#efe6d2" : "#c0473a", INK); for (const y of [10, 13, 16]) p.line(7, y, 13, y, variant === 1 ? "#c9b8a6" : "#9a3a30");
+      p.rect(8, 7, 5, 1, "#2a2626"); p.rect(8, 18, 5, 1, "#2a2626"); p.set(10, 13, "#f2c46a");
+      p.outline();
+    });
+    case "wish_board": return pixelArt(key, 28, 26, p => {
+      // A wish board: a little roofed rack hung with wooden plaques.
+      p.line(3, 25, 3, 6, BARK, 2); p.line(25, 25, 25, 6, BARK, 2); p.poly([[0, 7], [14, 1], [28, 7], [26, 8], [2, 8]], "#56606e", INK);
+      for (let row = 0; row < 3; row++) for (let k = 0; k < 4; k++) { const x = 5 + k * 5 + (row % 2), y = 10 + row * 5; p.rect(x, y, 4, 4, ["#d9c49a", "#cdb98a", "#e2d4ae"][(k + row) % 3]); p.set(x + 1, y + 1, "#c0473a"); }
+      p.outline();
+    });
+    case "wayside_statue": return pixelArt(key, 12, 18, p => {
+      // A little round-headed stone figure in a red bib, hands together.
+      p.rect(2, 15, 8, 2, "#8f8a83"); p.poly([[3, 15], [3, 9], [9, 9], [9, 15]], "#b3aea6", INK); p.disc(6, 6, 3.2, 3.2, "#b3aea6", INK);
+      p.poly([[3, 9], [9, 9], [6, 13]], "#c0473a", null); p.set(5, 6, "#5a5550"); p.set(7, 6, "#5a5550");
+      p.outline();
+    });
+    case "nets": return pixelArt(key, 28, 20, p => {
+      p.line(2, 19, 2, 2, BARK, 2); p.line(26, 19, 26, 2, BARK, 2); p.line(2, 3, 26, 3, BARK_DARK);
+      for (let x = 4; x < 26; x += 3) p.line(x, 4, x + (x % 2 ? 1 : -1), 16, "#7a8a8a"); for (let y = 6; y < 17; y += 3) p.line(3, y, 25, y + 1, "#7a8a8a");
+      for (const [x, y] of [[7, 15], [15, 16], [22, 14]] as const) p.disc(x, y, 1.5, 1.5, "#d9a93f", INK);
+      p.outline();
+    });
+    case "palian_boat": return pixelArt(key, 52, 26, p => {
+      // A Palian ferry: a long wooden hull with an upswept bow, a straw-roofed cabin amidships, a sculling oar at the stern.
+      const bob = frame % 2;
+      p.poly([[2, 14 + bob], [6, 19 + bob], [44, 19 + bob], [50, 12 + bob], [46, 14 + bob], [6, 14 + bob]], "#7a5a44", INK); p.line(6, 16 + bob, 45, 16 + bob, "#9c7a58"); p.line(7, 18 + bob, 44, 18 + bob, "#5a4030");
+      p.poly([[16, 14 + bob], [16, 9 + bob], [32, 9 + bob], [32, 14 + bob]], "#c9b8a6", INK); p.poly([[13, 9 + bob], [24, 4 + bob], [35, 9 + bob]], "#a8925f", INK); p.line(16, 7 + bob, 32, 7 + bob, "#c9b27a");
+      p.line(3, 13 + bob, 6, 23, "#6f5d4c", 2); p.rect(36, 10 + bob, 2, 4, "#c0473a");
+      p.disc(26, 23, 22, 2, "#9fc3d9", null);
+      p.outline();
+    });
     default: return null;
   }
 }

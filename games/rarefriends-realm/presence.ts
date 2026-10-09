@@ -107,6 +107,12 @@ export const TITLES: readonly TitleDef[] = [
   { id: "dragonfriend", name: "Dragonfriend", quest: "ashfall_embers", text: "Clear Ashfall's passes for Ember Tamsin." },
   { id: "lanternkeeper", name: "Lanternkeeper", quest: "gravesend_lanterns", text: "Light Gravesend's lanterns." },
   { id: "tithed", name: "Sea-tithed", quest: "saltmarrow_tithe", text: "Pay the Salt Tithe." },
+  // The Palian Isles.
+  { id: "isles_guest", name: "Guest of the Isles", quest: "landfall", text: "Be presented at the Hall of Takamori." },
+  { id: "lantern_friend", name: "Friend of the Lanterns", quest: "lanterns_drowned", text: "Relight Torojima's great lantern." },
+  { id: "treaty_reader", name: "Who Read the Treaty", quest: "josaki_truce", text: "Bring Josaki's broken treaty to light." },
+  { id: "ogre_breaker", name: "Ogre-breaker", quest: "red_ogre", text: "Bring down Akagane, the Red Ogre." },
+  { id: "sea_gave_back", name: "Who the Sea Gave Back", quest: "sea_gave_back", text: "Lay the Starving Colossus down and give the drowned their names." },
   { id: "brewer", name: "Master Brewer", skill: "apothecary", level: 99, text: "Apothecary 99." },
   { id: "wayfarer", name: "Wayfarer", skill: "agility", level: 99, text: "Wayfaring 99." },
   { id: "slayer", name: "Warden's Own", skill: "slayer", level: 99, text: "Pursuance 99." },

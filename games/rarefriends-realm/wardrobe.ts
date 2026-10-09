@@ -380,6 +380,14 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
         }
         for (let y = 0; y < p.h; y++) for (let x = 0; x < p.w; x++) { const v = helm.get(x, y); if (v) p.set(x, y, v); }
         const l = hl, r = hr, metal = metalOf(piece.id), dome = top - 3;
+        if (isItem(piece.id) && item(piece.id).icon.kind === "kabuto") {
+          // A Palian kabuto: a broad neck-guard flaring out below the bowl in lames, and two gilt horns rising from the brow.
+          const [a, b] = rowSpan(rim), flare = side ? 2 : 3;
+          for (let k = 0; k < 3; k++) { const y = rim + k - 1; p.line(a - flare - k + (side > 0 ? 2 : 0), y, b + flare + k - (side < 0 ? 2 : 0), y, k === 1 ? dark : color); }
+          const gilt = piece.trim ?? "#c9a24a";
+          if (!back) for (const s2 of side ? [side] : [-1, 1]) { const hx = side ? mid + side * 2 : mid + s2 * 2; p.polyline([[hx, top], [hx + s2 * 2, top - 3], [hx + s2 * 4, top - 7], [hx + s2 * 5, top - 9]], gilt, 1); p.set(hx + s2 * 5, top - 10, gilt); }
+          break;
+        }
         if (isItem(piece.id) && item(piece.id).icon.kind === "horned") {
           // Curled horns sweeping out and up from the sides.
           for (const s2 of side ? [side] : [-1, 1]) { const hx = s2 < 0 ? l : r; p.polyline([[hx, top + 1], [hx + s2 * 4, top - 1], [hx + s2 * 5, top - 5], [hx + s2 * 3, top - 7]], piece.trim ?? "#e8dcc0", 2); }
@@ -457,6 +465,14 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
           p.rect(l - 1, band, r - l + 3, 2, dark); p.line(l + 1, top - 3, r - 2, top - 3, light);
           const fx = side ? Math.round(cx) - side * 2 : r - 1, feather = piece.trim ?? "#f7f5f0";
           p.polyline([[fx, top - 2], [fx + back2 * 3, top - 7], [fx + back2 * 6, top - 10]], feather, 2); p.set(fx + back2 * 6, top - 11, feather);
+          break;
+        }
+        if (piece.style === "kasa") {
+          // A Palian kasa: a wide, shallow cone of straw, its point over the crown, a darker band where it sits.
+          const brimY = top + 1, half = headHalf + 7;
+          p.poly([[cx - half, brimY + 1], [cx + half, brimY + 1], [cx + 2, top - 7], [cx - 2, top - 7]], color, null);
+          p.line(cx - half + 1, brimY, cx + half - 1, brimY, dark); for (let k = -half + 4; k < half - 2; k += 4) p.line(cx + k, brimY, cx + k * 0.3, top - 5, shadeHex(color, -0.1));
+          p.line(cx - 3, top - 6, cx + 3, top - 6, light); if (piece.trim) p.set(Math.round(cx), top - 7, piece.trim);
           break;
         }
         if (piece.style === "wide") {
@@ -681,8 +697,8 @@ function drawWeapon(p: Pixels, piece: Piece, x: number, y: number, dir: number, 
     p.set(x, y, dark);
   };
   switch (shape) {
-    case "sword": blade(15); break;
-    case "greatsword": blade(21); break;
+    case "sword": blade(15, piece.style === "katana" ? 1.8 : 0); break;
+    case "greatsword": blade(21, piece.style === "katana" ? 2.4 : 0); break;
     case "mace": {
       // A short haft with a wrapped grip and a capped pommel, a collar, and a flanged head above: six ridges from a boss
       // in the blessing's gold, lit along the top.
@@ -756,7 +772,7 @@ function drawWeapon(p: Pixels, piece: Piece, x: number, y: number, dir: number, 
       p.poly([[top.x, top.y - 4], [top.x + dir * 2, top.y + 1], [top.x, top.y + 4], [top.x - dir * 2, top.y + 1]], metal, null); p.set(top.x, top.y - 3, light);
       break;
     }
-    case "dagger": blade(8); break;
+    case "dagger": blade(8, piece.style === "katana" ? 0.8 : 0); break;
     case "sabre": blade(14, 2.4); break;
     case "axe": case "pickaxe": {
       // A haft over the shoulder, the head at its top.

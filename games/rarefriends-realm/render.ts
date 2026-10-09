@@ -322,7 +322,7 @@ function captureBox(ctx: CanvasRenderingContext2D, camera: Camera, x: number, y:
   const lid = pattern === "cap" && top.startsWith("#") ? gl.wallLayers.layer(wallTexture("cap", top, variant)) : -1;
   const ink = !stroke ? 0 : stroke === INK ? 1 : (rgbaOf(stroke)[3] ?? 1);
   // In the light of the thing it belongs to; a lit window's glass glows in the shader.
-  const glow = pattern === "window_lit" ? 1 : pattern === "timber_window_lit" ? 2 : 0;
+  const glow = pattern === "window_lit" ? 1 : pattern === "timber_window_lit" || pattern === "palian_window_lit" ? 2 : 0;
   gl.addBox(rx, ry, w, d, rlift, h, face(left), face(right), lid, rgbOf(top), rgbOf(left), rgbOf(right), ink, spriteState.light, spriteState.clear, glow);
   spriteState.sent = true;
   punch(ctx, boxHull(camera, x, y, w, d, h, lift));
@@ -526,8 +526,8 @@ function box(ctx: CanvasRenderingContext2D, camera: Camera, x: number, y: number
       const o = q(ax, ay, lift + h), across = q(bx, by, lift + h), down = q(ax, ay, lift);
       texturedQuad(ctx, wallTexture(pattern, fill, variant), o, across, down, length * TEX_PER_TILE, h * TEX_PER_HEIGHT);
       // A window lit from inside: where its glass landed on screen, so the light pass can let it shine.
-      if (!bare && (pattern === "window_lit" || pattern === "timber_window_lit")) {
-        const cols = Math.max(1, Math.round(length * TEX_PER_TILE)), rows = Math.max(1, Math.min(24, Math.round(h * TEX_PER_HEIGHT))), top = PANE.top(pattern === "timber_window_lit");
+      if (!bare && (pattern === "window_lit" || pattern === "timber_window_lit" || pattern === "palian_window_lit")) {
+        const cols = Math.max(1, Math.round(length * TEX_PER_TILE)), rows = Math.max(1, Math.min(24, Math.round(h * TEX_PER_HEIGHT))), top = PANE.top(pattern !== "window_lit");
         const at = (u: number, v: number): [number, number] => [o.x + (across.x - o.x) * u / cols + (down.x - o.x) * v / rows, o.y + (across.y - o.y) * u / cols + (down.y - o.y) * v / rows];
         if (rows >= top + PANE.h) emitted.push([at(PANE.x0, top), at(PANE.x0 + PANE.w, top), at(PANE.x0 + PANE.w, top + PANE.h), at(PANE.x0, top + PANE.h)]);
       }
@@ -1274,7 +1274,18 @@ function drawStation(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldO
       const spindle = toScreen(camera, ox - 0.3, oy, 16); ellipse(ctx, spindle.x, spindle.y, 4.5 * z, 3.2 * z, "#efeae0", INK, 1);
       return hit(40);
     }
-    case "altar": box(ctx, camera, ox, oy, 0.9, 0.6, 16, PAPER, "#d6d3cc", "#c8c5be"); box(ctx, camera, ox, oy, 0.4, 0.62, 2, C.rose, C.rose, shade(C.rose, -0.1), 16);
+    case "dock": {
+      // A Palian boat moored off the pier's end, rocking a little.
+      const art = decorArt("palian_boat", 0, scene.reducedMotion ? 0 : Math.floor(now / 800 + ox) % 2);
+      return art ? drawPixels(ctx, art, sx, sy + 8 * z, ART * z) : hit(20, 60);
+    }
+    case "altar": if (object.text === "palian") {
+      // A Palian altar: a low vermilion offering table under a little tiled roof, a mirror on it catching the light.
+      box(ctx, camera, ox, oy, 0.9, 0.6, 14, "#b5452f", "#9a3a30", "#86322a"); box(ctx, camera, ox, oy, 0.92, 0.64, 2, "#2a2626", "#2a2626", "#1f1d1d", 14);
+      miniRoof(ctx, camera, ox, oy, 1.1, 0.8, 26, 12, "#3f4651", "gable", "#b5452f");
+      ellipse(ctx, sx, sy - 20 * z, 3 * z, 3 * z, `rgba(242,226,143,${0.5 + flicker * 0.5})`, INK, 0.8); return hit(40);
+    }
+    box(ctx, camera, ox, oy, 0.9, 0.6, 16, PAPER, "#d6d3cc", "#c8c5be"); box(ctx, camera, ox, oy, 0.4, 0.62, 2, C.rose, C.rose, shade(C.rose, -0.1), 16);
       ellipse(ctx, sx, sy - 26 * z, 3 * z, 3 * z, `rgba(226,215,173,${0.5 + flicker * 0.5})`, null); return hit(30);
     case "ladder": {
       const down = object.action?.includes("down");
@@ -1800,8 +1811,9 @@ function roomLights(world: World) {
 type RoofVertex = [number, number, number];
 /** The roof's corners (with an overhang) and its ridge, in world coordinates and height. */
 function roofGeometry(building: Building) {
-  const o = 0.3, X0 = building.x0 - 0.5 - o, X1 = building.x1 + 0.5 + o, Y0 = building.y0 - 0.5 - o, Y1 = building.y1 + 0.5 + o;
-  const alongX = X1 - X0 >= Y1 - Y0, half = (alongX ? Y1 - Y0 : X1 - X0) / 2, rise = building.roof === "cone" ? building.spire ?? 118 : Math.max(20, Math.min(48, half * 11));
+  // (A Palian roof reaches further out over its walls, and climbs steeper.)
+  const palian = building.style === "palian", o = palian ? 0.62 : 0.3, X0 = building.x0 - 0.5 - o, X1 = building.x1 + 0.5 + o, Y0 = building.y0 - 0.5 - o, Y1 = building.y1 + 0.5 + o;
+  const alongX = X1 - X0 >= Y1 - Y0, half = (alongX ? Y1 - Y0 : X1 - X0) / 2, rise = building.roof === "cone" ? building.spire ?? 118 : Math.max(20, Math.min(palian ? 60 : 48, half * (palian ? 13 : 11)));
   const base = WALL_H * (building.storeys ?? 1) + (building.tall ?? 0), top = base + rise, mid = alongX ? (Y0 + Y1) / 2 : (X0 + X1) / 2;
   const A: RoofVertex = [X0, Y0, base], B: RoofVertex = [X1, Y0, base], C: RoofVertex = [X1, Y1, base], D: RoofVertex = [X0, Y1, base];
   // A hipped roof's ridge stops short of the ends by half the span (a square one comes to a point).
@@ -1956,6 +1968,30 @@ function drawKeepRoof(ctx: CanvasRenderingContext2D, camera: Camera, building: B
   ctx.strokeStyle = INK; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(qx, qy); ctx.stroke();
   poly(ctx, [[qx, qy], [qx + 18 * camera.zoom, qy + 4 * camera.zoom + wave], [qx, qy + 9 * camera.zoom]], C.butter, INK, 1);
 }
+/**
+ * A Palian roof's trim (the Palian Isles): a heavy ridge cap with its ends turned up, and every corner of the eaves
+ * swept up and out. Drawn over the slopes on either renderer.
+ */
+function palianTrim(ctx: CanvasRenderingContext2D, camera: Camera, building: Building, g: ReturnType<typeof roofGeometry>) {
+  if (building.style !== "palian") return;
+  const z = camera.zoom, P = ([x, y, h]: RoofVertex) => { const s = toScreen(camera, x, y, h); return [s.x, s.y] as const; };
+  const dx = g.alongX ? 1 : 0, dy = g.alongX ? 0 : 1, cap = shadeHex(building.color, -0.3);
+  const ends: RoofVertex[] = [[g.R0[0] - dx * 0.25, g.R0[1] - dy * 0.25, g.top + 2], [g.R1[0] + dx * 0.25, g.R1[1] + dy * 0.25, g.top + 2]];
+  const [ax, ay] = P(ends[0]), [bx, by] = P(ends[1]);
+  ctx.lineCap = "round";
+  ctx.strokeStyle = INK; ctx.lineWidth = 4.6 * z; ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+  ctx.strokeStyle = cap; ctx.lineWidth = 2.6 * z; ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+  // The ridge's ends curl up like horns, and the eaves' corners sweep up and out.
+  const flick = (from: RoofVertex, out: [number, number], up: number, width: number) => {
+    const [fx, fy] = P(from), [tx, ty] = P([from[0] + out[0], from[1] + out[1], from[2] + up]);
+    ctx.strokeStyle = INK; ctx.lineWidth = (width + 2) * z; ctx.beginPath(); ctx.moveTo(fx, fy); ctx.quadraticCurveTo((fx + tx) / 2, fy - 1 * z, tx, ty); ctx.stroke();
+    ctx.strokeStyle = cap; ctx.lineWidth = width * z; ctx.beginPath(); ctx.moveTo(fx, fy); ctx.quadraticCurveTo((fx + tx) / 2, fy - 1 * z, tx, ty); ctx.stroke();
+  };
+  flick(ends[0], [-dx * 0.12, -dy * 0.12], 6, 2.6); flick(ends[1], [dx * 0.12, dy * 0.12], 6, 2.6);
+  const cx = (g.X0 + g.X1) / 2, cy = (g.Y0 + g.Y1) / 2;
+  for (const corner of [g.A, g.B, g.C, g.D]) flick(corner, [Math.sign(corner[0] - cx) * 0.1, Math.sign(corner[1] - cy) * 0.1], 4, 2.4);
+  ctx.lineCap = "butt";
+}
 function roofHull(camera: Camera, building: Building) {
   const g = roofGeometry(building), points = building.roof === "flat" ? [g.A, g.B, g.C, g.D].map(([x, y]) => [x, y, g.base + 12] as RoofVertex).concat([g.A, g.B, g.C, g.D])
     : building.roof === "cone" ? [g.A, g.B, g.C, g.D, [g.apex[0], g.apex[1], g.top + 22 + keepHeight(building)] as RoofVertex] : [g.A, g.B, g.C, g.D, g.R0, g.R1];
@@ -2070,6 +2106,7 @@ function drawRoofParts(ctx: CanvasRenderingContext2D, camera: Camera, building: 
       else { const fill = face.fill.startsWith("#") ? face.fill : gable; gpuSlope(ctx, camera, face.points, wallTexture(building.walls === "stone" ? "brick" : building.walls === "plank" ? "plank" : "timber", fill), fill, alpha, face.points[0], face.points[1], (g.top - g.base) * TEX_PER_HEIGHT, g.top, g.base); }
     }
     slopesDrawn = 2; ridgeDrawn = true; chimney();
+    palianTrim(ctx, camera, building, g);
     ctx.globalAlpha = 1;
     return;
   }
@@ -2100,6 +2137,7 @@ function drawRoofParts(ctx: CanvasRenderingContext2D, camera: Camera, building: 
     if (face.chimney) chimney();
   }
   ridge();
+  palianTrim(ctx, camera, building, g);
   ctx.globalAlpha = 1;
 }
 
@@ -2296,10 +2334,11 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       // (On the GPU unless it's see-through: a wall you're standing behind.)
       capturing = glr && !near && ctx === target ? glr : null;
       ctx.globalAlpha = near ? 0.3 : 1;
-      const [top, left, right] = dungeon ? ["#4a4950", "#3a3940", "#2f2e35"] : timber ? ["#8a6a50", "#e6dcc6", "#cfc4ab"] : style === "plank" ? ["#8a6a50", "#b89c7e", "#9c8266"] : style === "marble" ? ["#eee8db", "#e0d8c7", "#cbc2af"] : ["#b9b4ab", "#a39e95", "#8f8a82"];
-      const plain: WallStyle = dungeon ? "dungeon" : timber ? "timber" : style === "plank" ? "plank" : "brick";
-      // At night most windows glow with the lamps inside.
-      const glazed = (k: number): WallStyle => windowGlow > 0.02 && hash(x * 5 + 3, y + k * 11) < 0.8 ? (timber ? "timber_window_lit" : "window_lit") : timber ? "timber_window" : "window";
+      const palian = style === "palian", shrine = style === "lacquer";
+      const [top, left, right] = dungeon ? ["#4a4950", "#3a3940", "#2f2e35"] : timber ? ["#8a6a50", "#e6dcc6", "#cfc4ab"] : palian ? ["#3d2e26", "#efe9dc", "#d9d1c0"] : shrine ? ["#5a2a22", "#efe6d6", "#d9cfbc"] : style === "plank" ? ["#8a6a50", "#b89c7e", "#9c8266"] : style === "marble" ? ["#eee8db", "#e0d8c7", "#cbc2af"] : ["#b9b4ab", "#a39e95", "#8f8a82"];
+      const plain: WallStyle = dungeon ? "dungeon" : timber ? "timber" : palian ? "palian" : shrine ? "lacquer" : style === "plank" ? "plank" : "brick";
+      // At night most windows glow with the lamps inside (a Palian window is a paper lattice; a shrine's walls have none).
+      const glazed = (k: number): WallStyle => shrine ? "lacquer" : palian ? (windowGlow > 0.02 && hash(x * 5 + 3, y + k * 11) < 0.8 ? "palian_window_lit" : "palian_window") : windowGlow > 0.02 && hash(x * 5 + 3, y + k * 11) < 0.8 ? (timber ? "timber_window_lit" : "window_lit") : timber ? "timber_window" : "window";
       if (dungeon) box(ctx, camera, x, y, 1, 1, 34, top, left, right, 0, INK, "dungeon");
       else if (cut) box(ctx, camera, x, y, 1, 1, 9, top, left, right, 0, INK, plain);
       else if (battlement) { box(ctx, camera, x, y, 1, 1, 12, top, left, right, 0, INK, "brick"); if ((Math.round(x) + Math.round(y)) % 2 === 0) box(ctx, camera, x, y, 0.62, 0.62, 10, top, left, right, 12, INK, "brick"); }
@@ -2358,17 +2397,17 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     const object = objectAtTile(world, x, y);
     if (!object || object.name === "__removed") return;
     if (object.kind === "decor" && SMALL_DECOR.has(object.decor!) && Math.abs(x - camera.x) + Math.abs(y - camera.y) > HAZE_START) return;
-    if (object.decor === "lamp") glow(x, y, 48, 150, "#f2b261", 0.9); else if (object.decor === "torch") glow(x, y, 32, 130, "#ef9a4c", 1, true); else if (object.decor === "hearth") glow(x, y, 14, 170, "#f0a050", 1, true);
+    if (object.decor === "lamp") glow(x, y, 48, 150, "#f2b261", 0.9); else if (object.decor === "stone_lantern" || object.decor === "paper_lantern") glow(x, y, object.decor === "stone_lantern" ? 30 : 50, 110, "#f2b261", 0.75); else if (object.decor === "torch") glow(x, y, 32, 130, "#ef9a4c", 1, true); else if (object.decor === "hearth") glow(x, y, 14, 170, "#f0a050", 1, true);
     else if (object.kind === "furnace" || object.kind === "range") glow(x, y, 16, 110); else if (object.kind === "altar") glow(x, y, 26, 70); else if (object.kind === "fountain" && objectAtTile(world, x - 1, y)?.kind !== "fountain" && objectAtTile(world, x, y - 1)?.kind !== "fountain") glow(x + 0.5, y + 0.5, 12, 110, "#a9d4f2", 0.55); else if (object.kind === "sigil_altar") glow(x, y, 30, 90);
     // The fountain is 2 × 2: sorted by its centre (a little forward, for its rim), not its back tile, so Friends beside it
     // stand behind its rim rather than on it, at any camera angle.
     const fountainMaster = object.kind === "fountain" && objectAtTile(world, x - 1, y)?.kind !== "fountain" && objectAtTile(world, x, y - 1)?.kind !== "fountain";
     const d = fountainMaster ? depth(x + 0.5, y + 0.5) + 0.3 : depth(x, y) + (object.kind === "wheat" || object.kind === "spot" ? -0.4 : 0);
     const flat = object.kind === "spot" || (object.kind === "decor" && FLAT_DECOR.has(object.decor!));
-    const sprite = object.kind === "tree" || object.kind === "rock" || (object.kind === "decor" && object.decor !== "banner");
-    drawables.push({ depth: d, at: { x, y }, cast: !flat, flat, sprite, scenery: object.kind === "tree" || object.kind === "rock" || object.kind === "decor" || object.kind === "spot", size: object.decor === "windmill" ? [320, 140, 40] : object.kind === "tree" ? [260, 110, 40] : [200, 110, 40], draw: () => {
+    const sprite = object.kind === "tree" || object.kind === "rock" || object.kind === "dock" || (object.kind === "decor" && object.decor !== "banner");
+    drawables.push({ depth: d, at: { x, y }, cast: !flat, flat, sprite, scenery: object.kind === "tree" || object.kind === "rock" || object.kind === "decor" || object.kind === "spot", size: object.decor === "pagoda" || object.decor === "castle_keep" ? [520, 200, 60] : object.decor === "windmill" ? [320, 140, 40] : object.kind === "tree" ? [260, 110, 40] : [200, 110, 40], draw: () => {
       let rect: { x: number; y: number; w: number; h: number };
-      const tall = object.kind === "tree" || (object.kind === "decor" && (["pine", "windmill", "palm", "pillar", "tent", "crypt", "obelisk", "canopy", "wise_friend", "god_dusk"].includes(object.decor!) || (object.decor === "ruin_wall" && (object.height ?? 0) > 34)));
+      const tall = object.kind === "tree" || (object.kind === "decor" && (["pine", "windmill", "palm", "pillar", "tent", "crypt", "obelisk", "canopy", "wise_friend", "god_dusk", "torii", "pagoda", "castle_keep"].includes(object.decor!) || (object.decor === "ruin_wall" && (object.height ?? 0) > 34)));
       // Anything tall in front of your Friend that covers it on screen turns see-through (works at any angle and zoom).
       const fade = tall && d > playerDepth + 0.3 && coversPlayer(x, y) ? 0.35 : 1;
       if (object.kind === "tree") rect = drawTree(ctx, scene, object, game.depleted.has(object.id), fade, scene.reducedMotion ? 0 : treeShake(game, object.id, now));
@@ -3470,6 +3509,23 @@ const NPC_WEAR: Record<string, readonly string[]> = {
   cragmaw_foreman: ["fur_hood", "ironreach_greatcoat", "quilted_trousers", "climbers_cape", "moonsilver_pickaxe"], cragmaw_armourer: ["ironreach_greatcoat", "quilted_trousers", "rarite_gauntlets", "hammer"], cragmaw_ore: ["fur_hood", "ironreach_greatcoat", "quilted_trousers"], cragmaw_clothier: ["ironreach_greatcoat", "quilted_trousers", "climbers_cape"],
   quillhaven_archivist: ["scholars_cap_quill", "archivist_robe", "inkstained_trousers", "librarians_cape"], quillhaven_scribe: ["scholars_cap_quill", "archivist_robe", "inkstained_trousers"], quillhaven_clothier: ["archivist_robe", "inkstained_trousers", "librarians_cape"],
   ashfall_trader: ["drakehide_hood", "ember_coat", "scorched_trousers", "scorched_cloak"],
+  // The Palian Isles: the harbour, the Hall, the shrine, the islands, every boatman under a straw hat.
+  kuro_harbourmaster: ["palian_kimono", "palian_hakama", "palian_haori"], kuro_innkeeper: ["palian_kimono", "palian_sandals"], kuro_sealwright: ["sealwright_hood", "sealwright_robe", "sealwright_staff"],
+  kuro_fishmonger: ["straw_kasa", "palian_hakama", "knife"], kuro_merchant: ["palian_kimono", "palian_haori"], kuro_clothier: ["palian_kimono", "palian_hakama", "palian_haori"], kuro_apothecary: ["palian_kimono", "palian_sandals"],
+  kuro_smith: ["palian_hakama", "hammer"], kuro_magistrate: ["shrine_hat", "palian_kimono", "palian_hakama", "palian_haori"], kuro_dockhand: ["straw_kasa", "palian_hakama"],
+  palian_guard: ["ashigaru_hat", "ashigaru_do", "ashigaru_greaves", "yari"],
+  lord_takamori: ["palian_kimono", "palian_hakama", "palian_haori", "takamori_katana"], lady_suzu: ["palian_kimono", "palian_hakama", "naginata"],
+  takamori_captain: ["samurai_kabuto", "samurai_do", "samurai_haidate", "samurai_kote", "samurai_suneate", "takamori_banner", "takamori_katana"],
+  palian_samurai: ["samurai_kabuto", "samurai_do", "samurai_haidate", "samurai_suneate", "takamori_banner", "kurohama_katana"],
+  takamori_sensei: ["palian_kimono", "palian_hakama", "tamahagane_katana"], takamori_armourer: ["samurai_do", "palian_hakama", "hammer"], takamori_bowyer: ["palian_kasa", "palian_kimono", "palian_longbow"], takamori_teahouse: ["palian_kimono", "palian_sandals"],
+  kumo_priestess: ["shrine_hat", "shrine_robe", "shrine_hakama", "shrine_wand"], kumo_attendant: ["shrine_robe", "shrine_hakama", "shrine_bell"], kumo_shrine_maiden: ["shrine_robe", "shrine_hakama", "shrine_bell"],
+  tanabe_headman: ["straw_kasa", "palian_kimono", "palian_hakama"], tanabe_farmer: ["straw_kasa", "palian_hakama"], yumoto_host: ["palian_kimono", "palian_haori"], isohama_fisher: ["straw_kasa", "palian_hakama"],
+  cedar_woodsman: ["straw_kasa", "palian_hakama", "blackiron_axe"], bamboo_teacher: ["mistwalker_hood", "mistwalker_coat", "mistwalker_trousers"],
+  shio_netmender: ["palian_kimono", "palian_sandals"], shio_fisher: ["straw_kasa", "palian_hakama"], kibi_teamaster: ["palian_kimono", "palian_haori"], kibi_picker: ["palian_kasa", "palian_kimono"],
+  hana_poet: ["palian_kimono", "palian_hakama", "palian_haori"], hana_tea: ["palian_kimono", "palian_sandals"], mori_maiden: ["shrine_robe", "shrine_hakama", "fox_charm"], iwa_abbot: ["palian_kimono", "palian_kasa"], iwa_monk: ["straw_kasa", "palian_kimono"],
+  toro_keeper: ["palian_kimono", "palian_haori", "paper_charm"], kusa_herbalist: ["palian_kasa", "palian_kimono"], cove_boss: ["mistwalker_hood", "mistwalker_coat", "tanto"],
+  ...Object.fromEntries(["eastport", "kurohama", "tanabe", "shiogama", "kibi", "hanazono", "morishima", "iwaoka", "josaki", "torojima", "kusabana", "ashigane", "smugglers_cove", "three_stones", "turtle_rock", "hakkotsu"]
+    .map((dock, i) => [`boat_${dock}`, dock === "hakkotsu" ? ["palian_kimono", "straw_kasa"] : i % 2 ? ["straw_kasa", "palian_hakama"] : ["straw_kasa", "palian_kimono", "palian_sandals"]])),
 };
 /** A village's people dress in its own clothes: a stable pick of its hat, top, legs and cape from their uid. */
 const regionalWear = new Map<number, readonly string[]>();

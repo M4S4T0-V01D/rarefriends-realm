@@ -9,7 +9,9 @@ import { Pixels, pixelArt, shadeHex } from "./pixel.ts";
 export const TEX_PER_TILE = 16;
 /** Texture rows per world pixel of height. */
 export const TEX_PER_HEIGHT = 0.5;
-export type WallStyle = "brick" | "window" | "timber" | "timber_window" | "window_lit" | "timber_window_lit" | "plank" | "cap" | "dungeon";
+export type WallStyle = "brick" | "window" | "timber" | "timber_window" | "window_lit" | "timber_window_lit" | "plank" | "cap" | "dungeon"
+  // The Palian Isles: white plaster between dark posts over a dark board skirt, with paper-latticed windows; and a shrine's vermilion.
+  | "palian" | "palian_window" | "palian_window_lit" | "lacquer";
 /** Where a window's glass sits on a 16-wide wall texture (x0, width) and, per wall kind, its top row and height. */
 export const PANE = { x0: 5, w: 6, h: 7, top: (timber: boolean) => timber ? 3 : 5 };
 const BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
@@ -19,6 +21,7 @@ const noise = (x: number, y: number, seed: number) => { let h = Math.imul(x * 37
 export function wallTexture(style: WallStyle, color: string, variant = 0): HTMLCanvasElement {
   return pixelArt(`wall:${style}:${color}:${variant}`, TEX_PER_TILE, 24, p => {
     const W = TEX_PER_TILE, H = 24, mortar = shadeHex(color, -0.2), light = shadeHex(color, 0.07), dark = shadeHex(color, -0.08);
+    if (style === "palian" || style === "palian_window" || style === "palian_window_lit" || style === "lacquer") { palianWall(p, style, color, variant); return; }
     const lit = style === "window_lit" || style === "timber_window_lit", glazed = lit || style === "window" || style === "timber_window";
     const timberish = style === "timber" || style === "timber_window" || style === "timber_window_lit";
     if (style === "brick" || style === "window" || style === "window_lit" || style === "dungeon" || style === "cap") {
@@ -67,6 +70,25 @@ export function wallTexture(style: WallStyle, color: string, variant = 0): HTMLC
       p.rect(x0 - 1, y0 + h + 1, w + 2, 1, shadeHex(color, 0.14));
     }
   });
+}
+/**
+ * A Palian wall face: white plaster (the face's colour) between dark cedar posts, a beam under the eaves, a skirt of
+ * dark boards along the bottom; a window is a paper lattice (shoji), warm when lit. A shrine's wall has vermilion posts
+ * and beams instead.
+ */
+function palianWall(p: Pixels, style: WallStyle, color: string, variant: number) {
+  const W = TEX_PER_TILE, H = 24, shrine = style === "lacquer", post = shrine ? "#b5452f" : "#3d2e26", postLight = shrine ? "#cf5a40" : "#5a4636", skirt = shrine ? "#8a3428" : "#4a3a2e";
+  p.rect(0, 0, W, H, color);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (BAYER[y & 3][x & 3] < 2 && noise(x, y, variant) > 0.6) p.set(x, y, shadeHex(color, -0.04));
+  p.rect(0, 0, W, 2, post); p.rect(0, 0, W, 1, postLight); p.rect(0, 0, 2, H, post); p.rect(W - 1, 0, 1, H, post); p.rect(1, 0, 1, H, postLight);
+  p.rect(0, 16, W, 8, skirt); for (let x = 2; x < W; x += 3) p.line(x, 16, x, 23, shadeHex(skirt, -0.25)); p.rect(0, 16, W, 1, post);
+  if (style === "palian_window" || style === "palian_window_lit") {
+    const x0 = PANE.x0, y0 = PANE.top(true), w = PANE.w, h = PANE.h, lit = style === "palian_window_lit";
+    p.rect(x0 - 1, y0 - 1, w + 2, h + 2, "#3d2e26");
+    p.rect(x0, y0, w, h, lit ? "#f6d48a" : "#efe9dc"); if (lit) p.rect(x0 + 1, y0 + 1, w - 2, h - 2, "#ffe7b0");
+    for (let x = x0 + 2; x < x0 + w; x += 2) p.line(x, y0, x, y0 + h - 1, lit ? "#8a5a30" : "#6f5d4c");
+    for (let y = y0 + 2; y < y0 + h; y += 3) p.line(x0, y, x0 + w - 1, y, lit ? "#8a5a30" : "#6f5d4c");
+  }
 }
 /** Roof shingles: scalloped courses running along the eave, in the roof's colour. */
 export function shingleTexture(color: string, cols: number, rows: number): HTMLCanvasElement {
