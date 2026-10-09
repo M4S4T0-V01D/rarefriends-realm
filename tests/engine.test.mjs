@@ -2173,7 +2173,7 @@ test("Fellowship invitations: a day-long join link with the look inside, and joi
 test("Belts at the waist, barrels that fill vials, a follower in your wardrobe, and a darker band", async () => {
   const { BELTS, beltContents, stock, wornBelt } = await import("../games/rarefriends-realm/state.ts");
   const { beltFill, beltEmpty, sipBelt, fillVials, toggleFollowerWorn, headlessRecipe } = await import("../games/rarefriends-realm/engine.ts");
-  const { TRACKS } = await import("../games/rarefriends-realm/audio.ts");
+  const { TRACKS, MIZUKAI_TRACKS } = await import("../games/rarefriends-realm/audio.ts");
   const g = newGame(), p = g.player, w = g.world; p.inventory.fill(null);
   assert.equal(item("fletchers_belt").equip.slot, "belt"); assert(SHOPS.war_bows.stock.includes("fletchers_belt") && SHOPS.hollyhock_herbs.stock.includes("apothecary_belt"));
   give(p, "fletchers_belt"); equip(g, p.inventory.findIndex(slot => slot?.id === "fletchers_belt")); assert.equal(p.equipment.belt, "fletchers_belt"); assert.equal(wornBelt(p).id, "fletchers_belt");
@@ -2193,8 +2193,8 @@ test("Belts at the waist, barrels that fill vials, a follower in your wardrobe, 
   p.wardrobe.push("rose_cape", "silver_halo", "blue_cape"); toggleFollowerWorn(g, "rose_cape"); toggleFollowerWorn(g, "silver_halo"); toggleFollowerWorn(g, "blue_cape");
   assert.deepEqual(p.followerWorn, ["silver_halo", "blue_cape"], "one cape at a time"); toggleFollowerWorn(g, "golden_aura"); assert.equal(p.followerWorn.length, 2, "only what you own");
   const save = JSON.parse(JSON.stringify(serialize(g))), fresh = newGame(); assert(restore(fresh, save)); assert.deepEqual(fresh.player.followerWorn, p.followerWorn); assert.equal(fresh.player.belts.apothecary_belt.vial_of_water, 6); assert.equal(fresh.player.equipment.belt, "apothecary_belt");
-  // Every area track has a drummer and a drone now.
-  for (const track of TRACKS) if (track.id !== "theme") { assert(track.hits.some(hit => hit.drum === "deep"), `${track.name} has a deep drum`); assert(track.notes.some(note => note.voice === "drone"), `${track.name} has a drone`); }
+  // Every area track has a drummer and a drone now (the Mizukai Isles keep their own instruments).
+  for (const track of TRACKS) if (track.id !== "theme" && !MIZUKAI_TRACKS.includes(track.id)) { assert(track.hits.some(hit => hit.drum === "deep"), `${track.name} has a deep drum`); assert(track.notes.some(note => note.voice === "drone"), `${track.name} has a drone`); }
 });
 
 test("Faith spells, wards, weaknesses, and the crown of the head", async () => {
@@ -2856,4 +2856,27 @@ test("a save from the hours the Mizukai Isles had their first name comes back un
   assert.equal(fresh.player.equipment.head, "mizukai_kasa"); assert.equal(fresh.player.equipment.body, "mizukai_kimono");
   assert.equal(fresh.player.inventory[0]?.id, "mizukai_longbow");
   assert.equal(fresh.player.visited.mizukai_sea, 1);
+});
+
+test("the Mizukai Isles' music: their own instruments, ornamented, and every piece its own ensemble", async () => {
+  const { TRACKS, MIZUKAI_TRACKS, trackFor } = await import("../games/rarefriends-realm/audio.ts");
+  const isles = TRACKS.filter(track => MIZUKAI_TRACKS.includes(track.id)); assert.equal(isles.length, 10);
+  const own = new Set(["koto", "shamisen", "shakuhachi", "sho", "kane", "shinobue", "ryuteki", "hichiriki", "nohkan", "biwa"]);
+  const drums = new Set(["taiko", "shime", "clapper", "odaiko", "kara", "kakko", "shoko", "atarigane", "tsuzumi", "otsuzumi", "yo", "ha", "wave", "wind"]);
+  const ensembles = new Set();
+  for (const track of isles) {
+    for (const note of track.notes) { assert(own.has(note.voice), `${track.name}: no ${note.voice} on the Isles`); assert(note.beat >= 0 && note.beat < track.beats, `${track.name}: a note inside the loop`); }
+    for (const hit of track.hits) { assert(drums.has(hit.drum), `${track.name}: no ${hit.drum} on the Isles`); assert(hit.beat >= 0 && hit.beat < track.beats, `${track.name}: a stroke inside the loop`); }
+    assert(track.beats % 4 === 0, `${track.name} loops on a bar line`);
+    assert(track.notes.some(note => note.shape), `${track.name} is ornamented, not just played`);
+    ensembles.add([...new Set([...track.notes.map(note => note.voice), ...track.hits.map(hit => hit.drum)])].sort().join());
+  }
+  assert.equal(ensembles.size, 10, "no two pieces with the same ensemble");
+  assert(new Set(isles.map(track => track.bpm)).size >= 9, "and hardly two at one tempo");
+  // The court music, the noh, and the festival each turn up where they belong.
+  const voices = id => new Set(TRACKS.find(track => track.id === id).notes.map(note => note.voice));
+  assert(voices("mizukai_shrine").has("hichiriki") && voices("mizukai_shrine").has("sho"), "gagaku at the shrine");
+  assert(voices("mizukai_haunted").has("biwa") && voices("mizukai_spirit").has("nohkan"), "the biwa's ghost tales and the noh's spirits");
+  assert(voices("mizukai_harbour").has("shinobue"), "the harbour's festival flute");
+  assert.equal(trackFor("hinode", false), "mizukai_sunrise"); assert.equal(trackFor("hinode", false, { fight: true }), "mizukai_battle"); assert.equal(trackFor("friendhollow", false, { sea: true }), "mizukai_sea");
 });

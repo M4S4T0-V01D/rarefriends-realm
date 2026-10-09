@@ -233,6 +233,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   // ---------- Rendering mode: switching is a change of view, never of game ----------
   chooseRenderer.current = next => {
     if (next === modeRef.current && !rendererOverride) return;
+    // Taken as the mode at once, so a second switch before the next render compares with this one, not the old (and isn't lost).
+    modeRef.current = next;
     // The adventure is saved first; the game itself (state, position, inventory) stays exactly as it is, and only the
     // picture is made again: the draw loop restarts on fresh canvases (see the loop's effect), the old GPU let go.
     saveNow.current();

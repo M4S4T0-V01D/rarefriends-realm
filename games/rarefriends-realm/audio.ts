@@ -28,11 +28,19 @@ const VOICES: Record<string, { kind: VoiceKind; f0: number; length: number; brig
 /** General-MIDI-style instruments, like an old-school RPG soundtrack: bright leads up high, plucked strings, light drums. */
 type Voice = "lute" | "flute" | "recorder" | "oboe" | "trumpet" | "bell" | "glock" | "harp" | "pizz" | "strings" | "organ" | "pad" | "bass" | "brass" | "pluck" | "choir" | "drone"
   // The Mizukai Isles: a plucked koto, a twanging shamisen, a breathy shakuhachi, the sho's held clusters, a temple bell.
-  | "koto" | "shamisen" | "shakuhachi" | "sho" | "kane";
+  | "koto" | "shamisen" | "shakuhachi" | "sho" | "kane"
+  // ...the festival's shinobue, the court's ryuteki and hichiriki, the noh theatre's nokan, and the storyteller's biwa.
+  | "shinobue" | "ryuteki" | "hichiriki" | "nohkan" | "biwa";
 type Drum = "kick" | "snare" | "hat" | "shaker" | "tom" | "clank" | "hand" | "rim" | "timpani" | "tambourine" | "deep" | "ride"
   // The Isles' drums: the great taiko, the tight shime-daiko, the wooden clappers.
-  | "taiko" | "shime" | "clapper";
-type Note = { beat: number; voice: Voice; midi: number; length: number; velocity: number };
+  | "taiko" | "shime" | "clapper"
+  // ...the great odaiko, the taiko's rim (kara), the court's kakko and shoko, the festival's little gong (atarigane), the noh
+  // drums (the kotsuzumi's "pon", the otsuzumi's crack) and the drummers' calls ("yo-o", "ha"), and the sea and the wind.
+  | "odaiko" | "kara" | "kakko" | "shoko" | "atarigane" | "tsuzumi" | "otsuzumi" | "yo" | "ha" | "wave" | "wind";
+/** How a note is played (the Mizukai Isles' ornaments): scooped up into from below, pressed up after the pluck, let fall at
+ * the end (each in semitones), or shaken slowly and wide (yuri). */
+type Shape = { scoop?: number; up?: number; fall?: number; yuri?: boolean };
+type Note = { beat: number; voice: Voice; midi: number; length: number; velocity: number; shape?: Shape };
 type Hit = { beat: number; drum: Drum; velocity: number };
 export type Track = { id: TrackId; name: string; bpm: number; beats: number; notes: Note[]; hits: Hit[] };
 
@@ -282,115 +290,234 @@ function composeTrack(given: Style): Track {
   }
   return { id: style.id, name: style.name, bpm: style.bpm, beats: loop * 4, notes, hits };
 }
-// ---------- The Mizukai Isles (What Rises in the East): ten hand-written pieces for koto, shamisen, shakuhachi, sho, temple bell and taiko ----------
-/** A chord by name ("Dmaj9", "F#m7", "Asus4", "D/F#"): pitch classes from the root, the bass note last for a slash chord. */
-function chordTones(name: string): { root: number; tones: number[]; bass: number } {
-  const [main, slash] = name.split("/"), match = /^([A-G])([#b]?)(.*)$/.exec(main)!, pc = (letter: string, accidental: string) => (N[letter] + (accidental === "#" ? 1 : accidental === "b" ? -1 : 0) + 12) % 12;
-  const root = pc(match[1], match[2]), quality = match[3];
-  const SHAPES: Record<string, number[]> = {
-    "": [0, 4, 7], m: [0, 3, 7], maj7: [0, 4, 7, 11], 7: [0, 4, 7, 10], m7: [0, 3, 7, 10], maj9: [0, 4, 7, 11, 14], m9: [0, 3, 7, 10, 14], 9: [0, 4, 7, 10, 14], sus4: [0, 5, 7], sus2: [0, 2, 7],
-    "7sus4": [0, 5, 7, 10], add9: [0, 4, 7, 14], "m(add9)": [0, 3, 7, 14], 6: [0, 4, 7, 9], m6: [0, 3, 7, 9], "maj7#11": [0, 4, 7, 11, 18], "7b9": [0, 4, 7, 10, 13], dim: [0, 3, 6], "m7b5": [0, 3, 6, 10],
-  };
-  const tones = (SHAPES[quality] ?? SHAPES[""]).map(step => root + step);
-  const bass = slash ? pc(slash[0], slash.slice(1)) : root;
-  return { root, tones, bass };
-}
-type MizukaiKit = "calm" | "festival" | "temple" | "sea" | "haunted" | "battle" | "spirit" | "court" | "village";
-type MizukaiPiece = {
-  id: TrackId; name: string; bpm: number; meter: 3 | 4;
-  /** The tune's two eight-bar sections (tune() notation), and the chord under each bar of each. */
-  a: string; b: string; chordsA: readonly string[]; chordsB: readonly string[];
-  /** Who plays the tune each time through (A, B, A, B), and how far up or down. */
-  voices: readonly [Voice, number][];
-  /** The bed: the koto's broken chords, a shamisen's figure, the sho's held clusters. */
-  bed: "arp" | "roll" | "ostinato" | "sho"; sho?: boolean; bass: Voice; kit: MizukaiKit;
-};
-function composeMizukai(piece: MizukaiPiece): Track {
-  const per = piece.meter, bars = 8, section = bars * per, notes: Note[] = [], hits: Hit[] = [];
-  const sections = [piece.a, piece.b, piece.a, piece.b], harmony = [piece.chordsA, piece.chordsB, piece.chordsA, piece.chordsB];
-  sections.forEach((text, i) => {
-    const [voice, shift] = piece.voices[i % piece.voices.length], start = i * section;
-    // A grace note before the long notes, as the shakuhachi and koto both bend into them.
-    for (const note of tune(text, voice, start, 0.86)) {
-      if (note.length >= 1.4 && (voice === "shakuhachi" || voice === "koto") && note.midi > 50) notes.push({ beat: note.beat - 0.12, voice, midi: note.midi + shift - 1, length: 0.1, velocity: 0.45 });
-      notes.push({ ...note, midi: note.midi + shift });
-    }
-    // A low drone under each section (the key's root), and the deep drum marking each section's top, as under every area's tune.
-    notes.push({ beat: start, voice: "drone", midi: chordTones(harmony[i][0]).root + 36, length: section, velocity: 0.32 });
-    hits.push({ beat: start, drum: "deep", velocity: 0.4 });
-    harmony[i].forEach((name, bar) => {
-      const b0 = start + bar * per, { tones, bass } = chordTones(name), up = tones.map(tone => tone + 60), last = i === 3 && bar === bars - 1;
-      notes.push({ beat: b0, voice: piece.bass, midi: bass + 48, length: per - 0.2, velocity: 0.8 });
-      if (per === 4 && piece.kit !== "temple") notes.push({ beat: b0 + 2, voice: piece.bass, midi: bass + 55, length: 1.6, velocity: 0.55 });
-      if (piece.bed === "arp") {
-        const order = [0, 1, 2, 3, 2, 1, 3, 2].map(k => up[k % up.length] + (k >= up.length ? 12 : 0));
-        for (let step = 0; step < per * 2; step++) notes.push({ beat: b0 + step / 2, voice: "koto", midi: order[step % order.length], length: 0.45, velocity: 0.36 + (step % 2 === 0 ? 0.1 : 0) });
-      } else if (piece.bed === "roll") {
-        for (const beat of per === 4 ? [0, 2] : [0]) up.slice(0, 4).forEach((midi, k) => notes.push({ beat: b0 + beat + k * 0.07, voice: "koto", midi, length: 1.6, velocity: 0.4 - k * 0.04 }));
-      } else if (piece.bed === "ostinato") {
-        const figure = [bass + 48, bass + 55, bass + 60, bass + 55];
-        for (let step = 0; step < per * 2; step++) notes.push({ beat: b0 + step / 2, voice: "shamisen", midi: figure[step % 4], length: 0.3, velocity: 0.32 + (step % 4 === 0 ? 0.12 : 0) });
+// ---------- The Mizukai Isles (What Rises in the East): ten pieces in the Isles' own forms ----------
+/**
+ * Each piece is written out by hand in a traditional form, on its own five-note scale, for its own ensemble, and none
+ * has chords or a bass line, as in the music they draw on. Instruments share a tune in heterophony (each its own way
+ * through the same melody), silence (ma) is part of the phrase, and the ornaments are written in: the shakuhachi's
+ * scoop up into a note (meri) and its slow, wide shake (yuri), the koto's press that raises a string after the pluck
+ * (oshide), the falls at a phrase's end, and the drummers' calls.
+ */
+/** "D5:2v+" is D5 for two beats, scooped into and shaken. Flags: v scoop up into it (v2: from two semitones down), ^ press it
+ * up after the pluck (^2: a whole tone), ~ let it fall at the end, + yuri, ! accent, p soft. "|" marks a bar and is skipped. */
+function phrase(text: string, voice: Voice, start = 0, velocity = 0.85, shift = 0): Note[] {
+  const notes: Note[] = [];
+  let beat = start;
+  for (const token of text.trim().split(/\s+/)) {
+    if (token === "|") continue;
+    const match = /^([A-G][#b]?\d|r):([\d.]+)(.*)$/.exec(token);
+    if (!match) throw new Error(`Not a note: ${token}`);
+    const length = Number(match[2]), flags = match[3];
+    if (match[1] !== "r") {
+      const pitch = /^([A-G])(#|b)?(\d)$/.exec(match[1])!, shape: Shape = {};
+      let accent = 1;
+      for (let k = 0; k < flags.length; k++) {
+        const flag = flags[k], amount = () => (/\d/.test(flags[k + 1] ?? "") ? Number(flags[++k]) : 1);
+        if (flag === "v") shape.scoop = amount(); else if (flag === "^") shape.up = amount(); else if (flag === "~") shape.fall = amount();
+        else if (flag === "+") shape.yuri = true; else if (flag === "!") accent = 1.25; else if (flag === "p") accent = 0.6;
       }
-      if (piece.bed === "sho" || piece.sho) notes.push({ beat: b0, voice: "sho", midi: up[0], length: per - 0.05, velocity: 0.5 });
-      if (piece.bed === "sho") up.slice(1).forEach((midi, k) => notes.push({ beat: b0 + 0.5 + k, voice: "koto", midi: midi + 12, length: 1, velocity: 0.22 }));
-      // The drums: each piece's own pattern, and a roll into the top of each section.
-      const fill = bar === bars - 1, k = piece.kit, hit = (beat: number, drum: Drum, velocity: number) => { if (beat < per) hits.push({ beat: b0 + beat, drum, velocity }); };
-      if (k === "calm") { if (bar % 2 === 0) hit(0, "taiko", 0.45); if (bar % 4 === 3) hit(per - 1, "clapper", 0.3); }
-      if (k === "village") { hit(0, "taiko", 0.4); hit(per === 3 ? 2 : 2, "shime", 0.25); if (bar % 2) hit(1, "clapper", 0.22); }
-      if (k === "festival") { hit(0, "taiko", 0.6); hit(1.5, "taiko", 0.35); hit(2, "taiko", 0.45); for (let e = 0; e < per * 2; e++) hit(e / 2, "shime", e % 2 ? 0.12 : 0.2); hit(1, "clapper", 0.25); hit(3, "clapper", 0.3); }
-      if (k === "temple") { if (bar % 4 === 0) notes.push({ beat: b0, voice: "kane", midi: tones[0] + 48, length: 4, velocity: 0.7 }); if (bar % 2 === 1) hit(0, "taiko", 0.3); }
-      if (k === "sea") { hit(0, "taiko", 0.38); hit(1.5, "taiko", 0.22); hit(1, "shaker", 0.12); hit(2, "shaker", 0.1); }
-      if (k === "haunted") { hit(0, "taiko", 0.4); hit(0.5, "taiko", 0.24); if (bar % 4 === 2) notes.push({ beat: b0 + 2, voice: "kane", midi: tones[0] + 48, length: 4, velocity: 0.45 }); if (bar % 2) hit(3, "clapper", 0.18); }
-      if (k === "court") { hit(0, "taiko", 0.5); hit(2, "taiko", 0.3); if (bar % 2 === 1) hit(3.5, "shime", 0.3); if (bar % 8 === 0) notes.push({ beat: b0, voice: "kane", midi: tones[0] + 48, length: 4, velocity: 0.5 }); }
-      if (k === "battle") { for (const [beat, v] of [[0, 0.7], [1, 0.45], [1.5, 0.4], [2, 0.6], [3, 0.5], [3.5, 0.4]] as const) hit(beat, "taiko", v); for (let e = 1; e < 8; e += 2) hit(e / 2, "shime", 0.2); hit(1, "clapper", 0.28); hit(3, "clapper", 0.32); }
-      if (k === "spirit") { for (const [beat, v] of [[0, 0.8], [0.75, 0.5], [1.5, 0.6], [2, 0.7], [2.75, 0.5], [3.5, 0.6]] as const) hit(beat, "taiko", v); for (let e = 0; e < 8; e++) hit(e / 2, "shime", e % 2 ? 0.18 : 0.26); if (bar % 2 === 0) notes.push({ beat: b0, voice: "kane", midi: tones[0] + 48, length: 2, velocity: 0.4 }); }
-      if (fill && k !== "temple" && k !== "calm") for (let e = 0; e < 4; e++) hit(per - 1 + e / 4, "shime", 0.2 + e * 0.08);
-      if (last) notes.push({ beat: b0 + per - 0.5, voice: "koto", midi: up[0] + 12, length: 0.5, velocity: 0.3 });
-    });
-  });
-  return { id: piece.id, name: piece.name, bpm: piece.bpm, beats: section * 4, notes, hits };
+      notes.push({ beat, voice, midi: 12 * (Number(pitch[3]) + 1) + N[pitch[1]] + (pitch[2] === "#" ? 1 : pitch[2] === "b" ? -1 : 0) + shift,
+        length: length * 0.96, velocity: Math.min(1, velocity * accent), shape: Object.keys(shape).length ? shape : undefined });
+    }
+    beat += length;
+  }
+  return notes;
 }
+const MIZUKAI_DRUMS: ReadonlySet<string> = new Set(["taiko", "shime", "clapper", "odaiko", "kara", "kakko", "shoko", "atarigane", "tsuzumi", "otsuzumi", "yo", "ha", "wave", "wind"]);
+/** A drummer's line: "taiko:1! kara:0.5 r:0.5", "yo+tsuzumi:1" for two at once. ! accent, p soft. */
+function strokes(text: string, start = 0, velocity = 0.7): Hit[] {
+  const hits: Hit[] = [];
+  let beat = start;
+  for (const token of text.trim().split(/\s+/)) {
+    if (token === "|") continue;
+    const match = /^([a-z+]+):([\d.]+)([!p]?)$/.exec(token);
+    if (!match) throw new Error(`Not a stroke: ${token}`);
+    if (match[1] !== "r") for (const drum of match[1].split("+")) {
+      if (!MIZUKAI_DRUMS.has(drum)) throw new Error(`Not one of the Isles' drums: ${drum}`);
+      hits.push({ beat, drum: drum as Drum, velocity: Math.min(1, velocity * (match[3] === "!" ? 1.3 : match[3] === "p" ? 0.55 : 1)) });
+    }
+    beat += Number(match[2]);
+  }
+  return hits;
+}
+/** The same bar's strokes, bar after bar. */
+const everyBar = (bars: number, per: number, bar: (b0: number, index: number) => Hit[]) => Array.from({ length: bars }, (_, index) => bar(index * per, index)).flat();
+/** Another player's way through the same tune: later by `delay`, `shift` semitones away, softer, on their own instrument. */
+function hetero(notes: readonly Note[], voice: Voice, shift: number, delay: number, velocity: number, keep: (note: Note) => boolean = () => true): Note[] {
+  return notes.filter(keep).map(note => ({ ...note, voice, midi: note.midi + shift, beat: note.beat + delay, velocity: note.velocity * velocity }));
+}
+/** The note sounding at a beat (for the shamisen and koto picking out the tune under a flute). */
+const sounding = (notes: readonly Note[], beat: number) => [...notes].reverse().find(note => note.beat <= beat + 0.01 && note.beat + note.length / 0.96 > beat + 0.01) ?? null;
+/** The notes of a scale (pitch classes above `tonic`) between two MIDI notes. */
+const scaleNotes = (tonic: number, steps: readonly number[], low: number, high: number) => {
+  const out: number[] = [];
+  for (let midi = low; midi <= high; midi++) if (steps.includes(((midi - tonic) % 12 + 12) % 12)) out.push(midi);
+  return out;
+};
+/** The koto's flowing figures (like the opening of Haru no Umi): eighth notes wandering up and down the scale from each bar's centre, never a chord. */
+function flow(centres: readonly number[], scale: readonly number[], per: number, start: number, velocity: number): Note[] {
+  const figure = [0, 2, 1, 3, 2, 4, 3, 1], notes: Note[] = [];
+  centres.forEach((centre, bar) => {
+    const at = scale.indexOf(centre);
+    for (let step = 0; step < per * 2; step++) {
+      const midi = scale[Math.max(0, Math.min(scale.length - 1, at + figure[step % figure.length]))];
+      notes.push({ beat: start + bar * per + step / 2, voice: "koto", midi, length: 0.5, velocity: velocity * (step % 4 === 0 ? 1.2 : step % 2 ? 0.75 : 0.95) });
+    }
+  });
+  return notes;
+}
+/** A koto's sararin: a sweep up the strings in half a beat. */
+const sararin = (beat: number, scale: readonly number[], from: number, count: number, velocity: number): Note[] =>
+  scale.slice(scale.indexOf(from), scale.indexOf(from) + count).map((midi, k) => ({ beat: beat + k * 0.06, voice: "koto" as Voice, midi, length: 0.8, velocity: velocity * (0.7 + k * 0.04) }));
+/** A koto's kororin: three strings plucked downwards, quick. */
+const kororin = (beat: number, scale: readonly number[], top: number, velocity: number): Note[] =>
+  [0, 1, 2].map(k => ({ beat: beat + k * 0.18, voice: "koto" as Voice, midi: scale[Math.max(0, scale.indexOf(top) - k)], length: 0.6, velocity }));
+/** Wrap a canon's tail round to the loop's start. */
+const wrap = (notes: readonly Note[], beats: number) => notes.map(note => ({ ...note, beat: note.beat % beats }));
+
+type MizukaiPiece = { id: TrackId; name: string; bpm: number; beats: number; tonic: number; scale: readonly number[]; notes: () => Note[]; hits: () => Hit[] };
+function composeMizukai(piece: MizukaiPiece): Track {
+  const notes = piece.notes(), hits = piece.hits();
+  const outside = [...notes, ...hits].find(entry => entry.beat < 0 || entry.beat >= piece.beats);
+  if (outside) throw new Error(`${piece.name}: something at beat ${outside.beat}, outside its ${piece.beats} beats`);
+  // Every note of the tune on the piece's own five (the bell and the sho's clusters ring their own way).
+  const stray = notes.find(note => note.voice !== "kane" && note.voice !== "sho" && !piece.scale.includes(((note.midi - piece.tonic) % 12 + 12) % 12));
+  if (stray) throw new Error(`${piece.name}: MIDI ${stray.midi} is off its scale`);
+  return { id: piece.id, name: piece.name, bpm: piece.bpm, beats: piece.beats, notes, hits };
+}
+// Scales, as steps above the tonic: yo (bright, open), min'yo (the folk songs'), in (miyako-bushi: the half-steps of the koto
+// and the ghosts), hirajoshi, kumoi, and the court's ritsu.
+const YO = [0, 2, 5, 7, 9], MINYO = [0, 3, 5, 7, 10], IN = [0, 1, 5, 7, 8], HIRAJOSHI = [0, 2, 3, 7, 8], KUMOI = [0, 2, 3, 7, 9], RITSU = [0, 2, 5, 7, 10];
+const D = 62, E = 64, G = 67, A = 69, CS = 61;
 const MIZUKAI_PIECES: readonly MizukaiPiece[] = [
-  { id: "mizukai_sunrise", name: "Hinode, Isle of Sunrise", bpm: 84, meter: 4, bed: "arp", bass: "pizz", kit: "calm", voices: [["shakuhachi", 0], ["shakuhachi", 0], ["koto", 12], ["shakuhachi", 0]],
-    a: "A4:1.5 B4:0.5 D5:2  E5:1 D5:0.5 B4:0.5 A4:2  B4:1 D5:1 E5:1 G5:1  E5:3 r:1  D5:1.5 E5:0.5 D5:1 B4:1  A4:1 G4:1 A4:2  B4:1 A4:0.5 G4:0.5 E4:1 G4:1  A4:4",
-    b: "D5:1 E5:1 G5:2  A5:1.5 G5:0.5 E5:2  G5:1 E5:1 D5:1 E5:1  B4:3 r:1  D5:1 B4:0.5 A4:0.5 B4:1 D5:1  E5:2 D5:1 B4:1  A4:1 B4:1 D5:1 B4:1  D5:4",
-    chordsA: ["Dmaj9", "Bm7", "Gmaj7", "A7sus4", "D/F#", "Em9", "Gmaj9", "Asus4"], chordsB: ["Bm9", "Gmaj7", "Em7", "F#m7", "Gmaj7", "A6", "Bm7", "Dadd9"] },
-  { id: "mizukai_harbour", name: "Kurohama Harbour", bpm: 116, meter: 4, bed: "roll", bass: "bass", kit: "festival", voices: [["shamisen", 0], ["koto", 0], ["shamisen", 0], ["koto", 12]],
-    a: "G4:0.5 A4:0.5 C5:1 D5:1 C5:1  A4:1 G4:1 E4:2  G4:0.5 A4:0.5 C5:0.5 D5:0.5 E5:1 D5:1  C5:1 D5:1 A4:2  E5:1 G5:0.5 E5:0.5 D5:1 C5:1  D5:1.5 C5:0.5 A4:2  C5:1 A4:0.5 G4:0.5 E4:1 G4:1  G4:3 r:1",
-    b: "D5:1 E5:1 G5:1 E5:1  A5:1.5 G5:0.5 E5:1 D5:1  E5:0.5 D5:0.5 C5:1 D5:2  A4:1 C5:1 D5:2  G5:1 E5:1 D5:1 E5:1  C5:1 A4:1 C5:1 D5:1  E5:1 D5:0.5 C5:0.5 A4:1 C5:1  G4:4",
-    chordsA: ["G", "Em7", "Cmaj7", "D", "Am7", "D7", "C", "Gadd9"], chordsB: ["Em7", "Am7", "Cmaj7", "D", "Em7", "Am7", "D7sus4", "G"] },
-  { id: "mizukai_village", name: "Under the Eaves", bpm: 92, meter: 3, bed: "arp", bass: "pizz", kit: "village", voices: [["koto", 0], ["shakuhachi", 0], ["shakuhachi", 0], ["koto", 0]],
-    a: "C5:1 D5:1 F5:1  G5:2 F5:1  D5:1 C5:1 A4:1  C5:3  F5:1 G5:1 A5:1  G5:1.5 F5:0.5 D5:1  F5:1 D5:1 C5:1  D5:3",
-    b: "A5:1 G5:1 F5:1  G5:2 A5:1  C6:1.5 A5:0.5 G5:1  F5:3  D5:1 F5:1 G5:1  A5:1 G5:1 F5:1  D5:1 C5:1 D5:1  C5:3",
-    chordsA: ["C", "Dm7", "F", "C", "F", "Gsus4", "Dm7", "G7sus4"], chordsB: ["Am7", "Gm7", "Fmaj7", "F", "Dm7", "Am7", "Gsus4", "C"] },
-  { id: "mizukai_shrine", name: "Kumoyama", bpm: 60, meter: 4, bed: "sho", bass: "pizz", kit: "temple", voices: [["shakuhachi", 0], ["shakuhachi", 0], ["koto", 0], ["shakuhachi", 0]],
-    a: "A4:3 Bb4:1  A4:2 G4:2  D5:3 Eb5:1  D5:4  G5:2 Eb5:1 D5:1  Bb4:2 A4:2  G4:1 A4:1 Bb4:1 A4:1  D4:4",
-    b: "D5:2 Eb5:2  G5:3 A5:1  Bb5:2 A5:1 G5:1  Eb5:4  D5:1.5 Eb5:0.5 D5:2  Bb4:2 A4:2  G4:2 Eb4:2  D4:4",
-    chordsA: ["Dsus4", "Gm9", "Ebmaj7", "Dsus4", "Gm7", "Ebmaj7", "Cm9", "Dsus4"], chordsB: ["Bbmaj7", "Ebmaj7", "Gm9", "Cm7", "Dsus4", "Gm7", "Ebmaj7", "Dsus4"] },
-  { id: "mizukai_forest", name: "The Old Cedars", bpm: 74, meter: 4, bed: "arp", bass: "pizz", kit: "calm", voices: [["koto", 0], ["shakuhachi", 0], ["shakuhachi", 0], ["koto", 0]],
-    a: "E5:1 F5:1 A5:2  B5:1.5 A5:0.5 F5:2  E5:1 C5:1 B4:1 C5:1  E5:4  A5:1 B5:1 C6:2  B5:1 A5:1 F5:2  E5:1.5 F5:0.5 E5:1 C5:1  B4:4",
-    b: "A4:1 B4:1 C5:1 E5:1  F5:3 E5:1  C5:1 B4:1 A4:2  B4:4  C5:1 E5:1 F5:1 A5:1  B5:2 A5:1 F5:1  E5:1 F5:0.5 E5:0.5 C5:1 B4:1  A4:4",
-    chordsA: ["Am(add9)", "Fmaj7", "Am7", "Esus4", "Fmaj7#11", "Dm9", "Am7", "Esus4"], chordsB: ["Am7", "Dm7", "Fmaj7", "E7sus4", "Am9", "Fmaj7", "Dm7", "Am(add9)"] },
-  { id: "mizukai_sea", name: "Crossing the Eastern Sea", bpm: 88, meter: 3, bed: "arp", bass: "pizz", kit: "sea", voices: [["shakuhachi", 0], ["koto", 0], ["shakuhachi", 0], ["koto", 0]],
-    a: "E5:1.5 F#5:0.5 E5:1  D5:2 B4:1  A4:1 B4:1 D5:1  E5:3  F#5:1 A5:1 F#5:1  E5:1.5 D5:0.5 B4:1  D5:1 B4:1 A4:1  B4:3",
-    b: "A5:2 F#5:1  E5:1 F#5:1 A5:1  B5:2 A5:1  F#5:3  E5:1 D5:1 E5:1  F#5:1.5 E5:0.5 D5:1  B4:1 D5:1 E5:1  A4:3",
-    chordsA: ["A", "Bm7", "Dmaj7", "E", "F#m7", "Bm7", "Dmaj9", "Esus4"], chordsB: ["F#m7", "Dmaj7", "E6", "F#m", "Bm7", "Dmaj7", "Esus4", "Aadd9"] },
-  { id: "mizukai_haunted", name: "Lanterns of the Drowned", bpm: 66, meter: 4, bed: "roll", sho: true, bass: "pizz", kit: "haunted", voices: [["shamisen", -12], ["shakuhachi", 0], ["shamisen", -12], ["shakuhachi", 0]],
-    a: "A4:2 Bb4:2  A4:3 r:1  E5:2 F5:1 E5:1  D5:4  F5:2 E5:1 Bb4:1  A4:4  D5:1 E5:1 F5:1 E5:1  A4:4",
-    b: "Bb4:1 D5:1 E5:2  F5:3 E5:1  A5:2 Bb5:1 A5:1  E5:4  F5:1 E5:1 D5:1 Bb4:1  A4:2 Bb4:2  D5:1.5 E5:0.5 D5:1 Bb4:1  A4:4",
-    chordsA: ["Am", "Bbmaj7", "Am7", "Dm9", "Bbmaj7", "Am", "Gm7", "Asus4"], chordsB: ["Bbmaj7", "Dm7", "Fmaj7", "Esus4", "Dm7", "Bbmaj7", "Gm7", "Am"] },
-  { id: "mizukai_battle", name: "Steel and Blossom", bpm: 138, meter: 4, bed: "roll", bass: "bass", kit: "battle", voices: [["shamisen", 0], ["koto", 0], ["shamisen", 0], ["koto", 12]],
-    a: "E4:0.5 E4:0.5 F4:0.5 E4:0.5 A4:1 B4:1  C5:0.5 B4:0.5 A4:1 F4:1 E4:1  E4:0.5 E4:0.5 F4:0.5 A4:0.5 B4:1 C5:1  E5:2 B4:2  C5:0.5 C5:0.5 B4:0.5 A4:0.5 F4:1 A4:1  B4:1 C5:1 E5:2  F5:0.5 E5:0.5 C5:0.5 B4:0.5 A4:1 F4:1  E4:4",
-    b: "A4:1 A4:0.5 B4:0.5 C5:1 E5:1  F5:1.5 E5:0.5 C5:2  B4:1 C5:0.5 B4:0.5 A4:1 F4:1  E4:2 F4:2  A4:0.5 B4:0.5 C5:0.5 E5:0.5 F5:1 E5:1  C5:1 B4:1 A4:2  F4:1 A4:1 B4:1 C5:1  E5:4",
-    chordsA: ["Em", "Fmaj7", "Am", "Esus4", "Fmaj7", "Am", "Fmaj7", "Esus4"], chordsB: ["Am", "Fmaj7", "Dm", "Esus4", "Am", "Fmaj7", "Dm7", "E7sus4"] },
-  { id: "mizukai_spirit", name: "The Great Spirit", bpm: 150, meter: 4, bed: "roll", sho: true, bass: "bass", kit: "spirit", voices: [["shamisen", 0], ["shakuhachi", 0], ["shamisen", 0], ["shakuhachi", 12]],
-    a: "C#5:1 D5:1 C#5:2  G#4:1 A4:1 G#4:2  F#4:0.5 G#4:0.5 A4:1 C#5:1 D5:1  C#5:4  F#5:1 G#5:1 A5:1 G#5:1  F#5:2 D5:2  C#5:1 D5:0.5 C#5:0.5 A4:1 G#4:1  C#4:4",
-    b: "A4:1 C#5:1 D5:2  F#5:2 G#5:2  A5:1 G#5:1 F#5:1 D5:1  C#5:4  D5:1 C#5:1 A4:1 G#4:1  F#4:2 G#4:2  A4:1 G#4:0.5 A4:0.5 C#5:1 D5:1  C#5:4",
-    chordsA: ["C#m", "Dmaj7", "C#m", "Amaj7", "Dmaj7", "F#m", "Dmaj7", "C#sus4"], chordsB: ["Amaj7", "Dmaj7", "F#m7", "C#sus4", "Dmaj7", "F#m", "Amaj7", "C#m"] },
-  { id: "mizukai_castle", name: "The Hall of Takamori", bpm: 76, meter: 4, bed: "sho", bass: "pizz", kit: "court", voices: [["oboe", 0], ["shakuhachi", 0], ["oboe", 0], ["koto", 12]],
-    a: "B4:2 C#5:2  B4:1 A4:1 F#4:2  E4:1 F#4:1 A4:2  B4:4  C#5:2 E5:2  F#5:1 E5:1 C#5:2  B4:1 A4:1 B4:1 C#5:1  B4:4",
-    b: "E5:2 F#5:2  A5:3 F#5:1  E5:1 C#5:1 B4:2  A4:4  B4:1 C#5:1 E5:2  F#5:2 E5:1 C#5:1  B4:2 A4:1 F#4:1  E4:4",
-    chordsA: ["Esus4", "F#m7", "Asus2", "Bsus4", "Amaj7", "F#m7", "Bsus4", "Esus4"], chordsB: ["Amaj7", "F#m7", "C#m7", "Asus2", "Esus4", "F#m7", "Bsus4", "Esus4"] },
+  // Like Haru no Umi: the koto's flowing figures like the morning sea, the shakuhachi singing over it in yo, a bell at dawn.
+  { id: "mizukai_sunrise", name: "Hinode, Isle of Sunrise", bpm: 84, beats: 64, tonic: D, scale: YO,
+    notes: () => {
+      const tune = phrase(`A4:2v B4:1 D5:1 | E5:3+ D5:1 | B4:1 A4:1 G4:2~ | A4:4+ | D5:2v E5:1 G5:1 | A5:3+ G5:1 | E5:1 D5:1 B4:1 D5:1 | E5:4+ |
+        G5:2v E5:1 D5:1 | B4:3+ A4:1 | G4:1 A4:1 B4:1 D5:1 | E5:4~ | D5:1 B4:1 A4:2v | G4:1 E4:1 G4:2 | A4:1 B4:1 G4:1 E4:1 | D4:4+`, "shakuhachi", 0, 0.82);
+      const koto = scaleNotes(D, YO, D - 12, D + 24);
+      return [...tune, ...flow([50, 55, 52, 57, 50, 55, 59, 52, 55, 50, 52, 57, 59, 55, 52, 50], koto, 4, 0, 0.3), { beat: 0, voice: "kane", midi: 50, length: 4, velocity: 0.5 }];
+    },
+    hits: () => strokes("wave+odaiko:32p wave:32p", 0, 0.5) },
+  // A fishermen's min'yo: the shinobue's tune, the shamisen picking it out underneath, taiko, the little gong, and the calls.
+  { id: "mizukai_harbour", name: "Kurohama Harbour", bpm: 104, beats: 64, tonic: E, scale: MINYO,
+    notes: () => {
+      const tune = phrase(`E5:1 G5:1 A5:2 | B5:1.5 A5:0.5 G5:1 E5:1 | G5:1 A5:1 B5:1 D6:1 | B5:3+ r:1 | A5:1 B5:0.5 A5:0.5 G5:1 E5:1 | G5:2 A5:1 G5:1 | E5:1 D5:1 E5:1 G5:1 | E5:3~ r:1 |
+        B5:1 D6:1 E6:2! | D6:1 B5:1 A5:2 | B5:1 A5:1 G5:1 A5:1 | B5:2v A5:2 | G5:1 A5:1 B5:1 A5:1 | G5:1 E5:1 D5:2 | E5:1 G5:1 A5:1 G5:1 | E5:4+`, "shinobue", 0, 0.8);
+      const shamisen: Note[] = [];
+      for (let beat = 0; beat < 64; beat++) {
+        const note = sounding(tune, beat);
+        if (note) shamisen.push({ beat, voice: "shamisen", midi: note.midi - 12, length: 0.45, velocity: beat % 4 === 0 ? 0.62 : 0.46 });
+        shamisen.push({ beat: beat + 0.5, voice: "shamisen", midi: E, length: 0.3, velocity: 0.3 });
+      }
+      return [...tune, ...shamisen];
+    },
+    hits: () => [...everyBar(16, 4, (b0, bar) => [...strokes("taiko:1! kara:1 taiko:0.5 taiko:0.5 kara:1", b0), ...strokes("atarigane:1.5! atarigane:0.5 atarigane:1.5 atarigane:0.5", b0, 0.5),
+      ...(bar % 4 === 3 ? strokes(bar % 8 === 7 ? "r:3 yo:1" : "r:3.5 ha:0.5", b0, 0.75) : []), ...(bar % 8 === 7 ? strokes("r:3 clapper:0.5! clapper:0.5!", b0, 0.7) : [])])] },
+  // A koto duet in hirajoshi, like Sakura or Rokudan: the tune with its presses, a second koto low with its sweeps and
+  // kororin, and the second time round a shakuhachi joins, holding the long notes.
+  { id: "mizukai_village", name: "Under the Eaves", bpm: 76, beats: 128, tonic: A, scale: HIRAJOSHI,
+    notes: () => {
+      const a = `A4:1 B4:1 C5:2^ | B4:1 A4:1 F4:2~ | E4:1 F4:1 A4:1 B4:1 | C5:2^ B4:2 | E5:1 C5:1 B4:1 A4:1 | B4:1 C5:1 B4:1 A4:0.5 F4:0.5 | E4:4~ | r:4`;
+      const b = `E5:1 F5:1 E5:2^ | C5:1 B4:1 C5:2 | E5:1 F5:1 A5:2^ | F5:1 E5:1 C5:2 | B4:1 C5:1 E5:1 C5:1 | B4:1 A4:1 F4:2~ | E4:1 F4:1 A4:2^ | A4:4`;
+      const tune = phrase(`${a} | ${b} | ${a} | ${b}`, "koto", 0, 0.75), scale = scaleNotes(A, HIRAJOSHI, A - 24, A + 24);
+      const low: Note[] = [];
+      for (let bar = 0; bar < 32; bar++) {
+        const note = sounding(tune, bar * 4);
+        if (note) low.push({ beat: bar * 4, voice: "koto", midi: note.midi - 12, length: 1.5, velocity: 0.34 });
+        if (bar % 4 === 3) low.push(...kororin(bar * 4 + 3, scale, 64, 0.32));
+      }
+      const sweeps = [0, 32, 64, 96].flatMap(beat => sararin(beat, scale, 57, 8, 0.3));
+      const flute = hetero(tune.filter(note => note.beat >= 64), "shakuhachi", 0, 0.1, 0.62, note => note.length >= 0.9).map(note => ({ ...note, shape: { scoop: 1, yuri: note.length >= 1.9 } }));
+      return [...tune, ...low, ...sweeps, ...flute];
+    },
+    hits: () => [] },
+  // Gagaku: the sho's held clusters, the hichiriki's slow line with its slides (enbai), the ryuteki twining round it an octave
+  // up, the kakko's rolls, the shoko's chimes, and the great drum.
+  { id: "mizukai_shrine", name: "Kumoyama", bpm: 44, beats: 64, tonic: E, scale: RITSU,
+    notes: () => {
+      const tune = phrase(`E4:4v2 | F#4:2 A4:2~ | B4:4v2 | B4:2+ A4:2 | F#4:4 | E4:2v2 F#4:2 | E4:4+ | r:4 |
+        A4:4v2 | B4:2 D5:2v | B4:4+ | A4:2 F#4:2~ | F#4:2 A4:2 | F#4:2 E4:2v2 | E4:4+ | r:4`, "hichiriki", 0, 0.75);
+      const flute = hetero(tune, "ryuteki", 12, 0.12, 0.62).map(note => ({ ...note, shape: { ...note.shape, scoop: 1 } }));
+      const sho = [64, 64, 69, 66, 69, 71, 69, 64].map((midi, k) => ({ beat: k * 8, voice: "sho" as Voice, midi, length: 7.9, velocity: 0.55 }));
+      return [...tune, ...flute, ...sho];
+    },
+    hits: () => everyBar(16, 4, (b0, bar) => [
+      ...(bar % 2 === 0 ? strokes("kakko:0.5p kakko:0.3p kakko:0.25 kakko:0.2 kakko:0.15 kakko:0.6!", b0, 0.5) : strokes("r:2 kakko:1", b0, 0.5)),
+      ...strokes(bar % 4 === 3 ? "r:1 shoko:0.5 shoko:0.5" : "r:1 shoko:1", b0, 0.45),
+      ...(bar % 2 === 1 ? strokes(bar % 4 === 3 ? "r:3 odaiko:1!" : "r:3 odaiko:1p", b0, 0.7) : [])]) },
+  // Honkyoku for two shakuhachi in kumoi: the second follows the first six beats behind, the cedars' wind between.
+  { id: "mizukai_forest", name: "The Old Cedars", bpm: 60, beats: 64, tonic: D, scale: KUMOI,
+    notes: () => {
+      const tune = phrase(`A4:2v B4:2 A4:1 F4:1 E4:2~ | r:2 D4:2v E4:1 F4:1 A4:2+ | B4:3v A4:1 F4:2 E4:2 | D4:6+ r:2 |
+        F4:2v A4:2 B4:2 D5:2 | E5:4+ D5:1 B4:1 A4:2 | F4:2 E4:1 D4:1 E4:2v F4:2 | D4:6~ r:2`, "shakuhachi", 0, 0.82);
+      const canon = wrap(hetero(tune, "shakuhachi", 0, 6, 0.55), 64);
+      return [...tune, ...canon, { beat: 16, voice: "koto", midi: 76, length: 3, velocity: 0.28 }, { beat: 48, voice: "koto", midi: 81, length: 3, velocity: 0.28 }];
+    },
+    hits: () => [...strokes("odaiko:24p wind:24 wind:16", 0, 0.45)] },
+  // A rowing song (funauta) in yo: the shakuhachi sings it, the oars beat on the drums, the shamisen keeps the boat, the sea swells.
+  { id: "mizukai_sea", name: "Crossing the Eastern Sea", bpm: 72, beats: 64, tonic: G, scale: YO,
+    notes: () => {
+      const tune = phrase(`G4:2 A4:1 C5:1 | D5:3v C5:1 | A4:2 G4:1 A4:1 | C5:4+ | D5:1 E5:1 D5:2 | C5:1 A4:1 G4:2~ | A4:1 C5:1 A4:1 G4:1 | E4:4+ |
+        C5:2 D5:1 E5:1 | G5:3v E5:1 | D5:2 C5:1 D5:1 | E5:4+ | D5:1 C5:1 A4:2 | G4:1 A4:1 C5:2v | A4:1 G4:1 E4:1 D4:1 | G4:4+`, "shakuhachi", 0, 0.82);
+      const oars = Array.from({ length: 16 }, (_, bar) => [{ beat: bar * 4 + 1, voice: "shamisen" as Voice, midi: G - 12, length: 0.5, velocity: 0.38 }, { beat: bar * 4 + 3, voice: "shamisen" as Voice, midi: D - 12, length: 0.5, velocity: 0.3 }]).flat();
+      return [...tune, ...oars];
+    },
+    hits: () => [...everyBar(16, 4, (b0, bar) => [...strokes("odaiko:2p taiko:2p", b0, 0.6), ...(bar % 4 === 3 ? strokes("r:3.5 yo:0.5p", b0, 0.6) : [])]), ...strokes("wave:8 wave:8 wave:8 wave:8 wave:8 wave:8 wave:8 wave:8", 0, 0.45)] },
+  // A ghost story told on the biwa: struck strings, pressed and buzzing, long silences, the noh flute's cry (its top, the
+  // hishigi, a shriek), the kotsuzumi's "pon" after the drummer's call, and a far bell.
+  { id: "mizukai_haunted", name: "Lanterns of the Drowned", bpm: 54, beats: 64, tonic: E, scale: IN,
+    notes: () => {
+      const biwa = phrase(`E3:1! r:1 E3:0.5 F3:0.5 A3:2^2 r:3 | B3:1! C4:1^ B3:2~ r:4 | E3:0.5! E3:0.5 E3:1 F3:2^ E3:4~ | r:8 |
+        A3:1! B3:1 C4:2^ B3:1 A3:1 F3:2 | E3:4~ r:4 | F3:0.5! E3:0.5 F3:1 A3:2^ r:4 | E3:2! r:6`, "biwa", 0, 0.85);
+      const nohkan = phrase(`r:8 | r:2 E5:2v F5:1 A5:3+ | r:8 | B5:2v C6:1 B5:1 A5:4~ | r:8 | r:4 E6:4! | r:8 | A5:2v F5:2 E5:4+`, "nohkan", 0, 0.7);
+      return [...biwa, ...nohkan, { beat: 0, voice: "kane", midi: 52, length: 6, velocity: 0.35 }, { beat: 32, voice: "kane", midi: 52, length: 6, velocity: 0.3 }];
+    },
+    hits: () => [...everyBar(8, 8, (b0, bar) => bar % 2 === 0 ? strokes("r:6 yo:1 tsuzumi:1!", b0, 0.6) : bar % 4 === 3 ? strokes("otsuzumi:8!", b0, 0.6) : []), ...strokes("r:16 wind:32 wind:16", 0, 0.35)] },
+  // Kumi-daiko: the great drum, the nagado taiko's "don doko", rim clicks, the tsugaru shamisen's driving runs, the
+  // shinobue over the top, and the players' shouts.
+  { id: "mizukai_battle", name: "Steel and Blossom", bpm: 144, beats: 64, tonic: A, scale: MINYO,
+    notes: () => {
+      const runs = `A4:0.5! A4:0.5 C5:0.5 D5:0.5 E5:0.5! D5:0.5 C5:0.5 A4:0.5 | G4:0.5! A4:0.5 C5:0.5 A4:0.5 G4:0.5 E4:0.5 G4:0.5 A4:0.5 |
+        A4:0.5! C5:0.5 D5:0.5 E5:0.5 G5:0.5! E5:0.5 D5:0.5 C5:0.5 | D5:1! C5:0.5 A4:0.5 C5:1 A4:1 | E5:0.5! E5:0.5 D5:0.5 C5:0.5 D5:0.5! C5:0.5 A4:0.5 G4:0.5 |
+        A4:0.5! C5:0.5 A4:0.5 G4:0.5 E4:1 G4:1 | A4:0.5! A4:0.5 E5:0.5 A4:0.5 D5:0.5 A4:0.5 C5:0.5 A4:0.5 | A4:2! r:2`;
+      const shamisen = phrase(`${runs} | ${runs}`, "shamisen", 0, 0.78);
+      const fue = phrase(`E5:2v G5:2 | A5:3! G5:1 | E5:2 D5:1 C5:1 | D5:4+ | E5:2v G5:1 A5:1 | C6:3! A5:1 | G5:1 E5:1 D5:1 E5:1 | A4:4+ |
+        A5:2v C6:2 | D6:3! C6:1 | A5:2 G5:1 E5:1 | G5:4+ | A5:1 G5:1 E5:1 D5:1 | E5:2 G5:2v | A5:1 G5:1 E5:1 D5:1 | A5:4!+`, "shinobue", 0, 0.78);
+      return [...shamisen, ...fue];
+    },
+    hits: () => everyBar(16, 4, (b0, bar) => [
+      ...strokes("taiko:1! taiko:0.5 taiko:0.5 taiko:1! taiko:1", b0, 0.75), ...strokes("r:0.5 kara:2 kara:1 kara:0.5", b0, 0.5),
+      ...strokes("shime:0.5 shime:0.5p shime:0.5! shime:0.5p shime:0.5 shime:0.5p shime:0.5! shime:0.5p", b0, 0.45),
+      ...(bar % 2 === 0 ? strokes("odaiko:4!", b0, 0.8) : []),
+      ...(bar % 8 === 7 ? strokes("r:3 taiko:0.25 taiko:0.25 taiko:0.25! taiko:0.25!", b0, 0.7) : []),
+      ...(bar % 4 === 3 ? strokes(bar === 15 ? "r:2.5 yo:1 ha:0.5" : bar % 8 === 7 ? "r:3 yo:1" : "r:3.5 ha:0.5", b0, 0.8) : [])]) },
+  // A noh hayashi at full pitch: the nokan's wild line with its shrieks, the otsuzumi's crack and the kotsuzumi's "pon"
+  // locked together with the drummers' "yo-o" and "ho", the stick drum, the great drum's footsteps, a bell.
+  { id: "mizukai_spirit", name: "The Great Spirit", bpm: 120, beats: 64, tonic: CS, scale: IN,
+    notes: () => [...phrase(`C#5:1v D5:1 F#5:2+ | G#5:0.5! A5:0.5 G#5:1 F#5:2~ | D5:1 C#5:1 r:2 | C#6:4!+ | A5:1v G#5:1 F#5:1 D5:1 | C#5:2+ D5:1 F#5:1 | G#5:1! A5:1 C#6:2v | D6:4!+ |
+        r:2 C#5:1v D5:1 | F#5:2 G#5:1 A5:1 | G#5:1! F#5:1 D5:1 C#5:1 | r:4 | A5:1v C#6:1 D6:2+ | C#6:1! A5:1 G#5:1 F#5:1 | D5:1 F#5:1 G#5:1 A5:1 | C#6:4!~`, "nohkan", 0, 0.78),
+      { beat: 0, voice: "kane", midi: CS - 12, length: 4, velocity: 0.45 }, { beat: 32, voice: "kane", midi: CS - 12, length: 4, velocity: 0.45 }],
+    hits: () => everyBar(16, 4, (b0, bar) => [
+      ...(bar % 2 === 0 ? strokes("yo:0.5 tsuzumi:0.5 otsuzumi:1! ha:0.5 tsuzumi:0.25 tsuzumi:0.25 otsuzumi:1!", b0, 0.7) : strokes("tsuzumi:1 ha:0.5 otsuzumi:1.5! tsuzumi:1", b0, 0.65)),
+      ...strokes("r:1.5 kakko:2! kakko:0.5!", b0, 0.6),
+      ...(bar % 4 === 3 ? strokes("odaiko:2! odaiko:2!", b0, 0.85) : [])]) },
+  // Sankyoku for the lord's hall: shakuhachi, koto and shamisen through one stately tune in kumoi (the koto picking it out on
+  // the beat, the shamisen on the bar), the ceremonial drum, the clappers, the bell.
+  { id: "mizukai_castle", name: "The Hall of Takamori", bpm: 72, beats: 64, tonic: E, scale: KUMOI,
+    notes: () => {
+      const tune = phrase(`E4:2v F#4:1 G4:1 | B4:3+ C#5:1 | B4:1 G4:1 F#4:1 E4:1 | F#4:4+ | G4:2v B4:1 C#5:1 | E5:3+ C#5:1 | B4:1 C#5:1 B4:1 G4:1 | B4:4~ |
+        E5:2v F#5:1 E5:1 | C#5:3+ B4:1 | G4:1 B4:1 C#5:1 B4:1 | G4:4 | F#4:1 G4:1 B4:2v | C#5:1 B4:1 G4:1 F#4:1 | E4:2 F#4:1 G4:1 | E4:4+`, "shakuhachi", 0, 0.8);
+      const scale = scaleNotes(E, KUMOI, E - 12, E + 24), koto: Note[] = [], shamisen: Note[] = [];
+      for (let beat = 0; beat < 64; beat++) {
+        const note = sounding(tune, beat);
+        if (note) koto.push({ beat, voice: "koto", midi: note.midi + 12, length: 0.9, velocity: beat % 4 === 0 ? 0.42 : 0.32, shape: note.length >= 2.5 && note.beat === beat ? { up: 1 } : undefined });
+        if (note && beat % 4 === 0) shamisen.push({ beat, voice: "shamisen", midi: note.midi - 12, length: 0.8, velocity: 0.5 });
+      }
+      for (const bar of [3, 7, 11]) koto.push(...kororin(bar * 4 + 3.4, scale, 76, 0.3));
+      return [...tune, ...koto, ...shamisen, { beat: 0, voice: "kane", midi: E - 12, length: 4, velocity: 0.4 }, { beat: 32, voice: "kane", midi: E - 12, length: 4, velocity: 0.35 }];
+    },
+    hits: () => [...everyBar(8, 8, b0 => strokes("odaiko:4! taiko:4p", b0, 0.6)), ...strokes("r:63 clapper:0.5! clapper:0.5!", 0, 0.7)] },
 ];
 /** Which Mizukai piece plays where. */
 const MIZUKAI_REGION_TRACK: Partial<Record<RegionId, TrackId>> = {
@@ -501,7 +628,7 @@ export class RealmAudio {
       const notes = sortedNotes(this.track), hits = sortedHits(this.track);
       while (this.noteIndex < notes.length && notes[this.noteIndex].beat < this.position + step) {
         const note = notes[this.noteIndex++], at = this.nextTime + (note.beat - this.position) * secondsPerBeat;
-        this.voice(note.voice, note.midi, at, note.length * secondsPerBeat, note.velocity, this.fade!);
+        this.voice(note.voice, note.midi, at, note.length * secondsPerBeat, note.velocity, this.fade!, note.shape);
       }
       while (this.hitIndex < hits.length && hits[this.hitIndex].beat < this.position + step) {
         const hit = hits[this.hitIndex++], at = this.nextTime + (hit.beat - this.position) * secondsPerBeat;
@@ -523,7 +650,15 @@ export class RealmAudio {
     const osc = this.ctx!.createOscillator(); osc.type = type; osc.frequency.value = frequency; osc.detune.value = detune;
     osc.connect(into); osc.start(t); osc.stop(stop); return osc;
   }
-  private voice(voice: Voice, midi: number, t: number, length: number, velocity: number, bus: AudioNode) {
+  /** A note's ornaments on an oscillator's pitch: the scoop up into it, the press up after the pluck, the fall at the end. */
+  private shapePitch(o: OscillatorNode, f: number, t: number, length: number, shape: Shape | undefined) {
+    if (!shape) return;
+    const p = o.frequency, end = t + length, pressed = f * 2 ** ((shape.up ?? 0) / 12);
+    if (shape.scoop) { p.cancelScheduledValues(t); p.setValueAtTime(f * 2 ** (-shape.scoop / 12), t); p.exponentialRampToValueAtTime(f, t + Math.min(0.4, Math.max(0.12, length * 0.35))); }
+    if (shape.up) { const at = t + Math.max(0.13, Math.min(0.5, length * 0.4)); p.setValueAtTime(f, at); p.exponentialRampToValueAtTime(pressed, at + 0.14); }
+    if (shape.fall) { const at = Math.max(t + 0.3, end - Math.min(0.5, length * 0.35)); p.setValueAtTime(pressed, at); p.exponentialRampToValueAtTime(pressed * 2 ** (-shape.fall / 12), end + 0.15); }
+  }
+  private voice(voice: Voice, midi: number, t: number, length: number, velocity: number, bus: AudioNode, shape?: Shape) {
     const ctx = this.ctx!, f = hz(midi), gain = ctx.createGain(), v = velocity;
     gain.connect(bus);
     switch (voice) {
@@ -585,19 +720,21 @@ export class RealmAudio {
         const filter = ctx.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.setValueAtTime(5200, t); filter.frequency.exponentialRampToValueAtTime(900, t + 0.6); filter.connect(gain);
         const a = this.osc("triangle", f, t, t + 1.8, filter), b = this.osc("sawtooth", f, t, t + 0.5, filter, 3);
         a.frequency.setValueAtTime(f * 1.008, t); a.frequency.exponentialRampToValueAtTime(f, t + 0.05); b.frequency.setValueAtTime(f * 1.008, t); b.frequency.exponentialRampToValueAtTime(f, t + 0.05);
-        this.osc("sine", f * 2, t, t + 0.5, filter);
+        this.osc("sine", f * 2, t, t + 0.5, filter); this.shapePitch(a, f, t, length, shape); this.shapePitch(b, f, t, length, shape);
         this.env(gain, t, 0.085 * v, 0.002, 0, Math.min(1.6, length + 0.9)); break; }
       case "shamisen": {
         // A shamisen: the plectrum's click, a nasal twang through a narrow band, and the buzz of the open string (sawari).
         const band = ctx.createBiquadFilter(); band.type = "bandpass"; band.frequency.setValueAtTime(Math.min(5000, f * 4), t); band.frequency.exponentialRampToValueAtTime(Math.min(3000, f * 2), t + 0.3); band.Q.value = 2.2; band.connect(gain);
-        this.osc("sawtooth", f, t, t + 0.6, band); this.osc("square", f * 1.003, t, t + 0.35, band);
+        const string = this.osc("sawtooth", f, t, t + 0.6, band); this.shapePitch(string, f, t, length, shape); this.osc("square", f * 1.003, t, t + 0.35, band);
         this.noiseBurst(t, 0.025, 3200, 0.05 * v, gain, "bandpass", 3);
         this.env(gain, t, 0.12 * v, 0.002, 0, Math.min(0.55, length + 0.25)); break; }
       case "shakuhachi": {
         // A shakuhachi: breath before the note, a scoop up into the pitch, a slow vibrato, and air all the way through.
-        const vibrato = ctx.createOscillator(), depth = ctx.createGain(); vibrato.frequency.value = 4.2; depth.gain.setValueAtTime(0, t); depth.gain.linearRampToValueAtTime(f * 0.009, t + Math.min(1, length * 0.6)); vibrato.connect(depth);
+        // Its yuri is slower and wider, the head nodding.
+        const vibrato = ctx.createOscillator(), depth = ctx.createGain(); vibrato.frequency.value = shape?.yuri ? 3.1 : 4.2; depth.gain.setValueAtTime(0, t); depth.gain.linearRampToValueAtTime(f * (shape?.yuri ? 0.024 : 0.009), t + Math.min(1, length * 0.6)); vibrato.connect(depth);
         const o = this.osc("sine", f, t, t + length + 0.25, gain); o.frequency.setValueAtTime(f * 0.97, t); o.frequency.exponentialRampToValueAtTime(f, t + 0.12); depth.connect(o.frequency); vibrato.start(t); vibrato.stop(t + length + 0.25);
-        const breathy = ctx.createGain(); breathy.gain.value = 0.22; breathy.connect(gain); this.osc("triangle", f, t, t + length + 0.25, breathy);
+        const breathy = ctx.createGain(); breathy.gain.value = 0.22; breathy.connect(gain); const body = this.osc("triangle", f, t, t + length + 0.25, breathy);
+        this.shapePitch(o, f, t, length, shape); this.shapePitch(body, f, t, length, shape);
         this.noiseBurst(t - 0.03, 0.09, f * 2, 0.02 * v, gain, "bandpass", 1.5); this.noiseBurst(t, Math.max(0.1, length), f * 2.2, 0.006 * v, gain, "bandpass", 4);
         this.env(gain, t, 0.1 * v, 0.06, Math.max(0, length - 0.1), 0.2); break; }
       case "sho": {
@@ -605,6 +742,37 @@ export class RealmAudio {
         const filter = ctx.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.value = 3800; filter.connect(gain);
         for (const ratio of [1, 4 / 3, 1.5, 2, 2.25]) this.osc("triangle", f * ratio, t, t + length + 0.6, filter, (Math.random() - 0.5) * 6);
         this.env(gain, t, 0.016 * v, Math.min(0.6, length / 3), Math.max(0, length - 0.6), 0.6); break; }
+      case "shinobue": case "ryuteki": case "nohkan": {
+        // Side-blown bamboo flutes. The shinobue is bright and piercing, the court's ryuteki breathier and lower in its colour,
+        // and the noh theatre's nokan out of tune with itself on purpose (two voices a quarter-tone apart), its top a shriek.
+        const nohkan = voice === "nohkan", court = voice === "ryuteki", shriek = nohkan && midi >= 86;
+        const vibrato = ctx.createOscillator(), depth = ctx.createGain(); vibrato.frequency.value = court ? 4.4 : nohkan ? 5.6 : 6.2;
+        depth.gain.setValueAtTime(0, t); depth.gain.linearRampToValueAtTime(f * (shape?.yuri ? 0.016 : 0.006), t + Math.min(0.8, length * 0.7)); vibrato.connect(depth);
+        const o = this.osc("sine", f, t, t + length + 0.15, gain); depth.connect(o.frequency); vibrato.start(t); vibrato.stop(t + length + 0.15); this.shapePitch(o, f, t, length, shape);
+        const over = ctx.createGain(); over.gain.value = court ? 0.14 : 0.3; over.connect(gain); const o2 = this.osc(shriek ? "square" : "sine", f * 2, t, t + length + 0.15, over); this.shapePitch(o2, f * 2, t, length, shape);
+        if (nohkan) { const off = ctx.createGain(); off.gain.value = 0.45; off.connect(gain); const o3 = this.osc("sine", f * 1.014, t, t + length + 0.15, off); this.shapePitch(o3, f * 1.014, t, length, shape); }
+        this.noiseBurst(t - 0.02, 0.07, f * 2.5, (court ? 0.035 : 0.028) * v, gain, "bandpass", 1.5);
+        this.noiseBurst(t, Math.max(0.1, length), f * (court ? 2 : 3), (court ? 0.016 : shriek ? 0.03 : 0.01) * v, gain, "bandpass", court ? 2 : 3);
+        this.env(gain, t, (court ? 0.075 : shriek ? 0.07 : 0.082) * v, nohkan ? 0.02 : 0.035, Math.max(0, length - 0.06), 0.12); break; }
+      case "hichiriki": {
+        // The hichiriki: a short double reed, nasal and loud for its size, sliding up into its notes (enbai) and swaying slowly.
+        const band = ctx.createBiquadFilter(); band.type = "bandpass"; band.frequency.value = Math.min(3600, f * 2.6); band.Q.value = 1.3;
+        const soft = ctx.createBiquadFilter(); soft.type = "lowpass"; soft.frequency.value = 3800; band.connect(soft).connect(gain);
+        const vibrato = ctx.createOscillator(), depth = ctx.createGain(); vibrato.frequency.value = 4.4; depth.gain.setValueAtTime(0, t); depth.gain.linearRampToValueAtTime(f * (shape?.yuri ? 0.014 : 0.006), t + Math.min(1.2, length * 0.6)); vibrato.connect(depth);
+        const reed = this.osc("sawtooth", f, t, t + length + 0.2, band), reed2 = this.osc("square", f, t, t + length + 0.2, band, 8);
+        depth.connect(reed.frequency); depth.connect(reed2.frequency); vibrato.start(t); vibrato.stop(t + length + 0.2);
+        const enbai = shape ?? { scoop: 1.5 }; this.shapePitch(reed, f, t, length, enbai); this.shapePitch(reed2, f, t, length, enbai);
+        this.noiseBurst(t, 0.06, f * 3, 0.02 * v, gain, "bandpass", 2);
+        this.env(gain, t, 0.07 * v, 0.08, Math.max(0, length - 0.12), 0.2); break; }
+      case "biwa": {
+        // The biwa: struck with a big plectrum (the bachi's crack), the string buzzing on its high frets (sawari), pressed up
+        // and let fall, and ringing a long while in the silence after.
+        const body = ctx.createBiquadFilter(); body.type = "lowpass"; body.frequency.setValueAtTime(3400, t); body.frequency.exponentialRampToValueAtTime(700, t + 0.5); body.connect(gain);
+        const buzz = ctx.createBiquadFilter(); buzz.type = "highpass"; buzz.frequency.value = 1400; const buzzGain = ctx.createGain(); buzzGain.gain.setValueAtTime(0.5, t); buzzGain.gain.exponentialRampToValueAtTime(0.02, t + 1.6); buzz.connect(buzzGain).connect(gain);
+        const string = this.osc("sawtooth", f, t, t + 2.4, body), second = this.osc("square", f, t, t + 1.2, body, 5), sawari = this.osc("sawtooth", f, t, t + 2, buzz, 14);
+        for (const o of [string, second, sawari]) this.shapePitch(o, f, t, length, shape);
+        this.noiseBurst(t, 0.03, 2600, 0.12 * v, gain, "bandpass", 1.8); this.thump(t, 300, 180, 0.05, 0.05 * v, gain);
+        this.env(gain, t, 0.11 * v, 0.002, 0, Math.min(2.2, length + 1.2)); break; }
       case "kane": { const mod = ctx.createOscillator(), depth = ctx.createGain(); mod.frequency.value = f * 2.76; depth.gain.setValueAtTime(f * 1.6, t); depth.gain.exponentialRampToValueAtTime(f * 0.05, t + 2.5);
         mod.connect(depth); const o = this.osc("sine", f, t, t + 4, gain); depth.connect(o.frequency); mod.start(t); mod.stop(t + 4); this.osc("sine", f * 0.5, t, t + 4, gain);
         this.env(gain, t, 0.06 * v, 0.004, 0, 3.6); break; }
@@ -642,6 +810,37 @@ export class RealmAudio {
       case "taiko": this.thump(t, 96, 44, 0.65, 0.42 * v, bus); this.noiseBurst(t, 0.12, 160, 0.06 * v, bus, "lowpass"); this.thump(t, 180, 90, 0.06, 0.08 * v, bus); break;
       case "shime": this.thump(t, 460, 330, 0.07, 0.18 * v, bus); this.noiseBurst(t, 0.03, 2600, 0.05 * v, bus, "bandpass", 2); break;
       case "clapper": this.thump(t, 1700, 1500, 0.025, 0.16 * v, bus); this.thump(t + 0.012, 1450, 1300, 0.02, 0.1 * v, bus); break;
+      // The Isles' drums.
+      case "odaiko": this.thump(t, 70, 34, 1.1, 0.55 * v, bus); this.noiseBurst(t, 0.25, 120, 0.08 * v, bus, "lowpass"); this.thump(t, 150, 75, 0.08, 0.1 * v, bus); break;
+      case "kara": this.thump(t, 1150, 950, 0.03, 0.14 * v, bus); this.noiseBurst(t, 0.02, 3600, 0.06 * v, bus, "bandpass", 3); break;
+      case "kakko": this.thump(t, 430, 330, 0.05, 0.16 * v, bus); this.noiseBurst(t, 0.035, 2900, 0.07 * v, bus, "bandpass", 2); break;
+      case "shoko": case "atarigane": {
+        // Small bronze gongs struck with horn-tipped sticks: the court's shoko lower and longer, the festival's atarigane bright and short.
+        const ctx = this.ctx!, gain = ctx.createGain(), high = drum === "atarigane", base = high ? 2100 : 1250; gain.connect(bus);
+        for (const ratio of high ? [1, 2.42, 3.9] : [1, 2.7, 4.1]) this.osc("square", base * ratio * (0.99 + Math.random() * 0.02), t, t + (high ? 0.25 : 0.5), gain);
+        this.noiseBurst(t, 0.015, high ? 6000 : 4000, 0.05 * v, bus, "bandpass", 2);
+        this.env(gain, t, (high ? 0.014 : 0.016) * v, 0.001, 0, high ? 0.2 : 0.42); break; }
+      case "tsuzumi": {
+        // The kotsuzumi's "pon": a hollow, ringing note that sags as the player's hand loosens the cords.
+        this.thump(t, 340, 250, 0.42, 0.3 * v, bus); this.thump(t, 680, 520, 0.14, 0.06 * v, bus); this.noiseBurst(t, 0.02, 1800, 0.04 * v, bus, "bandpass", 2); break; }
+      case "otsuzumi": this.noiseBurst(t, 0.05, 3000, 0.22 * v, bus, "highpass"); this.thump(t, 1300, 1000, 0.04, 0.2 * v, bus); break;
+      case "yo": case "ha": {
+        // The drummers' calls (kakegoe): a long "yo-o" before a stroke, a short "ha" or "ho" with one. A voice through two formants.
+        const ctx = this.ctx!, long = drum === "yo", gain = ctx.createGain(), length = long ? 0.5 : 0.18; gain.connect(bus);
+        for (const [centre, q] of (long ? [[620, 2.2], [1050, 3]] : [[880, 2], [1450, 3]]) as [number, number][]) {
+          const formant = ctx.createBiquadFilter(); formant.type = "bandpass"; formant.frequency.value = centre; formant.Q.value = q; formant.connect(gain);
+          const throat = this.osc("sawtooth", long ? 290 : 340, t, t + length + 0.1, formant); throat.frequency.setValueAtTime(long ? 290 : 340, t); throat.frequency.exponentialRampToValueAtTime(long ? 185 : 250, t + length);
+        }
+        this.noiseBurst(t, long ? 0.12 : 0.06, long ? 900 : 1300, 0.05 * v, bus, "bandpass", 1.5);
+        this.env(gain, t, 0.09 * v, long ? 0.05 : 0.015, long ? 0.22 : 0.05, long ? 0.25 : 0.1); break; }
+      case "wave": case "wind": {
+        // A long breath of the sea or the cedars: looped noise, swelling and falling away, the wind's colour drifting.
+        const ctx = this.ctx!, source = ctx.createBufferSource(), filter = ctx.createBiquadFilter(), gain = ctx.createGain(), sea = drum === "wave", length = sea ? 4.5 : 6;
+        source.buffer = this.noise; source.loop = true; filter.type = sea ? "lowpass" : "bandpass"; filter.Q.value = sea ? 0.7 : 0.9;
+        filter.frequency.setValueAtTime(sea ? 420 : 700, t); filter.frequency.linearRampToValueAtTime(sea ? 900 : 1500, t + length * 0.45); filter.frequency.linearRampToValueAtTime(sea ? 380 : 800, t + length);
+        source.connect(filter).connect(gain).connect(bus);
+        gain.gain.setValueAtTime(0.0001, t); gain.gain.linearRampToValueAtTime((sea ? 0.05 : 0.03) * v, t + length * 0.4); gain.gain.linearRampToValueAtTime(0.0001, t + length);
+        source.start(t, Math.random() * 0.5); source.stop(t + length + 0.05); break; }
       case "clank": { const ctx = this.ctx!, gain = ctx.createGain(); gain.connect(bus); for (const ratio of [1, 2.76, 5.4]) this.osc("square", 880 * ratio * (0.97 + Math.random() * 0.06), t, t + 0.4, gain);
         this.env(gain, t, 0.03 * v, 0.001, 0, 0.35); break; }
     }

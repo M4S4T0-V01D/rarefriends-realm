@@ -87,6 +87,10 @@ try {
   await a.page.waitForTimeout(800);
   r = await a.rendering();
   assert.deepEqual([r.mode, r.loops, r.gl], ["normal", 1, false], `ten switches later: one loop, no GPU (${JSON.stringify(r)})`);
+  // Two switches before the game has drawn again: the second one is the one that counts.
+  await a.state(() => { window.__realm.renderer("webgl"); window.__realm.renderer("normal"); }); await a.page.waitForTimeout(800);
+  r = await a.rendering();
+  assert.deepEqual([r.mode, r.loops, r.gl], ["normal", 1, false], `a quick switch there and back stays back (${JSON.stringify(r)})`);
   assert.equal(await a.snapshot(), before);
 
   // ---------- WebGL plays: walking by clicking the world ----------
