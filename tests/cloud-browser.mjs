@@ -52,6 +52,8 @@ try {
   const artworkCall = await createArtworkFixture();
   browser = await chromium.launch({ headless: true });
 
+  /** Wait until the cloud's version has stopped changing (a logout's last upload has landed). */
+  const settled = async () => { let last = -1, same = 0; for (let i = 0; i < 120 && same < 12; i++) { const v = cloud.row()?.version ?? 0; same = v === last ? same + 1 : 0; last = v; await new Promise(r => setTimeout(r, 500)); } return last; };
   /** A device: its own browser storage, the wallet (signing as the test player), the chain and the save service. */
   async function device(name, seed = null) {
     const context = await browser.newContext({ viewport: { width: 1320, height: 900 } });
@@ -138,8 +140,7 @@ try {
   await a.openSettings();
   await a.game.getByRole("button", { name: "⏻ Save and log out" }).click();
   await a.game.locator('.realm-game[data-phase="title"]').waitFor();
-  await a.page.waitForTimeout(3000);
-  const loggedOut = cloud.row().version;
+  const loggedOut = await settled();
 
   // ---------- Another device: the same adventure, after one sign-in there ----------
   const b = await device("second device");
@@ -158,8 +159,8 @@ try {
   await b.until(() => cloud.row().version > loggedOut && JSON.parse(cloud.row().save).xp.woodcutting >= 260_000, 40_000, "the second device's save");
   await b.openSettings();
   await b.game.getByRole("button", { name: "⏻ Save and log out" }).click();
-  await b.page.waitForTimeout(3000);
-  const afterB = cloud.row().version;
+  await b.game.locator('.realm-game[data-phase="title"]').waitFor();
+  const afterB = await settled();
   await a.game.getByRole("button", { name: "Continue your adventure" }).click();
   await a.game.locator('.realm-game[data-phase="playing"]').waitFor();
   await a.train(30_000);

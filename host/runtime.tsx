@@ -188,7 +188,8 @@ function RealmHost() {
         else if (action === "keep-local") void cloud.keepLocal();
         else if (action === "retry") cloud.retry();
         else if (action === "reload") window.location.reload();
-        else if (action === "flush" && !superseded) void cloud.flush();
+        // Logging out: up now, as an exit (never held back by the every-few-seconds limit).
+        else if (action === "flush" && !superseded) void cloud.flush(true);
       }
       else if (event.data?.type === TEXT_COPY && typeof event.data.text === "string" && event.data.text.length <= 1000) {
         const source = event.source as Window;
