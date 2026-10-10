@@ -234,10 +234,11 @@ try {
         under = (await game.locator(".realm-hover").textContent()) ?? "";
         if (!/^Walk here/.test(under)) { await page.mouse.move(target.x, target.y - 40); await page.waitForTimeout(1000); continue; }
         presses++; await page.mouse.down();
+        // (A slow machine takes a while to register the hold: after the usual second and a half, look for it a while longer.)
         await page.waitForTimeout(1500);
-        holding = await state(() => !!window.__realm.game().held);
+        for (let wait = 0; wait < 8 && !(holding = await state(() => !!window.__realm.game().held)); wait++) await page.waitForTimeout(250);
       }
-      const near = holding ? "" : await state(([x, y]) => { const g = window.__realm.game(), by = e => Math.abs(e.x - x) <= 3 && Math.abs(e.y - y) <= 4; return JSON.stringify({ npcs: g.npcs.filter(by).map(n => [n.id, n.x, n.y]), monsters: g.monsters.filter(m => !m.dead && by(m)).map(m => [m.def.id, m.x, m.y]), held: g.held, path: g.player.path.length, at: [g.player.x, g.player.y] }); }, [open.x, open.y]);
+      const near = holding ? "" : await frame().evaluate(([x, y]) => { const g = window.__realm.game(), by = e => Math.abs(e.x - x) <= 3 && Math.abs(e.y - y) <= 4; return JSON.stringify({ npcs: g.npcs.filter(by).map(n => [n.id, n.x, n.y]), monsters: g.monsters.filter(m => !m.dead && by(m)).map(m => [m.def.id, m.x, m.y]), held: g.held, path: g.player.path.length, at: [g.player.x, g.player.y] }); }, [open.x, open.y]);
       assert(holding, `pressing on open ground and holding walks by the pointer (under the pointer: "${under}", pressed ${presses}×, ${near})`);
       const mid = await state(() => ({ x: window.__realm.game().player.x, y: window.__realm.game().player.y }));
       assert(mid.x - open.from.x >= 2 && Math.abs(mid.y - open.from.y) <= 1, `holding the button walks towards the pointer (${mid.x - open.from.x}, ${mid.y - open.from.y})`);

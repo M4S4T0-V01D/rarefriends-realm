@@ -333,7 +333,7 @@ export function buildHeartlands(ctx: GenContext, t: Tools, places: World["places
     }
     for (const [k, wx, wy] of [[0, B.x0 + 10, by0 + 8], [1, B.x0 + 52, by0 + 17], [2, B.x0 + 100, by0 + 38]] as const) clue(wx, wy, { kind: "decor", decor: "rubble", blocks: true, name: "A fallen ward stone", clue: `ward_stone_${k}` });
     clue(B.x0 + 59, by0 + 34, { kind: "sign", blocks: true, name: "The warden's lintel", clue: "black_stair_lintel", text: "" });
-    for (const [x, y] of [[B.x0 + 9, by0 + 3], [B.x0 + 30, by0 + 6], [B.x0 + 46, by0 + 3], [B.x0 + 68, by0 + 3], [B.x0 + 57, by0 + 26], [B.x0 + 44, by0 + 33], [B.x0 + 74, by0 + 33], [B.x0 + 96, by0 + 28]] as const) put2(x, y, "torch", "Old torch bracket", false);
+    for (const [x, y] of [[B.x0 + 9, by0 + 3], [B.x0 + 30, by0 + 6], [B.x0 + 46, by0 + 3], [B.x0 + 68, by0 + 3], [B.x0 + 57, by0 + 26], [B.x0 + 44, by0 + 33], [B.x0 + 74, by0 + 33], [B.x0 + 41, by0 + 38], [B.x0 + 77, by0 + 38], [B.x0 + 51, by0 + 43], [B.x0 + 67, by0 + 43], [B.x0 + 96, by0 + 28]] as const) put2(x, y, "torch", "Old torch bracket", false);
     for (const [x, y] of [[B.x0 + 94, by0 + 30], [B.x0 + 104, by0 + 30], [B.x0 + 98, by0 + 39]] as const) put2(x, y, "tomb", "A sealed sarcophagus of black stone");
     for (let k = 0; k < 5; k++) monsterAt("dust_walker", B.x0 + 20 + k * 9, by0 + 6, 3);
     for (let k = 0; k < 4; k++) monsterAt("obsidian_scarab", B.x0 + 46 + k * 6, by0 + 12, 3);

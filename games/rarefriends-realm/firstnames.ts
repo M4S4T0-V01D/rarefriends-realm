@@ -56,7 +56,7 @@ export function buildFirstNames(ctx: GenContext, t: Tools, places: World["places
   add({ kind: "gate", x: X + 42, y: y0 + 21, blocks: true, name: "The lower stair", action: "Open", to: { x: X + 42, y: y0 + 22 }, clue: "lower_stair" });
   monsterAt("the_unnamed", X + 49, y0 + 40, 2);
   for (let k = 0; k < 4; k++) monsterAt("nameless_shade", X + 34 + k * 10, y0 + 36, 3);
-  for (const [x, y] of [[X + 30, y0 + 33], [X + 68, y0 + 33], [X + 30, y0 + 45], [X + 68, y0 + 45]] as const) put2(x, y, "torch", "A lamp, guttering", false);
+  for (const [x, y] of [[X + 30, y0 + 33], [X + 41, y0 + 33], [X + 57, y0 + 33], [X + 68, y0 + 33], [X + 29, y0 + 39], [X + 69, y0 + 39], [X + 30, y0 + 45], [X + 41, y0 + 45], [X + 57, y0 + 45], [X + 68, y0 + 45]] as const) put2(x, y, "torch", "A lamp, guttering", false);
 
   // ---------- The gods' shrines, across the heartlands ----------
   const shrine = (x: number, y: number, id: string, name: string) => clue(x, y, { kind: "decor", decor: "statue", blocks: true, name, clue: `shrine_${id}` });
