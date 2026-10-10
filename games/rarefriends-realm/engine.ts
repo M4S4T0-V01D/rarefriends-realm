@@ -27,6 +27,7 @@ import { passage, VOYAGE_TICKS } from "./boats.ts";
 import { codexTick } from "./codex.ts";
 import { SOLDIERLY, SOLDIERS, TWIN_BASE, hostile, sideOf } from "./skirmish.ts";
 import { examineCreature, inspectTrack, knows, learn, learnTrick, masteryBoost, maxHpOf, onAttacked, onKilled, onPoison, onWeakSpot, rollMarked, trackTick } from "./pursuance.ts";
+import { patternBroken, techniqueGuard, techniqueStrike } from "./techniques.ts";
 import { cleanMysteries, studySherd } from "./mysteries.ts";
 import { clueExamine, clueOptions, onKharavethTick, useClue } from "./kharaveth.ts";
 import { studySeal } from "./dynasties.ts";
@@ -1619,7 +1620,9 @@ function playerCombat(game: Game) {
   }
   if (!monster.target) rally(game, monster);
   monster.target = true;
-  if (!spell && range) { rangedAttack(game, monster, boost); return; }
+  // A Mysteries preparation (techniques.ts): stillness, a marked edge, a severing cut.
+  const art = spell ? null : techniqueStrike(game, monster, !range);
+  if (!spell && range) { rangedAttack(game, monster, boost, art!); return; }
   if (spell) {
     const problem = canCast(game, spell);
     if (problem) { message(game, problem, "warn"); player.combat = null; player.queuedSpell = null; player.autocast = null; return; }
@@ -1663,7 +1666,8 @@ function playerCombat(game: Game) {
     return;
   }
   player.attackTimer = attackSpeed(player);
-  const hit = game.rng() < playerAccuracy(game, monster, boost) ? Math.floor(game.rng() * (Math.floor(playerMaxHit(game) * boost) + 1)) : -1;
+  const most = Math.floor(playerMaxHit(game) * boost * art!.damage);
+  const hit = art!.sure ? 1 + Math.floor(game.rng() * Math.max(1, most)) : game.rng() < playerAccuracy(game, monster, boost * art!.accuracy) ? Math.floor(game.rng() * (most + 1)) : -1;
   const damage = Math.max(0, Math.min(hit, monster.hp));
   if (damage > 0) {
     const xp = damage * 4;
@@ -1709,15 +1713,15 @@ export function rangedMaxHit(game: Game, arrowStrength = bestArrow(game)?.streng
   const effective = level(game, "ranged") + (game.player.style === "accurate" ? 3 : 0) + 8, punch = weapon(game.player)?.equip?.bow?.strength ?? 0;
   return Math.floor(0.5 + effective * (arrowStrength + punch + 64) / 640);
 }
-function rangedAttack(game: Game, monster: Monster, boost: number) {
+function rangedAttack(game: Game, monster: Monster, boost: number, art = { accuracy: 1, damage: 1, sure: false }) {
   const player = game.player, arrow = bestArrow(game);
   const bolts = !!weapon(player)?.equip?.bow?.bolts;
   if (!arrow) { message(game, bolts ? "You have no bolts you can use. Fletch & Feather in Friendhollow and Hazel in Fernwick sell them." : "You have no arrows you can use. Fletch & Feather in Friendhollow sells them.", "warn"); player.combat = null; return; }
   take(player, arrow.id, 1);
   player.attackTimer = Math.max(2, attackSpeed(player) - (player.style === "aggressive" ? 1 : 0));
-  const accuracy = (level(game, "ranged") + (player.style === "accurate" ? 3 : 0) + 8) * (bonuses(player).ranged + 64) * boost * (1 + carvingEffect(game).accuracy);
+  const accuracy = (level(game, "ranged") + (player.style === "accurate" ? 3 : 0) + 8) * (bonuses(player).ranged + 64) * boost * art.accuracy * (1 + carvingEffect(game).accuracy);
   const defence = (monster.def.defence * cursed(game, monster, "defence") + 9) * (monster.def.defenceBonus + 64);
-  const hit = game.rng() < hitChance(accuracy, defence) ? Math.floor(game.rng() * (Math.floor(rangedMaxHit(game, arrow.strength) * boost) + 1)) : -1;
+  const hit = game.rng() < hitChance(accuracy, defence) ? Math.floor(game.rng() * (Math.floor(rangedMaxHit(game, arrow.strength) * boost * art.damage) + 1)) : -1;
   const damage = Math.max(0, Math.min(hit, monster.hp));
   if (damage > 0) {
     if (player.style === "defensive") { addXp(game, "ranged", damage * 2); addXp(game, "defence", damage * 2); } else addXp(game, "ranged", damage * 4);
@@ -1803,7 +1807,7 @@ function damagePlayer(game: Game, damage: number, from: Monster | null) {
 function die(game: Game) {
   const player = game.player, spawn = game.world.places.spawn;
   message(game, "Oh dear, you are dead!", "warn"); emit(game, { type: "death", tick: game.tick }); remember(game, "first_death"); friendSays(game, "death"); sound(game, "death");
-  player.deaths++; stopAll(game); closeInterfaces(game); player.prayers = []; player.hp = maxHp(player); player.energy = 100;
+  player.deaths++; stopAll(game); closeInterfaces(game); player.prayers = []; player.preparation = null; player.hp = maxHp(player); player.energy = 100;
   for (const monster of game.monsters) monster.target = false;
   // Fallen in the Rare Friends Ring: its magic revives you in the lobby instead.
   if (inRingBuilding(player.x, player.y)) { arenaRevive(game); player.moved = game.tick - 10; player.stunned = 0; return; }
@@ -1850,7 +1854,7 @@ function monsterTick(game: Game, monster: Monster) {
   else if (wouldAttack) { game.sneakingPast.delete(monster.uid); monster.target = true; creature(game, monster, "aggro"); }
   else if (!monster.target && game.sneakingPast.has(monster.uid)) slippedPast(game, monster);
   // It mends itself while it's hurt (the Archivist Below reads itself whole again).
-  if (monster.def.heals && monster.hp < maxHpOf(monster) / 2 && game.tick % 5 === 0) { monster.hp = Math.min(maxHpOf(monster), monster.hp + monster.def.heals); if (monster.target) learnTrick(game, monster.def.id, "heals"); }
+  if (monster.def.heals && !patternBroken(game, monster) && monster.hp < maxHpOf(monster) / 2 && game.tick % 5 === 0) { monster.hp = Math.min(maxHpOf(monster), monster.hp + monster.def.heals); if (monster.target) learnTrick(game, monster.def.id, "heals"); }
   if (monster.target) {
     monster.idle = 0;
     const leash = Math.max(Math.abs(monster.x - monster.spawn.x), Math.abs(monster.y - monster.spawn.y));
@@ -1860,7 +1864,7 @@ function monsterTick(game: Game, monster: Monster) {
     if (shooting || adjacentTo(player.x, player.y, monster.x, monster.y, footprint(monster))) {
       if (monster.attackTimer <= 0) {
         // Below a third of its health an enraged thing hits half as hard again, and faster.
-        const enraged = !!monster.def.enrage && monster.hp <= maxHpOf(monster) / 3;
+        const enraged = !!monster.def.enrage && !patternBroken(game, monster) && monster.hp <= maxHpOf(monster) / 3;
         monster.attackTimer = Math.max(2, monster.def.speed - (enraged ? 1 : 0));
         const boost = prayerBoost(player), style = STYLE_BONUS[player.style];
         let breathed = false;
@@ -1879,18 +1883,28 @@ function monsterTick(game: Game, monster: Monster) {
           sound(game, "fire");
           message(game, shielded ? "Your shield absorbs most of the dragon's breath." : "You're horribly burnt by the dragonfire! A Wyrmward shield would help.", shielded ? "game" : "warn");
         }
+        // The Weigher's counter and the Gate-Mother's ward (techniques.ts).
+        const close = adjacentTo(player.x, player.y, monster.x, monster.y, footprint(monster)) && monster.def.attackStyle !== "magic";
+        const guard = techniqueGuard(game, monster, hit, { melee: close, breath: breathed });
+        hit = guard.hit;
         creature(game, monster, "attack");
         damagePlayer(game, hit, monster);
-        const poisoned = hit > 0 && !!monster.def.poison && game.rng() < monster.def.poison.chance;
+        if (guard.counter > 0 && player.hp > 0 && !monster.dead) {
+          const answer = Math.max(1, Math.min(guard.counter, Math.floor(playerMaxHit(game) * 1.5)));
+          message(game, "You take half the blow, and answer it with one of the same weight.");
+          damageMonster(game, monster, answer, false, true);
+          if (monster.dead) return;
+        }
+        const poisoned = hit > 0 && !guard.noVenom && !!monster.def.poison && game.rng() < monster.def.poison.chance;
         if (poisoned) poisonPlayer(game, monster.def.poison!.damage);
         // A wraith's touch takes faith (or wind) with the blood.
-        if (hit > 0 && monster.def.drain) {
+        if (hit > 0 && monster.def.drain && !guard.noDrain) {
           if (monster.def.drain.faith) player.prayer = Math.max(0, player.prayer - monster.def.drain.faith);
           if (monster.def.drain.energy) player.energy = Math.max(0, player.energy - monster.def.drain.energy);
           if (game.rng() < 0.3) message(game, `The ${monster.def.name.replace(/^The /, "").toLowerCase()}'s touch drains your ${monster.def.drain.faith ? "faith" : "strength to run"}.`, "warn");
         }
         // What it just did to you, you know now.
-        onAttacked(game, monster, { shooting: shooting && !adjacentTo(player.x, player.y, monster.x, monster.y, footprint(monster)), poisoned, drained: hit > 0 && !!monster.def.drain, breath: breathed, enraged });
+        onAttacked(game, monster, { shooting: shooting && !adjacentTo(player.x, player.y, monster.x, monster.y, footprint(monster)), poisoned, drained: hit > 0 && !!monster.def.drain && !guard.noDrain, breath: breathed, enraged });
       }
       return;
     }
@@ -2711,6 +2725,7 @@ export function restore(game: Game, raw: unknown): boolean {
   const save = raw as Partial<SaveData>;
   if (save.v !== 1) return false;
   const player = game.player;
+  player.techniqueReady = {}; player.preparation = null;
   if (typeof save.friendId === "number" && save.friendId !== player.friendId) return false;
   for (const skill of SKILLS) player.xp[skill] = typeof save.xp?.[skill] === "number" ? Math.max(0, Math.min(200_000_000, save.xp[skill])) : player.xp[skill];
   player.xp.hitpoints = Math.max(XP_TABLE[10], player.xp.hitpoints);

@@ -11,6 +11,7 @@ import { createWorld, type World } from "./world.ts";
 import type { Daily } from "./daily.ts";
 import type { Lore, Track } from "./pursuance.ts";
 import type { MysteriesRecord } from "./mysteries.ts";
+import type { Preparation } from "./techniques.ts";
 import { LATEST_UPDATE } from "./updates.ts";
 
 export const TICK_MS = 600;
@@ -143,6 +144,8 @@ export type Player = {
   celebrate?: { skill: Skill; level: number; until: number };
   /** The mount you rode last (not saved), for the ride button. */
   lastMount?: string;
+  /** Mysteries techniques (techniques.ts, not saved): the tick each is ready again, and the preparation in force. */
+  techniqueReady: Partial<Record<string, number>>; preparation: Preparation | null;
   /** The emote you're performing, and the tick it ends (not saved). */
   emote?: { id: string; start: number; until: number } | null;
   /** Friends from your friends list playing near you right now (not saved): +5% XP while any are. */
@@ -160,7 +163,7 @@ export type Monster = {
   mine?: boolean;
   bornAt?: number;
   /** Curses and Bind: the tick each wears off. */
-  curses: Partial<Record<"attack" | "strength" | "defence" | "bound" | "pacified", number>>;
+  curses: Partial<Record<"attack" | "strength" | "defence" | "bound" | "pacified" | "broken", number>>;
   /** Weapon poison on it: doses left, and ticks to the next. */
   poison?: { damage: number; left: number; timer: number } | null;
   /** Another creature it's fighting (the Realm's wars: skirmish.ts), by uid. */
@@ -191,6 +194,8 @@ export type GameEvent =
   | { type: "death"; tick: number }
   | { type: "quest"; quest: string; tick: number }
   | { type: "cast"; spell: string; tick: number }
+  /** A Mysteries technique taking hold, where it does (techniques.ts). */
+  | { type: "technique"; id: string; color: string; x: number; y: number; tick: number }
   /** Your Friend said something: show it over its head, and (share) tell other players nearby. */
   | { type: "friend"; text: string; share: boolean; tick: number }
   | { type: "creature"; id: string; action: "attack" | "hurt" | "death" | "aggro"; x: number; y: number; tick: number }
@@ -278,7 +283,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
     style: "accurate", autocast: null, prayers: [], target: null, activity: null, combat: null,
     attackTimer: 0, eatTimer: 0, stunned: 0, regenTimer: 0, quests: {}, questData: {},
     wardrobe: [], worn: [], follower: null, courseStep: -1, kills: 0, deaths: 0, overhead: null, music: ["theme"],
-    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, boneBag: {}, sigilBag: {}, belts: {}, followerWorn: [], orders: {}, card: { bg: "paper", frame: "rose", skills: "boxes", font: "mono", ink: "ink", layout: "classic" }, cards: {}, rarian: false, mizukai: false, orashai: false, mana: 10, mysteries: { found: {}, glyphs: {}, read: {} }, spiritWardUntil: 0, home: null, restedTicks: 0, ward: null, wardUntil: 0, renew: 0, renewUntil: 0, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, friendVillage: null, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, lore: {}, trail: null, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false, rerolls: 0 }, seenUpdate: LATEST_UPDATE,
+    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, boneBag: {}, sigilBag: {}, belts: {}, followerWorn: [], orders: {}, card: { bg: "paper", frame: "rose", skills: "boxes", font: "mono", ink: "ink", layout: "classic" }, cards: {}, rarian: false, mizukai: false, orashai: false, mana: 10, mysteries: { found: {}, glyphs: {}, read: {} }, techniqueReady: {}, preparation: null, spiritWardUntil: 0, home: null, restedTicks: 0, ward: null, wardUntil: 0, renew: 0, renewUntil: 0, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, friendVillage: null, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, lore: {}, trail: null, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false, rerolls: 0 }, seenUpdate: LATEST_UPDATE,
     lastHitBy: null, created: Date.now(), queuedSpell: null, castTimer: 0,
   };
 }

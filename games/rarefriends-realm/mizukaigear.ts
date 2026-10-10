@@ -111,6 +111,8 @@ export const MIZUKAI_ITEMS: readonly Item[] = [
   item("harbour_letter", "Harbourmaster's letter", "A letter of introduction from Harbourmaster Kaneda to the Hall of Takamori, sealed with the harbour's anchor.", 0, "scroll", "#efe6d2", "#2f3a5e", { tradeable: false }),
   item("sacred_rope", "Sacred rope", "A length of new rice-straw rope, twisted left, with paper zigzags tied in. The shrine's to give, not yours to keep.", 0, "string", "#c9b27a", "#efe6d2", { tradeable: false }),
   item("rice_straw", "Rice straw", "A bundle of last year's best straw from Tanabe, for the shrine's new rope.", 0, "wheat", "#c9b27a", "#8a6a3a", { tradeable: false }),
+  // The Hidden Road (hiddenroad.ts): a lost walker's mask, for Ascetic Kōdō to burn.
+  item("hermits_crow_mask", "Hermit's crow mask", "A crow's face of lacquered paper, beak cracked. Whoever wore it walked the Hidden Road and lost it, and the mask kept them lost.", 0, "hat", "#22252e", "#b9bec6", { tradeable: false }),
   item("binding_seal", "Binding seal", "A seal written by Sealwright Ren to tie into the shrine's rope. Don't read it; it doesn't like being read.", 0, "sigil", "#efe6d2", "#2f3a5e", { tradeable: false }),
   item("blank_seal", "Blank seal paper", "Mulberry paper cut to a seal's length, waiting for the ink.", 0, "scroll", "#efe6d2", "#c9b27a", { tradeable: false }),
   item("sealing_ink", "Sealing ink", "Ink ground with cedar ash and spring water from Kumoyama. Seals written in it hold.", 0, "vial", "#22252e", "#b5452f", { tradeable: false }),

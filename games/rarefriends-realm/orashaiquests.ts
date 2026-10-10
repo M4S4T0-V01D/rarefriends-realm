@@ -43,7 +43,7 @@ export const ORASHAI_QUESTS: readonly QuestDef[] = [
   {
     id: INIT, name: "The Orashai Mysteries", points: 4, difficulty: "Experienced", start: "Talk to Priestess Anzah in the Temple of the Hidden Sun, Sefrah, once the House is out of mourning.",
     requirements: ["The Matriarch's Seal", "Mysteries: three inscriptions read whole", "Combat 70 recommended"],
-    rewards: ["4 Quest Points", "6,000 Faith XP", "6,000 Magic XP", "A first name, from the Keeper", "The Orashai way: the First Script and the Hidden Sun's watchings, and mana to write with", "The Staff of the Hidden Sun"],
+    rewards: ["4 Quest Points", "6,000 Faith XP", "6,000 Magic XP", "3,000 Mysteries XP", "A first name, from the Keeper", "Two Mysteries techniques: the Weigher's Counter and the Gate-Mother's Ward", "The Orashai way: the First Script and the Hidden Sun's watchings, and mana to write with", "The Staff of the Hidden Sun"],
     journal: game => {
       const s = stage(game, INIT);
       if (s === 0) return ["The Temple of the Hidden Sun in Sefrah keeps the Orashai Mysteries. While the House mourns, they're shut."];
@@ -182,7 +182,7 @@ export function talkOrashai(game: Game, npcId: string, name: string): Dialogue |
       ]);
       if (s === 4) return chat(name, npcSays(name, "Three names, scratched out of my wall. I know whose; I want them back. Each wants its glyph understood: the open ring, the capped stroke, the almond with a point. Then the stair will open, and you'll meet what scratched them."));
       if (stage(game, BAG) === 2 || stage(game, BAG) === 3) return chat(name, npcSays(name, "Him. The one in the bag. Yes. At the First Ceremony, when I was writing the first names, he put his hand up. Nobody had ever done that. I didn't know what it was. Neither did anyone else. They asked him to leave.", "I scratched his name out because I was embarrassed. He scratched it out again because he was. It's low on the wall, by the stair. Go and read it."));
-      return chat(name, npcSays(name, pick(game, ["Ink and reeds, and the ibis mask, if you want to copy names the way my scribes do.", "Everything has a first name. Some things have only that.", "I am not finished. I'll never be finished. That's what keeping is."])));
+      return chat(name, npcSays(name, pick(game, ["Ink and reeds, and the ibis mask, if you want to copy names the way my scribes do.", "Everything has a first name. Some things have only that.", "I am not finished. I'll never be finished. That's what keeping is.", ...(questDone(game, INIT) ? ["The Weigher's counter is a measure, not a prayer: wait for the blow, and answer it with its own weight. The Gate-Mother's ward is a doorway you stand in. Neither asks you to believe anything."] : [])])));
     }
     case "bag_man": {
       const b = stage(game, BAG);
@@ -205,9 +205,10 @@ function finishInit(game: Game) {
   if (questDone(game, INIT)) return;
   discover(game, "orashai_initiation");
   giveOrDrop(game, "hidden_sun_staff");
-  addXp(game, "prayer", 6000, { raw: true }); addXp(game, "magic", 6000, { raw: true });
+  addXp(game, "prayer", 6000, { raw: true }); addXp(game, "magic", 6000, { raw: true }); addXp(game, "mysteries", 3000, { raw: true });
   game.player.mana = maxMana(game.player);
   completeQuest(game, INIT);
+  say(game, "The Weigher's Counter and the Gate-Mother's Ward are yours: Mysteries techniques, in your Combat options.");
 }
 function finishBag(game: Game) {
   giveOrDrop(game, "fish_bag"); addXp(game, "presence", 4000, { raw: true });

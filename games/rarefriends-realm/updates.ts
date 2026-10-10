@@ -4,6 +4,15 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 99, date: "2026-10-10", title: "The Land Before Stone: Mysteries techniques, and the Hidden Road", items: [
+    "Mysteries techniques, in the Combat options tab: preparations any fighter can learn, a melee one most of all, without Magic or Faith. Each has its level, its targets, a cooldown, and one preparation at a time.",
+    "The Mysteries' common learning: Stillness Before Impact (be still two beats, and your next blow lands truer and harder), Marked Edge (once your Pursuance journal knows a creature's weakness) and Pattern Break (a creature that mends itself or rages, doesn't).",
+    "The Orashai's two, for finishing the Orashai Mysteries: the Weigher's Counter (wait for a blow, take half, answer it with its own weight) and the Gate-Mother's Ward (fire and spells at half; no venom, no draining touch). The initiation gives Mysteries XP now too.",
+    "The Hidden Road, the Mizukai Isles' own Mysteries: a new quest from Ascetic Kōdō below Iwaoka's monastery, after The Silent Climb. Walk to the standing mist, the foxfire and the stone with no echo, and free a crow-masked hermit.",
+    "Kōdō teaches the Hidden Road's three: Mist Step (whatever's after you loses you), Severing Cut (a sure, heavy blow against a wayward spirit) and the Mountain's Shout (what's in reach falters).",
+    "Pursuance no longer says \"the The\" for creatures whose names have their own article.",
+    "Still to come in The Land Before Stone: Meghavan, the Rain Country, east of Khetmar, with Mysteries schools of its own.",
+  ] },
   { id: 98, date: "2026-10-10", title: "The Land Before Stone: the Orashai, and the god behind the bag", items: [
     "The Orashai Mysteries: an initiation in five thresholds, from Priestess Anzah at Sefrah's Temple of the Hidden Sun, through the door that sees in the Ochre Spine, to the Hall of First Names beneath it, the Listener, the scratched names, the Unnamed, and the Keeper of First Names.",
     "A new tradition, the Orashai way, kept like Raria's Law or the Mizukai way: the First Script (glyphs written on the air: Stone, Dust, Door, Water, Measure, Star, the First Name, and the old roads) and the Hidden Sun's watchings and rites.",

@@ -594,6 +594,11 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
             else if (event.type === "projectile") projectiles.current.push(event.projectile);
             else if (event.type === "death") { setDead(true); setTimeout(() => setDead(false), 2600); }
             else if (event.type === "quest") setQuest(event.quest);
+            // A Mysteries technique taking hold: a ring on the ground and a rising shimmer in its colour.
+            else if (event.type === "technique" && !reducedMotion) {
+              burst("ring", event.x, event.y, 2, 1, event.color, { speed: 0, up: 0, life: 0.9, size: 3 });
+              burst("spark", event.x, event.y, 18, 18, event.color, { speed: 0.5, up: 70, life: 1.1, size: 2.5, gravity: 30, bright: true });
+            }
             else if (event.type === "friend") { chat.current = { text: event.text, until: performance.now() + 4000 }; if (event.share && players.current.state.status === "online") window.parent.postMessage({ type: NET_CHAT, text: event.text }, "*"); }
           }
           if (xp.size) setDrops(list => [...list.filter(drop => now - drop.at < 1800), ...[...xp].map(([skill, amount]) => ({ id: ++dropId, skill, amount, at: now }))]);

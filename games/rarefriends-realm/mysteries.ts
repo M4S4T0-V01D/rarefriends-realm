@@ -89,6 +89,22 @@ export const DISCOVERIES: Record<string, Discovery> = Object.fromEntries(([
   { id: "god_smoke", name: "The Smoke That Remembers", kind: "being", xp: 260,
     observed: "At the Zuri tents, a brazier of blue resin whose smoke goes straight up in any wind.",
     learned: "The Blue Smoke people's god: what's gone, kept as smoke is kept, by those who know which way it went." },
+  // The Hidden Road (hiddenroad.ts): the Mizukai Isles' own Mysteries.
+  { id: "hr_mist", name: "The standing mist", kind: "phenomenon", xp: 320,
+    observed: "Above Kumoyama, a column of mist as tall as a cedar stands still in the wind. Inside it, the mountain is quiet.",
+    learned: "Something very large lies under Mount Kumo, asleep, and breathes out here.", uncertain: "Whether the shrine was built where it is because of the mist, or the mist came because of the shrine." },
+  { id: "hr_foxfire", name: "The foxfire road", kind: "phenomenon", xp: 320,
+    observed: "At the edge of Morishima's wood, pale flames hang in the air and go out when looked at. Looked at sideways, they stay.",
+    learned: "The flames are a road, going further into the wood than the island is wide.", uncertain: "Who walks it, and whether the foxes made it or only use it." },
+  { id: "hr_stone", name: "The stone with no echo", kind: "phenomenon", xp: 320,
+    observed: "On Iwaoka's slope, a split boulder gives nothing back: not a voice, not the wind, not the end of a call.",
+    learned: "The stone keeps what's said to it. Every word called into it is still there.", uncertain: "What happens if it fills up." },
+  { id: "crow_mask", name: "The crow masks", kind: "being", xp: 360,
+    observed: "Under a crow-masked hermit's mask, nobody: the wind going through.",
+    learned: "The hermits walked the Hidden Road and put on masks to see further. The masks kept the seeing and left them the crow.", uncertain: "How many walkers are still up there, and whether they know." },
+  { id: "hidden_road", name: "The road under the road", kind: "rite", xp: 500,
+    observed: "Ascetic Kōdō burned a crow mask on a fire of pine needles, and far up the slope a person's voice said something, surprised.",
+    learned: "The Hidden Road is a practice, not a faith: going, looking, coming back, and helping someone else come back.", uncertain: "Whether Kharaveth's Orashai walk the same road under another name, as Kōdō thinks." },
 ] as Discovery[]).map(d => [d.id, d]));
 
 /** Azhurak's glyphs met so far (each one's look, and what it means once understood). */

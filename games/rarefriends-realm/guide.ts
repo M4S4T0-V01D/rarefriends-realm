@@ -8,6 +8,7 @@ import {
 } from "./data.ts";
 import { ESSENCES, HERBS, MIXTURES, POTIONS } from "./apothecary.ts";
 import { NPCS } from "./content.ts";
+import { TECHNIQUES } from "./techniques.ts";
 import { AMULETS, STALLS, amuletRecipe, carvingRecipes, arrowRecipe, boltRecipe, craftingRecipes, crossbowRecipe, spinningRecipes, stringingRecipe, fletchingRecipes, headlessRecipe, smeltingRecipes, smithingRecipes } from "./engine.ts";
 import type { Recipe } from "./state.ts";
 import { ORDERS, ORDER_TIERS, orderOf, type OrderId } from "./knights.ts";
@@ -144,6 +145,9 @@ export function skillGuide(skill: Skill): GuideEntry[] {
       add(1, "Azhurak glyphs", "Kharaveth's oldest letters. First you know a glyph by sight, then by meaning: from a picture cut beside it, from someone who knows, or from working it out.");
       add(1, "Inscriptions", "An inscription can be read once every glyph in it is understood. Inscribed sherds from the Underway teach glyphs you haven't seen.", "azhurak_sherd");
       add(1, "The Sunteeth", "A breathing crack in a blind canyon, the road beneath it, the counterweight that still works: Kharaveth's north holds the first of them.");
+      add(1, "The Hidden Road", "The Mizukai Isles' own Mysteries: Ascetic Kōdō on Iwaoka teaches them, after The Silent Climb. The standing mist, the foxfire, the stone with no echo.");
+      // The techniques, in the Combat options tab (techniques.ts).
+      for (const technique of TECHNIQUES) add(technique.level, technique.name, `${technique.description}${technique.tradition === "orashai" ? " (The Orashai Mysteries)" : technique.tradition === "mizukai" ? " (The Hidden Road)" : ""}`);
       break;
     case "presence":
       add(1, "Presence", "The mark you leave on the world. Earned by discovering regions, finishing quests, felling bosses, rare finds, people met, rumours heard, work orders filled, your Friend, your name and the clothes you're seen in. The slowest skill in the Realm.");

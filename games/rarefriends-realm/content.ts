@@ -17,6 +17,7 @@ import { MIZUKAI_NPCS, MIZUKAI_QUESTS, onMizukaiAltar, onMizukaiKill, mizukaiSho
 import { KHARAVETH_NPCS, KHARAVETH_QUESTS, onKharavethKill, talkKharaveth } from "./kharaveth.ts";
 import { HEARTLAND_NPCS, HEARTLAND_QUESTS, onHeartlandsKill, talkHeartlands } from "./dynasties.ts";
 import { ORASHAI_NPCS, ORASHAI_QUESTS, onOrashaiKill, talkOrashai } from "./orashaiquests.ts";
+import { HIDDEN_ROAD_NPCS, HIDDEN_ROAD_QUESTS, onHiddenRoadKill, talkHiddenRoad } from "./hiddenroad.ts";
 import { BAR_NPCS, BAR_QUEST_DEFS, jobBoard, onBountyKill, talkBar } from "./bars.ts";
 /** A bar's job board (bars.ts), for the engine (which reaches the bars through here, so they load after this module). */
 export const readJobBoard = (game: Game, barId: string) => jobBoard(game, barId);
@@ -64,6 +65,7 @@ export const NPCS: Record<string, NpcDef> = {
   ...KHARAVETH_NPCS,
   ...HEARTLAND_NPCS,
   ...ORASHAI_NPCS,
+  ...HIDDEN_ROAD_NPCS,
   ...BAR_NPCS,
   mender: { id: "mender", name: "Mender Hale", examine: "The chapel's mender. Her hands are always clean and her apron never is.", options: ["Talk-to", "Trade"], shop: "mender", art: art(3, 318) },
   // The wider world's villages (2026-10). Each village's people wear its own clothes (NPC_WEAR / regionalLook in render.ts).
@@ -473,6 +475,7 @@ export const QUESTS: readonly QuestDef[] = [
   ...KHARAVETH_QUESTS,
   ...HEARTLAND_QUESTS,
   ...ORASHAI_QUESTS,
+  ...HIDDEN_ROAD_QUESTS,
   ...BAR_QUEST_DEFS,
   // ---------- The quests of being known: long ones, for Presence, with gear only they give ----------
   {
@@ -514,7 +517,7 @@ export const QUESTS: readonly QuestDef[] = [
   },
 ];
 export const questPoints = (game: Game) => QUESTS.reduce((sum, quest) => sum + (stage(game, quest.id) >= finalStage(quest.id) ? quest.points : 0), 0);
-export function finalStage(quest: string) { return quest === "orashai_mysteries" ? 6 : quest === "matriarchs_seal" ? 5 : quest === "hollow_whispers" || quest === "quarry_woke" || quest === "god_behind_bag" ? 4 : quest === "hollow_king" || quest === "greyhorn_light" || quest === "rope_and_brush" || quest === "first_flush" || quest === "foothold_in_the_stone" || quest === "salt_and_smoke" ? 3 : 2; }
+export function finalStage(quest: string) { return quest === "orashai_mysteries" ? 6 : quest === "matriarchs_seal" ? 5 : quest === "hollow_whispers" || quest === "quarry_woke" || quest === "god_behind_bag" ? 4 : quest === "hollow_king" || quest === "greyhorn_light" || quest === "rope_and_brush" || quest === "first_flush" || quest === "foothold_in_the_stone" || quest === "salt_and_smoke" || quest === "hidden_road" ? 3 : 2; }
 /** Bones to offer at the Dawnhold chapel for the Dawn Vigil. */
 const VIGIL_BONES = 8;
 /** The Pilgrim's Road: the old altars to pray at ([quest flag, altar name, where it is]). */
@@ -548,7 +551,7 @@ export function chat(npc: string, lines: DialogueLine[], options?: Dialogue["opt
 /** Pickpocket and quest hooks the engine calls. */
 export function onMonsterKilled(game: Game, monsterId: string, x: number, y: number) {
   const player = game.player;
-  onWestKill(game, monsterId); onMizukaiKill(game, monsterId); onKharavethKill(game, monsterId); onHeartlandsKill(game, monsterId); onOrashaiKill(game, monsterId); onBountyKill(game, monsterId);
+  onWestKill(game, monsterId); onMizukaiKill(game, monsterId); onKharavethKill(game, monsterId); onHeartlandsKill(game, monsterId); onOrashaiKill(game, monsterId); onHiddenRoadKill(game, monsterId); onBountyKill(game, monsterId);
   // The wider world's village quests count their kills wherever they fall.
   const tally = (quest: string, key: string, goal: number, done: string) => {
     if (stage(game, quest) !== 1) return;
@@ -757,6 +760,7 @@ function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
   const mizukai = talkMizukai(game, npcId, name); if (mizukai) return mizukai;
   const kharaveth = talkKharaveth(game, npcId, name); if (kharaveth) return kharaveth;
   const orashai = talkOrashai(game, npcId, name); if (orashai) return orashai;
+  const road = talkHiddenRoad(game, npcId, name); if (road) return road;
   const heartlands = talkHeartlands(game, npcId, name); if (heartlands) return heartlands;
   switch (npcId) {
     case "slayer_master:assignment": case "slayer_master": {

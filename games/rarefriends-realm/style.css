@@ -140,6 +140,14 @@
 .realm-styles button, .realm-prayers button, .realm-spells button { display: grid; gap: 1px; text-align: left; padding: 5px 7px; border: 1.5px solid #000; background: var(--panel-2); color: #e8e5de; border-radius: 3px; }
 .realm-styles button small, .realm-prayers button small, .realm-spells button small { color: #a8a39c; font-size: 10px; }
 .realm-styles button[aria-pressed="true"], .realm-prayers button[aria-pressed="true"], .realm-spells button[aria-pressed="true"] { background: #5b4a3b; border-color: var(--gold); color: var(--gold); }
+/* Mysteries techniques, under the combat styles: a thin rule of each one's colour down the left. */
+.realm-techniques { margin-top: 10px; border-top: 1px solid #000; padding-top: 6px; }
+.realm-techniques h4 { display: flex; align-items: center; gap: 5px; margin: 0 0 5px; font-size: 12px; color: var(--gold); }
+.realm-technique-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.realm-technique { display: grid; gap: 1px; text-align: left; padding: 4px 6px 4px 8px; border: 1.5px solid #000; border-left: 3px solid var(--technique); background: var(--panel-2); color: #e8e5de; border-radius: 3px; font-size: 11px; line-height: 1.15; }
+.realm-technique small { color: #a8a39c; font-size: 10px; }
+.realm-technique:disabled { opacity: 0.45; cursor: default; }
+.realm-technique[aria-pressed="true"] { background: #5b4a3b; border-color: var(--gold); border-left-color: var(--technique); color: var(--gold); }
 /* Spellbook and prayer book: icon grids with a paper info card underneath. */
 .realm-icon-grid { display: grid; gap: 4px; }
 .realm-icon-grid.spells { grid-template-columns: repeat(6, 1fr); gap: 3px; }

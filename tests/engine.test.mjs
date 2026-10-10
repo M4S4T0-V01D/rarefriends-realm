@@ -603,7 +603,7 @@ test("A Friend's Feast from start to finish", () => {
   assert.equal(g.player.quests.friends_feast, 2);
   assert.equal(questPoints(g), 1);
   assert(level(g, "cooking") >= 10, "Quest XP");
-  assert.equal(QUESTS.length, 77); assert.equal(MAX_QUEST_POINTS, 140);
+  assert.equal(QUESTS.length, 78); assert.equal(MAX_QUEST_POINTS, 142);
 });
 
 test("Grumblin Trouble counts kills and pays out", () => {
@@ -1949,7 +1949,7 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   assert.equal(p.quests.dawn_against_hollow, 2); assert(has(p, "dawnplate_cuirass"));
   assert.equal(count(p, "hollow_essence"), 0);
   assert.equal(capeProblem(g, "dawnplate_cuirass"), null, "the armoury sells Dawnplate once earned");
-  assert.equal(QUESTS.length, 77); assert.equal(MAX_QUEST_POINTS, 140);
+  assert.equal(QUESTS.length, 78); assert.equal(MAX_QUEST_POINTS, 142);
 });
 
 test("Boots and gauntlets in every metal, smithed at the anvil; the clothier's shirts, dresses, trousers and skirts", () => {
@@ -3141,4 +3141,93 @@ test("The Orashai Mysteries (five thresholds) and The God Behind the Bag", async
   assert.equal(p.quests[B], 1); clue("shrine_smoke", "Pay-respects"); assert.equal(p.quests[B], 2);
   clue("bag_ring", "Read"); assert.equal(p.quests[B], 3); assert("the_asked_god" in p.mysteries.found);
   say("bag_man", "It isn't a glyph"); assert.equal(p.quests[B], 4); assert(has(p, "fish_bag"));
+});
+
+test("Mysteries techniques: learnt by level and tradition, each with its targets, one preparation at a time, on cooldowns", async () => {
+  const T = await import("../games/rarefriends-realm/techniques.ts");
+  const { learn } = await import("../games/rarefriends-realm/pursuance.ts");
+  const g = newGame(), p = g.player;
+  const foe = id => { const m = g.monsters.find(x => x.def.id === id && !x.dead); assert(m, id); m.target = true; p.combat = m.uid; teleport(g, m.x + 1, m.y); return m; };
+  const later = () => { g.tick += 200; p.preparation = null; };
+  const none = { accuracy: 1, damage: 1, sure: false };
+  // Locked by Mysteries level, and by the tradition that teaches it.
+  assert.match(T.techniqueLocked(g, T.TECHNIQUE.stillness), /Mysteries level of 5/);
+  p.xp.mysteries = XP_TABLE[40];
+  assert.equal(T.techniqueLocked(g, T.TECHNIQUE.stillness), null);
+  assert.match(T.techniqueLocked(g, T.TECHNIQUE.measured_counter), /Orashai Mysteries/);
+  assert.match(T.techniqueLocked(g, T.TECHNIQUE.mist_step), /Hidden Road/);
+  assert.equal(T.useTechnique(g, "stillness"), false, "nothing to be still before");
+  // Stillness: two beats still, then one truer, harder blow; moving breaks it; a cooldown after.
+  const wolf = foe("wolf");
+  assert(T.useTechnique(g, "stillness")); assert.equal(T.useTechnique(g, "stillness"), false, "on its cooldown");
+  assert.deepEqual(T.techniqueStrike(g, wolf, true), none, "not yet: two beats first");
+  g.tick += 2; assert.deepEqual(T.techniqueStrike(g, wolf, true), { accuracy: 1.2, damage: 1.2, sure: false }); assert.equal(p.preparation, null, "used up by the blow");
+  later(); assert(T.useTechnique(g, "stillness")); teleport(g, wolf.x - 1, wolf.y); g.tick += 2;
+  assert.deepEqual(T.techniqueStrike(g, wolf, true), none, "moving broke it");
+  // Marked Edge: only once Pursuance knows the weakness, and only against that creature.
+  later(); assert.equal(T.useTechnique(g, "marked_edge"), false);
+  learn(g, "wolf", "weakness", true); assert(T.useTechnique(g, "marked_edge"));
+  assert(T.techniqueStrike(g, wolf, true).damage > 1);
+  assert.deepEqual(T.techniqueStrike(g, g.monsters.find(m => m.def.id === "grumblin"), true), none, "not against another");
+  // Pattern Break: only something that mends or rages; then it neither mends nor rages.
+  later(); assert.equal(T.useTechnique(g, "pattern_break"), false, "a wolf keeps no pattern");
+  const captain = foe("rrr_captain"); assert(T.useTechnique(g, "pattern_break")); assert(T.patternBroken(g, captain));
+  // The Orashai's two and the Hidden Road's three come with their quests.
+  p.quests.orashai_mysteries = 6; p.quests.hidden_road = 3;
+  // The Weigher's Counter: halves the next melee blow from its creature and answers it with the same weight; it replaces
+  // any other preparation (never two at once).
+  later(); foe("wolf"); assert(T.useTechnique(g, "marked_edge")); assert(T.useTechnique(g, "measured_counter"));
+  assert.equal(p.preparation.id, "measured_counter", "one preparation at a time");
+  assert.deepEqual(T.techniqueGuard(g, wolf, 10, { melee: true, breath: false }), { hit: 5, counter: 10, noVenom: false, noDrain: false });
+  assert.equal(p.preparation, null, "spent");
+  // The Gate-Mother's Ward: only against fire, spells, venom or a draining touch; stops venom.
+  later(); for (const m of g.monsters) m.target = false;
+  assert.equal(T.useTechnique(g, "threshold_ward"), false, "nothing here it keeps out");
+  const spider = foe("cave_spider"); assert(T.useTechnique(g, "threshold_ward"));
+  assert(T.techniqueGuard(g, spider, 6, { melee: true, breath: false }).noVenom);
+  assert.equal(T.techniqueGuard(g, spider, 10, { melee: false, breath: true }).hit, 5, "fire at half");
+  // Severing Cut: spirits only; a sure, heavier blow.
+  later(); foe("wolf"); assert.equal(T.useTechnique(g, "severing_cut"), false);
+  const wraith = foe("grudge_wraith"); assert(T.useTechnique(g, "severing_cut"));
+  assert.deepEqual(T.techniqueStrike(g, wraith, true), { accuracy: 1, damage: 1.5, sure: true });
+  // The Mountain's Shout: what's in reach loses three beats (a great one only one).
+  later(); const shouted = foe("wolf"); shouted.attackTimer = 0; assert(T.useTechnique(g, "mountain_shout")); assert.equal(shouted.attackTimer, 3);
+  // Mist Step: whatever's after you loses you, but not a great one.
+  later(); foe("wolf"); assert(T.useTechnique(g, "mist_step")); assert(!g.monsters.some(m => m.target)); assert.equal(p.combat, null);
+  later(); foe("hollow_king"); assert.equal(T.useTechnique(g, "mist_step"), false);
+  // In a real fight: with the counter set, the wolf's blow is halved and answered (the engine's tick).
+  const g2 = newGame(), p2 = g2.player; p2.xp.mysteries = XP_TABLE[40]; p2.quests.orashai_mysteries = 6;
+  for (const skill of ["attack", "strength", "defence", "hitpoints"]) p2.xp[skill] = 13_034_431; p2.hp = 99;
+  const w2 = g2.monsters.find(m => m.def.id === "wolf"); for (const m of g2.monsters) if (m !== w2) { m.dead = true; m.respawnAt = Infinity; }
+  teleport(g2, w2.x + 1, w2.y); w2.target = true; p2.combat = w2.uid; g2.autoRetaliate = false;
+  let answered = false;
+  for (let i = 0; i < 400 && !answered; i++) {
+    w2.dead = false; w2.hp = w2.def.hp; w2.target = true; w2.attackTimer = 0; p2.attackTimer = 99; p2.hp = 99; p2.techniqueReady = {};
+    T.useTechnique(g2, "measured_counter"); const before = w2.hp; tick(g2);
+    if (w2.hp < before) answered = true;
+  }
+  assert(answered, "the counter answers a landed blow");
+});
+
+test("The Hidden Road: the Isles' own Mysteries, from Ascetic Kōdō on Iwaoka", async () => {
+  const { useClue } = await import("../games/rarefriends-realm/kharaveth.ts");
+  const g = newGame(), world = g.world, p = g.player, Q = "hidden_road";
+  const pickOpt = (d, label) => { const o = d.options.find(x => x.label.startsWith(label)); assert(o, label); d.onEnd?.(); return o.then(); };
+  const say = (id, ...labels) => { let d = talk(g, id); for (const label of labels) d = pickOpt(d, label); d?.onEnd?.(); return d; };
+  const clue = id => { const object = world.objects.find(o => o.clue === id); assert(object, id); return useClue(g, object, "Look"); };
+  assert(g.npcs.some(npc => npc.id === "iwa_kodo"), "Kōdō is on Iwaoka");
+  for (const id of ["hr_mist", "hr_foxfire", "hr_stone"]) assert(world.objects.find(o => o.clue === id).x >= 1160, `${id} is on the Isles`);
+  assert.equal(talk(g, "iwa_kodo").options?.length ?? 0, 0, "not before The Silent Climb");
+  p.quests.silent_climb = 2;
+  say("iwa_kodo", "Teach me the Hidden Road."); assert.equal(p.quests[Q], 1);
+  clue("hr_mist"); clue("hr_foxfire"); say("iwa_kodo"); assert.equal(p.quests[Q], 1, "all three first");
+  clue("hr_stone"); assert(["hr_mist", "hr_foxfire", "hr_stone"].every(id => id in p.mysteries.found));
+  say("iwa_kodo"); assert.equal(p.quests[Q], 2);
+  onMonsterKilled(g, "crow_hermit", 0, 0); assert(has(p, "hermits_crow_mask"));
+  const before = p.xp.mysteries;
+  say("iwa_kodo"); assert.equal(p.quests[Q], 3); assert(!has(p, "hermits_crow_mask"));
+  assert(p.xp.mysteries - before >= 4000); assert("hidden_road" in p.mysteries.found);
+  const { techniqueLocked, TECHNIQUE } = await import("../games/rarefriends-realm/techniques.ts");
+  p.xp.mysteries = XP_TABLE[40];
+  for (const id of ["mist_step", "severing_cut", "mountain_shout"]) assert.equal(techniqueLocked(g, TECHNIQUE[id]), null, id);
 });

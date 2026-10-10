@@ -295,6 +295,21 @@ export function buildMizukaiTowns(ctx: GenContext, t: Tools, isle: Isle, places:
     t.road([[1606, 116], [1618, 116], [1626, 110], [1632, 104], [cx, cy + 6]], 2, T.GRAVEL);
     sign(cx - 2, cy + 6, "Iwaoka", "IWAOKA. The monastery of the silent climb. Speak at the gate, if you must; nowhere else.");
   }
+  // The Hidden Road (hiddenroad.ts): Ascetic Kōdō where the road starts to climb, and the three places the road walks to.
+  {
+    npcAt("iwa_kodo", 1620, 114);
+    const place = (x: number, y: number, kind: DecorKind, name: string, clue: string) => { const [px, py] = nearFree(x, y, 6); add({ kind: "decor", decor: kind, x: px, y: py, blocks: true, name, clue }); return [px, py] as const; };
+    /** More of the same round it (not blocking, no clue): the mist's body, the foxfire's road, the stone's other half. */
+    const around = (x: number, y: number, kind: DecorKind, name: string, offsets: readonly (readonly [number, number])[]) => {
+      for (const [dx, dy] of offsets) if (!occupied(x + dx, y + dy) && WALKABLE(get(x + dx, y + dy))) decor(x + dx, y + dy, kind, false, name);
+    };
+    const [mx, my] = place(1450, 196, "steam", "A standing mist", "hr_mist");
+    around(mx, my, "steam", "A standing mist", [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, 1]]);
+    const [fx, fy] = place(1600, 402, "torch", "Foxfire", "hr_foxfire");
+    around(fx, fy, "torch", "Foxfire", [[-2, -1], [-4, -1], [-6, -2], [-8, -2]]);
+    const [sx, sy] = place(1656, 96, "boulder", "A split stone", "hr_stone");
+    around(sx, sy, "boulder", "A split stone", [[1, 0]]);
+  }
   // Josaki: the ruin of the Josaki clan's fortress, still held by those who will not leave.
   {
     const cx = 1630, cy = 272;

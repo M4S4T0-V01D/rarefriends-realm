@@ -19,7 +19,7 @@ import { CARDS, CARD_KINDS, CARD_KIND_NAMES, cardFound, cardsFound, orderOpen, t
 import { decorArt } from "./scenery.ts";
 import { HIGH_QUALITY, LOW_QUALITY, type Quality } from "./render.ts";
 import { LANGUAGES } from "./i18n.ts";
-import { setTradition, traditionOf } from "./state.ts";
+import { TICK_MS, level, setTradition, traditionOf } from "./state.ts";
 import { routesFrom, DOCK_TEXT } from "./boats.ts";
 import { FEEDBACK_KINDS, FEEDBACK_MAX, feedbackPost, type FeedbackKind } from "./feedback.ts";
 import { friendSays, remember } from "./friend.ts";
@@ -44,6 +44,7 @@ import type { NetState } from "./net.ts";
 import type { TradeView } from "./trade.ts";
 import { recipeBook, skillGuide } from "./guide.ts";
 import { MysteriesJournal } from "./mysteriesui.tsx";
+import { TECHNIQUES, cooldownLeft, preparation, techniqueLocked, useTechnique, type TechniqueId } from "./techniques.ts";
 import { artUrl, emoteArt, itemArt, orbArt, prayerArt, skillArt, spellArt, tabArt, type TabIcon } from "./icons.ts";
 import { creatureSprite, friendSprite } from "./sprites.ts";
 import { figureArt } from "./wardrobe.ts";
@@ -212,7 +213,30 @@ function CombatTab({ game, refresh, openMenu }: PanelProps) {
       </div>
       {player.autocast && <p className="realm-note">Autocasting {SPELLS.find(spell => spell.id === player.autocast)?.name}. Choose it again in Magic to stop.</p>}
       <label className="realm-check"><input type="checkbox" checked={game.autoRetaliate} onChange={event => { game.autoRetaliate = event.target.checked; refresh(); }} /> Auto retaliate</label>
+      <Techniques game={game} refresh={refresh} openMenu={openMenu} />
     </div>
+  );
+}
+/** Mysteries techniques (techniques.ts): preparations any fighter can learn, under the combat styles. */
+function Techniques({ game, refresh, openMenu }: Pick<PanelProps, "game" | "refresh" | "openMenu">) {
+  const active = preparation(game);
+  const use = (id: TechniqueId) => { useTechnique(game, id); refresh(); };
+  return (
+    <section className="realm-techniques" aria-label="Mysteries techniques">
+      <h4><PixelIcon art={skillArt("mysteries")} size={16} /> Mysteries techniques</h4>
+      <div className="realm-technique-grid">
+        {TECHNIQUES.map(technique => {
+          const locked = techniqueLocked(game, technique), wait = cooldownLeft(game, technique.id);
+          const status = locked ? (technique.tradition === "common" || level(game, "mysteries") < technique.level ? `Lv ${technique.level}` : technique.tradition === "orashai" ? "Orashai" : "Hidden Road")
+            : active?.id === technique.id ? "Ready…" : wait ? `${Math.ceil(wait * TICK_MS / 1000)}s` : `Lv ${technique.level}`;
+          const tip = `${technique.description}${locked ? ` ${locked}` : ""}`;
+          return <button key={technique.id} type="button" className={`realm-technique ${technique.tradition}`} disabled={!!locked} aria-pressed={active?.id === technique.id} title={tip} aria-label={technique.name}
+            style={{ "--technique": technique.color } as CSSProperties} onClick={() => use(technique.id)}
+            {...rightClick(openMenu, () => [{ verb: "Use", noun: technique.name, run: () => use(technique.id) }, { verb: "Check", noun: technique.name, run: () => message(game, tip) }])}>
+            <b>{technique.name}</b><small>{status}</small></button>;
+        })}
+      </div>
+    </section>
   );
 }
 function SkillsTab({ game, openMenu, openGuide }: PanelProps) {
