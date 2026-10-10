@@ -128,6 +128,8 @@ try {
   await a.until(async () => (await a.rendering()).mode === "normal", "Normal again at the plain address", 15_000);
 
   // ---------- No WebGL on this device: told so, stays on Normal ----------
+  // (The first browser is done: closed, so its title screen isn't drawing alongside the second on a small machine.)
+  await a.page.context().close();
   const b = await open("no-WebGL browser", { noWebgl: true });
   await b.enter();
   await b.begin();
