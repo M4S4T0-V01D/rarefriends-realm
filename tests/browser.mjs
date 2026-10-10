@@ -223,9 +223,18 @@ try {
     if (spot) await teleport(spot.x, spot.y);
     const open = spot && { x: spot.x + 7, y: spot.y, from: spot };
     if (open) {
-      const target = await screenOf(open.x, open.y);
-      await page.mouse.move(target.x, target.y); await page.mouse.down();
-      await page.waitForTimeout(1500);
+      // (Only a press on open ground starts a hold: if someone wandered under the pointer just then, it was a click on
+      // them, so let go and press again.)
+      let holding = false, presses = 0;
+      for (let attempt = 0; attempt < 4 && !holding; attempt++) {
+        presses++;
+        if (attempt) { await page.mouse.up(); await teleport(spot.x, spot.y); await page.waitForTimeout(400); }
+        const target = await screenOf(open.x, open.y);
+        await page.mouse.move(target.x, target.y); await page.mouse.down();
+        await page.waitForTimeout(1500);
+        holding = await state(() => !!window.__realm.game().held);
+      }
+      assert(holding, "pressing on open ground and holding walks by the pointer");
       const mid = await state(() => ({ x: window.__realm.game().player.x, y: window.__realm.game().player.y }));
       assert(mid.x - open.from.x >= 2 && Math.abs(mid.y - open.from.y) <= 1, `holding the button walks towards the pointer (${mid.x - open.from.x}, ${mid.y - open.from.y})`);
       const back = await screenOf(mid.x - 6, open.from.y);
@@ -238,13 +247,14 @@ try {
         peak = Math.max(peak, turnedBack.x);
         if (turnedBack.x < peak) break;
       }
-      assert(turnedBack.x < peak, `moving the pointer steers the walk (${turnedBack.x - peak})`);
+      const why = turnedBack.x < peak ? "" : await state(() => { const g = window.__realm.game(), p = g.player; return JSON.stringify({ held: g.held, path: p.path.length, at: [p.x, p.y], camera: window.__realm.camera(), stunned: p.stunned }); });
+      assert(turnedBack.x < peak, `moving the pointer steers the walk (${turnedBack.x - peak}; spot ${JSON.stringify(spot)}, pressed ${presses}×, pointer ${JSON.stringify(back)}, ${why})`);
       await page.mouse.up(); await page.waitForTimeout(700);
       const after = await state(() => ({ x: window.__realm.game().player.x, y: window.__realm.game().player.y }));
       await page.waitForTimeout(1200);
       const still = await state(() => ({ x: window.__realm.game().player.x, y: window.__realm.game().player.y }));
       assert(still.x === after.x && still.y === after.y, "letting go stops the walk");
-      console.log(`hold to walk: ${mid.x - open.from.x} tiles towards the pointer, steered back ${peak - turnedBack.x}, stopped on release`);
+      console.log(`hold to walk: ${mid.x - open.from.x} tiles towards the pointer, steered back ${peak - turnedBack.x}, stopped on release (pressed ${presses}×)`);
       await teleport(start.x, start.y);
     } else console.log("hold to walk: no open ground near the start, skipped");
   }
