@@ -29,6 +29,7 @@ import { SOLDIERLY, SOLDIERS, TWIN_BASE, hostile, sideOf } from "./skirmish.ts";
 import { examineCreature, inspectTrack, knows, learn, learnTrick, masteryBoost, maxHpOf, onAttacked, onKilled, onPoison, onWeakSpot, rollMarked, trackTick } from "./pursuance.ts";
 import { cleanMysteries, studySherd } from "./mysteries.ts";
 import { clueExamine, clueOptions, onKharavethTick, useClue } from "./kharaveth.ts";
+import { studySeal } from "./dynasties.ts";
 import {
   BANK_SIZE, BANK_TABS, DAY_MS, SATCHEL, SATCHEL_SIZE, STONE_BOX, STONE_BOX_SIZE, BONE_BAG, BONE_BAG_SIZE, bagAdd, bagBones, bagTakeAll, hasBoneBag, SIGIL_BAG, BELTS, beltAdd, beltContents, beltDef, wornBelt, SIGIL_BAG_SIZE, hasSigilBag, isSigil, sigilBagAdd, sigilBagTotal, sigilStock, useSigils, setPieces, wayfarerPieces, fullSlayerSet, heartguardPieces, mixtureOn, compactBankTabs, hasSatchel, hasStoneBox, stock, useUp, INVENTORY_SIZE, REFERRAL_COINS, REFERRALS_PER_DAY, REFERRAL_TICKS, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
   level, maxHp, maxPrayer, message, prayerBoost, riding, sound, take, weapon, combatLevel, createGame,
@@ -322,6 +323,7 @@ export function itemOptions(game: Game, slotIndex: number): ItemOption[] {
   if (slot.id === "glimmer_shard") out.push({ verb: "Look-at", run: g => message(g, "The shard hums. Old Glimmer will want it back.") });
   // An inscribed sherd from Kharaveth: study it for a glyph you haven't seen (Mysteries); the sherd crumbles either way.
   if (slot.id === "azhurak_sherd") out.push({ verb: "Study", run: g => { take(g.player, "azhurak_sherd", 1); message(g, studySherd(g), "info"); } });
+  if (slot.id === "khasreth_seal") out.push({ verb: "Study", run: g => message(g, studySeal(g), "info") });
   if (definition.tablet) out.push({ verb: "Break", run: g => breakTablet(g, slotIndex) });
   if (slot.id === "insight_lamp") out.push({ verb: "Rub", run: g => { g.ui.lamp = slotIndex; } });
   if (slot.id === "ringmasters_signet") out.push({ verb: "Teleport", run: signetTeleport });

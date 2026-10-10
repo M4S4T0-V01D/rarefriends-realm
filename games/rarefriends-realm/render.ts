@@ -19,7 +19,7 @@ import type { Strike, Weather } from "./weather.ts";
 import { emoteMotion, emoteParticles, type Motion } from "./emotes.ts";
 import { drawPixels, pixelArt, shadeHex } from "./pixel.ts";
 import { CARVINGS, CARVING_REACH } from "./data.ts";
-import { TEX_PER_HEIGHT, TEX_PER_TILE, beginTextures, groundTexture, textureStats, shingleTexture, texturedQuad, texturedTriangle, wallTexture, PANE, type GroundStyle, type WallStyle } from "./textures.ts";
+import { TEX_PER_HEIGHT, TEX_PER_TILE, beginTextures, groundTexture, textureStats, shingleTexture, stoneCourseTexture, texturedQuad, texturedTriangle, wallTexture, PANE, type GroundStyle, type WallStyle } from "./textures.ts";
 import { campfireLogs, decorArt, fireArt, rockArt, treeArt , herbArt } from "./scenery.ts";
 import { beginSprites, recordSprites, noteSprite, replaySprites, stampSprites, sendSprites, sinkSprite, type SpriteDraw } from "./pixel.ts";
 import { spellArt } from "./spellart.ts";
@@ -322,7 +322,7 @@ function captureBox(ctx: CanvasRenderingContext2D, camera: Camera, x: number, y:
   const lid = pattern === "cap" && top.startsWith("#") ? gl.wallLayers.layer(wallTexture("cap", top, variant)) : -1;
   const ink = !stroke ? 0 : stroke === INK ? 1 : (rgbaOf(stroke)[3] ?? 1);
   // In the light of the thing it belongs to; a lit window's glass glows in the shader.
-  const glow = pattern === "window_lit" ? 1 : pattern === "timber_window_lit" || pattern === "mizukai_window_lit" ? 2 : 0;
+  const glow = pattern === "window_lit" || pattern === "sandstone_window_lit" || pattern === "mudbrick_window_lit" ? 1 : pattern === "timber_window_lit" || pattern === "mizukai_window_lit" ? 2 : 0;
   gl.addBox(rx, ry, w, d, rlift, h, face(left), face(right), lid, rgbOf(top), rgbOf(left), rgbOf(right), ink, spriteState.light, spriteState.clear, glow);
   spriteState.sent = true;
   punch(ctx, boxHull(camera, x, y, w, d, h, lift));
@@ -537,8 +537,8 @@ function box(ctx: CanvasRenderingContext2D, camera: Camera, x: number, y: number
       const o = q(ax, ay, lift + h), across = q(bx, by, lift + h), down = q(ax, ay, lift);
       texturedQuad(ctx, wallTexture(pattern, fill, variant), o, across, down, length * TEX_PER_TILE, h * TEX_PER_HEIGHT);
       // A window lit from inside: where its glass landed on screen, so the light pass can let it shine.
-      if (!bare && (pattern === "window_lit" || pattern === "timber_window_lit" || pattern === "mizukai_window_lit")) {
-        const cols = Math.max(1, Math.round(length * TEX_PER_TILE)), rows = Math.max(1, Math.min(24, Math.round(h * TEX_PER_HEIGHT))), top = PANE.top(pattern !== "window_lit");
+      if (!bare && pattern.endsWith("window_lit")) {
+        const cols = Math.max(1, Math.round(length * TEX_PER_TILE)), rows = Math.max(1, Math.min(24, Math.round(h * TEX_PER_HEIGHT))), top = PANE.top(pattern === "timber_window_lit" || pattern === "mizukai_window_lit");
         const at = (u: number, v: number): [number, number] => [o.x + (across.x - o.x) * u / cols + (down.x - o.x) * v / rows, o.y + (across.y - o.y) * u / cols + (down.y - o.y) * v / rows];
         if (rows >= top + PANE.h) emitted.push([at(PANE.x0, top), at(PANE.x0 + PANE.w, top), at(PANE.x0 + PANE.w, top + PANE.h), at(PANE.x0, top + PANE.h)]);
       }
@@ -1849,7 +1849,9 @@ function drawIcon(ctx: CanvasRenderingContext2D, icon: Icon, x: number, y: numbe
 /** A soft sky haze over the far distance (visible when the camera looks low across the land). */
 
 // ---------- Buildings ----------
-const WALL_H = 42;
+const WALL_H = 42, PLINTH_H = 12;
+/** How high a building's roof reaches (for its shadow and its draw order). */
+const roofTop = (building: Building) => building.pyramid ? roofGeometry(building).top : (building.storeys ?? 1) * WALL_H + (building.tall ?? 0) + (building.roof === "flat" ? 0 : 26) + (building.spire ?? 0) * 0.35;
 /** Floors inside buildings (a wall face onto one of these, under a roof, can't be seen). */
 const INDOOR_FLOORS = new Set<number>([T.WOOD, T.STONE, T.CARPET]);
 const roofAlpha = new Map<number, number>();
@@ -1932,9 +1934,10 @@ type RoofVertex = [number, number, number];
 /** The roof's corners (with an overhang) and its ridge, in world coordinates and height. */
 function roofGeometry(building: Building) {
   // (A Mizukai roof reaches further out over its walls, and climbs steeper.)
-  const mizukai = building.style === "mizukai", o = mizukai ? 0.62 : 0.3, X0 = building.x0 - 0.5 - o, X1 = building.x1 + 0.5 + o, Y0 = building.y0 - 0.5 - o, Y1 = building.y1 + 0.5 + o;
-  const alongX = X1 - X0 >= Y1 - Y0, half = (alongX ? Y1 - Y0 : X1 - X0) / 2, rise = building.roof === "cone" ? building.spire ?? 118 : Math.max(20, Math.min(mizukai ? 60 : 48, half * (mizukai ? 13 : 11)));
-  const base = WALL_H * (building.storeys ?? 1) + (building.tall ?? 0), top = base + rise, mid = alongX ? (Y0 + Y1) / 2 : (X0 + X1) / 2;
+  // (A pyramid's faces start from its plinth, close in over it, and climb to a point at about fifty degrees.)
+  const mizukai = building.style === "mizukai", o = building.pyramid ? 0.1 : mizukai ? 0.62 : 0.3, X0 = building.x0 - 0.5 - o, X1 = building.x1 + 0.5 + o, Y0 = building.y0 - 0.5 - o, Y1 = building.y1 + 0.5 + o;
+  const alongX = X1 - X0 >= Y1 - Y0, half = (alongX ? Y1 - Y0 : X1 - X0) / 2, rise = building.pyramid ? half * (building.unfinished ? 24 : 38) : building.roof === "cone" ? building.spire ?? 118 : Math.max(20, Math.min(mizukai ? 60 : 48, half * (mizukai ? 13 : 11)));
+  const base = building.pyramid ? PLINTH_H : WALL_H * (building.storeys ?? 1) + (building.tall ?? 0), top = base + rise, mid = alongX ? (Y0 + Y1) / 2 : (X0 + X1) / 2;
   const A: RoofVertex = [X0, Y0, base], B: RoofVertex = [X1, Y0, base], C: RoofVertex = [X1, Y1, base], D: RoofVertex = [X0, Y1, base];
   // A hipped roof's ridge stops short of the ends by half the span (a square one comes to a point).
   const inset = building.hip ? Math.min(half, (alongX ? X1 - X0 : Y1 - Y0) / 2) : 0;
@@ -1952,6 +1955,11 @@ function rotateLit(camera: Camera, e0: RoofVertex, r0: RoofVertex) {
 const rampartAt = (world: World, x: number, y: number) => {
   for (const r of world.ramparts ?? []) if (x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1 && (x === r.x0 || x === r.x1 || y === r.y0 || y === r.y1)) return r.storeys;
   return 0;
+};
+/** What a rampart's wall at a tile is built of. */
+const rampartWalls = (world: World, x: number, y: number): Building["walls"] => {
+  for (const r of world.ramparts ?? []) if (x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1 && (x === r.x0 || x === r.x1 || y === r.y0 || y === r.y1)) return r.walls ?? "stone";
+  return "stone";
 };
 /**
  * A gilded dome on a drum (a hall of state): a hemisphere of `radius` tiles standing at `base`, in facets (ribbed, lit
@@ -2142,6 +2150,19 @@ function flatRoofTile(ctx: CanvasRenderingContext2D, camera: Camera, building: B
   if (edge && (x + y) % 2 === 0) box(ctx, camera, x, y, 0.6, 0.6, 8, shadeHex(color, 0.14), shadeHex(color, -0.04), shadeHex(color, -0.12), base + 9, INK, "brick");
   ctx.globalAlpha = 1;
 }
+/** A pyramid's capstone: a little pyramid of gilded electrum on the point (an unfinished one has a bare, flat top). */
+function pyramidCap(ctx: CanvasRenderingContext2D, camera: Camera, building: Building, g: ReturnType<typeof roofGeometry>) {
+  if (building.unfinished) {
+    // Left unfinished: the last course half laid, a few blocks of it waiting on the platform.
+    const [cx, cy] = [g.apex[0], g.apex[1]], stone = "#c9a878";
+    for (const [dx, dy, s] of [[-0.6, -0.4, 1.3], [0.7, 0.2, 1.1], [-0.2, 0.8, 0.9]] as const) box(ctx, camera, cx + dx, cy + dy, s, s * 0.8, 9, shadeHex(stone, 0.08), shadeHex(stone, -0.04), shadeHex(stone, -0.14), g.top - 8, INK, "sandstone");
+    return;
+  }
+  const P = ([x, y, h]: RoofVertex) => { const s = toScreen(camera, x, y, h); return [s.x, s.y] as const; }, r = 0.55, foot = g.top - r * 38;
+  const [cx, cy] = [g.apex[0], g.apex[1]], ring: RoofVertex[] = [[cx - r, cy - r, foot], [cx + r, cy - r, foot], [cx + r, cy + r, foot], [cx - r, cy + r, foot]];
+  const faces = ring.map((a, i) => { const b = ring[(i + 1) % 4], { rx, ry } = rotate(camera, a[1] - b[1], b[0] - a[0]); return { points: [a, b, g.apex], lit: rx - ry < 0, d: depthOf(camera, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2) }; });
+  for (const face of faces.sort((a, b) => a.d - b.d)) poly(ctx, face.points.map(P), face.lit ? "#f2d27a" : "#c9a24a", INK, 1.1);
+}
 function drawRoof(ctx: CanvasRenderingContext2D, camera: Camera, building: Building, alpha: number, now: number, reduced: boolean) {
   // (On the GPU, a whole roof's boxes, its chimney, a keep's storeys, go there too.)
   capturing = roofGL && ctx === roofLayer && alpha >= 0.98 ? roofGL : null;
@@ -2190,6 +2211,8 @@ function drawRoofParts(ctx: CanvasRenderingContext2D, camera: Camera, building: 
     ctx.globalAlpha = 1;
     return;
   }
+  // A pyramid's faces are dressed stone in courses; every other roof is shingled.
+  const slopeTexture = building.pyramid ? stoneCourseTexture : shingleTexture, slopeGPU = (fill: string) => building.pyramid ? stoneCourseTexture(fill, 20, 24) : roofShingles(fill);
   const color = building.color, gable = building.walls === "stone" ? "#b9b4ab" : building.walls === "marble" ? "#eee8db" : "#e6dcc6";
   // The ends: gable walls, or on a hipped roof more slopes of shingle.
   const endA = building.hip ? shadeHex(color, 0.02) : gable, endB = building.hip ? shadeHex(color, -0.1) : shade(gable, -0.08);
@@ -2221,11 +2244,12 @@ function drawRoofParts(ctx: CanvasRenderingContext2D, camera: Camera, building: 
   if (roofGL && ctx === roofLayer) {
     // On the GPU: every face at once (its depth sorts them), shingled, the ends shingled or walled; then the chimney.
     for (const face of faces) {
-      if (face.slope) { const [e0, e1, , r0] = face.slope, fill = shadeHex(color, rotateLit(camera, e0, r0) ? 0.06 : -0.08); gpuSlope(ctx, camera, face.points, roofShingles(fill), fill, alpha, e0, e1, slopeRows, g.top, g.base); }
-      else if (building.hip) gpuSlope(ctx, camera, face.points, roofShingles(face.fill), face.fill, alpha, face.points[0], face.points[1], slopeRows, g.top, g.base);
+      if (face.slope) { const [e0, e1, , r0] = face.slope, fill = shadeHex(color, rotateLit(camera, e0, r0) ? 0.06 : -0.08); gpuSlope(ctx, camera, face.points, slopeGPU(fill), fill, alpha, e0, e1, slopeRows, g.top, g.base); }
+      else if (building.hip) gpuSlope(ctx, camera, face.points, slopeGPU(face.fill), face.fill, alpha, face.points[0], face.points[1], slopeRows, g.top, g.base);
       else { const fill = face.fill.startsWith("#") ? face.fill : gable; gpuSlope(ctx, camera, face.points, wallTexture(building.walls === "stone" ? "brick" : building.walls === "plank" ? "plank" : "timber", fill), fill, alpha, face.points[0], face.points[1], (g.top - g.base) * TEX_PER_HEIGHT, g.top, g.base); }
     }
     slopesDrawn = 2; ridgeDrawn = true; chimney();
+    if (building.pyramid) pyramidCap(ctx, camera, building, g);
     mizukaiTrim(ctx, camera, building, g);
     ctx.globalAlpha = 1;
     return;
@@ -2235,7 +2259,7 @@ function drawRoofParts(ctx: CanvasRenderingContext2D, camera: Camera, building: 
     if (!texturesOn) { poly(ctx, face.points.map(P), face.fill, INK, 1.2); if (face.chimney) chimney(); continue; }
     if (face.slope) {
       // Shingles run along the ridge, from the ridge down to the eave.
-      const [e0, e1, r1, r0] = face.slope, shingles = shingleTexture(shadeHex(color, rotateLit(camera, e0, r0) ? 0.06 : -0.08), Math.round(span * TEX_PER_TILE), Math.round(slopeRows));
+      const [e0, e1, r1, r0] = face.slope, shingles = slopeTexture(shadeHex(color, rotateLit(camera, e0, r0) ? 0.06 : -0.08), Math.round(span * TEX_PER_TILE), Math.round(slopeRows));
       if (!building.hip) texturedQuad(ctx, shingles, at(r0), at(r1), at(e0), span * TEX_PER_TILE, slopeRows);
       else {
         // Hipped: the slope narrows to the ridge, so lay the shingles over the whole eave's width and clip to the slope.
@@ -2248,7 +2272,7 @@ function drawRoofParts(ctx: CanvasRenderingContext2D, camera: Camera, building: 
     } else if (building.hip) {
       // A hipped end: shingles, from its eave up to the ridge's end.
       const [a, b, c] = face.points.map(at), endSpan = Math.hypot(face.points[1][0] - face.points[0][0], face.points[1][1] - face.points[0][1]);
-      texturedTriangle(ctx, shingleTexture(face.fill, Math.round(endSpan * TEX_PER_TILE), Math.round(slopeRows)), a, b, c, endSpan * TEX_PER_TILE, slopeRows);
+      texturedTriangle(ctx, slopeTexture(face.fill, Math.round(endSpan * TEX_PER_TILE), Math.round(slopeRows)), a, b, c, endSpan * TEX_PER_TILE, slopeRows);
     } else {
       const [a, b, c] = face.points.map(at);
       texturedTriangle(ctx, wallTexture(building.walls === "stone" ? "brick" : building.walls === "plank" ? "plank" : "timber", face.fill.startsWith("#") ? face.fill : gable), a, b, c, across * TEX_PER_TILE, (g.top - g.base) * TEX_PER_HEIGHT);
@@ -2256,7 +2280,8 @@ function drawRoofParts(ctx: CanvasRenderingContext2D, camera: Camera, building: 
     poly(ctx, face.points.map(P), null, INK, 1.2);
     if (face.chimney) chimney();
   }
-  ridge();
+  if (!building.pyramid) ridge();
+  else pyramidCap(ctx, camera, building, g);
   mizukaiTrim(ctx, camera, building, g);
   ctx.globalAlpha = 1;
 }
@@ -2441,8 +2466,10 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   // Hover highlight and click marker.
   const tileOutline = (tx: number, ty: number, color: string) => { const c = (dx: number, dy: number) => { const s = toScreen(camera, tx + dx, ty + dy); return [s.x, s.y] as const; }; poly(ctx, [c(-0.5, -0.5), c(0.5, -0.5), c(0.5, 0.5), c(-0.5, 0.5)], null, color, 1.5); };
   /** A wall tile: storeys of brick (with windows on buildings), cut low when it stands between you and the camera inside. */
-  const wall = (x: number, y: number, storeys: number, cut: boolean, near: boolean, windows: boolean, battlement = false, style: Building["walls"] = "stone", tall = 0, joined?: (nx: number, ny: number) => boolean, crown = false) => {
+  const wall = (x: number, y: number, storeys: number, cut: boolean, near: boolean, windows: boolean, battlement = false, style: Building["walls"] = "stone", tall = 0, joined?: (nx: number, ny: number) => boolean, crown = false, plinth = false) => {
     if (crown) tall += 17;
+    // A pyramid stands on a low plinth of dressed stone (its faces are its roof).
+    if (plinth) { storeys = 0; tall = PLINTH_H; windows = false; }
     const d = depth(x, y), dungeon = isUnderground(y), timber = style === "timber";
     // Under a roof you can see, a wall's inward faces can't be seen: skip them (they're half the work).
     const owner = !dungeon && inBounds(x, y) ? world.buildingAt[y * W + x] : 0, roofed = owner > 0 && (roofAlpha.get(owner - 1) ?? 0) > 0.95 && !cut;
@@ -2455,10 +2482,12 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       capturing = glr && !near && ctx === target ? glr : null;
       ctx.globalAlpha = near ? 0.3 : 1;
       const mizukai = style === "mizukai", shrine = style === "lacquer";
-      const [top, left, right] = dungeon ? ["#4a4950", "#3a3940", "#2f2e35"] : timber ? ["#8a6a50", "#e6dcc6", "#cfc4ab"] : mizukai ? ["#3d2e26", "#efe9dc", "#d9d1c0"] : shrine ? ["#5a2a22", "#efe6d6", "#d9cfbc"] : style === "plank" ? ["#8a6a50", "#b89c7e", "#9c8266"] : style === "marble" ? ["#eee8db", "#e0d8c7", "#cbc2af"] : ["#b9b4ab", "#a39e95", "#8f8a82"];
-      const plain: WallStyle = dungeon ? "dungeon" : timber ? "timber" : mizukai ? "mizukai" : shrine ? "lacquer" : style === "plank" ? "plank" : "brick";
+      const sand = style === "sandstone", mud = style === "mudbrick";
+      const [top, left, right] = dungeon ? ["#4a4950", "#3a3940", "#2f2e35"] : timber ? ["#8a6a50", "#e6dcc6", "#cfc4ab"] : mizukai ? ["#3d2e26", "#efe9dc", "#d9d1c0"] : shrine ? ["#5a2a22", "#efe6d6", "#d9cfbc"] : style === "plank" ? ["#8a6a50", "#b89c7e", "#9c8266"] : style === "marble" ? ["#eee8db", "#e0d8c7", "#cbc2af"]
+        : sand ? ["#d9b98a", "#d4a874", "#b98c5c"] : mud ? ["#d8c4a0", "#cdb48c", "#b39a74"] : ["#b9b4ab", "#a39e95", "#8f8a82"];
+      const plain: WallStyle = dungeon ? "dungeon" : timber ? "timber" : mizukai ? "mizukai" : shrine ? "lacquer" : style === "plank" ? "plank" : sand ? "sandstone" : mud ? "mudbrick" : "brick";
       // At night most windows glow with the lamps inside (a Mizukai window is a paper lattice; a shrine's walls have none).
-      const glazed = (k: number): WallStyle => shrine ? "lacquer" : mizukai ? (windowGlow > 0.02 && hash(x * 5 + 3, y + k * 11) < 0.8 ? "mizukai_window_lit" : "mizukai_window") : windowGlow > 0.02 && hash(x * 5 + 3, y + k * 11) < 0.8 ? (timber ? "timber_window_lit" : "window_lit") : timber ? "timber_window" : "window";
+      const glazed = (k: number): WallStyle => sand || mud ? (windowGlow > 0.02 && hash(x * 5 + 3, y + k * 11) < 0.8 ? (sand ? "sandstone_window_lit" : "mudbrick_window_lit") : sand ? "sandstone_window" : "mudbrick_window") : shrine ? "lacquer" : mizukai ? (windowGlow > 0.02 && hash(x * 5 + 3, y + k * 11) < 0.8 ? "mizukai_window_lit" : "mizukai_window") : windowGlow > 0.02 && hash(x * 5 + 3, y + k * 11) < 0.8 ? (timber ? "timber_window_lit" : "window_lit") : timber ? "timber_window" : "window";
       if (dungeon) box(ctx, camera, x, y, 1, 1, 34, top, left, right, 0, INK, "dungeon");
       else if (cut) box(ctx, camera, x, y, 1, 1, 9, top, left, right, 0, INK, plain);
       else if (battlement) { box(ctx, camera, x, y, 1, 1, 12, top, left, right, 0, INK, "brick"); if ((Math.round(x) + Math.round(y)) % 2 === 0) box(ctx, camera, x, y, 0.62, 0.62, 10, top, left, right, 12, INK, "brick"); }
@@ -2572,7 +2601,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       // Tall buildings show every storey from outside; inside, only the storey you're on (and the ones below).
       // A city's rampart stands storeys high, battlemented, wherever no building owns the wall.
       const rampart = building || mine ? 0 : rampartAt(world, x, y);
-      wall(x, y, mine ? 1 : building?.storeys ?? (rampart || 1), cut, near, !!owner && !cut, false, building?.walls ?? "stone", mine ? 0 : building?.tall ?? 0, joined, rampart > 0);
+      wall(x, y, mine ? 1 : building?.storeys ?? (rampart || 1), cut, near, !!owner && !cut, false, building?.walls ?? (rampart > 0 ? rampartWalls(world, x, y) : "stone"), mine ? 0 : building?.tall ?? 0, joined, rampart > 0, !!building?.pyramid && !mine);
       // Walls not under a roof cast their own shadows (a building's are cast whole).
       if (!building || building.roof === "none") blockers.push([x, y, (building?.storeys ?? (rampart || 1)) * WALL_H]);
     } else if (y < FLOOR_Y && !isUnderground(y) && world.buildingAt[y * W + x] && (world.buildings[world.buildingAt[y * W + x] - 1].storeys ?? 1) > 1 && edgeOf(world.buildings[world.buildingAt[y * W + x] - 1], x, y)
@@ -3121,7 +3150,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       };
       for (const building of world.buildings) {
         if (building.roof === "none" || building.x1 < x0 - 12 || building.x0 > x1 + 12 || building.y1 < y0 - 12 || building.y0 > y1 + 12) continue;
-        shadowBox(building.x0 - 0.5, building.y0 - 0.5, building.x1 + 0.5, building.y1 + 0.5, (building.storeys ?? 1) * WALL_H + (building.tall ?? 0) + (building.roof === "flat" ? 0 : 26) + (building.spire ?? 0) * 0.35);
+        shadowBox(building.x0 - 0.5, building.y0 - 0.5, building.x1 + 0.5, building.y1 + 0.5, roofTop(building));
         if (building.keep) { const kx = (building.x0 + building.x1) / 2, ky = (building.y0 + building.y1) / 2, kh = building.keep.size / 2; shadowBox(kx - kh, ky - kh, kx + kh, ky + kh, (building.storeys ?? 1) * WALL_H + (building.spire ?? 0) + building.keep.storeys * WALL_H + building.keep.spire * 0.35); }
       }
       for (const [bx, by, height] of blockers) shadowBox(bx - 0.5, by - 0.5, bx + 0.5, by + 0.5, height);
@@ -3191,7 +3220,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       };
       if (!underground) for (const building of world.buildings) {
         if (building.roof === "none" || building.x1 < x0 - 12 || building.x0 > x1 + 12 || building.y1 < y0 - 12 || building.y0 > y1 + 12) continue;
-        shadowBox(building.x0 - 0.5, building.y0 - 0.5, building.x1 + 0.5, building.y1 + 0.5, (building.storeys ?? 1) * WALL_H + (building.tall ?? 0) + (building.roof === "flat" ? 0 : 26) + (building.spire ?? 0) * 0.35);
+        shadowBox(building.x0 - 0.5, building.y0 - 0.5, building.x1 + 0.5, building.y1 + 0.5, roofTop(building));
         // A palace's keep and spire throw their own, longer shadow.
         if (building.keep) { const kx = (building.x0 + building.x1) / 2, ky = (building.y0 + building.y1) / 2, kh = building.keep.size / 2; shadowBox(kx - kh, ky - kh, kx + kh, ky + kh, (building.storeys ?? 1) * WALL_H + (building.spire ?? 0) + building.keep.storeys * WALL_H + building.keep.spire * 0.35); }
       }
@@ -3626,6 +3655,18 @@ const NPC_WEAR: Record<string, readonly string[]> = {
   fh_sergeant: ["blackiron_helm", "blackiron_cuirass", "hollowmere_cape", "blackiron_battleaxe"], fh_soldier: ["blackiron_helm", "foothold_cloak", "blackiron_battleaxe"],
   fh_rook_lost: ["blackiron_cuirass", "hollowmere_cape"], fh_rook: ["blackiron_cuirass", "hollowmere_cape"],
   fh_ibbu_lost: ["steppe_headwrap", "steppe_robe", "steppe_sash"], fh_ibbu: ["steppe_headwrap", "steppe_robe", "steppe_sash"],
+  // Kharaveth's heartlands: the Gilded Court in white and gold, the Obsidian Legacy in black and lapis, the Copper Banner in copper and indigo, the nomads in their own.
+  sefrah_vizier: ["gilded_headcloth", "gilded_robe", "gilded_mantle"], sefrah_seleneh: ["gilded_headcloth", "gilded_robe", "gilded_pleats", "gilded_mantle", "gilded_sandals"],
+  sefrah_priestess: ["gilded_robe", "gilded_sandals", "zuri_shawl"], sefrah_merchant: ["gilded_robe", "steppe_sash"], sefrah_clothier: ["gilded_headcloth", "gilded_robe"],
+  sefrah_innkeeper: ["gilded_pleats", "steppe_robe"], sefrah_smith: ["gilded_pleats", "hammer"], tomb_keeper: ["gilded_robe", "gilded_sandals"],
+  sefrah_guard: ["gilded_headcloth", "gilded_pleats", "gilded_mantle", "blackiron_sabre"],
+  tamesh_meretkhet: ["obsidian_headcloth", "mason_tunic", "obsidian_kilt", "lapis_mantle"], tamesh_mason: ["obsidian_headcloth", "mason_tunic", "obsidian_kilt", "hammer"],
+  tamesh_quarrymaster: ["obsidian_headcloth", "mason_tunic", "quarry_sandals", "blackiron_pickaxe"], tamesh_clothier: ["obsidian_headcloth", "mason_tunic", "obsidian_kilt"],
+  tamesh_stonecutter: ["mason_tunic", "obsidian_kilt", "pewter_pickaxe"],
+  khetmar_ardesh: ["banner_coif", "banner_coat", "banner_trousers", "banner_cloak", "banner_boots"], khetmar_captain: ["blackiron_helm", "banner_coat", "banner_trousers", "banner_cloak", "blackiron_sabre"],
+  khetmar_outfitter: ["banner_coif", "banner_coat", "banner_trousers"], khetmar_soldier: ["blackiron_helm", "banner_coat", "banner_trousers", "banner_boots", "blackiron_sabre"],
+  zuri_asmeh: ["blue_smoke_turban", "zuri_robe", "zuri_shawl"], zuri_trader: ["blue_smoke_turban", "zuri_robe", "zuri_trousers"], zuri_ibbu: ["steppe_headwrap", "zuri_robe", "steppe_sash"],
+  ouresh_halzir: ["salt_turban", "salt_coat", "salt_trousers", "salt_boots", "steppe_sash"], ouresh_trader: ["salt_turban", "salt_coat", "salt_trousers"],
   hollowmere_officer: ["moonsilver_helm", "moonsilver_cuirass", "hollowmere_cape", "moonsilver_greatsword"], hollowmere_soldier: ["blackiron_helm", "blackiron_cuirass", "hollowmere_cape", "blackiron_battleaxe"], hollowmere_lieutenant: ["ashsteel_helm", "ashsteel_cuirass", "hollowmere_cape", "ashsteel_greatsword"],
   lawgate_governor: ["royal_circlet", "rarian_tabard", "rarian_mantle", "law_book"], lawgate_innkeeper: ["rarian_veil", "rarian_tabard"], raria_innkeeper: ["rarian_veil", "rarian_tabard", "rarian_skirts"],
   vesper_abbess: ["dusk_paladin_helm", "dusk_paladin_body", "dusk_cape", "dusk_lantern"], ranger_warden: ["ranger_royal_hood", "ranger_royal_coat", "ranger_royal_leggings", "rangers_longbow"],

@@ -12,6 +12,8 @@
  */
 import { DUNGEON_Y, OVERWORLD_H, T, W, isWater, type DecorKind, type Floor, type GenContext, type RegionId, type World, type WorldObject, type worldTools } from "./world.ts";
 
+import { ASHAR, SPINE, buildHeartlands } from "./heartlands.ts";
+
 type Tools = ReturnType<typeof worldTools>;
 
 /** Kharaveth's bounds (the coast wanders inside them). */
@@ -87,7 +89,6 @@ export function buildSouth(ctx: GenContext, t: Tools, places: World["places"], f
   // east, bare stone pavements (the hamada), sandstone mesas, the Ochre Spine winding south-west to north-east, the
   // Black Range in the south-east, and the Sunteeth's broken foothills round the maze.
   const big = makeNoise(5105, 70), mid = makeNoise(5106, 26), warp = makeNoise(5107, 40);
-  const SPINE: readonly (readonly [number, number])[] = [[300, 800], [380, 770], [450, 735], [520, 718], [590, 690], [650, 664], [700, 650]];
   const toSpine = (x: number, y: number) => {
     const wx = x + (warp(x, y) - 0.5) * 50, wy = y + (warp(y + 500, x) - 0.5) * 30;
     let best = Infinity;
@@ -116,7 +117,7 @@ export function buildSouth(ctx: GenContext, t: Tools, places: World["places"], f
     else if (md > 0.76 && m > 0.6) put(x, y, T.CLIFF);                              // a mesa's cliffs
   }
   // The Ashar, the one river: out of the Black Range's foothills, north-west across the steppe, into the strait. Green along it.
-  const river: [number, number][] = [[860, 742], [820, 716], [770, 690], [742, 650], [748, 608], [770, 570], [786, 540]];
+  const river = ASHAR;
   for (let i = 0; i + 1 < river.length; i++) {
     const [ax, ay] = river[i], [bx, by] = river[i + 1], steps = Math.ceil(Math.hypot(bx - ax, by - ay) * 2);
     for (let s = 0; s <= steps; s++) {
@@ -367,11 +368,7 @@ export function buildSouth(ctx: GenContext, t: Tools, places: World["places"], f
   // A cache the sentinel guards.
   put2(U.x0 + 148, uy0 + 48, "chest", "Azhurak coffer");
 
-  // ---------- 5. The steppe beyond the camp: its creatures, until the cities are mapped ----------
-  for (let k = 0; k < 40; k++) {
-    const x = 160 + Math.floor(random() * 880), y = 640 + Math.floor(random() * 220);
-    if (!land(x, y) || !open(get(x, y))) continue;
-    monsterAt(k % 4 === 0 ? "sand_scorpion" : k % 4 === 1 ? "dune_jackal" : k % 4 === 2 ? "glasswing_vulture" : "dune_jackal", x, y, 4);
-  }
+  // ---------- 5. Beyond the camp: the heartlands (heartlands.ts) ----------
+  buildHeartlands(ctx, t, places, { land, random, nearFree, occupied, open, npcAt, monsterAt, put2, clue });
   void ([] as RegionId[]); void isWater;
 }

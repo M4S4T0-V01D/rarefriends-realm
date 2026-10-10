@@ -10,7 +10,8 @@ export type TrackId = RegionId | "theme" | "boss"
   // The Mizukai Isles' own pieces (What Rises in the East).
   | "mizukai_sunrise" | "mizukai_harbour" | "mizukai_village" | "mizukai_shrine" | "mizukai_forest" | "mizukai_sea" | "mizukai_haunted" | "mizukai_battle" | "mizukai_spirit" | "mizukai_castle"
   // Kharaveth's (The Land Before Stone).
-  | "kharaveth_sunteeth" | "kharaveth_foothold" | "kharaveth_underway" | "kharaveth_steppe";
+  | "kharaveth_sunteeth" | "kharaveth_foothold" | "kharaveth_underway" | "kharaveth_steppe"
+  | "kharaveth_sefrah" | "kharaveth_tamesh" | "kharaveth_khetmar" | "kharaveth_dunes" | "kharaveth_azhurak";
 export type SfxName = SoundName | "slash" | "stab" | "crush" | "punch" | "step_grass" | "step_stone" | "step_wood" | "step_sand" | "step_snow" | "step_swamp"
   | "crackle" | "forge" | "water" | "bird" | "gull" | "frog" | "wind" | "drip" | "rain" | "thunder" | "pop" | "hoof" | "whinny" | "rare" | "duel";
 type VoiceKind = "cluck" | "moo" | "squeak" | "grumble" | "growl" | "rattle" | "gurgle" | "whisper" | "clank" | "rumble" | "roar" | "king";
@@ -575,9 +576,52 @@ const KHARAVETH_PIECES: readonly MizukaiPiece[] = [
     },
     hits: () => everyBar(16, 4, (b0, bar) => [...strokes("dum:0.5 dum:1 tek:0.5 dum:1 tek:1", b0, 0.62), ...strokes("riq:0.5p riq:0.5 riq:0.5p riq:0.5 riq:0.5p riq:0.5 riq:0.5p riq:0.5", b0, 0.4),
       ...(bar >= 8 ? strokes("r:1 clap:1 r:1 clap:1", b0, 0.5) : []), ...(bar % 8 === 0 ? strokes("zill:0.5", b0, 0.55) : [])]) },
+  // Sefrah, the Gilded City: the qanun's stately tune, the ney taking it up high, the oud walking underneath, maqsum and riq.
+  { id: "kharaveth_sefrah", name: "Sefrah, the Gilded City", bpm: 96, beats: 64, tonic: 60, scale: RAST,
+    notes: () => {
+      const qanun = phrase(`C5:1 D5:1 E5:1 F5:1 | G5:2 E5:1 D5:1 | C5:1 Bb4:1 A4:1 G4:1 | A4:3 r:1 | F4:1 G4:1 A4:1 Bb4:1 | C5:2 D5:1 C5:1 | Bb4:1 A4:1 G4:1 F4:1 | G4:4`, "qanun", 0, 0.76);
+      const ney = phrase(`G5:3v F5:1 | E5:2 D5:2~ | C5:1 D5:1 E5:1 F5:1 | G5:4+ | A5:2v G5:1 F5:1 | E5:2 D5:2 | C5:1 Bb4:1 A4:1 Bb4:1 | C5:4+`, "ney", 32, 0.72);
+      const oud = Array.from({ length: 16 }, (_, bar) => phrase("C3:1 r:0.5 G2:0.5 C3:0.5 D3:0.5 E3:0.5 D3:0.5", "oud", bar * 4, bar % 4 === 0 ? 0.66 : 0.56)).flat();
+      return [...qanun, ...ney, ...hetero(ney, "qanun", -12, 0.5, 0.42, note => note.length >= 1.9), ...oud];
+    },
+    hits: () => everyBar(16, 4, (b0, bar) => [...strokes("dum:0.5 tek:1 tek:0.5 dum:1 tek:1", b0, 0.58), ...strokes("riq:0.5p riq:0.5 riq:0.5p riq:0.5 riq:0.5p riq:0.5 riq:0.5p riq:0.5", b0, 0.38),
+      ...(bar % 4 === 0 ? strokes("zill:0.5 r:3.5", b0, 0.5) : [])]) },
+  // Tamesh: the rebab's slow lament over a drone, the oud striking low like a mallet, and the chisels' tek between the dum.
+  { id: "kharaveth_tamesh", name: "Tamesh", bpm: 80, beats: 64, tonic: 62, scale: NAHAWAND,
+    notes: () => {
+      const rebab = phrase(`D4:2v E4:1 F4:1 | G4:3 F4:1 | E4:1 F4:1 G4:1 A4:1 | Bb4:4+ | A4:2v G4:1 F4:1 | E4:2 F4:2 | E4:1 D4:1 C#4:1 E4:1 | D4:4+ |
+        A4:2v Bb4:1 A4:1 | G4:2 F4:2 | G4:1 A4:1 Bb4:1 C#5:1 | D5:4+ | C#5:2 Bb4:1 A4:1 | G4:2 F4:2 | E4:1 F4:1 E4:1 C#4:1 | D4:4+`, "rebab", 0, 0.7);
+      const oud = Array.from({ length: 16 }, (_, bar) => phrase("D3:1 D3:0.5 A2:0.5 D3:1 r:1", "oud", bar * 4, 0.6)).flat();
+      return [{ beat: 0, voice: "drone", midi: 38, length: 63.5, velocity: 0.48 }, ...rebab, ...oud];
+    },
+    hits: () => everyBar(16, 4, (b0, bar) => [...strokes("dum:1 r:1 dum:0.5 dum:0.5 tek:1", b0, 0.64), ...strokes("r:0.5 tek:0.5p r:0.5 tek:0.5p r:0.5 tek:0.5p r:0.5 tek:0.5p", b0, 0.34),
+      ...(bar % 4 === 3 ? strokes("r:3 bendir:1", b0, 0.5) : [])]) },
+  // Khetmar: a march in Hijaz, the rebab leading, the ney answering over it, the frame drum and the snare drilling.
+  { id: "kharaveth_khetmar", name: "Khetmar", bpm: 112, beats: 64, tonic: 64, scale: HIJAZ,
+    notes: () => {
+      const rebab = phrase(`E4:1 F4:1 G#4:1 A4:1 | B4:2 A4:1 G#4:1 | A4:1 B4:1 C5:1 D5:1 | E5:4 | D5:1 C5:1 B4:1 A4:1 | G#4:2 A4:2 | F4:1 G#4:1 F4:1 E4:1 | E4:4`, "rebab", 0, 0.74);
+      const ney = phrase(`B4:2v C5:1 B4:1 | A4:2 G#4:2 | A4:1 B4:1 C5:1 B4:1 | A4:4+ | G#4:2 A4:1 G#4:1 | F4:2 E4:2 | F4:1 G#4:1 A4:1 G#4:1 | E4:4+`, "ney", 32, 0.74);
+      return [...rebab, ...hetero(rebab, "ney", 12, 0.5, 0.4, note => note.length >= 1.9), ...ney, ...hetero(ney, "rebab", -12, 0.05, 0.45)];
+    },
+    hits: () => everyBar(16, 4, (b0, bar) => [...strokes("bendir:1 bendir:0.5 bendir:0.5 dum:1 tek:1", b0, 0.62),
+      ...(bar % 4 === 3 ? strokes("r:2 snare:0.5 snare:0.5 snare:1!", b0, 0.58) : strokes("r:1 snare:0.5p r:1.5 snare:1p", b0, 0.32))]) },
+  // The Sea of Dunes: the ney alone over a drone, long silences, the wind; a frame drum now and then, far off.
+  { id: "kharaveth_dunes", name: "The Sea of Dunes", bpm: 70, beats: 64, tonic: 57, scale: KURD,
+    notes: () => [{ beat: 0, voice: "drone", midi: 45, length: 63.5, velocity: 0.46 }, { beat: 32, voice: "drone", midi: 52, length: 31.5, velocity: 0.3 },
+      ...phrase(`r:4 | E4:4v+ | F4:2 E4:1 D4:1 | C4:4~ | r:2 D4:1 E4:1 | F4:3v G4:1 | A4:4+ | r:4 | A4:2v Bb4:1 A4:1 | G4:2 F4:2~ | E4:3 D4:1 | E4:4+ | r:2 C4:1 D4:1 | E4:2 F4:1 E4:1 | D4:2 C4:1 Bb3:1 | A3:4+`, "ney", 0, 0.74)],
+    hits: () => [...strokes("wind:32 wind:32", 0, 0.62), ...everyBar(16, 4, (b0, bar) => bar % 2 ? [] : strokes("bendir:1p r:1 bendir:0.5p r:1.5", b0, 0.42))] },
+  // Azhurak (the old places): the qanun plucked a note at a time over a low drone, water dripping, the wind outside.
+  { id: "kharaveth_azhurak", name: "Azhurak", bpm: 54, beats: 64, tonic: 59, scale: KURD,
+    notes: () => [{ beat: 0, voice: "drone", midi: 35, length: 63.5, velocity: 0.5 }, { beat: 16, voice: "drone", midi: 42, length: 47.5, velocity: 0.28 },
+      ...phrase(`B4:2 r:2 | r:4 | D5:1 C5:1 B4:2 | r:4 | F#4:2 G4:2 | r:4 | A4:1 G4:1 F#4:1 E4:1 | B3:4 | r:4 | C5:2 B4:2 | r:4 | G4:1 A4:1 B4:2 | r:4 | E4:2 D4:2 | C4:2 r:2 | B3:4`, "qanun", 0, 0.62)],
+    hits: () => [...strokes("wind:32 wind:32", 0, 0.45), ...everyBar(16, 4, (b0, bar) => bar % 4 === 0 ? strokes("bendir:1p r:3", b0, 0.42) : []),
+      ...[3.5, 11.25, 19.5, 26.75, 35, 41.5, 50.25, 57.5].map(beat => ({ beat, drum: "drip" as Drum, velocity: 0.48 }))] },
 ];
 /** Which Kharaveth piece plays where. */
-const KHARAVETH_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { sunteeth: "kharaveth_sunteeth", foothold: "kharaveth_foothold", underway: "kharaveth_underway", ochre_steppe: "kharaveth_steppe", sunward_strait: "kharaveth_steppe" };
+const KHARAVETH_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { sunteeth: "kharaveth_sunteeth", foothold: "kharaveth_foothold", underway: "kharaveth_underway", ochre_steppe: "kharaveth_steppe", sunward_strait: "kharaveth_steppe",
+  ashar_valley: "kharaveth_steppe", ochre_spine: "kharaveth_steppe", khetmar_pass: "kharaveth_khetmar", zuri_camp: "kharaveth_steppe", ouresh_camp: "kharaveth_dunes", sea_of_dunes: "kharaveth_dunes",
+  sefrah: "kharaveth_sefrah", tamesh: "kharaveth_tamesh", black_range: "kharaveth_tamesh", khetmar: "kharaveth_khetmar",
+  seven_crowns: "kharaveth_azhurak", first_names: "kharaveth_azhurak", sunken_obelisk: "kharaveth_azhurak", unfinished_pyramid: "kharaveth_azhurak", black_stair: "kharaveth_azhurak" };
 /** Which Mizukai piece plays where. */
 const MIZUKAI_REGION_TRACK: Partial<Record<RegionId, TrackId>> = {
   hinode: "mizukai_sunrise", kurohama: "mizukai_harbour", shiogama: "mizukai_harbour", smugglers_cove: "mizukai_harbour", takamori: "mizukai_castle",

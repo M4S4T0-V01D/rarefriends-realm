@@ -42,6 +42,28 @@ export const DISCOVERIES: Record<string, Discovery> = Object.fromEntries(([
   { id: "first_names_lintel", name: "Stone, eye, name", kind: "inscription", xp: 320,
     observed: "Over the refuge in the Underway: the glyphs for stone, for seeing, and a ring that is only ever drawn round something.",
     uncertain: "The scholar at Foothold has heard the south's people speak of a hall where the first names are kept. She thinks the ring is a name." },
+  // The heartlands (heartlands.ts, dynasties.ts).
+  { id: "seven_crowns", name: "Seven crowns, one name", kind: "site", xp: 420,
+    observed: "West of the dunes, seven standing stones in a ring, each crowned with a glyph, and an eighth fallen in the middle with words on it.",
+    learned: "Seven rulers, or seven peoples, stood round one name older than any of them.", uncertain: "Whose name. The fallen stone says only that it came first." },
+  { id: "first_names_door", name: "The door that sees", kind: "site", xp: 450,
+    observed: "In the Ochre Spine a door is cut in the living rock, an eye over it, two bird-headed scribes worn smooth on either side. It doesn't open.",
+    learned: "This is the Hall of First Names the scholars and the nomads speak of. The door is shut, not locked: something decides who it opens for.", uncertain: "What it wants of you." },
+  { id: "sunken_obelisk", name: "The Sunken Obelisk", kind: "phenomenon", xp: 380,
+    observed: "An obelisk sunk to its chest in the sand of the far south-west, its top half clean of drift as if the wind went round it.",
+    learned: "It isn't sinking. The country is rising round it: it was set up when the ground here was lower, and the glyphs speak of water measured.", uncertain: "Where the water went." },
+  { id: "unfinished_pyramid", name: "The builders' last count", kind: "contradiction", xp: 400,
+    observed: "The Unfinished Pyramid's builders cut a tally on it every day the work went on. The last mark is half a stroke.",
+    learned: "They stopped in the middle of a day, mid-stroke, and never came back. Tamesh says a plague; Sefrah says a war; the nomads say they were told to stop.", uncertain: "Who told them." },
+  { id: "black_stair_wards", name: "The wards of the Black Stair", kind: "rite", xp: 500,
+    observed: "Three ward stones set back in their niches under the Black Range, each cut with an eye and a bar on a point: watching, and measure.",
+    learned: "Azhurak kept the dead below by measure: so many wards for so much stone. Take one away and the measure is wrong, and what was kept walks." },
+  { id: "warden_ring", name: "A face with no name in it", kind: "being", xp: 520,
+    observed: "The Stair Warden's face is the open ring that means a name, cut through, with nothing in it.",
+    learned: "It keeps the dead whose names were taken off them. It falls when the wards hold, and stands again when they don't.", uncertain: "Who took the names, and why." },
+  { id: "three_suns", name: "The three suns", kind: "contradiction", xp: 480,
+    observed: "The Grand Matriarch had House Khasreth's falcon cut off her own seal and glyphs cut in its place; on her sarcophagus, three suns where the falcon should be.",
+    learned: "She meant no single heir to rule. By measure, to the many names: the seal was a council's, not a crown's.", uncertain: "Whether the heirs will keep to it." },
 ] as Discovery[]).map(d => [d.id, d]));
 
 /** Azhurak's glyphs met so far (each one's look, and what it means once understood). */
@@ -58,6 +80,9 @@ export const GLYPHS: readonly Glyph[] = [
   { id: "first", name: "first", looks: "one stroke with a cap on it", meaning: "first, before" },
   { id: "many", name: "many", looks: "three points in a row", meaning: "many" },
   { id: "measure", name: "measure", looks: "a bar balanced on a point", meaning: "measure, what is owed" },
+  { id: "crown", name: "crown", looks: "a bowl with three points standing in it", meaning: "crown, a ruler" },
+  { id: "hand", name: "hand", looks: "an open hand, five strokes", meaning: "hand, giving" },
+  { id: "dust", name: "dust", looks: "a line broken into dots", meaning: "dust, an ending" },
 ];
 export const GLYPH = Object.fromEntries(GLYPHS.map(glyph => [glyph.id, glyph])) as Record<string, Glyph>;
 
@@ -66,6 +91,12 @@ export const INSCRIPTIONS: Record<string, Inscription> = {
   underway_lintel: { id: "underway_lintel", name: "The refuge lintel", glyphs: ["stone", "eye", "name"], reading: "The stone that watches keeps the name.", where: "Over the refuge in the Underway" },
   underway_glyphs: { id: "underway_glyphs", name: "The teaching wall", glyphs: ["sun", "water", "star"], reading: "Sun. Water. Star.", where: "The Underway's shrine hall" },
   underway_marker: { id: "underway_marker", name: "A road marker", glyphs: ["road", "many", "sun", "measure"], reading: "The road: many days, by measure.", where: "Where the Underway turns north" },
+  seven_crowns: { id: "seven_crowns", name: "The fallen stone", glyphs: ["crown", "many", "first", "name"], reading: "Many crowns. One first name.", where: "The middle of the Seven Crowns" },
+  first_names_door: { id: "first_names_door", name: "The sealed door", glyphs: ["first", "name", "door", "eye"], reading: "The first names. The door that sees.", where: "The Hall of First Names, in the Ochre Spine" },
+  sunken_obelisk: { id: "sunken_obelisk", name: "The Sunken Obelisk", glyphs: ["sun", "below", "water", "measure"], reading: "The sun goes below. The water is measured.", where: "The far south-west of the Sea of Dunes" },
+  pyramid_marks: { id: "pyramid_marks", name: "Builders' marks", glyphs: ["stone", "many", "sun", "dust"], reading: "Stone, for many days. Then dust.", where: "The Unfinished Pyramid" },
+  black_stair_lintel: { id: "black_stair_lintel", name: "The warden's lintel", glyphs: ["stone", "eye", "below", "measure"], reading: "The stone watches below, by measure.", where: "The Black Stair" },
+  khasreth_seal: { id: "khasreth_seal", name: "The Matriarch's seal", glyphs: ["measure", "many", "name", "hand"], reading: "By measure, to the many names, given.", where: "The seal of House Khasreth" },
 };
 
 /** A player's Mysteries record: discoveries (the tick each was made), glyphs (1 seen, 2 understood), inscriptions read. */
@@ -125,7 +156,7 @@ export function readInscription(game: Game, id: string): string {
 
 /** Study an inscribed sherd: one glyph on it you haven't seen, or nothing new. */
 export function studySherd(game: Game): string {
-  const unseen = GLYPHS.filter(glyph => !game.player.mysteries.glyphs[glyph.id] && glyph.id !== "measure");
+  const unseen = GLYPHS.filter(glyph => !game.player.mysteries.glyphs[glyph.id] && glyph.id !== "measure" && glyph.id !== "hand");
   if (!unseen.length) return "The sherd's glyphs are ones you know by sight already.";
   const glyph = unseen[Math.floor(game.rng() * unseen.length)];
   learnGlyph(game, glyph.id, false);

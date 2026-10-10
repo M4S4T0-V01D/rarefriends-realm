@@ -11,7 +11,9 @@ export const TEX_PER_TILE = 16;
 export const TEX_PER_HEIGHT = 0.5;
 export type WallStyle = "brick" | "window" | "timber" | "timber_window" | "window_lit" | "timber_window_lit" | "plank" | "cap" | "dungeon"
   // The Mizukai Isles: white plaster between dark posts over a dark board skirt, with paper-latticed windows; and a shrine's vermilion.
-  | "mizukai" | "mizukai_window" | "mizukai_window_lit" | "lacquer";
+  | "mizukai" | "mizukai_window" | "mizukai_window_lit" | "lacquer"
+  // Kharaveth: dressed sandstone ashlar with a carved lintel over each window; and plastered mudbrick with a latticed window.
+  | "sandstone" | "sandstone_window" | "sandstone_window_lit" | "mudbrick" | "mudbrick_window" | "mudbrick_window_lit";
 /** Where a window's glass sits on a 16-wide wall texture (x0, width) and, per wall kind, its top row and height. */
 export const PANE = { x0: 5, w: 6, h: 7, top: (timber: boolean) => timber ? 3 : 5 };
 const BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
@@ -22,6 +24,7 @@ export function wallTexture(style: WallStyle, color: string, variant = 0): HTMLC
   return pixelArt(`wall:${style}:${color}:${variant}`, TEX_PER_TILE, 24, p => {
     const W = TEX_PER_TILE, H = 24, mortar = shadeHex(color, -0.2), light = shadeHex(color, 0.07), dark = shadeHex(color, -0.08);
     if (style === "mizukai" || style === "mizukai_window" || style === "mizukai_window_lit" || style === "lacquer") { mizukaiWall(p, style, color, variant); return; }
+    if (style.startsWith("sandstone") || style.startsWith("mudbrick")) { desertWall(p, style, color, variant); return; }
     const lit = style === "window_lit" || style === "timber_window_lit", glazed = lit || style === "window" || style === "timber_window";
     const timberish = style === "timber" || style === "timber_window" || style === "timber_window_lit";
     if (style === "brick" || style === "window" || style === "window_lit" || style === "dungeon" || style === "cap") {
@@ -89,6 +92,50 @@ function mizukaiWall(p: Pixels, style: WallStyle, color: string, variant: number
     for (let x = x0 + 2; x < x0 + w; x += 2) p.line(x, y0, x, y0 + h - 1, lit ? "#8a5a30" : "#6f5d4c");
     for (let y = y0 + 2; y < y0 + h; y += 3) p.line(x0, y, x0 + w - 1, y, lit ? "#8a5a30" : "#6f5d4c");
   }
+}
+/**
+ * Kharaveth's walls. Sandstone: big blocks in courses of 6, long and short, joints barely there, each block its own warm
+ * tone; a window is a dark slot under a carved lintel. Mudbrick: smooth plaster, a little lumpy, the ends of palm beams
+ * sticking out under the top; a window is a lattice of turned wood (lit, it glows through the holes).
+ */
+function desertWall(p: Pixels, style: WallStyle, color: string, variant: number) {
+  const W = TEX_PER_TILE, H = 24, sand = style.startsWith("sandstone");
+  p.rect(0, 0, W, H, color);
+  if (sand) {
+    for (let row = 0; row < 4; row++) {
+      const y = row * 6, step = row % 2 ? 9 : 6;
+      for (let x = -(row % 2 ? 3 : 0); x < W; x += step) {
+        const tone = shadeHex(color, (noise(x + 7, row, variant) - 0.5) * 0.08);
+        p.rect(Math.max(0, x), y, Math.min(step - 1, W - Math.max(0, x)), 5, tone); p.rect(Math.max(0, x), y, Math.min(step - 1, W - Math.max(0, x)), 1, shadeHex(tone, 0.06));
+      }
+      p.rect(0, y + 5, W, 1, shadeHex(color, -0.14));
+    }
+  } else {
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (BAYER[y & 3][x & 3] < 2 && noise(x, y, variant + 5) > 0.55) p.set(x, y, shadeHex(color, noise(y, x, variant) > 0.5 ? 0.04 : -0.05));
+    for (const x of [3, 11]) { p.rect(x, 1, 2, 2, "#6f5440"); p.set(x, 1, "#8a6a50"); }
+  }
+  if (style.endsWith("_window") || style.endsWith("_window_lit")) {
+    const x0 = PANE.x0, y0 = PANE.top(false), w = PANE.w, h = PANE.h, lit = style.endsWith("_lit");
+    if (sand) {
+      p.rect(x0 - 1, y0 - 2, w + 2, 2, shadeHex(color, 0.1)); p.rect(x0 - 1, y0 - 2, w + 2, 1, "#2f3f66");
+      p.rect(x0, y0, w, h, lit ? "#f2c46a" : "#2a2420"); if (lit) p.rect(x0 + 1, y0 + 1, w - 2, h - 2, "#ffe0a0");
+    } else {
+      p.rect(x0 - 1, y0 - 1, w + 2, h + 2, "#6f5440");
+      p.rect(x0, y0, w, h, lit ? "#f2b45a" : "#3a2e26");
+      for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) if ((x + y) % 2 === 0) p.set(x, y, lit ? "#8a5a30" : "#7a5c44");
+    }
+  }
+}
+/** A pyramid's faces: dressed stone in courses running along the base, each course a little set back (Kharaveth). */
+export function stoneCourseTexture(color: string, cols: number, rows: number): HTMLCanvasElement {
+  return pixelArt(`courses:${color}:${cols}:${rows}`, cols, rows, p => {
+    p.rect(0, 0, cols, rows, color);
+    for (let y = 0; y < rows; y += 4) {
+      const offset = (y / 4) % 2 ? 5 : 0;
+      for (let x = -offset; x < cols; x += 10) { const tone = shadeHex(color, (noise(x, y, 3) - 0.5) * 0.07); p.rect(Math.max(0, x), y, Math.min(9, cols - Math.max(0, x)), 3, tone); }
+      p.rect(0, y + 3, cols, 1, shadeHex(color, -0.12)); p.rect(0, y, cols, 1, shadeHex(color, 0.05));
+    }
+  });
 }
 /** Roof shingles: scalloped courses running along the eave, in the roof's colour. */
 export function shingleTexture(color: string, cols: number, rows: number): HTMLCanvasElement {

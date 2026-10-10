@@ -97,15 +97,16 @@ test("the world is large, deterministic and every landmark is reachable on foot"
   assert(world.objects.filter(object => object.kind === "tree").length > 400, "Plenty of trees");
   assert(world.objects.filter(object => object.kind === "rock").length > 60, "Plenty of rocks");
   assert(world.objects.filter(object => object.kind === "spot").length >= 15, "Fishing spots");
-  // Walk from the spawn, and take every ladder and staircase you can reach (dungeons, the castle's storeys), and every
-  // boat between the Mizukai Isles once you can reach a landing (boats.ts: from any landing to every other).
+  // Walk from the spawn, and take every ladder and staircase you can reach (dungeons, the castle's storeys), every boat
+  // between the Mizukai Isles once you can reach a landing (boats.ts: from any landing to every other), and every quest
+  // gate (a gate with a clue, like Foothold's south gate into Kharaveth's heartlands, opens once its quest is done).
   const areas = [reachable(g, world.places.spawn)], taken = new Set();
   const ok = (x, y) => areas.some(seen => seen[y * W + x]);
   const beside = object => [[0, 1], [1, 0], [0, -1], [-1, 0]].some(([dx, dy]) => ok(object.x + dx, object.y + dy));
   const docks = world.objects.filter(object => object.kind === "dock");
   for (let grew = true; grew;) {
     grew = false;
-    for (const ladder of world.objects.filter(object => object.kind === "ladder" && !taken.has(object.id) && beside(object))) {
+    for (const ladder of world.objects.filter(object => (object.kind === "ladder" || object.kind === "gate" && object.clue && object.to) && !taken.has(object.id) && beside(object))) {
       taken.add(ladder.id); grew = true;
       if (!ok(ladder.to.x, ladder.to.y)) areas.push(reachable(g, ladder.to));
     }
@@ -602,7 +603,7 @@ test("A Friend's Feast from start to finish", () => {
   assert.equal(g.player.quests.friends_feast, 2);
   assert.equal(questPoints(g), 1);
   assert(level(g, "cooking") >= 10, "Quest XP");
-  assert.equal(QUESTS.length, 72); assert.equal(MAX_QUEST_POINTS, 128);
+  assert.equal(QUESTS.length, 75); assert.equal(MAX_QUEST_POINTS, 134);
 });
 
 test("Grumblin Trouble counts kills and pays out", () => {
@@ -1948,7 +1949,7 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   assert.equal(p.quests.dawn_against_hollow, 2); assert(has(p, "dawnplate_cuirass"));
   assert.equal(count(p, "hollow_essence"), 0);
   assert.equal(capeProblem(g, "dawnplate_cuirass"), null, "the armoury sells Dawnplate once earned");
-  assert.equal(QUESTS.length, 72); assert.equal(MAX_QUEST_POINTS, 128);
+  assert.equal(QUESTS.length, 75); assert.equal(MAX_QUEST_POINTS, 134);
 });
 
 test("Boots and gauntlets in every metal, smithed at the anvil; the clothier's shirts, dresses, trousers and skirts", () => {
@@ -2897,7 +2898,8 @@ test("Kharaveth: the Sunteeth is the only way in on foot, Foothold's gate the on
   const beside = (seen, o) => [[0, 1], [1, 0], [0, -1], [-1, 0]].some(([dx, dy]) => at(seen, o.x + dx, o.y + dy));
   assert(at(fromSpawn, SUNTEETH.north.x, SUNTEETH.north.y), "the shingle spit reaches the Sunteeth from the mainland");
   assert(at(fromSpawn, SUNTEETH.south.x, SUNTEETH.south.y) && at(fromSpawn, world.places.foothold.x, world.places.foothold.y), "through the canyons to the camp");
-  let leaked = 0; for (let y = FOOTHOLD.y1 + 1; y < OVERWORLD_H; y++) for (let x = 0; x < W; x++) if (fromSpawn[y * W + x] && regionAt(world, x, y).id === "ochre_steppe") leaked++;
+  const inland = new Set(REGIONS.filter(r => r.south && !r.underground && !["sunward_strait", "sunteeth", "foothold"].includes(r.id)).map(r => r.id));
+  let leaked = 0; for (let y = FOOTHOLD.y1 + 1; y < OVERWORLD_H; y++) for (let x = 0; x < W; x++) if (fromSpawn[y * W + x] && inland.has(regionAt(world, x, y).id)) leaked++;
   assert.equal(leaked, 0, "nothing of Kharaveth past the camp is reached without its gate");
   const beyond = reachable(g, { x: FOOTHOLD.gate.x, y: FOOTHOLD.gate.y + 1 }); let open = 0; for (const v of beyond) open += v;
   assert(open > 100_000, `a continent through the gate (${open} tiles)`);
@@ -2984,13 +2986,84 @@ test("The world grew south: a save from before keeps its place, whether on the s
 
 test("Kharaveth's music: oud, ney, qanun and rebab, darbuka and frame drum, in four modes; each region its piece", async () => {
   const { TRACKS, KHARAVETH_TRACKS, trackFor } = await import("../games/rarefriends-realm/audio.ts");
-  const pieces = TRACKS.filter(track => KHARAVETH_TRACKS.includes(track.id)); assert.equal(pieces.length, 4);
+  const pieces = TRACKS.filter(track => KHARAVETH_TRACKS.includes(track.id)); assert.equal(pieces.length, 9);
   const own = new Set(["oud", "ney", "qanun", "rebab", "drone", "lute"]), ensembles = new Set();
   for (const track of pieces) {
     for (const note of track.notes) assert(own.has(note.voice), `${track.name}: ${note.voice}`);
     assert(track.hits.some(hit => ["dum", "tek", "bendir", "riq"].includes(hit.drum)), `${track.name} has a hand drum`);
     ensembles.add([...new Set(track.notes.map(n => n.voice))].sort().join());
   }
-  assert.equal(ensembles.size, 4, "each its own ensemble");
-  for (const [region, id] of [["sunteeth", "kharaveth_sunteeth"], ["foothold", "kharaveth_foothold"], ["underway", "kharaveth_underway"], ["ochre_steppe", "kharaveth_steppe"]]) assert.equal(trackFor(region, false), id);
+  assert.equal(ensembles.size, 9, "each its own ensemble");
+  for (const [region, id] of [["sunteeth", "kharaveth_sunteeth"], ["foothold", "kharaveth_foothold"], ["underway", "kharaveth_underway"], ["ochre_steppe", "kharaveth_steppe"], ["sefrah", "kharaveth_sefrah"],
+    ["tamesh", "kharaveth_tamesh"], ["khetmar", "kharaveth_khetmar"], ["sea_of_dunes", "kharaveth_dunes"], ["first_names", "kharaveth_azhurak"], ["black_stair", "kharaveth_azhurak"]]) assert.equal(trackFor(region, false), id);
+});
+
+test("Kharaveth's heartlands: every town, camp and old place is reached from Foothold's gate, the Black Stair's halls from its stair, and no older dungeon is touched", async () => {
+  const { FOOTHOLD } = await import("../games/rarefriends-realm/south.ts");
+  const { SITES, BLACK_STAIR } = await import("../games/rarefriends-realm/heartlands.ts");
+  const g = newGame(), world = g.world, beyond = reachable(g, { x: FOOTHOLD.gate.x, y: FOOTHOLD.gate.y + 1 }), at = (seen, x, y) => !!seen[y * W + x];
+  const beside = (seen, o) => o && [[0, 1], [1, 0], [0, -1], [-1, 0], [1, 1], [-1, -1], [1, -1], [-1, 1]].some(([dx, dy]) => at(seen, o.x + dx, o.y + dy));
+  for (const place of ["sefrah", "tamesh", "khetmar", "zuri", "ouresh"]) assert(at(beyond, world.places[place].x, world.places[place].y), `${place} is on foot from the gate`);
+  for (const id of ["seven_crowns", "first_names_door", "sunken_obelisk", "pyramid_marks", "tomb_ledger", "well_tahr", "black_stair_down"]) assert(beside(beyond, world.objects.find(o => o.clue === id)), `${id} can be reached`);
+  for (const id of ["sefrah_vizier", "sefrah_seleneh", "tamesh_meretkhet", "tamesh_mason", "tamesh_quarrymaster", "khetmar_ardesh", "zuri_asmeh", "ouresh_halzir", "tomb_keeper"]) {
+    const npc = g.npcs.find(n => n.id === id); assert(npc, `${id} is somewhere`); assert(beside(beyond, npc) || at(beyond, npc.x, npc.y), `${id} can be reached`);
+  }
+  const stair = world.objects.find(o => o.clue === "black_stair_down"), below = reachable(g, stair.to);
+  for (const id of ["ward_stone_0", "ward_stone_1", "ward_stone_2", "ward_niche_0", "ward_niche_1", "ward_niche_2", "black_stair_lintel"]) assert(beside(below, world.objects.find(o => o.clue === id)), `${id} below`);
+  const warden = g.monsters.find(m => m.def.id === "stair_warden"); assert(warden && at(below, warden.x, warden.y), "the Stair Warden in its chamber");
+  const bitter = g.monsters.find(m => m.def.id === "tahr_matriarch"); assert(bitter && at(beyond, bitter.x, bitter.y), "Old Bitter-Laugh in her den");
+  for (const id of ["sea_of_dunes", "ashar_valley", "black_range", "khetmar_pass", "ochre_spine", "sefrah", "tamesh", "khetmar", "zuri_camp", "ouresh_camp", "seven_crowns", "first_names", "sunken_obelisk", "unfinished_pyramid", "black_stair"])
+    assert(world.region.includes(REGIONS.findIndex(r => r.id === id)), `${id} exists`);
+  // The Black Stair's halls keep to columns no older dungeon uses.
+  const stairIndex = REGIONS.findIndex(r => r.id === "black_stair");
+  for (let y = DUNGEON_Y; y < DUNGEON_Y + 60; y++) for (let x = 0; x < W; x++) if (world.region[y * W + x] === stairIndex) assert(x >= BLACK_STAIR.x0 - 2 && x <= BLACK_STAIR.x1 + 2, `the Black Stair stays in its own columns (${x},${y})`);
+  for (const id of ["deepglass", "root_cellars", "drowned_archive", "mossy_undercroft", "underway", "catacombs"]) assert(world.region.includes(REGIONS.findIndex(r => r.id === id)), `${id} still there`);
+  void SITES;
+});
+
+test("The Matriarch's Seal: three heirs, the tomb's ledger, the Zuri, the seal read glyph by glyph, the Council of Three", async () => {
+  const { useClue } = await import("../games/rarefriends-realm/kharaveth.ts");
+  const { talk } = await import("../games/rarefriends-realm/content.ts");
+  const { studySeal } = await import("../games/rarefriends-realm/dynasties.ts");
+  const g = newGame(), world = g.world, Q = "matriarchs_seal";
+  const say = (id, label) => { let d = talk(g, id); if (label) { const o = d.options.find(x => x.label.startsWith(label)); assert(o, `${id}: ${label}`); d.onEnd?.(); d = o.then(); } d?.onEnd?.(); return d; };
+  const clue = (id, option) => useClue(g, world.objects.find(o => o.clue === id), option ?? "Read");
+  assert.doesNotMatch(talk(g, "sefrah_vizier").lines.map(l => l.text).join(" "), /seal/, "nothing to ask before Foothold");
+  g.player.quests.foothold_in_the_stone = 3;
+  say("sefrah_vizier", "I'll find the seal."); assert.equal(g.player.quests[Q], 1);
+  clue("tomb_ledger"); assert.equal(g.player.quests[Q], 1, "the ledger alone isn't enough");
+  say("sefrah_seleneh"); say("khetmar_ardesh"); assert.equal(g.player.quests[Q], 1);
+  say("tamesh_meretkhet"); assert.equal(g.player.mysteries.glyphs.stone, 2, "the Warden teaches 'stone'");
+  assert.equal(g.player.quests[Q], 2, "three heirs and the ledger: ask the Zuri");
+  let d = talk(g, "zuri_asmeh"); d.onEnd?.(); d = d.options.find(o => o.label.startsWith("Can I see it?")).then(); d.onEnd?.();
+  assert.equal(g.player.quests[Q], 3); assert(has(g.player, "khasreth_seal"));
+  assert.match(studySeal(g), /One you don't: a bar balanced on a point/, "measure still unread");
+  assert.equal(g.player.quests[Q], 3);
+  say("tamesh_mason"); assert.equal(g.player.mysteries.glyphs.measure, 2, "the old mason teaches 'measure'");
+  assert.match(studySeal(g), /By measure, to the many names, given/); assert.equal(g.player.quests[Q], 4); assert("three_suns" in g.player.mysteries.found);
+  d = talk(g, "sefrah_vizier"); d.onEnd?.(); d = d.options[0].then(); d.onEnd?.(); d = d.options[0].then(); d.onEnd?.();
+  assert.equal(g.player.quests[Q], 5); assert(has(g.player, "three_suns_sash")); assert(!has(g.player, "khasreth_seal"));
+});
+
+test("Salt and Blue Smoke, and What the Quarry Woke: the well, the den, both peoples told; the wards set, the warden laid to rest", async () => {
+  const { useClue, clueOptions } = await import("../games/rarefriends-realm/kharaveth.ts");
+  const { talk } = await import("../games/rarefriends-realm/content.ts");
+  const g = newGame(), world = g.world;
+  const say = (id, label) => { let d = talk(g, id); if (label) { const o = d.options.find(x => x.label.startsWith(label)); assert(o, `${id}: ${label}`); d.onEnd?.(); d = o.then(); } d?.onEnd?.(); return d; };
+  const clue = (id, option) => useClue(g, world.objects.find(o => o.clue === id), option);
+  g.player.quests.foothold_in_the_stone = 3;
+  say("ouresh_halzir", "I'll find out"); assert.equal(g.player.quests.salt_and_smoke, 1);
+  onMonsterKilled(g, "tahr_matriarch", 0, 0); assert.equal(g.player.quests.salt_and_smoke, 1, "killing her before you know is just a hyena");
+  say("zuri_asmeh"); clue("well_tahr", "Inspect"); onMonsterKilled(g, "tahr_matriarch", 0, 0);
+  assert.equal(g.player.quests.salt_and_smoke, 2);
+  say("ouresh_halzir"); assert.equal(g.player.quests.salt_and_smoke, 2, "one people told");
+  say("zuri_asmeh"); assert.equal(g.player.quests.salt_and_smoke, 3); assert(has(g.player, "blue_smoke_turban") && has(g.player, "salt_turban"));
+  // The quarry: the stones lift only on the quest; the warden won't stay down till the wards are set.
+  assert.deepEqual(clue("ward_stone_0", "Lift").text.length > 0, true); assert(!has(g.player, "ward_stone"), "not your business yet");
+  say("tamesh_quarrymaster", "I'll go down"); assert.equal(g.player.quests.quarry_woke, 1);
+  onMonsterKilled(g, "stair_warden", 0, 0); assert.equal(g.player.quests.quarry_woke, 1, "it gathers itself back up");
+  for (const k of [0, 1, 2]) { clue(`ward_stone_${k}`, "Lift"); assert.deepEqual(clueOptions(g, world.objects.find(o => o.clue === `ward_stone_${k}`)), []); clue(`ward_niche_${k}`, "Set-stone"); }
+  assert.equal(g.player.quests.quarry_woke, 2); assert("black_stair_wards" in g.player.mysteries.found); assert(!has(g.player, "ward_stone"));
+  onMonsterKilled(g, "stair_warden", 0, 0); assert.equal(g.player.quests.quarry_woke, 3);
+  say("tamesh_quarrymaster"); assert.equal(g.player.quests.quarry_woke, 4); assert(has(g.player, "obsidian_mattock"));
 });

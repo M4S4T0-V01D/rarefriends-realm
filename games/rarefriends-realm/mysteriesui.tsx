@@ -24,6 +24,9 @@ const GLYPH_DRAW: Record<string, (p: Pixels) => void> = {
   first: p => { p.line(5, 2, 5, 10, INK); p.line(3, 2, 8, 2, INK); },
   many: p => { for (const x of [2, 5, 8]) p.disc(x + 0.5, 5.5, 1.1, 1.1, INK, null); },
   measure: p => { p.line(1, 4, 10, 4, INK); p.poly([[5.5, 5], [3.5, 9], [7.5, 9]], INK, null); },
+  crown: p => { p.line(2, 6, 2, 9, INK); p.line(2, 9, 9, 9, INK); p.line(9, 9, 9, 6, INK); for (const x of [3, 5, 8]) p.line(x, 6, x, 2, INK); },
+  hand: p => { p.rect(3, 6, 6, 4, INK); for (const x of [3, 5, 7]) p.line(x, 5, x, 1, INK); p.line(9, 6, 9, 2, INK); p.line(2, 7, 0, 5, INK); },
+  dust: p => { for (const x of [1, 4, 7, 10]) p.rect(x, 5, 1, 2, INK); p.set(2, 8, INK); p.set(8, 3, INK); },
 };
 const glyphArt = (id: string) => pixelArt(`glyph:${id}`, 12, 12, p => { p.rect(0, 0, 12, 12, "#efe6d2"); GLYPH_DRAW[id]?.(p); });
 const Glyph = ({ id }: { id: string }) => <img className="pixel realm-glyph" src={artUrl(glyphArt(id))} width={24} height={24} alt="" aria-hidden draggable={false} />;

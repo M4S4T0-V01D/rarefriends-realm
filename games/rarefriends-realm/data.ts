@@ -70,6 +70,7 @@ import { ORDER_IDS, orderGear, orderStock } from "./knights.ts";
 import { FACTION_MONSTERS, factionGear } from "./factions.ts";
 import { MIZUKAI_ITEMS, MIZUKAI_MONSTERS, mizukaiGear } from "./mizukaigear.ts";
 import { KHARAVETH_GEAR, KHARAVETH_ITEMS, KHARAVETH_MONSTERS, KHARAVETH_SHOPS, STEPPE_CLOTHES } from "./kharavethgear.ts";
+import { HEARTLAND_GEAR, HEARTLAND_ITEMS, HEARTLAND_MONSTERS, HEARTLAND_SHOPS, OURESH_GOODS, ZURI_GOODS } from "./heartlandsgear.ts";
 import { SOLDIERS } from "./skirmish.ts";
 // ---------- Items ----------
 export type EquipSlot = "head" | "cape" | "neck" | "weapon" | "body" | "shield" | "legs" | "hands" | "feet" | "belt" | "ring";
@@ -790,6 +791,40 @@ export const REGIONAL_CLOTHING: readonly RegionalSet[] = [
     { id: "mizukai_haori", name: "Crane haori", slot: "cape", shape: "cape", kind: "crane", color: "#8f2b2b", accent: "#efe6d2", examine: "A short coat worn open over the kimono, a white crane on the back. For visiting, and being seen to visit.", value: 700 },
     { id: "mizukai_sandals", name: "Straw sandals", slot: "feet", shape: "boots", color: "#c9b27a", accent: "#8f2b2b", examine: "Woven straw sandals with red thongs, worn with split-toed socks.", value: 90 },
   ] },
+  // The Land Before Stone: Kharaveth's dynasties dress their own, and so do the nomads.
+  { region: "sefrah", shop: "sefrah_clothier", pieces: [
+    { id: "gilded_headcloth", name: "Gilded headcloth", slot: "head", shape: "hat", kind: "headcloth", color: "#f0e8d4", accent: "#d9b866", examine: "White linen drawn close over the head, striped in gold thread, a lappet to each shoulder. The Gilded Court's, worn in Sefrah's streets by anyone who can afford the thread.", value: 600 },
+    { id: "gilded_robe", name: "Gilded linen robe", slot: "body", shape: "body", kind: "robe", color: "#f2ecdc", accent: "#d9b866", examine: "Fine pleated linen, so thin the light comes through it, belted with a gold-worked sash. In Sefrah, plain is the most expensive colour.", value: 1400 },
+    { id: "gilded_pleats", name: "Pleated kilt", slot: "legs", shape: "legs", kind: "skirt", color: "#ece2c8", accent: "#c9a050", examine: "A wrapped kilt of pleated linen with a gold-edged front panel.", value: 600 },
+    { id: "gilded_sandals", name: "Gilded sandals", slot: "feet", shape: "boots", color: "#c9a050", accent: "#7a5636", examine: "Leather sandals with gilt on the straps. The Court walks on marble; the gilt is for the marble.", value: 300 },
+    { id: "gilded_mantle", name: "Gilded mantle", slot: "cape", shape: "cape", color: "#2f3f66", accent: "#d9b866", examine: "A lapis-blue mantle bordered in gold, the Gilded Court's colours, as its clerks wear to the treasury.", value: 1200 },
+  ] },
+  { region: "tamesh", shop: "tamesh_clothier", pieces: [
+    { id: "obsidian_headcloth", name: "Obsidian headcloth", slot: "head", shape: "hat", kind: "headcloth", color: "#1e1c22", accent: "#2f5f9a", examine: "Black cloth striped in lapis, close over the head and down to the shoulders: the Obsidian Legacy's, the oldest dress in Kharaveth, and they'll tell you so.", value: 600 },
+    { id: "mason_tunic", name: "Mason's tunic", slot: "body", shape: "body", kind: "tunic", color: "#e6dcc6", accent: "#1e1c22", examine: "A short-sleeved linen tunic, black at the hem, grey with stone dust everywhere else. Tamesh's stonecutters wear nothing finer to work, or to weddings.", value: 900 },
+    { id: "obsidian_kilt", name: "Black kilt", slot: "legs", shape: "legs", kind: "skirt", color: "#2a2730", accent: "#2f5f9a", examine: "A wrapped kilt of black linen, a lapis bead at the knot.", value: 500 },
+    { id: "quarry_sandals", name: "Quarry sandals", slot: "feet", shape: "boots", color: "#5f4128", accent: "#1e1c22", examine: "Thick-soled sandals with a toe cap of hardened leather, for when the stone wins.", value: 260 },
+    { id: "lapis_mantle", name: "Lapis mantle", slot: "cape", shape: "cape", color: "#1e1c22", accent: "#2f5f9a", examine: "A black mantle with a lapis border, worn by the Legacy's master masons when they go to Sefrah and wish to be noticed disapproving of it.", value: 1100 },
+  ] },
+  { region: "khetmar", shop: "khetmar_outfitter", pieces: [
+    { id: "banner_coif", name: "Copper Banner coif", slot: "head", shape: "hood", color: "#a8643a", accent: "#2f3f66", examine: "A quilted coif dyed copper-red, the Copper Banner's: its riders wear it under the helm, and its marshal wears it instead of one.", value: 500 },
+    { id: "banner_coat", name: "Copper Banner coat", slot: "body", shape: "body", kind: "tunic", color: "#b87333", accent: "#2f3f66", examine: "A riding coat faced with copper scales at the chest, indigo at the cuffs. The Banner's soldiers wear it on duty and their families wear it off.", value: 1300 },
+    { id: "banner_trousers", name: "Riding trousers", slot: "legs", shape: "legs", kind: "trousers", color: "#2f3f66", accent: "#b87333", examine: "Indigo riding trousers with a copper-red stripe, for long days in the saddle on the Khetmar Pass.", value: 600 },
+    { id: "banner_boots", name: "Banner boots", slot: "feet", shape: "boots", color: "#4a3426", accent: "#b87333", examine: "Tall riding boots, the Banner's copper at the heel.", value: 320 },
+    { id: "banner_cloak", name: "Copper Banner cloak", slot: "cape", shape: "cape", color: "#8f4a2a", accent: "#e2c46a", examine: "A rust-red cloak with a copper pennant worked on the back. The Banner holds the east, and wants you to see it from the west.", value: 1200 },
+  ] },
+  { region: "zuri", shop: "zuri_trader", pieces: [
+    { id: "blue_smoke_turban", name: "Blue Smoke turban", slot: "head", shape: "hat", kind: "turban", color: "#4a5f8a", accent: "#9fb4d0", examine: "Indigo cloth wound round and round, a pale tail left loose to draw over the face: the Zuri's, the Blue Smoke people, who are known by the colour of their fires.", value: 400 },
+    { id: "zuri_robe", name: "Zuri robe", slot: "body", shape: "body", kind: "robe", color: "#5a6f9a", accent: "#e2d6b8", examine: "A long robe the colour of evening smoke, stitched at the hem with a pattern the Zuri say is the road home.", value: 800 },
+    { id: "zuri_trousers", name: "Zuri trousers", slot: "legs", shape: "legs", kind: "trousers", color: "#3b4a6a", accent: "#e2d6b8", examine: "Loose indigo trousers, tied at the ankle against sand.", value: 360 },
+    { id: "zuri_shawl", name: "Zuri shawl", slot: "cape", shape: "cape", color: "#9fb4d0", accent: "#2f3f66", examine: "A pale blue shawl, smelling faintly of the resin they burn. Worn, the Zuri say, by the patient.", value: 600 },
+  ] },
+  { region: "ouresh", shop: "ouresh_trader", pieces: [
+    { id: "salt_turban", name: "Salt rider's turban", slot: "head", shape: "hat", kind: "turban", color: "#ece8e0", accent: "#a5443a", examine: "A white turban, crusted at the edges with salt, its red tail the Ouresh's: the riders who carry salt across the Sea of Dunes.", value: 400 },
+    { id: "salt_coat", name: "Salt rider's coat", slot: "body", shape: "body", kind: "tunic", color: "#d8d2c4", accent: "#a5443a", examine: "A pale riding coat, red-stitched, stiff with salt and dust. The Ouresh say a coat that's never been to the salt flats isn't finished.", value: 800 },
+    { id: "salt_trousers", name: "Salt rider's trousers", slot: "legs", shape: "legs", kind: "trousers", color: "#8a7a62", accent: "#a5443a", examine: "Sand-coloured trousers with leather at the knees and the seat, for a life on camelback.", value: 360 },
+    { id: "salt_boots", name: "Salt rider's boots", slot: "feet", shape: "boots", color: "#6f5440", accent: "#ece8e0", examine: "Soft high boots with salt in every seam.", value: 260 },
+  ] },
 ];
 const REGIONAL_ITEMS: Item[] = REGIONAL_CLOTHING.flatMap(set => set.pieces.map((piece): Item => ({
   id: piece.id, name: piece.name, examine: piece.examine, value: piece.value, icon: { shape: piece.shape, color: piece.color, accent: piece.accent, ...(piece.kind ? { kind: piece.kind } : {}) },
@@ -965,7 +1000,7 @@ function dyedItem(id: string): Item | undefined {
   DYED.set(id, made);
   return made;
 }
-export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...DYE_POTS, ...CARVING_ITEMS, ...BAR_ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...ORDER_ARMOUR, ...orderGear(), ...slayerGear(), ...heartguardGear(), ...REGIONAL_ITEMS, ...APOTHECARY_ITEMS, ...factionGear(), ...mizukaiGear(), ...MIZUKAI_ITEMS, ...KHARAVETH_ITEMS, ...KHARAVETH_GEAR, ...STEPPE_CLOTHES]);
+export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...DYE_POTS, ...CARVING_ITEMS, ...BAR_ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...ORDER_ARMOUR, ...orderGear(), ...slayerGear(), ...heartguardGear(), ...REGIONAL_ITEMS, ...APOTHECARY_ITEMS, ...factionGear(), ...mizukaiGear(), ...MIZUKAI_ITEMS, ...KHARAVETH_ITEMS, ...KHARAVETH_GEAR, ...STEPPE_CLOTHES, ...HEARTLAND_ITEMS, ...HEARTLAND_GEAR]);
 const ITEM_MAP = new Map(ITEM_LIST.map(item => [item.id, item]));
 export function item(id: string): Item {
   const found = ITEM_MAP.get(id) ?? dyedItem(id);
@@ -1352,6 +1387,7 @@ export const MONSTERS: Record<string, MonsterDef> = {
   // The Mizukai Isles: the wild, the wayward spirits, the Josaki dead, the ogres and the great ones.
   ...MIZUKAI_MONSTERS,
   ...KHARAVETH_MONSTERS,
+  ...HEARTLAND_MONSTERS,
   // Return of Raria: the Regiment, the Federation's pickets, the Royal Rangers, BarkReach's wild things, the deserters and the Burned.
   ...FACTION_MONSTERS,
   // Every soldier's fighting self, for when it draws steel (skirmish.ts).
@@ -1600,6 +1636,13 @@ export type ShopDef = { id: string; name: string; stock: readonly string[]; gene
 const QUEST_CLOTHES = new Set(["maiden_veil", "rarian_mantle", "scorched_cloak"]);
 export const SHOPS: Record<string, ShopDef> = {
   ...KHARAVETH_SHOPS,
+  ...HEARTLAND_SHOPS,
+  // The dynasties' tailors and the nomads' traders: their own people's clothes (and the nomads, what fits on a camel).
+  sefrah_clothier: { id: "sefrah_clothier", name: "Tahmira's Linens", buys: ["other"], rate: 0.5, stock: REGIONAL_CLOTHING.find(set => set.region === "sefrah")!.pieces.map(piece => piece.id) },
+  tamesh_clothier: { id: "tamesh_clothier", name: "Ketty's Weaving", buys: ["other"], rate: 0.5, stock: REGIONAL_CLOTHING.find(set => set.region === "tamesh")!.pieces.map(piece => piece.id) },
+  khetmar_outfitter: { id: "khetmar_outfitter", name: "The Banner armoury", buys: ["weapon", "armour", "other"], rate: 0.5, stock: [...REGIONAL_CLOTHING.find(set => set.region === "khetmar")!.pieces.map(piece => piece.id), "blackiron_helm", "blackiron_cuirass", "blackiron_sabre", "ashsteel_sabre"] },
+  zuri_trader: { id: "zuri_trader", name: "Tanu's packs", buys: ["other", "food"], rate: 0.5, stock: [...REGIONAL_CLOTHING.find(set => set.region === "zuri")!.pieces.map(piece => piece.id), ...ZURI_GOODS] },
+  ouresh_trader: { id: "ouresh_trader", name: "Saltwife Meriam's", buys: ["other", "food"], rate: 0.5, stock: [...REGIONAL_CLOTHING.find(set => set.region === "ouresh")!.pieces.map(piece => piece.id), ...OURESH_GOODS] },
   // The Mizukai Isles: Kurohama's market, the Ironsand Forge, the Bureau of Seals, the shrine office, Takamori's armourer and bowyer, the teahouses.
   mizukai_general: { id: "mizukai_general", name: "Okiku's General Store", general: true, buys: ["food", "logs", "other"], rate: 0.55, stock: ["rice", "rice_ball", "miso_soup", "cucumber", "straw_kasa", "vial", "tinderbox", "knife", "hammer", "bucket", "small_net", "fishing_rod", "fishing_bait", "pewter_axe", "pewter_pickaxe"] },
   mizukai_fish: { id: "mizukai_fish", name: "The Kurohama Fish Market", buys: ["fish"], rate: 0.6, stock: ["grilled_eel", "raw_carp", "raw_perch", "small_net", "fishing_rod", "harpoon", "fishing_bait"] },

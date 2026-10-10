@@ -14,6 +14,7 @@ import { addXp, giveOrDrop, has, message, sound, take, type Dialogue, type Game 
 import { chat, completeQuest, data, npcSays, questDone, stage, type NpcDef, type QuestDef } from "./content.ts";
 import { discover, knows, learnGlyph, readInscription } from "./mysteries.ts";
 import type { WorldObject } from "./world.ts";
+import { HEARTLAND_CLUES } from "./dynasties.ts";
 
 const art = (family: number, seed: number) => ({ family, seed });
 const person = (id: string, name: string, examine: string, seed: number, extra: Partial<NpcDef> = {}): NpcDef => ({ id, name, examine, options: ["Talk-to"], art: art(9, seed), ...extra });
@@ -156,6 +157,7 @@ export const CLUES: Record<string, Clue> = {
       return { to: { x: object.x, y: object.y + (south ? 1 : -1) }, text: south ? "The gate swings open onto Kharaveth." : "You come back in through the gate." };
     },
   },
+  ...HEARTLAND_CLUES,
 };
 
 /** A clue's options, examine text and use (null if the object isn't one). */

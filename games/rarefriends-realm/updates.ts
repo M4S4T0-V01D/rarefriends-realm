@@ -4,6 +4,14 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 97, date: "2026-10-10", title: "The Land Before Stone: Kharaveth's heartlands", items: [
+    "Foothold's south gate opens on the heartlands of Kharaveth: the Ochre Steppe, the Sea of Dunes in the west, the green Ashar Valley, the Ochre Spine winding across the middle, the basalt Black Range in the south-east and the Khetmar Pass going east toward the Rain Country.",
+    "Three dynasties out of one house. Sefrah, the Gilded City on the Ashar, is the Gilded Court's: its gold-domed palace, the Treasury (a bank), the Temple of the Hidden Sun and a bazaar. Tamesh, the quarry town of the Obsidian Legacy, cuts black stone at the Range's foot. Khetmar, the Copper Banner's fortress, holds the eastern pass. Each dresses its own people, and its tailor will dress you too.",
+    "The nomads: the Zuri, the Blue Smoke people, camp north of the Spine; the Ouresh salt riders cross the dunes. Both have their own clothes, goods and grievances.",
+    "Three new quests. The Matriarch's Seal: the Grand Matriarch is forty days dead, her seal is missing, and her three heirs each hold a third of the country. Salt and Blue Smoke: who fouled the Well of Tahr? What the Quarry Woke: Tamesh's cutters broke into the Black Stair, and something below is walking.",
+    "Azhurak stands up out of the sand: the Seven Crowns, the Hall of First Names (its door shut, for now), the Sunken Obelisk, the Unfinished Pyramid and the Black Stair, with seven new Mysteries discoveries and three new glyphs to learn.",
+    "Desert buildings in sandstone and mudbrick, flat-roofed, and pyramids of dressed stone; new creatures from dune vipers and reed cats to obsidian scarabs, basalt golems and the Stair Warden; five new pieces of music for Sefrah, Tamesh, Khetmar, the Sea of Dunes and the old places.",
+  ] },
   { id: 96, date: "2026-10-10", title: "The Land Before Stone: the Sunteeth and Foothold Camp", items: [
     "South of the mainland, across the Sunward Strait, lies Kharaveth: a continent of desert, sandstone and old stone. The way in on foot is the Sunteeth, a massif of wind-cut sandstone rising out of the sea between Hollyhock and Dyemoor, split by slot canyons: most of them end blind, a few go through.",
     "Hollowmere's expedition has dug in at Foothold Camp, at the Sunteeth's southern mouth. A new quest, A Foothold in the Stone: the supply party is six days overdue, every officer has a different story, and somebody has been redrawing the chalk arrows.",

@@ -149,7 +149,10 @@ export type RegionId =
   | "shiogama" | "kibi" | "hanazono" | "morishima" | "iwaoka" | "josaki" | "torojima" | "kusabana" | "ashigane" | "smugglers_cove" | "hakkotsu" | "three_stones" | "turtle_rock" | "mizukai_sea"
   | "kumo_hollow" | "ashigane_deeps" | "bone_shrine"
   // The Land Before Stone (2026-10): Kharaveth, the desert continent under the mainland, and the strait between.
-  | "sunward_strait" | "sunteeth" | "foothold" | "ochre_steppe" | "underway";
+  | "sunward_strait" | "sunteeth" | "foothold" | "ochre_steppe" | "underway"
+  // Kharaveth's heartlands: the country, the dynasties' towns, the nomads' camps, Azhurak's places.
+  | "sea_of_dunes" | "ashar_valley" | "black_range" | "khetmar_pass" | "ochre_spine" | "sefrah" | "tamesh" | "khetmar" | "zuri_camp" | "ouresh_camp"
+  | "seven_crowns" | "first_names" | "sunken_obelisk" | "unfinished_pyramid" | "black_stair";
 export type Region = { id: RegionId; name: string; label: { x: number; y: number }; danger: number; underground?: boolean;
   /** A far-west region (Return of Raria) or a Mizukai one: its label is already in world coordinates. */
   far?: boolean;
@@ -233,8 +236,15 @@ export const REGIONS: readonly Region[] = [
   { id: "sunward_strait", name: "The Sunward Strait", label: { x: 420, y: 528 }, danger: 0, far: true, south: true },
   { id: "sunteeth", name: "The Sunteeth", label: { x: 628, y: 548 }, danger: 3, far: true, south: true },
   { id: "foothold", name: "Foothold Camp", label: { x: 630, y: 614 }, danger: 0, far: true, south: true },
-  { id: "ochre_steppe", name: "Kharaveth", label: { x: 560, y: 700 }, danger: 4, far: true, south: true },
+  { id: "ochre_steppe", name: "The Ochre Steppe", label: { x: 640, y: 760 }, danger: 4, far: true, south: true },
   { id: "underway", name: "The Underway", label: { x: 378, y: 902 }, danger: 4, underground: true, far: true, south: true },
+  ...([
+    ["sea_of_dunes", "The Sea of Dunes", 200, 720, 5], ["ashar_valley", "The Ashar Valley", 770, 620, 2], ["black_range", "The Black Range", 920, 816, 6], ["khetmar_pass", "The Khetmar Pass", 1050, 650, 5],
+    ["ochre_spine", "The Ochre Spine", 470, 744, 5], ["sefrah", "Sefrah, the Gilded City", 808, 668, 0], ["tamesh", "Tamesh", 772, 788, 0], ["khetmar", "Khetmar", 1046, 700, 0],
+    ["zuri_camp", "The Blue Smoke Tents", 432, 686, 0], ["ouresh_camp", "The Ouresh Salt Camp", 236, 702, 0], ["seven_crowns", "The Seven Crowns", 250, 604, 3], ["first_names", "The Hall of First Names", 520, 716, 3],
+    ["sunken_obelisk", "The Sunken Obelisk", 330, 832, 4], ["unfinished_pyramid", "The Unfinished Pyramid", 720, 828, 4],
+  ] as const).map(([id, name, x, y, danger]) => ({ id, name, label: { x, y }, danger, far: true, south: true }) as Region),
+  { id: "black_stair", name: "The Black Stair", label: { x: 215, y: 906 }, danger: 6, underground: true, far: true, south: true },
 ];
 export const regionIndex = (id: RegionId) => REGIONS.findIndex(region => region.id === id);
 /** The mainland regions' labels were written in the mainland's own coordinates: move them with it (once, at load). */
@@ -265,7 +275,11 @@ export type Building = {
   /** A pitched roof hipped at both ends (sloping on all four sides) instead of gabled. */
   hip?: boolean;
   /** What the walls are made of: stone brick, half-timbered plaster, planks, or pale dressed marble. */
-  walls?: "stone" | "timber" | "plank" | "marble" | "mizukai" | "lacquer";
+  walls?: "stone" | "timber" | "plank" | "marble" | "mizukai" | "lacquer" | "sandstone" | "mudbrick";
+  /** A pyramid (Kharaveth): a plinth course of dressed stone, then four steep faces of stone courses up to a point (square, with `hip`). */
+  pyramid?: boolean;
+  /** A pyramid left three-fifths built: no capstone, its top a rough platform. */
+  unfinished?: boolean;
   /**
    * A Mizukai building (the Mizukai Isles): a hipped roof of dark tile with a wide overhang, its eaves turned up at the
    * corners and a ridge cap along the top; walls of white plaster between dark posts ("mizukai") or a shrine's vermilion
@@ -283,7 +297,7 @@ export type Building = {
 /** An upper storey: the real rectangle it covers and where its tiles are stored (real + (dx, dy)). */
 export type Floor = { complex: string; level: number; x0: number; y0: number; x1: number; y1: number; dx: number; dy: number };
 /** A city wall standing taller than a storey: the outline of the rectangle, `storeys` high, battlemented. */
-export type Rampart = { x0: number; y0: number; x1: number; y1: number; storeys: number };
+export type Rampart = { x0: number; y0: number; x1: number; y1: number; storeys: number; /** What it's built of (stone unless said). */ walls?: Building["walls"] };
 export type World = {
   tiles: Uint8Array; region: Uint8Array; objects: WorldObject[]; objectAt: Int32Array; spawns: SpawnDef[];
   buildings: Building[];
@@ -295,7 +309,7 @@ export type World = {
   /** Ground height (world pixels) at every tile corner: (W + 1) × (H + 1), corner (i, j) sits at (i − ½, j − ½). */
   heights: Float32Array;
   places: Record<"spawn" | "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier" | "crypt" | "depths" | "king" | "fernwick" | "highcairn" | "dawnhold" | "gravesend" | "saltmarrow" | "hollyhock" | "dyemoor" | "tallgrass" | "cragmaw" | "quillhaven" | "raria" | "fff_fortress" | "barkreach" | "ashfall" | "ring"
-    | "kurohama" | "takamori" | "kumoyama" | "tanabe" | "yumoto" | "foothold", { x: number; y: number }>;
+    | "kurohama" | "takamori" | "kumoyama" | "tanabe" | "yumoto" | "foothold" | "sefrah" | "tamesh" | "khetmar" | "zuri" | "ouresh", { x: number; y: number }>;
 };
 
 function mulberry(seed: number) {

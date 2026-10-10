@@ -302,6 +302,18 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
           for (const x of [8, 13, 19, 24]) line(p, [[x, 24], [16, 9]], shadeHex(color, -0.14));
           line(p, [[4, 24], [28, 24]], accent ?? DARK_WOOD, 2); break;
         }
+        if (icon.kind === "headcloth") {
+          // A Kharaveth headcloth: close over the crown, striped, a lappet down each side.
+          part(p, all(poly([[7, 16], [9, 7], [16, 5], [23, 7], [25, 16]]), box(4, 14, 6, 15), box(22, 14, 6, 15)), color, "cloth");
+          for (const y of [9, 13, 17, 21, 25]) line(p, [[4, y], [28, y]], accent ?? DARK_WOOD);
+          line(p, [[8, 15], [24, 15]], accent ?? GOLD_C, 2); break;
+        }
+        if (icon.kind === "turban") {
+          // A wrapped turban: turns of cloth, a fold across, a tail.
+          part(p, poly([[5, 24], [5, 14], [9, 8], [16, 6], [23, 8], [27, 14], [27, 24]]), color, "cloth");
+          for (const y of [12, 17, 22]) line(p, [[6, y + 1], [26, y - 1]], shadeHex(color, -0.16));
+          part(p, poly([[24, 20], [29, 22], [28, 30], [25, 29]]), accent ?? shadeHex(color, -0.2), "cloth"); break;
+        }
         if (icon.kind === "wide") {
           // A wide brim and a round crown with a band.
           part(p, disc(16, 23, 15, 5), shadeHex(color, -0.06), "cloth");

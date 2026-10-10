@@ -483,6 +483,27 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
           p.rect(l + 1, top - 1, r - l - 1, 2, piece.trim ?? dark); p.line(l + 2, top - 5, r - 3, top - 5, light);
           break;
         }
+        if (piece.style === "headcloth") {
+          // A Kharaveth headcloth: drawn tight over the crown, striped in its trim, a lappet falling to each shoulder in
+          // front (behind, it gathers into a tail down the back).
+          const brow = top + 2, cloth = new Pixels(p.w, p.h), lappet = (x: number) => cloth.poly([[x - 2, brow], [x + 2, brow], [x + 2, neckY + 4], [x - 2, neckY + 4]], color, null);
+          cloth.poly([[l - 1, brow + 1], [l - 1, top - 1], [l + 1, top - 4], [r - 1, top - 4], [r + 1, top - 1], [r + 1, brow + 1]], color, null);
+          if (back) cloth.poly([[Math.round(cx) - 3, brow], [Math.round(cx) + 3, brow], [Math.round(cx) + 1 + sway, neckY + 5], [Math.round(cx) - 1 + sway, neckY + 5]], color, null);
+          else for (const x of side ? [Math.round(cx) - side * (headHalf + 1)] : [l - 1, r + 1]) lappet(x);
+          for (let y = 0; y < p.h; y++) for (let x = 0; x < p.w; x++) { const v = cloth.get(x, y); if (v) { if ((y - top) % 2 === 0) p.set(x, y, piece.trim ?? dark); else p.set(x, y, v); } }
+          p.line(l, brow + 1, r, brow + 1, piece.trim ?? light); p.line(l + 1, top - 3, r - 1, top - 3, light);
+          break;
+        }
+        if (piece.style === "turban") {
+          // A wrapped turban: turns of cloth round the crown, a darker fold across, a loose tail behind.
+          const brimY = top + 1, tail = piece.trim ?? shadeHex(color, -0.15);
+          p.poly([[l - 1, brimY], [l - 1, top - 3], [l + 1, top - 6], [r - 1, top - 6], [r + 1, top - 3], [r + 1, brimY]], color, null);
+          for (const y of [top - 4, top - 1]) p.line(l, y, r, y + 1, shadeHex(color, -0.12));
+          p.line(l + 1, top - 5, r - 2, top - 5, light);
+          const tx = side ? Math.round(cx) - side * (headHalf + 1) : back ? Math.round(cx) : r + 1;
+          if (side || back) p.poly([[tx - 1, brimY - 1], [tx + 1, brimY - 1], [tx + sway + (side ? -side : 0), neckY + 6], [tx - 1 + sway + (side ? -side : 0), neckY + 6]], tail, null);
+          break;
+        }
         // A pointed wizard's hat with a brim and a band.
         const brimY = top + 1, tipX = Math.round(cx) + 3 + sway * 2 - side * 2;
         p.disc(cx, brimY, headHalf + 4, 2.2, dark, null);
