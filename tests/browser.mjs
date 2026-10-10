@@ -225,16 +225,20 @@ try {
     if (open) {
       // (Only a press on open ground starts a hold: if someone wandered under the pointer just then, it was a click on
       // them, so let go and press again.)
-      let holding = false, presses = 0;
-      for (let attempt = 0; attempt < 4 && !holding; attempt++) {
-        presses++;
+      let holding = false, presses = 0, under = "";
+      for (let attempt = 0; attempt < 6 && !holding; attempt++) {
         if (attempt) { await page.mouse.up(); await teleport(spot.x, spot.y); await page.waitForTimeout(400); }
         const target = await screenOf(open.x, open.y);
-        await page.mouse.move(target.x, target.y); await page.mouse.down();
+        await page.mouse.move(target.x, target.y); await page.waitForTimeout(150);
+        // What the game says is under the pointer: press only on "Walk here".
+        under = (await game.locator(".realm-hover").textContent()) ?? "";
+        if (!/^Walk here/.test(under)) { await page.mouse.move(target.x, target.y - 40); await page.waitForTimeout(1000); continue; }
+        presses++; await page.mouse.down();
         await page.waitForTimeout(1500);
         holding = await state(() => !!window.__realm.game().held);
       }
-      assert(holding, "pressing on open ground and holding walks by the pointer");
+      const near = holding ? "" : await state(([x, y]) => { const g = window.__realm.game(), by = e => Math.abs(e.x - x) <= 3 && Math.abs(e.y - y) <= 4; return JSON.stringify({ npcs: g.npcs.filter(by).map(n => [n.id, n.x, n.y]), monsters: g.monsters.filter(m => !m.dead && by(m)).map(m => [m.def.id, m.x, m.y]), held: g.held, path: g.player.path.length, at: [g.player.x, g.player.y] }); }, [open.x, open.y]);
+      assert(holding, `pressing on open ground and holding walks by the pointer (under the pointer: "${under}", pressed ${presses}×, ${near})`);
       const mid = await state(() => ({ x: window.__realm.game().player.x, y: window.__realm.game().player.y }));
       assert(mid.x - open.from.x >= 2 && Math.abs(mid.y - open.from.y) <= 1, `holding the button walks towards the pointer (${mid.x - open.from.x}, ${mid.y - open.from.y})`);
       const back = await screenOf(mid.x - 6, open.from.y);
