@@ -375,7 +375,7 @@ const kororin = (beat: number, scale: readonly number[], top: number, velocity: 
 /** Wrap a canon's tail round to the loop's start. */
 const wrap = (notes: readonly Note[], beats: number) => notes.map(note => ({ ...note, beat: note.beat % beats }));
 
-type MizukaiPiece = { id: TrackId; name: string; bpm: number; beats: number; tonic: number; scale: readonly number[]; notes: () => Note[]; hits: () => Hit[] };
+type MizukaiPiece = { id: TrackId; name: string; bpm: number; beats: number; tonic: number; scale: readonly number[]; level?: number; notes: () => Note[]; hits: () => Hit[] };
 function composeMizukai(piece: MizukaiPiece): Track {
   const notes = piece.notes(), hits = piece.hits();
   const outside = [...notes, ...hits].find(entry => entry.beat < 0 || entry.beat >= piece.beats);
@@ -383,7 +383,9 @@ function composeMizukai(piece: MizukaiPiece): Track {
   // Every note of the tune on the piece's own five (the bell and the sho's clusters ring their own way).
   const stray = notes.find(note => note.voice !== "kane" && note.voice !== "sho" && !piece.scale.includes(((note.midi - piece.tonic) % 12 + 12) % 12));
   if (stray) throw new Error(`${piece.name}: MIDI ${stray.midi} is off its scale`);
-  return { id: piece.id, name: piece.name, bpm: piece.bpm, beats: piece.beats, notes, hits };
+  // The quiet pieces (a koto alone, the court's few instruments) brought up to sit with the others.
+  const level = piece.level ?? 1;
+  return { id: piece.id, name: piece.name, bpm: piece.bpm, beats: piece.beats, notes: notes.map(note => ({ ...note, velocity: note.velocity * level })), hits: hits.map(hit => ({ ...hit, velocity: hit.velocity * level })) };
 }
 // Scales, as steps above the tonic: yo (bright, open), min'yo (the folk songs'), in (miyako-bushi: the half-steps of the koto
 // and the ghosts), hirajoshi, kumoi, and the court's ritsu.
@@ -416,7 +418,7 @@ const MIZUKAI_PIECES: readonly MizukaiPiece[] = [
       ...(bar % 4 === 3 ? strokes(bar % 8 === 7 ? "r:3 yo:1" : "r:3.5 ha:0.5", b0, 0.75) : []), ...(bar % 8 === 7 ? strokes("r:3 clapper:0.5! clapper:0.5!", b0, 0.7) : [])])] },
   // A koto duet in hirajoshi, like Sakura or Rokudan: the tune with its presses, a second koto low with its sweeps and
   // kororin, and the second time round a shakuhachi joins, holding the long notes.
-  { id: "mizukai_village", name: "Under the Eaves", bpm: 76, beats: 128, tonic: A, scale: HIRAJOSHI,
+  { id: "mizukai_village", name: "Under the Eaves", bpm: 76, beats: 128, tonic: A, scale: HIRAJOSHI, level: 1.45,
     notes: () => {
       const a = `A4:1 B4:1 C5:2^ | B4:1 A4:1 F4:2~ | E4:1 F4:1 A4:1 B4:1 | C5:2^ B4:2 | E5:1 C5:1 B4:1 A4:1 | B4:1 C5:1 B4:1 A4:0.5 F4:0.5 | E4:4~ | r:4`;
       const b = `E5:1 F5:1 E5:2^ | C5:1 B4:1 C5:2 | E5:1 F5:1 A5:2^ | F5:1 E5:1 C5:2 | B4:1 C5:1 E5:1 C5:1 | B4:1 A4:1 F4:2~ | E4:1 F4:1 A4:2^ | A4:4`;
@@ -425,6 +427,8 @@ const MIZUKAI_PIECES: readonly MizukaiPiece[] = [
       for (let bar = 0; bar < 32; bar++) {
         const note = sounding(tune, bar * 4);
         if (note) low.push({ beat: bar * 4, voice: "koto", midi: note.midi - 12, length: 1.5, velocity: 0.34 });
+        // Where the tune rests, the low koto answers it.
+        else low.push(...[64, 60, 59].map((midi, k) => ({ beat: bar * 4 + k * 0.75, voice: "koto" as Voice, midi, length: k === 2 ? 1.5 : 0.75, velocity: 0.36, shape: k === 2 ? { fall: 1 } : undefined })));
         if (bar % 4 === 3) low.push(...kororin(bar * 4 + 3, scale, 64, 0.32));
       }
       const sweeps = [0, 32, 64, 96].flatMap(beat => sararin(beat, scale, 57, 8, 0.3));
@@ -434,7 +438,7 @@ const MIZUKAI_PIECES: readonly MizukaiPiece[] = [
     hits: () => [] },
   // Gagaku: the sho's held clusters, the hichiriki's slow line with its slides (enbai), the ryuteki twining round it an octave
   // up, the kakko's rolls, the shoko's chimes, and the great drum.
-  { id: "mizukai_shrine", name: "Kumoyama", bpm: 44, beats: 64, tonic: E, scale: RITSU,
+  { id: "mizukai_shrine", name: "Kumoyama", bpm: 44, beats: 64, tonic: E, scale: RITSU, level: 1.35,
     notes: () => {
       const tune = phrase(`E4:4v2 | F#4:2 A4:2~ | B4:4v2 | B4:2+ A4:2 | F#4:4 | E4:2v2 F#4:2 | E4:4+ | r:4 |
         A4:4v2 | B4:2 D5:2v | B4:4+ | A4:2 F#4:2~ | F#4:2 A4:2 | F#4:2 E4:2v2 | E4:4+ | r:4`, "hichiriki", 0, 0.75);
