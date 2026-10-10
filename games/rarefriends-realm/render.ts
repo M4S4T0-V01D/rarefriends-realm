@@ -2580,7 +2580,8 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       else if (object.kind === "spot") rect = drawSpot(ctx, camera, object, now, scene.reducedMotion);
       else if (object.kind === "decor") rect = drawDecor(ctx, scene, object, fade);
       else rect = drawStation(ctx, scene, object);
-      if (object.kind !== "decor" || object.decor === "chest") hits.push({ ...rect, pick: { kind: "object", id: object.id } });
+      // Scenery isn't clickable, but a chest is, and so is anything with a clue on it (a shrine, a counterweight, a split stone).
+      if (object.kind !== "decor" || object.decor === "chest" || object.clue) hits.push({ ...rect, pick: { kind: "object", id: object.id } });
     } });
   };
   // Static objects, walls and cliffs on the ground.
