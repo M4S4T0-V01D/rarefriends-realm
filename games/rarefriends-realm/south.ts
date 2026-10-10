@@ -332,6 +332,13 @@ export function buildSouth(ctx: GenContext, t: Tools, places: World["places"], f
   hall(U.x0 + 80, uy0 + 25, U.x0 + 82, uy0 + 28);
   hall(U.x0 + 132, uy0 + 34, U.x0 + 150, uy0 + 50);                      // the beetles' gallery, a dead end east
   hall(U.x0 + 120, uy0 + 40, U.x0 + 132, uy0 + 42); hall(U.x0 + 118, uy0 + 30, U.x0 + 120, uy0 + 42);
+  // Walls of dressed stone round every hall and passage (the dark beyond them is solid rock).
+  for (let y = uy0 - 1; y <= uy1 + 1; y++) for (let x = U.x0 - 1; x <= U.x1 + 1; x++) {
+    if (get(x, y) !== T.VOID) continue;
+    let beside = false;
+    for (let dy = -1; dy <= 1 && !beside; dy++) for (let dx = -1; dx <= 1 && !beside; dx++) { const tt = get(x + dx, y + dy); if (tt === T.STONE || tt === T.DUNGEON) beside = true; }
+    if (beside) put(x, y, T.WALL);
+  }
   // Its stones: inscriptions on the road (three), the refuge, the counterweight, the shaft out.
   clue(U.x0 + 34, uy0 + 5, { kind: "sign", blocks: true, name: "Carved lintel", clue: "underway_lintel", text: "" });
   clue(U.x0 + 81, uy0 + 13, { kind: "sign", blocks: true, name: "Glyph wall", clue: "underway_glyphs", text: "" });
@@ -345,7 +352,13 @@ export function buildSouth(ctx: GenContext, t: Tools, places: World["places"], f
   put(shaftTop.x, shaftTop.y, T.STONE); for (const [dx, dy] of [[1, 0], [0, 1], [-1, 0], [0, -1]] as const) if (get(shaftTop.x + dx, shaftTop.y + dy) === T.CLIFF) put(shaftTop.x + dx, shaftTop.y + dy, T.SAND);
   add({ kind: "ladder", x: U.x0 + 120, y: uy0 + 8, blocks: true, name: "Old shaft", action: "Climb-up", to: { x: shaftTop.x, y: shaftTop.y + 1 }, clue: "underway_shaft_up" });
   add({ kind: "ladder", x: shaftTop.x, y: shaftTop.y, blocks: true, name: "Sand-choked shaft", action: "Climb-down", to: { x: U.x0 + 120, y: uy0 + 10 }, clue: "underway_shaft_down" });
-  for (const [x, y] of [[U.x0 + 40, uy0 + 5], [U.x0 + 59, uy0 + 18], [U.x0 + 90, uy0 + 29], [U.x0 + 119, uy0 + 20]] as const) put2(x, y, "torch", "Old torch bracket", false);
+  // Torch brackets along the road, every dozen paces, and in each hall: the road's keepers kept it lit.
+  const torches: [number, number][] = [[U.x0 + 8, uy0 + 3], [U.x0 + 31, uy0 + 12], [U.x0 + 30, uy0 + 19], [U.x0 + 75, uy0 + 14], [U.x0 + 87, uy0 + 14], [U.x0 + 70, uy0 + 36], [U.x0 + 88, uy0 + 44], [U.x0 + 116, uy0 + 8], [U.x0 + 140, uy0 + 36]];
+  for (let x = U.x0 + 16; x < U.x0 + 58; x += 12) torches.push([x, uy0 + 4]);
+  for (let y = uy0 + 10; y < uy0 + 28; y += 12) torches.push([U.x0 + 58, y]);
+  for (let x = U.x0 + 64; x < U.x0 + 118; x += 12) torches.push([x, uy0 + 28]);
+  for (let y = uy0 + 14; y < uy0 + 28; y += 12) torches.push([U.x0 + 120, y]);
+  for (const [x, y] of torches) put2(x, y, "torch", "Old torch bracket", false);
   // Its creatures: tomb beetles, lamp-eyed bats, and the road's sentinel at the glyph hall.
   for (const [id, x0, y0, x1, y1, n] of [["tomb_beetle", U.x0 + 132, uy0 + 34, U.x0 + 150, uy0 + 50, 6], ["lamp_bat", U.x0 + 10, uy0 + 4, U.x0 + 120, uy0 + 30, 6], ["tomb_beetle", U.x0 + 66, uy0 + 34, U.x0 + 92, uy0 + 46, 3]] as const) {
     t.monsters(id, x0, y0, x1, y1, n);

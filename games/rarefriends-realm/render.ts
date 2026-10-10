@@ -502,6 +502,17 @@ function gpuSlope(ctx: CanvasRenderingContext2D, camera: Camera, points: readonl
 }
 const roofShingles = (fill: string) => shingleTexture(fill, 16, 24);
 
+/** A cliff tile's height and colours: grey stone, or in Kharaveth (the south) sandstone, towering in the Sunteeth, and the Black Range's basalt. */
+let sunteethIndex = -1, southRegions: Set<number> | null = null;
+/** A cliff's height and colours: grey rock, except in the south (Kharaveth's sandstone, and the Black Range's basalt). */
+function cliffLook(x: number, y: number): [number, string, string, string] {
+  const r = hash(x, y);
+  if (!southRegions) { southRegions = new Set(REGIONS.flatMap((region, i) => region.south ? [i] : [])); sunteethIndex = REGIONS.findIndex(region => region.id === "sunteeth"); }
+  if (y >= OVERWORLD_H || !ground || !southRegions.has(ground.region[y * W + x])) return [22 + r * 10, "#a39e96", "#8f8a83", "#7c7771"];
+  if (ground.region[y * W + x] === sunteethIndex) return [40 + r * 26, shadeHex("#d9a878", (r - 0.5) * 0.08), "#c98f5f", "#a8744a"];
+  if (((x - 900) / 125) ** 2 + ((y - 790) / 60) ** 2 < 1) return [30 + r * 14, "#5a5560", "#46424c", "#36333b"];
+  return [26 + r * 14, "#d4b088", "#c59a6c", "#a87f56"];
+}
 /** A world point's depth as the GPU's camera has it (gl.ts `project`), upstairs points moved to their real place. */
 function glDepth(camera: Camera, x: number, y: number, lift = 0) {
   if (y >= FLOOR_Y - 0.5 && ground) { const floor = floorAt(ground, x, y); if (floor) { x -= floor.dx; y -= floor.dy; lift += floor.level * STOREY; } }
@@ -2574,7 +2585,11 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
         box(ctx, camera, x, y, 1, 1, h - 6, "#b9b4ab", "#a39e95", "#8f8a82", WALL_H + 6, INK, hash(x, y + 5) < 0.4 ? (windowGlow > 0.02 ? "window_lit" : "window") : "brick");
         capturing = null;
       } });
-    } else if (terrain === T.CLIFF) { drawables.push({ depth: depth(x, y), at: { x, y }, size: [60, 52, 30], exact: true, hull: () => boxHull(camera, x, y, 1, 1, 22 + hash(x, y) * 10), draw: () => { capturing = glr && ctx === target ? glr : null; box(ctx, camera, x, y, 1, 1, 22 + hash(x, y) * 10, "#a39e96", "#8f8a83", "#7c7771"); capturing = null; } }); blockers.push([x, y, 28]); }
+    } else if (terrain === T.CLIFF) {
+      // Kharaveth's rock is its own: the Sunteeth's towering sandstone, the desert's lower sandstone, the Black Range's basalt.
+      const [h, top, left, right] = cliffLook(x, y);
+      drawables.push({ depth: depth(x, y), at: { x, y }, size: [h + 38, 52, 30], exact: true, hull: () => boxHull(camera, x, y, 1, 1, h), draw: () => { capturing = glr && ctx === target ? glr : null; box(ctx, camera, x, y, 1, 1, h, top, left, right); capturing = null; } }); blockers.push([x, y, h + 6]);
+    }
     if (!covered(x, y)) object(x, y);
   }
   // The storeys you've climbed: outer walls of the ones below, and the floor you stand on with its walls and furniture.
