@@ -4,6 +4,11 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 95, date: "2026-10-10", title: "The Isles' own music, and gates you walk under", items: [
+    "The Mizukai Isles' music, written again: every piece has its own tradition now. Court music (hichiriki, ryuteki and sho) at the shrines, the festival flute and taiko at the harbour, the biwa and the noh flute in the haunted places and against the great spirits, Tsugaru shamisen in battle, and koto and shakuhachi in the villages and forests, each in its own scale and at its own pace.",
+    "The Isles' shrine gates stand in the world now, across their paths: taller, wide enough for the whole path to pass under, and no longer turning to face you when the camera turns. The Thousand Gates on Morishima make a tunnel, and you can walk through the Bone Gate and the gate on Turtle Rock.",
+    "Choosing a rendering mode twice in quick succession no longer leaves the Realm in the first one you picked.",
+  ] },
   { id: 94, date: "2026-10-09", title: "What rises in the east: the Mizukai Isles", items: [
     "East of the old east coast, where the sun comes up first, lie the Mizukai Isles: Hinode, the Isle of Sunrise, and thirteen islands round it. A ferry runs from Eastport, by Quillhaven, to Kurohama's harbour.",
     "Hinode is a whole country: Kurohama's harbour city on its stone quay, the castle town of Takamori and the Hall of the Takamori lords, the Thousand Steps up Mount Kumo to the shrine of Kumoyama and its pagoda, the Old Cedars, the Whispering Bamboo, Tanabe's rice terraces, the hot springs of Yumoto, and Kurokage Wood, where the lord's foresters won't go after dark.",

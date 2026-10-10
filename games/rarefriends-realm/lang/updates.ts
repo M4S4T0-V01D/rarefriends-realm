@@ -24,9 +24,10 @@ import { UPDATES20 } from "./updates20.ts";
 import { UPDATES21 } from "./updates21.ts";
 import { UPDATES22 } from "./updates22.ts";
 import { UPDATES23 } from "./updates23.ts";
+import { UPDATES24 } from "./updates24.ts";
 
 export const UPDATE_LOG: Readonly<Record<string, Row>> = {
   ...UPDATES1, ...UPDATES2, ...UPDATES3, ...UPDATES4, ...UPDATES5, ...UPDATES6, ...UPDATES7, ...UPDATES8, ...UPDATES9, ...UPDATES10,
   ...UPDATES11, ...UPDATES12, ...UPDATES13, ...UPDATES14, ...UPDATES15, ...UPDATES16, ...UPDATES17, ...UPDATES18, ...UPDATES19, ...UPDATES20,
-  ...UPDATES21, ...UPDATES22, ...UPDATES23,
+  ...UPDATES21, ...UPDATES22, ...UPDATES23, ...UPDATES24,
 };

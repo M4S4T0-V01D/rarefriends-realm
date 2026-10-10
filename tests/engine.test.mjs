@@ -2880,3 +2880,9 @@ test("the Mizukai Isles' music: their own instruments, ornamented, and every pie
   assert(voices("mizukai_harbour").has("shinobue"), "the harbour's festival flute");
   assert.equal(trackFor("hinode", false), "mizukai_sunrise"); assert.equal(trackFor("hinode", false, { fight: true }), "mizukai_battle"); assert.equal(trackFor("friendhollow", false, { sea: true }), "mizukai_sea");
 });
+
+test("every standing shrine gate on the Isles can be walked under (only the fallen one lies in the way)", () => {
+  const g = createGame({ familyId: 1, friendId: 7730 }), gates = g.world.objects.filter(o => o && o.decor === "torii");
+  assert(gates.length >= 30, `the Isles' gates (${gates.length})`);
+  for (const gate of gates) assert.equal(gate.blocks, /fallen/i.test(gate.name), `${gate.name} at ${gate.x},${gate.y}`);
+});

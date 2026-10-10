@@ -362,13 +362,13 @@ export function buildMizukaiTowns(ctx: GenContext, t: Tools, isle: Isle, places:
   }
   // Turtle Rock: a wish shrine on a rock like a turtle's back.
   {
-    put2(1548, 371, "wayside_statue", "A stone turtle, polished on the nose by every hand that ever wished"); put2(1546, 373, "offering_box", "An offering box for wishes: one coin, one wish, and the turtle decides"); put2(1550, 373, "torii", "A small shrine gate on Turtle Rock");
+    put2(1548, 371, "wayside_statue", "A stone turtle, polished on the nose by every hand that ever wished"); put2(1546, 373, "offering_box", "An offering box for wishes: one coin, one wish, and the turtle decides"); put2(1550, 373, "torii", "A small shrine gate on Turtle Rock", false);
   }
   // Hakkotsu: the white island, its bone gate, and the shrine underneath.
   {
     const cx = 1690, cy = 484;
     for (let i = 0; i < 26; i++) { const [x, y] = nearFree(cx - 18 + Math.floor(random() * 36), cy - 14 + Math.floor(random() * 28), 2); if (at(x, y) >= 0 && !occupied(x, y)) decor(x, y, "bones", false, "Bones, white as salt, and too many"); }
-    put2(cx, cy - 4, "torii", "The Bone Gate: a shrine gate built of two great white ribs. Whatever they came from is underneath.");
+    put2(cx, cy - 4, "torii", "The Bone Gate: a shrine gate built of two great white ribs. Whatever they came from is underneath.", false);
     for (const [dx, dy] of [[-10, 4], [8, 6], [12, -6], [-6, -10]] as const) monsterAt("starved_dead", cx + dx, cy + dy, 3);
   }
 

@@ -1,0 +1,48 @@
+// The update log (updates.ts) in every language: update 95 (the Isles' own music, and shrine gates that stand in the world). See updates.ts in this folder.
+import type { Row } from "./table.ts";
+
+export const UPDATES24: Readonly<Record<string, Row>> = {
+  "The Isles' own music, and gates you walk under": ["諸島の音楽と、くぐれる鳥居", "제도의 음악과 지나갈 수 있는 도리이", "群岛自己的音乐,以及可以穿过的鸟居", "群島自己的音樂,以及可以穿過的鳥居", "Âm nhạc riêng của Quần đảo, và những cổng torii để đi qua", "Musik Kepulauan sendiri, dan gerbang yang bisa dilewati", "ดนตรีของหมู่เกาะเอง และประตูโทริอิที่เดินลอดได้", "Adaların kendi müziği ve altından geçilen kapılar", "La música propia de las Islas, y puertas bajo las que pasar", "A música das Ilhas, e portais para passar por baixo", "Своя музыка островов и ворота, под которыми можно пройти", "Власна музика островів і ворота, під якими можна пройти"],
+  "The Mizukai Isles' music, written again: every piece has its own tradition now. Court music (hichiriki, ryuteki and sho) at the shrines, the festival flute and taiko at the harbour, the biwa and the noh flute in the haunted places and against the great spirits, Tsugaru shamisen in battle, and koto and shakuhachi in the villages and forests, each in its own scale and at its own pace.": [
+    "ミズカイ諸島の音楽を書き直しました。どの曲にもそれぞれの伝統があります。社には雅楽(篳篥・龍笛・笙)、港には祭りの笛と太鼓、怪しい場所と大いなる霊との戦いには琵琶と能管、戦いには津軽三味線、村と森には箏と尺八。それぞれ独自の音階と速さで。",
+    "미즈카이 제도의 음악을 새로 썼습니다. 이제 곡마다 저마다의 전통이 있습니다. 신사에는 궁중 음악(히치리키, 류테키, 쇼), 항구에는 축제의 피리와 북, 으스스한 곳과 위대한 영과의 싸움에는 비와와 노칸, 전투에는 쓰가루 샤미센, 마을과 숲에는 고토와 샤쿠하치가 흐르며, 각자 고유한 음계와 빠르기를 지닙니다.",
+    "水海群岛的音乐重新谱写:如今每首曲子都有自己的传统。神社里是雅乐(筚篥、龙笛和笙),港口是祭典的笛子和太鼓,闹鬼之地和与大灵的战斗中是琵琶和能管,战斗时是津轻三味线,村庄和森林里是筝与尺八,各有各的音阶与速度。",
+    "水海群島的音樂重新譜寫:如今每首曲子都有自己的傳統。神社裡是雅樂(篳篥、龍笛和笙),港口是祭典的笛子和太鼓,鬧鬼之地和與大靈的戰鬥中是琵琶和能管,戰鬥時是津輕三味線,村莊和森林裡是箏與尺八,各有各的音階與速度。",
+    "Âm nhạc của Quần đảo Mizukai được viết lại: giờ mỗi bản nhạc có truyền thống riêng. Nhã nhạc cung đình (hichiriki, ryuteki và sho) ở các đền, sáo lễ hội và trống taiko ở bến cảng, đàn biwa và sáo noh ở những nơi ma ám và khi đối đầu các linh hồn lớn, shamisen Tsugaru khi chiến đấu, và đàn koto cùng sáo shakuhachi ở làng mạc và rừng, mỗi bản một thang âm và nhịp độ riêng.",
+    "Musik Kepulauan Mizukai ditulis ulang: kini setiap lagu punya tradisinya sendiri. Musik istana (hichiriki, ryuteki dan sho) di kuil, seruling festival dan taiko di pelabuhan, biwa dan seruling noh di tempat-tempat berhantu dan melawan roh-roh agung, shamisen Tsugaru dalam pertempuran, serta koto dan shakuhachi di desa dan hutan, masing-masing dengan tangga nada dan temponya sendiri.",
+    "ดนตรีของหมู่เกาะมิซุไคถูกเขียนขึ้นใหม่ ตอนนี้ทุกเพลงมีขนบของตัวเอง ดนตรีราชสำนัก (ฮิจิริกิ ริวเทกิ และโช) ที่ศาลเจ้า ขลุ่ยงานเทศกาลและกลองไทโกะที่ท่าเรือ บิวะและขลุ่ยโนในที่ผีสิงและยามสู้กับวิญญาณผู้ยิ่งใหญ่ ชามิเซ็งสึการุยามต่อสู้ และโคโตะกับชากุฮาจิในหมู่บ้านและป่า แต่ละเพลงมีบันไดเสียงและจังหวะของตัวเอง",
+    "Mizukai Adaları'nın müziği yeniden yazıldı: artık her parçanın kendi geleneği var. Tapınaklarda saray müziği (hichiriki, ryuteki ve sho), limanda şenlik flütü ve taiko, perili yerlerde ve büyük ruhlara karşı biwa ve noh flütü, savaşta Tsugaru shamiseni, köylerde ve ormanlarda koto ve shakuhachi; her biri kendi dizisinde ve kendi hızında.",
+    "La música de las Islas Mizukai, escrita de nuevo: ahora cada pieza tiene su propia tradición. Música de corte (hichiriki, ryuteki y sho) en los santuarios, la flauta y los taiko de las fiestas en el puerto, el biwa y la flauta del noh en los lugares embrujados y contra los grandes espíritus, shamisen de Tsugaru en combate, y koto y shakuhachi en las aldeas y los bosques, cada una en su propia escala y a su propio ritmo.",
+    "A música das Ilhas Mizukai, escrita de novo: agora cada peça tem a sua própria tradição. Música da corte (hichiriki, ryuteki e sho) nos santuários, a flauta e os taiko das festas no porto, o biwa e a flauta do nô nos lugares assombrados e contra os grandes espíritos, shamisen de Tsugaru em combate, e koto e shakuhachi nas aldeias e florestas, cada uma na sua escala e no seu andamento.",
+    "Музыка Мидзукайских островов написана заново: теперь у каждой пьесы своя традиция. Придворная музыка (хитирики, рютэки и сё) у святилищ, праздничная флейта и тайко в гавани, бива и флейта но в местах с привидениями и в битвах с великими духами, цугару-сямисэн в бою, а кото и сякухати в деревнях и лесах — у каждой свой лад и свой темп.",
+    "Музику Мідзукайських островів написано заново: тепер кожна п'єса має власну традицію. Придворна музика (хітірікі, рютекі та сьо) біля святилищ, святкова флейта й тайко в гавані, біва та флейта но в місцях із привидами й у битвах із великими духами, цуґару-сямісен у бою, а кото й сякухаті в селах і лісах — кожна у своєму ладі та своєму темпі.",
+  ],
+  "The Isles' shrine gates stand in the world now, across their paths: taller, wide enough for the whole path to pass under, and no longer turning to face you when the camera turns. The Thousand Gates on Morishima make a tunnel, and you can walk through the Bone Gate and the gate on Turtle Rock.": [
+    "諸島の鳥居が世界の中に、道をまたいで立つようになりました。より高く、道幅いっぱいにくぐれる広さになり、カメラを回してもこちらを向いて回ることはもうありません。森島の千本鳥居はトンネルになり、骨の門と亀岩の鳥居もくぐれます。",
+    "제도의 도리이가 이제 길을 가로질러 세계 안에 서 있습니다. 더 높아졌고, 길 전체가 아래로 지나갈 만큼 넓어졌으며, 카메라를 돌려도 더는 플레이어 쪽으로 돌아서지 않습니다. 모리시마의 천 개의 문은 터널을 이루고, 뼈의 문과 거북 바위의 도리이도 지나갈 수 있습니다.",
+    "群岛的鸟居如今横跨道路立在世界之中:更高了,宽到整条路都能从下面穿过,转动镜头时也不再转过来面向你。森岛的千本鸟居连成一条隧道,骨门和龟岩上的鸟居也可以穿过了。",
+    "群島的鳥居如今橫跨道路立在世界之中:更高了,寬到整條路都能從下面穿過,轉動鏡頭時也不再轉過來面向你。森島的千本鳥居連成一條隧道,骨門和龜岩上的鳥居也可以穿過了。",
+    "Các cổng torii của Quần đảo giờ đứng hẳn trong thế giới, bắc ngang con đường: cao hơn, đủ rộng để cả con đường đi qua bên dưới, và không còn xoay theo bạn khi xoay góc nhìn. Ngàn Cổng trên Morishima tạo thành một đường hầm, và bạn có thể đi qua Cổng Xương cùng cổng trên Đá Rùa.",
+    "Gerbang kuil Kepulauan kini berdiri di dunia, melintang di atas jalannya: lebih tinggi, cukup lebar untuk dilalui seluruh jalan, dan tidak lagi berputar menghadapmu saat kamera diputar. Seribu Gerbang di Morishima membentuk terowongan, dan kamu bisa berjalan melewati Gerbang Tulang dan gerbang di Batu Kura-kura.",
+    "ประตูโทริอิของหมู่เกาะตอนนี้ตั้งอยู่ในโลกจริง คร่อมทางเดิน สูงขึ้น กว้างพอให้ทั้งทางเดินลอดผ่านได้ และไม่หมุนหันมาหาคุณเมื่อหมุนกล้องอีกต่อไป ประตูพันบานบนโมริชิมะกลายเป็นอุโมงค์ และคุณเดินลอดประตูกระดูกกับประตูบนหินเต่าได้แล้ว",
+    "Adaların tapınak kapıları artık dünyada, yollarının üzerinde duruyor: daha yüksek, yolun tamamı altından geçecek kadar geniş ve kamera döndüğünde artık size dönmüyor. Morishima'daki Bin Kapı bir tünel oluşturuyor ve Kemik Kapı'dan ve Kaplumbağa Kayası'ndaki kapıdan geçebilirsiniz.",
+    "Las puertas de santuario de las Islas se alzan ahora en el mundo, cruzando sus caminos: más altas, lo bastante anchas para que todo el camino pase por debajo, y ya no giran para mirarte al girar la cámara. Las Mil Puertas de Morishima forman un túnel, y se puede pasar bajo La Puerta de Hueso y la puerta de Roca Tortuga.",
+    "Os portais de santuário das Ilhas estão agora no mundo, atravessando os seus caminhos: mais altos, largos o bastante para todo o caminho passar por baixo, e já não se viram para ti quando a câmara roda. Os Mil Portões de Morishima formam um túnel, e podes passar sob O Portão de Osso e o portal da Rocha da Tartaruga.",
+    "Ворота святилищ на островах теперь стоят в самом мире, поперёк своих дорог: они выше, достаточно широки, чтобы под ними проходила вся дорога, и больше не поворачиваются к вам, когда вращается камера. Тысяча ворот на Морисиме образует туннель, а через Костяные врата и ворота на Черепашьем камне теперь можно пройти.",
+    "Ворота святилищ на островах тепер стоять у самому світі, впоперек своїх доріг: вони вищі, достатньо широкі, щоб під ними проходила вся дорога, і більше не повертаються до вас, коли обертається камера. Тисяча воріт на Морісімі утворює тунель, а крізь Кістяну браму та ворота на Черепашачій скелі тепер можна пройти.",
+  ],
+  "Choosing a rendering mode twice in quick succession no longer leaves the Realm in the first one you picked.": [
+    "描画モードを続けてすばやく2回選んでも、最初に選んだほうのままになることはなくなりました。",
+    "렌더링 모드를 연달아 빠르게 두 번 고르면 처음 고른 모드에 머무르던 문제가 고쳐졌습니다.",
+    "快速连续两次选择渲染模式时,王国不会再停留在你选的第一个模式上。",
+    "快速連續兩次選擇渲染模式時,王國不會再停留在你選的第一個模式上。",
+    "Chọn chế độ hiển thị hai lần liên tiếp thật nhanh không còn khiến Vương quốc giữ nguyên chế độ bạn chọn đầu tiên.",
+    "Memilih mode tampilan dua kali berturut-turut dengan cepat tidak lagi membuat Realm tertahan di mode pertama yang kamu pilih.",
+    "การเลือกโหมดการแสดงผลสองครั้งติดกันอย่างรวดเร็วจะไม่ทำให้อาณาจักรค้างอยู่ที่โหมดแรกที่คุณเลือกอีกต่อไป",
+    "Görüntüleme modunu art arda hızlıca iki kez seçmek artık Diyar'ı ilk seçtiğiniz modda bırakmıyor.",
+    "Elegir un modo de dibujo dos veces seguidas muy rápido ya no deja el Reino en el primero que elegiste.",
+    "Escolher um modo de renderização duas vezes seguidas muito depressa já não deixa o Reino no primeiro que escolheste.",
+    "Если быстро выбрать режим отрисовки два раза подряд, Королевство больше не остаётся в первом выбранном режиме.",
+    "Якщо швидко вибрати режим відтворення двічі поспіль, Королівство більше не залишається в першому вибраному режимі.",
+  ],
+};

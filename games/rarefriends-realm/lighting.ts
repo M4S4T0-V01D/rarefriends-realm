@@ -92,7 +92,7 @@ const DECOR_OCCLUDERS: Record<string, [number, number]> = {
   statue: [52, 1], monument: [48, 1], god_diamond: [70, 1], god_ink: [70, 1], god_sol: [70, 1], god_hood: [70, 1], god_ember: [60, 1], god_dusk: [70, 1], wise_friend: [76, 1], cannon: [40, 1], device: [36, 0.9], wagon: [40, 1], watchtower: [110, 1], stake: [30, 0.8], plaque: [20, 1], banner_fff: [40, 0.6], banner_rrr: [40, 0.6], banner_hollowmere: [40, 0.6], banner_diamond: [40, 0.6], banner_ink: [40, 0.6], banner_sol: [40, 0.6], banner_hood: [40, 0.6], banner_ember: [40, 0.6], banner_dusk: [40, 0.6], snowman: [24, 1], armour: [34, 1], shelf: [38, 1], throne: [30, 1], crate: [16, 1], barrel: [18, 1], hay: [16, 1], logpile: [16, 1],
   bush: [16, 0.6], chest: [12, 1], boulder: [22, 1], grave: [14, 1], fence: [12, 0.4], target: [26, 0.8], boat: [12, 1],
   // The Mizukai Isles.
-  torii: [70, 0.5], stone_lantern: [52, 1], pagoda: [210, 1], castle_keep: [240, 1], guardian: [40, 1], sacred_rope: [40, 1], drying_rack: [40, 0.5], offering_box: [36, 1], paper_lantern: [60, 0.6], wish_board: [46, 0.8], wayside_statue: [30, 1], nets: [36, 0.3], steam: [10, 0.2],
+  torii: [90, 0.25], stone_lantern: [52, 1], pagoda: [210, 1], castle_keep: [240, 1], guardian: [40, 1], sacred_rope: [40, 1], drying_rack: [40, 0.5], offering_box: [36, 1], paper_lantern: [60, 0.6], wish_board: [46, 0.8], wayside_statue: [30, 1], nets: [36, 0.3], steam: [10, 0.2],
 };
 const STATION_HEIGHT: Record<string, number> = { furnace: 40, range: 30, anvil: 14, bank: 40, altar: 22, sigil_altar: 26, spinning_wheel: 24, loom: 30, coop: 34 };
 function buildStatic(world: World, colors: Record<number, string>): Static {

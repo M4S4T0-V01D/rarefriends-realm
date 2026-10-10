@@ -1405,6 +1405,105 @@ function drawStation(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldO
     default: return hit(20);
   }
 }
+// ---------- Shrine gates: built across their path in the world (not a picture turned to face you) ----------
+type ToriiPlan = { cx: number; cy: number; ux: number; uy: number; half: number; look: "red" | "worn" | "soot" | "bone"; fallen: boolean };
+const toriiPlans = new WeakMap<WorldObject, ToriiPlan>();
+/**
+ * How a shrine gate stands: across the path it's on (the way that ground runs least far from it), centred on the path,
+ * its posts on the path's edges, so the whole path walks under it. On open ground, three tiles wide, facing north.
+ */
+function toriiPlan(world: World, object: WorldObject): ToriiPlan {
+  const known = toriiPlans.get(object);
+  if (known) return known;
+  const { x, y } = object, under = world.tiles[y * W + x];
+  const run = (dx: number, dy: number) => { let n = 0; while (n < 4 && inBounds(x + dx * (n + 1), y + dy * (n + 1)) && world.tiles[(y + dy * (n + 1)) * W + x + dx * (n + 1)] === under) n++; return n; };
+  const left = run(-1, 0), right = run(1, 0), up = run(0, -1), down = run(0, 1), wideX = left + right + 1, wideY = up + down + 1;
+  let ux = 1, uy = 0, cx = x, cy = y, half = 1.5;
+  if (Math.min(wideX, wideY) <= 5) {
+    if (wideX <= wideY) { half = wideX / 2; cx = x + (right - left) / 2; }
+    else { ux = 0; uy = 1; half = wideY / 2; cy = y + (down - up) / 2; }
+  }
+  const name = object.name, plan: ToriiPlan = {
+    cx, cy, ux, uy, half: Math.max(1.2, half), fallen: /fallen/i.test(name),
+    look: /\bBone\b/.test(name) ? "bone" : /soot/i.test(name) ? "soot" : /worn/i.test(name) || Math.floor(hash(x, y) * 3) === 2 ? "worn" : "red",
+  };
+  toriiPlans.set(object, plan);
+  return plan;
+}
+/**
+ * A block in the world: its footprint (four corners, in order round it) from `h0` to `h1` above the height `base`, each
+ * corner raised by its `rise`; the sides that face the camera, then (unless `lid` is false) its top.
+ */
+function slab(ctx: CanvasRenderingContext2D, camera: Camera, corners: readonly (readonly [number, number])[], h0: number, h1: number, base: number, colours: readonly [string, string, string], rise: readonly number[] = [0, 0, 0, 0], lid = true) {
+  const [top, left, right] = colours, mx = corners.reduce((s, c) => s + c[0], 0) / 4, my = corners.reduce((s, c) => s + c[1], 0) / 4;
+  const at = (i: number, h: number): [number, number] => { const [px, py] = corners[i], s = toScreen(camera, px, py, base + h + rise[i] - groundAt(px, py)); return [s.x, s.y]; };
+  const stroke = bare ? null : INK;
+  for (let i = 0; i < 4; i++) {
+    const j = (i + 1) % 4, [ax, ay] = corners[i], [bx, by] = corners[j];
+    let nx = by - ay, ny = ax - bx;
+    if (nx * ((ax + bx) / 2 - mx) + ny * ((ay + by) / 2 - my) < 0) { nx = -nx; ny = -ny; }
+    const { rx, ry } = rotate(camera, nx, ny);
+    if (rx + ry <= 0.001) continue;
+    poly(ctx, [at(i, h0), at(j, h0), at(j, h1), at(i, h1)], rx - ry < 0 ? left : right, stroke, 0.8);
+  }
+  if (lid) poly(ctx, [at(0, h1), at(1, h1), at(2, h1), at(3, h1)], top, stroke, 0.8);
+}
+/** A gate's heights (world px): the posts, the tie beam (nuki), the plaque, the beam under the top (shimaki) and the top (kasagi), swept up at its ends. */
+const TORII = { post: 0.13, nuki: [58, 64], plaque: [62, 76], shimaki: [76, 82], kasagi: [82, 90], rise: 9 } as const;
+function toriiColours(look: ToriiPlan["look"]) {
+  const tone = (hex: string): [string, string, string] => [shade(hex, 0.07), hex, shade(hex, -0.13)];
+  const post = look === "bone" ? "#e3dccb" : look === "soot" ? "#4b3d39" : look === "worn" ? "#8f6a4a" : "#c0473a";
+  return { post: tone(post), cap: look === "bone" ? tone("#efeadf") : tone("#2e2a2a"), foot: tone(look === "bone" ? "#cfc6b0" : "#262222"), plaque: tone("#2a2626"), gold: tone("#c9a24a") };
+}
+const toriiPosts = (plan: ToriiPlan): [[number, number], [number, number]] => [[plan.cx - plan.ux * plan.half, plan.cy - plan.uy * plan.half], [plan.cx + plan.ux * plan.half, plan.cy + plan.uy * plan.half]];
+/** The ground the gate is built up from: the higher of its two posts' (so on a slope its beams stay level). */
+const toriiBase = (plan: ToriiPlan) => { const [a, b] = toriiPosts(plan); return Math.max(groundAt(a[0], a[1]), groundAt(b[0], b[1])); };
+const square = (x: number, y: number, r: number) => [[x - r, y - r], [x + r, y - r], [x + r, y + r], [x - r, y + r]] as const;
+/** A beam's footprint from `from` to `to` (distances along the gate from its centre), `thick` tiles deep. */
+const toriiBeam = (plan: ToriiPlan, from: number, to: number, thick: number) => {
+  const { cx, cy, ux, uy } = plan, vx = -uy * thick / 2, vy = ux * thick / 2;
+  return [[cx + ux * from + vx, cy + uy * from + vy], [cx + ux * to + vx, cy + uy * to + vy], [cx + ux * to - vx, cy + uy * to - vy], [cx + ux * from - vx, cy + uy * from - vy]] as const;
+};
+/** One post of a standing gate, from its black foot up to the tie beam (the rest is drawn with the beams). */
+function drawToriiPost(ctx: CanvasRenderingContext2D, camera: Camera, plan: ToriiPlan, x: number, y: number) {
+  const base = toriiBase(plan), c = toriiColours(plan.look);
+  slab(ctx, camera, square(x, y, TORII.post + 0.04), 0, 7, base, c.foot, undefined, false);
+  slab(ctx, camera, square(x, y, TORII.post), 7, TORII.nuki[0], base, c.post, undefined, false);
+}
+/** The top of a standing gate, back to front: the posts above the tie beam, the tie beam, the plaque, and the two top beams. */
+function drawToriiBeams(ctx: CanvasRenderingContext2D, camera: Camera, plan: ToriiPlan) {
+  const base = toriiBase(plan), c = toriiColours(plan.look), posts = toriiPosts(plan), half = plan.half;
+  const near = depthOf(camera, posts[0][0], posts[0][1]) > depthOf(camera, posts[1][0], posts[1][1]) ? 0 : 1;
+  const stub = (k: number) => slab(ctx, camera, square(posts[k][0], posts[k][1], TORII.post), TORII.nuki[0], TORII.shimaki[0], base, c.post, undefined, false);
+  stub(1 - near);
+  slab(ctx, camera, toriiBeam(plan, -half - 0.32, half + 0.32, 0.1), TORII.nuki[0], TORII.nuki[1], base, c.post);
+  if (plan.look !== "bone") {
+    slab(ctx, camera, toriiBeam(plan, -0.2, 0.2, 0.12), TORII.plaque[0], TORII.plaque[1], base, c.plaque);
+    slab(ctx, camera, toriiBeam(plan, -0.13, 0.13, 0.15), TORII.plaque[0] + 3, TORII.plaque[1] - 3, base, c.gold);
+  }
+  stub(near);
+  slab(ctx, camera, toriiBeam(plan, -half - 0.42, half + 0.42, 0.16), TORII.shimaki[0], TORII.shimaki[1], base, plan.look === "bone" ? c.cap : c.post);
+  // The top beam in four lengths, rising more and more towards its ends; the farthest drawn first.
+  const ends = half + 0.68, cuts = [-1, -0.5, 0, 0.5, 1], lift = (t: number) => TORII.rise * t * t;
+  const pieces = cuts.slice(0, -1).map((t, i) => ({ a: t, b: cuts[i + 1] }));
+  const centre = (p: { a: number; b: number }) => { const m = (p.a + p.b) / 2 * ends; return depthOf(camera, plan.cx + plan.ux * m, plan.cy + plan.uy * m); };
+  for (const p of pieces.sort((p, q) => centre(p) - centre(q))) {
+    const ra = lift(p.a), rb = lift(p.b);
+    slab(ctx, camera, toriiBeam(plan, p.a * ends, p.b * ends, 0.24), TORII.kasagi[0], TORII.kasagi[1], base, c.cap, [ra, rb, rb, ra]);
+  }
+}
+/** A gate fallen on its side: its posts lying in the grass, its top beam across them. */
+function drawFallenTorii(ctx: CanvasRenderingContext2D, camera: Camera, plan: ToriiPlan) {
+  const { cx, cy } = plan, base = groundAt(cx, cy), c = toriiColours(plan.look);
+  const lying = (x0: number, y0: number, x1: number, y1: number, thick: number, h: number, colours: readonly [string, string, string]) => {
+    const dx = x1 - x0, dy = y1 - y0, n = Math.hypot(dx, dy), vx = -dy / n * thick / 2, vy = dx / n * thick / 2;
+    slab(ctx, camera, [[x0 + vx, y0 + vy], [x1 + vx, y1 + vy], [x1 - vx, y1 - vy], [x0 - vx, y0 - vy]], 0, h, base, colours);
+  };
+  lying(cx - 1.4, cy - 0.7, cx + 1.3, cy - 0.55, 0.26, 7, c.post);
+  lying(cx - 1.2, cy + 0.65, cx + 1.4, cy + 0.8, 0.26, 7, c.post);
+  lying(cx - 0.1, cy - 0.5, cx + 0.2, cy + 0.6, 0.12, 5, c.post);
+  lying(cx + 1.55, cy - 1.7, cx + 1.85, cy + 1.8, 0.3, 9, c.cap);
+}
 function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObject, alpha: number) {
   const { camera, now } = scene, z = camera.zoom, { x: sx, y: sy } = toScreen(camera, object.x, object.y), ox = object.x, oy = object.y, h = hash(ox, oy);
   const hit = (height: number, w = 36) => ({ x: sx - w / 2 * z, y: sy - height * z, w: w * z, h: (height + 10) * z });
@@ -2401,6 +2500,22 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     else if (object.kind === "furnace" || object.kind === "range") glow(x, y, 16, 110); else if (object.kind === "altar") glow(x, y, 26, 70); else if (object.kind === "fountain" && objectAtTile(world, x - 1, y)?.kind !== "fountain" && objectAtTile(world, x, y - 1)?.kind !== "fountain") glow(x + 0.5, y + 0.5, 12, 110, "#a9d4f2", 0.55); else if (object.kind === "sigil_altar") glow(x, y, 30, 90);
     // The fountain is 2 × 2: sorted by its centre (a little forward, for its rim), not its back tile, so Friends beside it
     // stand behind its rim rather than on it, at any camera angle.
+    // A shrine gate stands across its path: each post sorted where it stands (so a Friend beside one passes in front of
+    // or behind it), the beams by the gate's middle, all turning see-through when they'd hide your Friend.
+    if (object.decor === "torii") {
+      const plan = toriiPlan(world, object), seeThrough = (px: number, py: number, d: number) => d > playerDepth + 0.3 && coversPlayer(px, py) ? 0.35 : 1;
+      if (plan.fallen) { drawables.push({ depth: depth(plan.cx, plan.cy), at: { x: plan.cx, y: plan.cy }, size: [40, 120, 60], cast: true, scenery: true, draw: () => drawFallenTorii(ctx, camera, plan) }); return; }
+      for (const [px, py] of toriiPosts(plan)) {
+        const d = depth(px, py);
+        drawables.push({ depth: d, at: { x: px, y: py }, size: [70, 24, 16], cast: true, scenery: true, draw: () => { ctx.globalAlpha = seeThrough(px, py, d); drawToriiPost(ctx, camera, plan, px, py); ctx.globalAlpha = 1; } });
+      }
+      const d = depth(plan.cx, plan.cy);
+      drawables.push({ depth: d, at: { x: plan.cx, y: plan.cy }, size: [130, 50 + plan.half * 60, 30], cast: true, scenery: true, draw: () => {
+        ctx.globalAlpha = seeThrough(plan.cx, plan.cy, d) < 1 || toriiPosts(plan).some(([px, py]) => seeThrough(px, py, depth(px, py)) < 1) ? 0.35 : 1;
+        drawToriiBeams(ctx, camera, plan); ctx.globalAlpha = 1;
+      } });
+      return;
+    }
     const fountainMaster = object.kind === "fountain" && objectAtTile(world, x - 1, y)?.kind !== "fountain" && objectAtTile(world, x, y - 1)?.kind !== "fountain";
     const d = fountainMaster ? depth(x + 0.5, y + 0.5) + 0.3 : depth(x, y) + (object.kind === "wheat" || object.kind === "spot" ? -0.4 : 0);
     const flat = object.kind === "spot" || (object.kind === "decor" && FLAT_DECOR.has(object.decor!));
