@@ -2,6 +2,7 @@
  * Game state and the small helpers every system shares: inventory, bank, equipment, experience and messages.
  */
 import { unbakeWorld } from "./bake.ts";
+import { ORASHAI_FOCI } from "./orashai.ts";
 import {
   EQUIP_SLOTS, FAMILY_NAMES, MAX_XP, MONSTERS, mountDef, PRAYERS, RELICS, SKILLS, SKILL_NAMES, WAYFARER_SET, XP_RATE, XP_TABLE, item, levelForXp,
   type Bonuses, type EquipSlot, type Item, type MonsterDef, type Skill, type SpotKind, type Tradition, type WardrobeId,
@@ -128,6 +129,10 @@ export type Player = {
   cards: Record<string, number>; rarian: boolean;
   /** Keeping the Mizukai way (What Rises in the East): the Isles' Magic and Faith in place of the Realm's (never both this and `rarian`). */
   mizukai: boolean;
+  /** Keeps the Orashai way (The Land Before Stone): the Hidden Sun's watchings and the First Script in place of the Old Friend's. */
+  orashai: boolean;
+  /** Mana, the Orashai's own (its globe sits under Faith while you keep the Orashai way): the First Script is written with it. */
+  mana: number;
   /** Mysteries (The Land Before Stone): discoveries made, Azhurak glyphs seen and understood, inscriptions read. */
   mysteries: MysteriesRecord;
   /** A spirit ward (spirit incense): wayward spirits don't come for you and strike softer until this tick. */
@@ -273,7 +278,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
     style: "accurate", autocast: null, prayers: [], target: null, activity: null, combat: null,
     attackTimer: 0, eatTimer: 0, stunned: 0, regenTimer: 0, quests: {}, questData: {},
     wardrobe: [], worn: [], follower: null, courseStep: -1, kills: 0, deaths: 0, overhead: null, music: ["theme"],
-    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, boneBag: {}, sigilBag: {}, belts: {}, followerWorn: [], orders: {}, card: { bg: "paper", frame: "rose", skills: "boxes", font: "mono", ink: "ink", layout: "classic" }, cards: {}, rarian: false, mizukai: false, mysteries: { found: {}, glyphs: {}, read: {} }, spiritWardUntil: 0, home: null, restedTicks: 0, ward: null, wardUntil: 0, renew: 0, renewUntil: 0, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, friendVillage: null, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, lore: {}, trail: null, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false, rerolls: 0 }, seenUpdate: LATEST_UPDATE,
+    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, boneBag: {}, sigilBag: {}, belts: {}, followerWorn: [], orders: {}, card: { bg: "paper", frame: "rose", skills: "boxes", font: "mono", ink: "ink", layout: "classic" }, cards: {}, rarian: false, mizukai: false, orashai: false, mana: 10, mysteries: { found: {}, glyphs: {}, read: {} }, spiritWardUntil: 0, home: null, restedTicks: 0, ward: null, wardUntil: 0, renew: 0, renewUntil: 0, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, friendVillage: null, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, lore: {}, trail: null, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false, rerolls: 0 }, seenUpdate: LATEST_UPDATE,
     lastHitBy: null, created: Date.now(), queuedSpell: null, castTimer: 0,
   };
 }
@@ -512,7 +517,7 @@ export const fullSlayerSet = (player: Player, set: string) => setPieces(player, 
 // ---------- The ossuary bag ----------
 export const BONE_BAG = "bone_bag", BONE_BAG_SIZE = 60;
 /** The tradition you keep: the Realm's own, Raria's Law, or the Mizukai way. */
-export const traditionOf = (player: Player): Tradition => player.rarian ? "raria" : player.mizukai ? "mizukai" : "realm";
+export const traditionOf = (player: Player): Tradition => player.rarian ? "raria" : player.mizukai ? "mizukai" : player.orashai ? "orashai" : "realm";
 /**
  * Keep a tradition (from the top of the spellbook or prayers, anywhere): the Realm's own (the Old Friend's book),
  * Raria's (the Wise Friend's Law) or the Mizukai Isles' (the rope and the brush). Only one at a time; active prayers and
@@ -522,9 +527,10 @@ export const traditionOf = (player: Player): Tradition => player.rarian ? "raria
 export function setTradition(game: Game, tradition: Tradition) {
   const player = game.player;
   if (traditionOf(player) === tradition) return;
-  player.rarian = tradition === "raria"; player.mizukai = tradition === "mizukai"; player.prayers = []; if (player.autocast) player.autocast = null;
+  player.rarian = tradition === "raria"; player.mizukai = tradition === "mizukai"; player.orashai = tradition === "orashai"; if (player.orashai) player.mana = Math.min(player.mana, maxMana(player)); player.prayers = []; if (player.autocast) player.autocast = null;
   message(game, tradition === "raria" ? "You keep the Wise Friend's Law. Your Magic is Raria's edicts now, and your Faith its commandments and rites; the Old Friend's book is closed."
     : tradition === "mizukai" ? "You keep the Mizukai way. Your Magic is the Isles' seals and bindings now, and your Faith their vows, blessings and rites; the Old Friend's book is closed, not lost."
+    : tradition === "orashai" ? "You keep the Orashai way. Your Magic is the First Script now, glyphs written on the air, and your Faith the Hidden Sun's watchings; the Old Friend's book is closed, not lost."
     : "You open the Old Friend's book again. The Realm's own prayers and light are yours.", "quest");
   sound(game, "quest");
 }
@@ -670,3 +676,17 @@ export function prayerBoost(player: Player) {
 export const heartguardPieces = (player: Player) => setPieces(player, "heartguard");
 export const maxHp = (player: Player) => levelForXp(player.xp.hitpoints) + heartguardPieces(player);
 export const maxPrayer = (player: Player) => levelForXp(player.xp.prayer);
+/** The Orashai's mana: as deep as your Magic and your Mysteries together (half of both), and ten besides. */
+export const maxMana = (player: Player) => 10 + Math.floor((levelForXp(player.xp.magic) + levelForXp(player.xp.mysteries)) / 2);
+/** What a glyph of the First Script costs to write: half its level in mana (the Hidden Sun's rites are paid in faith instead). */
+export const manaCost = (spell: { orashai?: boolean; skill?: string; level: number }, player?: Player) =>
+  spell.orashai && spell.skill !== "prayer" && !(player && orashaiFocus(player)) ? Math.max(2, Math.round(spell.level / 2)) : 0;
+/** An Orashai wand or staff in hand (the Scribe's reed, the Lapis rod, the Staff of the Hidden Sun): the First Script costs no mana. */
+export const orashaiFocus = (player: Player) => !!player.equipment.weapon && ORASHAI_FOCI.has(player.equipment.weapon);
+/** A faith staff (any staff with a Faith bonus: the acolyte's and dawn staves, the Orders' staves, the shrine wand): while you wield one, Faith spells cost no faith. */
+export function faithStaff(player: Player) {
+  const id = player.equipment.weapon;
+  if (!id || !isItem(id)) return false;
+  const def = item(id);
+  return def.icon.shape === "staff" && (def.equip?.bonuses.prayer ?? 0) > 0;
+}

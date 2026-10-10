@@ -494,6 +494,31 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
           p.line(l, brow + 1, r, brow + 1, piece.trim ?? light); p.line(l + 1, top - 3, r - 1, top - 3, light);
           break;
         }
+        if (piece.style === "ibis") {
+          // An ibis head over your own: white, a black face, a long curved bill (to the side you face; behind, just the head).
+          const brow = top + 2, face = piece.trim ?? "#1e1c22";
+          p.poly([[l - 1, neckY], [l - 1, top - 1], [l + 1, top - 4], [r - 1, top - 4], [r + 1, top - 1], [r + 1, neckY]], color, null);
+          if (!back) {
+            p.disc(Math.round(cx) + side * 2, brow + 1, headHalf * 0.6, 2.2, face, null); p.set(Math.round(cx) + side * 2 + (side || 1), brow, "#e2c46a");
+            const bx = side ? Math.round(cx) + side * (headHalf + 1) : Math.round(cx), dir = side || 1;
+            p.polyline([[bx, brow + 2], [bx + dir * 4, brow + 5], [bx + dir * 6, brow + 10]], face, 2);
+          }
+          p.line(l + 1, top - 3, r - 1, top - 3, light);
+          break;
+        }
+        if (piece.style === "fishbag") {
+          // A paper bag over the head, eyeholes, and a surprised fish drawn on the front in charcoal.
+          const ink = piece.trim ?? "#2a2730", bottom = neckY + 2;
+          p.poly([[l - 2, bottom], [l - 1, top - 5], [r + 1, top - 5], [r + 2, bottom]], color, null);
+          for (let x = l - 1; x <= r + 1; x += 2) p.set(x, top - 5, shadeHex(color, -0.15));
+          p.line(l - 2, bottom, r + 2, bottom, shadeHex(color, -0.2));
+          if (!back) {
+            const fx = Math.round(cx) + side * 2;
+            p.set(fx - 2, top - 1, ink); p.set(fx + 2, top - 1, ink);
+            p.disc(fx, top + 3, 2.5, 1.3, ink, null); p.disc(fx, top + 3, 1.6, 0.6, color, null); p.poly([[fx + 2, top + 3], [fx + 4, top + 1], [fx + 4, top + 5]], ink, null); p.set(fx - 1, top + 3, ink);
+          }
+          break;
+        }
         if (piece.style === "turban") {
           // A wrapped turban: turns of cloth round the crown, a darker fold across, a loose tail behind.
           const brimY = top + 1, tail = piece.trim ?? shadeHex(color, -0.15);

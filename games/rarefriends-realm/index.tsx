@@ -21,7 +21,7 @@ import { logoSvg } from "./logo.ts";
 const TITLE_LOGO = logoSvg("horizontal");
 import { HIGH_QUALITY, PITCH, RENDER_PROFILE, VIEW, ZOOM, addPrint, daylight, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
 import {
-  BankModal, BoatModal, CardsModal, CarvingBuffs, FeedbackModal, ChatBox, ContextMenu, DailyModal, FellowshipModal, HomeModal, JoinModal, RfActionModal, FirstStepsCard, GuideModal, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, NamingModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
+  BankModal, BoatModal, CardsModal, CarvingBuffs, MountOrb, FeedbackModal, ChatBox, ContextMenu, DailyModal, FellowshipModal, HomeModal, JoinModal, RfActionModal, FirstStepsCard, GuideModal, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, NamingModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
   cancelLongPress, longPress, rightClick, NerdSettings, LanguagePicker, customFrom, type CustomGraphics, type MenuEntry, type Settings, type Tab,
 } from "./panels.tsx";
 import { REGULAR_SPRITES } from "./regulars.ts";
@@ -1126,6 +1126,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
                 {...rightClick((x, y, entries) => setMenu({ x, y, entries }), () => ([["North", 0], ["East", -Math.PI / 2], ["South", Math.PI], ["West", Math.PI / 2]] as const).map(([name, turn]) => ({ verb: `Look ${name}`, noun: "", run: () => {
                   const from = cameraGoal.current?.angle ?? camera.current.angle, goal = NORTH + turn; cameraGoal.current = { angle: goal + Math.round((from - goal) / (Math.PI * 2)) * Math.PI * 2, pitch: cameraGoal.current?.pitch ?? camera.current.pitch }; } })))}
                 onClick={() => { const from = cameraGoal.current?.angle ?? camera.current.angle; cameraGoal.current = { angle: NORTH + Math.round((from - NORTH) / (Math.PI * 2)) * Math.PI * 2, pitch: cameraGoal.current?.pitch ?? camera.current.pitch }; }}><i aria-hidden="true">▲</i><b>N</b></button>
+              <MountOrb game={state} openMenu={(x, y, entries) => setMenu({ x, y, entries })} onRide={id => { toggleMount(state, id); refresh(); }} />
               <button type="button" className="realm-feedback-btn" aria-label="Send feedback" title="Send feedback: a bug, an idea, anything" onClick={() => { setFeedbackStatus(""); setModal("feedback"); }}>💬</button>
               <button type="button" className="realm-logout-btn" aria-label="Save and log out" title="Save and log out" onClick={logOut}
                 {...rightClick((x, y, entries) => setMenu({ x, y, entries }), () => [{ verb: "Save-and-log-out", noun: "", run: logOut }])}>⏻</button>

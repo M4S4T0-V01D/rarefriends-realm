@@ -4,6 +4,15 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 98, date: "2026-10-10", title: "The Land Before Stone: the Orashai, and the god behind the bag", items: [
+    "The Orashai Mysteries: an initiation in five thresholds, from Priestess Anzah at Sefrah's Temple of the Hidden Sun, through the door that sees in the Ochre Spine, to the Hall of First Names beneath it, the Listener, the scratched names, the Unnamed, and the Keeper of First Names.",
+    "A new tradition, the Orashai way, kept like Raria's Law or the Mizukai way: the First Script (glyphs written on the air: Stone, Dust, Door, Water, Measure, Star, the First Name, and the old roads) and the Hidden Sun's watchings and rites.",
+    "Mana: keeping the Orashai way gives you a mana globe under Faith, and the First Script is written with it. It comes back as you go, and all at once at an altar. The mount orb has moved to the right edge of the minimap to make room.",
+    "Faith staves: wield a staff with a Faith bonus (the acolyte's, the dawn and First Light staves, the Orders' staves, the Rarian staff, the shrine wand) and Faith spells cost no faith. The Orashai's wands and staves (the Scribe's reed, the Lapis rod, the Staff of the Hidden Sun) make the First Script cost no mana.",
+    "Each tradition's book has its own roads now. Homeward takes you to the home of the tradition you keep (Raria; the shrine at Kumoyama; Sefrah's temple). The Law summons you to the FFF Fortress and BarkReach, the Mizukai crossings reach Takamori, Tanabe and Yumoto, and the Orashai roads run to Sefrah, Tamesh, Khetmar and the Blue Smoke. And for the Old Friend's faithful, a Faith spell: the Pilgrimage to Dawnhold.",
+    "Kharaveth's gods have shrines: the Weigher at Tamesh, the Gate-Mother at Khetmar, the Salt Twins with the Ouresh, the Smoke That Remembers with the Zuri. And outside Sefrah's wall stands a man with a paper bag on his head and a fish drawn on it: a new quest, The God Behind the Bag.",
+    "Still to come in The Land Before Stone: Mysteries combat techniques, the Mizukai Mysteries tradition, and Meghavan, the Rain Country, east of Khetmar.",
+  ] },
   { id: 97, date: "2026-10-10", title: "The Land Before Stone: Kharaveth's heartlands", items: [
     "Foothold's south gate opens on the heartlands of Kharaveth: the Ochre Steppe, the Sea of Dunes in the west, the green Ashar Valley, the Ochre Spine winding across the middle, the basalt Black Range in the south-east and the Khetmar Pass going east toward the Rain Country.",
     "Three dynasties out of one house. Sefrah, the Gilded City on the Ashar, is the Gilded Court's: its gold-domed palace, the Treasury (a bank), the Temple of the Hidden Sun and a bazaar. Tamesh, the quarry town of the Obsidian Legacy, cuts black stone at the Range's foot. Khetmar, the Copper Banner's fortress, holds the eastern pass. Each dresses its own people, and its tailor will dress you too.",

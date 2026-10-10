@@ -3666,7 +3666,9 @@ const NPC_WEAR: Record<string, readonly string[]> = {
   khetmar_ardesh: ["banner_coif", "banner_coat", "banner_trousers", "banner_cloak", "banner_boots"], khetmar_captain: ["blackiron_helm", "banner_coat", "banner_trousers", "banner_cloak", "blackiron_sabre"],
   khetmar_outfitter: ["banner_coif", "banner_coat", "banner_trousers"], khetmar_soldier: ["blackiron_helm", "banner_coat", "banner_trousers", "banner_boots", "blackiron_sabre"],
   zuri_asmeh: ["blue_smoke_turban", "zuri_robe", "zuri_shawl"], zuri_trader: ["blue_smoke_turban", "zuri_robe", "zuri_trousers"], zuri_ibbu: ["steppe_headwrap", "zuri_robe", "steppe_sash"],
-  ouresh_halzir: ["salt_turban", "salt_coat", "salt_trousers", "salt_boots", "steppe_sash"], ouresh_trader: ["salt_turban", "salt_coat", "salt_trousers"],
+  ouresh_halzir: ["salt_turban", "salt_coat", "salt_trousers", "salt_boots", "steppe_sash"],
+  // The Orashai: the Keeper's ibis head and scribe's robe, the Listener's veil, the man in the bag in a good robe.
+  keeper_first_names: ["ibis_mask", "gilded_robe", "lapis_mantle", "lapis_rod"], orashai_listener: ["zuri_shawl", "gilded_robe"], bag_man: ["fish_bag", "gilded_robe", "gilded_sandals"], ouresh_trader: ["salt_turban", "salt_coat", "salt_trousers"],
   hollowmere_officer: ["moonsilver_helm", "moonsilver_cuirass", "hollowmere_cape", "moonsilver_greatsword"], hollowmere_soldier: ["blackiron_helm", "blackiron_cuirass", "hollowmere_cape", "blackiron_battleaxe"], hollowmere_lieutenant: ["ashsteel_helm", "ashsteel_cuirass", "hollowmere_cape", "ashsteel_greatsword"],
   lawgate_governor: ["royal_circlet", "rarian_tabard", "rarian_mantle", "law_book"], lawgate_innkeeper: ["rarian_veil", "rarian_tabard"], raria_innkeeper: ["rarian_veil", "rarian_tabard", "rarian_skirts"],
   vesper_abbess: ["dusk_paladin_helm", "dusk_paladin_body", "dusk_cape", "dusk_lantern"], ranger_warden: ["ranger_royal_hood", "ranger_royal_coat", "ranger_royal_leggings", "rangers_longbow"],

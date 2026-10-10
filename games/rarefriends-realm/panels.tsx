@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { PursuanceJournal } from "./journal.tsx";
 import type { GenerationSprites } from "@rarefriends/friendsdk/sprites";
-import { SPELL_TABS, RARIAN_SPELL_TABS, MIZUKAI_SPELL_TABS, spellInBook, MONSTERS, type Spell, type Prayer, type Tradition, ITEM_LIST, isItem,
+import { SPELL_TABS, RARIAN_SPELL_TABS, MIZUKAI_SPELL_TABS, ORASHAI_SPELL_TABS, spellInBook, MONSTERS, type Spell, type Prayer, type Tradition, ITEM_LIST, isItem,
   EMOTES, EQUIP_SLOTS, FAMILY_NAMES, FAMILY_PERKS, PRAYERS, RELICS, SHOPS, SKILLS, SKILL_ICONS, SKILL_NAMES, SPELLS, WARDROBE, XP_TABLE, item, levelForXp,
   type EquipSlot, type Skill, mountDef, PETS, CARVINGS, CARVING_REACH,
 } from "./data.ts";
@@ -31,7 +31,7 @@ import { weightPenalty } from "./wayfaring.ts";
 import { HOME_LOOKS, HOME_TIERS, SLOTS, buyFurnishing, buyHome, furnishingOf, homeDeed, setHomeLook, slotOpen } from "./housing.ts";
 import { REGIONS } from "./world.ts";
 import {
-  BANK_TABS, CONTAINERS, SATCHEL, heft, bankDeposit, emptyToBank, fillFromBank, bankDepositAll, bankDepositWorn, bankInOrder, bankMove, bankTabs, bankWithdraw, bonuses, combatLevel, count, isStaffEquipped, maxHp, maxPrayer, message, totalLevel, totalXp,
+  BANK_TABS, CONTAINERS, SATCHEL, heft, bankDeposit, emptyToBank, fillFromBank, bankDepositAll, bankDepositWorn, bankInOrder, bankMove, bankTabs, bankWithdraw, bonuses, combatLevel, count, isStaffEquipped, maxHp, maxPrayer, maxMana, message, totalLevel, totalXp,
   weapon, xpMultiplier, wornWeight, type Game, type Message, type Recipe, type Slot,
 } from "./state.ts";
 import {
@@ -436,9 +436,10 @@ const TRADITIONS: readonly { id: Tradition; name: string; emblem: string; faith:
   { id: "realm", name: "The Old Friend's Book", emblem: "realm", faith: "The Old Friend's Prayers", magic: "The Spellbook", blurb: "The Realm's own: sigils, the Old Friend's prayers and light." },
   { id: "raria", name: "The Wise Friend's Law", emblem: "raria", faith: "The Commandments of the Law", magic: "The Book of the Law", blurb: "Raria's: edicts, judgements, vigils, commandments and rites." },
   { id: "mizukai", name: "Mizukai Traditions", emblem: "mizukai", faith: "The Shrine's Book of Vows", magic: "The Scroll of Seals", blurb: "The Isles': seals, bindings, barriers, vows, blessings and rites." },
+  { id: "orashai", name: "The Orashai Way", emblem: "orashai", faith: "The Watchings of the Hidden Sun", magic: "The First Script", blurb: "Kharaveth's initiates: glyphs written on the air, measures, doors and roads, and the Hidden Sun's watchings and rites." },
 ];
 /** Which traditions you've been given (the Realm's is always yours). */
-const traditionsKnown = (game: Game) => TRADITIONS.filter(entry => entry.id === "realm" || (entry.id === "raria" && questDone(game, "wise_friends_law")) || (entry.id === "mizukai" && questDone(game, "rope_and_brush")));
+const traditionsKnown = (game: Game) => TRADITIONS.filter(entry => entry.id === "realm" || (entry.id === "raria" && questDone(game, "wise_friends_law")) || (entry.id === "mizukai" && questDone(game, "rope_and_brush")) || (entry.id === "orashai" && questDone(game, "orashai_mysteries")));
 /**
  * The tradition over the Faith and Magic tabs, and the way to change it (Return of Raria; What Rises in the East): the
  * one you keep, with its emblem and doctrine, and a deliberate choice of another, from anywhere. Changing never teaches
@@ -463,11 +464,13 @@ function TraditionHeader({ game, refresh, faith }: { game: Game; refresh: () => 
       {chooser}
     </div>
   );
-  const head = kept === "raria"
+  const head = kept === "orashai"
+    ? <><span className="realm-orashai-eye" aria-hidden="true" /><b>{faith ? current.faith : current.magic}</b><small>{faith ? "Watchings kept from dawn to the hidden noon, and the rites the embalmers and the initiates keep: the Hidden Sun, kept in place of the Old Friend's light." : "Glyphs, measures, doors, offices and roads: the First Script of Azhurak, written on the air in ochre and lapis. A thing written truly is a thing done."}</small></>
+    : kept === "raria"
     ? <><span className="realm-law-eye" aria-hidden="true" /><b>{faith ? current.faith : current.magic}</b><small>{faith ? "Obey, and be wise. The Law is kept here in place of prayer; the rites stand in place of the light." : "Edicts, judgements, vigils, offices and summons: magic as Raria keeps it, a rite with a staff in it."}</small></>
     : <><span className="realm-mizukai-seal" aria-hidden="true">{faith ? "誓" : "封"}</span><b>{faith ? current.faith : current.magic}</b><small>{faith ? "Vows of protection, blessings for the road and the fight, purification, the spirits' wards, the great rites: the Thousand Friends kept as the shrine keeps them." : "Seals, bindings, barriers, arts and crossings: magic as the Isles write it, with a brush, in ink, on paper."}</small></>;
   return (
-    <div className={kept === "raria" ? "realm-law-head" : "realm-mizukai-head"}>
+    <div className={kept === "raria" ? "realm-law-head" : kept === "orashai" ? "realm-orashai-head" : "realm-mizukai-head"}>
       {head}
       {!choosing && <button type="button" onClick={() => setChoosing(true)}>Change tradition…</button>}
       {chooser}
@@ -477,42 +480,43 @@ function TraditionHeader({ game, refresh, faith }: { game: Game; refresh: () => 
 /** The shrine's book of vows, in its parts. */
 const MIZUKAI_SECTIONS = [["protection", "Protection"], ["blessings", "Blessings"], ["purification", "Purification"], ["spirits", "Spirits"], ["rituals", "Rituals"]] as const;
 function PrayerTab({ game, refresh, openMenu }: PanelProps) {
-  const player = game.player, level = levelForXp(player.xp.prayer), [hover, setHover] = useState<string | null>(null), tradition = traditionOf(player), rarian = tradition === "raria", mizukai = tradition === "mizukai";
-  const prayers = PRAYERS.filter(prayer => rarian ? prayer.rarian : mizukai ? prayer.mizukai : !prayer.rarian && !prayer.mizukai);
+  const player = game.player, level = levelForXp(player.xp.prayer), [hover, setHover] = useState<string | null>(null), tradition = traditionOf(player), rarian = tradition === "raria", mizukai = tradition === "mizukai", orashai = tradition === "orashai";
+  const prayers = PRAYERS.filter(prayer => rarian ? prayer.rarian : mizukai ? prayer.mizukai : orashai ? prayer.orashai : !prayer.rarian && !prayer.mizukai && !prayer.orashai);
   const button = (prayer: Prayer) => (
     <button key={prayer.id} type="button" aria-pressed={player.prayers.includes(prayer.id)} disabled={level < prayer.level} aria-label={`${prayer.name} (level ${prayer.level}): ${prayer.description}`}
       onMouseEnter={() => setHover(prayer.id)} onFocus={() => setHover(prayer.id)} onClick={() => { togglePrayer(game, prayer.id); refresh(); }}
-      {...rightClick(openMenu, () => [{ verb: player.prayers.includes(prayer.id) ? (rarian ? "Release" : mizukai ? "Unbind" : "Deactivate") : (rarian ? "Keep" : mizukai ? "Vow" : "Activate"), noun: prayer.name, run: () => { togglePrayer(game, prayer.id); refresh(); } }, { verb: "Examine", noun: prayer.name, run: () => { message(game, `${prayer.name} (level ${prayer.level}): ${prayer.description}.`); refresh(); } }])}>
+      {...rightClick(openMenu, () => [{ verb: player.prayers.includes(prayer.id) ? (rarian ? "Release" : mizukai ? "Unbind" : orashai ? "Rest" : "Deactivate") : (rarian ? "Keep" : mizukai ? "Vow" : orashai ? "Watch" : "Activate"), noun: prayer.name, run: () => { togglePrayer(game, prayer.id); refresh(); } }, { verb: "Examine", noun: prayer.name, run: () => { message(game, `${prayer.name} (level ${prayer.level}): ${prayer.description}.`); refresh(); } }])}>
       <PixelIcon art={prayerArt(prayer.id)} size={36} />
     </button>
   );
   return (
-    <div className={rarian ? "realm-rarian" : mizukai ? "realm-mizukai faith" : undefined}>
+    <div className={rarian ? "realm-rarian" : mizukai ? "realm-mizukai faith" : orashai ? "realm-orashai faith" : undefined}>
       <TraditionHeader game={game} refresh={refresh} faith />
-      <p className="realm-muted">{rarian ? "Devotion" : mizukai ? "Devotion" : "Faith"}: <b>{Math.ceil(player.prayer)}</b> / {maxPrayer(player)} · Bonus {signed(bonuses(player).prayer)}</p>
+      <p className="realm-muted">{rarian || mizukai || orashai ? "Devotion" : "Faith"}: <b>{Math.ceil(player.prayer)}</b> / {maxPrayer(player)} · Bonus {signed(bonuses(player).prayer)}</p>
       {mizukai ? MIZUKAI_SECTIONS.map(([section, title]) => (
         <section key={section} className="realm-mizukai-section"><h4>{title}</h4><div className="realm-icon-grid prayers">{prayers.filter(prayer => prayer.section === section).map(button)}</div></section>
       )) : <div className="realm-icon-grid prayers">{prayers.map(button)}</div>}
       <InfoCard>{(() => { const prayer = prayers.find(entry => entry.id === hover); return prayer ? <><b>{prayer.name}</b> <small>{`Level ${prayer.level}`}</small><p>{`${prayer.description}. Drains ${Math.round(prayer.drain * 100) / 100} points a tick.`}</p></>
         : rarian ? <p>The Law is kept at the Wise Friend's altar in Raria, and at any altar besides: the Law uses what works. The Order of Dusk's gear slows the drain of every commandment.</p>
         : mizukai ? <p>Renew your devotion at any shrine or altar: ring once, bow twice, clap twice, bow once. Paper and spirit seals pay for the rites; the Bureau of Seals and the shrine office sell them.</p>
+        : orashai ? <p>Renew your devotion at any altar, facing the hidden sun. Ochre and lapis ink pay for the rites; the Keeper's scriptorium and the Temple of the Hidden Sun sell them.</p>
         : <p>Recharge at any altar. Bury bones to train Prayer.</p>; })()}</InfoCard>
     </div>
   );
 }
 const TARGET_HINT: Record<string, string> = { monster: "Cast on a monster", item: "Cast on an item in your pack", ground: "Cast on an item on the ground", self: "Casts straight away" };
 function MagicTab({ game, refresh, setSelection, selection, openMenu }: PanelProps) {
-  const player = game.player, staff = isStaffEquipped(player), [hover, setHover] = useState<string | null>(null), [tab, setTab] = useState(SPELL_TABS[0].id), tradition = traditionOf(player), rarian = tradition === "raria", mizukai = tradition === "mizukai";
-  const TABS = rarian ? RARIAN_SPELL_TABS : mizukai ? MIZUKAI_SPELL_TABS : SPELL_TABS, BOOK = SPELLS.filter(spell => spellInBook(spell, tradition));
+  const player = game.player, staff = isStaffEquipped(player), [hover, setHover] = useState<string | null>(null), [tab, setTab] = useState(SPELL_TABS[0].id), tradition = traditionOf(player), rarian = tradition === "raria", mizukai = tradition === "mizukai", orashai = tradition === "orashai";
+  const TABS = rarian ? RARIAN_SPELL_TABS : mizukai ? MIZUKAI_SPELL_TABS : orashai ? ORASHAI_SPELL_TABS : SPELL_TABS, BOOK = SPELLS.filter(spell => spellInBook(spell, tradition));
   const levelFor = (spell: Spell) => levelForXp(player.xp[spell.skill ?? "magic"]);
   const shown = BOOK.find(spell => spell.id === (hover ?? (selection?.kind === "spell" ? selection.spell : player.autocast)));
   // Raria's own edicts and rites come first in their tabs: the book is theirs now.
-  const kinds = TABS.find(entry => entry.id === tab)?.kinds ?? TABS[0].kinds, spells = BOOK.filter(spell => kinds.includes(spell.kind)).sort((a, b) => rarian ? Number(!!b.rarian) - Number(!!a.rarian) : mizukai ? Number(!!b.mizukai) - Number(!!a.mizukai) : 0);
+  const kinds = TABS.find(entry => entry.id === tab)?.kinds ?? TABS[0].kinds, spells = BOOK.filter(spell => kinds.includes(spell.kind)).sort((a, b) => rarian ? Number(!!b.rarian) - Number(!!a.rarian) : mizukai ? Number(!!b.mizukai) - Number(!!a.mizukai) : orashai ? Number(!!b.orashai) - Number(!!a.orashai) : 0);
   const learnt = (spell: Spell) => !spell.quest || (player.quests[spell.quest] ?? 0) >= 2;
   return (
-    <div className={rarian ? "realm-rarian" : mizukai ? "realm-mizukai magic" : undefined}>
+    <div className={rarian ? "realm-rarian" : mizukai ? "realm-mizukai magic" : orashai ? "realm-orashai magic" : undefined}>
       <TraditionHeader game={game} refresh={refresh} faith={false} />
-      <div className="realm-graphics realm-magic-tabs" role="tablist" aria-label={rarian ? "The Book of the Law" : mizukai ? "The Scroll of Seals" : "Spellbook"}>
+      <div className="realm-graphics realm-magic-tabs" role="tablist" aria-label={rarian ? "The Book of the Law" : mizukai ? "The Scroll of Seals" : orashai ? "The First Script" : "Spellbook"}>
         {TABS.map(entry => <button key={entry.id} type="button" role="tab" aria-selected={tab === entry.id} aria-checked={tab === entry.id} onClick={() => setTab(entry.id)}>{entry.name}<small>{BOOK.filter(spell => entry.kinds.includes(spell.kind) && levelFor(spell) >= spell.level && learnt(spell)).length}/{BOOK.filter(spell => entry.kinds.includes(spell.kind)).length}</small></button>)}
       </div>
       <div className="realm-icon-grid spells">
@@ -540,7 +544,8 @@ function MagicTab({ game, refresh, setSelection, selection, openMenu }: PanelPro
           <div className="realm-sigils">{Object.entries(shown.sigils).map(([sigil, n]) => { const have = count(player, sigil) + (sigil === "breeze_sigil" && player.equipment.weapon === "breeze_staff" ? 999 : 0);
             return <span key={sigil} data-short={have < n}><ItemIcon slot={{ id: sigil, n: 1 }} size={26} bare />{n}<small>/{have > 998 ? "∞" : have}</small></span>; })}
             {!Object.keys(shown.sigils).length && <span>Free</span>}</div>
-        </> : mizukai ? <p>Magic level <b>{levelForXp(player.xp.magic)}</b>, Devotion <b>{levelForXp(player.xp.prayer)}</b>. The Scroll of Seals: the Isles' seals, bindings, barriers, Spirit Sight and the crossings, the Realm's common magic beside them, and the shrine's rites in place of the old light. The Isles' seals bite a wayward spirit harder. Paper and spirit seals are sold at the Bureau of Seals in Kurohama.</p> : rarian ? <p>Magic level <b>{levelForXp(player.xp.magic)}</b>, Devotion <b>{levelForXp(player.xp.prayer)}</b>. The Book of the Law: Raria's edicts, judgements, vigils, the Office of Tithes and the Summons to Raria, the Realm's common magic beside them, and the Wise Friend's rites in place of the old light. Law, dusk and crown sigils are pressed in Raria.</p> : <p>Magic level <b>{levelForXp(player.xp.magic)}</b>, Faith <b>{levelForXp(player.xp.prayer)}</b>. Hover a spell for details. Darts, lances and bursts, wards, curses, Gilded Touch, Forgeheart, Far Reach, Bonebloom, teleports, and the Faith tab's light.</p>}
+        </> : orashai ? <p>Magic level <b>{levelForXp(player.xp.magic)}</b>, Devotion <b>{levelForXp(player.xp.prayer)}</b>. The First Script: the Azhurak glyphs written on the air, measures, doors and the old roads, the Realm's common magic beside them, and the Hidden Sun's rites in place of the old light. The rites bite harder on spirits.</p>
+        : mizukai ? <p>Magic level <b>{levelForXp(player.xp.magic)}</b>, Devotion <b>{levelForXp(player.xp.prayer)}</b>. The Scroll of Seals: the Isles' seals, bindings, barriers, Spirit Sight and the crossings, the Realm's common magic beside them, and the shrine's rites in place of the old light. The Isles' seals bite a wayward spirit harder. Paper and spirit seals are sold at the Bureau of Seals in Kurohama.</p> : rarian ? <p>Magic level <b>{levelForXp(player.xp.magic)}</b>, Devotion <b>{levelForXp(player.xp.prayer)}</b>. The Book of the Law: Raria's edicts, judgements, vigils, the Office of Tithes and the Summons to Raria, the Realm's common magic beside them, and the Wise Friend's rites in place of the old light. Law, dusk and crown sigils are pressed in Raria.</p> : <p>Magic level <b>{levelForXp(player.xp.magic)}</b>, Faith <b>{levelForXp(player.xp.prayer)}</b>. Hover a spell for details. Darts, lances and bursts, wards, curses, Gilded Touch, Forgeheart, Far Reach, Bonebloom, teleports, and the Faith tab's light.</p>}
       </InfoCard>
     </div>
   );
@@ -1492,6 +1497,7 @@ export function Orbs({ game, onRun, onSneak, onRide, onMap, onZoom, onRotate, op
   const player = game.player, hpFraction = player.hp / maxHp(player), prayerFraction = player.prayer / Math.max(1, maxPrayer(player));
   const orbMenu = (label: string): MenuEntry[] => label === "Hitpoints" ? [{ verb: "Check", noun: "Hitpoints", run: () => message(game, `Hitpoints: ${player.hp} / ${maxHp(player)}.`) }]
     : label === "Faith" ? [{ verb: "Deactivate", noun: "Prayers", run: () => { player.prayers = []; } }, { verb: "Check", noun: "Faith", run: () => message(game, `Faith: ${Math.ceil(player.prayer)} / ${maxPrayer(player)}.`) }]
+    : label === "Mana" ? [{ verb: "Check", noun: "Mana", run: () => message(game, `Mana: ${Math.floor(player.mana)} / ${maxMana(player)}.`) }]
     : [{ verb: player.run ? "Walk" : "Run", noun: "", run: onRun }, { verb: "Check", noun: "Run energy", run: () => message(game, `Run energy: ${Math.floor(player.energy)}%.`) }];
   const orb = (label: string, value: number, fraction: number, color: string, art: HTMLCanvasElement, onClick?: () => void, pressed?: boolean) => (
     <button type="button" className="realm-orb" onClick={onClick} disabled={!onClick && !openMenu} aria-pressed={pressed} aria-label={`${label}: ${value}`} title={label} {...rightClick(openMenu, () => orbMenu(label))}>
@@ -1502,20 +1508,29 @@ export function Orbs({ game, onRun, onSneak, onRide, onMap, onZoom, onRotate, op
     <div className="realm-orbs">
       {orb("Hitpoints", player.hp, hpFraction, "#cf6e6e", orbArt("hitpoints"))}
       {orb("Faith", Math.ceil(player.prayer), prayerFraction, "#9fb4d0", orbArt("prayer"))}
+      {/* Mana: the Orashai way's own, under Faith, only while you keep it. */}
+      {player.orashai && orb("Mana", Math.floor(player.mana), player.mana / Math.max(1, maxMana(player)), "#3f6fb0", orbArt("mana"))}
       <div className="realm-orb-row">
         {/* Sneak (Stealth): beside run energy, which it spends. */}
         <button type="button" className="realm-sneak" onClick={onSneak} aria-pressed={player.sneak} aria-label={player.sneak ? "Stop sneaking (C)" : "Sneak (C)"} title={player.sneak ? "Stop sneaking (C)" : "Sneak (C): slip past aggressive monsters"}
           {...rightClick(openMenu, () => [{ verb: player.sneak ? "Stop-sneaking" : "Sneak", noun: "", run: onSneak }])}><PixelIcon art={orbArt("sneak")} size={16} /></button>
         {orb(player.run ? "Run: on" : "Run: off", Math.floor(player.energy), player.energy / 100, player.sneak ? "#8f8ab8" : player.run ? "#e2c46a" : "#9a968f", orbArt(player.run ? "run" : "walk"), onRun, player.run)}
       </div>
-      {onRide && player.mounts.length > 0 && (() => { const shown = mountDef(player.mount ?? player.lastMount ?? player.mounts[0])!;
-        return <button type="button" className="realm-orb map ride" onClick={() => onRide()} aria-pressed={!!player.mount} aria-label={player.mount ? `Dismount (H)` : `Ride your ${shown.name.toLowerCase()} (H)`} title={player.mount ? "Dismount (H)" : "Ride (H)"}
-          {...rightClick(openMenu, () => [...player.mounts.map(id => ({ verb: player.mount === id ? "Dismount" : "Ride", noun: mountDef(id)!.name, run: () => onRide(id) }))])}><PixelIcon art={mountArt(shown.coat, "side", -1, true)} size={26} /></button>; })()}
       <button type="button" className="realm-orb map" onClick={onMap} aria-label="World map (M)" title="World map (M)" {...rightClick(openMenu, () => [{ verb: "Open", noun: "World map", run: onMap }])}><PixelIcon art={orbArt("map")} size={22} /></button>
       <div className="realm-zoom"><button type="button" onClick={() => onZoom(0.12)} aria-label="Zoom in">+</button><button type="button" onClick={() => onZoom(-0.12)} aria-label="Zoom out">−</button></div>
       <div className="realm-zoom"><button type="button" onClick={() => onRotate(-Math.PI / 4)} aria-label="Turn the camera left" title="Turn left (←)">⟲</button><button type="button" onClick={() => onRotate(Math.PI / 4)} aria-label="Turn the camera right" title="Turn right (→)">⟳</button></div>
     </div>
   );
+}
+
+/** Your mount's orb, on the right of the minimap (Faith's column keeps the Orashai's mana under it). */
+export function MountOrb({ game, onRide, openMenu }: { game: Game; onRide?: (id?: string) => void; openMenu?: OpenMenu }) {
+  const player = game.player;
+  return <>
+      {onRide && player.mounts.length > 0 && (() => { const shown = mountDef(player.mount ?? player.lastMount ?? player.mounts[0])!;
+        return <button type="button" className="realm-orb map ride realm-mount-orb" onClick={() => onRide()} aria-pressed={!!player.mount} aria-label={player.mount ? `Dismount (H)` : `Ride your ${shown.name.toLowerCase()} (H)`} title={player.mount ? "Dismount (H)" : "Ride (H)"}
+          {...rightClick(openMenu, () => [...player.mounts.map(id => ({ verb: player.mount === id ? "Dismount" : "Ride", noun: mountDef(id)!.name, run: () => onRide(id) }))])}><PixelIcon art={mountArt(shown.coat, "side", -1, true)} size={26} /></button>; })()}
+  </>;
 }
 
 // ---------- The daily popup: the streak and challenges, and the update log ----------

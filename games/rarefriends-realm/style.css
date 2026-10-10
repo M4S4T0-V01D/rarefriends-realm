@@ -518,6 +518,20 @@
 .realm-mizukai-head button { margin-top: 3px; padding: 1px 8px; font-size: 10px; border-radius: 10px; border: 1px solid #b5452f; background: transparent; color: inherit; }
 .realm-mizukai.magic .realm-mizukai-head button { border-color: #c9a24a; }
 .realm-mizukai-seal { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 3px; background: #b5452f; color: #f6efdf; font-size: 15px; line-height: 1; font-weight: 700; box-shadow: inset 0 0 0 2px #b5452f, inset 0 0 0 3px rgba(246,239,223,0.8); transform: rotate(-4deg); }
+/* The Orashai way (The Land Before Stone): lapis and gold, a clay-tablet book; the emblem is the eye of the First Script. */
+.realm-tradition-emblem.orashai { background: radial-gradient(circle, #1b1a22 0 3px, #e2c46a 3px 6px, #2f3f66 6px); border-color: #e2c46a; }
+.realm-orashai { position: relative; margin: -6px; padding: 8px; border-radius: 2px; }
+.realm-orashai.faith { color: #e8e2d0; border: 2px solid #e2c46a; background: linear-gradient(#2f3f66, #22304f); }
+.realm-orashai.magic { color: #3a2a1c; border: 2px solid #8a5a3a; background: linear-gradient(#e2c49a, #d4ac7c); }
+.realm-orashai.faith .realm-muted { color: #b9c3d9; } .realm-orashai.faith b { color: #e2c46a; }
+.realm-orashai.magic .realm-muted { color: #6f5440; } .realm-orashai.magic b { color: #2f3f66; }
+.realm-orashai-head { display: grid; justify-items: center; gap: 2px; margin: 0 0 6px; padding: 2px 4px 6px; text-align: center; border-bottom: 1px solid rgba(226,196,106,0.55); }
+.realm-orashai-head b { font-family: Georgia, "Times New Roman", serif; font-size: 13px; letter-spacing: .06em; font-variant: small-caps; }
+.realm-orashai-head small { font-size: 10px; font-style: italic; opacity: .85; }
+.realm-orashai-head button { margin-top: 3px; padding: 1px 8px; font-size: 10px; border-radius: 10px; border: 1px solid #e2c46a; background: transparent; color: inherit; }
+.realm-orashai-eye { width: 30px; height: 18px; border-radius: 50%; background: radial-gradient(circle, #1b1a22 0 3px, #e2c46a 3px 6px, #f2ecdc 6px); border: 2px solid #1b1a22; }
+.realm-orashai.magic .realm-icon-grid button { border: 1px solid #8a5a3a; border-radius: 2px; background: linear-gradient(#ecd3ac, #dcb98a); }
+.realm-orashai.faith .realm-icon-grid button { border: 1px solid #e2c46a; border-radius: 2px; background: linear-gradient(#3a4c78, #2f3f66); }
 .realm-mizukai-section { margin: 0 0 4px; } .realm-mizukai-section h4 { margin: 4px 0 2px; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: #8f2b2b; border-bottom: 1px dotted rgba(143,43,43,0.4); }
 .realm-mizukai-section .realm-icon-grid { min-height: 0; }
 .realm-mizukai.faith .realm-icon-grid button { border: 1px solid #c9a24a; border-radius: 2px; background: linear-gradient(#fbf6ea, #ede2c9); box-shadow: inset 0 -2px 0 rgba(181,69,47,0.25); }
@@ -567,6 +581,8 @@
 /* ---------- Feedback: the button on the minimap ring and its window ---------- */
 .realm-feedback-btn { position: absolute; right: -4px; top: 68px; z-index: 3; width: 28px; height: 28px; padding: 0 !important; min-height: 0 !important; display: grid; place-items: center; font-size: 14px; border-radius: 50%; background: var(--paper) !important; border: 2px solid var(--ink) !important; box-shadow: 2px 2px 0 #000; }
 .realm-feedback-btn:hover { background: #fff !important; }
+/* The mount orb sits on the minimap's right edge, between the feedback button and full screen (Faith's column keeps mana under it). */
+.realm-mount-orb { position: absolute; right: -8px; top: 106px; z-index: 3; }
 .realm-feedback-text { width: 100%; min-height: 110px; margin: 6px 0 2px; padding: 8px; border: 2px solid var(--ink); border-radius: 4px; font: 13px/1.4 ui-monospace, Menlo, Consolas, monospace; resize: vertical; background: #fff; color: var(--ink); user-select: text; -webkit-user-select: text; }
 
 /* The Adventurer card's styles: a grid of labelled dropdowns. */

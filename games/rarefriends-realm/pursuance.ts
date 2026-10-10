@@ -59,7 +59,9 @@ const LEARNT: Record<Exclude<Fact, "seen" | "abilities">, string> = {
   weakness: "Pursuance: you've learnt what the {x} is weak to.",
   defences: "Pursuance: you've learnt how the {x} guards itself.",
 };
-const say = (game: Game, line: string, def: MonsterDef, tone: Parameters<typeof message>[2] = "game") => message(game, line.replace("{x}", def.name), tone);
+/** "the {x}" with a name that has its own article ("The Unnamed") reads "the Unnamed", not "the The Unnamed". */
+const say = (game: Game, line: string, def: MonsterDef, tone: Parameters<typeof message>[2] = "game") =>
+  message(game, line.replace("{x}", line.includes("the {x}") ? def.name.replace(/^The /, "") : def.name), tone);
 
 /** Learn a fact about a creature (once): XP, and a line in the chat. True if it was new. */
 export function learn(game: Game, id: string, fact: Fact, quiet = false): boolean {

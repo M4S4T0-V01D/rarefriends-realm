@@ -15,6 +15,7 @@ import { chat, completeQuest, data, npcSays, questDone, stage, type NpcDef, type
 import { discover, knows, learnGlyph, readInscription } from "./mysteries.ts";
 import type { WorldObject } from "./world.ts";
 import { HEARTLAND_CLUES } from "./dynasties.ts";
+import { ORASHAI_CLUES } from "./orashaiquests.ts";
 
 const art = (family: number, seed: number) => ({ family, seed });
 const person = (id: string, name: string, examine: string, seed: number, extra: Partial<NpcDef> = {}): NpcDef => ({ id, name, examine, options: ["Talk-to"], art: art(9, seed), ...extra });
@@ -158,6 +159,7 @@ export const CLUES: Record<string, Clue> = {
     },
   },
   ...HEARTLAND_CLUES,
+  ...ORASHAI_CLUES,
 };
 
 /** A clue's options, examine text and use (null if the object isn't one). */

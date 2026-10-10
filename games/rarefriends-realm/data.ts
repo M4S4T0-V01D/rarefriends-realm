@@ -71,6 +71,8 @@ import { FACTION_MONSTERS, factionGear } from "./factions.ts";
 import { MIZUKAI_ITEMS, MIZUKAI_MONSTERS, mizukaiGear } from "./mizukaigear.ts";
 import { KHARAVETH_GEAR, KHARAVETH_ITEMS, KHARAVETH_MONSTERS, KHARAVETH_SHOPS, STEPPE_CLOTHES } from "./kharavethgear.ts";
 import { HEARTLAND_GEAR, HEARTLAND_ITEMS, HEARTLAND_MONSTERS, HEARTLAND_SHOPS, OURESH_GOODS, ZURI_GOODS } from "./heartlandsgear.ts";
+import { ORASHAI_GEAR, ORASHAI_ITEMS, ORASHAI_MONSTERS, ORASHAI_PRAYERS, ORASHAI_QUEST_ITEMS, ORASHAI_SPELLS, ORASHAI_SPELL_TABS } from "./orashai.ts";
+export { ORASHAI_SPELL_TABS };
 import { SOLDIERS } from "./skirmish.ts";
 // ---------- Items ----------
 export type EquipSlot = "head" | "cape" | "neck" | "weapon" | "body" | "shield" | "legs" | "hands" | "feet" | "belt" | "ring";
@@ -1000,7 +1002,7 @@ function dyedItem(id: string): Item | undefined {
   DYED.set(id, made);
   return made;
 }
-export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...DYE_POTS, ...CARVING_ITEMS, ...BAR_ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...ORDER_ARMOUR, ...orderGear(), ...slayerGear(), ...heartguardGear(), ...REGIONAL_ITEMS, ...APOTHECARY_ITEMS, ...factionGear(), ...mizukaiGear(), ...MIZUKAI_ITEMS, ...KHARAVETH_ITEMS, ...KHARAVETH_GEAR, ...STEPPE_CLOTHES, ...HEARTLAND_ITEMS, ...HEARTLAND_GEAR]);
+export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...DYE_POTS, ...CARVING_ITEMS, ...BAR_ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...ORDER_ARMOUR, ...orderGear(), ...slayerGear(), ...heartguardGear(), ...REGIONAL_ITEMS, ...APOTHECARY_ITEMS, ...factionGear(), ...mizukaiGear(), ...MIZUKAI_ITEMS, ...KHARAVETH_ITEMS, ...KHARAVETH_GEAR, ...STEPPE_CLOTHES, ...HEARTLAND_ITEMS, ...HEARTLAND_GEAR, ...ORASHAI_ITEMS, ...ORASHAI_GEAR, ...ORASHAI_QUEST_ITEMS]);
 const ITEM_MAP = new Map(ITEM_LIST.map(item => [item.id, item]));
 export function item(id: string): Item {
   const found = ITEM_MAP.get(id) ?? dyedItem(id);
@@ -1158,6 +1160,8 @@ export type Spell = {
   rarian?: boolean;
   /** The Mizukai Isles' own (What Rises in the East): a seal, binding, barrier, art, crossing or rite, castable only while you keep the Mizukai way. */
   mizukai?: boolean;
+  /** The Orashai's own (The Land Before Stone): a glyph of the First Script, or a rite of the Hidden Sun, castable only while you keep the Orashai way. */
+  orashai?: boolean;
   /** Faith spells: the level is a Faith level and each cast spends this much faith. */
   skill?: "prayer"; faith?: number;
   /** A ward on yourself: more defence (a fraction of your bonus plus a flat amount), less damage taken (a fraction), for so many ticks. */
@@ -1167,7 +1171,7 @@ export type Spell = {
   description: string;
 };
 /** Everywhere a teleport can land (the keys of World["places"] that spells use). */
-export type TeleportPlace = "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier" | "fernwick" | "highcairn" | "dawnhold" | "gravesend" | "saltmarrow" | "hollyhock" | "dyemoor" | "tallgrass" | "cragmaw" | "quillhaven" | "ashfall" | "raria" | "fff_fortress" | "barkreach" | "kurohama" | "kumoyama";
+export type TeleportPlace = "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier" | "fernwick" | "highcairn" | "dawnhold" | "gravesend" | "saltmarrow" | "hollyhock" | "dyemoor" | "tallgrass" | "cragmaw" | "quillhaven" | "ashfall" | "raria" | "fff_fortress" | "barkreach" | "kurohama" | "kumoyama" | "sefrah" | "tamesh" | "khetmar" | "foothold" | "zuri" | "takamori" | "tanabe" | "yumoto";
 /** The spellbook's tabs: which kinds go where. */
 export const SPELL_TABS: readonly { id: string; name: string; kinds: readonly SpellKind[] }[] = [
   { id: "combat", name: "Combat", kinds: ["strike", "bolt", "blast"] }, { id: "curses", name: "Curses", kinds: ["curse", "bind"] },
@@ -1193,18 +1197,23 @@ export const MIZUKAI_SPELL_TABS: readonly { id: string; name: string; kinds: rea
  * The magical and faith traditions you can keep (switched from the top of your spellbook or prayers, anywhere): the
  * Realm's own (the Old Friend's book), Raria's (the Wise Friend's Law), the Mizukai Isles' (the rope and the brush).
  */
-export type Tradition = "realm" | "raria" | "mizukai";
+export type Tradition = "realm" | "raria" | "mizukai" | "orashai";
+/** Which tradition a spell is the own of (none: the Realm's common magic, or the Old Friend's light). */
+export const spellTradition = (spell: Spell): Tradition | null => spell.rarian ? "raria" : spell.mizukai ? "mizukai" : spell.orashai ? "orashai" : null;
 /**
  * Whether a spell belongs in the book you keep: the Realm's common magic is in all of them; the Old Friend's light only
- * in the old book; Raria's edicts and rites only in the Law's; the Isles' seals and rites only in the Mizukai way's.
+ * in the old book; each tradition's own (Raria's edicts, the Isles' seals, the Orashai's glyphs) only in its own.
  */
-export const spellInBook = (spell: Spell, tradition: Tradition) =>
-  tradition === "raria" ? !spell.mizukai && !(spell.skill === "prayer" && !spell.rarian)
-  : tradition === "mizukai" ? !spell.rarian && !(spell.skill === "prayer" && !spell.mizukai)
-  : !spell.rarian && !spell.mizukai;
+export const spellInBook = (spell: Spell, tradition: Tradition) => {
+  const own = spellTradition(spell);
+  // (Each tradition's book has its own roads: the Realm's glides are the old book's, and Homeward is in every book.)
+  return own ? own === tradition : tradition === "realm" || (spell.skill !== "prayer" && (spell.kind !== "teleport" || spell.id === "home"));
+};
+/** Where Homeward takes you: home is the tradition you keep (Friendhollow; Raria; the shrine at Kumoyama; Sefrah's Temple of the Hidden Sun). */
+export const HOME_PLACE: Record<Tradition, TeleportPlace> = { realm: "hollow_square", raria: "raria", mizukai: "kumoyama", orashai: "sefrah" };
 /** The Realm's spellbook, in level order: combat, curses, utility and teleports. */
 export const SPELLS: readonly Spell[] = [
-  { id: "home", name: "Homeward", level: 1, xp: 0, sigils: {}, kind: "teleport", element: "home", target: "self", teleport: "hollow_square", description: "Return to Friendhollow. Slow to cast, free, and not in combat." },
+  { id: "home", name: "Homeward", level: 1, xp: 0, sigils: {}, kind: "teleport", element: "home", target: "self", teleport: "hollow_square", description: "Return home: Friendhollow, or the home of the tradition you keep (Raria; the shrine at Kumoyama; Sefrah's temple). Slow to cast, free, and not in combat." },
   { id: "breeze_dart", name: "Breeze Dart", level: 1, xp: 5.5, sigils: { breeze_sigil: 1, thought_sigil: 1 }, kind: "strike", element: "wind", target: "monster", maxHit: 2, description: "A basic air missile." },
   { id: "muddle", name: "Muddle", level: 3, xp: 13, sigils: { shade_sigil: 1, tide_sigil: 3, stone_sigil: 2 }, kind: "curse", element: "hollow", target: "monster", curse: { stat: "attack", amount: 0.1 }, description: "Lowers a monster's accuracy by 10% for a minute." },
   { id: "tide_dart", name: "Tide Dart", level: 5, xp: 7.5, sigils: { tide_sigil: 1, breeze_sigil: 1, thought_sigil: 1 }, kind: "strike", element: "water", target: "monster", maxHit: 4, description: "A basic water missile." },
@@ -1291,6 +1300,16 @@ export const SPELLS: readonly Spell[] = [
   { id: "rite_of_rising_sun", name: "Rite of the Rising Sun", level: 76, xp: 62, sigils: { spirit_seal: 3, star_sigil: 2 }, kind: "smite", element: "holy", target: "monster", skill: "prayer", faith: 5, maxHit: 32, mizukai: true, description: "The first light of the Isles, called down (max hit 32, half as hard again against a wayward spirit). Costs 5 faith." },
   { id: "rite_of_dusk", name: "Rite of Dusk", level: 72, xp: 58, sigils: { dusk_sigil: 3, law_sigil: 2 }, kind: "smite", element: "dusk", target: "monster", skill: "prayer", faith: 4, maxHit: 30, rarian: true, description: "The last rite of the Order of Dusk, pronounced over a creature (max hit 30, half as much again against the undead). Costs 4 faith." },
   { id: "banishment", name: "Banishment", level: 80, xp: 60, sigils: { star_sigil: 4, hollow_sigil: 1 }, kind: "smite", element: "holy", target: "monster", skill: "prayer", faith: 5, maxHit: 32, description: "Light that unmakes (max hit 32, twice that against the undead). Costs 5 faith a cast." },
+  ...ORASHAI_SPELLS,
+  // Each tradition's own roads (the Realm's glides stay in the old book), and the Old Friend's own road to Dawnhold.
+  { id: "pilgrimage_dawnhold", name: "Pilgrimage to Dawnhold", level: 45, xp: 50, sigils: { star_sigil: 1 }, kind: "teleport", element: "holy", target: "self", teleport: "dawnhold", skill: "prayer", faith: 3, description: "The Old Friend's road for the faithful: a prayer said walking, and you arrive at Dawnhold's gate." },
+  { id: "summons_to_the_federation", name: "Summons to the Federation", level: 45, xp: 50, sigils: { law_sigil: 2, path_sigil: 1 }, kind: "teleport", element: "law", target: "self", teleport: "fff_fortress", rarian: true, description: "The Law summons you to the FFF Fortress, where it is argued with daily." },
+  { id: "summons_to_barkreach", name: "Summons to BarkReach", level: 55, xp: 62, sigils: { law_sigil: 2, path_sigil: 2 }, kind: "teleport", element: "law", target: "self", teleport: "barkreach", rarian: true, description: "The Law reaches even the redwoods: you arrive in BarkReach, among the loggers." },
+  { id: "crossing_takamori", name: "Castle-path to Takamori", level: 40, xp: 48, sigils: { paper_seal: 2, stone_sigil: 2 }, kind: "teleport", element: "earth", target: "self", teleport: "takamori", mizukai: true, description: "A seal of the castle road: you arrive at Takamori, under the keep." },
+  { id: "crossing_tanabe", name: "Field-path to Tanabe", level: 46, xp: 54, sigils: { paper_seal: 2, bloom_sigil: 1 }, kind: "teleport", element: "earth", target: "self", teleport: "tanabe", mizukai: true, description: "A seal of the terraced fields: you arrive at Tanabe, among the rice." },
+  { id: "crossing_yumoto", name: "Steam-path to Yumoto", level: 58, xp: 66, sigils: { spirit_seal: 1, tide_sigil: 2 }, kind: "teleport", element: "water", target: "self", teleport: "yumoto", mizukai: true, description: "A seal of the hot springs: you arrive at Yumoto, in the steam." },
+  { id: "road_to_khetmar", name: "The Road to Khetmar", level: 56, xp: 64, sigils: {}, kind: "teleport", element: "earth", target: "self", teleport: "khetmar", orashai: true, description: "Two lines running together, and an arch: the road to the fortress on the eastern pass." },
+  { id: "road_to_the_blue_smoke", name: "The Road to the Blue Smoke", level: 38, xp: 46, sigils: {}, kind: "teleport", element: "wind", target: "self", teleport: "zuri", orashai: true, description: "Two lines running together, and smoke going up: the road to the Zuri's tents." },
 ];
 export type Prayer = { id: string; name: string; level: number; drain: number;
   /**
@@ -1301,7 +1320,9 @@ export type Prayer = { id: string; name: string; level: number; drain: number;
   /** A commandment of the Wise Friend's Law (Return of Raria): kept only while you keep the Law, in place of the Old Friend's prayers. */
   rarian?: boolean;
   /** A vow or blessing of the Mizukai Isles: kept only while you keep the Mizukai way; and which part of the shrine's book it's in. */
-  mizukai?: boolean; section?: "protection" | "blessings" | "purification" | "spirits" | "rituals" };
+  mizukai?: boolean; section?: "protection" | "blessings" | "purification" | "spirits" | "rituals";
+  /** A watching of the Orashai (The Land Before Stone): kept only while you keep the Orashai way. */
+  orashai?: boolean };
 export const PRAYERS: readonly Prayer[] = [
   { id: "paper_shield", name: "Paper Shield", level: 1, drain: 1 / 12, effect: { defence: 0.05 }, description: "+5% Defence" },
   { id: "warm_heart", name: "Warm Heart", level: 4, drain: 1 / 12, effect: { strength: 0.05 }, description: "+5% Strength" },
@@ -1337,6 +1358,7 @@ export const PRAYERS: readonly Prayer[] = [
   { id: "friend_of_the_place", name: "The Friend of the Place", level: 48, drain: 1 / 3, effect: { defence: 0.1, magic: 0.12, spirit: 0.15 }, description: "+10% Defence, +12% Magic, and spirits strike 15% softer", mizukai: true, section: "spirits" },
   { id: "rising_sun", name: "Blessing of the Rising Sun", level: 60, drain: 2 / 5, effect: { attack: 0.14, strength: 0.14, defence: 0.14 }, description: "+14% Attack, Strength and Defence", mizukai: true, section: "rituals" },
   { id: "thousand_friends", name: "Kagura of a Thousand Friends", level: 74, drain: 1 / 2, effect: { attack: 0.12, strength: 0.12, defence: 0.12, magic: 0.12, spirit: 0.2 }, description: "+12% Attack, Strength, Defence and Magic, and spirits strike 20% softer", mizukai: true, section: "rituals" },
+  ...ORASHAI_PRAYERS,
 ];
 
 // ---------- Monsters ----------
@@ -1388,6 +1410,7 @@ export const MONSTERS: Record<string, MonsterDef> = {
   ...MIZUKAI_MONSTERS,
   ...KHARAVETH_MONSTERS,
   ...HEARTLAND_MONSTERS,
+  ...ORASHAI_MONSTERS,
   // Return of Raria: the Regiment, the Federation's pickets, the Royal Rangers, BarkReach's wild things, the deserters and the Burned.
   ...FACTION_MONSTERS,
   // Every soldier's fighting self, for when it draws steel (skirmish.ts).
@@ -1637,6 +1660,9 @@ const QUEST_CLOTHES = new Set(["maiden_veil", "rarian_mantle", "scorched_cloak"]
 export const SHOPS: Record<string, ShopDef> = {
   ...KHARAVETH_SHOPS,
   ...HEARTLAND_SHOPS,
+  // The Orashai: the Keeper's scriptorium (inks, reeds, rods, the ibis mask) and the Temple of the Hidden Sun (inks).
+  keeper_scriptorium: { id: "keeper_scriptorium", name: "The Keeper's scriptorium", buys: ["other"], rate: 0.5, stock: ["ochre_ink", "lapis_ink", "scribes_reed", "lapis_rod", "ibis_mask"] },
+  hidden_sun_temple: { id: "hidden_sun_temple", name: "The Temple of the Hidden Sun", buys: ["other"], rate: 0.5, stock: ["ochre_ink", "lapis_ink", "vial_of_water"] },
   // The dynasties' tailors and the nomads' traders: their own people's clothes (and the nomads, what fits on a camel).
   sefrah_clothier: { id: "sefrah_clothier", name: "Tahmira's Linens", buys: ["other"], rate: 0.5, stock: REGIONAL_CLOTHING.find(set => set.region === "sefrah")!.pieces.map(piece => piece.id) },
   tamesh_clothier: { id: "tamesh_clothier", name: "Ketty's Weaving", buys: ["other"], rate: 0.5, stock: REGIONAL_CLOTHING.find(set => set.region === "tamesh")!.pieces.map(piece => piece.id) },

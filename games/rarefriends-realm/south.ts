@@ -13,6 +13,7 @@
 import { DUNGEON_Y, OVERWORLD_H, T, W, isWater, type DecorKind, type Floor, type GenContext, type RegionId, type World, type WorldObject, type worldTools } from "./world.ts";
 
 import { ASHAR, SPINE, buildHeartlands } from "./heartlands.ts";
+import { buildFirstNames } from "./firstnames.ts";
 
 type Tools = ReturnType<typeof worldTools>;
 
@@ -369,6 +370,8 @@ export function buildSouth(ctx: GenContext, t: Tools, places: World["places"], f
   put2(U.x0 + 148, uy0 + 48, "chest", "Azhurak coffer");
 
   // ---------- 5. Beyond the camp: the heartlands (heartlands.ts) ----------
-  buildHeartlands(ctx, t, places, { land, random, nearFree, occupied, open, npcAt, monsterAt, put2, clue });
+  const kit = { land, random, nearFree, occupied, open, npcAt, monsterAt, put2, clue };
+  buildHeartlands(ctx, t, places, kit);
+  buildFirstNames(ctx, t, places, kit);
   void ([] as RegionId[]); void isWater;
 }

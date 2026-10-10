@@ -184,3 +184,11 @@ test("Pursuance speaks every language: examine, discoveries, tracks, contracts, 
     assert.deepEqual([...new Set(left)].slice(0, 12), [], `${lang}: still in English`);
   }
 });
+
+test("a creature whose name has its own article reads naturally: \"how the Unnamed fights\", not \"the The Unnamed\"", () => {
+  const game = fresh();
+  learn(game, "the_unnamed", "temper"); learn(game, "rat_king", "weakness");
+  const said = game.messages.map(entry => entry.text);
+  assert.ok(said.includes("Pursuance: you've learnt how the Unnamed fights."), said.join("\n"));
+  assert.ok(!said.some(text => text.includes("the The ")));
+});

@@ -308,6 +308,18 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
           for (const y of [9, 13, 17, 21, 25]) line(p, [[4, y], [28, y]], accent ?? DARK_WOOD);
           line(p, [[8, 15], [24, 15]], accent ?? GOLD_C, 2); break;
         }
+        if (icon.kind === "ibis") {
+          // A painted ibis head: white, black face, a long curved bill.
+          part(p, poly([[8, 26], [8, 12], [12, 7], [19, 7], [23, 12], [23, 26]]), color, "cloth");
+          part(p, disc(17, 13, 4, 3), accent ?? "#1e1c22", "cloth"); dot(p, 18, 12, GOLD_C);
+          line(p, [[20, 15], [25, 19], [28, 26]], accent ?? "#1e1c22", 2); break;
+        }
+        if (icon.kind === "fishbag") {
+          // A paper bag, eyeholes, a surprised fish.
+          part(p, poly([[6, 28], [8, 5], [24, 5], [26, 28]]), color, "cloth");
+          for (const x of [12, 20]) part(p, disc(x, 11, 1.5, 1.5), accent ?? "#2a2730", "cloth");
+          part(p, disc(15, 19, 5, 2.5), accent ?? "#2a2730", "cloth"); part(p, poly([[19, 19], [23, 16], [23, 22]]), accent ?? "#2a2730", "cloth"); dot(p, 12, 19, color); break;
+        }
         if (icon.kind === "turban") {
           // A wrapped turban: turns of cloth, a fold across, a tail.
           part(p, poly([[5, 24], [5, 14], [9, 8], [16, 6], [23, 8], [27, 14], [27, 24]]), color, "cloth");
@@ -1044,10 +1056,12 @@ const TAB_PAINTERS: Record<TabIcon, Painter> = {
   },
 };
 export const tabArt = (tab: TabIcon) => pixelArt(`tab24:${tab}`, 24, 24, p => { TAB_PAINTERS[tab](p); p.outline(); p.halo(); });
-export type OrbIcon = "hitpoints" | "prayer" | "run" | "walk" | "map" | "sneak";
+export type OrbIcon = "hitpoints" | "prayer" | "run" | "walk" | "map" | "sneak" | "mana";
 const ORB_PAINTERS: Record<OrbIcon, Painter> = {
   hitpoints: SKILL_PAINTERS.hitpoints, prayer: SKILL_PAINTERS.prayer,
   run: p => { p.poly([[3, 12], [9, 12], [10, 8], [13, 7], [15, 13], [15, 15], [3, 15]], GOLD); p.line(4, 10, 8, 6, SAGE, 2); p.line(7, 6, 10, 4, SAGE, 2); },
+  // Mana (the Orashai way): a drop of lapis with the eye of the First Script in gold.
+  mana: p => { p.poly([[8, 1], [13, 8], [14, 11], [12, 15], [8, 16], [4, 15], [2, 11], [3, 8]], "#3f6fb0"); p.disc(8, 11, 3.5, 2, "#e2c46a", null); p.disc(8, 11, 1.3, 1.3, "#1b1a22", null); p.line(6, 4, 4, 8, "#9fc0e8"); },
   walk: p => { p.poly([[3, 12], [9, 12], [10, 8], [13, 7], [15, 13], [15, 15], [3, 15]], "#9a968f"); },
   sneak: p => { p.poly([[8, 1], [13, 5], [14, 15], [2, 15], [3, 5]], "#8f8ab8"); p.poly([[8, 5], [11, 8], [10, 12], [6, 12], [5, 8]], "#1b1a22", null); p.set(7, 8, "#f2eeff"); p.set(9, 8, "#f2eeff"); },
   map: p => { p.poly([[2, 4], [6, 2], [11, 4], [16, 2], [16, 14], [11, 16], [6, 14], [2, 16]], "#efe3c4"); p.line(6, 2, 6, 14, INK); p.line(11, 4, 11, 16, INK); p.disc(9, 9, 1.5, 1.5, "#cf6e6e", null); },
@@ -1057,7 +1071,7 @@ export const orbArt = (orb: OrbIcon) => icon16(`orb:${orb}`, ORB_PAINTERS[orb]);
 // ---------- Spell and prayer icons (generated from their element) ----------
 const ELEMENT_COLORS: Record<string, string> = { wind: "#e6ecef", water: "#8fa3c9", earth: "#a89479", fire: "#e9a07a", hollow: "#6d6b67", moon: "#c6bed4", gold: "#e2d49e", home: "#e8d4c0", holy: "#f2e28f", law: "#cfc7e6", dusk: "#8a6ab0", paper: "#efe6d2" };
 /** The Mizukai Isles' spells: each a paper seal (an ofuda strip) with its own mark in red ink. */
-const MIZUKAI_SPELL_MARKS = new Set(["seal_strike", "withering_seal", "paper_wall", "spirit_sight", "ink_serpent", "binding_seal_spell", "mist_veil", "storm_seal", "true_name", "crossing_kurohama", "crossing_kumoyama", "purifying_rite", "talisman_of_mending", "blessing_of_journeys", "shrine_barrier", "pacify_spirit", "rite_of_rising_sun"]);
+const MIZUKAI_SPELL_MARKS = new Set(["crossing_takamori", "crossing_tanabe", "crossing_yumoto", "seal_strike", "withering_seal", "paper_wall", "spirit_sight", "ink_serpent", "binding_seal_spell", "mist_veil", "storm_seal", "true_name", "crossing_kurohama", "crossing_kumoyama", "purifying_rite", "talisman_of_mending", "blessing_of_journeys", "shrine_barrier", "pacify_spirit", "rite_of_rising_sun"]);
 function mizukaiSpell(p: Pixels, id: string, kind: string, color: string) {
   // A strip of seal paper, slightly turned, with a red border and a brushed mark; a coloured wisp of what it does behind.
   p.disc(13, 8, 6, 6, shadeHex(color, -0.05), null);
@@ -1079,10 +1093,46 @@ function mizukaiSpell(p: Pixels, id: string, kind: string, color: string) {
   if (id === "true_name") { p.line(5, 6, 10, 13, red); }
 }
 /** Spell icon: an element orb with a shape by kind (bolt, strike, blast, curse, teleport, alchemy, utility). */
+/** The Orashai's First Script: each glyph cut into an ochre clay tablet; the Hidden Sun's rites on lapis. */
+const ORASHAI_GLYPHS: Record<string, (p: Pixels, ink: string) => void> = {
+  write_stone: (p, ink) => p.rect(7, 7, 6, 6, ink),
+  write_dust: (p, ink) => { for (const x of [5, 8, 11, 14]) p.rect(x, 9, 1, 2, ink); },
+  write_door: (p, ink) => { p.line(6, 15, 6, 7, ink); p.line(6, 7, 14, 7, ink); p.line(14, 7, 14, 15, ink); p.rect(9, 7, 2, 1, "#d9a878"); },
+  write_eye: (p, ink) => { p.disc(10, 10, 5, 2.5, ink, null); p.disc(10, 10, 1.3, 1.3, "#e2c46a", null); },
+  write_water: (p, ink) => { for (const y of [6, 9, 12]) for (let x = 5; x < 15; x += 2) { p.set(x, y + 1, ink); p.set(x + 1, y, ink); } },
+  write_measure: (p, ink) => { p.line(4, 8, 15, 8, ink); p.poly([[9.5, 9], [7, 14], [12, 14]], ink, null); },
+  write_veil: (p, ink) => { p.line(4, 8, 15, 8, ink); p.poly([[8, 9], [12, 9], [10, 14]], ink, null); },
+  write_star: (p, ink) => { p.set(10, 10, ink); for (const [x, y] of [[6, 6], [14, 6], [5, 12], [15, 13], [10, 4], [10, 16]]) p.set(x, y, ink); },
+  write_first_name: (p, ink) => { p.disc(10, 10, 5, 5, ink, null); p.disc(10, 10, 3.2, 3.2, "#d9a878", null); p.rect(9, 4, 2, 2, "#d9a878"); p.line(6, 4, 8, 6, "#e2c46a"); },
+  road_to_sefrah: (p, ink) => { p.line(4, 7, 15, 7, ink); p.line(4, 11, 15, 11, ink); p.disc(10, 15, 2, 2, "#e2c46a", null); },
+  road_to_tamesh: (p, ink) => { p.line(4, 7, 15, 7, ink); p.line(4, 11, 15, 11, ink); p.rect(8, 13, 4, 4, ink); },
+  road_to_khetmar: (p, ink) => { p.line(4, 6, 15, 6, ink); p.line(4, 9, 15, 9, ink); p.line(7, 16, 7, 12, ink); p.line(7, 12, 13, 12, ink); p.line(13, 12, 13, 16, ink); },
+  road_to_the_blue_smoke: (p, ink) => { p.line(4, 6, 15, 6, ink); p.line(4, 9, 15, 9, ink); for (const [x, y] of [[9, 16], [10, 14], [9, 12], [10, 11]]) p.set(x, y, "#3f6fb0"); },
+  road_below: (p, ink) => { p.line(4, 6, 15, 6, ink); p.line(4, 9, 15, 9, ink); p.poly([[8, 11], [12, 11], [10, 16]], ink, null); },
+};
+function orashaiSpell(p: Pixels, id: string, kind: string, color: string) {
+  if (ORASHAI_GLYPHS[id]) {
+    // A tablet of ochre clay, a little turned, the glyph cut into it; what it does as a glow behind.
+    p.disc(14, 6, 5, 5, shadeHex(color, -0.05), null);
+    p.poly([[3, 3], [16, 2], [17, 17], [3, 18]], "#d9a878", INK); p.line(4, 4, 15, 3, "#ecc79a");
+    ORASHAI_GLYPHS[id](p, "#5f4128");
+    return;
+  }
+  // The Hidden Sun's rites: a disc of lapis, a gold rim, the eye in it, and the rite's mark.
+  p.disc(10, 10, 8, 8, "#2f3f66", INK); p.disc(10, 10, 6, 6, "#e2c46a", null); p.disc(10, 10, 5, 5, "#2f3f66", null);
+  p.disc(10, 10, 3.5, 1.8, "#f2ecdc", null); p.disc(10, 10, 1.2, 1.2, "#1b1a22", null);
+  if (kind === "mend") p.line(10, 14, 10, 17, "#e7a9b0", 2);
+  if (kind === "aegis") { p.line(4, 4, 7, 7, "#e2c46a"); p.line(16, 4, 13, 7, "#e2c46a"); }
+  if (kind === "pacify") p.line(6, 15, 14, 15, "#9fc3d9");
+  if (kind === "smite") for (const [x, y] of [[10, 1], [10, 19], [1, 10], [19, 10]]) p.set(x, y, color);
+}
+const ORASHAI_SPELL_IDS = new Set(["write_stone", "write_dust", "write_door", "write_eye", "write_water", "write_measure", "write_veil", "write_star", "write_first_name", "road_to_sefrah", "road_to_tamesh", "road_below", "road_to_khetmar", "road_to_the_blue_smoke",
+  "rite_of_noon", "rite_of_cedar_oil", "rite_of_the_threshold", "rite_of_the_unnamed", "rite_of_the_hidden_sun"]);
 export function spellArt(id: string, element: string, kind: string): HTMLCanvasElement {
   const color = ELEMENT_COLORS[element] ?? "#c7d3dc";
   return pixelArt(`spell:${id}`, 20, 20, p => {
     if (MIZUKAI_SPELL_MARKS.has(id)) { mizukaiSpell(p, id, kind, color); p.halo(); return; }
+    if (ORASHAI_SPELL_IDS.has(id)) { orashaiSpell(p, id, kind, color); p.halo(); return; }
     switch (kind) {
       case "strike": p.disc(10, 10, 5, 5, color, INK, shadeHex(color, -0.15)); p.line(3, 15, 7, 11, color, 2); break;
       case "bolt": p.poly([[11, 1], [5, 11], [9, 11], [7, 19], [15, 8], [11, 8], [13, 1]], color); break;
@@ -1116,6 +1166,10 @@ const PRAYER_KIND: Record<string, [string, string]> = {
   vow_of_cedar: ["rope", "#5f7d6a"], vow_of_stone_lantern: ["lantern", "#a39e96"], ancestors_watch: ["rope_protect", "#b5452f"],
   blessing_of_brush: ["charm", "#22252e"], blessing_of_drum: ["charm", "#b5452f"], blessing_of_still_water: ["charm", "#2f3a5e"], blessing_of_long_road: ["charm", "#c9a24a"], rising_sun: ["sun", "#e2573f"],
   salt_and_water: ["bowl", "#efe6d2"], lantern_ward: ["lantern", "#f2c46a"], friend_of_the_place: ["rope", "#c9a24a"], thousand_friends: ["sun", "#c9a24a"],
+  // The Hidden Sun's watchings: a lapis disc with the gold eye of the First Script, its rim in each watching's colour.
+  watch_of_dawn: ["hidden_sun", "#e9a07a"], watch_of_the_scribe: ["hidden_sun", "#c9703a"], watch_of_the_mason: ["hidden_sun", "#8a8690"], watch_of_the_ibis: ["hidden_sun", "#f2ecdc"],
+  watch_of_noon: ["hidden_sun", "#e2c46a"], salt_on_the_tongue: ["hidden_sun", "#ece8e0"], watch_of_the_road: ["hidden_sun", "#d9a878"], watch_of_the_unnamed: ["hidden_sun", "#9fb4d0"],
+  name_held_fast: ["hidden_sun_protect", "#e2c46a"], the_weighers_due: ["hidden_sun", "#5f7d6a"], the_hidden_sun: ["sun", "#e2c46a"], first_light: ["sun", "#f2ecdc"],
 };
 export function prayerArt(id: string): HTMLCanvasElement {
   const [kind, color] = PRAYER_KIND[id] ?? ["star", PAPER];
@@ -1137,6 +1191,11 @@ export function prayerArt(id: string): HTMLCanvasElement {
     }
     else if (kind === "lantern") { p.rect(7, 13, 4, 4, "#8f8a83"); p.rect(5, 6, 8, 6, "#a39e96"); p.rect(7, 7, 4, 3, color); p.poly([[3, 6], [9, 2], [15, 6]], "#7d7870"); }
     else if (kind === "charm") { p.poly([[5, 3], [13, 3], [14, 16], [4, 16]], "#e8d8b8", INK); p.rect(6, 5, 6, 9, color); p.line(9, 1, 9, 3, "#b5452f"); p.set(9, 9, "#f6efdf"); }
+    else if (kind === "hidden_sun" || kind === "hidden_sun_protect") {
+      p.disc(9, 9, 8, 8, color, INK); p.disc(9, 9, 6, 6, "#2f3f66", null);
+      p.disc(9, 9, 4, 2, "#e2c46a", null); p.disc(9, 9, 1.2, 1.2, "#1b1a22", null);
+      if (kind === "hidden_sun_protect") { p.line(3, 15, 15, 3, INK, 2); }
+    }
     else if (kind === "bowl") { p.disc(9, 11, 7, 4, "#2f3a5e"); p.disc(9, 10, 5, 2, "#9fc3d9", null); for (const [x, y] of [[6, 5], [9, 3], [12, 5]]) p.set(x, y, "#ffffff"); }
     else if (kind === "sun") { p.disc(9, 9, 5, 5, color, INK); for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; p.line(9 + Math.cos(a) * 6, 9 + Math.sin(a) * 6, 9 + Math.cos(a) * 8, 9 + Math.sin(a) * 8, color); } }
     else p.poly([[9, 1], [11, 7], [17, 9], [11, 11], [9, 17], [7, 11], [1, 9], [7, 7]], color);

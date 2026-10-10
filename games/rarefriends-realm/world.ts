@@ -152,7 +152,7 @@ export type RegionId =
   | "sunward_strait" | "sunteeth" | "foothold" | "ochre_steppe" | "underway"
   // Kharaveth's heartlands: the country, the dynasties' towns, the nomads' camps, Azhurak's places.
   | "sea_of_dunes" | "ashar_valley" | "black_range" | "khetmar_pass" | "ochre_spine" | "sefrah" | "tamesh" | "khetmar" | "zuri_camp" | "ouresh_camp"
-  | "seven_crowns" | "first_names" | "sunken_obelisk" | "unfinished_pyramid" | "black_stair";
+  | "seven_crowns" | "first_names" | "sunken_obelisk" | "unfinished_pyramid" | "black_stair" | "first_names_hall";
 export type Region = { id: RegionId; name: string; label: { x: number; y: number }; danger: number; underground?: boolean;
   /** A far-west region (Return of Raria) or a Mizukai one: its label is already in world coordinates. */
   far?: boolean;
@@ -245,6 +245,7 @@ export const REGIONS: readonly Region[] = [
     ["sunken_obelisk", "The Sunken Obelisk", 330, 832, 4], ["unfinished_pyramid", "The Unfinished Pyramid", 720, 828, 4],
   ] as const).map(([id, name, x, y, danger]) => ({ id, name, label: { x, y }, danger, far: true, south: true }) as Region),
   { id: "black_stair", name: "The Black Stair", label: { x: 215, y: 906 }, danger: 6, underground: true, far: true, south: true },
+  { id: "first_names_hall", name: "Beneath the Hall of First Names", label: { x: 85, y: 906 }, danger: 5, underground: true, far: true, south: true },
 ];
 export const regionIndex = (id: RegionId) => REGIONS.findIndex(region => region.id === id);
 /** The mainland regions' labels were written in the mainland's own coordinates: move them with it (once, at load). */
@@ -309,7 +310,7 @@ export type World = {
   /** Ground height (world pixels) at every tile corner: (W + 1) × (H + 1), corner (i, j) sits at (i − ½, j − ½). */
   heights: Float32Array;
   places: Record<"spawn" | "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier" | "crypt" | "depths" | "king" | "fernwick" | "highcairn" | "dawnhold" | "gravesend" | "saltmarrow" | "hollyhock" | "dyemoor" | "tallgrass" | "cragmaw" | "quillhaven" | "raria" | "fff_fortress" | "barkreach" | "ashfall" | "ring"
-    | "kurohama" | "takamori" | "kumoyama" | "tanabe" | "yumoto" | "foothold" | "sefrah" | "tamesh" | "khetmar" | "zuri" | "ouresh", { x: number; y: number }>;
+    | "kurohama" | "takamori" | "kumoyama" | "tanabe" | "yumoto" | "foothold" | "sefrah" | "tamesh" | "khetmar" | "zuri" | "ouresh" | "first_names", { x: number; y: number }>;
 };
 
 function mulberry(seed: number) {

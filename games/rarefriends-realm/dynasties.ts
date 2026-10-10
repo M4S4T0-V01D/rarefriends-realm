@@ -30,7 +30,7 @@ export const HEARTLAND_NPCS: Record<string, NpcDef> = {
   // Sefrah: the Gilded Court.
   sefrah_vizier: person("sefrah_vizier", "Vizier Tamun Orrel", "The late Grand Matriarch's vizier: forty years of her letters, her quarrels and her silences. He serves the Gilded Court now, and says, carefully, that he serves the House.", 1420),
   sefrah_seleneh: person("sefrah_seleneh", "Lady Seleneh Khasreth", "The Matriarch's eldest, head of the Gilded Court: Sefrah, its treasury and its river. She has her mother's eyes and, she'd tell you, her mother's patience, which is to say none.", 1421),
-  sefrah_priestess: person("sefrah_priestess", "Priestess Anzah", "Keeper of the Temple of the Hidden Sun, in mourning white. She reads Azhurak better than anyone in Sefrah, and admits it to nobody in particular.", 1422),
+  sefrah_priestess: person("sefrah_priestess", "Priestess Anzah", "Keeper of the Temple of the Hidden Sun, in mourning white. She reads Azhurak better than anyone in Sefrah, and admits it to nobody in particular.", 1422, { options: ["Talk-to", "Trade"], shop: "hidden_sun_temple" }),
   sefrah_merchant: trader("sefrah_merchant", "Hadiya", "Keeps the Emporium on the bazaar. Speaks five languages and haggles in all of them.", 1423, "sefrah_bazaar"),
   sefrah_clothier: trader("sefrah_clothier", "Tahmira the tailor", "Dresses the Gilded Court in linen so fine it's mostly light. Her own sleeves are rolled to the elbow.", 1424, "sefrah_clothier"),
   sefrah_innkeeper: trader("sefrah_innkeeper", "Old Ezzar", "Keeps the Lamp and Palm. Has fed three generations of Khasreths and will tell you which of them tipped.", 1425, "sefrah_inn"),

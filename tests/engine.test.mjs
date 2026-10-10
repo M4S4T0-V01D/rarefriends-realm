@@ -99,14 +99,14 @@ test("the world is large, deterministic and every landmark is reachable on foot"
   assert(world.objects.filter(object => object.kind === "spot").length >= 15, "Fishing spots");
   // Walk from the spawn, and take every ladder and staircase you can reach (dungeons, the castle's storeys), every boat
   // between the Mizukai Isles once you can reach a landing (boats.ts: from any landing to every other), and every quest
-  // gate (a gate with a clue, like Foothold's south gate into Kharaveth's heartlands, opens once its quest is done).
+  // way (a gate or door with a clue, like Foothold's south gate or the door that sees, opens once its quest is done).
   const areas = [reachable(g, world.places.spawn)], taken = new Set();
   const ok = (x, y) => areas.some(seen => seen[y * W + x]);
   const beside = object => [[0, 1], [1, 0], [0, -1], [-1, 0]].some(([dx, dy]) => ok(object.x + dx, object.y + dy));
   const docks = world.objects.filter(object => object.kind === "dock");
   for (let grew = true; grew;) {
     grew = false;
-    for (const ladder of world.objects.filter(object => (object.kind === "ladder" || object.kind === "gate" && object.clue && object.to) && !taken.has(object.id) && beside(object))) {
+    for (const ladder of world.objects.filter(object => (object.kind === "ladder" || object.clue && object.to) && !taken.has(object.id) && beside(object))) {
       taken.add(ladder.id); grew = true;
       if (!ok(ladder.to.x, ladder.to.y)) areas.push(reachable(g, ladder.to));
     }
@@ -603,7 +603,7 @@ test("A Friend's Feast from start to finish", () => {
   assert.equal(g.player.quests.friends_feast, 2);
   assert.equal(questPoints(g), 1);
   assert(level(g, "cooking") >= 10, "Quest XP");
-  assert.equal(QUESTS.length, 75); assert.equal(MAX_QUEST_POINTS, 134);
+  assert.equal(QUESTS.length, 77); assert.equal(MAX_QUEST_POINTS, 140);
 });
 
 test("Grumblin Trouble counts kills and pays out", () => {
@@ -1949,7 +1949,7 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   assert.equal(p.quests.dawn_against_hollow, 2); assert(has(p, "dawnplate_cuirass"));
   assert.equal(count(p, "hollow_essence"), 0);
   assert.equal(capeProblem(g, "dawnplate_cuirass"), null, "the armoury sells Dawnplate once earned");
-  assert.equal(QUESTS.length, 75); assert.equal(MAX_QUEST_POINTS, 134);
+  assert.equal(QUESTS.length, 77); assert.equal(MAX_QUEST_POINTS, 140);
 });
 
 test("Boots and gauntlets in every metal, smithed at the anvil; the clothier's shirts, dresses, trousers and skirts", () => {
@@ -3066,4 +3066,79 @@ test("Salt and Blue Smoke, and What the Quarry Woke: the well, the den, both peo
   assert.equal(g.player.quests.quarry_woke, 2); assert("black_stair_wards" in g.player.mysteries.found); assert(!has(g.player, "ward_stone"));
   onMonsterKilled(g, "stair_warden", 0, 0); assert.equal(g.player.quests.quarry_woke, 3);
   say("tamesh_quarrymaster"); assert.equal(g.player.quests.quarry_woke, 4); assert(has(g.player, "obsidian_mattock"));
+});
+
+test("The Orashai way: a tradition like the Law and the Mizukai way, its glyphs written with mana, free with an Orashai wand or staff; and faith staves make Faith spells free", async () => {
+  const { SPELLS, PRAYERS, spellInBook } = await import("../games/rarefriends-realm/data.ts");
+  const { setTradition, traditionOf, maxMana, manaCost, faithStaff } = await import("../games/rarefriends-realm/state.ts");
+  const { canCast, faithCost } = await import("../games/rarefriends-realm/engine.ts");
+  const g = newGame(), p = g.player, spell = id => SPELLS.find(entry => entry.id === id);
+  assert(SPELLS.filter(entry => entry.orashai).length >= 15 && PRAYERS.filter(entry => entry.orashai).length >= 12, "a book and a set of watchings of its own");
+  assert(spellInBook(spell("write_stone"), "orashai") && !spellInBook(spell("write_stone"), "realm") && !spellInBook(spell("seal_strike"), "orashai"), "each tradition's own in its own book");
+  assert(spellInBook(spell("breeze_dart"), "orashai"), "the Realm's common magic in every book");
+  p.xp.magic = 1_000_000; p.xp.prayer = 1_000_000;
+  assert.match(canCast(g, spell("write_stone")), /Orashai way/, "kept only by the initiated");
+  setTradition(g, "orashai"); assert.equal(traditionOf(p), "orashai");
+  assert.equal(manaCost(spell("write_stone"), p), 8); assert.equal(manaCost(spell("rite_of_noon"), p), 0, "the rites are paid in faith");
+  p.mana = 3; assert.match(canCast(g, spell("write_stone")), /mana/);
+  p.mana = maxMana(p); assert.equal(canCast(g, spell("write_stone")), null);
+  p.equipment.weapon = "scribes_reed"; assert.equal(manaCost(spell("write_first_name"), p), 0, "an Orashai wand writes for nothing");
+  p.mana = 0; assert.equal(canCast(g, spell("write_stone")), null);
+  // Mana comes back by itself.
+  p.equipment.weapon = null; p.mana = 0; for (let i = 0; i < 10; i++) tick(g); assert(p.mana > 0, "mana returns");
+  // Faith staves: a staff with a Faith bonus makes Faith spells free.
+  p.equipment.weapon = "acolyte_staff"; assert(faithStaff(p)); assert.equal(faithCost(g, spell("rite_of_noon")), 0);
+  p.equipment.weapon = "tide_staff"; assert(!faithStaff(p)); assert(faithCost(g, spell("rite_of_noon")) > 0);
+  p.equipment.weapon = "hidden_sun_staff"; assert(faithStaff(p)); assert.equal(manaCost(spell("write_star"), p), 0, "the Staff of the Hidden Sun frees both");
+  const save = JSON.parse(JSON.stringify(serialize(g))), fresh = newGame(); assert(restore(fresh, save));
+  assert.equal(traditionOf(fresh.player), "orashai"); assert(Math.abs(fresh.player.mana - p.mana) < 1e-9);
+});
+
+test("Each tradition's book has its own roads, Homeward goes to the home of the tradition you keep, and the Old Friend's faithful can walk to Dawnhold", async () => {
+  const { SPELLS, spellInBook } = await import("../games/rarefriends-realm/data.ts");
+  const { setTradition } = await import("../games/rarefriends-realm/state.ts");
+  const spell = id => SPELLS.find(entry => entry.id === id);
+  assert(spellInBook(spell("glide_emberforge"), "realm") && !spellInBook(spell("glide_emberforge"), "raria") && !spellInBook(spell("glide_emberforge"), "orashai"), "the glides are the old book's");
+  for (const tradition of ["realm", "raria", "mizukai", "orashai"]) assert(spellInBook(spell("home"), tradition), `Homeward in ${tradition}`);
+  for (const [tradition, min] of [["raria", 3], ["mizukai", 5], ["orashai", 5]]) assert(SPELLS.filter(entry => entry.kind === "teleport" && spellInBook(entry, tradition) && entry.id !== "home").length >= min, `${tradition} has its own roads`);
+  assert(spellInBook(spell("pilgrimage_dawnhold"), "realm") && !spellInBook(spell("pilgrimage_dawnhold"), "raria"), "the pilgrimage is the Old Friend's");
+  for (const [tradition, place] of [["realm", "hollow_square"], ["raria", "raria"], ["mizukai", "kumoyama"], ["orashai", "sefrah"]]) {
+    const g = newGame(); if (tradition !== "realm") setTradition(g, tradition);
+    castSpell(g, "home"); assert.deepEqual(g.player.activity?.to, g.world.places[place], `Homeward takes the ${tradition} keeper to ${place}`);
+  }
+  const g = newGame(), p = g.player; p.xp.prayer = 1_000_000; p.prayer = 50; give(p, "star_sigil", 1);
+  const xp = p.xp.prayer; castSpell(g, "pilgrimage_dawnhold");
+  assert.deepEqual(p.activity?.to, g.world.places.dawnhold); assert.equal(p.prayer, 47, "paid in faith"); assert(p.xp.prayer > xp, "Faith XP");
+});
+
+test("The Orashai Mysteries (five thresholds) and The God Behind the Bag", async () => {
+  const { useClue, clueOptions } = await import("../games/rarefriends-realm/kharaveth.ts");
+  const { talk } = await import("../games/rarefriends-realm/content.ts");
+  const { learnGlyph } = await import("../games/rarefriends-realm/mysteries.ts");
+  const g = newGame(), world = g.world, p = g.player, Q = "orashai_mysteries", B = "god_behind_bag";
+  const pickOpt = (d, label) => { const o = d.options.find(x => x.label.startsWith(label)); assert(o, label); d.onEnd?.(); return o.then(); };
+  const say = (id, ...labels) => { let d = talk(g, id); for (const label of labels) d = pickOpt(d, label); d?.onEnd?.(); return d; };
+  const clue = (id, option) => useClue(g, world.objects.find(o => o.clue === id), option);
+  assert.equal(talk(g, "sefrah_priestess").options?.length ?? 0, 0, "nothing before the Matriarch's Seal");
+  p.quests.matriarchs_seal = 5;
+  say("sefrah_priestess", "I'll read them."); assert.equal(p.quests[Q], 1);
+  say("sefrah_priestess"); assert.equal(p.quests[Q], 1, "not before the reading");
+  for (const glyph of ["crown", "many", "first", "name", "sun", "below", "water", "measure", "door", "eye"]) { learnGlyph(g, glyph, false); learnGlyph(g, glyph, true); }
+  say("sefrah_priestess"); assert.equal(p.quests[Q], 2); assert(has(p, "orashai_token"));
+  const door = world.objects.find(o => o.clue === "first_names_door");
+  assert(clueOptions(g, door).includes("Enter")); assert(clue("first_names_door", "Enter").to); assert.equal(p.quests[Q], 3);
+  // The Silence: answer, and it turns away; say nothing three times, and it lets you by.
+  let d = talk(g, "orashai_listener"); d = pickOpt(d, "Answer it."); assert.equal(p.quests[Q], 3);
+  say("orashai_listener", "(Say nothing.)", "(Say nothing.)", "(Say nothing.)"); assert.equal(p.quests[Q], 4); assert("the_silence" in p.mysteries.found);
+  assert(!clue("lower_stair", "Open").to, "the stair is shut until the names are cut");
+  for (const k of [0, 1, 2]) clue(`name_ring_${k}`, "Cut-again");
+  assert(clue("lower_stair", "Open").to);
+  onMonsterKilled(g, "the_unnamed", 0, 0); assert.equal(p.quests[Q], 5);
+  say("keeper_first_names", "Keep the Orashai way."); assert.equal(p.quests[Q], 6); assert(p.orashai); assert(has(p, "hidden_sun_staff"));
+  // The god behind the bag.
+  say("bag_man", "I'll find out"); assert.equal(p.quests[B], 1);
+  for (const id of ["weigher", "gate_mother", "salt_twins"]) clue(`shrine_${id}`, "Pay-respects");
+  assert.equal(p.quests[B], 1); clue("shrine_smoke", "Pay-respects"); assert.equal(p.quests[B], 2);
+  clue("bag_ring", "Read"); assert.equal(p.quests[B], 3); assert("the_asked_god" in p.mysteries.found);
+  say("bag_man", "It isn't a glyph"); assert.equal(p.quests[B], 4); assert(has(p, "fish_bag"));
 });

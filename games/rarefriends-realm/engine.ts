@@ -4,7 +4,7 @@
  */
 import {
   ARMOURY_FIRST, ARMOURY_LATER, DAWNPLATE_QUEST, COOKING, CRAFTING, CROSSBOWS, FORGED_STAFF_MAGIC, LIMBS_OFFSET, metalLevel, STOCKS, WAR_BOWS, EMOTES, EQUIP_SLOTS, MOUNTS, PETS, mountDef, FLETCH_ARROWS, FLETCH_BOWS, SIGILCRAFT, STAFF_SIGILS, itemCategory, sigilsPerStone, FAMILY_NAMES, FIREMAKING, FISHING_SPOTS, GEM_CUTTING, METALS, MONSTERS, PRAYERS, RELICS, RF_BUNDLES, ROCKS, SHOPS, SHOP_BUY,
-  FLETCH_WANDS, SHOP_SELL, SKILLS, SKILL_NAMES, SMELTING, SMITH_PIECES, SMITH_XP, SPELLS, TREES, WARDROBE, XP_TABLE, isItem, item, levelForXp, smithLevel, COURSES, WAYFARER_MARK, WAYFARER_REWARDS,
+  FLETCH_WANDS, SHOP_SELL, SKILLS, SKILL_NAMES, SMELTING, SMITH_PIECES, SMITH_XP, SPELLS, HOME_PLACE, TREES, WARDROBE, XP_TABLE, isItem, item, levelForXp, smithLevel, COURSES, WAYFARER_MARK, WAYFARER_REWARDS,
   type EquipSlot, type MetalId, type Skill, type Spell, type SpotKind, type WardrobeId, DYES, baseOf, dyeOf, dyeable, CARVINGS, CARVING_REACH, CARVINGS_AT_ONCE, type CarvingEffect } from "./data.ts";
 import { cleanDaily } from "./daily.ts";
 import { searchChest } from "./dungeons.ts";
@@ -32,7 +32,7 @@ import { clueExamine, clueOptions, onKharavethTick, useClue } from "./kharaveth.
 import { studySeal } from "./dynasties.ts";
 import {
   BANK_SIZE, BANK_TABS, DAY_MS, SATCHEL, SATCHEL_SIZE, STONE_BOX, STONE_BOX_SIZE, BONE_BAG, BONE_BAG_SIZE, bagAdd, bagBones, bagTakeAll, hasBoneBag, SIGIL_BAG, BELTS, beltAdd, beltContents, beltDef, wornBelt, SIGIL_BAG_SIZE, hasSigilBag, isSigil, sigilBagAdd, sigilBagTotal, sigilStock, useSigils, setPieces, wayfarerPieces, fullSlayerSet, heartguardPieces, mixtureOn, compactBankTabs, hasSatchel, hasStoneBox, stock, useUp, INVENTORY_SIZE, REFERRAL_COINS, REFERRALS_PER_DAY, REFERRAL_TICKS, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
-  level, maxHp, maxPrayer, message, prayerBoost, riding, sound, take, weapon, combatLevel, createGame,
+  level, maxHp, maxPrayer, maxMana, manaCost, faithStaff, traditionOf, message, prayerBoost, riding, sound, take, weapon, combatLevel, createGame,
   type Activity, type CombatStyle, type Dialogue, type Game, type Monster, type Npc, type Player, type Point, type Recipe, type Slot, type BankSlot, type Target,
  type WorkOrder,
 } from "./state.ts";
@@ -1034,7 +1034,7 @@ function interactObject(game: Game, object: WorldObject, option: string, use?: n
       // An ossuary bag worn on the back empties itself onto the altar as you pray.
       if (player.equipment.cape === BONE_BAG && bagBones(player) > 0) offerBag(game, object.text === "dawn");
       if (player.prayer >= maxPrayer(player)) { message(game, "Your faith is already full."); return; }
-      player.prayer = maxPrayer(player); message(game, object.text === "mizukai" ? "You ring the bell, bow twice, clap twice, bow once. Your faith is restored." : "You pray to the Old Friend. Your faith is restored."); sound(game, "pray"); return;
+      player.prayer = maxPrayer(player); if (player.orashai) player.mana = maxMana(player); message(game, object.text === "mizukai" ? "You ring the bell, bow twice, clap twice, bow once. Your faith is restored." : "You pray to the Old Friend. Your faith is restored."); sound(game, "pray"); return;
     case "dock": game.ui.boat = object.dock ?? null; sound(game, "click"); return;
     case "ladder":
       // The Ring's arena gates: you step through to the tile across; barred from inside while a match is on.
@@ -1394,7 +1394,7 @@ function runActivity(game: Game) {
     case "gather": return gatherTick(game, activity);
     case "teleport": {
       player.activity = null;
-      const place = activity.spell.startsWith("tablet:") ? activity.spell.slice(7) : SPELLS.find(spell => spell.id === activity.spell)?.teleport ?? "hollow_square";
+      const place = activity.spell.startsWith("tablet:") ? activity.spell.slice(7) : activity.spell === "home" ? HOME_PLACE[traditionOf(player)] : SPELLS.find(spell => spell.id === activity.spell)?.teleport ?? "hollow_square";
       travel(game, activity.to, `You teleport to ${TELEPORT_NAMES[place] ?? "Friendhollow"}.`); sound(game, "teleport");
     }
   }
@@ -1585,6 +1585,9 @@ export function canCast(game: Game, spell: Spell) {
   if (spell.mizukai && !game.player.mizukai) return "That is the Isles' own: keep the Mizukai way (the priestess at Kumoyama teaches it) to cast it.";
   if (!spell.rarian && spell.skill === "prayer" && game.player.rarian) return "You keep the Wise Friend's Law: its rites stand in place of the Old Friend's light until you set it down.";
   if (!spell.mizukai && spell.skill === "prayer" && game.player.mizukai) return "You keep the Mizukai way: its rites stand in place of the Old Friend's light until you set it down.";
+  if (spell.orashai && !game.player.orashai) return "That is the First Script: keep the Orashai way (the Keeper of First Names gives it to the initiated) to write it.";
+  if (!spell.orashai && spell.skill === "prayer" && game.player.orashai) return "You keep the Orashai way: the Hidden Sun's rites stand in place of the Old Friend's light until you set it down.";
+  if (manaCost(spell, game.player) > game.player.mana) return `You need ${manaCost(spell, game.player)} mana to write that glyph. It comes back as you rest, and all at once at an altar.`;
   for (const [sigil, n] of Object.entries(spellCost(game, spell))) if (sigilStock(game.player, sigil) < n) return "You do not have enough sigils to cast this spell.";
   return null;
 }
@@ -1629,7 +1632,7 @@ function playerCombat(game: Game) {
     // The Old Friend's light and the Wise Friend's rites both burn the dead (the Dusk's last rite as hard as Banishment).
     if ((spell.element === "holy" || (spell.rarian && spell.kind === "smite")) && monster.def.undead) boost *= spell.kind === "smite" && (spell.id === "banishment" || spell.id === "rite_of_dusk") ? 2 : 1.5;
     // The Isles' seals and rites were written for the Isles' spirits: they bite a wayward one harder (the purifying rite twice as hard).
-    if (spell.mizukai && monster.def.spirit) boost *= spell.id === "purifying_rite" ? 2 : spell.kind === "smite" ? 1.5 : 1.15;
+    if ((spell.mizukai || spell.orashai) && monster.def.spirit) boost *= spell.id === "purifying_rite" ? 2 : spell.kind === "smite" ? 1.5 : 1.15;
     // A true name is stronger said by someone who knows what the creature fears.
     if (spell.id === "true_name" && knows(game, monster.def.id, "weakness")) boost *= 1.5;
     const castSkill: Skill = spell.skill ?? "magic";
@@ -2118,6 +2121,8 @@ function upkeep(game: Game) {
     player.prayer = Math.max(0, player.prayer - drain);
     if (player.prayer <= 0) { player.prayers = []; message(game, "You have run out of faith. Pray at an altar to restore it.", "warn"); }
   }
+  // Mana (the Orashai way) comes back slowly in a fight, twice as fast out of one.
+  if (player.orashai && player.mana < maxMana(player)) player.mana = Math.min(maxMana(player), player.mana + (player.combat === null ? 0.5 : 0.25));
   const moving = player.path.length > 0 || !!game.held, spending = moving && (player.run || player.sneak);
   if (!spending || player.mount) player.energy = Math.min(100, player.energy + (0.25 + level(game, "agility") / 110) * (player.equipment.feet === "wayfarer_boots" ? 1.5 : 1) * (player.tonicUntil > game.tick ? 2 : 1) * carvingEffect(game).energy);
 }
@@ -2132,6 +2137,8 @@ export function togglePrayer(game: Game, id: string) {
   if (!prayer.rarian && player.rarian) { message(game, "You keep the Wise Friend's Law: its commandments stand in place of the old prayers until you set it down.", "warn"); return; }
   if (prayer.mizukai && !player.mizukai) { message(game, "That is a vow of the Mizukai Isles. Keep the Mizukai way to make it.", "warn"); return; }
   if (!prayer.mizukai && player.mizukai) { message(game, "You keep the Mizukai way: its vows and blessings stand in place of the old prayers until you set it down.", "warn"); return; }
+  if (prayer.orashai && !player.orashai) { message(game, "That is a watching of the Hidden Sun. Keep the Orashai way to hold it.", "warn"); return; }
+  if (!prayer.orashai && player.orashai) { message(game, "You keep the Orashai way: the Hidden Sun's watchings stand in place of the old prayers until you set it down.", "warn"); return; }
   if (player.prayer < 1) { message(game, "You need to restore your faith at an altar.", "warn"); return; }
   // Only one prayer per stat: turn off overlapping ones.
   const keys = Object.keys(prayer.effect);
@@ -2155,9 +2162,10 @@ export function castSpell(game: Game, id: string): Selection {
     if (game.arena) { message(game, "The Ring's magic holds you until the match is done. No glide, no homeward, no second chances.", "warn"); return null; }
     if (player.combat !== null && spell.id === "home") { message(game, "You can't use Homeward during combat.", "warn"); return null; }
     stopAll(game); closeInterfaces(game);
-    for (const [sigil, n] of Object.entries(spellCost(game, spell))) useSigils(player, sigil, n);
-    player.activity = { kind: "teleport", to: game.world.places[spell.teleport ?? "hollow_square"], timer: spell.id === "home" ? 10 : 3, spell: spell.id };
-    if (spell.xp) addXp(game, "magic", spell.xp);
+    payRunes(game, spell); payFaith(game, spell);
+    const place = spell.id === "home" ? HOME_PLACE[traditionOf(player)] : spell.teleport ?? "hollow_square";
+    player.activity = { kind: "teleport", to: game.world.places[place], timer: spell.id === "home" ? 10 : 3, spell: spell.id };
+    if (spell.xp) addXp(game, spell.skill ?? "magic", spell.xp);
     message(game, spell.id === "home" ? "You begin to channel home…" : "You feel the Realm fold around you…"); sound(game, "spell");
     return null;
   }
@@ -2187,18 +2195,18 @@ export function signetTeleport(game: Game) {
   player.activity = { kind: "teleport", to: game.world.places.ring, timer: 3, spell: "tablet:ring" };
   message(game, `The signet warms, and the Ring's magic folds the Realm around you… (${signetCharges(game)} left today)`); sound(game, "spell");
 }
-const TELEPORT_NAMES: Record<string, string> = { kurohama: "Kurohama's quay", kumoyama: "the gate of Kumoyama", ring: "the Rare Friends Ring", raria: "Raria, before the palace", fff_fortress: "the FFF Fortress", barkreach: "BarkReach", hollow_square: "Friendhollow", emberforge: "Emberforge", oasis: "the Oasis", frostpeak: "Frostpeak", pier: "Pike's Pier", fernwick: "Fernwick", highcairn: "Highcairn", dawnhold: "Dawnhold", gravesend: "Gravesend", saltmarrow: "Saltmarrow", hollyhock: "Hollyhock", dyemoor: "Dyemoor", tallgrass: "Tallgrass", cragmaw: "Cragmaw", quillhaven: "Quillhaven", ashfall: "Ember Tamsin's camp at Ashfall" };
+const TELEPORT_NAMES: Record<string, string> = { sefrah: "Sefrah, before the palace", tamesh: "Tamesh", khetmar: "Khetmar's gate", foothold: "Foothold Camp", zuri: "the Blue Smoke Tents", takamori: "Takamori", tanabe: "Tanabe", yumoto: "Yumoto", kurohama: "Kurohama's quay", kumoyama: "the gate of Kumoyama", ring: "the Rare Friends Ring", raria: "Raria, before the palace", fff_fortress: "the FFF Fortress", barkreach: "BarkReach", hollow_square: "Friendhollow", emberforge: "Emberforge", oasis: "the Oasis", frostpeak: "Frostpeak", pier: "Pike's Pier", fernwick: "Fernwick", highcairn: "Highcairn", dawnhold: "Dawnhold", gravesend: "Gravesend", saltmarrow: "Saltmarrow", hollyhock: "Hollyhock", dyemoor: "Dyemoor", tallgrass: "Tallgrass", cragmaw: "Cragmaw", quillhaven: "Quillhaven", ashfall: "Ember Tamsin's camp at Ashfall" };
 const ELEMENT_COLORS: Record<string, string> = { wind: "#e6ecef", water: "#8fa3c9", earth: "#a89479", fire: "#e9a07a", hollow: "#6d6b67", moon: "#c6bed4", gold: "#e2d49e", home: "#e8d4c0", holy: "#f2e28f", law: "#cfc7e6", dusk: "#8a6ab0" };
 /** Faith spells spend faith as well as sigils. */
 /** Faith a spell costs: the Order of Dusk's gear takes 4% off a rite of the Wise Friend for every piece worn. */
-export const faithCost = (game: Game, spell: Spell) => !spell.faith ? 0 : spell.rarian ? spell.faith * (1 - 0.04 * Math.min(10, orderPieces(game.player.equipment, "dusk"))) : spell.faith;
+export const faithCost = (game: Game, spell: Spell) => !spell.faith || faithStaff(game.player) ? 0 : spell.rarian ? spell.faith * (1 - 0.04 * Math.min(10, orderPieces(game.player.equipment, "dusk"))) : spell.faith;
 function payFaith(game: Game, spell: Spell) { if (spell.faith) game.player.prayer = Math.max(0, game.player.prayer - faithCost(game, spell)); }
 /** Wards, mending and blessings: cast on yourself, paid in sigils (and faith), XP to the spell's skill. */
 function castOnSelf(game: Game, spell: Spell) {
   const player = game.player, notes: string[] = [];
   payRunes(game, spell); payFaith(game, spell);
   if (spell.ward) { player.ward = { defence: spell.ward.defence ?? 0, flat: spell.ward.flat ?? 0, reduce: spell.ward.reduce ?? 0 }; player.wardUntil = game.tick + spell.ward.ticks; notes.push(spell.ward.reduce ? `turns ${Math.round(spell.ward.reduce * 100)}% of every blow aside` : "steels your defence"); }
-  if (spell.kind === "veil") { player.stealthUntil = game.tick + 300; player.spiritWardUntil = Math.max(player.spiritWardUntil, game.tick + 300); notes.push("hides you in a rain-mist"); }
+  if (spell.kind === "veil") { player.stealthUntil = game.tick + 300; player.spiritWardUntil = Math.max(player.spiritWardUntil, game.tick + 300); notes.push(spell.orashai ? "writes you below notice" : "hides you in a rain-mist"); }
   if (spell.heal) {
     const before = player.hp;
     if (spell.heal.now) player.hp = Math.min(maxHp(player), player.hp + spell.heal.now);
@@ -2211,7 +2219,10 @@ function castOnSelf(game: Game, spell: Spell) {
   message(game, `You cast ${spell.name}. It ${notes.join(", ") || "settles over you"}.`); sound(game, "spell");
   emit(game, { type: "projectile", projectile: { from: { x: player.x, y: player.y }, to: { x: player.x, y: player.y - 0.01 }, start: game.tick, end: game.tick + 1, color: SPELL_COLORS[spell.id] ?? ELEMENT_COLORS[spell.element] ?? "#f2e28f", style: "magic", element: spell.element } });
 }
-function payRunes(game: Game, spell: Spell) { for (const [sigil, n] of Object.entries(spellCost(game, spell))) useSigils(game.player, sigil, n); }
+function payRunes(game: Game, spell: Spell) {
+  for (const [sigil, n] of Object.entries(spellCost(game, spell))) useSigils(game.player, sigil, n);
+  game.player.mana = Math.max(0, game.player.mana - manaCost(spell, game.player));
+}
 function bonebloom(game: Game, spell: Spell) {
   const player = game.player, slots = player.inventory.map((slot, index) => slot?.id === "bones" ? index : -1).filter(index => index >= 0);
   if (!slots.length) { message(game, "You aren't holding any bones!", "warn"); return; }
@@ -2632,7 +2643,7 @@ export type SaveData = {
   met?: unknown; achievements?: Record<string, number>; pets?: string[]; petOut?: string | null; killLog?: Record<string, number>; lore?: Record<string, unknown>; stats?: Record<string, number>; referredBy?: number | null; referrals?: number[]; referralTimes?: number[]; boostTicks?: number; coalBag?: number; stoneBox?: number; boneBag?: Record<string, number>;
   boosts?: Record<string, number>; poison?: { damage: number; left: number; timer: number } | null; weaponPoison?: { weapon: string; damage: number; charges: number; weaken: boolean } | null;
   antidoteUntil?: number; antifireUntil?: number; stealthUntil?: number; tonicUntil?: number; mixture?: { family: number; until: number } | null;
-  firsts?: Record<string, number>; friendKinds?: Record<string, 1>; rumours?: Record<string, 1>; orders?: Record<string, WorkOrder>; card?: Record<string, string>; cards?: Record<string, number>; rarian?: boolean; mizukai?: boolean; mysteries?: unknown; spiritWardUntil?: number; home?: unknown; restedTicks?: number; sigilBag?: Record<string, number>; ward?: { defence: number; flat: number; reduce: number } | null; wardUntil?: number; renew?: number; renewUntil?: number; belts?: Record<string, Record<string, number>>; followerWorn?: string[];
+  firsts?: Record<string, number>; friendKinds?: Record<string, 1>; rumours?: Record<string, 1>; orders?: Record<string, WorkOrder>; card?: Record<string, string>; cards?: Record<string, number>; rarian?: boolean; mizukai?: boolean; orashai?: boolean; mana?: number; mysteries?: unknown; spiritWardUntil?: number; home?: unknown; restedTicks?: number; sigilBag?: Record<string, number>; ward?: { defence: number; flat: number; reduce: number } | null; wardUntil?: number; renew?: number; renewUntil?: number; belts?: Record<string, Record<string, number>>; followerWorn?: string[];
   name?: string | null; fellowship?: { name: string; tag: string; logo?: string; banner?: string; colors?: string[] } | null; title?: string | null; visited?: Record<string, number>; regionTicks?: Record<string, number>; talked?: Record<string, 1>; emotesUsed?: Record<string, 1>; outfits?: Record<string, 1>; friendTicks?: number; mounts?: string[]; mount?: string | null; daily?: unknown; seenUpdate?: number;
 };
 export function serialize(game: Game): SaveData {
@@ -2645,7 +2656,7 @@ export function serialize(game: Game): SaveData {
     playTicks: game.playTicks, retaliate: game.autoRetaliate, music: [...player.music],
     referredBy: player.referredBy, referrals: [...player.referrals], referralTimes: [...player.referralTimes], boostTicks: player.boostTicks, coalBag: player.coalBag, stoneBox: player.stoneBox, boneBag: { ...player.boneBag }, boosts: { ...player.boosts }, poison: player.poison ? { ...player.poison } : null, weaponPoison: player.weaponPoison ? { ...player.weaponPoison } : null,
     antidoteUntil: Math.max(0, player.antidoteUntil - game.tick), antifireUntil: Math.max(0, player.antifireUntil - game.tick), stealthUntil: Math.max(0, player.stealthUntil - game.tick), tonicUntil: Math.max(0, player.tonicUntil - game.tick), mixture: player.mixture ? { family: player.mixture.family, until: Math.max(0, player.mixture.until - game.tick) } : null,
-    firsts: { ...player.firsts } as Record<string, number>, friendKinds: { ...player.friendKinds } as Record<string, 1>, rumours: { ...player.rumours } as Record<string, 1>, orders: { ...player.orders }, card: { ...player.card }, cards: { ...player.cards }, rarian: player.rarian, mizukai: player.mizukai, mysteries: { found: { ...player.mysteries.found }, glyphs: { ...player.mysteries.glyphs }, read: { ...player.mysteries.read } }, spiritWardUntil: Math.max(0, player.spiritWardUntil - game.tick), home: player.home ? { ...player.home, furniture: { ...player.home.furniture } } : null, restedTicks: player.restedTicks, sigilBag: { ...player.sigilBag }, ward: player.ward ? { ...player.ward } : null, wardUntil: Math.max(0, player.wardUntil - game.tick), renew: player.renew, renewUntil: Math.max(0, player.renewUntil - game.tick), belts: Object.fromEntries(Object.entries(player.belts).map(([id, contents]) => [id, { ...contents }])), followerWorn: [...player.followerWorn],
+    firsts: { ...player.firsts } as Record<string, number>, friendKinds: { ...player.friendKinds } as Record<string, 1>, rumours: { ...player.rumours } as Record<string, 1>, orders: { ...player.orders }, card: { ...player.card }, cards: { ...player.cards }, rarian: player.rarian, mizukai: player.mizukai, orashai: player.orashai, mana: player.mana, mysteries: { found: { ...player.mysteries.found }, glyphs: { ...player.mysteries.glyphs }, read: { ...player.mysteries.read } }, spiritWardUntil: Math.max(0, player.spiritWardUntil - game.tick), home: player.home ? { ...player.home, furniture: { ...player.home.furniture } } : null, restedTicks: player.restedTicks, sigilBag: { ...player.sigilBag }, ward: player.ward ? { ...player.ward } : null, wardUntil: Math.max(0, player.wardUntil - game.tick), renew: player.renew, renewUntil: Math.max(0, player.renewUntil - game.tick), belts: Object.fromEntries(Object.entries(player.belts).map(([id, contents]) => [id, { ...contents }])), followerWorn: [...player.followerWorn],
     name: player.name, fellowship: player.fellowship ? { ...player.fellowship } : null, title: player.title, visited: { ...player.visited } as Record<string, number>, regionTicks: { ...player.regionTicks } as Record<string, number>, talked: { ...player.talked } as Record<string, 1>, emotesUsed: { ...player.emotesUsed } as Record<string, 1>, outfits: { ...player.outfits } as Record<string, 1>, friendTicks: player.friendTicks, mounts: [...player.mounts], mount: player.mount, met: JSON.parse(JSON.stringify(player.met)), achievements: { ...player.achievements }, pets: [...player.pets], petOut: player.petOut, killLog: { ...player.killLog }, lore: Object.fromEntries(Object.entries(player.lore).map(([id, entry]) => [id, { ...entry, d: [...entry.d] }])), stats: { ...player.stats }, daily: JSON.parse(JSON.stringify(player.daily)), seenUpdate: player.seenUpdate,
   };
 }
@@ -2772,7 +2783,7 @@ export function restore(game: Game, raw: unknown): boolean {
   player.referralTimes = (Array.isArray(save.referralTimes) ? save.referralTimes : []).filter((at): at is number => typeof at === "number" && Number.isFinite(at) && at > 0).slice(-REFERRALS_PER_DAY);
   player.mounts = MOUNTS.filter(mount => Array.isArray(save.mounts) && save.mounts.includes(mount.id)).map(mount => mount.id);
   player.mount = typeof save.mount === "string" && player.mounts.includes(save.mount) ? save.mount : null;
-  player.daily = cleanDaily(save.daily, SKILLS); player.orders = cleanOrders(save.orders); player.card = cleanCard(save.card); player.cards = Object.fromEntries(Object.entries(save.cards && typeof save.cards === "object" ? save.cards : {}).filter(([id, day]) => /^[a-z0-9_]{1,40}$/.test(id) && typeof day === "number" && Number.isFinite(day)).slice(0, 2000).map(([id, day]) => [id, Math.max(0, Math.floor(day))])); player.rarian = save.rarian === true; player.mizukai = !player.rarian && save.mizukai === true; player.mysteries = cleanMysteries(save.mysteries); player.spiritWardUntil = game.tick + int(save.spiritWardUntil, 0, 1000, 0); player.home = cleanHome(save.home); player.restedTicks = int(save.restedTicks, 0, 100000, 0); applyHome(game);
+  player.daily = cleanDaily(save.daily, SKILLS); player.orders = cleanOrders(save.orders); player.card = cleanCard(save.card); player.cards = Object.fromEntries(Object.entries(save.cards && typeof save.cards === "object" ? save.cards : {}).filter(([id, day]) => /^[a-z0-9_]{1,40}$/.test(id) && typeof day === "number" && Number.isFinite(day)).slice(0, 2000).map(([id, day]) => [id, Math.max(0, Math.floor(day))])); player.rarian = save.rarian === true; player.mizukai = !player.rarian && save.mizukai === true; player.orashai = !player.rarian && !player.mizukai && save.orashai === true; player.mana = typeof save.mana === "number" && Number.isFinite(save.mana) ? Math.max(0, Math.min(maxMana(player), save.mana)) : maxMana(player); player.mysteries = cleanMysteries(save.mysteries); player.spiritWardUntil = game.tick + int(save.spiritWardUntil, 0, 1000, 0); player.home = cleanHome(save.home); player.restedTicks = int(save.restedTicks, 0, 100000, 0); applyHome(game);
   player.sigilBag = {}; for (const [id, n] of Object.entries(save.sigilBag ?? {})) if (isItem(id) && isSigil(id)) { const v = int(n, 0, SIGIL_BAG_SIZE, 0); if (v) player.sigilBag[id] = v; }
   player.ward = save.ward && typeof save.ward === "object" ? { defence: Math.max(0, Math.min(1, Number(save.ward.defence) || 0)), flat: int(save.ward.flat, 0, 100, 0), reduce: Math.max(0, Math.min(0.9, Number(save.ward.reduce) || 0)) } : null; player.wardUntil = game.tick + int(save.wardUntil, 0, 1000, 0); if (!int(save.wardUntil, 0, 1000, 0)) player.ward = null;
   player.renew = int(save.renew, 0, 50, 0); player.renewUntil = game.tick + int(save.renewUntil, 0, 1000, 0);
