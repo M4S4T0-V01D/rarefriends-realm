@@ -138,6 +138,13 @@ export function skillGuide(skill: Skill): GuideEntry[] {
       for (const potion of POTIONS) add(potion.level, potion.name, `${potion.examine} (${Object.entries(potion.inputs).filter(([id]) => id !== "vial_of_water").map(([id, n]) => `${n} ${item(id).name.toLowerCase()}`).join(", ")}, in a vial of water)`, potion.id);
       for (const mix of MIXTURES) add(mix.level, mix.name, `For ${FAMILY_NAMES[mix.family]} Friends only: ${mix.effect.toLowerCase()} for ten minutes`, mix.id);
       break;
+    case "mysteries":
+      add(1, "Mysteries", "Hidden laws, old inscriptions, true names and the techniques of the old traditions. Not Faith and not Magic: it's trained by finding things out, the first time each, never by repeating them.");
+      add(1, "Discoveries", "Strange places, phenomena, beings and contradictions, each recorded once in your Mysteries journal (the Quest journal's third page): what you saw, what you understood, and what you still don't.");
+      add(1, "Azhurak glyphs", "Kharaveth's oldest letters. First you know a glyph by sight, then by meaning: from a picture cut beside it, from someone who knows, or from working it out.");
+      add(1, "Inscriptions", "An inscription can be read once every glyph in it is understood. Inscribed sherds from the Underway teach glyphs you haven't seen.", "azhurak_sherd");
+      add(1, "The Sunteeth", "A breathing crack in a blind canyon, the road beneath it, the counterweight that still works: Kharaveth's north holds the first of them.");
+      break;
     case "presence":
       add(1, "Presence", "The mark you leave on the world. Earned by discovering regions, finishing quests, felling bosses, rare finds, people met, rumours heard, work orders filled, your Friend, your name and the clothes you're seen in. The slowest skill in the Realm.");
       add(1, "Title: Newcomer", "Everyone starts somewhere. Titles show when players examine you.");

@@ -20,7 +20,7 @@ import { ECO_REGIONS, HERBS } from "./apothecary.ts";
 import { buildVillages } from "./villages.ts";
 import { buildWest } from "./west.ts";
 // REGIONS is read only inside buildExpansion (called from createWorld), never at load, since world.ts imports this module.
-import { ARENA_LEGACY as ARENA, MAINLAND_RECT, OVERWORLD_H, REGIONS, T, isWater, legacyMainlandToWorld as mainlandToWorld, type DecorKind, type GenContext, type RegionId, type worldTools } from "./world.ts";
+import { ARENA_LEGACY as ARENA, MAINLAND_RECT, GEN_OVERWORLD_H as OVERWORLD_H, REGIONS, T, isWater, legacyMainlandToWorld as mainlandToWorld, type DecorKind, type GenContext, type RegionId, type worldTools } from "./world.ts";
 import { ORDERS, ORDER_IDS } from "./knights.ts";
 
 export type Tools = ReturnType<typeof worldTools>;

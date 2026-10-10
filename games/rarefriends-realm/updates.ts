@@ -4,6 +4,14 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 96, date: "2026-10-10", title: "The Land Before Stone: the Sunteeth and Foothold Camp", items: [
+    "South of the mainland, across the Sunward Strait, lies Kharaveth: a continent of desert, sandstone and old stone. The way in on foot is the Sunteeth, a massif of wind-cut sandstone rising out of the sea between Hollyhock and Dyemoor, split by slot canyons: most of them end blind, a few go through.",
+    "Hollowmere's expedition has dug in at Foothold Camp, at the Sunteeth's southern mouth. A new quest, A Foothold in the Stone: the supply party is six days overdue, every officer has a different story, and somebody has been redrawing the chalk arrows.",
+    "Under the Sunteeth runs the Underway, a road of the Azhurak, the people before Kharaveth's great houses: its tomb beetles and lamp-eyed bats, the stone sentinel that keeps it, and a way through the maze that no hyena walks.",
+    "A new skill, Mysteries: hidden laws, old inscriptions and true names. It isn't Faith and it isn't Magic, and it trains by finding things out, once each. Your discoveries, the Azhurak glyphs you've learnt and the inscriptions you can read are on the Quest journal's new third page.",
+    "Kharaveth's own music: the oud, the ney, the qanun and the rebab, the darbuka and the frame drum, in four pieces for the Sunteeth, Foothold Camp, the Underway and the steppe.",
+    "Still to come in The Land Before Stone: Kharaveth's heartlands, its three feuding houses and its nomads, Azhurak's monuments, the Orashai, and Meghavan to the east.",
+  ] },
   { id: 95, date: "2026-10-10", title: "The Isles' own music, and gates you walk under", items: [
     "The Mizukai Isles' music, written again: every piece has its own tradition now. Court music (hichiriki, ryuteki and sho) at the shrines, the festival flute and taiko at the harbour, the biwa and the noh flute in the haunted places and against the great spirits, Tsugaru shamisen in battle, and koto and shakuhachi in the villages and forests, each in its own scale and at its own pace.",
     "The Isles' shrine gates stand in the world now, across their paths: taller, wide enough for the whole path to pass under, and no longer turning to face you when the camera turns. The Thousand Gates on Morishima make a tunnel, and you can walk through the Bone Gate and the gate on Turtle Rock.",

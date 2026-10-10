@@ -14,6 +14,7 @@ import { FOE_GROUPS, MATCHES, customMatch, entryFee, startMatch } from "./arena.
 import { ORDERS, ORDER_IDS } from "./knights.ts";
 import { WEST_NPCS, WEST_QUESTS, onWestAltar, onWestKill, talkWest, westShopProblem } from "./raria.ts";
 import { MIZUKAI_NPCS, MIZUKAI_QUESTS, onMizukaiAltar, onMizukaiKill, mizukaiShopProblem, talkMizukai } from "./mizukai.ts";
+import { KHARAVETH_NPCS, KHARAVETH_QUESTS, onKharavethKill, talkKharaveth } from "./kharaveth.ts";
 import { BAR_NPCS, BAR_QUEST_DEFS, jobBoard, onBountyKill, talkBar } from "./bars.ts";
 /** A bar's job board (bars.ts), for the engine (which reaches the bars through here, so they load after this module). */
 export const readJobBoard = (game: Game, barId: string) => jobBoard(game, barId);
@@ -28,6 +29,8 @@ export type NpcDef = {
   shop?: string;
   /** Drawn as this mount instead of a Friend (the paddock horses). */
   mount?: string;
+  /** Only here (drawn, and to be talked to) while this holds: someone who's lost until you find them, then back home. */
+  present?: (game: Game) => boolean;
   pickpocket?: { level: number; xp: number; coins: readonly [number, number]; stun: number; damage: number; extra?: readonly [string, number][] };
 };
 const art = (family: number, seed: number) => ({ family, seed });
@@ -56,6 +59,7 @@ export const NPCS: Record<string, NpcDef> = {
   maidens_villager: { id: "maidens_villager", name: "Deadwood Maiden", examine: "A Maiden off watch. Still armed.", options: ["Talk-to"], art: art(9, 842) },
   ...WEST_NPCS,
   ...MIZUKAI_NPCS,
+  ...KHARAVETH_NPCS,
   ...BAR_NPCS,
   mender: { id: "mender", name: "Mender Hale", examine: "The chapel's mender. Her hands are always clean and her apron never is.", options: ["Talk-to", "Trade"], shop: "mender", art: art(3, 318) },
   // The wider world's villages (2026-10). Each village's people wear its own clothes (NPC_WEAR / regionalLook in render.ts).
@@ -462,6 +466,7 @@ export const QUESTS: readonly QuestDef[] = [
   // ---------- Return of Raria: Hollowmere's watch, the Federation, BarkReach and Raria ----------
   ...WEST_QUESTS,
   ...MIZUKAI_QUESTS,
+  ...KHARAVETH_QUESTS,
   ...BAR_QUEST_DEFS,
   // ---------- The quests of being known: long ones, for Presence, with gear only they give ----------
   {
@@ -503,7 +508,7 @@ export const QUESTS: readonly QuestDef[] = [
   },
 ];
 export const questPoints = (game: Game) => QUESTS.reduce((sum, quest) => sum + (stage(game, quest.id) >= finalStage(quest.id) ? quest.points : 0), 0);
-export function finalStage(quest: string) { return quest === "hollow_whispers" ? 4 : quest === "hollow_king" || quest === "greyhorn_light" || quest === "rope_and_brush" || quest === "first_flush" ? 3 : 2; }
+export function finalStage(quest: string) { return quest === "hollow_whispers" ? 4 : quest === "hollow_king" || quest === "greyhorn_light" || quest === "rope_and_brush" || quest === "first_flush" || quest === "foothold_in_the_stone" ? 3 : 2; }
 /** Bones to offer at the Dawnhold chapel for the Dawn Vigil. */
 const VIGIL_BONES = 8;
 /** The Pilgrim's Road: the old altars to pray at ([quest flag, altar name, where it is]). */
@@ -514,6 +519,8 @@ export const PILGRIM_ALTARS = [["pilgrim_chapel", "Altar", "The Friendhollow cha
 const CRYPT_REST = 12, SENTINELS = 5;
 const faithArmed = (game: Game) => !!(game.player.equipment.weapon && item(game.player.equipment.weapon).equip?.holy);
 export const questDone = (game: Game, quest: string) => stage(game, quest) >= finalStage(quest);
+/** Whether an NPC is here at the moment (most always are). */
+export const npcHere = (game: Game, id: string) => { const def = NPCS[id]; return !def?.present || def.present(game); };
 export const MAX_QUEST_POINTS = QUESTS.reduce((sum, quest) => sum + quest.points, 0);
 
 export function completeQuest(game: Game, quest: string) {
@@ -535,7 +542,7 @@ export function chat(npc: string, lines: DialogueLine[], options?: Dialogue["opt
 /** Pickpocket and quest hooks the engine calls. */
 export function onMonsterKilled(game: Game, monsterId: string, x: number, y: number) {
   const player = game.player;
-  onWestKill(game, monsterId); onMizukaiKill(game, monsterId); onBountyKill(game, monsterId);
+  onWestKill(game, monsterId); onMizukaiKill(game, monsterId); onKharavethKill(game, monsterId); onBountyKill(game, monsterId);
   // The wider world's village quests count their kills wherever they fall.
   const tally = (quest: string, key: string, goal: number, done: string) => {
     if (stage(game, quest) !== 1) return;
@@ -742,6 +749,7 @@ function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
   if (!everyday) { const bar = talkBar(game, npcId, name, () => talkInner(game, npcId, true)); if (bar) return bar; }
   const west = talkWest(game, npcId, name); if (west) return west;
   const mizukai = talkMizukai(game, npcId, name); if (mizukai) return mizukai;
+  const kharaveth = talkKharaveth(game, npcId, name); if (kharaveth) return kharaveth;
   switch (npcId) {
     case "slayer_master:assignment": case "slayer_master": {
       const task = currentTask(game);

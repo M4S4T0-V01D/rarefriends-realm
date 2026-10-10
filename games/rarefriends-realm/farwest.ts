@@ -9,7 +9,7 @@
  * west end. Between them lie the Greyfields, where the Regiment's Fort Ordinance and the Federation's forward camp face
  * each other across a battlefield, and the roads east to Deep Westmarch and the Free Marches.
  */
-import { FLOOR_Y, OVERWORLD_H, T, WEST_DX, isWater, regionIndex, type DecorKind, type Floor, type GenContext, type RegionId, type World, type worldTools } from "./world.ts";
+import { GEN_FLOOR_Y as FLOOR_Y, GEN_OVERWORLD_H as OVERWORLD_H, T, WEST_DX, isWater, regionIndex, type DecorKind, type Floor, type GenContext, type RegionId, type World, type worldTools } from "./world.ts";
 import type { RockKind, TreeKind } from "./data.ts";
 
 type Tools = ReturnType<typeof worldTools>;

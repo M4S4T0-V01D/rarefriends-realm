@@ -25,6 +25,7 @@ const INTRO: Record<Skill, string> = {
   slayer: "Warden Thistle gives contracts: put creatures down, read their tracks or study them. Contracts give Pursuance XP and points, and every new fact about a creature pays once.",
   apothecary: "Gather the Realm's herbs region by region, clean, grind and brew them into tonics, potions, poisons and antidotes at Mother Yarrow's bench in Hollyhock.",
   presence: "The mark you leave on the world: discovery, quests, bosses, rare finds, your Friend, your outfits and your name. Shown as your character's profile.",
+  mysteries: "Hidden laws, old inscriptions, true names and the techniques of the old traditions. Not Faith and not Magic: it's trained by finding things out, the first time each, never by repeating them.",
 };
 const img = (canvas: HTMLCanvasElement, alt = "") => `<img src="${artUrl(canvas)}" alt="${alt}" loading="lazy">`;
 const escape = (text: string) => text.replace(/[&<>"]/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[char]!);

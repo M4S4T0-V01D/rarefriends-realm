@@ -802,6 +802,8 @@ const SKILL_PAINTERS: Record<Skill, Painter> = {
   // Presence: an adventurer seen from behind, hat on, cape out, a walking stick, the road ahead.
   presence: p => { p.rect(3, 13, 10, 2, "#8a6446"); p.rect(6, 6, 4, 6, "#4a3a60"); p.rect(5, 7, 1, 5, "#b0443c"); p.rect(10, 7, 1, 5, "#b0443c"); p.disc(8, 4, 2.2, 2.2, "#e8c9a0"); p.rect(4, 2, 8, 1, "#5f5a52"); p.rect(6, 1, 4, 2, "#5f5a52"); p.line(12, 5, 12, 13, "#9c8672", 1); p.rect(6, 12, 1, 2, "#3b3a38"); p.rect(9, 12, 1, 2, "#3b3a38"); },
   // Pursuance: a paw print, and the lens you read it with.
+  // Mysteries: the eye in the triangle.
+  mysteries: p => { p.poly([[8, 1], [15, 14], [1, 14]], "#d9b866"); p.poly([[8, 4], [12.5, 12], [3.5, 12]], "#2f3f66", null); p.poly([[4.5, 9.5], [8, 7.5], [11.5, 9.5], [8, 11.5]], "#f7f5f0", null); p.disc(8, 9.5, 1.5, 1.5, "#3b8a8a"); p.set(8, 9, INK); },
   slayer: p => { p.disc(6.5, 10, 3, 2.5, "#7a5a3c"); for (const [x, y] of [[2.5, 6.5], [5, 4], [8, 4], [10.5, 6.5]]) p.disc(x, y, 1.3, 1.3, "#7a5a3c"); p.disc(11.5, 11.5, 3.2, 3.2, "#9aa6ad"); p.disc(11.5, 11.5, 2, 2, "#cfe8f2"); p.line(13.5, 13.5, 15.5, 15.5, "#5a3e28", 2); },
 };
 /** Skill icons: 24 pixels, shaded like the items, a distinct picture for each skill (the 16-pixel ones above stay for the orbs). */
@@ -912,6 +914,14 @@ const SKILL24: Record<Skill, Painter> = {
     part(p, poly([[8, 9], [16, 9], [18, 19], [6, 19]]), "#4a3a60", "cloth"); part(p, poly([[6, 9], [9, 9], [8, 19], [3, 19]]), "#b0443c", "cloth");
     part(p, disc(12, 6, 3.2), "#e8c9a0", "cloth"); part(p, box(6, 3, 12, 2), "#5f5a52", "cloth"); part(p, box(9, 1, 6, 3), "#5f5a52", "cloth");
     part(p, box(13, 10, 4, 6), "#9c8672", "wood"); line(p, [[19, 7], [19, 20]], "#c49a74", 2); part(p, box(9, 19, 2, 3), "#3b3a38", "cloth"); part(p, box(13, 19, 2, 3), "#3b3a38", "cloth");
+  },
+  mysteries: p => {
+    // Mysteries: the Eye of Providence, its upper part only: one open eye inside a triangle of aged gold.
+    part(p, all(stroke([[12, 1.5], [22.5, 21], [1.5, 21], [12, 1.5]], 2.4)), GOLD_C, "metal");
+    part(p, poly([[12, 6], [19, 19], [5, 19]]), "#2f3f66", "stone", false);
+    part(p, poly([[5.5, 14], [9, 11.5], [12, 10.8], [15, 11.5], [18.5, 14], [15, 16.5], [12, 17.2], [9, 16.5]]), WHITE, "flat");
+    part(p, disc(12, 14, 2.6), "#3b8a8a", "gem"); part(p, disc(12, 14, 1.1), "#16161a", "flat", false);
+    line(p, [[5.5, 14], [9, 11.5], [12, 10.8], [15, 11.5], [18.5, 14]], "#16161a");
   },
   slayer: p => {
     // Pursuance: a paw print in the dirt, and a lens over it.

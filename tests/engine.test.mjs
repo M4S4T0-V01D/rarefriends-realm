@@ -25,7 +25,7 @@ import { ORDERS, ORDER_IDS, orderOf, orderPieces } from "../games/rarefriends-re
 import { signetCharges, signetTeleport } from "../games/rarefriends-realm/engine.ts";
 import { COFFER_TICKS } from "../games/rarefriends-realm/dungeons.ts";
 import { gloomAt, inDeadwood } from "../games/rarefriends-realm/world.ts";
-import { FLOOR_Y, H, MAINLAND, REGIONS, T, W, WEST_DX, createWorld, floorAt, isUnderground, mainlandToWorld, objectAtTile, onLevel, realPoint, regionAt, terrainAt } from "../games/rarefriends-realm/world.ts";
+import { DUNGEON_Y, FLOOR_Y, H, MAINLAND, OVERWORLD_H, SOUTH_DY, southShift, REGIONS, T, W, WEST_DX, createWorld, floorAt, isUnderground, mainlandToWorld, objectAtTile, onLevel, realPoint, regionAt, terrainAt } from "../games/rarefriends-realm/world.ts";
 import { addXp, emptyToBank, fillFromBank, bankDeposit, bankInOrder, bankMove, bankTabs, bankWithdraw, bonuses, bagBones, combatLevel, count, dropItem, earlyXp, give, has, heft, level, maxHp, xpMultiplier, BONE_BAG, BONE_BAG_SIZE } from "../games/rarefriends-realm/state.ts";
 import game from "../games/rarefriends-realm/game.json" with { type: "json" };
 
@@ -88,7 +88,7 @@ test("a fresh adventurer: level 3, 10 hitpoints, a starter kit", () => {
   assert.equal(level(g, "hitpoints"), 10);
   assert.equal(g.player.hp, 10);
   for (const id of ["pewter_axe", "pewter_pickaxe", "small_net", "tinderbox"]) assert(has(g.player, id), id);
-  assert.equal(SKILLS.length, 21);
+  assert.equal(SKILLS.length, 22, "the twenty-one, and Mysteries");
 });
 
 test("the world is large, deterministic and every landmark is reachable on foot", () => {
@@ -602,7 +602,7 @@ test("A Friend's Feast from start to finish", () => {
   assert.equal(g.player.quests.friends_feast, 2);
   assert.equal(questPoints(g), 1);
   assert(level(g, "cooking") >= 10, "Quest XP");
-  assert.equal(QUESTS.length, 71); assert.equal(MAX_QUEST_POINTS, 126);
+  assert.equal(QUESTS.length, 72); assert.equal(MAX_QUEST_POINTS, 128);
 });
 
 test("Grumblin Trouble counts kills and pays out", () => {
@@ -1948,7 +1948,7 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   assert.equal(p.quests.dawn_against_hollow, 2); assert(has(p, "dawnplate_cuirass"));
   assert.equal(count(p, "hollow_essence"), 0);
   assert.equal(capeProblem(g, "dawnplate_cuirass"), null, "the armoury sells Dawnplate once earned");
-  assert.equal(QUESTS.length, 71); assert.equal(MAX_QUEST_POINTS, 126);
+  assert.equal(QUESTS.length, 72); assert.equal(MAX_QUEST_POINTS, 128);
 });
 
 test("Boots and gauntlets in every metal, smithed at the anvil; the clothier's shirts, dresses, trousers and skirts", () => {
@@ -2173,7 +2173,7 @@ test("Fellowship invitations: a day-long join link with the look inside, and joi
 test("Belts at the waist, barrels that fill vials, a follower in your wardrobe, and a darker band", async () => {
   const { BELTS, beltContents, stock, wornBelt } = await import("../games/rarefriends-realm/state.ts");
   const { beltFill, beltEmpty, sipBelt, fillVials, toggleFollowerWorn, headlessRecipe } = await import("../games/rarefriends-realm/engine.ts");
-  const { TRACKS, MIZUKAI_TRACKS } = await import("../games/rarefriends-realm/audio.ts");
+  const { TRACKS, MIZUKAI_TRACKS, KHARAVETH_TRACKS } = await import("../games/rarefriends-realm/audio.ts");
   const g = newGame(), p = g.player, w = g.world; p.inventory.fill(null);
   assert.equal(item("fletchers_belt").equip.slot, "belt"); assert(SHOPS.war_bows.stock.includes("fletchers_belt") && SHOPS.hollyhock_herbs.stock.includes("apothecary_belt"));
   give(p, "fletchers_belt"); equip(g, p.inventory.findIndex(slot => slot?.id === "fletchers_belt")); assert.equal(p.equipment.belt, "fletchers_belt"); assert.equal(wornBelt(p).id, "fletchers_belt");
@@ -2194,7 +2194,7 @@ test("Belts at the waist, barrels that fill vials, a follower in your wardrobe, 
   assert.deepEqual(p.followerWorn, ["silver_halo", "blue_cape"], "one cape at a time"); toggleFollowerWorn(g, "golden_aura"); assert.equal(p.followerWorn.length, 2, "only what you own");
   const save = JSON.parse(JSON.stringify(serialize(g))), fresh = newGame(); assert(restore(fresh, save)); assert.deepEqual(fresh.player.followerWorn, p.followerWorn); assert.equal(fresh.player.belts.apothecary_belt.vial_of_water, 6); assert.equal(fresh.player.equipment.belt, "apothecary_belt");
   // Every area track has a drummer and a drone now (the Mizukai Isles keep their own instruments).
-  for (const track of TRACKS) if (track.id !== "theme" && !MIZUKAI_TRACKS.includes(track.id)) { assert(track.hits.some(hit => hit.drum === "deep"), `${track.name} has a deep drum`); assert(track.notes.some(note => note.voice === "drone"), `${track.name} has a drone`); }
+  for (const track of TRACKS) if (track.id !== "theme" && !MIZUKAI_TRACKS.includes(track.id) && !KHARAVETH_TRACKS.includes(track.id)) { assert(track.hits.some(hit => hit.drum === "deep"), `${track.name} has a deep drum`); assert(track.notes.some(note => note.voice === "drone"), `${track.name} has a drone`); }
 });
 
 test("Faith spells, wards, weaknesses, and the crown of the head", async () => {
@@ -2275,7 +2275,7 @@ test("The dungeon update: three dungeons under the lake, the library and the sto
   // Regions, creatures and their doors exist and are placed.
   for (const id of ["deepglass", "drowned_archive", "howling_vault"]) assert(REGIONS.find(region => region.id === id)?.underground, `${id} is underground`);
   for (const id of ["cave_bat", "glass_crab", "crystal_golem", "drowned_scholar", "ink_wraith", "archivist_below", "grave_moth", "vault_archer", "vault_knight", "howling_king"]) assert(world.spawns.some(spawn => spawn.kind === "monster" && spawn.id === id), id);
-  assert.equal(regionAt(world, 430 + WEST_DX, 530).id, "deepglass"); assert.equal(regionAt(world, 490 + WEST_DX, 528).id, "drowned_archive"); assert.equal(regionAt(world, 300 + WEST_DX, 567).id, "howling_vault");
+  assert.equal(regionAt(world, 430 + WEST_DX, southShift(530)).id, "deepglass"); assert.equal(regionAt(world, 490 + WEST_DX, southShift(528)).id, "drowned_archive"); assert.equal(regionAt(world, 300 + WEST_DX, southShift(567)).id, "howling_vault");
   const doors = world.objects.filter(object => object.kind === "gate" && object.requires?.item);
   assert.deepEqual(doors.map(door => door.requires.item).sort(), ["archive_key", "bone_shrine_key", "deepglass_key", "kumo_seal_key", "moss_key", "ogre_key", "vault_key"]);
   const coffers = world.objects.filter(object => object.decor === "chest" && / coffer$/.test(object.name));
@@ -2429,7 +2429,7 @@ test("The Rare Friends Ring: matches for coins and bloodmarks, your own foes, re
 test("The Root Cellars and the Mossy Undercroft: a dungeon for new heroes and one for the middle levels", () => {
   const g = newGame(), world = g.world;
   assert(REGIONS.find(region => region.id === "root_cellars")?.underground && REGIONS.find(region => region.id === "mossy_undercroft")?.underground);
-  assert.equal(regionAt(world, 420 + WEST_DX, 560).id, "root_cellars"); assert.equal(regionAt(world, 490 + WEST_DX, 560).id, "mossy_undercroft");
+  assert.equal(regionAt(world, 420 + WEST_DX, southShift(560)).id, "root_cellars"); assert.equal(regionAt(world, 490 + WEST_DX, southShift(560)).id, "mossy_undercroft");
   assert(world.objects.some(o => o.name === "Cellar door" && o.to) && world.objects.some(o => o.name === "Mossy stair" && o.action === "Climb-down"), "both mouths");
   assert(world.objects.some(o => o.kind === "gate" && o.requires?.item === "moss_key"), "the warden's door takes a moss key");
   assert(world.objects.filter(o => o.name === "Cellar coffer").length >= 3 && world.objects.filter(o => o.name === "Undercroft coffer").length >= 3, "coffers in both");
@@ -2596,7 +2596,7 @@ test("Raria's walls stand three storeys high under taller towers, and the Cathed
   assert(nave.x1 < palace.x0 && (nave.x1 - nave.x0 + 1) * (nave.y1 - nave.y0 + 1) >= 400, "a great nave of its own, apart from the palace");
   assert((bells.storeys ?? 1) >= 8 && bells.roof === "cone" && (bells.spire ?? 0) >= 250, "a bell tower eight storeys high under a spire");
   // From the tower's door, climb ladder after ladder to the belfry.
-  let at = world.objects.find(o => o.name === "Bell tower ladder" && o.action === "Climb-up" && o.y < 520), level = 0, climbs = 0;
+  let at = world.objects.find(o => o.name === "Bell tower ladder" && o.action === "Climb-up" && o.y < OVERWORLD_H), level = 0, climbs = 0;
   while (at) {
     climbs++; level = floorAt(world, at.to.x, at.to.y)?.level ?? 0;
     const here = level;
@@ -2649,7 +2649,10 @@ test("The baked world unbakes to the generated one: every tile, object, building
   let worst = 0; for (let i = 0; i < world.heights.length; i++) worst = Math.max(worst, Math.abs(world.heights[i] - back.heights[i]));
   assert(worst < 0.5, `heights within half a pixel (worst ${worst})`);
   console.log(`bake ${Math.round(t1 - t0)} ms, unbake ${Math.round(t2 - t1)} ms, ${Math.round(text.length / 1024)} KB`);
-  assert.equal(unbakeWorld(text.replace('"v":1', '"v":0')), null, "a bake from another version is refused");
+  // (Checked as a boolean: a failing equal on a world would try to print all of it.)
+  const { BAKE_VERSION } = await import("../games/rarefriends-realm/bake.ts");
+  assert.ok(text.includes(`"v":${BAKE_VERSION}`), "the bake carries its version");
+  assert.ok(unbakeWorld(text.replace(`"v":${BAKE_VERSION}`, '"v":0')) === null, "a bake from another version is refused");
 });
 
 test("Adaptive resolution: High drops to 1× after three slow seconds on a sharp screen, comes back with headroom, and gives up after two drops", async () => {
@@ -2672,7 +2675,7 @@ test("Adaptive resolution: High drops to 1× after three slow seconds on a sharp
 test("Townscape: homes in every village (with their doors reachable), L-shaped and hipped and two-storey buildings, shop and bank fronts, Raria's grand halls", async () => {
   const { walkable } = await import("../games/rarefriends-realm/world.ts");
   const { dressWorld } = await import("../games/rarefriends-realm/facades.ts");
-  const g = newGame(), world = dressWorld(g.world), Wd = world.tiles.length / 640;
+  const g = newGame(), world = dressWorld(g.world), Wd = W;
   // Homes: three for nearly every village, a bed in each, a door you can walk to from the village.
   const homes = world.buildings.filter(b => / home$/.test(b.name)), villages = new Map();
   for (const b of homes) { const parts = b.complex ? world.buildings.filter(o => o.complex === b.complex) : [b]; if (parts[0] !== b) continue; villages.set(b.name, [...(villages.get(b.name) ?? []), parts]); }
@@ -2715,7 +2718,7 @@ test("Townscape: homes in every village (with their doors reachable), L-shaped a
 
 test("The Ring is roofed and battlemented, with stairs to a walk round the top, the old arcades half-fallen, and the pit open to the sky", async () => {
   const { ARENA, floorAt, walkable } = await import("../games/rarefriends-realm/world.ts");
-  const g = newGame(), world = g.world, Wd = world.tiles.length / 640;
+  const g = newGame(), world = g.world, Wd = W;
   const roof = world.buildings.filter(b => b.complex === "friends_ring");
   assert(roof.length >= 40 && roof.every(b => b.roof === "flat"), "the concourse is roofed, flat and battlemented");
   // The pit is open: nothing over the courtyard.
@@ -2885,4 +2888,109 @@ test("every standing shrine gate on the Isles can be walked under (only the fall
   const g = createGame({ familyId: 1, friendId: 7730 }), gates = g.world.objects.filter(o => o && o.decor === "torii");
   assert(gates.length >= 30, `the Isles' gates (${gates.length})`);
   for (const gate of gates) assert.equal(gate.blocks, /fallen/i.test(gate.name), `${gate.name} at ${gate.x},${gate.y}`);
+});
+
+// ---------- The Land Before Stone ----------
+test("Kharaveth: the Sunteeth is the only way in on foot, Foothold's gate the only way on, and the Underway joins the maze to the camp", async () => {
+  const { FOOTHOLD, SUNTEETH } = await import("../games/rarefriends-realm/south.ts");
+  const g = newGame(), world = g.world, fromSpawn = reachable(g, world.places.spawn), at = (seen, x, y) => !!seen[y * W + x];
+  const beside = (seen, o) => [[0, 1], [1, 0], [0, -1], [-1, 0]].some(([dx, dy]) => at(seen, o.x + dx, o.y + dy));
+  assert(at(fromSpawn, SUNTEETH.north.x, SUNTEETH.north.y), "the shingle spit reaches the Sunteeth from the mainland");
+  assert(at(fromSpawn, SUNTEETH.south.x, SUNTEETH.south.y) && at(fromSpawn, world.places.foothold.x, world.places.foothold.y), "through the canyons to the camp");
+  let leaked = 0; for (let y = FOOTHOLD.y1 + 1; y < OVERWORLD_H; y++) for (let x = 0; x < W; x++) if (fromSpawn[y * W + x] && regionAt(world, x, y).id === "ochre_steppe") leaked++;
+  assert.equal(leaked, 0, "nothing of Kharaveth past the camp is reached without its gate");
+  const beyond = reachable(g, { x: FOOTHOLD.gate.x, y: FOOTHOLD.gate.y + 1 }); let open = 0; for (const v of beyond) open += v;
+  assert(open > 100_000, `a continent through the gate (${open} tiles)`);
+  for (const id of ["sunteeth_crack", "sunteeth_stele", "last_camp", "chalk_ochre", "trail_blood"]) assert(beside(fromSpawn, world.objects.find(o => o.clue === id)), `${id} can be reached`);
+  const crack = world.objects.find(o => o.clue === "sunteeth_crack"), under = reachable(g, crack.to);
+  for (const id of ["underway_shaft_up", "underway_counterweight", "underway_glyphs", "underway_lintel"]) assert(beside(under, world.objects.find(o => o.clue === id)), `${id} on the Underway's road`);
+  assert(at(under, g.npcs.find(n => n.id === "fh_rook_lost").x, g.npcs.find(n => n.id === "fh_rook_lost").y), "the party's refuge is on the road");
+  assert(beside(fromSpawn, world.objects.find(o => o.clue === "underway_shaft_down")), "the shaft comes up inside the camp, not outside its gate");
+  for (const id of ["sunward_strait", "sunteeth", "foothold", "ochre_steppe", "underway"]) assert(world.region.includes(REGIONS.findIndex(r => r.id === id)), `${id} exists`);
+});
+
+test("A Foothold in the Stone: the officers, the camp, the trail in order, the ochre, the stele and the crack, the Underway, both endings", async () => {
+  const { useClue, clueOptions } = await import("../games/rarefriends-realm/kharaveth.ts");
+  const { talk, npcHere } = await import("../games/rarefriends-realm/content.ts");
+  for (const choice of [1, 2]) {
+    const g = newGame(), world = g.world, Q = "foothold_in_the_stone";
+    const say = (id, label) => { let d = talk(g, id); if (label) { const o = d.options.find(x => x.label.startsWith(label)); assert(o, `${id}: ${label}`); d.onEnd?.(); d = o.then(); } d?.onEnd?.(); };
+    const clue = (id, option) => useClue(g, world.objects.find(o => o.clue === id), option ?? "Read");
+    assert.match(clue("foothold_gate", "Open").text, /barred/, "the south gate is barred before");
+    say("fh_commander", "I'll find them."); assert.equal(g.player.quests[Q], 1); assert(has(g.player, "party_roster"));
+    say("fh_lieutenant"); say("fh_cartographer"); say("fh_scholar");
+    clue("last_camp", "Search"); assert(has(g.player, "ochre_chalk"), "the ochre chalk at the cold fire");
+    assert.match(clue("trail_shoe", "Inspect").text, /from the beginning/, "the trail is read from the camp, in order");
+    for (const id of ["trail_sand", "trail_tin", "trail_shoe", "trail_blood"]) clue(id, "Inspect");
+    assert.equal(g.player.questData.ft_trail, 4);
+    clue("chalk_ochre"); assert("ochre_marks" in g.player.mysteries.found, "two hands at the walls: a Mysteries discovery");
+    clue("sunteeth_stele"); say("fh_scholar"); assert.equal(g.player.mysteries.glyphs.road, 2, "the scholar teaches 'road'");
+    const crack = world.objects.find(o => o.clue === "sunteeth_crack");
+    assert.deepEqual(clueOptions(g, crack), ["Search"], "a crack is only a way in once you've felt it breathe");
+    clue("sunteeth_crack", "Search"); assert.deepEqual(clueOptions(g, crack), ["Squeeze-into"]); assert.equal(g.player.mysteries.glyphs.door, 2, "and the stele's arch is a door");
+    assert.deepEqual(useClue(g, crack, "Squeeze-into").to, crack.to);
+    assert(npcHere(g, "fh_rook_lost") && !npcHere(g, "fh_rook"), "the party is in the Underway");
+    say("fh_rook_lost"); assert.equal(g.player.quests[Q], 2);
+    assert(!clue("underway_shaft_up", "Climb-up").to, "the shaft is choked until the counterweight drops");
+    clue("underway_counterweight", "Release"); assert(clue("underway_shaft_up", "Climb-up").to);
+    assert(!npcHere(g, "fh_rook_lost") && npcHere(g, "fh_rook"), "and they walk out to the camp");
+    say("fh_commander", choice === 1 ? "It's true" : "Ibbu got");
+    assert.equal(g.player.quests[Q], 3); assert.equal(g.player.questData.ft_choice, choice); assert(has(g.player, "foothold_cloak"));
+    assert.equal(npcHere(g, "fh_ibbu"), choice === 2, "the guide stays only if his secret was kept");
+    assert(clue("foothold_gate", "Open").to, "the south gate opens");
+    // Mysteries never pays twice.
+    clue("underway_glyphs"); clue("underway_lintel");
+    const xp = g.player.xp.mysteries;
+    clue("sunteeth_stele"); clue("underway_glyphs"); clue("underway_lintel"); clue("underway_counterweight", "Release"); clue("sunteeth_crack", "Search");
+    assert.equal(g.player.xp.mysteries, xp, "repeating a discovery gives nothing");
+    const save = JSON.parse(JSON.stringify(serialize(g))), fresh = newGame(); assert(restore(fresh, save));
+    assert.deepEqual(fresh.player.mysteries, g.player.mysteries); assert.equal(fresh.player.quests[Q], 3); assert.equal(fresh.player.xp.mysteries, g.player.xp.mysteries);
+  }
+  // Out of order: the counterweight dropped before the party is found (exploring ahead) still lets them out and the quest end.
+  const g = newGame(), world = g.world, Q = "foothold_in_the_stone", clue = (id, option) => useClue(g, world.objects.find(o => o.clue === id), option ?? "Read");
+  const say = (id, label) => { let d = talk(g, id); if (label) { const o = d.options.find(x => x.label.startsWith(label)); d.onEnd?.(); d = o.then(); } d?.onEnd?.(); };
+  say("fh_commander", "I'll find them."); clue("underway_counterweight", "Release");
+  assert(npcHere(g, "fh_rook_lost"), "the party waits to be found"); say("fh_rook_lost");
+  assert(npcHere(g, "fh_rook") && !npcHere(g, "fh_rook_lost"), "then walks out by the open shaft");
+  say("fh_commander", "It's true"); assert.equal(g.player.quests[Q], 3, "and the commander takes the report");
+});
+
+test("Mysteries: a skill of its own, trained by finding out (glyphs seen, then understood; inscriptions read once), saved, and cleaned on load", async () => {
+  const { learnGlyph, readInscription, studySherd, cleanMysteries, INSCRIPTIONS } = await import("../games/rarefriends-realm/mysteries.ts");
+  const { skillGuide } = await import("../games/rarefriends-realm/guide.ts");
+  assert(SKILLS.includes("mysteries")); assert(skillGuide("mysteries").length >= 4, "the guide explains it");
+  const g = newGame(); assert.equal(g.player.xp.mysteries, 0);
+  assert.match(readInscription(g, "underway_glyphs"), /One you don't: a disc/, "unknown glyphs are read as their shapes");
+  for (const id of INSCRIPTIONS.underway_glyphs.glyphs) learnGlyph(g, id, true);
+  assert.equal(g.player.mysteries.read.underway_glyphs, 1); assert.match(readInscription(g, "underway_glyphs"), /Sun\. Water\. Star\./);
+  const xp = g.player.xp.mysteries; for (const id of INSCRIPTIONS.underway_glyphs.glyphs) learnGlyph(g, id, true); assert.equal(g.player.xp.mysteries, xp, "a glyph is understood once");
+  for (let i = 0; i < 20; i++) studySherd(g); assert.match(studySherd(g), /already/, "sherds run out of new glyphs");
+  assert.deepEqual(cleanMysteries({ found: { nonsense: 3, underway_found: 5 }, glyphs: { sun: 2, moon: 2, road: 7 }, read: { underway_glyphs: 1, x: 1 } }), { found: { underway_found: 5 }, glyphs: { sun: 2 }, read: { underway_glyphs: 1 } });
+});
+
+test("The world grew south: a save from before keeps its place, whether on the surface, in a dungeon or upstairs", () => {
+  const g = newGame(), world = g.world;
+  // A spot in a dungeon and one on a castle storey, in the old frame (rows 520–639) and in the new one (moved down SOUTH_DY).
+  const dungeonLadder = world.objects.find(o => o.kind === "ladder" && o.y >= DUNGEON_Y && o.y < FLOOR_Y), storey = world.objects.find(o => o.kind === "ladder" && o.y >= FLOOR_Y);
+  for (const [o, label] of [[dungeonLadder, "a dungeon"], [storey, "a storey"]]) {
+    const spot = [[0, 1], [1, 0], [0, -1], [-1, 0]].map(([dx, dy]) => ({ x: o.x + dx, y: o.y + dy })).find(p => canWalk(g, p.x, p.y));
+    const save = JSON.parse(JSON.stringify(serialize(g))); save.world = 3; save.x = spot.x; save.y = spot.y - SOUTH_DY;
+    const fresh = newGame(); assert(restore(fresh, save)); assert.deepEqual([fresh.player.x, fresh.player.y], [spot.x, spot.y], `${label}: an old save lands where it was`);
+  }
+  const surface = JSON.parse(JSON.stringify(serialize(g))); surface.world = 3;
+  const fresh = newGame(); assert(restore(fresh, surface)); assert.deepEqual([fresh.player.x, fresh.player.y], [g.player.x, g.player.y], "the old overworld didn't move");
+  assert.equal(serialize(g).world, 4);
+});
+
+test("Kharaveth's music: oud, ney, qanun and rebab, darbuka and frame drum, in four modes; each region its piece", async () => {
+  const { TRACKS, KHARAVETH_TRACKS, trackFor } = await import("../games/rarefriends-realm/audio.ts");
+  const pieces = TRACKS.filter(track => KHARAVETH_TRACKS.includes(track.id)); assert.equal(pieces.length, 4);
+  const own = new Set(["oud", "ney", "qanun", "rebab", "drone", "lute"]), ensembles = new Set();
+  for (const track of pieces) {
+    for (const note of track.notes) assert(own.has(note.voice), `${track.name}: ${note.voice}`);
+    assert(track.hits.some(hit => ["dum", "tek", "bendir", "riq"].includes(hit.drum)), `${track.name} has a hand drum`);
+    ensembles.add([...new Set(track.notes.map(n => n.voice))].sort().join());
+  }
+  assert.equal(ensembles.size, 4, "each its own ensemble");
+  for (const [region, id] of [["sunteeth", "kharaveth_sunteeth"], ["foothold", "kharaveth_foothold"], ["underway", "kharaveth_underway"], ["ochre_steppe", "kharaveth_steppe"]]) assert.equal(trackFor(region, false), id);
 });

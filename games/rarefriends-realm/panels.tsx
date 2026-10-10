@@ -43,6 +43,7 @@ import { DUNGEON_Y, FLOOR_Y, OVERWORLD_H, W, isUnderground, mainlandToWorld, rea
 import type { NetState } from "./net.ts";
 import type { TradeView } from "./trade.ts";
 import { recipeBook, skillGuide } from "./guide.ts";
+import { MysteriesJournal } from "./mysteriesui.tsx";
 import { artUrl, emoteArt, itemArt, orbArt, prayerArt, skillArt, spellArt, tabArt, type TabIcon } from "./icons.ts";
 import { creatureSprite, friendSprite } from "./sprites.ts";
 import { figureArt } from "./wardrobe.ts";
@@ -250,16 +251,17 @@ function questSteps(game: Game, quest: QuestDef) {
   const lines = quest.journal(game).filter(line => /^[✓•]/.test(line));
   return lines.length ? { done: lines.filter(line => line.startsWith("✓")).length, total: lines.length } : null;
 }
-/** The Quest journal tab: your quests, or (the other page) your Pursuance journal. */
+/** The Quest journal tab: your quests, or (the other pages) your Pursuance journal and your Mysteries. */
 function QuestsTab(props: PanelProps) {
-  const [page, setPage] = useState<"quests" | "pursuance">("quests");
+  const [page, setPage] = useState<"quests" | "pursuance" | "mysteries">("quests");
   return (
     <>
       <div className="realm-journal-switch" role="tablist" aria-label="Journal">
         <button type="button" role="tab" aria-selected={page === "quests"} onClick={() => setPage("quests")}>Quests</button>
         <button type="button" role="tab" aria-selected={page === "pursuance"} onClick={() => setPage("pursuance")}>Pursuance</button>
+        <button type="button" role="tab" aria-selected={page === "mysteries"} onClick={() => setPage("mysteries")}>Mysteries</button>
       </div>
-      {page === "quests" ? <QuestList {...props} /> : <PursuanceJournal game={props.game} />}
+      {page === "quests" ? <QuestList {...props} /> : page === "pursuance" ? <PursuanceJournal game={props.game} /> : <MysteriesJournal game={props.game} />}
     </>
   );
 }

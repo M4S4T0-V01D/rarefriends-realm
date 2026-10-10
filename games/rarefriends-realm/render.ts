@@ -8,7 +8,7 @@ import { herbDef } from "./apothecary.ts";
 import { doorwaysOf, dressWorld } from "./facades.ts";
 import type { RealmGL } from "./gl.ts";
 const isPet = (id: string) => !!petDef(id);
-import { NPCS } from "./content.ts";
+import { NPCS, npcHere } from "./content.ts";
 import { TICK_MS, attackSpeed, riding, type Facing, type Game, type Monster, type Npc, type Projectile } from "./state.ts";
 import { npcOverhead, veiled, type Pick } from "./engine.ts";
 import { knows, maxHpOf as creatureMaxHp } from "./pursuance.ts";
@@ -74,7 +74,7 @@ export type Quality = {
 export const HIGH_QUALITY: Quality = { drawDistance: 72, lightScale: 0.5, shadows: true, spriteShadows: true, clouds: true, footprints: true, ambient: true, fog: true, haze: true, rain: 1, blend: true, textures: true };
 export const LOW_QUALITY: Quality = { drawDistance: 44, lightScale: 0.25, shadows: true, spriteShadows: false, clouds: false, footprints: false, ambient: false, fog: false, haze: false, rain: 0.35, blend: false, textures: false };
 /** Decorations too small to matter in the far distance. */
-const SMALL_DECOR = new Set(["flowers", "reeds", "lily", "rubble", "bush", "hay", "crate", "barrel", "bones"]);
+const SMALL_DECOR = new Set(["flowers", "reeds", "lily", "rubble", "bush", "hay", "crate", "barrel", "bones", "scuffs"]);
 export type ClickMarker = { x: number; y: number; at: number; red: boolean };
 export type Firework = { at: number; color: string };
 export type Scene = {
@@ -845,7 +845,7 @@ function drawPrints(ctx: CanvasRenderingContext2D, camera: Camera, now: number, 
 /** How far from the camera (tiles) sprites cast their own shadows; beyond it the haze hides them. */
 const SHADOW_REACH = 30;
 /** Decorations lying flat on the ground: they cast no shadow. */
-const FLAT_DECOR = new Set(["flowers", "lily", "rubble", "reeds", "grave", "bones"]);
+const FLAT_DECOR = new Set(["flowers", "lily", "rubble", "reeds", "grave", "bones", "scuffs", "bedroll", "campfire_cold"]);
 /** Pixel art scale: two world pixels per art pixel. */
 const ART = 2;
 /** Trees drawn as scenery was: palms, pines and dead trees keep their old look, and show a stump when they're cut. */
@@ -1694,6 +1694,16 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
         ctx.strokeStyle = "#6f6b64"; ctx.lineWidth = Math.max(1, z); for (let i = 0; i < 4; i++) { const s = toScreen(camera, ox, oy + 0.16, 14 + i * 7); ctx.beginPath(); ctx.moveTo(s.x - 3 * z, s.y); ctx.lineTo(s.x + 3 * z, s.y); ctx.stroke(); }
         return hit(62, 26);
       }
+      case "rock_spire": {
+        // A sandstone tower: three tapering courses, each a little turned, banded where the wind has cut it.
+        const r = hash(ox + 3, oy + 7), tall = 70 + r * 50, base = groundAt(ox, oy);
+        const course = (w: number, h0: number, h1: number, turn: number, colour: string) => {
+          const c = Math.cos(turn), s2 = Math.sin(turn), corners = [[-w, -w], [w, -w], [w, w], [-w, w]].map(([dx, dy]) => [ox + dx * c - dy * s2, oy + dx * s2 + dy * c] as const);
+          slab(ctx, camera, corners, h0, h1, base, [shade(colour, 0.08), colour, shade(colour, -0.14)]);
+        };
+        course(0.62, 0, tall * 0.42, r, "#b9774f"); course(0.5, tall * 0.42, tall * 0.78, r + 0.4, "#c98a5e"); course(0.34, tall * 0.78, tall, r + 0.9, "#d6a074");
+        return hit(tall + 10, 44);
+      }
       case "stake": {
         // A palisade standing in the world (not a picture turned to face you): sharpened logs from this stake to the next
         // along the line (up to two tiles east or south), lashed with rope, each log a little different.
@@ -2496,7 +2506,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     const object = objectAtTile(world, x, y);
     if (!object || object.name === "__removed") return;
     if (object.kind === "decor" && SMALL_DECOR.has(object.decor!) && Math.abs(x - camera.x) + Math.abs(y - camera.y) > HAZE_START) return;
-    if (object.decor === "lamp") glow(x, y, 48, 150, "#f2b261", 0.9); else if (object.decor === "stone_lantern" || object.decor === "paper_lantern") glow(x, y, object.decor === "stone_lantern" ? 30 : 50, 110, "#f2b261", 0.75); else if (object.decor === "torch") glow(x, y, 32, 130, "#ef9a4c", 1, true); else if (object.decor === "hearth") glow(x, y, 14, 170, "#f0a050", 1, true);
+    if (object.decor === "lamp") glow(x, y, 48, 150, "#f2b261", 0.9); else if (object.decor === "stone_lantern" || object.decor === "paper_lantern") glow(x, y, object.decor === "stone_lantern" ? 30 : 50, 110, "#f2b261", 0.75); else if (object.decor === "torch") glow(x, y, 32, 130, "#ef9a4c", 1, true); else if (object.decor === "hearth" || object.decor === "campfire") glow(x, y, 14, 170, "#f0a050", 1, true);
     else if (object.kind === "furnace" || object.kind === "range") glow(x, y, 16, 110); else if (object.kind === "altar") glow(x, y, 26, 70); else if (object.kind === "fountain" && objectAtTile(world, x - 1, y)?.kind !== "fountain" && objectAtTile(world, x, y - 1)?.kind !== "fountain") glow(x + 0.5, y + 0.5, 12, 110, "#a9d4f2", 0.55); else if (object.kind === "sigil_altar") glow(x, y, 30, 90);
     // The fountain is 2 × 2: sorted by its centre (a little forward, for its rim), not its back tile, so Friends beside it
     // stand behind its rim rather than on it, at any camera angle.
@@ -2522,7 +2532,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     const sprite = object.kind === "tree" || object.kind === "rock" || object.kind === "dock" || (object.kind === "decor" && object.decor !== "banner");
     drawables.push({ depth: d, at: { x, y }, cast: !flat, flat, sprite, scenery: object.kind === "tree" || object.kind === "rock" || object.kind === "decor" || object.kind === "spot", size: object.decor === "pagoda" || object.decor === "castle_keep" ? [520, 200, 60] : object.decor === "windmill" ? [320, 140, 40] : object.kind === "tree" ? [260, 110, 40] : [200, 110, 40], draw: () => {
       let rect: { x: number; y: number; w: number; h: number };
-      const tall = object.kind === "tree" || (object.kind === "decor" && (["pine", "windmill", "palm", "pillar", "tent", "crypt", "obelisk", "canopy", "wise_friend", "god_dusk", "torii", "pagoda", "castle_keep"].includes(object.decor!) || (object.decor === "ruin_wall" && (object.height ?? 0) > 34)));
+      const tall = object.kind === "tree" || (object.kind === "decor" && (["pine", "windmill", "palm", "pillar", "tent", "crypt", "obelisk", "canopy", "wise_friend", "god_dusk", "torii", "rock_spire", "pagoda", "castle_keep"].includes(object.decor!) || (object.decor === "ruin_wall" && (object.height ?? 0) > 34)));
       // Anything tall in front of your Friend that covers it on screen turns see-through (works at any angle and zoom).
       const fade = tall && d > playerDepth + 0.3 && coversPlayer(x, y) ? 0.35 : 1;
       if (object.kind === "tree") rect = drawTree(ctx, scene, object, game.depleted.has(object.id), fade, scene.reducedMotion ? 0 : treeShake(game, object.id, now));
@@ -2680,7 +2690,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   });
   // NPCs.
   for (const npc of game.npcs) {
-    if (npc.drawn) continue;
+    if (npc.drawn || !npcHere(game, npc.id)) continue;
     if (!shown(npc.x, npc.y)) continue;
     const at = interpolate(npc, game, alpha);
     drawables.push({ depth: depth(at.x, at.y) + 0.1, at, cast: true, sprite: true, size: [170, 90, 30], tag: "npc", draw: () => drawNpc(ctx, scene, npc, at, hits) });
@@ -3595,6 +3605,12 @@ const NPC_WEAR: Record<string, readonly string[]> = {
   fff_outfitter: ["fff_cap", "fff_tunic", "fff_cape_artisan"], fff_knight_asleep: ["fff_helm", "fff_cuirass", "fff_cape_knight"], fff_wizard_arguing: ["fff_wizard_hat", "fff_battle_robe", "fff_cape_wizard", "fff_wand"], fff_ranger: ["fff_ranger_hood", "fff_ranger_jerkin", "fff_cape_ranger", "fff_longbow"],
   barkreach_foreman: ["woodsman_cap", "woodsman_jerkin", "woodsman_breeches", "woodsman_boots", "moonsilver_axe"], barkreach_bowyer: ["woodsman_cap", "woodsman_jerkin", "redwood_bow"], barkreach_outfitter: ["woodsman_jerkin", "woodsman_breeches"],
   barkreach_ranger: ["woodsman_cap", "woodsman_jerkin", "woodsman_breeches", "ironbark_bow"], barkreach_hunter: ["woodsman_cap", "woodsman_jerkin", "woodsman_boots", "redwood_war_bow"],
+  // The Land Before Stone: Hollowmere's expedition at Foothold Camp, and its steppe guide.
+  fh_commander: ["moonsilver_cuirass", "hollowmere_cape", "moonsilver_greatsword"], fh_lieutenant: ["blackiron_helm", "blackiron_cuirass", "hollowmere_cape"],
+  fh_cartographer: ["foothold_cloak", "steppe_headwrap"], fh_scholar: ["scholar_hat", "scholar_robe"], fh_quartermaster: ["steppe_robe", "hollowmere_cape"],
+  fh_sergeant: ["blackiron_helm", "blackiron_cuirass", "hollowmere_cape", "blackiron_battleaxe"], fh_soldier: ["blackiron_helm", "foothold_cloak", "blackiron_battleaxe"],
+  fh_rook_lost: ["blackiron_cuirass", "hollowmere_cape"], fh_rook: ["blackiron_cuirass", "hollowmere_cape"],
+  fh_ibbu_lost: ["steppe_headwrap", "steppe_robe", "steppe_sash"], fh_ibbu: ["steppe_headwrap", "steppe_robe", "steppe_sash"],
   hollowmere_officer: ["moonsilver_helm", "moonsilver_cuirass", "hollowmere_cape", "moonsilver_greatsword"], hollowmere_soldier: ["blackiron_helm", "blackiron_cuirass", "hollowmere_cape", "blackiron_battleaxe"], hollowmere_lieutenant: ["ashsteel_helm", "ashsteel_cuirass", "hollowmere_cape", "ashsteel_greatsword"],
   lawgate_governor: ["royal_circlet", "rarian_tabard", "rarian_mantle", "law_book"], lawgate_innkeeper: ["rarian_veil", "rarian_tabard"], raria_innkeeper: ["rarian_veil", "rarian_tabard", "rarian_skirts"],
   vesper_abbess: ["dusk_paladin_helm", "dusk_paladin_body", "dusk_cape", "dusk_lantern"], ranger_warden: ["ranger_royal_hood", "ranger_royal_coat", "ranger_royal_leggings", "rangers_longbow"],
@@ -3894,7 +3910,7 @@ export function renderMinimap(ctx: CanvasRenderingContext2D, game: Game, size: n
     ctx.fillStyle = color; ctx.fillRect(x + 0.5 - r / 2, y + 0.5 - r / 2, r, r);
   };
   for (const entry of game.ground) dot(entry.x, entry.y, "#e0463c", 1);
-  for (const npc of game.npcs) if (!npc.drawn) dot(npc.x, npc.y, "#f5e04a", 1.3);
+  for (const npc of game.npcs) if (!npc.drawn && npcHere(game, npc.id)) dot(npc.x, npc.y, "#f5e04a", 1.3);
   for (const monster of game.monsters) if (!monster.dead) dot(monster.x, monster.y, "#f5e04a", 1.3);
   if (game.player.trail && game.player.trail.until > game.tick) for (const monster of game.monsters) if (!monster.dead && monster.def.id === game.player.trail.id) dot(monster.x, monster.y, "#e0533c", 2.2);
   if (game.pet) dot(game.pet.x, game.pet.y, "#ffffff", 1.3);

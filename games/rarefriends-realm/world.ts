@@ -11,6 +11,7 @@ import { buildIsles } from "./isles.ts";
 import { growVillages, varyBuildings } from "./townscape.ts";
 import { roofRing } from "./ringroof.ts";
 import { fitBars } from "./barfit.ts";
+import { buildSouth } from "./south.ts";
 
 /**
  * The far west (Return of Raria): the world grew by WEST_DX columns on its west side for a second continent, Raria and
@@ -24,22 +25,32 @@ export const WEST_DX = 440, LEGACY_W = 720;
  * east of the old east coast. Nothing west of EAST_X moves.
  */
 export const EAST_X = LEGACY_W + WEST_DX, EAST_W = 560;
-export const W = EAST_X + EAST_W, H = 640;
-/** The overworld is rows 0–519; rows 520–579 are the dungeons (reached by ladders, never seen from above); rows from FLOOR_Y hold upper storeys. */
-export const OVERWORLD_H = 520, DUNGEON_Y = 520, FLOOR_Y = 580;
+/**
+ * The Land Before Stone: the world grew south. SOUTH_DY rows of new overworld (Kharaveth, and Meghavan east of it) lie
+ * under the old one, and the dungeon and storey rows moved down by as much. Everything older is still generated in the
+ * frame it always had (the GEN_ rows: overworld 0–519, dungeons 520–579, storeys 580–639) and `generateWorld` moves the
+ * rows below the old overworld down once it's built; at runtime everything is in the grown frame.
+ */
+export const SOUTH_DY = 360;
+export const GEN_H = 640, GEN_OVERWORLD_H = 520, GEN_DUNGEON_Y = 520, GEN_FLOOR_Y = 580;
+export const W = EAST_X + EAST_W, H = GEN_H + SOUTH_DY;
+/** The overworld is rows 0–879 (the south from row 520); then the dungeons (reached by ladders, never seen from above); rows from FLOOR_Y hold upper storeys. */
+export const OVERWORLD_H = GEN_OVERWORLD_H + SOUTH_DY, DUNGEON_Y = GEN_DUNGEON_Y + SOUTH_DY, FLOOR_Y = GEN_FLOOR_Y + SOUTH_DY;
+/** A row of the generation frame in the grown world (the dungeon and storey rows moved down; the old overworld didn't). */
+export const southShift = (y: number) => y >= GEN_OVERWORLD_H ? y + SOUTH_DY : y;
 /**
  * Where the original Realm (the mainland, 350 × 200 with 40 dungeon rows and 40 storey rows) sits in the wider world.
  * Its content is generated in its own coordinates and set in here, so nothing on it moves relative to anything else.
  */
 export const MAINLAND = { x: 185, y: 160, w: 350, h: 200, dungeonRows: 40, floorRows: 40 } as const;
-/** A mainland coordinate (overworld, dungeon row or storey row) in the legacy frame (generation code only). */
+/** A mainland coordinate (overworld, dungeon row or storey row) in the legacy frame (generation code only: the GEN_ rows). */
 export function legacyMainlandToWorld(x: number, y: number): [number, number] {
-  if (y >= MAINLAND.h + MAINLAND.dungeonRows) return [x + MAINLAND.x, FLOOR_Y + (y - MAINLAND.h - MAINLAND.dungeonRows)];
-  if (y >= MAINLAND.h) return [x + MAINLAND.x, DUNGEON_Y + (y - MAINLAND.h)];
+  if (y >= MAINLAND.h + MAINLAND.dungeonRows) return [x + MAINLAND.x, GEN_FLOOR_Y + (y - MAINLAND.h - MAINLAND.dungeonRows)];
+  if (y >= MAINLAND.h) return [x + MAINLAND.x, GEN_DUNGEON_Y + (y - MAINLAND.h)];
   return [x + MAINLAND.x, y + MAINLAND.y];
 }
 /** A mainland coordinate in world coordinates. */
-export function mainlandToWorld(x: number, y: number): [number, number] { const [lx, ly] = legacyMainlandToWorld(x, y); return [lx + WEST_DX, ly]; }
+export function mainlandToWorld(x: number, y: number): [number, number] { const [lx, ly] = legacyMainlandToWorld(x, y); return [lx + WEST_DX, southShift(ly)]; }
 /** The mainland's overworld rectangle in the legacy frame (inclusive; generation code only). */
 export const MAINLAND_RECT = { x0: MAINLAND.x, y0: MAINLAND.y, x1: MAINLAND.x + MAINLAND.w - 1, y1: MAINLAND.y + MAINLAND.h - 1 } as const;
 /** One storey, in world pixels (the height of a wall). */
@@ -84,7 +95,9 @@ export type DecorKind =
   | "god_dusk" | "wise_friend" | "bell" | "canopy" | "cannon" | "device" | "wagon" | "watchtower" | "stake" | "plaque" | "banner_fff" | "banner_rrr" | "banner_hollowmere"
   | "banner_diamond" | "banner_ink" | "banner_sol" | "banner_hood" | "banner_ember" | "banner_dusk"
   // The Mizukai Isles: shrine gates, stone lanterns, pagodas, guardian lion-dogs, sacred ropes, the things of a harbour and a hot spring.
-  | "torii" | "stone_lantern" | "pagoda" | "guardian" | "sacred_rope" | "drying_rack" | "steam" | "castle_keep" | "offering_box" | "paper_lantern" | "wish_board" | "wayside_statue" | "nets";
+  | "torii" | "stone_lantern" | "pagoda" | "guardian" | "sacred_rope" | "drying_rack" | "steam" | "castle_keep" | "offering_box" | "paper_lantern" | "wish_board" | "wayside_statue" | "nets"
+  // The Land Before Stone: the Sunteeth's sandstone towers, camp fires, trodden ground, a bedroll, the Underway's counterweight.
+  | "rock_spire" | "campfire" | "campfire_cold" | "scuffs" | "bedroll" | "counterweight";
 /** A monument's state: whole on its plinth, toppled and lying, broken off at the waist, or sunk to the chest in the ground. */
 export type MonumentState = "whole" | "toppled" | "broken" | "buried";
 export type WorldObject = {
@@ -107,6 +120,11 @@ export type WorldObject = {
   herb?: string;
   /** A Mizukai boat: which dock it serves (boats.ts DOCKS). Its `to` is where you stand to board it, and where you arrive. */
   dock?: string;
+  /**
+   * Something to look into (The Land Before Stone): its options, its examine text and what happens are kharaveth.ts's
+   * CLUES[clue], which can depend on what you've found (a crack you only see once you've felt the draught from it).
+   */
+  clue?: string;
 };
 export type StallKind = "bakery" | "silk" | "gem" | "fish";
 export type SpawnDef = { kind: "npc" | "monster"; id: string; x: number; y: number; wander?: number };
@@ -129,12 +147,16 @@ export type RegionId =
   // The Mizukai Isles (2026-10): Hinode, the Isle of Sunrise, its quarters and the islands round it, the sea between, and what lies under them.
   | "hinode" | "kurohama" | "takamori" | "kumoyama" | "old_cedars" | "whispering_bamboo" | "tanabe" | "yumoto" | "kurokage"
   | "shiogama" | "kibi" | "hanazono" | "morishima" | "iwaoka" | "josaki" | "torojima" | "kusabana" | "ashigane" | "smugglers_cove" | "hakkotsu" | "three_stones" | "turtle_rock" | "mizukai_sea"
-  | "kumo_hollow" | "ashigane_deeps" | "bone_shrine";
+  | "kumo_hollow" | "ashigane_deeps" | "bone_shrine"
+  // The Land Before Stone (2026-10): Kharaveth, the desert continent under the mainland, and the strait between.
+  | "sunward_strait" | "sunteeth" | "foothold" | "ochre_steppe" | "underway";
 export type Region = { id: RegionId; name: string; label: { x: number; y: number }; danger: number; underground?: boolean;
   /** A far-west region (Return of Raria) or a Mizukai one: its label is already in world coordinates. */
   far?: boolean;
   /** One of the Mizukai Isles' (the archipelago east of the mainland). */
-  mizukai?: boolean };
+  mizukai?: boolean;
+  /** One of the south's (The Land Before Stone): its label is already in the grown world's coordinates. */
+  south?: boolean };
 const MAINLAND_REGIONS = new Set<RegionId>(["coast", "friendhollow", "farmland", "whisperwood", "ashen_hills", "emberforge", "frostpeak", "glass_lake", "pale_dunes", "oasis", "murkmire", "mossy_ruins",
   "wizards_tower", "wyrmreach", "fernwick", "greyhorn", "highcairn", "crypt", "hollow_depths"]);
 export const REGIONS: readonly Region[] = [
@@ -207,12 +229,19 @@ export const REGIONS: readonly Region[] = [
   { id: "kumo_hollow", name: "The Hollow Under Kumo", label: { x: 1230, y: 534 }, danger: 3, underground: true, far: true, mizukai: true },
   { id: "ashigane_deeps", name: "The Ashigane Deeps", label: { x: 1350, y: 534 }, danger: 5, underground: true, far: true, mizukai: true },
   { id: "bone_shrine", name: "The Bone Shrine", label: { x: 1470, y: 534 }, danger: 6, underground: true, far: true, mizukai: true },
+  // The Land Before Stone: written in the grown world's coordinates (south.ts).
+  { id: "sunward_strait", name: "The Sunward Strait", label: { x: 420, y: 528 }, danger: 0, far: true, south: true },
+  { id: "sunteeth", name: "The Sunteeth", label: { x: 628, y: 548 }, danger: 3, far: true, south: true },
+  { id: "foothold", name: "Foothold Camp", label: { x: 630, y: 614 }, danger: 0, far: true, south: true },
+  { id: "ochre_steppe", name: "Kharaveth", label: { x: 560, y: 700 }, danger: 4, far: true, south: true },
+  { id: "underway", name: "The Underway", label: { x: 378, y: 902 }, danger: 4, underground: true, far: true, south: true },
 ];
 export const regionIndex = (id: RegionId) => REGIONS.findIndex(region => region.id === id);
 /** The mainland regions' labels were written in the mainland's own coordinates: move them with it (once, at load). */
 for (const region of REGIONS as Region[]) {
   if (MAINLAND_REGIONS.has(region.id)) { const [x, y] = mainlandToWorld(region.label.x, region.label.y); region.label = { x, y }; }
-  else if (!region.far) region.label = { x: region.label.x + WEST_DX, y: region.label.y };
+  else if (!region.far) region.label = { x: region.label.x + WEST_DX, y: southShift(region.label.y) };
+  else if (!region.south) region.label = { x: region.label.x, y: southShift(region.label.y) };
 }
 export const isUnderground = (y: number) => y >= DUNGEON_Y && y < FLOOR_Y;
 
@@ -266,7 +295,7 @@ export type World = {
   /** Ground height (world pixels) at every tile corner: (W + 1) × (H + 1), corner (i, j) sits at (i − ½, j − ½). */
   heights: Float32Array;
   places: Record<"spawn" | "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier" | "crypt" | "depths" | "king" | "fernwick" | "highcairn" | "dawnhold" | "gravesend" | "saltmarrow" | "hollyhock" | "dyemoor" | "tallgrass" | "cragmaw" | "quillhaven" | "raria" | "fff_fortress" | "barkreach" | "ashfall" | "ring"
-    | "kurohama" | "takamori" | "kumoyama" | "tanabe" | "yumoto", { x: number; y: number }>;
+    | "kurohama" | "takamori" | "kumoyama" | "tanabe" | "yumoto" | "foothold", { x: number; y: number }>;
 };
 
 function mulberry(seed: number) {
@@ -1316,12 +1345,13 @@ export const WORLD_SEED = 20260927;
 export function createWorld(seed = WORLD_SEED): World { return generateWorld(seed).world; }
 /** The world, and the hill lift it was raised with (which, with the tiles, is all its heights need: see `bakeWorld`). */
 export function generateWorld(seed = WORLD_SEED): { world: World; lift: Float32Array } {
-  const old = buildLegacyWorld(seed), LW = LEGACY_W;
+  // Everything older is built as it always was, in the generation frame (GEN_H rows), in arrays already the grown size.
+  const old = buildLegacyWorld(seed), LW = LEGACY_W, OVERWORLD_H = GEN_OVERWORLD_H;
   const tiles = new Uint8Array(W * H).fill(T.DEEP), region = new Uint8Array(W * H), objects: WorldObject[] = [], spawns: SpawnDef[] = [];
   const objectAt = new Int32Array(W * H).fill(-1), lift = new Float32Array(W * H), buildings: Building[] = [...old.buildings.map(b => ({ ...b, x0: b.x0 + WEST_DX, x1: b.x1 + WEST_DX }))];
   for (let y = OVERWORLD_H; y < H; y++) for (let x = 0; x < W; x++) tiles[y * W + x] = T.VOID;
   // Everything that was: every row (overworld, dungeons, storeys) moves WEST_DX columns east, nothing else changes.
-  for (let y = 0; y < H; y++) for (let x = 0; x < LW; x++) { const from = y * LW + x, to = y * W + x + WEST_DX; tiles[to] = old.tiles[from]; region[to] = old.region[from]; lift[to] = old.lift[from]; }
+  for (let y = 0; y < GEN_H; y++) for (let x = 0; x < LW; x++) { const from = y * LW + x, to = y * W + x + WEST_DX; tiles[to] = old.tiles[from]; region[to] = old.region[from]; lift[to] = old.lift[from]; }
   for (const object of old.objects) {
     const moved: WorldObject = { ...object, x: object.x + WEST_DX, ...(object.to ? { to: { x: object.to.x + WEST_DX, y: object.to.y } } : {}) };
     objects.push(moved);
@@ -1331,7 +1361,7 @@ export function generateWorld(seed = WORLD_SEED): { world: World; lift: Float32A
   const floors: Floor[] = old.floors.map(f => ({ ...f, x0: f.x0 + WEST_DX, x1: f.x1 + WEST_DX }));
   const places = Object.fromEntries(Object.entries(old.places).map(([key, at]) => [key, { x: at.x + WEST_DX, y: at.y }])) as World["places"];
   // The far west: a second continent, Raria and BarkReach.
-  const ctx: GenContext = { W, H, tiles, region, objectAt, lift, objects, spawns, buildings, doorways: [], ramparts: [], random: mulberry(seed + 9191), noise: makeNoise(seed + 71, 11), noise2: makeNoise(seed + 83, 4) };
+  const ctx: GenContext = { W, H: GEN_H, tiles, region, objectAt, lift, objects, spawns, buildings, doorways: [], ramparts: [], random: mulberry(seed + 9191), noise: makeNoise(seed + 71, 11), noise2: makeNoise(seed + 83, 4) };
   buildFarWest(ctx, worldTools(ctx), places, floors);
   // The Mizukai Isles: the archipelago east of the old east coast (What Rises in the East).
   buildIsles({ ...ctx, random: mulberry(seed + 7337), noise: makeNoise(seed + 97, 11), noise2: makeNoise(seed + 101, 4) }, worldTools({ ...ctx, random: mulberry(seed + 7337), noise: makeNoise(seed + 97, 11), noise2: makeNoise(seed + 101, 4) }), places, floors);
@@ -1342,14 +1372,33 @@ export function generateWorld(seed = WORLD_SEED): { world: World; lift: Float32A
   // Homes for the villages, then every ordinary building given a shape and a roof of its own (townscape.ts).
   growVillages(ctx, worldTools(ctx), places);
   varyBuildings(ctx, worldTools(ctx));
+  // The Land Before Stone: the dungeon and storey rows move down, and the south is built in the room that makes (south.ts).
+  growSouth(ctx, floors, places);
+  const south: GenContext = { ...ctx, H, random: mulberry(seed + 5151), noise: makeNoise(seed + 131, 13), noise2: makeNoise(seed + 137, 4) };
+  buildSouth(south, worldTools(south), places, floors);
   for (const object of objects) if (object.name === "__removed") object.blocks = false;
   const buildingAt = new Uint16Array(W * H);
   buildings.forEach((b, index) => { if (b.roof === "none") return; for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) buildingAt[y * W + x] = index + 1; });
   return { world: { tiles, region, objects, objectAt, spawns, places, heights: buildHeights(tiles, seed, lift), buildings, buildingAt, floors, ramparts: ctx.ramparts }, lift };
 }
+/**
+ * Make room for the south: the generation frame's dungeon and storey rows (everything from GEN_OVERWORLD_H) move down
+ * SOUTH_DY rows, with every object, ladder, spawn, building, storey and place on them; the rows they leave are open sea.
+ */
+function growSouth(ctx: GenContext, floors: Floor[], places: World["places"]) {
+  const { tiles, region, objectAt, lift, objects, spawns, buildings } = ctx, from = GEN_OVERWORLD_H * W, rows = (GEN_H - GEN_OVERWORLD_H) * W, to = from + SOUTH_DY * W;
+  for (const array of [tiles, region, objectAt, lift]) array.copyWithin(to, from, from + rows);
+  tiles.fill(T.DEEP, from, to); region.fill(0, from, to); objectAt.fill(-1, from, to); lift.fill(0, from, to);
+  for (const object of objects) { object.y = southShift(object.y); if (object.to) object.to = { x: object.to.x, y: southShift(object.to.y) }; }
+  for (const spawn of spawns) spawn.y = southShift(spawn.y);
+  for (const b of buildings) if (b.y0 >= GEN_OVERWORLD_H) { b.y0 += SOUTH_DY; b.y1 += SOUTH_DY; }
+  // A storey's tiles sit at real + (dx, dy): an upper storey of a building on the old overworld keeps its building and moves its rows.
+  for (const f of floors) { if (f.y0 >= GEN_OVERWORLD_H) { f.y0 += SOUTH_DY; f.y1 += SOUTH_DY; } else if (f.y0 + f.dy >= GEN_OVERWORLD_H) f.dy += SOUTH_DY; }
+  for (const key of Object.keys(places) as (keyof World["places"])[]) places[key] = { x: places[key].x, y: southShift(places[key].y) };
+}
 /** The world as it was before the far west: the mainland set into the wider world, and the wider world built round it, LEGACY_W wide. */
 function buildLegacyWorld(seed: number) {
-  const W = LEGACY_W, main = buildMainland(seed), mainlandToWorld = legacyMainlandToWorld, ARENA = ARENA_LEGACY;
+  const W = LEGACY_W, H = GEN_H, OVERWORLD_H = GEN_OVERWORLD_H, FLOOR_Y = GEN_FLOOR_Y, main = buildMainland(seed), mainlandToWorld = legacyMainlandToWorld, ARENA = ARENA_LEGACY;
   const tiles = new Uint8Array(W * H).fill(T.DEEP), region = new Uint8Array(W * H), objects: WorldObject[] = [], spawns: SpawnDef[] = [];
   const objectAt = new Int32Array(W * H).fill(-1), lift = new Float32Array(W * H), buildings: Building[] = [], floors: Floor[] = [];
   for (let y = OVERWORLD_H; y < H; y++) for (let x = 0; x < W; x++) tiles[y * W + x] = T.VOID;
@@ -1393,6 +1442,7 @@ const DECOR_NAMES: Record<DecorKind, string> = {
   tomb: "Stone tomb", crypt: "Crypt", obelisk: "Obelisk", bones: "Bones", hearth: "Hearth",
   torii: "Shrine gate", stone_lantern: "Stone lantern", pagoda: "Pagoda", guardian: "Guardian lion-dog", sacred_rope: "Sacred rock", drying_rack: "Drying rack", steam: "Hot spring",
   castle_keep: "Castle keep", offering_box: "Offering box", paper_lantern: "Paper lantern", wish_board: "Wish board", wayside_statue: "Wayside statue", nets: "Fishing nets",
+  rock_spire: "Sandstone tower", campfire: "Camp fire", campfire_cold: "Cold campfire", scuffs: "Trodden ground", bedroll: "Bedroll", counterweight: "Stone counterweight",
 };
 
 export function terrainAt(world: World, x: number, y: number) { return inBounds(x, y) ? world.tiles[tileIndex(x, y)] : T.VOID; }

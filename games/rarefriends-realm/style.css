@@ -595,6 +595,13 @@
 .realm-game[data-lang="ja"] .realm-tabs button, .realm-game[data-lang^="zh"] .realm-tabs button { letter-spacing: 0; }
 /* The Quest journal's two pages, and the Pursuance journal (journal.tsx). */
 .realm-journal-switch { display: flex; gap: 4px; margin-bottom: 6px; }
+/* The Mysteries journal: discoveries in three parts, Azhurak glyphs, inscriptions. */
+.realm-mysteries h4 { margin: 8px 0 4px; font-size: 12px; color: var(--gold); letter-spacing: 0.04em; }
+.realm-mysteries .realm-discovery { margin: 0 0 8px; padding: 6px 8px; border-left: 2px solid #2f3f66; background: rgba(47, 63, 102, 0.08); }
+.realm-mysteries .realm-glyphs { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.realm-mysteries .realm-glyphs li { display: flex; align-items: center; gap: 8px; font-size: 11px; }
+.realm-mysteries .realm-glyph { border: 1px solid #b9a77f; border-radius: 2px; flex: none; }
+.realm-mysteries .realm-glyph-row { display: flex; gap: 4px; margin: 4px 0; }
 .realm-journal-switch button { flex: 1; padding: 4px 6px !important; font-size: 11px; font-weight: 700; background: #ffffff10 !important; color: #e8e5de !important; border: 1px solid #ffffff22 !important; box-shadow: none !important; }
 .realm-journal-switch button[aria-selected="true"] { background: var(--gold) !important; color: var(--ink) !important; }
 .realm-facts { margin: 6px 0; display: grid; grid-template-columns: auto 1fr; gap: 3px 8px; font-size: 11px; }

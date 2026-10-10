@@ -5,9 +5,9 @@
 // wallet and ownership gate.
 import assert from "node:assert/strict";
 import { FLOOR_Y, H, mainlandToWorld } from "../games/rarefriends-realm/world.ts";
-// Page-side functions below are serialized into the frame, so they carry these as literals: storeys start at row 580 (FLOOR_Y) and the castle's ground floor lies west of column 765 (mainland 140).
-if (FLOOR_Y !== 580 || mainlandToWorld(140, 0)[0] !== 765) throw new Error("world constants changed: update the literals in browser.mjs");
-if (H !== 640) throw new Error("world height changed: update the 640 in browser.mjs");
+// Page-side functions below are serialized into the frame, so they carry these as literals: storeys start at row 940 (FLOOR_Y) and the castle's ground floor lies west of column 765 (mainland 140).
+if (FLOOR_Y !== 940 || mainlandToWorld(140, 0)[0] !== 765) throw new Error("world constants changed: update the literals in browser.mjs");
+if (H !== 1000) throw new Error("world height changed: update the 1000 in browser.mjs");
 import { execFileSync } from "node:child_process";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -211,7 +211,7 @@ try {
     const start = await state(() => ({ x: window.__realm.game().player.x, y: window.__realm.game().player.y }));
     // Somewhere near with an open band of ground three rows deep (no objects, people, walls, water or cliffs) to walk along.
     const spot = await state(() => {
-      const g = window.__realm.game(), w = g.world, p = g.player, W = w.tiles.length / 640;
+      const g = window.__realm.game(), w = g.world, p = g.player, W = w.tiles.length / 1000;
       const free = (x, y) => w.objectAt[y * W + x] < 0 && ![0, 6, 7, 15, 16, 21].includes(w.tiles[y * W + x]) && !g.npcs.some(n => n.x === x && n.y === y);
       for (let r = 0; r < 60; r++) for (let dy = -r; dy <= r; dy++) for (const dx of [-r, r]) {
         const x = p.x + dx, y = p.y + dy; let clear = true;
@@ -512,14 +512,14 @@ try {
   await game.locator('.realm-game[data-phase="playing"]').waitFor();
 
   // ---------- Friendhollow Castle: real clicks up the spiral stairs to the King's floor and the roof ----------
-  const levelNow = () => state(() => { const g = window.__realm.game(), p = g.player; return g.world.floors.find(f => p.y >= 580 && p.x >= f.x0 + f.dx && p.x <= f.x1 + f.dx && p.y >= f.y0 + f.dy && p.y <= f.y1 + f.dy)?.level ?? 0; });
+  const levelNow = () => state(() => { const g = window.__realm.game(), p = g.player; return g.world.floors.find(f => p.y >= 940 && p.x >= f.x0 + f.dx && p.x <= f.x1 + f.dx && p.y >= f.y0 + f.dy && p.y <= f.y1 + f.dy)?.level ?? 0; });
   /** Stand beside a staircase on a storey, then click it (its first option climbs). */
   const clickStairs = async (level, action) => {
     const { stairs, stand } = await frame().evaluate(([level, action]) => {
-      const g = window.__realm.game(), w = g.world, storey = o => w.floors.find(f => o.x >= f.x0 + f.dx && o.x <= f.x1 + f.dx && o.y >= f.y0 + f.dy && o.y <= f.y1 + f.dy && o.y >= 580)?.level ?? 0;
+      const g = window.__realm.game(), w = g.world, storey = o => w.floors.find(f => o.x >= f.x0 + f.dx && o.x <= f.x1 + f.dx && o.y >= f.y0 + f.dy && o.y <= f.y1 + f.dy && o.y >= 940)?.level ?? 0;
       const castle = o => storey(o) ? w.floors.some(f => f.complex === "castle" && o.x >= f.x0 + f.dx && o.x <= f.x1 + f.dx && o.y >= f.y0 + f.dy && o.y <= f.y1 + f.dy) : o.x < 765;
       const stairs = w.objects.filter(o => o.look === "stairs" && o.action === action && storey(o) === level && castle(o)).sort((a, b) => b.x - a.x)[0];
-      const WW = w.tiles.length / 640, open = (x, y) => { const t = w.tiles[y * WW + x], id = w.objectAt[y * WW + x]; return t !== 0 && t !== 16 && (id < 0 || !w.objects[id].blocks); };
+      const WW = w.tiles.length / 1000, open = (x, y) => { const t = w.tiles[y * WW + x], id = w.objectAt[y * WW + x]; return t !== 0 && t !== 16 && (id < 0 || !w.objects[id].blocks); };
       const [dx, dy] = [[0, 1], [1, 0], [-1, 0], [0, -1]].find(([dx, dy]) => open(stairs.x + dx, stairs.y + dy));
       return { stairs, stand: { x: stairs.x + dx, y: stairs.y + dy } };
     }, [level, action]);
@@ -533,7 +533,7 @@ try {
   await page.waitForTimeout(1500); await shot("castle");
   await state(() => window.__realm.view(0.8, 0.5, 0));
   await clickStairs(0, "Climb-up");
-  await until(() => window.__realm.game().player.y >= 580, 15_000);
+  await until(() => window.__realm.game().player.y >= 940, 15_000);
   assert.equal(await levelNow(), 1, "the stairs climb to the King's floor");
   const king = await state(() => window.__realm.game().npcs.find(npc => npc.id === "king"));
   await teleport(king.x + 1, king.y + 3);

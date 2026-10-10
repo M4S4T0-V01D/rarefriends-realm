@@ -8,7 +8,7 @@
  * inside the roof lifts away like any other. The walk is that complex's first storey (a Floor), stored in the storey
  * rows like the castle's.
  */
-import { ARENA, FLOOR_Y, T, type Floor, type GenContext, type worldTools } from "./world.ts";
+import { ARENA, GEN_FLOOR_Y as FLOOR_Y, T, type Floor, type GenContext, type worldTools } from "./world.ts";
 
 type Tools = ReturnType<typeof worldTools>;
 export const RING_COMPLEX = "friends_ring";

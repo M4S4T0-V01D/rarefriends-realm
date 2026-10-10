@@ -8,7 +8,7 @@
  * goes on past it to the mouth of the Hollow. Tanabe farms the terraces in the south, Yumoto keeps the hot springs, and
  * Isohama's fishers work the south-east bay. Every other island has its own place: see each block below.
  */
-import { OVERWORLD_H, T, isWater, type Building, type DecorKind, type GenContext, type RegionId, type World, type worldTools } from "./world.ts";
+import { GEN_OVERWORLD_H as OVERWORLD_H, T, isWater, type Building, type DecorKind, type GenContext, type RegionId, type World, type worldTools } from "./world.ts";
 import type { RockKind, TreeKind } from "./data.ts";
 import { ISLANDS, MIZUKAI_DUNGEONS, MIZUKAI_PLACES, MIZUKAI_ROOFS, type buildIsles } from "./isles.ts";
 

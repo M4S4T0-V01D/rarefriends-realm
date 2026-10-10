@@ -284,6 +284,28 @@ export function decorArt(kind: string, variant: number, frame = 0): HTMLCanvasEl
       p.outline();
     });
     case "crate": return pixelArt(key, 16, 16, p => { p.rect(1, 3, 14, 12, "#cdb9a0"); p.line(1, 3, 14, 14, COLORS.wood); p.line(1, 14, 14, 3, COLORS.wood); p.rect(1, 3, 14, 2, COLORS.woodLight); p.outline(); });
+    // ---------- The Land Before Stone ----------
+    case "campfire": case "campfire_cold": return pixelArt(key, 18, 12, p => {
+      // Stones in a ring, logs crossed in them; the cold one grey ash and a last curl of smoke-stain.
+      for (const [x, y] of [[2, 8], [5, 10], [9, 11], [13, 10], [16, 8], [14, 6], [4, 6]] as const) p.disc(x, y, 1.6, 1.3, "#9a948a", null);
+      p.line(5, 9, 13, 5, "#6f5440", 2); p.line(5, 5, 13, 9, "#7a5c44", 2);
+      if (kind === "campfire_cold") { p.disc(9, 7, 3, 1.6, "#bdb8ae", null); p.set(8, 7, "#3b3a38"); p.set(10, 6, "#3b3a38"); }
+      else { p.poly([[6, 7], [8, 1], [9, 4], [11, 0], [12, 7]], "#ef9a4c", null); p.poly([[8, 7], [9, 3], [11, 7]], "#ffd26b", null); }
+      p.outline();
+    });
+    case "scuffs": return pixelArt(key, 20, 10, p => {
+      // Trodden sand: overlapping prints, boots and hooves, dragged in one direction.
+      for (let i = 0; i < 6; i++) { const x = 2 + i * 3 + random() * 1.5, y = 3 + (i % 2) * 3 + random(); p.disc(x, y, 1.3, 0.8, "#b89a6a", null); p.set(Math.round(x + 1), Math.round(y), "#a3865a"); }
+      p.line(1, 8, 18, 6, "#c7aa78", 1);
+    });
+    case "bedroll": return pixelArt(key, 20, 10, p => { p.rect(2, 3, 16, 5, "#7d6a4a"); p.rect(2, 3, 5, 5, "#a99e86"); p.line(7, 3, 7, 7, "#5f5038"); p.rect(13, 4, 4, 3, "#8a7a5a"); p.outline(); });
+    case "counterweight": return pixelArt(key, 18, 30, p => {
+      // A block of dressed stone hanging in a slot, its chain running up into the dark; Azhurak lines cut round it.
+      p.line(9, 0, 9, 10, "#6d6b67", 2); for (let y = 1; y < 10; y += 3) p.rect(8, y, 3, 1, "#8b8e92");
+      p.rect(2, 10, 14, 18, "#a39e96"); p.rect(2, 10, 14, 3, "#c3beb6"); p.rect(13, 13, 3, 15, "#8f8a83");
+      p.line(4, 17, 13, 17, "#2f3f66"); p.line(4, 22, 13, 22, "#2f3f66"); p.disc(8.5, 19.5, 1.4, 1.4, "#d9b866", null);
+      p.outline();
+    });
     case "tent": return pixelArt(key, 34, 22, p => { p.poly([[1, 21], [17, 1], [33, 21]], "#bfb49c", null); p.poly([[17, 1], [33, 21], [22, 21]], "#a99e86", null); p.poly([[14, 21], [17, 12], [20, 21]], "#3b3a38", null); p.line(17, 1, 17, 12, "#8a7563"); p.outline(); });
     case "lamp": return pixelArt(key, 10, 30, p => { p.rect(4, 8, 2, 21, "#3b3a38"); p.rect(2, 28, 6, 2, "#3b3a38"); p.rect(1, 1, 8, 7, "#f4ecc8"); p.rect(1, 1, 8, 1, "#3b3a38"); p.rect(4, 3, 2, 3, "#ffffff"); p.outline(); });
     case "torch": return pixelArt(key, 10, 22, p => { p.rect(4, 9, 2, 12, BARK); p.rect(3, 8, 4, 2, "#5f5e66"); p.outline(); });

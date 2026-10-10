@@ -9,7 +9,7 @@
  */
 import { NPCS } from "./content.ts";
 import { SHOPS } from "./data.ts";
-import { T, W, type Building, type World } from "./world.ts";
+import { OVERWORLD_H, T, W, type Building, type World } from "./world.ts";
 
 /** A bank's slate roof. */
 export const BANK_ROOF = "#3d4a5c";
@@ -36,7 +36,7 @@ export function dressWorld(world: World): World {
   for (const b of world.buildings) {
     // (Not a building made of thin strips, like the Ring's roof: it has no front.)
     // (A Mizukai building keeps its own front: no awnings, columns or pediments on the Isles.)
-    if (b.facade || b.style === "mizukai" || b.roof === "none" || b.y0 >= 520 || b.x1 - b.x0 < 3 || b.y1 - b.y0 < 3) continue;
+    if (b.facade || b.style === "mizukai" || b.roof === "none" || b.y0 >= OVERWORLD_H || b.x1 - b.x0 < 3 || b.y1 - b.y0 < 3) continue;
     const front = facadeOf(b);
     if (!front) continue;
     // A building of parts (an L) wears its front on every part.

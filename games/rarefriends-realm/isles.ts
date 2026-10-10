@@ -13,7 +13,7 @@
  * Every inhabited island has a dock (a "Mizukai boat" object, `dock` = its id, `to` = where you stand on arrival):
  * boats.ts sells passage between them.
  */
-import { EAST_X, OVERWORLD_H, T, isWater, regionIndex, type DecorKind, type Floor, type GenContext, type RegionId, type World, type worldTools } from "./world.ts";
+import { EAST_X, GEN_OVERWORLD_H as OVERWORLD_H, T, isWater, regionIndex, type DecorKind, type Floor, type GenContext, type RegionId, type World, type worldTools } from "./world.ts";
 import { buildMizukaiTowns } from "./islestowns.ts";
 
 type Tools = ReturnType<typeof worldTools>;

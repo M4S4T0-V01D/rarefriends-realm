@@ -14,7 +14,7 @@
  * all round it, so no way through is closed.
  */
 import { FAR_PLACES } from "./farwest.ts";
-import { OVERWORLD_H, T, WEST_DX, regionIndex, type Building, type GenContext, type RegionId, type World, type worldTools } from "./world.ts";
+import { GEN_OVERWORLD_H as OVERWORLD_H, T, WEST_DX, regionIndex, type Building, type GenContext, type RegionId, type World, type worldTools } from "./world.ts";
 
 type Tools = ReturnType<typeof worldTools>;
 

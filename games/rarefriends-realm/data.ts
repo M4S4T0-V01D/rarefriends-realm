@@ -7,13 +7,15 @@
 export const SKILLS = [
   "attack", "strength", "defence", "ranged", "hitpoints", "magic", "prayer", "sigilcraft", "woodcutting", "fletching", "fishing",
   "cooking", "firemaking", "mining", "smithing", "crafting", "thieving", "agility", "slayer", "apothecary", "presence",
+  // The Land Before Stone: hidden laws, rites, true names and the techniques of the old traditions (mysteries.ts).
+  "mysteries",
 ] as const;
 export type Skill = typeof SKILLS[number];
 export const SKILL_NAMES: Record<Skill, string> = {
   attack: "Attack", strength: "Strength", defence: "Defence", ranged: "Ranged", hitpoints: "Hitpoints", magic: "Magic", prayer: "Faith",
   woodcutting: "Woodcutting", fishing: "Fishing", cooking: "Cooking", firemaking: "Firemaking", mining: "Mining",
   smithing: "Smithing", crafting: "Craftwork", thieving: "Stealth", agility: "Wayfaring", slayer: "Pursuance",
-  sigilcraft: "Sigilcraft", fletching: "Fletching", apothecary: "Apothecary", presence: "Presence",
+  sigilcraft: "Sigilcraft", fletching: "Fletching", apothecary: "Apothecary", presence: "Presence", mysteries: "Mysteries",
 };
 /** Each skill's colour: its mastery cape, and its trim. */
 export const SKILL_COLORS: Record<Skill, [string, string]> = {
@@ -21,12 +23,12 @@ export const SKILL_COLORS: Record<Skill, [string, string]> = {
   hitpoints: ["#e8e4dc", "#cf6e6e"], magic: ["#6f7ea6", "#e2d49e"], prayer: ["#efede7", "#e2d49e"], woodcutting: ["#8e9f7a", "#c49a74"],
   fishing: ["#8fb3c9", "#efede7"], cooking: ["#9c7aa6", "#e8d4c0"], firemaking: ["#e9a07a", "#e2d49e"], mining: ["#8b8e92", "#c9c2b6"],
   smithing: ["#6d6b67", "#e3a58c"], crafting: ["#b89c86", "#efede7"], thieving: ["#6d6b8a", "#c6bed4"], agility: ["#8f9cb2", "#efede7"],
-  slayer: ["#3b3a38", "#cf6e6e"], sigilcraft: ["#c6bed4", "#6f7ea6"], fletching: ["#7d9a86", "#e8d4c0"], apothecary: ["#8fbf9a", "#c98f95"], presence: ["#e2d49e", "#6e4a8a"],
+  slayer: ["#3b3a38", "#cf6e6e"], sigilcraft: ["#c6bed4", "#6f7ea6"], fletching: ["#7d9a86", "#e8d4c0"], apothecary: ["#8fbf9a", "#c98f95"], presence: ["#e2d49e", "#6e4a8a"], mysteries: ["#2f3f66", "#d9b866"],
 };
 /** Small glyphs for XP drops and the skills tab (drawn as text). */
 export const SKILL_ICONS: Record<Skill, string> = {
   attack: "⚔", strength: "✊", defence: "⛨", hitpoints: "♥", magic: "✦", prayer: "✚", woodcutting: "🪓", fishing: "🐟",
-  cooking: "🍳", firemaking: "🔥", mining: "⛏", smithing: "⚒", crafting: "✂", thieving: "👣", agility: "➶", ranged: "➹", slayer: "⌖", sigilcraft: "◈", fletching: "➴", apothecary: "⚗", presence: "✧",
+  cooking: "🍳", firemaking: "🔥", mining: "⛏", smithing: "⚒", crafting: "✂", thieving: "👣", agility: "➶", ranged: "➹", slayer: "⌖", sigilcraft: "◈", fletching: "➴", apothecary: "⚗", presence: "✧", mysteries: "◬",
 };
 export const MAX_LEVEL = 99;
 /** The classic old-school curve: XP needed for each level, index = level. */
@@ -67,6 +69,7 @@ import { APOTHECARY_ITEMS, type PotionEffect } from "./apothecary.ts";
 import { ORDER_IDS, orderGear, orderStock } from "./knights.ts";
 import { FACTION_MONSTERS, factionGear } from "./factions.ts";
 import { MIZUKAI_ITEMS, MIZUKAI_MONSTERS, mizukaiGear } from "./mizukaigear.ts";
+import { KHARAVETH_GEAR, KHARAVETH_ITEMS, KHARAVETH_MONSTERS, KHARAVETH_SHOPS, STEPPE_CLOTHES } from "./kharavethgear.ts";
 import { SOLDIERS } from "./skirmish.ts";
 // ---------- Items ----------
 export type EquipSlot = "head" | "cape" | "neck" | "weapon" | "body" | "shield" | "legs" | "hands" | "feet" | "belt" | "ring";
@@ -962,7 +965,7 @@ function dyedItem(id: string): Item | undefined {
   DYED.set(id, made);
   return made;
 }
-export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...DYE_POTS, ...CARVING_ITEMS, ...BAR_ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...ORDER_ARMOUR, ...orderGear(), ...slayerGear(), ...heartguardGear(), ...REGIONAL_ITEMS, ...APOTHECARY_ITEMS, ...factionGear(), ...mizukaiGear(), ...MIZUKAI_ITEMS]);
+export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...DYE_POTS, ...CARVING_ITEMS, ...BAR_ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...ORDER_ARMOUR, ...orderGear(), ...slayerGear(), ...heartguardGear(), ...REGIONAL_ITEMS, ...APOTHECARY_ITEMS, ...factionGear(), ...mizukaiGear(), ...MIZUKAI_ITEMS, ...KHARAVETH_ITEMS, ...KHARAVETH_GEAR, ...STEPPE_CLOTHES]);
 const ITEM_MAP = new Map(ITEM_LIST.map(item => [item.id, item]));
 export function item(id: string): Item {
   const found = ITEM_MAP.get(id) ?? dyedItem(id);
@@ -1348,6 +1351,7 @@ const one = (id: string, chance: number, min = 1, max = min): Drop => ({ item: i
 export const MONSTERS: Record<string, MonsterDef> = {
   // The Mizukai Isles: the wild, the wayward spirits, the Josaki dead, the ogres and the great ones.
   ...MIZUKAI_MONSTERS,
+  ...KHARAVETH_MONSTERS,
   // Return of Raria: the Regiment, the Federation's pickets, the Royal Rangers, BarkReach's wild things, the deserters and the Burned.
   ...FACTION_MONSTERS,
   // Every soldier's fighting self, for when it draws steel (skirmish.ts).
@@ -1595,6 +1599,7 @@ export type ShopDef = { id: string; name: string; stock: readonly string[]; gene
 /** Clothes that are only had by earning them (quest rewards, the rarest drops): never on a clothier's rail. */
 const QUEST_CLOTHES = new Set(["maiden_veil", "rarian_mantle", "scorched_cloak"]);
 export const SHOPS: Record<string, ShopDef> = {
+  ...KHARAVETH_SHOPS,
   // The Mizukai Isles: Kurohama's market, the Ironsand Forge, the Bureau of Seals, the shrine office, Takamori's armourer and bowyer, the teahouses.
   mizukai_general: { id: "mizukai_general", name: "Okiku's General Store", general: true, buys: ["food", "logs", "other"], rate: 0.55, stock: ["rice", "rice_ball", "miso_soup", "cucumber", "straw_kasa", "vial", "tinderbox", "knife", "hammer", "bucket", "small_net", "fishing_rod", "fishing_bait", "pewter_axe", "pewter_pickaxe"] },
   mizukai_fish: { id: "mizukai_fish", name: "The Kurohama Fish Market", buys: ["fish"], rate: 0.6, stock: ["grilled_eel", "raw_carp", "raw_perch", "small_net", "fishing_rod", "harpoon", "fishing_bait"] },
