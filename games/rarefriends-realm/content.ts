@@ -18,6 +18,7 @@ import { KHARAVETH_NPCS, KHARAVETH_QUESTS, onKharavethKill, talkKharaveth } from
 import { HEARTLAND_NPCS, HEARTLAND_QUESTS, onHeartlandsKill, talkHeartlands } from "./dynasties.ts";
 import { ORASHAI_NPCS, ORASHAI_QUESTS, onOrashaiKill, talkOrashai } from "./orashaiquests.ts";
 import { HIDDEN_ROAD_NPCS, HIDDEN_ROAD_QUESTS, onHiddenRoadKill, talkHiddenRoad } from "./hiddenroad.ts";
+import { MEGHAVAN_NPCS, talkMeghavan } from "./meghavanpeople.ts";
 import { BAR_NPCS, BAR_QUEST_DEFS, jobBoard, onBountyKill, talkBar } from "./bars.ts";
 /** A bar's job board (bars.ts), for the engine (which reaches the bars through here, so they load after this module). */
 export const readJobBoard = (game: Game, barId: string) => jobBoard(game, barId);
@@ -66,6 +67,7 @@ export const NPCS: Record<string, NpcDef> = {
   ...HEARTLAND_NPCS,
   ...ORASHAI_NPCS,
   ...HIDDEN_ROAD_NPCS,
+  ...MEGHAVAN_NPCS,
   ...BAR_NPCS,
   mender: { id: "mender", name: "Mender Hale", examine: "The chapel's mender. Her hands are always clean and her apron never is.", options: ["Talk-to", "Trade"], shop: "mender", art: art(3, 318) },
   // The wider world's villages (2026-10). Each village's people wear its own clothes (NPC_WEAR / regionalLook in render.ts).
@@ -762,6 +764,7 @@ function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
   const orashai = talkOrashai(game, npcId, name); if (orashai) return orashai;
   const road = talkHiddenRoad(game, npcId, name); if (road) return road;
   const heartlands = talkHeartlands(game, npcId, name); if (heartlands) return heartlands;
+  const meghavan = talkMeghavan(game, npcId, name); if (meghavan) return meghavan;
   switch (npcId) {
     case "slayer_master:assignment": case "slayer_master": {
       const task = currentTask(game);

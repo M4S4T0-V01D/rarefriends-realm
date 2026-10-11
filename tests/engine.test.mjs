@@ -2174,7 +2174,7 @@ test("Fellowship invitations: a day-long join link with the look inside, and joi
 test("Belts at the waist, barrels that fill vials, a follower in your wardrobe, and a darker band", async () => {
   const { BELTS, beltContents, stock, wornBelt } = await import("../games/rarefriends-realm/state.ts");
   const { beltFill, beltEmpty, sipBelt, fillVials, toggleFollowerWorn, headlessRecipe } = await import("../games/rarefriends-realm/engine.ts");
-  const { TRACKS, MIZUKAI_TRACKS, KHARAVETH_TRACKS } = await import("../games/rarefriends-realm/audio.ts");
+  const { TRACKS, MIZUKAI_TRACKS, KHARAVETH_TRACKS, MEGHAVAN_TRACKS } = await import("../games/rarefriends-realm/audio.ts");
   const g = newGame(), p = g.player, w = g.world; p.inventory.fill(null);
   assert.equal(item("fletchers_belt").equip.slot, "belt"); assert(SHOPS.war_bows.stock.includes("fletchers_belt") && SHOPS.hollyhock_herbs.stock.includes("apothecary_belt"));
   give(p, "fletchers_belt"); equip(g, p.inventory.findIndex(slot => slot?.id === "fletchers_belt")); assert.equal(p.equipment.belt, "fletchers_belt"); assert.equal(wornBelt(p).id, "fletchers_belt");
@@ -2194,8 +2194,8 @@ test("Belts at the waist, barrels that fill vials, a follower in your wardrobe, 
   p.wardrobe.push("rose_cape", "silver_halo", "blue_cape"); toggleFollowerWorn(g, "rose_cape"); toggleFollowerWorn(g, "silver_halo"); toggleFollowerWorn(g, "blue_cape");
   assert.deepEqual(p.followerWorn, ["silver_halo", "blue_cape"], "one cape at a time"); toggleFollowerWorn(g, "golden_aura"); assert.equal(p.followerWorn.length, 2, "only what you own");
   const save = JSON.parse(JSON.stringify(serialize(g))), fresh = newGame(); assert(restore(fresh, save)); assert.deepEqual(fresh.player.followerWorn, p.followerWorn); assert.equal(fresh.player.belts.apothecary_belt.vial_of_water, 6); assert.equal(fresh.player.equipment.belt, "apothecary_belt");
-  // Every area track has a drummer and a drone now (the Mizukai Isles keep their own instruments).
-  for (const track of TRACKS) if (track.id !== "theme" && !MIZUKAI_TRACKS.includes(track.id) && !KHARAVETH_TRACKS.includes(track.id)) { assert(track.hits.some(hit => hit.drum === "deep"), `${track.name} has a deep drum`); assert(track.notes.some(note => note.voice === "drone"), `${track.name} has a drone`); }
+  // Every area track has a drummer and a drone now (the Mizukai Isles, Kharaveth and Meghavan keep their own instruments).
+  for (const track of TRACKS) if (track.id !== "theme" && !MIZUKAI_TRACKS.includes(track.id) && !KHARAVETH_TRACKS.includes(track.id) && !MEGHAVAN_TRACKS.includes(track.id)) { assert(track.hits.some(hit => hit.drum === "deep"), `${track.name} has a deep drum`); assert(track.notes.some(note => note.voice === "drone"), `${track.name} has a drone`); }
 });
 
 test("Faith spells, wards, weaknesses, and the crown of the head", async () => {
@@ -3230,4 +3230,77 @@ test("The Hidden Road: the Isles' own Mysteries, from Ascetic Kōdō on Iwaoka",
   const { techniqueLocked, TECHNIQUE } = await import("../games/rarefriends-realm/techniques.ts");
   p.xp.mysteries = XP_TABLE[40];
   for (const id of ["mist_step", "severing_cut", "mountain_shout"]) assert.equal(techniqueLocked(g, TECHNIQUE[id]), null, id);
+});
+
+test("Meghavan: the Rain Country is on foot from Khetmar's east gate, its towns, people and clues all reached; only the sea became land", async () => {
+  const { KHETMAR } = await import("../games/rarefriends-realm/heartlands.ts");
+  const { MEGHAVAN, RAIN_GATE, ILAVATI } = await import("../games/rarefriends-realm/meghavan.ts");
+  const g = newGame(), world = g.world, at = (seen, x, y) => !!seen[y * W + x];
+  const beside = (seen, o) => o && [[0, 0], [0, 1], [1, 0], [0, -1], [-1, 0], [1, 1], [-1, -1], [1, -1], [-1, 1]].some(([dx, dy]) => at(seen, o.x + dx, o.y + dy));
+  const gate = { x: KHETMAR.x1 + 1, y: (KHETMAR.y0 + KHETMAR.y1) >> 1 }, east = reachable(g, gate);
+  for (const place of ["tirthali", "sarovan", "shailagarh", "mandapur", "suvarnatira", "kanthar"]) assert(at(east, world.places[place].x, world.places[place].y), `${place} is on foot from Khetmar`);
+  assert(at(east, RAIN_GATE.x + 1, RAIN_GATE.y), "the road runs through the Gate of Rains");
+  for (const id of ["rain_gate_plaque", "great_tank_measure", "great_stepwell", "speakers_stone"]) assert(beside(east, world.objects.find(o => o.clue === id)), `${id} can be reached`);
+  for (const id of ["tirthali_amul", "sarovan_saumitra", "sarovan_engineer", "sarovan_treasurer", "shailagarh_varanjit", "mandapur_speaker", "suvarnatira_lalitha", "suvarnatira_archivist", "kanthar_sukesh"]) {
+    const npc = g.npcs.find(n => n.id === id); assert(npc, `${id} is somewhere`); assert(beside(east, npc), `${id} can be reached`);
+  }
+  const ids = ["rain_pass", "tirthali", "ilavati_valley", "sarovan", "shaila_highlands", "shailagarh", "parasol_plains", "mandapur", "golden_shore", "suvarnatira", "deepgreen", "kanthar"];
+  const index = new Set(ids.map(id => REGIONS.findIndex(r => r.id === id)));
+  for (const id of ids) assert(world.region.includes(REGIONS.findIndex(r => r.id === id)), `${id} exists`);
+  // Meghavan is east of Khetmar's wall and south of the strait to the Isles: nothing of it reaches back into Kharaveth or north.
+  for (let y = 0; y < OVERWORLD_H; y++) for (let x = 0; x < W; x++) if (index.has(world.region[y * W + x])) assert(x >= MEGHAVAN.x0 && y >= MEGHAVAN.y0 - 6, `Meghavan stays in its own sea (${x},${y})`);
+  // The Ilavati runs as water past Sarovan, and it's crossed (the ford, the Queen's bridge, the Shaila bridge).
+  const [rx, ry] = ILAVATI[2]; assert([[0, 0], [1, 0], [0, 1], [-1, 0], [0, -1]].some(([dx, dy]) => [T.WATER, T.BRIDGE].includes(world.tiles[(ry + dy) * W + rx + dx])), "the river at Sarovan");
+  let bridges = 0; for (let y = MEGHAVAN.y0; y <= MEGHAVAN.y1; y++) for (let x = MEGHAVAN.x0; x <= MEGHAVAN.x1; x++) if (world.tiles[y * W + x] === T.BRIDGE) bridges++;
+  assert(bridges > 10, "bridges over the Ilavati and the docks");
+  // The highlands have their mines; the shore its fishing.
+  const rocks = world.objects.filter(o => o.kind === "rock" && index.has(world.region[o.y * W + o.x]));
+  for (const kind of ["blackiron", "moonsilver", "glimmer"]) assert(rocks.some(r => r.rock === kind), `${kind} in the Shaila mines`);
+  assert(world.objects.some(o => o.kind === "spot" && o.x > MEGHAVAN.x0), "fishing in Meghavan");
+  assert(g.monsters.some(m => m.def.id === "deepgreen_tiger") && g.monsters.some(m => m.def.id === "crag_bear"), "its creatures roam");
+});
+
+test("Meghavan's people: every one talks, every tailor sells their town's clothes, every town's villagers wear them, every creature has its own look", async () => {
+  const { MEGHAVAN_NPCS } = await import("../games/rarefriends-realm/meghavanpeople.ts");
+  const { MEGHAVAN_CLOTHING, MEGHAVAN_MONSTERS, MEGHAVAN_SHOPS } = await import("../games/rarefriends-realm/meghavangear.ts");
+  const { creatureSprite, CREATURES } = await import("../games/rarefriends-realm/sprites.ts");
+  const g = newGame();
+  for (const id of Object.keys(MEGHAVAN_NPCS)) {
+    const d = talk(g, id); assert(d && d.lines.length && d.lines[0].text.length > 10, `${id} says something`);
+    assert(g.npcs.some(n => n.id === id) || id === "banker", `${id} is in the world`);
+    const shop = NPCS[id].shop; if (shop) assert(SHOPS[shop], `${id}'s shop ${shop}`);
+  }
+  for (const [id, shop] of Object.entries(MEGHAVAN_SHOPS)) for (const item of shop.stock) assert(ITEM_LIST.some(i => i.id === item), `${id} sells a real ${item}`);
+  for (const set of MEGHAVAN_CLOTHING) {
+    assert(REGIONAL_CLOTHING.includes(set), `${set.region}'s clothes are regional`);
+    assert(Object.values(NPCS).some(n => n.shop === set.shop), `${set.region}'s tailor`);
+    assert.deepEqual(SHOPS[set.shop].stock.filter(id => set.pieces.some(p => p.id === id)).length, set.pieces.length, `${set.shop} sells all of ${set.region}'s clothes`);
+    assert(NPCS[`${set.region}_villager`], `${set.region}'s villagers`);
+  }
+  for (const id of ["mango", "spiced_tea", "rice_and_dal", "ilavati_sabre", "push_dagger", "shaila_mail"]) assert(ITEM_LIST.some(i => i.id === id), id);
+  for (const m of Object.values(MEGHAVAN_MONSTERS)) { assert(MONSTERS[m.id], m.id); assert(CREATURES[m.art] && creatureSprite(m.art) === CREATURES[m.art], `${m.id} has its own sprite (${m.art})`); }
+  assert.equal(new Set(Object.values(MEGHAVAN_MONSTERS).map(m => m.art)).size, Object.keys(MEGHAVAN_MONSTERS).length, "a sprite each");
+});
+
+test("Meghavan's music: tanpura, sitar, bansuri, shehnai and santoor, tabla and dholak, in five ragas; each region its piece", async () => {
+  const { TRACKS, MEGHAVAN_TRACKS, trackFor } = await import("../games/rarefriends-realm/audio.ts");
+  const pieces = TRACKS.filter(track => MEGHAVAN_TRACKS.includes(track.id)); assert.equal(pieces.length, 5);
+  const own = new Set(["tanpura", "sitar", "bansuri", "shehnai", "santoor"]), ensembles = new Set();
+  for (const track of pieces) {
+    for (const note of track.notes) assert(own.has(note.voice), `${track.name}: ${note.voice}`);
+    assert(track.hits.some(hit => ["na", "tin", "ge", "ke", "dholak"].includes(hit.drum)), `${track.name} has a drum`);
+    ensembles.add([...new Set(track.notes.map(n => n.voice))].sort().join());
+  }
+  assert.equal(ensembles.size, 5, "each its own ensemble");
+  for (const [region, id] of [["rain_pass", "meghavan_rains"], ["ilavati_valley", "meghavan_rains"], ["sarovan", "meghavan_sarovan"], ["tirthali", "meghavan_sarovan"], ["shailagarh", "meghavan_shailagarh"],
+    ["shaila_highlands", "meghavan_shailagarh"], ["suvarnatira", "meghavan_suvarnatira"], ["mandapur", "meghavan_suvarnatira"], ["deepgreen", "meghavan_deepgreen"], ["kanthar", "meghavan_deepgreen"]]) assert.equal(trackFor(region, false), id);
+  assert.equal(TRACKS.length, 81, "the jukebox's count");
+});
+
+test("The Rain Country rains more than anywhere else, and the Deepgreen is misty", async () => {
+  const { weatherAt } = await import("../games/rarefriends-realm/weather.ts");
+  let wet = 0, dry = 0;
+  for (let k = 0; k < 400; k++) { const ms = k * 4 * 60_000 + 60_000; if (weatherAt(ms, "sarovan", false, null).rain > 0) wet++; if (weatherAt(ms, "friendhollow", false, null).rain > 0) dry++; }
+  assert(wet > dry, `more rain in Sarovan (${wet}) than Friendhollow (${dry})`);
+  assert(weatherAt(0, "deepgreen", false, 0.6).fog >= 0.35, "mist in the Deepgreen");
 });

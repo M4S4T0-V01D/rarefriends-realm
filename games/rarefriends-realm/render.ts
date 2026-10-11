@@ -511,6 +511,8 @@ function cliffLook(x: number, y: number): [number, string, string, string] {
   if (y >= OVERWORLD_H || !ground || !southRegions.has(ground.region[y * W + x])) return [22 + r * 10, "#a39e96", "#8f8a83", "#7c7771"];
   if (ground.region[y * W + x] === sunteethIndex) return [40 + r * 26, shadeHex("#d9a878", (r - 0.5) * 0.08), "#c98f5f", "#a8744a"];
   if (((x - 900) / 125) ** 2 + ((y - 790) / 60) ** 2 < 1) return [30 + r * 14, "#5a5560", "#46424c", "#36333b"];
+  // Meghavan's: the Shaila Highlands' grey granite, taller, a little blue in the shadow.
+  if (x >= 1110) return [30 + r * 16, shadeHex("#9a9a96", (r - 0.5) * 0.08), "#85868a", "#6f7178"];
   return [26 + r * 14, "#d4b088", "#c59a6c", "#a87f56"];
 }
 /** A world point's depth as the GPU's camera has it (gl.ts `project`), upstairs points moved to their real place. */
@@ -3670,6 +3672,26 @@ const NPC_WEAR: Record<string, readonly string[]> = {
   ouresh_halzir: ["salt_turban", "salt_coat", "salt_trousers", "salt_boots", "steppe_sash"],
   // The Orashai: the Keeper's ibis head and scribe's robe, the Listener's veil, the man in the bag in a good robe.
   keeper_first_names: ["ibis_mask", "gilded_robe", "lapis_mantle", "lapis_rod"], orashai_listener: ["zuri_shawl", "gilded_robe"], bag_man: ["fish_bag", "gilded_robe", "gilded_sandals"], ouresh_trader: ["salt_turban", "salt_coat", "salt_trousers"],
+  // Meghavan: Ilavarta in tank blue and lotus white, Shailagarh in highland wool and mail, the League in its parasol colours, the free port in ink silk, the Kanthari in leaf green, Tirthali in both halves.
+  rain_gate_guard: ["ilavartan_turban", "tank_jama", "pleated_dhoti", "ilavati_sabre"],
+  tirthali_amul: ["ford_turban", "caravan_kurta", "ford_trousers", "dust_shawl", "ford_sandals"], tirthali_innkeeper: ["dust_shawl", "caravan_kurta"], tirthali_merchant: ["gilded_headcloth", "caravan_kurta", "ford_trousers"],
+  tirthali_clothier: ["ford_turban", "caravan_kurta"], tirthali_dealer: ["dust_shawl", "caravan_kurta", "ford_trousers"], tirthali_guard: ["ford_turban", "caravan_kurta", "ford_trousers", "push_dagger"],
+  sarovan_saumitra: ["royal_circlet", "tank_jama", "pleated_dhoti", "lotus_shawl", "ghat_slippers"], sarovan_engineer: ["ilavartan_turban", "caravan_kurta", "pleated_dhoti", "hammer"],
+  sarovan_treasurer: ["lotus_shawl", "tank_jama", "pleated_dhoti", "ghat_slippers"], sarovan_factor: ["gilded_headcloth", "gilded_robe", "gilded_mantle"], sarovan_tankwarden: ["ilavartan_turban", "pleated_dhoti"],
+  sarovan_tollkeeper: ["ilavartan_turban", "tank_jama", "ilavati_sabre"], sarovan_merchant: ["ilavartan_turban", "caravan_kurta", "pleated_dhoti"], sarovan_clothier: ["lotus_shawl", "tank_jama"],
+  sarovan_innkeeper: ["ilavartan_turban", "pleated_dhoti"], sarovan_smith: ["pleated_dhoti", "hammer"], sarovan_guard: ["ilavartan_turban", "tank_jama", "pleated_dhoti", "ilavati_sabre"],
+  shailagarh_varanjit: ["highland_cap", "shaila_mail", "highland_trousers", "shaila_blanket", "pass_boots"], shailagarh_captain: ["banner_coif", "banner_coat", "banner_trousers", "banner_cloak", "blackiron_sabre"],
+  shailagarh_metallurgist: ["highland_cap", "shaila_coat", "highland_trousers"], shailagarh_merchant: ["highland_cap", "shaila_coat"], shailagarh_clothier: ["highland_cap", "shaila_coat", "shaila_blanket"],
+  shailagarh_innkeeper: ["highland_cap", "shaila_coat", "pass_boots"], shailagarh_smith: ["shaila_coat", "highland_trousers", "hammer"], shailagarh_guard: ["blackiron_helm", "shaila_mail", "shaila_blanket", "pass_boots", "blackiron_sword"],
+  shailagarh_miner: ["highland_cap", "shaila_coat", "highland_trousers", "blackiron_pickaxe"], deepgreen_logger: ["highland_cap", "shaila_coat", "highland_trousers", "blackiron_axe"],
+  mandapur_speaker: ["parasol_hat", "council_angarkha", "plains_trousers", "parasol_mantle"], mandapur_raja: ["ilavartan_turban", "council_angarkha", "plains_trousers", "snow_cape"],
+  mandapur_tollclerk: ["parasol_hat", "council_angarkha"], mandapur_merchant: ["parasol_hat", "caravan_kurta", "plains_trousers"], mandapur_clothier: ["council_angarkha", "plains_trousers"],
+  mandapur_innkeeper: ["parasol_hat", "caravan_kurta"], mandapur_smith: ["plains_trousers", "hammer"], mandapur_guard: ["parasol_hat", "council_angarkha", "plains_trousers", "push_dagger"],
+  suvarnatira_lalitha: ["scholars_cap", "ink_silk_robe", "harbour_trousers", "assembly_stole", "harbour_sandals"], suvarnatira_archivist: ["scholars_cap", "ink_silk_robe", "assembly_stole"],
+  suvarnatira_envoy: ["obsidian_headcloth", "mason_tunic", "obsidian_kilt", "lapis_mantle"], suvarnatira_scholar: ["scholars_cap", "ink_silk_robe", "harbour_trousers"],
+  suvarnatira_merchant: ["harbour_trousers", "caravan_kurta"], suvarnatira_clothier: ["scholars_cap", "ink_silk_robe"], suvarnatira_innkeeper: ["assembly_stole", "caravan_kurta"],
+  suvarnatira_smith: ["harbour_trousers", "hammer"], suvarnatira_guard: ["scholars_cap", "ink_silk_robe", "harbour_trousers", "ilavati_sabre"], suvarnatira_sailor: ["harbour_trousers", "harbour_sandals"],
+  kanthar_sukesh: ["bead_headband", "forest_wrap", "kanthari_skirt", "leaf_rain_cape"], kanthar_trader: ["bead_headband", "forest_wrap", "kanthari_skirt"], kanthar_hunter: ["bead_headband", "forest_wrap", "kanthari_skirt", "leaf_rain_cape"],
   hollowmere_officer: ["moonsilver_helm", "moonsilver_cuirass", "hollowmere_cape", "moonsilver_greatsword"], hollowmere_soldier: ["blackiron_helm", "blackiron_cuirass", "hollowmere_cape", "blackiron_battleaxe"], hollowmere_lieutenant: ["ashsteel_helm", "ashsteel_cuirass", "hollowmere_cape", "ashsteel_greatsword"],
   lawgate_governor: ["royal_circlet", "rarian_tabard", "rarian_mantle", "law_book"], lawgate_innkeeper: ["rarian_veil", "rarian_tabard"], raria_innkeeper: ["rarian_veil", "rarian_tabard", "rarian_skirts"],
   vesper_abbess: ["dusk_paladin_helm", "dusk_paladin_body", "dusk_cape", "dusk_lantern"], ranger_warden: ["ranger_royal_hood", "ranger_royal_coat", "ranger_royal_leggings", "rangers_longbow"],

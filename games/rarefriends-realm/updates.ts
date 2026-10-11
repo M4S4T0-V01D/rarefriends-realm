@@ -4,6 +4,15 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 100, date: "2026-10-10", title: "The Land Before Stone: Meghavan, the Rain Country", items: [
+    "East of Khetmar, over its bay, lies Meghavan: the country Kharaveth's traders call the Rain Country. Through the Gate of Rains the dry hills turn green, and the river Ilavati runs from the Shaila Highlands past Sarovan and down through the Deepgreen to the sea.",
+    "Six towns, each with its own people, tailor and clothes: Tirthali, the ford town, half Kharaveth and half Meghavan; Sarovan, the marble capital of Ilavarta, with its palace, the Great Tank and the Great Stepwell; Shailagarh, the highland fortress over the mines; Mandapur, where the League of Seven Parasols meets in an open hall; Suvarnatira, the free port, with its docks and the Archive; and Kanthar, the Kanthari's stilt village in the Deepgreen.",
+    "Powers that don't agree: Queen Saumitra, Keeper of the Tanks, between her engineers and the temple treasurers; the League and its Speaker by turn; Lord Varanjit and his hired Copper Banner companies; Provost Lalitha and the Assembly of Ink and Coin; Grandmother Sukesh and the Kanthari; and Ferrywarden Amul, who asks very few questions.",
+    "Inns, general stores and forges in the big towns, with rice and lentils, mangoes, flatbread and spiced tea, and the smiths' curved Ilavati sabre, the push-dagger and Shaila mail. Mines of blackiron, moonsilver and glimmer under the Shaila peaks.",
+    "Twelve new creatures, from rain frogs, jewelled peafowl and wild gaur to rock langurs, hooded serpents, crag bears, vine stranglers and the Deepgreen tiger, and dacoits, corsairs and Banner deserters. It rains more often in the Rain Country, and the Deepgreen is always misty.",
+    "Five new pieces of music in the ragas, for tanpura, sitar, bansuri, shehnai, santoor and tabla.",
+    "Still to come in Meghavan: its quests and the Great Stepwell under Sarovan, then the four eastern schools of the Mysteries.",
+  ] },
   { id: 99, date: "2026-10-10", title: "The Land Before Stone: Mysteries techniques, and the Hidden Road", items: [
     "Mysteries techniques, in the Combat options tab: preparations any fighter can learn, a melee one most of all, without Magic or Faith. Each has its level, its targets, a cooldown, and one preparation at a time.",
     "The Mysteries' common learning: Stillness Before Impact (be still two beats, and your next blow lands truer and harder), Marked Edge (once your Pursuance journal knows a creature's weakness) and Pattern Break (a creature that mends itself or rages, doesn't).",

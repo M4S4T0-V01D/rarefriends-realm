@@ -152,7 +152,9 @@ export type RegionId =
   | "sunward_strait" | "sunteeth" | "foothold" | "ochre_steppe" | "underway"
   // Kharaveth's heartlands: the country, the dynasties' towns, the nomads' camps, Azhurak's places.
   | "sea_of_dunes" | "ashar_valley" | "black_range" | "khetmar_pass" | "ochre_spine" | "sefrah" | "tamesh" | "khetmar" | "zuri_camp" | "ouresh_camp"
-  | "seven_crowns" | "first_names" | "sunken_obelisk" | "unfinished_pyramid" | "black_stair" | "first_names_hall";
+  | "seven_crowns" | "first_names" | "sunken_obelisk" | "unfinished_pyramid" | "black_stair" | "first_names_hall"
+  // Meghavan, the Rain Country, east of Kharaveth: the country, and its towns.
+  | "rain_pass" | "tirthali" | "ilavati_valley" | "sarovan" | "shaila_highlands" | "shailagarh" | "parasol_plains" | "mandapur" | "golden_shore" | "suvarnatira" | "deepgreen" | "kanthar";
 export type Region = { id: RegionId; name: string; label: { x: number; y: number }; danger: number; underground?: boolean;
   /** A far-west region (Return of Raria) or a Mizukai one: its label is already in world coordinates. */
   far?: boolean;
@@ -246,6 +248,12 @@ export const REGIONS: readonly Region[] = [
   ] as const).map(([id, name, x, y, danger]) => ({ id, name, label: { x, y }, danger, far: true, south: true }) as Region),
   { id: "black_stair", name: "The Black Stair", label: { x: 215, y: 906 }, danger: 6, underground: true, far: true, south: true },
   { id: "first_names_hall", name: "Beneath the Hall of First Names", label: { x: 85, y: 906 }, danger: 5, underground: true, far: true, south: true },
+  // Meghavan, the Rain Country.
+  ...([
+    ["rain_pass", "The Gate of Rains", 1130, 690, 4], ["tirthali", "Tirthali", 1216, 716, 0], ["ilavati_valley", "The Ilavati Valley", 1240, 640, 2], ["sarovan", "Sarovan", 1288, 660, 0],
+    ["shaila_highlands", "The Shaila Highlands", 1520, 596, 6], ["shailagarh", "Shailagarh", 1470, 636, 0], ["parasol_plains", "The Parasol Plains", 1470, 800, 3], ["mandapur", "Mandapur", 1430, 764, 0],
+    ["golden_shore", "The Golden Shore", 1600, 800, 1], ["suvarnatira", "Suvarnatira", 1628, 726, 0], ["deepgreen", "The Deepgreen", 1220, 806, 5], ["kanthar", "Kanthar", 1250, 826, 0],
+  ] as const).map(([id, name, x, y, danger]) => ({ id, name, label: { x, y }, danger, far: true, south: true }) as Region),
 ];
 export const regionIndex = (id: RegionId) => REGIONS.findIndex(region => region.id === id);
 /** The mainland regions' labels were written in the mainland's own coordinates: move them with it (once, at load). */
@@ -310,7 +318,8 @@ export type World = {
   /** Ground height (world pixels) at every tile corner: (W + 1) × (H + 1), corner (i, j) sits at (i − ½, j − ½). */
   heights: Float32Array;
   places: Record<"spawn" | "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier" | "crypt" | "depths" | "king" | "fernwick" | "highcairn" | "dawnhold" | "gravesend" | "saltmarrow" | "hollyhock" | "dyemoor" | "tallgrass" | "cragmaw" | "quillhaven" | "raria" | "fff_fortress" | "barkreach" | "ashfall" | "ring"
-    | "kurohama" | "takamori" | "kumoyama" | "tanabe" | "yumoto" | "foothold" | "sefrah" | "tamesh" | "khetmar" | "zuri" | "ouresh" | "first_names", { x: number; y: number }>;
+    | "kurohama" | "takamori" | "kumoyama" | "tanabe" | "yumoto" | "foothold" | "sefrah" | "tamesh" | "khetmar" | "zuri" | "ouresh" | "first_names"
+    | "tirthali" | "sarovan" | "shailagarh" | "mandapur" | "suvarnatira" | "kanthar", { x: number; y: number }>;
 };
 
 function mulberry(seed: number) {

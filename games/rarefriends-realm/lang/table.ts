@@ -19,8 +19,10 @@ import { KHARAVETH_NAMES } from "./kharaveth1.ts";
 import { KHARAVETH_TALK } from "./kharaveth2.ts";
 import { HEARTLANDS_NAMES } from "./heartlands1.ts";
 import { HEARTLANDS_TALK } from "./heartlands2.ts";
+import { MEGHAVAN_NAMES } from "./meghavan1.ts";
+import { MEGHAVAN_TALK } from "./meghavan2.ts";
 
 export const TABLE_LANGUAGES = ["ja", "ko", "zh-CN", "zh-TW", "vi", "id", "th", "tr", "es", "pt-BR", "ru", "uk"] as const;
 export type Row = readonly [ja: string, ko: string, zhCN: string, zhTW: string, vi: string, id: string, th: string, tr: string, es: string, ptBR: string, ru: string, uk: string];
 // The soundtrack and the panels' words first, so a title or a name that is also something else keeps that row.
-export const TABLE: Readonly<Record<string, Row>> = { ...HEARTLANDS_TALK, ...HEARTLANDS_NAMES, ...KHARAVETH_TALK, ...KHARAVETH_NAMES, ...MIZUKAI_MORE, ...MIZUKAI_TALK, ...MIZUKAI_NAMES, ...TRACKS, ...PANELS, ...PURSUANCE, ...CLOUD, ...RENDERER, ...NAMES, ...GUIDE, ...TIPS, ...DIALOGUE, ...UPDATE_LOG };
+export const TABLE: Readonly<Record<string, Row>> = { ...MEGHAVAN_TALK, ...MEGHAVAN_NAMES, ...HEARTLANDS_TALK, ...HEARTLANDS_NAMES, ...KHARAVETH_TALK, ...KHARAVETH_NAMES, ...MIZUKAI_MORE, ...MIZUKAI_TALK, ...MIZUKAI_NAMES, ...TRACKS, ...PANELS, ...PURSUANCE, ...CLOUD, ...RENDERER, ...NAMES, ...GUIDE, ...TIPS, ...DIALOGUE, ...UPDATE_LOG };

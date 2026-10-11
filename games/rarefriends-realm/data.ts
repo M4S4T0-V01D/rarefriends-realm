@@ -71,6 +71,7 @@ import { FACTION_MONSTERS, factionGear } from "./factions.ts";
 import { MIZUKAI_ITEMS, MIZUKAI_MONSTERS, mizukaiGear } from "./mizukaigear.ts";
 import { KHARAVETH_GEAR, KHARAVETH_ITEMS, KHARAVETH_MONSTERS, KHARAVETH_SHOPS, STEPPE_CLOTHES } from "./kharavethgear.ts";
 import { HEARTLAND_GEAR, HEARTLAND_ITEMS, HEARTLAND_MONSTERS, HEARTLAND_SHOPS, OURESH_GOODS, ZURI_GOODS } from "./heartlandsgear.ts";
+import { MEGHAVAN_CLOTHING, MEGHAVAN_GEAR, MEGHAVAN_ITEMS, MEGHAVAN_MONSTERS, MEGHAVAN_SHOPS } from "./meghavangear.ts";
 import { ORASHAI_GEAR, ORASHAI_ITEMS, ORASHAI_MONSTERS, ORASHAI_PRAYERS, ORASHAI_QUEST_ITEMS, ORASHAI_SPELLS, ORASHAI_SPELL_TABS } from "./orashai.ts";
 export { ORASHAI_SPELL_TABS };
 import { SOLDIERS } from "./skirmish.ts";
@@ -826,7 +827,8 @@ export const REGIONAL_CLOTHING: readonly RegionalSet[] = [
     { id: "salt_coat", name: "Salt rider's coat", slot: "body", shape: "body", kind: "tunic", color: "#d8d2c4", accent: "#a5443a", examine: "A pale riding coat, red-stitched, stiff with salt and dust. The Ouresh say a coat that's never been to the salt flats isn't finished.", value: 800 },
     { id: "salt_trousers", name: "Salt rider's trousers", slot: "legs", shape: "legs", kind: "trousers", color: "#8a7a62", accent: "#a5443a", examine: "Sand-coloured trousers with leather at the knees and the seat, for a life on camelback.", value: 360 },
     { id: "salt_boots", name: "Salt rider's boots", slot: "feet", shape: "boots", color: "#6f5440", accent: "#ece8e0", examine: "Soft high boots with salt in every seam.", value: 260 },
-  ] },
+  ] },  // Meghavan, the Rain Country: each town's own clothes (meghavangear.ts).
+  ...MEGHAVAN_CLOTHING,
 ];
 const REGIONAL_ITEMS: Item[] = REGIONAL_CLOTHING.flatMap(set => set.pieces.map((piece): Item => ({
   id: piece.id, name: piece.name, examine: piece.examine, value: piece.value, icon: { shape: piece.shape, color: piece.color, accent: piece.accent, ...(piece.kind ? { kind: piece.kind } : {}) },
@@ -1002,7 +1004,7 @@ function dyedItem(id: string): Item | undefined {
   DYED.set(id, made);
   return made;
 }
-export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...DYE_POTS, ...CARVING_ITEMS, ...BAR_ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...ORDER_ARMOUR, ...orderGear(), ...slayerGear(), ...heartguardGear(), ...REGIONAL_ITEMS, ...APOTHECARY_ITEMS, ...factionGear(), ...mizukaiGear(), ...MIZUKAI_ITEMS, ...KHARAVETH_ITEMS, ...KHARAVETH_GEAR, ...STEPPE_CLOTHES, ...HEARTLAND_ITEMS, ...HEARTLAND_GEAR, ...ORASHAI_ITEMS, ...ORASHAI_GEAR, ...ORASHAI_QUEST_ITEMS]);
+export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...DYE_POTS, ...CARVING_ITEMS, ...BAR_ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...ORDER_ARMOUR, ...orderGear(), ...slayerGear(), ...heartguardGear(), ...REGIONAL_ITEMS, ...APOTHECARY_ITEMS, ...factionGear(), ...mizukaiGear(), ...MIZUKAI_ITEMS, ...KHARAVETH_ITEMS, ...KHARAVETH_GEAR, ...STEPPE_CLOTHES, ...HEARTLAND_ITEMS, ...HEARTLAND_GEAR, ...ORASHAI_ITEMS, ...ORASHAI_GEAR, ...ORASHAI_QUEST_ITEMS, ...MEGHAVAN_ITEMS, ...MEGHAVAN_GEAR]);
 const ITEM_MAP = new Map(ITEM_LIST.map(item => [item.id, item]));
 export function item(id: string): Item {
   const found = ITEM_MAP.get(id) ?? dyedItem(id);
@@ -1411,6 +1413,7 @@ export const MONSTERS: Record<string, MonsterDef> = {
   ...KHARAVETH_MONSTERS,
   ...HEARTLAND_MONSTERS,
   ...ORASHAI_MONSTERS,
+  ...MEGHAVAN_MONSTERS,
   // Return of Raria: the Regiment, the Federation's pickets, the Royal Rangers, BarkReach's wild things, the deserters and the Burned.
   ...FACTION_MONSTERS,
   // Every soldier's fighting self, for when it draws steel (skirmish.ts).
@@ -1660,6 +1663,7 @@ const QUEST_CLOTHES = new Set(["maiden_veil", "rarian_mantle", "scorched_cloak"]
 export const SHOPS: Record<string, ShopDef> = {
   ...KHARAVETH_SHOPS,
   ...HEARTLAND_SHOPS,
+  ...MEGHAVAN_SHOPS,
   // The Orashai: the Keeper's scriptorium (inks, reeds, rods, the ibis mask) and the Temple of the Hidden Sun (inks).
   keeper_scriptorium: { id: "keeper_scriptorium", name: "The Keeper's scriptorium", buys: ["other"], rate: 0.5, stock: ["ochre_ink", "lapis_ink", "scribes_reed", "lapis_rod", "ibis_mask"] },
   hidden_sun_temple: { id: "hidden_sun_temple", name: "The Temple of the Hidden Sun", buys: ["other"], rate: 0.5, stock: ["ochre_ink", "lapis_ink", "vial_of_water"] },

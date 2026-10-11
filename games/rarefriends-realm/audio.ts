@@ -11,7 +11,9 @@ export type TrackId = RegionId | "theme" | "boss"
   | "mizukai_sunrise" | "mizukai_harbour" | "mizukai_village" | "mizukai_shrine" | "mizukai_forest" | "mizukai_sea" | "mizukai_haunted" | "mizukai_battle" | "mizukai_spirit" | "mizukai_castle"
   // Kharaveth's (The Land Before Stone).
   | "kharaveth_sunteeth" | "kharaveth_foothold" | "kharaveth_underway" | "kharaveth_steppe"
-  | "kharaveth_sefrah" | "kharaveth_tamesh" | "kharaveth_khetmar" | "kharaveth_dunes" | "kharaveth_azhurak";
+  | "kharaveth_sefrah" | "kharaveth_tamesh" | "kharaveth_khetmar" | "kharaveth_dunes" | "kharaveth_azhurak"
+  // Meghavan's (the Rain Country).
+  | "meghavan_rains" | "meghavan_sarovan" | "meghavan_shailagarh" | "meghavan_suvarnatira" | "meghavan_deepgreen";
 export type SfxName = SoundName | "slash" | "stab" | "crush" | "punch" | "step_grass" | "step_stone" | "step_wood" | "step_sand" | "step_snow" | "step_swamp"
   | "crackle" | "forge" | "water" | "bird" | "gull" | "frog" | "wind" | "drip" | "rain" | "thunder" | "pop" | "hoof" | "whinny" | "rare" | "duel";
 type VoiceKind = "cluck" | "moo" | "squeak" | "grumble" | "growl" | "rattle" | "gurgle" | "whisper" | "clank" | "rumble" | "roar" | "king";
@@ -35,7 +37,9 @@ type Voice = "lute" | "flute" | "recorder" | "oboe" | "trumpet" | "bell" | "gloc
   // ...the festival's shinobue, the court's ryuteki and hichiriki, the noh theatre's nokan, and the storyteller's biwa.
   | "shinobue" | "ryuteki" | "hichiriki" | "nohkan" | "biwa"
   // Kharaveth: the oud (a fretless lute), the ney (an end-blown reed flute), the qanun (a plucked zither), the rebab (a bowed fiddle).
-  | "oud" | "ney" | "qanun" | "rebab";
+  | "oud" | "ney" | "qanun" | "rebab"
+  // Meghavan: the tanpura's drone (plucked, buzzing), the sitar, the bansuri (a bamboo flute), the shehnai (a double reed), the santoor (a hammered zither).
+  | "tanpura" | "sitar" | "bansuri" | "shehnai" | "santoor";
 type Drum = "kick" | "snare" | "hat" | "shaker" | "tom" | "clank" | "hand" | "rim" | "timpani" | "tambourine" | "deep" | "ride"
   // The Isles' drums: the great taiko, the tight shime-daiko, the wooden clappers.
   | "taiko" | "shime" | "clapper"
@@ -44,7 +48,10 @@ type Drum = "kick" | "snare" | "hat" | "shaker" | "tom" | "clank" | "hand" | "ri
   | "odaiko" | "kara" | "kakko" | "shoko" | "atarigane" | "tsuzumi" | "otsuzumi" | "yo" | "ha" | "wave" | "wind"
   // Kharaveth's: the goblet drum's deep "dum" and sharp "tek", the riq's jingles, the frame drum with its snares, finger
   // cymbals, hands clapping, and water dripping in the dark.
-  | "dum" | "tek" | "riq" | "bendir" | "zill" | "clap" | "drip";
+  | "dum" | "tek" | "riq" | "bendir" | "zill" | "clap" | "drip"
+  // Meghavan's: the tabla's right-hand drum ringing ("na") and damped ("tin"), the left-hand drum's bass that bends ("ge") and
+  // its flat slap ("ke"), the two-headed dholak, the manjira's little cymbals, and the rain.
+  | "na" | "tin" | "ge" | "ke" | "dholak" | "manjira" | "rain";
 /** How a note is played (the Mizukai Isles' ornaments): scooped up into from below, pressed up after the pluck, let fall at
  * the end (each in semitones), or shaken slowly and wide (yuri). */
 type Shape = { scoop?: number; up?: number; fall?: number; yuri?: boolean };
@@ -333,7 +340,9 @@ function phrase(text: string, voice: Voice, start = 0, velocity = 0.85, shift = 
 }
 const MIZUKAI_DRUMS: ReadonlySet<string> = new Set(["taiko", "shime", "clapper", "odaiko", "kara", "kakko", "shoko", "atarigane", "tsuzumi", "otsuzumi", "yo", "ha", "wave", "wind",
   // Kharaveth's (and Hollowmere's snare at Foothold).
-  "dum", "tek", "riq", "bendir", "zill", "clap", "drip", "snare"]);
+  "dum", "tek", "riq", "bendir", "zill", "clap", "drip", "snare",
+  // Meghavan's.
+  "na", "tin", "ge", "ke", "dholak", "manjira", "rain"]);
 /** A drummer's line: "taiko:1! kara:0.5 r:0.5", "yo+tsuzumi:1" for two at once. ! accent, p soft. */
 function strokes(text: string, start = 0, velocity = 0.7): Hit[] {
   const hits: Hit[] = [];
@@ -617,6 +626,67 @@ const KHARAVETH_PIECES: readonly MizukaiPiece[] = [
     hits: () => [...strokes("wind:32 wind:32", 0, 0.45), ...everyBar(16, 4, (b0, bar) => bar % 4 === 0 ? strokes("bendir:1p r:3", b0, 0.42) : []),
       ...[3.5, 11.25, 19.5, 26.75, 35, 41.5, 50.25, 57.5].map(beat => ({ beat, drum: "drip" as Drum, velocity: 0.48 }))] },
 ];
+// ---------- Meghavan (the Rain Country): five pieces in the ragas, for tanpura, sitar, bansuri, shehnai and santoor ----------
+// Each on its own raga and for its own ensemble: the tanpura's drone under most of them (sa and pa, plucked round and
+// round), the tune slid into and out of (meend: written as scoops and falls), and the tabla's cycles under it: dha (the
+// two drums together), dhin, tin, na, ge.
+const KAFI = [0, 2, 3, 5, 7, 9, 10], YAMAN = [0, 2, 4, 6, 7, 9, 11], BHAIRAV = [0, 1, 4, 5, 7, 8, 11], KHAMAJ = [0, 2, 4, 5, 7, 9, 10], BHUPALI = [0, 2, 4, 7, 9];
+/** The tanpura's cycle under a piece: pa, sa above, sa above, sa, round and round, each string left ringing. */
+const tanpura = (sa: number, beats: number, per = 4, velocity = 0.42): Note[] =>
+  Array.from({ length: Math.floor(beats / per) }, (_, k) => [sa - 5, sa + 12, sa + 12, sa].map((midi, i): Note => ({ beat: k * per + i * per / 4, voice: "tanpura", midi, length: per * 0.9, velocity: velocity * (i === 0 ? 1.1 : 1) }))).flat();
+const MEGHAVAN_PIECES: readonly MizukaiPiece[] = [
+  // The Rain Country (the Gate of Rains, the valley, the plains): raga Kafi, the sitar's slow opening, the bansuri taking the
+  // tune up, the tabla's teental coming in under them.
+  { id: "meghavan_rains", name: "The Rain Country", bpm: 92, beats: 64, tonic: 62, scale: KAFI,
+    notes: () => {
+      const sitar = phrase(`D4:2v F4:1 E4:1 | D4:2~ r:2 | F4:1 G4:1 A4:2v | G4:1 F4:1 E4:2~ | A4:1 B4:1 C5:1 D5:1 | C5:2 A4:1 G4:1 | F4:1 E4:1 F4:1 G4:1 | A4:4~`, "sitar", 0, 0.78);
+      const bansuri = phrase(`D5:3v C5:1 | A4:2 G4:2 | F4:1 G4:1 A4:1 C5:1 | D5:4+ | E5:2v D5:1 C5:1 | A4:2 G4:2~ | F4:1 E4:1 D4:1 F4:1 | D4:4+`, "bansuri", 32, 0.74);
+      return [...tanpura(50, 64), ...sitar, ...bansuri, ...hetero(bansuri, "sitar", -12, 0.5, 0.45, note => note.length >= 0.9)];
+    },
+    hits: () => everyBar(16, 4, (b0, bar) => bar < 4 ? [] : [...strokes("na+ge:1 tin+ge:1 tin+ge:1 na+ge:1", b0, bar % 4 === 2 ? 0.42 : 0.5), ...(bar % 4 === 3 ? strokes("r:2 na:0.5 na:0.5 ke:0.5 na:0.5", b0, 0.46) : [])]) },
+  // Sarovan: raga Yaman at evening, the shehnai's long phrases over the santoor's rippling strings, the tabla's keherwa.
+  { id: "meghavan_sarovan", name: "Sarovan", bpm: 84, beats: 64, tonic: 60, scale: YAMAN,
+    notes: () => {
+      const shehnai = phrase(`E4:2v F#4:1 G4:1 | A4:2 G4:1 F#4:1 | E4:1 D4:1 E4:2~ | r:4 | B3:1 D4:1 E4:1 F#4:1 | G4:2 A4:2 | B4:1 A4:1 G4:1 F#4:1 | E4:4+ |
+        B4:2v C5:1 B4:1 | A4:2 G4:2 | F#4:1 G4:1 A4:1 B4:1 | C5:4+ | B4:2 A4:1 G4:1 | F#4:2 E4:2 | D4:1 E4:1 F#4:1 D4:1 | C4:4~`, "shehnai", 0, 0.7);
+      const santoor = Array.from({ length: 16 }, (_, bar) => phrase(bar % 2 ? "D4:0.5 A4:0.5 C5:0.5 A4:0.5 F#4:0.5 A4:0.5 C5:0.5 A4:0.5" : "C4:0.5 G4:0.5 B4:0.5 G4:0.5 E4:0.5 G4:0.5 B4:0.5 G4:0.5", "santoor", bar * 4, bar % 4 === 0 ? 0.5 : 0.42)).flat();
+      return [...tanpura(48, 64), ...shehnai, ...santoor];
+    },
+    hits: () => everyBar(16, 4, (b0, bar) => strokes(bar % 2 ? "ke:1 na:0.5 na+ge:0.5 ge:1 na:1" : "na+ge:1 ge:0.5 na:0.5 tin:1 na:1", b0, bar < 2 ? 0.36 : 0.48)) },
+  // Shailagarh: raga Bhairav at dawn on the walls, the shehnai's call, the sitar striking its drone strings, dholak and manjira.
+  { id: "meghavan_shailagarh", name: "Shailagarh", bpm: 100, beats: 64, tonic: 64, scale: BHAIRAV,
+    notes: () => {
+      const shehnai = phrase(`E4:1 F4:1 G#4:1 A4:1 | B4:2 C5:1 B4:1 | A4:1 G#4:1 F4:1 G#4:1 | E4:4~ | B4:1 C5:1 D#5:1 E5:1 | D#5:2 C5:1 B4:1 | A4:1 G#4:1 A4:1 F4:1 | E4:4+`, "shehnai", 0, 0.74);
+      const again = phrase(`B4:2v C5:1 B4:1 | A4:2 G#4:2 | A4:1 B4:1 C5:1 B4:1 | A4:4+ | G#4:2 A4:1 G#4:1 | F4:2 E4:2 | F4:1 G#4:1 A4:1 G#4:1 | E4:4+`, "shehnai", 32, 0.72);
+      const sitar = Array.from({ length: 16 }, (_, bar) => phrase("E3:1 E3:0.5 B2:0.5 E3:1 r:1", "sitar", bar * 4, bar % 4 === 0 ? 0.64 : 0.54)).flat();
+      return [...tanpura(52, 64), ...shehnai, ...again, ...hetero(again, "sitar", -12, 0.05, 0.4), ...sitar];
+    },
+    hits: () => everyBar(16, 4, (b0, bar) => [...strokes("dholak:1 dholak:0.5 dholak:0.5 dholak:1 dholak:1", b0, 0.58), ...strokes("manjira:1p manjira:1 manjira:1p manjira:1", b0, 0.4),
+      ...(bar % 4 === 3 ? strokes("r:2 dholak:0.5 dholak:0.5 dholak:1!", b0, 0.6) : [])]) },
+  // Suvarnatira, the Free Port: raga Khamaj, the santoor's quick runs, the bansuri answering, the sitar walking low, the sea.
+  { id: "meghavan_suvarnatira", name: "Suvarnatira, the Free Port", bpm: 108, beats: 64, tonic: 67, scale: KHAMAJ,
+    notes: () => {
+      const santoor = phrase(`G4:0.5 A4:0.5 B4:0.5 D5:0.5 E5:1 D5:1 | C5:0.5 B4:0.5 A4:0.5 G4:0.5 A4:2 | B4:0.5 C5:0.5 D5:0.5 E5:0.5 F5:1 E5:1 | D5:4 |
+        E5:1 D5:0.5 C5:0.5 B4:1 A4:1 | B4:1 C5:1 D5:2 | C5:0.5 B4:0.5 A4:0.5 B4:0.5 A4:1 F4:1 | G4:4`, "santoor", 0, 0.74);
+      const bansuri = phrase(`D5:2v E5:1 D5:1 | C5:2 A4:2~ | B4:1 C5:1 D5:1 E5:1 | F5:3 E5:1 | D5:1 C5:1 B4:1 A4:1 | B4:2 G4:2 | A4:1 B4:1 C5:1 A4:1 | G4:4+`, "bansuri", 32, 0.72);
+      const sitar = Array.from({ length: 16 }, (_, bar) => phrase("G2:1 r:0.5 D3:0.5 G3:1 F3:0.5 D3:0.5", "sitar", bar * 4, 0.5)).flat();
+      return [...santoor, ...hetero(santoor, "bansuri", 12, 0.5, 0.35, note => note.length >= 1.9), ...bansuri, ...hetero(bansuri, "santoor", 0, 0.5, 0.5), ...sitar];
+    },
+    hits: () => [...everyBar(16, 4, (b0, bar) => [...strokes("na+ge:1 na:0.5 tin:0.5 na:1 tin+ge:1", b0, 0.46), ...(bar % 8 === 7 ? strokes("r:3 na:0.25 na:0.25 na:0.5!", b0, 0.5) : [])]),
+      ...strokes("wave:16 wave:16 wave:16 wave:16", 0, 0.5)] },
+  // The Deepgreen: raga Bhupali, the bansuri alone over the tanpura, the rain on the leaves, the bayan's low call now and then.
+  { id: "meghavan_deepgreen", name: "The Deepgreen", bpm: 66, beats: 64, tonic: 62, scale: BHUPALI,
+    notes: () => [...tanpura(50, 64, 8, 0.38),
+      ...phrase(`r:4 | A4:4v+ | B4:2 A4:1 F#4:1 | E4:4~ | r:2 D4:1 E4:1 | F#4:3v A4:1 | B4:4+ | r:4 | D5:2v B4:1 A4:1 | B4:2 A4:2~ | F#4:3 E4:1 | F#4:4+ | r:2 E4:1 D4:1 | E4:2 F#4:1 E4:1 | D4:2 B3:1 A3:1 | D4:4+`, "bansuri", 0, 0.74)],
+    hits: () => [...strokes("rain:16 rain:16 rain:16 rain:16", 0, 0.55), ...everyBar(16, 4, (b0, bar) => bar % 4 === 0 ? strokes("ge:1p r:3", b0, 0.5) : []),
+      ...[5.5, 13.25, 22.5, 29.75, 38, 45.5, 54.25, 61.5].map(beat => ({ beat, drum: "drip" as Drum, velocity: 0.4 }))] },
+];
+/** Which Meghavan piece plays where. */
+const MEGHAVAN_REGION_TRACK: Partial<Record<RegionId, TrackId>> = {
+  rain_pass: "meghavan_rains", ilavati_valley: "meghavan_rains", parasol_plains: "meghavan_rains", tirthali: "meghavan_sarovan", sarovan: "meghavan_sarovan",
+  shaila_highlands: "meghavan_shailagarh", shailagarh: "meghavan_shailagarh", mandapur: "meghavan_suvarnatira", golden_shore: "meghavan_suvarnatira", suvarnatira: "meghavan_suvarnatira",
+  deepgreen: "meghavan_deepgreen", kanthar: "meghavan_deepgreen",
+};
 /** Which Kharaveth piece plays where. */
 const KHARAVETH_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { sunteeth: "kharaveth_sunteeth", foothold: "kharaveth_foothold", underway: "kharaveth_underway", ochre_steppe: "kharaveth_steppe", sunward_strait: "kharaveth_steppe",
   ashar_valley: "kharaveth_steppe", ochre_spine: "kharaveth_steppe", khetmar_pass: "kharaveth_khetmar", zuri_camp: "kharaveth_steppe", ouresh_camp: "kharaveth_dunes", sea_of_dunes: "kharaveth_dunes",
@@ -632,17 +702,18 @@ const MIZUKAI_REGION_TRACK: Partial<Record<RegionId, TrackId>> = {
   mizukai_sea: "mizukai_sea", three_stones: "mizukai_sea", turtle_rock: "mizukai_sea",
 };
 
-export const TRACKS: readonly Track[] = [themeTrack(), ...STYLES.map(composeTrack), ...MIZUKAI_PIECES.map(composeMizukai), ...KHARAVETH_PIECES.map(composeMizukai)];
+export const TRACKS: readonly Track[] = [themeTrack(), ...STYLES.map(composeTrack), ...MIZUKAI_PIECES.map(composeMizukai), ...KHARAVETH_PIECES.map(composeMizukai), ...MEGHAVAN_PIECES.map(composeMizukai)];
 /** The Mizukai pieces (for tests). */
 export const MIZUKAI_TRACKS: readonly TrackId[] = MIZUKAI_PIECES.map(piece => piece.id);
 export const KHARAVETH_TRACKS: readonly TrackId[] = KHARAVETH_PIECES.map(piece => piece.id);
+export const MEGHAVAN_TRACKS: readonly TrackId[] = MEGHAVAN_PIECES.map(piece => piece.id);
 export const trackById = (id: TrackId) => TRACKS.find(track => track.id === id) ?? TRACKS[0];
 /** Which track plays where: each region has its own, and the Hollow King's throne room its boss theme. */
 export function trackFor(region: RegionId, nearBoss: boolean, mizukai: { sea?: boolean; fight?: boolean; spirit?: boolean } = {}): TrackId {
   if (nearBoss) return "boss";
   // The Mizukai Isles: the place's own piece, the sea's on a crossing, and in a fight the battle (or, against one of the great spirits, theirs).
   if (mizukai.sea) return "mizukai_sea";
-  const south = KHARAVETH_REGION_TRACK[region];
+  const south = KHARAVETH_REGION_TRACK[region] ?? MEGHAVAN_REGION_TRACK[region];
   if (south) return south;
   const isles = MIZUKAI_REGION_TRACK[region];
   if (isles) return mizukai.spirit ? "mizukai_spirit" : mizukai.fight ? "mizukai_battle" : isles;
@@ -848,6 +919,43 @@ export class RealmAudio {
         const filter = ctx.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.value = 3800; filter.connect(gain);
         for (const ratio of [1, 4 / 3, 1.5, 2, 2.25]) this.osc("triangle", f * ratio, t, t + length + 0.6, filter, (Math.random() - 0.5) * 6);
         this.env(gain, t, 0.016 * v, Math.min(0.6, length / 3), Math.max(0, length - 0.6), 0.6); break; }
+      // ---------- Meghavan's ----------
+      case "tanpura": {
+        // A tanpura string: plucked and left to ring, its bridge making it buzz (jawari), the buzz shimmering as it rings.
+        const band = ctx.createBiquadFilter(); band.type = "bandpass"; band.Q.value = 3; band.frequency.setValueAtTime(f * 6, t); band.frequency.linearRampToValueAtTime(f * 3, t + Math.min(3, length)); band.connect(gain);
+        this.osc("sawtooth", f, t, t + length + 1, band, -3); this.osc("sawtooth", f, t, t + length + 1, band, 3);
+        const body = ctx.createGain(); body.gain.value = 0.5; body.connect(gain); this.osc("sine", f, t, t + length + 1, body);
+        this.env(gain, t, 0.03 * v, 0.01, Math.max(0, length * 0.3), Math.max(0.8, length * 0.7)); break; }
+      case "sitar": {
+        // A sitar: the mizrab's bright pluck, the buzz of the flat bridge, the sympathetic strings ringing after, notes pulled (meend).
+        const band = ctx.createBiquadFilter(); band.type = "bandpass"; band.Q.value = 2.6; band.frequency.setValueAtTime(Math.min(6000, f * 7), t); band.frequency.exponentialRampToValueAtTime(Math.min(3000, f * 2.5), t + 0.6); band.connect(gain);
+        const a = this.osc("sawtooth", f, t, t + Math.max(1.2, length + 0.6), band), b = this.osc("square", f * 1.002, t, t + 0.6, band);
+        this.shapePitch(a, f, t, length, shape); this.shapePitch(b, f, t, length, shape);
+        const halo = ctx.createGain(); halo.gain.setValueAtTime(0.0001, t); halo.gain.linearRampToValueAtTime(0.25, t + 0.15); halo.gain.exponentialRampToValueAtTime(0.001, t + 1.6); halo.connect(gain); this.osc("triangle", f * 2, t, t + 1.7, halo, 7);
+        this.noiseBurst(t, 0.02, 3800, 0.05 * v, gain, "bandpass", 2.5);
+        this.env(gain, t, 0.1 * v, 0.003, 0, Math.min(1.8, length + 0.8)); break; }
+      case "bansuri": {
+        // A bansuri: a side-blown bamboo flute, deep and soft, breath in it, a slow vibrato that arrives late.
+        const vibrato = ctx.createOscillator(), depth = ctx.createGain(); vibrato.frequency.value = shape?.yuri ? 4.2 : 5.2; depth.gain.setValueAtTime(0, t); depth.gain.linearRampToValueAtTime(f * (shape?.yuri ? 0.016 : 0.007), t + Math.min(1, length * 0.7)); vibrato.connect(depth);
+        const o = this.osc("sine", f, t, t + length + 0.2, gain); depth.connect(o.frequency); vibrato.start(t); vibrato.stop(t + length + 0.2); this.shapePitch(o, f, t, length, shape);
+        const over = ctx.createGain(); over.gain.value = 0.16; over.connect(gain); this.shapePitch(this.osc("triangle", f * 2, t, t + length + 0.2, over), f * 2, t, length, shape);
+        this.noiseBurst(t - 0.03, 0.1, f * 2, 0.022 * v, gain, "bandpass", 1.4); this.noiseBurst(t, Math.max(0.1, length), f * 2.4, 0.008 * v, gain, "bandpass", 3);
+        this.env(gain, t, 0.09 * v, 0.06, Math.max(0, length - 0.1), 0.2); break; }
+      case "shehnai": {
+        // A shehnai: a double reed with a flared bell, piercing and festive, sliding between its notes, a quick tremble in it.
+        const band = ctx.createBiquadFilter(); band.type = "bandpass"; band.frequency.value = Math.min(4200, f * 3.2); band.Q.value = 1.1; band.connect(gain);
+        const vibrato = ctx.createOscillator(), depth = ctx.createGain(); vibrato.frequency.value = 6.2; depth.gain.setValueAtTime(0, t); depth.gain.linearRampToValueAtTime(f * (shape?.yuri ? 0.018 : 0.008), t + Math.min(0.5, length * 0.5)); vibrato.connect(depth);
+        const reed = this.osc("sawtooth", f, t, t + length + 0.15, band), reed2 = this.osc("square", f, t, t + length + 0.15, band, -6);
+        depth.connect(reed.frequency); depth.connect(reed2.frequency); vibrato.start(t); vibrato.stop(t + length + 0.15); this.shapePitch(reed, f, t, length, shape); this.shapePitch(reed2, f, t, length, shape);
+        this.noiseBurst(t, 0.05, f * 3, 0.018 * v, gain, "bandpass", 2);
+        this.env(gain, t, 0.065 * v, 0.04, Math.max(0, length - 0.08), 0.14); break; }
+      case "santoor": {
+        // A santoor: a hammered zither, its strings in fours, struck with light mallets: a bright tap and a shimmering ring.
+        const filter = ctx.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.setValueAtTime(7000, t); filter.frequency.exponentialRampToValueAtTime(2000, t + 0.5); filter.connect(gain);
+        for (const cents of [-6, -2, 2, 6]) this.osc("triangle", f, t, t + 1.4, filter, cents);
+        const ping = ctx.createGain(); ping.gain.setValueAtTime(0.4, t); ping.gain.exponentialRampToValueAtTime(0.001, t + 0.2); ping.connect(gain); this.osc("sine", f * 3, t, t + 0.25, ping);
+        this.noiseBurst(t, 0.012, 5000, 0.035 * v, gain, "highpass");
+        this.env(gain, t, 0.045 * v, 0.002, 0, Math.min(1.3, length + 0.7)); break; }
       // ---------- Kharaveth's ----------
       case "oud": {
         // An oud: a fretless, round-bellied lute plucked with a quill: the quill's click, a warm body, notes that slide.
@@ -944,6 +1052,28 @@ export class RealmAudio {
       case "taiko": this.thump(t, 96, 44, 0.65, 0.42 * v, bus); this.noiseBurst(t, 0.12, 160, 0.06 * v, bus, "lowpass"); this.thump(t, 180, 90, 0.06, 0.08 * v, bus); break;
       case "shime": this.thump(t, 460, 330, 0.07, 0.18 * v, bus); this.noiseBurst(t, 0.03, 2600, 0.05 * v, bus, "bandpass", 2); break;
       case "clapper": this.thump(t, 1700, 1500, 0.025, 0.16 * v, bus); this.thump(t + 0.012, 1450, 1300, 0.02, 0.1 * v, bus); break;
+      // Meghavan's drums: the tabla (dayan and bayan), the dholak, the manjira, and the rain.
+      case "na": { const ctx = this.ctx!, gain = ctx.createGain(); gain.connect(bus); this.osc("sine", 520, t, t + 0.4, gain); this.osc("sine", 1040, t, t + 0.2, gain, 4);
+        this.noiseBurst(t, 0.02, 3000, 0.04 * v, bus, "bandpass", 2); this.env(gain, t, 0.12 * v, 0.002, 0, 0.32); break; }
+      case "tin": this.thump(t, 680, 640, 0.08, 0.13 * v, bus); this.noiseBurst(t, 0.02, 2600, 0.04 * v, bus, "bandpass", 2); break;
+      case "ge": {
+        // The bayan's bass, the heel of the hand pressing the skin so the note swells up and sags.
+        const ctx = this.ctx!, gain = ctx.createGain(), o = ctx.createOscillator(); o.type = "sine"; gain.connect(bus); o.connect(gain);
+        o.frequency.setValueAtTime(88, t); o.frequency.exponentialRampToValueAtTime(128, t + 0.12); o.frequency.exponentialRampToValueAtTime(98, t + 0.55); o.start(t); o.stop(t + 0.62);
+        this.env(gain, t, 0.3 * v, 0.004, 0.05, 0.5); break; }
+      case "ke": this.thump(t, 150, 100, 0.05, 0.2 * v, bus); this.noiseBurst(t, 0.03, 600, 0.05 * v, bus, "lowpass"); break;
+      case "dholak": this.thump(t, 165, 92, 0.24, 0.32 * v, bus); this.noiseBurst(t, 0.03, 2100, 0.07 * v, bus, "bandpass", 1.6); break;
+      case "manjira": {
+        const ctx = this.ctx!, gain = ctx.createGain(); gain.connect(bus);
+        for (const ratio of [1, 2.32, 3.71]) this.osc("square", 3300 * ratio * (0.99 + Math.random() * 0.02), t, t + 0.6, gain);
+        this.noiseBurst(t, 0.02, 7000, 0.02 * v, bus, "highpass"); this.env(gain, t, 0.009 * v, 0.001, 0, 0.5); break; }
+      case "rain": {
+        // Rain on leaves: a long hiss, swelling and fading, high and soft.
+        const ctx = this.ctx!, source = ctx.createBufferSource(), filter = ctx.createBiquadFilter(), gain = ctx.createGain(), length = 9;
+        source.buffer = this.noise; source.loop = true; filter.type = "highpass"; filter.frequency.value = 2600;
+        source.connect(filter).connect(gain).connect(bus);
+        gain.gain.setValueAtTime(0.0001, t); gain.gain.linearRampToValueAtTime(0.022 * v, t + 3); gain.gain.linearRampToValueAtTime(0.0001, t + length);
+        source.start(t, Math.random() * 0.5); source.stop(t + length + 0.05); break; }
       // Kharaveth's drums.
       case "dum": this.thump(t, 120, 62, 0.32, 0.36 * v, bus); this.noiseBurst(t, 0.03, 400, 0.03 * v, bus, "lowpass"); break;
       case "tek": this.thump(t, 1000, 760, 0.04, 0.16 * v, bus); this.noiseBurst(t, 0.035, 3400, 0.08 * v, bus, "bandpass", 2.2); break;
