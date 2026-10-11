@@ -796,6 +796,8 @@ export function recipeProblem(game: Game, recipe: Recipe): string | null {
   if (recipe.coins && count(player, "coins") < recipe.coins) return "You don't have enough coins.";
   return null;
 }
+/** How many of a recipe one go can make (up to 28): what the satchel and belts hold counts, as the furnace reaches into them. */
+export const mostMakeable = (game: Game, recipe: Recipe) => Math.min(28, ...Object.entries(recipe.inputs).map(([id, n]) => Math.floor(stock(game.player, id) / n)));
 export function startProduction(game: Game, recipe: Recipe, n: number) {
   const problem = recipeProblem(game, recipe);
   game.ui.production = null;

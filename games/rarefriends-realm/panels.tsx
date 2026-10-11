@@ -35,7 +35,7 @@ import {
   weapon, xpMultiplier, wornWeight, type Game, type Message, type Recipe, type Slot,
 } from "./state.ts";
 import {
-  bestArrow, bowRange, emoteProblem, performEmote, signetTeleport, applyReferral, shopBuys, buy, buyPrice, canCast, capeProblem, castSpell, rangedMaxHit, rubLamp, chooseOption, continueDialogue, dialogueAtOptions, itemOptions, playerMaxHit, recipeProblem, sell, sellPrice,
+  bestArrow, bowRange, emoteProblem, performEmote, signetTeleport, applyReferral, shopBuys, buy, buyPrice, canCast, capeProblem, castSpell, rangedMaxHit, rubLamp, chooseOption, continueDialogue, dialogueAtOptions, itemOptions, playerMaxHit, recipeProblem, mostMakeable, sell, sellPrice,
   castOnItem, satchelCheck, satchelEmpty, satchelFill, setFollower, setPet, setStyle, startProduction, swapSlots, toggleRun, toggleSneak, togglePrayer, toggleWorn, unequip, useItemOnItem, type OwnedFriend, type Selection,
  beltCheck, beltFill, beltEmpty, sipBelt, toggleFollowerWorn } from "./engine.ts";
 import { friendRows, renderWorldMap } from "./render.ts";
@@ -898,7 +898,7 @@ export function LevelUpBox({ skill, level, onClose }: { skill: Skill; level: num
 }
 export function ProductionBox({ game, refresh, openMenu }: { game: Game; refresh: () => void; openMenu?: OpenMenu }) {
   const menu = game.ui.production!, [amount, setAmount] = useState(28);
-  const most = (recipe: Recipe) => Math.min(28, ...Object.entries(recipe.inputs).map(([id, n]) => Math.floor(count(game.player, id) / n)));
+  const most = (recipe: Recipe) => mostMakeable(game, recipe);
   return (
     <section className="realm-dialogue realm-make" aria-label={menu.title}>
       <div className="realm-make-head"><h3>{menu.title}</h3>

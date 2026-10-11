@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buy, canWalk, castSpell, chooseOption, collectFromCasket, continueDialogue, createGame, equip, unequip, findPath, itemOptions, menuFor, restore, sell,
-  serialize, setFollower, setRelics, setTarget, smeltingRecipes, smithingRecipes, startProduction, tick, togglePrayer, useItemOnItem, walkTo, setHeld,
+  serialize, setFollower, setRelics, setTarget, smeltingRecipes, smithingRecipes, startProduction, mostMakeable, tick, togglePrayer, useItemOnItem, walkTo, setHeld,
   successChance, hitChance, unlockMusic, toggleSneak, veiled, VEIL_HOOD, toggleRun, bestArrow, rangedMaxHit, bowRange, syncMonster, toggleMount, grantMount, rideProblem, castOnItem, isBound, grantBundle, rubLamp, breakTablet, capeProblem, sellPrice, craftSigils,
   canCast, bagFill, offerBag, OFFER_TICKS, eat, boneBoost, fireFactor, thorns, sigilSave, stalkerFactor, regenTicks, foodBoost, cleanHerb, drink, coatWeapon, performEmote,
 } from "../games/rarefriends-realm/engine.ts";
@@ -327,7 +327,11 @@ test("Inkcoal satchel: mined inkcoal goes in, the furnace takes from it, and it'
   standBy(g, furnace);
   startProduction(g, smeltingRecipes().find(recipe => recipe.outputs.ashsteel_bar), 2); until(g, () => count(p, "ashsteel_bar") === 2, 60);
   assert.equal(p.coalBag, 8, "ashsteel takes one inkcoal a bar from the satchel");
-  const fresh = newGame(); restore(fresh, serialize(g)); assert.equal(fresh.player.coalBag, 8);
+  // The furnace's "All" counts the satchel: 5 ore and 8 inkcoal in it make 5 bars in one go, not one a click.
+  give(p, "blackiron_ore", 5); const ashsteel = smeltingRecipes().find(recipe => recipe.outputs.ashsteel_bar);
+  assert.equal(mostMakeable(g, ashsteel), 5); startProduction(g, ashsteel, mostMakeable(g, ashsteel));
+  until(g, () => count(p, "ashsteel_bar") === 7, 120); assert.equal(p.coalBag, 3);
+  const fresh = newGame(); restore(fresh, serialize(g)); assert.equal(fresh.player.coalBag, 3);
   assert(item("grumblin_head").equip.slot === "head" && MONSTERS.grumblin.drops.some(drop => drop.item === "grumblin_head" && drop.chance < 0.01), "a very rare Grumblin head");
 });
 
