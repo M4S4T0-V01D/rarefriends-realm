@@ -4,7 +4,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { gzipSync } from "node:zlib";
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
 import { privateKeyToAccount } from "viem/accounts";
@@ -35,11 +35,11 @@ function d1() {
     },
   };
 }
-function world() {
+function world({ attestKey = null } = {}) {
   const db = d1(), owners = new Map([[7730, alice.address], [3412, bob.address]]);
   let clock = Date.parse("2026-10-09T12:00:00Z");
   const real = chainFor({ RPC_URL: "http://127.0.0.1:9", COLLECTION: "0x14C49e6118F46525dE9ab41a51cBAA3c6EBF181D" });
-  const app = createApp({ db, origins: [ORIGIN], chainId: 4663, clock: () => clock, chain: { ownerOf: async friend => owners.get(friend) ?? null, verify: real.verify } });
+  const app = createApp({ db, origins: [ORIGIN], chainId: 4663, clock: () => clock, attestKey, chain: { ownerOf: async friend => owners.get(friend) ?? null, verify: real.verify } });
   const call = async (method, path, { body, token, origin = ORIGIN, gzip = false } = {}) => {
     const headers = { ...(origin ? { origin } : {}), ...(token ? { authorization: `Bearer ${token}` } : {}) };
     let payload;
@@ -195,4 +195,62 @@ test("CORS: the Realm's page gets answers; other sites are refused", async () =>
   assert.equal(ok.headers.get("access-control-allow-origin"), ORIGIN);
   const evil = await w.call("GET", "/v1/health", { origin: "https://evil.example" });
   assert.equal(evil.status, 403); assert.equal(evil.headers.get("access-control-allow-origin"), null);
+});
+
+test("verified progress: honest saves keep a character verified; impossible ones are refused; imports from outside, takeovers beyond play, restores and head starts leave it unverified; attestations are signed", async () => {
+  const w = world({ attestKey: "test-key" }), token = await w.signIn(alice), h = save => createHash("sha256").update(JSON.stringify(save)).digest("hex");
+  const first = await w.put(token, 7730, 0, w.save(7730, 1000, { playTicks: 100 }));
+  assert.equal(first.status, 200); assert.equal(first.body.trust, "verified");
+  w.advance(60_000);
+  // XP can't fall, play time can't outrun the clock, and XP can't outrun the play time (nor the clock, as before).
+  assert.match((await w.put(token, 7730, 1, w.save(7730, 900, { playTicks: 200 }))).body.error, /attack experience went backwards/);
+  assert.match((await w.put(token, 7730, 1, w.save(7730, 1000, { playTicks: 100_000 }))).body.error, /more play time than the time/);
+  assert.match((await w.put(token, 7730, 1, w.save(7730, 1000 + LIMITS.xpSlack + 100_000, { playTicks: 150 }))).body.error, /more progress than the play time allows/);
+  assert.match((await w.put(token, 7730, 1, w.save(7730, 1000 + LIMITS.xpSlack + 1_000_000, { playTicks: 150 }))).body.error, /more progress than the time since the last save/);
+  assert.equal((await w.put(token, 7730, 1, w.save(7730, 5000, { playTicks: 150 }))).body.trust, "verified");
+  // An earlier version brought back is kept, but the character is no longer verified.
+  w.advance(LIMITS.historyGapMs + 1000);
+  const third = w.save(7730, 6000, { playTicks: 300 });
+  assert.equal((await w.put(token, 7730, 2, third)).status, 200);
+  assert.equal((await w.call("POST", "/v1/characters/7730/restore", { token, body: { version: 2 } })).body.trust, "unverified");
+  const loaded = await w.call("GET", "/v1/characters/7730", { token });
+  assert.equal(loaded.body.trust, "unverified"); assert.match(loaded.body.trustNote, /restored version 2/);
+  assert.equal((await w.call("GET", "/v1/characters", { token })).body.characters[0].trust, "unverified");
+  // The first import of a character the cloud has never seen is trusted once; an import of something it never stored isn't.
+  const tb = await w.signIn(bob), legacy = w.save(3412, 50_000_000, { playTicks: 1 });
+  assert.equal((await w.put(tb, 3412, 0, legacy, "import", h(legacy))).body.trust, "verified", "the first import is trusted once");
+  w.advance(60_000);
+  const outside = w.save(3412, 50_000_100, { playTicks: 5 }), imported = await w.put(tb, 3412, 1, outside, "import", h(outside));
+  assert.equal(imported.status, 200); assert.equal(imported.body.trust, "unverified");
+  assert.match((await w.call("GET", "/v1/characters/3412", { token: tb })).body.trustNote, /outside the cloud/);
+  // A re-import of a save the cloud itself stored keeps a verified character verified; a new character with a head start isn't.
+  w.owners.set(9002, bob.address);
+  const own = w.save(9002, 1000, { playTicks: 10 });
+  assert.equal((await w.put(tb, 9002, 0, own)).body.trust, "verified");
+  w.advance(60_000);
+  assert.equal((await w.put(tb, 9002, 1, own, "import", h(own))).body.trust, "verified", "our own stored save, imported again");
+  w.owners.set(9003, bob.address);
+  assert.equal((await w.put(tb, 9003, 0, w.save(9003, 10_000_000, { playTicks: 1 }))).body.trust, "unverified");
+  // A takeover within what play allows keeps the character verified; one beyond it is kept but unverified.
+  w.owners.set(9004, bob.address);
+  assert.equal((await w.put(tb, 9004, 0, w.save(9004, 1000, { playTicks: 10 }))).body.trust, "verified");
+  w.advance(60_000);
+  assert.equal((await w.put(tb, 9004, 1, w.save(9004, 2000, { playTicks: 50 }), "takeover")).body.trust, "verified");
+  w.advance(60_000);
+  const over = await w.put(tb, 9004, 2, w.save(9004, 90_000_000, { playTicks: 60 }), "takeover");
+  assert.equal(over.status, 200); assert.equal(over.body.trust, "unverified");
+  // Unverified is for good: honest saves after it don't make it verified again.
+  w.advance(60_000);
+  assert.equal((await w.put(tb, 9004, 3, w.save(9004, 90_000_100, { playTicks: 160 }))).body.trust, "unverified");
+  // Attestations: the stored version's hash, XP and trust, signed with the service's key; none without a key.
+  const attested = await w.call("GET", "/v1/characters/7730/attestation", { token });
+  assert.equal(attested.status, 200);
+  assert.equal(attested.body.version, 4); assert.equal(attested.body.trust, "unverified"); assert.equal(attested.body.totalXp, 5000 + 1154);
+  assert.equal(attested.body.hash, h(w.save(7730, 5000, { playTicks: 150 })), "the hash of the save as stored (the restored version 2)");
+  const text = ["realm-attestation-1", alice.address, 7730, 4, attested.body.hash, attested.body.totalXp, "unverified", attested.body.at].join("\n");
+  assert.equal(attested.body.sig, createHmac("sha256", "test-key").update(text).digest("hex"));
+  assert.equal((await world().call("GET", "/v1/characters/7730/attestation", { token: await world().signIn(alice) })).status, 401, "another world: no session there");
+  const bare = world(), tbare = await bare.signIn(alice);
+  await bare.put(tbare, 7730, 0, bare.save(7730));
+  assert.equal((await bare.call("GET", "/v1/characters/7730/attestation", { token: tbare })).status, 503);
 });

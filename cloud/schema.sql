@@ -28,6 +28,13 @@ CREATE TABLE IF NOT EXISTS characters (
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
   imported_at INTEGER,
+  -- Verified progress (README "Verified progress"): the stored save's SHA-256, the facts the progress checks compare
+  -- (XP by skill, ticks played), and whether the service vouches for the character ('verified' or 'unverified', why, and since which version).
+  save_hash TEXT,
+  facts TEXT,
+  trust TEXT NOT NULL DEFAULT 'verified',
+  trust_note TEXT,
+  trust_version INTEGER,
   PRIMARY KEY (address, friend_id)
 );
 -- Earlier versions, kept for recovery (the latest few per character).
@@ -38,6 +45,7 @@ CREATE TABLE IF NOT EXISTS history (
   save TEXT NOT NULL,
   saved_at INTEGER NOT NULL,
   reason TEXT NOT NULL,
+  save_hash TEXT,
   PRIMARY KEY (address, friend_id, version)
 );
 -- Imports already made (a hash of the imported save), so the same import can't be applied twice.

@@ -100,10 +100,23 @@ The game is client-authoritative. It runs in the player's browser, so a determin
   - limited depth and lengths, finite numbers
   - an inventory of at most 64 slots
 - **Impossible values:** at most 200,000,000 XP per skill (the game's own cap).
-- **Plausible progress:** between saves, total XP may grow by at most 2,000,000 plus 3,000 XP per second of real time (about 10.8 million an hour, far beyond honest play). Imports and takeovers are the player's explicit choice and skip this check. A save that fails it is refused, and the player keeps their browser save.
+- **Plausible progress:** between saves, no skill's XP may fall, play time (the save's ticks) may neither fall nor run more than a quarter ahead of real time (plus half an hour's slack), and total XP may grow by at most 2,000,000 plus 3,000 XP per second of real time (about 10.8 million an hour, far beyond honest play), and no more than that per second of play time either. An automatic save that fails is refused, and the player keeps their browser save. Imports and takeovers are the player's explicit choice: they are kept, but the character stops being verified (below).
 - **The client still validates:** every field of a loaded save is checked again by the game (`engine.ts` `restore`), exactly as for browser saves, so a tampered save can't break the game.
 
 Currency, items and achievements are not treated as authoritative for anything shared: the Realm's economy is simulated and per player. If shared stakes ever arrive, such as real rewards or a global leaderboard, they will need server-side rules for those specific actions, not just stored saves.
+
+## Verified progress
+
+For anything with shared stakes, the service keeps, per character, whether it can vouch for the progress: `trust` is `verified` or `unverified`, with a note saying why and the version it changed at. It is sent back with every save and load, and listed with the characters.
+
+- **Verified** progress is progress the service watched grow, save by save, within the checks above. Characters stored before trust was recorded are trusted as they stand (the migration's default), and so is the **first import** of a character the cloud has never seen: the adventure brought in from a browser is trusted once.
+- A character becomes **unverified**, for good, when a save comes from outside that chain:
+  - an import of a save the service never stored (a save code from elsewhere; re-importing a save the cloud itself stored, by its hash, is fine)
+  - an import or a takeover with more progress than the time allows
+  - an earlier version brought back with `restore`
+  - a new character that didn't start from nothing (its first save already past the slack)
+- Nothing else changes: an unverified character saves, loads and plays exactly as before. Only what needs the service's word (a collectible card's snapshot, prizes) asks for `verified`.
+- **Attestations:** `GET /v1/characters/:friend/attestation` returns the stored version vouched for: `{ address, friend, version, hash, totalXp, trust, at, sig }`, where `hash` is the SHA-256 of the stored save and `sig` an HMAC-SHA256 over those fields with the service's `ATTEST_KEY`. A step that didn't watch the save being stored (a mint) can check the signature instead of trusting its caller. Without the secret the route answers 503.
 
 ## Backups and recovery
 
@@ -120,6 +133,8 @@ From `cloud/`, with Wrangler logged in to the account:
 ```sh
 npx wrangler d1 create rarefriends-realm-saves          # once; put the id in wrangler.toml
 npx wrangler d1 execute rarefriends-realm-saves --remote --file schema.sql
+npx wrangler d1 execute rarefriends-realm-saves --remote --file migrations/0002-verified.sql   # once, for a database made before verified progress
+npx wrangler secret put ATTEST_KEY                      # a long random string; attestations are signed with it
 npx wrangler deploy
 npx wrangler tail                                       # live logs
 ```
@@ -129,7 +144,7 @@ Configuration is in `wrangler.toml` `[vars]`:
 - `ORIGINS`: the pages allowed to sign in. Both renderers share `https://m4s4t0-v01d.github.io`.
 - `RPC_URL`, `CHAIN_ID`, `COLLECTION`
 
-There are no secrets: the Worker holds no keys. Sessions are random tokens, and chain reads are public.
+The one secret is `ATTEST_KEY`, which signs attestations; it never leaves the Worker and nothing in the game or the host page holds it. Sessions are random tokens, and chain reads are public.
 
 Known limits:
 

@@ -12,11 +12,14 @@
  *                                                     (Bearer) → { version, updatedAt } | 409 { version, updatedAt }
  *   GET  /v1/characters/:friend/history               (Bearer) earlier versions kept for recovery
  *   POST /v1/characters/:friend/restore { version }   (Bearer) bring an earlier version back as the newest
+ *   GET  /v1/characters/:friend/attestation           (Bearer) the stored version, vouched for: { version, hash, totalXp, trust, at, sig }
  *
  * Rules: a session is made only from a valid signature over a single-use challenge for this site; a character is the
  * pair (wallet, Friend); writing needs the wallet to own the Friend on chain right now; every write names the version
  * it was based on, so an older save can never overwrite a newer one (409 instead); saves are size- and shape-checked
- * and their progress has to be possible in the time since the last save. See cloud/README.md for the policies.
+ * and their progress has to be possible in the time since the last save. A character this service watched grow, save by
+ * save, within what honest play allows is "verified"; one that took a save from outside that chain stays "unverified"
+ * (kept, playable, but not vouched for). See cloud/README.md for the policies.
  */
 import { BaseError, ContractFunctionRevertedError, HttpRequestError, createPublicClient, getAddress, http, isAddress, parseAbi, recoverMessageAddress, zeroAddress, type Hex } from "viem";
 
@@ -29,7 +32,7 @@ export type Chain = {
   /** Whether `signature` is `address` signing `message` (plain wallets, and contract wallets through EIP-1271/6492). */
   verify(address: string, message: string, signature: string): Promise<boolean>;
 };
-export type Env = { DB: Database; RPC_URL: string; COLLECTION: string; CHAIN_ID: string; ORIGINS: string };
+export type Env = { DB: Database; RPC_URL: string; COLLECTION: string; CHAIN_ID: string; ORIGINS: string; ATTEST_KEY?: string };
 
 export const LIMITS = {
   /** A save's JSON, at most (today's saves are 20–90 KB). */
@@ -48,6 +51,10 @@ export const LIMITS = {
   xpPerSecond: 3_000,
   xpSlack: 2_000_000,
   maxXpPerSkill: 200_000_000,
+  /** A game tick; how far play time may run ahead of real time between saves (catch-up ticks, clock drift); and slack. */
+  tickMs: 600,
+  playRate: 1.25,
+  playTickSlack: 3_000,
 } as const;
 const REASONS = new Set(["auto", "event", "import", "takeover", "exit"]);
 
@@ -76,7 +83,7 @@ const sumXp = (xp: unknown) => !xp || typeof xp !== "object" ? 0 : Object.values
  * keeps out what could hurt storage or other players' expectations: the wrong Friend, wrong shape, oversized or
  * impossible values. It can't make a client-side game cheat-proof, and doesn't pretend to (see README).
  */
-export function validateSave(save: unknown, friend: number): { ok: true; totalXp: number } | { ok: false; reason: string } {
+export function validateSave(save: unknown, friend: number): { ok: true; totalXp: number; facts: Facts } | { ok: false; reason: string } {
   if (!save || typeof save !== "object" || Array.isArray(save)) return { ok: false, reason: "not a save" };
   const s = save as Record<string, unknown>;
   if (s.v !== 1) return { ok: false, reason: "unknown save version" };
@@ -86,6 +93,8 @@ export function validateSave(save: unknown, friend: number): { ok: true; totalXp
   if (xp.length > 60 || xp.some(([key, value]) => !/^[a-z_]{2,24}$/.test(key) || typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > LIMITS.maxXpPerSkill)) return { ok: false, reason: "impossible skill experience" };
   if (s.inventory !== undefined && (!Array.isArray(s.inventory) || s.inventory.length > 64)) return { ok: false, reason: "impossible inventory" };
   if (s.bank !== undefined && (!Array.isArray(s.bank) || s.bank.length > 5_000)) return { ok: false, reason: "impossible bank" };
+  const playTicks = s.playTicks === undefined ? null : s.playTicks;
+  if (playTicks !== null && (typeof playTicks !== "number" || !Number.isFinite(playTicks) || playTicks < 0 || playTicks > 1e9)) return { ok: false, reason: "impossible play time" };
   // Shape: plain JSON, sensible keys, no deep or giant structures.
   let nodes = 0;
   const walk = (value: unknown, depth: number): string | null => {
@@ -105,7 +114,36 @@ export function validateSave(save: unknown, friend: number): { ok: true; totalXp
   };
   const shape = walk(save, 0);
   if (shape) return { ok: false, reason: shape };
-  return { ok: true, totalXp: Math.round(sumXp(s.xp)) };
+  const totalXp = Math.round(sumXp(s.xp));
+  return { ok: true, totalXp, facts: { totalXp, xp: Object.fromEntries(xp.map(([skill, value]) => [skill, Math.round(value as number)])), playTicks: playTicks === null ? null : Math.round(playTicks) } };
+}
+/** What the progress checks compare between saves: XP by skill and in total, and ticks played (null where a save has none). */
+export type Facts = { totalXp: number; xp: Record<string, number> | null; playTicks: number | null };
+/**
+ * Whether `next` could honestly follow `previous` after `elapsedMs` of real time: no skill's XP falls, play time doesn't
+ * fall or outrun the clock, and XP outruns neither the clock nor the play time. Null when it could; otherwise why not.
+ */
+export function implausible(previous: Facts | null, next: Facts, elapsedMs: number): string | null {
+  if (!previous) return null;
+  const seconds = Math.max(0, elapsedMs / 1000), gained = next.totalXp - previous.totalXp;
+  if (previous.xp && next.xp) for (const [skill, xp] of Object.entries(previous.xp)) if ((next.xp[skill] ?? 0) < xp) return `${skill} experience went backwards`;
+  if (gained > LIMITS.xpSlack + LIMITS.xpPerSecond * seconds) return "more progress than the time since the last save allows";
+  if (previous.playTicks !== null && next.playTicks !== null) {
+    const ticks = next.playTicks - previous.playTicks;
+    if (ticks < 0) return "play time went backwards";
+    if (ticks > LIMITS.playTickSlack + (seconds * 1000 / LIMITS.tickMs) * LIMITS.playRate) return "more play time than the time since the last save allows";
+    if (gained > LIMITS.xpSlack + LIMITS.xpPerSecond * ticks * LIMITS.tickMs / 1000) return "more progress than the play time allows";
+  }
+  return null;
+}
+/**
+ * A stored version, vouched for: the fields the service stands behind, signed with its key (HMAC-SHA256), so a later
+ * step that didn't watch the save being stored (a collectible card's snapshot, say) can trust what it's handed.
+ */
+export async function attest(key: string, claim: { address: string; friend: number; version: number; hash: string; totalXp: number; trust: string; at: number }) {
+  const text = ["realm-attestation-1", claim.address, claim.friend, claim.version, claim.hash, claim.totalXp, claim.trust, claim.at].join("\n");
+  const k = await crypto.subtle.importKey("raw", new TextEncoder().encode(key), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  return { ...claim, sig: hex(await crypto.subtle.sign("HMAC", k, new TextEncoder().encode(text))) };
 }
 
 async function gunzipJson(request: Request): Promise<unknown> {
@@ -130,7 +168,7 @@ class HttpError extends Error {
 }
 
 // ---------- The app ----------
-export function createApp({ db, chain, clock = now, origins, chainId }: { db: Database; chain: Chain; clock?: () => number; origins: string[]; chainId: number }) {
+export function createApp({ db, chain, clock = now, origins, chainId, attestKey = null }: { db: Database; chain: Chain; clock?: () => number; origins: string[]; chainId: number; attestKey?: string | null }) {
   const cors = (origin: string | null): Record<string, string> => origin && origins.includes(origin)
     ? { "access-control-allow-origin": origin, "access-control-allow-methods": "GET,POST,PUT,OPTIONS", "access-control-allow-headers": "authorization,content-type,content-encoding", "access-control-max-age": "600", vary: "origin" } : { vary: "origin" };
   const json = (origin: string | null, status: number, body: unknown, headers: Record<string, string> = {}) =>
@@ -200,18 +238,18 @@ export function createApp({ db, chain, clock = now, origins, chainId }: { db: Da
     // ---------- Characters ----------
     if (path === "/v1/characters" && method === "GET") {
       const { address } = await session(request);
-      const rows = await db.prepare("SELECT friend_id, version, updated_at, total_xp FROM characters WHERE address = ? ORDER BY updated_at DESC").bind(address).all<{ friend_id: number; version: number; updated_at: number; total_xp: number }>();
-      return json(origin, 200, { characters: rows.results.map(row => ({ friend: row.friend_id, version: row.version, updatedAt: row.updated_at, totalXp: row.total_xp })) });
+      const rows = await db.prepare("SELECT friend_id, version, updated_at, total_xp, trust FROM characters WHERE address = ? ORDER BY updated_at DESC").bind(address).all<{ friend_id: number; version: number; updated_at: number; total_xp: number; trust: string }>();
+      return json(origin, 200, { characters: rows.results.map(row => ({ friend: row.friend_id, version: row.version, updatedAt: row.updated_at, totalXp: row.total_xp, trust: row.trust })) });
     }
-    const match = /^\/v1\/characters\/([^/]+)(\/history|\/restore)?$/.exec(path);
+    const match = /^\/v1\/characters\/([^/]+)(\/history|\/restore|\/attestation)?$/.exec(path);
     if (match) {
       const friend = friendOf(match[1]), { address } = await session(request), part = match[2] ?? "";
       if (part === "" && method === "GET") {
-        const row = await db.prepare("SELECT version, save, updated_at, imported_at FROM characters WHERE address = ? AND friend_id = ?").bind(address, friend).first<{ version: number; save: string; updated_at: number; imported_at: number | null }>();
+        const row = await db.prepare("SELECT version, save, updated_at, imported_at, trust, trust_note FROM characters WHERE address = ? AND friend_id = ?").bind(address, friend).first<{ version: number; save: string; updated_at: number; imported_at: number | null; trust: string; trust_note: string | null }>();
         if (!row) return json(origin, 404, { error: "no cloud save yet", version: 0 });
         // Your own character is always yours to read and export, even after the Friend has moved to another wallet.
         let owned: boolean | null = null; try { owned = await owns(address, friend); } catch { owned = null; }
-        return json(origin, 200, { version: row.version, updatedAt: row.updated_at, importedAt: row.imported_at, save: JSON.parse(row.save), owned });
+        return json(origin, 200, { version: row.version, updatedAt: row.updated_at, importedAt: row.imported_at, save: JSON.parse(row.save), owned, trust: row.trust, trustNote: row.trust_note });
       }
       if (part === "" && method === "PUT") {
         const body = await gunzipJson(request) as { baseVersion?: unknown; save?: unknown; reason?: unknown; importHash?: unknown };
@@ -225,29 +263,45 @@ export function createApp({ db, chain, clock = now, origins, chainId }: { db: Da
         if (text.length > LIMITS.saveBytes) throw new HttpError(413, "save too large");
         if (!await owns(address, friend)) throw new HttpError(403, "this wallet doesn't own this Friend now, so it can't save over it");
         const at = clock();
-        const current = await db.prepare("SELECT version, updated_at, total_xp FROM characters WHERE address = ? AND friend_id = ?").bind(address, friend).first<{ version: number; updated_at: number; total_xp: number }>();
+        const current = await db.prepare("SELECT version, updated_at, total_xp, facts, trust, trust_note, trust_version FROM characters WHERE address = ? AND friend_id = ?").bind(address, friend)
+          .first<{ version: number; updated_at: number; total_xp: number; facts: string | null; trust: string; trust_note: string | null; trust_version: number | null }>();
         if (importHash) {
           const done = await db.prepare("SELECT version FROM imports WHERE address = ? AND friend_id = ? AND hash = ?").bind(address, friend, importHash).first<{ version: number }>();
           if (done) return json(origin, 200, { version: current?.version ?? done.version, updatedAt: current?.updated_at ?? at, duplicate: true });
         }
         if ((current?.version ?? 0) !== baseVersion) throw new HttpError(409, "a newer save exists", { version: current?.version ?? 0, updatedAt: current?.updated_at ?? null });
         if (current && reason === "auto" && at - current.updated_at < LIMITS.minWriteGapMs) throw new HttpError(429, "saving too often", { retryAfterMs: LIMITS.minWriteGapMs - (at - current.updated_at) });
-        // Progress has to be possible in the time since the last save (imports and takeovers are the player's explicit choice).
-        if (current && reason !== "import" && reason !== "takeover") {
-          const allowed = LIMITS.xpSlack + LIMITS.xpPerSecond * Math.max(0, (at - current.updated_at) / 1000);
-          if (checked.totalXp - current.total_xp > allowed) throw new HttpError(422, "save rejected: more progress than the time since the last save allows");
+        // Progress has to be possible in the time since the last save. An automatic save that isn't is refused; an import or a
+        // takeover is the player's explicit choice, so it's kept, but the character stops being verified.
+        const previous: Facts | null = current ? (current.facts ? JSON.parse(current.facts) as Facts : { totalXp: current.total_xp, xp: null, playTicks: null }) : null;
+        const problem = current ? implausible(previous, checked.facts, at - current.updated_at) : null;
+        if (problem && reason !== "import" && reason !== "takeover") throw new HttpError(422, `save rejected: ${problem}`);
+        // Trust. Verified progress is progress this service watched grow, save by save, within what honest play allows; a
+        // character that was here before trust was recorded is trusted as it stands, and so is the first import of a
+        // character the cloud has never seen (the adventure brought in from a browser). It stops being verified, for good,
+        // when a save comes from outside that chain: an import of something this service never stored, an import or a
+        // takeover beyond what play allows, an earlier version brought back, or a new character that didn't start from nothing.
+        let trust = current?.trust ?? "verified", note = current?.trust_note ?? null;
+        const distrust = (why: string) => { if (trust === "verified") { trust = "unverified"; note = why; } };
+        if (!current && reason !== "import" && checked.totalXp > LIMITS.xpSlack) distrust("a new character that didn't start from nothing");
+        if (problem) distrust(`${reason}: ${problem}`);
+        if (importHash && current) {
+          const ours = await db.prepare("SELECT 1 AS ok FROM characters WHERE address = ? AND friend_id = ? AND save_hash = ? UNION SELECT 1 FROM history WHERE address = ? AND friend_id = ? AND save_hash = ?").bind(address, friend, importHash, address, friend, importHash).first();
+          if (!ours) distrust("imported from outside the cloud");
         }
-        const version = baseVersion + 1, statements: Statement[] = [];
-        if (!current) statements.push(db.prepare("INSERT INTO characters (address, friend_id, version, save, size, total_xp, created_at, updated_at, imported_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(address, friend, version, text, text.length, checked.totalXp, at, at, importHash ? at : null));
+        const version = baseVersion + 1, statements: Statement[] = [], hash = await sha256(text), facts = JSON.stringify(checked.facts);
+        const trustVersion = current && trust === current.trust ? current.trust_version : version;
+        if (!current) statements.push(db.prepare("INSERT INTO characters (address, friend_id, version, save, size, total_xp, created_at, updated_at, imported_at, save_hash, facts, trust, trust_note, trust_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+          .bind(address, friend, version, text, text.length, checked.totalXp, at, at, importHash ? at : null, hash, facts, trust, note, version));
         else {
           // Keep the version being replaced (every so often, and always before an import or takeover).
           const last = await db.prepare("SELECT MAX(saved_at) AS at FROM history WHERE address = ? AND friend_id = ?").bind(address, friend).first<{ at: number | null }>();
           if (reason === "import" || reason === "takeover" || !last?.at || at - last.at >= LIMITS.historyGapMs) {
-            statements.push(db.prepare("INSERT OR REPLACE INTO history (address, friend_id, version, save, saved_at, reason) SELECT address, friend_id, version, save, ?, ? FROM characters WHERE address = ? AND friend_id = ? AND version = ?").bind(at, reason, address, friend, baseVersion));
+            statements.push(db.prepare("INSERT OR REPLACE INTO history (address, friend_id, version, save, saved_at, reason, save_hash) SELECT address, friend_id, version, save, ?, ?, save_hash FROM characters WHERE address = ? AND friend_id = ? AND version = ?").bind(at, reason, address, friend, baseVersion));
             statements.push(db.prepare("DELETE FROM history WHERE address = ? AND friend_id = ? AND version NOT IN (SELECT version FROM history WHERE address = ? AND friend_id = ? ORDER BY version DESC LIMIT ?)").bind(address, friend, address, friend, LIMITS.historyKeep));
           }
-          statements.push(db.prepare(`UPDATE characters SET version = ?, save = ?, size = ?, total_xp = ?, updated_at = ?${importHash ? ", imported_at = ?" : ""} WHERE address = ? AND friend_id = ? AND version = ?`)
-            .bind(...[version, text, text.length, checked.totalXp, at, ...(importHash ? [at] : []), address, friend, baseVersion]));
+          statements.push(db.prepare(`UPDATE characters SET version = ?, save = ?, size = ?, total_xp = ?, updated_at = ?, save_hash = ?, facts = ?, trust = ?, trust_note = ?, trust_version = ?${importHash ? ", imported_at = ?" : ""} WHERE address = ? AND friend_id = ? AND version = ?`)
+            .bind(...[version, text, text.length, checked.totalXp, at, hash, facts, trust, note, trustVersion, ...(importHash ? [at] : []), address, friend, baseVersion]));
         }
         // The import is recorded only if the write itself landed (same transaction, after it).
         if (importHash) statements.push(db.prepare("INSERT OR IGNORE INTO imports (address, friend_id, hash, version, at) SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM characters WHERE address = ? AND friend_id = ? AND version = ? AND updated_at = ?)")
@@ -257,7 +311,15 @@ export function createApp({ db, chain, clock = now, origins, chainId }: { db: Da
         catch { const now2 = await db.prepare("SELECT version, updated_at FROM characters WHERE address = ? AND friend_id = ?").bind(address, friend).first<{ version: number; updated_at: number }>(); throw new HttpError(409, "a newer save exists", { version: now2?.version ?? 0, updatedAt: now2?.updated_at ?? null }); }
         const write = results[current ? statements.length - (importHash ? 2 : 1) : 0];
         if (!write?.meta.changes) { const now2 = await db.prepare("SELECT version, updated_at FROM characters WHERE address = ? AND friend_id = ?").bind(address, friend).first<{ version: number; updated_at: number }>(); throw new HttpError(409, "a newer save exists", { version: now2?.version ?? 0, updatedAt: now2?.updated_at ?? null }); }
-        return json(origin, 200, { version, updatedAt: at });
+        return json(origin, 200, { version, updatedAt: at, trust });
+      }
+      if (part === "/attestation" && method === "GET") {
+        if (!attestKey) throw new HttpError(503, "attestations aren't available");
+        const row = await db.prepare("SELECT version, save, updated_at, total_xp, save_hash, trust, trust_note FROM characters WHERE address = ? AND friend_id = ?").bind(address, friend)
+          .first<{ version: number; save: string; updated_at: number; total_xp: number; save_hash: string | null; trust: string; trust_note: string | null }>();
+        if (!row) throw new HttpError(404, "no cloud save yet");
+        const claim = await attest(attestKey, { address, friend, version: row.version, hash: row.save_hash ?? await sha256(row.save), totalXp: row.total_xp, trust: row.trust, at: row.updated_at });
+        return json(origin, 200, { ...claim, trustNote: row.trust_note });
       }
       if (part === "/history" && method === "GET") {
         const rows = await db.prepare("SELECT version, saved_at, reason, LENGTH(save) AS size FROM history WHERE address = ? AND friend_id = ? ORDER BY version DESC").bind(address, friend).all<{ version: number; saved_at: number; reason: string; size: number }>();
@@ -267,16 +329,18 @@ export function createApp({ db, chain, clock = now, origins, chainId }: { db: Da
         const body = await request.json().catch(() => null) as { version?: unknown } | null;
         if (!body || typeof body.version !== "number") throw new HttpError(400, "bad version");
         if (!await owns(address, friend)) throw new HttpError(403, "this wallet doesn't own this Friend now");
-        const old = await db.prepare("SELECT save FROM history WHERE address = ? AND friend_id = ? AND version = ?").bind(address, friend, body.version).first<{ save: string }>();
-        const current = await db.prepare("SELECT version, save, total_xp FROM characters WHERE address = ? AND friend_id = ?").bind(address, friend).first<{ version: number; save: string; total_xp: number }>();
+        const old = await db.prepare("SELECT save, save_hash FROM history WHERE address = ? AND friend_id = ? AND version = ?").bind(address, friend, body.version).first<{ save: string; save_hash: string | null }>();
+        const current = await db.prepare("SELECT version, save, save_hash FROM characters WHERE address = ? AND friend_id = ?").bind(address, friend).first<{ version: number; save: string; save_hash: string | null }>();
         if (!old || !current) throw new HttpError(404, "no such version");
         const at = clock(), version = current.version + 1, checked = validateSave(JSON.parse(old.save), friend);
         if (!checked.ok) throw new HttpError(422, "that version can't be restored");
+        // An earlier version brought back is the player's choice, not progress the service watched: the character stays, unverified.
         await db.batch([
-          db.prepare("INSERT OR REPLACE INTO history (address, friend_id, version, save, saved_at, reason) VALUES (?, ?, ?, ?, ?, 'restore')").bind(address, friend, current.version, current.save, at),
-          db.prepare("UPDATE characters SET version = ?, save = ?, size = ?, total_xp = ?, updated_at = ? WHERE address = ? AND friend_id = ? AND version = ?").bind(version, old.save, old.save.length, checked.totalXp, at, address, friend, current.version),
+          db.prepare("INSERT OR REPLACE INTO history (address, friend_id, version, save, saved_at, reason, save_hash) VALUES (?, ?, ?, ?, ?, 'restore', ?)").bind(address, friend, current.version, current.save, at, current.save_hash),
+          db.prepare("UPDATE characters SET version = ?, save = ?, size = ?, total_xp = ?, updated_at = ?, save_hash = ?, facts = ?, trust = 'unverified', trust_note = ?, trust_version = ? WHERE address = ? AND friend_id = ? AND version = ?")
+            .bind(version, old.save, old.save.length, checked.totalXp, at, old.save_hash ?? await sha256(old.save), JSON.stringify(checked.facts), `restored version ${body.version}`, version, address, friend, current.version),
         ]);
-        return json(origin, 200, { version, updatedAt: at });
+        return json(origin, 200, { version, updatedAt: at, trust: "unverified" });
       }
     }
     throw new HttpError(404, "not found");
@@ -322,6 +386,6 @@ export function chainFor(env: Pick<Env, "RPC_URL" | "COLLECTION">): Chain {
 
 export default {
   fetch(request: Request, env: Env) {
-    return createApp({ db: env.DB, chain: chainFor(env), origins: env.ORIGINS.split(",").map(origin => origin.trim()), chainId: Number(env.CHAIN_ID) }).fetch(request);
+    return createApp({ db: env.DB, chain: chainFor(env), origins: env.ORIGINS.split(",").map(origin => origin.trim()), chainId: Number(env.CHAIN_ID), attestKey: env.ATTEST_KEY ?? null }).fetch(request);
   },
 };
