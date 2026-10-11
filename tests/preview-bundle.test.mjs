@@ -21,7 +21,7 @@ test("the preview build carries no transaction-capable code", async () => {
       if (file === "runtime.js" && marker === "eth_sendTransaction") {
         // Exactly one: the Adventurer Card's mint, and only that function.
         assert.equal(code.split("eth_sendTransaction").length - 1, 1, "runtime.js sends one kind of transaction only");
-        assert.ok(code.includes("function mint(uint256 tokenId, bytes32 character, bytes32 snapshot, uint256 deadline, bytes signature)"), "the transaction is the card's mint");
+        assert.ok(code.includes("function mint(uint256 tokenId, bytes32 character, bytes32 snapshot, uint256 deadline, bytes signature)") && code.includes("function redeem(uint256 tokenId)"), "the transactions are the card's mint and redeem, nothing else");
         continue;
       }
       if (file === "runtime.js" && marker === "personal_sign") {

@@ -262,9 +262,10 @@ const MINTER = privateKeyToAccount("0x4bbbf85ce3377467afe5d46f804f221813b2bb87f2
 function cardWorld() {
   const files = new Map(), receipts = new Map();
   const bucket = { put: async (key, value, options) => { files.set(key, { bytes: new Uint8Array(value), type: options?.httpMetadata?.contentType }); }, get: async key => { const f = files.get(key); return f ? { arrayBuffer: async () => f.bytes.buffer, httpMetadata: { contentType: f.type } } : null; }, delete: async key => { files.delete(key); } };
-  const chain = { receipt: async hash => receipts.get(hash) ?? { status: "pending" } };
+  const owners = new Map();
+  const chain = { receipt: async hash => receipts.get(hash) ?? { status: "pending" }, ownerOf: async id => owners.get(id) ?? null };
   const w = world({ attestKey: "k", cards: { minterKey: "0x4bbbf85ce3377467afe5d46f804f221813b2bb87f24d81f60f1fcdbf7cbf4356", contract: CONTRACT, chainId: 46630, bucket, chain, baseUrl: "https://saves.example", gameUrl: "https://game.example/" } });
-  return { ...w, files, receipts };
+  return { ...w, files, receipts, cardOwners: owners };
 }
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
 
@@ -339,4 +340,45 @@ test("Adventurer Cards: unverified progress can't become a card; a card given up
   w.receipts.set(tx, { status: "failed" });
   assert.equal((await w.call("POST", "/v1/cards/3/submitted", { token, body: { txHash: tx } })).body.card.state, "reserved");
   assert.equal((await w.call("GET", "/v1/characters/7730/card", { token })).body.card.tokenId, 3);
+});
+
+test("Adventurer Cards: redeeming settles the snapshot exactly: the redeemer gains its XP and items, the original loses that XP and its lockbox empties; a session still on an older save has the settlement applied to what it sends, until it carries the mark", async () => {
+  const w = cardWorld(), token = await w.signIn(alice), tb = await w.signIn(bob);
+  // Alice mints a card of 1000 attack XP and 20 logs; Bob has a character of his own.
+  await w.put(token, 7730, 0, w.save(7730, 1000, { playTicks: 10, lockbox: [{ id: "logs", n: 20 }] }));
+  const made = await w.call("POST", "/v1/cards/prepare", { token, body: { friend: 7730, layout: "classic", show: [] } });
+  const tx = "0x" + "11".repeat(32);
+  await w.call("POST", "/v1/cards/1/submitted", { token, body: { txHash: tx } });
+  w.receipts.set(tx, { status: "success", minted: [{ tokenId: 1n, to: alice.address, character: made.body.voucher.character, snapshot: made.body.voucher.snapshot }] });
+  assert.equal((await w.call("POST", "/v1/cards/1/confirm", { token })).body.card.state, "active");
+  await w.put(tb, 3412, 0, w.save(3412, 500, { playTicks: 10 }));
+  // Alice plays on (the card is out); then gives the card to Bob on chain.
+  w.advance(60_000);
+  assert.equal((await w.put(token, 7730, 1, w.save(7730, 1300, { playTicks: 60, lockbox: [{ id: "logs", n: 20 }] }))).status, 200);
+  w.cardOwners.set(1, bob.address);
+  const held = await w.call("GET", "/v1/cards/held", { token: tb });
+  assert.equal(held.body.held.length, 1); assert.equal(held.body.held[0].tokenId, 1); assert.equal(held.body.held[0].from.friend, 7730); assert.equal(held.body.held[0].totalXp, 2154);
+  assert.equal((await w.call("GET", "/v1/cards/held", { token })).body.held.length, 0, "Alice no longer holds it");
+  // Bob burns it; the chain says so; the service settles both characters.
+  const burn = "0x" + "22".repeat(32);
+  assert.equal((await w.call("POST", "/v1/cards/1/redeem", { token: tb, body: { txHash: burn, friend: 3412 } })).status, 202, "not in yet");
+  w.receipts.set(burn, { status: "success", minted: [], redeemed: [{ tokenId: 1n, by: bob.address, character: made.body.voucher.character, snapshot: made.body.voucher.snapshot }] });
+  const settled = await w.call("POST", "/v1/cards/1/redeem", { token: tb, body: { txHash: burn, friend: 3412 } });
+  assert.equal(settled.status, 200, JSON.stringify(settled.body)); assert.equal(settled.body.card.state, "redeemed");
+  const bobNow = (await w.call("GET", "/v1/characters/3412", { token: tb })).body.save, aliceNow = (await w.call("GET", "/v1/characters/7730", { token })).body.save;
+  assert.equal(bobNow.xp.attack, 1500); assert.equal(bobNow.xp.hitpoints, 1154 + 1154); assert.deepEqual(bobNow.bank, [{ id: "logs", n: 20 }]); assert.deepEqual(bobNow.settled, [1]); assert.match(bobNow.notices[0], /redeemed Adventurer Card #1/);
+  assert.equal(aliceNow.xp.attack, 300, "what she earned since the mint"); assert.equal(aliceNow.xp.hitpoints, 1154, "never below Hitpoints 10"); assert.deepEqual(aliceNow.lockbox, []); assert.deepEqual(aliceNow.settled, [1]);
+  assert.equal((await w.call("GET", "/v1/characters/7730/card", { token })).body.card, null, "Alice can make another card now");
+  // Alice's session is still playing her older save (1300 attack, the logs in the lockbox): what it sends is settled on the way in.
+  w.advance(60_000);
+  const stale = await w.put(token, 7730, 3, w.save(7730, 1400, { playTicks: 120, lockbox: [{ id: "logs", n: 20 }] }));
+  assert.equal(stale.status, 200, JSON.stringify(stale.body));
+  const after = (await w.call("GET", "/v1/characters/7730", { token })).body.save;
+  assert.equal(after.xp.attack, 400); assert.deepEqual(after.lockbox, []); assert.deepEqual(after.settled, [1]);
+  // Once her game carries the mark (it loaded the settled save), nothing is applied again.
+  w.advance(60_000);
+  assert.equal((await w.put(token, 7730, 4, w.save(7730, 450, { playTicks: 180, lockbox: [], settled: [1] }))).status, 200);
+  assert.equal((await w.call("GET", "/v1/characters/7730", { token })).body.save.xp.attack, 450);
+  // A card can't be redeemed twice, nor by someone who didn't burn it.
+  assert.equal((await w.call("POST", "/v1/cards/1/redeem", { token: tb, body: { txHash: burn, friend: 3412 } })).status, 404);
 });

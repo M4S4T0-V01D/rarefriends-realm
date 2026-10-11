@@ -3816,3 +3816,12 @@ test("The card lockbox: tradeable items go in from the inventory and come back t
   const save = serialize(g); assert.deepEqual(save.lockbox, [{ id: "logs", n: 7 }]);
   const h = newGame(); assert.ok(restore(h, save)); assert.deepEqual(h.player.lockbox, [{ id: "logs", n: 7 }]);
 });
+
+test("Settlements travel with the save: the marks stay, the service's notices are said once on load and then forgotten", () => {
+  const g = newGame(); g.player.settled = [3, 7];
+  const save = serialize(g); save.notices = ["Your Adventurer Card #3 was redeemed: 2,000 XP left you with it."];
+  const h = newGame(); assert.ok(restore(h, save));
+  assert.deepEqual(h.player.settled, [3, 7]); assert.deepEqual(h.player.notices, []);
+  assert.ok(h.messages.some(entry => /Card #3 was redeemed/.test(entry.text)), "said once");
+  assert.deepEqual(serialize(h).notices, []);
+});

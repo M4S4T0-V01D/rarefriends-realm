@@ -205,6 +205,8 @@ function RealmHost() {
           void cloud.mintCard({ layout: event.data.layout, show: event.data.show.filter((entry: unknown): entry is string => typeof entry === "string"), facts: event.data.facts && typeof event.data.facts === "object" ? event.data.facts as Record<string, unknown> : {}, image: event.data.image });
         else if (action === "card-status") void cloud.cardStatus();
         else if (action === "cancel-card") void cloud.cancelCard();
+        else if (action === "held-cards") void cloud.heldCards();
+        else if (action === "redeem-card" && typeof event.data.tokenId === "number") void cloud.redeemCard(event.data.tokenId);
       }
       else if (event.data?.type === TEXT_COPY && typeof event.data.text === "string" && event.data.text.length <= 1000) {
         const source = event.source as Window;

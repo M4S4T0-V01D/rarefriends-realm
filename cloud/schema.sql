@@ -35,6 +35,8 @@ CREATE TABLE IF NOT EXISTS characters (
   trust TEXT NOT NULL DEFAULT 'verified',
   trust_note TEXT,
   trust_version INTEGER,
+  -- Redemptions settled into this character but not yet carried by every session's save (cards.ts Settlement[]).
+  pending TEXT,
   PRIMARY KEY (address, friend_id)
 );
 -- Earlier versions, kept for recovery (the latest few per character).

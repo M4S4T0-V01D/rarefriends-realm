@@ -202,14 +202,14 @@ test("the wallet is only ever asked to sign the Realm's own sign-in message", as
 test("Adventurer Cards from the host: the lockbox goes up, the service signs the voucher, the picture goes up, the wallet is switched to the card's chain and sends the one mint transaction, and the chain's word makes the card active", async () => {
   const srv = server(), phone = storage();
   // The service with cards open: a bucket in a Map, a chain whose receipts the test writes.
-  const files = new Map(), receipts = new Map(), MINTER_KEY = "0x4bbbf85ce3377467afe5d46f804f221813b2bb87f24d81f60f1fcdbf7cbf4356", CONTRACT = "0x1000000000000000000000000000000000000001";
+  const files = new Map(), receipts = new Map(), cardOwners = new Map(), MINTER_KEY = "0x4bbbf85ce3377467afe5d46f804f221813b2bb87f24d81f60f1fcdbf7cbf4356", CONTRACT = "0x1000000000000000000000000000000000000001";
   const bucket = { put: async (key, value) => { files.set(key, new Uint8Array(value)); }, get: async key => files.has(key) ? { arrayBuffer: async () => files.get(key).buffer } : null, delete: async () => {} };
   const app = createApp({ db: srv.db, origins: [ORIGIN], chainId: 4663, clock: srv.clock, chain: { ownerOf: async f => srv.owners.get(f) ?? null, verify: chainFor({ RPC_URL: "http://127.0.0.1:9", COLLECTION: "0x14C49e6118F46525dE9ab41a51cBAA3c6EBF181D" }).verify },
-    cards: { minterKey: MINTER_KEY, contract: CONTRACT, chainId: 46630, bucket, chain: { receipt: async hash => receipts.get(hash) ?? { status: "pending" } }, baseUrl: BASE, gameUrl: "https://game.example/" } });
+    cards: { minterKey: MINTER_KEY, contract: CONTRACT, chainId: 46630, bucket, chain: { receipt: async hash => receipts.get(hash) ?? { status: "pending" }, ownerOf: async id => cardOwners.get(id) ?? null }, baseUrl: BASE, gameUrl: "https://game.example/" } });
   const http = async (url, init = {}) => app.fetch(new Request(url, { ...init, headers: { ...init.headers, origin: ORIGIN } }));
   // A wallet that signs in, switches chain when asked, and "sends" the mint: the test records what it was asked.
   const asked = [];
-  let chain = "0x1237";
+  let chain = "0x1237", minted = null;
   const provider = { request: async ({ method, params }) => {
     asked.push(method);
     if (method === "personal_sign") return alice.signMessage({ message: hexToString(params[0]) });
@@ -217,10 +217,12 @@ test("Adventurer Cards from the host: the lockbox goes up, the service signs the
     if (method === "wallet_addEthereumChain") { assert.equal(params[0].chainId, "0xb626"); chain = "added"; return null; }
     if (method === "eth_sendTransaction") {
       const tx = params[0]; assert.equal(tx.to, CONTRACT); assert.equal(tx.from, alice.address);
-      const call = decodeFunctionData({ abi: parseAbi(["function mint(uint256 tokenId, bytes32 character, bytes32 snapshot, uint256 deadline, bytes signature)"]), data: tx.data });
-      assert.equal(call.functionName, "mint"); assert.equal(call.args[0], 1n);
+      const call = decodeFunctionData({ abi: parseAbi(["function mint(uint256 tokenId, bytes32 character, bytes32 snapshot, uint256 deadline, bytes signature)", "function redeem(uint256 tokenId)"]), data: tx.data });
+      assert.equal(call.args[0], 1n);
+      if (call.functionName === "redeem") { const hash = "0x" + "dd".repeat(32); receipts.set(hash, { status: "success", minted: [], redeemed: [{ tokenId: call.args[0], by: alice.address, character: minted.character, snapshot: minted.snapshot }] }); cardOwners.delete(1); return hash; }
       const hash = "0x" + "ee".repeat(32);
-      receipts.set(hash, { status: "success", minted: [{ tokenId: 1n, to: alice.address, character: call.args[1], snapshot: call.args[2] }] });
+      minted = { character: call.args[1], snapshot: call.args[2] };
+      receipts.set(hash, { status: "success", minted: [{ tokenId: 1n, to: alice.address, character: call.args[1], snapshot: call.args[2] }] }); cardOwners.set(1, alice.address);
       return hash;
     }
     throw new Error(`unexpected ${method}`);
@@ -252,4 +254,12 @@ test("Adventurer Cards from the host: the lockbox goes up, the service signs the
   const kept = { ...touched, lockbox: [{ id: "logs", n: 5 }] };
   phone.setItem(key, JSON.stringify(kept)); sync.queue(kept, true, null); await sync.flush();
   assert.equal(states.at(-1).status, "saved");
+  // Redeeming her own card: the wallet burns it, the service settles (her logs back to the bank), and the host takes the settled save.
+  await sync.heldCards(); assert.equal(states.at(-1).held.length, 1);
+  await sync.redeemCard(1);
+  const done = states.at(-1);
+  assert.equal(done.redeeming.done, true, JSON.stringify(done.redeeming)); assert.equal(done.card, null); assert.deepEqual(done.held, []);
+  assert.deepEqual(asked.filter(m => m === "eth_sendTransaction").length, 2, "the mint, and the redeem");
+  const settledSave = JSON.parse(phone.getItem(key));
+  assert.deepEqual(settledSave.lockbox, []); assert.deepEqual(settledSave.bank, [{ id: "logs", n: 5 }]); assert.deepEqual(settledSave.settled, [1]); assert.equal(settledSave.xp.attack, 1200, "her own card: XP unchanged");
 });

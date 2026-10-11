@@ -23,7 +23,7 @@
  * (kept, playable, but not vouched for). See cloud/README.md for the policies.
  */
 import { BaseError, ContractFunctionRevertedError, HttpRequestError, createPublicClient, getAddress, http, isAddress, parseAbi, recoverMessageAddress, zeroAddress, type Hex } from "viem";
-import { cardRoutes, cardsChainFor, heldLockbox, lockboxOf, sameLockbox, type Bucket, type CardsOptions } from "./cards.ts";
+import { applySettlements, cardRoutes, cardsChainFor, heldLockbox, lockboxOf, parsePending, sameLockbox, type Bucket, type CardsOptions, type Settlement } from "./cards.ts";
 
 // ---------- Storage (the subset of D1 used here, so tests can supply SQLite) ----------
 export type Statement = { bind(...values: unknown[]): Statement; first<T = Record<string, unknown>>(): Promise<T | null>; all<T = Record<string, unknown>>(): Promise<{ results: T[] }>; run(): Promise<{ meta: { changes: number } }> };
@@ -195,7 +195,23 @@ export function createApp({ db, chain, clock = now, origins, chainId, attestKey 
     return normal === address;
   }
   const characterOf = (address: string, friend: number) => db.prepare("SELECT version, save, save_hash, trust FROM characters WHERE address = ? AND friend_id = ?").bind(address, friend).first<{ version: number; save: string; save_hash: string | null; trust: string }>();
-  const cardsRoute = cards ? cardRoutes(db, cards, { clock, session, owns, json, characterOf }) : null;
+  /** A redemption's settlement, written into a stored character now and left pending for sessions still on an older save. */
+  const settle = async (address: string, friend: number, settlement: Settlement) => {
+    const current = await db.prepare("SELECT version, save, pending FROM characters WHERE address = ? AND friend_id = ?").bind(address, friend).first<{ version: number; save: string; pending: string | null }>();
+    if (!current) return false;
+    const save = JSON.parse(current.save) as Record<string, unknown>;
+    applySettlements(save, [settlement]);
+    const checked = validateSave(save, friend);
+    if (!checked.ok) return false;
+    const text = JSON.stringify(save), at = clock(), version = current.version + 1, pending = JSON.stringify([...parsePending(current.pending), settlement].slice(-20));
+    const results = await db.batch([
+      db.prepare("INSERT OR REPLACE INTO history (address, friend_id, version, save, saved_at, reason, save_hash) SELECT address, friend_id, version, save, ?, 'settlement', save_hash FROM characters WHERE address = ? AND friend_id = ? AND version = ?").bind(at, address, friend, current.version),
+      db.prepare("UPDATE characters SET version = ?, save = ?, size = ?, total_xp = ?, updated_at = ?, save_hash = ?, facts = ?, pending = ? WHERE address = ? AND friend_id = ? AND version = ?")
+        .bind(version, text, text.length, checked.totalXp, at, await sha256(text), JSON.stringify(checked.facts), pending, address, friend, current.version),
+    ]);
+    return !!results[1]?.meta.changes;
+  };
+  const cardsRoute = cards ? cardRoutes(db, cards, { clock, session, owns, json, characterOf, settle }) : null;
   const friendOf = (text: string) => { const id = Number(text); if (!/^[0-9]{1,15}$/.test(text) || !Number.isSafeInteger(id)) throw new HttpError(400, "bad Friend"); return id; };
 
   async function route(request: Request, url: URL, origin: string | null): Promise<Response> {
@@ -263,8 +279,13 @@ export function createApp({ db, chain, clock = now, origins, chainId, attestKey 
         if (typeof baseVersion !== "number" || !Number.isSafeInteger(baseVersion) || baseVersion < 0) throw new HttpError(400, "bad version");
         const importHash = reason === "import" && typeof body.importHash === "string" && /^[0-9a-f]{64}$/.test(body.importHash) ? body.importHash : null;
         if (reason === "import" && !importHash) throw new HttpError(400, "an import needs its hash");
-        const checked = validateSave(body.save, friend);
+        let checked = validateSave(body.save, friend);
         if (!checked.ok) throw new HttpError(422, `save rejected: ${checked.reason}`);
+        // A redemption this session hasn't taken yet (it's playing an older save) is settled into the save first, so the
+        // stored progress stays settled whatever the session knew; the game carries the marks once it loads the settled save.
+        const settlements = await db.prepare("SELECT pending FROM characters WHERE address = ? AND friend_id = ?").bind(address, friend).first<{ pending: string | null }>();
+        const pendingList = parsePending(settlements?.pending), drop = reason !== "import";
+        if (pendingList.length && applySettlements(body.save as Record<string, unknown>, pendingList)) { checked = validateSave(body.save, friend); if (!checked.ok) throw new HttpError(422, `save rejected: ${checked.reason}`); }
         const text = JSON.stringify(body.save);
         if (text.length > LIMITS.saveBytes) throw new HttpError(413, "save too large");
         if (!await owns(address, friend)) throw new HttpError(403, "this wallet doesn't own this Friend now, so it can't save over it");
@@ -309,8 +330,10 @@ export function createApp({ db, chain, clock = now, origins, chainId, attestKey 
             statements.push(db.prepare("INSERT OR REPLACE INTO history (address, friend_id, version, save, saved_at, reason, save_hash) SELECT address, friend_id, version, save, ?, ?, save_hash FROM characters WHERE address = ? AND friend_id = ? AND version = ?").bind(at, reason, address, friend, baseVersion));
             statements.push(db.prepare("DELETE FROM history WHERE address = ? AND friend_id = ? AND version NOT IN (SELECT version FROM history WHERE address = ? AND friend_id = ? ORDER BY version DESC LIMIT ?)").bind(address, friend, address, friend, LIMITS.historyKeep));
           }
-          statements.push(db.prepare(`UPDATE characters SET version = ?, save = ?, size = ?, total_xp = ?, updated_at = ?, save_hash = ?, facts = ?, trust = ?, trust_note = ?, trust_version = ?${importHash ? ", imported_at = ?" : ""} WHERE address = ? AND friend_id = ? AND version = ?`)
-            .bind(...[version, text, text.length, checked.totalXp, at, hash, facts, trust, note, trustVersion, ...(importHash ? [at] : []), address, friend, baseVersion]));
+          // Settlements the save now carries are done with; the rest stay pending for other sessions.
+          const carried = new Set(Array.isArray((body.save as { settled?: unknown }).settled) ? (body.save as { settled: unknown[] }).settled : []), stillPending = pendingList.filter(entry => !carried.has(entry.token));
+          statements.push(db.prepare(`UPDATE characters SET version = ?, save = ?, size = ?, total_xp = ?, updated_at = ?, save_hash = ?, facts = ?, trust = ?, trust_note = ?, trust_version = ?, pending = ?${importHash ? ", imported_at = ?" : ""} WHERE address = ? AND friend_id = ? AND version = ?`)
+            .bind(...[version, text, text.length, checked.totalXp, at, hash, facts, trust, note, trustVersion, drop && stillPending.length === 0 ? null : JSON.stringify(stillPending), ...(importHash ? [at] : []), address, friend, baseVersion]));
         }
         // The import is recorded only if the write itself landed (same transaction, after it).
         if (importHash) statements.push(db.prepare("INSERT OR IGNORE INTO imports (address, friend_id, hash, version, at) SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM characters WHERE address = ? AND friend_id = ? AND version = ? AND updated_at = ?)")

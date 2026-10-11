@@ -1076,6 +1076,17 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     if (card.state === "redeemed") return `Card #${card.tokenId} was redeemed.`;
     return "";
   })();
+  const [redeemAsk, setRedeemAsk] = useState<number | null>(null);
+  const redeemLine = (() => {
+    const r = cloud?.redeeming; if (!r) return "";
+    if (r.error === "cancelled") return "The wallet didn't send the redemption.";
+    if (r.error) return `Couldn't redeem: ${r.error}`;
+    if (r.step === "wallet") return "Confirm the transaction in your wallet…";
+    if (r.step === "waiting") return `Card #${r.tokenId} is being redeemed: waiting for the chain…`;
+    if (r.step === "settling") return "Settling its progress onto this character…";
+    if (r.done) return `Card #${r.tokenId} is redeemed: its progress is yours. Your adventure reloads with it.`;
+    return "";
+  })();
   const canMint = hosted === "linked" && cloud?.status === "saved" && !cloud.card?.step && (!cloud.card || cloud.card.state === "cancelled" || cloud.card.state === "reserved" || cloud.card.state === "redeemed");
   const shareCollectible = (action: ShareAction) => { const state = game.current, blob = collectibleBlob.current; if (state && blob) shareBlob(action, blob, shareText(state), `rarefriends-realm-card-${state.player.friendId}.png`); };
   const shareBlob = (action: ShareAction, blob: Blob, text: string, filename: string) => {
@@ -1357,6 +1368,21 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
                   {cloud?.card?.state === "reserved" && !cloud.card.step && <button type="button" onClick={() => cloudAction("cancel-card")}>Give up this card</button>}
                   {cloud?.card && <button type="button" onClick={() => cloudAction("card-status")}>Check again</button>}
                 </div>
+                <h3>Redeem a card</h3>
+                <p className="realm-muted">A card in your wallet (yours, or one you were given or bought) can be redeemed onto this character: the wallet burns it, and its XP and items become yours. The character it came from loses exactly that. Redeeming can't be undone.</p>
+                {redeemLine && <p className="realm-note" role="status">{redeemLine}</p>}
+                <div className="realm-buttons">
+                  <button type="button" disabled={hosted !== "linked" || cloud?.status !== "saved"} onClick={() => { setRedeemAsk(null); cloudAction("held-cards"); }}>Show the cards in my wallet</button>
+                </div>
+                {cloud?.held && !cloud.held.length && <p className="realm-muted">No Adventurer Cards in this wallet.</p>}
+                {cloud?.held && cloud.held.length > 0 && <ul className="realm-held-cards">
+                  {cloud.held.map(entry => <li key={entry.tokenId}>
+                    <span>Card #{entry.tokenId} · from {entry.from.name ?? `Friend #${entry.from.friend}`} · {entry.totalXp.toLocaleString()} XP · {entry.items} kind{entry.items === 1 ? "" : "s"} of item</span>
+                    {redeemAsk === entry.tokenId
+                      ? <span><button type="button" className="realm-primary" disabled={!!cloud.redeeming?.step} onClick={() => { setRedeemAsk(null); cloudAction("redeem-card", { tokenId: entry.tokenId }); }}>Yes, redeem it onto this character</button> <button type="button" onClick={() => setRedeemAsk(null)}>No</button></span>
+                      : <button type="button" disabled={!!cloud.redeeming?.step} onClick={() => setRedeemAsk(entry.tokenId)}>Redeem…</button>}
+                  </li>)}
+                </ul>}
               </div>
               <div className="realm-card-styles">
                 <div className="realm-card-selects">

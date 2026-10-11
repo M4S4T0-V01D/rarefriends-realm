@@ -77,7 +77,7 @@ export type ShareOutcome = "shared" | "copied-and-opened" | "saved-and-opened" |
  */
 export const CLOUD_STATE = "rarefriends-realm:cloud-state";
 export const CLOUD_ACTION = "rarefriends-realm:cloud-action";
-export type CloudAction = "verify" | "sign-out" | "import" | "skip-import" | "keep-cloud" | "keep-local" | "retry" | "reload" | "flush" | "mint-card" | "card-status" | "cancel-card";
+export type CloudAction = "verify" | "sign-out" | "import" | "skip-import" | "keep-cloud" | "keep-local" | "retry" | "reload" | "flush" | "mint-card" | "card-status" | "cancel-card" | "held-cards" | "redeem-card";
 /**
  * An Adventurer Card (cloud/src/cards.ts) this character has out, as the host reports it: the card's token, where it
  * is in its life (reserved → submitted → active → redeemed; or cancelled), and what the host is doing about it now.
@@ -107,7 +107,11 @@ export type CloudState = {
   lost?: boolean; imported?: boolean; duplicate?: boolean;
   /** This character's Adventurer Card, if it has one out (null: none; absent: not known yet). */
   card?: CardState | null;
+  /** The active cards this wallet holds on chain, when asked for (`held-cards`), and what a redemption is doing. */
+  held?: HeldCard[]; redeeming?: { tokenId: number; step: "wallet" | "waiting" | "settling" | null; error?: string; done?: boolean };
 };
+/** A card held in the wallet: whose progress it stands for, and how much. */
+export type HeldCard = { tokenId: number; from: { friend: number; name: string | null }; totalXp: number; items: number; layout: string };
 const CLOUD_STATUSES = new Set<CloudState["status"]>(["off", "unverified", "signing", "loading", "saved", "saving", "offline", "conflict", "import", "local-only", "not-owner", "error"]);
 const CARD_STATES = new Set(["prepared", "reserved", "submitted", "active", "redeemed", "cancelled"]), CARD_STEPS = new Set(["preparing", "uploading", "wallet", "waiting"]);
 export function parseCardState(raw: unknown): CardState | null {
@@ -118,6 +122,13 @@ export function parseCardState(raw: unknown): CardState | null {
   return { tokenId: c.tokenId, state: c.state as CardState["state"], txHash: text(c.txHash), holder: text(c.holder), contract: text(c.contract), chainId: typeof c.chainId === "number" ? c.chainId : undefined,
     deadline: typeof c.deadline === "number" ? c.deadline : null, step: CARD_STEPS.has(c.step as string) ? c.step as CardState["step"] : null, error: text(c.error, 200) ?? undefined };
 }
+export function parseHeldCard(raw: unknown): HeldCard | null {
+  if (!raw || typeof raw !== "object") return null;
+  const c = raw as Record<string, unknown>, from = (c.from && typeof c.from === "object" ? c.from : {}) as Record<string, unknown>;
+  if (typeof c.tokenId !== "number" || !Number.isSafeInteger(c.tokenId)) return null;
+  return { tokenId: c.tokenId, from: { friend: typeof from.friend === "number" ? from.friend : 0, name: typeof from.name === "string" ? from.name.slice(0, 40) : null }, totalXp: typeof c.totalXp === "number" ? c.totalXp : 0, items: Array.isArray(c.items) ? c.items.length : typeof c.items === "number" ? c.items : 0, layout: typeof c.layout === "string" ? c.layout.slice(0, 24) : "" };
+}
+const parseRedeeming = (r: Record<string, unknown>): NonNullable<CloudState["redeeming"]> => ({ tokenId: typeof r.tokenId === "number" ? r.tokenId : 0, step: r.step === "wallet" || r.step === "waiting" || r.step === "settling" ? r.step : null, error: typeof r.error === "string" ? r.error.slice(0, 200) : undefined, done: r.done === true });
 /** Check a CLOUD_STATE from the host before showing it. */
 export function parseCloudState(raw: unknown): CloudState | null {
   if (!raw || typeof raw !== "object") return null;
@@ -133,6 +144,8 @@ export function parseCloudState(raw: unknown): CloudState | null {
     conflict: conflict && save(conflict.cloud) ? { cloud: save(conflict.cloud)!, cloudAt: num(conflict.cloudAt) ?? 0, cloudVersion: num(conflict.cloudVersion) ?? 0, local: save(conflict.local) ?? null, localAt: num(conflict.localAt) ?? null, where: conflict.where === "play" ? "play" : "start" } : undefined,
     importable: save(s.importable), lost: s.lost === true, imported: s.imported === true, duplicate: s.duplicate === true,
     ...(s.card === null ? { card: null } : parseCardState(s.card) ? { card: parseCardState(s.card)! } : {}),
+    ...(Array.isArray(s.held) ? { held: (s.held as unknown[]).map(parseHeldCard).filter((entry): entry is HeldCard => !!entry).slice(0, 50) } : {}),
+    ...(s.redeeming && typeof s.redeeming === "object" ? { redeeming: parseRedeeming(s.redeeming as Record<string, unknown>) } : {}),
   };
 }
 

@@ -8,6 +8,8 @@
  *   POST /v1/cards/:id/submitted { txHash }            (Bearer) the player sent the mint; the service checks the chain
  *   POST /v1/cards/:id/confirm                         (Bearer) check the chain again (a receipt that wasn't in yet)
  *   POST /v1/cards/:id/cancel                          (Bearer) give it up before it's minted: the lockbox opens again
+ *   GET  /v1/cards/held                                (Bearer) the active cards this wallet holds on chain (any character's)
+ *   POST /v1/cards/:id/redeem { txHash, friend }       (Bearer) the holder burned the card: its progress settles onto this character
  *   GET  /v1/characters/:friend/card                   (Bearer) this character's card, if it has one out
  *   GET  /v1/cards/collection                                   the collection's own metadata (OpenSea's contractURI)
  *   GET  /v1/cards/:id                                          a minted card's metadata (the token URI)
@@ -16,6 +18,12 @@
  * The lifecycle: prepared → reserved (the voucher is signed; from here the save's lockbox can't change) → submitted
  * (a transaction was sent) → active (the chain shows the mint) → redeemed (the chain shows the burn; settled in the
  * game). A reserved card the player cancels, or whose voucher expires unsent, is cancelled and its lockbox opens.
+ *
+ * Redemption settles exactly what the card stands for: the redeemer's character gains the snapshot's XP in every skill
+ * and its items (into the bank); the original character loses that XP (keeping what it earned since the mint; never
+ * below Hitpoints 10) and the lockbox empties. Both settlements are written to the stored saves at once and kept
+ * pending for any session still playing an older save: every save that comes in without the card marked as settled
+ * has the settlement applied before anything else, until the game carries the mark (`settled` in the save).
  *
  * What's never here: anything of a Friend itself. A card stands for Realm progress only, never a Friend's generation,
  * family or any state on chain. The player's wallet pays the gas and holds the card; this service holds one signing
@@ -32,8 +40,8 @@ export type Bucket = {
   delete(key: string): Promise<unknown>;
 };
 /** What the chain shows of a mint transaction: not yet in, failed, or the cards it minted. */
-export type MintReceipt = { status: "pending" } | { status: "failed" } | { status: "success"; minted: { tokenId: bigint; to: string; character: Hex; snapshot: Hex }[] };
-export type CardsChain = { receipt(txHash: Hex): Promise<MintReceipt> };
+export type MintReceipt = { status: "pending" } | { status: "failed" } | { status: "success"; minted: { tokenId: bigint; to: string; character: Hex; snapshot: Hex }[]; redeemed?: { tokenId: bigint; by: string; character: Hex; snapshot: Hex }[] };
+export type CardsChain = { receipt(txHash: Hex): Promise<MintReceipt>; ownerOf(tokenId: number): Promise<string | null> };
 export type CardsOptions = {
   /** The signing key (a Worker secret). Without it, cards can't be prepared. */
   minterKey: string | null;
@@ -52,6 +60,7 @@ export const CARDS_ABI = parseAbi([
   "event CardRedeemed(uint256 indexed tokenId, address indexed by, bytes32 indexed character, bytes32 snapshot)",
   "function mint(uint256 tokenId, bytes32 character, bytes32 snapshot, uint256 deadline, bytes signature)",
   "function redeem(uint256 tokenId)",
+  "function ownerOf(uint256 tokenId) view returns (address)",
 ]);
 export const VOUCHER_TYPES = { CardVoucher: [{ name: "to", type: "address" }, { name: "tokenId", type: "uint256" }, { name: "character", type: "bytes32" }, { name: "snapshot", type: "bytes32" }, { name: "deadline", type: "uint256" }] } as const;
 export const voucherDomain = (chainId: number, contract: string) => ({ name: "RareFriends Realm Adventurer Cards", version: "1", chainId, verifyingContract: getAddress(contract) }) as const;
@@ -73,6 +82,30 @@ export type Snapshot = {
   layout: string; show: string[]; facts: Record<string, unknown>;
 };
 export type CardRow = { token_id: number; address: string; friend_id: number; character: string; state: string; snapshot: string; snapshot_hash: string; voucher: string | null; deadline: number | null; tx_hash: string | null; holder: string | null; image: number; created_at: number; updated_at: number; redeemed_by: string | null; redeemed_at: number | null };
+/** A settlement a character still has to take: XP by skill (signed), items into the bank, the lockbox emptied, and a word to the player. */
+export type Settlement = { token: number; xp: Record<string, number>; items: LockboxSlot[]; clearLockbox: boolean; notice: string };
+const HITPOINTS_FLOOR = 1154;
+/** Apply the settlements a save hasn't taken yet (by its `settled` marks), in place; returns whether anything was applied. */
+export function applySettlements(save: Record<string, unknown>, pending: Settlement[]): boolean {
+  const done = new Set(Array.isArray(save.settled) ? (save.settled as unknown[]).filter((entry): entry is number => typeof entry === "number") : []);
+  let applied = false;
+  for (const entry of pending) {
+    if (done.has(entry.token)) continue;
+    const xp = (save.xp && typeof save.xp === "object" ? save.xp : (save.xp = {})) as Record<string, number>;
+    for (const [skill, delta] of Object.entries(entry.xp)) xp[skill] = Math.max(skill === "hitpoints" ? HITPOINTS_FLOOR : 0, Math.round((typeof xp[skill] === "number" ? xp[skill] : 0) + delta));
+    if (entry.items.length) {
+      const bank = (Array.isArray(save.bank) ? save.bank : (save.bank = [])) as { id: string; n: number; tab?: number }[];
+      for (const item of entry.items) { const stack = bank.find(slot => slot && slot.id === item.id); if (stack) stack.n += item.n; else bank.push({ id: item.id, n: item.n }); }
+    }
+    if (entry.clearLockbox) save.lockbox = [];
+    const notices = (Array.isArray(save.notices) ? save.notices : (save.notices = [])) as string[];
+    if (entry.notice && notices.length < 20) notices.push(entry.notice);
+    done.add(entry.token); applied = true;
+  }
+  save.settled = [...done].slice(-50);
+  return applied;
+}
+export const parsePending = (text: string | null | undefined): Settlement[] => { if (!text) return []; try { const list = JSON.parse(text); return Array.isArray(list) ? list as Settlement[] : []; } catch { return []; } };
 
 /** The lockbox as a save carries it: plain slots, sorted, so two saves' lockboxes compare by text. */
 export function lockboxOf(save: unknown): LockboxSlot[] | null {
@@ -100,8 +133,12 @@ export function cardsChainFor(rpcUrl: string, contract: string): CardsChain {
       let receipt;
       try { receipt = await client.getTransactionReceipt({ hash: txHash }); } catch { return { status: "pending" }; }
       if (receipt.status !== "success") return { status: "failed" };
-      const logs = parseEventLogs({ abi: CARDS_ABI, eventName: "CardMinted", logs: receipt.logs.filter(log => log.address.toLowerCase() === contract.toLowerCase()) });
-      return { status: "success", minted: logs.map(log => ({ tokenId: log.args.tokenId, to: log.args.to, character: log.args.character, snapshot: log.args.snapshot })) };
+      const ours = receipt.logs.filter(log => log.address.toLowerCase() === contract.toLowerCase());
+      const minted = parseEventLogs({ abi: CARDS_ABI, eventName: "CardMinted", logs: ours }), redeemed = parseEventLogs({ abi: CARDS_ABI, eventName: "CardRedeemed", logs: ours });
+      return { status: "success", minted: minted.map(log => ({ tokenId: log.args.tokenId, to: log.args.to, character: log.args.character, snapshot: log.args.snapshot })), redeemed: redeemed.map(log => ({ tokenId: log.args.tokenId, by: log.args.by, character: log.args.character, snapshot: log.args.snapshot })) };
+    },
+    async ownerOf(tokenId) {
+      try { return await client.readContract({ address: contract as Hex, abi: CARDS_ABI, functionName: "ownerOf", args: [BigInt(tokenId)] }); } catch { return null; }
     },
   };
 }
@@ -116,8 +153,10 @@ export function cardRoutes(db: Database, options: CardsOptions, helpers: {
   owns(address: string, friend: number): Promise<boolean>;
   json(origin: string | null, status: number, body: unknown, headers?: Record<string, string>): Response;
   characterOf(address: string, friend: number): Promise<{ version: number; save: string; save_hash: string | null; trust: string } | null>;
+  /** Write a settlement into a stored character: its save changed (a new version, the old kept), and the settlement left pending for sessions on older saves. */
+  settle(address: string, friend: number, settlement: Settlement): Promise<boolean>;
 }) {
-  const { clock, session, owns, json, characterOf } = helpers;
+  const { clock, session, owns, json, characterOf, settle } = helpers;
   const row = (id: number) => db.prepare("SELECT * FROM cards WHERE token_id = ?").bind(id).first<CardRow>();
   const outstanding = (address: string, friend: number) => db.prepare("SELECT * FROM cards WHERE address = ? AND friend_id = ? AND state IN ('prepared', 'reserved', 'submitted', 'active') ORDER BY token_id DESC").bind(address, friend).first<CardRow>();
   const setState = (id: number, state: string, extra: Record<string, unknown> = {}) => {
@@ -161,6 +200,51 @@ export function cardRoutes(db: Database, options: CardsOptions, helpers: {
       ];
       return json(origin, 200, { name: `Adventurer Card #${card.token_id}`, description: `A RareFriends Realm Adventurer Card: a snapshot of ${facts.name ?? `Friend #${snapshot.friendId}`}'s progress, held in the Realm until the card is redeemed. Snapshot ${card.snapshot_hash}.`,
         image: `${options.baseUrl}/v1/cards/${card.token_id}/image`, external_url: options.gameUrl, attributes }, { "cache-control": "public, max-age=300", "access-control-allow-origin": "*" });
+    }
+    // ---------- Signed in: the cards this wallet holds, and redeeming one ----------
+    if (path === "/v1/cards/held" && method === "GET") {
+      const { address } = await session(request);
+      const active = await db.prepare("SELECT * FROM cards WHERE state = 'active' ORDER BY token_id DESC LIMIT 200").bind().all<CardRow>();
+      const held: Record<string, unknown>[] = [];
+      for (const card of active.results) {
+        // The chain's word on who holds it (cards change hands); the stored holder is refreshed as it's read.
+        const owner = options.chain ? await options.chain.ownerOf(card.token_id) : null;
+        if (owner && getAddress(owner) !== card.holder) await db.prepare("UPDATE cards SET holder = ? WHERE token_id = ?").bind(getAddress(owner), card.token_id).run();
+        const holder = owner ? getAddress(owner) : card.holder;
+        if (holder !== address) continue;
+        const snapshot = JSON.parse(card.snapshot) as Snapshot;
+        held.push({ ...publicCard(card), holder, from: { friend: snapshot.friendId, name: (snapshot.facts as { name?: unknown }).name ?? null }, totalXp: Object.values(snapshot.xp).reduce((sum, value) => sum + value, 0), xp: snapshot.xp, items: snapshot.items, facts: snapshot.facts, layout: snapshot.layout });
+      }
+      return json(origin, 200, { held });
+    }
+    const redeem = /^\/v1\/cards\/([0-9]+)\/redeem$/.exec(path);
+    if (redeem && method === "POST") {
+      const { address } = await session(request), id = tokenId(redeem[1]);
+      const body = await request.json().catch(() => null) as { txHash?: unknown; friend?: unknown } | null;
+      if (!body || typeof body.txHash !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(body.txHash) || typeof body.friend !== "number" || !Number.isSafeInteger(body.friend) || body.friend < 0) throw new HttpError(400, "bad redemption");
+      const card = await row(id);
+      if (!card || card.state !== "active") throw new HttpError(404, "no such card out");
+      if (!options.chain) throw new HttpError(503, "the chain can't be read");
+      if (!await owns(address, body.friend)) throw new HttpError(403, "this wallet doesn't own this Friend now");
+      const to = await characterOf(address, body.friend);
+      if (!to) throw new HttpError(404, "no cloud save for this character yet: play and save first");
+      const receipt = await options.chain.receipt(body.txHash as Hex);
+      if (receipt.status === "pending") return json(origin, 202, { card: publicCard(card), pending: true });
+      if (receipt.status === "failed") throw new HttpError(422, "that transaction failed");
+      const burn = (receipt.redeemed ?? []).find(entry => Number(entry.tokenId) === id && getAddress(entry.by) === address && entry.snapshot.toLowerCase() === card.snapshot_hash.toLowerCase());
+      if (!burn) throw new HttpError(422, "that transaction didn't redeem this card from this wallet");
+      // Settle: the whole snapshot onto the redeemer, the same off the original (which keeps what it earned since).
+      const snapshot = JSON.parse(card.snapshot) as Snapshot, at = clock(), same = card.address === address && card.friend_id === body.friend;
+      const gain: Record<string, number> = {}, loss: Record<string, number> = {};
+      for (const [skill, xp] of Object.entries(snapshot.xp)) { gain[skill] = xp; loss[skill] = -xp; }
+      const what = `${snapshot.items.length ? `${snapshot.items.length} kind${snapshot.items.length === 1 ? "" : "s"} of item and ` : ""}${Object.values(snapshot.xp).reduce((sum, value) => sum + value, 0).toLocaleString()} XP`;
+      if (same) await settle(address, body.friend, { token: id, xp: {}, items: snapshot.items, clearLockbox: true, notice: `You redeemed your own Adventurer Card #${id}: its items are back in your bank.` });
+      else {
+        await settle(address, body.friend, { token: id, xp: gain, items: snapshot.items, clearLockbox: false, notice: `You redeemed Adventurer Card #${id}: ${what} are yours now (items in your bank).` });
+        await settle(card.address, card.friend_id, { token: id, xp: loss, items: [], clearLockbox: true, notice: `Your Adventurer Card #${id} was redeemed: ${what} left you with it. What you earned since the mint is still yours.` });
+      }
+      await db.prepare("UPDATE cards SET state = 'redeemed', redeemed_by = ?, redeemed_at = ?, holder = ?, updated_at = ? WHERE token_id = ?").bind(address, at, address, at, id).run();
+      return json(origin, 200, { card: publicCard((await row(id))!), settled: true });
     }
     // ---------- Signed in: the character's card, and making one ----------
     const mine = /^\/v1\/characters\/([0-9]{1,15})\/card$/.exec(path);

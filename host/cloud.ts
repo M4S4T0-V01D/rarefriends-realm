@@ -9,14 +9,16 @@
  * carries on and uploads resume by themselves.
  */
 import { encodeFunctionData, parseAbi, stringToHex } from "viem";
-import type { CardState, CloudConflict, CloudState } from "../games/rarefriends-realm/roster.ts";
+import type { CardState, CloudConflict, CloudState, HeldCard } from "../games/rarefriends-realm/roster.ts";
 
 /**
  * Adventurer Cards (cloud/src/cards.ts): the one transaction this page ever sends is the card's mint, to the contract
  * the service names, with the voucher the service signed; the wallet shows it and the player pays its gas. Nothing
  * here approves, transfers or signs typed data.
  */
-const MINT_ABI = parseAbi(["function mint(uint256 tokenId, bytes32 character, bytes32 snapshot, uint256 deadline, bytes signature)"]);
+const MINT_ABI = parseAbi(["function mint(uint256 tokenId, bytes32 character, bytes32 snapshot, uint256 deadline, bytes signature)", "function redeem(uint256 tokenId)"]);
+/** The one way this page sends a transaction: to the cards contract the service named, from the player's wallet. */
+const sendTransaction = (provider: Provider, from: string, to: string, data: string) => provider.request({ method: "eth_sendTransaction", params: [{ from, to, data }] });
 type Voucher = { tokenId: number; to: string; character: string; snapshot: string; deadline: number; signature: string; contract: string; chainId: number };
 /** The chains a card may live on, as a wallet is told to add them. */
 const CHAIN_PARAMS: Record<number, { chainId: string; chainName: string; rpcUrls: string[]; nativeCurrency: { name: string; symbol: string; decimals: number }; blockExplorerUrls?: string[] }> = {
@@ -91,6 +93,7 @@ export class CloudSync {
   private conflict: CloudConflict | null = null;
   /** This character's Adventurer Card (null: none; undefined: not asked yet). */
   private card: CardState | null | undefined = undefined;
+  private held: HeldCard[] | undefined = undefined; private redeeming: CloudState["redeeming"] = undefined;
   readonly account: string; readonly friend: string; private readonly io: Io; private readonly base: string; private readonly http: typeof fetch;
   constructor(account: string, friend: string, io: Io, base = CLOUD_URL, http: typeof fetch = (...args) => fetch(...args)) {
     this.account = account; this.friend = friend; this.io = io; this.base = base; this.http = http;
@@ -102,7 +105,7 @@ export class CloudSync {
   /** Whether the game has been given its starting save yet. */
   started() { return this.delivered; }
   current() { return this.status; }
-  private set(state: CloudState) { this.status = { ...state, address: this.session?.address ?? this.account, ...(this.card !== undefined ? { card: this.card } : {}) }; if (!this.disposed) this.io.state(this.status); }
+  private set(state: CloudState) { this.status = { ...state, address: this.session?.address ?? this.account, ...(this.card !== undefined ? { card: this.card } : {}), ...(this.held !== undefined ? { held: this.held } : {}), ...(this.redeeming ? { redeeming: this.redeeming } : {}) }; if (!this.disposed) this.io.state(this.status); }
   private setCard(card: CardState | null) { this.card = card; this.set(this.status); }
   private give(save: Save | null, replace = false) { if (!this.delivered || replace) { this.delivered = true; this.io.deliver(save, replace); } if (this.session && this.card === undefined) void this.cardStatus(); }
 
@@ -174,7 +177,7 @@ export class CloudSync {
   /** This character's card, from the service (none, or where it is in its life). */
   async cardStatus() {
     if (!this.session) return;
-    try { const result = await this.api("GET", `/v1/characters/${this.friend}/card`); if (result.status === 200) this.setCard(result.data.card ? cardFrom(result.data.card) : null); }
+    try { const result = await this.api("GET", `/v1/characters/${this.friend}/card`); if (result.status === 200) { const card = result.data.card ? cardFrom(result.data.card) : null; if (card?.contract) { this.cardContract = card.contract; this.cardChainId = card.chainId ?? null; } this.setCard(card); } }
     catch { /* asked again next time */ }
   }
   /** Give up a card that was never minted: its lockbox opens again. */
@@ -211,7 +214,7 @@ export class CloudSync {
       this.setCard({ ...card!, step: "wallet" });
       await switchChain(provider, voucher.chainId);
       const data = encodeFunctionData({ abi: MINT_ABI, functionName: "mint", args: [BigInt(voucher.tokenId), voucher.character as `0x${string}`, voucher.snapshot as `0x${string}`, BigInt(voucher.deadline), voucher.signature as `0x${string}`] });
-      const txHash = String(await provider.request({ method: "eth_sendTransaction", params: [{ from: this.account, to: voucher.contract, data }] }));
+      const txHash = String(await sendTransaction(provider, this.account, voucher.contract, data));
       this.setCard({ ...card!, state: "submitted", txHash, step: "waiting" });
       const sent = await this.api("POST", `/v1/cards/${card!.tokenId}/submitted`, { json: { txHash } });
       if (sent.status === 200) card = cardFrom(sent.data.card);
@@ -222,6 +225,44 @@ export class CloudSync {
       this.setCard({ ...(card ?? { tokenId: 0, state: "cancelled" as const }), step: null, error: rejected ? "cancelled" : "failed" });
     }
   }
+  /** The active cards this wallet holds on chain (any character's), from the service. */
+  async heldCards() {
+    if (!this.session) return;
+    try { const result = await this.api("GET", "/v1/cards/held"); if (result.status === 200 && Array.isArray(result.data.held)) { const first = result.data.held[0] as { contract?: unknown; chainId?: unknown } | undefined; if (typeof first?.contract === "string") { this.cardContract = first.contract; this.cardChainId = typeof first.chainId === "number" ? first.chainId : null; } this.held = result.data.held as HeldCard[]; this.set(this.status); } }
+    catch { /* asked again next time */ }
+  }
+  /** Redeem a held card onto this character: the wallet burns it (one transaction), the service settles its progress. */
+  async redeemCard(tokenId: number) {
+    const provider = this.io.provider(), card = this.held?.find(entry => entry.tokenId === tokenId);
+    if (!this.session || !provider || !card || !this.card?.contract && !this.cardContract) { this.redeeming = { tokenId, step: null, error: "not held" }; this.set(this.status); return; }
+    const contract = this.card?.contract ?? this.cardContract!, chainId = this.card?.chainId ?? this.cardChainId ?? 46630;
+    try {
+      this.redeeming = { tokenId, step: "wallet" }; this.set(this.status);
+      await switchChain(provider, chainId);
+      const txHash = String(await sendTransaction(provider, this.account, contract, encodeFunctionData({ abi: MINT_ABI, functionName: "redeem", args: [BigInt(tokenId)] })));
+      this.redeeming = { tokenId, step: "waiting" }; this.set(this.status);
+      let result = await this.api("POST", `/v1/cards/${tokenId}/redeem`, { json: { txHash, friend: Number(this.friend) } });
+      for (let i = 0; i < 36 && result.status === 202 && !this.disposed; i++) { await wait(5_000); result = await this.api("POST", `/v1/cards/${tokenId}/redeem`, { json: { txHash, friend: Number(this.friend) } }); }
+      if (result.status !== 200) throw new Error(String(result.data.error ?? `status ${result.status}`));
+      this.redeeming = { tokenId, step: "settling" }; this.set(this.status);
+      // The settled save is the cloud's now: this session's next upload would be older, so take the cloud's (the game reloads with it).
+      await this.takeCloud();
+      this.redeeming = { tokenId, step: null, done: true }; this.held = (this.held ?? []).filter(entry => entry.tokenId !== tokenId); this.set(this.status);
+      await this.cardStatus();
+    } catch (error) {
+      const rejected = typeof error === "object" && error !== null && (error as { code?: unknown }).code === 4001;
+      this.redeeming = { tokenId, step: null, error: rejected ? "cancelled" : error instanceof Error ? error.message : "failed" }; this.set(this.status);
+    }
+  }
+  /** Take the cloud's save as this browser's, whatever this session has (a settlement the service made): the game reloads with it. */
+  private async takeCloud() {
+    const result = await this.api("GET", `/v1/characters/${this.friend}`);
+    if (result.status !== 200 || !result.data.save) return;
+    const save = result.data.save as Save, version = Number(result.data.version), hash = await hashSave(save);
+    this.pending = null; this.adopt(save, version, hash); this.set({ status: "saved", version, savedAt: Number(result.data.updatedAt) }); this.give(save, true);
+  }
+  /** Where the cards live, learned from the service's answers (a held card's redeem needs it even with no card of our own out). */
+  private cardContract: string | null = null; private cardChainId: number | null = null;
   /** Sign in: the server's message, signed by the wallet (no transaction), for a session token. */
   async signIn() {
     const provider = this.io.provider();
