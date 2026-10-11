@@ -2,3 +2,4 @@ node_modules/
 .friendsdk/
 artifacts/
 *.log
+contracts/out/

@@ -200,6 +200,11 @@ function RealmHost() {
         else if (action === "reload") window.location.reload();
         // Logging out: up now, as an exit (never held back by the every-few-seconds limit).
         else if (action === "flush" && !superseded) void cloud.flush(true);
+        // Adventurer Cards: mint this picture (the one transaction this page sends), ask after the card, or give it up.
+        else if (action === "mint-card" && event.data.image instanceof Blob && typeof event.data.layout === "string" && Array.isArray(event.data.show))
+          void cloud.mintCard({ layout: event.data.layout, show: event.data.show.filter((entry: unknown): entry is string => typeof entry === "string"), facts: event.data.facts && typeof event.data.facts === "object" ? event.data.facts as Record<string, unknown> : {}, image: event.data.image });
+        else if (action === "card-status") void cloud.cardStatus();
+        else if (action === "cancel-card") void cloud.cancelCard();
       }
       else if (event.data?.type === TEXT_COPY && typeof event.data.text === "string" && event.data.text.length <= 1000) {
         const source = event.source as Window;

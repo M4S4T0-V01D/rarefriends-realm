@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import { privateKeyToAccount } from "viem/accounts";
 import { hexToString } from "viem";
 import { createApp, chainFor } from "../cloud/src/worker.ts";
+import { decodeFunctionData, parseAbi } from "viem";
 import { CloudSync, hashSave } from "../host/cloud.ts";
 
 const ORIGIN = "https://m4s4t0-v01d.github.io", BASE = "https://saves.test";
@@ -30,7 +31,7 @@ function server() {
     const response = await app.fetch(new Request(url, { ...init, headers: { ...init.headers, origin: ORIGIN } }));
     return response;
   };
-  return { sqlite, owners, http, advance: ms => { clock += ms; }, setDown: value => { down = value; }, row: (friend = 7730, address = alice.address) => sqlite.prepare("SELECT version, save, imported_at FROM characters WHERE address = ? AND friend_id = ?").get(address, friend) };
+  return { sqlite, db, owners, clock: () => clock, http, advance: ms => { clock += ms; }, setDown: value => { down = value; }, row: (friend = 7730, address = alice.address) => sqlite.prepare("SELECT version, save, imported_at FROM characters WHERE address = ? AND friend_id = ?").get(address, friend) };
 }
 /** One device: its storage, the game's save in it, what it was told, and a wallet that signs as `account`. */
 function device(srv, store, account = alice, friend = "7730") {
@@ -196,4 +197,59 @@ test("the wallet is only ever asked to sign the Realm's own sign-in message", as
     provider: () => ({ request: async () => { asked++; return "0x"; } }) }, BASE, async (url, init) => url.endsWith("/challenge") ? new Response(JSON.stringify({ message: good.replace("Version: 1", "Version: 1\nTransfer: everything") }), { status: 200 }) : srv.http(url, init));
   await sync.signIn();
   assert.equal(asked, 0); assert.equal(sync.current().status, "unverified");
+});
+
+test("Adventurer Cards from the host: the lockbox goes up, the service signs the voucher, the picture goes up, the wallet is switched to the card's chain and sends the one mint transaction, and the chain's word makes the card active", async () => {
+  const srv = server(), phone = storage();
+  // The service with cards open: a bucket in a Map, a chain whose receipts the test writes.
+  const files = new Map(), receipts = new Map(), MINTER_KEY = "0x4bbbf85ce3377467afe5d46f804f221813b2bb87f24d81f60f1fcdbf7cbf4356", CONTRACT = "0x1000000000000000000000000000000000000001";
+  const bucket = { put: async (key, value) => { files.set(key, new Uint8Array(value)); }, get: async key => files.has(key) ? { arrayBuffer: async () => files.get(key).buffer } : null, delete: async () => {} };
+  const app = createApp({ db: srv.db, origins: [ORIGIN], chainId: 4663, clock: srv.clock, chain: { ownerOf: async f => srv.owners.get(f) ?? null, verify: chainFor({ RPC_URL: "http://127.0.0.1:9", COLLECTION: "0x14C49e6118F46525dE9ab41a51cBAA3c6EBF181D" }).verify },
+    cards: { minterKey: MINTER_KEY, contract: CONTRACT, chainId: 46630, bucket, chain: { receipt: async hash => receipts.get(hash) ?? { status: "pending" } }, baseUrl: BASE, gameUrl: "https://game.example/" } });
+  const http = async (url, init = {}) => app.fetch(new Request(url, { ...init, headers: { ...init.headers, origin: ORIGIN } }));
+  // A wallet that signs in, switches chain when asked, and "sends" the mint: the test records what it was asked.
+  const asked = [];
+  let chain = "0x1237";
+  const provider = { request: async ({ method, params }) => {
+    asked.push(method);
+    if (method === "personal_sign") return alice.signMessage({ message: hexToString(params[0]) });
+    if (method === "wallet_switchEthereumChain") { if (params[0].chainId === "0xb626" && chain !== "added") { const e = new Error("unknown chain"); e.code = 4902; throw e; } chain = params[0].chainId; return null; }
+    if (method === "wallet_addEthereumChain") { assert.equal(params[0].chainId, "0xb626"); chain = "added"; return null; }
+    if (method === "eth_sendTransaction") {
+      const tx = params[0]; assert.equal(tx.to, CONTRACT); assert.equal(tx.from, alice.address);
+      const call = decodeFunctionData({ abi: parseAbi(["function mint(uint256 tokenId, bytes32 character, bytes32 snapshot, uint256 deadline, bytes signature)"]), data: tx.data });
+      assert.equal(call.functionName, "mint"); assert.equal(call.args[0], 1n);
+      const hash = "0x" + "ee".repeat(32);
+      receipts.set(hash, { status: "success", minted: [{ tokenId: 1n, to: alice.address, character: call.args[1], snapshot: call.args[2] }] });
+      return hash;
+    }
+    throw new Error(`unexpected ${method}`);
+  } };
+  const key = `rarefriends-realm:save:v1:${alice.address.toLowerCase()}:7730`, states = [];
+  globalThis.localStorage = phone;
+  const sync = new CloudSync(alice.address, "7730", { readSave: () => { const raw = phone.getItem(key); return raw ? JSON.parse(raw) : null; }, writeSave: save => phone.setItem(key, JSON.stringify(save)), deliver: () => {}, state: s => states.push(s), provider: () => provider, reload: () => {}, origin: () => ORIGIN }, BASE, http);
+  await sync.open(); await sync.signIn();
+  const save = { v: 1, friendId: 7730, xp: { attack: 1000, hitpoints: 1154 }, name: "Tester", inventory: [], bank: [], playTicks: 10, lockbox: [{ id: "logs", n: 5 }] };
+  phone.setItem(key, JSON.stringify(save)); sync.queue(save, true, null); await sync.flush();
+  assert.equal(states.at(-1).status, "saved");
+  await sync.cardStatus(); assert.equal(states.at(-1).card, null, "no card yet");
+  await sync.mintCard({ layout: "classic", show: ["skills"], facts: { name: "Tester", combat: 3 }, image: new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4, 5, 6, 7, 8])], { type: "image/png" }) });
+  const card = states.at(-1).card;
+  assert.equal(card.state, "active", JSON.stringify(card)); assert.equal(card.tokenId, 1); assert.equal(card.holder, alice.address); assert.equal(card.step, null);
+  assert.deepEqual(asked.filter(m => m !== "personal_sign"), ["wallet_switchEthereumChain", "wallet_addEthereumChain", "eth_sendTransaction"], "the chain is added when the wallet doesn't know it; one transaction");
+  assert.ok(files.has("cards/1.png"), "the picture went up");
+  // The steps were reported on the way: snapshot, picture, wallet, chain.
+  const steps = states.map(s => s.card?.step).filter(Boolean);
+  assert.deepEqual([...new Set(steps)], ["preparing", "uploading", "wallet", "waiting"]);
+  // Public metadata now exists, with the facts the game sent.
+  const meta = await (await http(`${BASE}/v1/cards/1`)).json();
+  assert.equal(meta.name, "Adventurer Card #1"); assert.ok(meta.attributes.some(a => a.trait_type === "Combat level" && a.value === 3));
+  // While the card is out, a save that touches the lockbox is refused (and the host reports it), one that doesn't goes up.
+  srv.advance(60_000);
+  const touched = { ...save, xp: { attack: 1200, hitpoints: 1154 }, playTicks: 60, lockbox: [] };
+  phone.setItem(key, JSON.stringify(touched)); sync.queue(touched, true, null); await sync.flush();
+  assert.equal(states.at(-1).status, "error"); assert.match(states.at(-1).error, /lockbox/);
+  const kept = { ...touched, lockbox: [{ id: "logs", n: 5 }] };
+  phone.setItem(key, JSON.stringify(kept)); sync.queue(kept, true, null); await sync.flush();
+  assert.equal(states.at(-1).status, "saved");
 });

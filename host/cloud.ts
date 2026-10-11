@@ -8,8 +8,27 @@
  * can never overwrite a newer one: the player is asked instead. When the cloud can't be reached, the browser save
  * carries on and uploads resume by themselves.
  */
-import { stringToHex } from "viem";
-import type { CloudConflict, CloudState } from "../games/rarefriends-realm/roster.ts";
+import { encodeFunctionData, parseAbi, stringToHex } from "viem";
+import type { CardState, CloudConflict, CloudState } from "../games/rarefriends-realm/roster.ts";
+
+/**
+ * Adventurer Cards (cloud/src/cards.ts): the one transaction this page ever sends is the card's mint, to the contract
+ * the service names, with the voucher the service signed; the wallet shows it and the player pays its gas. Nothing
+ * here approves, transfers or signs typed data.
+ */
+const MINT_ABI = parseAbi(["function mint(uint256 tokenId, bytes32 character, bytes32 snapshot, uint256 deadline, bytes signature)"]);
+type Voucher = { tokenId: number; to: string; character: string; snapshot: string; deadline: number; signature: string; contract: string; chainId: number };
+/** The chains a card may live on, as a wallet is told to add them. */
+const CHAIN_PARAMS: Record<number, { chainId: string; chainName: string; rpcUrls: string[]; nativeCurrency: { name: string; symbol: string; decimals: number }; blockExplorerUrls?: string[] }> = {
+  46630: { chainId: "0xb626", chainName: "Robinhood Chain Testnet", rpcUrls: ["https://rpc.testnet.chain.robinhood.com"], nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }, blockExplorerUrls: ["https://explorer.testnet.chain.robinhood.com"] },
+  4663: { chainId: "0x1237", chainName: "Robinhood Chain", rpcUrls: ["https://rpc.mainnet.chain.robinhood.com"], nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 } },
+};
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const cardFrom = (raw: unknown): CardState => {
+  const c = (raw ?? {}) as Record<string, unknown>;
+  return { tokenId: Number(c.tokenId ?? 0), state: String(c.state ?? "cancelled") as CardState["state"], txHash: typeof c.txHash === "string" ? c.txHash : null, holder: typeof c.holder === "string" ? c.holder : null,
+    contract: typeof c.contract === "string" ? c.contract : null, chainId: typeof c.chainId === "number" ? c.chainId : undefined, deadline: typeof c.deadline === "number" ? c.deadline : null };
+};
 
 export const CLOUD_URL = "https://rarefriends-realm-saves.masato-void.workers.dev";
 type Provider = { request(args: { method: string; params?: readonly unknown[] }): Promise<unknown> };
@@ -70,6 +89,8 @@ export class CloudSync {
   private lastUpload = 0; private timer: ReturnType<typeof setTimeout> | null = null; private backoff = 0;
   private uploading = false; private paused = false; private disposed = false; private delivered = false;
   private conflict: CloudConflict | null = null;
+  /** This character's Adventurer Card (null: none; undefined: not asked yet). */
+  private card: CardState | null | undefined = undefined;
   readonly account: string; readonly friend: string; private readonly io: Io; private readonly base: string; private readonly http: typeof fetch;
   constructor(account: string, friend: string, io: Io, base = CLOUD_URL, http: typeof fetch = (...args) => fetch(...args)) {
     this.account = account; this.friend = friend; this.io = io; this.base = base; this.http = http;
@@ -81,11 +102,12 @@ export class CloudSync {
   /** Whether the game has been given its starting save yet. */
   started() { return this.delivered; }
   current() { return this.status; }
-  private set(state: CloudState) { this.status = { ...state, address: this.session?.address ?? this.account }; if (!this.disposed) this.io.state(this.status); }
-  private give(save: Save | null, replace = false) { if (!this.delivered || replace) { this.delivered = true; this.io.deliver(save, replace); } }
+  private set(state: CloudState) { this.status = { ...state, address: this.session?.address ?? this.account, ...(this.card !== undefined ? { card: this.card } : {}) }; if (!this.disposed) this.io.state(this.status); }
+  private setCard(card: CardState | null) { this.card = card; this.set(this.status); }
+  private give(save: Save | null, replace = false) { if (!this.delivered || replace) { this.delivered = true; this.io.deliver(save, replace); } if (this.session && this.card === undefined) void this.cardStatus(); }
 
-  private async api(method: string, path: string, init: { body?: BodyInit; type?: string; keepalive?: boolean; json?: unknown } = {}) {
-    const headers: Record<string, string> = {};
+  private async api(method: string, path: string, init: { body?: BodyInit; type?: string; keepalive?: boolean; json?: unknown; headers?: Record<string, string> } = {}) {
+    const headers: Record<string, string> = { ...(init.headers ?? {}) };
     if (this.session) headers.authorization = `Bearer ${this.session.token}`;
     let body = init.body;
     if (init.json !== undefined) { body = JSON.stringify(init.json); headers["content-type"] = "application/json"; }
@@ -148,6 +170,58 @@ export class CloudSync {
   }
   private forget() { this.session = null; store.remove(SESSION_KEY(this.account)); }
 
+  // ---------- Adventurer Cards ----------
+  /** This character's card, from the service (none, or where it is in its life). */
+  async cardStatus() {
+    if (!this.session) return;
+    try { const result = await this.api("GET", `/v1/characters/${this.friend}/card`); if (result.status === 200) this.setCard(result.data.card ? cardFrom(result.data.card) : null); }
+    catch { /* asked again next time */ }
+  }
+  /** Give up a card that was never minted: its lockbox opens again. */
+  async cancelCard() {
+    const card = this.card;
+    if (!this.session || !card) return;
+    const result = await this.api("POST", `/v1/cards/${card.tokenId}/cancel`).catch(() => null);
+    if (result?.status === 200) await this.cardStatus(); else this.setCard({ ...card, error: String(result?.data.error ?? "failed") });
+  }
+  /**
+   * Mint: the save goes up, the service makes the snapshot and signs the voucher, the picture goes up, the wallet
+   * sends the one transaction (switching to the card's chain first), and the service watches the chain for the mint.
+   */
+  async mintCard(input: { layout: string; show: string[]; facts: Record<string, unknown>; image: Blob }) {
+    const provider = this.io.provider();
+    if (!this.session || !provider) { this.setCard({ tokenId: 0, state: "cancelled", error: "sign in to cloud saves first" }); return; }
+    await this.flush().catch(() => { /* the snapshot is of what the service has */ });
+    let card: CardState | null = this.card ?? null, voucher: Voucher | null = null;
+    try {
+      // A card reserved earlier (the wallet closed, say) is sent again with its voucher rather than made anew.
+      if (card && card.state === "reserved") {
+        const result = await this.api("GET", `/v1/characters/${this.friend}/card`);
+        const found = result.status === 200 && result.data.card ? result.data.card as Record<string, unknown> : null;
+        voucher = found?.voucher ? found.voucher as Voucher : null; card = found ? cardFrom(found) : null;
+      }
+      if (!voucher) {
+        this.setCard({ tokenId: card?.tokenId ?? 0, state: "prepared", step: "preparing" });
+        const made = await this.api("POST", "/v1/cards/prepare", { json: { friend: Number(this.friend), layout: input.layout, show: input.show } });
+        if (made.status !== 200) { this.setCard({ tokenId: 0, state: "cancelled", error: made.data.trust === "unverified" ? "unverified" : String(made.data.error ?? "failed") }); return; }
+        card = cardFrom(made.data.card); voucher = made.data.voucher as Voucher;
+      }
+      this.setCard({ ...card!, step: "uploading" });
+      await this.api("PUT", `/v1/cards/${card!.tokenId}/image`, { body: await input.image.arrayBuffer(), type: "image/png", headers: { "x-card-facts": JSON.stringify(input.facts).slice(0, 3_900) } });
+      this.setCard({ ...card!, step: "wallet" });
+      await switchChain(provider, voucher.chainId);
+      const data = encodeFunctionData({ abi: MINT_ABI, functionName: "mint", args: [BigInt(voucher.tokenId), voucher.character as `0x${string}`, voucher.snapshot as `0x${string}`, BigInt(voucher.deadline), voucher.signature as `0x${string}`] });
+      const txHash = String(await provider.request({ method: "eth_sendTransaction", params: [{ from: this.account, to: voucher.contract, data }] }));
+      this.setCard({ ...card!, state: "submitted", txHash, step: "waiting" });
+      const sent = await this.api("POST", `/v1/cards/${card!.tokenId}/submitted`, { json: { txHash } });
+      if (sent.status === 200) card = cardFrom(sent.data.card);
+      for (let i = 0; i < 36 && card!.state === "submitted" && !this.disposed; i++) { await wait(5_000); const result = await this.api("POST", `/v1/cards/${card!.tokenId}/confirm`); if (result.status === 200) card = cardFrom(result.data.card); }
+      this.setCard({ ...card!, step: card!.state === "submitted" ? "waiting" : null });
+    } catch (error) {
+      const rejected = typeof error === "object" && error !== null && (error as { code?: unknown }).code === 4001;
+      this.setCard({ ...(card ?? { tokenId: 0, state: "cancelled" as const }), step: null, error: rejected ? "cancelled" : "failed" });
+    }
+  }
   /** Sign in: the server's message, signed by the wallet (no transaction), for a session token. */
   async signIn() {
     const provider = this.io.provider();
@@ -280,5 +354,16 @@ export class CloudSync {
       this.set({ status: "offline" }); this.schedule(() => void this.flush(), this.backoff);
       return "failed";
     } finally { this.uploading = false; }
+  }
+}
+
+/** Put the wallet on the card's chain (adding it if the wallet doesn't know it). */
+async function switchChain(provider: Provider, chainId: number) {
+  const hex = `0x${chainId.toString(16)}`;
+  try { await provider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: hex }] }); }
+  catch (error) {
+    const unknown = typeof error === "object" && error !== null && (error as { code?: unknown }).code === 4902;
+    if (!unknown || !CHAIN_PARAMS[chainId]) throw error;
+    await provider.request({ method: "wallet_addEthereumChain", params: [CHAIN_PARAMS[chainId]] });
   }
 }

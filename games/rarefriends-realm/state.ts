@@ -126,6 +126,10 @@ export type Player = {
   orders: Record<string, WorkOrder>;
   /** The adventurer card's chosen style (background, frame, skills panel, font, ink, layout). */
   card: Record<string, string>;
+  /** The collectible card's choices (collectible.ts): its layout, and what it shows. */
+  collectible: { layout: string; show: string[] };
+  /** The Adventurer Card's lockbox (cardescrow.ts): items set aside for a card, out of the inventory and bank. */
+  lockbox: Slot[];
   /** Return of Raria: the Adventurer Cards you've found (card id → the UTC day), and whether you keep the Wise Friend's Law (Raria's Magic and Faith in place of the Old Friend's). */
   cards: Record<string, number>; rarian: boolean;
   /** Keeping the Mizukai way (What Rises in the East): the Isles' Magic and Faith in place of the Realm's (never both this and `rarian`). */
@@ -220,7 +224,9 @@ export type Game = {
   /** Ore left in a rock someone has started on (2–4 to a rock; it runs out when they're mined). */
   rockOre: Map<number, number>; messages: Message[];
   /** What the sky is doing (set by the page each frame; the engine only reads it) and how much your Friend talks. */
-  ambient: { night: boolean; rain: boolean; storm?: boolean; fog?: boolean }; friendSpeech: "full" | "reduced" | "rare" | "off"; events: GameEvent[]; rng: () => number; nextUid: number;
+  ambient: { night: boolean; rain: boolean; storm?: boolean; fog?: boolean }; friendSpeech: "full" | "reduced" | "rare" | "off";
+  /** An Adventurer Card is out for this character (the host says so): the lockbox is held. */
+  cardHeld: boolean; events: GameEvent[]; rng: () => number; nextUid: number;
   dialogue: Dialogue | null; ui: { shop: string | null; bank: boolean; production: ProductionMenu | null; lamp: number | null; naming: "first" | "rename" | null; fellowship?: boolean; home?: boolean; join?: Fellowship | null; /** A purchase with simulated RF waiting for the player's word: what it does and how many caskets it costs. */ rfAction?: { kind: "slayer-complete" | "slayer-reroll"; caskets: number; text: string } | null;
     /** The boat list open at a Mizukai landing (What Rises in the East): the dock you're boarding at. */ boat?: string | null };
   /** The last boat crossing between the Mizukai Isles (for the picture of it: boats.ts). */
@@ -285,7 +291,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
     style: "accurate", autocast: null, prayers: [], target: null, activity: null, combat: null,
     attackTimer: 0, eatTimer: 0, stunned: 0, regenTimer: 0, quests: {}, questData: {},
     wardrobe: [], worn: [], follower: null, courseStep: -1, kills: 0, deaths: 0, overhead: null, music: ["theme"],
-    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, boneBag: {}, sigilBag: {}, belts: {}, followerWorn: [], orders: {}, card: { bg: "paper", frame: "rose", skills: "boxes", font: "mono", ink: "ink", layout: "classic" }, cards: {}, rarian: false, mizukai: false, orashai: false, mana: 10, mysteries: { found: {}, glyphs: {}, read: {} }, techniqueReady: {}, preparation: null, spiritWardUntil: 0, home: null, restedTicks: 0, ward: null, wardUntil: 0, renew: 0, renewUntil: 0, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, friendVillage: null, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, lore: {}, trail: null, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false, rerolls: 0 }, seenUpdate: LATEST_UPDATE,
+    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, boneBag: {}, sigilBag: {}, belts: {}, followerWorn: [], orders: {}, collectible: { layout: "classic", show: ["skills", "combat", "quests", "generation"] }, lockbox: [], card: { bg: "paper", frame: "rose", skills: "boxes", font: "mono", ink: "ink", layout: "classic" }, cards: {}, rarian: false, mizukai: false, orashai: false, mana: 10, mysteries: { found: {}, glyphs: {}, read: {} }, techniqueReady: {}, preparation: null, spiritWardUntil: 0, home: null, restedTicks: 0, ward: null, wardUntil: 0, renew: 0, renewUntil: 0, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, friendVillage: null, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, lore: {}, trail: null, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false, rerolls: 0 }, seenUpdate: LATEST_UPDATE,
     lastHitBy: null, created: Date.now(), queuedSpell: null, castTimer: 0,
   };
 }
@@ -294,7 +300,7 @@ export function createGame(options: { familyId: number; friendId: number; rng?: 
   const world = options.world ?? realmWorld(), rng = options.rng ?? Math.random;
   const game: Game = {
     world, tick: 0, player: createPlayer(world, options.familyId, options.friendId), monsters: [], npcs: [], ground: [], fires: [], carvings: [], shopStock: {},
-    depleted: new Map(), herbPicks: new Map(), rockOre: new Map(), ambient: { night: false, rain: false }, friendSpeech: "full", sneakingPast: new Map(), sneakPaid: new Map(), messages: [], events: [], rng, nextUid: 1, dialogue: null, ui: { shop: null, bank: false, production: null, lamp: null, naming: null },
+    depleted: new Map(), herbPicks: new Map(), rockOre: new Map(), ambient: { night: false, rain: false }, friendSpeech: "full", cardHeld: false, sneakingPast: new Map(), sneakPaid: new Map(), messages: [], events: [], rng, nextUid: 1, dialogue: null, ui: { shop: null, bank: false, production: null, lamp: null, naming: null },
     held: null, autoRetaliate: true, playTicks: 0, overheads: new Map(), tracks: [], pet: null, trail: [], arena: null,
   };
   for (const spawn of world.spawns) {
@@ -573,7 +579,7 @@ export function useUp(player: Player, id: string, n: number) {
 
 // ---------- Bank ----------
 /** Add to the bank: onto the item's existing stack, or as a new slot at the end of `tab`. */
-function bankAdd(player: Player, id: string, n: number, tab = 0) {
+export function bankAdd(player: Player, id: string, n: number, tab = 0) {
   const entry = player.bank.find(bank => bank.id === id);
   if (entry) { entry.n += n; return; }
   const slot: BankSlot = tab ? { id, n, tab } : { id, n }, last = player.bank.map(bank => bank.tab ?? 0).lastIndexOf(tab);

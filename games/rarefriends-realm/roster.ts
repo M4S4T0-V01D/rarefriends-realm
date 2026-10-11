@@ -77,7 +77,19 @@ export type ShareOutcome = "shared" | "copied-and-opened" | "saved-and-opened" |
  */
 export const CLOUD_STATE = "rarefriends-realm:cloud-state";
 export const CLOUD_ACTION = "rarefriends-realm:cloud-action";
-export type CloudAction = "verify" | "sign-out" | "import" | "skip-import" | "keep-cloud" | "keep-local" | "retry" | "reload" | "flush";
+export type CloudAction = "verify" | "sign-out" | "import" | "skip-import" | "keep-cloud" | "keep-local" | "retry" | "reload" | "flush" | "mint-card" | "card-status" | "cancel-card";
+/**
+ * An Adventurer Card (cloud/src/cards.ts) this character has out, as the host reports it: the card's token, where it
+ * is in its life (reserved → submitted → active → redeemed; or cancelled), and what the host is doing about it now.
+ */
+export type CardState = {
+  tokenId: number; state: "prepared" | "reserved" | "submitted" | "active" | "redeemed" | "cancelled";
+  txHash?: string | null; holder?: string | null; contract?: string | null; chainId?: number; deadline?: number | null;
+  /** What the host is doing: making the snapshot, sending the picture, waiting for the wallet, waiting for the chain. */
+  step?: "preparing" | "uploading" | "wallet" | "waiting" | null;
+  /** Why the last step stopped: "cancelled" (the wallet), "unverified", "held", or the server's reason. */
+  error?: string;
+};
 export type CloudConflict = {
   cloud: Record<string, unknown>; cloudAt: number; cloudVersion: number;
   local: Record<string, unknown> | null; localAt: number | null;
@@ -93,8 +105,19 @@ export type CloudState = {
   importable?: Record<string, unknown>;
   /** The cloud had no save even though this browser had synced one (it was reset): offered back as an import. */
   lost?: boolean; imported?: boolean; duplicate?: boolean;
+  /** This character's Adventurer Card, if it has one out (null: none; absent: not known yet). */
+  card?: CardState | null;
 };
 const CLOUD_STATUSES = new Set<CloudState["status"]>(["off", "unverified", "signing", "loading", "saved", "saving", "offline", "conflict", "import", "local-only", "not-owner", "error"]);
+const CARD_STATES = new Set(["prepared", "reserved", "submitted", "active", "redeemed", "cancelled"]), CARD_STEPS = new Set(["preparing", "uploading", "wallet", "waiting"]);
+export function parseCardState(raw: unknown): CardState | null {
+  if (!raw || typeof raw !== "object") return null;
+  const c = raw as Record<string, unknown>;
+  if (typeof c.tokenId !== "number" || !Number.isSafeInteger(c.tokenId) || !CARD_STATES.has(c.state as string)) return null;
+  const text = (value: unknown, max = 120) => typeof value === "string" ? value.slice(0, max) : null;
+  return { tokenId: c.tokenId, state: c.state as CardState["state"], txHash: text(c.txHash), holder: text(c.holder), contract: text(c.contract), chainId: typeof c.chainId === "number" ? c.chainId : undefined,
+    deadline: typeof c.deadline === "number" ? c.deadline : null, step: CARD_STEPS.has(c.step as string) ? c.step as CardState["step"] : null, error: text(c.error, 200) ?? undefined };
+}
 /** Check a CLOUD_STATE from the host before showing it. */
 export function parseCloudState(raw: unknown): CloudState | null {
   if (!raw || typeof raw !== "object") return null;
@@ -109,6 +132,7 @@ export function parseCloudState(raw: unknown): CloudState | null {
     version: num(s.version), savedAt: num(s.savedAt), error: typeof s.error === "string" ? s.error.slice(0, 200) : undefined,
     conflict: conflict && save(conflict.cloud) ? { cloud: save(conflict.cloud)!, cloudAt: num(conflict.cloudAt) ?? 0, cloudVersion: num(conflict.cloudVersion) ?? 0, local: save(conflict.local) ?? null, localAt: num(conflict.localAt) ?? null, where: conflict.where === "play" ? "play" : "start" } : undefined,
     importable: save(s.importable), lost: s.lost === true, imported: s.imported === true, duplicate: s.duplicate === true,
+    ...(s.card === null ? { card: null } : parseCardState(s.card) ? { card: parseCardState(s.card)! } : {}),
   };
 }
 

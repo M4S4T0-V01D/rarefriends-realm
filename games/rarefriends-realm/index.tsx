@@ -35,6 +35,8 @@ import { SETTINGS_STATE, SETTINGS_WRITE, parseRenderer, type RendererMode, CLOUD
 import { CloudControls, CloudDialogs, type SaveSummary } from "./cloudui.tsx";
 import { RealmAudio, trackFor, trackById, type SfxName, type TrackId } from "./audio.ts";
 import { recruitText, renderCard, renderFellowshipCard, shareText } from "./card.ts";
+import { COLLECTIBLE_ATTRIBUTES, COLLECTIBLE_LAYOUTS, collectibleFacts } from "./collectible.ts";
+import { renderCollectible } from "./collectibleart.ts";
 import { feedbackIssue, feedbackPost, type FeedbackKind } from "./feedback.ts";
 import { CARD_CATEGORY_NAMES, CARD_COLOR_KEYS, CARD_COLOR_NAMES, CARD_OPTIONS, cardRequirement, cardUnlocked, fellowshipArt, parseInvite, type CardCategory } from "./cardstyle.ts";
 import { dailyWaiting, rollDaily, streakStatus } from "./daily.ts";
@@ -65,7 +67,7 @@ import "./style.css";
 export const RF_DISPLAY_DECIMALS = 15;
 const rf = (value: bigint) => `${formatGameAmount(value, RF_DISPLAY_DECIMALS)} RF`;
 type Phase = "loading" | "title" | "playing" | "failed";
-type Modal = "caskets" | "map" | "card" | "cards" | "help" | "feedback" | "nerds" | null;
+type Modal = "caskets" | "map" | "card" | "collectible" | "cards" | "help" | "feedback" | "nerds" | null;
 type XpDrop = { id: number; skill: Skill; amount: number; at: number };
 type CasketResult = { play: bigint; outcomeId: number; wardrobe: string | null; coins: number; redeemed: boolean };
 const CANONICAL = new Map<number, GenerationSprites>(REGULAR_SPRITES.map(sprites => [Number(sprites.tokenId), sprites]));
@@ -179,8 +181,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const [netState, setNetState] = useState<NetState>(players.current.state), [whisper, setWhisper] = useState<{ text: string; at: number } | null>(null);
   const lastMinimapPoint = useRef<React.MouseEvent<HTMLCanvasElement> | null>(null);
   const [snapshot, setSnapshot] = useState<GameSnapshot | null>(null), [busy, setBusy] = useState(false), [casketError, setCasketError] = useState(""), [reveal, setReveal] = useState<CasketResult[] | null>(null);
-  const [size, setSize] = useState({ width: 960, height: 640, scale: 1 }), [sideOpen, setSideOpen] = useState(true), [fullscreen, setFullscreen] = useState(false), [pip, setPip] = useState(false), [shareStatus, setShareStatus] = useState(""), [feedbackStatus, setFeedbackStatus] = useState(""), [cardUrl, setCardUrl] = useState<string | null>(null);
-  const pendingSave = useRef<unknown>(null), cardBlob = useRef<Blob | null>(null), resizeRef = useRef<() => void>(() => {}), saveNow = useRef<(claim?: boolean, importHash?: string) => void>(() => {});
+  const [size, setSize] = useState({ width: 960, height: 640, scale: 1 }), [sideOpen, setSideOpen] = useState(true), [fullscreen, setFullscreen] = useState(false), [pip, setPip] = useState(false), [shareStatus, setShareStatus] = useState(""), [feedbackStatus, setFeedbackStatus] = useState(""), [cardUrl, setCardUrl] = useState<string | null>(null), [collectibleUrl, setCollectibleUrl] = useState<string | null>(null);
+  const pendingSave = useRef<unknown>(null), cardBlob = useRef<Blob | null>(null), collectibleBlob = useRef<Blob | null>(null), generation = useRef<number | null>(null), resizeRef = useRef<() => void>(() => {}), saveNow = useRef<(claim?: boolean, importHash?: string) => void>(() => {});
   const [cloud, setCloud] = useState<CloudState | null>(null), cloudWas = useRef<CloudState["status"] | null>(null), milestone = useRef("");
   /** Logged out: back on the title screen with the adventure saved. */
   const [loggedOut, setLoggedOut] = useState(false);
@@ -281,7 +283,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         }
         refresh(); return;
       }
-      setRoster(parsed.others); setRosterState(parsed.others.length ? "ready" : "none");
+      setRoster(parsed.others); setRosterState(parsed.others.length ? "ready" : "none"); generation.current = parsed.self;
       if (state.player.follower !== null) { const follower = parsed.others.find(entry => entry.id === state.player.follower); setFollower(state, follower ?? null); if (follower) loadFriendSprite(follower.id); }
       if (!linked.current) {
         linked.current = true; setHosted("linked");
@@ -317,7 +319,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           "copied-and-opened": "Picture copied and X opened: paste it into your post (Ctrl/Cmd+V), then press Post.",
           "saved-and-opened": "Picture saved and X opened: attach it to your post, then press Post.", copied: "Adventurer card copied as a picture.", saved: "Adventurer card saved as a picture.",
         };
-        setShareStatus(messages[event.data.result as ShareOutcome] ?? messages.failed); return;
+        const collectible: Partial<Record<ShareOutcome, string>> = { copied: "Collectible card copied as a picture.", saved: "Collectible card saved as a picture." };
+        setShareStatus((live.current.modal === "collectible" ? collectible[event.data.result as ShareOutcome] : null) ?? messages[event.data.result as ShareOutcome] ?? messages.failed); return;
       }
       // A newer tab took over this Friend's saves: stop saving here, so this older adventure can't overwrite it.
       if (event.data?.type === SAVE_ELSEWHERE) {
@@ -410,6 +413,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           else if (next.status === "not-owner") message(state, "This wallet doesn't own this Friend now, so cloud saving has stopped. Your progress is still saved in this browser.", "info");
           refresh();
         }
+        // A card out holds the lockbox (cardescrow.ts); the host says whether one is.
+        if (state && next.card !== undefined) state.cardHeld = !!next.card && (next.card.state === "reserved" || next.card.state === "submitted" || next.card.state === "active");
         setCloud(next); return;
       }
       if (event.data?.type === SETTINGS_STATE) {
@@ -1045,6 +1050,34 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     drawCard(state);
     setShareStatus(""); setModal("card");
   };
+  // ---------- Collectible card: the portrait picture (collectible.ts); its own modal, the adventurer card's untouched ----------
+  const drawCollectible = (state: Game) => {
+    if (game.current !== state) return;
+    renderCollectible(state, friend.current, collectibleFacts(state, generation.current)).toBlob(blob => { if (!blob) return; collectibleBlob.current = blob; setCollectibleUrl(url => { if (url) URL.revokeObjectURL(url); return URL.createObjectURL(blob); }); });
+  };
+  const openCollectible = () => { const state = game.current; if (!state) return; drawCollectible(state); setShareStatus(""); setModal("collectible"); };
+  // Minting the picture as an Adventurer Card: the host does it all (cloud/src/cards.ts, host/cloud.ts); the game only asks, and shows where it is.
+  const mintCard = () => {
+    const state = game.current; if (!state) return;
+    const facts = collectibleFacts(state, generation.current);
+    renderCollectible(state, friend.current, facts).toBlob(blob => { if (blob) cloudAction("mint-card", { layout: state.player.collectible.layout, show: [...state.player.collectible.show], facts, image: blob }); });
+  };
+  const cardLine = (() => {
+    const card = cloud?.card; if (!card) return "";
+    if (card.error === "cancelled") return "The wallet didn't send the mint. The card is still reserved: press Mint again to send it.";
+    if (card.error === "unverified") return "Only verified progress can be made into a card: this adventure took a save from outside the cloud (an import, a restore), so it can't be.";
+    if (card.error) return `Couldn't mint: ${card.error}`;
+    if (card.step === "preparing") return "Making the snapshot…";
+    if (card.step === "uploading") return "Sending the picture…";
+    if (card.step === "wallet") return "Confirm the transaction in your wallet…";
+    if (card.state === "submitted") return `Card #${card.tokenId} is minting: waiting for the chain…`;
+    if (card.state === "reserved") return `Card #${card.tokenId} is reserved and its lockbox held: send the mint from your wallet, or give the card up.`;
+    if (card.state === "active") return `Card #${card.tokenId} is minted: it's in your wallet. Your XP snapshot and lockbox are held until it's redeemed.`;
+    if (card.state === "redeemed") return `Card #${card.tokenId} was redeemed.`;
+    return "";
+  })();
+  const canMint = hosted === "linked" && cloud?.status === "saved" && !cloud.card?.step && (!cloud.card || cloud.card.state === "cancelled" || cloud.card.state === "reserved" || cloud.card.state === "redeemed");
+  const shareCollectible = (action: ShareAction) => { const state = game.current, blob = collectibleBlob.current; if (state && blob) shareBlob(action, blob, shareText(state), `rarefriends-realm-card-${state.player.friendId}.png`); };
   const shareBlob = (action: ShareAction, blob: Blob, text: string, filename: string) => {
     if (hosted !== "linked") { setShareStatus("Sharing needs the Realm's own host page (the Pages link)."); return; }
     window.parent.postMessage({ type: SHARE_REQUEST, action, text, image: blob, filename }, "*");
@@ -1174,7 +1207,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
                 if (linked.current) saveNow.current(true, hash);
                 else message(state, "Saves aren't connected yet, so this restore isn't saved: keep playing in this tab and it saves once they connect. If Settings still says saves are off, reload the page and restore the code again.", "info");
               } return error; }} settings={settings} setSettings={setSettings}
-            friend={friend.current} trackName={audio.current?.trackName ?? ""} trackId={audio.current?.trackId ?? ""} playTrack={id => { audio.current?.play(id as TrackId); audio.current?.unlock(); setSettings({ ...settings, autoMusic: false }); }} openCard={openCard} openCards={() => setModal("cards")} openFeedback={() => { setFeedbackStatus(""); setModal("feedback"); }} openHelp={() => setModal("help")} openNerds={() => setModal("nerds")} paused={paused} saved={savedText}
+            friend={friend.current} trackName={audio.current?.trackName ?? ""} trackId={audio.current?.trackId ?? ""} playTrack={id => { audio.current?.play(id as TrackId); audio.current?.unlock(); setSettings({ ...settings, autoMusic: false }); }} openCard={openCard} openCollectible={openCollectible} openCards={() => setModal("cards")} openFeedback={() => { setFeedbackStatus(""); setModal("feedback"); }} openHelp={() => setModal("help")} openNerds={() => setModal("nerds")} paused={paused} saved={savedText}
             relicCounts={snapshot?.inventory.map(Number) ?? [0, 0, 0, 0]} openCaskets={() => setModal("caskets")} />
           {selection && <div className="realm-selection" role="status">{selection.kind === "item" ? `Use ${player.inventory[selection.slot] ? itemName(player.inventory[selection.slot]!.id) : "item"} ->` : `Cast ${SPELLS.find(spell => spell.id === selection.spell)?.name ?? "spell"} ->`} pick a target <button type="button" onClick={() => setSelection(null)}>Cancel</button></div>}
 
@@ -1303,6 +1336,43 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
                 <p className="realm-muted">Every style is free: the card is yours. Your own colours override the ink, background and backdrop presets; the accent and banner colours paint your own header banner. Fellowship logos and backgrounds come from the site's fellowships folder: see preview/fellowships/README on the site.</p>
               </div>
               <p className="realm-note">Post text: “{shareText(state)}”</p>
+            </Modal>
+          )}
+          {modal === "collectible" && (
+            <Modal title="Collectible card" onClose={() => setModal(null)} wide>
+              <p className="realm-muted">A portrait, playing-card-shaped picture of your adventurer, for your collection: choose a layout and what it shows. The adventurer card you share is untouched. Minting this as a card in the Realm's collection comes later; the picture is yours now.</p>
+              {collectibleUrl && <img className="realm-card realm-card-portrait" src={collectibleUrl} alt={`Collectible card: Friend #${player.friendId}, total level ${totalLevel(player)}, combat ${combatLevel(player)}`} />}
+              <div className="realm-buttons">
+                <button type="button" className="realm-primary" onClick={() => shareCollectible("save")}>Save picture</button>
+                <button type="button" onClick={() => shareCollectible("copy")}>Copy picture</button>
+                <button type="button" onClick={openCard}>Adventurer card</button>
+              </div>
+              {shareStatus && <p className="realm-note" role="status">{shareStatus}</p>}
+              <div className="realm-card-mint">
+                <h3>Mint as an Adventurer Card</h3>
+                <p className="realm-muted">An Adventurer Card is this picture minted as a one-of-one in the Realm's own collection on Robinhood Chain, standing for a snapshot of your progress: your XP, and what's in your card lockbox (the bank's 🂠 tab). You pay the gas from your wallet. Whoever redeems the card gets that progress, and it leaves you. It needs verified cloud saves. {player.lockbox.length ? `Your lockbox holds ${player.lockbox.length} kind${player.lockbox.length === 1 ? "" : "s"} of item.` : "Your lockbox is empty: the card would carry your XP only."}</p>
+                {cardLine && <p className="realm-note" role="status">{cardLine}</p>}
+                <div className="realm-buttons">
+                  <button type="button" className="realm-primary" disabled={!canMint} onClick={mintCard}>Mint as an Adventurer Card</button>
+                  {cloud?.card?.state === "reserved" && !cloud.card.step && <button type="button" onClick={() => cloudAction("cancel-card")}>Give up this card</button>}
+                  {cloud?.card && <button type="button" onClick={() => cloudAction("card-status")}>Check again</button>}
+                </div>
+              </div>
+              <div className="realm-card-styles">
+                <div className="realm-card-selects">
+                  <label className="realm-card-select"><span>Layout</span>
+                    <select value={player.collectible.layout} onChange={event => { player.collectible.layout = event.target.value; drawCollectible(state); refresh(); }}>
+                      {COLLECTIBLE_LAYOUTS.map(option => { const open = cardUnlocked(state, option);
+                        return <option key={option.id} value={option.id} disabled={!open} title={open ? option.text : `Locked: ${cardRequirement(option)}`}>{open ? option.name : `🔒 ${option.name} (${cardRequirement(option)})`}</option>; })}
+                    </select></label>
+                </div>
+                <div className="realm-graphics realm-card-row" aria-label="Show on the card">
+                  <span>Show on the card:</span>
+                  {COLLECTIBLE_ATTRIBUTES.map(entry => <label key={entry.id} className="realm-check"><input type="checkbox" checked={player.collectible.show.includes(entry.id)}
+                    onChange={event => { player.collectible.show = COLLECTIBLE_ATTRIBUTES.map(a => a.id).filter(id => id === entry.id ? event.target.checked : player.collectible.show.includes(id)); drawCollectible(state); refresh(); }} /> {entry.name}</label>)}
+                </div>
+                <p className="realm-muted">{COLLECTIBLE_LAYOUTS.find(entry => entry.id === player.collectible.layout)?.text}</p>
+              </div>
             </Modal>
           )}
           {quest && (

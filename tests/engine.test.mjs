@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   buy, canWalk, castSpell, chooseOption, collectFromCasket, continueDialogue, createGame, equip, unequip, findPath, itemOptions, menuFor, restore, sell,
   serialize, setFollower, setRelics, setTarget, smeltingRecipes, smithingRecipes, startProduction, mostMakeable, tick, togglePrayer, useItemOnItem, walkTo, setHeld,
@@ -3762,4 +3763,56 @@ test("Mining country: the Ashen quarry is stepped and walled with its own smithy
   assert(lava >= 6, `lava in Emberforge's cracks (${lava})`);
   assert(near("furnace", at(176, 40), 2) && near("anvil", at(180, 42), 1), "the smelting yard");
   assert.equal(world.objects.filter(o => o.kind === "anvil").length >= 12, true, "more smithies than before");
+});
+
+test("Two card formats: the adventurer card stays landscape and business-card shaped, the collectible card is portrait and playing-card shaped, each with its own versioned layouts", async () => {
+  // card.ts draws (it needs a document), so the shareable card's size is read from its source.
+  const CARD = /CARD: [^=]*= \{ width: (\d+), height: (\d+) \}/.exec(readFileSync(new URL("../games/rarefriends-realm/card.ts", import.meta.url), "utf8")).slice(1, 3).map(Number);
+  const { COLLECTIBLE, COLLECTIBLE_LAYOUTS, COLLECTIBLE_ATTRIBUTES, DEFAULT_COLLECTIBLE, cleanCollectible, collectibleChoice, collectibleFacts } = await import("../games/rarefriends-realm/collectible.ts");
+  const { DEFAULT_CARD, CARD_OPTIONS } = await import("../games/rarefriends-realm/cardstyle.ts");
+  assert.deepEqual(CARD, [1200, 675], "the shareable card is the X card size, as it always was");
+  assert.deepEqual([COLLECTIBLE.width, COLLECTIBLE.height], [750, 1050]); assert.ok(COLLECTIBLE.height / COLLECTIBLE.width > 1.3, "portrait, two and a half by three and a half");
+  assert.deepEqual(DEFAULT_CARD, { bg: "paper", frame: "rose", skills: "boxes", font: "mono", ink: "ink", layout: "classic", banner: "auto" }, "the adventurer card's defaults are untouched");
+  assert.ok(!CARD_OPTIONS.layout.some(option => COLLECTIBLE_LAYOUTS.some(layout => layout.id === option.id && layout.name === option.name)), "the collectible's layouts are its own, not the adventurer card's");
+  assert.deepEqual(COLLECTIBLE_LAYOUTS.map(layout => layout.name), ["Classic Adventurer", "Skill Master", "Legendary Build", "Quest Champion", "Collector's Edition", "Minimalist"]);
+  assert.ok(COLLECTIBLE_LAYOUTS.every(layout => Number.isInteger(layout.version) && layout.version >= 1), "every layout is versioned");
+  assert.equal(new Set(COLLECTIBLE_LAYOUTS.map(layout => layout.id)).size, COLLECTIBLE_LAYOUTS.length);
+  // Choices are cleaned: unknown layouts and attributes are dropped, and a locked layout falls back to the first.
+  assert.deepEqual(cleanCollectible({ layout: "nope", show: ["skills", "money", "gear"] }), { layout: "classic", show: ["skills", "gear"] });
+  assert.deepEqual(cleanCollectible(null), DEFAULT_COLLECTIBLE);
+  const g = newGame();
+  g.player.collectible = { layout: "legendary", show: ["combat"] };
+  assert.equal(collectibleChoice(g).layout, "classic", "Legendary Build needs achievements");
+  for (let i = 0; i < 15; i++) g.player.achievements[`a${i}`] = 1;
+  assert.equal(collectibleChoice(g).layout, "legendary");
+  // The facts a card shows are read once, and are public progress only: no bank, no coins, nothing bound.
+  const facts = collectibleFacts(g, 3, 1_700_000_000_000);
+  assert.equal(facts.generation, 3); assert.equal(facts.friendId, 7730); assert.equal(facts.at, 1_700_000_000_000);
+  assert.equal(facts.skills.hitpoints, 10); assert.equal(typeof facts.combat, "number"); assert.ok(Array.isArray(facts.gear));
+  for (const key of ["bank", "inventory", "coins", "equipment"]) assert.ok(!(key in facts), `${key} is not on the card`);
+  assert.deepEqual(COLLECTIBLE_ATTRIBUTES.map(entry => entry.id), ["skills", "combat", "gear", "quests", "achievements", "generation"]);
+  // The choices survive a save and a load.
+  const save = serialize(g); assert.deepEqual(save.collectible, { layout: "legendary", show: ["combat"] });
+  const h = newGame(); assert.ok(restore(h, save)); assert.deepEqual(h.player.collectible, { layout: "legendary", show: ["combat"] });
+});
+
+test("The card lockbox: tradeable items go in from the inventory and come back to the bank; coins and quest things can't; it's held while a card is out; it survives a save", async () => {
+  const { LOCKBOX_SIZE, cardEligible, cleanLockbox, fromLockbox, toLockbox } = await import("../games/rarefriends-realm/cardescrow.ts");
+  const g = newGame(), p = g.player;
+  assert.ok(cardEligible("logs") && cardEligible("pewter_axe"), "ordinary things are eligible");
+  assert.ok(!cardEligible("coins") && !cardEligible("crypt_key") && !cardEligible("nothing_of_the_kind"), "coins, quest keys and unknown ids aren't");
+  give(p, "logs", 10); give(p, "coins", 500); const coins = count(p, "coins");
+  const at = id => p.inventory.findIndex(slot => slot?.id === id);
+  assert.equal(toLockbox(g, at("logs"), 4), null); assert.equal(count(p, "logs"), 6); assert.deepEqual(p.lockbox, [{ id: "logs", n: 4 }]);
+  assert.equal(toLockbox(g, at("logs")), null); assert.deepEqual(p.lockbox, [{ id: "logs", n: 10 }], "onto the same stack");
+  assert.match(toLockbox(g, at("coins")), /can't go in a card/); assert.equal(count(p, "coins"), coins);
+  assert.equal(fromLockbox(g, "logs", 3), null); assert.deepEqual(p.lockbox, [{ id: "logs", n: 7 }]); assert.ok(p.bank.some(slot => slot.id === "logs" && slot.n === 3), "back to the bank");
+  g.cardHeld = true;
+  assert.match(fromLockbox(g, "logs"), /A card is out/); assert.match(toLockbox(g, at("coins")) ?? toLockbox(g, 0), /card is out|can't go in/);
+  assert.deepEqual(p.lockbox, [{ id: "logs", n: 7 }], "held");
+  g.cardHeld = false;
+  assert.deepEqual(cleanLockbox([{ id: "logs", n: 2 }, { id: "coins", n: 9 }, { id: "logs", n: 1 }, { id: "x", n: 1 }, null, { id: "pewter_axe", n: 0 }]), [{ id: "logs", n: 2 }], "cleaned: known, eligible, whole, once");
+  assert.equal(cleanLockbox(Array.from({ length: 40 }, (_, i) => ({ id: ["logs", "oak_logs", "pewter_axe", "pewter_pickaxe"][i % 4] + "", n: 1 }))).length <= LOCKBOX_SIZE, true);
+  const save = serialize(g); assert.deepEqual(save.lockbox, [{ id: "logs", n: 7 }]);
+  const h = newGame(); assert.ok(restore(h, save)); assert.deepEqual(h.player.lockbox, [{ id: "logs", n: 7 }]);
 });

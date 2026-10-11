@@ -437,6 +437,22 @@ try {
   (await import("node:fs")).writeFileSync("./artifacts/adventurer-card.png", Buffer.from(card.data, "base64"));
   await game.getByRole("button", { name: "Close" }).click();
 
+  // ---------- Collectible card: a second, portrait format, with its own layouts; the adventurer card above is untouched ----------
+  await game.getByRole("button", { name: /Collectible card/ }).click();
+  await game.getByRole("img", { name: /Collectible card: Friend #7730/ }).waitFor();
+  const portrait = await game.getByRole("img", { name: /Collectible card/ }).evaluate(image => {
+    const canvas = document.createElement("canvas"); canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
+    canvas.getContext("2d").drawImage(image, 0, 0); return { width: image.naturalWidth, height: image.naturalHeight, data: canvas.toDataURL("image/png").split(",")[1] };
+  });
+  assert.deepEqual([portrait.width, portrait.height], [750, 1050], "portrait, playing-card shaped");
+  (await import("node:fs")).writeFileSync("./artifacts/collectible-card.png", Buffer.from(portrait.data, "base64"));
+  await game.getByLabel("Layout").selectOption("minimalist");
+  await game.getByText("Name, levels, Friend. Nothing else.").waitFor();
+  await shot("collectible");
+  await game.getByRole("button", { name: "Copy picture" }).click();
+  await game.getByText(/Collectible card copied as a picture/).waitFor();
+  await game.getByRole("button", { name: "Close" }).click();
+
   // ---------- Feedback: the button on the minimap ring opens a GitHub issue and an X post, through the host ----------
   await page.evaluate(() => { window.__shared.opened = []; });
   await game.getByRole("button", { name: "Send feedback" }).first().click();

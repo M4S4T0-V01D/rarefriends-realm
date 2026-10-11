@@ -8,6 +8,8 @@ import { createHash, createHmac } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
 import { privateKeyToAccount } from "viem/accounts";
+import { verifyTypedData } from "viem";
+import { VOUCHER_TYPES, characterKey, voucherDomain } from "../cloud/src/cards.ts";
 import { createApp, chainFor, LIMITS } from "../cloud/src/worker.ts";
 
 const ORIGIN = "https://m4s4t0-v01d.github.io";
@@ -35,11 +37,11 @@ function d1() {
     },
   };
 }
-function world({ attestKey = null } = {}) {
+function world({ attestKey = null, cards = null } = {}) {
   const db = d1(), owners = new Map([[7730, alice.address], [3412, bob.address]]);
   let clock = Date.parse("2026-10-09T12:00:00Z");
   const real = chainFor({ RPC_URL: "http://127.0.0.1:9", COLLECTION: "0x14C49e6118F46525dE9ab41a51cBAA3c6EBF181D" });
-  const app = createApp({ db, origins: [ORIGIN], chainId: 4663, clock: () => clock, attestKey, chain: { ownerOf: async friend => owners.get(friend) ?? null, verify: real.verify } });
+  const app = createApp({ db, origins: [ORIGIN], chainId: 4663, clock: () => clock, attestKey, cards, chain: { ownerOf: async friend => owners.get(friend) ?? null, verify: real.verify } });
   const call = async (method, path, { body, token, origin = ORIGIN, gzip = false } = {}) => {
     const headers = { ...(origin ? { origin } : {}), ...(token ? { authorization: `Bearer ${token}` } : {}) };
     let payload;
@@ -57,7 +59,7 @@ function world({ attestKey = null } = {}) {
   };
   const save = (friend, xp = 1000, extra = {}) => ({ v: 1, friendId: friend, xp: { attack: xp, hitpoints: 1154 }, inventory: [null, { id: "logs", n: 1 }], bank: [], name: "Tester", ...extra });
   const put = (token, friend, baseVersion, data, reason = "auto", importHash) => call("PUT", `/v1/characters/${friend}`, { token, gzip: true, body: { baseVersion, save: data, reason, ...(importHash ? { importHash } : {}) } });
-  return { db, owners, call, signIn, save, put, advance: ms => { clock += ms; } };
+  return { db, owners, app, call, signIn, save, put, advance: ms => { clock += ms; } };
 }
 
 test("signing in: a signature over the issued challenge makes a session; replays, other signers and edits don't", async () => {
@@ -253,4 +255,88 @@ test("verified progress: honest saves keep a character verified; impossible ones
   const bare = world(), tbare = await bare.signIn(alice);
   await bare.put(tbare, 7730, 0, bare.save(7730));
   assert.equal((await bare.call("GET", "/v1/characters/7730/attestation", { token: tbare })).status, 503);
+});
+
+const MINTER = privateKeyToAccount("0x4bbbf85ce3377467afe5d46f804f221813b2bb87f24d81f60f1fcdbf7cbf4356"), CONTRACT = "0x1000000000000000000000000000000000000001";
+/** A card world: a bucket in a Map, a chain whose receipts the test writes. */
+function cardWorld() {
+  const files = new Map(), receipts = new Map();
+  const bucket = { put: async (key, value, options) => { files.set(key, { bytes: new Uint8Array(value), type: options?.httpMetadata?.contentType }); }, get: async key => { const f = files.get(key); return f ? { arrayBuffer: async () => f.bytes.buffer, httpMetadata: { contentType: f.type } } : null; }, delete: async key => { files.delete(key); } };
+  const chain = { receipt: async hash => receipts.get(hash) ?? { status: "pending" } };
+  const w = world({ attestKey: "k", cards: { minterKey: "0x4bbbf85ce3377467afe5d46f804f221813b2bb87f24d81f60f1fcdbf7cbf4356", contract: CONTRACT, chainId: 46630, bucket, chain, baseUrl: "https://saves.example", gameUrl: "https://game.example/" } });
+  return { ...w, files, receipts };
+}
+const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
+
+test("Adventurer Cards: a verified character's lockbox and XP become a snapshot and a signed voucher; the lockbox is held while the card is out; the chain's receipt makes it active; its metadata and picture are public", async () => {
+  const w = cardWorld(), token = await w.signIn(alice);
+  const lockbox = [{ id: "pewter_axe", n: 1 }, { id: "logs", n: 20 }];
+  assert.equal((await w.put(token, 7730, 0, w.save(7730, 1000, { playTicks: 10, lockbox }))).status, 200);
+  const prep = (friend = 7730, tok = token) => w.call("POST", "/v1/cards/prepare", { token: tok, body: { friend, layout: "classic", show: ["skills", "combat"] } });
+  const made = await prep();
+  assert.equal(made.status, 200, JSON.stringify(made.body));
+  const { card, voucher, snapshot } = made.body;
+  assert.equal(card.state, "reserved"); assert.equal(card.tokenId, 1); assert.equal(voucher.minter, MINTER.address); assert.equal(voucher.contract, CONTRACT);
+  assert.deepEqual(snapshot.items, [{ id: "logs", n: 20 }, { id: "pewter_axe", n: 1 }], "the lockbox, sorted"); assert.equal(snapshot.xp.attack, 1000);
+  assert.equal(voucher.character, characterKey(alice.address, 7730));
+  // The voucher verifies against the minter's address with the contract's EIP-712 domain and types: what the contract checks.
+  assert.ok(await verifyTypedData({ address: MINTER.address, domain: voucherDomain(46630, CONTRACT), types: VOUCHER_TYPES, primaryType: "CardVoucher", signature: voucher.signature,
+    message: { to: alice.address, tokenId: 1n, character: voucher.character, snapshot: voucher.snapshot, deadline: BigInt(voucher.deadline) } }));
+  assert.equal(voucher.snapshot, card.snapshotHash);
+  // Only one card out per character; the character's card is readable.
+  assert.equal((await prep()).status, 409);
+  assert.equal((await w.call("GET", "/v1/characters/7730/card", { token })).body.card.tokenId, 1);
+  // While it's out, a save must keep the lockbox exactly; everything else may change.
+  w.advance(60_000);
+  assert.match((await w.put(token, 7730, 1, w.save(7730, 1500, { playTicks: 60, lockbox: [{ id: "logs", n: 19 }, { id: "pewter_axe", n: 1 }] }))).body.error, /lockbox holds what your card stands for/);
+  assert.match((await w.put(token, 7730, 1, w.save(7730, 1500, { playTicks: 60 }))).body.error, /lockbox/);
+  assert.equal((await w.put(token, 7730, 1, w.save(7730, 1500, { playTicks: 60, lockbox: [{ id: "logs", n: 20 }, { id: "pewter_axe", n: 1 }] }))).status, 200);
+  // The picture goes up (a PNG only), with the facts it shows; before the mint nobody can see it.
+  assert.equal((await w.call("PUT", "/v1/cards/1/image", { token, body: undefined })).status, 413);
+  const up = await (async () => { const headers = { origin: ORIGIN, authorization: `Bearer ${token}`, "content-type": "image/png", "x-card-facts": JSON.stringify({ name: "Tester", family: "Oak", combat: 3, total: 30, questPoints: 1 }) };
+    const r = await w.app.fetch(new Request("https://saves.example/v1/cards/1/image", { method: "PUT", headers, body: PNG })); return { status: r.status, body: await r.json() }; })();
+  assert.equal(up.status, 200, JSON.stringify(up.body));
+  assert.equal((await w.call("GET", "/v1/cards/1", { token: null })).status, 404, "not minted: no metadata yet");
+  // The player sends the mint; the chain's receipt (the CardMinted event, this token, this snapshot) makes the card active.
+  const tx = "0x" + "ab".repeat(32);
+  assert.equal((await w.call("POST", "/v1/cards/1/submitted", { token, body: { txHash: tx } })).body.card.state, "submitted");
+  w.receipts.set(tx, { status: "success", minted: [{ tokenId: 1n, to: alice.address, character: voucher.character, snapshot: voucher.snapshot }] });
+  const confirmed = await w.call("POST", "/v1/cards/1/confirm", { token });
+  assert.equal(confirmed.body.card.state, "active"); assert.equal(confirmed.body.card.holder, alice.address);
+  const meta = await w.call("GET", "/v1/cards/1", { token: null, origin: null });
+  assert.equal(meta.status, 200); assert.equal(meta.body.name, "Adventurer Card #1"); assert.equal(meta.body.image, "https://saves.example/v1/cards/1/image");
+  assert.ok(meta.body.attributes.some(a => a.trait_type === "Combat level" && a.value === 3)); assert.ok(meta.body.description.includes(voucher.snapshot));
+  const picture = await w.app.fetch(new Request("https://saves.example/v1/cards/1/image"));
+  assert.equal(picture.status, 200); assert.equal(picture.headers.get("content-type"), "image/png"); assert.equal((await picture.arrayBuffer()).byteLength, PNG.byteLength);
+  assert.equal((await w.call("GET", "/v1/cards/collection", { token: null, origin: null })).body.name, "RareFriends Realm");
+  // An active card can't be cancelled; still one card out.
+  assert.equal((await w.call("POST", "/v1/cards/1/cancel", { token })).status, 409);
+  assert.equal((await prep()).status, 409);
+});
+
+test("Adventurer Cards: unverified progress can't become a card; a card given up or whose voucher expires unsent is cancelled and the lockbox opens; a failed mint goes back to reserved", async () => {
+  const w = cardWorld(), tb = await w.signIn(bob), h = save => createHash("sha256").update(JSON.stringify(save)).digest("hex");
+  const outside = w.save(3412, 50_000, { playTicks: 1 });
+  assert.equal((await w.put(tb, 3412, 0, outside, "import", h(outside))).body.trust, "verified"); w.advance(60_000);
+  const again = w.save(3412, 50_100, { playTicks: 5 }); await w.put(tb, 3412, 1, again, "import", h(again));
+  const refused = await w.call("POST", "/v1/cards/prepare", { token: tb, body: { friend: 3412, layout: "classic", show: [] } });
+  assert.equal(refused.status, 403); assert.equal(refused.body.trust, "unverified");
+  // Alice: a card, given up.
+  const token = await w.signIn(alice);
+  await w.put(token, 7730, 0, w.save(7730, 1000, { playTicks: 10, lockbox: [{ id: "logs", n: 5 }] }));
+  const prep = () => w.call("POST", "/v1/cards/prepare", { token, body: { friend: 7730, layout: "minimalist", show: [] } });
+  assert.equal((await prep()).body.card.tokenId, 1);
+  assert.equal((await w.call("POST", "/v1/cards/1/cancel", { token })).body.card.state, "cancelled");
+  w.advance(60_000);
+  assert.equal((await w.put(token, 7730, 1, w.save(7730, 1200, { playTicks: 60, lockbox: [] }))).status, 200, "the lockbox is free again");
+  // A second card; its voucher expires unsent.
+  assert.equal((await prep()).body.card.tokenId, 2);
+  w.advance(2 * 3_600_000);
+  assert.equal((await w.call("POST", "/v1/cards/2/confirm", { token })).body.card.state, "cancelled");
+  // A third; its transaction fails on chain: back to reserved, to be sent again (or given up).
+  const third = await prep(); assert.equal(third.body.card.tokenId, 3);
+  const tx = "0x" + "cd".repeat(32);
+  w.receipts.set(tx, { status: "failed" });
+  assert.equal((await w.call("POST", "/v1/cards/3/submitted", { token, body: { txHash: tx } })).body.card.state, "reserved");
+  assert.equal((await w.call("GET", "/v1/characters/7730/card", { token })).body.card.tokenId, 3);
 });

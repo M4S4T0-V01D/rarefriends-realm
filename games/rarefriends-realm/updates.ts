@@ -4,6 +4,9 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 108, date: "2026-10-11", title: "The collectible card: a portrait, playing-card picture of your adventurer", items: [
+    "Beside the adventurer card you share, a second picture: portrait, playing-card shaped, for your collection, with six layouts (Classic Adventurer, Skill Master, Legendary Build, Quest Champion, Collector's Edition, Minimalist; some open with Presence, a quest or achievements) and your choice of what it shows. The adventurer card is untouched. Minting it as a card in the Realm's own collection comes later.",
+  ] },
   { id: 107, date: "2026-10-11", title: "Mining country: the Ashen quarry, Frostpeak's summit, Emberforge's smelting yard", items: [
     "The Ashen mine is a quarry now: a stepped pit with a level floor, terraces up to a rim of broken cliff, a retaining wall with its ramp, planks over the cut, ore carts, pit props, a tool shed and the mine's own smithy. Refined sigil stone shows in its faces.",
     "Frostpeak climbs: the snowfield rises from the camp to a summit above the yetis, with a scree track up it, crags on the high slopes, a cairn on top, and a forge at the camp. Emberforge has a volcanic district east of the forge hall: ash underfoot, lava in the cracks, a stone smelting yard with two furnaces, an anvil, carts and coal.",

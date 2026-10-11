@@ -118,6 +118,17 @@ For anything with shared stakes, the service keeps, per character, whether it ca
 - Nothing else changes: an unverified character saves, loads and plays exactly as before. Only what needs the service's word (a collectible card's snapshot, prizes) asks for `verified`.
 - **Attestations:** `GET /v1/characters/:friend/attestation` returns the stored version vouched for: `{ address, friend, version, hash, totalXp, trust, at, sig }`, where `hash` is the SHA-256 of the stored save and `sig` an HMAC-SHA256 over those fields with the service's `ATTEST_KEY`. A step that didn't watch the save being stored (a mint) can check the signature instead of trusting its caller. Without the secret the route answers 503.
 
+## Adventurer Cards
+
+`src/cards.ts` is the service's half of the Realm's collectible cards; `contracts/AdventurerCards.sol` (an ERC-721 on Robinhood Chain, one collection) is the other. A card is a **snapshot** of a verified character's progress: every skill's XP, and the items the player set aside in the card's **lockbox** (the bank's 🂠 tab in the game; `cardescrow.ts`). The service holds the snapshot and keeps the lockbox exactly as it was while the card is out: a save that changes it is refused. Minting is by **voucher**: the service signs (EIP-712, `MINTER_KEY`) that this wallet may mint this token for this character with this snapshot hash; the player's wallet sends the one transaction and pays its gas. Nothing on chain concerns a Friend itself: a card carries Realm progress only, never a Friend's generation, family or any state on chain.
+
+- **Lifecycle:** prepared → reserved (voucher signed, lockbox held) → submitted (transaction sent) → active (the chain shows the mint; `holder` set) → redeemed (the chain shows the burn; settled in the game). A reserved card the player gives up, or whose voucher expires unsent (an hour), is cancelled and its lockbox opens. A failed transaction puts the card back to reserved.
+- **One card out per character** at a time; no lifetime cap.
+- **Only verified progress** (above) can be made into a card.
+- **Routes:** `POST /v1/cards/prepare`, `PUT /v1/cards/:id/image` (a PNG, at most 400 KB, with the facts it shows in `x-card-facts`), `POST /v1/cards/:id/submitted|confirm|cancel`, `GET /v1/characters/:friend/card` (the owner's view, with the voucher while reserved); public: `GET /v1/cards/collection` (OpenSea's contract-level metadata), `GET /v1/cards/:id` (a minted card's token metadata), `GET /v1/cards/:id/image` (its picture, from the R2 bucket `rarefriends-realm-nft`, which stays private: the Worker serves it).
+- **The host page** (`host/cloud.ts` `mintCard`) does the whole flow on the game's `mint-card`; the game only asks and shows where the card is (`CLOUD_STATE.card`). `tests/preview-bundle.test.mjs` allows exactly one `eth_sendTransaction` in the host, the card's mint.
+- **Contract:** `npm run cards:compile`, then `DEPLOYER_KEY=… MINTER=<the MINTER_KEY's address> npm run cards:deploy` (testnet by default; mainnet needs `CHAIN=mainnet CONFIRM_MAINNET=yes`, set on purpose). Put the address in `CARDS_CONTRACT` and redeploy the Worker. Roles: the admin (the deployer unless `ADMIN`) sets the base URI and royalties; the minter is the service's key; royalties (ERC-2981, `ROYALTY_BPS`, default 5%) go to `TREASURY`.
+
 ## Backups and recovery
 
 - **The cloud keeps earlier versions:** the last 12 per character. A copy is taken at most every 10 minutes, and always before an import, a takeover or a restore. `GET /v1/characters/:friend/history` lists them, and `POST /v1/characters/:friend/restore { version }` brings one back as the newest version (keeping the replaced one too).
@@ -135,6 +146,9 @@ npx wrangler d1 create rarefriends-realm-saves          # once; put the id in wr
 npx wrangler d1 execute rarefriends-realm-saves --remote --file schema.sql
 npx wrangler d1 execute rarefriends-realm-saves --remote --file migrations/0002-verified.sql   # once, for a database made before verified progress
 npx wrangler secret put ATTEST_KEY                      # a long random string; attestations are signed with it
+npx wrangler d1 execute rarefriends-realm-saves --remote --file migrations/0003-cards.sql      # once, for a database made before Adventurer Cards
+npx wrangler secret put MINTER_KEY                      # the cards' signing key (0x…64 hex); its address is the contract's MINTER
+npx wrangler r2 bucket create rarefriends-realm-nft     # once; the cards' pictures (bound as CARDS in wrangler.toml)
 npx wrangler deploy
 npx wrangler tail                                       # live logs
 ```
@@ -143,8 +157,9 @@ Configuration is in `wrangler.toml` `[vars]`:
 
 - `ORIGINS`: the pages allowed to sign in. Both renderers share `https://m4s4t0-v01d.github.io`.
 - `RPC_URL`, `CHAIN_ID`, `COLLECTION`
+- `CARDS_CONTRACT`, `CARDS_CHAIN_ID`, `CARDS_RPC_URL`, `GAME_URL`: the Adventurer Cards contract and its chain (testnet 46630 while it's being tried); an empty contract keeps cards closed
 
-The one secret is `ATTEST_KEY`, which signs attestations; it never leaves the Worker and nothing in the game or the host page holds it. Sessions are random tokens, and chain reads are public.
+The secrets are `ATTEST_KEY`, which signs attestations, and `MINTER_KEY`, which signs card vouchers; neither leaves the Worker, and nothing in the game or the host page holds them. The Worker holds no funds: the player's wallet pays a mint's gas. Sessions are random tokens, and chain reads are public.
 
 Known limits:
 

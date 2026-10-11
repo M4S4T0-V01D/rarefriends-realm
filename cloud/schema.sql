@@ -63,3 +63,24 @@ CREATE TABLE IF NOT EXISTS owners (
   address TEXT NOT NULL,
   checked_at INTEGER NOT NULL
 );
+-- Adventurer Cards (src/cards.ts): one row per card, from prepared to active or redeemed. The snapshot is what the
+-- card stands for (XP, lockbox items); its hash is what the chain commits to. token_id is the card's token on chain.
+CREATE TABLE IF NOT EXISTS cards (
+  token_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  address TEXT NOT NULL,
+  friend_id INTEGER NOT NULL,
+  character TEXT NOT NULL,
+  state TEXT NOT NULL,
+  snapshot TEXT NOT NULL,
+  snapshot_hash TEXT NOT NULL,
+  voucher TEXT,
+  deadline INTEGER,
+  tx_hash TEXT,
+  holder TEXT,
+  image INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  redeemed_by TEXT,
+  redeemed_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS cards_by_character ON cards (address, friend_id, state);

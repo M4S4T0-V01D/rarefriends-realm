@@ -13,6 +13,7 @@
  *   GET  /v1/characters/:friend/history               (Bearer) earlier versions kept for recovery
  *   POST /v1/characters/:friend/restore { version }   (Bearer) bring an earlier version back as the newest
  *   GET  /v1/characters/:friend/attestation           (Bearer) the stored version, vouched for: { version, hash, totalXp, trust, at, sig }
+ *   /v1/cards/…                                        Adventurer Cards: see cards.ts
  *
  * Rules: a session is made only from a valid signature over a single-use challenge for this site; a character is the
  * pair (wallet, Friend); writing needs the wallet to own the Friend on chain right now; every write names the version
@@ -22,6 +23,7 @@
  * (kept, playable, but not vouched for). See cloud/README.md for the policies.
  */
 import { BaseError, ContractFunctionRevertedError, HttpRequestError, createPublicClient, getAddress, http, isAddress, parseAbi, recoverMessageAddress, zeroAddress, type Hex } from "viem";
+import { cardRoutes, cardsChainFor, heldLockbox, lockboxOf, sameLockbox, type Bucket, type CardsOptions } from "./cards.ts";
 
 // ---------- Storage (the subset of D1 used here, so tests can supply SQLite) ----------
 export type Statement = { bind(...values: unknown[]): Statement; first<T = Record<string, unknown>>(): Promise<T | null>; all<T = Record<string, unknown>>(): Promise<{ results: T[] }>; run(): Promise<{ meta: { changes: number } }> };
@@ -32,7 +34,9 @@ export type Chain = {
   /** Whether `signature` is `address` signing `message` (plain wallets, and contract wallets through EIP-1271/6492). */
   verify(address: string, message: string, signature: string): Promise<boolean>;
 };
-export type Env = { DB: Database; RPC_URL: string; COLLECTION: string; CHAIN_ID: string; ORIGINS: string; ATTEST_KEY?: string };
+export type Env = { DB: Database; RPC_URL: string; COLLECTION: string; CHAIN_ID: string; ORIGINS: string; ATTEST_KEY?: string;
+  /** Adventurer Cards (cards.ts): the pictures' bucket, the signing key (a secret), the contract and its chain, and the game's address for the metadata. */
+  CARDS?: Bucket; MINTER_KEY?: string; CARDS_CONTRACT?: string; CARDS_CHAIN_ID?: string; CARDS_RPC_URL?: string; GAME_URL?: string };
 
 export const LIMITS = {
   /** A save's JSON, at most (today's saves are 20–90 KB). */
@@ -168,7 +172,7 @@ class HttpError extends Error {
 }
 
 // ---------- The app ----------
-export function createApp({ db, chain, clock = now, origins, chainId, attestKey = null }: { db: Database; chain: Chain; clock?: () => number; origins: string[]; chainId: number; attestKey?: string | null }) {
+export function createApp({ db, chain, clock = now, origins, chainId, attestKey = null, cards = null }: { db: Database; chain: Chain; clock?: () => number; origins: string[]; chainId: number; attestKey?: string | null; cards?: CardsOptions | null }) {
   const cors = (origin: string | null): Record<string, string> => origin && origins.includes(origin)
     ? { "access-control-allow-origin": origin, "access-control-allow-methods": "GET,POST,PUT,OPTIONS", "access-control-allow-headers": "authorization,content-type,content-encoding", "access-control-max-age": "600", vary: "origin" } : { vary: "origin" };
   const json = (origin: string | null, status: number, body: unknown, headers: Record<string, string> = {}) =>
@@ -190,6 +194,8 @@ export function createApp({ db, chain, clock = now, origins, chainId, attestKey 
     await db.prepare("INSERT INTO owners (friend_id, address, checked_at) VALUES (?, ?, ?) ON CONFLICT(friend_id) DO UPDATE SET address = excluded.address, checked_at = excluded.checked_at").bind(friend, normal, clock()).run();
     return normal === address;
   }
+  const characterOf = (address: string, friend: number) => db.prepare("SELECT version, save, save_hash, trust FROM characters WHERE address = ? AND friend_id = ?").bind(address, friend).first<{ version: number; save: string; save_hash: string | null; trust: string }>();
+  const cardsRoute = cards ? cardRoutes(db, cards, { clock, session, owns, json, characterOf }) : null;
   const friendOf = (text: string) => { const id = Number(text); if (!/^[0-9]{1,15}$/.test(text) || !Number.isSafeInteger(id)) throw new HttpError(400, "bad Friend"); return id; };
 
   async function route(request: Request, url: URL, origin: string | null): Promise<Response> {
@@ -262,6 +268,9 @@ export function createApp({ db, chain, clock = now, origins, chainId, attestKey 
         const text = JSON.stringify(body.save);
         if (text.length > LIMITS.saveBytes) throw new HttpError(413, "save too large");
         if (!await owns(address, friend)) throw new HttpError(403, "this wallet doesn't own this Friend now, so it can't save over it");
+        // A card out (cards.ts) holds its lockbox: the save must keep exactly what the card stands for.
+        const held = cards ? await heldLockbox(db, address, friend) : null;
+        if (held) { const box = lockboxOf(body.save); if (!box || !sameLockbox(box, held)) throw new HttpError(422, "save rejected: the lockbox holds what your card stands for, and can't change while the card is out"); }
         const at = clock();
         const current = await db.prepare("SELECT version, updated_at, total_xp, facts, trust, trust_note, trust_version FROM characters WHERE address = ? AND friend_id = ?").bind(address, friend)
           .first<{ version: number; updated_at: number; total_xp: number; facts: string | null; trust: string; trust_note: string | null; trust_version: number | null }>();
@@ -343,6 +352,7 @@ export function createApp({ db, chain, clock = now, origins, chainId, attestKey 
         return json(origin, 200, { version, updatedAt: at, trust: "unverified" });
       }
     }
+    if (cardsRoute) { const response = await cardsRoute(request, url, origin); if (response) return response; }
     throw new HttpError(404, "not found");
   }
 
@@ -354,7 +364,7 @@ export function createApp({ db, chain, clock = now, origins, chainId, attestKey 
       if (origin && !origins.includes(origin)) return json(origin, 403, { error: "this site can't use Realm cloud saves" });
       try { return await route(request, url, origin); }
       catch (error) {
-        if (error instanceof HttpError) return json(origin, error.status, { error: error.message, ...error.extra });
+        if (error instanceof HttpError || (error instanceof Error && typeof (error as { status?: unknown }).status === "number")) { const e = error as HttpError; return json(origin, e.status, { error: e.message, ...(e.extra ?? {}) }); }
         console.error(error);
         return json(origin, 500, { error: "the save service had a problem; your save is kept on this device", retry: true });
       }
@@ -386,6 +396,8 @@ export function chainFor(env: Pick<Env, "RPC_URL" | "COLLECTION">): Chain {
 
 export default {
   fetch(request: Request, env: Env) {
-    return createApp({ db: env.DB, chain: chainFor(env), origins: env.ORIGINS.split(",").map(origin => origin.trim()), chainId: Number(env.CHAIN_ID), attestKey: env.ATTEST_KEY ?? null }).fetch(request);
+    const cards: CardsOptions = { minterKey: env.MINTER_KEY ?? null, contract: env.CARDS_CONTRACT || null, chainId: Number(env.CARDS_CHAIN_ID ?? 46630), bucket: env.CARDS ?? null,
+      chain: env.CARDS_CONTRACT && env.CARDS_RPC_URL ? cardsChainFor(env.CARDS_RPC_URL, env.CARDS_CONTRACT) : null, baseUrl: new URL(request.url).origin, gameUrl: env.GAME_URL ?? "https://m4s4t0-v01d.github.io/rarefriends-realm/" };
+    return createApp({ db: env.DB, chain: chainFor(env), origins: env.ORIGINS.split(",").map(origin => origin.trim()), chainId: Number(env.CHAIN_ID), attestKey: env.ATTEST_KEY ?? null, cards }).fetch(request);
   },
 };

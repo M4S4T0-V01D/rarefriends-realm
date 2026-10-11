@@ -1,4 +1,5 @@
 /** The Realm's interface: side tabs, chat and dialogue, bank, shops, production, map and more. */
+import { fromLockbox, toLockbox } from "./cardescrow.ts";
 import React, { useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { PursuanceJournal } from "./journal.tsx";
 import type { GenerationSprites } from "@rarefriends/friendsdk/sprites";
@@ -148,7 +149,7 @@ export type PanelProps = {
   game: Game; tab: Tab; setTab: (tab: Tab) => void; selection: Selection; setSelection: (selection: Selection) => void;
   openMenu: (x: number, y: number, entries: MenuEntry[]) => void; refresh: () => void; roster: readonly OwnedFriend[]; rosterState: "waiting" | "ready" | "none";
   friendSprites: ReadonlyMap<number, GenerationSprites>; loadFriend: (id: number) => void; settings: Settings; setSettings: (settings: Settings) => void;
-  friend: GenerationSprites | null; trackName: string; trackId: string; playTrack: (id: string) => void; openCard: () => void; openCards?: () => void; openFeedback?: () => void; openHelp: () => void; openNerds?: () => void; paused: boolean; saved: string; relicCounts: readonly number[]; openCaskets: () => void;
+  friend: GenerationSprites | null; trackName: string; trackId: string; playTrack: (id: string) => void; openCard: () => void; openCollectible?: () => void; openCards?: () => void; openFeedback?: () => void; openHelp: () => void; openNerds?: () => void; paused: boolean; saved: string; relicCounts: readonly number[]; openCaskets: () => void;
   /** Playing together: who's around, and the friends list. */
   /** The skill guide (a skill) or the recipe book (null). */
   openGuide?: (skill: Skill | null) => void;
@@ -426,7 +427,7 @@ let pressTimer: ReturnType<typeof setTimeout> | null = null;
 export function longPress(action: () => void) { cancelLongPress(); pressTimer = setTimeout(() => { pressTimer = null; action(); }, 450); }
 export function cancelLongPress() { if (pressTimer) clearTimeout(pressTimer); pressTimer = null; }
 const SLOT_NAMES: Record<EquipSlot, string> = { head: "Head", cape: "Cape", neck: "Neck", weapon: "Weapon", body: "Body", shield: "Shield", legs: "Legs", hands: "Hands", feet: "Feet", belt: "Belt", ring: "Ring" };
-function EquipmentTab({ game, refresh, openCard, openCards, openMenu }: PanelProps) {
+function EquipmentTab({ game, refresh, openCard, openCollectible, openCards, openMenu }: PanelProps) {
   const player = game.player, total = bonuses(player);
   const layout: (EquipSlot | null)[] = [null, "head", null, "cape", "neck", "ring", "weapon", "body", "shield", null, "legs", "belt", "hands", "feet", null];
   return (
@@ -452,6 +453,7 @@ function EquipmentTab({ game, refresh, openCard, openCards, openMenu }: PanelPro
       </dl>
       {heft(player) > 0 && <p className="realm-note">Heft: your Strength adds <b>+{heft(player)}</b> to your two-handed weapon's strength bonus (1% for every two levels).</p>}
       <button type="button" className="realm-wide" onClick={openCard}>Adventurer card · Share on X</button>
+      {openCollectible && <button type="button" className="realm-wide" onClick={openCollectible}>Collectible card · Portrait</button>}
       {openCards && <button type="button" className="realm-wide" onClick={openCards}>Adventurer Cards · {cardsFound(game)}/{CARDS.length} found</button>}
     </div>
   );
@@ -987,7 +989,8 @@ export function BankModal({ game, refresh, onClose, openMenu }: { game: Game; re
     const moved = target.startsWith("bank:") ? bankMove(player, id, target.slice(5)) : target === "tab:new" ? bankMove(player, id, null, "new") : target.startsWith("tab:") ? bankMove(player, id, null, Number(target.slice(4))) : false;
     if (moved) refresh();
   });
-  const setTab = (next: number) => { lastBankTab = next; setTabState(next); };
+  const [lockbox, setLockbox] = useState(false);
+  const setTab = (next: number) => { lastBankTab = next; setTabState(next); setLockbox(false); };
   const current = tabs.includes(tab) ? tab : 0;
   // Tab 0 shows everything (the main tab's items first, then each tab's); tabs 1+ show only their own.
   const shown = bankInOrder(player).filter(slot => (current === 0 || (slot.tab ?? 0) === current) && (!search || item(slot.id).name.toLowerCase().includes(search.toLowerCase())));
@@ -1014,7 +1017,9 @@ export function BankModal({ game, refresh, onClose, openMenu }: { game: Game; re
           </button>
         ); })}
         {tabs.length < BANK_TABS && <button type="button" className="new" aria-label="New tab (drop an item here)" title="New tab: drag an item here" {...dropTarget("tab:new")}>+</button>}
+        <button type="button" role="tab" aria-selected={lockbox} aria-label="Card lockbox" title="Adventurer Card lockbox: what a card of yours stands for" onClick={() => setLockbox(true)}>🂠</button>
       </div>
+      {lockbox && <p className="realm-note">The card lockbox: what's in here is what your Adventurer Card stands for, set aside from your things (tradeable items only). Click an item in your inventory to put it in, an item here to take it back to the bank. {game.cardHeld ? "A card is out: the lockbox is held until it's redeemed or given up." : ""}</p>}
       <div className="realm-bank-bar">
         <input type="search" placeholder="Search" value={search} onChange={event => setSearch(event.target.value)} aria-label="Search the bank" />
         <span>Withdraw/deposit:</span>{[1, 5, 10, Infinity].map(n => <button key={n} type="button" aria-pressed={amount === n} onClick={() => setAmount(n)}>{n === Infinity ? "All" : n}</button>)}
@@ -1023,8 +1028,16 @@ export function BankModal({ game, refresh, onClose, openMenu }: { game: Game; re
         {carriedBoxes.length > 0 && <button type="button" onClick={() => { for (const box of carriedBoxes) fillBox(box.item); refresh(); }}>Fill {carriedBoxes.length > 1 ? "boxes" : carriedBoxes[0].item === SATCHEL ? "satchel" : "box"}</button>}
       </div>
       <div className="realm-bank">
-        <div className="realm-bank-grid" aria-label="Bank">
-          {shown.map(slot => {
+        <div className="realm-bank-grid" aria-label={lockbox ? "Card lockbox" : "Bank"}>
+          {lockbox && player.lockbox.map(slot => (
+            <button key={slot.id} type="button" className="realm-slot" aria-label={`Take back ${item(slot.id).name} (${slot.n})`} disabled={game.cardHeld}
+              onClick={() => { const why = fromLockbox(game, slot.id, amount); if (why) message(game, why, "warn"); refresh(); }}
+              {...rightClick(openMenu, () => [...[1, 5, 10, Infinity].map(n => ({ verb: `Take-back-${n === Infinity ? "All" : n}`, noun: item(slot.id).name, tone: "item" as const, run: () => { const why = fromLockbox(game, slot.id, n); if (why) message(game, why, "warn"); refresh(); } })), examine(game, slot.id, refresh)])}>
+              <ItemIcon slot={slot} />
+            </button>
+          ))}
+          {lockbox && !player.lockbox.length && <p className="realm-muted">The lockbox is empty.</p>}
+          {!lockbox && shown.map(slot => {
             const slotTab = slot.tab ?? 0, divider = current === 0 && !search && slotTab !== lastTab && slotTab > 0;
             lastTab = slotTab;
             return (
@@ -1040,11 +1053,11 @@ export function BankModal({ game, refresh, onClose, openMenu }: { game: Game; re
             );
           })}
           {drag.layer}
-          {!shown.length && <p className="realm-muted">{search ? "Nothing matches." : current ? "This tab is empty." : "Your bank is empty."}</p>}
+          {!lockbox && !shown.length && <p className="realm-muted">{search ? "Nothing matches." : current ? "This tab is empty." : "Your bank is empty."}</p>}
         </div>
         <div className="realm-inventory small" aria-label="Inventory (click to deposit)">
           {player.inventory.map((slot, index) => (
-            <button key={index} type="button" className="realm-slot" aria-label={slot ? `Deposit ${item(slot.id).name}` : `Empty slot ${index + 1}`} onClick={() => { if (slot) { bankDeposit(player, index, amount, current); refresh(); } }}
+            <button key={index} type="button" className="realm-slot" aria-label={slot ? `Deposit ${item(slot.id).name}` : `Empty slot ${index + 1}`} onClick={() => { if (slot) { if (lockbox) { const why = toLockbox(game, index, amount); if (why) message(game, why, "warn"); } else bankDeposit(player, index, amount, current); refresh(); } }}
               {...rightClick(openMenu, () => slot ? [
                 // A satchel or sigil stone box you carry fills straight from the bank (or tips its contents in).
                 ...(CONTAINERS.some(box => box.item === slot.id) ? [
