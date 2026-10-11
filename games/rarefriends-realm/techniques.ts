@@ -4,7 +4,9 @@
  *
  * Three are the Mysteries' common learning (Mysteries level only). Two are the Orashai's, learnt by finishing the
  * Orashai Mysteries (the Weigher's and the Gate-Mother's: the gods of measure and of thresholds). Three are the Hidden
- * Road's, the Mizukai Isles' own Mysteries, learnt from Ascetic Kōdō on Iwaoka (The Hidden Road).
+ * Road's, the Mizukai Isles' own Mysteries, learnt from Ascetic Kōdō on Iwaoka (The Hidden Road). Seven are Meghavan's, from
+ * its four schools (meghavanschools.ts): the Discipline of Inner Measure's breath, the School of Living Patterns' reading, the
+ * Keepers of Thresholds' mark and ward, and the Archive of Unfinished Things' prepared answer.
  *
  * Each has its valid targets and the reasons it fails, a cooldown, a level, and one active preparation at a time:
  * starting another replaces the first, so they never stack. None costs anything but its cooldown; none gives XP
@@ -12,11 +14,13 @@
  */
 import { TICK_MS, emit, level, message, sound, type Game, type Monster } from "./state.ts";
 import { questDone } from "./content.ts";
-import { knows } from "./pursuance.ts";
+import { knows, learn } from "./pursuance.ts";
+import { INNER_MEASURE, LIVING_PATTERNS, THRESHOLDS, UNFINISHED } from "./meghavanschools.ts";
 
-export type TechniqueId = "stillness" | "marked_edge" | "pattern_break" | "measured_counter" | "threshold_ward" | "mist_step" | "severing_cut" | "mountain_shout";
+export type TechniqueId = "stillness" | "marked_edge" | "pattern_break" | "measured_counter" | "threshold_ward" | "mist_step" | "severing_cut" | "mountain_shout"
+  | "held_breath" | "fourth_breath" | "read_pattern" | "threshold_mark" | "doorstone_ward" | "prepared_answer";
 export type Technique = {
-  id: TechniqueId; name: string; level: number; cooldown: number; tradition: "common" | "orashai" | "mizukai";
+  id: TechniqueId; name: string; level: number; cooldown: number; tradition: "common" | "orashai" | "mizukai" | "inner_measure" | "living_patterns" | "thresholds" | "unfinished";
   /** What it does, for the Combat options tab. */
   description: string;
   /** The colour of its mark in the world. */
@@ -41,6 +45,19 @@ export const TECHNIQUES: readonly Technique[] = [
     description: "Stand in a doorway nobody else can see, for 16 ticks: dragonfire and spells come through it at half strength, and no venom or draining touch comes through at all." },
   { id: "mountain_shout", name: "The Mountain's Shout", level: 35, cooldown: 40, tradition: "mizukai", color: "#e0c68c",
     description: "One shout from the belly, at a foe in reach: it falters and loses three beats of its attack (one, if it's a great one)." },
+  // Meghavan's four schools.
+  { id: "read_pattern", name: "Reading the Pattern", level: 22, cooldown: 80, tradition: "living_patterns", color: "#7fb8c9",
+    description: "Watch the creature you're fighting until its pattern shows: your Pursuance journal learns what it's weak to, how it fights and how it guards, at once." },
+  { id: "threshold_mark", name: "The Threshold Mark", level: 26, cooldown: 40, tradition: "thresholds", color: "#d98a2b",
+    description: "Chalk the Keepers' mark on something that came back through a door (the undead, a wayward spirit): it stands half in the doorway, and your blows strike it a quarter harder for 30 ticks." },
+  { id: "held_breath", name: "Held Breath", level: 30, cooldown: 80, tradition: "inner_measure", color: "#d8e4e8",
+    description: "Hold the breath you've counted: any venom in you goes still and leaves, and none takes hold for 40 ticks." },
+  { id: "doorstone_ward", name: "The Doorstone Ward", level: 38, cooldown: 90, tradition: "thresholds", color: "#c9a46a",
+    description: "Chalk a threshold where you stand: for 20 ticks, while you keep to it, every blow that reaches you through it loses a quarter. Step off it and it's only chalk." },
+  { id: "fourth_breath", name: "The Fourth Breath", level: 40, cooldown: 30, tradition: "inner_measure", color: "#e8eef0",
+    description: "Count four breaths and strike on the fourth: a blow on the fourth or fifth tick can't miss and lands half as hard again. Strike too early and the count is lost." },
+  { id: "prepared_answer", name: "The Prepared Answer", level: 45, cooldown: 120, tradition: "unfinished", color: "#9fb4d0",
+    description: "Against a great one you've researched (faced and beaten before): for 30 ticks your blows find where it's short, a fifth harder, and its own land a fifth lighter." },
 ];
 export const TECHNIQUE = Object.fromEntries(TECHNIQUES.map(entry => [entry.id, entry])) as Record<TechniqueId, Technique>;
 
@@ -51,6 +68,10 @@ export type Preparation = { id: TechniqueId; at: number; x: number; y: number; u
 export function techniqueLocked(game: Game, technique: Technique): string | null {
   if (technique.tradition === "orashai" && !questDone(game, ORASHAI_TECHNIQUE_QUEST)) return "The Orashai teach it to their initiates: finish The Orashai Mysteries.";
   if (technique.tradition === "mizukai" && !questDone(game, HIDDEN_ROAD)) return "The Hidden Road's: Ascetic Kōdō on Iwaoka teaches it (The Hidden Road).";
+  if (technique.tradition === "inner_measure" && !questDone(game, INNER_MEASURE)) return "The Discipline of Inner Measure's: Breath-master Ojas at Shailagarh teaches it (The Counted Breath).";
+  if (technique.tradition === "living_patterns" && !questDone(game, LIVING_PATTERNS)) return "The School of Living Patterns': Astronomer Vidyut at Sarovan teaches it (Patterns in the Water).";
+  if (technique.tradition === "thresholds" && !questDone(game, THRESHOLDS)) return "The Keepers of Thresholds': Door-keeper Ishwari at Tirthali teaches it (The Keepers' Door).";
+  if (technique.tradition === "unfinished" && !questDone(game, UNFINISHED)) return "The Archive of Unfinished Things': Scholar Anvaya at Suvarnatira teaches it (The Unfinished Page).";
   if (level(game, "mysteries") < technique.level) return `You need a Mysteries level of ${technique.level} for that.`;
   return null;
 }
@@ -116,9 +137,33 @@ export function useTechnique(game: Game, id: TechniqueId): boolean {
       if (!near(game, foe)) return fail("It has to be in reach to hear the mountain.");
       foe.attackTimer += foe.def.boss || foe.def.worldBoss ? 1 : 3;
       message(game, `You shout from the belly. The ${bare(foe)} falters.`); mark(game, technique, foe); break;
+    case "read_pattern": {
+      if (!foe) return fail("There's no pattern to read: be in a fight first.");
+      const learnt = (["weakness", "abilities", "defences"] as const).filter(fact => learn(game, foe.def.id, fact, true)).length;
+      if (!learnt) return fail(`You've read the ${bare(foe)}'s pattern already: your Pursuance journal knows it.`);
+      message(game, `You watch the ${bare(foe)} until its pattern repeats, and read it. Your Pursuance journal has it now.`); mark(game, technique, foe); break;
+    }
+    case "threshold_mark":
+      if (!foe) return fail("Mark what? Be in a fight first.");
+      if (!foe.def.undead && !foe.def.spirit) return fail(`The ${bare(foe)} never came through a door it shouldn't have: there's nothing for the mark to hold.`);
+      prepare(foe.uid, 30); message(game, `You chalk the Keepers' mark on the ${bare(foe)}. It stands half in a doorway.`); mark(game, technique, foe); break;
+    case "held_breath":
+      if (!player.poison && !game.monsters.some(monster => monster.target && !monster.dead && monster.def.poison)) return fail("There's no venom in you, and nothing here that carries it.");
+      player.poison = null; prepare(null, 40); message(game, "You hold the breath you've counted. The venom has nowhere to go."); break;
+    case "doorstone_ward":
+      if (!game.monsters.some(monster => monster.target && !monster.dead)) return fail("Nothing's coming at you through any door.");
+      prepare(null, 20); message(game, "You chalk a threshold where you stand: a line, a gap, a line."); break;
+    case "fourth_breath":
+      if (!foe) return fail("Count your breath for a blow: be in a fight first.");
+      prepare(foe.uid, 6); message(game, "In for one. Out. Two. Three."); break;
+    case "prepared_answer":
+      if (!foe) return fail("Answer what? Be in a fight first.");
+      if (!foe.def.boss && !foe.def.worldBoss) return fail(`The Archive keeps no record of the ${bare(foe)}: it's for the great ones.`);
+      if (!game.player.killLog[foe.def.id]) return fail(`You haven't researched the ${bare(foe)}: face it and beat it once, and the Archive's way will have something to answer it with.`);
+      prepare(foe.uid, 30); message(game, `You know the ${bare(foe)}'s count, and where it's short.`); mark(game, technique, foe); break;
   }
   player.techniqueReady[id] = game.tick + technique.cooldown;
-  if (id === "stillness" || id === "marked_edge" || id === "measured_counter" || id === "threshold_ward" || id === "severing_cut" || id === "mist_step") mark(game, technique, player);
+  if (id === "stillness" || id === "marked_edge" || id === "measured_counter" || id === "threshold_ward" || id === "severing_cut" || id === "mist_step" || id === "held_breath" || id === "doorstone_ward" || id === "fourth_breath") mark(game, technique, player);
   sound(game, "pray");
   return true;
 }
@@ -137,6 +182,13 @@ export function techniqueStrike(game: Game, monster: Monster, melee: boolean): {
   }
   if (now.id === "marked_edge" && now.uid === monster.uid) return { accuracy: 1, damage: 7 / 6, sure: false };
   if (now.id === "severing_cut" && melee && now.uid === monster.uid && monster.def.spirit) { player.preparation = null; return { accuracy: 1, damage: 1.5, sure: true }; }
+  if (now.id === "threshold_mark" && now.uid === monster.uid) return { accuracy: 1, damage: 1.25, sure: false };
+  if (now.id === "prepared_answer" && now.uid === monster.uid) return { accuracy: 1, damage: 1.2, sure: false };
+  if (now.id === "fourth_breath" && now.uid === monster.uid) {
+    player.preparation = null;
+    if (game.tick - now.at < 4) { message(game, "Too soon: you lost the count."); return none; }
+    return { accuracy: 1, damage: 1.5, sure: true };
+  }
   return none;
 }
 
@@ -146,13 +198,17 @@ export function techniqueStrike(game: Game, monster: Monster, melee: boolean): {
  * and drains). Returns the damage to take, and what's kept out.
  */
 export function techniqueGuard(game: Game, monster: Monster, hit: number, kind: { melee: boolean; breath: boolean }): { hit: number; counter: number; noVenom: boolean; noDrain: boolean } {
-  const ward = preparation(game, "threshold_ward"), weighed = preparation(game, "measured_counter");
+  const ward = preparation(game, "threshold_ward"), weighed = preparation(game, "measured_counter"), held = preparation(game, "held_breath");
+  const door = preparation(game, "doorstone_ward"), answer = preparation(game, "prepared_answer");
   let counter = 0;
   if (weighed && weighed.uid === monster.uid && kind.melee && !kind.breath && hit > 0) {
     counter = hit; hit = Math.floor(hit / 2); game.player.preparation = null;
   }
   if (ward && (kind.breath || monster.def.attackStyle === "magic")) hit = Math.floor(hit / 2);
-  return { hit, counter, noVenom: !!ward, noDrain: !!ward };
+  // The Doorstone Ward holds while you keep to the threshold you chalked; the Prepared Answer lightens the great one it's set on.
+  if (door && game.player.x === door.x && game.player.y === door.y) hit = Math.floor(hit * 0.75);
+  if (answer && answer.uid === monster.uid) hit = Math.floor(hit * 0.8);
+  return { hit, counter, noVenom: !!ward || !!held, noDrain: !!ward };
 }
 
 /** A creature whose pattern is broken neither mends itself nor rages. */

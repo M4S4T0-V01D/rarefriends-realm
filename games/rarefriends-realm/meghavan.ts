@@ -486,6 +486,25 @@ export function buildMeghavan(ctx: GenContext, t: Tools, places: World["places"]
     for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2, tx = Math.round(x + Math.cos(a) * 8), ty = Math.round(y + Math.sin(a) * 7); if (land(tx, ty) && !occupied(tx, ty) && open(get(tx, ty))) t.tree(tx, ty, "bamboo"); }
   }
 
+  // ---------- 14b. The four schools of the Mysteries (meghavanschools.ts) ----------
+  // The Breath Hall outside Shailagarh's west gate, and the three breath cairns on the heights.
+  ground(1424, 628, 1438, 638, null);
+  building(1426, 629, 1436, 636, "s", T.STONE, undefined, { name: "The Breath Hall", walls: "stone", roof: "flat", color: ROOF.slate, chimney: false });
+  npc("school_ojas", 1431, 632); decor(1428, 630, "shelf", true, "A row of clay cups, all empty, all clean: the Discipline's only possessions");
+  for (const [k, cx, cy] of [[0, 1434, 600], [1, 1455, 614], [2, 1560, 590]] as const) clue(cx, cy, { kind: "decor", decor: "rubble", blocks: true, name: "A breath cairn", clue: `breath_cairn_${k}` });
+  // The observatory north of Sarovan's walls, and the patterns: the Great Tank's south ghats, the star wheel, the Stepwell's serpent pillar.
+  ground(SAROVAN.x0 + 20, SAROVAN.y0 - 12, SAROVAN.x0 + 32, SAROVAN.y0 - 3, null);
+  building(SAROVAN.x0 + 22, SAROVAN.y0 - 11, SAROVAN.x0 + 30, SAROVAN.y0 - 4, "s", T.WOOD, undefined, { name: "The Observatory", walls: "marble", roof: "cone", round: true, storeys: 2, spire: 36, color: ROOF.indigo, chimney: false });
+  npc("school_vidyut", SAROVAN.x0 + 26, SAROVAN.y0 - 8);
+  clue(SAROVAN.x0 + 24, SAROVAN.y0 - 9, { kind: "decor", decor: "device", blocks: true, name: "The star wheel", clue: "pattern_wheel" });
+  clue(SAROVAN.x0 + 13, SAROVAN.y1 - 5, { kind: "decor", decor: "lily", blocks: false, name: "Ripples on the Great Tank", clue: "pattern_tank" });
+  // The Keepers' doors: Door-keeper Ishwari at the ford post; the marks at the Gate of Rains and the ford.
+  npcAt("school_ishwari", FORD.x + 4, FORD.y - 1);
+  clue(RAIN_GATE.x - 1, RAIN_GATE.y + 4, { kind: "decor", decor: "plaque", blocks: true, name: "A threshold of the Gate of Rains", clue: "threshold_rain" });
+  clue(FORD.x - 4, FORD.y + 3, { kind: "decor", decor: "plaque", blocks: true, name: "A threshold of the ford", clue: "threshold_ford" });
+  // The Keeper of Unfinished Things, among the Archive's shelves.
+  npc("school_anvaya", SUVARNATIRA.x0 + 22, SUVARNATIRA.y0 + 10);
+
   // ---------- 15. The Great Stepwell, below Sarovan: its galleries, the sluice, the cistern ----------
   {
     const S = GREAT_STEPWELL, X = S.x0, y0 = DUNGEON_Y + S.row0, y1 = DUNGEON_Y + S.row1;
@@ -513,6 +532,10 @@ export function buildMeghavan(ctx: GenContext, t: Tools, places: World["places"]
     add({ kind: "ladder", x: X + 6, y: y0 + 3, blocks: true, name: "The Great Stepwell's steps", action: "Climb-up", to: { x: SAROVAN.x0 + (SAROVAN.x1 - SAROVAN.x0 >> 1) + 9, y: SAROVAN.y0 + (SAROVAN.y1 - SAROVAN.y0 >> 1) + 2 } });
     for (let x = X + 43; x <= X + 67; x += 6) { put2(x, y0 + 5, "pillar", "A carved pillar: a river goddess pouring from a jar, her face worn away by hands"); put2(x, y0 + 13, "pillar", "A carved pillar: a river goddess pouring from a jar, her face worn away by hands"); }
     clue(X + 112, y0 + 6, { kind: "decor", decor: "counterweight", blocks: true, name: "The old sluice wheel", clue: "stepwell_sluice" });
+    // The schools' places below: the Keepers' threshold on the first landing, the serpent pillar, the drowned record.
+    clue(X + 12, y0 + 8, { kind: "decor", decor: "plaque", blocks: true, name: "The first landing's threshold", clue: "threshold_stair" });
+    clue(X + 64, y0 + 9, { kind: "decor", decor: "pillar", blocks: true, name: "The serpent pillar", clue: "pattern_pillar" });
+    clue(X + 160, y0 + 47, { kind: "decor", decor: "tomb", blocks: true, name: "A drowned record", clue: "drowned_record" });
     for (const [x, y] of [[X + 60, y0 + 15], [X + 118, y0 + 41], [X + 102, y0 + 5]] as const) put2(x, y, "chest", "A coffer of green copper");
     put2(X + 170, y0 + 50, "chest", "The Serpent's hoard");
     const torches: [number, number][] = [[X + 5, y0 + 3], [X + 15, y0 + 3], [X + 41, y0 + 3], [X + 69, y0 + 3], [X + 41, y0 + 15], [X + 69, y0 + 15], [X + 41, y0 + 27], [X + 65, y0 + 27], [X + 41, y0 + 33],

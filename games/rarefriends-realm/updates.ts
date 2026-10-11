@@ -4,6 +4,15 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 102, date: "2026-10-11", title: "The Land Before Stone: Meghavan's four schools of the Mysteries", items: [
+    "Meghavan has its own Mysteries, in four schools, each with a teacher, an initiation and techniques for your Combat options.",
+    "The Discipline of Inner Measure, in the Breath Hall outside Shailagarh: count your breath at three cairns on the heights (The Counted Breath). Held Breath keeps venom out; the Fourth Breath strikes sure on the count.",
+    "The School of Living Patterns, at the observatory outside Sarovan: read the patterns in the Great Tank, the stars and the Stepwell's serpent pillar (Patterns in the Water). Reading the Pattern fills in your Pursuance journal on a creature at once.",
+    "The Keepers of Thresholds, at the ford below Tirthali: mark the Gate of Rains, the ford and the Great Stepwell's first landing (The Keepers' Door). The Threshold Mark makes the dead and the wayward spirits easier to strike; the Doorstone Ward softens every blow while you hold your ground.",
+    "The Archive of Unfinished Things, in Suvarnatira's Archive: take rubbings of three old writings, one of them under the Stepwell's water (The Unfinished Page). The east reads Azhurak glyphs as counts, and a drowned record becomes readable. The Prepared Answer turns what you know of a great beast you've beaten against it.",
+    "Fourteen new Mysteries discoveries, each giving its Mysteries XP once.",
+    "Meghavan is complete: the Rain Country, its quests and the Great Stepwell, and its four schools.",
+  ] },
   { id: 101, date: "2026-10-11", title: "The Land Before Stone: Meghavan's quests and the Great Stepwell", items: [
     "Six new quests in the Rain Country. Caravan of the Rains: see a Khetmar caravan over the Gate of Rains, past the dacoits, to the ford at Tirthali, where one crate holds something that was dug up.",
     "The Silted Tank: Queen Saumitra's engineers and the temple's treasurers each want the other to pay for the silt. Read the Great Tank's measure, and go down the Great Stepwell under Sarovan, where the old sluice is jammed and the Monsoon Serpent keeps the cistern.",

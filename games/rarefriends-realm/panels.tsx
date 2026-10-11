@@ -217,6 +217,8 @@ function CombatTab({ game, refresh, openMenu }: PanelProps) {
     </div>
   );
 }
+/** Who teaches a locked technique, in a word or two (techniques.ts traditions). */
+const TRADITION_LABEL: Record<string, string> = { common: "", orashai: "Orashai", mizukai: "Hidden Road", inner_measure: "Inner Measure", living_patterns: "Living Patterns", thresholds: "Thresholds", unfinished: "Unfinished Things" };
 /** Mysteries techniques (techniques.ts): preparations any fighter can learn, under the combat styles. */
 function Techniques({ game, refresh, openMenu }: Pick<PanelProps, "game" | "refresh" | "openMenu">) {
   const active = preparation(game);
@@ -227,7 +229,7 @@ function Techniques({ game, refresh, openMenu }: Pick<PanelProps, "game" | "refr
       <div className="realm-technique-grid">
         {TECHNIQUES.map(technique => {
           const locked = techniqueLocked(game, technique), wait = cooldownLeft(game, technique.id);
-          const status = locked ? (technique.tradition === "common" || level(game, "mysteries") < technique.level ? `Lv ${technique.level}` : technique.tradition === "orashai" ? "Orashai" : "Hidden Road")
+          const status = locked ? (technique.tradition === "common" || level(game, "mysteries") < technique.level ? `Lv ${technique.level}` : TRADITION_LABEL[technique.tradition])
             : active?.id === technique.id ? "Ready…" : wait ? `${Math.ceil(wait * TICK_MS / 1000)}s` : `Lv ${technique.level}`;
           const tip = `${technique.description}${locked ? ` ${locked}` : ""}`;
           return <button key={technique.id} type="button" className={`realm-technique ${technique.tradition}`} disabled={!!locked} aria-pressed={active?.id === technique.id} title={tip} aria-label={technique.name}

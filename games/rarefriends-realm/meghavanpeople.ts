@@ -13,6 +13,7 @@
 import { type Dialogue, type Game } from "./state.ts";
 import { chat, npcSays, type NpcDef } from "./content.ts";
 import type { WorldObject } from "./world.ts";
+import { canRub, takeRubbing } from "./meghavanschools.ts";
 
 const art = (family: number, seed: number) => ({ family, seed });
 const person = (id: string, name: string, examine: string, seed: number, extra: Partial<NpcDef> = {}): NpcDef => ({ id, name, examine, options: ["Talk-to"], art: art(9, seed), ...extra });
@@ -161,13 +162,19 @@ export function talkMeghavan(game: Game, npcId: string, name: string): Dialogue 
 type ClueOutcome = { to?: { x: number; y: number }; text?: string } | null;
 type Clue = { options: (game: Game, object: WorldObject) => readonly string[]; examine: (game: Game, object: WorldObject) => string; use: (game: Game, object: WorldObject, option: string) => ClueOutcome };
 const readClue = (text: string, examine: string): Clue => ({ options: () => ["Read"], examine: () => examine, use: () => ({ text }) });
+/** A writing the Archive of Unfinished Things wants a rubbing of (meghavanschools.ts), while its initiation asks for one. */
+const rubbed = (id: "rain_gate_plaque" | "speakers_stone", clue: Clue): Clue => ({
+  options: (game, object) => canRub(game, id) ? [...clue.options(game, object), "Take-rubbing"] : clue.options(game, object),
+  examine: clue.examine,
+  use: (game, object, option) => option === "Take-rubbing" ? { text: takeRubbing(game, id) ?? "You have a rubbing of it already." } : clue.use(game, object, option),
+});
 export const MEGHAVAN_CLUES: Record<string, Clue> = {
-  rain_gate_plaque: readClue("Cut in two scripts, Meghavan's and Kharaveth's: 'Here the rain begins. Whoever passes under the clouds is a guest of the rain; whoever does harm under them is the rain's enemy.' Under it, newer and smaller: 'Tolls payable at Tirthali or Sarovan, by order of the Keeper of the Tanks.'",
-    "A bronze plaque set in the gateway's south pillar, green with weather."),
+  rain_gate_plaque: rubbed("rain_gate_plaque", readClue("Cut in two scripts, Meghavan's and Kharaveth's: 'Here the rain begins. Whoever passes under the clouds is a guest of the rain; whoever does harm under them is the rain's enemy.' Under it, newer and smaller: 'Tolls payable at Tirthali or Sarovan, by order of the Keeper of the Tanks.'",
+    "A bronze plaque set in the gateway's south pillar, green with weather.")),
   great_tank_measure: readClue("A stone post marked in the Queen's hands of depth, the old marks cut deep and gilded, the water's line now three marks below the lowest gilt. Someone has scratched beside it, small: 'Silt, or sorrow?'",
     "The Great Tank's measure: a carved post at the top of the ghats."),
   great_stepwell: readClue("Steps go down four sides of a square shaft, landing after landing, galleries of carved pillars along each, to green water far below. A chain is across the lowest landing you can see, and a brass notice: 'Closed by order of the Chief Engineer. Silt. Do not descend.'",
     "The Great Stepwell: a stair of carved stone going down, down, to water."),
-  speakers_stone: readClue("A low stone in the middle of the Mandapa, worn smooth where seven generations of Speakers have stood. Cut round its edge: 'I speak for seven. Seven hear me. None stands higher.' Someone has added, in chalk: 'Except when it rains.'",
-    "The Speaker's stone, at the heart of the Mandapa."),
+  speakers_stone: rubbed("speakers_stone", readClue("A low stone in the middle of the Mandapa, worn smooth where seven generations of Speakers have stood. Cut round its edge: 'I speak for seven. Seven hear me. None stands higher.' Someone has added, in chalk: 'Except when it rains.'",
+    "The Speaker's stone, at the heart of the Mandapa.")),
 };

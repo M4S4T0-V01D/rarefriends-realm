@@ -603,7 +603,7 @@ test("A Friend's Feast from start to finish", () => {
   assert.equal(g.player.quests.friends_feast, 2);
   assert.equal(questPoints(g), 1);
   assert(level(g, "cooking") >= 10, "Quest XP");
-  assert.equal(QUESTS.length, 84); assert.equal(MAX_QUEST_POINTS, 154);
+  assert.equal(QUESTS.length, 88); assert.equal(MAX_QUEST_POINTS, 161);
 });
 
 test("Grumblin Trouble counts kills and pays out", () => {
@@ -1949,7 +1949,7 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   assert.equal(p.quests.dawn_against_hollow, 2); assert(has(p, "dawnplate_cuirass"));
   assert.equal(count(p, "hollow_essence"), 0);
   assert.equal(capeProblem(g, "dawnplate_cuirass"), null, "the armoury sells Dawnplate once earned");
-  assert.equal(QUESTS.length, 84); assert.equal(MAX_QUEST_POINTS, 154);
+  assert.equal(QUESTS.length, 88); assert.equal(MAX_QUEST_POINTS, 161);
 });
 
 test("Boots and gauntlets in every metal, smithed at the anvil; the clothier's shirts, dresses, trousers and skirts", () => {
@@ -3371,4 +3371,65 @@ test("Seven Parasols, The Pass Toll, The Missing Folio and What the Forest Keeps
   say("deepgreen_logger"); assert(has(p, "logging_licence")); say("shailagarh_varanjit"); assert.equal(p.quests.forest_keeps, 3); assert(!has(p, "logging_licence"));
   say("kanthar_sukesh"); assert.equal(p.quests.forest_keeps, 4); assert(has(p, "seed_charm"));
   assert.equal(questPoints(g), 10, "two each, and A Foothold in the Stone's two");
+});
+
+test("Meghavan's four schools: every teacher and every place is reached, each initiation teaches its techniques, and nothing is taught before", async () => {
+  const { KHETMAR } = await import("../games/rarefriends-realm/heartlands.ts");
+  const { useClue, clueOptions } = await import("../games/rarefriends-realm/kharaveth.ts");
+  const { TECHNIQUES, techniqueLocked } = await import("../games/rarefriends-realm/techniques.ts");
+  const g = newGame(), world = g.world, p = g.player, at = (seen, x, y) => !!seen[y * W + x];
+  const beside = (seen, o) => o && [[0, 0], [0, 1], [1, 0], [0, -1], [-1, 0], [1, 1], [-1, -1], [1, -1], [-1, 1]].some(([dx, dy]) => at(seen, o.x + dx, o.y + dy));
+  const east = reachable(g, { x: KHETMAR.x1 + 1, y: (KHETMAR.y0 + KHETMAR.y1) >> 1 }), below = reachable(g, world.objects.find(o => o.clue === "great_stepwell").to);
+  for (const id of ["school_ojas", "school_vidyut", "school_ishwari", "school_anvaya"]) assert(beside(east, g.npcs.find(n => n.id === id)), `${id} can be reached`);
+  for (const id of ["breath_cairn_0", "breath_cairn_1", "breath_cairn_2", "pattern_tank", "pattern_wheel", "threshold_rain", "threshold_ford"]) assert(beside(east, world.objects.find(o => o.clue === id)), `${id} can be reached`);
+  for (const id of ["pattern_pillar", "threshold_stair", "drowned_record"]) assert(beside(below, world.objects.find(o => o.clue === id)), `${id}, below`);
+  const say = (id, label) => { let d = talk(g, id); if (label) { const o = d.options.find(x => x.label.startsWith(label)); assert(o, `${id}: ${label}`); d.onEnd?.(); d = o.then(); } d?.onEnd?.(); return d; };
+  const clue = (id, option) => useClue(g, world.objects.find(o => o.clue === id), option);
+  p.quests.foothold_in_the_stone = 3; p.xp.mysteries = 13_034_431;
+  const eastern = TECHNIQUES.filter(t => ["inner_measure", "living_patterns", "thresholds", "unfinished"].includes(t.tradition));
+  assert.equal(eastern.length, 6); for (const t of eastern) assert.match(techniqueLocked(g, t), /teaches it/, `${t.name} is locked before its school`);
+  const found = Object.keys(p.mysteries.found).length;
+  for (const [teacher, quest, places, verb] of [["school_ojas", "counted_breath", ["breath_cairn_0", "breath_cairn_1", "breath_cairn_2"], "Breathe"], ["school_vidyut", "patterns_in_water", ["pattern_tank", "pattern_wheel", "pattern_pillar"], "Read"],
+    ["school_ishwari", "keepers_door", ["threshold_rain", "threshold_ford", "threshold_stair"], "Mark"]]) {
+    assert.deepEqual(clueOptions(g, world.objects.find(o => o.clue === places[0])), ["Look"], `${places[0]}: only a look before the initiation`);
+    say(teacher, "Teach me."); assert.equal(p.quests[quest], 1);
+    for (const id of places) { assert(clueOptions(g, world.objects.find(o => o.clue === id)).includes(verb), `${id}: ${verb}`); clue(id, verb); }
+    say(teacher); assert.equal(p.quests[quest], 2, `${quest} done`);
+  }
+  // The Archive: rubbings of the plaque, the Speaker's stone and the drowned record; then the record reads.
+  say("school_anvaya", "Teach me."); assert(clueOptions(g, world.objects.find(o => o.clue === "rain_gate_plaque")).includes("Take-rubbing"));
+  clue("rain_gate_plaque", "Take-rubbing"); clue("speakers_stone", "Take-rubbing"); clue("drowned_record", "Take-rubbing");
+  say("school_anvaya"); assert.equal(p.quests.unfinished_page, 2);
+  assert.match(clue("drowned_record", "Look").text, /Seven measures for the tank/); assert("drowned_record" in p.mysteries.found);
+  assert(Object.keys(p.mysteries.found).length >= found + 14, "fourteen discoveries");
+  for (const t of eastern) assert.equal(techniqueLocked(g, t), null, `${t.name} is taught`);
+});
+
+test("Meghavan's techniques: Reading the Pattern, the Threshold Mark, Held Breath, the Doorstone Ward, the Fourth Breath and the Prepared Answer", async () => {
+  const { useTechnique, techniqueStrike, techniqueGuard, preparation } = await import("../games/rarefriends-realm/techniques.ts");
+  const { knows } = await import("../games/rarefriends-realm/pursuance.ts");
+  const g = newGame(), p = g.player;
+  p.xp.mysteries = 13_034_431; for (const q of ["counted_breath", "patterns_in_water", "keepers_door", "unfinished_page"]) p.quests[q] = 2;
+  const fight = id => { const m = g.monsters.find(m => m.def.id === id); assert(m, id); p.combat = m.uid; m.target = true; p.techniqueReady = {}; p.preparation = null; return m; };
+  // Reading the Pattern: the journal learns a creature's weakness at once.
+  let m = fight("crag_bear"); assert(!knows(g, "crag_bear", "weakness")); assert(useTechnique(g, "read_pattern")); assert(knows(g, "crag_bear", "weakness"));
+  assert.equal(useTechnique(g, "read_pattern"), false, "cooling down"); p.techniqueReady = {}; assert.equal(useTechnique(g, "read_pattern"), false, "nothing more to read");
+  // The Threshold Mark: only the undead and the wayward spirits.
+  assert.equal(useTechnique(g, "threshold_mark"), false, "a bear never came through a door");
+  const spirit = g.monsters.find(x => x.def.spirit || x.def.undead); p.combat = spirit.uid; p.techniqueReady = {};
+  assert(useTechnique(g, "threshold_mark")); assert.equal(techniqueStrike(g, spirit, true).damage, 1.25);
+  // Held Breath: venom leaves and stays out.
+  m = fight("hooded_serpent"); p.poison = { damage: 5, left: 4, timer: 10 }; assert(useTechnique(g, "held_breath")); assert.equal(p.poison, null);
+  assert.equal(techniqueGuard(g, m, 4, { melee: true, breath: false }).noVenom, true);
+  // The Doorstone Ward: a quarter off while you keep to the chalk.
+  p.techniqueReady = {}; assert(useTechnique(g, "doorstone_ward")); assert.equal(techniqueGuard(g, m, 8, { melee: true, breath: false }).hit, 6);
+  p.x += 1; assert.equal(techniqueGuard(g, m, 8, { melee: true, breath: false }).hit, 8, "step off it and it's only chalk"); p.x -= 1;
+  // The Fourth Breath: too soon loses the count; on the fourth, sure and half as hard again.
+  m = fight("crag_bear"); assert(useTechnique(g, "fourth_breath")); assert.equal(techniqueStrike(g, m, true).sure, false, "too soon");
+  p.techniqueReady = {}; assert(useTechnique(g, "fourth_breath")); g.tick += 4; const blow = techniqueStrike(g, m, true); assert(blow.sure && blow.damage === 1.5); assert.equal(preparation(g), null);
+  // The Prepared Answer: a great one you've beaten, a fifth both ways.
+  const serpent = fight("monsoon_serpent"); assert.equal(useTechnique(g, "prepared_answer"), false, "not researched yet");
+  p.killLog.monsoon_serpent = 1; assert(useTechnique(g, "prepared_answer")); assert.equal(techniqueStrike(g, serpent, true).damage, 1.2);
+  assert.equal(techniqueGuard(g, serpent, 10, { melee: true, breath: false }).hit, 8);
+  fight("crag_bear"); assert.equal(useTechnique(g, "prepared_answer"), false, "not for an ordinary creature");
 });
