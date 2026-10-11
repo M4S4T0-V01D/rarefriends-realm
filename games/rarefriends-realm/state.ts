@@ -216,7 +216,9 @@ export type Game = {
   shopStock: Record<string, Slot[]>;
   /** A match under way in the Rare Friends Ring: which, and the creatures summoned for it. */
   arena: { match: string; name: string; uids: number[]; startedAt: number; coins: number; marks: number; level: number } | null;
-  depleted: Map<number, number>; herbPicks: Map<number, number>; messages: Message[];
+  depleted: Map<number, number>; herbPicks: Map<number, number>;
+  /** Ore left in a rock someone has started on (2–4 to a rock; it runs out when they're mined). */
+  rockOre: Map<number, number>; messages: Message[];
   /** What the sky is doing (set by the page each frame; the engine only reads it) and how much your Friend talks. */
   ambient: { night: boolean; rain: boolean; storm?: boolean; fog?: boolean }; friendSpeech: "full" | "reduced" | "rare" | "off"; events: GameEvent[]; rng: () => number; nextUid: number;
   dialogue: Dialogue | null; ui: { shop: string | null; bank: boolean; production: ProductionMenu | null; lamp: number | null; naming: "first" | "rename" | null; fellowship?: boolean; home?: boolean; join?: Fellowship | null; /** A purchase with simulated RF waiting for the player's word: what it does and how many caskets it costs. */ rfAction?: { kind: "slayer-complete" | "slayer-reroll"; caskets: number; text: string } | null;
@@ -292,7 +294,7 @@ export function createGame(options: { familyId: number; friendId: number; rng?: 
   const world = options.world ?? realmWorld(), rng = options.rng ?? Math.random;
   const game: Game = {
     world, tick: 0, player: createPlayer(world, options.familyId, options.friendId), monsters: [], npcs: [], ground: [], fires: [], carvings: [], shopStock: {},
-    depleted: new Map(), herbPicks: new Map(), ambient: { night: false, rain: false }, friendSpeech: "full", sneakingPast: new Map(), sneakPaid: new Map(), messages: [], events: [], rng, nextUid: 1, dialogue: null, ui: { shop: null, bank: false, production: null, lamp: null, naming: null },
+    depleted: new Map(), herbPicks: new Map(), rockOre: new Map(), ambient: { night: false, rain: false }, friendSpeech: "full", sneakingPast: new Map(), sneakPaid: new Map(), messages: [], events: [], rng, nextUid: 1, dialogue: null, ui: { shop: null, bank: false, production: null, lamp: null, naming: null },
     held: null, autoRetaliate: true, playTicks: 0, overheads: new Map(), tracks: [], pet: null, trail: [], arena: null,
   };
   for (const spawn of world.spawns) {

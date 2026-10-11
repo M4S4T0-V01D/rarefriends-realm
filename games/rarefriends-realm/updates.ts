@@ -4,6 +4,9 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 103, date: "2026-10-11", title: "Rocks with more ore in them", items: [
+    "Every rock now holds two to four ores, and you keep mining until the last of them is out; then it's empty until it fills again. No more one swing and gone.",
+  ] },
   { id: 102, date: "2026-10-11", title: "The Land Before Stone: Meghavan's four schools of the Mysteries", items: [
     "Meghavan has its own Mysteries, in four schools, each with a teacher, an initiation and techniques for your Combat options.",
     "The Discipline of Inner Measure, in the Breath Hall outside Shailagarh: count your breath at three cairns on the heights (The Counted Breath). Held Breath keeps venom out; the Fourth Breath strikes sure on the count.",

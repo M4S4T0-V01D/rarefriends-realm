@@ -1455,6 +1455,14 @@ function mineTick(game: Game, activity: Extract<Activity, { kind: "mine" }>) {
   }
   message(game, bagged ? `You put the inkcoal in your satchel (${player.coalBag}/${SATCHEL_SIZE}).` : `You manage to mine some ${item(ore).name.toLowerCase().replace(" ore", "")}.`);
   rollPet(game, "pebble", level(game, "mining"));
+  // A rock holds two to four ores; it runs out when the last is mined, and you keep at it till then.
+  const left = (game.rockOre.get(object.id) ?? 2 + Math.floor(game.rng() * 3)) - 1;
+  if (left > 0) {
+    game.rockOre.set(object.id, left);
+    if (!freeSlots(player) && !bagged) { message(game, "Your inventory is too full to hold any more ore.", "warn"); player.activity = null; }
+    return;
+  }
+  game.rockOre.delete(object.id);
   game.depleted.set(object.id, game.tick + rock.respawn + Math.floor(game.rng() * rock.respawn * 0.5));
   player.activity = null;
 }

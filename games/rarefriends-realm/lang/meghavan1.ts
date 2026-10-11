@@ -383,4 +383,5 @@ export const MEGHAVAN_NAMES: Readonly<Record<string, Row>> = {
   "Living Patterns": ["生ける紋様", "살아있는 무늬", "活纹", "活紋", "Hoa Văn Sống", "Pola Hidup", "ลวดลายที่มีชีวิต", "Yaşayan Desenler", "Patrones Vivos", "Padrões Vivos", "Живые Узоры", "Живі Візерунки"],
   "Thresholds": ["敷居", "문턱", "门槛", "門檻", "Ngưỡng Cửa", "Ambang", "ธรณีประตู", "Eşikler", "Umbrales", "Limiares", "Пороги", "Пороги"],
   "Unfinished Things": ["未完のもの", "끝나지 않은 것들", "未竟之物", "未竟之物", "Những Điều Dang Dở", "Hal yang Belum Selesai", "สิ่งที่ยังไม่เสร็จ", "Bitmemiş Şeyler", "Cosas Inacabadas", "Coisas Inacabadas", "Незавершённое", "Незавершене"],
+  "Rocks with more ore in them": ["鉱石の多い岩", "광석이 더 많은 바위", "矿石更多的岩石", "礦石更多的岩石", "Đá chứa nhiều quặng hơn", "Batu dengan bijih lebih banyak", "หินที่มีแร่มากขึ้น", "Daha çok cevherli kayalar", "Rocas con más mineral", "Rochas com mais minério", "Камни, в которых больше руды", "Камені, у яких більше руди"],
 };
