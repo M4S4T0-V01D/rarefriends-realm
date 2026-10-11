@@ -15,6 +15,7 @@ import { DUNGEON_Y, OVERWORLD_H, T, W, isWater, type DecorKind, type Floor, type
 import { ASHAR, SPINE, buildHeartlands } from "./heartlands.ts";
 import { buildFirstNames } from "./firstnames.ts";
 import { buildMeghavan } from "./meghavan.ts";
+import { buildPorts } from "./ports.ts";
 
 type Tools = ReturnType<typeof worldTools>;
 
@@ -376,5 +377,7 @@ export function buildSouth(ctx: GenContext, t: Tools, places: World["places"], f
   buildFirstNames(ctx, t, places, kit);
   // ---------- 6. East over Khetmar's bay: Meghavan, the Rain Country (meghavan.ts) ----------
   buildMeghavan(ctx, t, places, kit);
+  // ---------- 7. The sea ports: Gullwick, Saltreach, Merrab, Tel Ashun and Ennu's Well, and their packet boats (ports.ts) ----------
+  buildPorts(ctx, t, places, kit);
   void ([] as RegionId[]); void isWater;
 }

@@ -154,7 +154,9 @@ export type RegionId =
   | "sea_of_dunes" | "ashar_valley" | "black_range" | "khetmar_pass" | "ochre_spine" | "sefrah" | "tamesh" | "khetmar" | "zuri_camp" | "ouresh_camp"
   | "seven_crowns" | "first_names" | "sunken_obelisk" | "unfinished_pyramid" | "black_stair" | "first_names_hall"
   // Meghavan, the Rain Country, east of Kharaveth: the country, and its towns.
-  | "rain_pass" | "tirthali" | "ilavati_valley" | "sarovan" | "shaila_highlands" | "shailagarh" | "parasol_plains" | "mandapur" | "golden_shore" | "suvarnatira" | "deepgreen" | "kanthar" | "great_stepwell";
+  | "rain_pass" | "tirthali" | "ilavati_valley" | "sarovan" | "shaila_highlands" | "shailagarh" | "parasol_plains" | "mandapur" | "golden_shore" | "suvarnatira" | "deepgreen" | "kanthar" | "great_stepwell"
+  // The sea ports: Gullwick on the mainland, Saltreach below Raria, and Merrab, Tel Ashun and Ennu's Well in Kharaveth's east.
+  | "gullwick" | "saltreach" | "merrab" | "tel_ashun" | "ennus_well";
 export type Region = { id: RegionId; name: string; label: { x: number; y: number }; danger: number; underground?: boolean;
   /** A far-west region (Return of Raria) or a Mizukai one: its label is already in world coordinates. */
   far?: boolean;
@@ -255,6 +257,12 @@ export const REGIONS: readonly Region[] = [
     ["golden_shore", "The Golden Shore", 1600, 800, 1], ["suvarnatira", "Suvarnatira", 1628, 726, 0], ["deepgreen", "The Deepgreen", 1220, 806, 5], ["kanthar", "Kanthar", 1250, 826, 0],
   ] as const).map(([id, name, x, y, danger]) => ({ id, name, label: { x, y }, danger, far: true, south: true }) as Region),
   { id: "great_stepwell", name: "The Great Stepwell", label: { x: 1610, y: 910 }, danger: 7, underground: true, far: true, south: true },
+  // The sea ports (ports.ts), in world coordinates: two in the north (the mainland's, Raria's), three in Kharaveth's east.
+  { id: "gullwick", name: "Gullwick", label: { x: 554, y: 446 }, danger: 0, far: true },
+  { id: "saltreach", name: "Saltreach", label: { x: 160, y: 308 }, danger: 0, far: true },
+  { id: "merrab", name: "Merrab", label: { x: 1066, y: 784 }, danger: 0, far: true, south: true },
+  { id: "tel_ashun", name: "Tel Ashun", label: { x: 1015, y: 750 }, danger: 0, far: true, south: true },
+  { id: "ennus_well", name: "Ennu's Well", label: { x: 1025, y: 828 }, danger: 0, far: true, south: true },
 ];
 export const regionIndex = (id: RegionId) => REGIONS.findIndex(region => region.id === id);
 /** The mainland regions' labels were written in the mainland's own coordinates: move them with it (once, at load). */
@@ -320,7 +328,7 @@ export type World = {
   heights: Float32Array;
   places: Record<"spawn" | "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier" | "crypt" | "depths" | "king" | "fernwick" | "highcairn" | "dawnhold" | "gravesend" | "saltmarrow" | "hollyhock" | "dyemoor" | "tallgrass" | "cragmaw" | "quillhaven" | "raria" | "fff_fortress" | "barkreach" | "ashfall" | "ring"
     | "kurohama" | "takamori" | "kumoyama" | "tanabe" | "yumoto" | "foothold" | "sefrah" | "tamesh" | "khetmar" | "zuri" | "ouresh" | "first_names"
-    | "tirthali" | "sarovan" | "shailagarh" | "mandapur" | "suvarnatira" | "kanthar", { x: number; y: number }>;
+    | "tirthali" | "sarovan" | "shailagarh" | "mandapur" | "suvarnatira" | "kanthar" | "gullwick" | "saltreach" | "merrab" | "tel_ashun" | "ennus_well", { x: number; y: number }>;
 };
 
 function mulberry(seed: number) {

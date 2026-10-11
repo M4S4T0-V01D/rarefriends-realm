@@ -71,6 +71,31 @@ export const DOCKS: readonly { id: string; name: string; region: RegionId; from:
   { id: "turtle_rock", name: "Turtle Rock", region: "turtle_rock", from: [1548, 372], heading: [-1, 0], boatman: "boat_turtle_rock" },
   { id: "hakkotsu", name: "Hakkotsu", region: "hakkotsu", from: [1690, 486], heading: [-1, 0], boatman: "boat_hakkotsu" },
 ];
+export type Dock = typeof DOCKS[number];
+/**
+ * Lay a landing's pier: walk from the landing towards the sea until the water, then lay the pier on out, the land
+ * behind it paved as a quay; moor the boat beyond the pier's end (you stand at the end to board, and arrive there), set
+ * a lamp either side of the pier's foot, and put the boatman on the quay. The sea ports (ports.ts) lay theirs the same way.
+ */
+export function layPier(t: Tools, dock: Dock, kit: { occupied: (x: number, y: number) => boolean; walkable: (t: number) => boolean; npcAt: (id: string, x: number, y: number) => void; lamp: DecorKind; boat: string; region: boolean }) {
+  const { get, put, add, decor, clearAt } = t;
+  let [x, y] = dock.from as [number, number];
+  const [hx, hy] = dock.heading;
+  for (let k = 0; k < 120 && !isWater(get(x + hx, y + hy)); k++) { x += hx; y += hy; }
+  const shoreX = x, shoreY = y, side = hx === 0 ? [1, 0] : [0, 1];
+  // A paved quay on the land side.
+  for (let k = -3; k <= 0; k++) for (let s = -2; s <= 2; s++) { const qx = shoreX + hx * k + side[0] * s, qy = shoreY + hy * k + side[1] * s; if (!isWater(get(qx, qy))) { clearAt(qx, qy); put(qx, qy, T.STONE); } }
+  const LENGTH = 6;
+  for (let k = 1; k <= LENGTH; k++) for (const s of [0, 1]) { const px = shoreX + hx * k + side[0] * s, py = shoreY + hy * k + side[1] * s; clearAt(px, py); put(px, py, T.WOOD); }
+  for (let k = 1; k <= LENGTH + 3; k++) for (const s of [-1, 2]) { const wx = shoreX + hx * k + side[0] * s, wy = shoreY + hy * k + side[1] * s; if (isWater(get(wx, wy))) put(wx, wy, T.WATER); }
+  for (let k = LENGTH + 1; k <= LENGTH + 3; k++) for (const s of [0, 1]) { const wx = shoreX + hx * k + side[0] * s, wy = shoreY + hy * k + side[1] * s; put(wx, wy, T.WATER); }
+  const endX = shoreX + hx * LENGTH, endY = shoreY + hy * LENGTH;
+  add({ kind: "dock", x: endX + hx, y: endY + hy, blocks: true, name: kit.boat, dock: dock.id, to: { x: endX, y: endY } });
+  for (const s of [-1, 2]) { const lx = shoreX + side[0] * s, ly = shoreY + side[1] * s; if (!kit.occupied(lx, ly) && kit.walkable(get(lx, ly))) decor(lx, ly, kit.lamp); }
+  kit.npcAt(dock.boatman, shoreX - hx * 2 + side[0] * 2, shoreY - hy * 2 + side[1] * 2);
+  if (kit.region) t.setRegion(endX, endY, dock.region);
+  return { shoreX, shoreY, endX, endY };
+}
 /** Where Hinode's towns are (world coordinates). */
 export const MIZUKAI_PLACES = {
   kurohama: [1366, 262], takamori: [1452, 286], kumoyama: [1448, 214], tanabe: [1420, 326], yumoto: [1514, 206], kurokage: [1484, 140], isohama: [1494, 316],
@@ -216,25 +241,7 @@ export function buildIsles(ctx: GenContext, t: Tools, places: World["places"], f
   road([[1370, 252], [1390, 230], [1396, 212]], 2, T.GRAVEL);                                                             // the woodcutters' track into the Old Cedars
 
   // ---------- 5. Docks: a pier out to sea from each landing, a moored boat at its end, its boatman on the quay ----------
-  for (const dock of DOCKS) {
-    // Walk from the landing towards the sea until the water, then lay the pier on out; the land behind is the quay.
-    let [x, y] = dock.from as [number, number];
-    const [hx, hy] = dock.heading;
-    for (let k = 0; k < 120 && !isWater(get(x + hx, y + hy)); k++) { x += hx; y += hy; }
-    const shoreX = x, shoreY = y, side = hx === 0 ? [1, 0] : [0, 1];
-    // A paved quay on the land side.
-    for (let k = -3; k <= 0; k++) for (let s = -2; s <= 2; s++) { const qx = shoreX + hx * k + side[0] * s, qy = shoreY + hy * k + side[1] * s; if (!isWater(get(qx, qy))) { clearAt(qx, qy); put(qx, qy, T.STONE); } }
-    const LENGTH = 6;
-    for (let k = 1; k <= LENGTH; k++) for (const s of [0, 1]) { const px = shoreX + hx * k + side[0] * s, py = shoreY + hy * k + side[1] * s; clearAt(px, py); put(px, py, T.WOOD); }
-    for (let k = 1; k <= LENGTH + 3; k++) for (const s of [-1, 2]) { const wx = shoreX + hx * k + side[0] * s, wy = shoreY + hy * k + side[1] * s; if (isWater(get(wx, wy))) put(wx, wy, T.WATER); }
-    for (let k = LENGTH + 1; k <= LENGTH + 3; k++) for (const s of [0, 1]) { const wx = shoreX + hx * k + side[0] * s, wy = shoreY + hy * k + side[1] * s; put(wx, wy, T.WATER); }
-    const endX = shoreX + hx * LENGTH, endY = shoreY + hy * LENGTH;
-    // The boat is moored beyond the pier's end; you stand at the end to board, and arrive there.
-    add({ kind: "dock", x: endX + hx, y: endY + hy, blocks: true, name: "Mizukai boat", dock: dock.id, to: { x: endX, y: endY } });
-    for (const s of [-1, 2]) { const lx = shoreX + side[0] * s, ly = shoreY + side[1] * s; if (!occupied(lx, ly) && WALKABLE(get(lx, ly))) decor(lx, ly, dock.id === "eastport" ? "lamp" : "stone_lantern"); }
-    npcAt(dock.boatman, shoreX - hx * 2 + side[0] * 2, shoreY - hy * 2 + side[1] * 2);
-    if (dock.id !== "eastport") t.setRegion(endX, endY, dock.region);
-  }
+  for (const dock of DOCKS) layPier(t, dock, { occupied, walkable: WALKABLE, npcAt, lamp: dock.id === "eastport" ? "lamp" : "stone_lantern", boat: "Mizukai boat", region: dock.id !== "eastport" });
 
   const isle = { at, nearFree, put2, npcAt, monsterAt, sign, occupied, regionIs, WALKABLE };
   buildMizukaiTowns(ctx, t, isle, places);

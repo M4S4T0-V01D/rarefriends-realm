@@ -13,7 +13,7 @@ import { TICK_MS, attackSpeed, combatLevel, createGame, giveOrDrop, message, tot
 import {
   chooseOption, closeInterfaces, collectFromCasket, creditReferral, emoteProblem, performEmote, syncMonster, continueDialogue, grantBundle, menuFor, tailorChoices, unlockMusic, restore, serialize, setFollower, setHeld, setRelics, tick, toggleRun, toggleSneak, toggleMount, grantMount, walkTo, sailTo, atSea, type OwnedFriend, type Selection,
 } from "./engine.ts";
-import { DOCKS } from "./isles.ts";
+import { DOCKS } from "./boats.ts";
 import { LANGUAGES, languageOf, setLanguage } from "./i18n.ts";
 import { logoSvg } from "./logo.ts";
 

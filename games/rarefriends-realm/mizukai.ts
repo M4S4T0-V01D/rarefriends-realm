@@ -557,6 +557,11 @@ const BOAT_LINES: Record<string, string> = {
   boat_three_stones: "The Three Stones. Lovely for an afternoon. Nobody knows what the watch-post watched for.",
   boat_turtle_rock: "Turtle Rock! One coin in the box, one wish. Mine came true twice.",
   boat_hakkotsu: "…",
+  // The sea ports' packets (ports.ts).
+  boat_gullwick: "Gullwick packet, for anywhere the sea goes and a few places it shouldn't. Fares by the league, paid at the plank.",
+  boat_saltreach: "Every passenger is written in the Ledger, coming and going. Sign here. And here. And there, for the Salt-House.",
+  boat_merrab: "My dhow takes pearls east and passengers anywhere. The pearls complain less.",
+  boat_suvarnatira: "No crown on my boat, just a fare and, if you're lucky, a good wind.",
 };
 
 /** Kills that count for the Isles' quests, and the things creatures carry for them. */

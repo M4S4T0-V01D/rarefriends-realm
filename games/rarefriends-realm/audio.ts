@@ -692,6 +692,8 @@ const KHARAVETH_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { sunteeth: "
   ashar_valley: "kharaveth_steppe", ochre_spine: "kharaveth_steppe", khetmar_pass: "kharaveth_khetmar", zuri_camp: "kharaveth_steppe", ouresh_camp: "kharaveth_dunes", sea_of_dunes: "kharaveth_dunes",
   sefrah: "kharaveth_sefrah", tamesh: "kharaveth_tamesh", black_range: "kharaveth_tamesh", khetmar: "kharaveth_khetmar",
   seven_crowns: "kharaveth_azhurak", first_names: "kharaveth_azhurak", sunken_obelisk: "kharaveth_azhurak", unfinished_pyramid: "kharaveth_azhurak", black_stair: "kharaveth_azhurak", first_names_hall: "kharaveth_azhurak" };
+/** The sea ports' pieces, borrowed from their neighbours: Saltmarrow's shanty for Gullwick, the Crownlands' hymn for Saltreach, Kharaveth's for the east. */
+const PORTS_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { gullwick: "saltmarrow", saltreach: "crownlands", merrab: "kharaveth_sefrah", tel_ashun: "kharaveth_azhurak", ennus_well: "kharaveth_dunes" };
 /** Which Mizukai piece plays where. */
 const MIZUKAI_REGION_TRACK: Partial<Record<RegionId, TrackId>> = {
   hinode: "mizukai_sunrise", kurohama: "mizukai_harbour", shiogama: "mizukai_harbour", smugglers_cove: "mizukai_harbour", takamori: "mizukai_castle",
@@ -713,7 +715,7 @@ export function trackFor(region: RegionId, nearBoss: boolean, mizukai: { sea?: b
   if (nearBoss) return "boss";
   // The Mizukai Isles: the place's own piece, the sea's on a crossing, and in a fight the battle (or, against one of the great spirits, theirs).
   if (mizukai.sea) return "mizukai_sea";
-  const south = KHARAVETH_REGION_TRACK[region] ?? MEGHAVAN_REGION_TRACK[region];
+  const south = KHARAVETH_REGION_TRACK[region] ?? MEGHAVAN_REGION_TRACK[region] ?? PORTS_REGION_TRACK[region];
   if (south) return south;
   const isles = MIZUKAI_REGION_TRACK[region];
   if (isles) return mizukai.spirit ? "mizukai_spirit" : mizukai.fight ? "mizukai_battle" : isles;

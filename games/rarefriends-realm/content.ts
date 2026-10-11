@@ -21,6 +21,8 @@ import { HIDDEN_ROAD_NPCS, HIDDEN_ROAD_QUESTS, onHiddenRoadKill, talkHiddenRoad 
 import { MEGHAVAN_NPCS, talkMeghavan } from "./meghavanpeople.ts";
 import { MEGHAVAN_QUESTS, MEGHAVAN_QUEST_NPCS, onMeghavanKill, talkMeghavanQuests } from "./meghavanquests.ts";
 import { MEGHAVAN_SCHOOL_NPCS, MEGHAVAN_SCHOOL_QUESTS, talkMeghavanSchools } from "./meghavanschools.ts";
+import { PORTS_NPCS, talkPorts } from "./portspeople.ts";
+import { PORTS_FINAL, PORTS_QUESTS, onPortsKill, talkPortsQuests } from "./portsquests.ts";
 import { BAR_NPCS, BAR_QUEST_DEFS, jobBoard, onBountyKill, talkBar } from "./bars.ts";
 /** A bar's job board (bars.ts), for the engine (which reaches the bars through here, so they load after this module). */
 export const readJobBoard = (game: Game, barId: string) => jobBoard(game, barId);
@@ -72,6 +74,7 @@ export const NPCS: Record<string, NpcDef> = {
   ...MEGHAVAN_NPCS,
   ...MEGHAVAN_QUEST_NPCS,
   ...MEGHAVAN_SCHOOL_NPCS,
+  ...PORTS_NPCS,
   ...BAR_NPCS,
   mender: { id: "mender", name: "Mender Hale", examine: "The chapel's mender. Her hands are always clean and her apron never is.", options: ["Talk-to", "Trade"], shop: "mender", art: art(3, 318) },
   // The wider world's villages (2026-10). Each village's people wear its own clothes (NPC_WEAR / regionalLook in render.ts).
@@ -484,6 +487,7 @@ export const QUESTS: readonly QuestDef[] = [
   ...HIDDEN_ROAD_QUESTS,
   ...MEGHAVAN_QUESTS,
   ...MEGHAVAN_SCHOOL_QUESTS,
+  ...PORTS_QUESTS,
   ...BAR_QUEST_DEFS,
   // ---------- The quests of being known: long ones, for Presence, with gear only they give ----------
   {
@@ -527,7 +531,7 @@ export const QUESTS: readonly QuestDef[] = [
 export const questPoints = (game: Game) => QUESTS.reduce((sum, quest) => sum + (stage(game, quest.id) >= finalStage(quest.id) ? quest.points : 0), 0);
 /** Meghavan's quests that end at stage 4 (meghavanquests.ts). */
 const MEGHAVAN_FOUR: ReadonlySet<string> = new Set(["silted_tank", "seven_parasols", "pass_toll", "missing_folio", "forest_keeps"]);
-export function finalStage(quest: string) { return quest === "orashai_mysteries" ? 6 : quest === "matriarchs_seal" ? 5 : quest === "hollow_whispers" || quest === "quarry_woke" || quest === "god_behind_bag" || MEGHAVAN_FOUR.has(quest) ? 4 : quest === "caravan_of_rains" ? 3 : quest === "hollow_king" || quest === "greyhorn_light" || quest === "rope_and_brush" || quest === "first_flush" || quest === "foothold_in_the_stone" || quest === "salt_and_smoke" || quest === "hidden_road" ? 3 : 2; }
+export function finalStage(quest: string) { return PORTS_FINAL[quest] ?? (quest === "orashai_mysteries" ? 6 : quest === "matriarchs_seal" ? 5 : quest === "hollow_whispers" || quest === "quarry_woke" || quest === "god_behind_bag" || MEGHAVAN_FOUR.has(quest) ? 4 : quest === "caravan_of_rains" ? 3 : quest === "hollow_king" || quest === "greyhorn_light" || quest === "rope_and_brush" || quest === "first_flush" || quest === "foothold_in_the_stone" || quest === "salt_and_smoke" || quest === "hidden_road" ? 3 : 2); }
 /** Bones to offer at the Dawnhold chapel for the Dawn Vigil. */
 const VIGIL_BONES = 8;
 /** The Pilgrim's Road: the old altars to pray at ([quest flag, altar name, where it is]). */
@@ -561,7 +565,7 @@ export function chat(npc: string, lines: DialogueLine[], options?: Dialogue["opt
 /** Pickpocket and quest hooks the engine calls. */
 export function onMonsterKilled(game: Game, monsterId: string, x: number, y: number) {
   const player = game.player;
-  onWestKill(game, monsterId); onMizukaiKill(game, monsterId); onKharavethKill(game, monsterId); onHeartlandsKill(game, monsterId); onOrashaiKill(game, monsterId); onHiddenRoadKill(game, monsterId); onMeghavanKill(game, monsterId); onBountyKill(game, monsterId);
+  onWestKill(game, monsterId); onMizukaiKill(game, monsterId); onKharavethKill(game, monsterId); onHeartlandsKill(game, monsterId); onOrashaiKill(game, monsterId); onHiddenRoadKill(game, monsterId); onMeghavanKill(game, monsterId); onPortsKill(game, monsterId); onBountyKill(game, monsterId);
   // The wider world's village quests count their kills wherever they fall.
   const tally = (quest: string, key: string, goal: number, done: string) => {
     if (stage(game, quest) !== 1) return;
@@ -775,6 +779,8 @@ function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
   const meghavanQuest = talkMeghavanQuests(game, npcId, name); if (meghavanQuest) return meghavanQuest;
   const meghavanSchool = talkMeghavanSchools(game, npcId, name); if (meghavanSchool) return meghavanSchool;
   const meghavan = talkMeghavan(game, npcId, name); if (meghavan) return meghavan;
+  const portsQuest = talkPortsQuests(game, npcId, name); if (portsQuest) return portsQuest;
+  const ports = talkPorts(game, npcId, name); if (ports) return ports;
   switch (npcId) {
     case "slayer_master:assignment": case "slayer_master": {
       const task = currentTask(game);
