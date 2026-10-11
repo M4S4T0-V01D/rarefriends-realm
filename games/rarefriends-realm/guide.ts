@@ -4,7 +4,7 @@
  */
 import {
   BOWS, COOKING, CRAFTING, CROSSBOWS, STOCKS, WAR_BOWS, FIREMAKING, FISHING_SPOTS, FLETCH_ARROWS, FLETCH_BOWS, GEM_CUTTING, ITEM_LIST, METALS, MONSTERS, PRAYERS, ROCKS, SIGILCRAFT,
-  SKILL_NAMES, SLAYER_SETS, SLAYER_TASKS, COURSES, WAYFARER_REWARDS, FAMILY_NAMES, SMELTING, SPELLS, TREES, sigilsPerStone, item, type Skill, CARVINGS,
+  SKILL_NAMES, SLAYER_SETS, SLAYER_TASKS, COURSES, WAYFARER_REWARDS, FAMILY_NAMES, SMELTING, SPELLS, TREES, SIGIL_STONES, sigilsPerStone, item, type Skill, CARVINGS,
 } from "./data.ts";
 import { ESSENCES, HERBS, MIXTURES, POTIONS } from "./apothecary.ts";
 import { NPCS } from "./content.ts";
@@ -75,6 +75,7 @@ export function skillGuide(skill: Skill): GuideEntry[] {
       for (const weapon of ITEM_LIST.filter(entry => entry.equip?.holy && !orderOf(entry.id))) add(weapon.equip!.requires?.prayer ?? 1, weapon.name, "Faith weapon: Faith XP with every hit, and it hurts the undead more", weapon.id);
       break;
     case "sigilcraft":
+      for (const grade of SIGIL_STONES) if (grade.base > 1) add(grade.level, grade.name, `${grade.base} sigils a stone before the level bonus; Mining ${grade.level} to dig it`, grade.item);
       for (const altar of SIGILCRAFT) add(altar.level, `${item(altar.sigil).name}s`, `${altar.xp} XP a stone at the ${item(altar.sigil).name.replace(" sigil", "")} altar; ${sigilsPerStone(altar.level + 11, altar.level)} per stone from level ${altar.level + 11}`, altar.sigil);
       break;
     case "woodcutting":

@@ -148,6 +148,8 @@ export const FORGE_GLOW: Partial<Record<MetalId, string>> = { frostsilver: "#eef
 export const FORGED_STAFF_MAGIC: Partial<Record<MetalId, number>> = { frostsilver: 26, gloomsteel: 32, wyrmscale: 38, hollowsteel: 42, cindersteel: 46, ashenheart: 54 };
 export type MetalId = typeof METALS[number]["id"];
 /** Smithable pieces: bars used, smithing level offset over the metal's base, and relative strength. */
+/** The armour a smith can reinforce at the anvil with a plate of the same metal (ordinary metal pieces only: never the Orders', a boss's or a quest's). */
+export const REINFORCED_PIECES = ["helm", "cuirass", "greaves", "shield", "roundshield", "gauntlets", "boots"] as const;
 export const SMITH_PIECES = [
   { piece: "dagger", name: "dagger", bars: 1, offset: 0, shape: "dagger", slot: "weapon", att: 4, str: 3, def: 0, speed: 4 },
   { piece: "axe", name: "axe", bars: 1, offset: 1, shape: "axe", slot: "weapon", att: 3, str: 4, def: 0, speed: 5 },
@@ -264,6 +266,9 @@ const ITEMS: Item[] = [
   { id: "drakehide", name: "Drakehide", examine: "A scaled hide from an ash drake. A crafter could stitch it.", value: 700, icon: { shape: "hide", color: "#6f8a5c", accent: "#3b3a38" } },
   { id: "wyrm_heart", name: "Wyrm heart", examine: "It still glows. Collectors in the Oasis pay a fortune for these.", value: 60_000, icon: { shape: "orb", color: "#e3734f", accent: "#f2e28f" } },
   { id: "sigil_stone", name: "Sigil stone", examine: "A pale, blank stone. An altar can press a sigil into it.", value: 6, icon: { shape: "ore", color: "#d9d4e6" } },
+  { id: "refined_sigil_stone", name: "Refined sigil stone", examine: "A sigil stone with a grain to it, denser than the Tower's. An altar presses three sigils into it.", value: 40, stackable: true, icon: { shape: "ore", color: "#c3b7ea", accent: "#7d64c4" } },
+  { id: "charged_sigil_stone", name: "Charged sigil stone", examine: "A sigil stone that hums in the hand. An altar presses five sigils into it.", value: 140, stackable: true, icon: { shape: "ore", color: "#9a82e0", accent: "#4e35a8" } },
+  { id: "primal_sigil_stone", name: "Primal sigil stone", examine: "A sigil stone with light inside it, from the Realm's deepest and coldest rock. An altar presses eight sigils into it.", value: 480, stackable: true, icon: { shape: "ore", color: "#6b4fcf", accent: "#f2e28f" } },
   // Fletching
   { id: "arrow_shaft", name: "Arrow shafts", examine: "Wooden shafts, ready for feathers.", value: 1, stackable: true, icon: { shape: "arrow", color: "#9c8672", accent: "shaft" } },
   { id: "headless_arrow", name: "Headless arrows", examine: "Fletched shafts. They need arrowheads.", value: 2, stackable: true, icon: { shape: "arrow", color: "#efede7", accent: "headless" } },
@@ -402,7 +407,16 @@ function metalGear(): Item[] {
         tool: isTool ? { kind: piece.piece as "axe" | "pickaxe", tier, level: metal.level } : undefined,
         weight,
       });
+      // Reinforced: the same piece riveted with a plate, a sixth more protection and a little heavier.
+      if ((REINFORCED_PIECES as readonly string[]).includes(piece.piece)) out.push({
+        id: `${id}_r`, name: `Reinforced ${name}`, examine: "Riveted with a reinforcement plate: a sixth more protection, and a little heavier.",
+        value: Math.round((metal.value * piece.bars * 1.6 + 10) * 1.6), icon: { shape: piece.shape as IconShape, color: metal.color, accent: "#f2e28f" },
+        equip: { slot: piece.slot as EquipSlot, bonuses: { ...bonuses, defence: Math.ceil((bonuses.defence ?? 0) * 7 / 6) }, requires: Object.keys(requires).length ? requires : undefined },
+        weight: Math.round(weight * 1.15 * 10) / 10,
+      });
     }
+    out.push({ id: `${metal.id}_plate`, name: `${metal.name} reinforcement plate`, examine: "A hammered plate, to rivet onto armour at the anvil for a sixth more protection.",
+      value: Math.round(metal.value * 2 * 1.6 + 10), icon: { shape: "bar", color: metal.color, accent: "#f2e28f" } });
     const magic = FORGED_STAFF_MAGIC[metal.id];
     if (magic) out.push({
       id: `${metal.id}_staff`, name: `${metal.name} staff`, examine: `A staff forged of ${metal.id}, humming with power.`, value: Math.round(metal.value * 2 * 1.6 + 10),
@@ -1038,9 +1052,13 @@ export const TREES: Record<TreeKind, { name: string; level: number; xp: number; 
   sakura: { name: "Blossom tree", level: 40, xp: 90, log: "blossom_logs", low: 12, high: 36, deplete: 1 / 8, respawn: 45 },
   cedar: { name: "Cedar", level: 62, xp: 190, log: "cedar_logs", low: 4, high: 12, deplete: 1 / 9, respawn: 110 },
 };
-export type RockKind = "pewter" | "clay" | "blackiron" | "inkcoal" | "moonsilver" | "glimmer" | "rarite" | "gem" | "sigil";
+export type RockKind = "pewter" | "clay" | "blackiron" | "inkcoal" | "moonsilver" | "glimmer" | "rarite" | "gem" | "sigil" | "sigil2" | "sigil3" | "sigil4";
 export const ROCKS: Record<RockKind, { name: string; level: number; xp: number; ore: string; low: number; high: number; respawn: number; color: string }> = {
   sigil: { name: "Sigil stone", level: 1, xp: 5, ore: "sigil_stone", low: 200, high: 400, respawn: 0, color: "#d9d4e6" },
+  // The better grades of sigil stone (SIGIL_STONES): denser, in the Realm's mines, and they run out like any rock.
+  sigil2: { name: "Refined sigil rocks", level: 20, xp: 30, ore: "refined_sigil_stone", low: 40, high: 180, respawn: 60, color: "#c3b7ea" },
+  sigil3: { name: "Charged sigil rocks", level: 40, xp: 60, ore: "charged_sigil_stone", low: 16, high: 90, respawn: 140, color: "#9a82e0" },
+  sigil4: { name: "Primal sigil rocks", level: 65, xp: 100, ore: "primal_sigil_stone", low: 4, high: 40, respawn: 320, color: "#6b4fcf" },
   clay: { name: "Clay rocks", level: 1, xp: 5, ore: "clay", low: 128, high: 400, respawn: 2, color: "#d7c3a5" },
   pewter: { name: "Pewter rocks", level: 1, xp: 17.5, ore: "pewter_ore", low: 100, high: 350, respawn: 4, color: "#a4a7aa" },
   blackiron: { name: "Blackiron rocks", level: 15, xp: 35, ore: "blackiron_ore", low: 96, high: 350, respawn: 9, color: "#5f5e66" },
@@ -1144,6 +1162,14 @@ export const SIGILCRAFT = [
 ] as const;
 /** Sigils per stone at your Sigilcraft level: one more for every 11 levels past the altar's. */
 export const sigilsPerStone = (level: number, needed: number) => Math.min(6, 1 + Math.floor(Math.max(0, level - needed) / 11));
+/**
+ * The four grades of sigil stone: each presses `base` sigils at an altar (plus the level bonus above, once, not multiplied),
+ * and takes that Mining level to dig and that Sigilcraft level to press. XP is per stone, the altar's, whatever the grade.
+ */
+export const SIGIL_STONES = [
+  { item: "sigil_stone", rock: "sigil", name: "Sigil stone", base: 1, level: 1 }, { item: "refined_sigil_stone", rock: "sigil2", name: "Refined sigil stone", base: 3, level: 20 },
+  { item: "charged_sigil_stone", rock: "sigil3", name: "Charged sigil stone", base: 5, level: 40 }, { item: "primal_sigil_stone", rock: "sigil4", name: "Primal sigil stone", base: 8, level: 65 },
+] as const;
 /** Staffs that stand in for a sigil. */
 export const STAFF_SIGILS: Record<string, string> = { breeze_staff: "breeze_sigil", tide_staff: "tide_sigil", stone_staff: "stone_sigil", ember_staff: "ember_sigil" };
 export const GEM_CUTTING: Record<string, { cut: string; level: number; xp: number }> = {
@@ -1648,7 +1674,7 @@ export function itemCategory(id: string): Category {
   const it = item(id), shape = it.icon.shape, slot = it.equip?.slot;
   if (shape === "fish") return "fish";
   if (shape === "log") return "logs";
-  if (id === "sigil_stone" || shape === "sigil") return "sigil";
+  if (id === "sigil_stone" || id.endsWith("_sigil_stone") || shape === "sigil") return "sigil";
   if (shape === "ore" || shape === "material") return "ore";
   if (shape === "bar") return "bar";
   if (shape === "gem" && id !== "slayer_gem") return "gem";

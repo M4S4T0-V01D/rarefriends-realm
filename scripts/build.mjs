@@ -20,9 +20,9 @@ const build = await buildGame(game, { outdir, watch: dev });
 if (!dev) {
   const { generateWorld, WORLD_SEED } = await import(pathToFileURL(path.join(game, "world.ts")).href);
   const { bakeWorld } = await import(pathToFileURL(path.join(game, "bake.ts")).href);
-  const { world, lift } = generateWorld(WORLD_SEED), script = path.join(outdir, "game.js");
+  const { world, lift, raise } = generateWorld(WORLD_SEED), script = path.join(outdir, "game.js");
   // (In single quotes: JSON is full of double quotes, and escaping each one would add a sixth to the download.)
-  const literal = bakeWorld(world, lift, WORLD_SEED).replace(/[\\']/g, ch => `\\${ch}`).replace(/\n/g, "\\n").replace(/\r/g, "\\r");
+  const literal = bakeWorld(world, lift, WORLD_SEED, raise).replace(/[\\']/g, ch => `\\${ch}`).replace(/\n/g, "\\n").replace(/\r/g, "\\r");
   await writeFile(script, `globalThis.__REALM_WORLD__='${literal}';\n${await readFile(script, "utf8")}`);
 }
 const host = await context({

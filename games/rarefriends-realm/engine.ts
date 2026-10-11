@@ -3,7 +3,7 @@
  * Pure TypeScript over the Game state, so it runs the same in the browser and in node tests.
  */
 import {
-  ARMOURY_FIRST, ARMOURY_LATER, DAWNPLATE_QUEST, COOKING, CRAFTING, CROSSBOWS, FORGED_STAFF_MAGIC, LIMBS_OFFSET, metalLevel, STOCKS, WAR_BOWS, EMOTES, EQUIP_SLOTS, MOUNTS, PETS, mountDef, FLETCH_ARROWS, FLETCH_BOWS, SIGILCRAFT, STAFF_SIGILS, itemCategory, sigilsPerStone, FAMILY_NAMES, FIREMAKING, FISHING_SPOTS, GEM_CUTTING, METALS, MONSTERS, PRAYERS, RELICS, RF_BUNDLES, ROCKS, SHOPS, SHOP_BUY,
+  ARMOURY_FIRST, ARMOURY_LATER, DAWNPLATE_QUEST, COOKING, CRAFTING, CROSSBOWS, FORGED_STAFF_MAGIC, LIMBS_OFFSET, metalLevel, REINFORCED_PIECES, SIGIL_STONES, STOCKS, WAR_BOWS, EMOTES, EQUIP_SLOTS, MOUNTS, PETS, mountDef, FLETCH_ARROWS, FLETCH_BOWS, SIGILCRAFT, STAFF_SIGILS, itemCategory, sigilsPerStone, FAMILY_NAMES, FIREMAKING, FISHING_SPOTS, GEM_CUTTING, METALS, MONSTERS, PRAYERS, RELICS, RF_BUNDLES, ROCKS, SHOPS, SHOP_BUY,
   FLETCH_WANDS, SHOP_SELL, SKILLS, SKILL_NAMES, SMELTING, SMITH_PIECES, SMITH_XP, SPELLS, HOME_PLACE, TREES, WARDROBE, XP_TABLE, isItem, item, levelForXp, smithLevel, COURSES, WAYFARER_MARK, WAYFARER_REWARDS,
   type EquipSlot, type MetalId, type Skill, type Spell, type SpotKind, type WardrobeId, DYES, baseOf, dyeOf, dyeable, CARVINGS, CARVING_REACH, CARVINGS_AT_ONCE, type CarvingEffect } from "./data.ts";
 import { cleanDaily } from "./daily.ts";
@@ -824,6 +824,12 @@ export function smithingRecipes(metal: MetalId): Recipe[] {
     skill: "smithing" as const, label: `${name} ${piece.name}`, level: smithLevel(metal, piece.piece), xp: SMITH_XP[metal] * piece.bars,
     ticks: 5, station: "anvil" as const, inputs: { [`${metal}_bar`]: piece.bars }, outputs: { [`${metal}_${piece.piece}`]: 1 }, tools: ["hammer"],
   })),
+  // A reinforcement plate from two bars, and the armour it rivets onto: the piece and a plate make the reinforced piece.
+  { skill: "smithing" as const, label: `${name} reinforcement plate`, level: metalLevel(metal, 8), xp: SMITH_XP[metal] * 2, ticks: 5, station: "anvil" as const,
+    inputs: { [`${metal}_bar`]: 2 }, outputs: { [`${metal}_plate`]: 1 }, tools: ["hammer"] },
+  ...REINFORCED_PIECES.map(piece => { const def = SMITH_PIECES.find(entry => entry.piece === piece)!; return {
+    skill: "smithing" as const, label: `Reinforced ${name} ${def.name}`, level: Math.min(99, smithLevel(metal, piece) + 5), xp: SMITH_XP[metal] * def.bars, ticks: 5, station: "anvil" as const,
+    inputs: { [`${metal}_${piece}`]: 1, [`${metal}_plate`]: 1 }, outputs: { [`${metal}_${piece}_r`]: 1 }, tools: ["hammer"] }; }),
   // Arrowheads for Fletching: fifteen from a bar.
   { skill: "smithing" as const, label: `15 ${name.toLowerCase()} arrowheads`, level: metalLevel(metal, 5), xp: SMITH_XP[metal], ticks: 4, station: "anvil" as const,
     inputs: { [`${metal}_bar`]: 1 }, outputs: { [`${metal}_arrowheads`]: 15 }, tools: ["hammer"] },
@@ -842,13 +848,21 @@ export function craftSigils(game: Game, object: WorldObject) {
   const player = game.player, entry = SIGILCRAFT.find(row => row.sigil === object.sigil);
   if (!entry) return 0;
   if (level(game, "sigilcraft") < entry.level) { message(game, `You need a Sigilcraft level of ${entry.level} to press ${item(entry.sigil).name.toLowerCase()}s.`, "warn"); return 0; }
-  const stones = stock(player, "sigil_stone");
-  if (!stones) { message(game, "You need sigil stones. Mine them in the Wizards' Tower.", "warn"); return 0; }
-  const each = sigilsPerStone(level(game, "sigilcraft"), entry.level), made = stones * each;
-  useUp(player, "sigil_stone", stones); give(player, entry.sigil, made);
+  // Every grade of stone you carry, from the Tower's plain ones up: each presses its base number of sigils plus the level
+  // bonus, once (a Refined stone at the Breeze threshold makes four, not six), and earns the altar's XP per stone.
+  const lvl = level(game, "sigilcraft"), bonus = sigilsPerStone(lvl, entry.level) - 1;
+  let stones = 0, made = 0;
+  for (const grade of SIGIL_STONES) {
+    const n = stock(player, grade.item);
+    if (!n) continue;
+    if (lvl < grade.level) { message(game, `You need a Sigilcraft level of ${grade.level} to press ${grade.name.toLowerCase()}s.`, "warn"); continue; }
+    useUp(player, grade.item, n); stones += n; made += n * (grade.base + bonus);
+  }
+  if (!stones) { if (!SIGIL_STONES.some(grade => stock(player, grade.item))) message(game, "You need sigil stones. Mine them in the Wizards' Tower, or the better grades in the Realm's mines.", "warn"); return 0; }
+  give(player, entry.sigil, made);
   addXp(game, "sigilcraft", entry.xp * stones); sound(game, "spell");
   emit(game, { type: "cast", spell: "sigilcraft", tick: game.tick });
-  message(game, `You press ${made} ${item(entry.sigil).name.toLowerCase()}s${each > 1 ? ` (${each} per stone)` : ""}.`);
+  message(game, `You press ${made} ${item(entry.sigil).name.toLowerCase()}s from ${stones} stones.`);
   rollPet(game, "mote", level(game, "sigilcraft"));
   return made;
 }

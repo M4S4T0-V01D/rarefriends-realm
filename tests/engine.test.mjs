@@ -19,7 +19,7 @@ import { wonDuel } from "../games/rarefriends-realm/duel.ts";
 import { cleanPresence } from "../games/rarefriends-realm/net.ts";
 import { buySlayerReward, longTasks, slayerXpBoost, eligibleTasks } from "../games/rarefriends-realm/slayer.ts";
 import { currentTask, slayerPoints } from "../games/rarefriends-realm/slayer.ts";
-import { COURSES, EQUIP_SLOTS, HEARTGUARD, ITEM_LIST, METALS, MONSTERS, SMITH_PIECES, SPELL_TABS, FIREMAKING, REGIONAL_CLOTHING, WARDROBE, MOUNTS, SHOPS, SKILLS, SKILL_NAMES, SLAYER_SETS, SLAYER_TASKS, SPELLS, TREES, WAYFARER_MARK, WAYFARER_REWARDS, XP_RATE, XP_TABLE, heavyStrength, isItem, item, levelForXp } from "../games/rarefriends-realm/data.ts";
+import { COURSES, EQUIP_SLOTS, HEARTGUARD, ITEM_LIST, METALS, MONSTERS, ROCKS, SMITH_PIECES, SPELL_TABS, FIREMAKING, REGIONAL_CLOTHING, WARDROBE, MOUNTS, SHOPS, SKILLS, SKILL_NAMES, SLAYER_SETS, SLAYER_TASKS, SPELLS, TREES, WAYFARER_MARK, WAYFARER_REWARDS, XP_RATE, XP_TABLE, heavyStrength, isItem, item, levelForXp } from "../games/rarefriends-realm/data.ts";
 import { NPCS, QUESTS, MAX_QUEST_POINTS, PILGRIM_ALTARS, questPoints, onMonsterKilled, shopProblem, readJobBoard } from "../games/rarefriends-realm/content.ts";
 import { ORDERS, ORDER_IDS, orderOf, orderPieces } from "../games/rarefriends-realm/knights.ts";
 import { signetCharges, signetTeleport } from "../games/rarefriends-realm/engine.ts";
@@ -2636,11 +2636,11 @@ test("The Palace of Raria: five floors under a spire, a four-wide door, and stai
 test("The baked world unbakes to the generated one: every tile, object, building and storey, and heights within a pixel", async () => {
   const { generateWorld, WORLD_SEED, indexObjects, indexBuildings } = await import("../games/rarefriends-realm/world.ts");
   const { bakeWorld, unbakeWorld } = await import("../games/rarefriends-realm/bake.ts");
-  const { world, lift } = generateWorld(WORLD_SEED);
+  const { world, lift, raise } = generateWorld(WORLD_SEED);
   // The maps the bake leaves out are rebuilt from the lists exactly.
   assert.deepEqual(indexObjects(world.objects), world.objectAt, "the tile → object map rebuilds exactly");
   assert.deepEqual(indexBuildings(world.buildings), world.buildingAt, "the tile → building map rebuilds exactly");
-  const t0 = performance.now(), text = bakeWorld(world, lift, WORLD_SEED), t1 = performance.now(), back = unbakeWorld(text), t2 = performance.now();
+  const t0 = performance.now(), text = bakeWorld(world, lift, WORLD_SEED, raise), t1 = performance.now(), back = unbakeWorld(text), t2 = performance.now();
   assert(back, "it unbakes");
   for (const key of ["tiles", "region", "objectAt", "buildingAt"]) assert.deepEqual(back[key], world[key], `${key} survive the bake`);
   // Plain data only: what JSON keeps is everything there was (no NaN, Infinity, functions or class instances).
@@ -3707,4 +3707,59 @@ test("The Pearl-Divers' Debt, What the Tell Remembers and The Well's Share: afte
   clue("well_channel", "Look"); assert.equal(p.quests.wells_share, 2);
   say("ennu_keeper", "Equal notches"); assert.equal(p.quests.wells_share, 3); assert(has(p, "wellkeepers_headcloth"));
   assert.equal(questPoints(g), 6, "two, one and one, and A Foothold in the Stone's two");
+});
+
+test("Sigil stones in four grades: each presses its base number of sigils plus the level bonus once; the better grades are in the mines and need their levels", async () => {
+  const { SIGIL_STONES, sigilsPerStone } = await import("../games/rarefriends-realm/data.ts");
+  const g = newGame(), p = g.player, world = g.world;
+  assert.deepEqual(SIGIL_STONES.map(s => s.base), [1, 3, 5, 8]);
+  for (const grade of SIGIL_STONES.slice(1)) assert(world.objects.some(o => o.kind === "rock" && o.rock === grade.rock), `${grade.rock} rocks exist`);
+  const altar = world.objects.find(o => o.kind === "sigil_altar" && o.sigil === "breeze_sigil");
+  standBy(g, altar); p.inventory.fill(null);
+  // At Sigilcraft 20 the Breeze bonus is +1: a plain stone makes 2, a Refined one 4; the Primal stone waits for level 65.
+  p.xp.sigilcraft = XP_TABLE[20]; give(p, "sigil_stone"); give(p, "refined_sigil_stone", 2); give(p, "primal_sigil_stone");
+  assert.equal(sigilsPerStone(20, 1), 2);
+  assert.equal(craftSigils(g, altar), 2 + 2 * 4, "plain and Refined pressed together, the bonus added once each");
+  assert.equal(count(p, "primal_sigil_stone"), 1, "Primal stays until Sigilcraft 65"); assert.equal(count(p, "breeze_sigil"), 10);
+  const xp = p.xp.sigilcraft; p.xp.sigilcraft = XP_TABLE[65]; give(p, "charged_sigil_stone");
+  assert.equal(craftSigils(g, altar), (8 + 5) + (5 + 5), "at 65 the bonus is +5 (six a stone, the cap): Primal 13, Charged 10");
+  assert(p.xp.sigilcraft - XP_TABLE[65] > 0 && xp > XP_TABLE[20], "XP per stone, not per sigil");
+  // Digging: the grades take their Mining levels, and run out like other rock.
+  const rock = world.objects.find(o => o.kind === "rock" && o.rock === "sigil3");
+  assert.equal(ROCKS.sigil3.level, 40); assert(ROCKS.sigil3.respawn > 0 && ROCKS.sigil.respawn === 0);
+  standBy(g, rock); give(p, "rarite_pickaxe"); p.xp.mining = XP_TABLE[39];
+  menuFor(g, [{ kind: "object", id: rock.id }], null)[0].run(g); assert.equal(p.activity, null, "Mining 40 to dig Charged stone");
+});
+
+test("Reinforced armour: two bars make a plate, a piece and a plate make the reinforced piece (a sixth more protection); only ordinary metal", async () => {
+  const { REINFORCED_PIECES, item } = await import("../games/rarefriends-realm/data.ts");
+  const g = newGame(), p = g.player;
+  p.xp.smithing = XP_TABLE[30]; give(p, "hammer"); give(p, "pewter_bar", 2); give(p, "pewter_helm");
+  const anvil = g.world.objects.find(object => object.kind === "anvil"); standBy(g, anvil);
+  const recipes = smithingRecipes("pewter");
+  startProduction(g, recipes.find(r => r.label === "Pewter reinforcement plate"), 1); until(g, () => has(p, "pewter_plate"), 50);
+  assert.equal(count(p, "pewter_bar"), 0);
+  startProduction(g, recipes.find(r => r.label === "Reinforced Pewter helm"), 1); until(g, () => has(p, "pewter_helm_r"), 50);
+  assert(!has(p, "pewter_helm") && !has(p, "pewter_plate"), "both consumed");
+  assert(item("pewter_helm_r").equip.bonuses.defence > item("pewter_helm").equip.bonuses.defence && item("pewter_helm_r").weight > item("pewter_helm").weight);
+  assert.equal(REINFORCED_PIECES.length, 7);
+  for (const metal of METALS) for (const r of smithingRecipes(metal.id)) for (const out of Object.keys(r.outputs)) assert(out.startsWith(`${metal.id}_`), `smithing only makes ${metal.id} things, not ${out}`);
+});
+
+test("Mining country: the Ashen quarry is stepped and walled with its own smithy, Frostpeak rises to a summit with a forge at the camp, Emberforge has lava and a smelting yard", () => {
+  const g = newGame(), world = g.world;
+  const at = (mx, my) => { const [x, y] = mainlandToWorld(mx, my); return { x, y, i: y * W + x, c: y * (W + 1) + x }; };   // c: the height corner at the tile's top-left
+  const rim = at(114, 43), floor = at(114, 52), camp = at(195, 30), summit = at(224, 14);
+  assert(world.heights[rim.c] > world.heights[floor.c] + 30, "the quarry's rim stands above its floor");
+  assert(world.tiles[at(116, 61).i] === T.WALL && world.tiles[at(107, 61).i] === T.STONE, "a retaining wall, and the ramp through it");
+  assert(world.objects.filter(o => o.kind === "decor" && o.name === "Ore cart").length >= 4, "ore carts at the quarry and the yard");
+  const near = (kind, p, r) => world.objects.some(o => o.kind === kind && Math.abs(o.x - p.x) <= r && Math.abs(o.y - p.y) <= r);
+  assert(near("furnace", at(101, 64), 2) && near("anvil", at(103, 66), 2), "the Ashen smithy");
+  assert(world.heights[summit.c] > world.heights[camp.c] + 100, "Frostpeak's summit is high above its camp");
+  assert(near("furnace", at(192, 36), 1) && near("anvil", at(194, 36), 1), "the Frostpeak forge");
+  assert(world.objects.some(o => o.name === "Summit cairn"), "a cairn on top");
+  let lava = 0; for (let y = 40; y < 62; y++) for (let x = 170; x < 190; x++) if (world.tiles[at(x, y).i] === T.LAVA) lava++;
+  assert(lava >= 6, `lava in Emberforge's cracks (${lava})`);
+  assert(near("furnace", at(176, 40), 2) && near("anvil", at(180, 42), 1), "the smelting yard");
+  assert.equal(world.objects.filter(o => o.kind === "anvil").length >= 12, true, "more smithies than before");
 });

@@ -203,6 +203,7 @@ export function buildHeartlands(ctx: GenContext, t: Tools, places: World["places
     for (let y = qy0; y <= qy1; y++) for (let x = qx0; x <= qx1; x++) { put(x, y, (x + y) % 5 === 0 ? T.GRAVEL : T.STONE); lift[tileIndex(x, y)] = 0.2 + (x - qx0) * 0.08; clearAt(x, y); }
     for (const [rx, ry, kind] of [[qx1 - 1, qy0 + 2, "blackiron"], [qx1 - 1, qy0 + 5, "inkcoal"], [qx1 - 1, qy0 + 9, "blackiron"], [qx1 - 3, qy1 - 2, "glimmer"], [qx1 - 1, qy1 - 6, "inkcoal"], [qx0 + 6, qy1, "pewter"], [qx0 + 9, qy0, "clay"]] as const)
       t.rock(rx, ry, kind as RockKind);
+    { const [sx, sy] = nearFree(qx0 + 2, qy0 + 4, 2); t.rock(sx, sy, "sigil3"); }      // charged sigil stone, in the quarry face
     put2(qx0 + 2, qy0 + 1, "logpile", "Timber for the sledges"); put2(qx0 + 4, qy1 - 1, "crate", "Black stone blocks, roped for the sledge");
     npcAt("tamesh_quarrymaster", qx0 + 3, cy, 1);
     for (const [dx, dy] of [[5, -6], [8, 4], [11, -2]] as const) npcAt("tamesh_stonecutter", qx0 + dx, cy + dy, 2);

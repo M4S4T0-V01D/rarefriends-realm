@@ -360,7 +360,7 @@ export function buildMeghavan(ctx: GenContext, t: Tools, places: World["places"]
     villagers("shailagarh_villager", cx, cy, [[-8, -2], [4, -2], [-2, 4]]);
     sign(x0 - 3, cy - 4, "Shailagarh", "SHAILAGARH, the fortress of the passes. Held by Lord Varanjit. The mines are open to those who pay the mine-tithe; the passes are open to those who pay the pass-toll; the fortress is open to those who are asked in.");
     // The mines, north and east under the peaks: blackiron, moonsilver, and the glimmer that lights the deep seams.
-    for (const [mx, my, kinds] of [[1432, 606, ["blackiron", "blackiron", "inkcoal"]], [1506, 610, ["moonsilver", "blackiron", "moonsilver"]], [1540, 628, ["glimmer", "moonsilver", "glimmer"]], [1500, 664, ["blackiron", "inkcoal", "pewter"]]] as const) {
+    for (const [mx, my, kinds] of [[1432, 606, ["blackiron", "blackiron", "inkcoal"]], [1506, 610, ["moonsilver", "blackiron", "moonsilver"]], [1540, 628, ["glimmer", "moonsilver", "glimmer", "sigil4"]], [1500, 664, ["blackiron", "inkcoal", "pewter"]]] as const) {
       ground(mx - 4, my - 3, mx + 4, my + 3, T.GRAVEL, false);
       kinds.forEach((kind, k) => { const [rx, ry] = nearFree(mx - 3 + k * 3, my - 2, 2); t.rock(rx, ry, kind as RockKind); });
       put2(mx, my + 2, "logpile", "Pit props of highland pine"); put2(mx + 3, my + 2, "crate", "Ore baskets, wet, waiting for the mule");

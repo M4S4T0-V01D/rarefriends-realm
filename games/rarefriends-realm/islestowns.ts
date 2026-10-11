@@ -468,6 +468,7 @@ export function buildMizukaiTowns(ctx: GenContext, t: Tools, isle: Isle, places:
     add({ kind: "ladder", x: 1281, y: 527, blocks: true, name: "Mine ladder", action: "Climb-up", to: pt(nearFree(mx, my + 1, 2)) });
     add({ kind: "gate", x: 1353, y: 533, blocks: true, name: "The Red Ogre's door", action: "Unlock", to: { x: 1356, y: 533 }, requires: { item: "ogre_key" } });
     for (const [kind, n] of [["blackiron", 6], ["inkcoal", 6], ["moonsilver", 4], ["glimmer", 3]] as const) scatter(1280, 522, 1350, 550, n, (x, y) => rock(x, y, kind as RockKind), (x, y) => get(x, y) === T.DUNGEON && ctx.objectAt[tileIndex(x, y)] < 0);
+    for (const [x, y] of [[1300, 532], [1332, 544]]) if ((get(x, y) === T.DUNGEON || get(x, y) === T.STONE) && !occupied(x, y)) t.rock(x, y, "sigil3");   // charged sigil stone, in the Hollow's seams
     for (const x of [1286, 1298, 1318]) decor(x, 524, "torch", true); add({ kind: "furnace", x: 1336, y: 524, blocks: true, name: "Ogre furnace" }); add({ kind: "anvil", x: 1342, y: 524, blocks: true, name: "Ogre anvil" });
     decor(1388, 548, "chest", true, "The Red Ogre's hoard: copper, and things that were not his"); coffers("Deeps coffer", 1280, 522, 1350, 550, 4, T.DUNGEON);
     inside({ x0: 1280, x1: 1350, y0: 522, y1: 550 }, 12, "ash_ogre"); inside({ x0: 1280, x1: 1350, y0: 522, y1: 550 }, 4, "silk_widow");

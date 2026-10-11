@@ -4,6 +4,15 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 107, date: "2026-10-11", title: "Mining country: the Ashen quarry, Frostpeak's summit, Emberforge's smelting yard", items: [
+    "The Ashen mine is a quarry now: a stepped pit with a level floor, terraces up to a rim of broken cliff, a retaining wall with its ramp, planks over the cut, ore carts, pit props, a tool shed and the mine's own smithy. Refined sigil stone shows in its faces.",
+    "Frostpeak climbs: the snowfield rises from the camp to a summit above the yetis, with a scree track up it, crags on the high slopes, a cairn on top, and a forge at the camp. Emberforge has a volcanic district east of the forge hall: ash underfoot, lava in the cracks, a stone smelting yard with two furnaces, an anvil, carts and coal.",
+  ] },
+  { id: 106, date: "2026-10-11", title: "Sigil stones in four grades, and reinforced armour", items: [
+    "Smiths can hammer two bars into a reinforcement plate, and rivet it onto a helm, cuirass, greaves, shield, round shield, gauntlets or boots of the same metal at the anvil: a sixth more protection, a little heavier, five levels above the piece. Ordinary metal only: the Orders' armour, boss drops and quest rewards stay what they are.",
+    "Sigil stone comes in four grades now: the Wizards' Tower's plain stone (one sigil), Refined (three; Mining and Sigilcraft 20), Charged (five; 40) and Primal (eight; 65). Your level bonus adds to a stone's sigils once, as before, whatever the grade.",
+    "Refined stone is in the Ashen mine and Cragmaw's deep mine; Charged in the deep mine, the Deepglass, the Hollow under Kumo and Tamesh's quarry; Primal on Frostpeak's summit, in Ashfall's ash and the Shaila mines. The better grades run out like any rock. An altar presses every grade you carry at once.",
+  ] },
   { id: 105, date: "2026-10-11", title: "The Land Before Stone: two pyramids, and the deeps beneath them", items: [
     "The Unfinished Pyramid by Kharaveth's south coast is eight times the size it was. Its faces climb to a flat, unfinished top, its ramps lie slumped against its sides, and inside, the builders' hauling ways climb storey by storey to the summit. The builders' marks are on the wall of the Hall of the Count, as before.",
     "The builders' dead still haul on its storeys, and the overseers' shades and the grit wraiths keep the count: the first creatures to walk a building's upper floors.",

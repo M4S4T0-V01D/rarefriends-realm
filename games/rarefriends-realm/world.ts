@@ -362,7 +362,7 @@ export const inBounds = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y
 
 /** Everything a world generator needs: the arrays it paints into and the dice it rolls. */
 export type GenContext = {
-  W: number; H: number; tiles: Uint8Array; region: Uint8Array; objectAt: Int32Array; lift: Float32Array;
+  W: number; H: number; tiles: Uint8Array; region: Uint8Array; objectAt: Int32Array; lift: Float32Array; raise: Float32Array;
   objects: WorldObject[]; spawns: SpawnDef[]; buildings: Building[]; doorways: [number, number][]; ramparts?: Rampart[];
   random: () => number; noise: (x: number, y: number) => number; noise2: (x: number, y: number) => number;
 };
@@ -474,10 +474,10 @@ function buildMainland(seed: number) {
   const objectAt = new Int32Array(W * H).fill(-1);
   const random = mulberry(seed), noise = makeNoise(seed, 9), noise2 = makeNoise(seed + 7, 4), coastNoise = makeNoise(seed + 3, 14), swell = makeNoise(seed + 55, 26);
   /** Extra height for mountains (0 = the terrain's own relief), per tile. */
-  const lift = new Float32Array(W * H);
+  const lift = new Float32Array(W * H), raise = new Float32Array(W * H);
   const buildings: Building[] = [], doorways: [number, number][] = [];
   const { tileIndex, inBounds, get, put, setRegion, fillRect, blob, regionBlob, road, river, add, decor, clearAt, free, building, scatter, tree, rock, spot, shoreSpots, rockCluster, monster, npc, monsters } =
-    worldTools({ W, H, tiles, region, objectAt, lift, objects, spawns, buildings, doorways, random, noise, noise2 });
+    worldTools({ W, H, tiles, region, objectAt, lift, raise, objects, spawns, buildings, doorways, random, noise, noise2 });
 
   // ---------- Land and sea ----------
   // The overworld is an island in the Pale Sea; the dungeon strip below starts as void.
@@ -810,6 +810,7 @@ function buildMainland(seed: number) {
   for (let i = 0; i < 9; i++) { mine(104 + i * 2, 50 + (i % 3), "pewter"); mine(105 + i * 2, 55 + (i % 2), "pewter"); }
   for (let i = 0; i < 5; i++) mine(100 + i, 45 + (i % 2) * 2, "clay");
   for (let i = 0; i < 7; i++) mine(118 + i * 2, 42 + (i % 2) * 2, "blackiron");
+  mine(108, 42, "sigil2"); mine(121, 50, "sigil2"); mine(130, 60, "sigil2");          // refined sigil stone, the mine's own
   for (let i = 0; i < 6; i++) mine(122 + (i % 3) * 2, 60 + Math.floor(i / 3) * 3, "inkcoal");
   mine(126, 36, "moonsilver"); mine(128, 37, "moonsilver"); mine(106, 38, "gem");
   rockCluster(106, 52, 6, "pewter", 5); rockCluster(110, 56, 6, "pewter", 6); rockCluster(122, 44, 5, "blackiron", 4); rockCluster(124, 62, 5, "inkcoal", 4);
@@ -844,6 +845,7 @@ function buildMainland(seed: number) {
   monsters("wolf", 180, 14, 204, 26, 8);
   monsters("frost_yeti", 210, 8, 232, 22, 5);
   rockCluster(214, 36, 5, "glimmer", 5); rockCluster(226, 14, 5, "rarite", 3); rockCluster(206, 40, 4, "moonsilver", 4); rockCluster(186, 20, 4, "inkcoal", 4);
+  for (const [x, y] of [[229, 10], [232, 12], [227, 13]]) if (free(x, y) && get(x, y) === T.SNOW) rock(x, y, "sigil4");   // primal sigil stone, on the summit among the yetis
   shoreSpots(214, 24, 230, 36, "deep", 3);
 
   // ---------- Glass Lake and Pike's Pier ----------
@@ -1376,21 +1378,93 @@ function buildMainland(seed: number) {
   // The house behind Fletch & Feather, set back five tiles.
   building(140, 135, 145, 140, "w", T.WOOD, undefined, { name: "House", color: "#a996b5", chimney: true });
   decor(142, 136, "bed"); decor(144, 139, "table");
-  return { tiles, region, objects, objectAt, spawns, places, lift, buildings, floors, W, H };
+  return { tiles, region, objects, objectAt, spawns, places, lift, raise, buildings, floors, W, H };
 }
 
 /** The Realm's seed: every player's world is generated (or baked) from it. */
 export const WORLD_SEED = 20260927;
 export function createWorld(seed = WORLD_SEED): World { return generateWorld(seed).world; }
+
+/**
+ * Mining country: the Ashen quarry, Frostpeak's mountain and Emberforge's volcanic district (the Skill overhaul's one
+ * conscious change to the mainland). Built last of all, in mainland coordinates, from fixed shapes: nothing here draws
+ * from any random stream, and nothing random is placed after it, so the rest of the world stays exactly as it was.
+ */
+function buildMiningCountry(ctx: GenContext, toWorld: (x: number, y: number) => [number, number]) {
+  const t = worldTools(ctx), [OX, OY] = toWorld(0, 0), { lift, raise, objectAt, noise2 } = ctx;
+  const tileIndex = (x: number, y: number) => (y + OY) * ctx.W + x + OX;
+  const get = (x: number, y: number) => t.get(x + OX, y + OY), put = (x: number, y: number, terrain: number) => t.put(x + OX, y + OY, terrain);
+  const free = (x: number, y: number) => t.free(x + OX, y + OY), rock = (x: number, y: number, kind: RockKind) => t.rock(x + OX, y + OY, kind);
+  const fillRect = (x0: number, y0: number, x1: number, y1: number, terrain: number) => t.fillRect(x0 + OX, y0 + OY, x1 + OX, y1 + OY, terrain);
+  const road = (points: readonly (readonly [number, number])[], width: number, terrain: number) => t.road(points.map(([x, y]) => [x + OX, y + OY] as const), width, terrain);
+  const building = (x0: number, y0: number, x1: number, y1: number, door: "n" | "s" | "e" | "w", floor: number, doorAt: number | undefined, roof: Partial<Building>) => t.building(x0 + OX, y0 + OY, x1 + OX, y1 + OY, door, floor, doorAt, roof);
+  const decor = (x: number, y: number, kind: DecorKind, blocks = true, name?: string) => t.decor(x + OX, y + OY, kind, blocks, name);
+  const add = (object: Omit<WorldObject, "id">) => t.add({ ...object, x: object.x + OX, y: object.y + OY }), clearAt = (x: number, y: number) => t.clearAt(x + OX, y + OY);
+  const freeSpot = (x: number, y: number, r = 2): [number, number] | null => { for (let d = 0; d <= r; d++) for (let dy = -d; dy <= d; dy++) for (let dx = -d; dx <= d; dx++) if (free(x + dx, y + dy)) return [x + dx, y + dy]; return null; };
+  // ---------- Ashen Hills: the quarry ----------
+  // A stepped pit cut into the gravel: a level floor, two terraces climbing to a rim of broken cliff, a retaining wall
+  // along the south with the ramp through its west end, and planks laid over the cut. (No random draws: fixed shapes.)
+  {
+    const QX = 114, QY = 52;
+    for (let y = QY - 12; y <= QY + 12; y++) for (let x = QX - 16; x <= QX + 16; x++) {
+      const t = get(x, y); if (t !== T.GRAVEL && t !== T.GRASS && t !== T.DARK_GRASS) continue;
+      const d = Math.hypot((x - QX) / 14, (y - QY) / 9) + (noise2(x, y) - 0.5) * 0.12, i = tileIndex(x, y);
+      if (d < 0.45) { put(x, y, T.GRAVEL); lift[i] = 0; }
+      else if (d < 0.7) { put(x, y, T.GRAVEL); lift[i] = 0.7; }
+      else if (d < 0.92) { put(x, y, T.GRAVEL); lift[i] = 1.5; }
+      else if (d < 1.05) { lift[i] = 2.2; if (noise2(x * 2, y * 2) > 0.5 && objectAt[i] < 0) put(x, y, T.CLIFF); }
+    }
+    for (let x = QX - 4; x <= QX + 9; x++) if ((get(x, QY + 9) === T.GRAVEL || get(x, QY + 9) === T.CLIFF) && objectAt[tileIndex(x, QY + 9)] < 0) put(x, QY + 9, T.WALL);
+    for (let y = QY + 8; y <= QY + 11; y++) { put(QX - 7, y, T.STONE); put(QX - 6, y, T.STONE); }
+    fillRect(QX + 2, QY - 1, QX + 5, QY, T.WOOD);
+  }
+  // The quarry's gear: ore carts on the floor, pit props, a tool shed by the gate, and the mine's own smithy.
+  for (const [x, y] of [[109, 49], [117, 57], [113, 53]]) { const p = freeSpot(x, y); if (p) decor(p[0], p[1], "wagon", true, "Ore cart"); }
+  for (const [x, y] of [[121, 55], [106, 58]]) { const p = freeSpot(x, y); if (p) decor(p[0], p[1], "logpile", true, "Pit props, stacked"); }
+  building(126, 64, 130, 67, "w", T.WOOD, undefined, { name: "Tool shed", color: "#8f8a83", chimney: false }); decor(129, 65, "crate", true, "Picks, wedges, hammers, rope");
+  building(99, 63, 104, 67, "e", T.STONE, undefined, { name: "The Ashen smithy", color: "#8f8a83", chimney: true });   // beside the Stone altar, not over it
+  add({ kind: "furnace", x: 101, y: 64, blocks: true, name: "Furnace" }); add({ kind: "anvil", x: 103, y: 66, blocks: true, name: "Anvil" });
+  // The volcanic district east of the forge: ash underfoot, lava showing in the cracks, and a stone smelting yard with its own furnaces, anvil, carts and coal. (Fixed shapes, after the random scatter.)
+  for (let y = 43; y <= 58; y++) for (let x = 171; x <= 189; x++) {
+    const t = get(x, y); if (t !== T.GRASS && t !== T.DARK_GRASS) continue;
+    if (Math.hypot((x - 180) / 9, (y - 50) / 7) + (noise2(x, y) - 0.5) * 0.3 < 1) put(x, y, T.ASH);
+  }
+  for (const [cx, cy, rx, ry] of [[178, 46, 2.2, 1.1], [184, 53, 2.6, 1.2], [176, 58, 1.8, 1]] as const) for (let y = Math.floor(cy - ry); y <= cy + ry; y++) for (let x = Math.floor(cx - rx); x <= cx + rx; x++) {
+    const t = get(x, y); if ((t === T.ASH || t === T.GRASS || t === T.DARK_GRASS) && objectAt[tileIndex(x, y)] < 0 && Math.hypot((x - cx) / rx, (y - cy) / ry) < 1) put(x, y, T.LAVA);
+  }
+  fillRect(173, 39, 180, 42, T.STONE); for (let y = 39; y <= 42; y++) for (let x = 173; x <= 180; x++) clearAt(x, y);
+  add({ kind: "furnace", x: 175, y: 40, blocks: true, name: "Furnace" }); add({ kind: "furnace", x: 178, y: 40, blocks: true, name: "Furnace" }); add({ kind: "anvil", x: 180, y: 42, blocks: true, name: "Anvil" });
+  for (const [x, y, kind, name] of [[172, 40, "wagon", "Ore cart"], [178, 43, "wagon", "Ore cart"], [173, 43, "logpile", "A heap of inkcoal for the furnaces"], [176, 44, "torch", ""]] as const) { const p = freeSpot(x, y); if (p) decor(p[0], p[1], kind, true, name || undefined); }
+  // The mountain: the snowfield climbs from the camp to a summit above the yetis, with a scree track up it, crags on the
+  // upper slopes (never across the track or the ice course), a cairn on top, and a forge at the camp. (Fixed shapes.)
+  {
+    const SX = 226, SY = 12;
+    for (let y = 2; y < 46; y++) for (let x = 168; x < 238; x++) {
+      const t = get(x, y); if (t !== T.SNOW && t !== T.GRASS && t !== T.DARK_GRASS && t !== T.GRAVEL) continue;
+      const i = tileIndex(x, y);
+      if (Math.hypot(x - 195, y - 30) < 8) { lift[i] = 0; raise[i] = 0; continue; }
+      const up = Math.max(0, 1 - Math.hypot((x - SX) / 30, (y - SY) / 20));
+      raise[i] = Math.max(raise[i], 0.3 + up * up * 3.4);
+    }
+    road([[200, 30], [208, 26], [216, 20], [222, 16], [SX, SY + 2]], 2, T.GRAVEL);
+    for (let y = 4; y < 30; y++) for (let x = 204; x < 236; x++) {
+      const i = tileIndex(x, y);
+      if (get(x, y) === T.SNOW && raise[i] > 2.4 && noise2(x * 1.7, y * 1.7) > 0.62 && objectAt[i] < 0 && Math.hypot(x - SX, y - SY) > 3 && !(y >= 12 && y <= 20 && x <= 224)) put(x, y, T.CLIFF);
+    }
+    if (free(SX, SY)) decor(SX, SY, "rubble", true, "Summit cairn");
+    clearAt(192, 36); clearAt(194, 36); add({ kind: "furnace", x: 192, y: 36, blocks: true, name: "Furnace" }); add({ kind: "anvil", x: 194, y: 36, blocks: true, name: "Anvil" }); if (free(196, 36)) decor(196, 36, "torch", true);
+  }
+}
+
 /** The world, and the hill lift it was raised with (which, with the tiles, is all its heights need: see `bakeWorld`). */
-export function generateWorld(seed = WORLD_SEED): { world: World; lift: Float32Array } {
+export function generateWorld(seed = WORLD_SEED): { world: World; lift: Float32Array; raise: Float32Array } {
   // Everything older is built as it always was, in the generation frame (GEN_H rows), in arrays already the grown size.
   const old = buildLegacyWorld(seed), LW = LEGACY_W, OVERWORLD_H = GEN_OVERWORLD_H;
   const tiles = new Uint8Array(W * H).fill(T.DEEP), region = new Uint8Array(W * H), objects: WorldObject[] = [], spawns: SpawnDef[] = [];
-  const objectAt = new Int32Array(W * H).fill(-1), lift = new Float32Array(W * H), buildings: Building[] = [...old.buildings.map(b => ({ ...b, x0: b.x0 + WEST_DX, x1: b.x1 + WEST_DX }))];
+  const objectAt = new Int32Array(W * H).fill(-1), lift = new Float32Array(W * H), raise = new Float32Array(W * H), buildings: Building[] = [...old.buildings.map(b => ({ ...b, x0: b.x0 + WEST_DX, x1: b.x1 + WEST_DX }))];
   for (let y = OVERWORLD_H; y < H; y++) for (let x = 0; x < W; x++) tiles[y * W + x] = T.VOID;
   // Everything that was: every row (overworld, dungeons, storeys) moves WEST_DX columns east, nothing else changes.
-  for (let y = 0; y < GEN_H; y++) for (let x = 0; x < LW; x++) { const from = y * LW + x, to = y * W + x + WEST_DX; tiles[to] = old.tiles[from]; region[to] = old.region[from]; lift[to] = old.lift[from]; }
+  for (let y = 0; y < GEN_H; y++) for (let x = 0; x < LW; x++) { const from = y * LW + x, to = y * W + x + WEST_DX; tiles[to] = old.tiles[from]; region[to] = old.region[from]; lift[to] = old.lift[from]; raise[to] = old.raise[from]; }
   for (const object of old.objects) {
     const moved: WorldObject = { ...object, x: object.x + WEST_DX, ...(object.to ? { to: { x: object.to.x + WEST_DX, y: object.to.y } } : {}) };
     objects.push(moved);
@@ -1400,7 +1474,7 @@ export function generateWorld(seed = WORLD_SEED): { world: World; lift: Float32A
   const floors: Floor[] = old.floors.map(f => ({ ...f, x0: f.x0 + WEST_DX, x1: f.x1 + WEST_DX }));
   const places = Object.fromEntries(Object.entries(old.places).map(([key, at]) => [key, { x: at.x + WEST_DX, y: at.y }])) as World["places"];
   // The far west: a second continent, Raria and BarkReach.
-  const ctx: GenContext = { W, H: GEN_H, tiles, region, objectAt, lift, objects, spawns, buildings, doorways: [], ramparts: [], random: mulberry(seed + 9191), noise: makeNoise(seed + 71, 11), noise2: makeNoise(seed + 83, 4) };
+  const ctx: GenContext = { W, H: GEN_H, tiles, region, objectAt, lift, raise, objects, spawns, buildings, doorways: [], ramparts: [], random: mulberry(seed + 9191), noise: makeNoise(seed + 71, 11), noise2: makeNoise(seed + 83, 4) };
   buildFarWest(ctx, worldTools(ctx), places, floors);
   // The Mizukai Isles: the archipelago east of the old east coast (What Rises in the East).
   buildIsles({ ...ctx, random: mulberry(seed + 7337), noise: makeNoise(seed + 97, 11), noise2: makeNoise(seed + 101, 4) }, worldTools({ ...ctx, random: mulberry(seed + 7337), noise: makeNoise(seed + 97, 11), noise2: makeNoise(seed + 101, 4) }), places, floors);
@@ -1418,16 +1492,16 @@ export function generateWorld(seed = WORLD_SEED): { world: World; lift: Float32A
   for (const object of objects) if (object.name === "__removed") object.blocks = false;
   const buildingAt = new Uint16Array(W * H);
   buildings.forEach((b, index) => { if (b.roof === "none") return; for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) buildingAt[y * W + x] = index + 1; });
-  return { world: { tiles, region, objects, objectAt, spawns, places, heights: buildHeights(tiles, seed, lift), buildings, buildingAt, floors, ramparts: ctx.ramparts }, lift };
+  return { world: { tiles, region, objects, objectAt, spawns, places, heights: buildHeights(tiles, seed, lift, raise), buildings, buildingAt, floors, ramparts: ctx.ramparts }, lift, raise };
 }
 /**
  * Make room for the south: the generation frame's dungeon and storey rows (everything from GEN_OVERWORLD_H) move down
  * SOUTH_DY rows, with every object, ladder, spawn, building, storey and place on them; the rows they leave are open sea.
  */
 function growSouth(ctx: GenContext, floors: Floor[], places: World["places"]) {
-  const { tiles, region, objectAt, lift, objects, spawns, buildings } = ctx, from = GEN_OVERWORLD_H * W, rows = (GEN_H - GEN_OVERWORLD_H) * W, to = from + SOUTH_DY * W;
-  for (const array of [tiles, region, objectAt, lift]) array.copyWithin(to, from, from + rows);
-  tiles.fill(T.DEEP, from, to); region.fill(0, from, to); objectAt.fill(-1, from, to); lift.fill(0, from, to);
+  const { tiles, region, objectAt, lift, raise, objects, spawns, buildings } = ctx, from = GEN_OVERWORLD_H * W, rows = (GEN_H - GEN_OVERWORLD_H) * W, to = from + SOUTH_DY * W;
+  for (const array of [tiles, region, objectAt, lift, raise]) array.copyWithin(to, from, from + rows);
+  tiles.fill(T.DEEP, from, to); region.fill(0, from, to); objectAt.fill(-1, from, to); lift.fill(0, from, to); raise.fill(0, from, to);
   for (const object of objects) { object.y = southShift(object.y); if (object.to) object.to = { x: object.to.x, y: southShift(object.to.y) }; }
   for (const spawn of spawns) spawn.y = southShift(spawn.y);
   for (const b of buildings) if (b.y0 >= GEN_OVERWORLD_H) { b.y0 += SOUTH_DY; b.y1 += SOUTH_DY; }
@@ -1439,12 +1513,12 @@ function growSouth(ctx: GenContext, floors: Floor[], places: World["places"]) {
 function buildLegacyWorld(seed: number) {
   const W = LEGACY_W, H = GEN_H, OVERWORLD_H = GEN_OVERWORLD_H, FLOOR_Y = GEN_FLOOR_Y, main = buildMainland(seed), mainlandToWorld = legacyMainlandToWorld, ARENA = ARENA_LEGACY;
   const tiles = new Uint8Array(W * H).fill(T.DEEP), region = new Uint8Array(W * H), objects: WorldObject[] = [], spawns: SpawnDef[] = [];
-  const objectAt = new Int32Array(W * H).fill(-1), lift = new Float32Array(W * H), buildings: Building[] = [], floors: Floor[] = [];
+  const objectAt = new Int32Array(W * H).fill(-1), lift = new Float32Array(W * H), raise = new Float32Array(W * H), buildings: Building[] = [], floors: Floor[] = [];
   for (let y = OVERWORLD_H; y < H; y++) for (let x = 0; x < W; x++) tiles[y * W + x] = T.VOID;
   // Set the mainland in: its overworld at MAINLAND.x/y, its dungeon rows into the dungeon strip, its storeys into the storey rows.
   for (let y = 0; y < main.H; y++) for (let x = 0; x < main.W; x++) {
     const [wx, wy] = mainlandToWorld(x, y), from = y * main.W + x, to = wy * W + wx;
-    tiles[to] = main.tiles[from]; region[to] = main.region[from]; lift[to] = main.lift[from];
+    tiles[to] = main.tiles[from]; region[to] = main.region[from]; lift[to] = main.lift[from]; raise[to] = main.raise[from];
   }
   for (const object of main.objects) {
     const [x, y] = mainlandToWorld(object.x, object.y), moved: WorldObject = { ...object, x, y };
@@ -1461,9 +1535,12 @@ function buildLegacyWorld(seed: number) {
   const m = (x: number, y: number) => { const [wx, wy] = mainlandToWorld(x, y); return { x: wx, y: wy }; };
   Object.assign(places, { fernwick: m(36, 72), highcairn: m(282, 84), dawnhold: m(316, 82), gravesend: { x: 300, y: 136 }, ring: { x: ARENA.lobby.x, y: ARENA.lobby.y }, raria: { x: 26, y: 228 }, fff_fortress: { x: 40, y: 418 }, barkreach: { x: 112, y: 382 }, saltmarrow: { x: 424, y: 466 }, hollyhock: { x: 160, y: 452 }, dyemoor: { x: 254, y: 470 }, tallgrass: { x: 556, y: 402 }, cragmaw: { x: 632, y: 204 }, quillhaven: { x: 646, y: 404 }, ashfall: { x: 72, y: 128 } });
   // The wider world around it.
-  const ctx: GenContext = { W, H, tiles, region, objectAt, lift, objects, spawns, buildings, doorways: [], random: mulberry(seed + 4242), noise: makeNoise(seed + 11, 9), noise2: makeNoise(seed + 19, 4) };
+  const ctx: GenContext = { W, H, tiles, region, objectAt, lift, raise, objects, spawns, buildings, doorways: [], random: mulberry(seed + 4242), noise: makeNoise(seed + 11, 9), noise2: makeNoise(seed + 19, 4) };
   buildExpansion(ctx, worldTools(ctx), seed);
-  return { tiles, region, objects, objectAt, spawns, places, lift, buildings, floors };
+  // Primal sigil stone in Ashfall's ash, among the Burned: placed last, at fixed spots, so no random draw before it moves.
+  { const t = worldTools(ctx); for (const [x, y] of [[480, 120], [536, 64], [510, 96]]) if (t.free(x, y)) t.rock(x, y, "sigil4"); }
+  buildMiningCountry(ctx, mainlandToWorld);   // the legacy mapping, here: everything is moved east together, below
+  return { tiles, region, objects, objectAt, spawns, places, lift, raise, buildings, floors };
 }
 const i2 = (random: () => number) => random() > 0.5;
 const SIDES = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
@@ -1506,7 +1583,7 @@ const FLAT = new Set<number>([T.LAVA, T.VOID, T.WATER, T.DEEP, T.BRIDGE, T.COBBL
  * Rolling hills from two noise octaves, scaled by each terrain's relief, eased to flat ground near water, towns,
  * buildings and bridges (so shores and streets stay level), then blurred once for gentle slopes.
  */
-export function buildHeights(tiles: Uint8Array, seed: number, lift?: Float32Array): Float32Array {
+export function buildHeights(tiles: Uint8Array, seed: number, lift?: Float32Array, raise?: Float32Array): Float32Array {
   const broad = makeNoise(seed + 21, 13), fine = makeNoise(seed + 33, 5);
   // Distance (in tiles, capped) from every tile to the nearest flat tile.
   const distance = new Uint8Array(W * H).fill(255), queue = new Int32Array(W * H);
@@ -1522,23 +1599,24 @@ export function buildHeights(tiles: Uint8Array, seed: number, lift?: Float32Arra
     if (y > 0) visit(index - W, d);
   }
   // Relief per tile (its terrain's, raised by the lift), so each corner below just sums its four tiles.
-  const relief = new Float64Array(W * H);
-  for (let i = 0; i < W * H; i++) relief[i] = (RELIEF[tiles[i]] ?? 0) * (1 + (lift?.[i] ?? 0));
+  // The raise is relief too, but it stands clear of the hill noise below: a mountain is where it was put, not where the noise allows.
+  const relief = new Float64Array(W * H), raised = new Float64Array(W * H);
+  for (let i = 0; i < W * H; i++) { const r = RELIEF[tiles[i]] ?? 0; relief[i] = r * (1 + (lift?.[i] ?? 0)); raised[i] = r * (raise?.[i] ?? 0); }
   const CW = W + 1, raw = new Float32Array(CW * (H + 1));
   for (let j = 0; j <= H; j++) for (let i = 0; i <= W; i++) {
-    let sum = 0, near = 255, count = 0;
+    let sum = 0, up = 0, near = 255, count = 0;
     // The four tiles round the corner, in the same order as ever (so the sums, and the heights, come out the same).
     for (let k = 0; k < 4; k++) {
       const tx = k & 1 ? i : i - 1, ty = k & 2 ? j : j - 1;
       if (tx < 0 || ty < 0 || tx >= W || ty >= H) { near = 0; continue; }
       const t = ty * W + tx;
-      sum += relief[t]; count++; if (distance[t] < near) near = distance[t];
+      sum += relief[t]; up += raised[t]; count++; if (distance[t] < near) near = distance[t];
     }
-    if (!count || sum === 0 || near === 0) continue;
+    if (!count || (sum === 0 && up === 0) || near === 0) continue;
     const ease = Math.min(1, near / 4), smooth = ease * ease * (3 - 2 * ease);
     // The hill noise is sampled in the mainland's own coordinates, so its relief is exactly what it always was (the wider world sees the same field, shifted).
     const shape = broad(i - MAINLAND.x, j - MAINLAND.y) * 0.75 + fine(i - MAINLAND.x, j - MAINLAND.y) * 0.25;
-    raw[j * CW + i] = (sum / count) * (0.12 + 0.88 * Math.pow(Math.max(0, shape), 1.6)) * smooth;
+    raw[j * CW + i] = ((sum / count) * (0.12 + 0.88 * Math.pow(Math.max(0, shape), 1.6)) + up / count) * smooth;
   }
   const heights = new Float32Array(raw.length);
   for (let j = 0; j <= H; j++) for (let i = 0; i <= W; i++) {

@@ -474,6 +474,8 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
     scatter(x0, 554, x1, 577, n, (x, y) => rock(x, y, kind), (x, y) => get(x, y) === T.DUNGEON && ctx.objectAt[tileIndex(x, y)] < 0);
   }
   for (let x = 556; x <= 612; x += 8) decor(x, 556, "torch", true); decor(706, 574, "chest", true, "Foreman's chest");
+  // Sigil stone of the better grades, in the richest rock: Refined at the top of the mine, Charged in its deepest gallery (fixed spots: no random draws).
+  for (const [x, y, kind] of [[552, 558, "sigil2"], [600, 563, "sigil2"], [612, 572, "sigil2"], [662, 558, "sigil3"], [690, 572, "sigil3"], [704, 560, "sigil3"]] as const) if (get(x, y) === T.DUNGEON && ctx.objectAt[tileIndex(x, y)] < 0) rock(x, y, kind);
   monsters("stone_golem", 548, 554, 710, 577, 10); monsters("ember_salamander", 616, 554, 710, 577, 5); monsters("gloom_hound", 656, 554, 710, 577, 4);
   // ---------- 7b. The dungeon update: three more dungeons, and coffers in every one ----------
   /** A dungeon coffer: random loot by the dungeon it's in (dungeons.ts), once in a while. Never where it would wall a passage. */
@@ -488,6 +490,7 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
   for (const [kind, n, x0, x1] of [["gem", 5, 422, 450], ["glimmer", 4, 422, 450], ["moonsilver", 4, 404, 440]] as const) {
     scatter(x0, 522, x1, 546, n, (x, y) => rock(x, y, kind), (x, y) => get(x, y) === T.STONE && ctx.objectAt[tileIndex(x, y)] < 0);
   }
+  for (const [x, y] of [[430, 530], [446, 541]]) if (get(x, y) === T.STONE && ctx.objectAt[tileIndex(x, y)] < 0) rock(x, y, "sigil3");   // charged sigil stone, among the crystal
   for (let x = 408; x <= 420; x += 6) decor(x, 526, "torch", true); for (let x = 426; x <= 446; x += 10) decor(x, 522, "pillar"); decor(412, 538, "boulder"); decor(436, 546, "rubble"); decor(463, 524, "pillar"); decor(468, 546, "boulder");
   coffers("Deepglass coffer", 404, 522, 450, 546, 4, T.STONE); decor(468, 530, "chest", true, "The lake's hoard");
   monsters("cave_bat", 404, 522, 450, 546, 10); monsters("glass_crab", 422, 522, 450, 546, 8); monsters("glass_crab", 408, 538, 440, 546, 4); monsters("cave_spider", 408, 538, 440, 546, 3);
