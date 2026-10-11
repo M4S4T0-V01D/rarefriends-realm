@@ -4,8 +4,9 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
-  { id: 103, date: "2026-10-11", title: "Rocks with more ore in them", items: [
+  { id: 103, date: "2026-10-11", title: "More ore in the rocks, and a furnace that reads the satchel", items: [
     "Every rock now holds two to four ores, and you keep mining until the last of them is out; then it's empty until it fills again. No more one swing and gone.",
+    "At the furnace, Make All now counts the inkcoal in your satchel: a full satchel smelts a whole pack of ore in one go, not one bar a click.",
   ] },
   { id: 102, date: "2026-10-11", title: "The Land Before Stone: Meghavan's four schools of the Mysteries", items: [
     "Meghavan has its own Mysteries, in four schools, each with a teacher, an initiation and techniques for your Combat options.",
