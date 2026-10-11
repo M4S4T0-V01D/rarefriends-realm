@@ -3433,3 +3433,18 @@ test("Meghavan's techniques: Reading the Pattern, the Threshold Mark, Held Breat
   assert.equal(techniqueGuard(g, serpent, 10, { melee: true, breath: false }).hit, 8);
   fight("crag_bear"); assert.equal(useTechnique(g, "prepared_answer"), false, "not for an ordinary creature");
 });
+
+test("A rock holds two to four ores: you keep mining till the last, and then it's empty", () => {
+  const g = newGame(), p = g.player;
+  p.inventory.fill(null); give(p, "pewter_pickaxe"); p.xp.mining = XP_TABLE[60];
+  const counts = new Set();
+  for (const rock of g.world.objects.filter(object => object.kind === "rock" && object.rock === "pewter").slice(0, 6)) {
+    const before = count(p, "pewter_ore");
+    standBy(g, rock); setTarget(g, { kind: "object", id: rock.id, option: "Mine" });
+    until(g, () => g.depleted.has(rock.id), 1500);
+    const got = count(p, "pewter_ore") - before; counts.add(got);
+    assert(got >= 2 && got <= 4, `two to four ores from a rock (${got})`); assert(!g.rockOre.has(rock.id), "nothing left in it");
+    p.activity = null;
+  }
+  assert(counts.size >= 2, `not always the same (${[...counts]})`);
+});
