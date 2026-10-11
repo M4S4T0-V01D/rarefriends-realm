@@ -3732,6 +3732,22 @@ const NPC_WEAR: Record<string, readonly string[]> = {
   suvarnatira_envoy: ["obsidian_headcloth", "mason_tunic", "obsidian_kilt", "lapis_mantle"], suvarnatira_scholar: ["scholars_cap", "ink_silk_robe", "harbour_trousers"],
   suvarnatira_merchant: ["harbour_trousers", "caravan_kurta"], suvarnatira_clothier: ["scholars_cap", "ink_silk_robe"], suvarnatira_innkeeper: ["assembly_stole", "caravan_kurta"],
   suvarnatira_smith: ["harbour_trousers", "hammer"], suvarnatira_guard: ["scholars_cap", "ink_silk_robe", "harbour_trousers", "ilavati_sabre"], suvarnatira_sailor: ["harbour_trousers", "harbour_sandals"],
+  // The sea ports: Gullwick in ganseys and sailcloth, Saltreach in salt-white and its one violet, Merrab in the divers' sea-green; Tel Ashun in Tamesh's linen, Ennu's Well in the Zuri's indigo.
+  gullwick_harbourmaster: ["gullwick_cap", "gansey", "canvas_breeches", "pilot_cloak", "sea_boots"], gullwick_collector: ["felt_wide_hat", "gansey", "canvas_breeches", "crimson_cape"],
+  gullwick_keeper: ["gullwick_cap", "gansey", "sea_boots", "teal_cape"], gullwick_innkeeper: ["gansey", "canvas_breeches"], gullwick_chandler: ["gullwick_cap", "gansey", "canvas_breeches"],
+  gullwick_fishmonger: ["gullwick_cap", "gansey", "knife"], gullwick_ropemaker: ["gansey", "canvas_breeches", "sea_boots"], gullwick_clothier: ["gullwick_cap", "gansey", "pilot_cloak"],
+  gullwick_nan: ["gansey", "canvas_breeches"], gullwick_fisher: ["gullwick_cap", "gansey", "canvas_breeches", "sea_boots"], gullwick_watch: ["leather_hood", "gansey", "canvas_breeches", "pilot_cloak"],
+  boat_gullwick: ["gullwick_cap", "gansey", "pilot_cloak", "sea_boots"],
+  saltreach_assessor: ["rarian_tabard", "salt_mantle", "law_book"], saltreach_brannagh: ["salt_coif", "panners_smock", "pan_kirtle", "wading_boots"], saltreach_reeve: ["salt_coif", "panners_smock", "wading_boots"],
+  saltreach_innkeeper: ["salt_coif", "panners_smock", "pan_kirtle"], saltreach_merchant: ["panners_smock", "salt_mantle"], saltreach_clothier: ["salt_coif", "panners_smock", "salt_mantle"],
+  saltreach_panner: ["salt_coif", "panners_smock", "pan_kirtle", "wading_boots"], saltreach_guard: ["rrr_helm", "rarian_tabard", "salt_mantle", "rarian_halberd"], boat_saltreach: ["salt_coif", "panners_smock", "salt_mantle"],
+  merrab_yamina: ["diver_headcloth", "pearl_wrap", "merrab_trousers", "reed_sandals"], merrab_factor: ["gilded_headcloth", "gilded_robe", "gilded_mantle"], merrab_harbourmaster: ["banner_coif", "banner_coat", "banner_trousers", "banner_cloak", "blackiron_sabre"],
+  merrab_innkeeper: ["diver_headcloth", "pearl_wrap"], merrab_merchant: ["pearl_wrap", "merrab_trousers"], merrab_clothier: ["diver_headcloth", "pearl_wrap", "sea_mantle"], merrab_boatwright: ["merrab_trousers", "hammer"],
+  merrab_diver: ["diver_headcloth", "merrab_trousers", "reed_sandals"], merrab_guard: ["blackiron_helm", "banner_coat", "banner_trousers", "blackiron_sabre"], boat_merrab: ["diver_headcloth", "pearl_wrap", "sea_mantle"],
+  tel_ashun_elder: ["obsidian_headcloth", "mason_tunic", "obsidian_kilt", "lapis_mantle"], tel_ashun_brickmaker: ["mason_tunic", "obsidian_kilt", "quarry_sandals"], tel_ashun_recorder: ["obsidian_headcloth", "mason_tunic", "obsidian_kilt", "lapis_mantle"],
+  tel_ashun_potter: ["obsidian_headcloth", "mason_tunic"], tel_ashun_digger: ["mason_tunic", "obsidian_kilt", "pewter_pickaxe"],
+  ennu_keeper: ["blue_smoke_turban", "zuri_robe", "zuri_shawl"], ennu_caravaneer: ["salt_turban", "salt_coat", "salt_trousers", "salt_boots"], ennu_gardener: ["blue_smoke_turban", "zuri_trousers"],
+  ennu_trader: ["blue_smoke_turban", "zuri_robe"], ennu_herder: ["salt_turban", "salt_coat", "salt_trousers"], boat_suvarnatira: ["scholars_cap", "harbour_trousers", "assembly_stole"],
   kanthar_sukesh: ["bead_headband", "forest_wrap", "kanthari_skirt", "leaf_rain_cape"], kanthar_trader: ["bead_headband", "forest_wrap", "kanthari_skirt"], kanthar_hunter: ["bead_headband", "forest_wrap", "kanthari_skirt", "leaf_rain_cape"],
   hollowmere_officer: ["moonsilver_helm", "moonsilver_cuirass", "hollowmere_cape", "moonsilver_greatsword"], hollowmere_soldier: ["blackiron_helm", "blackiron_cuirass", "hollowmere_cape", "blackiron_battleaxe"], hollowmere_lieutenant: ["ashsteel_helm", "ashsteel_cuirass", "hollowmere_cape", "ashsteel_greatsword"],
   lawgate_governor: ["royal_circlet", "rarian_tabard", "rarian_mantle", "law_book"], lawgate_innkeeper: ["rarian_veil", "rarian_tabard"], raria_innkeeper: ["rarian_veil", "rarian_tabard", "rarian_skirts"],
@@ -3780,12 +3796,14 @@ const NPC_WEAR: Record<string, readonly string[]> = {
   ...Object.fromEntries(["eastport", "kurohama", "tanabe", "shiogama", "kibi", "hanazono", "morishima", "iwaoka", "josaki", "torojima", "kusabana", "ashigane", "smugglers_cove", "three_stones", "turtle_rock", "hakkotsu"]
     .map((dock, i) => [`boat_${dock}`, dock === "hakkotsu" ? ["mizukai_kimono", "straw_kasa"] : i % 2 ? ["straw_kasa", "mizukai_hakama"] : ["straw_kasa", "mizukai_kimono", "mizukai_sandals"]])),
 };
+/** Villages that dress as another place's people: Tel Ashun in Tamesh's masons' linen, Ennu's Well in the Zuri's indigo. */
+const WEAR_AS: Record<string, string> = { tel_ashun: "tamesh", ennus_well: "zuri" };
 /** A village's people dress in its own clothes: a stable pick of its hat, top, legs and cape from their uid. */
 const regionalWear = new Map<number, readonly string[]>();
 function regionalLook(region: string, uid: number): readonly string[] {
   let look = regionalWear.get(uid);
   if (look) return look;
-  const set = regionalSetOf(region), roll = (salt: number) => hash(uid * 13 + salt, uid * 7 + salt * 3);
+  const set = regionalSetOf(WEAR_AS[region] ?? region), roll = (salt: number) => hash(uid * 13 + salt, uid * 7 + salt * 3);
   if (!set) return [];
   const piece = (slot: string) => set.pieces.find(entry => entry.slot === slot)?.id;
   look = [...(roll(1) < 0.75 ? [piece("head")] : []), ...(roll(3) < 0.9 ? [piece("body")] : []), ...(roll(5) < 0.7 ? [piece("legs")] : []), ...(roll(7) < 0.4 ? [piece("cape")] : [])].filter((id): id is string => !!id);

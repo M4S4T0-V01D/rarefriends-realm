@@ -607,7 +607,7 @@ test("A Friend's Feast from start to finish", () => {
   assert.equal(g.player.quests.friends_feast, 2);
   assert.equal(questPoints(g), 1);
   assert(level(g, "cooking") >= 10, "Quest XP");
-  assert.equal(QUESTS.length, 88); assert.equal(MAX_QUEST_POINTS, 161);
+  assert.equal(QUESTS.length, 93); assert.equal(MAX_QUEST_POINTS, 167);
 });
 
 test("Grumblin Trouble counts kills and pays out", () => {
@@ -1953,7 +1953,7 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   assert.equal(p.quests.dawn_against_hollow, 2); assert(has(p, "dawnplate_cuirass"));
   assert.equal(count(p, "hollow_essence"), 0);
   assert.equal(capeProblem(g, "dawnplate_cuirass"), null, "the armoury sells Dawnplate once earned");
-  assert.equal(QUESTS.length, 88); assert.equal(MAX_QUEST_POINTS, 161);
+  assert.equal(QUESTS.length, 93); assert.equal(MAX_QUEST_POINTS, 167);
 });
 
 test("Boots and gauntlets in every metal, smithed at the anvil; the clothier's shirts, dresses, trousers and skirts", () => {
@@ -3572,4 +3572,139 @@ test("The pyramids' discoveries, their bosses' rewards, and their music", async 
   }
   assert(item("last_stroke_staff").equip.staff && item("last_stroke_staff").equip.bonuses.magic >= 40);
   for (const region of ["unfinished_pyramid", "siruvet_pyramid", "uncounted_deep", "measured_vault"]) assert(trackFor(region, false), `${region} has music`);
+});
+
+// ---------- The sea ports (ports.ts) ----------
+test("The sea ports: Gullwick, Saltreach, Merrab, Tel Ashun and Ennu's Well are on foot from the roads, their people and clues reached, and nobody stands in the sea", async () => {
+  const { KHETMAR } = await import("../games/rarefriends-realm/heartlands.ts");
+  const { GULLWICK, SALTREACH } = await import("../games/rarefriends-realm/ports.ts");
+  const { PORTS_NPCS } = await import("../games/rarefriends-realm/portspeople.ts");
+  const g = newGame(), world = g.world, at = (seen, x, y) => !!seen[y * W + x];
+  const beside = (seen, o) => o && [[0, 0], [0, 1], [1, 0], [0, -1], [-1, 0], [1, 1], [-1, -1], [1, -1], [-1, 1]].some(([dx, dy]) => at(seen, o.x + dx, o.y + dy));
+  // Gullwick from Hollyhock's lane; Saltreach from Greyford's road; the desert three from Khetmar's east gate.
+  const gull = reachable(g, { x: GULLWICK.x1 + 1, y: 450 }), salt = reachable(g, { x: 214, y: 314 }), east = reachable(g, { x: KHETMAR.x1 + 2, y: (KHETMAR.y0 + KHETMAR.y1) >> 1 });
+  assert(at(gull, world.places.hollyhock.x, world.places.hollyhock.y), "Gullwick's street joins Hollyhock");
+  assert(at(salt, world.places.raria.x, world.places.raria.y) || at(salt, 205, 262), "Saltreach's road joins Raria's");
+  const seenFor = { gullwick: gull, saltreach: salt, merrab: east, tel_ashun: east, ennus_well: east };
+  for (const [place, seen] of Object.entries(seenFor)) {
+    assert(at(seen, world.places[place].x, world.places[place].y), `${place} is on foot`);
+    assert(world.region.includes(REGIONS.findIndex(r => r.id === place)), `${place} exists`);
+  }
+  for (const id of Object.keys(PORTS_NPCS)) {
+    if (id === "boat_suvarnatira") continue;
+    const npc = g.npcs.find(n => n.id === id); assert(npc, `${id} is somewhere`);
+    assert(Object.values(seenFor).some(seen => beside(seen, npc)), `${id} can be reached`);
+    assert(![T.WATER, T.DEEP, T.CLIFF, T.WALL].includes(world.tiles[npc.y * W + npc.x]), `${id} stands on open ground`);
+  }
+  for (const id of ["gullwick_lamp_log", "wreckers_lantern", "kings_scale", "pan_weights", "pearl_ledger", "tell_layer_0", "tell_layer_1", "tell_layer_2", "well_channel"]) {
+    const o = world.objects.find(o => o.clue === id); assert(o, `${id} is placed`); assert(Object.values(seenFor).some(seen => beside(seen, o)), `${id} can be reached`);
+  }
+  for (const id of ["wrecker_chief", "saltjaw", "sand_borer"]) { const m = g.monsters.find(m => m.def.id === id); assert(m && Object.values(seenFor).some(seen => beside(seen, m)), `${id} can be reached`); }
+  assert(world.objects.some(o => o.kind === "bank" && o.x >= GULLWICK.x0 && o.x <= GULLWICK.x1 && o.y >= GULLWICK.y0 && o.y <= GULLWICK.y1), "Gullwick has a counting house");
+  assert(world.buildings.some(b => b.name === "Gullwick Light" && b.round), "and its lighthouse");
+  let pans = 0; for (let y = SALTREACH.y0; y <= SALTREACH.y1; y++) for (let x = SALTREACH.x0; x <= SALTREACH.x1; x++) if (world.tiles[y * W + x] === T.WATER) pans++;
+  assert(pans > 20, "Saltreach's salt pans");
+  // Every door of every new building opens onto ground you can reach.
+  const { doorwaysOf } = await import("../games/rarefriends-realm/facades.ts");
+  for (const b of world.buildings.filter(b => ["gullwick", "saltreach", "merrab", "tel_ashun", "ennus_well"].includes(regionAt(world, b.x0 + 1, b.y0 + 1).id))) {
+    const doors = doorwaysOf(world, b); assert(doors.length, `${b.name} has a door`);
+    for (const d of doors) assert(Object.values(seenFor).some(seen => at(seen, d.x + d.nx, d.y + d.ny)), `${b.name}'s door at ${d.x},${d.y} opens onto reachable ground`);
+  }
+});
+
+test("The sea ports' packet boats: every new landing reached, on the same network, Gullwick open from the start and the far ports only once walked to", async () => {
+  const { routesFrom, dockLocked, passage } = await import("../games/rarefriends-realm/boats.ts");
+  const { SEA_DOCKS } = await import("../games/rarefriends-realm/ports.ts");
+  const g = newGame(), world = g.world, p = g.player;
+  const docks = world.objects.filter(o => o.kind === "dock");
+  for (const dock of SEA_DOCKS) {
+    const object = docks.find(o => o.dock === dock.id); assert(object, `${dock.id} has a boat`);
+    assert(canWalk(g, object.to.x, object.to.y), `${dock.id}'s pier end can be stood on`);
+    assert(g.npcs.some(n => n.id === dock.boatman && Math.max(Math.abs(n.x - object.to.x), Math.abs(n.y - object.to.y)) <= 10), `${dock.id}'s boatman is on the quay`);
+    const pier = reachable(g, object.to); assert(pier[world.places[dock.id === "suvarnatira" ? "suvarnatira" : dock.id].y * W + world.places[dock.id === "suvarnatira" ? "suvarnatira" : dock.id].x], `${dock.id}'s pier joins its town`);
+  }
+  assert.equal(dockLocked(g, "gullwick"), null);
+  for (const id of ["saltreach", "merrab", "suvarnatira"]) assert(dockLocked(g, id), `${id} is locked to begin with`);
+  const routes = routesFrom(g, "kurohama");
+  for (const id of ["gullwick", "saltreach", "merrab", "suvarnatira"]) assert(routes.some(r => r.id === id), `${id} is on the Isles' list`);
+  assert(routes.find(r => r.id === "gullwick").open && !routes.find(r => r.id === "merrab").open);
+  const fromGull = routesFrom(g, "gullwick");
+  assert(fromGull.find(r => r.id === "kurohama").open && fromGull.find(r => r.id === "kurohama").fare > fromGull.find(r => r.id === "eastport").fare - 1000, "fares by distance");
+  p.visited.saltreach = 1; p.visited.merrab = 1; p.visited.suvarnatira = 1;
+  for (const id of ["saltreach", "merrab", "suvarnatira"]) assert.equal(dockLocked(g, id), null, `${id} opens once walked to`);
+  const gull = docks.find(o => o.dock === "gullwick"); teleport(g, gull.to.x, gull.to.y); give(p, "coins", 100000);
+  const ok = passage(g, "gullwick", "merrab"); assert(!("problem" in ok), "passage from Gullwick to Merrab");
+});
+
+test("The sea ports' people: every one talks, every tailor sells their port's clothes, every port's villagers wear them, and the desert villages dress as their neighbours", async () => {
+  const { PORTS_NPCS } = await import("../games/rarefriends-realm/portspeople.ts");
+  const { PORTS_CLOTHING, PORTS_MONSTERS, PORTS_SHOPS } = await import("../games/rarefriends-realm/portsgear.ts");
+  const { trackFor } = await import("../games/rarefriends-realm/audio.ts");
+  const g = newGame();
+  for (const id of Object.keys(PORTS_NPCS)) {
+    const d = talk(g, id); assert(d && d.lines.length && d.lines[0].text.length > 10, `${id} says something`);
+    assert(g.npcs.some(n => n.id === id), `${id} is in the world`);
+    const shop = NPCS[id].shop; if (shop) assert(SHOPS[shop], `${id}'s shop ${shop}`);
+  }
+  for (const [id, shop] of Object.entries(PORTS_SHOPS)) for (const item of shop.stock) assert(ITEM_LIST.some(i => i.id === item), `${id} sells a real ${item}`);
+  assert.equal(PORTS_CLOTHING.length, 3);
+  for (const set of PORTS_CLOTHING) {
+    assert(REGIONAL_CLOTHING.includes(set), `${set.region}'s clothes are regional`);
+    assert(Object.values(NPCS).some(n => n.shop === set.shop), `${set.region}'s tailor`);
+    assert.equal(SHOPS[set.shop].stock.filter(id => set.pieces.some(p => p.id === id)).length, set.pieces.length, `${set.shop} sells all of ${set.region}'s clothes`);
+    assert(NPCS[`${set.region}_villager`], `${set.region}'s villagers`);
+  }
+  for (const id of ["tel_ashun_villager", "ennus_well_villager"]) assert(NPCS[id] && g.npcs.some(n => n.id === id), `${id} lives there`);
+  for (const id of ["fish_stew", "salt_herring", "pearl", "keepers_oilskin", "true_weight_ring", "pearl_pendant", "brickmakers_gloves", "wellkeepers_headcloth"]) assert(ITEM_LIST.some(i => i.id === id), id);
+  for (const m of Object.values(PORTS_MONSTERS)) assert(MONSTERS[m.id] && m.ink, `${m.id} has its own colour`);
+  for (const [region, id] of [["gullwick", "saltmarrow"], ["saltreach", "crownlands"], ["merrab", "kharaveth_sefrah"], ["tel_ashun", "kharaveth_azhurak"], ["ennus_well", "kharaveth_dunes"]]) assert.equal(trackFor(region, false), id);
+});
+
+test("Lights Out at Gullwick and The King's Salt, start to finish, both ways round", async () => {
+  const { useClue } = await import("../games/rarefriends-realm/kharaveth.ts");
+  const g = newGame(), world = g.world, p = g.player;
+  const say = (id, label) => { let d = talk(g, id); if (label) { const o = d.options.find(x => x.label.startsWith(label)); assert(o, `${id}: ${label}`); d.onEnd?.(); d = o.then(); } d?.onEnd?.(); return d; };
+  const clue = (id, option) => useClue(g, world.objects.find(o => o.clue === id), option);
+  say("gullwick_harbourmaster", "I'll find out"); assert.equal(p.quests.lights_out_gullwick, 1);
+  clue("wreckers_lantern", "Look"); assert.equal(p.quests.lights_out_gullwick, 1, "the lantern means nothing yet");
+  say("gullwick_keeper"); clue("gullwick_lamp_log", "Read"); assert.equal(p.quests.lights_out_gullwick, 2);
+  clue("wreckers_lantern", "Look"); assert.equal(p.quests.lights_out_gullwick, 3);
+  say("gullwick_nan"); assert.equal(p.quests.lights_out_gullwick, 4);
+  say("gullwick_harbourmaster", "The wreckers are fishers"); assert.equal(p.quests.lights_out_gullwick, 5); assert(has(p, "keepers_oilskin")); assert.equal(p.questData.lo_choice, 1);
+  // The other way: the wreckers' chief killed instead.
+  const h = newGame(), q = h.player, sayH = (id, label) => { let d = talk(h, id); if (label) { const o = d.options.find(x => x.label.startsWith(label)); assert(o, `${id}: ${label}`); d.onEnd?.(); d = o.then(); } d?.onEnd?.(); };
+  const clueH = id => useClue(h, h.world.objects.find(o => o.clue === id), "Look");
+  sayH("gullwick_harbourmaster", "I'll find out"); sayH("gullwick_keeper"); useClue(h, h.world.objects.find(o => o.clue === "gullwick_lamp_log"), "Read"); clueH("wreckers_lantern");
+  onMonsterKilled(h, "wrecker_chief", 0, 0); assert.equal(q.quests.lights_out_gullwick, 4);
+  assert(!talk(h, "gullwick_harbourmaster").options.some(o => o.label.startsWith("The wreckers are fishers")), "only what you know to tell");
+  sayH("gullwick_harbourmaster", "The wreckers' chief is dead"); assert.equal(q.quests.lights_out_gullwick, 5); assert.equal(q.questData.lo_choice, 2);
+  // The King's Salt.
+  say("saltreach_brannagh", "I'll weigh"); assert.equal(p.quests.kings_salt, 1);
+  say("saltreach_assessor"); clue("kings_scale", "Look"); assert.equal(p.quests.kings_salt, 1);
+  clue("pan_weights", "Look"); assert.equal(p.quests.kings_salt, 2);
+  say("saltreach_assessor", "Your new pound"); assert.equal(p.quests.kings_salt, 3); assert(has(p, "true_weight_ring")); assert.equal(p.questData.ks_choice, 1);
+  assert.equal(questPoints(g), 2, "one each");
+});
+
+test("The Pearl-Divers' Debt, What the Tell Remembers and The Well's Share: after Foothold, start to finish", async () => {
+  const { useClue } = await import("../games/rarefriends-realm/kharaveth.ts");
+  const g = newGame(), world = g.world, p = g.player;
+  const say = (id, label) => { let d = talk(g, id); if (label) { const o = d.options.find(x => x.label.startsWith(label)); assert(o, `${id}: ${label}`); d.onEnd?.(); d = o.then(); } d?.onEnd?.(); return d; };
+  const clue = (id, option) => useClue(g, world.objects.find(o => o.clue === id), option);
+  for (const id of ["merrab_yamina", "tel_ashun_elder", "ennu_keeper"]) assert(!talk(g, id).options?.length, `${id} has no quest before Foothold`);
+  p.quests.foothold_in_the_stone = 3;
+  // The pearl beds: Saltjaw, the factor, the ledger; then the choice.
+  say("merrab_yamina", "I'll deal with"); assert.equal(p.quests.pearl_divers_debt, 1);
+  onMonsterKilled(g, "saltjaw", 0, 0); say("merrab_factor"); assert.equal(p.quests.pearl_divers_debt, 1);
+  clue("pearl_ledger", "Read"); assert.equal(p.quests.pearl_divers_debt, 2);
+  say("merrab_yamina", "Bargain with the factor"); assert.equal(p.quests.pearl_divers_debt, 3); assert(has(p, "pearl_pendant")); assert.equal(p.questData.pd_choice, 2);
+  // The tell: three layers, then the elder.
+  say("tel_ashun_elder", "I'll read"); clue("tell_layer_0", "Read"); clue("tell_layer_2", "Read"); assert.equal(p.quests.tell_remembers, 1);
+  clue("tell_layer_1", "Read"); assert.equal(p.quests.tell_remembers, 2);
+  say("tel_ashun_elder", "Dig the upper layers"); assert.equal(p.quests.tell_remembers, 3); assert(has(p, "brickmakers_gloves"));
+  // The well: the channel and its borer, then the shares.
+  say("ennu_keeper", "I'll see"); onMonsterKilled(g, "sand_borer", 0, 0); assert.equal(p.quests.wells_share, 1);
+  clue("well_channel", "Look"); assert.equal(p.quests.wells_share, 2);
+  say("ennu_keeper", "Equal notches"); assert.equal(p.quests.wells_share, 3); assert(has(p, "wellkeepers_headcloth"));
+  assert.equal(questPoints(g), 6, "two, one and one, and A Foothold in the Stone's two");
 });

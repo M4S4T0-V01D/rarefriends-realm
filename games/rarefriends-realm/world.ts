@@ -156,7 +156,9 @@ export type RegionId =
   // Meghavan, the Rain Country, east of Kharaveth: the country, and its towns.
   | "rain_pass" | "tirthali" | "ilavati_valley" | "sarovan" | "shaila_highlands" | "shailagarh" | "parasol_plains" | "mandapur" | "golden_shore" | "suvarnatira" | "deepgreen" | "kanthar" | "great_stepwell"
   // The pyramids by Kharaveth's south coast (pyramids.ts): Queen Siruvet's, and the deeps under hers and the Unfinished Pyramid.
-  | "siruvet_pyramid" | "uncounted_deep" | "measured_vault";
+  | "siruvet_pyramid" | "uncounted_deep" | "measured_vault"
+  // The sea ports: Gullwick on the mainland, Saltreach below Raria, and Merrab, Tel Ashun and Ennu's Well in Kharaveth's east.
+  | "gullwick" | "saltreach" | "merrab" | "tel_ashun" | "ennus_well";
 export type Region = { id: RegionId; name: string; label: { x: number; y: number }; danger: number; underground?: boolean;
   /** A far-west region (Return of Raria) or a Mizukai one: its label is already in world coordinates. */
   far?: boolean;
@@ -261,6 +263,12 @@ export const REGIONS: readonly Region[] = [
   { id: "siruvet_pyramid", name: "The Pyramid of Queen Siruvet", label: { x: 656, y: 824 }, danger: 6, far: true, south: true },
   { id: "uncounted_deep", name: "The Uncounted Deep", label: { x: 1312, y: 926 }, danger: 8, underground: true, far: true, south: true },
   { id: "measured_vault", name: "The Measured Vault", label: { x: 1124, y: 906 }, danger: 7, underground: true, far: true, south: true },
+  // The sea ports (ports.ts), in world coordinates: two in the north (the mainland's, Raria's), three in Kharaveth's east.
+  { id: "gullwick", name: "Gullwick", label: { x: 554, y: 446 }, danger: 0, far: true },
+  { id: "saltreach", name: "Saltreach", label: { x: 160, y: 308 }, danger: 0, far: true },
+  { id: "merrab", name: "Merrab", label: { x: 1066, y: 784 }, danger: 0, far: true, south: true },
+  { id: "tel_ashun", name: "Tel Ashun", label: { x: 1015, y: 750 }, danger: 0, far: true, south: true },
+  { id: "ennus_well", name: "Ennu's Well", label: { x: 1025, y: 828 }, danger: 0, far: true, south: true },
 ];
 export const regionIndex = (id: RegionId) => REGIONS.findIndex(region => region.id === id);
 /** The mainland regions' labels were written in the mainland's own coordinates: move them with it (once, at load). */
@@ -326,7 +334,7 @@ export type World = {
   heights: Float32Array;
   places: Record<"spawn" | "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier" | "crypt" | "depths" | "king" | "fernwick" | "highcairn" | "dawnhold" | "gravesend" | "saltmarrow" | "hollyhock" | "dyemoor" | "tallgrass" | "cragmaw" | "quillhaven" | "raria" | "fff_fortress" | "barkreach" | "ashfall" | "ring"
     | "kurohama" | "takamori" | "kumoyama" | "tanabe" | "yumoto" | "foothold" | "sefrah" | "tamesh" | "khetmar" | "zuri" | "ouresh" | "first_names"
-    | "tirthali" | "sarovan" | "shailagarh" | "mandapur" | "suvarnatira" | "kanthar", { x: number; y: number }>;
+    | "tirthali" | "sarovan" | "shailagarh" | "mandapur" | "suvarnatira" | "kanthar" | "gullwick" | "saltreach" | "merrab" | "tel_ashun" | "ennus_well", { x: number; y: number }>;
 };
 
 function mulberry(seed: number) {

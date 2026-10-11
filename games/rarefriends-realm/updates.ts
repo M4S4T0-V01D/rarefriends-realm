@@ -12,6 +12,13 @@ export const UPDATES: readonly Update[] = [
     "A new kind of coffer for kings and queens: far more coins, gold scarabs, electrum armlets, lapis pectorals, cut stones and amulets. Fourteen new creatures, among them ward-scribes, tally-wraiths, drowned overseers and lamp-keepers that fight with magic.",
     "New rewards: the Staff of the Last Stroke, the Crown of the Uncounted and the Ring of the Full Count from the Uncounted King, and Siruvet's collar from the Gilded Keeper. Four new Mysteries discoveries and three new inscriptions.",
   ] },
+  { id: 104, date: "2026-10-11", title: "The sea ports: Gullwick, Saltreach, Merrab, and two desert villages", items: [
+    "Gullwick, the mainland's harbour on the Thistle Vale's bay west of Hollyhock: a stone quay and wooden piers, the harbourmaster's office, a customs house, an inn, a chandlery, a fish market, a ropewalk, a counting house, and Gullwick Light on the point.",
+    "Saltreach, Raria's salt port on the inlet below the capital, with its pans, its quay and the King's Salt-House; and in Kharaveth's east, Merrab, the harbour where the pearl divers work the beds, Tel Ashun on its mound, and the oasis of Ennu's Well, joined to Khetmar by road.",
+    "Packet boats join the new ports to the Isles' boats: Gullwick's sails from the start; Saltreach's, Merrab's and Suvarnatira's once you've walked there yourself. Fares by distance, as before.",
+    "Five new quests: Lights Out at Gullwick, The King's Salt, The Pearl-Divers' Debt, What the Tell Remembers and The Well's Share. Each ends in a choice.",
+    "New clothes from three new tailors (Gullwick's ganseys, Saltreach's salt-white, Merrab's sea-green), new creatures (Gullwick's wreckers, Old Saltjaw, the sand-borer), pearls, fish stew and salt herring.",
+  ] },
   { id: 103, date: "2026-10-11", title: "More ore in the rocks, and a furnace that reads the satchel", items: [
     "Every rock now holds two to four ores, and you keep mining until the last of them is out; then it's empty until it fills again. No more one swing and gone.",
     "At the furnace, Make All now counts the inkcoal in your satchel: a full satchel smelts a whole pack of ore in one go, not one bar a click.",

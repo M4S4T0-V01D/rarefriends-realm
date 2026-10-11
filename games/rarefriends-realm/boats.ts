@@ -7,16 +7,22 @@
  * shown you; and the dangerous islands only when a quest sends you (Josaki, Ashigane, the cove, Hakkotsu). Once a
  * landing is open it stays open.
  *
+ * The sea ports' packets (ports.ts) sail the same network: Gullwick's always, and Saltreach, Merrab and Suvarnatira
+ * once you've walked there yourself, so nobody sails round the long roads into Raria, Kharaveth or the Rain Country.
+ *
  * What it costs: a fare by distance, more for the dangerous islands (the boatman's risk), a tenth off once you're known
  * on the docks (Presence 40). The fare is shown before you board; you pay once, when you board, and arrive at once:
  * paying and moving happen in the same step of the game, so a second click, a reload or a disconnect can't charge you
  * twice or land you without paying. (The crossing you see is only the picture of it.)
  */
-import { DOCKS } from "./isles.ts";
+import { DOCKS as ISLE_DOCKS } from "./isles.ts";
+import { SEA_DOCKS } from "./ports.ts";
 import { REGIONS, type World, type WorldObject } from "./world.ts";
 import { count, level, type Game } from "./state.ts";
 import { data, questDone, stage } from "./content.ts";
 
+/** Every landing: the Isles' and the sea ports'. */
+export const DOCKS = [...ISLE_DOCKS, ...SEA_DOCKS];
 export type DockId = typeof DOCKS[number]["id"];
 export type Route = { id: string; name: string; text: string; fare: number; open: boolean; why: string | null; here: boolean };
 
@@ -38,6 +44,10 @@ export const DOCK_TEXT: Record<string, string> = {
   three_stones: "Three rocks in a row and a watch-post nobody remembers.",
   turtle_rock: "A wish shrine on a rock shaped like a turtle.",
   hakkotsu: "The white island. The bones are not driftwood.",
+  gullwick: "The mainland's harbour on the Thistle Vale, under its lighthouse. Packets to every port that pays.",
+  saltreach: "Raria's salt port below the capital: the pans, a quay, and a Salt-House that writes everything down.",
+  merrab: "Kharaveth's harbour on the desert's east coast, where the divers work the pearl beds.",
+  suvarnatira: "Meghavan's free port on the Golden Shore, and its Archive.",
 };
 
 /** The dock objects of a world, by dock id (where you stand to board each, and where you arrive). */
@@ -50,7 +60,11 @@ export function docksOf(world: World): Map<string, WorldObject> {
 /** Why you can't sail to a landing yet (null when you can). */
 export function dockLocked(game: Game, id: string): string | null {
   switch (id) {
-    case "eastport": case "kurohama": case "tanabe": case "shiogama": return null;
+    case "eastport": case "kurohama": case "tanabe": case "shiogama": case "gullwick": return null;
+    // The sea ports beyond the long roads: open once you've set foot there.
+    case "saltreach": return game.player.visited.saltreach ? null : "Not until you've walked into Saltreach yourself: the Salt-House only writes down those who've come by the King's road.";
+    case "merrab": return game.player.visited.merrab ? null : "Not until you've walked to Merrab yourself, down Kharaveth's east coast: the Banner's harbour takes nobody it hasn't seen come in.";
+    case "suvarnatira": return game.player.visited.suvarnatira ? null : "Not until you've walked to Suvarnatira yourself, through the Rain Country: the free port's pilots carry only those the port has met.";
     case "kibi": case "hanazono": case "morishima": case "iwaoka": case "kusabana": case "torojima":
       return questDone(game, "landfall") ? null : "Not until you've been presented at the Hall of Takamori (the harbourmaster in Kurohama will explain).";
     case "turtle_rock": case "three_stones":
