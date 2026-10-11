@@ -199,9 +199,16 @@ try {
   await b.frame().evaluate(() => { const p = window.__realm.game().player; p.hp = 2; p.inventory = p.inventory.map(slot => slot?.id === "coins" ? slot : null); window.__realm.refresh(); });
   await a.frame().evaluate(() => { const p = window.__realm.game().player; for (const s of ["attack", "strength"]) p.xp[s] = 200_000; });
   await a.until(() => window.__realm.peers().some(peer => peer.id === 3412 && peer.x === 766 && peer.y === 306), "B in the ring");
-  const ringAt = await a.frame().evaluate(() => window.__realm.screenOf(766, 306)), ringBox = await a.page.locator("iframe").boundingBox();
-  await a.page.mouse.click(ringBox.x + ringAt.x, ringBox.y + ringAt.y - 20, { button: "right" });
-  await a.game.getByRole("menuitem", { name: /^Fight .*#3412/ }).click();
+  // The camera may still be gliding after the teleport (slower under WebGL), so aim afresh and try again until B is under the pointer.
+  const fight = a.game.getByRole("menuitem", { name: /^Fight .*#3412/ });
+  for (let attempt = 0; ; attempt++) {
+    const ringAt = await a.frame().evaluate(() => window.__realm.screenOf(766, 306)), ringBox = await a.page.locator("iframe").boundingBox();
+    await a.page.mouse.click(ringBox.x + ringAt.x, ringBox.y + ringAt.y - 20, { button: "right" });
+    if (await fight.waitFor({ timeout: 3000 }).then(() => true, () => false)) break;
+    if (attempt >= 5) throw new Error("No Fight option on B in the ring");
+    await a.page.keyboard.press("Escape"); await a.page.waitForTimeout(500);
+  }
+  await fight.click();
   await a.until(() => (window.__realm.game().player.stats.duelsWon ?? 0) >= 1, "A winning the duel", 40_000);
   await b.until(() => (window.__realm.game().player.stats.duelsLost ?? 0) >= 1 && window.__realm.game().player.hp > 2, "B losing, and back on its feet");
   await a.page.locator(".rf-game-frame").screenshot({ path: "./artifacts/duel.png" });
