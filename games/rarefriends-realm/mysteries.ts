@@ -147,6 +147,19 @@ export const DISCOVERIES: Record<string, Discovery> = Object.fromEntries(([
   { id: "unfinished_things", name: "The Archive of Unfinished Things", kind: "rite", xp: 500,
     observed: "Scholar Anvaya read three rubbings as counts, and a record nobody could read became one somebody could.",
     learned: "The east reads Azhurak as numbers, the Orashai as words. Both are right about different halves of it.", uncertain: "Which half the Azhurak meant." },
+  // The pyramids by Kharaveth's south coast (pyramidsclues.ts).
+  { id: "uncounted_deep", name: "The deep under the pyramid", kind: "site", xp: 450,
+    observed: "Under the Unfinished Pyramid a shaft goes down past the builders' tally into halls cut for more dead than the stone above was ever meant to hold.",
+    learned: "Azhurak dug the deep first and built over it. The pyramid wasn't a tomb with a cellar: it was the weight that was meant to keep the cellar shut." },
+  { id: "uncounted_measure", name: "So much stone, so many wards", kind: "contradiction", xp: 500,
+    observed: "In the Uncounted Deep's ward hall, niches for wards stand in long rows, nearly all of them empty, and the tally over them stops at the same half stroke as the builders' tally above.",
+    learned: "The wards were set as the stone was laid. The stone was never all laid, so the wards were never all set, and what was kept below was never all kept.", uncertain: "Whether the builders stopped because it woke, or it woke because they stopped." },
+  { id: "uncounted_king", name: "The Uncounted King", kind: "being", xp: 600,
+    observed: "The king in the hall under the Unfinished Pyramid fell, and the tally on the walls round him stopped moving.",
+    learned: "He was the one the pyramid was for. His name was never cut, because a name is cut when the count is done, and his never was. He'll be back: the count still isn't." },
+  { id: "siruvet_measure", name: "The measure that was made", kind: "inscription", xp: 450,
+    observed: "At the top of Queen Siruvet's pyramid, over her sarcophagus, the builders' tally runs whole to its last stroke, and her name is cut in its ring over the count.",
+    learned: "A finished pyramid keeps its dead by measure. Her household and her guardians still keep their posts, but they keep them: they don't walk. It's what the Unfinished Pyramid was meant to be." },
 ] as Discovery[]).map(d => [d.id, d]));
 
 /** Azhurak's glyphs met so far (each one's look, and what it means once understood). */
@@ -180,6 +193,10 @@ export const INSCRIPTIONS: Record<string, Inscription> = {
   pyramid_marks: { id: "pyramid_marks", name: "Builders' marks", glyphs: ["stone", "many", "sun", "dust"], reading: "Stone, for many days. Then dust.", where: "The Unfinished Pyramid" },
   black_stair_lintel: { id: "black_stair_lintel", name: "The warden's lintel", glyphs: ["stone", "eye", "below", "measure"], reading: "The stone watches below, by measure.", where: "The Black Stair" },
   khasreth_seal: { id: "khasreth_seal", name: "The Matriarch's seal", glyphs: ["measure", "many", "name", "hand"], reading: "By measure, to the many names, given.", where: "The seal of House Khasreth" },
+  // The pyramids by Kharaveth's south coast.
+  siruvet_measure: { id: "siruvet_measure", name: "The queen's measure", glyphs: ["measure", "stone", "crown", "name"], reading: "By measure, all the stone. The crown's name is cut.", where: "The top of Queen Siruvet's pyramid" },
+  uncounted_wards: { id: "uncounted_wards", name: "The count of wards", glyphs: ["eye", "many", "stone", "measure"], reading: "So many watchers for so much stone.", where: "The ward hall of the Uncounted Deep" },
+  uncounted_lintel: { id: "uncounted_lintel", name: "The king's lintel", glyphs: ["crown", "below", "measure", "dust"], reading: "The crown below, short of measure. Dust.", where: "The Uncounted Deep" },
 };
 
 /** A player's Mysteries record: discoveries (the tick each was made), glyphs (1 seen, 2 understood), inscriptions read. */

@@ -371,7 +371,7 @@ export function buildSouth(ctx: GenContext, t: Tools, places: World["places"], f
   put2(U.x0 + 148, uy0 + 48, "chest", "Azhurak coffer");
 
   // ---------- 5. Beyond the camp: the heartlands (heartlands.ts) ----------
-  const kit = { land, random, nearFree, occupied, open, npcAt, monsterAt, put2, clue };
+  const kit = { land, random, nearFree, occupied, open, npcAt, monsterAt, put2, clue, floors };
   buildHeartlands(ctx, t, places, kit);
   buildFirstNames(ctx, t, places, kit);
   // ---------- 6. East over Khetmar's bay: Meghavan, the Rain Country (meghavan.ts) ----------

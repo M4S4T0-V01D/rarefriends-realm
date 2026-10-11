@@ -4,6 +4,14 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 105, date: "2026-10-11", title: "The Land Before Stone: two pyramids, and the deeps beneath them", items: [
+    "The Unfinished Pyramid by Kharaveth's south coast is eight times the size it was. Its faces climb to a flat, unfinished top, its ramps lie slumped against its sides, and inside, the builders' hauling ways climb storey by storey to the summit. The builders' marks are on the wall of the Hall of the Count, as before.",
+    "The builders' dead still haul on its storeys, and the overseers' shades and the grit wraiths keep the count: the first creatures to walk a building's upper floors.",
+    "Under it lies the Uncounted Deep, the biggest dungeon yet: the Counting Gallery, the Builders' Ossuary, the Slump, the flooded Drowned Measure, the Ward Hall, the Treasury of the Count and the Hall of the Uncounted, where the Uncounted King keeps his hoard. Read the builders' count first, and you'll know the way down.",
+    "West of it stands Queen Siruvet's pyramid, a little larger and finished to its gilded cap, with her household and her guardians on four floors and the Measured Vault beneath, where the Gilded Keeper waits by her hoard.",
+    "A new kind of coffer for kings and queens: far more coins, gold scarabs, electrum armlets, lapis pectorals, cut stones and amulets. Fourteen new creatures, among them ward-scribes, tally-wraiths, drowned overseers and lamp-keepers that fight with magic.",
+    "New rewards: the Staff of the Last Stroke, the Crown of the Uncounted and the Ring of the Full Count from the Uncounted King, and Siruvet's collar from the Gilded Keeper. Four new Mysteries discoveries and three new inscriptions.",
+  ] },
   { id: 103, date: "2026-10-11", title: "More ore in the rocks, and a furnace that reads the satchel", items: [
     "Every rock now holds two to four ores, and you keep mining until the last of them is out; then it's empty until it fills again. No more one swing and gone.",
     "At the furnace, Make All now counts the inkcoal in your satchel: a full satchel smelts a whole pack of ore in one go, not one bar a click.",

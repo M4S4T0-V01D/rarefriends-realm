@@ -3452,3 +3452,124 @@ test("A rock holds two to four ores: you keep mining till the last, and then it'
   }
   assert(counts.size >= 2, `not always the same (${[...counts]})`);
 });
+
+// ---------- The pyramids by Kharaveth's south coast (pyramids.ts) ----------
+test("The pyramids: the Unfinished Pyramid eight times its old size, Queen Siruvet's larger, both reached from the Tamesh road, every storey by its stairs and back", async () => {
+  const { UNFINISHED_PYRAMID, SIRUVET_PYRAMID } = await import("../games/rarefriends-realm/pyramids.ts");
+  const g = newGame(), world = g.world, at = (seen, x, y) => !!seen[y * W + x];
+  const beside = (seen, o) => o && [[0, 0], [0, 1], [1, 0], [0, -1], [-1, 0], [1, 1], [-1, -1], [1, -1], [-1, 1]].some(([dx, dy]) => at(seen, o.x + dx, o.y + dy));
+  const unfinished = world.buildings.find(b => b.name === "The Unfinished Pyramid"), siruvet = world.buildings.find(b => b.name === "The Pyramid of Queen Siruvet");
+  const area = b => (b.x1 - b.x0 + 1) * (b.y1 - b.y0 + 1);
+  assert(unfinished.pyramid && unfinished.unfinished && siruvet.pyramid && !siruvet.unfinished);
+  assert(area(unfinished) >= 8 * 13 * 13, `the Unfinished Pyramid is eight times the old 13 × 13 (${area(unfinished)})`);
+  assert(area(siruvet) > area(unfinished), "Siruvet's is a little larger");
+  assert.deepEqual([unfinished.x0, unfinished.y0], [UNFINISHED_PYRAMID.x0, UNFINISHED_PYRAMID.y0]);
+  assert(SIRUVET_PYRAMID.x1 + 15 <= UNFINISHED_PYRAMID.x0, "open sand between them");
+  // From the road out of Tamesh, on foot: both doors, and the builders' marks inside the Unfinished one.
+  const road = reachable(g, { x: 780, y: 772 });
+  for (const b of [unfinished, siruvet]) { const door = (b.x0 + b.x1) >> 1; assert(at(road, door, b.y0) && at(road, door, b.y0 + 1), `${b.name}'s door is on foot from Tamesh`); }
+  assert(beside(road, world.objects.find(o => o.clue === "pyramid_marks")), "the builders' marks, inside");
+  // Each storey: its floor narrower than the one below, its stairs up from the one below and back down.
+  for (const [complex, levels] of [["unfinished_pyramid", 3], ["siruvet_pyramid", 3]]) {
+    const storeys = world.floors.filter(f => f.complex === complex).sort((a, b) => a.level - b.level);
+    assert.equal(storeys.length, levels, `${complex}: ${levels} storeys over the ground floor`);
+    let seen = road, width = Infinity;
+    for (const floor of storeys) {
+      assert(floor.x1 - floor.x0 < width, `${complex} ${floor.level}: narrower than the storey below`); width = floor.x1 - floor.x0;
+      const up = world.objects.find(o => o.kind === "ladder" && o.action === "Climb-up" && beside(seen, o) && floorAt(world, o.to.x, o.to.y) === floor);
+      assert(up, `${complex}: stairs up to storey ${floor.level}`);
+      const above = reachable(g, up.to), down = world.objects.find(o => o.kind === "ladder" && o.action === "Climb-down" && beside(above, o) && at(seen, o.to.x, o.to.y));
+      assert(down, `${complex}: and back down from storey ${floor.level}`);
+      // Creatures on it, reached, and something to find.
+      const here = g.monsters.filter(m => floorAt(world, m.x, m.y) === floor);
+      assert(here.length >= 2 && here.every(m => at(above, m.x, m.y)), `${complex} ${floor.level}: creatures walk it (${here.length})`);
+      assert(world.objects.some(o => o.decor === "chest" && floorAt(world, o.x, o.y) === floor && beside(above, o)), `${complex} ${floor.level}: a coffer`);
+      seen = above;
+    }
+  }
+  // Magic and melee alike upstairs.
+  const upstairs = g.monsters.filter(m => floorAt(world, m.x, m.y)?.complex === "unfinished_pyramid" || floorAt(world, m.x, m.y)?.complex === "siruvet_pyramid");
+  assert(upstairs.some(m => m.def.attackStyle === "magic") && upstairs.some(m => m.def.attackStyle !== "magic"));
+});
+
+test("A fight on a pyramid's storey: the labourer notices you, you kill it, it drops where it fell", () => {
+  const g = newGame(), world = g.world, p = g.player;
+  for (const skill of ["attack", "strength", "defence", "hitpoints"]) p.xp[skill] = 13_034_431;
+  p.hp = 99;
+  const labourer = g.monsters.find(m => m.def.id === "tally_labourer" && floorAt(world, m.x, m.y)?.level === 1);
+  assert(labourer, "a tally-bound labourer on the first storey");
+  standNear(g, labourer.x, labourer.y, 2);
+  assert.equal(floorAt(world, p.x, p.y), floorAt(world, labourer.x, labourer.y), "on the same storey");
+  until(g, () => labourer.target, 20);
+  setTarget(g, { kind: "monster", uid: labourer.uid, option: "Attack" });
+  until(g, () => labourer.dead, 600);
+  assert(g.ground.some(entry => floorAt(world, entry.x, entry.y)?.level === 1 && Math.abs(entry.x - labourer.x) <= 2 && Math.abs(entry.y - labourer.y) <= 2), "its drop lies on the storey");
+  assert.equal(p.killLog.tally_labourer, 1);
+});
+
+test("The Uncounted Deep and the Measured Vault: the builders' count shows the way down, the halls are reached, royal coffers full of gold, magic creatures, and each boss by its hoard", async () => {
+  const { useClue, clueOptions } = await import("../games/rarefriends-realm/kharaveth.ts");
+  const { cofferTier, searchChest } = await import("../games/rarefriends-realm/dungeons.ts");
+  const { UNCOUNTED_DEEP, MEASURED_VAULT } = await import("../games/rarefriends-realm/pyramids.ts");
+  const g = newGame(), world = g.world, p = g.player, at = (seen, x, y) => !!seen[y * W + x];
+  const beside = (seen, o) => o && [[0, 0], [0, 1], [1, 0], [0, -1], [-1, 0], [1, 1], [-1, -1], [1, -1], [-1, 1]].some(([dx, dy]) => at(seen, o.x + dx, o.y + dy));
+  // The sealed shaft: only a search, until you've read the builders' count on the hall wall (and you're past Foothold).
+  const shaft = world.objects.find(o => o.clue === "uncounted_shaft"), marks = world.objects.find(o => o.clue === "pyramid_marks");
+  p.quests.foothold_in_the_stone = 3;
+  assert.deepEqual(clueOptions(g, shaft), ["Search"]);
+  assert.match(useClue(g, shaft, "Search").text, /Read the count on the hall wall/);
+  useClue(g, marks, "Read"); assert("unfinished_pyramid" in p.mysteries.found, "the builders' last count, as before");
+  assert.deepEqual(clueOptions(g, shaft), ["Climb-down"]);
+  const down = useClue(g, shaft, "Climb-down").to; assert(isUnderground(down.y));
+  const deep = reachable(g, down), deepIndex = REGIONS.findIndex(r => r.id === "uncounted_deep"), vaultIndex = REGIONS.findIndex(r => r.id === "measured_vault");
+  const vault = reachable(g, world.objects.find(o => o.clue === "siruvet_stair").to);
+  // Every creature and coffer below is reached; the bosses; their hoards.
+  for (const [seen, index] of [[deep, deepIndex], [vault, vaultIndex]]) {
+    const creatures = g.monsters.filter(m => world.region[m.y * W + m.x] === index), coffers = world.objects.filter(o => o.decor === "chest" && world.region[o.y * W + o.x] === index);
+    assert(creatures.length >= 15 && creatures.every(m => at(seen, m.x, m.y)), `${REGIONS[index].name}: ${creatures.length} creatures, all reached`);
+    assert(coffers.length >= 8 && coffers.every(o => beside(seen, o)), `${REGIONS[index].name}: ${coffers.length} coffers, all reached`);
+    assert(creatures.some(m => m.def.attackStyle === "magic"), "magic creatures below");
+    for (const o of coffers) assert.equal(cofferTier(g, o), "royal");
+  }
+  assert(g.monsters.filter(m => world.region[m.y * W + m.x] === deepIndex).length >= 40, "the Uncounted Deep is massive");
+  for (const [id, hoard, seen] of [["uncounted_king", "The Uncounted King's hoard", deep], ["gilded_keeper", "Siruvet's hoard", vault]]) {
+    const boss = g.monsters.find(m => m.def.id === id); assert(boss && boss.def.boss && at(seen, boss.x, boss.y), `${id} in its hall`);
+    assert(world.objects.some(o => o.decor === "chest" && o.name === hoard && beside(seen, o)), hoard);
+  }
+  assert.equal(g.monsters.find(m => m.def.id === "uncounted_king").def.attackStyle, "magic");
+  // Upstairs coffers are dread; below, the royal ones give coins by the thousand and jewellery.
+  const upstairs = world.objects.find(o => o.decor === "chest" && floorAt(world, o.x, o.y)?.complex === "unfinished_pyramid");
+  assert.equal(cofferTier(g, upstairs), "dread");
+  const coffer = world.objects.find(o => o.decor === "chest" && world.region[o.y * W + o.x] === deepIndex && o.name === "A coffer of the Uncounted");
+  const jewels = ["gold_scarab", "electrum_armlet", "lapis_pectoral", "rosestone", "sagestone", "moonstone", "rosestone_amulet", "sagestone_amulet"];
+  let coins = 0, found = new Set();
+  for (let i = 0; i < 40; i++) {
+    p.inventory = p.inventory.map(() => null); delete p.questData[`coffer_${coffer.x}_${coffer.y}`]; g.ground.length = 0;
+    searchChest(g, coffer);
+    coins += count(p, "coins"); for (const id of jewels) if (has(p, id) || g.ground.some(e => e.id === id)) found.add(id);
+  }
+  assert(coins / 40 > 1500, `coins by the jar (${Math.round(coins / 40)} a search)`);
+  assert(found.size >= 4 && found.has("gold_scarab"), `jewellery: ${[...found].join(", ")}`);
+  // The deeps keep to their own columns; the older dungeons are all still there.
+  for (let y = DUNGEON_Y; y < FLOOR_Y; y++) for (let x = 0; x < W; x++) {
+    const r = world.region[y * W + x];
+    if (r === deepIndex) assert(x >= UNCOUNTED_DEEP.x0 - 2 && x <= UNCOUNTED_DEEP.x1 + 2, `the deep stays in its columns (${x},${y})`);
+    if (r === vaultIndex) assert(x >= MEASURED_VAULT.west.x0 - 2 && x <= MEASURED_VAULT.east.x1 + 2, `the vault stays in its columns (${x},${y})`);
+  }
+  for (const id of ["deepglass", "drowned_archive", "underway", "black_stair", "first_names_hall", "great_stepwell", "kumo_hollow", "ashigane_deeps", "bone_shrine"]) assert(world.region.includes(REGIONS.findIndex(r => r.id === id)), `${id} still there`);
+});
+
+test("The pyramids' discoveries, their bosses' rewards, and their music", async () => {
+  const { onKharavethTick, useClue } = await import("../games/rarefriends-realm/kharaveth.ts");
+  const { trackFor } = await import("../games/rarefriends-realm/audio.ts");
+  const g = newGame(), p = g.player, world = g.world;
+  onKharavethTick(g, "uncounted_deep"); assert("uncounted_deep" in p.mysteries.found);
+  onMonsterKilled(g, "uncounted_king", 0, 0); assert("uncounted_king" in p.mysteries.found);
+  useClue(g, world.objects.find(o => o.clue === "uncounted_wards"), "Read"); assert("uncounted_measure" in p.mysteries.found);
+  useClue(g, world.objects.find(o => o.clue === "siruvet_measure"), "Read"); assert("siruvet_measure" in p.mysteries.found);
+  for (const [boss, items] of [["uncounted_king", ["last_stroke_staff", "uncounted_crown", "full_count_ring"]], ["gilded_keeper", ["siruvet_collar"]]]) {
+    for (const id of items) { assert(MONSTERS[boss].drops.some(d => d.item === id), `${boss} drops ${id}`); assert(item(id).equip, `${id} is worn`); }
+  }
+  assert(item("last_stroke_staff").equip.staff && item("last_stroke_staff").equip.bonuses.magic >= 40);
+  for (const region of ["unfinished_pyramid", "siruvet_pyramid", "uncounted_deep", "measured_vault"]) assert(trackFor(region, false), `${region} has music`);
+});

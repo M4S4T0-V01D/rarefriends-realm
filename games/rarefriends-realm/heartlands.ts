@@ -15,8 +15,9 @@
  *
  * Built after the north (south.ts), in the grown world's own coordinates. Module constants are literals (see south.ts).
  */
-import { DUNGEON_Y, OVERWORLD_H, T, W, isWater, type Building, type DecorKind, type GenContext, type RegionId, type World, type WorldObject, type worldTools } from "./world.ts";
+import { DUNGEON_Y, OVERWORLD_H, T, W, isWater, type Building, type DecorKind, type Floor, type GenContext, type RegionId, type World, type WorldObject, type worldTools } from "./world.ts";
 import type { RockKind } from "./data.ts";
+import { buildPyramids } from "./pyramids.ts";
 
 type Tools = ReturnType<typeof worldTools>;
 /** What south.ts lends the heartlands: its coast test, and its careful placers. */
@@ -26,6 +27,8 @@ export type SouthKit = {
   npcAt: (id: string, x: number, y: number, wander?: number) => void; monsterAt: (id: string, x: number, y: number, wander?: number) => void;
   put2: (x: number, y: number, kind: DecorKind, name?: string, blocks?: boolean) => WorldObject | null;
   clue: (x: number, y: number, object: Omit<WorldObject, "id" | "x" | "y">) => WorldObject | null;
+  /** The world's upper storeys (the pyramids keep theirs here). */
+  floors?: Floor[];
 };
 
 export const SEFRAH = { x0: 780, y0: 644, x1: 836, y1: 692 } as const;
@@ -112,7 +115,7 @@ export function buildHeartlands(ctx: GenContext, t: Tools, places: World["places
     [[ZURI.x - 8, ZURI.y + 2], [380, 694], [320, 700], [OURESH.x + 8, OURESH.y]],            // on west into the dunes to the Ouresh
     [[OURESH.x, OURESH.y - 8], [244, 660], [250, SITES.seven_crowns.y + 8]],                 // the Ouresh to the Seven Crowns
     [[510, 676], [518, 694], [520, SITES.first_names.y - 4]],                                 // up into the Spine to the Hall of First Names
-    [[780, 772], [752, 800], [728, 818]],                                                     // Tamesh down to the Unfinished Pyramid
+    [[780, 772], [752, 800], [722, 805]],                                                     // Tamesh down to the Unfinished Pyramid's door
   ];
   for (const points of ROADS) road(points, 2.4, T.PATH);
   // The caravan ways across the dunes are only cairns and a line of camel droppings: a trail, not a road.
@@ -289,16 +292,8 @@ export function buildHeartlands(ctx: GenContext, t: Tools, places: World["places
     clue(x, y, { kind: "decor", decor: "obelisk", blocks: true, name: "The Sunken Obelisk", clue: "sunken_obelisk" });
     for (const [dx, dy] of [[-4, -3], [4, -2], [-3, 4], [5, 3]] as const) put2(x + dx, y + dy, "ruin_wall", "A wall of a court that was here, mostly sand now");
   }
-  // The Unfinished Pyramid: three-fifths built, its ramps still against it, its quarry tools where the builders left them.
-  {
-    const { x, y } = SITES.unfinished_pyramid;
-    ground(x - 12, y - 10, x + 12, y + 9, T.GRAVEL);
-    round(x, y, 13, "unfinished_pyramid");
-    building(x - 6, y - 6, x + 6, y + 6, "n", T.STONE, undefined, { name: "The Unfinished Pyramid", walls: "sandstone", pyramid: true, unfinished: true, hip: true, roof: "gable", color: "#c9a878", chimney: false });
-    clue(x, y - 3, { kind: "sign", blocks: true, name: "Builders' marks", clue: "pyramid_marks", text: "" });
-    for (const [dx, dy, kind, name] of [[-9, -8, "wagon", "A stone sledge, its runners sunk in the sand"], [9, -7, "logpile", "Rollers of old cedar, split and dry"], [-10, 4, "crate", "Casing blocks, dressed, numbered, never laid"],
-      [10, 5, "crate", "Casing blocks, dressed, numbered, never laid"], [0, 9, "ruin_wall", "The builders' ramp, slumped"]] as const) put2(x + dx, y + dy, kind, name);
-  }
+  // The Unfinished Pyramid, and Queen Siruvet's finished one west of it, with the deeps under both (pyramids.ts).
+  if (kit.floors) buildPyramids(ctx, t, kit, kit.floors, { ground, area, sign });
   // The Black Stair: steps cut down into the Black Range, where Tamesh's quarry broke through into something older.
   {
     const { x, y } = SITES.black_stair;

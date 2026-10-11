@@ -8,12 +8,14 @@ import { addXp, give, giveOrDrop, message, sound, type Game } from "./state.ts";
 import { regionAt, type RegionId, type WorldObject } from "./world.ts";
 import { searchCryptChest } from "./content.ts";
 
-type Tier = "shallow" | "deep" | "dread";
+type Tier = "shallow" | "deep" | "dread" | "royal";
 const TIER: Partial<Record<RegionId, Tier>> = { root_cellars: "shallow", mossy_undercroft: "shallow", crypt: "shallow", sea_cave: "shallow", deepglass: "shallow", hollow_depths: "deep", catacombs: "deep", deep_mine: "deep", drowned_archive: "deep", wyrm_lair: "dread", howling_vault: "dread",
   // The Mizukai Isles: the Hollow under Kumo, the Ashigane Deeps, the Bone Shrine under Hakkotsu, and the Three Stones' sunken chest.
   kumo_hollow: "deep", ashigane_deeps: "dread", bone_shrine: "dread", three_stones: "shallow",
   // Meghavan: the Great Stepwell under Sarovan.
-  great_stepwell: "deep" };
+  great_stepwell: "deep",
+  // The pyramids by Kharaveth's south coast: their storeys are dread; the deeps under them are royal, the richest of all.
+  unfinished_pyramid: "dread", siruvet_pyramid: "dread", uncounted_deep: "royal", measured_vault: "royal" };
 /** The key a dungeon's coffers can hold. */
 const KEYS: Partial<Record<RegionId, string>> = { mossy_undercroft: "moss_key", deepglass: "deepglass_key", drowned_archive: "archive_key", howling_vault: "vault_key", kumo_hollow: "kumo_seal_key", ashigane_deeps: "ogre_key", bone_shrine: "bone_shrine_key" };
 /** Ticks before a coffer fills again for the one who searched it (an hour: coffers and hoards are not a living). */
@@ -26,14 +28,19 @@ const COMMON: Record<Tier, readonly Drop[]> = {
     { item: "glimmer_ore", min: 1, max: 2, chance: 1 }, { item: "rarite_ore", min: 1, max: 1, chance: 0.5 }, { item: "grave_dust", min: 1, max: 3, chance: 1 }, { item: "rough_rosestone", min: 1, max: 1, chance: 0.4 }, { item: "ink_page", min: 1, max: 1, chance: 0.5 }],
   dread: [{ item: "coins", min: 500, max: 1800, chance: 3 }, { item: "rarite_bar", min: 1, max: 2, chance: 1 }, { item: "hollow_essence", min: 1, max: 1, chance: 0.6 }, { item: "star_sigil", min: 5, max: 12, chance: 1.5 }, { item: "path_sigil", min: 3, max: 8, chance: 1.2 },
     { item: "grave_dust", min: 2, max: 5, chance: 1.2 }, { item: "large_bones", min: 2, max: 3, chance: 1.5 }, { item: "rough_rosestone", min: 1, max: 1, chance: 0.6 }, { item: "glimmer_ore", min: 2, max: 4, chance: 1 }],
+  // What kings and queens were buried with: coins by the jar, gold and lapis, cut stones.
+  royal: [{ item: "coins", min: 1500, max: 5000, chance: 4 }, { item: "gold_scarab", min: 1, max: 3, chance: 2.2 }, { item: "electrum_armlet", min: 1, max: 1, chance: 1.4 }, { item: "lapis_pectoral", min: 1, max: 1, chance: 0.9 },
+    { item: "rosestone", min: 1, max: 2, chance: 1 }, { item: "sagestone", min: 1, max: 3, chance: 1.2 }, { item: "moonstone", min: 2, max: 4, chance: 1.2 }, { item: "rosestone_amulet", min: 1, max: 1, chance: 0.6 },
+    { item: "sagestone_amulet", min: 1, max: 1, chance: 0.6 }, { item: "rarite_bar", min: 1, max: 3, chance: 0.8 }, { item: "star_sigil", min: 8, max: 20, chance: 1 }],
 };
 const RARE: Record<Tier, readonly string[]> = {
   shallow: ["insight_lamp", "glimmer_helm", "crystal_shield", "oak_bow"],
   deep: ["insight_lamp", "glimmer_cuirass", "rarite_helm", "archivist_cowl", "hollowsteel_helm"],
   dread: ["insight_lamp", "vault_helm", "howling_cape", "rarite_sabre", "wyrmscale_shield", "hollowsteel_sabre"],
+  royal: ["full_count_ring", "siruvet_collar", "rosestone_pendant", "vault_helm", "rarite_sabre", "hollowsteel_sabre"],
 };
 /** The chance of a rare from a coffer; a named hoard doubles it. */
-const RARE_CHANCE: Record<Tier, number> = { shallow: 0.04, deep: 0.06, dread: 0.08 };
+const RARE_CHANCE: Record<Tier, number> = { shallow: 0.04, deep: 0.06, dread: 0.08, royal: 0.1 };
 const KEY_CHANCE = 0.15;
 /** The old named chests, and the new bosses' hoards: richer than a coffer. */
 const RICH = /hoard|Archivist's chest|Foreman's chest|Barnacled chest|Ossuary chest|Dusty chest/;

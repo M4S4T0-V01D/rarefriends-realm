@@ -1938,15 +1938,21 @@ function roofGeometry(building: Building) {
   // (A Mizukai roof reaches further out over its walls, and climbs steeper.)
   // (A pyramid's faces start from its plinth, close in over it, and climb to a point at about fifty degrees.)
   const mizukai = building.style === "mizukai", o = building.pyramid ? 0.1 : mizukai ? 0.62 : 0.3, X0 = building.x0 - 0.5 - o, X1 = building.x1 + 0.5 + o, Y0 = building.y0 - 0.5 - o, Y1 = building.y1 + 0.5 + o;
-  const alongX = X1 - X0 >= Y1 - Y0, half = (alongX ? Y1 - Y0 : X1 - X0) / 2, rise = building.pyramid ? half * (building.unfinished ? 24 : 38) : building.roof === "cone" ? building.spire ?? 118 : Math.max(20, Math.min(mizukai ? 60 : 48, half * (mizukai ? 13 : 11)));
+  const alongX = X1 - X0 >= Y1 - Y0, half = (alongX ? Y1 - Y0 : X1 - X0) / 2, rise = building.pyramid ? half * (building.unfinished ? 38 * UNFINISHED_CUT : 38) : building.roof === "cone" ? building.spire ?? 118 : Math.max(20, Math.min(mizukai ? 60 : 48, half * (mizukai ? 13 : 11)));
   const base = building.pyramid ? PLINTH_H : WALL_H * (building.storeys ?? 1) + (building.tall ?? 0), top = base + rise, mid = alongX ? (Y0 + Y1) / 2 : (X0 + X1) / 2;
   const A: RoofVertex = [X0, Y0, base], B: RoofVertex = [X1, Y0, base], C: RoofVertex = [X1, Y1, base], D: RoofVertex = [X0, Y1, base];
   // A hipped roof's ridge stops short of the ends by half the span (a square one comes to a point).
   const inset = building.hip ? Math.min(half, (alongX ? X1 - X0 : Y1 - Y0) / 2) : 0;
   const R0: RoofVertex = alongX ? [X0 + inset, mid, top] : [mid, Y0 + inset, top], R1: RoofVertex = alongX ? [X1 - inset, mid, top] : [mid, Y1 - inset, top];
   const apex: RoofVertex = [(X0 + X1) / 2, (Y0 + Y1) / 2, top];
-  return { A, B, C, D, R0, R1, apex, alongX, base, top, X0, X1, Y0, Y1 };
+  // (An unfinished pyramid's faces stop at a flat top: its corners, as far in as the faces had climbed.)
+  const c = half * UNFINISHED_CUT, platform: RoofVertex[] | null = building.pyramid && building.unfinished ? [[X0 + c, Y0 + c, top], [X1 - c, Y0 + c, top], [X1 - c, Y1 - c, top], [X0 + c, Y1 - c, top]] : null;
+  return { A, B, C, D, R0, R1, apex, alongX, base, top, X0, X1, Y0, Y1, platform };
 }
+/** How far up an unfinished pyramid got before the work stopped (of the height it would have had). */
+const UNFINISHED_CUT = 0.6;
+/** How far in a pyramid's top is from its foot on every side, for its shadow (none for any other building). */
+const pyramidInset = (building: Building) => building.pyramid ? (Math.min(building.x1 - building.x0, building.y1 - building.y0) + 1) / 2 * (building.unfinished ? UNFINISHED_CUT : 1) : 0;
 /** Whether a roof slope (eave e0–e1, rising to r0) faces the light, so it can be drawn a shade lighter. */
 function rotateLit(camera: Camera, e0: RoofVertex, r0: RoofVertex) {
   // The slope's outward normal on the ground plane points from the ridge towards the eave.
@@ -2124,7 +2130,7 @@ function mizukaiTrim(ctx: CanvasRenderingContext2D, camera: Camera, building: Bu
 }
 function roofHull(camera: Camera, building: Building) {
   const g = roofGeometry(building), points = building.roof === "flat" ? [g.A, g.B, g.C, g.D].map(([x, y]) => [x, y, g.base + 12] as RoofVertex).concat([g.A, g.B, g.C, g.D])
-    : building.roof === "cone" ? [g.A, g.B, g.C, g.D, [g.apex[0], g.apex[1], g.top + 22 + keepHeight(building)] as RoofVertex] : [g.A, g.B, g.C, g.D, g.R0, g.R1];
+    : building.roof === "cone" ? [g.A, g.B, g.C, g.D, [g.apex[0], g.apex[1], g.top + 22 + keepHeight(building)] as RoofVertex] : [g.A, g.B, g.C, g.D, g.R0, g.R1, ...(g.platform ?? [])];
   const screen = points.map(([x, y, h]) => { const s = toScreen(camera, x, y, h); return [s.x, s.y] as [number, number]; });
   // Convex hull (monotone chain).
   screen.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
@@ -2155,15 +2161,46 @@ function flatRoofTile(ctx: CanvasRenderingContext2D, camera: Camera, building: B
 /** A pyramid's capstone: a little pyramid of gilded electrum on the point (an unfinished one has a bare, flat top). */
 function pyramidCap(ctx: CanvasRenderingContext2D, camera: Camera, building: Building, g: ReturnType<typeof roofGeometry>) {
   if (building.unfinished) {
-    // Left unfinished: the last course half laid, a few blocks of it waiting on the platform.
-    const [cx, cy] = [g.apex[0], g.apex[1]], stone = "#c9a878";
-    for (const [dx, dy, s] of [[-0.6, -0.4, 1.3], [0.7, 0.2, 1.1], [-0.2, 0.8, 0.9]] as const) box(ctx, camera, cx + dx, cy + dy, s, s * 0.8, 9, shadeHex(stone, 0.08), shadeHex(stone, -0.04), shadeHex(stone, -0.14), g.top - 8, INK, "sandstone");
+    // Left unfinished: the last course half laid, a few blocks of it waiting on the platform (more on a bigger one).
+    const [cx, cy] = [g.apex[0], g.apex[1]], stone = "#c9a878", reach = g.platform ? Math.max(0.5, (g.platform[1][0] - g.platform[0][0]) / 2 - 1) : 0.5;
+    for (const [dx, dy, s] of [[-0.6, -0.4, 1.3], [0.7, 0.2, 1.1], [-0.2, 0.8, 0.9], [-0.8, -0.8, 1], [0.6, -0.7, 1.2], [0.8, 0.8, 0.9], [-0.7, 0.5, 1.1]] as const) {
+      if (reach < 2 && Math.abs(dx) + Math.abs(dy) > 1.6) continue;
+      box(ctx, camera, cx + dx * reach, cy + dy * reach, s, s * 0.8, 9, shadeHex(stone, 0.08), shadeHex(stone, -0.04), shadeHex(stone, -0.14), g.top, INK, "sandstone");
+    }
     return;
   }
   const P = ([x, y, h]: RoofVertex) => { const s = toScreen(camera, x, y, h); return [s.x, s.y] as const; }, r = 0.55, foot = g.top - r * 38;
   const [cx, cy] = [g.apex[0], g.apex[1]], ring: RoofVertex[] = [[cx - r, cy - r, foot], [cx + r, cy - r, foot], [cx + r, cy + r, foot], [cx - r, cy + r, foot]];
   const faces = ring.map((a, i) => { const b = ring[(i + 1) % 4], { rx, ry } = rotate(camera, a[1] - b[1], b[0] - a[0]); return { points: [a, b, g.apex], lit: rx - ry < 0, d: depthOf(camera, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2) }; });
   for (const face of faces.sort((a, b) => a.d - b.d)) poly(ctx, face.points.map(P), face.lit ? "#f2d27a" : "#c9a24a", INK, 1.1);
+}
+/**
+ * An unfinished pyramid: four faces of stone courses climbing from the plinth and stopping, flat, three-fifths of the way
+ * up, where the last course is half laid.
+ */
+function drawStoppedPyramid(ctx: CanvasRenderingContext2D, camera: Camera, building: Building, g: ReturnType<typeof roofGeometry>, alpha: number) {
+  const P = ([x, y, h]: RoofVertex) => { const s = toScreen(camera, x, y, h); return [s.x, s.y] as const; }, at = (v: RoofVertex) => { const [x, y] = P(v); return { x, y }; };
+  const [a, b, c, d] = g.platform!, eaves: [RoofVertex, RoofVertex, RoofVertex, RoofVertex][] = [[g.A, g.B, b, a], [g.B, g.C, c, b], [g.C, g.D, d, c], [g.D, g.A, a, d]];
+  const span = g.X1 - g.X0, rows = Math.hypot((g.platform![0][0] - g.X0) * TEX_PER_TILE, (g.top - g.base) * TEX_PER_HEIGHT);
+  const centre = (points: RoofVertex[]) => depthOf(camera, points.reduce((sum, v) => sum + v[0], 0) / 4, points.reduce((sum, v) => sum + v[1], 0) / 4);
+  const faces = eaves.map(points => ({ points, fill: shadeHex(building.color, rotateLit(camera, points[0], points[3]) ? 0.06 : -0.08) })).sort((p, q) => centre(p.points) - centre(q.points));
+  for (const face of faces) {
+    const [e0, e1, , t0] = face.points;
+    if (roofGL && ctx === roofLayer) { gpuSlope(ctx, camera, face.points, stoneCourseTexture(face.fill, 20, 24), face.fill, alpha, e0, e1, rows, g.top, g.base); continue; }
+    if (!texturesOn) { poly(ctx, face.points.map(P), face.fill, INK, 1.2); continue; }
+    // The courses run along the eave; laid over the whole eave's width and clipped to the face as it narrows.
+    const up = [t0[0] - e0[0] + (face.points[2][0] - e1[0]), t0[1] - e0[1] + (face.points[2][1] - e1[1]), t0[2] - e0[2] + (face.points[2][2] - e1[2])].map(v => v / 2);
+    const lift = (v: RoofVertex): RoofVertex => [v[0] + up[0], v[1] + up[1], v[2] + up[2]];
+    ctx.save(); ctx.beginPath(); face.points.map(P).forEach(([px, py], i) => i ? ctx.lineTo(px, py) : ctx.moveTo(px, py)); ctx.closePath(); ctx.clip();
+    texturedQuad(ctx, stoneCourseTexture(face.fill, Math.round(span * TEX_PER_TILE), Math.round(rows)), at(lift(e0)), at(lift(e1)), at(e0), span * TEX_PER_TILE, rows);
+    ctx.restore();
+    poly(ctx, face.points.map(P), null, INK, 1.2);
+  }
+  // The flat top: rough-dressed, the colour of the stone in the sun.
+  const top = shadeHex(building.color, 0.1);
+  if (roofGL && ctx === roofLayer) gpuFace(ctx, camera, g.platform!, top, alpha, roofGL.wallLayers.layer(stoneCourseTexture(top, 20, 24)), p => [(p[0] - g.X0) * TEX_PER_TILE, (p[1] - g.Y0) * TEX_PER_TILE]);
+  else poly(ctx, g.platform!.map(P), top, INK, 1.2);
+  pyramidCap(ctx, camera, building, g);
 }
 function drawRoof(ctx: CanvasRenderingContext2D, camera: Camera, building: Building, alpha: number, now: number, reduced: boolean) {
   // (On the GPU, a whole roof's boxes, its chimney, a keep's storeys, go there too.)
@@ -2213,6 +2250,7 @@ function drawRoofParts(ctx: CanvasRenderingContext2D, camera: Camera, building: 
     ctx.globalAlpha = 1;
     return;
   }
+  if (g.platform) { drawStoppedPyramid(ctx, camera, building, g, alpha); ctx.globalAlpha = 1; return; }
   // A pyramid's faces are dressed stone in courses; every other roof is shingled.
   const slopeTexture = building.pyramid ? stoneCourseTexture : shingleTexture, slopeGPU = (fill: string) => building.pyramid ? stoneCourseTexture(fill, 20, 24) : roofShingles(fill);
   const color = building.color, gable = building.walls === "stone" ? "#b9b4ab" : building.walls === "marble" ? "#eee8db" : "#e6dcc6";
@@ -2460,6 +2498,8 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   const covered = (x: number, y: number) => level > 0 && inside !== null && complexAt(world, x, y) === inside;
   /** An outer wall of your building (it shows on every storey below you). */
   const outerWall = (x: number, y: number) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => complexAt(world, x + dx, y + dy) !== inside);
+  /** Whether a storey of your building above `below` (and not above you) covers a ground tile. In a pyramid, the masonry no storey above covers shows, a step down at a time. */
+  const storeyOver = (x: number, y: number, below: number) => world.floors.some(f => f.complex === inside && f.level > below && f.level <= level && x >= f.x0 && x <= f.x1 && y >= f.y0 && y <= f.y1 && world.tiles[(y + f.dy) * W + x + f.dx] !== T.VOID);
   /** Whether something standing on a tile is drawn: your storey only, and nothing under it. */
   const shown = (x: number, y: number, margin = 0) => {
     if (y >= FLOOR_Y - 0.5) { const on = floorAt(world, x, y); return !!on && !!floor && on.complex === floor.complex && on.level === level; }
@@ -2592,7 +2632,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     const terrain = world.tiles[y * W + x];
     if (terrain === T.WALL) {
       const owner = world.buildingAt[y * W + x], building = owner ? world.buildings[owner - 1] : null, mine = inside !== null && complexAt(world, x, y) === inside;
-      if (mine && level > 0 && !outerWall(x, y)) continue;
+      if (mine && level > 0 && !outerWall(x, y) && !(building?.pyramid && !storeyOver(x, y, 0))) continue;
       const d = depth(x, y), cut = mine && level === 0 && d > playerDepth - 0.5;
       const faded = (tx: number, ty: number) => Math.abs(tx - pp.x) + Math.abs(ty - pp.y) < 7 && depth(tx, ty) > playerDepth + 0.5 && !floor;
       const near = !mine && faded(x, y);
@@ -2604,10 +2644,10 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       // Tall buildings show every storey from outside; inside, only the storey you're on (and the ones below).
       // A city's rampart stands storeys high, battlemented, wherever no building owns the wall.
       const rampart = building || mine ? 0 : rampartAt(world, x, y);
-      wall(x, y, mine ? 1 : building?.storeys ?? (rampart || 1), cut, near, !!owner && !cut, false, building?.walls ?? (rampart > 0 ? rampartWalls(world, x, y) : "stone"), mine ? 0 : building?.tall ?? 0, joined, rampart > 0, !!building?.pyramid && !mine);
+      wall(x, y, mine ? 1 : building?.storeys ?? (rampart || 1), cut, near, !!owner && !cut && !building?.pyramid, false, building?.walls ?? (rampart > 0 ? rampartWalls(world, x, y) : "stone"), mine ? 0 : building?.tall ?? 0, joined, rampart > 0, !!building?.pyramid && !mine);
       // Walls not under a roof cast their own shadows (a building's are cast whole).
       if (!building || building.roof === "none") blockers.push([x, y, (building?.storeys ?? (rampart || 1)) * WALL_H]);
-    } else if (y < FLOOR_Y && !isUnderground(y) && world.buildingAt[y * W + x] && (world.buildings[world.buildingAt[y * W + x] - 1].storeys ?? 1) > 1 && edgeOf(world.buildings[world.buildingAt[y * W + x] - 1], x, y)
+    } else if (y < FLOOR_Y && !isUnderground(y) && world.buildingAt[y * W + x] && (world.buildings[world.buildingAt[y * W + x] - 1].storeys ?? 1) > 1 && !world.buildings[world.buildingAt[y * W + x] - 1].pyramid && edgeOf(world.buildings[world.buildingAt[y * W + x] - 1], x, y)
       && !(inside !== null && complexAt(world, x, y) === inside) && !(Math.abs(x - pp.x) + Math.abs(y - pp.y) < 7 && depth(x, y) > playerDepth + 0.5 && !floor)) {
       // A doorway in a tall building is one storey high: the wall carries on above it.
       const building = world.buildings[world.buildingAt[y * W + x] - 1], h = ((building.storeys ?? 1) - 1) * WALL_H + (building.tall ?? 0);
@@ -2632,11 +2672,11 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       if (terrain === T.VOID) continue;
       const owner = world.buildingAt[ry * W + rx], building = owner ? world.buildings[owner - 1] : null;
       if (terrain === T.WALL) {
-        if (storey.level < level && !outerWall(rx, ry)) continue;
+        if (storey.level < level && !outerWall(rx, ry) && !(building?.pyramid && !storeyOver(rx, ry, storey.level))) continue;
         // On the roof, the keep's walls are battlements; the towers carry on up. Walls of the part you're in (the keep, or a
         // tower you've stepped into) drop to a cutaway between you and the camera.
         const battlement = (building?.storeys ?? 1) <= storey.level, yours = !!building && here.x >= building.x0 && here.x <= building.x1 && here.y >= building.y0 && here.y <= building.y1;
-        wall(x, y, 1, storey.level === level && !battlement && yours && depth(x, y) > playerDepth - 0.5, false, !!owner, battlement, building?.walls ?? "stone");
+        wall(x, y, 1, storey.level === level && !battlement && yours && depth(x, y) > playerDepth - 0.5, false, !!owner && !building?.pyramid, battlement, building?.walls ?? "stone");
         continue;
       }
       if (storey.level !== level) continue;
@@ -3146,14 +3186,15 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     let shadows: number[] | null = null;
     if (sunPower > 0.02 && !floor && q.shadows && !underground) {
       const reach = Math.min(4, 1 / sky.tanE) / 32;
-      const shadowBox = (ax: number, ay: number, bx: number, by: number, height: number) => {
+      // (`inset`: how far in the top is on every side; a pyramid's top is a point, or an unfinished one's a platform.)
+      const shadowBox = (ax: number, ay: number, bx: number, by: number, height: number, inset = 0) => {
         const ox = sky.dirX * height * reach, oy = sky.dirY * height * reach, points: [number, number][] = [];
-        for (const [px, py] of [[ax, ay], [bx, ay], [bx, by], [ax, by]]) { const g = toScreen(camera, px, py), t = toScreen(camera, px + ox, py + oy); points.push([g.x, g.y], [t.x, t.y]); }
+        for (const [px, py, sx, sy] of [[ax, ay, 1, 1], [bx, ay, -1, 1], [bx, by, -1, -1], [ax, by, 1, -1]]) { const g = toScreen(camera, px, py), t = toScreen(camera, px + sx * inset + ox, py + sy * inset + oy); points.push([g.x, g.y], [t.x, t.y]); }
         glr.addShadowShape(convexHull(points));
       };
       for (const building of world.buildings) {
         if (building.roof === "none" || building.x1 < x0 - 12 || building.x0 > x1 + 12 || building.y1 < y0 - 12 || building.y0 > y1 + 12) continue;
-        shadowBox(building.x0 - 0.5, building.y0 - 0.5, building.x1 + 0.5, building.y1 + 0.5, roofTop(building));
+        shadowBox(building.x0 - 0.5, building.y0 - 0.5, building.x1 + 0.5, building.y1 + 0.5, roofTop(building), pyramidInset(building));
         if (building.keep) { const kx = (building.x0 + building.x1) / 2, ky = (building.y0 + building.y1) / 2, kh = building.keep.size / 2; shadowBox(kx - kh, ky - kh, kx + kh, ky + kh, (building.storeys ?? 1) * WALL_H + (building.spire ?? 0) + building.keep.storeys * WALL_H + building.keep.spire * 0.35); }
       }
       for (const [bx, by, height] of blockers) shadowBox(bx - 0.5, by - 0.5, bx + 0.5, by + 0.5, height);
@@ -3215,15 +3256,15 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       sb.setTransform(1, 0, 0, 1, 0, 0); sb.globalCompositeOperation = "source-over"; sb.clearRect(0, 0, sb.canvas.width, sb.canvas.height);
       sb.setTransform(LS, 0, 0, LS, 0, 0); sb.fillStyle = "#000";
       // Boxes (buildings, walls, cliffs): the footprint swept along the sun to where its top's shadow lands.
-      const shadowBox = (ax: number, ay: number, bx: number, by: number, height: number) => {
+      const shadowBox = (ax: number, ay: number, bx: number, by: number, height: number, inset = 0) => {
         const ox = sky.dirX * height * reach, oy = sky.dirY * height * reach, points: [number, number][] = [];
-        for (const [px, py] of [[ax, ay], [bx, ay], [bx, by], [ax, by]]) { const g = toScreen(camera, px, py), t = toScreen(camera, px + ox, py + oy); points.push([g.x, g.y], [t.x, t.y]); }
+        for (const [px, py, sx, sy] of [[ax, ay, 1, 1], [bx, ay, -1, 1], [bx, by, -1, -1], [ax, by, 1, -1]]) { const g = toScreen(camera, px, py), t = toScreen(camera, px + sx * inset + ox, py + sy * inset + oy); points.push([g.x, g.y], [t.x, t.y]); }
         const hull = convexHull(points);
         sb.beginPath(); hull.forEach(([px, py], i) => i ? sb.lineTo(px, py) : sb.moveTo(px, py)); sb.closePath(); sb.fill();
       };
       if (!underground) for (const building of world.buildings) {
         if (building.roof === "none" || building.x1 < x0 - 12 || building.x0 > x1 + 12 || building.y1 < y0 - 12 || building.y0 > y1 + 12) continue;
-        shadowBox(building.x0 - 0.5, building.y0 - 0.5, building.x1 + 0.5, building.y1 + 0.5, roofTop(building));
+        shadowBox(building.x0 - 0.5, building.y0 - 0.5, building.x1 + 0.5, building.y1 + 0.5, roofTop(building), pyramidInset(building));
         // A palace's keep and spire throw their own, longer shadow.
         if (building.keep) { const kx = (building.x0 + building.x1) / 2, ky = (building.y0 + building.y1) / 2, kh = building.keep.size / 2; shadowBox(kx - kh, ky - kh, kx + kh, ky + kh, (building.storeys ?? 1) * WALL_H + (building.spire ?? 0) + building.keep.storeys * WALL_H + building.keep.spire * 0.35); }
       }

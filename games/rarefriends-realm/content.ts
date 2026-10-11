@@ -21,6 +21,7 @@ import { HIDDEN_ROAD_NPCS, HIDDEN_ROAD_QUESTS, onHiddenRoadKill, talkHiddenRoad 
 import { MEGHAVAN_NPCS, talkMeghavan } from "./meghavanpeople.ts";
 import { MEGHAVAN_QUESTS, MEGHAVAN_QUEST_NPCS, onMeghavanKill, talkMeghavanQuests } from "./meghavanquests.ts";
 import { MEGHAVAN_SCHOOL_NPCS, MEGHAVAN_SCHOOL_QUESTS, talkMeghavanSchools } from "./meghavanschools.ts";
+import { onPyramidsKill } from "./pyramidsclues.ts";
 import { BAR_NPCS, BAR_QUEST_DEFS, jobBoard, onBountyKill, talkBar } from "./bars.ts";
 /** A bar's job board (bars.ts), for the engine (which reaches the bars through here, so they load after this module). */
 export const readJobBoard = (game: Game, barId: string) => jobBoard(game, barId);
@@ -561,7 +562,7 @@ export function chat(npc: string, lines: DialogueLine[], options?: Dialogue["opt
 /** Pickpocket and quest hooks the engine calls. */
 export function onMonsterKilled(game: Game, monsterId: string, x: number, y: number) {
   const player = game.player;
-  onWestKill(game, monsterId); onMizukaiKill(game, monsterId); onKharavethKill(game, monsterId); onHeartlandsKill(game, monsterId); onOrashaiKill(game, monsterId); onHiddenRoadKill(game, monsterId); onMeghavanKill(game, monsterId); onBountyKill(game, monsterId);
+  onWestKill(game, monsterId); onMizukaiKill(game, monsterId); onKharavethKill(game, monsterId); onHeartlandsKill(game, monsterId); onOrashaiKill(game, monsterId); onHiddenRoadKill(game, monsterId); onMeghavanKill(game, monsterId); onBountyKill(game, monsterId); onPyramidsKill(game, monsterId);
   // The wider world's village quests count their kills wherever they fall.
   const tally = (quest: string, key: string, goal: number, done: string) => {
     if (stage(game, quest) !== 1) return;

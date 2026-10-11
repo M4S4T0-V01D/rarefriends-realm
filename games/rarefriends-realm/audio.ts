@@ -691,7 +691,8 @@ const MEGHAVAN_REGION_TRACK: Partial<Record<RegionId, TrackId>> = {
 const KHARAVETH_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { sunteeth: "kharaveth_sunteeth", foothold: "kharaveth_foothold", underway: "kharaveth_underway", ochre_steppe: "kharaveth_steppe", sunward_strait: "kharaveth_steppe",
   ashar_valley: "kharaveth_steppe", ochre_spine: "kharaveth_steppe", khetmar_pass: "kharaveth_khetmar", zuri_camp: "kharaveth_steppe", ouresh_camp: "kharaveth_dunes", sea_of_dunes: "kharaveth_dunes",
   sefrah: "kharaveth_sefrah", tamesh: "kharaveth_tamesh", black_range: "kharaveth_tamesh", khetmar: "kharaveth_khetmar",
-  seven_crowns: "kharaveth_azhurak", first_names: "kharaveth_azhurak", sunken_obelisk: "kharaveth_azhurak", unfinished_pyramid: "kharaveth_azhurak", black_stair: "kharaveth_azhurak", first_names_hall: "kharaveth_azhurak" };
+  seven_crowns: "kharaveth_azhurak", first_names: "kharaveth_azhurak", sunken_obelisk: "kharaveth_azhurak", unfinished_pyramid: "kharaveth_azhurak", black_stair: "kharaveth_azhurak", first_names_hall: "kharaveth_azhurak",
+  siruvet_pyramid: "kharaveth_azhurak", uncounted_deep: "kharaveth_underway", measured_vault: "kharaveth_underway" };
 /** Which Mizukai piece plays where. */
 const MIZUKAI_REGION_TRACK: Partial<Record<RegionId, TrackId>> = {
   hinode: "mizukai_sunrise", kurohama: "mizukai_harbour", shiogama: "mizukai_harbour", smugglers_cove: "mizukai_harbour", takamori: "mizukai_castle",
