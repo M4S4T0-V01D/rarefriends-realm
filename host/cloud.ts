@@ -244,8 +244,12 @@ export class CloudSync {
     const pending = this.pending;
     if (!pending || !this.session || this.uploading) return;
     if (this.paused && !pending.claim) return;
-    const hash = await hashSave(pending.save);
-    if (!pending.claim && this.meta?.syncedHash === hash) { this.pending = null; return; }
+    // Claimed before hashing: a timer firing meanwhile (the first save's waits nothing) must not send it twice.
+    this.uploading = true;
+    if (this.timer) { clearTimeout(this.timer); this.timer = null; }
+    let hash: string;
+    try { hash = await hashSave(pending.save); } catch (e) { this.uploading = false; throw e; }
+    if (!pending.claim && this.meta?.syncedHash === hash) { this.uploading = false; this.pending = null; return; }
     this.pending = null;
     const base = pending.claim ? (this.conflict?.cloudVersion ?? this.meta?.cloudVersion ?? 0) : (this.meta?.cloudVersion ?? 0);
     await this.put(pending.save, base, pending.claim ? "import" : exit ? "exit" : pending.important ? "event" : "auto", pending.claim, exit, hash);
