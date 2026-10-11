@@ -14,7 +14,7 @@
  * Built after Kharaveth (south.ts), in the grown world's own coordinates. Only the sea is turned to land. Module
  * constants are literals (see south.ts).
  */
-import { OVERWORLD_H, T, W, isWater, type Building, type DecorKind, type GenContext, type RegionId, type World, type WorldObject, type worldTools } from "./world.ts";
+import { DUNGEON_Y, OVERWORLD_H, T, W, isWater, type Building, type DecorKind, type GenContext, type RegionId, type World, type WorldObject, type worldTools } from "./world.ts";
 import type { RockKind, TreeKind } from "./data.ts";
 import type { SouthKit } from "./heartlands.ts";
 
@@ -36,6 +36,12 @@ export const SUVARNATIRA = { x0: 1600, y0: 708, x1: 1656, y1: 752 } as const;
 export const KANTHAR = { x: 1250, y: 830 } as const;
 /** The Ilavati's ford below Tirthali (the free crossing: the Queen's bridge at Sarovan takes a toll). */
 export const FORD = { x: 1243, y: 754 } as const;
+/** The Great Stepwell's galleries below Sarovan (dungeon rows; columns 1520–1700, which no other dungeon uses). */
+export const GREAT_STEPWELL = { x0: 1520, x1: 1700, row0: 4, row1: 56 } as const;
+/** The quests' places: the dacoits' camp by the Gate of Rains, the high toll-house on the eastern pass, the Kanthari's grove. */
+export const DACOIT_CAMP = { x: 1124, y: 734 } as const;
+export const TOLL_HOUSE = { x: 1586, y: 622 } as const;
+export const GROVE = { x: 1200, y: 822 } as const;
 
 const toLine = (points: readonly (readonly [number, number])[], x: number, y: number) => {
   let best = Infinity;
@@ -300,7 +306,8 @@ export function buildMeghavan(ctx: GenContext, t: Tools, places: World["places"]
       if (edge >= 4) { put(x, y, T.WATER); lift[i] = 0; } else { put(x, y, T.STONE); lift[i] = 0.5 - edge * 0.12; }
     }
     for (const [px, py] of [[sx0, sy0], [sx1, sy0], [sx0, sy1], [sx1, sy1]] as const) decor(px, py, "pillar", true, "A carved pillar of the Great Stepwell's top gallery");
-    clue(cx + 9, sy0 - 1, { kind: "decor", decor: "plaque", blocks: true, name: "The Great Stepwell", clue: "great_stepwell" });
+    const well = clue(cx + 9, sy0 - 1, { kind: "decor", decor: "plaque", blocks: true, name: "The Great Stepwell", clue: "great_stepwell" });
+    if (well) well.to = { x: GREAT_STEPWELL.x0 + 8, y: DUNGEON_Y + GREAT_STEPWELL.row0 + 6 };
     // Bank (the Royal Treasury), the market, the inn, the forge, the looms, the houses.
     house(x1 - 13, y0 + 2, x1 - 4, y0 + 10, "s", "The Royal Treasury of Ilavarta", { walls: "marble", storeys: 2, color: ROOF.tileDark }, T.STONE);
     for (const by of [y0 + 4, y0 + 6]) add({ kind: "bank", x: x1 - 11, y: by, blocks: true, name: "Treasury counter" }); npc("banker", x1 - 8, y0 + 5);
@@ -381,6 +388,7 @@ export function buildMeghavan(ctx: GenContext, t: Tools, places: World["places"]
     house(x - 18, y + 9, x - 11, y + 15, "n", "Champa's Weaving", { color: ROOF.saffron }); npc("mandapur_clothier", x - 15, y + 12);
     house(x + 11, y + 9, x + 18, y + 15, "n", "Revati's Smithy", { walls: "stone", color: ROOF.slate }, T.STONE); npc("mandapur_smith", x + 14, y + 12); add({ kind: "furnace", x: x + 12, y: y + 10, blocks: true, name: "Furnace" }); add({ kind: "anvil", x: x + 17, y: y + 10, blocks: true, name: "Anvil" });
     house(x - 4, y + 12, x + 3, y + 17, "n", "The League's Toll Office"); npc("mandapur_tollclerk", x - 1, y + 14);
+    clue(x + 1, y + 15, { kind: "decor", decor: "table", blocks: true, name: "The League's toll ledger", clue: "toll_ledger" });
     for (const [gx, gy] of [[x - 21, y - 2], [x + 21, y + 2], [x, y - 16]] as const) npcAt("mandapur_guard", gx, gy, 1);
     villagers("mandapur_villager", x, y, [[-13, 0], [13, -2], [-4, -12], [6, 11]]);
     sign(x - 21, y - 5, "Mandapur", "MANDAPUR. Here the League of Seven Parasols meets under the open sky, and the Speaker speaks for all seven until the next turn. No ruler's parasol stands higher than another's. Tolls on League roads are paid at the office by the south step.");
@@ -398,6 +406,7 @@ export function buildMeghavan(ctx: GenContext, t: Tools, places: World["places"]
     npc("suvarnatira_archivist", cx - 4, y0 + 7); npc("suvarnatira_envoy", cx + 5, y0 + 9);
     for (const [sx, sy] of [[cx - 8, y0 + 3], [cx - 5, y0 + 3], [cx + 5, y0 + 3], [cx + 8, y0 + 3], [cx - 8, y0 + 12], [cx + 8, y0 + 12]] as const) decor(sx, sy, "shelf", true, "Shelves of palm-leaf books, bound in boards, each with a label in three scripts");
     decor(cx, y0 + 3, "table", true, "A reading desk under the dome, a star chart weighted flat with four inkpots");
+    clue(cx + 3, y0 + 12, { kind: "decor", decor: "table", blocks: true, name: "The Archive's borrowing ledger", clue: "archive_ledger" });
     // The Assembly of Ink and Coin's hall, the counting house (a bank), the market by the docks, the inn, the smithy, the silk house.
     building(x0 + 2, y0 + 2, x0 + 13, y0 + 11, "s", T.STONE, undefined, { name: "The Hall of the Assembly of Ink and Coin", walls: "marble", roof: "gable", hip: true, storeys: 2, color: ROOF.tile, facade: "civic" });
     npc("suvarnatira_lalitha", x0 + 7, y0 + 5); decor(x0 + 3, y0 + 3, "banner", true, "The Assembly's banner: a pen crossed with a coin, on sea green");
@@ -446,6 +455,79 @@ export function buildMeghavan(ctx: GenContext, t: Tools, places: World["places"]
     places.kanthar = { x, y: y + 2 };
   }
 
+  // ---------- 14. The quests' places (meghavanquests.ts) ----------
+  // The Khetmar caravan, waiting outside the east gate for someone to see it over the Gate of Rains.
+  npcAt("caravan_master", 1072, 697); put2(1074, 694, "wagon", "The Khetmar caravan's wagons, roped and covered"); put2(1077, 697, "hay", "Fodder for twelve mules");
+  // The dacoits' camp in the hills south of the Gate of Rains.
+  {
+    const { x, y } = DACOIT_CAMP;
+    ground(x - 6, y - 5, x + 6, y + 5, null, false);
+    for (const [dx, dy] of [[-4, -2], [3, -3], [-2, 3]] as const) put2(x + dx, y + dy, "tent", "A dacoits' tent of stolen caravan canvas");
+    put2(x, y, "campfire", "The dacoits' fire", false); put2(x + 4, y + 2, "crate", "Crates from a Khetmar caravan, broken open");
+    monsterAt("dacoit_chief", x + 1, y - 1, 2); for (const [dx, dy] of [[-3, 1], [3, 1], [0, 3]] as const) monsterAt("rain_dacoit", x + dx, y + dy, 3);
+  }
+  // The high toll-house on the eastern pass, and the road up to it from Shailagarh.
+  road([[1470, SHAILAGARH.y1 + 2], [1500, 662], [1540, 652], [TOLL_HOUSE.x - 6, TOLL_HOUSE.y + 6]], 2.2, T.PATH);
+  {
+    const { x, y } = TOLL_HOUSE;
+    ground(x - 8, y - 6, x + 8, y + 7, null, true, false);
+    building(x - 3, y - 3, x + 3, y + 2, "s", T.STONE, undefined, { name: "The high toll-house", walls: "stone", roof: "flat", color: ROOF.slate, chimney: false });
+    clue(x - 1, y - 1, { kind: "decor", decor: "table", blocks: true, name: "A soldier's paybook", clue: "deserters_paybook" });
+    put2(x + 5, y + 4, "banner", "A Copper Banner pennant with the badge cut out of it"); put2(x - 5, y + 4, "barrel", "A toll barrel, half full of other people's copper");
+    monsterAt("deserter_sergeant", x, y + 4, 2); for (const [dx, dy] of [[-4, 5], [4, 5], [6, 0]] as const) monsterAt("highland_deserter", x + dx, y + dy, 3);
+    area(x - 9, y - 7, x + 9, y + 8, "shaila_highlands");
+  }
+  // The Kanthari's grove in the Deepgreen: three great stumps, and the three stones the loggers dragged out of their hollows.
+  {
+    const { x, y } = GROVE;
+    ground(x - 7, y - 6, x + 7, y + 6, null, false);
+    for (const [dx, dy] of [[-3, -2], [2, -3], [0, 3]] as const) put2(x + dx, y + dy, "stump", "The stump of a grove tree, older than Shailagarh's walls, freshly cut");
+    [[-6, 0], [5, 4], [4, -5]].forEach(([dx, dy], k) => clue(x + dx, y + dy, { kind: "decor", decor: "boulder", blocks: true, name: "A grove stone", clue: `grove_stone_${k}` }));
+    for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2, tx = Math.round(x + Math.cos(a) * 8), ty = Math.round(y + Math.sin(a) * 7); if (land(tx, ty) && !occupied(tx, ty) && open(get(tx, ty))) t.tree(tx, ty, "bamboo"); }
+  }
+
+  // ---------- 15. The Great Stepwell, below Sarovan: its galleries, the sluice, the cistern ----------
+  {
+    const S = GREAT_STEPWELL, X = S.x0, y0 = DUNGEON_Y + S.row0, y1 = DUNGEON_Y + S.row1;
+    for (let y = y0 - 2; y <= y1 + 2; y++) for (let x = S.x0 - 2; x <= S.x1 + 2; x++) { put(x, y, T.VOID); setRegion(x, y, "great_stepwell"); }
+    const hall = (ax: number, ay: number, bx: number, by: number, kind: number = T.DUNGEON) => { for (let y = ay; y <= by; y++) for (let x = ax; x <= bx; x++) put(x, y, kind); };
+    hall(X + 4, y0 + 2, X + 16, y0 + 10, T.STONE);            // the first landing, under the shaft
+    hall(X + 16, y0 + 5, X + 40, y0 + 7, T.STONE);            // the stair down the east side
+    hall(X + 40, y0 + 2, X + 70, y0 + 16);                    // the Gallery of Pillars
+    hall(X + 54, y0 + 16, X + 56, y0 + 26, T.STONE);          // down again
+    hall(X + 40, y0 + 26, X + 66, y0 + 34, T.STONE);          // the second landing
+    hall(X + 66, y0 + 29, X + 92, y0 + 31, T.STONE);          // the flooded passage
+    hall(X + 90, y0 + 20, X + 120, y0 + 42);                  // the flooded gallery
+    hall(X + 102, y0 + 12, X + 104, y0 + 20, T.STONE); hall(X + 100, y0 + 4, X + 124, y0 + 12, T.STONE); // up to the sluice chamber
+    hall(X + 120, y0 + 37, X + 132, y0 + 39, T.STONE);        // through to
+    hall(X + 132, y0 + 28, X + 172, y0 + 52);                 // the cistern
+    // Water in the flooded gallery (pools between the pillars) and the cistern's deep middle.
+    for (let y = y0 + 22; y <= y0 + 40; y++) for (let x = X + 92; x <= X + 118; x++) if ((x * 3 + y * 5) % 11 < 2 && Math.abs(y - (y0 + 30)) > 1) put(x, y, T.WATER);
+    for (let y = y0 + 34; y <= y0 + 46; y++) for (let x = X + 144; x <= X + 160; x++) put(x, y, Math.hypot((x - X - 152) / 9, (y - y0 - 40) / 6.5) < 1 ? T.DEEP : get(x, y));
+    for (let y = y0 - 1; y <= y1 + 1; y++) for (let x = S.x0 - 1; x <= S.x1 + 1; x++) {
+      if (get(x, y) !== T.VOID) continue;
+      let beside = false;
+      for (let dy = -1; dy <= 1 && !beside; dy++) for (let dx = -1; dx <= 1 && !beside; dx++) { const tt = get(x + dx, y + dy); if (tt === T.STONE || tt === T.DUNGEON || tt === T.WATER || tt === T.DEEP) beside = true; }
+      if (beside) put(x, y, T.WALL);
+    }
+    add({ kind: "ladder", x: X + 6, y: y0 + 3, blocks: true, name: "The Great Stepwell's steps", action: "Climb-up", to: { x: SAROVAN.x0 + (SAROVAN.x1 - SAROVAN.x0 >> 1) + 9, y: SAROVAN.y0 + (SAROVAN.y1 - SAROVAN.y0 >> 1) + 2 } });
+    for (let x = X + 43; x <= X + 67; x += 6) { put2(x, y0 + 5, "pillar", "A carved pillar: a river goddess pouring from a jar, her face worn away by hands"); put2(x, y0 + 13, "pillar", "A carved pillar: a river goddess pouring from a jar, her face worn away by hands"); }
+    clue(X + 112, y0 + 6, { kind: "decor", decor: "counterweight", blocks: true, name: "The old sluice wheel", clue: "stepwell_sluice" });
+    for (const [x, y] of [[X + 60, y0 + 15], [X + 118, y0 + 41], [X + 102, y0 + 5]] as const) put2(x, y, "chest", "A coffer of green copper");
+    put2(X + 170, y0 + 50, "chest", "The Serpent's hoard");
+    const torches: [number, number][] = [[X + 5, y0 + 3], [X + 15, y0 + 3], [X + 41, y0 + 3], [X + 69, y0 + 3], [X + 41, y0 + 15], [X + 69, y0 + 15], [X + 41, y0 + 27], [X + 65, y0 + 27], [X + 41, y0 + 33],
+      [X + 91, y0 + 21], [X + 119, y0 + 21], [X + 91, y0 + 41], [X + 101, y0 + 5], [X + 123, y0 + 5], [X + 133, y0 + 29], [X + 171, y0 + 29], [X + 133, y0 + 51], [X + 171, y0 + 51], [X + 152, y0 + 29],
+      [X + 50, y0 + 3], [X + 60, y0 + 3], [X + 50, y0 + 15], [X + 105, y0 + 21], [X + 105, y0 + 41], [X + 143, y0 + 29], [X + 162, y0 + 29], [X + 143, y0 + 51], [X + 162, y0 + 51], [X + 133, y0 + 40], [X + 171, y0 + 40], [X + 112, y0 + 11]];
+    for (let x = X + 20; x < X + 40; x += 10) torches.push([x, y0 + 5]);
+    for (let x = X + 72; x < X + 92; x += 10) torches.push([x, y0 + 29]);
+    for (const [x, y] of torches) put2(x, y, "torch", "A brass lamp in a niche, still burning", false);
+    for (let k = 0; k < 5; k++) monsterAt("silt_crawler", X + 44 + k * 6, y0 + 9, 3);
+    for (let k = 0; k < 4; k++) monsterAt("monsoon_leech", X + 44 + k * 6, y0 + 30, 3);
+    for (let k = 0; k < 6; k++) monsterAt(k % 2 ? "monsoon_leech" : "silt_crawler", X + 94 + (k % 3) * 9, y0 + 24 + (k >> 1) * 7, 3);
+    for (let k = 0; k < 3; k++) monsterAt("silt_crawler", X + 136 + k * 14, y0 + 32, 3);
+    monsterAt("monsoon_serpent", X + 152, y0 + 49, 2);
+  }
+
   // ---------- 12. Trees, rocks and fishing: the country's own things ----------
   const plant = (x0: number, y0: number, x1: number, y1: number, count: number, kinds: readonly TreeKind[], ok: (x: number, y: number) => boolean) =>
     t.scatter(x0, y0, x1, y1, count, (x, y) => t.tree(x, y, kinds[Math.floor(random() * kinds.length)]), (x, y) => land(x, y) && !occupied(x, y) && ok(x, y));
@@ -478,6 +560,18 @@ export function buildMeghavan(ctx: GenContext, t: Tools, places: World["places"]
   populate("shaila_highlands", ["crag_bear", "rock_langur", "highland_deserter"], 20);
   populate("golden_shore", ["giant_rain_frog", "jewelled_peafowl", "shore_corsair"], 12);
   populate("deepgreen", ["deepgreen_tiger", "monsoon_leech", "vine_strangler", "hooded_serpent"], 26);
+
+  // ---------- 16. Nothing out of reach: rocks, fishing spots and creatures in a pocket no path leads to are taken away ----------
+  {
+    const walk = new Set<number>([...OPEN, T.SWAMP, T.BRIDGE]), y1 = OVERWORLD_H - 1, h = y1 - MEGHAVAN.y0 + 1, seen = new Uint8Array(BW * h);
+    const id = (x: number, y: number) => (y - MEGHAVAN.y0) * BW + (x - MEGHAVAN.x0);
+    const passable = (x: number, y: number) => x >= MEGHAVAN.x0 && x <= MEGHAVAN.x1 && y >= MEGHAVAN.y0 && y <= y1 && walk.has(get(x, y)) && !(ctx.objectAt[tileIndex(x, y)] >= 0 && ctx.objects[ctx.objectAt[tileIndex(x, y)]].blocks);
+    const q: [number, number][] = [[MEGHAVAN.x0, 700]]; seen[id(MEGHAVAN.x0, 700)] = 1;
+    for (let k = 0; k < q.length; k++) { const [x, y] = q[k]; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) { const nx = x + dx, ny = y + dy; if (passable(nx, ny) && !seen[id(nx, ny)]) { seen[id(nx, ny)] = 1; q.push([nx, ny]); } } }
+    const reached = (x: number, y: number) => [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => { const nx = x + dx, ny = y + dy; return nx >= MEGHAVAN.x0 && nx <= MEGHAVAN.x1 && ny >= MEGHAVAN.y0 && ny <= y1 && seen[id(nx, ny)] === 1; });
+    for (const object of ctx.objects) if ((object.kind === "rock" || object.kind === "spot") && land(object.x, object.y) || object.kind === "spot" && object.x >= MEGHAVAN.x0 && object.y >= MEGHAVAN.y0 && object.y <= y1) { if (!reached(object.x, object.y)) clearAt(object.x, object.y); }
+    for (let i = ctx.spawns.length - 1; i >= 0; i--) { const sp = ctx.spawns[i]; if (sp.kind === "monster" && land(sp.x, sp.y) && !reached(sp.x, sp.y)) ctx.spawns.splice(i, 1); }
+  }
   void W; void OVERWORLD_H;
 }
 

@@ -71,7 +71,7 @@ import { FACTION_MONSTERS, factionGear } from "./factions.ts";
 import { MIZUKAI_ITEMS, MIZUKAI_MONSTERS, mizukaiGear } from "./mizukaigear.ts";
 import { KHARAVETH_GEAR, KHARAVETH_ITEMS, KHARAVETH_MONSTERS, KHARAVETH_SHOPS, STEPPE_CLOTHES } from "./kharavethgear.ts";
 import { HEARTLAND_GEAR, HEARTLAND_ITEMS, HEARTLAND_MONSTERS, HEARTLAND_SHOPS, OURESH_GOODS, ZURI_GOODS } from "./heartlandsgear.ts";
-import { MEGHAVAN_CLOTHING, MEGHAVAN_GEAR, MEGHAVAN_ITEMS, MEGHAVAN_MONSTERS, MEGHAVAN_SHOPS } from "./meghavangear.ts";
+import { MEGHAVAN_CLOTHING, MEGHAVAN_GEAR, MEGHAVAN_ITEMS, MEGHAVAN_MONSTERS, MEGHAVAN_QUEST_ITEMS, MEGHAVAN_SHOPS } from "./meghavangear.ts";
 import { ORASHAI_GEAR, ORASHAI_ITEMS, ORASHAI_MONSTERS, ORASHAI_PRAYERS, ORASHAI_QUEST_ITEMS, ORASHAI_SPELLS, ORASHAI_SPELL_TABS } from "./orashai.ts";
 export { ORASHAI_SPELL_TABS };
 import { SOLDIERS } from "./skirmish.ts";
@@ -1004,7 +1004,7 @@ function dyedItem(id: string): Item | undefined {
   DYED.set(id, made);
   return made;
 }
-export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...DYE_POTS, ...CARVING_ITEMS, ...BAR_ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...ORDER_ARMOUR, ...orderGear(), ...slayerGear(), ...heartguardGear(), ...REGIONAL_ITEMS, ...APOTHECARY_ITEMS, ...factionGear(), ...mizukaiGear(), ...MIZUKAI_ITEMS, ...KHARAVETH_ITEMS, ...KHARAVETH_GEAR, ...STEPPE_CLOTHES, ...HEARTLAND_ITEMS, ...HEARTLAND_GEAR, ...ORASHAI_ITEMS, ...ORASHAI_GEAR, ...ORASHAI_QUEST_ITEMS, ...MEGHAVAN_ITEMS, ...MEGHAVAN_GEAR]);
+export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...DYE_POTS, ...CARVING_ITEMS, ...BAR_ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...ORDER_ARMOUR, ...orderGear(), ...slayerGear(), ...heartguardGear(), ...REGIONAL_ITEMS, ...APOTHECARY_ITEMS, ...factionGear(), ...mizukaiGear(), ...MIZUKAI_ITEMS, ...KHARAVETH_ITEMS, ...KHARAVETH_GEAR, ...STEPPE_CLOTHES, ...HEARTLAND_ITEMS, ...HEARTLAND_GEAR, ...ORASHAI_ITEMS, ...ORASHAI_GEAR, ...ORASHAI_QUEST_ITEMS, ...MEGHAVAN_ITEMS, ...MEGHAVAN_GEAR, ...MEGHAVAN_QUEST_ITEMS]);
 const ITEM_MAP = new Map(ITEM_LIST.map(item => [item.id, item]));
 export function item(id: string): Item {
   const found = ITEM_MAP.get(id) ?? dyedItem(id);

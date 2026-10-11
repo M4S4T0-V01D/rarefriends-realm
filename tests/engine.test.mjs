@@ -603,7 +603,7 @@ test("A Friend's Feast from start to finish", () => {
   assert.equal(g.player.quests.friends_feast, 2);
   assert.equal(questPoints(g), 1);
   assert(level(g, "cooking") >= 10, "Quest XP");
-  assert.equal(QUESTS.length, 78); assert.equal(MAX_QUEST_POINTS, 142);
+  assert.equal(QUESTS.length, 84); assert.equal(MAX_QUEST_POINTS, 154);
 });
 
 test("Grumblin Trouble counts kills and pays out", () => {
@@ -1949,7 +1949,7 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   assert.equal(p.quests.dawn_against_hollow, 2); assert(has(p, "dawnplate_cuirass"));
   assert.equal(count(p, "hollow_essence"), 0);
   assert.equal(capeProblem(g, "dawnplate_cuirass"), null, "the armoury sells Dawnplate once earned");
-  assert.equal(QUESTS.length, 78); assert.equal(MAX_QUEST_POINTS, 142);
+  assert.equal(QUESTS.length, 84); assert.equal(MAX_QUEST_POINTS, 154);
 });
 
 test("Boots and gauntlets in every metal, smithed at the anvil; the clothier's shirts, dresses, trousers and skirts", () => {
@@ -3303,4 +3303,72 @@ test("The Rain Country rains more than anywhere else, and the Deepgreen is misty
   for (let k = 0; k < 400; k++) { const ms = k * 4 * 60_000 + 60_000; if (weatherAt(ms, "sarovan", false, null).rain > 0) wet++; if (weatherAt(ms, "friendhollow", false, null).rain > 0) dry++; }
   assert(wet > dry, `more rain in Sarovan (${wet}) than Friendhollow (${dry})`);
   assert(weatherAt(0, "deepgreen", false, 0.6).fog >= 0.35, "mist in the Deepgreen");
+});
+
+test("Meghavan's quest places: the caravan, the dacoits' camp, the toll-house, the grove and the Great Stepwell's halls are all reached, and the Stepwell keeps to its own columns", async () => {
+  const { KHETMAR } = await import("../games/rarefriends-realm/heartlands.ts");
+  const { GREAT_STEPWELL } = await import("../games/rarefriends-realm/meghavan.ts");
+  const g = newGame(), world = g.world, at = (seen, x, y) => !!seen[y * W + x];
+  const beside = (seen, o) => o && [[0, 0], [0, 1], [1, 0], [0, -1], [-1, 0], [1, 1], [-1, -1], [1, -1], [-1, 1]].some(([dx, dy]) => at(seen, o.x + dx, o.y + dy));
+  const east = reachable(g, { x: KHETMAR.x1 + 1, y: (KHETMAR.y0 + KHETMAR.y1) >> 1 });
+  for (const id of ["toll_ledger", "deserters_paybook", "archive_ledger", "grove_stone_0", "grove_stone_1", "grove_stone_2", "great_stepwell", "great_tank_measure"]) assert(beside(east, world.objects.find(o => o.clue === id)), `${id} can be reached`);
+  for (const id of ["dacoit_chief", "deserter_sergeant"]) { const m = g.monsters.find(m => m.def.id === id); assert(m && beside(east, m), `${id} can be reached`); }
+  assert(beside(east, g.npcs.find(n => n.id === "caravan_master")), "the caravan waits by Khetmar's gate");
+  const well = world.objects.find(o => o.clue === "great_stepwell"), below = reachable(g, well.to);
+  assert(beside(below, world.objects.find(o => o.clue === "stepwell_sluice")), "the sluice wheel below");
+  const serpent = g.monsters.find(m => m.def.id === "monsoon_serpent"); assert(serpent && beside(below, serpent), "the Monsoon Serpent in its cistern");
+  assert(world.objects.some(o => o.decor === "chest" && o.name === "The Serpent's hoard" && beside(below, o)), "its hoard");
+  const up = world.objects.find(o => o.kind === "ladder" && o.name === "The Great Stepwell's steps"); assert(up && beside(below, up) && at(east, up.to.x, up.to.y), "and the way back up to Sarovan");
+  const index = REGIONS.findIndex(r => r.id === "great_stepwell");
+  for (let y = DUNGEON_Y; y < FLOOR_Y; y++) for (let x = 0; x < W; x++) if (world.region[y * W + x] === index) assert(x >= GREAT_STEPWELL.x0 - 2 && x <= GREAT_STEPWELL.x1 + 2, `the Stepwell stays in its own columns (${x},${y})`);
+  for (const id of ["deepglass", "drowned_archive", "underway", "black_stair", "first_names_hall"]) assert(world.region.includes(REGIONS.findIndex(r => r.id === id)), `${id} still there`);
+});
+
+test("Caravan of the Rains and The Silted Tank: the dacoits' chief, the crate at the ford; the engineer, the treasurer, the measure, the Stepwell's serpent and sluice", async () => {
+  const { useClue, clueOptions } = await import("../games/rarefriends-realm/kharaveth.ts");
+  const g = newGame(), world = g.world, p = g.player;
+  const say = (id, label) => { let d = talk(g, id); if (label) { const o = d.options.find(x => x.label.startsWith(label)); assert(o, `${id}: ${label}`); d.onEnd?.(); d = o.then(); } d?.onEnd?.(); return d; };
+  const clue = (id, option) => useClue(g, world.objects.find(o => o.clue === id), option);
+  assert.doesNotMatch(talk(g, "caravan_master").lines.map(l => l.text).join(" "), /Gate of Rains/, "nothing before Foothold");
+  p.quests.foothold_in_the_stone = 3;
+  say("caravan_master", "I'll see your caravan"); assert.equal(p.quests.caravan_of_rains, 1);
+  onMonsterKilled(g, "dacoit_chief", 0, 0); assert.equal(p.quests.caravan_of_rains, 2);
+  say("tirthali_amul", "Send it to the Archive"); assert.equal(p.quests.caravan_of_rains, 3); assert(has(p, "monsoon_cloak")); assert.equal(p.questData.cq_choice, 1);
+  // The Silted Tank.
+  assert.deepEqual(clueOptions(g, world.objects.find(o => o.clue === "great_stepwell")), ["Read"], "the Stepwell is chained");
+  say("sarovan_saumitra", "I'll find out"); assert.equal(p.quests.silted_tank, 1);
+  say("sarovan_engineer"); say("sarovan_treasurer"); assert.equal(p.quests.silted_tank, 1);
+  clue("great_tank_measure", "Read"); assert.equal(p.quests.silted_tank, 2, "both heard and the measure read");
+  say("sarovan_engineer"); assert(clueOptions(g, world.objects.find(o => o.clue === "great_stepwell")).includes("Climb-down"), "the chain unhooked");
+  assert.equal(clue("great_stepwell", "Climb-down").to.y > DUNGEON_Y, true);
+  clue("stepwell_sluice", "Turn"); assert.equal(p.quests.silted_tank, 2, "the wheel won't turn while the serpent's there");
+  onMonsterKilled(g, "monsoon_serpent", 0, 0); clue("stepwell_sluice", "Turn"); assert.equal(p.quests.silted_tank, 3);
+  say("sarovan_saumitra", "Both of them are right"); assert.equal(p.quests.silted_tank, 4); assert(has(p, "kept_tank_ring"));
+});
+
+test("Seven Parasols, The Pass Toll, The Missing Folio and What the Forest Keeps, start to finish", async () => {
+  const { useClue } = await import("../games/rarefriends-realm/kharaveth.ts");
+  const g = newGame(), world = g.world, p = g.player;
+  const say = (id, label) => { let d = talk(g, id); if (label) { const o = d.options.find(x => x.label.startsWith(label)); assert(o, `${id}: ${label}`); d.onEnd?.(); d = o.then(); } d?.onEnd?.(); return d; };
+  const clue = (id, option) => useClue(g, world.objects.find(o => o.clue === id), option);
+  p.quests.foothold_in_the_stone = 3;
+  // The League's tolls: the raja, the ledger, the clerk, the factor, the Speaker.
+  say("mandapur_speaker", "I'll look into"); say("mandapur_raja"); say("mandapur_tollclerk"); assert.equal(p.quests.seven_parasols, 1, "the clerk only talks once you've read the ledger");
+  clue("toll_ledger", "Read"); say("mandapur_tollclerk"); assert.equal(p.quests.seven_parasols, 2);
+  say("sarovan_factor"); assert.equal(p.quests.seven_parasols, 3); say("mandapur_speaker"); assert.equal(p.quests.seven_parasols, 4); assert(has(p, "speakers_parasol"));
+  // The pass: Marr, the paybook, Hask, the Lord.
+  say("shailagarh_varanjit", "I'll take back"); onMonsterKilled(g, "deserter_sergeant", 0, 0); assert.equal(p.quests.pass_toll, 1, "Hask's death counts once you know why");
+  say("shailagarh_captain"); clue("deserters_paybook", "Read"); assert.equal(p.quests.pass_toll, 2);
+  onMonsterKilled(g, "deserter_sergeant", 0, 0); assert.equal(p.quests.pass_toll, 3);
+  say("shailagarh_varanjit", "Your money reached"); assert.equal(p.quests.pass_toll, 4); assert(has(p, "pass_warden_helm"));
+  // The folio: the envoy, the ledger, the pedlar, the Archivist.
+  say("suvarnatira_archivist", "I'll find"); say("suvarnatira_envoy"); clue("archive_ledger", "Read"); assert.equal(p.quests.missing_folio, 2);
+  say("tirthali_dealer"); assert(has(p, "star_folio")); assert.equal(p.quests.missing_folio, 3);
+  say("suvarnatira_archivist"); assert.equal(p.quests.missing_folio, 4); assert(!has(p, "star_folio")); assert(has(p, "readers_stole"));
+  // The forest: the loggers, the stones, the licence, the Lord, the grandmother.
+  say("kanthar_sukesh", "I'll put"); clue("grove_stone_0", "Set-stone"); say("deepgreen_logger"); assert.equal(p.quests.forest_keeps, 1);
+  clue("grove_stone_1", "Set-stone"); clue("grove_stone_2", "Set-stone"); assert.equal(p.quests.forest_keeps, 2);
+  say("deepgreen_logger"); assert(has(p, "logging_licence")); say("shailagarh_varanjit"); assert.equal(p.quests.forest_keeps, 3); assert(!has(p, "logging_licence"));
+  say("kanthar_sukesh"); assert.equal(p.quests.forest_keeps, 4); assert(has(p, "seed_charm"));
+  assert.equal(questPoints(g), 10, "two each, and A Foothold in the Stone's two");
 });

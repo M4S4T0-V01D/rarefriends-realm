@@ -32,6 +32,24 @@ export const MEGHAVAN_GEAR: readonly Item[] = [
     icon: { shape: "dagger", color: "#8f9aa6", accent: "#a8643a" }, equip: { slot: "weapon", bonuses: { attack: 28, strength: 24 }, speed: 3, requires: { attack: 35 } } },
   { id: "shaila_mail", name: "Shaila mail", examine: "A coat of fine blackiron rings riveted shut, lined with quilted highland wool so it doesn't freeze to you in the passes. Shailagarh's forge-masters sign each one inside the collar.", value: 9000, weight: 6,
     icon: { shape: "body", color: "#6f7680", accent: "#a5443a" }, equip: { slot: "body", bonuses: { defence: 38, ranged: 6 }, requires: { defence: 40 } } },
+  // The quests' gifts (meghavanquests.ts).
+  { id: "monsoon_cloak", name: "Monsoon cloak", examine: "An oiled cotton cloak the colour of rain clouds, a Khetmar caravan's thanks. The rain runs off it; the dust doesn't stick.", value: 2500,
+    icon: { shape: "cape", color: "#5f6f7a", accent: "#c9a46a" }, equip: { slot: "cape", bonuses: { defence: 4, magic: 2 }, requires: { defence: 20 } } },
+  { id: "kept_tank_ring", name: "Ring of the Kept Tank", examine: "A silver ring set with one lapis drop: a tank seen from above. Ilavarta's queens give one to whoever keeps the water.", value: 9000, weight: 0,
+    icon: { shape: "ring", color: "#c9ced6", accent: "#2f5f9a" }, equip: { slot: "ring", bonuses: { prayer: 4, magic: 4, defence: 2 }, requires: { defence: 40 } } },
+  { id: "speakers_parasol", name: "Speaker's parasol", examine: "A parasol of the League, its ribs gaur horn, its canopy the seven colours. Held up, it's a shade; held out, it's a shield; held by you, it's a debt the League will remember.", value: 7000,
+    icon: { shape: "shield", color: "#d9b866", accent: "#6f3f7a" }, equip: { slot: "shield", bonuses: { defence: 24, magic: 6 }, requires: { defence: 45 } } },
+  { id: "pass_warden_helm", name: "Pass-warden's helm", examine: "A blackiron helm with a red horsehair crest and a nasal bar, the last pass-warden of Shailagarh's. It has watched the eastern pass for sixty winters.", value: 8000,
+    icon: { shape: "helm", color: "#6f7680", accent: "#a5443a" }, equip: { slot: "head", bonuses: { defence: 26, strength: 4 }, requires: { defence: 50 } } },
+  { id: "readers_stole", name: "Reader's stole", examine: "A sea-green stole with a pen worked at both ends: the Assembly of Ink and Coin's thanks to someone who read the ledger before believing the envoy.", value: 6000,
+    icon: { shape: "cape", color: "#2f6f7a", accent: "#e6dcc6" }, equip: { slot: "cape", bonuses: { magic: 8, defence: 4, prayer: 2 }, requires: { magic: 40 } } },
+  { id: "seed_charm", name: "Kanthari seed charm", examine: "Seeds of the grove trees strung on palm fibre. Plant one where you were born, Grandmother Sukesh says, and something of the Deepgreen will grow there. Probably bamboo.", value: 5000,
+    icon: { shape: "amulet", color: "#6a4a2a", accent: "#5a7a3a" }, equip: { slot: "neck", bonuses: { defence: 6, ranged: 6, prayer: 2 }, requires: { defence: 35 } } },
+];
+/** The quests' things you carry for a while. */
+export const MEGHAVAN_QUEST_ITEMS: readonly Item[] = [
+  item("star_folio", "Star chart folio", "The ninth leaf of the Azhurak star chart: a river of stars across a sheet of beaten bark, bound in lapis thread. It belongs to the Archive, or to Tamesh, or to the sky.", 0, "scroll", "#e6dcc6", "#2f5f9a", { tradeable: false }),
+  item("logging_licence", "Logging licence", "Shailagarh's licence to the loggers: pit props from the Deepgreen, signed by Lord Varanjit, with no grove stones drawn on it anywhere.", 0, "scroll", "#e6dcc6", "#a5443a", { tradeable: false }),
 ];
 
 /** Each town's tailor and the clothes of its people (data.ts puts these into REGIONAL_CLOTHING). */
@@ -128,6 +146,16 @@ export const MEGHAVAN_MONSTERS: Record<string, MonsterDef> = {
     examine: "Orange and black, the size of a pony, moving through the bamboo without moving it. The Kanthari don't say its name in the forest; they call it 'the one with stripes', politely.", always: [one("bones", 1)], drops: [one("tiger_pelt", 0.5), coins(30, 200, 0.6), one("raw_beef", 0.5)] },
   highland_deserter: { id: "highland_deserter", name: "Banner deserter", level: 60, hp: 80, attack: 50, strength: 48, defence: 46, attackBonus: 32, defenceBonus: 34, maxHit: 9, speed: 4, respawn: 50, wander: 4, aggressive: true, art: 256, ink: "#8f4a2a",
     examine: "A soldier of a Copper Banner company who stopped waiting for his pay, still in the copper-faced coat with the badge cut off. He's kept the sabre.", always: [one("bones", 1)], drops: [coins(60, 260, 0.9), one("blackiron_sabre", 0.04), one("shaila_mail", 0.01)] },
+  // The quests' foes, and the Great Stepwell's.
+  dacoit_chief: { id: "dacoit_chief", name: "Red Jhanda", level: 54, hp: 84, attack: 46, strength: 44, defence: 38, attackBonus: 28, defenceBonus: 24, maxHit: 8, speed: 4, respawn: 90, wander: 2, aggressive: true, art: 257, ink: "#a5443a",
+    examine: "The dacoits' chief, in a red turban he's proud of and a caravan-master's stolen coat he's prouder of. He says he takes only from those who have too much. He decides who that is.", always: [one("bones", 1)], drops: [coins(80, 300, 1), one("push_dagger", 0.1)] },
+  deserter_sergeant: { id: "deserter_sergeant", name: "Sergeant Hask", level: 68, hp: 120, attack: 56, strength: 56, defence: 54, attackBonus: 36, defenceBonus: 40, maxHit: 11, speed: 5, respawn: 90, wander: 2, aggressive: true, art: 258, ink: "#8f4a2a",
+    examine: "A Copper Banner sergeant of twelve years' service, the badge cut off his coat, a battleaxe across his knees. He kept the books on everything, including how much he was owed.", always: [one("bones", 1)], drops: [coins(100, 400, 1), one("shaila_mail", 0.04)] },
+  silt_crawler: { id: "silt_crawler", name: "Silt crawler", level: 56, hp: 76, attack: 42, strength: 44, defence: 48, attackBonus: 24, defenceBonus: 36, maxHit: 8, speed: 5, respawn: 45, wander: 3, aggressive: true, weakness: "wind", art: 259, ink: "#6a5a40",
+    examine: "A many-legged thing the colour of river mud, armoured in plates of dried silt, that came up the Stepwell's drains and found the dark agreed with it.", always: [one("bones", 1)], drops: [coins(30, 180, 0.7), one("clay", 0.4, 1, 3), one("gaur_horn", 0.05)] },
+  monsoon_serpent: { id: "monsoon_serpent", name: "The Monsoon Serpent", level: 90, hp: 320, attack: 70, strength: 72, defence: 66, magicDef: 60, attackBonus: 50, defenceBonus: 54, maxHit: 17, speed: 5, respawn: 200, wander: 1, aggressive: true, boss: true, size: 2,
+    poison: { damage: 7, chance: 0.25 }, weakness: "earth", art: 260, ink: "#2f6f7a",
+    examine: "A serpent as long as the cistern is wide, its scales the green of deep tank water, a hood like a storm cloud. The Stepwell's builders carved it on the pillars, holding up the rain. It stopped holding it up.", always: [one("large_bones", 1)], drops: [coins(400, 1500, 1), one("tiger_pelt", 0.3), one("jewelled_feather", 0.5, 2, 5), one("kept_tank_ring", 0.01)] },
   crag_bear: { id: "crag_bear", name: "Crag bear", level: 62, hp: 112, attack: 48, strength: 56, defence: 50, attackBonus: 28, defenceBonus: 34, maxHit: 10, speed: 5, respawn: 60, wander: 4, aggressive: true, art: 251, ink: "#4a3a30",
     examine: "A shaggy black bear with a pale crescent on its chest and claws for digging grubs out of rock, or anything else out of anything else. It rules the scree above the mines.", always: [one("bones", 1)], drops: [one("raw_beef", 0.7, 1, 3), coins(40, 220, 0.6), one("moonsilver_ore", 0.15)] },
 };

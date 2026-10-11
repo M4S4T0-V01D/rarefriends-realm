@@ -4,6 +4,14 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 101, date: "2026-10-11", title: "The Land Before Stone: Meghavan's quests and the Great Stepwell", items: [
+    "Six new quests in the Rain Country. Caravan of the Rains: see a Khetmar caravan over the Gate of Rains, past the dacoits, to the ford at Tirthali, where one crate holds something that was dug up.",
+    "The Silted Tank: Queen Saumitra's engineers and the temple's treasurers each want the other to pay for the silt. Read the Great Tank's measure, and go down the Great Stepwell under Sarovan, where the old sluice is jammed and the Monsoon Serpent keeps the cistern.",
+    "Seven Parasols, One Shade: the League's toll books say Ilavarta's bridge has doubled its toll. The Pass Toll: Copper Banner deserters hold Shailagarh's high toll-house. The Missing Folio: a leaf of the Azhurak star chart is gone from the Archive. What the Forest Keeps: Shailagarh's loggers have moved the Kanthari's grove stones.",
+    "The Great Stepwell: its landings, a gallery of carved pillars, a flooded gallery, the sluice chamber and the cistern, with silt crawlers, monsoon leeches, coffers, and the Monsoon Serpent's hoard.",
+    "New rewards: the monsoon cloak, the Ring of the Kept Tank, the Speaker's parasol, the pass-warden's helm, a reader's stole and a Kanthari seed charm.",
+    "Still to come in Meghavan: the four eastern schools of the Mysteries and their techniques.",
+  ] },
   { id: 100, date: "2026-10-10", title: "The Land Before Stone: Meghavan, the Rain Country", items: [
     "East of Khetmar, over its bay, lies Meghavan: the country Kharaveth's traders call the Rain Country. Through the Gate of Rains the dry hills turn green, and the river Ilavati runs from the Shaila Highlands past Sarovan and down through the Deepgreen to the sea.",
     "Six towns, each with its own people, tailor and clothes: Tirthali, the ford town, half Kharaveth and half Meghavan; Sarovan, the marble capital of Ilavarta, with its palace, the Great Tank and the Great Stepwell; Shailagarh, the highland fortress over the mines; Mandapur, where the League of Seven Parasols meets in an open hall; Suvarnatira, the free port, with its docks and the Archive; and Kanthar, the Kanthari's stilt village in the Deepgreen.",

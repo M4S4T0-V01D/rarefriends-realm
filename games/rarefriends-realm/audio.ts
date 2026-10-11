@@ -685,7 +685,7 @@ const MEGHAVAN_PIECES: readonly MizukaiPiece[] = [
 const MEGHAVAN_REGION_TRACK: Partial<Record<RegionId, TrackId>> = {
   rain_pass: "meghavan_rains", ilavati_valley: "meghavan_rains", parasol_plains: "meghavan_rains", tirthali: "meghavan_sarovan", sarovan: "meghavan_sarovan",
   shaila_highlands: "meghavan_shailagarh", shailagarh: "meghavan_shailagarh", mandapur: "meghavan_suvarnatira", golden_shore: "meghavan_suvarnatira", suvarnatira: "meghavan_suvarnatira",
-  deepgreen: "meghavan_deepgreen", kanthar: "meghavan_deepgreen",
+  deepgreen: "meghavan_deepgreen", kanthar: "meghavan_deepgreen", great_stepwell: "meghavan_deepgreen",
 };
 /** Which Kharaveth piece plays where. */
 const KHARAVETH_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { sunteeth: "kharaveth_sunteeth", foothold: "kharaveth_foothold", underway: "kharaveth_underway", ochre_steppe: "kharaveth_steppe", sunward_strait: "kharaveth_steppe",

@@ -18,6 +18,7 @@ import { HEARTLAND_CLUES } from "./dynasties.ts";
 import { ORASHAI_CLUES } from "./orashaiquests.ts";
 import { HIDDEN_ROAD_CLUES } from "./hiddenroad.ts";
 import { MEGHAVAN_CLUES } from "./meghavanpeople.ts";
+import { MEGHAVAN_QUEST_CLUES } from "./meghavanquests.ts";
 
 const art = (family: number, seed: number) => ({ family, seed });
 const person = (id: string, name: string, examine: string, seed: number, extra: Partial<NpcDef> = {}): NpcDef => ({ id, name, examine, options: ["Talk-to"], art: art(9, seed), ...extra });
@@ -166,6 +167,7 @@ export const CLUES: Record<string, Clue> = {
   ...HIDDEN_ROAD_CLUES,
   // Meghavan, the Rain Country (meghavanpeople.ts).
   ...MEGHAVAN_CLUES,
+  ...MEGHAVAN_QUEST_CLUES,
 };
 
 /** A clue's options, examine text and use (null if the object isn't one). */
