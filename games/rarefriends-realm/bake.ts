@@ -52,5 +52,5 @@ export function unbakeWorld(text: string): World | null {
   if (baked.v !== BAKE_VERSION || baked.w !== W || baked.h !== H) return null;
   const tiles = fromBase64(baked.tiles), region = fromBase64(baked.region), lift = unbakeSteps(baked.lift), raise = unbakeSteps(baked.raise);
   const { objects, spawns, places, buildings, floors, ramparts } = baked.data;
-  return { tiles, region, objects, objectAt: indexObjects(objects), spawns, places, heights: buildHeights(tiles, baked.seed, lift, raise), buildings, buildingAt: indexBuildings(buildings), floors, ramparts };
+  return { tiles, region, objects, objectAt: indexObjects(objects), spawns, places, heights: buildHeights(tiles, baked.seed, lift, raise), buildings, buildingAt: indexBuildings(buildings), floors, ramparts, lift, raise };
 }

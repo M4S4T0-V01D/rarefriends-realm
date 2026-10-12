@@ -23,6 +23,7 @@
  * (kept, playable, but not vouched for). See cloud/README.md for the policies.
  */
 import { BaseError, ContractFunctionRevertedError, HttpRequestError, createPublicClient, getAddress, http, isAddress, parseAbi, recoverMessageAddress, zeroAddress, type Hex } from "viem";
+import { devRoutes, type DevEnv } from "./dev.ts";
 import { applySettlements, cardRoutes, cardsChainFor, heldLockbox, lockboxOf, parsePending, sameLockbox, type Bucket, type CardsOptions, type Settlement } from "./cards.ts";
 
 // ---------- Storage (the subset of D1 used here, so tests can supply SQLite) ----------
@@ -36,7 +37,9 @@ export type Chain = {
 };
 export type Env = { DB: Database; RPC_URL: string; COLLECTION: string; CHAIN_ID: string; ORIGINS: string; ATTEST_KEY?: string;
   /** Adventurer Cards (cards.ts): the pictures' bucket, the signing key (a secret), the contract and its chain, and the game's address for the metadata. */
-  CARDS?: Bucket; MINTER_KEY?: string; CARDS_CONTRACT?: string; CARDS_CHAIN_ID?: string; CARDS_RPC_URL?: string; GAME_URL?: string };
+  CARDS?: Bucket; MINTER_KEY?: string; CARDS_CONTRACT?: string; CARDS_CHAIN_ID?: string; CARDS_RPC_URL?: string; GAME_URL?: string;
+  /** The private development game (dev.ts): the owner's password hash (a secret); its site lives in the cards' bucket. */
+  DEV_PASSWORD_HASH?: string };
 
 export const LIMITS = {
   /** A save's JSON, at most (today's saves are 20–90 KB). */
@@ -172,7 +175,7 @@ class HttpError extends Error {
 }
 
 // ---------- The app ----------
-export function createApp({ db, chain, clock = now, origins, chainId, attestKey = null, cards = null }: { db: Database; chain: Chain; clock?: () => number; origins: string[]; chainId: number; attestKey?: string | null; cards?: CardsOptions | null }) {
+export function createApp({ db, chain, clock = now, origins, chainId, attestKey = null, cards = null, dev = null }: { db: Database; chain: Chain; clock?: () => number; origins: string[]; chainId: number; attestKey?: string | null; cards?: CardsOptions | null; dev?: DevEnv | null }) {
   const cors = (origin: string | null): Record<string, string> => origin && origins.includes(origin)
     ? { "access-control-allow-origin": origin, "access-control-allow-methods": "GET,POST,PUT,OPTIONS", "access-control-allow-headers": "authorization,content-type,content-encoding", "access-control-max-age": "600", vary: "origin" } : { vary: "origin" };
   const json = (origin: string | null, status: number, body: unknown, headers: Record<string, string> = {}) =>
@@ -212,6 +215,7 @@ export function createApp({ db, chain, clock = now, origins, chainId, attestKey 
     return !!results[1]?.meta.changes;
   };
   const cardsRoute = cards ? cardRoutes(db, cards, { clock, session, owns, json, characterOf, settle }) : null;
+  const devRoute = dev ? devRoutes(db, dev, clock) : null;
   const friendOf = (text: string) => { const id = Number(text); if (!/^[0-9]{1,15}$/.test(text) || !Number.isSafeInteger(id)) throw new HttpError(400, "bad Friend"); return id; };
 
   async function route(request: Request, url: URL, origin: string | null): Promise<Response> {
@@ -382,6 +386,8 @@ export function createApp({ db, chain, clock = now, origins, chainId, attestKey 
   return {
     async fetch(request: Request): Promise<Response> {
       const url = new URL(request.url), origin = request.headers.get("origin");
+      // The private development game lives on this Worker's own origin, behind its own login (dev.ts).
+      if (devRoute && url.pathname.startsWith("/dev")) { if (origin && origin !== url.origin) return json(null, 403, { error: "not from the development game" }); const response = await devRoute(request, url); if (response) return response; }
       if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(origin) });
       // Browsers only: a request from a page that isn't the Realm's is refused outright.
       if (origin && !origins.includes(origin)) return json(origin, 403, { error: "this site can't use Realm cloud saves" });
@@ -421,6 +427,6 @@ export default {
   fetch(request: Request, env: Env) {
     const cards: CardsOptions = { minterKey: env.MINTER_KEY ?? null, contract: env.CARDS_CONTRACT || null, chainId: Number(env.CARDS_CHAIN_ID ?? 46630), bucket: env.CARDS ?? null,
       chain: env.CARDS_CONTRACT && env.CARDS_RPC_URL ? cardsChainFor(env.CARDS_RPC_URL, env.CARDS_CONTRACT) : null, baseUrl: new URL(request.url).origin, gameUrl: env.GAME_URL ?? "https://m4s4t0-v01d.github.io/rarefriends-realm/" };
-    return createApp({ db: env.DB, chain: chainFor(env), origins: env.ORIGINS.split(",").map(origin => origin.trim()), chainId: Number(env.CHAIN_ID), attestKey: env.ATTEST_KEY ?? null, cards }).fetch(request);
+    return createApp({ db: env.DB, chain: chainFor(env), origins: env.ORIGINS.split(",").map(origin => origin.trim()), chainId: Number(env.CHAIN_ID), attestKey: env.ATTEST_KEY ?? null, cards, dev: { DB: env.DB, DEV_PASSWORD_HASH: env.DEV_PASSWORD_HASH, bucket: env.CARDS ?? null } }).fetch(request);
   },
 };

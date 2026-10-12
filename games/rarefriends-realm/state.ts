@@ -280,6 +280,8 @@ export function realmWorld(): World {
   }
   return sharedWorld ??= createWorld();
 }
+/** The development game (devlayer.ts): the world every later game is made with, after an overlay was laid over it. */
+export function setSharedWorld(world: World) { sharedWorld = world; }
 
 export function createPlayer(world: World, familyId: number, friendId: number): Player {
   const spawn = world.places.spawn, xp = Object.fromEntries(SKILLS.map(skill => [skill, 0])) as Record<Skill, number>;
@@ -305,6 +307,13 @@ export function createGame(options: { familyId: number; friendId: number; rng?: 
     depleted: new Map(), herbPicks: new Map(), rockOre: new Map(), ambient: { night: false, rain: false }, friendSpeech: "full", cardHeld: false, sneakingPast: new Map(), sneakPaid: new Map(), messages: [], events: [], rng, nextUid: 1, dialogue: null, ui: { shop: null, bank: false, production: null, lamp: null, naming: null },
     held: null, autoRetaliate: true, playTicks: 0, overheads: new Map(), tracks: [], pet: null, trail: [], arena: null,
   };
+  spawnCreatures(game);
+  message(game, "Welcome to the Realm. Talk to the Realm Guide by the fountain if you get lost.", "info");
+  return game;
+}
+/** The world's creatures, from its spawn definitions: made at the start, and again when the development game rebuilds its world. */
+export function spawnCreatures(game: Game) {
+  const world = game.world; game.monsters = []; game.npcs = [];
   for (const spawn of world.spawns) {
     const uid = game.nextUid++, at = { x: spawn.x, y: spawn.y };
     if (spawn.kind === "monster") {
@@ -312,8 +321,6 @@ export function createGame(options: { familyId: number; friendId: number; rng?: 
       game.monsters.push({ uid, def, x: at.x, y: at.y, prev: { ...at }, spawn: at, hp: def.hp, heading: { x: 1, y: 1 }, target: false, attackTimer: 0, respawnAt: 0, dead: false, wander: spawn.wander ?? def.wander, moved: 0, retreat: 0, curses: {} });
     } else game.npcs.push({ uid, id: spawn.id, x: at.x, y: at.y, prev: { ...at }, spawn: at, wander: spawn.wander ?? 0, heading: { x: 1, y: 1 }, moved: 0, busy: 0 });
   }
-  message(game, "Welcome to the Realm. Talk to the Realm Guide by the fountain if you get lost.", "info");
-  return game;
 }
 
 // ---------- Messages and events ----------

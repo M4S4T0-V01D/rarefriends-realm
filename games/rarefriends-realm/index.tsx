@@ -31,6 +31,9 @@ import { Trades } from "./trade.ts";
 import { FELLOW_RANGE, PARTY_RANGE, Party, nearby } from "./party.ts";
 import { makeSaveCode, restoreSaveCode } from "./savecode.ts";
 import { strikeAt, weatherAt, type Weather } from "./weather.ts";
+import { DEV_CATALOG, DEV_MODE, DEV_PICK, DEV_REPORT, DEV_TELEPORT, DEV_WORLD } from "./roster.ts";
+import { catalog as devCatalog, isDevFrame, keepPristine, pick as devPick, rebuildWorld } from "./devlayer.ts";
+import { cleanOverlay } from "./overlay.ts";
 import { SETTINGS_STATE, SETTINGS_WRITE, parseRenderer, type RendererMode, CLOUD_ACTION, CLOUD_STATE, FEEDBACK_REQUEST, FEEDBACK_RESULT, FULLSCREEN_REQUEST, FULLSCREEN_STATE, JOIN_INVITE, TEXT_COPY, TEXT_COPY_RESULT, HOST_HELLO, HOST_STATE, SAVE_ELSEWHERE, SAVE_EXPORT, SAVE_EXPORT_RESULT, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, parseCloudState, parseRoster, type CloudAction, type CloudState, type ShareAction, type ShareOutcome } from "./roster.ts";
 import { CloudControls, CloudDialogs, type SaveSummary } from "./cloudui.tsx";
 import { RealmAudio, trackFor, trackById, type SfxName, type TrackId } from "./audio.ts";
@@ -182,6 +185,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const lastMinimapPoint = useRef<React.MouseEvent<HTMLCanvasElement> | null>(null);
   const [snapshot, setSnapshot] = useState<GameSnapshot | null>(null), [busy, setBusy] = useState(false), [casketError, setCasketError] = useState(""), [reveal, setReveal] = useState<CasketResult[] | null>(null);
   const [size, setSize] = useState({ width: 960, height: 640, scale: 1 }), [sideOpen, setSideOpen] = useState(true), [fullscreen, setFullscreen] = useState(false), [pip, setPip] = useState(false), [shareStatus, setShareStatus] = useState(""), [feedbackStatus, setFeedbackStatus] = useState(""), [cardUrl, setCardUrl] = useState<string | null>(null), [collectibleUrl, setCollectibleUrl] = useState<string | null>(null);
+  const devFrame = isDevFrame(), devEdit = useRef(false), devOverlay = useRef(cleanOverlay(null, []));
   const pendingSave = useRef<unknown>(null), cardBlob = useRef<Blob | null>(null), collectibleBlob = useRef<Blob | null>(null), generation = useRef<number | null>(null), resizeRef = useRef<() => void>(() => {}), saveNow = useRef<(claim?: boolean, importHash?: string) => void>(() => {});
   const [cloud, setCloud] = useState<CloudState | null>(null), cloudWas = useRef<CloudState["status"] | null>(null), milestone = useRef("");
   /** Logged out: back on the title screen with the adventure saved. */
@@ -423,6 +427,13 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         if (forced) setRendererOverride(forced);
         return;
       }
+      // The development layer (devlayer.ts): only in a frame opened with ?dev=1, and only from the page around it.
+      if (devFrame && event.source === window.parent) {
+        const state = game.current;
+        if (event.data?.type === DEV_WORLD && state) { const overlay = cleanOverlay(event.data.overlay, []); devOverlay.current = overlay; const report = rebuildWorld(state, overlay); refresh(); window.parent.postMessage({ type: DEV_REPORT, ...report, ops: overlay.ops.length }, "*"); return; }
+        if (event.data?.type === DEV_MODE) { devEdit.current = event.data.edit === true; return; }
+        if (event.data?.type === DEV_TELEPORT && state && typeof event.data.x === "number" && typeof event.data.y === "number") { const p = state.player; p.x = Math.round(event.data.x); p.y = Math.round(event.data.y); p.prev = { x: p.x, y: p.y }; p.path = []; p.target = null; const at = realPoint(state.world, p.x, p.y); camera.current.x = at.x; camera.current.y = at.y; refresh(); return; }
+      }
       if (event.data?.type !== HOST_STATE) return;
       if (game.current) applyHost(event.data); else pendingSave.current = event.data;
     };
@@ -467,6 +478,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       };
       if (pendingSave.current) { applyHost(pendingSave.current as { ids?: unknown; save?: unknown }); pendingSave.current = null; }
       window.parent.postMessage({ type: HOST_HELLO, friend: friendId.toString() }, "*");
+      if (devFrame) { keepPristine(); window.parent.postMessage({ type: DEV_CATALOG, catalog: devCatalog(state) }, "*"); }
     }).catch(() => { if (version === epoch.current) { setPhase("failed"); setStatus("Your Friend's artwork couldn't be loaded. Check your connection and try again."); } });
     return () => { clearTimeout(hostTimer); window.removeEventListener("message", receive); audio.current?.dispose(); audio.current = null; };
   }, [friendId, client]);
@@ -845,6 +857,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     if (phase !== "playing") return;
     canvas.current?.focus({ preventScroll: true });
     const p = logicalPoint(event.clientX, event.clientY);
+    // The development game in edit mode: a click reports the tile to the host's editor instead of acting (the middle button still orbits).
+    if (devEdit.current && event.button !== 1 && game.current) { const tile = toTile(camera.current, p.x, p.y); window.parent.postMessage({ type: DEV_PICK, pick: devPick(game.current, tile.x, tile.y, devOverlay.current), button: event.button, shift: event.shiftKey }, "*"); return; }
     if (event.button === 1) { event.preventDefault(); orbit.current = { x: p.x, y: p.y, angle: camera.current.angle, pitch: camera.current.pitch }; canvas.current?.setPointerCapture(event.pointerId); return; }
     if (event.pointerType === "touch") { longPress(() => openContext(p.x, p.y)); touchStart.current = { ...p, at: performance.now() }; return; }
     if (event.button === 0) {

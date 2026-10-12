@@ -31,3 +31,6 @@ enabled = true
 [[r2_buckets]]
 binding = "CARDS"
 bucket_name = "rarefriends-realm-nft"
+
+# The private development game (src/dev.ts) is served under /dev/ behind the owner's login (the secret DEV_PASSWORD_HASH;
+# scripts/dev-password.mjs); its built site lives in the bucket above under dev-site/ (npm run build:dev && npm run dev:upload).

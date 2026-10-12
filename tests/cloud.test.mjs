@@ -382,3 +382,59 @@ test("Adventurer Cards: redeeming settles the snapshot exactly: the redeemer gai
   // A card can't be redeemed twice, nor by someone who didn't burn it.
   assert.equal((await w.call("POST", "/v1/cards/1/redeem", { token: tb, body: { txHash: burn, friend: 3412 } })).status, 404);
 });
+
+test("The private development game: a password makes a session (hashed, rate-limited, cookie-bound); the built site is served only to it; the overlay saves with versions, revisions, restore, reset and export; everything is audited", async () => {
+  const { hashPassword } = await import("../cloud/src/dev.ts");
+  const w = world(), hash = await hashPassword("correct horse battery staple!", "00112233445566778899aabbccddeeff", 1000);
+  const site = new Map([["dev-site/index.html", "<!doctype html>the site"], ["dev-site/game.js", "// the game"]]);
+  const bucket = { get: async key => site.has(key) ? { arrayBuffer: async () => new TextEncoder().encode(site.get(key)).buffer, httpMetadata: {} } : null, put: async () => {}, delete: async () => {} };
+  const app = createApp({ db: w.db, origins: [ORIGIN], chainId: 4663, clock: () => Date.parse("2026-10-12T10:00:00Z"), chain: { ownerOf: async () => null, verify: async () => false }, dev: { DB: w.db, DEV_PASSWORD_HASH: hash, bucket } });
+  const call = async (method, path, { body, cookie, headers = {}, origin } = {}) => {
+    const h = { ...(origin ? { origin } : {}), ...(cookie ? { cookie } : {}), ...headers, ...(body !== undefined ? { "content-type": "application/json" } : {}) };
+    const response = await app.fetch(new Request(`https://saves.example${path}`, { method, headers: h, body: body !== undefined ? JSON.stringify(body) : undefined }));
+    const text = await response.text(); let json = null; try { json = JSON.parse(text); } catch { /* html or a file */ }
+    return { status: response.status, body: json, text, headers: response.headers };
+  };
+  // Not signed in: the login page at the root, 401 for everything else, nothing from the assets.
+  const root = await call("GET", "/dev/"); assert.equal(root.status, 200); assert.match(root.text, /the development game/); assert.equal(root.headers.get("x-robots-tag"), "noindex, nofollow");
+  assert.equal((await call("GET", "/dev/game.js")).status, 401); assert.equal((await call("GET", "/dev/api/world/main")).status, 401);
+  // Another site can't even try; a wrong password is counted; five wrong ones lock the address for a while.
+  assert.equal((await call("POST", "/dev/api/login", { body: { password: "x" }, origin: "https://evil.example", headers: { "x-realm-dev": "1" } })).status, 403);
+  assert.equal((await call("POST", "/dev/api/login", { body: { password: "x" } })).status, 403, "writes need the header");
+  for (let i = 0; i < 5; i++) assert.equal((await call("POST", "/dev/api/login", { body: { password: "wrong" }, headers: { "x-realm-dev": "1" } })).status, 401);
+  assert.equal((await call("POST", "/dev/api/login", { body: { password: "correct horse battery staple!" }, headers: { "x-realm-dev": "1" } })).status, 429, "locked out");
+  w.db.sqlite.exec("DELETE FROM dev_logins");
+  const login = await call("POST", "/dev/api/login", { body: { password: "correct horse battery staple!" }, headers: { "x-realm-dev": "1" }, origin: "https://saves.example" });
+  assert.equal(login.status, 200, JSON.stringify(login.body));
+  const cookie = login.headers.get("set-cookie"); assert.match(cookie, /^realm_dev=[0-9a-f]{64}; Path=\/dev; HttpOnly; Secure; SameSite=Strict/);
+  const session = cookie.split(";")[0];
+  assert.equal(w.db.sqlite.prepare("SELECT COUNT(*) AS n FROM dev_sessions WHERE token_hash = ?").get(session.slice(10)).n, 0, "the token itself is never stored");
+  // Signed in: the site, and the world.
+  const page = await call("GET", "/dev/", { cookie: session }); assert.equal(page.status, 200); assert.equal(page.text, "<!doctype html>the site"); assert.match(page.headers.get("content-type"), /text\/html/);
+  const script = await call("GET", "/dev/game.js", { cookie: session }); assert.equal(script.text, "// the game"); assert.match(script.headers.get("content-type"), /javascript/);
+  assert.equal((await call("GET", "/dev/no-such-file.txt", { cookie: session })).status, 404);
+  const empty = await call("GET", "/dev/api/world/main", { cookie: session }); assert.equal(empty.body.version, 0); assert.deepEqual(empty.body.overlay.ops, []);
+  const overlay = { v: 1, name: "Test", ops: [{ op: "tile", x: 1, y: 1, t: 1 }] };
+  assert.equal((await call("PUT", "/dev/api/world/main", { cookie: session, body: { baseVersion: 0, overlay } })).status, 403, "writes need the header");
+  const saved = await call("PUT", "/dev/api/world/main", { cookie: session, headers: { "x-realm-dev": "1" }, body: { baseVersion: 0, overlay, note: "first" } });
+  assert.equal(saved.status, 200); assert.equal(saved.body.version, 1);
+  assert.equal((await call("PUT", "/dev/api/world/main", { cookie: session, headers: { "x-realm-dev": "1" }, body: { baseVersion: 0, overlay } })).status, 409, "an older base can't overwrite");
+  assert.equal((await call("PUT", "/dev/api/world/main", { cookie: session, headers: { "x-realm-dev": "1" }, body: { baseVersion: 1, overlay: { nope: true } } })).status, 422);
+  const two = { ...overlay, ops: [...overlay.ops, { op: "tile", x: 2, y: 2, t: 2 }] };
+  assert.equal((await call("PUT", "/dev/api/world/main", { cookie: session, headers: { "x-realm-dev": "1" }, body: { baseVersion: 1, overlay: two } })).body.version, 2);
+  assert.equal((await call("POST", "/dev/api/world/main/revisions", { cookie: session, headers: { "x-realm-dev": "1" }, body: { name: "Two tiles" } })).body.name, "Two tiles");
+  const revisions = (await call("GET", "/dev/api/world/main/revisions", { cookie: session })).body.revisions;
+  assert.equal(revisions.length, 3); assert.equal(revisions[0].name, "Two tiles"); assert.equal(revisions[2].note, "first");
+  const restored = await call("POST", "/dev/api/world/main/restore", { cookie: session, headers: { "x-realm-dev": "1" }, body: { revision: revisions[2].id } });
+  assert.equal(restored.body.version, 3); assert.equal(restored.body.overlay.ops.length, 1);
+  assert.equal((await call("GET", "/dev/api/world/main", { cookie: session })).body.overlay.ops.length, 1);
+  const exported = await call("GET", "/dev/api/world/main/export", { cookie: session }); assert.match(exported.headers.get("content-disposition"), /main\.overlay\.json/); assert.equal(exported.body.ops.length, 1);
+  const reset = await call("POST", "/dev/api/world/main/reset", { cookie: session, headers: { "x-realm-dev": "1" } }); assert.equal(reset.body.version, 4); assert.deepEqual(reset.body.overlay.ops, []);
+  assert.ok((await call("GET", "/dev/api/world/main/revisions", { cookie: session })).body.revisions.some(r => /Before reset/.test(r.name ?? "")), "the overlay before a reset is kept");
+  const audit = (await call("GET", "/dev/api/audit", { cookie: session })).body.audit.map(a => a.action);
+  for (const action of ["login-failed", "login", "save", "checkpoint", "restore", "export", "reset"]) assert.ok(audit.includes(action), action);
+  // Sign out: the cookie is dead; the public routes never saw any of this.
+  assert.equal((await call("POST", "/dev/api/logout", { cookie: session, headers: { "x-realm-dev": "1" } })).status, 200);
+  assert.equal((await call("GET", "/dev/api/world/main", { cookie: session })).status, 401);
+  assert.equal((await call("GET", "/v1/health")).status, 200);
+});

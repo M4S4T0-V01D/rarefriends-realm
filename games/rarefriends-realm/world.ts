@@ -12,6 +12,8 @@ import { growVillages, varyBuildings } from "./townscape.ts";
 import { roofRing } from "./ringroof.ts";
 import { fitBars } from "./barfit.ts";
 import { buildSouth } from "./south.ts";
+import { applyOverlay } from "./overlay.ts";
+import { OVERLAYS } from "./overlays/index.ts";
 
 /**
  * The far west (Return of Raria): the world grew by WEST_DX columns on its west side for a second continent, Raria and
@@ -62,7 +64,7 @@ export const T = {
   BRICK: 22,
 } as const;
 export type Terrain = typeof T[keyof typeof T];
-const WALKABLE = new Set<number>([T.GRASS, T.DARK_GRASS, T.PATH, T.COBBLE, T.SAND, T.SWAMP, T.SNOW, T.STONE, T.WOOD, T.GRAVEL, T.DUNGEON, T.BRIDGE, T.FARMLAND, T.ICE, T.CARPET, T.ASH, T.BRICK]);
+export const WALKABLE = new Set<number>([T.GRASS, T.DARK_GRASS, T.PATH, T.COBBLE, T.SAND, T.SWAMP, T.SNOW, T.STONE, T.WOOD, T.GRAVEL, T.DUNGEON, T.BRIDGE, T.FARMLAND, T.ICE, T.CARPET, T.ASH, T.BRICK]);
 export const isWater = (terrain: number) => terrain === T.WATER || terrain === T.DEEP;
 /** The sparring ring east of Market Street: inside it, players may duel each other (safely: nobody dies or loses items). */
 export const RING = { x0: 138 + MAINLAND.x + WEST_DX, y0: 144 + MAINLAND.y, x1: 144 + MAINLAND.x + WEST_DX, y1: 149 + MAINLAND.y };
@@ -330,6 +332,8 @@ export type World = {
   buildingAt: Uint16Array;
   /** City walls taller than a storey: the outline of each rectangle is drawn `storeys` high, with battlements. */
   ramparts?: Rampart[];
+  /** The hill lift and the raise the heights were built from (kept so an overlay can rebuild them after a change; overlay.ts). */
+  lift?: Float32Array; raise?: Float32Array;
   /** Ground height (world pixels) at every tile corner: (W + 1) × (H + 1), corner (i, j) sits at (i − ½, j − ½). */
   heights: Float32Array;
   places: Record<"spawn" | "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier" | "crypt" | "depths" | "king" | "fernwick" | "highcairn" | "dawnhold" | "gravesend" | "saltmarrow" | "hollyhock" | "dyemoor" | "tallgrass" | "cragmaw" | "quillhaven" | "raria" | "fff_fortress" | "barkreach" | "ashfall" | "ring"
@@ -1492,7 +1496,10 @@ export function generateWorld(seed = WORLD_SEED): { world: World; lift: Float32A
   for (const object of objects) if (object.name === "__removed") object.blocks = false;
   const buildingAt = new Uint16Array(W * H);
   buildings.forEach((b, index) => { if (b.roof === "none") return; for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) buildingAt[y * W + x] = index + 1; });
-  return { world: { tiles, region, objects, objectAt, spawns, places, heights: buildHeights(tiles, seed, lift, raise), buildings, buildingAt, floors, ramparts: ctx.ramparts }, lift, raise };
+  const world: World = { tiles, region, objects, objectAt, spawns, places, heights: buildHeights(tiles, seed, lift, raise), buildings, buildingAt, floors, ramparts: ctx.ramparts, lift, raise };
+  // Content promoted from the development world (overlays/): the editable layer, applied last of all.
+  for (const overlay of OVERLAYS) applyOverlay(world, overlay, seed);
+  return { world, lift, raise };
 }
 /**
  * Make room for the south: the generation frame's dungeon and storey rows (everything from GEN_OVERWORLD_H) move down
@@ -1545,9 +1552,9 @@ function buildLegacyWorld(seed: number) {
 const i2 = (random: () => number) => random() > 0.5;
 const SIDES = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
 /** Faded roof tiles in the Rare Friends accents. */
-const ROOF_COLORS = ["#c99a96", "#9aab92", "#8f9cb2", "#cdb98a", "#a996b5"];
-const TREE_NAMES: Record<TreeKind, string> = { tree: "Tree", oak: "Oak", willow: "Willow", maple: "Maple tree", yew: "Yew", ashwood: "Ashwood", palm: "Palm tree", pine: "Pine tree", deadwood: "Dead tree", redwood: "Redwood", ironbark: "Ironbark", cedar: "Cedar", sakura: "Blossom tree", bamboo: "Bamboo" };
-const DECOR_NAMES: Record<DecorKind, string> = {
+export const ROOF_COLORS = ["#c99a96", "#9aab92", "#8f9cb2", "#cdb98a", "#a996b5"];
+export const TREE_NAMES: Record<TreeKind, string> = { tree: "Tree", oak: "Oak", willow: "Willow", maple: "Maple tree", yew: "Yew", ashwood: "Ashwood", palm: "Palm tree", pine: "Pine tree", deadwood: "Dead tree", redwood: "Redwood", ironbark: "Ironbark", cedar: "Cedar", sakura: "Blossom tree", bamboo: "Bamboo" };
+export const DECOR_NAMES: Record<DecorKind, string> = {
   monument: "Statue", god_diamond: "Statue of the Good Friend", god_ink: "Statue of the Squid Friend", god_sol: "Statue of the Weird Friend", god_hood: "Statue of the Hood Friend", god_ember: "The Ember, in its brazier",
   god_dusk: "Statue of the Wise Friend, blindfolded", wise_friend: "The Wise Friend", bell: "Great bell", canopy: "Old roofing", cannon: "Magical cannon", device: "Federation device", wagon: "Supply wagon", watchtower: "Watchtower", stake: "Stake wall", plaque: "Inscribed plaque", banner_fff: "The Federation's banner", banner_rrr: "The Regiment's banner", banner_hollowmere: "Hollowmere's banner", banner_diamond: "The Order of the Diamond's banner", banner_ink: "The Order of the Ink's banner", banner_sol: "The Order of the Sol's banner", banner_hood: "The Order of the Hood's banner", banner_ember: "The Order of the Ember's banner", banner_dusk: "The Order of Dusk's banner",
   flowers: "Flowers", bush: "Bush", boulder: "Boulder", lamp: "Lamp post", bench: "Bench", crate: "Crate", barrel: "Water barrel", tent: "Tent",

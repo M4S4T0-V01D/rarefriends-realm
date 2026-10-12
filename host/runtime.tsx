@@ -95,6 +95,7 @@ async function share(action: ShareAction, text: string, image: Blob, filename: s
   return copied ? "copied-and-opened" : "saved-and-opened";
 }
 
+declare global { var __REALM_DEV__: boolean | undefined; }
 function RealmHost() {
   useEffect(() => {
     const session = createFriendWalletSession(), client = createRosterClient();
@@ -253,7 +254,7 @@ function RealmHost() {
     // The SDK's own frame: a 960 × 640 viewport (3:2), which the game's stage fills exactly.
     <div>
       <style>{".rf-frame-wallet-balance { display: none; }"}</style>
-      <GameHost definition={definition} frameUrl="./game.html" />
+      <GameHost definition={definition} frameUrl={globalThis.__REALM_DEV__ === true ? "./game.html?dev=1" : "./game.html"} />
       <p style={{ margin: "10px auto 0", maxWidth: 1280, textAlign: "center", font: "13px ui-monospace, Menlo, Consolas, monospace" }}>
         <a href="./preview/#trailer">▶ Watch the trailer</a> · <a href="./preview/">About the game</a> · <a href="./preview/guides.html">Skill guides</a>
       </p>
@@ -262,3 +263,5 @@ function RealmHost() {
 }
 
 createRoot(document.getElementById("root")!).render(<RealmHost />);
+// The private development game (host/editor.tsx): only in a build made with --dev-tools; the public build has none of it.
+if (globalThis.__REALM_DEV__ === true) void import("./editor.tsx").then(({ mountEditor }) => mountEditor());

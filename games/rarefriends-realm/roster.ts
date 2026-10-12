@@ -160,3 +160,19 @@ export const SETTINGS_STATE = "rarefriends-realm:settings-state";
 export type RendererMode = "normal" | "webgl";
 export const parseRenderer = (value: unknown): RendererMode | null => value === "normal" || value === "webgl" ? value : null;
 
+
+/**
+ * The private development game (cloud/src/dev.ts, host/editor.tsx): the same baked game, with an overlay (overlay.ts)
+ * laid over its world by the host page behind the owner's login. The game never edits on its own: the host sends the
+ * whole overlay (DEV_WORLD) whenever it changes, and the game rebuilds its world from the bake with it; in edit mode
+ * the game reports what was clicked (DEV_PICK) instead of acting, and tells the host what it knows (DEV_CATALOG) and
+ * what an overlay couldn't do (DEV_REPORT). None of this is sent by the public host page.
+ */
+export const DEV_WORLD = "rarefriends-realm:dev-world";
+export const DEV_MODE = "rarefriends-realm:dev-mode";
+export const DEV_PICK = "rarefriends-realm:dev-pick";
+export const DEV_CATALOG = "rarefriends-realm:dev-catalog";
+export const DEV_REPORT = "rarefriends-realm:dev-report";
+export const DEV_TELEPORT = "rarefriends-realm:dev-teleport";
+export type DevPick = { x: number; y: number; tile: number; lift: number; object: { id: number; kind: string; name: string; uid?: string } | null; building: { index: number; name: string } | null; region: string };
+export type DevCatalog = { tiles: Record<string, number>; decor: string[]; trees: string[]; rocks: string[]; spots: string[]; npcs: { id: string; name: string }[]; monsters: { id: string; name: string; level: number }[]; items: { id: string; name: string }[]; kinds: string[]; spawn: { x: number; y: number } };

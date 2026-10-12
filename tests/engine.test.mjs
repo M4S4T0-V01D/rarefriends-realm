@@ -3825,3 +3825,29 @@ test("Settlements travel with the save: the marks stay, the service's notices ar
   assert.ok(h.messages.some(entry => /Card #3 was redeemed/.test(entry.text)), "said once");
   assert.deepEqual(serialize(h).notices, []);
 });
+
+test("World overlays: a layer over the baked world, applied deterministically; bad ops are dropped with a reason; placements are checked for reach; the public build applies the promoted ones last", async () => {
+  const { applyOverlay, cleanOverlay, validatePlacements, walkableAt } = await import("../games/rarefriends-realm/overlay.ts");
+  const { OVERLAYS } = await import("../games/rarefriends-realm/overlays/index.ts"), { WORLD_SEED } = await import("../games/rarefriends-realm/world.ts");
+  const why = [], overlay = cleanOverlay({ v: 1, name: "Test", ops: [
+    { op: "tile", x: 5, y: 5, t: T.GRASS }, { op: "tile", x: -1, y: 5, t: T.GRASS }, { op: "fill", x0: 10, y0: 10, x1: 14, y1: 12, t: T.STONE }, { op: "lift", x: 12, y: 11, v: 2 },
+    { op: "object", uid: "tree-1", kind: "tree", tree: "oak", x: 12, y: 11 }, { op: "object", uid: "bad!", kind: "tree", x: 1, y: 1 }, { op: "nothing" },
+    { op: "building", uid: "hut", x0: 20, y0: 20, x1: 26, y1: 25, door: "s", name: "The hut" }, { op: "spawn", uid: "guide-2", kind: "npc", id: "guide", x: 23, y: 27 }, { op: "spawn", uid: "nobody", kind: "monster", id: "no_such_monster", x: 23, y: 28 },
+  ] }, why);
+  assert.equal(overlay.ops.length, 7, "the three bad ops are dropped (the unknown monster is refused when applied)"); assert.ok(why.some(w => /bad tile/.test(w)) && why.some(w => /bad object/.test(w)) && why.some(w => /unknown op/.test(w)));
+  // On worlds of their own: the shared world stays as it is for every other test.
+  const g = newGame({ world: createWorld() }), world = g.world, problems = [];
+  const placed = applyOverlay(world, overlay, WORLD_SEED, problems, NPCS);
+  assert.equal(world.tiles[5 * W + 5], T.GRASS); assert.equal(world.tiles[11 * W + 12], T.STONE); assert.equal(world.lift[11 * W + 12], 2);
+  assert.ok(placed.objects.has("tree-1")); assert.equal(world.objects[placed.objects.get("tree-1")].tree, "oak"); assert.equal(world.objectAt[11 * W + 12], placed.objects.get("tree-1"));
+  assert.ok(placed.buildings.has("hut")); const hut = world.buildings[placed.buildings.get("hut")]; assert.equal(hut.name, "The hut"); assert.equal(world.tiles[20 * W + 20], T.WALL); assert.equal(world.tiles[22 * W + 23], T.WOOD); assert.equal(world.tiles[25 * W + 23], T.WOOD, "the door gap"); assert.equal(world.buildingAt[22 * W + 23], placed.buildings.get("hut") + 1);
+  assert.ok(placed.spawns.has("guide-2")); assert.ok(!placed.spawns.has("nobody")); assert.ok(problems.some(p => /no monster called no_such_monster/.test(p)));
+  assert.ok(world.heights.length > 0 && Number.isFinite(world.heights[11 * (W + 1) + 12]), "heights rebuilt");
+  // Reach: the corner of the world is water and void; nothing there can be reached from the spawn.
+  const unreachable = validatePlacements(world, overlay, placed);
+  assert.ok(unreachable.some(u => /tree-1/.test(u)) || walkableAt(world, 12, 11) === false, "an oak in the sea can't be reached");
+  assert.ok(Array.isArray(OVERLAYS), "the promoted overlays are a list (empty today)");
+  // Applying the same overlay to a fresh world gives the same result.
+  const h = newGame({ world: createWorld() }), again = applyOverlay(h.world, overlay, WORLD_SEED, [], NPCS);
+  assert.deepEqual([...again.objects.keys()], [...placed.objects.keys()]); assert.equal(h.world.tiles[11 * W + 12], T.STONE);
+});

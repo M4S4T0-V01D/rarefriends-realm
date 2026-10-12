@@ -769,6 +769,9 @@ export function talk(game: Game, npcId: string): Dialogue {
 }
 function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
   const player = game.player, def = NPCS[npcId.split(":")[0]], name = def.name;
+  // Someone the development world made (overlay.ts): they say their lines, in turn.
+  const made = def as NpcDef & { dev?: boolean; lines?: string[] };
+  if (made.dev) { const lines = made.lines?.length ? made.lines : ["…"]; const said = player.questData[`dev_said_${def.id}`] ?? 0; player.questData[`dev_said_${def.id}`] = (said + 1) % lines.length; return { npc: npcId, lines: npcSays(name, lines[said % lines.length]), index: 0 }; }
   // The bars' people: barkeeps with their quests (until they're done), the quiet traders.
   if (!everyday) { const bar = talkBar(game, npcId, name, () => talkInner(game, npcId, true)); if (bar) return bar; }
   const west = talkWest(game, npcId, name); if (west) return west;

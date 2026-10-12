@@ -16,9 +16,11 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "node --test --test-concurrency=2 tests/*.test.mjs",
     "test:gentle": "scripts/gentle-test.sh",
+    "build:dev": "node scripts/build.mjs --dev-tools",
+    "dev:upload": "node scripts/dev-upload.mjs",
     "cards:compile": "node scripts/cards-compile.mjs",
     "cards:deploy": "node scripts/cards-deploy.mjs",
-    "test:browser": "node tests/browser.mjs && node tests/multiplayer-browser.mjs && node tests/cloud-browser.mjs && node tests/renderer-browser.mjs && node tests/preview-browser.mjs",
+    "test:browser": "node tests/browser.mjs && node tests/multiplayer-browser.mjs && node tests/cloud-browser.mjs && node tests/renderer-browser.mjs && node tests/preview-browser.mjs && node tests/dev-browser.mjs",
     "test:browser:webgl": "REALM_RENDERER=webgl node tests/browser.mjs && REALM_RENDERER=webgl node tests/multiplayer-browser.mjs && REALM_RENDERER=webgl node tests/cloud-browser.mjs",
     "build:preview": "node scripts/build-preview.mjs"
   },
