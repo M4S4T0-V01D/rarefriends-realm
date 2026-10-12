@@ -1,10 +1,10 @@
 /**
  * The mounts' places (mounts.ts has the people and quests), in the world's own frame, drawn after the settlements: the
  * poachers' camp at The Wilds' east edge with the tiger's cage of stakes, the tracks that lead there from Tallgrass, and
- * the drakes' nest up by Wyrmreach's lava. (The Friendhollow stables themselves are grown in world.ts, in the mainland's
+ * (The drakes' nest is Wyrmreach's: wyrmreachworld.ts. The Friendhollow stables themselves are grown in world.ts, in the mainland's
  * frame, where they were built.)
  */
-import { T, W, mainlandToWorld, worldTools, type DecorKind, type GenContext } from "./world.ts";
+import { T, W, worldTools, type DecorKind, type GenContext } from "./world.ts";
 
 /** The poachers' camp at The Wilds' east edge (world coordinates), where their kills count (mounts.ts). */
 export const POACHER_CAMP = { x0: 586, y0: 423, x1: 602, y1: 435 };
@@ -31,10 +31,5 @@ export function buildMountCountry(ctx: GenContext) {
     clue(583, 421, "scuffs", "Tracks in the soft ground", "tiger_tracks", false);
   }
 
-  // ---------- The drakes' nest, up by Wyrmreach's lava ----------
-  {
-    const [nx, ny] = mainlandToWorld(44, 33);
-    clue(nx, ny, "bones", "A drake's nest", "drake_nest");
-    for (const [dx, dy] of [[-1, 1], [1, -1], [2, 1]] as const) { t.clearAt(nx + dx, ny + dy); t.decor(nx + dx, ny + dy, "bones", false, "Scorched bones"); }
-  }
+  // (The drakes' nest is on Wyrmreach's plateau: wyrmreachworld.ts.)
 }

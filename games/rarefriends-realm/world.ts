@@ -18,6 +18,7 @@ import { buildHearthkinCountry } from "./hearthkinworld.ts";
 import { buildDungeonIdentity } from "./dungeonworld.ts";
 import { buildSettlements } from "./settlementsworld.ts";
 import { buildMountCountry } from "./mountworld.ts";
+import { buildWyrmreach } from "./wyrmreachworld.ts";
 
 /**
  * The far west (Return of Raria): the world grew by WEST_DX columns on its west side for a second continent, Raria and
@@ -207,7 +208,7 @@ export const REGIONS: readonly Region[] = [
   { id: "murkmire", name: "Murkmire", label: { x: 44, y: 166 }, danger: 2 },
   { id: "mossy_ruins", name: "Mossy Ruins", label: { x: 120, y: 172 }, danger: 2 },
   { id: "wizards_tower", name: "Wizards' Tower", label: { x: 160, y: 124 }, danger: 0 },
-  { id: "wyrmreach", name: "Wyrmreach", label: { x: 36, y: 20 }, danger: 5 },
+  { id: "wyrmreach", name: "Wyrmreach", label: { x: 596, y: 118 }, danger: 5, far: true },
   { id: "fernwick", name: "Fernwick", label: { x: 34, y: 60 }, danger: 0 },
   { id: "greyhorn", name: "Greyhorn Highlands", label: { x: 272, y: 128 }, danger: 2 },
   { id: "highcairn", name: "Highcairn", label: { x: 282, y: 66 }, danger: 0 },
@@ -1546,7 +1547,8 @@ export function generateWorld(seed = WORLD_SEED): { world: World; lift: Float32A
   // The dungeons' identities (dungeonworld.ts): the Rime Galleries, the Sigil Vault, and every dungeon dressed in its family's things, in the world's own frame, last of all.
   buildDungeonIdentity({ ...south, random: mulberry(seed + 909) }, seed);
   buildSettlements({ ...south, random: mulberry(seed + 919) });   // Gravesend's mausoleums and vault, Fernwick's forester, Southshore's wreck and beach (settlementsworld.ts)
-  buildMountCountry({ ...south, random: mulberry(seed + 929) }); // the poachers' camp and the tiger's cage, the drakes' nest (mountworld.ts)
+  buildMountCountry({ ...south, random: mulberry(seed + 929) }); // the poachers' camp and the tiger's cage (mountworld.ts)
+  buildWyrmreach({ ...south, random: mulberry(seed + 939) });    // Wyrmreach moved up its mountain north-west of Fernwick, the forest grown over the old field, the drakes' nest (wyrmreachworld.ts)
   for (const object of objects) if (object.name === "__removed") object.blocks = false;
   // The dungeons settle under the ground they're reached from (the strip they were built in is left empty).
   const labels: World["labels"] = {}, under = settleUnderground(ctx, places, floors, labels);

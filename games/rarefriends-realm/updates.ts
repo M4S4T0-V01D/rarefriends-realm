@@ -4,6 +4,9 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 115, date: "2026-10-12", title: "Wyrmreach moved up its mountain: the forest grown north of Fernwick, the dragons far from the village", items: [
+    "The dragons were on Fernwick's doorstep, and the village has grown. Their ash field north of it is forest now: Whisperwood stretched far north of Fernwick, oaks and maples thinning to dead trees as the ground climbs, and at the forest's north-west edge a mountain rises out of the bay, ringed with crag. Switchbacks climb it from the hunters' camp at its foot to a plateau of ash and lava where the drakes roost, the crater at its heart where Old Cinder sleeps, and the drakes' nest on the far side past the lava, as far from anywhere as an egg can be.",
+  ] },
   { id: 114, date: "2026-10-12", title: "The underground lies where it lies: every dungeon under the ground its ladder stands on", items: [
     "The dungeons used to sit side by side in one long gallery under the Realm, whoever's they were; now each lies beneath the ground you climb down from, the first room directly under the ladder, its deeper levels beside it, and nothing between one dungeon and the next but the black of the rock. The world map, underground, shows them where they are: the Murkmire Crypt under the bog, the Hollow Depths under the castle, the Rime Galleries under Frostpeak's shelf, the Underway under Kharaveth. Nothing inside any of them changed; a save left down below finds its dungeon where it went.",
   ] },
