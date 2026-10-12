@@ -608,7 +608,7 @@ test("A Friend's Feast from start to finish", () => {
   assert.equal(g.player.quests.friends_feast, 2);
   assert.equal(questPoints(g), 1);
   assert(level(g, "cooking") >= 10, "Quest XP");
-  assert.equal(QUESTS.length, 97); assert.equal(MAX_QUEST_POINTS, 174);
+  assert.equal(QUESTS.length, 101); assert.equal(MAX_QUEST_POINTS, 178);
 });
 
 test("Grumblin Trouble counts kills and pays out", () => {
@@ -1954,7 +1954,7 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   assert.equal(p.quests.dawn_against_hollow, 2); assert(has(p, "dawnplate_cuirass"));
   assert.equal(count(p, "hollow_essence"), 0);
   assert.equal(capeProblem(g, "dawnplate_cuirass"), null, "the armoury sells Dawnplate once earned");
-  assert.equal(QUESTS.length, 97); assert.equal(MAX_QUEST_POINTS, 174);
+  assert.equal(QUESTS.length, 101); assert.equal(MAX_QUEST_POINTS, 178);
 });
 
 test("Boots and gauntlets in every metal, smithed at the anvil; the clothier's shirts, dresses, trousers and skirts", () => {
@@ -4111,7 +4111,7 @@ test("Dungeon identity: every underground region has a theme of a family, each f
 test("Activities: a challenge set by its host runs on the game's own mechanics, is timed, scored, paid once and remembered; the Quarry Call counts only the quarry's rock, the Assay Run only the guild furnaces' bars and counts the failures, the Hot Tunnel wants the gem rock and a live return, the Pass Run is on foot; a death or the clock fails it, a failure shortens the wait, and it all survives a save", async () => {
   const { ACTIVITIES, ACTIVITY_HOSTS, activityProblem, startActivity, cancelActivity, activityEvent, activityTick, activityRecord, cleanActivities } = await import("../games/rarefriends-realm/activities.ts");
   const { GUILD_FURNACE } = await import("../games/rarefriends-realm/hearthkinnames.ts");
-  const { mainlandToWorld } = await import("../games/rarefriends-realm/world.ts");
+  const { mainlandToWorld, regionAt } = await import("../games/rarefriends-realm/world.ts");
   const g = newGame(), p = g.player;
   assert.deepEqual(Object.keys(ACTIVITIES), ["quarry_call", "assay_run", "hot_tunnel", "pass_run"]); assert.deepEqual(ACTIVITY_HOSTS.quarry_master, ["quarry_call", "hot_tunnel"]);
   // The host offers it in talk; the level gates it.
@@ -4129,10 +4129,10 @@ test("Activities: a challenge set by its host runs on the game's own mechanics, 
   assert.equal(p.activities.run, null, "done at ten"); assert.ok(p.xp.mining > xp + 100 && count(p, "coins") > coins, "paid"); assert.equal(activityRecord(g, "quarry_call").done, 1); assert.ok(activityRecord(g, "quarry_call").best > 0.9, "a fast run scores high");
   assert.match(activityProblem(g, "quarry_call"), /Not yet/, "the cooldown holds"); assert.equal(p.stats.activities, 1);
   // The Assay Run: the best metal you can smelt; bars from the guild furnace count, failures count against, other furnaces don't count.
-  p.xp.smithing = XP_TABLE[25]; startActivity(g, "assay_run"); const assay = p.activities.run; assert.equal(assay.target.metal, "moonsilver"); assert.equal(assay.target.count, 4);
-  activityEvent(g, { kind: "produce", station: "Furnace", metal: "moonsilver", failed: false }); assert.equal(assay.progress, 0);
-  activityEvent(g, { kind: "produce", station: GUILD_FURNACE, metal: "moonsilver", failed: true }); assert.equal(assay.failed, 1);
-  for (let i = 0; i < 4; i++) activityEvent(g, { kind: "produce", station: GUILD_FURNACE, metal: "moonsilver", failed: false });
+  p.xp.smithing = XP_TABLE[25]; startActivity(g, "assay_run"); const assay = p.activities.run; assert.equal(assay.target.metal, "blackiron", "the best metal you can smelt at 25"); assert.equal(assay.target.count, 8);
+  activityEvent(g, { kind: "produce", station: "Furnace", metal: "blackiron", failed: false }); assert.equal(assay.progress, 0);
+  activityEvent(g, { kind: "produce", station: GUILD_FURNACE, metal: "blackiron", failed: true }); assert.equal(assay.failed, 1);
+  for (let i = 0; i < 8; i++) activityEvent(g, { kind: "produce", station: GUILD_FURNACE, metal: "blackiron", failed: false });
   assert.equal(p.activities.run, null); const assayRecord = activityRecord(g, "assay_run"); assert.ok(assayRecord.best < 0.95 && assayRecord.best > 0.5, `a failure costs (${assayRecord.best})`);
   // The clock: a run that times out fails, pays nothing, and shortens the wait to a third.
   g.tick += 5000; p.xp.mining = XP_TABLE[45]; give(p, "cooked_meat"); startActivity(g, "hot_tunnel"); const tunnel = p.activities.run; const before = p.xp.mining;
@@ -4140,7 +4140,7 @@ test("Activities: a challenge set by its host runs on the game's own mechanics, 
   const wait = activityRecord(g, "hot_tunnel").lastAt + ACTIVITIES.hot_tunnel.cooldown - g.tick; assert.ok(wait > 0 && wait <= ACTIVITIES.hot_tunnel.cooldown / 3 + 1, `a third of the wait (${wait})`);
   // The Hot Tunnel done: the gem rock in the shaft's region, then standing in the quarry again; a death on the way fails it.
   g.tick += 5000; startActivity(g, "hot_tunnel"); activityEvent(g, { kind: "death" }); assert.equal(p.activities.run, null, "a death fails it");
-  g.tick += 5000; startActivity(g, "hot_tunnel"); const gem = g.world.objects.find(o => o.rock === "gem" && o.y >= 880);
+  g.tick += 5000; startActivity(g, "hot_tunnel"); const gem = g.world.objects.find(o => o.rock === "gem" && regionAt(g.world, o.x, o.y).id === "ashen_shaft");
   teleport(g, gem.x, gem.y + 1); activityEvent(g, { kind: "mine", rock: "gem", x: gem.x, y: gem.y }); assert.equal(p.activities.run.marks.gem, 1); activityTick(g); assert.ok(p.activities.run, "still down there");
   teleport(g, qx, qy); activityTick(g); assert.equal(p.activities.run, null, "back up: done"); assert.ok(has(p, "rough_moonstone"), "the moonstone");
   // The Pass Run: from the lodge to the square on foot; a jump of more than three tiles in a tick is not running.
@@ -4168,7 +4168,7 @@ test("The settlements grown: Gravesend's mausoleums and the Disturbed Row (the g
   assert.ok(PATRONS.forester.items().some(i => i.id === "yew_logs" && i.level === 60), "the forester orders the woods' logs");
   // The Disturbed Row: three graves searched for their tokens, three robbers at the camp (not bandits elsewhere), then the sexton.
   const graves = world.objects.filter(o => o.clue === "disturbed_grave"); assert.equal(graves.length, 3);
-  const use = (object, option) => { teleport(g, object.x, object.y + 1); setTarget(g, { kind: "object", id: object.id, option }); until(g, () => g.dialogue !== null || g.messages.some(m => /token|been through/.test(m.text)), 30); };
+  const use = (object, option) => { teleport(g, object.x, object.y + 1); const n = g.messages.length; setTarget(g, { kind: "object", id: object.id, option }); until(g, () => g.dialogue !== null || g.messages.length > n, 30); };
   use(graves[0], "Search"); assert.equal(count(p, "grave_token"), 0, "not before the quest");
   let d = talk(g, "sexton"); d = d.options.find(o => o.label === "I'll do it.").then(); d.onEnd?.(); assert.equal(p.quests[DISTURBED_ROW], 1);
   for (const grave of graves) use(grave, "Search"); assert.equal(count(p, "grave_token"), 3); use(graves[0], "Search"); assert.equal(count(p, "grave_token"), 3, "once each");

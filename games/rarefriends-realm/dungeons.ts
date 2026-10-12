@@ -15,7 +15,7 @@ const TIER: Partial<Record<RegionId, Tier>> = { root_cellars: "shallow", mossy_u
   // Meghavan: the Great Stepwell under Sarovan.
   great_stepwell: "deep",
   // The dungeon identity update: the Rime Galleries and the Sigil Vault.
-  rime_galleries: "deep", sigil_vault: "deep", fellows_deep: "deep", ashen_shaft: "shallow",
+  rime_galleries: "deep", sigil_vault: "deep", ashworth_vault: "deep", fellows_deep: "deep", ashen_shaft: "shallow",
   // The pyramids by Kharaveth's south coast: their storeys are dread; the deeps under them are royal, the richest of all.
   unfinished_pyramid: "dread", siruvet_pyramid: "dread", uncounted_deep: "royal", measured_vault: "royal" };
 /** The key a dungeon's coffers can hold. */

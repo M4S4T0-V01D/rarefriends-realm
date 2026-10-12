@@ -21,6 +21,8 @@ import { HEARTLAND_NPCS, HEARTLAND_QUESTS, onHeartlandsKill, talkHeartlands } fr
 import { ORASHAI_NPCS, ORASHAI_QUESTS, onOrashaiKill, talkOrashai } from "./orashaiquests.ts";
 import { HIDDEN_ROAD_NPCS, HIDDEN_ROAD_QUESTS, onHiddenRoadKill, talkHiddenRoad } from "./hiddenroad.ts";
 import { HEARTHKIN_NPCS, HEARTHKIN_QUESTS, talkHearthkin } from "./hearthkin.ts";
+import { SETTLEMENT_NPCS, SETTLEMENT_QUESTS, onSettlementsKill, talkSettlements } from "./settlements.ts";
+import { ACTIVITIES, ACTIVITY_HOSTS, activityProblem, cancelActivity, startActivity } from "./activities.ts";
 import { MEGHAVAN_NPCS, talkMeghavan } from "./meghavanpeople.ts";
 import { MEGHAVAN_QUESTS, MEGHAVAN_QUEST_NPCS, onMeghavanKill, talkMeghavanQuests } from "./meghavanquests.ts";
 import { MEGHAVAN_SCHOOL_NPCS, MEGHAVAN_SCHOOL_QUESTS, talkMeghavanSchools } from "./meghavanschools.ts";
@@ -76,6 +78,7 @@ export const NPCS: Record<string, NpcDef> = {
   ...ORASHAI_NPCS,
   ...HIDDEN_ROAD_NPCS,
   ...HEARTHKIN_NPCS,
+  ...SETTLEMENT_NPCS,
   ...MEGHAVAN_NPCS,
   ...MEGHAVAN_QUEST_NPCS,
   ...MEGHAVAN_SCHOOL_NPCS,
@@ -491,6 +494,7 @@ export const QUESTS: readonly QuestDef[] = [
   ...ORASHAI_QUESTS,
   ...HIDDEN_ROAD_QUESTS,
   ...HEARTHKIN_QUESTS,
+  ...SETTLEMENT_QUESTS,
   ...MEGHAVAN_QUESTS,
   ...MEGHAVAN_SCHOOL_QUESTS,
   ...PORTS_QUESTS,
@@ -601,7 +605,7 @@ export function chat(npc: string, lines: DialogueLine[], options?: Dialogue["opt
 /** Pickpocket and quest hooks the engine calls. */
 export function onMonsterKilled(game: Game, monsterId: string, x: number, y: number) {
   const player = game.player;
-  onWestKill(game, monsterId); onMizukaiKill(game, monsterId); onKharavethKill(game, monsterId); onHeartlandsKill(game, monsterId); onOrashaiKill(game, monsterId); onHiddenRoadKill(game, monsterId); onMeghavanKill(game, monsterId); onPortsKill(game, monsterId); onBountyKill(game, monsterId); onPyramidsKill(game, monsterId);
+  onWestKill(game, monsterId); onMizukaiKill(game, monsterId); onKharavethKill(game, monsterId); onHeartlandsKill(game, monsterId); onOrashaiKill(game, monsterId); onHiddenRoadKill(game, monsterId); onSettlementsKill(game, monsterId, x, y); onMeghavanKill(game, monsterId); onPortsKill(game, monsterId); onBountyKill(game, monsterId); onPyramidsKill(game, monsterId);
   // The wider world's village quests count their kills wherever they fall.
   const tally = (quest: string, key: string, goal: number, done: string) => {
     if (stage(game, quest) !== 1) return;
@@ -790,6 +794,14 @@ export function talk(game: Game, npcId: string): Dialogue {
     dialogue.lines.unshift(...npcSays(name, level >= 70 && player.name ? `Everyone here knows ${who}.` : level >= 40 && player.name ? `${who}! What brings you back?` : "Back already?"));
   }
   // Craftsfolk have work going.
+  // The Realm's challenges (activities.ts): their hosts offer them, say where a run stands, and take a run back.
+  if (ACTIVITY_HOSTS[base] && !dialogue.onEnd) {
+    const run = game.player.activities.run;
+    const options = ACTIVITY_HOSTS[base].map(id => { const def = ACTIVITIES[id]; return run?.id === id
+      ? { label: `${def.name}: how am I doing?`, then: () => chat(name, npcSays(name, def.status(game, run)), [{ label: "I give it up.", then: () => { cancelActivity(game); return null; } }, { label: "Back to it.", then: () => null }]) }
+      : { label: `${def.name}.`, then: () => { const problem = activityProblem(game, id); if (problem) return chat(name, npcSays(name, problem)); const target = def.roll(game); return chat(name, npcSays(name, def.brief(game, target), def.promise), [{ label: "I'm in.", then: () => { startActivity(game, id, target); return null; } }, { label: "Not now.", then: () => null }]); } }; });
+    dialogue.options = [...(dialogue.options ?? []).filter(entry => !/^(Goodbye|Not today|Just|Maybe later|Nothing)/.test(entry.label)), ...options, { label: "Goodbye.", then: () => null }];
+  }
   if (PATRONS[base] && !dialogue.onEnd) {
     const option = { label: "Any work going?", then: () => orderDialogue(game, base, name) };
     dialogue.options = [...(dialogue.options ?? []).filter(entry => !/^(Goodbye|Not today|Just|Maybe later|Nothing)/.test(entry.label)), option, { label: "Goodbye.", then: () => null }];
@@ -817,6 +829,7 @@ function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
   const orashai = talkOrashai(game, npcId, name); if (orashai) return orashai;
   const road = talkHiddenRoad(game, npcId, name); if (road) return road;
   const hearthkin = talkHearthkin(game, npcId, name); if (hearthkin) return hearthkin;
+  const settlements = talkSettlements(game, npcId, name); if (settlements) return settlements;
   const heartlands = talkHeartlands(game, npcId, name); if (heartlands) return heartlands;
   const meghavanQuest = talkMeghavanQuests(game, npcId, name); if (meghavanQuest) return meghavanQuest;
   const meghavanSchool = talkMeghavanSchools(game, npcId, name); if (meghavanSchool) return meghavanSchool;

@@ -15,6 +15,7 @@ import { cleanCard, cleanFellowshipLook } from "./cardstyle.ts";
 import { cleanCollectible } from "./collectible.ts";
 import { cleanLockbox } from "./cardescrow.ts";
 import { applyCamp, campRespawn, packUpCamp, restAtCamp, setUpCamp, setUpFieldAltar, toggleRespawn, type Camp } from "./camping.ts";
+import { activityEvent, activityTick, cleanActivities } from "./activities.ts";
 import { COLD_QUENCH, COLD_QUENCH_ANVIL, ELDER_ANVIL, ELDER_ANVIL_NAME, FELLOWS_TRIAL, GAUGE_RESPAWN, GAUGE_ROCKS, GUILD_FURNACE } from "./hearthkinnames.ts";
 import { applyHome, cleanHome, sleep } from "./housing.ts";
 import { FIRST_STEPS, updateFirstSteps } from "./firststeps.ts";
@@ -1265,6 +1266,7 @@ export function tick(game: Game) {
   updateFirstSteps(game);
   game.tick++; game.playTicks++;
   arenaTick(game);
+  activityTick(game);
   const player = game.player;
   if (player.stunned > 0) player.stunned--;
   if (player.eatTimer > 0) player.eatTimer--;
@@ -1512,6 +1514,7 @@ function mineTick(game: Game, activity: Extract<Activity, { kind: "mine" }>) {
   const bagged = ore === "inkcoal" && hasSatchel(player) && player.coalBag < SATCHEL_SIZE, boxed = isSigilStone(ore) && hasStoneBox(player) && boxTotal(player) < STONE_BOX_SIZE;
   if (bagged) player.coalBag++; else if (boxed) { if (ore === "sigil_stone") player.stoneBox++; else player.stoneBoxGrades[ore] = (player.stoneBoxGrades[ore] ?? 0) + 1; } else give(player, ore);
   addXp(game, "mining", rock.xp);
+  activityEvent(game, { kind: "mine", rock: object.rock ?? "", x: object.x, y: object.y });
   if (player.familyId === 4 && game.rng() < 0.08 && freeSlots(player)) { give(player, ore); message(game, "Lopsided luck! You mine a second piece."); }
   else if (prospect && object.rock !== "gem" && !object.rock?.startsWith("sigil") && game.rng() < 0.04 * prospect && freeSlots(player)) { give(player, ore); message(game, "The prospector's tooth brings up a second piece."); }
   // Sigil stone of every grade never runs out (the Tower's stone, and the Refined, Charged and Primal faces in the mines): the better grades are rarer only by their level and odds.
@@ -1574,11 +1577,12 @@ function produceTick(game: Game, activity: Extract<Activity, { kind: "produce" }
   for (const [id, n] of Object.entries(recipe.inputs)) useUp(player, id, n);
   if (recipe.coins) take(player, "coins", recipe.coins);
   sound(game, recipe.station === "anvil" ? "anvil" : recipe.station === "furnace" ? "smelt" : "click");
-  if (recipe.chance !== undefined && game.rng() >= recipe.chance + level(game, recipe.skill) * 0.004) { message(game, "The ore is too impure and you fail to refine it."); return; }
+  const station = recipe.station === "anvil" || recipe.station === "furnace" ? stationBeside(game, recipe.station) : null, metal = METALS.find(entry => recipe.inputs[`${entry.id}_bar`] || recipe.outputs[`${entry.id}_bar`]);
+  if (recipe.chance !== undefined && game.rng() >= recipe.chance + level(game, recipe.skill) * 0.004) { message(game, "The ore is too impure and you fail to refine it."); activityEvent(game, { kind: "produce", station: station?.name ?? null, metal: metal?.id ?? null, failed: true }); return; }
   for (const [id, n] of Object.entries(recipe.outputs)) give(player, id, n);
   if (recipe.skill === "apothecary" && Object.keys(recipe.outputs).some(id => item(id).potion)) { player.stats.brews = (player.stats.brews ?? 0) + 1; presenceXp(game, 1); }
   // The Hearthkin's stations (hearthkin.ts): the Elder anvils teach a quarter more; a guild furnace gives up a second bar of the deep metals one time in five; the cold quench keeps a bar of forged metal back one time in five.
-  const station = recipe.station === "anvil" || recipe.station === "furnace" ? stationBeside(game, recipe.station) : null, metal = METALS.find(entry => recipe.inputs[`${entry.id}_bar`] || recipe.outputs[`${entry.id}_bar`]);
+  activityEvent(game, { kind: "produce", station: station?.name ?? null, metal: metal?.id ?? null, failed: false });
   addXp(game, recipe.skill, recipe.xp * (station?.name === ELDER_ANVIL_NAME && questDone(game, ELDER_ANVIL) ? 1.25 : 1));
   message(game, recipe.station === "furnace" ? `You retrieve a bar of ${recipe.label.replace(" bar", "").toLowerCase()}.` : `You make ${aOrAn(recipe.label)} ${recipe.label.toLowerCase()}.`);
   if (station?.name === GUILD_FURNACE && metal && metal.tier >= 4 && metal.tier <= 6 && recipe.outputs[`${metal.id}_bar`] && questDone(game, FELLOWS_TRIAL) && game.rng() < 0.2) { give(player, `${metal.id}_bar`); message(game, "The guild furnace gives up a second bar."); }
@@ -1893,6 +1897,7 @@ function damagePlayer(game: Game, damage: number, from: Monster | null) {
   if (player.hp <= 0) die(game);
 }
 export function die(game: Game) {
+  activityEvent(game, { kind: "death" });
   const player = game.player, spawn = game.world.places.spawn;
   message(game, "Oh dear, you are dead!", "warn"); emit(game, { type: "death", tick: game.tick }); remember(game, "first_death"); friendSays(game, "death"); sound(game, "death");
   player.deaths++; stopAll(game); closeInterfaces(game); player.prayers = []; player.preparation = null; player.hp = maxHp(player); player.energy = 100;
@@ -2747,7 +2752,7 @@ export type SaveData = {
   met?: unknown; achievements?: Record<string, number>; pets?: string[]; petOut?: string | null; killLog?: Record<string, number>; lore?: Record<string, unknown>; stats?: Record<string, number>; referredBy?: number | null; referrals?: number[]; referralTimes?: number[]; boostTicks?: number; stoneBoxGrades?: unknown; coalBag?: number; stoneBox?: number; boneBag?: Record<string, number>;
   boosts?: Record<string, number>; poison?: { damage: number; left: number; timer: number } | null; weaponPoison?: { weapon: string; damage: number; charges: number; weaken: boolean } | null;
   antidoteUntil?: number; antifireUntil?: number; stealthUntil?: number; tonicUntil?: number; mixture?: { family: number; until: number } | null;
-  firsts?: Record<string, number>; friendKinds?: Record<string, 1>; rumours?: Record<string, 1>; orders?: Record<string, WorkOrder>; card?: Record<string, string>; collectible?: unknown; lockbox?: unknown; settled?: unknown; notices?: unknown; camp?: unknown; campXpAt?: number; cards?: Record<string, number>; rarian?: boolean; mizukai?: boolean; orashai?: boolean; mana?: number; mysteries?: unknown; spiritWardUntil?: number; home?: unknown; restedTicks?: number; sigilBag?: Record<string, number>; ward?: { defence: number; flat: number; reduce: number } | null; wardUntil?: number; renew?: number; renewUntil?: number; belts?: Record<string, Record<string, number>>; followerWorn?: string[];
+  firsts?: Record<string, number>; friendKinds?: Record<string, 1>; rumours?: Record<string, 1>; orders?: Record<string, WorkOrder>; activities?: unknown; card?: Record<string, string>; collectible?: unknown; lockbox?: unknown; settled?: unknown; notices?: unknown; camp?: unknown; campXpAt?: number; cards?: Record<string, number>; rarian?: boolean; mizukai?: boolean; orashai?: boolean; mana?: number; mysteries?: unknown; spiritWardUntil?: number; home?: unknown; restedTicks?: number; sigilBag?: Record<string, number>; ward?: { defence: number; flat: number; reduce: number } | null; wardUntil?: number; renew?: number; renewUntil?: number; belts?: Record<string, Record<string, number>>; followerWorn?: string[];
   name?: string | null; fellowship?: { name: string; tag: string; logo?: string; banner?: string; colors?: string[] } | null; title?: string | null; visited?: Record<string, number>; regionTicks?: Record<string, number>; talked?: Record<string, 1>; emotesUsed?: Record<string, 1>; outfits?: Record<string, 1>; friendTicks?: number; mounts?: string[]; mount?: string | null; daily?: unknown; seenUpdate?: number;
 };
 export function serialize(game: Game): SaveData {
@@ -2760,7 +2765,7 @@ export function serialize(game: Game): SaveData {
     playTicks: game.playTicks, retaliate: game.autoRetaliate, music: [...player.music],
     referredBy: player.referredBy, referrals: [...player.referrals], referralTimes: [...player.referralTimes], boostTicks: player.boostTicks, coalBag: player.coalBag, stoneBoxGrades: { ...player.stoneBoxGrades }, stoneBox: player.stoneBox, boneBag: { ...player.boneBag }, boosts: { ...player.boosts }, poison: player.poison ? { ...player.poison } : null, weaponPoison: player.weaponPoison ? { ...player.weaponPoison } : null,
     antidoteUntil: Math.max(0, player.antidoteUntil - game.tick), antifireUntil: Math.max(0, player.antifireUntil - game.tick), stealthUntil: Math.max(0, player.stealthUntil - game.tick), tonicUntil: Math.max(0, player.tonicUntil - game.tick), mixture: player.mixture ? { family: player.mixture.family, until: Math.max(0, player.mixture.until - game.tick) } : null,
-    firsts: { ...player.firsts } as Record<string, number>, friendKinds: { ...player.friendKinds } as Record<string, 1>, rumours: { ...player.rumours } as Record<string, 1>, orders: { ...player.orders }, card: { ...player.card }, collectible: { layout: player.collectible.layout, show: [...player.collectible.show] }, lockbox: player.lockbox.map(slot => ({ ...slot })), settled: [...player.settled], notices: [...player.notices], camp: player.camp ? { ...player.camp } : null, campXpAt: player.campXpAt, cards: { ...player.cards }, rarian: player.rarian, mizukai: player.mizukai, orashai: player.orashai, mana: player.mana, mysteries: { found: { ...player.mysteries.found }, glyphs: { ...player.mysteries.glyphs }, read: { ...player.mysteries.read } }, spiritWardUntil: Math.max(0, player.spiritWardUntil - game.tick), home: player.home ? { ...player.home, furniture: { ...player.home.furniture } } : null, restedTicks: player.restedTicks, sigilBag: { ...player.sigilBag }, ward: player.ward ? { ...player.ward } : null, wardUntil: Math.max(0, player.wardUntil - game.tick), renew: player.renew, renewUntil: Math.max(0, player.renewUntil - game.tick), belts: Object.fromEntries(Object.entries(player.belts).map(([id, contents]) => [id, { ...contents }])), followerWorn: [...player.followerWorn],
+    firsts: { ...player.firsts } as Record<string, number>, friendKinds: { ...player.friendKinds } as Record<string, 1>, rumours: { ...player.rumours } as Record<string, 1>, orders: { ...player.orders }, activities: { run: player.activities.run ? { ...player.activities.run, target: { ...player.activities.run.target }, marks: { ...player.activities.run.marks } } : null, records: { ...player.activities.records } }, card: { ...player.card }, collectible: { layout: player.collectible.layout, show: [...player.collectible.show] }, lockbox: player.lockbox.map(slot => ({ ...slot })), settled: [...player.settled], notices: [...player.notices], camp: player.camp ? { ...player.camp } : null, campXpAt: player.campXpAt, cards: { ...player.cards }, rarian: player.rarian, mizukai: player.mizukai, orashai: player.orashai, mana: player.mana, mysteries: { found: { ...player.mysteries.found }, glyphs: { ...player.mysteries.glyphs }, read: { ...player.mysteries.read } }, spiritWardUntil: Math.max(0, player.spiritWardUntil - game.tick), home: player.home ? { ...player.home, furniture: { ...player.home.furniture } } : null, restedTicks: player.restedTicks, sigilBag: { ...player.sigilBag }, ward: player.ward ? { ...player.ward } : null, wardUntil: Math.max(0, player.wardUntil - game.tick), renew: player.renew, renewUntil: Math.max(0, player.renewUntil - game.tick), belts: Object.fromEntries(Object.entries(player.belts).map(([id, contents]) => [id, { ...contents }])), followerWorn: [...player.followerWorn],
     name: player.name, fellowship: player.fellowship ? { ...player.fellowship } : null, title: player.title, visited: { ...player.visited } as Record<string, number>, regionTicks: { ...player.regionTicks } as Record<string, number>, talked: { ...player.talked } as Record<string, 1>, emotesUsed: { ...player.emotesUsed } as Record<string, 1>, outfits: { ...player.outfits } as Record<string, 1>, friendTicks: player.friendTicks, mounts: [...player.mounts], mount: player.mount, met: JSON.parse(JSON.stringify(player.met)), achievements: { ...player.achievements }, pets: [...player.pets], petOut: player.petOut, killLog: { ...player.killLog }, lore: Object.fromEntries(Object.entries(player.lore).map(([id, entry]) => [id, { ...entry, d: [...entry.d] }])), stats: { ...player.stats }, daily: JSON.parse(JSON.stringify(player.daily)), seenUpdate: player.seenUpdate,
   };
 }
@@ -2891,7 +2896,7 @@ export function restore(game: Game, raw: unknown): boolean {
   player.referralTimes = (Array.isArray(save.referralTimes) ? save.referralTimes : []).filter((at): at is number => typeof at === "number" && Number.isFinite(at) && at > 0).slice(-REFERRALS_PER_DAY);
   player.mounts = MOUNTS.filter(mount => Array.isArray(save.mounts) && save.mounts.includes(mount.id)).map(mount => mount.id);
   player.mount = typeof save.mount === "string" && player.mounts.includes(save.mount) ? save.mount : null;
-  player.daily = cleanDaily(save.daily, SKILLS); player.orders = cleanOrders(save.orders); player.card = cleanCard(save.card); player.collectible = cleanCollectible(save.collectible); player.lockbox = cleanLockbox(save.lockbox);
+  player.daily = cleanDaily(save.daily, SKILLS); player.orders = cleanOrders(save.orders); player.activities = cleanActivities(save.activities, game.tick); player.card = cleanCard(save.card); player.collectible = cleanCollectible(save.collectible); player.lockbox = cleanLockbox(save.lockbox);
   player.settled = Array.isArray(save.settled) ? save.settled.filter((entry): entry is number => typeof entry === "number" && Number.isSafeInteger(entry)).slice(-50) : [];
   // What the save service settled while this adventure was away (a card redeemed): said once, here, then forgotten.
   const notices = Array.isArray(save.notices) ? save.notices.filter((entry): entry is string => typeof entry === "string").slice(0, 20) : [];

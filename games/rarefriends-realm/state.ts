@@ -1,6 +1,7 @@
 /**
  * Game state and the small helpers every system shares: inventory, bank, equipment, experience and messages.
  */
+import type { Activities } from "./activities.ts";
 import { unbakeWorld } from "./bake.ts";
 import { ORASHAI_FOCI } from "./orashai.ts";
 import {
@@ -127,6 +128,8 @@ export type Player = {
   daily: Daily; seenUpdate: number;
   /** Work orders by patron NPC. */
   orders: Record<string, WorkOrder>;
+  /** The Realm's challenges (activities.ts): the run you're on, and your records. */
+  activities: Activities;
   /** The adventurer card's chosen style (background, frame, skills panel, font, ink, layout). */
   card: Record<string, string>;
   /** The collectible card's choices (collectible.ts): its layout, and what it shows. */
@@ -300,7 +303,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
     style: "accurate", autocast: null, prayers: [], target: null, activity: null, combat: null,
     attackTimer: 0, eatTimer: 0, stunned: 0, regenTimer: 0, quests: {}, questData: {},
     wardrobe: [], worn: [], follower: null, courseStep: -1, kills: 0, deaths: 0, overhead: null, music: ["theme"],
-    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, stoneBoxGrades: {}, boneBag: {}, sigilBag: {}, belts: {}, followerWorn: [], orders: {}, collectible: { layout: "classic", show: ["skills", "combat", "quests", "generation"] }, lockbox: [], settled: [], notices: [], card: { bg: "paper", frame: "rose", skills: "boxes", font: "mono", ink: "ink", layout: "classic" }, cards: {}, rarian: false, mizukai: false, orashai: false, mana: 10, mysteries: { found: {}, glyphs: {}, read: {} }, techniqueReady: {}, preparation: null, spiritWardUntil: 0, home: null, restedTicks: 0, camp: null, campXpAt: -100000, ward: null, wardUntil: 0, renew: 0, renewUntil: 0, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, friendVillage: null, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, lore: {}, trail: null, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false, rerolls: 0 }, seenUpdate: LATEST_UPDATE,
+    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, stoneBoxGrades: {}, boneBag: {}, sigilBag: {}, belts: {}, followerWorn: [], orders: {}, activities: { run: null, records: {} }, collectible: { layout: "classic", show: ["skills", "combat", "quests", "generation"] }, lockbox: [], settled: [], notices: [], card: { bg: "paper", frame: "rose", skills: "boxes", font: "mono", ink: "ink", layout: "classic" }, cards: {}, rarian: false, mizukai: false, orashai: false, mana: 10, mysteries: { found: {}, glyphs: {}, read: {} }, techniqueReady: {}, preparation: null, spiritWardUntil: 0, home: null, restedTicks: 0, camp: null, campXpAt: -100000, ward: null, wardUntil: 0, renew: 0, renewUntil: 0, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, friendVillage: null, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, lore: {}, trail: null, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false, rerolls: 0 }, seenUpdate: LATEST_UPDATE,
     lastHitBy: null, created: Date.now(), queuedSpell: null, castTimer: 0,
   };
 }

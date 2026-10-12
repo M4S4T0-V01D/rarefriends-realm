@@ -710,6 +710,12 @@ const RANGED_GEAR: Item[] = [
 const MASTERY_BONUS: Partial<Bonuses> = { attack: 4, strength: 4, defence: 9, ranged: 4, magic: 4, prayer: 4 };
 const OTHER_ITEMS: Item[] = [
   { id: "oddhands_gauge", name: "Oddhand's gauge", examine: "Brass, a moonstone set in it, six marks: one for each of Bramble Oddhand's fingers. Carried, moonsilver, glimmer and rarite rocks come back a third sooner for you.", value: 1, tradeable: false, icon: { shape: "gem", color: "#c9a24a", accent: "#9fabc2" } },
+  // The settlements' things (settlements.ts): what the tide leaves, what the graves keep, what the wreck held, a chart and a necklace.
+  { id: "sea_shell", name: "Sea shell", examine: "A good shell, the kind the tide leaves in the crates it strands. Old Sal collects them.", value: 12, stackable: true, icon: { shape: "orb", color: "#efe6d6", accent: "#d8b6b4" } },
+  { id: "grave_token", name: "Grave token", examine: "A little stone disc Gravesend buries with its own, so the dead know the way back if they want it. The robbers dropped them: not gold.", value: 1, stackable: true, tradeable: false, icon: { shape: "sigil", color: "#8f8a83" } },
+  { id: "gullwing_bell", name: "The Gullwing's bell", examine: "Brass, green with the sea, the Gullwing's name round the rim. It still rings.", value: 1, tradeable: false, icon: { shape: "orb", color: "#6f9468", accent: "#c9a24a" } },
+  { id: "nells_tide_chart", name: "Nell's tide chart", examine: "The currents south of Southshore, as far as Nell has rowed them, drawn fair. For a boat that isn't built yet.", value: 1, tradeable: false, icon: { shape: "tablet", color: "#e8dfc6", accent: "#5d6f84" } },
+  { id: "shell_necklace", name: "Shell necklace", examine: "Six good shells on a cord, strung by Old Sal. Hold one to your ear when the beach is empty.", value: 90, icon: { shape: "amulet", color: "#efe6d6", kind: "strung" }, equip: { slot: "neck", bonuses: { prayer: 1 } } },
   { id: "slayer_gem", name: "Warden's gem", examine: "Tells you your Pursuance contract when you look into it.", value: 1, icon: { shape: "gem", color: "#6d8a8f", accent: "#161616" } },
   { id: "hunters_trophy", name: "Hunter's trophy", examine: "Taken from a marked creature: proof you tracked down one of the Realm's worst. Warden Thistle pays points for these.", value: 450, stackable: true, icon: { shape: "trophy", color: "#c9a84a", accent: "#7a5a2a" } },
   { id: "slayer_helm", name: "Warden's helm", examine: "A dark helm that knows your task. +15% accuracy and damage on it.", value: 12000, tradeable: false,

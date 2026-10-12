@@ -59,7 +59,7 @@ export const FAMILIES: Record<string, DungeonTheme> = {
 
 /** Every underground region's theme. A region without one gets the plain dungeon look it always had. */
 export const DUNGEON_THEMES: Partial<Record<RegionId, DungeonTheme>> = {
-  crypt: FAMILIES.ossuary, catacombs: FAMILIES.ossuary, bone_shrine: FAMILIES.ossuary, howling_vault: FAMILIES.ossuary,
+  crypt: FAMILIES.ossuary, catacombs: FAMILIES.ossuary, ashworth_vault: FAMILIES.ossuary, bone_shrine: FAMILIES.ossuary, howling_vault: FAMILIES.ossuary,
   deep_mine: FAMILIES.underworks, fellows_deep: FAMILIES.underworks, ashen_shaft: FAMILIES.underworks, wyrm_lair: FAMILIES.wyrm,
   rime_galleries: FAMILIES.rime, deepglass: FAMILIES.crystal,
   sigil_vault: FAMILIES.arcane, drowned_archive: FAMILIES.archive,

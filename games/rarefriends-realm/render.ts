@@ -3805,6 +3805,8 @@ const NPC_WEAR: Record<string, readonly string[]> = {
   // The Hearthkin (hearthkin.ts): Emberforge's in soot and leather, Frostpeak's in fur and snow capes.
   fellows_warden: ["blackiron_helm", "charcoal_shirt"], fellows_foreman: ["leather_hood", "moonsilver_pickaxe"], fellows_assayer: ["scholar_hat", "mustard_shirt"], pavilion_keeper: ["russet_cape"], ember_supplier: ["oak_shirt", "pewter_pickaxe"], quarry_master: ["leather_wide_hat", "charcoal_shirt"],
   frost_smith_cold: ["snow_cape"], frost_smith_wright: ["felt_wide_hat", "glimmer_pickaxe"], frost_elder: ["snow_cape"], camp_warden: ["snow_cape", "leather_hood"],
+  // The settlements' people (settlements.ts).
+  sexton: ["leather_hood", "charcoal_shirt"], stonemason: ["leather_wide_hat", "grey_trousers"], forester: ["forest_feathered_cap", "forest_cape", "ashsteel_axe"], beachcomber: ["straw_wide_hat", "teal_cape"], hermit: ["russet_cape"],
   miner: ["leather_hood", "pewter_pickaxe"], axel: ["forest_feathered_cap", "blackiron_axe"], rowan: ["leather_wide_hat", "forest_cape", "ashsteel_axe"],
   birch: ["straw_wide_hat", "pewter_axe"], fisher: ["straw_wide_hat", "teal_cape"], miller: ["straw_wide_hat"], mountain_guide: ["felt_wide_hat", "russet_cape", "pewter_pickaxe"],
   cook: ["snow_cape"], tailor: ["plum_wizard_hat", "bordered_cape", "sagestone_amulet"], shop_general: ["russet_feathered_cap"], innkeeper: ["crimson_cape"],

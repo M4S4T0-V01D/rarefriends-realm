@@ -8,6 +8,7 @@ import { POTIONS } from "./apothecary.ts";
 import { dayNumber, hash } from "./daily.ts";
 import { addXp, count, giveOrDrop, level, message, sound, take, type Game, type WorkOrder } from "./state.ts";
 import { presenceXp } from "./presence.ts";
+import { FORESTER_LOGS } from "./settlements.ts";
 
 export type Patron = { skill: Skill; ask: string; thanks: string; items: () => { id: string; level: number }[] };
 const SMITH_ORDER_PIECES = ["dagger", "axe", "sword", "helm", "shield", "sabre"] as const;
@@ -22,6 +23,8 @@ export const PATRONS: Record<string, Patron> = {
     items: () => ITEM_LIST.filter(entry => entry.family).flatMap(entry => { const level = familyLevel(entry.id); return level === null ? [] : [{ id: entry.id, level }]; }) },
   quarry_master: { skill: "smithing", ask: "The quarry's furnace is down and the carts are full. {n} {item}, smelted, at quarry rates.", thanks: "Good bars. The carts can roll again.",
     items: () => METALS.filter(metal => metal.tier <= 6).map(metal => ({ id: `${metal.id}_bar`, level: SMELTING[metal.id].level })) },
+  // Fernwick's forester (settlements.ts): the woods' own logs, for the lodge and the sawpit.
+  forester: { skill: "woodcutting", ask: "The lodge and the sawpit want {n} {item}. The woods' own, mind, and leave the Witness.", thanks: "Clean cut. The wood won't miss them.", items: FORESTER_LOGS },
   cook: { skill: "cooking", ask: "The castle eats like a siege. {n} {item}, and quickly.", thanks: "Oh, bless you. The King will never know how close it was.",
     items: () => Object.values(COOKING).map(entry => ({ id: entry.cooked, level: entry.level })) },
   rowan: { skill: "woodcutting", ask: "The yard's low. {n} {item}, and I'll pay yard rate and then some.", thanks: "Stacked and tallied. Fernwick thanks you.",

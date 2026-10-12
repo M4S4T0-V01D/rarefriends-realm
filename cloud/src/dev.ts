@@ -4,7 +4,7 @@
  * public site, and nothing here is reachable without a session made from the owner's password.
  *
  *   GET  /dev/                                   the login page, or (signed in) the development game (the built site, from the R2 bucket under dev-site/)
- *   POST /dev/api/login { password }             a session cookie (HttpOnly, Secure, SameSite=Strict, 12 h, sliding); 5 tries, then a wait
+ *   POST /dev/api/login { password }             a session cookie (HttpOnly, Secure, SameSite=None, 12 h, sliding); 5 tries, then a wait
  *   POST /dev/api/logout                         ends this session;  POST /dev/api/logout-all  ends every session (rotate after a password change)
  *   GET  /dev/api/me                             { ok, expiresAt }
  *   GET  /dev/api/world/:id                      { overlay, version, updatedAt, revisions: n }
@@ -17,7 +17,7 @@
  *   GET  /dev/api/audit                          what was done, newest first
  *
  * Authorization is the session cookie; writes also need the `x-realm-dev: 1` header (a cross-site form can't send it,
- * and the cookie is SameSite=Strict besides). The password is never stored: PBKDF2-SHA256 (scripts/dev-password.mjs
+ * and the sandboxed frame's own loads carry the cookie, SameSite=None, because its origin is opaque). The password is never stored: PBKDF2-SHA256 (scripts/dev-password.mjs
  * makes the hash; `npx wrangler secret put DEV_PASSWORD_HASH`). Secrets never reach the browser.
  */
 import type { Database } from "./worker.ts";
@@ -52,7 +52,10 @@ export async function verifyPassword(password: string, stored: string) {
 class HttpError extends Error { status: number; extra: Record<string, unknown>; constructor(status: number, message: string, extra: Record<string, unknown> = {}) { super(message); this.status = status; this.extra = extra; } }
 const json = (status: number, body: unknown, headers: Record<string, string> = {}) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store", "x-robots-tag": "noindex, nofollow", ...headers } });
 const cookieOf = (request: Request) => request.headers.get("cookie")?.split(";").map(part => part.trim()).find(part => part.startsWith(`${COOKIE}=`))?.slice(COOKIE.length + 1) ?? null;
-const setCookie = (token: string, maxAge: number) => `${COOKIE}=${token}; Path=/dev; HttpOnly; Secure; SameSite=Strict; Max-Age=${maxAge}`;
+// (SameSite=None, not Strict: the game runs in a sandboxed frame of an opaque origin, and its own fetches of game.js and the
+// styles must carry the session or they get the login page and the browser blocks them. Writes are still gated by the
+// x-realm-dev header and the Origin check, which an opaque frame can't pass.)
+const setCookie = (token: string, maxAge: number) => `${COOKIE}=${token}; Path=/dev; HttpOnly; Secure; SameSite=None; Max-Age=${maxAge}`;
 const WORLD_ID = /^[a-z0-9-]{1,32}$/;
 
 const LOGIN_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>RareFriends Realm · development</title>

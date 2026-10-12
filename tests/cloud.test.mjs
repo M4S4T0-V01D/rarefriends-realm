@@ -406,7 +406,7 @@ test("The private development game: a password makes a session (hashed, rate-lim
   w.db.sqlite.exec("DELETE FROM dev_logins");
   const login = await call("POST", "/dev/api/login", { body: { password: "correct horse battery staple!" }, headers: { "x-realm-dev": "1" }, origin: "https://saves.example" });
   assert.equal(login.status, 200, JSON.stringify(login.body));
-  const cookie = login.headers.get("set-cookie"); assert.match(cookie, /^realm_dev=[0-9a-f]{64}; Path=\/dev; HttpOnly; Secure; SameSite=Strict/);
+  const cookie = login.headers.get("set-cookie"); assert.match(cookie, /^realm_dev=[0-9a-f]{64}; Path=\/dev; HttpOnly; Secure; SameSite=None/);
   const session = cookie.split(";")[0];
   assert.equal(w.db.sqlite.prepare("SELECT COUNT(*) AS n FROM dev_sessions WHERE token_hash = ?").get(session.slice(10)).n, 0, "the token itself is never stored");
   // Signed in: the site, and the world.

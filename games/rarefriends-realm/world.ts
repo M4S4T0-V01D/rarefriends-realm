@@ -16,6 +16,7 @@ import { applyOverlay } from "./overlay.ts";
 import { OVERLAYS } from "./overlays/index.ts";
 import { buildHearthkinCountry } from "./hearthkinworld.ts";
 import { buildDungeonIdentity } from "./dungeonworld.ts";
+import { buildSettlements } from "./settlementsworld.ts";
 
 /**
  * The far west (Return of Raria): the world grew by WEST_DX columns on its west side for a second continent, Raria and
@@ -148,6 +149,8 @@ export type RegionId =
   | "fellows_deep" | "ashen_shaft"
   // The dungeon identity update: the Rime Galleries under Frostpeak's shelf, the Sigil Vault under the Wizards' Tower (dungeonworld.ts).
   | "rime_galleries" | "sigil_vault"
+  // The settlements' stage: the Ashworth Vault under Gravesend's first mausoleum (settlementsworld.ts).
+  | "ashworth_vault"
   // The Rare Friends Ring (2026-10): the arena west of the Deadwood.
   | "friends_ring"
   // Two more dungeons (2026-10): one for new heroes, one for the middle levels.
@@ -204,6 +207,7 @@ export const REGIONS: readonly Region[] = [
   { id: "ashen_shaft", name: "The Ashen Shaft", label: { x: 12, y: 220 }, danger: 3, underground: true },
   { id: "rime_galleries", name: "The Rime Galleries", label: { x: 268, y: 893 }, danger: 3, underground: true, far: true },
   { id: "sigil_vault", name: "The Sigil Vault", label: { x: 125, y: 895 }, danger: 2, underground: true, far: true },
+  { id: "ashworth_vault", name: "The Ashworth Vault", label: { x: 14, y: 896 }, danger: 2, underground: true, far: true },
   // The wider world. Labels here are in world coordinates (the mainland's above are moved by createWorld).
   { id: "deadwood", name: "The Deadwood", label: { x: 330, y: 62 }, danger: 3 },
   { id: "gravesend", name: "Gravesend", label: { x: 300, y: 128 }, danger: 0 },
@@ -1518,6 +1522,7 @@ export function generateWorld(seed = WORLD_SEED): { world: World; lift: Float32A
   buildSouth(south, worldTools(south), places, floors);
   // The dungeons' identities (dungeonworld.ts): the Rime Galleries, the Sigil Vault, and every dungeon dressed in its family's things, in the world's own frame, last of all.
   buildDungeonIdentity({ ...south, random: mulberry(seed + 909) }, seed);
+  buildSettlements({ ...south, random: mulberry(seed + 919) });   // Gravesend's mausoleums and vault, Fernwick's forester, Southshore's wreck and beach (settlementsworld.ts)
   for (const object of objects) if (object.name === "__removed") object.blocks = false;
   const buildingAt = new Uint16Array(W * H);
   buildings.forEach((b, index) => { if (b.roof === "none") return; for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) buildingAt[y * W + x] = index + 1; });

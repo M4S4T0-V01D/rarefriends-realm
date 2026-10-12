@@ -136,7 +136,9 @@ function translated(text: string, language: string, c: Compiled, depth: number, 
   // A name made a sentence ("Hollis Armoury." on a shop's sign): the name, and the full stop where the language uses one.
   if (/[^.]\.$/.test(core)) {
     const named = c.phrases.get(core.slice(0, -1));
-    if (named !== undefined) return lead + named + (/[。.!?！？]$/.test(named) || language === "ja" || language === "th" || language.startsWith("zh") ? "" : ".") + tail;
+    // (Japanese and Chinese write none after a name on its own, but a name that opens a run of sentences ("The Pass
+    // Run. Time's up.") needs its 。 so the run reads.)
+    if (named !== undefined) return lead + named + (/[。.!?！？]$/.test(named) || language === "th" ? "" : language === "ja" || language.startsWith("zh") ? (depth > 0 ? "。" : "") : ".") + tail;
   }
   // Numbers and symbols stay as they are.
   if (!/[A-Za-z]/.test(core)) return text;
