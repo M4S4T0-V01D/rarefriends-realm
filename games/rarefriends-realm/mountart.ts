@@ -206,8 +206,8 @@ function catBack(p: Pixels, coat: Coat, frame: number, saddle: boolean) {
 function spiderLeg(p: Pixels, coat: Coat, x: number, y: number, dir: number, reach: number, phase: number, far: boolean) {
   // Out and up to a knee, then down to the ground; the legs a shade off the body so they read over it.
   const color = shadeHex(coat.body, far ? -0.22 : 0.2), knee = { x: x + dir * Math.round(reach * 0.55) + phase, y: y - 6 - (phase ? 1 : 0) }, foot = { x: x + dir * reach + phase * 2, y: 27 - (Math.abs(phase) > 1 ? 1 : 0) };
-  p.line(x, y, knee.x, knee.y, color, 2); p.line(knee.x, knee.y, foot.x, foot.y, color, 1);
-  p.set(foot.x, foot.y, coat.hoof);
+  p.line(x, y, knee.x, knee.y, color, far ? 2 : 3); p.line(knee.x, knee.y, foot.x, foot.y, color, 2);
+  p.set(knee.x, knee.y - 1, shadeHex(color, 0.12)); p.rect(foot.x - 0.5, foot.y, 2, 1, coat.hoof);
 }
 function spiderSide(p: Pixels, coat: Coat, frame: number, saddle: boolean) {
   const body = coat.body, mark = coat.accent ?? shadeHex(body, -0.3), eye = coat.eye ?? "#e0463c", oy = 4, phases = frame < 0 ? [0, 0, 0, 0] : [[2, -2, 2, -2], [1, -1, 1, -1], [-2, 2, -2, 2], [-1, 1, -1, 1]][frame & 3];
@@ -218,16 +218,27 @@ function spiderSide(p: Pixels, coat: Coat, frame: number, saddle: boolean) {
   p.rect(6, 11 + oy, 11, 1, shadeHex(body, 0.1));
   for (let i = 0; i < 5; i++) p.rect(9 + i, 13 + oy + (i % 2), 1, 2, mark); p.rect(8, 17 + oy, 7, 1, mark);
   for (let y = 0; y < 12; y++) for (let x = 4; x < 19; x += 2) if (hash(x, y + 9) > 0.8) p.set(x + (y % 2), 11 + oy + y, shadeHex(coat.mane, 0.05));
-  p.disc(23, 19 + oy, 5, 3.5, shadeHex(body, -0.05), null);
-  p.set(26, 17 + oy, eye); p.set(27, 18 + oy, eye); p.set(25, 18 + oy, shadeHex(eye, -0.2)); p.set(27, 17 + oy, WHITE);
-  p.line(27, 21 + oy, 28, 23 + oy, coat.hoof, 1); p.line(26, 21 + oy, 26, 23 + oy, coat.hoof, 1);
   spiderLeg(p, coat, 20, 19 + oy, -1, 14, phases[2], false); spiderLeg(p, coat, 21, 19 + oy, -1, 8, phases[0], false);
   spiderLeg(p, coat, 25, 19 + oy, 1, 5, phases[3], false); spiderLeg(p, coat, 26, 19 + oy, 1, 9, phases[1], false);
+  // The head-body last, over the legs' roots (they grow from under it), so it reads clear of them.
+  spiderHeadSide(p, coat, eye, mark, oy);
   if (saddle) { p.rect(7, 10 + oy, 9, 3, BLANKET); p.poly([[7, 10 + oy], [8, 8 + oy], [15, 8 + oy], [16, 10 + oy]], SADDLE_LEATHER, null); p.rect(10, 13 + oy, 1, 3, SADDLE_LEATHER); }
+}
+/** The head-body from the side, out in front of the abdomen and held up: a carapace with a sheen, the eye cluster, palps and fangs. */
+function spiderHeadSide(p: Pixels, coat: Coat, eye: string, mark: string, oy: number) {
+  const head = shadeHex(coat.body, -0.08), cy = 15 + oy;
+  p.disc(24, cy + 0.5, 7, 5, INK, null); p.disc(24, cy, 6.5, 4.5, head, null);
+  p.rect(20, cy - 4, 7, 1, shadeHex(coat.body, 0.16)); p.rect(21, cy - 3, 4, 1, shadeHex(coat.body, 0.08));
+  p.rect(22, cy - 1, 3, 1, mark);
+  // The eyes, up on the brow at the front: two big ones and the smaller ones round them.
+  p.rect(27, cy - 3, 2, 2, eye); p.set(27, cy - 3, WHITE); p.set(29, cy - 1, eye); p.set(26, cy - 4, shadeHex(eye, -0.15)); p.set(29, cy - 3, shadeHex(eye, -0.2));
+  // The palps reaching forward, and the fangs hooked under the face.
+  p.line(29, cy + 1, 31, cy + 3, shadeHex(coat.body, 0.12), 1); p.set(31, cy + 4, coat.hoof);
+  p.line(27, cy + 3, 28, cy + 6, coat.hoof, 2); p.set(29, cy + 6, coat.hoof);
 }
 function spiderFront(p: Pixels, coat: Coat, frame: number, saddle: boolean, layer: MountLayer) {
   const body = coat.body, mark = coat.accent ?? shadeHex(body, -0.3), eye = coat.eye ?? "#e0463c", phases = frame < 0 ? [0, 0] : [[1, -1], [0, 0], [-1, 1], [0, 0]][frame & 3];
-  let oy = 4;
+  const oy = 4;
   if (layer !== "head") {
     // Legs splayed to both sides (four each), the abdomen rising behind.
     for (const [i, reach] of [[0, 9], [1, 8], [2, 7], [3, 6]] as const) { const ph = phases[i % 2]; spiderLeg(p, coat, 7, 17 + oy - i, -1, reach, ph, i > 1); spiderLeg(p, coat, 13, 17 + oy - i, 1, reach, -ph, i > 1); }
@@ -237,11 +248,14 @@ function spiderFront(p: Pixels, coat: Coat, frame: number, saddle: boolean, laye
     if (saddle) { p.rect(5, 8 + oy, 10, 3, BLANKET); p.rect(6, 7 + oy, 8, 2, SADDLE_LEATHER); }
   }
   if (layer === "body") return;
-  if (layer === "head") oy = 9;
-  // The head-body in front, low, with its cluster of eyes and the fangs under.
-  p.disc(10, 19 + oy, 5.5, 4, shadeHex(body, -0.05), null);
-  for (const [x, y] of [[7, 17], [9, 16], [11, 16], [13, 17], [8, 19], [12, 19]] as const) p.set(x, y + oy, eye); p.set(9, 16 + oy, WHITE);
-  p.line(8, 22 + oy, 7, 25 + oy, coat.hoof, 1); p.line(12, 22 + oy, 13, 25 + oy, coat.hoof, 1);
+  // The head-body in front, held up off the ground, its eyes facing you and the fangs under.
+  const cy = 15 + oy;
+  p.disc(10, cy, 6, 4.5, shadeHex(body, -0.08), null);
+  p.rect(7, cy - 4, 6, 1, shadeHex(body, 0.16));
+  p.rect(7, cy - 1, 2, 2, eye); p.rect(11, cy - 1, 2, 2, eye); p.set(7, cy - 1, WHITE); p.set(11, cy - 1, WHITE);
+  for (const [x, y] of [[6, cy - 3], [9, cy - 3], [10, cy - 3], [13, cy - 3]] as const) p.set(x, y, shadeHex(eye, -0.15));
+  p.line(5, cy + 2, 4, cy + 5, shadeHex(body, 0.12), 1); p.line(15, cy + 2, 16, cy + 5, shadeHex(body, 0.12), 1);
+  p.line(8, cy + 3, 7, cy + 6, coat.hoof, 2); p.line(12, cy + 3, 13, cy + 6, coat.hoof, 2);
 }
 function spiderBack(p: Pixels, coat: Coat, frame: number, saddle: boolean) {
   const body = coat.body, mark = coat.accent ?? shadeHex(body, -0.3), oy = 4, phases = frame < 0 ? [0, 0] : [[1, -1], [0, 0], [-1, 1], [0, 0]][frame & 3];

@@ -547,7 +547,7 @@ try {
     const at = await screenOf(stairs.x, stairs.y);
     await page.mouse.click(at.x, at.y - 12);
   };
-  await state(() => document.querySelector(".realm-side-toggle").click()); // tuck the side panels away for the pictures
+  await state(() => document.querySelector('.realm-tabs [aria-selected="true"]').click()); // tuck the side panels away for the pictures
   await teleportM(121, 110);
   await state(() => window.__realm.view(0.8, 0.5, -Math.PI / 4));
   await page.waitForTimeout(1500); await shot("castle");
@@ -567,10 +567,10 @@ try {
   await state(() => window.__realm.view(0.7, 0.24, 0.2));
   await page.waitForTimeout(1500); await shot("castle-roof");
   await state(() => window.__realm.view(0.8, 0.5, 0));
-  await state(() => document.querySelector(".realm-side-toggle").click()); // tuck the side panels away for the pictures
+  await state(() => document.querySelector('.realm-tabs [aria-selected="true"]').click()); // tuck the side panels away for the pictures
 
   // ---------- Market Street, a mastery cape and a bow, and nightfall ----------
-  await state(() => document.querySelector(".realm-side-toggle").click());
+  await state(() => document.querySelector('.realm-tabs [aria-selected="true"]').click());
   await teleportM(121, 141);
   await state(() => window.__realm.view(1, 0.45, -Math.PI / 4));
   await page.waitForTimeout(1500); await shot("market-street");
@@ -594,7 +594,7 @@ try {
   await teleportM(121, 141); await state(() => window.__realm.view(1.8, 0.45, 0.5));
   await page.waitForTimeout(1500); await shot("buildings");
   await state(() => window.__realm.view(0.8, 0.5, 0));
-  await state(() => document.querySelector(".realm-side-toggle").click());
+  await state(() => document.querySelector('.realm-tabs [aria-selected="true"]').click());
 
   // ---------- Every item, redrawn; and right-click inside an interface ----------
   await state(() => { const g = window.__realm.game(); g.player.bank = ["rarite_sabre", "glimmer_sword", "moonsilver_cuirass", "ashsteel_helm", "blackiron_shield", "yew_bow", "rarite_arrow", "ashsteel_arrowheads",

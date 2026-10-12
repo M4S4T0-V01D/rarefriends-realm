@@ -53,7 +53,7 @@ try {
   const rendering = await frame().evaluate(() => window.__realm.rendering?.() ?? { mode: "normal", gl: false });
   assert.equal(rendering.mode ?? "normal", mode, "the build draws in the mode asked for");
   if (mode === "webgl") assert.equal(rendering.gl, true, "a live GPU renderer in WebGL mode");
-  await frame().evaluate(() => { const g = window.__realm.game(); g.friendSpeech = "off"; window.__realm.weather({ rain: 0, storm: false, fog: 0 }); window.__realm.graphics("high"); document.querySelector(".realm-side-toggle")?.click(); window.__clock.start(); });
+  await frame().evaluate(() => { const g = window.__realm.game(); g.friendSpeech = "off"; window.__realm.weather({ rain: 0, storm: false, fog: 0 }); window.__realm.graphics("high"); document.querySelector('.realm-tabs [aria-selected="true"]')?.click(); window.__clock.start(); });
   for (const [name, place, dx, dy, time, zoom, pitch, angle] of SCENES) {
     await frame().evaluate(([place, dx, dy, time, zoom, pitch, angle]) => {
       const g = window.__realm.game(), p = g.player, at = g.world.places[place];

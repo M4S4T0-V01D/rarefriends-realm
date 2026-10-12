@@ -171,7 +171,7 @@ export type PanelProps = {
 };
 export function SidePanel(props: PanelProps & { open: boolean; setOpen: (open: boolean) => void }) {
   const { tab, setTab, open, setOpen } = props;
-  // The tab buttons sit along the bottom; pressing the open tab folds the panel away, pressing any tab opens it.
+  // The tab buttons sit along the bottom, one row of eleven; pressing the open tab folds the panel away, pressing any tab opens it (no separate hide button).
   const press = (id: Tab) => { if (open && tab === id) setOpen(false); else { setTab(id); setOpen(true); } };
   return (
     <aside className="realm-side" aria-label="Game panels" data-open={open}>
@@ -193,7 +193,6 @@ export function SidePanel(props: PanelProps & { open: boolean; setOpen: (open: b
           <button key={entry.id} type="button" role="tab" aria-selected={tab === entry.id} title={`${entry.label} (${entry.key})${open && tab === entry.id ? " · press again to hide" : ""}`} aria-label={entry.label} onClick={() => press(entry.id)}
             {...rightClick(props.openMenu, () => [{ verb: "Open", noun: entry.label, run: () => { setTab(entry.id); setOpen(true); } }, { verb: open ? "Hide" : "Show", noun: "panel", run: () => setOpen(!open) }])}><PixelIcon art={tabArt(entry.id as TabIcon)} size={24} /></button>
         ))}
-        <button type="button" className="realm-side-toggle" aria-expanded={open} aria-label={open ? "Hide the panel" : "Show the panel"} title={open ? "Hide the panel" : "Show the panel"} onClick={() => setOpen(!open)}>{open ? "▾" : "▴"}</button>
       </div>
     </aside>
   );
