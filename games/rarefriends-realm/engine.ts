@@ -5,7 +5,7 @@
 import {
   ARMOURY_FIRST, ARMOURY_LATER, DAWNPLATE_QUEST, COOKING, CRAFTING, CROSSBOWS, FORGED_STAFF_MAGIC, LIMBS_OFFSET, metalLevel, REINFORCED_PIECES, SIGIL_STONES, STOCKS, WAR_BOWS, EMOTES, EQUIP_SLOTS, MOUNTS, PETS, mountDef, FLETCH_ARROWS, FLETCH_BOWS, SIGILCRAFT, STAFF_SIGILS, itemCategory, sigilsPerStone, FAMILY_NAMES, FIREMAKING, FISHING_SPOTS, GEM_CUTTING, METALS, MONSTERS, PRAYERS, RELICS, RF_BUNDLES, ROCKS, SHOPS, SHOP_BUY,
   FLETCH_WANDS, SHOP_SELL, SKILLS, SKILL_NAMES, SMELTING, SMITH_PIECES, SMITH_XP, SPELLS, HOME_PLACE, TREES, WARDROBE, XP_TABLE, isItem, item, levelForXp, smithLevel, COURSES, WAYFARER_MARK, WAYFARER_REWARDS,
-  type EquipSlot, type MetalId, type Skill, type Spell, type SpotKind, type WardrobeId, DYES, baseOf, dyeOf, dyeable, CARVINGS, CARVING_REACH, CARVINGS_AT_ONCE, ITEM_LIST, type CarvingEffect } from "./data.ts";
+  type EquipSlot, type MetalId, type Skill, type Spell, type SpotKind, type WardrobeId, DYES, baseOf, dyeOf, dyeable, CARVINGS, CARVING_REACH, CARVINGS_AT_ONCE, ITEM_LIST, type CarvingEffect, FAMILY_RECIPES } from "./data.ts";
 import { cleanDaily } from "./daily.ts";
 import { searchChest } from "./dungeons.ts";
 import { arenaRevive, arenaTick } from "./arena.ts";
@@ -15,6 +15,7 @@ import { cleanCard, cleanFellowshipLook } from "./cardstyle.ts";
 import { cleanCollectible } from "./collectible.ts";
 import { cleanLockbox } from "./cardescrow.ts";
 import { applyCamp, campRespawn, packUpCamp, restAtCamp, setUpCamp, setUpFieldAltar, toggleRespawn, type Camp } from "./camping.ts";
+import { COLD_QUENCH, COLD_QUENCH_ANVIL, ELDER_ANVIL, ELDER_ANVIL_NAME, FELLOWS_TRIAL, GAUGE_RESPAWN, GAUGE_ROCKS, GUILD_FURNACE } from "./hearthkinnames.ts";
 import { applyHome, cleanHome, sleep } from "./housing.ts";
 import { FIRST_STEPS, updateFirstSteps } from "./firststeps.ts";
 import { cleanMet } from "./hiscores.ts";
@@ -853,10 +854,6 @@ export const TAMAHAGANE_FORGE: readonly [string, number, number][] = [
   ["samurai_kote", 64, 1], ["samurai_suneate", 64, 1], ["samurai_kabuto", 68, 2], ["samurai_haidate", 70, 3], ["samurai_do", 76, 5],
 ];
 export const tamahaganeRecipes = (): Recipe[] => TAMAHAGANE_FORGE.map(([id, level, bars]) => ({ skill: "smithing", label: item(id).name, level, xp: 80 * bars, ticks: 6, station: "anvil", inputs: { tamahagane_bar: bars }, outputs: { [id]: 1 }, tools: ["hammer"] }));
-const FAMILY_RECIPES: Record<string, { bars: number; logs?: number; offset: number; makes?: number }> = {
-  prospectors_pick: { bars: 3, logs: 1, offset: 10 }, rivets: { bars: 1, offset: 3, makes: 10 }, camp_kit: { bars: 2, logs: 2, offset: 6 }, field_stove: { bars: 3, offset: 8 }, camp_lantern: { bars: 2, offset: 9 },
-  field_altar: { bars: 4, offset: 11 }, expedition_frame: { bars: 3, logs: 1, offset: 12 }, wayfarers_compass: { bars: 2, offset: 13 }, hull_fitting: { bars: 3, offset: 9 }, anchor_chain: { bars: 4, offset: 7 }, ships_bell: { bars: 5, offset: 14 }, resonance_fitting: { bars: 2, offset: 11 },
-};
 function familyRecipes(metal: MetalId): Recipe[] {
   return ITEM_LIST.filter(entry => entry.family && entry.id.startsWith(`${metal}_`)).flatMap(entry => {
     const piece = entry.id.slice(metal.length + 1), def = FAMILY_RECIPES[piece]; if (!def) return [];
@@ -1103,6 +1100,8 @@ function interactObject(game: Game, object: WorldObject, option: string, use?: n
       player.prayer = maxPrayer(player); if (player.orashai) player.mana = maxMana(player); message(game, object.text === "mizukai" ? "You ring the bell, bow twice, clap twice, bow once. Your faith is restored." : "You pray to the Old Friend. Your faith is restored."); sound(game, "pray"); return;
     case "dock": game.ui.boat = object.dock ?? null; sound(game, "click"); return;
     case "ladder":
+      // A ladder with a quest on it (the Fellows' Deep): for those who've done it.
+      if (object.requires?.quest && !questDone(game, object.requires.quest)) { message(game, object.text ?? "That isn't yours to climb.", "warn"); return; }
       // The Ring's arena gates: you step through to the tile across; barred from inside while a match is on.
       if (object.name === "Arena gate") {
         if (game.arena && inArena(player.x, player.y)) { message(game, "The gate is barred. The Ring holds you until the match is done, one way or the other.", "warn"); return; }
@@ -1530,7 +1529,9 @@ function mineTick(game: Game, activity: Extract<Activity, { kind: "mine" }>) {
     return;
   }
   game.rockOre.delete(object.id);
-  game.depleted.set(object.id, game.tick + rock.respawn + Math.floor(game.rng() * rock.respawn * 0.5));
+  // (Oddhand's gauge, carried: the deep rock comes back a third sooner.)
+  const gauge = object.rock && GAUGE_ROCKS.has(object.rock) && has(player, "oddhands_gauge") ? GAUGE_RESPAWN : 1;
+  game.depleted.set(object.id, game.tick + Math.round((rock.respawn + Math.floor(game.rng() * rock.respawn * 0.5)) * gauge));
   player.activity = null;
 }
 function fishTick(game: Game, activity: Extract<Activity, { kind: "fish" }>) {
@@ -1575,8 +1576,17 @@ function produceTick(game: Game, activity: Extract<Activity, { kind: "produce" }
   if (recipe.chance !== undefined && game.rng() >= recipe.chance + level(game, recipe.skill) * 0.004) { message(game, "The ore is too impure and you fail to refine it."); return; }
   for (const [id, n] of Object.entries(recipe.outputs)) give(player, id, n);
   if (recipe.skill === "apothecary" && Object.keys(recipe.outputs).some(id => item(id).potion)) { player.stats.brews = (player.stats.brews ?? 0) + 1; presenceXp(game, 1); }
-  addXp(game, recipe.skill, recipe.xp);
+  // The Hearthkin's stations (hearthkin.ts): the Elder anvils teach a quarter more; a guild furnace gives up a second bar of the deep metals one time in five; the cold quench keeps a bar of forged metal back one time in five.
+  const station = recipe.station === "anvil" || recipe.station === "furnace" ? stationBeside(game, recipe.station) : null, metal = METALS.find(entry => recipe.inputs[`${entry.id}_bar`] || recipe.outputs[`${entry.id}_bar`]);
+  addXp(game, recipe.skill, recipe.xp * (station?.name === ELDER_ANVIL_NAME && questDone(game, ELDER_ANVIL) ? 1.25 : 1));
   message(game, recipe.station === "furnace" ? `You retrieve a bar of ${recipe.label.replace(" bar", "").toLowerCase()}.` : `You make ${aOrAn(recipe.label)} ${recipe.label.toLowerCase()}.`);
+  if (station?.name === GUILD_FURNACE && metal && metal.tier >= 4 && metal.tier <= 6 && recipe.outputs[`${metal.id}_bar`] && questDone(game, FELLOWS_TRIAL) && game.rng() < 0.2) { give(player, `${metal.id}_bar`); message(game, "The guild furnace gives up a second bar."); }
+  if (station?.name === COLD_QUENCH_ANVIL && metal && metal.tier >= 7 && recipe.inputs[`${metal.id}_bar`] && questDone(game, COLD_QUENCH) && game.rng() < 0.2) { give(player, `${metal.id}_bar`); message(game, "The cold quench keeps a bar back."); }
+}
+/** The station of a kind beside the player (you work at the one you stand by). */
+function stationBeside(game: Game, kind: "anvil" | "furnace"): WorldObject | null {
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const object = objectAtTile(game.world, game.player.x + dx, game.player.y + dy); if (object && object.kind === kind) return object; }
+  return null;
 }
 const aOrAn = (word: string) => /^[aeiou]/i.test(word) ? "an" : "a";
 function firemakeTick(game: Game, activity: Extract<Activity, { kind: "firemake" }>) {

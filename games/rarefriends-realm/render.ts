@@ -29,7 +29,7 @@ import { burst, cloudShadows, drawCloudShadows, drawEffects, hush, playerPose, p
 import { gloomSky, LightField, hexRgb, rgbCss, skyFor, type PointLight, type RGB , resetLighting } from "./lighting.ts";
 import { FIGURE_K, drawAuras, drawFigure, figureArt, heldTip, type Held } from "./wardrobe.ts";
 import { homeRect } from "./housing.ts";
-import { creatureSprite, friendSprite, type Mask } from "./sprites.ts";
+import { STRONG_FRIEND_MASK, creatureSprite, friendSprite, type Mask } from "./sprites.ts";
 
 /** The logical view size; the game sets it to match the frame (960 × 640 is the reference). */
 export const VIEW = { width: 960, height: 640 };
@@ -1648,6 +1648,15 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
         drawMask(ctx, OLD_FRIEND.idle, sx, top, px, "#9a958d");
         drawMask(ctx, OLD_FRIEND_BEARD, sx, top, px, "#e8e4d6");
         return hit(84, 56);
+      }
+      case "strong_friend": {
+        // The Strong Friend (hearthkin.ts): a Hearthkin in dark stone on a stepped plinth, the hammer across his knees, the knee and the hammer worn pale by the hands that touch them.
+        box(ctx, camera, ox, oy, 0.95, 0.95, 7, "#8f8a83", "#7d7872", "#6f6a64"); box(ctx, camera, ox, oy, 0.72, 0.72, 14, "#9a958d", "#857f78", "#746e67");
+        const top = sy - 14 * z, px = 3.2 * z;
+        drawMask(ctx, STRONG_FRIEND_MASK, sx, top, px, "#5c5751");
+        ctx.fillStyle = "#4a4541"; ctx.fillRect(sx - 7 * px, top - 3 * px, 14 * px, px); ctx.fillRect(sx + 4 * px, top - 4.6 * px, 3 * px, 2.6 * px);
+        ctx.fillStyle = "rgba(214,208,196,0.55)"; ctx.fillRect(sx - 2 * px, top - 3 * px, 4 * px, px); ctx.fillRect(sx - 1 * px, top - 2 * px, 2.5 * px, px);
+        return hit(68, 48);
       }
       case "grave": box(ctx, camera, ox, oy, 0.3, 0.6, 18, "#c8c5be", "#a9a59e", "#9a968f"); return hit(24, 24);
       case "canopy": {
@@ -3765,6 +3774,9 @@ const NPC_WEAR: Record<string, readonly string[]> = {
   quartermaster: ["pewter_helm", "dawn_cape", "vigil_spear"],
   chaplain: ["dawn_cape", "dawn_staff", "friends_charm"],
   // Townsfolk dressed for their trades (tools, never weapons).
+  // The Hearthkin (hearthkin.ts): Emberforge's in soot and leather, Frostpeak's in fur and snow capes.
+  fellows_warden: ["blackiron_helm", "charcoal_shirt"], fellows_foreman: ["leather_hood", "moonsilver_pickaxe"], fellows_assayer: ["scholar_hat", "mustard_shirt"], pavilion_keeper: ["russet_cape"], ember_supplier: ["oak_shirt", "pewter_pickaxe"], quarry_master: ["leather_wide_hat", "charcoal_shirt"],
+  frost_smith_cold: ["snow_cape"], frost_smith_wright: ["felt_wide_hat", "glimmer_pickaxe"], frost_elder: ["snow_cape"], camp_warden: ["snow_cape", "leather_hood"],
   miner: ["leather_hood", "pewter_pickaxe"], axel: ["forest_feathered_cap", "blackiron_axe"], rowan: ["leather_wide_hat", "forest_cape", "ashsteel_axe"],
   birch: ["straw_wide_hat", "pewter_axe"], fisher: ["straw_wide_hat", "teal_cape"], miller: ["straw_wide_hat"], mountain_guide: ["felt_wide_hat", "russet_cape", "pewter_pickaxe"],
   cook: ["snow_cape"], tailor: ["plum_wizard_hat", "bordered_cape", "sagestone_amulet"], shop_general: ["russet_feathered_cap"], innkeeper: ["crimson_cape"],

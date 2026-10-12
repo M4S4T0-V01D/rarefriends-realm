@@ -20,6 +20,7 @@ import { KHARAVETH_NPCS, KHARAVETH_QUESTS, onKharavethKill, talkKharaveth } from
 import { HEARTLAND_NPCS, HEARTLAND_QUESTS, onHeartlandsKill, talkHeartlands } from "./dynasties.ts";
 import { ORASHAI_NPCS, ORASHAI_QUESTS, onOrashaiKill, talkOrashai } from "./orashaiquests.ts";
 import { HIDDEN_ROAD_NPCS, HIDDEN_ROAD_QUESTS, onHiddenRoadKill, talkHiddenRoad } from "./hiddenroad.ts";
+import { HEARTHKIN_NPCS, HEARTHKIN_QUESTS, talkHearthkin } from "./hearthkin.ts";
 import { MEGHAVAN_NPCS, talkMeghavan } from "./meghavanpeople.ts";
 import { MEGHAVAN_QUESTS, MEGHAVAN_QUEST_NPCS, onMeghavanKill, talkMeghavanQuests } from "./meghavanquests.ts";
 import { MEGHAVAN_SCHOOL_NPCS, MEGHAVAN_SCHOOL_QUESTS, talkMeghavanSchools } from "./meghavanschools.ts";
@@ -74,6 +75,7 @@ export const NPCS: Record<string, NpcDef> = {
   ...HEARTLAND_NPCS,
   ...ORASHAI_NPCS,
   ...HIDDEN_ROAD_NPCS,
+  ...HEARTHKIN_NPCS,
   ...MEGHAVAN_NPCS,
   ...MEGHAVAN_QUEST_NPCS,
   ...MEGHAVAN_SCHOOL_NPCS,
@@ -488,6 +490,7 @@ export const QUESTS: readonly QuestDef[] = [
   ...HEARTLAND_QUESTS,
   ...ORASHAI_QUESTS,
   ...HIDDEN_ROAD_QUESTS,
+  ...HEARTHKIN_QUESTS,
   ...MEGHAVAN_QUESTS,
   ...MEGHAVAN_SCHOOL_QUESTS,
   ...PORTS_QUESTS,
@@ -813,6 +816,7 @@ function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
   const kharaveth = talkKharaveth(game, npcId, name); if (kharaveth) return kharaveth;
   const orashai = talkOrashai(game, npcId, name); if (orashai) return orashai;
   const road = talkHiddenRoad(game, npcId, name); if (road) return road;
+  const hearthkin = talkHearthkin(game, npcId, name); if (hearthkin) return hearthkin;
   const heartlands = talkHeartlands(game, npcId, name); if (heartlands) return heartlands;
   const meghavanQuest = talkMeghavanQuests(game, npcId, name); if (meghavanQuest) return meghavanQuest;
   const meghavanSchool = talkMeghavanSchools(game, npcId, name); if (meghavanSchool) return meghavanSchool;
@@ -1181,7 +1185,7 @@ function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
     case "heft": return chat(name, npcSays(name, "Two hands, one swing, no argument. Greatswords, battleaxes and war hammers: slower than a sword, and they hit like a falling tree.",
       "No room for a shield, mind. Anvils make them too, three bars apiece, if you'd rather forge your own."), [
       { label: "Show me.", then: () => { game.ui.shop = "heft"; return null; } }, { label: "Maybe later.", then: () => null }]);
-    case "mountain_guide": return chat(name, npcSays(name, (["Welcome to Highcairn, the town above the dunes. The road north-west climbs to the Frostpeak camp; the one west drops to the Oasis.",
+    case "mountain_guide": return chat(name, npcSays(name, (["Welcome to Highcairn, the town above the dunes. The road north-west climbs to the lower lodge and the pass up to Frostpeak; the one west drops to the Oasis.",
       "The Greyhorn mine's up the scree to the north-east: glimmer and rarite, if your pick's up to it. Wolves and yetis like the snow up there.",
       "Greyhorn Tarn's south of town. Bring a rod and some feathers; the char are fat this time of year.", "Gloom hounds hunt the southern slopes after dark. Don't go down there light."] as const)[Math.floor(game.rng() * 4)]));
     case "miner": return chat(name, npcSays(name, "Pewter anyone can mine. Blackiron's further in. Inkcoal at the south end. There's moonsilver and a gem rock at the north edge, if you're good.",

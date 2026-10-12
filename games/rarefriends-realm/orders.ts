@@ -3,7 +3,7 @@
  * order a day for you alone (rolled from the day and your token), asks for the best thing you can make, and pays
  * coins, skill XP and a little Presence when you bring it. Shops buy at 40% of value; a patron pays 150% and a fee.
  */
-import { BOWS, COOKING, CRAFTING, FISHING_SPOTS, FLETCH_BOWS, METALS, ROCKS, SIGILCRAFT, SKILL_NAMES, TREES, WAR_BOWS, isItem, item, smithLevel, type Skill } from "./data.ts";
+import { BOWS, COOKING, CRAFTING, FISHING_SPOTS, FLETCH_BOWS, ITEM_LIST, METALS, ROCKS, SIGILCRAFT, SKILL_NAMES, SMELTING, TREES, WAR_BOWS, familyLevel, isItem, item, smithLevel, type Skill } from "./data.ts";
 import { POTIONS } from "./apothecary.ts";
 import { dayNumber, hash } from "./daily.ts";
 import { addXp, count, giveOrDrop, level, message, sound, take, type Game, type WorkOrder } from "./state.ts";
@@ -17,6 +17,11 @@ export const PATRONS: Record<string, Patron> = {
     items: () => [...FLETCH_BOWS.map(entry => ({ id: entry.bow, level: entry.level })), ...WAR_BOWS.map(entry => ({ id: entry.id, level: entry.fletch })), ...BOWS.filter(bow => bow.id === "shortbow").map(bow => ({ id: bow.id, level: 1 }))] },
   smith: { skill: "smithing", ask: "The forge is hot but my arms are old. {n} {item}, if you can.", thanks: "Clean work. The Emberforge mark on every one.",
     items: () => METALS.flatMap(metal => SMITH_ORDER_PIECES.map(piece => ({ id: `${metal.id}_${piece}`, level: smithLevel(metal.id, piece) }))) },
+  // The Hearthkin (hearthkin.ts): the Fellows' Warden orders the four families' pieces; the quarrymaster, bars of the ordinary metals.
+  fellows_warden: { skill: "smithing", ask: "The Fellows have an order on the book: {n} {item}. Show me what a Fellow's work looks like.", thanks: "Even. Clean. The Fellows' mark goes on these.",
+    items: () => ITEM_LIST.filter(entry => entry.family).flatMap(entry => { const level = familyLevel(entry.id); return level === null ? [] : [{ id: entry.id, level }]; }) },
+  quarry_master: { skill: "smithing", ask: "The quarry's furnace is down and the carts are full. {n} {item}, smelted, at quarry rates.", thanks: "Good bars. The carts can roll again.",
+    items: () => METALS.filter(metal => metal.tier <= 6).map(metal => ({ id: `${metal.id}_bar`, level: SMELTING[metal.id].level })) },
   cook: { skill: "cooking", ask: "The castle eats like a siege. {n} {item}, and quickly.", thanks: "Oh, bless you. The King will never know how close it was.",
     items: () => Object.values(COOKING).map(entry => ({ id: entry.cooked, level: entry.level })) },
   rowan: { skill: "woodcutting", ask: "The yard's low. {n} {item}, and I'll pay yard rate and then some.", thanks: "Stacked and tallied. Fernwick thanks you.",

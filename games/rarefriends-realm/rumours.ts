@@ -35,6 +35,8 @@ export const RUMOURS: Partial<Record<RegionId, readonly Rumour[]>> = {
     r("Rowan swears there's a stump in the deep wood that grows back overnight."),
   ],
   emberforge: [
+    r("The Fellows of Metal dug past the far wall of the Deep once. They walled it up again the same night, and the Warden won't say why.", "half"),
+    r("The Strong Friend's statue in the Pavilion was carved from life. The Keeper says so. The Keeper also says it was there before anyone was.", "half"),
     r("Brann's forge was lit from an ember that never cools. He keeps it in a box and he won't say where the box is.", "true"),
     r("The Ashen Hills used to be green. The Ashen Hills used to be a lot of things."),
     r("Something under the hills sings when the furnace is hot. The smiths call it the draught. It isn't the draught."),
@@ -51,6 +53,8 @@ export const RUMOURS: Partial<Record<RegionId, readonly Rumour[]>> = {
     r("Dune stalkers only hunt alone. If you see two, you're already in trouble."),
   ],
   frostpeak: [
+    r("Sigrún Coldhammer once quenched a blade in a yeti's breath. It's still cold.", "false"),
+    r("Oddhand says there's a city under the mountains, bigger than Friendhollow, and that the mountain talks about it when it thinks nobody's listening.", "half"),
     r("The Frostpeak camp was a town, once. The town's still up there, under the snow.", "half"),
     r("Yetis bury their dead. In the ice. Face down."),
     r("The wisps lead people off cliffs. Or to things. Depends who you ask, and whether they came back."),

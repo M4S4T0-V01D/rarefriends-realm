@@ -709,6 +709,7 @@ const RANGED_GEAR: Item[] = [
 // ---------- Slayer, mastery capes, tablets and lamps ----------
 const MASTERY_BONUS: Partial<Bonuses> = { attack: 4, strength: 4, defence: 9, ranged: 4, magic: 4, prayer: 4 };
 const OTHER_ITEMS: Item[] = [
+  { id: "oddhands_gauge", name: "Oddhand's gauge", examine: "Brass, a moonstone set in it, six marks: one for each of Bramble Oddhand's fingers. Carried, moonsilver, glimmer and rarite rocks come back a third sooner for you.", value: 1, tradeable: false, icon: { shape: "gem", color: "#c9a24a", accent: "#9fabc2" } },
   { id: "slayer_gem", name: "Warden's gem", examine: "Tells you your Pursuance contract when you look into it.", value: 1, icon: { shape: "gem", color: "#6d8a8f", accent: "#161616" } },
   { id: "hunters_trophy", name: "Hunter's trophy", examine: "Taken from a marked creature: proof you tracked down one of the Realm's worst. Warden Thistle pays points for these.", value: 450, stackable: true, icon: { shape: "trophy", color: "#c9a84a", accent: "#7a5a2a" } },
   { id: "slayer_helm", name: "Warden's helm", examine: "A dark helm that knows your task. +15% accuracy and damage on it.", value: 12000, tradeable: false,
@@ -1140,6 +1141,16 @@ export const FIREMAKING: Record<string, { level: number; xp: number }> = {
   bamboo_canes: { level: 20, xp: 70 }, blossom_logs: { level: 40, xp: 125 }, cedar_logs: { level: 62, xp: 220 },
 };
 /** Smelting: ores in, bar out. Blackiron has a 50% success rate without a ring (like the classic furnace). */
+/** The four families' recipes (engine.ts familyRecipes): bars (and logs) a piece, its Smithing level above the metal's, and how many a go. */
+export const FAMILY_RECIPES: Record<string, { bars: number; logs?: number; offset: number; makes?: number }> = {
+  prospectors_pick: { bars: 3, logs: 1, offset: 10 }, rivets: { bars: 1, offset: 3, makes: 10 }, camp_kit: { bars: 2, logs: 2, offset: 6 }, field_stove: { bars: 3, offset: 8 }, camp_lantern: { bars: 2, offset: 9 },
+  field_altar: { bars: 4, offset: 11 }, expedition_frame: { bars: 3, logs: 1, offset: 12 }, wayfarers_compass: { bars: 2, offset: 13 }, hull_fitting: { bars: 3, offset: 9 }, anchor_chain: { bars: 4, offset: 7 }, ships_bell: { bars: 5, offset: 14 }, resonance_fitting: { bars: 2, offset: 11 },
+};
+/** The Smithing level of a family piece (its metal's, plus the piece's), or null for anything else. */
+export function familyLevel(id: string): number | null {
+  const metal = METALS.find(entry => id.startsWith(`${entry.id}_`)); if (!metal) return null;
+  const def = FAMILY_RECIPES[id.slice(metal.id.length + 1)]; return def ? metal.level + def.offset : null;
+}
 export const SMELTING: Record<MetalId, { level: number; xp: number; ores: Readonly<Record<string, number>>; chance?: number }> = {
   pewter: { level: 1, xp: 8, ores: { pewter_ore: 1 } },
   blackiron: { level: 15, xp: 13, ores: { blackiron_ore: 1 }, chance: 0.6 },
@@ -1853,6 +1864,9 @@ export const SHOPS: Record<string, ShopDef> = {
   cairn_forge: { id: "cairn_forge", name: "Highcairn Forge", buys: ["ore", "bar", "weapon", "armour"], rate: 0.6, stock: ["hammer", "moonsilver_pickaxe", "glimmer_pickaxe", "rarite_pickaxe", "inkcoal", "moonsilver_bar", "glimmer_bar", "glimmer_helm", "glimmer_gauntlets", "glimmer_boots", "glimmer_shield", "rarite_helm", "rarite_gauntlets", "rarite_boots", "inkcoal_satchel"] },
   heft: { id: "heft", name: "Heft & Haft", buys: ["weapon"], rate: 0.55, stock: ["pewter_greatsword", "pewter_battleaxe", "pewter_warhammer", "blackiron_greatsword", "blackiron_battleaxe", "blackiron_warhammer",
     "ashsteel_greatsword", "ashsteel_battleaxe", "ashsteel_warhammer", "moonsilver_greatsword", "moonsilver_battleaxe", "moonsilver_warhammer", "glimmer_greatsword"] },
+  // The Hearthkin's shops (hearthkin.ts): the Fellows' assay pays better for ore than the old miner (they melt it themselves); Picks & Carts sells what a miner forgot.
+  fellows_assay: { id: "fellows_assay", name: "The Fellows' Assay", buys: ["ore"], rate: 0.8, stock: ["inkcoal", "hammer", "moonsilver_pickaxe", "glimmer_pickaxe", "rarite_pickaxe", "inkcoal_satchel"] },
+  ember_supply: { id: "ember_supply", name: "Picks & Carts", buys: ["ore"], rate: 0.5, stock: ["pewter_pickaxe", "blackiron_pickaxe", "ashsteel_pickaxe", "moonsilver_pickaxe", "hammer", "tinderbox", "inkcoal_satchel", "inkcoal", "bread", "cooked_meat"] },
   mine_supplies: { id: "mine_supplies", name: "Old miner's supplies", buys: ["ore"], rate: 0.5, stock: ["pewter_pickaxe", "blackiron_pickaxe", "ashsteel_pickaxe", "moonsilver_pickaxe", "inkcoal_satchel", "hammer", "bread"] },
   // Fernwick, the woodcutters' village: the only place that sells war bows, and the best price for logs.
   war_bows: { id: "war_bows", name: "Hazel's War Bows", buys: ["bow", "arrow"], rate: 0.6, stock: ["string", "war_bow", "oak_war_bow", "willow_war_bow", "maple_war_bow", "yew_war_bow",

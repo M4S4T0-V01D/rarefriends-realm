@@ -14,6 +14,7 @@ import { fitBars } from "./barfit.ts";
 import { buildSouth } from "./south.ts";
 import { applyOverlay } from "./overlay.ts";
 import { OVERLAYS } from "./overlays/index.ts";
+import { buildHearthkinCountry } from "./hearthkinworld.ts";
 
 /**
  * The far west (Return of Raria): the world grew by WEST_DX columns on its west side for a second continent, Raria and
@@ -99,7 +100,9 @@ export type DecorKind =
   // The Mizukai Isles: shrine gates, stone lanterns, pagodas, guardian lion-dogs, sacred ropes, the things of a harbour and a hot spring.
   | "torii" | "stone_lantern" | "pagoda" | "guardian" | "sacred_rope" | "drying_rack" | "steam" | "castle_keep" | "offering_box" | "paper_lantern" | "wish_board" | "wayside_statue" | "nets"
   // The Land Before Stone: the Sunteeth's sandstone towers, camp fires, trodden ground, a bedroll, the Underway's counterweight.
-  | "rock_spire" | "campfire" | "campfire_cold" | "scuffs" | "bedroll" | "counterweight";
+  | "rock_spire" | "campfire" | "campfire_cold" | "scuffs" | "bedroll" | "counterweight"
+  // The Hearthkin's Strong Friend: a squat stone figure, a hammer across its knees (hearthkin.ts).
+  | "strong_friend";
 /** A monument's state: whole on its plinth, toppled and lying, broken off at the waist, or sunk to the chest in the ground. */
 export type MonumentState = "whole" | "toppled" | "broken" | "buried";
 export type WorldObject = {
@@ -138,6 +141,8 @@ export type RegionId =
   | "the_wilds" | "tallgrass" | "ironreach" | "cragmaw" | "quillhaven" | "pale_isles" | "catacombs" | "sea_cave" | "wyrm_lair" | "deep_mine"
   // The dungeon update (2026-10): three more under the lake, the library and the stones.
   | "deepglass" | "drowned_archive" | "howling_vault"
+  // The Skill overhaul: the Fellows of Metal's Deep under Emberforge, and the Ashen quarry's shaft with its hot tunnel.
+  | "fellows_deep" | "ashen_shaft"
   // The Rare Friends Ring (2026-10): the arena west of the Deadwood.
   | "friends_ring"
   // Two more dungeons (2026-10): one for new heroes, one for the middle levels.
@@ -169,7 +174,7 @@ export type Region = { id: RegionId; name: string; label: { x: number; y: number
   /** One of the south's (The Land Before Stone): its label is already in the grown world's coordinates. */
   south?: boolean };
 const MAINLAND_REGIONS = new Set<RegionId>(["coast", "friendhollow", "farmland", "whisperwood", "ashen_hills", "emberforge", "frostpeak", "glass_lake", "pale_dunes", "oasis", "murkmire", "mossy_ruins",
-  "wizards_tower", "wyrmreach", "fernwick", "greyhorn", "highcairn", "crypt", "hollow_depths"]);
+  "wizards_tower", "wyrmreach", "fernwick", "greyhorn", "highcairn", "crypt", "hollow_depths", "fellows_deep", "ashen_shaft"]);
 export const REGIONS: readonly Region[] = [
   { id: "coast", name: "The Pale Coast", label: { x: 10, y: 10 }, danger: 0 },
   { id: "friendhollow", name: "Friendhollow", label: { x: 121, y: 118 }, danger: 0 },
@@ -177,7 +182,7 @@ export const REGIONS: readonly Region[] = [
   { id: "whisperwood", name: "Whisperwood", label: { x: 46, y: 80 }, danger: 1 },
   { id: "ashen_hills", name: "Ashen Hills", label: { x: 112, y: 48 }, danger: 1 },
   { id: "emberforge", name: "Emberforge", label: { x: 160, y: 48 }, danger: 0 },
-  { id: "frostpeak", name: "Frostpeak", label: { x: 206, y: 22 }, danger: 3 },
+  { id: "frostpeak", name: "Frostpeak", label: { x: 252, y: 31 }, danger: 3 },
   { id: "glass_lake", name: "Glass Lake", label: { x: 178, y: 166 }, danger: 0 },
   { id: "pale_dunes", name: "Pale Dunes", label: { x: 206, y: 96 }, danger: 2 },
   { id: "oasis", name: "Oasis", label: { x: 190, y: 116 }, danger: 0 },
@@ -190,6 +195,8 @@ export const REGIONS: readonly Region[] = [
   { id: "highcairn", name: "Highcairn", label: { x: 282, y: 66 }, danger: 0 },
   { id: "crypt", name: "Murkmire Crypt", label: { x: 34, y: 220 }, danger: 3, underground: true },
   { id: "hollow_depths", name: "Hollow Depths", label: { x: 150, y: 220 }, danger: 4, underground: true },
+  { id: "fellows_deep", name: "The Fellows' Deep", label: { x: 90, y: 230 }, danger: 2, underground: true },
+  { id: "ashen_shaft", name: "The Ashen Shaft", label: { x: 12, y: 220 }, danger: 3, underground: true },
   // The wider world. Labels here are in world coordinates (the mainland's above are moved by createWorld).
   { id: "deadwood", name: "The Deadwood", label: { x: 330, y: 62 }, danger: 3 },
   { id: "gravesend", name: "Gravesend", label: { x: 300, y: 128 }, danger: 0 },
@@ -840,8 +847,9 @@ function buildMainland(seed: number) {
   scatter(170, 38, 186, 60, 8, (x, y) => rock(x, y, i2(random) ? "inkcoal" : "blackiron"), (x, y) => free(x, y) && (get(x, y) === T.GRASS || get(x, y) === T.DARK_GRASS));
 
   // ---------- Frostpeak ----------
-  building(192, 27, 199, 32, "w", T.WOOD, undefined, { name: "Frostpeak lodge", color: "#f3f2ee", chimney: true });      // Frostpeak lodge
-  add({ kind: "bank", x: 197, y: 28, blocks: true, name: "Bank booth" }); npc("banker", 196, 29); npc("outfitter", 194, 30); npc("villager", 200, 34, 3); npc("villager", 191, 33, 3);
+  // The lower lodge: the old Frostpeak camp, kept as a waystation since the town went back up the mountain (hearthkinworld.ts).
+  building(192, 27, 199, 32, "w", T.WOOD, undefined, { name: "The lower lodge", color: "#f3f2ee", chimney: true });      // the lower lodge (the old Frostpeak camp)
+  add({ kind: "bank", x: 197, y: 28, blocks: true, name: "Bank booth" }); npc("banker", 196, 29); npc("camp_warden", 194, 30); npc("villager", 200, 34, 3); npc("villager", 191, 33, 3);
   add({ kind: "range", x: 193, y: 28, blocks: true, name: "Cooking range" });
   scatter(172, 6, 236, 44, 60, (x, y) => random() > 0.3 ? tree(x, y, "pine") : decor(x, y, "boulder"), (x, y) => free(x, y) && get(x, y) === T.SNOW);
   scatter(200, 36, 230, 44, 10, (x, y) => tree(x, y, "ashwood"), (x, y) => free(x, y) && get(x, y) === T.SNOW);
@@ -999,7 +1007,7 @@ function buildMainland(seed: number) {
   for (const [bx, by] of [[278, 77], [287, 82]] as const) decor(bx, by, "banner");
   decor(279, 82, "bench"); decor(286, 76, "bench");
   npc("mountain_guide", 280, 84, 3); npc("villager", 285, 84, 5); npc("villager", 277, 80, 5); npc("villager", 280, 76, 5);
-  add({ kind: "sign", x: 266, y: 85, blocks: true, name: "Signpost", text: "Highcairn. North-west: the Frostpeak camp. West: the Oasis. North-east: the Greyhorn mine. South: Greyhorn Tarn." });
+  add({ kind: "sign", x: 266, y: 85, blocks: true, name: "Signpost", text: "Highcairn. North-west: the lower lodge, and the pass up to Frostpeak. West: the Oasis. North-east: the Greyhorn mine. South: Greyhorn Tarn." });
   // Dawnhold, the chapterhouse of the Order of the Dawn, on a terrace above the sea east of Highcairn: a cobbled
   // causeway through the ridge, a courtyard, the chapel (its altar takes offered bones), and the hall with the armoury.
   road([[297, 81], [304, 82], [310, 82]], 2.2, T.COBBLE);
@@ -1290,7 +1298,7 @@ function buildMainland(seed: number) {
 
   const places: Pick<World["places"], "spawn" | "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier" | "crypt" | "depths" | "king"> = {
     spawn: { x: 121, y: 123 }, hollow_square: { x: 121, y: 122 }, emberforge: { x: 162, y: 49 }, oasis: { x: 186, y: 115 },
-    frostpeak: { x: 195, y: 34 }, pier: { x: 178, y: 150 }, crypt: { x: 40, y: 180 }, depths: { x: 122, y: 188 }, king: { x: 198, y: 224 },
+    frostpeak: { x: 252, y: 31 }, pier: { x: 178, y: 150 }, crypt: { x: 40, y: 180 }, depths: { x: 122, y: 188 }, king: { x: 198, y: 224 },
   };
   const buildingAt = new Uint16Array(W * H);
   buildings.forEach((b, index) => { if (b.roof === "none") return; for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) buildingAt[y * W + x] = index + 1; });
@@ -1300,6 +1308,7 @@ function buildMainland(seed: number) {
     runa: ["breeze_sigil", "Runa's Sigils"], tanner: ["leather", "Tessa's Tannery"], outfitter: ["glimmer_helm", "Frostpeak Outfitters"], armourer: ["pewter_helm", "Hollis Armoury"],
     weaponsmith: ["pewter_sword", "Edge & Hilt"], bowyer: ["shortbow", "Fletch & Feather"], slayer_master: ["slayer_gem", "The Warden's Lodge"], innkeeper: ["cake", "The Sleepy Friend inn"],
     rare_trader: ["rough_moonstone", "The Rare Market"], stablemaster: ["__horse", "Friendhollow Stables"],
+    ember_supplier: ["pewter_pickaxe", "Picks & Carts"], fellows_assayer: ["moonsilver_ore", "The Fellows' Assay"],
     hazel: ["war_bow", "Hazel's War Bows"], rowan: ["pewter_axe", "Fernwick Timber Yard"],
     heft: ["pewter_greatsword", "Heft & Haft"], mender: ["heartguard_helm", "Hale's Infirmary"], tailor: ["striped_cape", "Threadneedle Tailors"], clothier: ["crimson_dress", "Ribbon & Rye Clothiers"], cairn_trader: ["pot", "Highcairn Stores"], kettle_keeper: ["cake", "The Stone Kettle"], cairn_smith: ["rarite_pickaxe", "Highcairn Forge"],
   };
@@ -1554,6 +1563,7 @@ function buildLegacyWorld(seed: number) {
   // Primal sigil stone in Ashfall's ash, among the Burned: placed last, at fixed spots, so no random draw before it moves.
   { const t = worldTools(ctx); for (const [x, y] of [[480, 120], [536, 64], [510, 96]]) if (t.free(x, y)) t.rock(x, y, "sigil4"); }
   buildMiningCountry(ctx, mainlandToWorld);   // the legacy mapping, here: everything is moved east together, below
+  buildHearthkinCountry(ctx, mainlandToWorld);   // the Hearthkin's country: the Fellows, the Pavilion, the quarry shaft, Frostpeak up the mountain
   return { tiles, region, objects, objectAt, spawns, places, lift, raise, buildings, floors };
 }
 const i2 = (random: () => number) => random() > 0.5;
@@ -1562,7 +1572,7 @@ const SIDES = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
 export const ROOF_COLORS = ["#c99a96", "#9aab92", "#8f9cb2", "#cdb98a", "#a996b5"];
 export const TREE_NAMES: Record<TreeKind, string> = { tree: "Tree", oak: "Oak", willow: "Willow", maple: "Maple tree", yew: "Yew", ashwood: "Ashwood", palm: "Palm tree", pine: "Pine tree", deadwood: "Dead tree", redwood: "Redwood", ironbark: "Ironbark", cedar: "Cedar", sakura: "Blossom tree", bamboo: "Bamboo" };
 export const DECOR_NAMES: Record<DecorKind, string> = {
-  monument: "Statue", god_diamond: "Statue of the Good Friend", god_ink: "Statue of the Squid Friend", god_sol: "Statue of the Weird Friend", god_hood: "Statue of the Hood Friend", god_ember: "The Ember, in its brazier",
+  strong_friend: "The Strong Friend", monument: "Statue", god_diamond: "Statue of the Good Friend", god_ink: "Statue of the Squid Friend", god_sol: "Statue of the Weird Friend", god_hood: "Statue of the Hood Friend", god_ember: "The Ember, in its brazier",
   god_dusk: "Statue of the Wise Friend, blindfolded", wise_friend: "The Wise Friend", bell: "Great bell", canopy: "Old roofing", cannon: "Magical cannon", device: "Federation device", wagon: "Supply wagon", watchtower: "Watchtower", stake: "Stake wall", plaque: "Inscribed plaque", banner_fff: "The Federation's banner", banner_rrr: "The Regiment's banner", banner_hollowmere: "Hollowmere's banner", banner_diamond: "The Order of the Diamond's banner", banner_ink: "The Order of the Ink's banner", banner_sol: "The Order of the Sol's banner", banner_hood: "The Order of the Hood's banner", banner_ember: "The Order of the Ember's banner", banner_dusk: "The Order of Dusk's banner",
   flowers: "Flowers", bush: "Bush", boulder: "Boulder", lamp: "Lamp post", bench: "Bench", crate: "Crate", barrel: "Water barrel", tent: "Tent",
   cactus: "Cactus", pine: "Pine tree", dead_tree: "Dead tree", statue: "Statue", grave: "Grave", fence: "Fence", reeds: "Reeds", table: "Table",

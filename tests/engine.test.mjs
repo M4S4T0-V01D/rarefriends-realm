@@ -608,7 +608,7 @@ test("A Friend's Feast from start to finish", () => {
   assert.equal(g.player.quests.friends_feast, 2);
   assert.equal(questPoints(g), 1);
   assert(level(g, "cooking") >= 10, "Quest XP");
-  assert.equal(QUESTS.length, 93); assert.equal(MAX_QUEST_POINTS, 167);
+  assert.equal(QUESTS.length, 97); assert.equal(MAX_QUEST_POINTS, 174);
 });
 
 test("Grumblin Trouble counts kills and pays out", () => {
@@ -1954,7 +1954,7 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   assert.equal(p.quests.dawn_against_hollow, 2); assert(has(p, "dawnplate_cuirass"));
   assert.equal(count(p, "hollow_essence"), 0);
   assert.equal(capeProblem(g, "dawnplate_cuirass"), null, "the armoury sells Dawnplate once earned");
-  assert.equal(QUESTS.length, 93); assert.equal(MAX_QUEST_POINTS, 167);
+  assert.equal(QUESTS.length, 97); assert.equal(MAX_QUEST_POINTS, 174);
 });
 
 test("Boots and gauntlets in every metal, smithed at the anvil; the clothier's shirts, dresses, trousers and skirts", () => {
@@ -3990,4 +3990,81 @@ test("Overlay definitions: an errand quest an overlay defines is offered by its 
     writeFileSync(join(dir, "bad.json"), JSON.stringify({ v: 1, ops: [{ op: "spawn", uid: "s1", kind: "monster", id: "no_such_monster", x: 10, y: 10 }] }));
     assert.throws(() => execFileSync("node", ["--no-warnings", "scripts/dev-promote.mjs", join(dir, "bad.json"), "--check"], { stdio: "pipe" }), /Command failed/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("The Hearthkin: Emberforge's Fellows of Metal (the trial, the Deep behind a Fellows' ladder, guild furnaces), the Old Pavilion (the Elder anvils after their quest), Frostpeak up the mountain with its two legendary smiths (the cold quench, Oddhand's gauge), the lower lodge below, the Strong Friend touched but not explained", async () => {
+  const { HEARTHKIN_NPCS, HEARTHKIN_QUESTS, FELLOWS_TRIAL, ELDER_ANVIL, COLD_QUENCH, VEINS } = await import("../games/rarefriends-realm/hearthkin.ts");
+  const { COLD_QUENCH_ANVIL, ELDER_ANVIL_NAME, GUILD_FURNACE } = await import("../games/rarefriends-realm/hearthkinnames.ts");
+  const { QUESTS, questDone, NPCS } = await import("../games/rarefriends-realm/content.ts");
+  const { HEARTHKIN, friendSprite } = await import("../games/rarefriends-realm/sprites.ts");
+  const { PATRONS } = await import("../games/rarefriends-realm/orders.ts");
+  const { mainlandToWorld, regionAt } = await import("../games/rarefriends-realm/world.ts");
+  const g = newGame(), p = g.player, world = g.world, m = (x, y) => { const [wx, wy] = mainlandToWorld(x, y); return { x: wx, y: wy }; };
+  // The people: thirteen of them, all placed, all Hearthkin (a family of their own in the sprite system, drawn stout and bearded).
+  for (const id of Object.keys(HEARTHKIN_NPCS)) { assert.ok(NPCS[id], `${id} is one of the Realm's people`); assert.ok(world.spawns.some(s => s.kind === "npc" && s.id === id), `${id} is placed`); assert.equal(NPCS[id].art.family, HEARTHKIN); }
+  assert.ok(world.spawns.filter(s => s.id === "ember_hearthkin_villager").length >= 4 && world.spawns.filter(s => s.id === "frost_hearthkin_villager").length >= 3, "Hearthkin about in both towns");
+  const sprite = friendSprite(HEARTHKIN, 2101); assert.equal(sprite.idle.length, 16); assert.ok(sprite.idle.slice(0, 3).every(row => !row.includes("#")) === false || sprite.idle[3].includes("#"), "short: nothing above row 3 but a helm or a hood"); assert.ok(sprite.idle[12].includes("########"), "broad");
+  assert.ok(new Set([2101, 2102, 2103, 2104, 2105, 2106, 2111, 2112].map(seed => friendSprite(HEARTHKIN, seed).idle.join("/"))).size >= 4, "hoods, helms, beards and tools vary");
+  for (const q of HEARTHKIN_QUESTS) assert.ok(QUESTS.some(entry => entry.id === q.id), `${q.name} is in the quest list`);
+  // Frostpeak is up the mountain: the town on its shelf stands far above the old camp, in the Frostpeak region, and glides land in the square; the old lodge is the lower lodge, with a warden.
+  const square = world.places.frostpeak, lodge = m(195, 30); assert.deepEqual(square, m(252, 31));
+  // (Heights flatten where there's building: a town's square sits level like Highcairn's; the climb is in the approach, where the switchbacks top out well above the road and the camp.)
+  const h = (at) => world.heights[at.y * (W + 1) + at.x], passTop = m(251, 42), bend = m(236, 54);
+  assert.ok(h(passTop) > h(bend) + 60 && h(passTop) > h(lodge) + 80 && h(square) > h(lodge) + 30, `the pass climbs above the road and the camp (${Math.round(h(passTop))} over ${Math.round(h(bend))}, the square ${Math.round(h(square))})`);
+  assert.equal(regionAt(world, square.x, square.y).id, "frostpeak"); assert.ok(world.buildings.some(b => b.name === "Frostpeak Lodge") && world.buildings.some(b => b.name === "The lower lodge") && !world.buildings.some(b => b.name === "Frostpeak lodge"));
+  assert.ok(world.spawns.some(s => s.id === "outfitter" && Math.abs(s.x - square.x) < 10 && Math.abs(s.y - square.y) < 10), "the outfitter moved up"); assert.ok(world.spawns.some(s => s.id === "camp_warden" && Math.abs(s.x - lodge.x) < 6));
+  const named = name => world.objects.find(o => o.name === name); assert.ok(named(COLD_QUENCH_ANVIL) && named("Furnace") && named("The snowmelt trough"), "Coldhammer's forge");
+  assert.equal(world.objects.filter(o => o.name === ELDER_ANVIL_NAME).length, 2); assert.equal(world.objects.filter(o => o.name === GUILD_FURNACE).length, 2);
+  assert.equal(world.objects.filter(o => o.decor === "strong_friend").length, 2, "the Strong Friend stands at the Pavilion and in Frostpeak");
+  const deepLadder = named("Ladder to the Deep"); assert.deepEqual(deepLadder.requires, { quest: FELLOWS_TRIAL });
+  assert.equal(regionAt(world, deepLadder.to.x, deepLadder.to.y).id, "fellows_deep"); assert.equal(regionAt(world, named("Quarry shaft").to.x, named("Quarry shaft").to.y).id, "ashen_shaft");
+  // The Deep's ladder is for Fellows: not before the trial.
+  teleport(g, deepLadder.x - 1, deepLadder.y); setTarget(g, { kind: "object", id: deepLadder.id, option: "Climb-down" }); until(g, () => g.messages.some(e => /for Fellows of Metal/.test(e.text)), 20);
+  assert.equal(regionAt(world, p.x, p.y).id, "emberforge", "still up top");
+  // The Fellows' Trial: Mining 50 and Smithing 50 first; four moonsilver bars and ten rivets; then the ladder, and the guild furnaces' second bar.
+  let d = talk(g, "fellows_warden"); assert.match(d.lines[0].text, /Come back with Mining 50 and Smithing 50/);
+  p.xp.mining = XP_TABLE[50]; p.xp.smithing = XP_TABLE[50];
+  d = talk(g, "fellows_warden"); d = d.options.find(o => o.label === "I'll do it.").then(); d.onEnd?.(); assert.equal(p.quests[FELLOWS_TRIAL], 1);
+  give(p, "moonsilver_bar", 4); give(p, "moonsilver_rivets", 10); d = talk(g, "fellows_warden"); assert.match(d.lines[0].text, /Welcome to the Fellows/); d.onEnd?.();
+  assert.ok(questDone(g, FELLOWS_TRIAL)); assert.equal(count(p, "moonsilver_bar"), 0); assert.ok(p.xp.mining > XP_TABLE[50] + 4999);
+  g.messages.length = 0; setTarget(g, { kind: "object", id: deepLadder.id, option: "Climb-down" }); until(g, () => regionAt(world, p.x, p.y).id === "fellows_deep", 20); assert.equal(regionAt(world, p.x, p.y).id, "fellows_deep", "down the ladder");
+  assert.ok(world.objects.filter(o => o.kind === "rock" && regionAt(world, o.x, o.y).id === "fellows_deep" && ["glimmer", "rarite"].includes(o.rock)).length >= 8, "glimmer and rarite in the Deep");
+  // A guild furnace: smelting moonsilver beside it gives up a second bar one time in five (the rng, pinned).
+  const furnace = named(GUILD_FURNACE); teleport(g, furnace.x, furnace.y + 1); p.inventory.fill(null);
+  const moonsilver = smeltingRecipes().find(r => r.label === "Moonsilver bar"); for (const [id, n] of Object.entries(moonsilver.inputs)) give(p, id, n * 5);
+  for (let i = 0; i < 5; i++) { g.rng = () => 0.1; startProduction(g, moonsilver, 1); until(g, () => p.activity === null, 40); } const bars = count(p, "moonsilver_bar");
+  assert.equal(bars, 10, `with the rng pinned low, a second bar from the guild furnace every time (${bars})`);
+  teleport(g, furnace.x + 3, furnace.y + 4); p.inventory.fill(null); for (const [id, n] of Object.entries(moonsilver.inputs)) give(p, id, n); g.rng = () => 0.1; startProduction(g, moonsilver, 1); until(g, () => p.activity === null, 40);
+  assert.equal(count(p, "moonsilver_bar"), 1, "away from the guild furnace, one bar");
+  // The Elder Anvil: fed, the Pavilion's anvils teach a quarter more.
+  p.xp.mining = XP_TABLE[30]; p.xp.smithing = XP_TABLE[30]; d = talk(g, "pavilion_keeper"); d = d.options.find(o => o.label === "I'll do it.").then(); d.onEnd?.();
+  give(p, "blackiron_bar", 10); give(p, "inkcoal", 5); d = talk(g, "pavilion_keeper"); d.onEnd?.(); assert.ok(questDone(g, ELDER_ANVIL)); assert.equal(count(p, "inkcoal"), 0);
+  const elder = named(ELDER_ANVIL_NAME), dagger = smithingRecipes("pewter").find(r => r.label === "Pewter dagger");
+  teleport(g, elder.x, elder.y + 1); p.inventory.fill(null); give(p, "pewter_bar", 2); give(p, "hammer"); let xp = p.xp.smithing; startProduction(g, dagger, 1); until(g, () => p.activity === null, 40);
+  const atElder = p.xp.smithing - xp; teleport(g, furnace.x + 3, furnace.y + 4); const anyAnvil = world.objects.find(o => o.kind === "anvil" && o.name === "Anvil"); teleport(g, anyAnvil.x, anyAnvil.y + 1);
+  xp = p.xp.smithing; startProduction(g, dagger, 1); until(g, () => p.activity === null, 40); const atPlain = p.xp.smithing - xp;
+  assert.ok(Math.abs(atElder - atPlain * 1.25) < 0.01, `a quarter more at the Elder anvil (${atElder} vs ${atPlain})`);
+  // The Cold Quench and Veins of the Shoulder, at Frostpeak: their levels, their makings, their rewards.
+  d = talk(g, "frost_smith_cold"); assert.match(d.lines[0].text, /Come back at Smithing 50 and Mining 45/);
+  p.xp.smithing = XP_TABLE[50]; p.xp.mining = XP_TABLE[55];
+  d = talk(g, "frost_smith_cold"); d = d.options.find(o => o.label === "I'll do it.").then(); d.onEnd?.(); give(p, "frost_shard", 3); give(p, "inkcoal", 6); give(p, "moonsilver_bar", 2);
+  d = talk(g, "frost_smith_cold"); d.onEnd?.(); assert.ok(questDone(g, COLD_QUENCH));
+  const cold = named(COLD_QUENCH_ANVIL), frostsilver = smithingRecipes("frostsilver").find(r => r.label === "Frostsilver dagger"); assert.ok(frostsilver, "a forged recipe");
+  p.xp.smithing = XP_TABLE[frostsilver.level]; teleport(g, cold.x, cold.y - 1); p.inventory.fill(null); give(p, "hammer"); give(p, "frostsilver_bar", Object.values(frostsilver.inputs)[0] * 12);
+  g.rng = () => 0.1; let kept = 0; for (let i = 0; i < 10; i++) { const before = count(p, "frostsilver_bar"); startProduction(g, frostsilver, 1); until(g, () => p.activity === null, 40); kept += before - count(p, "frostsilver_bar") < Object.values(frostsilver.inputs)[0] ? 1 : 0; }
+  assert.equal(kept, 10, "with the rng pinned low, the quench keeps a bar back every time"); g.rng = () => 0.9; { const before = count(p, "frostsilver_bar"); startProduction(g, frostsilver, 1); until(g, () => p.activity === null, 40); assert.equal(before - count(p, "frostsilver_bar"), Object.values(frostsilver.inputs)[0], "…and not when it doesn't"); }
+  d = talk(g, "frost_smith_wright"); assert.match(d.lines[0].text, /Every rock has a rhythm/); d = d.options.find(o => o.label === "I'll do it.").then(); assert.match(d.lines[0].text, /The faces along the track/); d.onEnd?.();
+  assert.equal(p.quests[VEINS], 1); p.inventory.fill(null); assert.equal(give(p, "moonsilver_ore", 8), 0, "the ore fits"); assert.equal(give(p, "rough_moonstone", 1), 0);
+  d = talk(g, "frost_smith_wright"); assert.match(d.lines[0].text, /Hold still/); d.onEnd?.(); assert.ok(questDone(g, VEINS)); assert.ok(has(p, "oddhands_gauge")); assert.equal(item("oddhands_gauge").tradeable, false);
+  // The gauge: a moonsilver rock mined with it carried comes back a third sooner.
+  const rock = world.objects.find(o => o.rock === "moonsilver"); teleport(g, rock.x, rock.y + 1); p.xp.mining = XP_TABLE[60]; p.inventory.fill(null); give(p, "oddhands_gauge"); give(p, "rarite_pickaxe");
+  g.rng = () => 0; setTarget(g, { kind: "object", id: rock.id, option: "Mine" }); until(g, () => g.depleted.has(rock.id), 60);
+  const withGauge = g.depleted.get(rock.id) - g.tick; take(p, "oddhands_gauge"); g.depleted.delete(rock.id); g.rng = () => 0; setTarget(g, { kind: "object", id: rock.id, option: "Mine" }); until(g, () => g.depleted.has(rock.id), 60);
+  const without = g.depleted.get(rock.id) - g.tick; assert.ok(Math.abs(withGauge / without - 2 / 3) < 0.05, `two thirds the wait (${withGauge} vs ${without})`);
+  // The Strong Friend: touched, counted, not explained; the Warden's and the quarrymaster's orders are smithing work.
+  const statue = world.objects.find(o => o.decor === "strong_friend"); assert.deepEqual(menuFor(g, [{ kind: "object", id: statue.id }], null).map(o => o.verb).filter(v => v !== "Walk here" && v !== "Examine"), ["Touch"]);
+  teleport(g, statue.x, statue.y + 1); setTarget(g, { kind: "object", id: statue.id, option: "Touch" }); until(g, () => (p.questData.touched_strong_friend ?? 0) > 0, 20); assert.equal(p.questData.touched_strong_friend, 1);
+  assert.ok(PATRONS.fellows_warden.items().some(i => i.id === "moonsilver_rivets" && i.level === 23) && PATRONS.quarry_master.items().some(i => i.id === "pewter_bar"));
+  // Saved and restored: the gauge, the quests, the touch.
+  give(p, "oddhands_gauge"); const k = newGame(); restore(k, serialize(g)); assert.ok(questDone(k, COLD_QUENCH) && questDone(k, FELLOWS_TRIAL) && has(k.player, "oddhands_gauge"));
 });

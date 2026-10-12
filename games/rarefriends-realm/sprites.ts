@@ -139,6 +139,33 @@ function knightBody(random: () => number, step: boolean): Grid {
   if (step) { set(grid, 4, 15); set(grid, 9, 15, false); set(grid, 11, 15); }
   return grid;
 }
+/**
+ * The Hearthkin (hearthkin.ts): the mountains' own Friends, short and broad, a helm or a hood, a beard to the chest, a
+ * hammer or a pick for some; twelve rows of them, squared off, built to carry ore.
+ */
+export const HEARTHKIN = 13;
+function hearthkinBody(random: () => number, step: boolean): Grid {
+  const grid = blank(), r = () => random(), hood = r() < 0.4, beardRows = 1 + Math.floor(r() * 3), prop = r() < 0.5 ? (r() < 0.5 ? "hammer" : "pick") : "none", lamp = !hood && r() < 0.5;
+  // The head: rows 3–7, wide and low, under a helm (a flat brim, a lamp on some) or a hood (peaked).
+  ellipse(grid, 8, 5.4, 3.4, 2.5);
+  if (hood) { rect(grid, 5, 3, 6, 1); set(grid, 7, 2); set(grid, 8, 2); set(grid, 8, 1); } else { rect(grid, 4, 3, 8, 1); if (lamp) set(grid, 8, 2); }
+  set(grid, 6, 5, false); set(grid, 9, 5, false);
+  // The beard: from under the mouth, squared, one to three rows, a notch or two at the bottom.
+  rect(grid, 5, 8, 6, beardRows); set(grid, 6, 8 + beardRows, true); set(grid, 9, 8 + beardRows, true);
+  // Shoulders and torso: ten wide at the top, eight below, a belt; arms a column out, thick.
+  const torsoTop = 8 + beardRows;
+  rect(grid, 3, torsoTop, 10, 1); rect(grid, 4, torsoTop + 1, 8, 13 - torsoTop); set(grid, 4, torsoTop + 2, false); set(grid, 11, torsoTop + 2, false);
+  rect(grid, 2, torsoTop, 1, 3); rect(grid, 13, torsoTop, 1, 3);
+  // Legs: two short thick ones to the last row.
+  rect(grid, 5, 13, 2, 3); rect(grid, 9, 13, 2, 3);
+  if (step) { set(grid, 4, 15); set(grid, 10, 15, false); set(grid, 11, 15); }
+  // What's in hand: a hammer (a block on a haft) or a pick (a bar on a haft), held up by the right arm.
+  if (prop === "hammer") { rect(grid, 14, torsoTop - 3, 1, 7); rect(grid, 13, torsoTop - 4, 3, 2); }
+  if (prop === "pick") { rect(grid, 14, torsoTop - 3, 1, 7); rect(grid, 12, torsoTop - 4, 4, 1); set(grid, 12, torsoTop - 3); set(grid, 15, torsoTop - 3); }
+  return grid;
+}
+/** The Strong Friend as his statues show him: a Hearthkin, stock still, the hammer across his knees (render.ts draws the plinth and the hammer). */
+export const STRONG_FRIEND_MASK: Mask = toMask((() => { const grid = hearthkinBody(mulberry(77), false); rect(grid, 12, 3, 4, 13, false); rect(grid, 14, 2, 2, 1, false); return grid; })());
 const friendCache = new Map<string, SpriteSet>();
 /** A procedural Friend of a family, stable for its seed. */
 export function friendSprite(family: number, seed: number): SpriteSet {
@@ -154,6 +181,8 @@ export function friendSprite(family: number, seed: number): SpriteSet {
       ? Object.freeze({ idle: toMask(smallKingBody(false)), step: toMask(smallKingBody(true)) })
       : family === KNIGHT
       ? Object.freeze({ idle: toMask(knightBody(mulberry(artSeed), false)), step: toMask(knightBody(mulberry(artSeed), true)) })
+      : family === HEARTHKIN
+      ? Object.freeze({ idle: toMask(hearthkinBody(mulberry(artSeed), false)), step: toMask(hearthkinBody(mulberry(artSeed), true)) })
       : Object.freeze({ idle: toMask(friendBody(family, mulberry(artSeed), false)), step: toMask(friendBody(family, mulberry(artSeed), true)) });
     friendCache.set(key, set);
   }
