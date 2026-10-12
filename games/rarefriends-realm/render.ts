@@ -3630,10 +3630,11 @@ function drawMount(ctx: CanvasRenderingContext2D, coat: Coat, facing: Facing, mo
   if (facing === "left") { ctx.save(); ctx.translate(x, 0); ctx.scale(-1, 1); drawPixels(ctx, art, 0, y + 2 * z, ART * z * MOUNT_SCALE); ctx.restore(); }
   else drawPixels(ctx, art, x, y + 2 * z, ART * z * MOUNT_SCALE);
 }
-/** A ridden mount's head and neck, over its rider, when it faces you. */
+/** What of a ridden mount is drawn over its rider: facing you, its head and neck; from behind, its back from the saddle down, so the rider's legs are hidden astride it. */
 function drawMountHead(ctx: CanvasRenderingContext2D, coat: Coat, facing: Facing, moving: boolean, now: number, x: number, y: number, z: number, reduced: boolean) {
-  if (facing !== "down") return;
-  drawPixels(ctx, mountArt(coat, "front", moving && !reduced ? Math.floor(now / 110) % 4 : -1, true, "head"), x, y + 2 * z, ART * z * MOUNT_SCALE);
+  if (facing !== "down" && facing !== "up") return;
+  const frame = moving && !reduced ? Math.floor(now / 110) % 4 : -1;
+  drawPixels(ctx, facing === "down" ? mountArt(coat, "front", frame, true, "head") : mountArt(coat, "back", frame, true, "rump"), x, y + 2 * z, ART * z * MOUNT_SCALE);
 }
 /**
  * What your Friend holds this frame and at what angle (radians forward from the resting pose), or null for the weapon at

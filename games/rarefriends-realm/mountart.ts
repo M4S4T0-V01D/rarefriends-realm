@@ -11,6 +11,8 @@ import { Pixels, pixelArt, shadeHex } from "./pixel.ts";
 export type MountView = "side" | "front" | "back";
 /** Art sizes, and the saddle's height above the hooves (art pixels), where a horse's rider sits. */
 export const MOUNT_SIZE: Record<MountView, { w: number; h: number }> = { side: { w: 34, h: 28 }, front: { w: 20, h: 28 }, back: { w: 20, h: 28 } };
+/** A mount's picture size: a spider's front and back are wider (it stands with its legs spread). */
+export const mountSize = (coat: Coat, view: MountView) => coat.kind === "spider" && view !== "side" ? { w: SPIDER_W, h: MOUNT_SIZE[view].h } : MOUNT_SIZE[view];
 export const SADDLE = 17;
 /** Where the rider sits on each kind: a horse's or a stag's back is high, a cat's or a wolf's lower, a spider's abdomen between. */
 export const saddleHeight = (coat: Coat) => ({ horse: SADDLE, stag: SADDLE, spider: 13, dragon: 13, tiger: 12, wolf: 12, golem: 19 } as const)[coat.kind ?? "horse"];
@@ -22,9 +24,11 @@ const hash = (a: number, b: number) => { let h = Math.imul(a * 374761393 + b * 6
  * A mount, `frame` 0–3 of its walk (or −1 standing), with a saddle when ridden or for sale. Facing you, a ridden mount is
  * drawn in two layers around its rider: the `body` under them and the `head` (and neck) over them.
  */
-export type MountLayer = "all" | "body" | "head";
+export type MountLayer = "all" | "body" | "head" | "rump";
+/** From behind, how far above the saddle's seat the rump layer starts (it covers the rider from there down: their legs, astride). */
+export const RUMP_ABOVE_SEAT = 1;
 export function mountArt(coat: Coat, view: MountView, frame: number, saddle: boolean, layer: MountLayer = "all"): HTMLCanvasElement {
-  const { w, h } = MOUNT_SIZE[view];
+  const { w, h } = mountSize(coat, view);
   return pixelArt(`mount:${JSON.stringify(coat)}:${view}:${frame}:${saddle}:${layer}`, w, h, p => {
     const kind = coat.kind ?? "horse";
     if (kind === "horse" || kind === "stag") { if (view === "side") side(p, coat, frame, saddle); else if (view === "front") front(p, coat, frame, saddle, layer); else back(p, coat, frame, saddle); markings(p, coat, view); }
@@ -33,6 +37,8 @@ export function mountArt(coat: Coat, view: MountView, frame: number, saddle: boo
     else if (kind === "dragon") { if (view === "side") dragonSide(p, coat, frame, saddle); else if (view === "front") dragonFront(p, coat, frame, saddle, layer); else dragonBack(p, coat, frame, saddle); }
     else if (kind === "golem") { if (view === "side") golemSide(p, coat, frame, saddle); else if (view === "front") golemFront(p, coat, frame, saddle, layer); else golemBack(p, coat, frame, saddle); }
     p.outline();
+    // From behind, ridden: the rows from just above the saddle down, drawn again over the rider so their legs are hidden astride it.
+    if (layer === "rump") p.data.fill(0, 0, Math.max(0, h - saddleHeight(coat) - RUMP_ABOVE_SEAT) * w);
   });
 }
 /** Mane colour along a strand (rainbow for unicorns that have one). */
@@ -236,37 +242,39 @@ function spiderHeadSide(p: Pixels, coat: Coat, eye: string, mark: string, oy: nu
   p.line(29, cy + 1, 31, cy + 3, shadeHex(coat.body, 0.12), 1); p.set(31, cy + 4, coat.hoof);
   p.line(27, cy + 3, 28, cy + 6, coat.hoof, 2); p.set(29, cy + 6, coat.hoof);
 }
+/** Facing you or from behind, a spider stands wider than a horse: its pictures are SPIDER_W wide, centred on SX. */
+const SPIDER_W = 30, SX = 15;
 function spiderFront(p: Pixels, coat: Coat, frame: number, saddle: boolean, layer: MountLayer) {
   const body = coat.body, mark = coat.accent ?? shadeHex(body, -0.3), eye = coat.eye ?? "#e0463c", phases = frame < 0 ? [0, 0] : [[1, -1], [0, 0], [-1, 1], [0, 0]][frame & 3];
-  const oy = 4;
+  const oy = 4, X = SX - 10;
   if (layer !== "head") {
-    // Legs splayed to both sides (four each), the abdomen rising behind.
-    for (const [i, reach] of [[0, 9], [1, 8], [2, 7], [3, 6]] as const) { const ph = phases[i % 2]; spiderLeg(p, coat, 7, 17 + oy - i, -1, reach, ph, i > 1); spiderLeg(p, coat, 13, 17 + oy - i, 1, reach, -ph, i > 1); }
-    p.disc(10, 11 + oy, 7, 6.5, body, null);
-    p.rect(5, 6 + oy, 10, 1, shadeHex(body, 0.1));
-    for (let i = 0; i < 4; i++) p.rect(8 + (i % 2) * 2, 7 + oy + i * 2, 2, 1, mark);
-    if (saddle) { p.rect(5, 8 + oy, 10, 3, BLANKET); p.rect(6, 7 + oy, 8, 2, SADDLE_LEATHER); }
+    // Legs splayed wide to both sides (four each, the front pair reaching furthest), the abdomen rising behind.
+    for (const [i, reach] of [[0, 12], [1, 11], [2, 10], [3, 8]] as const) { const ph = phases[i % 2]; spiderLeg(p, coat, SX - 3, 17 + oy - i, -1, reach, ph, i > 1); spiderLeg(p, coat, SX + 3, 17 + oy - i, 1, reach, -ph, i > 1); }
+    p.disc(SX, 11 + oy, 7, 6.5, body, null);
+    p.rect(X + 5, 6 + oy, 10, 1, shadeHex(body, 0.1));
+    for (let i = 0; i < 4; i++) p.rect(X + 8 + (i % 2) * 2, 7 + oy + i * 2, 2, 1, mark);
+    if (saddle) { p.rect(X + 5, 8 + oy, 10, 3, BLANKET); p.rect(X + 6, 7 + oy, 8, 2, SADDLE_LEATHER); }
   }
   if (layer === "body") return;
   // The head-body in front, held up off the ground, its eyes facing you and the fangs under.
   const cy = 15 + oy;
-  p.disc(10, cy, 6, 4.5, shadeHex(body, -0.08), null);
-  p.rect(7, cy - 4, 6, 1, shadeHex(body, 0.16));
-  p.rect(7, cy - 1, 2, 2, eye); p.rect(11, cy - 1, 2, 2, eye); p.set(7, cy - 1, WHITE); p.set(11, cy - 1, WHITE);
-  for (const [x, y] of [[6, cy - 3], [9, cy - 3], [10, cy - 3], [13, cy - 3]] as const) p.set(x, y, shadeHex(eye, -0.15));
-  p.line(5, cy + 2, 4, cy + 5, shadeHex(body, 0.12), 1); p.line(15, cy + 2, 16, cy + 5, shadeHex(body, 0.12), 1);
-  p.line(8, cy + 3, 7, cy + 6, coat.hoof, 2); p.line(12, cy + 3, 13, cy + 6, coat.hoof, 2);
+  p.disc(SX, cy, 6, 4.5, shadeHex(body, -0.08), null);
+  p.rect(X + 7, cy - 4, 6, 1, shadeHex(body, 0.16));
+  p.rect(X + 7, cy - 1, 2, 2, eye); p.rect(X + 11, cy - 1, 2, 2, eye); p.set(X + 7, cy - 1, WHITE); p.set(X + 11, cy - 1, WHITE);
+  for (const x of [6, 9, 10, 13]) p.set(X + x, cy - 3, shadeHex(eye, -0.15));
+  p.line(X + 5, cy + 2, X + 4, cy + 5, shadeHex(body, 0.12), 1); p.line(X + 15, cy + 2, X + 16, cy + 5, shadeHex(body, 0.12), 1);
+  p.line(X + 8, cy + 3, X + 7, cy + 6, coat.hoof, 2); p.line(X + 12, cy + 3, X + 13, cy + 6, coat.hoof, 2);
 }
 function spiderBack(p: Pixels, coat: Coat, frame: number, saddle: boolean) {
-  const body = coat.body, mark = coat.accent ?? shadeHex(body, -0.3), oy = 4, phases = frame < 0 ? [0, 0] : [[1, -1], [0, 0], [-1, 1], [0, 0]][frame & 3];
-  for (const [i, reach] of [[0, 6], [1, 7], [2, 8], [3, 9]] as const) { const ph = phases[i % 2]; spiderLeg(p, coat, 7, 14 + oy + i, -1, reach, ph, i < 2); spiderLeg(p, coat, 13, 14 + oy + i, 1, reach, -ph, i < 2); }
+  const body = coat.body, mark = coat.accent ?? shadeHex(body, -0.3), oy = 4, X = SX - 10, phases = frame < 0 ? [0, 0] : [[1, -1], [0, 0], [-1, 1], [0, 0]][frame & 3];
+  for (const [i, reach] of [[0, 8], [1, 10], [2, 11], [3, 12]] as const) { const ph = phases[i % 2]; spiderLeg(p, coat, SX - 3, 14 + oy + i, -1, reach, ph, i < 2); spiderLeg(p, coat, SX + 3, 14 + oy + i, 1, reach, -ph, i < 2); }
   // The abdomen nearest, big and round, its marking on top; the head-body beyond, mostly hidden.
-  p.disc(10, 8 + oy, 4, 3, shadeHex(body, -0.15), null);
-  p.disc(10, 16 + oy, 8, 7.5, body, null);
-  p.rect(4, 10 + oy, 12, 1, shadeHex(body, 0.1));
-  p.poly([[10, 11 + oy], [13, 15 + oy], [10, 21 + oy], [7, 15 + oy]], mark, null);
-  for (let y = 0; y < 14; y++) for (let x = 2; x < 18; x += 2) if (hash(x + 30, y) > 0.82) p.set(x + (y % 2), 10 + oy + y, shadeHex(coat.mane, 0.05));
-  if (saddle) { p.rect(5, 10 + oy, 10, 3, BLANKET); p.rect(6, 9 + oy, 8, 2, SADDLE_LEATHER); }
+  p.disc(SX, 8 + oy, 4, 3, shadeHex(body, -0.15), null);
+  p.disc(SX, 16 + oy, 8, 7.5, body, null);
+  p.rect(X + 4, 10 + oy, 12, 1, shadeHex(body, 0.1));
+  p.poly([[SX, 11 + oy], [SX + 3, 15 + oy], [SX, 21 + oy], [SX - 3, 15 + oy]], mark, null);
+  for (let y = 0; y < 14; y++) for (let x = 2; x < 18; x += 2) if (hash(x + 30, y) > 0.82) p.set(X + x + (y % 2), 10 + oy + y, shadeHex(coat.mane, 0.05));
+  if (saddle) { p.rect(X + 5, 10 + oy, 10, 3, BLANKET); p.rect(X + 6, 9 + oy, 8, 2, SADDLE_LEATHER); }
 }
 
 // ---------- Little dragons: a lizard's body, a long neck, folded wings, a tail with a point ----------
