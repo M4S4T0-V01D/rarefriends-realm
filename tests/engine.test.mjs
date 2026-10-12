@@ -3859,7 +3859,7 @@ test("The four smithed families: recipes at the anvil from the ordinary metals; 
   const { fitCarving, setCarving } = await import("../games/rarefriends-realm/engine.ts");
   const families = ITEM_LIST.filter(entry => entry.family);
   assert.deepEqual([...new Set(families.map(entry => entry.family))].sort(), ["fieldcraft", "prospector", "resonance", "shipwright"], "exactly four families");
-  assert.equal(families.filter(entry => entry.family === "prospector").length, 6); assert.equal(families.filter(entry => entry.family === "fieldcraft").length, 6);
+  assert.equal(families.filter(entry => entry.family === "prospector").length, 6); assert.equal(families.filter(entry => entry.family === "fieldcraft").length, 9, "six from the ore metals and three from the forged");
   assert.equal(families.filter(entry => entry.family === "shipwright").length, 11); assert.equal(families.filter(entry => entry.family === "resonance").length, 4);
   const pewter = smithingRecipes("pewter"), rarite = smithingRecipes("rarite");
   assert.ok(pewter.some(r => r.outputs.pewter_prospectors_pick === 1 && r.inputs.pewter_bar === 3 && r.inputs.logs === 1), "a prospector's pick: three bars and a handle");
@@ -3918,7 +3918,7 @@ test("Camping: a camp kit pitches a tent and a fire in the wild (not in town, no
   give(p, "bones"); const a0 = p.xp.prayer; offerBones(g, p.inventory.findIndex(slot => slot?.id === "bones"), false, false); const altar = p.xp.prayer - a0;
   assert.ok(Math.abs(field / altar - FIELD_ALTAR_RATE / 2) < 1e-6, `a field altar gives ${FIELD_ALTAR_RATE} to an altar's 2 (${field} vs ${altar})`);
   // Saved and restored: the camp, its altar, its waking place.
-  const save = serialize(g); assert.deepEqual(save.camp, { x: wild.x, y: wild.y, tier: 3, respawn: true, altar: true });
+  const save = serialize(g); assert.deepEqual(save.camp, { x: wild.x, y: wild.y, tier: 3, respawn: true, altar: true, cache: null, brazier: false, waystone: false });
   const h = newGame(); assert.ok(restore(h, save)); assert.deepEqual(h.player.camp, save.camp); assert.ok(h.world.objects.some(o => o.name === "Your tent"), "painted back in at load");
   packUpCamp(h); assert.ok(has(h.player, "moonsilver_field_altar"), "the altar comes back when the camp is packed");
   // Nowhere forbidden: underground, in a dangerous region, in the Ring.
@@ -4277,4 +4277,39 @@ test("Skill guide filters: every entry tagged, the groups a skill offers (metals
   // Names: a metal's own name, a slot, an element, a type; the groups in their order.
   assert.equal(tagName("metal:pewter"), METALS.find(m => m.id === "pewter").name); assert.equal(tagName("slot:head"), "Head"); assert.equal(tagName("element:fire"), "Fire"); assert.equal(tagName("type:weapon"), "Weapons"); assert.equal(tagName("method:Net"), "Net");
   assert.deepEqual(GUIDE_GROUPS.map(g => g.id), ["type", "metal", "slot", "element", "boost", "method", "tradition"]);
+});
+
+test("Camping grown: the cache keeps twelve things and comes home with the kit, the brazier's fire burns nothing and cures poison, the waystone walks you back (Wayfaring 50, once in a while, not underground), sleeping and tending pay now and then, and the trail log counts regions", async () => {
+  const { CAMP_RULES, CACHE_SLOTS, campAllowed, setUpCamp, packUpCamp, restAtCamp, sleepAtCamp, tendFire, setUpCache, cacheAt, stash, unstash, walkTheWay, brazierFire, byBrazier, applyCamp } = await import("../games/rarefriends-realm/camping.ts");
+  const { ACHIEVEMENTS } = await import("../games/rarefriends-realm/achievements.ts"); const { familyLevel } = await import("../games/rarefriends-realm/data.ts");
+  const g = newGame(), p = g.player;
+  for (const id of ["frostsilver_camp_cache", "gloomsteel_camp_brazier", "wyrmscale_waystone"]) { assert.ok(isItem(id), id); assert.equal(item(id).family, "fieldcraft"); assert.ok(familyLevel(id) > 50, `${id} is smithed from a forged metal`); }
+  assert.ok(ACHIEVEMENTS.some(a => a.id === "camper") && ACHIEVEMENTS.some(a => a.id === "every_sky"));
+  // A camp in the wild with everything carried: the brazier and the waystone are remembered; the first camp under a new sky pays.
+  p.xp.agility = XP_TABLE[50]; give(p, "pewter_camp_kit"); give(p, "gloomsteel_camp_brazier"); give(p, "wyrmscale_waystone"); give(p, "frostsilver_camp_cache");
+  const spot = (() => { for (let y = 230; y < 330; y++) for (let x = 560; x < 760; x++) if (!campAllowed(g, x, y)) return { x, y }; return null; })();
+  assert.ok(spot, "somewhere to camp"); teleport(g, spot.x, spot.y);
+  const wayfaringBefore = p.xp.agility; assert.ok(setUpCamp(g)); assert.ok(p.camp.brazier && p.camp.waystone && p.camp.cache === null);
+  assert.ok(p.xp.agility > wayfaringBefore, "a new sky's XP"); assert.equal(Object.keys(p.camps).length, 1);
+  // The brazier: the camp's fire burns nothing; poison sweated out at a rest; mending doubled beside it.
+  const fire = g.fires.find(f => f.expires === Infinity); assert.ok(fire && brazierFire(g, fire.uid)); assert.ok(byBrazier(g));
+  p.poison = { damage: 2, left: 4, timer: 10 }; restAtCamp(g); assert.equal(p.poison, null, "the brazier cures poison");
+  // Sleeping and tending: once in a while.
+  const slept = p.xp.agility; sleepAtCamp(g); assert.ok(p.xp.agility > slept); const again = p.xp.agility; sleepAtCamp(g); assert.equal(p.xp.agility, again, "not twice in a row");
+  const lit = p.xp.firemaking; tendFire(g); assert.ok(p.xp.firemaking > lit); const lit2 = p.xp.firemaking; tendFire(g); assert.equal(p.xp.firemaking, lit2); g.playTicks += CAMP_RULES.tendEvery; tendFire(g); assert.ok(p.xp.firemaking > lit2);
+  // The cache: set up beside the fire, twelve slots; stash a thing, take it back; saved with the camp; home with the kit.
+  const cacheSlot = p.inventory.findIndex(s => s?.id === "frostsilver_camp_cache"); setUpCache(g, cacheSlot); assert.equal(p.camp.cache.length, CACHE_SLOTS); assert.equal(count(p, "frostsilver_camp_cache"), 0);
+  assert.ok(g.world.objects.some(o => o.text === "camp_cache" && o.name !== "__removed"), "the cache stands at the camp");
+  give(p, "feather", 5); const feathers = p.inventory.findIndex(s => s?.id === "feather"); assert.ok(stash(g, feathers)); assert.equal(count(p, "feather"), 0); assert.deepEqual(cacheAt(g)[0], { id: "feather", n: 5 });
+  const save = JSON.parse(JSON.stringify(serialize(g))), fresh = newGame(); assert(restore(fresh, save)); assert.deepEqual(fresh.player.camp.cache[0], { id: "feather", n: 5 }); assert.ok(fresh.player.camp.brazier && fresh.player.camp.waystone); assert.equal(Object.keys(fresh.player.camps).length, 1);
+  assert.ok(unstash(g, 0)); assert.equal(count(p, "feather"), 5); assert.ok(stash(g, p.inventory.findIndex(s => s?.id === "feather")));
+  teleport(g, spot.x + 10, spot.y); assert.equal(cacheAt(g), null, "out of reach of the cache"); teleport(g, spot.x, spot.y + 1);
+  // The waystone: not from underground, not before Wayfaring 50, once in a while; it walks you to the fire.
+  teleport(g, spot.x + 40, spot.y + 20); p.xp.agility = XP_TABLE[49]; assert.equal(walkTheWay(g), false); p.xp.agility = XP_TABLE[50];
+  assert.ok(walkTheWay(g)); assert.equal(p.activity.kind, "teleport"); for (let i = 0; i < 12; i++) tick(g); assert.ok(Math.hypot(p.x - spot.x, p.y - spot.y) <= 2, `walked to the fire (${p.x},${p.y} vs ${spot.x},${spot.y})`);
+  teleport(g, spot.x + 40, spot.y + 20); assert.equal(walkTheWay(g), false, "the stone is cold"); g.tick += CAMP_RULES.waystoneEvery; assert.ok(walkTheWay(g)); p.activity = null;
+  { const under = movedPoint(g.world, ...M(0, 210)); teleport(g, under.x, under.y); assert.equal(walkTheWay(g), false, "not from underground"); }
+  // Packing up brings the cache and its things home (room needed).
+  teleport(g, spot.x, spot.y + 1); const free = p.inventory.filter(s => !s).length; p.inventory.fill(null); p.inventory[0] = { id: "pewter_camp_kit", n: 1 }; assert.ok(packUpCamp(g)); assert.equal(count(p, "frostsilver_camp_cache"), 1); assert.equal(count(p, "feather"), 5); assert.equal(p.camp, null); void free;
+  applyCamp(g); assert.ok(!g.world.objects.some(o => o.text === "camp_cache" && o.name !== "__removed"));
 });

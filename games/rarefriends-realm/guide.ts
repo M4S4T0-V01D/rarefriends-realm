@@ -191,6 +191,10 @@ export function skillGuide(skill: Skill): GuideEntry[] {
       add(5, "Camping", "With a camp kit (smithed from pewter): a tent and a fire in the wild, where the ground allows and not by a town, a dungeon's door or the dragons. Rest and cook there. Wayfaring XP for pitching one, once in a while.", "pewter_camp_kit", T("camp"));
       add(25, "A camp to wake at", "With a camp lantern carried when the camp is pitched: fall, and you wake by your own fire while it stands", "ashsteel_camp_lantern", T("camp"));
       add(5, "Field altar", "Set beside the tent, it takes bones for one and a half times a burial (an altar gives twice)", "moonsilver_field_altar", T("camp"));
+      add(5, "Sleeping and tending", "Sleep at the tent for a full rest and Wayfaring XP once in a while; tend the fire for Firemaking XP. A first camp in a region is a new sky: Wayfaring XP, and the trail log remembers", undefined, T("camp"));
+      add(5, "Camp cache", "Frostsilver: set beside the fire, it keeps twelve things while the camp stands (right-click a pack item at the camp: Stash)", "frostsilver_camp_cache", T("camp"));
+      add(5, "Camp brazier", "Gloomsteel, carried when the camp is pitched: a fire that burns hot. Nothing cooked on it burns, resting cures poison, and you mend twice as fast beside it", "gloomsteel_camp_brazier", T("camp"));
+      add(50, "Waystone", "Wyrmscale, carried when the camp is pitched: Walk-the-way from anywhere above ground, once in a while, and it takes you back to your fire", "wyrmscale_waystone", T("camp"));
       for (const reward of WAYFARER_REWARDS) if (reward.id !== "waybread") add(item(reward.id).equip?.requires?.agility ?? 1, reward.name, `${reward.cost} marks from Coach Skip · ${reward.text.replace(/ \(Wayfaring \d+\)/, "")}`, reward.id, [...T("reward"), ...(item(reward.id).equip ? [`slot:${item(reward.id).equip!.slot}`] : [])]);
       add(1, "Waybread", "1 mark for 3 from Coach Skip · 40 run energy each", "waybread", T("reward", "food"));
       break;

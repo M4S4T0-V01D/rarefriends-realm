@@ -4,6 +4,10 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 116, date: "2026-10-12", title: "Camping grown: a cache, a brazier and a waystone, sleeping and tending, and a trail log", items: [
+    "Three more Fieldcraft pieces, smithed from the forged metals. The camp cache (frostsilver): set beside the fire, it keeps twelve things while the camp stands (right-click a pack item at the camp to stash it; open the cache to take things back), and they come home with the kit when you pack up. The camp brazier (gloomsteel), carried when the camp is pitched: a fire that burns hot, so nothing cooked on it burns, resting there cures poison, and you mend twice as fast beside it. The waystone (wyrmscale), carried when the camp is pitched: Walk-the-way from anywhere above ground (Wayfaring 50), once in a while, and it takes you back to your fire.",
+    "At the tent you can Sleep now (everything a rest gives, and Wayfaring XP once in a while); at the fire, Tend it (Firemaking XP). Every region you first camp in is a new sky: Wayfaring XP, a word in the log, and two achievements for five and fifteen regions camped in.",
+  ] },
   { id: 115, date: "2026-10-12", title: "Wyrmreach moved up its mountain: the forest grown north of Fernwick, the dragons far from the village", items: [
     "The dragons were on Fernwick's doorstep, and the village has grown. Their ash field north of it is forest now: Whisperwood stretched far north of Fernwick, oaks and maples thinning to dead trees as the ground climbs, and at the forest's north-west edge a mountain rises out of the bay, ringed with crag. Switchbacks climb it from the hunters' camp at its foot to a plateau of ash and lava where the drakes roost, the crater at its heart where Old Cinder sleeps, and the drakes' nest on the far side past the lava, as far from anywhere as an egg can be.",
   ] },

@@ -14,7 +14,7 @@ import { cleanOrders } from "./orders.ts";
 import { cleanCard, cleanFellowshipLook } from "./cardstyle.ts";
 import { cleanCollectible } from "./collectible.ts";
 import { cleanLockbox } from "./cardescrow.ts";
-import { applyCamp, campRespawn, packUpCamp, restAtCamp, setUpCamp, setUpFieldAltar, toggleRespawn, type Camp } from "./camping.ts";
+import { applyCamp, brazierFire, byBrazier, cacheAt, campRespawn, packUpCamp, restAtCamp, setUpCache, setUpCamp, setUpFieldAltar, sleepAtCamp, stash, tendFire, toggleRespawn, walkTheWay, CACHE_SLOTS, type Camp } from "./camping.ts";
 import { activityEvent, activityTick, cleanActivities } from "./activities.ts";
 import { COLD_QUENCH, COLD_QUENCH_ANVIL, ELDER_ANVIL, ELDER_ANVIL_NAME, FELLOWS_TRIAL, GAUGE_RESPAWN, GAUGE_ROCKS, GUILD_FURNACE } from "./hearthkinnames.ts";
 import { applyHome, cleanHome, sleep } from "./housing.ts";
@@ -224,7 +224,7 @@ function objectOptions(game: Game, object: WorldObject): string[] {
     case "tanning": return ["Tan"];
     case "well": return ["Search"];
     case "sigil_altar": return ["Craft-sigil"];
-    case "decor": if (object.text === "camp") return game.player.camp?.respawn ? ["Rest", "Unmake-waking-place", "Pack-up"] : ["Rest", "Make-waking-place", "Pack-up"]; return object.name.endsWith("(sleep)") ? ["Sleep"] : object.name.endsWith("(fill)") || object.name === "Water barrel" ? ["Fill vials"] : object.name.endsWith("(furnish)") ? ["Warm-up", "Furnish"] : object.decor === "chest" && !object.name.startsWith("Chest") ? ["Search"] : [];
+    case "decor": if (object.text === "camp") return game.player.camp?.respawn ? ["Rest", "Sleep", "Unmake-waking-place", "Pack-up"] : ["Rest", "Sleep", "Make-waking-place", "Pack-up"]; if (object.text === "camp_fire") return ["Tend"]; if (object.text === "camp_cache") return ["Open"]; return object.name.endsWith("(sleep)") ? ["Sleep"] : object.name.endsWith("(fill)") || object.name === "Water barrel" ? ["Fill vials"] : object.name.endsWith("(furnish)") ? ["Warm-up", "Furnish"] : object.decor === "chest" && !object.name.startsWith("Chest") ? ["Search"] : [];
     default: return [];
   }
 }
@@ -304,6 +304,8 @@ function examineObject(game: Game, object: WorldObject): string {
   if (object.kind === "sign") return object.text ?? "A signpost.";
   return OBJECT_EXAMINE[object.kind] ?? object.name;
 }
+/** The Fieldcraft pieces themselves don't go in the cache (the kit least of all). */
+const FIELDCRAFT_IDS = new Set(["pewter_camp_kit", "blackiron_field_stove", "ashsteel_camp_lantern", "moonsilver_field_altar", "glimmer_expedition_frame", "rarite_wayfarers_compass", "frostsilver_camp_cache", "gloomsteel_camp_brazier", "wyrmscale_waystone"]);
 const DECOR_EXAMINE: Partial<Record<string, string>> = {
   trough: "A trough of water for the horses, and whatever else the stables keep now.", hitching_post: "A post with a rail, and a rope for a bridle. Somebody's horse waits here while they drink.",
   crystal: "A cluster of pale mineral grown out of the rock, cold to the touch, with a light of its own in the dark.", rune_circle: "A circle cut into the floor, and a figure inside it, its grooves alight. Whatever it holds, it's holding it still.",
@@ -331,6 +333,9 @@ export function itemOptions(game: Game, slotIndex: number): ItemOption[] {
   if (CARVINGS.some(carving => carving.id === slot.id)) out.push({ verb: "Set-down", run: g => setCarving(g, slotIndex) });
   if (slot.id === "pewter_camp_kit") out.push({ verb: "Set-up-camp", run: g => { setUpCamp(g); } });
   if (slot.id === "moonsilver_field_altar") out.push({ verb: "Set-up-altar", run: g => setUpFieldAltar(g, slotIndex) });
+  if (slot.id === "frostsilver_camp_cache") out.push({ verb: "Set-up-cache", run: g => setUpCache(g, slotIndex) });
+  if (slot.id === "wyrmscale_waystone") out.push({ verb: "Walk-the-way", run: g => { walkTheWay(g); } });
+  if (cacheAt(game) && !FIELDCRAFT_IDS.has(slot.id)) out.push({ verb: "Stash", run: g => { stash(g, slotIndex); } });
   if (definition.family === "resonance") out.push({ verb: "Fit-to-carving", run: g => fitCarving(g, slotIndex) });
   if (slot.id === "glimmer_shard") out.push({ verb: "Look-at", run: g => message(g, "The shard hums. Old Glimmer will want it back.") });
   // An inscribed sherd from Kharaveth: study it for a glyph you haven't seen (Mysteries); the sherd crumbles either way.
@@ -1054,7 +1059,9 @@ function interactObject(game: Game, object: WorldObject, option: string, use?: n
     else if (clue?.text) message(game, clue.text, "info");
     return;
   }
-  if (object.text === "camp" && object.kind === "decor") { if (option === "Rest") restAtCamp(game); else if (option === "Pack-up") packUpCamp(game); else toggleRespawn(game); return; }
+  if (object.text === "camp" && object.kind === "decor") { if (option === "Rest") restAtCamp(game); else if (option === "Sleep") sleepAtCamp(game); else if (option === "Pack-up") packUpCamp(game); else toggleRespawn(game); return; }
+  if (object.text === "camp_fire" && object.kind === "decor" && option === "Tend") { tendFire(game); return; }
+  if (object.text === "camp_cache" && object.kind === "decor" && option === "Open") { if (cacheAt(game)) { game.ui.cache = true; sound(game, "click"); } else message(game, "Go to your camp to open the cache.", "warn"); return; }
   switch (object.kind) {
     case "sigil_altar": craftSigils(game, object); return;
     case "herb": {
@@ -1465,7 +1472,7 @@ function runActivity(game: Game) {
     case "teleport": {
       player.activity = null;
       const place = activity.spell.startsWith("tablet:") ? activity.spell.slice(7) : activity.spell === "home" ? HOME_PLACE[traditionOf(player)] : SPELLS.find(spell => spell.id === activity.spell)?.teleport ?? "hollow_square";
-      travel(game, activity.to, `You teleport to ${TELEPORT_NAMES[place] ?? "Friendhollow"}.`); sound(game, "teleport");
+      travel(game, activity.to, activity.spell === "waystone" ? "The way closes behind you: your fire, and your tent beside it." : `You teleport to ${TELEPORT_NAMES[place] ?? "Friendhollow"}.`); sound(game, "teleport");
     }
   }
 }
@@ -1565,7 +1572,7 @@ function cookTick(game: Game, activity: Extract<Activity, { kind: "cook" }>) {
   take(player, activity.raw);
   const cooking = level(game, "cooking"), span = Math.max(1, recipe.stopBurn - recipe.level);
   // About one in five burns at the recipe's own level (a touch more on an open fire), easing off quickly and to none at its stop-burn level.
-  const left = Math.max(0, 1 - (cooking - recipe.level) / span), burn = cooking >= recipe.stopBurn ? 0 : 0.2 * left ** 1.5 + (activity.source === "fire" ? 0.03 : 0);
+  const left = Math.max(0, 1 - (cooking - recipe.level) / span), burn = cooking >= recipe.stopBurn || (activity.source === "fire" && brazierFire(game, activity.sourceId)) ? 0 : 0.2 * left ** 1.5 + (activity.source === "fire" ? 0.03 : 0);
   if (game.rng() < burn) { give(player, "burnt_food"); message(game, `You accidentally burn the ${item(recipe.cooked).name.toLowerCase()}.`); sound(game, "burn"); }
   else { give(player, recipe.cooked); addXp(game, "cooking", recipe.xp); message(game, `You successfully cook ${item(recipe.cooked).name.toLowerCase()}.`); sound(game, "sizzle"); }
   if (!has(player, activity.raw)) player.activity = null;
@@ -2201,7 +2208,7 @@ function upkeep(game: Game) {
   for (const carving of game.carvings) if (carving.until <= game.tick) crumble(game, carving);
   if (game.ground.length) game.ground = game.ground.filter(entry => entry.expires > game.tick);
   // Hitpoints regenerate slowly; Cellular Friends regrow twice as fast, and every Heartguard piece quickens it by 6% (the Hearth cordial, three times as fast).
-  if (++player.regenTimer >= Math.round(regenTicks(player) / (mixtureOn(game, 2) ? 3 : 1) / carvingEffect(game).regen)) { player.regenTimer = 0; if (player.hp < maxHp(player)) player.hp++; }
+  if (++player.regenTimer >= Math.round(regenTicks(player) / (mixtureOn(game, 2) ? 3 : 1) / carvingEffect(game).regen / (byBrazier(game) ? 2 : 1))) { player.regenTimer = 0; if (player.hp < maxHp(player)) player.hp++; }
   // Poison on you: four doses, ten ticks apart; an antidote ends it.
   if (player.poison && --player.poison.timer <= 0) {
     player.poison.timer = 10; player.poison.left--;
@@ -2833,6 +2840,7 @@ export type SaveData = {
   firsts?: Record<string, number>; friendKinds?: Record<string, 1>; rumours?: Record<string, 1>; orders?: Record<string, WorkOrder>; activities?: unknown; card?: Record<string, string>; collectible?: unknown; lockbox?: unknown; settled?: unknown; notices?: unknown; camp?: unknown; campXpAt?: number; cards?: Record<string, number>; rarian?: boolean; mizukai?: boolean; orashai?: boolean; mana?: number; mysteries?: unknown; spiritWardUntil?: number; home?: unknown; restedTicks?: number; sigilBag?: Record<string, number>; ward?: { defence: number; flat: number; reduce: number } | null; wardUntil?: number; renew?: number; renewUntil?: number; belts?: Record<string, Record<string, number>>; followerWorn?: string[];
   name?: string | null; fellowship?: { name: string; tag: string; logo?: string; banner?: string; colors?: string[] } | null; title?: string | null; visited?: Record<string, number>; regionTicks?: Record<string, number>; talked?: Record<string, 1>; emotesUsed?: Record<string, 1>; outfits?: Record<string, 1>; friendTicks?: number; mounts?: string[]; mount?: string | null; daily?: unknown; seenUpdate?: number;
   lastMount?: string | null; saddlebags?: unknown; mountReady?: number;
+  camps?: Record<string, number>; campTendAt?: number; campSleptAt?: number; waystoneAt?: number;
 };
 export function serialize(game: Game): SaveData {
   const player = game.player;
@@ -2844,14 +2852,14 @@ export function serialize(game: Game): SaveData {
     playTicks: game.playTicks, retaliate: game.autoRetaliate, music: [...player.music],
     referredBy: player.referredBy, referrals: [...player.referrals], referralTimes: [...player.referralTimes], boostTicks: player.boostTicks, coalBag: player.coalBag, stoneBoxGrades: { ...player.stoneBoxGrades }, stoneBox: player.stoneBox, boneBag: { ...player.boneBag }, boosts: { ...player.boosts }, poison: player.poison ? { ...player.poison } : null, weaponPoison: player.weaponPoison ? { ...player.weaponPoison } : null,
     antidoteUntil: Math.max(0, player.antidoteUntil - game.tick), antifireUntil: Math.max(0, player.antifireUntil - game.tick), stealthUntil: Math.max(0, player.stealthUntil - game.tick), tonicUntil: Math.max(0, player.tonicUntil - game.tick), mixture: player.mixture ? { family: player.mixture.family, until: Math.max(0, player.mixture.until - game.tick) } : null,
-    firsts: { ...player.firsts } as Record<string, number>, friendKinds: { ...player.friendKinds } as Record<string, 1>, rumours: { ...player.rumours } as Record<string, 1>, orders: { ...player.orders }, activities: { run: player.activities.run ? { ...player.activities.run, target: { ...player.activities.run.target }, marks: { ...player.activities.run.marks } } : null, records: { ...player.activities.records } }, card: { ...player.card }, collectible: { layout: player.collectible.layout, show: [...player.collectible.show] }, lockbox: player.lockbox.map(slot => ({ ...slot })), settled: [...player.settled], notices: [...player.notices], camp: player.camp ? { ...player.camp } : null, campXpAt: player.campXpAt, cards: { ...player.cards }, rarian: player.rarian, mizukai: player.mizukai, orashai: player.orashai, mana: player.mana, mysteries: { found: { ...player.mysteries.found }, glyphs: { ...player.mysteries.glyphs }, read: { ...player.mysteries.read } }, spiritWardUntil: Math.max(0, player.spiritWardUntil - game.tick), home: player.home ? { ...player.home, furniture: { ...player.home.furniture } } : null, restedTicks: player.restedTicks, sigilBag: { ...player.sigilBag }, ward: player.ward ? { ...player.ward } : null, wardUntil: Math.max(0, player.wardUntil - game.tick), renew: player.renew, renewUntil: Math.max(0, player.renewUntil - game.tick), belts: Object.fromEntries(Object.entries(player.belts).map(([id, contents]) => [id, { ...contents }])), followerWorn: [...player.followerWorn],
+    firsts: { ...player.firsts } as Record<string, number>, friendKinds: { ...player.friendKinds } as Record<string, 1>, rumours: { ...player.rumours } as Record<string, 1>, orders: { ...player.orders }, activities: { run: player.activities.run ? { ...player.activities.run, target: { ...player.activities.run.target }, marks: { ...player.activities.run.marks } } : null, records: { ...player.activities.records } }, card: { ...player.card }, collectible: { layout: player.collectible.layout, show: [...player.collectible.show] }, lockbox: player.lockbox.map(slot => ({ ...slot })), settled: [...player.settled], notices: [...player.notices], camp: player.camp ? { ...player.camp, cache: player.camp.cache ? player.camp.cache.map(slot => slot ? { ...slot } : null) : null } : null, campXpAt: player.campXpAt, camps: { ...player.camps }, campTendAt: player.campTendAt, campSleptAt: player.campSleptAt, waystoneAt: Math.min(0, player.waystoneAt - game.tick), cards: { ...player.cards }, rarian: player.rarian, mizukai: player.mizukai, orashai: player.orashai, mana: player.mana, mysteries: { found: { ...player.mysteries.found }, glyphs: { ...player.mysteries.glyphs }, read: { ...player.mysteries.read } }, spiritWardUntil: Math.max(0, player.spiritWardUntil - game.tick), home: player.home ? { ...player.home, furniture: { ...player.home.furniture } } : null, restedTicks: player.restedTicks, sigilBag: { ...player.sigilBag }, ward: player.ward ? { ...player.ward } : null, wardUntil: Math.max(0, player.wardUntil - game.tick), renew: player.renew, renewUntil: Math.max(0, player.renewUntil - game.tick), belts: Object.fromEntries(Object.entries(player.belts).map(([id, contents]) => [id, { ...contents }])), followerWorn: [...player.followerWorn],
     lastMount: player.lastMount ?? null, saddlebags: Object.fromEntries(Object.entries(player.saddlebags).map(([id, bags]) => [id, bags.map(slot => slot ? { ...slot } : null)])), mountReady: Math.max(0, player.mountReady - game.tick),
     name: player.name, fellowship: player.fellowship ? { ...player.fellowship } : null, title: player.title, visited: { ...player.visited } as Record<string, number>, regionTicks: { ...player.regionTicks } as Record<string, number>, talked: { ...player.talked } as Record<string, 1>, emotesUsed: { ...player.emotesUsed } as Record<string, 1>, outfits: { ...player.outfits } as Record<string, 1>, friendTicks: player.friendTicks, mounts: [...player.mounts], mount: player.mount, met: JSON.parse(JSON.stringify(player.met)), achievements: { ...player.achievements }, pets: [...player.pets], petOut: player.petOut, killLog: { ...player.killLog }, lore: Object.fromEntries(Object.entries(player.lore).map(([id, entry]) => [id, { ...entry, d: [...entry.d] }])), stats: { ...player.stats }, daily: JSON.parse(JSON.stringify(player.daily)), seenUpdate: player.seenUpdate,
   };
 }
 /** Every quest the Realm has (so a save keeps them all: the hand-kept list this used to be lost the dungeon, Ring, Orders and Maidens quests on reload). */
 const questIds = () => QUESTS.map(quest => quest.id);   // (at restore time: an overlay's quests register after this module loads)
-const cleanCamp = (raw: unknown): Camp | null => { if (!raw || typeof raw !== "object") return null; const c = raw as Record<string, unknown>; if (typeof c.x !== "number" || typeof c.y !== "number" || !Number.isInteger(c.x) || !Number.isInteger(c.y)) return null; return { x: c.x, y: c.y, tier: int(c.tier, 0, 6, 1), respawn: c.respawn === true, altar: c.altar === true }; };
+const cleanCamp = (raw: unknown): Camp | null => { if (!raw || typeof raw !== "object") return null; const c = raw as Record<string, unknown>; if (typeof c.x !== "number" || typeof c.y !== "number" || !Number.isInteger(c.x) || !Number.isInteger(c.y)) return null; return { x: c.x, y: c.y, tier: int(c.tier, 0, 9, 1), respawn: c.respawn === true, altar: c.altar === true, cache: Array.isArray(c.cache) ? Array.from({ length: CACHE_SLOTS }, (_, i) => slotOf((c.cache as unknown[])[i])) : null, brazier: c.brazier === true, waystone: c.waystone === true }; };
 const int = (value: unknown, min: number, max: number, fallback: number) => typeof value === "number" && Number.isFinite(value) ? Math.max(min, Math.min(max, Math.floor(value))) : fallback;
 /** Item and spell ids from saves made before the Realm's own names (old id → new id). */
 const RENAMED: Record<string, string> = {
@@ -2987,6 +2995,7 @@ export function restore(game: Game, raw: unknown): boolean {
   // What the save service settled while this adventure was away (a card redeemed): said once, here, then forgotten.
   const notices = Array.isArray(save.notices) ? save.notices.filter((entry): entry is string => typeof entry === "string").slice(0, 20) : [];
   for (const notice of notices) message(game, notice.slice(0, 300), "info");
+  player.camps = keyed(save.camps, v => typeof v === "number" ? int(v, 1, 1e6, 1) : null) as Record<string, number>; player.campTendAt = -1e9; player.campSleptAt = -1e9; player.waystoneAt = game.tick + int(save.waystoneAt, -1e6, 0, -1e6);
   player.notices = []; player.cards = Object.fromEntries(Object.entries(save.cards && typeof save.cards === "object" ? save.cards : {}).filter(([id, day]) => /^[a-z0-9_]{1,40}$/.test(id) && typeof day === "number" && Number.isFinite(day)).slice(0, 2000).map(([id, day]) => [id, Math.max(0, Math.floor(day))])); player.rarian = save.rarian === true; player.mizukai = !player.rarian && save.mizukai === true; player.orashai = !player.rarian && !player.mizukai && save.orashai === true; player.mana = typeof save.mana === "number" && Number.isFinite(save.mana) ? Math.max(0, Math.min(maxMana(player), save.mana)) : maxMana(player); player.mysteries = cleanMysteries(save.mysteries); player.spiritWardUntil = game.tick + int(save.spiritWardUntil, 0, 1000, 0); player.home = cleanHome(save.home); player.restedTicks = int(save.restedTicks, 0, 100000, 0); applyHome(game); player.camp = cleanCamp(save.camp); player.campXpAt = int(save.campXpAt, -100000, 1e9, -100000); applyCamp(game);
   player.sigilBag = {}; for (const [id, n] of Object.entries(save.sigilBag ?? {})) if (isItem(id) && isSigil(id)) { const v = int(n, 0, SIGIL_BAG_SIZE, 0); if (v) player.sigilBag[id] = v; }
   player.ward = save.ward && typeof save.ward === "object" ? { defence: Math.max(0, Math.min(1, Number(save.ward.defence) || 0)), flat: int(save.ward.flat, 0, 100, 0), reduce: Math.max(0, Math.min(0.9, Number(save.ward.reduce) || 0)) } : null; player.wardUntil = game.tick + int(save.wardUntil, 0, 1000, 0); if (!int(save.wardUntil, 0, 1000, 0)) player.ward = null;

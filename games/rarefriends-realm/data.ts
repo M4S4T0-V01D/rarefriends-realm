@@ -395,15 +395,19 @@ export function fieldGear(): Item[] {
     out.push({ id: `${id}_rivets`, name: `${name} rivets`, examine: `Ten ${name.toLowerCase()} rivets, for a hull or a hinge. Shipwrights pay for them.`, value: Math.round(metal.value * 0.8), stackable: true, icon: { shape: "bar", color: metal.color }, family: "shipwright", power: t, vessel: "rivets" } as Item);
   }
   // Fieldcraft, one piece a metal, each with its own use (camping.ts).
-  const field: [typeof ORE_METALS[number], string, string, string, number][] = [
+  const field: [typeof METALS[number]["id"], string, string, string, number][] = [
     ["pewter", "camp_kit", "Camp kit", "Pegs, poles, a bedroll and a tin kettle: a camp, wherever the ground allows. Set-up-camp to pitch it.", 3],
     ["blackiron", "field_stove", "Field stove", "A blackiron stove for the camp: carried when it's pitched, resting there gives back a little Faith too.", 3.5],
     ["ashsteel", "camp_lantern", "Camp lantern", "An ashsteel lantern. Carried when a camp is pitched, it makes a camp you can wake up at (Wayfaring 25).", 1.5],
     ["moonsilver", "field_altar", "Field altar", "A folding moonsilver altar for the road: set it up at your camp and offer bones there, for less than a standing altar gives.", 4],
     ["glimmer", "expedition_frame", "Expedition frame", "A glimmer pack frame. Carried, a quarter of your load weighs nothing.", 2],
     ["rarite", "wayfarers_compass", "Wayfarer's compass", "A rarite compass that always knows the way. Carried, running costs a tenth less.", 0.5],
+    // The forged metals' pieces: the camp grows a cache, a brazier and a waystone.
+    ["frostsilver", "camp_cache", "Camp cache", "A frostsilver-bound chest for the camp. Set-up-cache at your camp and it keeps twelve things for you while the camp stands; they come back with the kit.", 4],
+    ["gloomsteel", "camp_brazier", "Camp brazier", "A gloomsteel brazier. Carried when a camp is pitched, the camp's fire burns hot: nothing cooked on it burns, resting there cures poison, and you mend twice as fast beside it.", 5],
+    ["wyrmscale", "waystone", "Waystone", "A wyrmscale waystone. Carried when a camp is pitched, it remembers the way back: Walk-the-way from anywhere above ground (Wayfaring 50), once in a while, and it takes you to your fire.", 2],
   ];
-  for (const [id, piece, label, examine, weight] of field) { const metal = tierOf(id); out.push({ id: `${id}_${piece}`, name: label, examine, value: metal.value * 5, weight, icon: { shape: piece === "field_altar" ? "orb" : piece === "camp_lantern" ? "lamp" : "key", color: metal.color }, family: "fieldcraft", power: metal.tier } as Item); }
+  for (const [id, piece, label, examine, weight] of field) { const metal = tierOf(id); out.push({ id: `${id}_${piece}`, name: label, examine, value: metal.value * 5, weight, icon: { shape: piece === "field_altar" ? "orb" : piece === "camp_lantern" || piece === "camp_brazier" ? "lamp" : piece === "camp_cache" ? "stonebox" : piece === "waystone" ? "tablet" : "key", color: metal.color }, family: "fieldcraft", power: metal.tier } as Item); }
   // Shipwright's hardware beyond rivets: hull fittings (moonsilver up), an anchor chain, a ship's bell.
   for (const id of ["moonsilver", "glimmer", "rarite"] as const) { const metal = tierOf(id); out.push({ id: `${id}_hull_fitting`, name: `${metal.name} hull fitting`, examine: `A ${metal.name.toLowerCase()} fitting for a hull that isn't built yet. Carried, the boatmen take a fifth off: they know a shipwright's friend.`, value: metal.value * 6, weight: 3, icon: { shape: "shield", color: metal.color }, family: "shipwright", power: metal.tier, vessel: "hull" } as Item); }
   out.push({ id: "blackiron_anchor_chain", name: "Anchor chain", examine: "Blackiron links, heavy as sin. An anchor's worth, for a ship to come.", value: 400, weight: 8, icon: { shape: "key", color: "#5f5e66" }, family: "shipwright", power: 2, vessel: "anchor" } as Item);
@@ -1151,7 +1155,7 @@ export const FIREMAKING: Record<string, { level: number; xp: number }> = {
 /** The four families' recipes (engine.ts familyRecipes): bars (and logs) a piece, its Smithing level above the metal's, and how many a go. */
 export const FAMILY_RECIPES: Record<string, { bars: number; logs?: number; offset: number; makes?: number }> = {
   prospectors_pick: { bars: 3, logs: 1, offset: 10 }, rivets: { bars: 1, offset: 3, makes: 10 }, camp_kit: { bars: 2, logs: 2, offset: 6 }, field_stove: { bars: 3, offset: 8 }, camp_lantern: { bars: 2, offset: 9 },
-  field_altar: { bars: 4, offset: 11 }, expedition_frame: { bars: 3, logs: 1, offset: 12 }, wayfarers_compass: { bars: 2, offset: 13 }, hull_fitting: { bars: 3, offset: 9 }, anchor_chain: { bars: 4, offset: 7 }, ships_bell: { bars: 5, offset: 14 }, resonance_fitting: { bars: 2, offset: 11 },
+  field_altar: { bars: 4, offset: 11 }, expedition_frame: { bars: 3, logs: 1, offset: 12 }, wayfarers_compass: { bars: 2, offset: 13 }, camp_cache: { bars: 4, logs: 2, offset: 10 }, camp_brazier: { bars: 5, offset: 12 }, waystone: { bars: 3, offset: 14 }, hull_fitting: { bars: 3, offset: 9 }, anchor_chain: { bars: 4, offset: 7 }, ships_bell: { bars: 5, offset: 14 }, resonance_fitting: { bars: 2, offset: 11 },
 };
 /** The Smithing level of a family piece (its metal's, plus the piece's), or null for anything else. */
 export function familyLevel(id: string): number | null {

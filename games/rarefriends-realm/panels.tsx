@@ -8,6 +8,7 @@ import { SPELL_TABS, RARIAN_SPELL_TABS, MIZUKAI_SPELL_TABS, ORASHAI_SPELL_TABS, 
   type EquipSlot, type Skill, MOUNTS, mountDef, PETS, CARVINGS, CARVING_REACH,
 } from "./data.ts";
 import { mountArt } from "./mountart.ts";
+import { cacheAt, unstash } from "./camping.ts";
 import { CHEST_REWARD, DAY_MS, challengeProgress, challengeReward, challengeText, claimChallenge, claimChest, claimStreak, completeDaily, dailyWaiting, rerollDaily, rewardText, rollDaily, streakReward, streakStatus } from "./daily.ts";
 import { LATEST_UPDATE, UPDATES } from "./updates.ts";
 import { FIRST_STEPS, currentStep } from "./firststeps.ts";
@@ -1621,6 +1622,16 @@ function MountTab({ game, refresh, openMenu, paused }: PanelProps) {
       {stable}
     </div>
   );
+}
+/** The camp cache (camping.ts): twelve things kept at your camp while it stands. Click one to take it back; right-click a pack item: Stash. */
+export function CampCacheModal({ game, refresh, openMenu, onClose }: { game: Game; refresh: () => void; openMenu: OpenMenu; onClose: () => void }) {
+  const cache = cacheAt(game);
+  if (!cache) return null;
+  return <Modal title="Camp cache" onClose={onClose}>
+    <p className="realm-muted">Twelve things keep here while the camp stands, and come back with the kit when you pack up. Click one to take it back; right-click a pack item: Stash.</p>
+    <div className="realm-inventory bags" onContextMenu={event => event.preventDefault()}>{cache.map((slot, index) => <button key={index} type="button" className="realm-slot" aria-label={slot ? `Take back ${item(slot.id).name}${slot.n > 1 ? ` × ${slot.n}` : ""}` : `Empty cache slot ${index + 1}`} onClick={() => { if (slot) { unstash(game, index); refresh(); } }}
+      {...rightClick(openMenu, () => slot ? [{ verb: "Take-back", noun: item(slot.id).name, tone: "item", run: () => { unstash(game, index); refresh(); } }, { verb: "Examine", noun: item(slot.id).name, run: () => { message(game, examineItem(slot.id)); refresh(); } }] : [])}>{slot && <ItemIcon slot={slot} size={40} />}</button>)}</div>
+  </Modal>;
 }
 /** Your mount's orb, on the right of the minimap (Faith's column keeps the Orashai's mana under it). */
 export function MountOrb({ game, onRide, openMenu }: { game: Game; onRide?: (id?: string) => void; openMenu?: OpenMenu }) {

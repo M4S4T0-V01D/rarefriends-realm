@@ -46,6 +46,8 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   { id: "saddle_up", group: "Collecting", icon: "♞", name: "Saddle up", text: "Buy a mount at the Friendhollow stables.", check: g => g.player.mounts.length >= 1 },
   { id: "unicorn", group: "Collecting", icon: "♞", name: "Horn of plenty", text: "Own a unicorn.", check: g => g.player.mounts.some(id => id.includes("unicorn")) },
   { id: "stable", group: "Collecting", icon: "♞", name: "Stable master", text: `Own all ${MOUNTS.length} mounts.`, check: g => g.player.mounts.length >= MOUNTS.length },
+  { id: "camper", group: "Exploring", icon: "⛺", name: "Under new skies", text: "Camp in five regions (the trail log).", check: g => Object.keys(g.player.camps).length >= 5 },
+  { id: "every_sky", group: "Exploring", icon: "⛺", name: "A fire under every sky", text: "Camp in fifteen regions.", check: g => Object.keys(g.player.camps).length >= 15 },
   { id: "pet", group: "Collecting", icon: "❦", name: "A funny feeling", text: "Find a pet while training.", check: g => g.player.pets.length >= 1 },
   { id: "menagerie", group: "Collecting", icon: "❦", name: "Menagerie", text: `Find all ${PETS.length} pets.`, check: g => g.player.pets.length >= PETS.length },
   { id: "caped", group: "Collecting", icon: "★", name: "Caped crusader", text: "Own a mastery cape.", check: g => owns(g, id => !!item(id).mastery) },
