@@ -8,11 +8,11 @@
  * rebuilt from them, and only drawing uses them), and the objects, spawns, places, buildings, storeys and ramparts as
  * JSON. The tile → object and tile → building maps are rebuilt from the lists.
  */
-import { H, W, buildHeights, indexBuildings, indexObjects, type World } from "./world.ts";
+import { H, W, buildHeights, indexBuildings, indexObjects, relabelRegions, type World } from "./world.ts";
 
-export const BAKE_VERSION = 3;
+export const BAKE_VERSION = 4;
 const LIFT_STEPS = 64;
-type Baked = { v: number; seed: number; w: number; h: number; tiles: string; region: string; lift: string; raise: string; data: Pick<World, "objects" | "spawns" | "places" | "buildings" | "floors" | "ramparts"> };
+type Baked = { v: number; seed: number; w: number; h: number; tiles: string; region: string; lift: string; raise: string; data: Pick<World, "under" | "labels" | "objects" | "spawns" | "places" | "buildings" | "floors" | "ramparts"> };
 
 const toBase64 = (bytes: Uint8Array) => {
   let binary = "";
@@ -41,7 +41,7 @@ const unbakeSteps = (text: string) => {
 export function bakeWorld(world: World, lift: Float32Array, seed: number, raise = new Float32Array(lift.length)): string {
   const baked: Baked = {
     v: BAKE_VERSION, seed, w: W, h: H, tiles: toBase64(world.tiles), region: toBase64(world.region), lift: bakeSteps(lift, "lift"), raise: bakeSteps(raise, "raise"),
-    data: { objects: world.objects, spawns: world.spawns, places: world.places, buildings: world.buildings, floors: world.floors, ramparts: world.ramparts },
+    data: { objects: world.objects, spawns: world.spawns, places: world.places, buildings: world.buildings, floors: world.floors, ramparts: world.ramparts, under: world.under, labels: world.labels },
   };
   return JSON.stringify(baked);
 }
@@ -51,6 +51,7 @@ export function unbakeWorld(text: string): World | null {
   const baked = JSON.parse(text) as Baked;
   if (baked.v !== BAKE_VERSION || baked.w !== W || baked.h !== H) return null;
   const tiles = fromBase64(baked.tiles), region = fromBase64(baked.region), lift = unbakeSteps(baked.lift), raise = unbakeSteps(baked.raise);
-  const { objects, spawns, places, buildings, floors, ramparts } = baked.data;
-  return { tiles, region, objects, objectAt: indexObjects(objects), spawns, places, heights: buildHeights(tiles, baked.seed, lift, raise), buildings, buildingAt: indexBuildings(buildings), floors, ramparts, lift, raise };
+  const { objects, spawns, places, buildings, floors, ramparts, under, labels } = baked.data;
+  relabelRegions(labels ?? {});
+  return { tiles, region, objects, objectAt: indexObjects(objects), spawns, places, heights: buildHeights(tiles, baked.seed, lift, raise), buildings, buildingAt: indexBuildings(buildings), floors, ramparts, lift, raise, under: under ?? [], labels: labels ?? {} };
 }

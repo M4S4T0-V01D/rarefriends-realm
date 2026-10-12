@@ -42,7 +42,7 @@ import {
   type Activity, type CombatStyle, type Dialogue, type Game, type Monster, type Npc, type Player, type Point, type Recipe, type Slot, type BankSlot, type Target,
  type WorkOrder,
 } from "./state.ts";
-import { FLOOR_Y, GEN_H, MAINLAND, T, W, WEST_DX, H, southShift, inArena, inBounds, inRingBuilding, isUnderground, isWater, mainlandToWorld, objectAtTile, realPoint, regionAt, terrainAt, tileIndex, walkable, type WorldObject } from "./world.ts";
+import { DUNGEON_Y, FLOOR_Y, GEN_H, MAINLAND, T, W, WEST_DX, H, isStorey, movedPoint, southShift, inArena, inBounds, inRingBuilding, isUnderground, isWater, mainlandToWorld, objectAtTile, realPoint, regionAt, terrainAt, tileIndex, walkable, type WorldObject } from "./world.ts";
 
 export { createGame };
 
@@ -2680,7 +2680,7 @@ export function setPet(game: Game, id: string | null) {
 export function rideProblem(game: Game) {
   const player = game.player;
   if (isUnderground(player.y)) return "There's no room to ride down here.";
-  if (player.y >= FLOOR_Y) return "You can't ride a horse up the stairs.";
+  if (isStorey(player.y)) return "You can't ride a horse up the stairs.";
   return null;
 }
 /** Get on a mount you own (the last one you rode, or `id`), or off the one you're on. */
@@ -2837,7 +2837,7 @@ export type SaveData = {
 export function serialize(game: Game): SaveData {
   const player = game.player;
   return {
-    v: 1, world: 4, friendId: player.friendId, x: player.x, y: player.y, run: player.run, energy: Math.round(player.energy), xp: { ...player.xp }, hp: player.hp, prayer: Math.round(player.prayer * 10) / 10,
+    v: 1, world: 5, friendId: player.friendId, x: player.x, y: player.y, run: player.run, energy: Math.round(player.energy), xp: { ...player.xp }, hp: player.hp, prayer: Math.round(player.prayer * 10) / 10,
     inventory: player.inventory.map(slot => slot ? { ...slot } : null), equipment: { ...player.equipment } as Record<string, string>, bank: player.bank.map(slot => ({ ...slot })),
     style: player.style, autocast: player.autocast, quests: { ...player.quests }, questData: { ...player.questData }, wardrobe: [...player.wardrobe], worn: [...player.worn],
     follower: player.follower, followerGeneration: player.followerGeneration, kills: player.kills, deaths: player.deaths, tutorial: player.tutorial, guide: player.guide, created: player.created,
@@ -2926,7 +2926,9 @@ export function restore(game: Game, raw: unknown): boolean {
   // 4: the south grew under the old overworld (the dungeon and storey rows moved down SOUTH_DY); 3: the far west grew the
   // world WEST_DX columns on its west side; 2: the wider world before it; older: the mainland's own frame.
   if (save.world === 2 || save.world === 3) { y = int(save.y, 0, GEN_H - 1, -1); if (save.world === 2) x += WEST_DX; if (y >= 0) y = southShift(y); }
-  else if (save.world !== 4 && x >= 0 && x < MAINLAND.w && y >= 0 && y < MAINLAND.h + MAINLAND.dungeonRows + MAINLAND.floorRows) [x, y] = mainlandToWorld(x, y);
+  else if (save.world !== 4 && save.world !== 5 && x >= 0 && x < MAINLAND.w && y >= 0 && y < MAINLAND.h + MAINLAND.dungeonRows + MAINLAND.floorRows) [x, y] = mainlandToWorld(x, y);
+  // 5: the dungeons settled under their ground (the strip they were built in is empty): a save left down there follows its dungeon.
+  if (save.world !== 5 && y >= DUNGEON_Y && y < FLOOR_Y) ({ x, y } = movedPoint(game.world, x, y));
   if (inBounds(x, y) && walkable(game.world, x, y)) { player.x = x; player.y = y; player.prev = { x, y }; }
   player.run = !!save.run; player.energy = int(save.energy, 0, 100, 100);
   player.style = (["accurate", "aggressive", "defensive", "controlled"] as const).includes(save.style as CombatStyle) ? save.style as CombatStyle : "accurate";

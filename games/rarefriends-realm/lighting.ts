@@ -14,7 +14,7 @@
  * The renderer multiplies the ground by the field before anything stands on it, and tints each object by the light at its
  * own feet, so light lands on things instead of being painted over them.
  */
-import { FLOOR_Y, T, W, H, type World } from "./world.ts";
+import { T, W, H, isStorey, type World } from "./world.ts";
 
 export type RGB = [number, number, number];
 export type PointLight = { x: number; y: number; h: number; r: number; rgb: RGB; k: number };
@@ -113,7 +113,7 @@ function buildStatic(world: World, colors: Record<number, string>): Static {
     if (tile === T.LAVA) { emit[i * 3] = 1; emit[i * 3 + 1] = 0.42; emit[i * 3 + 2] = 0.16; }
   }
   for (const object of world.objects) {
-    if (object.name === "__removed" || object.y >= FLOOR_Y) continue;
+    if (object.name === "__removed" || isStorey(object.y)) continue;
     const i = object.y * W + object.x;
     if (i < 0 || i >= N) continue;
     let h = 0, a = 1;

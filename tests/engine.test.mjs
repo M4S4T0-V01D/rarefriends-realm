@@ -26,7 +26,7 @@ import { ORDERS, ORDER_IDS, orderOf, orderPieces } from "../games/rarefriends-re
 import { signetCharges, signetTeleport } from "../games/rarefriends-realm/engine.ts";
 import { COFFER_TICKS } from "../games/rarefriends-realm/dungeons.ts";
 import { gloomAt, inDeadwood } from "../games/rarefriends-realm/world.ts";
-import { DUNGEON_Y, FLOOR_Y, H, MAINLAND, OVERWORLD_H, SOUTH_DY, southShift, REGIONS, T, W, WEST_DX, createWorld, floorAt, isUnderground, mainlandToWorld, objectAtTile, onLevel, realPoint, regionAt, terrainAt } from "../games/rarefriends-realm/world.ts";
+import { DUNGEON_Y, FLOOR_Y, H, UNDER_Y, MAINLAND, OVERWORLD_H, SOUTH_DY, southShift, REGIONS, T, W, WEST_DX, createWorld, movedPoint, unmovedPoint, floorAt, isUnderground, mainlandToWorld, objectAtTile, onLevel, realPoint, regionAt, terrainAt } from "../games/rarefriends-realm/world.ts";
 import { addXp, take, emptyToBank, fillFromBank, bankDeposit, bankInOrder, bankMove, bankTabs, bankWithdraw, bonuses, bagBones, combatLevel, count, dropItem, earlyXp, give, has, heft, level, maxHp, xpMultiplier, BONE_BAG, BONE_BAG_SIZE } from "../games/rarefriends-realm/state.ts";
 import game from "../games/rarefriends-realm/game.json" with { type: "json" };
 
@@ -46,6 +46,8 @@ const objectNear = (g, kind, predicate = () => true) => {
 const teleport = (g, x, y) => { g.player.x = x; g.player.y = y; g.player.prev = { x, y }; g.player.path = []; };
 /** Mainland places named in the mainland's own coordinates (the world puts the mainland at MAINLAND.x/y). */
 const M = (mx, my) => mainlandToWorld(mx, my);
+/** The region at a point named in the dungeon strip, where its dungeon settled. */
+const regionUnder = (world, x, y) => { const at = movedPoint(world, x, y); return regionAt(world, at.x, at.y); };
 const standBy = (g, object) => {
   for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) if (canWalk(g, object.x + dx, object.y + dy)) { teleport(g, object.x + dx, object.y + dy); return; }
   assert.fail(`Nowhere to stand by ${object.name}`);
@@ -130,7 +132,7 @@ test("the world is large, deterministic and every landmark is reachable on foot"
   for (const region of REGIONS) if (region.id !== "coast") assert(world.region.includes(REGIONS.indexOf(region)), `${region.name} exists`);
   assert.equal(regionAt(world, world.places.spawn.x, world.places.spawn.y).id, "friendhollow");
   // The throne room lies behind the Hollow gate: the king is reachable from its far side.
-  const king = world.places.king, [tx, ty] = mainlandToWorld(177, 224), throne = reachable(g, { x: tx, y: ty });
+  const king = world.places.king, { x: tx, y: ty } = movedPoint(world, ...mainlandToWorld(177, 224)), throne = reachable(g, { x: tx, y: ty });
   assert(throne[king.y * W + king.x - 1] || throne[(king.y + 3) * W + king.x], "The Hollow King can be reached past the gate");
   assert(!ok(tx, ty), "…and only through the gate");
 });
@@ -1672,7 +1674,7 @@ test("Mounts: bought at the stables, ridden faster without run energy, each with
   assert(restore(fresh, save)); assert.deepEqual(fresh.player.mounts, ["unicorn"]); assert.equal(fresh.player.mount, "unicorn");
   save.mounts = ["dragon_bus"]; save.mount = "dragon_bus"; const bad = newGame(); restore(bad, save); assert.deepEqual(bad.player.mounts, []); assert.equal(bad.player.mount, null, "unknown mounts are dropped");
   // Underground you go on foot.
-  player.y = M(0, 210)[1]; assert(rideProblem(game)); tick(game); assert.equal(player.mount, null, "left to graze outside");
+  { const under = movedPoint(game.world, ...M(0, 210)); player.x = under.x; player.y = under.y; } assert(rideProblem(game)); tick(game); assert.equal(player.mount, null, "left to graze outside");
   toggleMount(game); assert.equal(player.mount, null, "can't mount down here");
 });
 
@@ -2281,7 +2283,7 @@ test("The dungeon update: three dungeons under the lake, the library and the sto
   // Regions, creatures and their doors exist and are placed.
   for (const id of ["deepglass", "drowned_archive", "howling_vault"]) assert(REGIONS.find(region => region.id === id)?.underground, `${id} is underground`);
   for (const id of ["cave_bat", "glass_crab", "crystal_golem", "drowned_scholar", "ink_wraith", "archivist_below", "grave_moth", "vault_archer", "vault_knight", "howling_king"]) assert(world.spawns.some(spawn => spawn.kind === "monster" && spawn.id === id), id);
-  assert.equal(regionAt(world, 430 + WEST_DX, southShift(530)).id, "deepglass"); assert.equal(regionAt(world, 490 + WEST_DX, southShift(528)).id, "drowned_archive"); assert.equal(regionAt(world, 300 + WEST_DX, southShift(567)).id, "howling_vault");
+  assert.equal(regionUnder(world, 430 + WEST_DX, southShift(530)).id, "deepglass"); assert.equal(regionUnder(world, 490 + WEST_DX, southShift(528)).id, "drowned_archive"); assert.equal(regionUnder(world, 300 + WEST_DX, southShift(567)).id, "howling_vault");
   const doors = world.objects.filter(object => object.kind === "gate" && object.requires?.item);
   assert.deepEqual(doors.map(door => door.requires.item).sort(), ["archive_key", "bone_shrine_key", "deepglass_key", "kumo_seal_key", "moss_key", "ogre_key", "vault_key"]);
   const coffers = world.objects.filter(object => object.decor === "chest" && / coffer$/.test(object.name));
@@ -2435,7 +2437,7 @@ test("The Rare Friends Ring: matches for coins and bloodmarks, your own foes, re
 test("The Root Cellars and the Mossy Undercroft: a dungeon for new heroes and one for the middle levels", () => {
   const g = newGame(), world = g.world;
   assert(REGIONS.find(region => region.id === "root_cellars")?.underground && REGIONS.find(region => region.id === "mossy_undercroft")?.underground);
-  assert.equal(regionAt(world, 420 + WEST_DX, southShift(560)).id, "root_cellars"); assert.equal(regionAt(world, 490 + WEST_DX, southShift(560)).id, "mossy_undercroft");
+  assert.equal(regionUnder(world, 420 + WEST_DX, southShift(560)).id, "root_cellars"); assert.equal(regionUnder(world, 490 + WEST_DX, southShift(560)).id, "mossy_undercroft");
   assert(world.objects.some(o => o.name === "Cellar door" && o.to) && world.objects.some(o => o.name === "Mossy stair" && o.action === "Climb-down"), "both mouths");
   assert(world.objects.some(o => o.kind === "gate" && o.requires?.item === "moss_key"), "the warden's door takes a moss key");
   assert(world.objects.filter(o => o.name === "Cellar coffer").length >= 3 && world.objects.filter(o => o.name === "Undercroft coffer").length >= 3, "coffers in both");
@@ -2978,15 +2980,15 @@ test("Mysteries: a skill of its own, trained by finding out (glyphs seen, then u
 test("The world grew south: a save from before keeps its place, whether on the surface, in a dungeon or upstairs", () => {
   const g = newGame(), world = g.world;
   // A spot in a dungeon and one on a castle storey, in the old frame (rows 520–639) and in the new one (moved down SOUTH_DY).
-  const dungeonLadder = world.objects.find(o => o.kind === "ladder" && o.y >= DUNGEON_Y && o.y < FLOOR_Y), storey = world.objects.find(o => o.kind === "ladder" && o.y >= FLOOR_Y);
+  const dungeonLadder = world.objects.find(o => o.kind === "ladder" && isUnderground(o.y)), storey = world.objects.find(o => o.kind === "ladder" && o.y >= FLOOR_Y && o.y < UNDER_Y);
   for (const [o, label] of [[dungeonLadder, "a dungeon"], [storey, "a storey"]]) {
     const spot = [[0, 1], [1, 0], [0, -1], [-1, 0]].map(([dx, dy]) => ({ x: o.x + dx, y: o.y + dy })).find(p => canWalk(g, p.x, p.y));
-    const save = JSON.parse(JSON.stringify(serialize(g))); save.world = 3; save.x = spot.x; save.y = spot.y - SOUTH_DY;
+    const save = JSON.parse(JSON.stringify(serialize(g))), old = unmovedPoint(world, spot.x, spot.y); save.world = 3; save.x = old.x; save.y = old.y - SOUTH_DY;
     const fresh = newGame(); assert(restore(fresh, save)); assert.deepEqual([fresh.player.x, fresh.player.y], [spot.x, spot.y], `${label}: an old save lands where it was`);
   }
   const surface = JSON.parse(JSON.stringify(serialize(g))); surface.world = 3;
   const fresh = newGame(); assert(restore(fresh, surface)); assert.deepEqual([fresh.player.x, fresh.player.y], [g.player.x, g.player.y], "the old overworld didn't move");
-  assert.equal(serialize(g).world, 4);
+  assert.equal(serialize(g).world, 5);
 });
 
 test("Kharaveth's music: oud, ney, qanun and rebab, darbuka and frame drum, in four modes; each region its piece", async () => {
@@ -3021,7 +3023,7 @@ test("Kharaveth's heartlands: every town, camp and old place is reached from Foo
     assert(world.region.includes(REGIONS.findIndex(r => r.id === id)), `${id} exists`);
   // The Black Stair's halls keep to columns no older dungeon uses.
   const stairIndex = REGIONS.findIndex(r => r.id === "black_stair");
-  for (let y = DUNGEON_Y; y < DUNGEON_Y + 60; y++) for (let x = 0; x < W; x++) if (world.region[y * W + x] === stairIndex) assert(x >= BLACK_STAIR.x0 - 2 && x <= BLACK_STAIR.x1 + 2, `the Black Stair stays in its own columns (${x},${y})`);
+  for (let y = UNDER_Y; y < H; y++) for (let x = 0; x < W; x++) if (world.region[y * W + x] === stairIndex) { const b = unmovedPoint(world, x, y); assert(b.x >= BLACK_STAIR.x0 - 2 && b.x <= BLACK_STAIR.x1 + 2, `the Black Stair stays in its own columns (${x},${y})`); }
   for (const id of ["deepglass", "root_cellars", "drowned_archive", "mossy_undercroft", "underway", "catacombs"]) assert(world.region.includes(REGIONS.findIndex(r => r.id === id)), `${id} still there`);
   void SITES;
 });
@@ -3325,7 +3327,7 @@ test("Meghavan's quest places: the caravan, the dacoits' camp, the toll-house, t
   assert(world.objects.some(o => o.decor === "chest" && o.name === "The Serpent's hoard" && beside(below, o)), "its hoard");
   const up = world.objects.find(o => o.kind === "ladder" && o.name === "The Great Stepwell's steps"); assert(up && beside(below, up) && at(east, up.to.x, up.to.y), "and the way back up to Sarovan");
   const index = REGIONS.findIndex(r => r.id === "great_stepwell");
-  for (let y = DUNGEON_Y; y < FLOOR_Y; y++) for (let x = 0; x < W; x++) if (world.region[y * W + x] === index) assert(x >= GREAT_STEPWELL.x0 - 2 && x <= GREAT_STEPWELL.x1 + 2, `the Stepwell stays in its own columns (${x},${y})`);
+  for (let y = UNDER_Y; y < H; y++) for (let x = 0; x < W; x++) if (world.region[y * W + x] === index) { const b = unmovedPoint(world, x, y); assert(b.x >= GREAT_STEPWELL.x0 - 2 && b.x <= GREAT_STEPWELL.x1 + 2, `the Stepwell stays in its own columns (${x},${y})`); }
   for (const id of ["deepglass", "drowned_archive", "underway", "black_stair", "first_names_hall"]) assert(world.region.includes(REGIONS.findIndex(r => r.id === id)), `${id} still there`);
 });
 
@@ -3552,10 +3554,10 @@ test("The Uncounted Deep and the Measured Vault: the builders' count shows the w
   assert(coins / 40 > 1500, `coins by the jar (${Math.round(coins / 40)} a search)`);
   assert(found.size >= 4 && found.has("gold_scarab"), `jewellery: ${[...found].join(", ")}`);
   // The deeps keep to their own columns; the older dungeons are all still there.
-  for (let y = DUNGEON_Y; y < FLOOR_Y; y++) for (let x = 0; x < W; x++) {
-    const r = world.region[y * W + x];
-    if (r === deepIndex) assert(x >= UNCOUNTED_DEEP.x0 - 2 && x <= UNCOUNTED_DEEP.x1 + 2, `the deep stays in its columns (${x},${y})`);
-    if (r === vaultIndex) assert(x >= MEASURED_VAULT.west.x0 - 2 && x <= MEASURED_VAULT.east.x1 + 2, `the vault stays in its columns (${x},${y})`);
+  for (let y = UNDER_Y; y < H; y++) for (let x = 0; x < W; x++) {
+    const r = world.region[y * W + x], b = unmovedPoint(world, x, y);
+    if (r === deepIndex) assert(b.x >= UNCOUNTED_DEEP.x0 - 2 && b.x <= UNCOUNTED_DEEP.x1 + 2, `the deep stays in its columns (${x},${y})`);
+    if (r === vaultIndex) assert(b.x >= MEASURED_VAULT.west.x0 - 2 && b.x <= MEASURED_VAULT.east.x1 + 2, `the vault stays in its columns (${x},${y})`);
   }
   for (const id of ["deepglass", "drowned_archive", "underway", "black_stair", "first_names_hall", "great_stepwell", "kumo_hollow", "ashigane_deeps", "bone_shrine"]) assert(world.region.includes(REGIONS.findIndex(r => r.id === id)), `${id} still there`);
 });

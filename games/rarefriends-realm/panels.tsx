@@ -40,7 +40,7 @@ import {
   castOnItem, satchelCheck, satchelEmpty, satchelFill, setFollower, setPet, setStyle, startProduction, swapSlots, toggleRun, toggleSneak, togglePrayer, toggleWorn, unequip, useItemOnItem, type OwnedFriend, type Selection,
  beltCheck, beltFill, beltEmpty, sipBelt, toggleFollowerWorn, chooseMount, forgeMenu, mountAttack, mountAttackProblem, saddlebags, toggleMount, unstow } from "./engine.ts";
 import { friendRows, renderWorldMap } from "./render.ts";
-import { DUNGEON_Y, FLOOR_Y, OVERWORLD_H, W, isUnderground, mainlandToWorld, realPoint } from "./world.ts";
+import { UNDER_Y, OVERWORLD_H, W, isUnderground, mainlandToWorld, realPoint } from "./world.ts";
 import type { NetState } from "./net.ts";
 import type { TradeView } from "./trade.ts";
 import { recipeBook, skillGuide, guideFilters, filterGuide } from "./guide.ts";
@@ -1486,7 +1486,7 @@ export function WorldMapModal({ game, onClose, onTravel }: { game: Game; onClose
         <input type="range" min={12} max={100} value={Math.round(focus.zoom * 10)} onChange={event => setFocus({ ...focus, zoom: Number(event.target.value) / 10 })} aria-label="Map zoom" />
         <button type="button" onClick={() => zoomBy(0.77)} aria-label="Zoom out">−</button>
         <button type="button" onClick={centre}>Centre on me (C)</button>
-        <button type="button" onClick={() => setFocus({ x: underground ? W / 2 : W / 2, y: underground ? (DUNGEON_Y + FLOOR_Y) / 2 : OVERWORLD_H / 2, zoom: underground ? 1.2 : 0.5 })}>Whole Realm</button>
+        <button type="button" onClick={() => setFocus({ x: underground ? W / 2 : W / 2, y: underground ? UNDER_Y + OVERWORLD_H / 2 : OVERWORLD_H / 2, zoom: 0.5 })}>Whole Realm</button>
       </div>
       <canvas ref={canvas} className="realm-worldmap" aria-label="World map. Drag to pan, scroll to zoom, click to walk there."
         onMouseDown={event => { const p = point(event); drag.current = { x: p.x, y: p.y, fx: focus.x, fy: focus.y, moved: false }; }}

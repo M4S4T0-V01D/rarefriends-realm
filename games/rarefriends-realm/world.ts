@@ -39,9 +39,16 @@ export const EAST_X = LEGACY_W + WEST_DX, EAST_W = 560;
  */
 export const SOUTH_DY = 360;
 export const GEN_H = 640, GEN_OVERWORLD_H = 520, GEN_DUNGEON_Y = 520, GEN_FLOOR_Y = 580;
-export const W = EAST_X + EAST_W, H = GEN_H + SOUTH_DY;
-/** The overworld is rows 0–879 (the south from row 520); then the dungeons (reached by ladders, never seen from above); rows from FLOOR_Y hold upper storeys. */
+export const W = EAST_X + EAST_W;
+/** The overworld is rows 0–879 (the south from row 520); then the strip the dungeons are built in (empty once they settle under their ground, from UNDER_Y); rows from FLOOR_Y hold upper storeys. */
 export const OVERWORLD_H = GEN_OVERWORLD_H + SOUTH_DY, DUNGEON_Y = GEN_DUNGEON_Y + SOUTH_DY, FLOOR_Y = GEN_FLOOR_Y + SOUTH_DY;
+/**
+ * The underground: a second copy of the overworld's rows, under the storeys, from UNDER_Y. The dungeons are built in the
+ * strip (DUNGEON_Y to FLOOR_Y, as they always were) and then settled here, each beneath the ground its ladder stands on
+ * (settleUnderground), so what you see down there lies where it lies up top, and nothing else: the black between is the
+ * rock. The strip is empty once they've gone.
+ */
+export const UNDER_Y = GEN_H + SOUTH_DY, H = UNDER_Y + OVERWORLD_H;
 /** A row of the generation frame in the grown world (the dungeon and storey rows moved down; the old overworld didn't). */
 export const southShift = (y: number) => y >= GEN_OVERWORLD_H ? y + SOUTH_DY : y;
 /**
@@ -300,7 +307,9 @@ for (const region of REGIONS as Region[]) {
   else if (!region.far) region.label = { x: region.label.x + WEST_DX, y: southShift(region.label.y) };
   else if (!region.south) region.label = { x: region.label.x, y: southShift(region.label.y) };
 }
-export const isUnderground = (y: number) => y >= DUNGEON_Y && y < FLOOR_Y;
+export const isUnderground = (y: number) => y >= UNDER_Y - 0.5 && y < H;
+/** On an upper storey's stored rows (between the strip and the underground). */
+export const isStorey = (y: number) => y >= FLOOR_Y - 0.5 && y < UNDER_Y - 0.5;
 
 /**
  * A building's footprint (walls included) and how its roof looks. Inner rooms (inside another building) have no roof.
@@ -357,6 +366,10 @@ export type World = {
   lift?: Float32Array; raise?: Float32Array;
   /** Ground height (world pixels) at every tile corner: (W + 1) × (H + 1), corner (i, j) sits at (i − ½, j − ½). */
   heights: Float32Array;
+  /** Where each dungeon went when it settled under its ground (its strip rectangle and the move), for whatever still speaks in strip coordinates: movedPoint. */
+  under: UnderMove[];
+  /** Where the underground regions are labelled now that they lie under their ground (REGIONS carries them too; a bake restores them). */
+  labels: Partial<Record<RegionId, { x: number; y: number }>>;
   places: Record<"spawn" | "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier" | "crypt" | "depths" | "king" | "fernwick" | "highcairn" | "dawnhold" | "gravesend" | "saltmarrow" | "hollyhock" | "dyemoor" | "tallgrass" | "cragmaw" | "quillhaven" | "raria" | "fff_fortress" | "barkreach" | "ashfall" | "ring"
     | "kurohama" | "takamori" | "kumoyama" | "tanabe" | "yumoto" | "foothold" | "sefrah" | "tamesh" | "khetmar" | "zuri" | "ouresh" | "first_names"
     | "tirthali" | "sarovan" | "shailagarh" | "mandapur" | "suvarnatira" | "kanthar" | "gullwick" | "saltreach" | "merrab" | "tel_ashun" | "ennus_well", { x: number; y: number }>;
@@ -386,6 +399,8 @@ export const tileIndex = (x: number, y: number) => y * W + x;
 export const inBounds = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H;
 
 /** Everything a world generator needs: the arrays it paints into and the dice it rolls. */
+/** A dungeon's rectangle in the generation strip and the move that settled it underground. */
+export type UnderMove = { x0: number; y0: number; x1: number; y1: number; dx: number; dy: number };
 export type GenContext = {
   W: number; H: number; tiles: Uint8Array; region: Uint8Array; objectAt: Int32Array; lift: Float32Array; raise: Float32Array;
   objects: WorldObject[]; spawns: SpawnDef[]; buildings: Building[]; doorways: [number, number][]; ramparts?: Rampart[];
@@ -1533,12 +1548,143 @@ export function generateWorld(seed = WORLD_SEED): { world: World; lift: Float32A
   buildSettlements({ ...south, random: mulberry(seed + 919) });   // Gravesend's mausoleums and vault, Fernwick's forester, Southshore's wreck and beach (settlementsworld.ts)
   buildMountCountry({ ...south, random: mulberry(seed + 929) }); // the poachers' camp and the tiger's cage, the drakes' nest (mountworld.ts)
   for (const object of objects) if (object.name === "__removed") object.blocks = false;
+  // The dungeons settle under the ground they're reached from (the strip they were built in is left empty).
+  const labels: World["labels"] = {}, under = settleUnderground(ctx, places, floors, labels);
   const buildingAt = new Uint16Array(W * H);
   buildings.forEach((b, index) => { if (b.roof === "none") return; for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) buildingAt[y * W + x] = index + 1; });
-  const world: World = { tiles, region, objects, objectAt, spawns, places, heights: buildHeights(tiles, seed, lift, raise), buildings, buildingAt, floors, ramparts: ctx.ramparts, lift, raise };
-  // Content promoted from the development world (overlays/): the editable layer, applied last of all.
-  for (const overlay of OVERLAYS) applyOverlay(world, overlay, seed);
+  const world: World = { tiles, region, objects, objectAt, spawns, places, heights: buildHeights(tiles, seed, lift, raise), buildings, buildingAt, floors, ramparts: ctx.ramparts, lift, raise, under, labels };
+  // Content promoted from the development world (overlays/): the editable layer, applied last of all (an overlay written in the strip's coordinates follows its dungeon down).
+  for (const overlay of OVERLAYS) applyOverlay(world, movedOverlay(world, overlay), seed);
   return { world, lift, raise };
+}
+/** A strip point's place after the dungeons settled (unchanged if it isn't in a dungeon's rectangle, or isn't in the strip at all). */
+/** The underground regions' labels from a bake, put back where the settled world put them. */
+export function relabelRegions(labels: World["labels"]) { for (const [id, label] of Object.entries(labels)) { const entry = REGIONS.find(region => region.id === id) as { label: { x: number; y: number } } | undefined; if (entry && label) entry.label = label; } }
+export function movedPoint(world: Pick<World, "under">, x: number, y: number): { x: number; y: number } {
+  if (y < DUNGEON_Y || y >= FLOOR_Y) return { x, y };
+  const move = world.under.find(m => x >= m.x0 && x <= m.x1 && y >= m.y0 && y <= m.y1);
+  return move ? { x: x + move.dx, y: y + move.dy } : { x, y: y - DUNGEON_Y + UNDER_Y };
+}
+/** A settled point's place in the strip it was built in (for tools and tests that think in the strip; unchanged above ground). */
+export function unmovedPoint(world: Pick<World, "under">, x: number, y: number): { x: number; y: number } {
+  if (y < UNDER_Y) return { x, y };
+  const move = world.under.find(m => x - m.dx >= m.x0 && x - m.dx <= m.x1 && y - m.dy >= m.y0 && y - m.dy <= m.y1);
+  return move ? { x: x - move.dx, y: y - move.dy } : { x, y: y - UNDER_Y + DUNGEON_Y };
+}
+/** An overlay with every strip coordinate in it moved where its dungeon went (overlays written before the dungeons settled). */
+export function movedOverlay<O extends { ops: readonly unknown[] }>(world: Pick<World, "under">, overlay: O): O {
+  const point = (x: unknown, y: unknown) => typeof x === "number" && typeof y === "number" ? movedPoint(world, x, y) : null;
+  const ops = overlay.ops.map(raw => {
+    if (!raw || typeof raw !== "object") return raw;
+    const op = { ...(raw as Record<string, unknown>) };
+    const at = point(op.x, op.y); if (at) { op.x = at.x; op.y = at.y; }
+    const a = point(op.x0, op.y0), b = point(op.x1, op.y1); if (a && b) { op.x0 = a.x; op.y0 = a.y; op.x1 = b.x; op.y1 = b.y; }
+    const to = op.to && typeof op.to === "object" ? point((op.to as Record<string, unknown>).x, (op.to as Record<string, unknown>).y) : null; if (to) op.to = to;
+    return op;
+  });
+  return { ...overlay, ops };
+}
+/**
+ * The dungeons settle under the ground they're reached from. Each connected piece of the strip (floor, wall and all) is
+ * found; a piece with a ladder down to it from the overworld (or from a storey, counted at its ground) goes beneath that
+ * ladder, the tile the ladder leads to directly under it; a piece reached only from another piece (a deeper level, a
+ * stair between galleries) keeps its place beside the piece it's reached from; a piece nothing leads to goes straight
+ * down. Where two would overlap, the later is nudged to the nearest clear ground. Then everything on the strip moves with
+ * its piece: tiles, regions, objects and where their ladders lead, spawns, buildings and places; the regions' labels
+ * follow their tiles; and the moves are kept (World.under) for whatever still names strip coordinates.
+ */
+function settleUnderground(ctx: GenContext, places: World["places"], floors: readonly Floor[], labels: World["labels"]): UnderMove[] {
+  const { tiles, region, objectAt, lift, raise, objects, spawns, buildings } = ctx, rows = FLOOR_Y - DUNGEON_Y;
+  const inStrip = (x: number, y: number) => y >= DUNGEON_Y && y < FLOOR_Y && x >= 0 && x < W;
+  // The pieces: every strip tile that isn't void, joined to its neighbours.
+  const piece = new Int32Array(W * rows).fill(-1), pieces: { x0: number; y0: number; x1: number; y1: number; cells: number[]; dx?: number; dy?: number; order: number }[] = [];
+  for (let y = DUNGEON_Y; y < FLOOR_Y; y++) for (let x = 0; x < W; x++) {
+    const start = (y - DUNGEON_Y) * W + x;
+    if (piece[start] >= 0 || tiles[y * W + x] === T.VOID) continue;
+    const id = pieces.length, found = { x0: x, y0: y, x1: x, y1: y, cells: [] as number[], order: Infinity }, queue = [start]; piece[start] = id;
+    while (queue.length) {
+      const i = queue.pop()!, cx = i % W, cy = Math.floor(i / W) + DUNGEON_Y; found.cells.push(i);
+      found.x0 = Math.min(found.x0, cx); found.x1 = Math.max(found.x1, cx); found.y0 = Math.min(found.y0, cy); found.y1 = Math.max(found.y1, cy);
+      for (const [nx, ny] of [[cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]] as const) {
+        if (!inStrip(nx, ny) || tiles[ny * W + nx] === T.VOID) continue;
+        const j = (ny - DUNGEON_Y) * W + nx; if (piece[j] >= 0) continue; piece[j] = id; queue.push(j);
+      }
+    }
+    pieces.push(found);
+  }
+  const pieceAt = (x: number, y: number) => inStrip(x, y) ? (piece[(y - DUNGEON_Y) * W + x] >= 0 ? piece[(y - DUNGEON_Y) * W + x] : pieces.findIndex(p => x >= p.x0 && x <= p.x1 && y >= p.y0 && y <= p.y1)) : -1;
+  const groundOf = (x: number, y: number) => { if (y < FLOOR_Y) return { x, y }; const floor = floors.find(f => x - f.dx >= f.x0 && x - f.dx <= f.x1 && y - f.dy >= f.y0 && y - f.dy <= f.y1); return floor ? { x: x - floor.dx, y: y - floor.dy } : { x, y }; };
+  // Anchors: ladders down from the ground (or a storey, at its ground) fix where their piece goes.
+  let order = 0;
+  for (const object of objects) {
+    if (!object.to || inStrip(object.x, object.y) || !inStrip(object.to.x, object.to.y)) continue;
+    const id = pieceAt(object.to.x, object.to.y); if (id < 0 || pieces[id].dx !== undefined) continue;
+    const ground = groundOf(object.x, object.y);
+    pieces[id].dx = ground.x - object.to.x; pieces[id].dy = UNDER_Y + ground.y - object.to.y; pieces[id].order = order++;
+  }
+  // Pieces reached from a placed piece (a ladder either way) keep their place beside it, until nothing more follows.
+  for (let moved = true; moved;) {
+    moved = false;
+    for (const object of objects) {
+      if (!object.to || !inStrip(object.x, object.y) || !inStrip(object.to.x, object.to.y)) continue;
+      const a = pieceAt(object.x, object.y), b = pieceAt(object.to.x, object.to.y); if (a < 0 || b < 0 || a === b) continue;
+      const [from, to] = pieces[a].dx !== undefined && pieces[b].dx === undefined ? [a, b] : pieces[b].dx !== undefined && pieces[a].dx === undefined ? [b, a] : [-1, -1];
+      if (from < 0) continue;
+      pieces[to].dx = pieces[from].dx; pieces[to].dy = pieces[from].dy; pieces[to].order = order++; moved = true;
+    }
+  }
+  for (const p of pieces) if (p.dx === undefined) { p.dx = 0; p.dy = UNDER_Y - DUNGEON_Y; p.order = order++; }
+  // Each piece takes its ground, nudged to the nearest clear ground where another already lies (two tiles of rock between).
+  const taken = new Uint8Array(W * OVERWORLD_H), margin = 2;
+  const clear = (p: typeof pieces[number], dx: number, dy: number) => {
+    const x0 = p.x0 + dx - margin, x1 = p.x1 + dx + margin, y0 = p.y0 + dy - margin, y1 = p.y1 + dy + margin;
+    if (p.x0 + dx < 0 || p.x1 + dx >= W || p.y0 + dy < UNDER_Y || p.y1 + dy >= H) return false;
+    for (let y = Math.max(UNDER_Y, y0); y <= Math.min(H - 1, y1); y++) for (let x = Math.max(0, x0); x <= Math.min(W - 1, x1); x++) if (taken[(y - UNDER_Y) * W + x]) return false;
+    return true;
+  };
+  for (const p of [...pieces].sort((a, b) => a.order - b.order)) {
+    let dx = p.dx!, dy = p.dy!;
+    if (!clear(p, dx, dy)) {
+      let best: [number, number] | null = null, bestFar = Infinity;
+      for (let r = 3; r <= 240 && !best; r += 3) for (let oy = -r; oy <= r; oy += 3) for (let ox = -r; ox <= r; ox += 3) {
+        if (Math.max(Math.abs(ox), Math.abs(oy)) !== r) continue;
+        const far = Math.hypot(ox, oy); if (far >= bestFar || !clear(p, dx + ox, dy + oy)) continue;
+        best = [dx + ox, dy + oy]; bestFar = far;
+      }
+      if (best) [dx, dy] = best;
+    }
+    p.dx = dx; p.dy = dy;
+    for (let y = Math.max(UNDER_Y, p.y0 + dy - margin); y <= Math.min(H - 1, p.y1 + dy + margin); y++) for (let x = Math.max(0, p.x0 + dx - margin); x <= Math.min(W - 1, p.x1 + dx + margin); x++) taken[(y - UNDER_Y) * W + x] = 1;
+  }
+  // The move: tiles and regions (and the ground's lift, flat down there anyway), then everything standing on them.
+  for (const p of pieces) for (const i of p.cells) {
+    const sx = i % W, sy = Math.floor(i / W) + DUNGEON_Y, from = sy * W + sx, to = (sy + p.dy!) * W + sx + p.dx!;
+    tiles[to] = tiles[from]; region[to] = region[from]; lift[to] = lift[from]; raise[to] = raise[from];
+    tiles[from] = T.VOID; region[from] = 0; lift[from] = 0; raise[from] = 0;
+  }
+  const moves: UnderMove[] = pieces.map(p => ({ x0: p.x0, y0: p.y0, x1: p.x1, y1: p.y1, dx: p.dx!, dy: p.dy! }));
+  const moved = (x: number, y: number) => { const id = pieceAt(x, y); return id >= 0 ? { x: x + pieces[id].dx!, y: y + pieces[id].dy! } : { x, y: y - DUNGEON_Y + UNDER_Y }; };
+  objectAt.fill(-1, DUNGEON_Y * W, FLOOR_Y * W);
+  for (const object of objects) {
+    if (object.to && inStrip(object.to.x, object.to.y)) object.to = moved(object.to.x, object.to.y);
+    if (!inStrip(object.x, object.y)) continue;
+    const at = moved(object.x, object.y); object.x = at.x; object.y = at.y;
+    if (object.name !== "__removed") objectAt[at.y * W + at.x] = object.id;
+  }
+  for (const spawn of spawns) if (inStrip(spawn.x, spawn.y)) { const at = moved(spawn.x, spawn.y); spawn.x = at.x; spawn.y = at.y; }
+  for (const b of buildings) if (inStrip(b.x0, b.y0)) { const at = moved(b.x0, b.y0); b.x1 += at.x - b.x0; b.y1 += at.y - b.y0; b.x0 = at.x; b.y0 = at.y; }
+  for (const [key, place] of Object.entries(places) as [keyof World["places"], { x: number; y: number }][]) if (inStrip(place.x, place.y)) places[key] = moved(place.x, place.y);
+  // The regions' labels follow their tiles: an underground region is labelled at the middle of where it lies now.
+  const sums = new Map<number, { x: number; y: number; n: number }>();
+  for (let y = UNDER_Y; y < H; y++) for (let x = 0; x < W; x++) { const r = region[y * W + x]; if (!r || tiles[y * W + x] === T.VOID) continue; const sum = sums.get(r) ?? { x: 0, y: 0, n: 0 }; sum.x += x; sum.y += y; sum.n++; sums.set(r, sum); }
+  for (const [index, sum] of sums) {
+    const entry = REGIONS[index] as { id: RegionId; underground?: boolean; label: { x: number; y: number } }; if (!entry?.underground) continue;
+    // The middle of the region, or the region's own tile nearest it when the middle falls in the rock between galleries.
+    const cx = Math.round(sum.x / sum.n), cy = Math.round(sum.y / sum.n); let best = { x: cx, y: cy }, near = Infinity;
+    for (let y = UNDER_Y; y < H; y++) for (let x = 0; x < W; x++) { if (region[y * W + x] !== index || tiles[y * W + x] === T.VOID) continue; const d = (x - cx) ** 2 + (y - cy) ** 2; if (d < near) { near = d; best = { x, y }; } }
+    entry.label = best; labels[entry.id] = best;
+  }
+  return moves;
 }
 /**
  * Make room for the south: the generation frame's dungeon and storey rows (everything from GEN_OVERWORLD_H) move down

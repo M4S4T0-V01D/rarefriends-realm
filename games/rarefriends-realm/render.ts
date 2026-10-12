@@ -13,7 +13,7 @@ import { TICK_MS, attackSpeed, riding, type Facing, type Game, type Monster, typ
 import { npcOverhead, veiled, type Pick } from "./engine.ts";
 import { knows, maxHpOf as creatureMaxHp } from "./pursuance.ts";
 import { FAMILIES, dungeonTheme } from "./dungeontheme.ts";
-import { gloomAt, inDeadwood, DUNGEON_Y, FLOOR_Y, OVERWORLD_H, REGIONS, STOREY, T, W, H, complexAt, cornerHeight, floorAt, groundHeight, inBounds, isUnderground, objectAtTile, onLevel, realPoint, type Building, type DecorKind, type Floor, type World, type WorldObject } from "./world.ts";
+import { gloomAt, inDeadwood, UNDER_Y, FLOOR_Y, OVERWORLD_H, REGIONS, STOREY, T, W, H, isStorey, complexAt, cornerHeight, floorAt, groundHeight, inBounds, isUnderground, objectAtTile, onLevel, realPoint, type Building, type DecorKind, type Floor, type World, type WorldObject } from "./world.ts";
 import { itemArt } from "./icons.ts";
 import type { PeerView } from "./social.ts";
 import type { Strike, Weather } from "./weather.ts";
@@ -175,7 +175,7 @@ const groundAt = (x: number, y: number) => ground ? groundHeight(ground, x, y) :
 let viewFloor: Floor | null = null;
 /** World point → screen, standing on the ground (`lift` is extra height above it). Stored upper-storey tiles are drawn on their building, a storey up per level. */
 export function toScreen(camera: Camera, x: number, y: number, lift = 0) {
-  if (y >= FLOOR_Y - 0.5 && ground) { const floor = floorAt(ground, x, y); if (floor) { x -= floor.dx; y -= floor.dy; lift += floor.level * STOREY; } }
+  if (isStorey(y) && ground) { const floor = floorAt(ground, x, y); if (floor) { x -= floor.dx; y -= floor.dy; lift += floor.level * STOREY; } }
   const { rx, ry } = rotate(camera, x - camera.x, y - camera.y), half = TILE_W / 2, height = lift + groundAt(x, y) - (camera.base ?? 0);
   return { x: (rx - ry) * half * camera.zoom + VIEW.width / 2, y: ((rx + ry) * half * camera.pitch - height * liftScale(camera)) * camera.zoom + VIEW.height / 2 };
 }
@@ -201,7 +201,7 @@ export function toTile(camera: Camera, sx: number, sy: number, floors = true) {
 /** Draw order: further from the camera first. */
 export function depthOf(camera: Camera, x: number, y: number) {
   let level = 0;
-  if (y >= FLOOR_Y - 0.5 && ground) { const floor = floorAt(ground, x, y); if (floor) { x -= floor.dx; y -= floor.dy; level = floor.level; } }
+  if (isStorey(y) && ground) { const floor = floorAt(ground, x, y); if (floor) { x -= floor.dx; y -= floor.dy; level = floor.level; } }
   const { rx, ry } = rotate(camera, x, y); return rx + ry + level * 0.002;
 }
 /** The screen facing of a world heading, for sprites. */
@@ -325,7 +325,7 @@ function rgbOf(color: string): readonly number[] {
 function captureBox(ctx: CanvasRenderingContext2D, camera: Camera, x: number, y: number, w: number, d: number, h: number, top: string, left: string, right: string, lift: number, pattern: WallStyle | null, stroke: string | null = INK) {
   const gl = capturing!;
   let rx = x, ry = y, rlift = lift;
-  if (y >= FLOOR_Y - 0.5 && ground) { const floor = floorAt(ground, x, y); if (floor) { rx -= floor.dx; ry -= floor.dy; rlift += floor.level * STOREY; } }
+  if (isStorey(y) && ground) { const floor = floorAt(ground, x, y); if (floor) { rx -= floor.dx; ry -= floor.dy; rlift += floor.level * STOREY; } }
   const variant = Math.abs(Math.floor(x * 7 + y * 13)) % 4;
   const face = (fill: string) => pattern && fill.startsWith("#") ? gl.wallLayers.layer(wallTexture(pattern, fill, variant)) : -1;
   const lid = pattern === "cap" && top.startsWith("#") ? gl.wallLayers.layer(wallTexture("cap", top, variant)) : -1;
@@ -526,7 +526,7 @@ function cliffLook(x: number, y: number): [number, string, string, string] {
 }
 /** A world point's depth as the GPU's camera has it (gl.ts `project`), upstairs points moved to their real place. */
 function glDepth(camera: Camera, x: number, y: number, lift = 0) {
-  if (y >= FLOOR_Y - 0.5 && ground) { const floor = floorAt(ground, x, y); if (floor) { x -= floor.dx; y -= floor.dy; lift += floor.level * STOREY; } }
+  if (isStorey(y) && ground) { const floor = floorAt(ground, x, y); if (floor) { x -= floor.dx; y -= floor.dy; lift += floor.level * STOREY; } }
   const { rx, ry } = rotate(camera, x - camera.x, y - camera.y), h = lift + groundAt(x, y) - (camera.base ?? 0);
   return (rx + ry) * 32 * Math.sqrt(Math.max(0, 1 - camera.pitch * camera.pitch)) + h * camera.pitch / 0.8660254;
 }
@@ -1930,7 +1930,7 @@ function roomLights(world: World) {
   const open = (x: number, y: number) => { const t = world.tiles[y * W + x]; return t !== T.WALL && t !== T.VOID && t !== T.WATER; };
   const indoor = (x: number, y: number) => {
     if (!inBounds(x, y) || !open(x, y)) return false;
-    if (y >= FLOOR_Y) { const floor = floorAt(world, x, y), owner = floor ? world.buildingAt[(y - floor.dy) * W + x - floor.dx] : 0; return !!floor && owner > 0 && floor.level < (world.buildings[owner - 1].storeys ?? 1); }
+    if (isStorey(y)) { const floor = floorAt(world, x, y), owner = floor ? world.buildingAt[(y - floor.dy) * W + x - floor.dx] : 0; return !!floor && owner > 0 && floor.level < (world.buildings[owner - 1].storeys ?? 1); }
     return !isUnderground(y) && world.buildingAt[y * W + x] > 0;
   };
   const blocked = (x: number, y: number) => { const id = world.objectAt[y * W + x]; return id >= 0 && world.objects[id].blocks; };
@@ -2524,7 +2524,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   // height, `radius` its reach (screen px at zoom 1). By day they hardly show.
   const lightK = 0.18 + 0.82 * sky.night;
   const glow = (x: number, y: number, lift: number, radius: number, color?: string, strength = 1, flicker = false) => {
-    if (y >= FLOOR_Y - 0.5) ({ x, y } = realPoint(world, x, y));
+    if (isStorey(y)) ({ x, y } = realPoint(world, x, y));
     if (x < x0 - 10 || x > x1 + 10 || y < y0 - 10 || y > y1 + 10) return;
     const wobble = flicker && !scene.reducedMotion ? 1 + Math.sin(now / 90 + x * 1.7 + y) * 0.07 + Math.sin(now / 37 + x * 3.1) * 0.04 : 1;
     lights.push({ x, y, h: lift, r: radius / 32 * 1.15, rgb: hexRgb(color ?? "#e89a4f"), k: strength * wobble * lightK });
@@ -2541,7 +2541,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   const storeyOver = (x: number, y: number, below: number) => world.floors.some(f => f.complex === inside && f.level > below && f.level <= level && x >= f.x0 && x <= f.x1 && y >= f.y0 && y <= f.y1 && world.tiles[(y + f.dy) * W + x + f.dx] !== T.VOID);
   /** Whether something standing on a tile is drawn: your storey only, and nothing under it. */
   const shown = (x: number, y: number, margin = 0) => {
-    if (y >= FLOOR_Y - 0.5) { const on = floorAt(world, x, y); return !!on && !!floor && on.complex === floor.complex && on.level === level; }
+    if (isStorey(y)) { const on = floorAt(world, x, y); return !!on && !!floor && on.complex === floor.complex && on.level === level; }
     return x >= x0 - margin && x <= x1 && y >= y0 - margin && y <= y1 && !covered(Math.round(x), Math.round(y));
   };
   // Hover highlight and click marker.
@@ -3106,7 +3106,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       const ridges = new Set<number>();
       for (const drawable of drawables) {
         const at = drawable.at;
-        if (!at || drawable.scenery || drawable.depth === Infinity || at.y >= FLOOR_Y - 0.5 || isUnderground(at.y)) continue;
+        if (!at || drawable.scenery || drawable.depth === Infinity || isStorey(at.y) || isUnderground(at.y)) continue;
         const feet = groundHeight(world, at.x, at.y);
         if ((highest - feet) * rise <= step - slack) continue;
         for (let k = 1; k <= 8; k++) {
@@ -3137,7 +3137,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   // The field changes slowly (the sky drifts, flames flicker): it's rebuilt when the view, the lights, the sky or the
   // world changed, and otherwise every other frame.
   // (Its range snaps outward to a 4-tile grid, so a walk doesn't change it every step.)
-  const fx0 = Math.floor(x0 / 4) * 4, fy0 = Math.floor(y0 / 4) * 4, fx1 = Math.ceil((x1 + 1) / 4) * 4 - 1, fy1 = Math.min(FLOOR_Y - 1, Math.ceil((y1 + 1) / 4) * 4 - 1);
+  const fx0 = Math.floor(x0 / 4) * 4, fy0 = Math.floor(y0 / 4) * 4, fx1 = Math.ceil((x1 + 1) / 4) * 4 - 1, fy1 = Math.min(y0 >= UNDER_Y ? H - 1 : FLOOR_Y - 1, Math.ceil((y1 + 1) / 4) * 4 - 1);
   const fieldKey = `${fx0},${fy0},${fx1},${fy1},${lights.length},${low ? 1 : 0},${game.worldVersion ?? 0},${Math.round((sky.sun[0] + sky.sun[1] + sky.sun[2] + sky.ambient[0] + sky.ambient[1] + sky.ambient[2]) * 40)},${Math.round(sky.night * 40)}`;
   fieldFrame++;
   // (Flames flicker, so a field with point lights in it is rebuilt every other frame; one lit by the sky alone only
@@ -3155,7 +3155,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     const at = drawable.at;
     if (lit && drawable.light) return drawable.light.map(v => Math.min(1, v)) as RGB;
     if (!lit || !at) return null;
-    const real = at.y >= FLOOR_Y - 0.5 ? realPoint(world, at.x, at.y) : at, light = field.at(real.x, real.y, at.h ?? 16), min = drawable.min ?? 0;
+    const real = isStorey(at.y) ? realPoint(world, at.x, at.y) : at, light = field.at(real.x, real.y, at.h ?? 16), min = drawable.min ?? 0;
     return [Math.min(1, Math.max(min, light[0])), Math.min(1, Math.max(min, light[1])), Math.min(1, Math.max(min, light[2]))];
   };
   const rectOf = (drawable: Drawable): [number, number, number, number] => {
@@ -3184,7 +3184,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   const gpuDraw = !!glr && ctx === target;
   /** How clear of the haze something standing at a point is (1: not hazed). */
   const clearAt = (at: { x: number; y: number }) => {
-    const real = at.y < FLOOR_Y - 0.5 ? at : here, far = Math.hypot(real.x - here.x, real.y - here.y);
+    const real = !isStorey(at.y) ? at : here, far = Math.hypot(real.x - here.x, real.y - here.y);
     const t = Math.max(0, Math.min(1, (far - HAZE_START) / (DRAW_DISTANCE - 4 - HAZE_START)));
     return 1 - 0.97 * t * t * (3 - 2 * t);
   };
@@ -3404,7 +3404,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       // (It only needs a haze of its own where it stands in front of hazy ground: zoomed out, the haze's ring can reach
       // the bottom of the screen, but what's behind most things is still clear.)
       if (hazy && rect[1] < hazeBottom && overHaze(rect)) {
-        const at = drawable.at && drawable.at.y < FLOOR_Y - 0.5 ? drawable.at : here, far = Math.hypot(at.x - here.x, at.y - here.y);
+        const at = drawable.at && !isStorey(drawable.at.y) ? drawable.at : here, far = Math.hypot(at.x - here.x, at.y - here.y);
         const t = Math.max(0, Math.min(1, (far - HAZE_START) / (DRAW_DISTANCE - 4 - HAZE_START))), clear = Math.round(255 * (1 - 0.97 * t * t * (3 - 2 * t)));
         if (hull && hull.length > 2) { hb.globalCompositeOperation = "source-over"; hb.fillStyle = `rgb(${clear},${clear},${clear})`; hb.beginPath(); hull.forEach(([hx, hy], i) => i ? hb.lineTo(hx, hy) : hb.moveTo(hx, hy)); hb.closePath(); hb.fill(); }
         else if (drawable.sprites) { const c = Math.round(clear / 15) * 15; hb.globalCompositeOperation = "source-over"; stampSprites(hb, drawable.sprites, `rgb(${c},${c},${c})`); }
@@ -4037,7 +4037,7 @@ export function worldImage(world: World): HTMLCanvasElement {
   const ctx = canvas.getContext("2d")!, image = ctx.createImageData(W, H);
   // Upper storeys aren't on the map: it shows the ground.
   for (let i = 0; i < W * H; i++) {
-    if (i >= W * FLOOR_Y) { image.data.set([...MAP_COLORS[T.VOID], 255], i * 4); continue; }
+    if (i >= W * FLOOR_Y && i < W * UNDER_Y) { image.data.set([...MAP_COLORS[T.VOID], 255], i * 4); continue; }
     let [r, g, b] = MAP_COLORS[world.tiles[i]] ?? [128, 128, 128];
     const object = world.objects[world.objectAt[i]];
     if (object?.kind === "tree") [r, g, b] = [78, 116, 70];
@@ -4062,7 +4062,7 @@ export function mapIcons(world: World): MapIcon[] {
     else if (object.kind === "altar") add(object.x, object.y, "✚", "Altar");
     else if (object.kind === "spot") add(object.x, object.y, "≈", "Fishing", 10);
     else if (object.kind === "rock") add(object.x, object.y, "⛏", "Mining", 14);
-    else if (object.y >= FLOOR_Y) continue;
+    else if (isStorey(object.y)) continue;
     else if (object.look === "stairs") add(object.x, object.y, "♜", "Friendhollow Castle", 12);
     else if (object.kind === "ladder" || object.kind === "gate") add(object.x, object.y, "▼", object.name);
     else if (object.kind === "stall") add(object.x, object.y, "✋", "Market stalls");
@@ -4071,7 +4071,7 @@ export function mapIcons(world: World): MapIcon[] {
     else if (object.kind === "sigil_altar") add(object.x, object.y, "◈", object.name);
   }
   for (const spawn of world.spawns) {
-    if (spawn.y >= FLOOR_Y) continue;
+    if (isStorey(spawn.y)) continue;
     const def = spawn.kind === "npc" ? NPCS[spawn.id] : null;
     if (def?.shop) add(spawn.x, spawn.y, "¤", def.name);
     if (spawn.kind === "npc" && spawn.id === "stablemaster") add(spawn.x, spawn.y, "♞", "Stables");
@@ -4133,7 +4133,7 @@ export function renderWorldMap(ctx: CanvasRenderingContext2D, game: Game, width:
   ctx.save(); ctx.fillStyle = "#1a1a1d"; ctx.fillRect(0, 0, width, height);
   ctx.translate(width / 2, height / 2); ctx.rotate(Math.PI / 4); ctx.scale(focus.zoom, focus.zoom); ctx.translate(-focus.x, -focus.y);
   ctx.imageSmoothingEnabled = false;
-  if (underground) ctx.drawImage(image, 0, DUNGEON_Y, W, FLOOR_Y - DUNGEON_Y, 0, DUNGEON_Y, W, FLOOR_Y - DUNGEON_Y); else ctx.drawImage(image, 0, 0, W, OVERWORLD_H, 0, 0, W, OVERWORLD_H);
+  if (underground) ctx.drawImage(image, 0, UNDER_Y, W, H - UNDER_Y, 0, UNDER_Y, W, H - UNDER_Y); else ctx.drawImage(image, 0, 0, W, OVERWORLD_H, 0, 0, W, OVERWORLD_H);
   ctx.fillStyle = "#fff"; ctx.strokeStyle = INK; ctx.lineWidth = 1 / focus.zoom;
   ctx.beginPath(); ctx.arc(player.x + 0.5, player.y + 0.5, 2.2, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
   ctx.restore();
