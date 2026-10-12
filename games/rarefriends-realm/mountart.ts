@@ -15,7 +15,7 @@ export const MOUNT_SIZE: Record<MountView, { w: number; h: number }> = { side: {
 export const mountSize = (coat: Coat, view: MountView) => coat.kind === "spider" && view !== "side" ? { w: SPIDER_W, h: MOUNT_SIZE[view].h } : MOUNT_SIZE[view];
 export const SADDLE = 17;
 /** Where the rider sits on each kind: a horse's or a stag's back is high, a cat's or a wolf's lower, a spider's abdomen between. */
-export const saddleHeight = (coat: Coat) => ({ horse: SADDLE, stag: SADDLE, spider: 13, dragon: 13, tiger: 12, wolf: 12, golem: 19 } as const)[coat.kind ?? "horse"];
+export const saddleHeight = (coat: Coat) => ({ horse: SADDLE, stag: SADDLE, spider: 13, dragon: 13, tiger: 12, wolf: 12, golem: 19, camel: 22 } as const)[coat.kind ?? "horse"];
 const RAINBOW = ["#e7a9b0", "#ebc26b", "#b4d4a0", "#9fc6f0", "#c6bed4"];
 const SADDLE_LEATHER = "#7a3b2e", BLANKET = "#9fb4d0", INK = "#161616", WHITE = "#ffffff";
 const hash = (a: number, b: number) => { let h = Math.imul(a * 374761393 + b * 668265263, 1274126177); h ^= h >>> 13; return ((Math.imul(h, 1103515245) >>> 0) % 1000) / 1000; };
@@ -35,6 +35,7 @@ export function mountArt(coat: Coat, view: MountView, frame: number, saddle: boo
     else if (kind === "tiger" || kind === "wolf") { if (view === "side") catSide(p, coat, frame, saddle); else if (view === "front") catFront(p, coat, frame, saddle, layer); else catBack(p, coat, frame, saddle); }
     else if (kind === "spider") { if (view === "side") spiderSide(p, coat, frame, saddle); else if (view === "front") spiderFront(p, coat, frame, saddle, layer); else spiderBack(p, coat, frame, saddle); }
     else if (kind === "dragon") { if (view === "side") dragonSide(p, coat, frame, saddle); else if (view === "front") dragonFront(p, coat, frame, saddle, layer); else dragonBack(p, coat, frame, saddle); }
+    else if (kind === "camel") { if (view === "side") camelSide(p, coat, frame, saddle); else if (view === "front") camelFront(p, coat, frame, saddle, layer); else camelBack(p, coat, frame, saddle); }
     else if (kind === "golem") { if (view === "side") golemSide(p, coat, frame, saddle); else if (view === "front") golemFront(p, coat, frame, saddle, layer); else golemBack(p, coat, frame, saddle); }
     p.outline();
     // From behind, ridden: the rows from just above the saddle down, drawn again over the rider so their legs are hidden astride it.
@@ -93,9 +94,22 @@ function side(p: Pixels, coat: Coat, frame: number, saddle: boolean) {
   if (stag) { for (let i = 0; i < 6; i++) p.rect(24 - Math.round(i * 0.55), 2 + oy + i, 1, 1, coat.mane); antlers(p, coat, 27, 0 + oy, 1, "side"); }
   else { for (let i = 0; i < 8; i++) p.rect(24 - Math.round(i * 0.55), 2 + oy + i, 2, 1, maneAt(coat, i)); p.rect(27, 1 + oy, 2, 1, maneAt(coat, 1)); }
   if (coat.horn) { p.line(29, 0 + oy, 32, -4 + oy, coat.horn, 1); p.line(28, 0 + oy, 31, -4 + oy, coat.horn, 1); p.set(30, -2 + oy, shadeHex(coat.horn, -0.2)); p.set(31, -4 + oy, WHITE); }
+  if (coat.barding) bardingSide(p, coat, oy + bob);
   // Near legs.
   leg(p, coat, 12, 16 + oy, 27, swings[0], false); leg(p, coat, 21, 16 + oy, 27, swings[2], false);
   if (saddle) sideSaddle(p, 12, 8 + oy + bob, 9);
+}
+/** A caparison from the side: cloth over the back, hanging below the belly, its edge scalloped in the trim, the emblem on the flank; and a plate down the face. */
+function bardingSide(p: Pixels, coat: Coat, oy: number) {
+  const cloth = coat.barding!, trim = coat.trim ?? shadeHex(cloth, -0.25), fold = shadeHex(cloth, -0.1);
+  for (let y = 9; y <= 19; y++) {
+    const dy = (y - 13) / 5, half = y >= 13 ? 9 : Math.round(10 * Math.sqrt(Math.max(0, 1 - dy * dy)));
+    for (let x = 16 - half; x < 16 + half; x++) p.set(x, y + oy, (x - 16 + half) % 5 === 4 ? fold : cloth);
+  }
+  p.rect(8, 9 + oy, 16, 1, shadeHex(cloth, 0.14));
+  for (let x = 7; x < 25; x++) p.set(x, 19 + oy + (x % 3 === 0 ? 1 : 0), trim);
+  p.disc(16, 14 + oy, 2, 2, trim, null); p.set(16, 14 + oy, cloth);
+  p.line(29, 3 + oy, 32, 6 + oy, trim, 1);
 }
 function front(p: Pixels, coat: Coat, frame: number, saddle: boolean, layer: MountLayer) {
   const body = coat.body, dark = shadeHex(body, -0.12), stag = coat.kind === "stag", { lift } = walk(frame);
@@ -106,6 +120,7 @@ function front(p: Pixels, coat: Coat, frame: number, saddle: boolean, layer: Mou
     p.disc(10, 13 + oy, stag ? 6 : 6.5, 5.5, body, null);
     if (stag) p.rect(8, 15 + oy, 4, 3, coat.belly ?? "#d9c9a8");
     if (saddle) { p.rect(3, 11 + oy, 2, 4, BLANKET); p.rect(15, 11 + oy, 2, 4, BLANKET); p.rect(3, 9 + oy, 14, 2, SADDLE_LEATHER); }
+    if (coat.barding) { const trim = coat.trim ?? shadeHex(coat.barding, -0.25); p.rect(3, 12 + oy, 14, 7, coat.barding); p.rect(3, 12 + oy, 14, 1, shadeHex(coat.barding, 0.14)); for (let x = 3; x < 17; x++) p.set(x, 19 + oy + (x % 3 === 0 ? 1 : 0), trim); p.disc(10, 15 + oy, 1.5, 1.5, trim, null); }
     leg(p, coat, 7, 16 + oy, 27 - lift[0], 0, false); leg(p, coat, 12, 16 + oy, 27 - lift[1], 0, false);
   }
   if (layer === "body") return;
@@ -130,7 +145,8 @@ function back(p: Pixels, coat: Coat, frame: number, saddle: boolean) {
   leg(p, coat, 7, 16 + oy, 27, 0, true); leg(p, coat, 12, 16 + oy, 27, 0, true);
   p.disc(10, 12 + oy, stag ? 6.5 : 7, 6, body, null);
   p.line(5, 8 + oy, 15, 8 + oy, shadeHex(body, 0.08));
-  if (saddle) { p.rect(4, 8 + oy, 12, 3, BLANKET); p.rect(5, 7 + oy, 10, 2, SADDLE_LEATHER); }
+  if (coat.barding) { const trim = coat.trim ?? shadeHex(coat.barding, -0.25); p.rect(3, 8 + oy, 14, 11, coat.barding); p.rect(3, 8 + oy, 14, 1, shadeHex(coat.barding, 0.14)); for (let x = 3; x < 17; x++) p.set(x, 19 + oy + (x % 3 === 0 ? 1 : 0), trim); }
+  if (saddle) { p.rect(4, 8 + oy, 12, 3, coat.barding ? shadeHex(coat.barding, -0.12) : BLANKET); p.rect(5, 7 + oy, 10, 2, SADDLE_LEATHER); }
   if (stag) { p.disc(10, 14 + oy, 3, 3, coat.belly ?? "#d9c9a8", null); p.rect(9, 11 + oy + (swish > 0 ? 1 : 0), 2, 3, coat.mane); }
   else for (let i = 0; i < 10; i++) p.rect(9 + (i > 5 ? swish : 0), 11 + oy + i, 2, 1, maneAt(coat, i));
   leg(p, coat, 5, 16 + oy, 27 - lift[0], 0, false); leg(p, coat, 14, 16 + oy, 27 - lift[1], 0, false);
@@ -158,7 +174,8 @@ function catSide(p: Pixels, coat: Coat, frame: number, saddle: boolean) {
   const body = coat.body, light = shadeHex(body, 0.08), belly = coat.belly ?? shadeHex(body, 0.25), eye = coat.eye ?? "#e9b547", wolf = coat.kind === "wolf", oy = 4, { swings, bob, swish } = walk(frame);
   leg(p, coat, 9, 19 + oy, 27, swings[1], true); leg(p, coat, 23, 19 + oy, 27, swings[3], true);
   // The tail: a cat's long and curling up, a wolf's bushy and carried low.
-  if (wolf) { p.polyline([[5, 17 + oy + bob], [2, 20 + oy + bob + swish], [1, 23 + oy + swish]], body, 3); p.rect(0, 22 + oy + swish, 2, 2, belly); }
+  if (wolf && coat.tails) foxTails(p, coat, [6, 15 + oy + bob], [[1, 5 + oy + swish], [5, 2 + oy], [9, 5 + oy - swish]]);
+  else if (wolf) { p.polyline([[5, 17 + oy + bob], [2, 20 + oy + bob + swish], [1, 23 + oy + swish]], body, 3); p.rect(0, 22 + oy + swish, 2, 2, belly); }
   else { p.polyline([[6, 16 + oy + bob], [3, 13 + oy + bob], [1, 9 + oy + swish], [2, 6 + oy + swish]], body, 2); for (let i = 0; i < 3; i++) p.set(1 + (i > 1 ? 1 : 0), 7 + oy + swish + i * 2, coat.mane); }
   // The body: long, low, lit along the back, pale under.
   p.disc(16, 16 + oy + bob, 11, 5, body, null);
@@ -170,12 +187,23 @@ function catSide(p: Pixels, coat: Coat, frame: number, saddle: boolean) {
   if (wolf) { p.poly([[25, 9 + oy], [26, 5 + oy], [28, 9 + oy]], body, null); p.poly([[29, 9 + oy], [31, 5 + oy], [32, 9 + oy]], body, null); p.poly([[29, 12 + oy], [34, 13 + oy], [31, 16 + oy]], body, null); p.rect(31, 14 + oy, 3, 1, belly); }
   else { p.disc(26, 8 + oy, 1.5, 1.5, body, null); p.disc(31, 8 + oy, 1.5, 1.5, body, null); p.rect(31, 13 + oy, 3, 2, belly); p.line(27, 9 + oy, 28, 11 + oy, coat.mane, 1); p.line(30, 9 + oy, 29, 11 + oy, coat.mane, 1); }
   p.set(33, 13 + oy, INK); p.set(30, 11 + oy, eye); p.set(30, 10 + oy, WHITE);
+  if (coat.tails) { p.line(29, 12 + oy, 31, 12 + oy, coat.mane, 1); p.set(27, 7 + oy, coat.mane); }
   leg(p, coat, 12, 19 + oy, 27, swings[0], false); leg(p, coat, 21, 19 + oy, 27, swings[2], false);
   if (saddle) sideSaddle(p, 12, 12 + oy + bob, 9);
+}
+/** A fox's tails, fanned up from `base` to each tip: thick and soft, the tips in the accent (foxfire). */
+function foxTails(p: Pixels, coat: Coat, base: readonly [number, number], tips: readonly (readonly [number, number])[]) {
+  const n = Math.min(coat.tails ?? 1, tips.length), tip = coat.accent ?? WHITE;
+  for (let k = 0; k < n; k++) {
+    const [tx, ty] = tips[k], mid: [number, number] = [Math.round((base[0] + tx) / 2 + (k - 1)), Math.round((base[1] + ty) / 2 + 2)];
+    p.polyline([base, mid, [tx, ty]], k % 2 ? shadeHex(coat.body, -0.06) : coat.body, 3);
+    p.disc(tx, ty, 1.5, 1.5, tip, null); p.set(tx, ty - 1, shadeHex(tip, 0.3));
+  }
 }
 function catFront(p: Pixels, coat: Coat, frame: number, saddle: boolean, layer: MountLayer) {
   const body = coat.body, belly = coat.belly ?? shadeHex(body, 0.25), eye = coat.eye ?? "#e9b547", wolf = coat.kind === "wolf", { lift } = walk(frame);
   let oy = 4;
+  if (layer !== "head" && wolf && coat.tails) foxTails(p, coat, [10, 17 + oy], [[2, 8 + oy], [18, 8 + oy], [16, 5 + oy]]);
   if (layer !== "head") {
     leg(p, coat, 4, 19 + oy, 26, 0, true); leg(p, coat, 15, 19 + oy, 26, 0, true);
     p.disc(10, 17 + oy, 7, 5, body, null); p.rect(7, 19 + oy, 6, 3, belly);
@@ -190,6 +218,7 @@ function catFront(p: Pixels, coat: Coat, frame: number, saddle: boolean, layer: 
   if (wolf) { p.poly([[5, 6 + oy], [5, 1 + oy], [8, 5 + oy]], body, null); p.poly([[15, 6 + oy], [15, 1 + oy], [12, 5 + oy]], body, null); p.rect(8, 11 + oy, 4, 3, belly); p.rect(9, 11 + oy, 2, 1, INK); }
   else { p.disc(6, 5 + oy, 1.5, 1.5, body, null); p.disc(14, 5 + oy, 1.5, 1.5, body, null); p.rect(8, 11 + oy, 4, 3, belly); p.set(10, 11 + oy, INK); p.set(9, 11 + oy, INK); for (let i = 0; i < 3; i++) p.line(8 + i * 2, 4 + oy, 8 + i * 2, 6 + oy, coat.mane, 1); }
   p.set(8, 8 + oy, eye); p.set(12, 8 + oy, eye); p.set(8, 9 + oy, INK); p.set(12, 9 + oy, INK);
+  if (coat.tails) { p.line(6, 10 + oy, 7, 10 + oy, coat.mane, 1); p.line(13, 10 + oy, 14, 10 + oy, coat.mane, 1); p.set(10, 5 + oy, coat.mane); }
 }
 function catBack(p: Pixels, coat: Coat, frame: number, saddle: boolean) {
   const body = coat.body, belly = coat.belly ?? shadeHex(body, 0.25), dark = shadeHex(body, -0.12), wolf = coat.kind === "wolf", oy = 4, { lift, swish } = walk(frame);
@@ -202,7 +231,8 @@ function catBack(p: Pixels, coat: Coat, frame: number, saddle: boolean) {
   p.line(5, 11 + oy, 15, 11 + oy, shadeHex(body, 0.08));
   fur(p, coat, 5, 15, 12 + oy, 16 + oy, 3);
   if (saddle) { p.rect(4, 12 + oy, 12, 3, BLANKET); p.rect(5, 11 + oy, 10, 2, SADDLE_LEATHER); }
-  if (wolf) { p.rect(9, 18 + oy, 3, 7, body); p.rect(9 + swish, 23 + oy, 3, 3, belly); }
+  if (wolf && coat.tails) foxTails(p, coat, [10, 18 + oy], [[3, 9 + oy + swish], [17, 9 + oy - swish], [10, 5 + oy]]);
+  else if (wolf) { p.rect(9, 18 + oy, 3, 7, body); p.rect(9 + swish, 23 + oy, 3, 3, belly); }
   else { p.polyline([[10, 18 + oy], [10 + swish, 23 + oy], [12 + swish * 2, 26 + oy]], body, 2); p.set(12 + swish * 2, 26 + oy, coat.mane); }
   leg(p, coat, 5, 19 + oy, 27 - lift[0], 0, false); leg(p, coat, 15, 19 + oy, 27 - lift[1], 0, false);
 }
@@ -339,6 +369,63 @@ function dragonBack(p: Pixels, coat: Coat, frame: number, saddle: boolean) {
   if (saddle) { p.rect(4, 11 + oy, 12, 3, BLANKET); p.rect(5, 10 + oy, 10, 2, SADDLE_LEATHER); }
   p.polyline([[10, 19 + oy], [10 + swish, 23 + oy], [11 + swish * 2, 26 + oy]], body, 2); p.poly([[9 + swish * 2, 25 + oy], [13 + swish * 2, 25 + oy], [11 + swish * 2, 27 + oy]], horn, null);
   leg(p, coat, 5, 18 + oy, 27 - lift[0], 0, false); leg(p, coat, 15, 18 + oy, 27 - lift[1], 0, false);
+}
+
+// ---------- The camel: long knobbly legs, a hump with the saddle on it, a neck that dips and rises to a small proud head ----------
+/** A camel's rug over the hump: the accent, fringed, with the saddle's two posts standing up from it. */
+function camelRug(p: Pixels, coat: Coat, x: number, y: number, w: number, posts: readonly number[]) {
+  const rug = coat.accent ?? "#a5443a", fringe = coat.trim ?? "#e8c26a";
+  p.rect(x, y, w, 5, rug); p.rect(x, y + 1, w, 1, shadeHex(rug, 0.15));
+  for (let i = 0; i < w; i += 2) p.rect(x + i, y + 3, 1, 1, fringe);
+  for (let i = 0; i < w; i++) p.set(x + i, y + 5 + (i % 2), fringe);
+  for (const px of posts) { p.rect(px, y - 3, 1, 3, "#7a5534"); p.set(px, y - 4, fringe); }
+  p.rect(x + 2, y - 1, w - 4, 2, SADDLE_LEATHER);
+}
+function camelSide(p: Pixels, coat: Coat, frame: number, saddle: boolean) {
+  const body = coat.body, dark = shadeHex(body, -0.12), light = shadeHex(body, 0.08), { swings, bob, swish } = walk(frame);
+  leg(p, coat, 10, 15, 27, swings[1], true); leg(p, coat, 21, 15, 27, swings[3], true);
+  p.line(6, 10 + bob, 5 + swish, 17 + bob, dark, 1); p.rect(4 + swish, 17 + bob, 2, 2, coat.mane);
+  // The body, and the hump high on it, lit along the top.
+  p.disc(15, 12 + bob, 9.5, 4.5, body, null);
+  p.disc(14, 7 + bob, 5.5, 4, body, null);
+  p.line(10, 4 + bob, 17, 4 + bob, light); p.line(8, 16 + bob, 22, 16 + bob, dark);
+  for (let i = 0; i < 4; i++) p.rect(11 + i * 2, 6 + bob + (i % 2), 1, 1, coat.mane);
+  // The neck: forward and down from the chest, then up to the head.
+  p.polyline([[22, 10 + bob], [26, 14 + bob], [29, 9], [30, 4]], body, 3);
+  p.line(24, 12 + bob, 27, 15 + bob, dark, 1);
+  // The head: long and small, a heavy-lidded eye, a soft drooping lip, small ears.
+  p.disc(30.5, 3.5, 3, 2, body, null); p.rect(31, 3, 3, 3, body); p.rect(32, 5, 2, 1, shadeHex(body, -0.2));
+  p.set(30, 2, INK); p.set(29, 2, dark); p.set(33, 4, INK); p.set(28, 1, dark);
+  // Knees: the knobbly joints a camel kneels on.
+  leg(p, coat, 13, 15, 27, swings[0], false); leg(p, coat, 19, 15, 27, swings[2], false);
+  for (const x of [13, 19]) p.rect(x - 0.5, 21, 2, 1, dark);
+  if (saddle) camelRug(p, coat, 9, 4 + bob, 10, [10, 17]);
+}
+function camelFront(p: Pixels, coat: Coat, frame: number, saddle: boolean, layer: MountLayer) {
+  const body = coat.body, dark = shadeHex(body, -0.12), { lift } = walk(frame);
+  if (layer !== "head") {
+    leg(p, coat, 6, 15, 26, 0, true); leg(p, coat, 13, 15, 26, 0, true);
+    p.disc(10, 12, 6, 5, body, null);
+    p.disc(10, 7, 4.5, 3.5, body, null);
+    if (saddle) camelRug(p, coat, 4, 5, 12, [5, 14]);
+    leg(p, coat, 7, 15, 27 - lift[0], 0, false); leg(p, coat, 12, 15, 27 - lift[1], 0, false);
+    for (const x of [7, 12]) p.rect(x - 0.5, 21, 2, 1, dark);
+  }
+  if (layer === "body") return;
+  // The neck rising in front of the chest, the head on top of it, looking down its nose at you.
+  p.rect(8, 10, 4, 8, body); p.rect(8, 10, 1, 8, shadeHex(body, 0.08));
+  p.disc(10, 6.5, 3.5, 3, body, null); p.rect(8, 8, 4, 3, shadeHex(body, -0.16)); p.set(8, 9, INK); p.set(11, 9, INK); p.rect(9, 10, 2, 1, shadeHex(body, -0.28));
+  p.set(7, 5, INK); p.set(13, 5, INK); p.set(7, 4, WHITE); p.set(13, 4, WHITE); p.rect(6, 3, 1, 2, dark); p.rect(14, 3, 1, 2, dark);
+}
+function camelBack(p: Pixels, coat: Coat, frame: number, saddle: boolean) {
+  const body = coat.body, dark = shadeHex(body, -0.12), { lift, swish } = walk(frame);
+  p.disc(10, 3, 2.5, 2, dark, null); p.set(8, 2, dark); p.set(12, 2, dark);
+  leg(p, coat, 7, 15, 27, 0, true); leg(p, coat, 12, 15, 27, 0, true);
+  p.disc(10, 12, 6.5, 5, body, null);
+  p.disc(10, 7, 4.5, 3.5, body, null);
+  if (saddle) camelRug(p, coat, 4, 5, 12, [5, 14]);
+  p.rect(9 + swish, 13, 2, 5, dark); p.rect(9 + swish, 18, 2, 2, coat.mane);
+  leg(p, coat, 5, 15, 27 - lift[0], 0, false); leg(p, coat, 14, 15, 27 - lift[1], 0, false);
 }
 
 // ---------- The forge golem: a stone body on short thick legs, a furnace and an anvil built into its back ----------

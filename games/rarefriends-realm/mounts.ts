@@ -10,6 +10,7 @@ import { addXp, combatLevel, count, give, giveOrDrop, has, message, sound, take,
 import { chat, data, fetchQuest, npcSays, questDone, stage, type NpcDef, type QuestDef } from "./content.ts";
 import { regionAt } from "./world.ts";
 import { POACHER_CAMP } from "./mountworld.ts";
+import { QUEST_MOUNT_CLUES, QUEST_MOUNT_NPCS, QUEST_MOUNT_QUESTS, onQuestMountKill, talkQuestMounts } from "./questmounts.ts";
 
 const pick = (game: Game, lines: readonly string[]) => lines[Math.floor(game.rng() * lines.length)];
 const mark = (done: boolean, text: string) => `${done ? "✓" : "•"} ${text}`;
@@ -25,6 +26,8 @@ const xp = (game: Game, skill: "slayer" | "strength" | "firemaking", amount: num
 export const MOUNT_NPCS: Record<string, NpcDef> = {
   caged_tiger: { id: "caged_tiger", name: "Caged tiger", examine: "A striped cat the size of a horse, in a cage of stakes, pacing. It has been looking at the poachers the way they'd rather it didn't.", options: ["Talk-to"], art: { family: 0, seed: 1 }, mount: "tiger", gone: game => !!data(game, "so_freed") },
   paddock_bay: { id: "paddock_bay", name: "Horse", examine: "A bay, tied at the hitching post, waiting for whoever's inside.", options: ["Stroke"], art: { family: 0, seed: 1 }, mount: "bay_horse" },
+  // The wider world's mounts (questmounts.ts): the Dawn's charger, the Dusk stag, Halzir's white camel, the three-tailed fox.
+  ...QUEST_MOUNT_NPCS,
 };
 
 export const MOUNT_QUESTS: readonly QuestDef[] = [
@@ -50,6 +53,7 @@ export const MOUNT_QUESTS: readonly QuestDef[] = [
       return ["The egg hatched by Ysolde's fire: a little green dragon, which has decided I'm its mother and carries me about. It hates the cold. QUEST COMPLETE!"];
     },
   },
+  ...QUEST_MOUNT_QUESTS,
 ];
 
 /** The places the quests read: the tiger's tracks, and the drakes' nest. */
@@ -73,9 +77,11 @@ export const MOUNT_CLUES: Record<string, { options: () => string[]; examine: () 
       return { text: "The egg's heavy, warm, and faintly ticking. Don't drop it." };
     },
   },
+  ...QUEST_MOUNT_CLUES,
 };
 
 export function talkMounts(game: Game, npcId: string, name: string): Dialogue | null {
+  const wider = talkQuestMounts(game, npcId, name); if (wider) return wider;
   const player = game.player, says = (...lines: string[]) => chat(name, npcSays(name, ...lines));
   switch (npcId) {
     case "caged_tiger": {
@@ -113,6 +119,7 @@ export function talkMounts(game: Game, npcId: string, name: string): Dialogue | 
 }
 /** Kills the quests count: the three poachers (bandits at their camp), and the drakes over the nest (in Wyrmreach). */
 export function onMountKill(game: Game, monsterId: string, x: number, y: number) {
+  onQuestMountKill(game, monsterId, x, y);
   if (monsterId === "bandit" && stage(game, STRIPED_ONE) === 1 && x >= POACHER_CAMP.x0 && x <= POACHER_CAMP.x1 && y >= POACHER_CAMP.y0 && y <= POACHER_CAMP.y1) {
     const n = data(game, "so_poachers") + 1; game.player.questData.so_poachers = n;
     if (n === POACHERS) say(game, "That's the three poachers. The cage is yours to open; the tiger's been waiting.");

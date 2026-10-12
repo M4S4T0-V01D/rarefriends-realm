@@ -1583,7 +1583,10 @@ export function Orbs({ game, onRun, onSneak, onRide, onMap, onZoom, onRotate, op
 }
 
 /** Who hands out a quest's mount, for the stable list before you have it. */
-const MOUNT_FROM: Record<string, string> = { striped_one: "Earned from Huntmaster Fenn at Tallgrass.", drake_of_your_own: "Earned from Ysolde the drake hunter at Wyrmreach." };
+/** Where each quest mount is earned (the Mount tab's collection, and the stables' list). */
+export const MOUNT_FROM: Record<string, string> = { striped_one: "Earned from Huntmaster Fenn at Tallgrass.", drake_of_your_own: "Earned from Ysolde the drake hunter at Wyrmreach.",
+  dawns_charger: "Earned from Brother Corwin, the Order of the Dawn's ostler at Dawnhold.", stag_at_dusk: "Earned from Warden Ysmay of the Order of Dusk, in the Silent Peaks.",
+  white_calf: "Earned from Rider-Captain Halzir at the Ouresh camp, in Kharaveth.", three_tails: "Earned from Fox-keeper Tamao at the fox shrine on Morishima." };
 /**
  * The Mount tab: the mount you ride by default (remembered in your save), ridden or not; while you ride, its attack
  * with the cooldown counting down, the forge golem's furnace and anvil, and the saddlebags of mounts that have them
@@ -1599,9 +1602,9 @@ function MountTab({ game, refresh, openMenu, paused }: PanelProps) {
         title={have ? `${mount.name}: ${mount.text}` : mount.quest ? `${mount.name}: ${MOUNT_FROM[mount.quest]}` : `${mount.name}: from the Friendhollow stables, for ${mount.caskets} Rare Caskets.`}
         onClick={() => { chooseMount(game, mount.id); toggleMount(game, mount.id); refresh(); }}
         {...rightClick(openMenu, () => have ? [{ verb: player.mount === mount.id ? "Dismount" : "Ride", noun: mount.name, run: () => { chooseMount(game, mount.id); toggleMount(game, mount.id); refresh(); } }, { verb: "Examine", noun: mount.name, run: () => { message(game, `${mount.name}: ${mount.text}`); refresh(); } }] : [{ verb: "Examine", noun: "Undiscovered mount", run: () => { message(game, mount.quest ? MOUNT_FROM[mount.quest] : "A mount the Friendhollow stables sell."); refresh(); } }])}>
-        {have ? <PixelIcon art={mountArt(mount.coat, "side", -1, true)} size={34} /> : <span className="realm-mystery">?</span>}<small>{have ? mount.name : mount.quest ? "A quest" : "The stables"}</small></button>; })}</div>
+        {have ? <PixelIcon art={mountArt(mount.coat, "side", -1, true)} size={34} /> : <span className="realm-mystery">?</span>}<small>{have ? mount.name : mount.quest ? QUESTS.find(quest => quest.id === mount.quest)?.name ?? "A quest" : "The stables"}</small></button>; })}</div>
   </>;
-  if (!owned.length) return <div className="realm-mount"><h3>Mounts</h3><p className="realm-muted">You don't own a mount yet. The Friendhollow stables sell horses, unicorns and stranger beasts for RF; a tiger and a little dragon are earned on quests.</p>{stable}</div>;
+  if (!owned.length) return <div className="realm-mount"><h3>Mounts</h3><p className="realm-muted">You don't own a mount yet. The Friendhollow stables sell horses, unicorns and stranger beasts for RF, and six more are earned on quests across the Realm: a tiger, a little dragon, the Dawn's charger, the Dusk stag, a white camel and a three-tailed fox.</p>{stable}</div>;
   return (
     <div className="realm-mount">
       <h3>Mounts</h3>

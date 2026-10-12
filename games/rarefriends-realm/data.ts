@@ -1961,8 +1961,10 @@ export const petDef = (id: string | null | undefined) => PETS.find(pet => pet.id
  * stags wear antlers (`accent`), cats stripes (`mane`), wolves a darker saddle of fur, spiders a marking (`accent`),
  * dragons wings (`mane`) and horns (`accent`), golems a furnace glow (`accent`); `belly` is the paler underside.
  */
-export type MountKind = "horse" | "stag" | "tiger" | "wolf" | "spider" | "dragon" | "golem";
-export type Coat = { body: string; mane: string; hoof: string; socks?: string; blaze?: string; pattern?: "dapple" | "piebald" | "stars"; horn?: string; rainbow?: boolean; kind?: MountKind; accent?: string; belly?: string; eye?: string };
+export type MountKind = "horse" | "stag" | "tiger" | "wolf" | "spider" | "dragon" | "golem" | "camel";
+/** `barding` drapes a horse or stag in a caparison (its edge in `trim`, an emblem on the flank); `tails` fans a wolf's tail into a fox's several, tipped in `accent`. */
+export type Coat = { body: string; mane: string; hoof: string; socks?: string; blaze?: string; pattern?: "dapple" | "piebald" | "stars"; horn?: string; rainbow?: boolean; kind?: MountKind; accent?: string; belly?: string; eye?: string;
+  barding?: string; trim?: string; tails?: number };
 /**
  * A mount's own attack, used now and then (a cooldown in ticks between uses) on the creature you're fighting: a kick, a
  * pounce, a gout of fire. `damage` is the most it hits, `heal` mends you as well, `web` and `stun` hold the creature's
@@ -2025,6 +2027,19 @@ export const MOUNTS: readonly MountDef[] = [
   { id: "little_dragon", name: "Little green dragon", caskets: 0, speed: 2, quest: "drake_of_your_own", coat: { kind: "dragon", body: "#4f8a4a", mane: "#7fbf6a", hoof: "#2d3a28", belly: "#d9e2a8", accent: "#e8d98a", eye: "#f4e27a" }, light: true, fireproof: true, heal: 12,
     attack: { name: "Flame", cooldown: 60, damage: 10, fire: true, reach: 3, text: "A gout of flame three tiles at what you're fighting: up to 10, every 36 seconds." },
     text: "Trots two tiles a tick without tiring, lights the dark, turns dragonfire aside, and its warmth mends you: 1 HP every 7 seconds." },
+  // Earned in the wider world (questmounts.ts): the Order of the Dawn's charger, the Order of Dusk's stag, Halzir's white camel, the three-tailed fox of Morishima.
+  { id: "dawn_charger", name: "Dawn charger", caskets: 0, speed: 3, quest: "dawns_charger", coat: { body: "#f4f1ea", mane: "#e6cf8a", hoof: "#8a7a5a", barding: "#c4553d", trim: "#e9b84a" }, skillXp: { prayer: 0.15 }, defence: 6, heal: 12,
+    attack: { name: "Dawn's charge", cooldown: 70, damage: 12, heal: 10, text: "Charges in a blaze of morning: up to 12 to what you're fighting and 10 HP mended, every 42 seconds." },
+    text: "Canters three tiles a tick without tiring, the Order's own: +15% Faith XP, +6 Defence, and it mends you 1 HP every 7 seconds." },
+  { id: "dusk_stag", name: "Dusk stag", caskets: 0, speed: 3, quest: "stag_at_dusk", coat: { kind: "stag", body: "#4a4258", mane: "#2a2533", hoof: "#1e1b24", belly: "#9d93b3", accent: "#d8d6e6", barding: "#5b3f86", trim: "#c9c6d8" }, sneak: true, skillXp: { ranged: 0.15 }, bags: 8,
+    attack: { name: "Last-hour charge", cooldown: 60, damage: 10, stun: 4, text: "Comes out of the dusk at what you're fighting: up to 10, and it staggers; every 36 seconds." },
+    text: "Bounds three tiles a tick without tiring, as quiet as the Order: you can sneak in the saddle, +15% Ranged XP, and eight saddlebag slots." },
+  { id: "white_camel", name: "White camel", caskets: 0, speed: 2, quest: "white_calf", coat: { kind: "camel", body: "#efe6d2", mane: "#d2c3a2", hoof: "#7a6a55", accent: "#a5443a", trim: "#e8c26a" }, skillXp: { agility: 0.15 }, poisonProof: true, bags: 16,
+    attack: { name: "Spit", cooldown: 60, damage: 4, stun: 5, text: "Spits at what you're fighting: up to 4, and it reels, blinking; every 36 seconds." },
+    text: "Walks two tiles a tick and never tires or thirsts: +15% Wayfaring XP, no scorpion's or serpent's poison touches you, and sixteen slots in its saddlebags." },
+  { id: "foxfire_kitsune", name: "Three-tailed fox", caskets: 0, speed: 3, quest: "three_tails", coat: { kind: "wolf", body: "#f3ece0", mane: "#c8442c", hoof: "#3a2a24", belly: "#ffffff", eye: "#f2c14a", accent: "#7fe0a0", tails: 3 }, light: true, skillXp: { magic: 0.15 },
+    attack: { name: "Foxfire", cooldown: 60, damage: 12, fire: true, reach: 3, text: "Throws green foxfire three tiles at what you're fighting: up to 12, every 36 seconds." },
+    text: "Runs three tiles a tick without tiring, lights the dark with its foxfire, and +15% Magic XP." },
 ];
 export const mountDef = (id: string | null | undefined) => MOUNTS.find(mount => mount.id === id);
 

@@ -23,7 +23,7 @@ const TITLE_LOGO = logoSvg("horizontal");
 import { HIGH_QUALITY, PITCH, RENDER_PROFILE, VIEW, ZOOM, addPrint, daylight, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
 import {
   BankModal, BoatModal, CardsModal, CarvingBuffs, MountOrb, FeedbackModal, ChatBox, ContextMenu, DailyModal, FellowshipModal, HomeModal, JoinModal, RfActionModal, FirstStepsCard, GuideModal, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, NamingModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
-  cancelLongPress, longPress, rightClick, NerdSettings, LanguagePicker, customFrom, type CustomGraphics, type MenuEntry, type Settings, type Tab, CampCacheModal } from "./panels.tsx";
+  cancelLongPress, longPress, rightClick, NerdSettings, LanguagePicker, customFrom, type CustomGraphics, type MenuEntry, type Settings, type Tab, CampCacheModal, MOUNT_FROM } from "./panels.tsx";
 import { REGULAR_SPRITES } from "./regulars.ts";
 import { NET_ACT, NET_ACT_IN, NET_CHAT, NET_CHAT_IN, NET_ONLINE, NET_PRESENCE, NET_SOCIAL, NET_STATE, cleanAct, cleanChat, cleanId, cleanPresence, type Act, type NetState, type Presence } from "./net.ts";
 import { Players, presenceOf } from "./social.ts";
@@ -1282,9 +1282,9 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
               <ul className="realm-market stable">{MOUNTS.map(mount => {
                 const owned = state.player.mounts.includes(mount.id), ridingNow = state.player.mount === mount.id;
                 return <li key={mount.id}><PixelIcon art={mountArt(mount.coat, "side", -1, true)} size={58} label={mount.name} />
-                  <div><b>{mount.name}</b><small>{mount.text} {owned ? "Yours." : `Includes ${mount.caskets} Rare Caskets.`}</small></div>
+                  <div><b>{mount.name}</b><small>{mount.text} {owned ? "Yours." : mount.quest ? "" : `Includes ${mount.caskets} Rare Caskets.`}</small></div>
                   {owned ? <button type="button" aria-pressed={ridingNow} onClick={() => { toggleMount(state, mount.id); refresh(); }}>{ridingNow ? "Dismount" : "Ride"}</button>
-                    : mount.quest ? <small className="realm-muted">{mount.quest === "striped_one" ? "Earned from Huntmaster Fenn at Tallgrass." : "Earned from Ysolde the drake hunter at Wyrmreach."}</small>
+                    : mount.quest ? <small className="realm-muted">{MOUNT_FROM[mount.quest]}</small>
                     : <button type="button" className="realm-primary" disabled={busy || paused}
                       {...rightClick((x, y, entries) => setMenu({ x, y, entries }), () => [{ verb: "Examine", noun: mount.name, run: () => { message(state, `${mount.name}: ${mount.text}`); refresh(); } }])}
                       onClick={() => void casket(() => client.buy(BigInt(mount.caskets)), () => { grantMount(state, mount.id); audio.current?.sfx("coins"); refresh(); })}>Buy · {rf(definition.price * BigInt(mount.caskets))}</button>}</li>;

@@ -20,6 +20,7 @@ import { buildSettlements } from "./settlementsworld.ts";
 import { buildMountCountry } from "./mountworld.ts";
 import { buildWyrmreach } from "./wyrmreachworld.ts";
 import { buildDragons } from "./dragonsworld.ts";
+import { buildQuestMounts } from "./questmountsworld.ts";
 
 /**
  * The far west (Return of Raria): the world grew by WEST_DX columns on its west side for a second continent, Raria and
@@ -1557,7 +1558,8 @@ export function generateWorld(seed = WORLD_SEED): { world: World; lift: Float32A
   buildSettlements({ ...south, random: mulberry(seed + 919) });   // Gravesend's mausoleums and vault, Fernwick's forester, Southshore's wreck and beach (settlementsworld.ts)
   buildMountCountry({ ...south, random: mulberry(seed + 929) }); // the poachers' camp and the tiger's cage (mountworld.ts)
   buildWyrmreach({ ...south, random: mulberry(seed + 939) });
-  buildDragons({ ...south, random: mulberry(seed + 949) });      // the Bonefield, the Cragmaw Heights, Qeshet and the Sunken Halls under it (dragonsworld.ts)    // Wyrmreach moved up its mountain north-west of Fernwick, the forest grown over the old field, the drakes' nest (wyrmreachworld.ts)
+  buildDragons({ ...south, random: mulberry(seed + 949) });      // the Bonefield, the Cragmaw Heights, Qeshet and the Sunken Halls under it (dragonsworld.ts)
+  buildQuestMounts({ ...south, random: mulberry(seed + 959) });  // the wider world's mount quests: Dawnhold's stable, the Dusk watchers, Qeshet's camel, the fox lanterns (questmountsworld.ts)    // Wyrmreach moved up its mountain north-west of Fernwick, the forest grown over the old field, the drakes' nest (wyrmreachworld.ts)
   for (const object of objects) if (object.name === "__removed") object.blocks = false;
   // The dungeons settle under the ground they're reached from (the strip they were built in is left empty).
   const labels: World["labels"] = {}, under = settleUnderground(ctx, places, floors, labels);

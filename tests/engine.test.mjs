@@ -610,7 +610,7 @@ test("A Friend's Feast from start to finish", () => {
   assert.equal(g.player.quests.friends_feast, 2);
   assert.equal(questPoints(g), 1);
   assert(level(g, "cooking") >= 10, "Quest XP");
-  assert.equal(QUESTS.length, 104); assert.equal(MAX_QUEST_POINTS, 182);
+  assert.equal(QUESTS.length, 108); assert.equal(MAX_QUEST_POINTS, 186);
 });
 
 test("Grumblin Trouble counts kills and pays out", () => {
@@ -1956,7 +1956,7 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   assert.equal(p.quests.dawn_against_hollow, 2); assert(has(p, "dawnplate_cuirass"));
   assert.equal(count(p, "hollow_essence"), 0);
   assert.equal(capeProblem(g, "dawnplate_cuirass"), null, "the armoury sells Dawnplate once earned");
-  assert.equal(QUESTS.length, 104); assert.equal(MAX_QUEST_POINTS, 182);
+  assert.equal(QUESTS.length, 108); assert.equal(MAX_QUEST_POINTS, 186);
 });
 
 test("Boots and gauntlets in every metal, smithed at the anvil; the clothier's shirts, dresses, trousers and skirts", () => {
@@ -4205,7 +4205,7 @@ test("Mounts grown: seven new beasts (quest ones not for sale), the chosen mount
   const { saddleHeight } = await import("../games/rarefriends-realm/mountart.ts");
   const g = newGame(), p = g.player, world = g.world;
   // The data: fifteen mounts, each with an attack; the tiger and the little dragon come from quests that exist.
-  assert.equal(MOUNTS.length, 15); assert.ok(MOUNTS.every(m => m.attack.cooldown > 0 && m.attack.name));
+  assert.equal(MOUNTS.length, 19); assert.ok(MOUNTS.every(m => m.attack.cooldown > 0 && m.attack.name));
   for (const id of ["tiger", "little_dragon"]) { const m = MOUNTS.find(x => x.id === id); assert.equal(m.caskets, 0); assert.ok(QUESTS.some(q => q.id === m.quest), `${id}'s quest`); }
   assert.ok(MOUNTS.filter(m => m.bags).length >= 6 && MOUNTS.some(m => m.forge) && MOUNTS.some(m => m.sneak && m.poisonProof) && MOUNTS.filter(m => m.fireproof).length === 2);
   assert.ok(saddleHeight(MOUNTS.find(m => m.id === "tiger").coat) < saddleHeight(MOUNTS[0].coat), "a cat sits lower than a horse");
@@ -4256,6 +4256,61 @@ test("Mounts grown: seven new beasts (quest ones not for sale), the chosen mount
   use(nest, "Search"); assert.equal(count(p, "drake_egg"), 1); use(nest, "Search"); assert.equal(count(p, "drake_egg"), 1, "one egg"); assert.equal(item("drake_egg").tradeable, false);
   give(p, "cooked_meat", 10); d = talk(g, "drake_hunter"); assert.match(d.lines[0].text, /shell going/); d.onEnd?.(); assert.ok(questDone(g, DRAKE_OF_YOUR_OWN)); assert.ok(p.mounts.includes("little_dragon")); assert.equal(count(p, "drake_egg"), 0); assert.equal(count(p, "cooked_meat"), 0);
   assert.ok(MOUNTS.find(m => m.id === "little_dragon").fireproof, "the hatchling turns dragonfire");
+});
+
+test("Quest mounts across the Realm: the Dawn's charger, the Dusk stag, the white camel and the three-tailed fox, each earned end to end", async () => {
+  const Q = await import("../games/rarefriends-realm/questmounts.ts");
+  const { talk, questDone, finalStage, QUESTS } = await import("../games/rarefriends-realm/content.ts");
+  const { mountSize, saddleHeight } = await import("../games/rarefriends-realm/mountart.ts");
+  const g = newGame(), p = g.player, world = g.world;
+  const ids = { dawns_charger: "dawn_charger", stag_at_dusk: "dusk_stag", white_calf: "white_camel", three_tails: "foxfire_kitsune" };
+  for (const [quest, id] of Object.entries(ids)) { const m = MOUNTS.find(x => x.id === id); assert.ok(m && m.quest === quest && m.caskets === 0, `${id} is earned on ${quest}`); assert.ok(QUESTS.some(q => q.id === quest)); }
+  // The art: barding on the charger and the stag, three tails on the fox, a camel taller in the saddle than a horse; a spider wider facing you.
+  assert.ok(MOUNTS.find(m => m.id === "dawn_charger").coat.barding && MOUNTS.find(m => m.id === "dusk_stag").coat.barding && MOUNTS.find(m => m.id === "foxfire_kitsune").coat.tails === 3);
+  assert.ok(saddleHeight(MOUNTS.find(m => m.id === "white_camel").coat) > saddleHeight(MOUNTS[0].coat), "a camel's saddle is high");
+  assert.ok(mountSize(MOUNTS.find(m => m.id === "cave_spider").coat, "front").w > mountSize(MOUNTS[0].coat, "front").w, "a spider stands wide");
+  // The places: the quest-givers, the mare, the camel and the fox, the watchers and the lanterns, each in its region.
+  const spawn = id => world.spawns.find(s => s.kind === "npc" && s.id === id);
+  for (const [id, region] of [["dawn_ostler", "greyhorn"], ["dawn_mare", "greyhorn"], ["dusk_warden", "silent_peaks"], ["hobbled_camel", "qeshet"], ["fox_keeper", "morishima"], ["three_tailed_fox", "morishima"]]) { const s = spawn(id); assert.ok(s, id); assert.equal(regionAt(world, s.x, s.y).id, region, `${id} in ${region}`); }
+  for (const id of [...Q.WATCHERS, ...Q.LANTERNS]) assert.ok(world.objects.some(o => o.clue === id), `${id} placed`);
+  const use = id => Q.QUEST_MOUNT_CLUES[id].use(g), say = (id, label) => { const d = talk(g, id); const o = label && d.options?.find(x => x.label === label); return o ? o.then() : d; };
+  const accept = id => { const d = say(id, "I'll do it."); d.onEnd?.(); };
+  const finish = id => { const d = talk(g, id); d.onEnd?.(); };
+
+  // The Dawn's Charger: not before Dawn Against the Hollow; twenty of the dead with a faith weapon (bare hands don't count), the mare groomed.
+  assert.match(talk(g, "dawn_ostler").lines[0].text, /not for squires/);
+  p.quests.dawn_against_hollow = finalStage("dawn_against_hollow"); accept("dawn_ostler"); assert.equal(p.quests[Q.DAWNS_CHARGER], 1);
+  assert.match(talk(g, "dawn_mare").lines[0].text, /Not yet/);
+  Q.onQuestMountKill(g, "skeleton", 0, 0); assert.equal(p.questData.dc_dead ?? 0, 0, "without a faith weapon the dead don't count");
+  p.equipment.weapon = ITEM_LIST.find(i => i.equip?.holy && i.equip.slot === "weapon").id;
+  for (let i = 0; i < Q.CHARGER_DEAD; i++) Q.onQuestMountKill(g, "skeleton", 0, 0); Q.onQuestMountKill(g, "rat", 0, 0); assert.equal(p.questData.dc_dead, Q.CHARGER_DEAD);
+  say("dawn_mare", "Groom her."); assert.equal(p.questData.dc_groomed, 1);
+  finish("dawn_ostler"); assert.ok(questDone(g, Q.DAWNS_CHARGER) && p.mounts.includes("dawn_charger")); assert.equal(NPCS.dawn_mare.gone(g), true, "the stall is empty");
+
+  // The Stag at Dusk: three vigils at the watchers, each once.
+  accept("dusk_warden"); assert.match(use(Q.WATCHERS[0]).text, /vigil/); use(Q.WATCHERS[0]); assert.equal(Q.WATCHERS.filter(id => p.questData[id]).length, 1, "once each");
+  assert.match(talk(g, "dusk_warden").lines[0].text, /2 watchers still/);
+  use(Q.WATCHERS[1]); use(Q.WATCHERS[2]); finish("dusk_warden"); assert.ok(questDone(g, Q.STAG_AT_DUSK) && p.mounts.includes("dusk_stag"));
+
+  // The White Calf: Halzir only after Salt and Smoke; the bandits must fall in Qeshet; the hobble cut; grain.
+  assert.ok(!/white, she was/.test(talk(g, "ouresh_halzir").lines[0].text), "nothing of it before Salt and Smoke");
+  p.quests.salt_and_smoke = finalStage("salt_and_smoke"); accept("ouresh_halzir"); assert.equal(p.quests[Q.WHITE_CALF], 1);
+  const camp = spawn("hobbled_camel"); Q.onQuestMountKill(g, "bandit", 586, 430); assert.equal(p.questData.wc_bandits ?? 0, 0, "bandits elsewhere don't count");
+  assert.match(talk(g, "hobbled_camel").lines[0].text, /bandits about/);
+  for (let i = 0; i < Q.CALF_BANDITS + 2; i++) Q.onQuestMountKill(g, "bandit", camp.x, camp.y); assert.equal(p.questData.wc_bandits, Q.CALF_BANDITS);
+  say("hobbled_camel", "Cut the hobble."); assert.equal(NPCS.hobbled_camel.gone(g), true);
+  assert.match(talk(g, "ouresh_halzir").lines[0].text, /Qeshet: three bandits/, "the grain still wanted");
+  give(p, "grain", Q.CALF_GRAIN); finish("ouresh_halzir"); assert.ok(questDone(g, Q.WHITE_CALF) && p.mounts.includes("white_camel")); assert.equal(count(p, "grain"), 0);
+
+  // Three Tails: after A Thousand Gates; a tinderbox for the lanterns; the fox only comes when they all burn and the vixens are tested.
+  p.quests.thousand_gates = finalStage("thousand_gates"); accept("fox_keeper");
+  const box = p.inventory.findIndex(slot => slot?.id === "tinderbox"); if (box >= 0) p.inventory[box] = null;
+  assert.match(use(Q.LANTERNS[0]).text, /tinderbox/); give(p, "tinderbox", 1);
+  for (const id of Q.LANTERNS) use(id); for (let i = 0; i < Q.FOX_VIXENS; i++) Q.onQuestMountKill(g, "foxfire_vixen", 0, 0);
+  assert.equal(NPCS.three_tailed_fox.present(g), true, "the fox comes to the light");
+  talk(g, "three_tailed_fox"); assert.equal(p.questData.tt_fox, 1); assert.equal(NPCS.three_tailed_fox.present(g), false, "and goes with you");
+  finish("fox_keeper"); assert.ok(questDone(g, Q.THREE_TAILS) && p.mounts.includes("foxfire_kitsune"));
+  for (const quest of Object.keys(ids)) assert.ok(QUESTS.find(q => q.id === quest).journal(g).some(line => /QUEST COMPLETE/.test(line)));
 });
 
 test("Dragons across the Realm: the Bonefield, the Cragmaw Heights, Qeshet and the Sunken Halls under it; Scale and Fire opens Ysolde's wyrmwright trade; the drakeward shields and the wyrmbane arms", async () => {
