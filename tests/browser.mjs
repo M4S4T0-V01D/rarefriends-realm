@@ -4,7 +4,7 @@
 // restore, and a screenshot tour of every region (./artifacts). Automated test only: public builds always use the real
 // wallet and ownership gate.
 import assert from "node:assert/strict";
-import { FLOOR_Y, H, mainlandToWorld } from "../games/rarefriends-realm/world.ts";
+import { FLOOR_Y, H, createWorld, mainlandToWorld, movedPoint } from "../games/rarefriends-realm/world.ts";
 // Page-side functions below are serialized into the frame, so they carry these as literals: storeys start at row 940 (FLOOR_Y) and the castle's ground floor lies west of column 765 (mainland 140).
 if (FLOOR_Y !== 940 || mainlandToWorld(140, 0)[0] !== 765) throw new Error("world constants changed: update the literals in browser.mjs");
 if (H !== 1880) throw new Error("world height changed: update the 1880 in browser.mjs");
@@ -93,6 +93,8 @@ try {
   };
   /** Mainland places named in the mainland's own coordinates (the world puts the mainland at MAINLAND.x/y). */
   const teleportM = (mx, my) => teleport(...mainlandToWorld(mx, my));
+  // A mainland point in the old dungeon strip: where its dungeon settled (the same world, generated here once).
+  const settled = createWorld(), teleportU = (mx, my) => { const at = movedPoint(settled, ...mainlandToWorld(mx, my)); return teleport(at.x, at.y); };
   const enter = async () => {
     await page.goto(`${origin}${RENDERER_PATH}`);
     await page.getByRole("button", { name: /^Connect (wallet|Browser wallet)$/ }).click();
@@ -585,7 +587,7 @@ try {
   await teleportM(160, 139); await state(() => window.__realm.view(0.9, 0.45, -Math.PI / 4));
   await page.waitForTimeout(1500); await shot("wizards-tower");
   await state(() => { const p = window.__realm.game().player; p.xp.hitpoints = 13_034_431; p.hp = 99; p.xp.defence = 13_034_431; p.equipment.shield = "wyrmward_shield"; window.__realm.refresh(); });
-  await teleportM(29, 21); await state(() => window.__realm.view(1.05, 0.4, 0.3));
+  await teleport(600, 142); await state(() => window.__realm.view(1.05, 0.4, 0.3));
   await page.waitForTimeout(1800); await shot("wyrmreach");
   await state(() => { const p = window.__realm.game().player; delete p.equipment.shield; p.hp = 99; for (const m of window.__realm.game().monsters) m.target = false; });
   await teleportM(121, 141); await state(() => window.__realm.view(1.8, 0.45, 0.5));
@@ -616,10 +618,10 @@ try {
   await state(() => { const p = window.__realm.game().player; p.xp.hitpoints = 13_034_431; p.hp = 99; p.xp.defence = 13_034_431; window.__realm.game().autoRetaliate = false; });
   const tour = [
     ["farms", 90, 118], ["whisperwood", 50, 97], ["ashen-mine", 112, 54], ["emberforge", 160, 49], ["frostpeak", 196, 22], ["glass-lake", 178, 154],
-    ["oasis", 185, 115], ["dunes", 208, 94], ["murkmire", 42, 182], ["mossy-ruins", 121, 181], ["agility", 94, 101], ["crypt", 44, 222], ["depths", 132, 222], ["throne", 190, 224],
+    ["oasis", 185, 115], ["dunes", 208, 94], ["murkmire", 42, 182], ["mossy-ruins", 121, 181], ["agility", 94, 101], ["crypt", 44, 222, true], ["depths", 132, 222, true], ["throne", 190, 224, true],
   ];
-  for (const [name, x, y] of tour) {
-    await teleportM(x, y);
+  for (const [name, x, y, under] of tour) {
+    if (under) await teleportU(x, y); else await teleportM(x, y);
     await state(() => { const p = window.__realm.game().player; p.hp = 99; });
     await page.waitForTimeout(1300);
     await shot(`region-${name}`);
