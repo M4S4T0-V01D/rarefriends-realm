@@ -19,6 +19,7 @@ import { buildDungeonIdentity } from "./dungeonworld.ts";
 import { buildSettlements } from "./settlementsworld.ts";
 import { buildMountCountry } from "./mountworld.ts";
 import { buildWyrmreach } from "./wyrmreachworld.ts";
+import { buildDragons } from "./dragonsworld.ts";
 
 /**
  * The far west (Return of Raria): the world grew by WEST_DX columns on its west side for a second continent, Raria and
@@ -183,6 +184,8 @@ export type RegionId =
   | "rain_pass" | "tirthali" | "ilavati_valley" | "sarovan" | "shaila_highlands" | "shailagarh" | "parasol_plains" | "mandapur" | "golden_shore" | "suvarnatira" | "deepgreen" | "kanthar" | "great_stepwell"
   // The pyramids by Kharaveth's south coast (pyramids.ts): Queen Siruvet's, and the deeps under hers and the Unfinished Pyramid.
   | "siruvet_pyramid" | "uncounted_deep" | "measured_vault"
+  // More dragons (dragonsworld.ts): the Bonefield in the Deadwood, the Cragmaw Heights north of Ironreach, Qeshet in the Sea of Dunes and the Sunken Halls under it.
+  | "bonefield" | "cragmaw_heights" | "qeshet" | "sunken_halls"
   // The sea ports: Gullwick on the mainland, Saltreach below Raria, and Merrab, Tel Ashun and Ennu's Well in Kharaveth's east.
   | "gullwick" | "saltreach" | "merrab" | "tel_ashun" | "ennus_well";
 export type Region = { id: RegionId; name: string; label: { x: number; y: number }; danger: number; underground?: boolean;
@@ -300,6 +303,11 @@ export const REGIONS: readonly Region[] = [
   { id: "merrab", name: "Merrab", label: { x: 1066, y: 784 }, danger: 0, far: true, south: true },
   { id: "tel_ashun", name: "Tel Ashun", label: { x: 1015, y: 750 }, danger: 0, far: true, south: true },
   { id: "ennus_well", name: "Ennu's Well", label: { x: 1025, y: 828 }, danger: 0, far: true, south: true },
+  // More dragons (dragonsworld.ts), in world coordinates (a label at or below row 520 is written 360 rows up, as the load-time shift below expects).
+  { id: "bonefield", name: "The Bonefield", label: { x: 908, y: 27 }, danger: 6, far: true },
+  { id: "cragmaw_heights", name: "The Cragmaw Heights", label: { x: 1078, y: 80 }, danger: 6, far: true },
+  { id: "qeshet", name: "Qeshet", label: { x: 150, y: 792 - 360 }, danger: 6, far: true },
+  { id: "sunken_halls", name: "The Sunken Halls", label: { x: 150, y: UNDER_Y + 805 - 360 }, danger: 8, underground: true, far: true },
 ];
 export const regionIndex = (id: RegionId) => REGIONS.findIndex(region => region.id === id);
 /** The mainland regions' labels were written in the mainland's own coordinates: move them with it (once, at load). */
@@ -1548,7 +1556,8 @@ export function generateWorld(seed = WORLD_SEED): { world: World; lift: Float32A
   buildDungeonIdentity({ ...south, random: mulberry(seed + 909) }, seed);
   buildSettlements({ ...south, random: mulberry(seed + 919) });   // Gravesend's mausoleums and vault, Fernwick's forester, Southshore's wreck and beach (settlementsworld.ts)
   buildMountCountry({ ...south, random: mulberry(seed + 929) }); // the poachers' camp and the tiger's cage (mountworld.ts)
-  buildWyrmreach({ ...south, random: mulberry(seed + 939) });    // Wyrmreach moved up its mountain north-west of Fernwick, the forest grown over the old field, the drakes' nest (wyrmreachworld.ts)
+  buildWyrmreach({ ...south, random: mulberry(seed + 939) });
+  buildDragons({ ...south, random: mulberry(seed + 949) });      // the Bonefield, the Cragmaw Heights, Qeshet and the Sunken Halls under it (dragonsworld.ts)    // Wyrmreach moved up its mountain north-west of Fernwick, the forest grown over the old field, the drakes' nest (wyrmreachworld.ts)
   for (const object of objects) if (object.name === "__removed") object.blocks = false;
   // The dungeons settle under the ground they're reached from (the strip they were built in is left empty).
   const labels: World["labels"] = {}, under = settleUnderground(ctx, places, floors, labels);
@@ -1638,6 +1647,8 @@ function settleUnderground(ctx: GenContext, places: World["places"], floors: rea
   for (const p of pieces) if (p.dx === undefined) { p.dx = 0; p.dy = UNDER_Y - DUNGEON_Y; p.order = order++; }
   // Each piece takes its ground, nudged to the nearest clear ground where another already lies (two tiles of rock between).
   const taken = new Uint8Array(W * OVERWORLD_H), margin = 2;
+  // Whatever was built straight into the underground layer (the sunken halls under their ruin, dragonsworld.ts) is already there, and the settling pieces keep clear of it.
+  for (let y = UNDER_Y; y < H; y++) for (let x = 0; x < W; x++) if (tiles[y * W + x] !== T.VOID) for (let dy = -margin; dy <= margin; dy++) for (let dx = -margin; dx <= margin; dx++) { const tx = x + dx, ty = y + dy; if (tx >= 0 && tx < W && ty >= UNDER_Y && ty < H) taken[(ty - UNDER_Y) * W + tx] = 1; }
   const clear = (p: typeof pieces[number], dx: number, dy: number) => {
     const x0 = p.x0 + dx - margin, x1 = p.x1 + dx + margin, y0 = p.y0 + dy - margin, y1 = p.y1 + dy + margin;
     if (p.x0 + dx < 0 || p.x1 + dx >= W || p.y0 + dy < UNDER_Y || p.y1 + dy >= H) return false;

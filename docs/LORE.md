@@ -139,6 +139,7 @@ Each region's card. Blank lines are deliberate: nobody has filled them in yet, i
 - **People:** gravekeepers who have made peace with the dead; Warden Mira Thorne, Old Wick, Lantern-seller Pip. **Architecture:** dark cottages round a lamplit square, graves in rows. **Clothing:** mourning charcoal, bone-white, lantern purple. **Food:** bread and candles, the dark comes early. **Music:** Lanterns at Gravesend; the Deadwood's own.
 - **Belief:** the Old Friend as the first to return. **Fear:** the third lantern on the old road after sunset. **Tradition:** lanterns lit on bone-oil, and waving at the fence on foggy nights.
 - **Old story:** the Deadwood died in one night. **Rumour:** the Catacombs' bottom gallery has a door. **Secret:** the faceless statue, and whoever keeps its candle. **Dungeon:** the Deadwood Catacombs. **Unique item:** the Mourner's hood. **Quest:** Lanterns for the Dead.
+- **The Bonefield:** north of the Maidens' camp, a scorched meadow where the Old One died before the Deadwood did. Its ribs still stand in a ring, bone drakes roost among them, and the Bone Wyrm keeps the heart.
 - **The Deadwood Maidens:** a camp in the east of the wood, red on black; Matriarch Ysolde Thornveil and Wren of the Maidens. **Belief:** a standing stone. **Quest:** The Maidens' Truce.
 
 ### Saltmarrow and Southshore
@@ -166,6 +167,7 @@ Each region's card. Blank lines are deliberate: nobody has filled them in yet, i
 ### Cragmaw and Ironreach
 
 - **People:** miners; Foreman Durga Pike, Gristle, Hearthkeeper Olwen, Brenna Anvilsong. **Architecture:** stone in a mountain pass. **Clothing:** fur hoods, greatcoats, red climbers' capes. **Music:** Cragmaw Hammers. **Resource:** the richest rock in the Realm; the only armoury that works rarite into plate.
+- **The Cragmaw Heights:** a snow-topped massif out of the sea north of Ironreach's coast, where frost drakes roost and the Iron Wyrm sleeps on ore Cragmaw's miners never climbed for. The ore in Cragmaw tastes of it, they say.
 - **Fear:** what woke in the deep mine. **Old story:** Pike's pickaxe and grudge. **Secret:** the seized mechanism the seam runs under. **Dungeon:** the deep mine. **Quest:** The Foreman's Shaft.
 
 ### Quillhaven

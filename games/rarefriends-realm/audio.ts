@@ -694,6 +694,8 @@ const KHARAVETH_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { sunteeth: "
   seven_crowns: "kharaveth_azhurak", first_names: "kharaveth_azhurak", sunken_obelisk: "kharaveth_azhurak", unfinished_pyramid: "kharaveth_azhurak", black_stair: "kharaveth_azhurak", first_names_hall: "kharaveth_azhurak",
   siruvet_pyramid: "kharaveth_azhurak", uncounted_deep: "kharaveth_underway", measured_vault: "kharaveth_underway" };
 /** The sea ports' pieces, borrowed from their neighbours: Saltmarrow's shanty for Gullwick, the Crownlands' hymn for Saltreach, Kharaveth's for the east. */
+/** The dragons' places (dragonsworld.ts) borrow their neighbours' pieces. */
+const DRAGON_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { bonefield: "deadwood", cragmaw_heights: "ironreach", qeshet: "kharaveth_dunes", sunken_halls: "kharaveth_underway" };
 const PORTS_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { gullwick: "saltmarrow", saltreach: "crownlands", merrab: "kharaveth_sefrah", tel_ashun: "kharaveth_azhurak", ennus_well: "kharaveth_dunes" };
 /** Which Mizukai piece plays where. */
 const MIZUKAI_REGION_TRACK: Partial<Record<RegionId, TrackId>> = {
@@ -716,7 +718,7 @@ export function trackFor(region: RegionId, nearBoss: boolean, mizukai: { sea?: b
   if (nearBoss) return "boss";
   // The Mizukai Isles: the place's own piece, the sea's on a crossing, and in a fight the battle (or, against one of the great spirits, theirs).
   if (mizukai.sea) return "mizukai_sea";
-  const south = KHARAVETH_REGION_TRACK[region] ?? MEGHAVAN_REGION_TRACK[region] ?? PORTS_REGION_TRACK[region];
+  const south = KHARAVETH_REGION_TRACK[region] ?? MEGHAVAN_REGION_TRACK[region] ?? PORTS_REGION_TRACK[region] ?? DRAGON_REGION_TRACK[region];
   if (south) return south;
   const isles = MIZUKAI_REGION_TRACK[region];
   if (isles) return mizukai.spirit ? "mizukai_spirit" : mizukai.fight ? "mizukai_battle" : isles;

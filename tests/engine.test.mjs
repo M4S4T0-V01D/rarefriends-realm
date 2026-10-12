@@ -610,7 +610,7 @@ test("A Friend's Feast from start to finish", () => {
   assert.equal(g.player.quests.friends_feast, 2);
   assert.equal(questPoints(g), 1);
   assert(level(g, "cooking") >= 10, "Quest XP");
-  assert.equal(QUESTS.length, 103); assert.equal(MAX_QUEST_POINTS, 180);
+  assert.equal(QUESTS.length, 104); assert.equal(MAX_QUEST_POINTS, 182);
 });
 
 test("Grumblin Trouble counts kills and pays out", () => {
@@ -1956,7 +1956,7 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   assert.equal(p.quests.dawn_against_hollow, 2); assert(has(p, "dawnplate_cuirass"));
   assert.equal(count(p, "hollow_essence"), 0);
   assert.equal(capeProblem(g, "dawnplate_cuirass"), null, "the armoury sells Dawnplate once earned");
-  assert.equal(QUESTS.length, 103); assert.equal(MAX_QUEST_POINTS, 180);
+  assert.equal(QUESTS.length, 104); assert.equal(MAX_QUEST_POINTS, 182);
 });
 
 test("Boots and gauntlets in every metal, smithed at the anvil; the clothier's shirts, dresses, trousers and skirts", () => {
@@ -4256,6 +4256,55 @@ test("Mounts grown: seven new beasts (quest ones not for sale), the chosen mount
   use(nest, "Search"); assert.equal(count(p, "drake_egg"), 1); use(nest, "Search"); assert.equal(count(p, "drake_egg"), 1, "one egg"); assert.equal(item("drake_egg").tradeable, false);
   give(p, "cooked_meat", 10); d = talk(g, "drake_hunter"); assert.match(d.lines[0].text, /shell going/); d.onEnd?.(); assert.ok(questDone(g, DRAKE_OF_YOUR_OWN)); assert.ok(p.mounts.includes("little_dragon")); assert.equal(count(p, "drake_egg"), 0); assert.equal(count(p, "cooked_meat"), 0);
   assert.ok(MOUNTS.find(m => m.id === "little_dragon").fireproof, "the hatchling turns dragonfire");
+});
+
+test("Dragons across the Realm: the Bonefield, the Cragmaw Heights, Qeshet and the Sunken Halls under it; Scale and Fire opens Ysolde's wyrmwright trade; the drakeward shields and the wyrmbane arms", async () => {
+  const { SCALE_AND_FIRE, DRAGON_KINDS, onDragonsKill } = await import("../games/rarefriends-realm/dragons.ts");
+  const { BONEFIELD, HEIGHTS, QESHET, SUNKEN_HALLS } = await import("../games/rarefriends-realm/dragonsworld.ts");
+  const { DRAKE_OF_YOUR_OWN } = await import("../games/rarefriends-realm/mounts.ts");
+  const { talk, questDone } = await import("../games/rarefriends-realm/content.ts");
+  const { DUNGEON_THEMES } = await import("../games/rarefriends-realm/dungeontheme.ts");
+  const { trackFor } = await import("../games/rarefriends-realm/audio.ts");
+  const g = newGame(), p = g.player, world = g.world;
+  // The places: each region on its ground, the halls underground beneath the ruin, and each kind of dragon in its place with one wyrm at the heart.
+  assert.equal(regionAt(world, BONEFIELD.x, BONEFIELD.y).id, "bonefield"); assert.equal(regionAt(world, HEIGHTS.x, HEIGHTS.y).id, "cragmaw_heights"); assert.equal(regionAt(world, QESHET.door.x, QESHET.door.y + 3).id, "qeshet");
+  const entry = { x: SUNKEN_HALLS.entry.x, y: UNDER_Y + SUNKEN_HALLS.entry.dy };
+  assert.equal(regionAt(world, entry.x, entry.y).id, "sunken_halls"); assert.ok(isUnderground(entry.y) && REGIONS.find(r => r.id === "sunken_halls").underground && DUNGEON_THEMES.sunken_halls, "the halls are a dungeon, with a theme");
+  assert.equal(regionAt(world, world.places.cragmaw.x, world.places.cragmaw.y).id, "cragmaw", "Cragmaw's village is where it was; the heights are north of it");
+  assert.ok(world.places.cragmaw.y > HEIGHTS.y + HEIGHTS.ry, "the heights lie north of the village");
+  const spawnsOf = id => world.spawns.filter(s => s.id === id);
+  assert.ok(spawnsOf("frost_drake").length >= 8 && spawnsOf("bone_drake").length >= 6 && spawnsOf("dune_drake").length >= 10, "drakes in all three places");
+  for (const [id, region] of [["iron_wyrm", "cragmaw_heights"], ["bone_wyrm", "bonefield"], ["sand_wyrm", "sunken_halls"]]) { const at = spawnsOf(id); assert.equal(at.length, 1, `one ${id}`); assert.equal(regionAt(world, at[0].x, at[0].y).id, region, `${id} in its place`); assert.ok(MONSTERS[id].breath && MONSTERS[id].boss); }
+  assert.ok(spawnsOf("frost_drake").every(s => regionAt(world, s.x, s.y).id === "cragmaw_heights") && spawnsOf("dune_drake").every(s => ["qeshet", "sunken_halls"].includes(regionAt(world, s.x, s.y).id)));
+  for (const id of ["frost_drake", "bone_drake", "dune_drake", "iron_wyrm", "bone_wyrm", "sand_wyrm"]) assert.ok(MONSTERS[id].breath > 0 && MONSTERS[id].drops.some(d => d.item === "wyrm_scale"), `${id} breathes, and drops scales`);
+  // The Sunken Door: down into the halls from the sanctum, and up again to the court.
+  const door = world.objects.find(o => o.kind === "ladder" && o.name === "The Sunken Door" && o.action === "Enter"), up = world.objects.find(o => o.kind === "ladder" && o.name === "The Sunken Door" && o.action === "Climb-up");
+  assert.ok(door && door.x === QESHET.door.x && door.to.y === entry.y, "the door goes down to the halls"); assert.deepEqual(up.to, { x: QESHET.door.x, y: QESHET.door.y + 1 });
+  assert.ok(canWalk(g, door.to.x, door.to.y) && canWalk(g, up.to.x, up.to.y), "both ends stand on floor");
+  const hoard = world.objects.find(o => o.decor === "chest" && o.name === "The Sand Mother's hoard"); assert.ok(hoard && isUnderground(hoard.y) && regionAt(world, hoard.x, hoard.y).id === "sunken_halls");
+  assert.ok(world.objects.some(o => o.kind === "sign" && /Bonefield/.test(o.text) && o.y < 60) && world.objects.some(o => o.kind === "sign" && /Cragmaw Heights/.test(o.text)) && world.objects.some(o => o.kind === "sign" && /Qeshet/.test(o.text) && o.x > 250), "signs: at the field, the pass, and the dunes road");
+  assert.deepEqual(["bonefield", "cragmaw_heights", "qeshet", "sunken_halls"].map(id => trackFor(id, false)), ["deadwood", "ironreach", "kharaveth_dunes", "kharaveth_underway"], "the places borrow their neighbours' music");
+  // The gear: wyrmward in the round and the tall, drakeward that turns breath wholly, wyrmbane a third harder; none of it tradeable, all of it Ysolde's, for scales.
+  assert.equal(item("wyrmward_shield").equip.dragonward, 4); assert.equal(item("wyrmward_roundshield").equip.dragonward, 3); assert.equal(item("wyrmward_aegis").equip.dragonward, 3);
+  for (const id of ["drakeward_shield", "drakeward_roundshield", "drakeward_aegis"]) assert.ok(item(id).equip.dragonward <= 1 && item(id).equip.slot === "shield", `${id} turns breath`);
+  for (const id of ["wyrmbane_sabre", "wyrmbane_wand", "wyrmbane_bow"]) assert.equal(item(id).equip.dragonbane, 1.3, `${id} bites a dragon harder`);
+  assert.equal(SHOPS.wyrmwright.currency, "wyrm_scale"); assert.equal(SHOPS.wyrmwright.stock.length, 8); assert.ok(SHOPS.wyrmwright.stock.every(id => item(id).tradeable === false));
+  assert.match(shopProblem(g, "wyrmwright"), /Scale and Fire/, "the trade waits on the quest");
+  // Scale and Fire: Ysolde's second errand, after A Drake of Your Own.
+  const quest = QUESTS.find(q => q.id === SCALE_AND_FIRE); assert.ok(quest && quest.points === 2 && quest.difficulty === "Master");
+  assert.ok(!/only place with dragons/.test(talk(g, "drake_hunter").lines[0].text), "nothing of it before the hatchling");
+  p.quests[DRAKE_OF_YOUR_OWN] = 2;
+  let d = talk(g, "drake_hunter"); assert.match(d.lines[0].text, /only place with dragons/); d = d.options.find(o => o.label === "I'll do it.").then(); d.onEnd?.(); assert.equal(p.quests[SCALE_AND_FIRE], 1);
+  onDragonsKill(g, "ash_drake"); onDragonsKill(g, "cinder_drake"); assert.ok(!p.questData.sf_frost && !p.questData.sf_bone && !p.questData.sf_dune, "Wyrmreach's drakes don't count");
+  for (const [key, id] of DRAGON_KINDS) { onDragonsKill(g, id); assert.equal(p.questData[key], 1); onDragonsKill(g, id); assert.equal(p.questData[key], 1, "once each"); }
+  assert.match(g.messages[g.messages.length - 1].text, /frost, bone and sand/);
+  d = talk(g, "drake_hunter"); assert.match(d.lines[0].text, /One of each kind, and a scale/, "the scale still wanted"); assert.equal(p.quests[SCALE_AND_FIRE], 1);
+  give(p, "wyrm_scale", 1); const slayer = p.xp.slayer;
+  d = talk(g, "drake_hunter"); assert.match(d.lines[0].text, /Frost burns cold/); d.onEnd?.();
+  assert.ok(questDone(g, SCALE_AND_FIRE)); assert.equal(count(p, "wyrm_scale"), 3, "hers taken, three given"); assert.ok(p.xp.slayer > slayer);
+  assert.equal(shopProblem(g, "wyrmwright"), null, "the trade opens");
+  d = talk(g, "drake_hunter"); d.options.find(o => o.label === "Let me see the wyrmwright work.").then(); assert.equal(g.ui.shop, "wyrmwright");
+  assert.ok(quest.journal(g).some(line => /QUEST COMPLETE/.test(line)));
 });
 
 test("Skill guide filters: every entry tagged, the groups a skill offers (metals in Smithing, elements in Magic, boosts in Faith, methods in Fishing, traditions in Mysteries), any-of within a group and all-of across groups, named buttons", async () => {

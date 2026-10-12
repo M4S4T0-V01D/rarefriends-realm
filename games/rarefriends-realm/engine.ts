@@ -1703,7 +1703,7 @@ function playerCombat(game: Game) {
   const spellId = player.queuedSpell ?? player.autocast, spell = spellId ? SPELLS.find(entry => entry.id === spellId && entry.target === "monster") ?? null : null;
   // A faith weapon hurts the undead more (more accurate, harder hitting).
   const holy = !!weapon(player)?.equip?.holy, range = spell ? 0 : bowRange(game);
-  let boost = slayerBoost(game, monster.def.id) * masteryBoost(game, monster.def.id) * (holy && monster.def.undead ? 1.2 : 1) * (1 + carvingEffect(game).dealt);
+  let boost = slayerBoost(game, monster.def.id) * masteryBoost(game, monster.def.id) * (holy && monster.def.undead ? 1.2 : 1) * (monster.def.breath ? weapon(player)?.equip?.dragonbane ?? 1 : 1) * (1 + carvingEffect(game).dealt);
   const within = (x: number, y: number) => spell ? chebyshev({ x, y }, monster) <= 8 && chebyshev({ x, y }, monster) >= 1
     : range ? reachGap({ x, y }, monster.x, monster.y, footprint(monster)) >= 1 && reachGap({ x, y }, monster.x, monster.y, footprint(monster)) <= range
     : adjacentTo(x, y, monster.x, monster.y, footprint(monster));
@@ -1983,11 +1983,11 @@ function monsterTick(game: Game, monster: Monster) {
         // Dragonfire: a third of a dragon's attacks are breath, which only a Wyrmward shield turns aside.
         if (monster.def.breath && game.rng() < 0.33) {
           breathed = true;
-          const shielded = player.equipment.shield === "wyrmward_shield" || !!riding(player)?.fireproof;
-          hit = Math.floor(game.rng() * ((shielded ? 4 : monster.def.breath) + 1) * fireFactor(player, game));
+          const ward = player.equipment.shield ? item(player.equipment.shield).equip?.dragonward : undefined, most = riding(player)?.fireproof ? Math.min(4, ward ?? 4) : ward ?? monster.def.breath;
+          hit = Math.floor(game.rng() * (most + 1) * fireFactor(player, game));
           emit(game, { type: "projectile", projectile: { from: { x: monster.x, y: monster.y }, to: { x: player.x, y: player.y }, start: game.tick, end: game.tick + 1, color: "#e9733f", style: "fire" } });
           sound(game, "fire");
-          message(game, shielded ? "Your shield absorbs most of the dragon's breath." : "You're horribly burnt by the dragonfire! A Wyrmward shield would help.", shielded ? "game" : "warn");
+          message(game, most === 0 ? "Your shield turns the dragon's breath aside entirely." : ward !== undefined || riding(player)?.fireproof ? "Your shield absorbs most of the dragon's breath." : "You're horribly burnt by the dragonfire! A Wyrmward shield would help.", ward !== undefined || riding(player)?.fireproof ? "game" : "warn");
         }
         // The Weigher's counter and the Gate-Mother's ward (techniques.ts).
         const close = adjacentTo(player.x, player.y, monster.x, monster.y, footprint(monster)) && monster.def.attackStyle !== "magic";

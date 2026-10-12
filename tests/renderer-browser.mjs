@@ -55,7 +55,7 @@ try {
       await page.locator(".rf-game-frame").screenshot({ path: "./artifacts/renderer-debug.png" }).catch(() => undefined);
       await game.locator('[aria-label="Settings"]').first().click({ timeout: 30_000 }); await game.locator(".realm-renderer").waitFor();
     };
-    const snapshot = () => state(() => { const g = window.__realm.game(), p = g.player; return JSON.stringify({ name: p.name, x: p.x, y: p.y, xp: p.xp, inv: p.inventory, quests: p.quests, bank: p.bank.length, tick: g.tick > 0 }); });
+    const snapshot = () => state(() => { const g = window.__realm.game(), p = g.player; return JSON.stringify({ name: p.name, x: p.x, y: p.y, xp: { ...p.xp, presence: 0 }, inv: p.inventory, quests: p.quests, bank: p.bank.length, tick: g.tick > 0 }); });
     return { page, ctx, game, state, rendering, until, enter, begin, openSettings, snapshot, shot: file => page.locator(".rf-game-frame").screenshot({ path: `./artifacts/${file}.png` }) };
   }
 

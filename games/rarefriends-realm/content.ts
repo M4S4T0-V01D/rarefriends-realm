@@ -23,6 +23,7 @@ import { HIDDEN_ROAD_NPCS, HIDDEN_ROAD_QUESTS, onHiddenRoadKill, talkHiddenRoad 
 import { HEARTHKIN_NPCS, HEARTHKIN_QUESTS, talkHearthkin } from "./hearthkin.ts";
 import { SETTLEMENT_NPCS, SETTLEMENT_QUESTS, onSettlementsKill, talkSettlements } from "./settlements.ts";
 import { MOUNT_NPCS, MOUNT_QUESTS, onMountKill, talkMounts } from "./mounts.ts";
+import { DRAGON_QUESTS, onDragonsKill, talkDragons } from "./dragons.ts";
 import { ACTIVITIES, ACTIVITY_HOSTS, activityProblem, cancelActivity, startActivity } from "./activities.ts";
 import { MEGHAVAN_NPCS, talkMeghavan } from "./meghavanpeople.ts";
 import { MEGHAVAN_QUESTS, MEGHAVAN_QUEST_NPCS, onMeghavanKill, talkMeghavanQuests } from "./meghavanquests.ts";
@@ -181,7 +182,7 @@ export const NPCS: Record<string, NpcDef> = {
   innkeeper: { id: "innkeeper", name: "Bram the innkeeper", examine: "Runs the Sleepy Friend. Has never seen it busy before noon.", options: ["Talk-to", "Trade"], shop: "inn", art: art(2, 291) },
   archmage: { id: "archmage", name: "Archmage Solenne", examine: "Head of the Wizards' Tower. Her hat has its own weather.", options: ["Talk-to"], art: art(1, 311) },
   apprentice: { id: "apprentice", name: "Apprentice Pell", examine: "Keeps the Tower's stores, and the Archmage's tea.", options: ["Talk-to", "Trade"], shop: "wizards", art: art(5, 321) },
-  drake_hunter: { id: "drake_hunter", name: "Ysolde the drake hunter", examine: "Singed eyebrows. Excellent stories.", options: ["Talk-to"], art: art(6, 331) },
+  drake_hunter: { id: "drake_hunter", name: "Ysolde the drake hunter", examine: "Singed eyebrows. Excellent stories.", options: ["Talk-to", "Trade"], shop: "wyrmwright", art: art(6, 331) },
   bone_collector: { id: "bone_collector", name: "Mort the bone collector", examine: "Buys bones and hides. Doesn't ask where from.", options: ["Talk-to", "Trade"], shop: "bones", art: art(0, 341) },
   cape_keeper: { id: "cape_keeper", name: "Keeper of Capes", examine: "Keeps a cape for every skill, and knows who's earned one.", options: ["Talk-to", "Trade"], shop: "capes", art: art(1, 301) },
 };
@@ -500,6 +501,7 @@ export const QUESTS: readonly QuestDef[] = [
   ...HEARTHKIN_QUESTS,
   ...SETTLEMENT_QUESTS,
   ...MOUNT_QUESTS,
+  ...DRAGON_QUESTS,
   ...MEGHAVAN_QUESTS,
   ...MEGHAVAN_SCHOOL_QUESTS,
   ...PORTS_QUESTS,
@@ -610,7 +612,7 @@ export function chat(npc: string, lines: DialogueLine[], options?: Dialogue["opt
 /** Pickpocket and quest hooks the engine calls. */
 export function onMonsterKilled(game: Game, monsterId: string, x: number, y: number) {
   const player = game.player;
-  onWestKill(game, monsterId); onMizukaiKill(game, monsterId); onKharavethKill(game, monsterId); onHeartlandsKill(game, monsterId); onOrashaiKill(game, monsterId); onHiddenRoadKill(game, monsterId); onSettlementsKill(game, monsterId, x, y); onMountKill(game, monsterId, x, y); onMeghavanKill(game, monsterId); onPortsKill(game, monsterId); onBountyKill(game, monsterId); onPyramidsKill(game, monsterId);
+  onWestKill(game, monsterId); onMizukaiKill(game, monsterId); onKharavethKill(game, monsterId); onHeartlandsKill(game, monsterId); onOrashaiKill(game, monsterId); onHiddenRoadKill(game, monsterId); onSettlementsKill(game, monsterId, x, y); onMountKill(game, monsterId, x, y); onDragonsKill(game, monsterId); onMeghavanKill(game, monsterId); onPortsKill(game, monsterId); onBountyKill(game, monsterId); onPyramidsKill(game, monsterId);
   // The wider world's village quests count their kills wherever they fall.
   const tally = (quest: string, key: string, goal: number, done: string) => {
     if (stage(game, quest) !== 1) return;
@@ -673,6 +675,7 @@ export function shopProblem(game: Game, shopId: string): string | null {
   const mizukai = mizukaiShopProblem(game, shopId); if (mizukai) return mizukai;
   const order = ORDER_IDS.find(id => shopId === `${id}_armoury`);
   if (order && !questDone(game, `oath_${order}`)) return `The quartermaster won't sell to one who hasn't sworn the ${ORDERS[order].short} Oath. The commander will hear you.`;
+  if (shopId === "wyrmwright" && !questDone(game, "scale_and_fire")) return "Ysolde's wyrmwright work is for those who've fought every kind of fire: Scale and Fire first.";
   if (shopId === "maidens_market" && !questDone(game, "maidens_truce")) return "Wren's hand stays on her spear. The Maidens trade with those who keep the truce; speak to the matriarch.";
   return null;
 }
@@ -835,6 +838,7 @@ function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
   const road = talkHiddenRoad(game, npcId, name); if (road) return road;
   const hearthkin = talkHearthkin(game, npcId, name); if (hearthkin) return hearthkin;
   const settlements = talkSettlements(game, npcId, name); if (settlements) return settlements;
+  const dragons = talkDragons(game, npcId, name); if (dragons) return dragons;   // Ysolde's second errand comes before her everyday lines (and after her first, mounts.ts)
   const mounts = talkMounts(game, npcId, name); if (mounts) return mounts;
   const heartlands = talkHeartlands(game, npcId, name); if (heartlands) return heartlands;
   const meghavanQuest = talkMeghavanQuests(game, npcId, name); if (meghavanQuest) return meghavanQuest;
