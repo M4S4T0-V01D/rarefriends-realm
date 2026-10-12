@@ -22,6 +22,7 @@ import { ORASHAI_NPCS, ORASHAI_QUESTS, onOrashaiKill, talkOrashai } from "./oras
 import { HIDDEN_ROAD_NPCS, HIDDEN_ROAD_QUESTS, onHiddenRoadKill, talkHiddenRoad } from "./hiddenroad.ts";
 import { HEARTHKIN_NPCS, HEARTHKIN_QUESTS, talkHearthkin } from "./hearthkin.ts";
 import { SETTLEMENT_NPCS, SETTLEMENT_QUESTS, onSettlementsKill, talkSettlements } from "./settlements.ts";
+import { MOUNT_NPCS, MOUNT_QUESTS, onMountKill, talkMounts } from "./mounts.ts";
 import { ACTIVITIES, ACTIVITY_HOSTS, activityProblem, cancelActivity, startActivity } from "./activities.ts";
 import { MEGHAVAN_NPCS, talkMeghavan } from "./meghavanpeople.ts";
 import { MEGHAVAN_QUESTS, MEGHAVAN_QUEST_NPCS, onMeghavanKill, talkMeghavanQuests } from "./meghavanquests.ts";
@@ -43,6 +44,8 @@ export type NpcDef = {
   shop?: string;
   /** Drawn as this mount instead of a Friend (the paddock horses). */
   mount?: string;
+  /** Not here any more (a creature freed, a person gone): not drawn and not clickable. */
+  gone?: (game: Game) => boolean;
   /** Only here (drawn, and to be talked to) while this holds: someone who's lost until you find them, then back home. */
   present?: (game: Game) => boolean;
   pickpocket?: { level: number; xp: number; coins: readonly [number, number]; stun: number; damage: number; extra?: readonly [string, number][] };
@@ -79,6 +82,7 @@ export const NPCS: Record<string, NpcDef> = {
   ...HIDDEN_ROAD_NPCS,
   ...HEARTHKIN_NPCS,
   ...SETTLEMENT_NPCS,
+  ...MOUNT_NPCS,
   ...MEGHAVAN_NPCS,
   ...MEGHAVAN_QUEST_NPCS,
   ...MEGHAVAN_SCHOOL_NPCS,
@@ -495,6 +499,7 @@ export const QUESTS: readonly QuestDef[] = [
   ...HIDDEN_ROAD_QUESTS,
   ...HEARTHKIN_QUESTS,
   ...SETTLEMENT_QUESTS,
+  ...MOUNT_QUESTS,
   ...MEGHAVAN_QUESTS,
   ...MEGHAVAN_SCHOOL_QUESTS,
   ...PORTS_QUESTS,
@@ -605,7 +610,7 @@ export function chat(npc: string, lines: DialogueLine[], options?: Dialogue["opt
 /** Pickpocket and quest hooks the engine calls. */
 export function onMonsterKilled(game: Game, monsterId: string, x: number, y: number) {
   const player = game.player;
-  onWestKill(game, monsterId); onMizukaiKill(game, monsterId); onKharavethKill(game, monsterId); onHeartlandsKill(game, monsterId); onOrashaiKill(game, monsterId); onHiddenRoadKill(game, monsterId); onSettlementsKill(game, monsterId, x, y); onMeghavanKill(game, monsterId); onPortsKill(game, monsterId); onBountyKill(game, monsterId); onPyramidsKill(game, monsterId);
+  onWestKill(game, monsterId); onMizukaiKill(game, monsterId); onKharavethKill(game, monsterId); onHeartlandsKill(game, monsterId); onOrashaiKill(game, monsterId); onHiddenRoadKill(game, monsterId); onSettlementsKill(game, monsterId, x, y); onMountKill(game, monsterId, x, y); onMeghavanKill(game, monsterId); onPortsKill(game, monsterId); onBountyKill(game, monsterId); onPyramidsKill(game, monsterId);
   // The wider world's village quests count their kills wherever they fall.
   const tally = (quest: string, key: string, goal: number, done: string) => {
     if (stage(game, quest) !== 1) return;
@@ -830,6 +835,7 @@ function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
   const road = talkHiddenRoad(game, npcId, name); if (road) return road;
   const hearthkin = talkHearthkin(game, npcId, name); if (hearthkin) return hearthkin;
   const settlements = talkSettlements(game, npcId, name); if (settlements) return settlements;
+  const mounts = talkMounts(game, npcId, name); if (mounts) return mounts;
   const heartlands = talkHeartlands(game, npcId, name); if (heartlands) return heartlands;
   const meghavanQuest = talkMeghavanQuests(game, npcId, name); if (meghavanQuest) return meghavanQuest;
   const meghavanSchool = talkMeghavanSchools(game, npcId, name); if (meghavanSchool) return meghavanSchool;

@@ -19,6 +19,7 @@ import { ORASHAI_CLUES } from "./orashaiquests.ts";
 import { HIDDEN_ROAD_CLUES } from "./hiddenroad.ts";
 import { HEARTHKIN_CLUES } from "./hearthkin.ts";
 import { SETTLEMENT_CLUES } from "./settlements.ts";
+import { MOUNT_CLUES } from "./mounts.ts";
 import { MEGHAVAN_CLUES } from "./meghavanpeople.ts";
 import { MEGHAVAN_QUEST_CLUES } from "./meghavanquests.ts";
 import { MEGHAVAN_SCHOOL_CLUES } from "./meghavanschools.ts";
@@ -174,6 +175,7 @@ export const CLUES: Record<string, Clue> = {
   ...HEARTHKIN_CLUES,
   // The settlements' graves, stone, wreck and crates (settlements.ts).
   ...SETTLEMENT_CLUES,
+  ...MOUNT_CLUES,
   // Meghavan, the Rain Country (meghavanpeople.ts).
   ...MEGHAVAN_CLUES,
   ...MEGHAVAN_QUEST_CLUES,

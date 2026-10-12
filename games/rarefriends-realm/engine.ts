@@ -38,7 +38,7 @@ import { clueExamine, clueOptions, onKharavethTick, useClue } from "./kharaveth.
 import { studySeal } from "./dynasties.ts";
 import {
   BANK_SIZE, BANK_TABS, DAY_MS, SATCHEL, SATCHEL_SIZE, STONE_BOX, STONE_BOX_SIZE, boxTotal, isSigilStone, BONE_BAG, BONE_BAG_SIZE, bagAdd, bagBones, bagTakeAll, hasBoneBag, SIGIL_BAG, BELTS, beltAdd, beltContents, beltDef, wornBelt, SIGIL_BAG_SIZE, hasSigilBag, isSigil, sigilBagAdd, sigilBagTotal, sigilStock, useSigils, setPieces, wayfarerPieces, fullSlayerSet, heartguardPieces, mixtureOn, compactBankTabs, hasSatchel, hasStoneBox, stock, useUp, INVENTORY_SIZE, REFERRAL_COINS, REFERRALS_PER_DAY, REFERRAL_TICKS, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
-  level, maxHp, maxPrayer, maxMana, manaCost, faithStaff, traditionOf, message, prayerBoost, riding, sound, take, weapon, combatLevel, createGame,
+  level, maxHp, maxPrayer, maxMana, manaCost, faithStaff, traditionOf, message, prayerBoost, riding, sound, take, weapon, combatLevel, createGame, TICK_MS,
   type Activity, type CombatStyle, type Dialogue, type Game, type Monster, type Npc, type Player, type Point, type Recipe, type Slot, type BankSlot, type Target,
  type WorkOrder,
 } from "./state.ts";
@@ -305,6 +305,7 @@ function examineObject(game: Game, object: WorldObject): string {
   return OBJECT_EXAMINE[object.kind] ?? object.name;
 }
 const DECOR_EXAMINE: Partial<Record<string, string>> = {
+  trough: "A trough of water for the horses, and whatever else the stables keep now.", hitching_post: "A post with a rail, and a rope for a bridle. Somebody's horse waits here while they drink.",
   crystal: "A cluster of pale mineral grown out of the rock, cold to the touch, with a light of its own in the dark.", rune_circle: "A circle cut into the floor, and a figure inside it, its grooves alight. Whatever it holds, it's holding it still.",
   rock_spire: "A tower of red sandstone, wind-carved, taller than a house. There are thousands of them.", campfire: "Somebody's keeping it in.", bedroll: "Somebody slept here.",
   statue: "A statue of the First Friend. It looks a lot like yours.", windmill: "Its sails creak in the wind.", snowman: "A Friend made of snow. Its carrot is a pinecone.",
@@ -326,6 +327,7 @@ export function itemOptions(game: Game, slotIndex: number): ItemOption[] {
   else if (definition.potion) out.push({ verb: "Drink", run: g => drink(g, slotIndex) });
   if (definition.equip) out.push({ verb: definition.equip.slot === "weapon" || definition.equip.slot === "shield" ? "Wield" : "Wear", run: g => equip(g, slotIndex) });
   if (FIREMAKING[slot.id]) out.push({ verb: "Light", run: g => lightFire(g, slotIndex) });
+  if (riding(game.player)?.bags) out.push({ verb: "Stow", run: g => { stow(g, slotIndex); return null; } });
   if (CARVINGS.some(carving => carving.id === slot.id)) out.push({ verb: "Set-down", run: g => setCarving(g, slotIndex) });
   if (slot.id === "pewter_camp_kit") out.push({ verb: "Set-up-camp", run: g => { setUpCamp(g); } });
   if (slot.id === "moonsilver_field_altar") out.push({ verb: "Set-up-altar", run: g => setUpFieldAltar(g, slotIndex) });
@@ -562,7 +564,7 @@ function applyWeaponPoison(game: Game, monster: Monster) {
 /** A venomous creature's bite. */
 function poisonPlayer(game: Game, damage: number) {
   const player = game.player;
-  if (player.antidoteUntil > game.tick || prayerBoost(player).purify) return;
+  if (player.antidoteUntil > game.tick || prayerBoost(player).purify || riding(player)?.poisonProof) return;
   if (!player.poison) message(game, "You've been poisoned! An antidote would cure it.", "warn");
   player.poison = { damage, left: 4, timer: 10 };
 }
@@ -1305,7 +1307,7 @@ function movePlayer(game: Game) {
   if (game.held) {
     // Held keys give a world-space direction (the UI turns screen keys into it for the camera angle); snap to 8 ways.
     const octant = Math.round(Math.atan2(game.held.dy, game.held.dx) / (Math.PI / 4)), tx = Math.round(Math.cos(octant * Math.PI / 4)), ty = Math.round(Math.sin(octant * Math.PI / 4));
-    const mount = riding(player), steps = mount ? mount.speed : player.run && !player.sneak && player.energy >= 1 ? 2 : 1, start = { x: player.x, y: player.y };
+    const mount = riding(player), steps = mount ? (player.sneak ? 1 : mount.speed) : player.run && !player.sneak && player.energy >= 1 ? 2 : 1, start = { x: player.x, y: player.y };
     let moved = 0;
     for (let i = 0; i < steps; i++) {
       const options: [number, number][] = [[tx, ty], [tx, 0], [0, ty]];
@@ -1319,7 +1321,7 @@ function movePlayer(game: Game) {
     return;
   }
   if (!player.path.length) return;
-  const mount = riding(player), steps = mount ? mount.speed : player.run && !player.sneak && player.energy >= 1 && player.path.length > 1 ? 2 : 1, start = { x: player.x, y: player.y };
+  const mount = riding(player), steps = mount ? (player.sneak ? 1 : mount.speed) : player.run && !player.sneak && player.energy >= 1 && player.path.length > 1 ? 2 : 1, start = { x: player.x, y: player.y };
   for (let i = 0; i < steps && player.path.length; i++) {
     const next = player.path[0];
     if (!canStep(game, player.x, player.y, next.x - player.x, next.y - player.y)) {
@@ -1350,7 +1352,7 @@ function drainSneak(game: Game) {
 }
 export function toggleSneak(game: Game) {
   const player = game.player;
-  if (!player.sneak && player.mount) { message(game, "You can't sneak on horseback.", "warn"); return; }
+  if (!player.sneak && player.mount && !riding(player)?.sneak) { message(game, "You can't sneak on horseback.", "warn"); return; }
   if (!player.sneak && player.energy < 5) { message(game, "You're too tired to sneak. Catch your breath first.", "warn"); return; }
   player.sneak = !player.sneak; sound(game, "click");
   message(game, player.sneak ? "You drop low and tread softly. Aggressive monsters may not notice you, but it's tiring." : "You stop sneaking.");
@@ -1590,6 +1592,8 @@ function produceTick(game: Game, activity: Extract<Activity, { kind: "produce" }
 }
 /** The station of a kind beside the player (you work at the one you stand by). */
 function stationBeside(game: Game, kind: "anvil" | "furnace"): WorldObject | null {
+  // A forge golem carries both on its back: wherever you ride it, the station is under you.
+  if (riding(game.player)?.forge) return { id: -1, kind, x: game.player.x, y: game.player.y, name: kind === "anvil" ? "Golem's anvil" : "Golem's furnace", blocks: false };
   for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const object = objectAtTile(game.world, game.player.x + dx, game.player.y + dy); if (object && object.kind === kind) return object; }
   return null;
 }
@@ -1972,7 +1976,7 @@ function monsterTick(game: Game, monster: Monster) {
         // Dragonfire: a third of a dragon's attacks are breath, which only a Wyrmward shield turns aside.
         if (monster.def.breath && game.rng() < 0.33) {
           breathed = true;
-          const shielded = player.equipment.shield === "wyrmward_shield";
+          const shielded = player.equipment.shield === "wyrmward_shield" || !!riding(player)?.fireproof;
           hit = Math.floor(game.rng() * ((shielded ? 4 : monster.def.breath) + 1) * fireFactor(player, game));
           emit(game, { type: "projectile", projectile: { from: { x: monster.x, y: monster.y }, to: { x: player.x, y: player.y }, start: game.tick, end: game.tick + 1, color: "#e9733f", style: "fire" } });
           sound(game, "fire");
@@ -2692,16 +2696,16 @@ export function toggleMount(game: Game, id?: string) {
   if (!choice || !player.mounts.includes(choice)) { message(game, "You don't own a mount. The Friendhollow stables sell them.", "warn"); return; }
   const problem = rideProblem(game);
   if (problem) { message(game, problem, "warn"); return; }
-  player.mount = choice; player.lastMount = choice; player.emote = null; player.sneak = false;
+  player.mount = choice; player.lastMount = choice; player.emote = null; if (!mountDef(choice)?.sneak) player.sneak = false;
   remember(game, "first_mount"); friendSays(game, "mount");
   message(game, `You mount your ${mountDef(choice)!.name.toLowerCase()}.`); sound(game, "whinny");
 }
-/** A new mount from the stables (bought with RF); you ride it straight away where you can. */
-export function grantMount(game: Game, id: string) {
+/** A new mount from the stables (bought with RF), or earned (`how` says how it came to you); you ride it straight away where you can. */
+export function grantMount(game: Game, id: string, how?: string) {
   const player = game.player, mount = mountDef(id);
   if (!mount) return;
   if (!player.mounts.includes(id)) player.mounts.push(id);
-  message(game, `The stablemaster leads out your ${mount.name.toLowerCase()}. ${mount.text}`, "quest"); sound(game, "level");
+  message(game, `${how ?? `The stablemaster leads out your ${mount.name.toLowerCase()}.`} ${mount.text}`, "quest"); sound(game, "level");
   if (!rideProblem(game)) { player.mount = id; player.lastMount = id; }
 }
 /** While riding: climb down where a horse can't go, and a gentle mount's healing. */
@@ -2710,6 +2714,80 @@ function rideUpkeep(game: Game) {
   if (!mount) return;
   if (rideProblem(game)) { player.mount = null; message(game, `You leave your ${mount.name.toLowerCase()} to graze and go on foot.`); return; }
   if (mount.heal && game.tick % mount.heal === 0 && player.hp > 0 && player.hp < maxHp(player)) player.hp++;
+}
+/** Choose the mount you ride by default (the Mount tab's list): remembered in your save, and swapped under you if you're riding. */
+export function chooseMount(game: Game, id: string | null) {
+  const player = game.player;
+  if (id && !player.mounts.includes(id)) return;
+  player.lastMount = id ?? undefined;
+  if (player.mount && id && id !== player.mount) { player.mount = id; if (!mountDef(id)?.sneak) player.sneak = false; message(game, `You swap to your ${mountDef(id)!.name.toLowerCase()}.`); sound(game, "whinny"); }
+  else if (player.mount && !id) { message(game, `You climb down from your ${mountDef(player.mount)!.name.toLowerCase()}.`); player.mount = null; sound(game, "click"); }
+}
+/** Why your mount can't make its attack now (it isn't ready, you're fighting nothing, the creature's out of reach), or null. */
+export function mountAttackProblem(game: Game): string | null {
+  const player = game.player, mount = riding(player);
+  if (!mount) return "You're not riding anything.";
+  const wait = player.mountReady - game.tick;
+  if (wait > 0) return `Your ${mount.name.toLowerCase()} isn't ready: ${Math.ceil(wait * TICK_MS / 1000)} seconds.`;
+  const monster = player.combat !== null ? monsterByUid(game, player.combat) : null;
+  if (!monster) return "You're not fighting anything.";
+  if (Math.max(Math.abs(monster.x - player.x), Math.abs(monster.y - player.y)) > (mount.attack.reach ?? 1)) return `${monster.def.name} is out of your ${mount.name.toLowerCase()}'s reach.`;
+  return null;
+}
+/** Your mount's own attack on what you're fighting (data.ts MountAttack), then its cooldown before the next. */
+export function mountAttack(game: Game): boolean {
+  const player = game.player, problem = mountAttackProblem(game);
+  if (problem) { message(game, problem, "warn"); return false; }
+  const mount = riding(player)!, attack = mount.attack, monster = monsterByUid(game, player.combat!)!;
+  player.mountReady = game.tick + attack.cooldown;
+  const hit = attack.damage ? Math.floor(game.rng() * (attack.damage + 1)) : 0;
+  if (attack.fire || attack.web) emit(game, { type: "projectile", projectile: { from: { x: player.x, y: player.y }, to: { x: monster.x, y: monster.y }, start: game.tick, end: game.tick + 1, color: attack.fire ? "#e9733f" : "#e8e4da", style: attack.fire ? "fire" : "bolt" } });
+  const hold = (attack.web ?? 0) + (attack.stun ?? 0);
+  if (hold) monster.attackTimer = Math.max(monster.attackTimer, hold);
+  if (attack.heal && player.hp < maxHp(player)) player.hp = Math.min(maxHp(player), player.hp + attack.heal);
+  damageMonster(game, monster, hit, hit <= 0);
+  if (hit > 0) { addXp(game, "strength", hit * 2); addXp(game, "hitpoints", hit * 1.33); }
+  message(game, `${attack.name}! Your ${mount.name.toLowerCase()} ${hit > 0 ? `hits ${monster.def.name.toLowerCase()} for ${hit}` : `misses ${monster.def.name.toLowerCase()}`}${attack.heal ? ` and mends you ${attack.heal}` : ""}.`);
+  sound(game, attack.fire ? "fire" : mount.coat.kind === "golem" ? "anvil" : "hit");
+  return true;
+}
+/** The saddlebags of the mount you're riding (its own slots, kept with it), or null on foot or on a mount without any. */
+export function saddlebags(game: Game): (Slot | null)[] | null {
+  const player = game.player, mount = riding(player);
+  if (!mount?.bags) return null;
+  const bags = player.saddlebags[mount.id] ?? (player.saddlebags[mount.id] = []);
+  while (bags.length < mount.bags) bags.push(null);
+  return bags;
+}
+/** Put a pack slot into the saddlebags (stackables join their kind). */
+export function stow(game: Game, slotIndex: number): boolean {
+  const player = game.player, slot = player.inventory[slotIndex], bags = saddlebags(game);
+  if (!slot || !bags) return false;
+  const same = item(slot.id).stackable ? bags.find(bag => bag?.id === slot.id) : null;
+  if (same) same.n = Math.min(2_147_483_647, same.n + slot.n);
+  else { const free = bags.indexOf(null); if (free < 0) { message(game, "The saddlebags are full.", "warn"); return false; } bags[free] = { ...slot }; }
+  player.inventory[slotIndex] = null; sound(game, "click");
+  return true;
+}
+/** Take a saddlebag's slot back into your pack (as much as fits). */
+export function unstow(game: Game, bagIndex: number): boolean {
+  const player = game.player, bags = saddlebags(game), bag = bags?.[bagIndex];
+  if (!bags || !bag) return false;
+  const left = give(player, bag.id, bag.n);
+  if (left === bag.n) { message(game, "Your pack is full.", "warn"); return false; }
+  if (left > 0) bag.n = left; else bags[bagIndex] = null;
+  sound(game, "click");
+  return true;
+}
+/** The forge golem's furnace or anvil: the production menu a station would give, wherever you're riding it. */
+export function forgeMenu(game: Game, station: "furnace" | "anvil"): boolean {
+  const player = game.player, mount = riding(player);
+  if (!mount?.forge) { message(game, "You're not riding anything with a forge on its back.", "warn"); return false; }
+  if (station === "furnace") { game.ui.production = { title: "What would you like to smelt in the golem's furnace?", recipes: smeltingRecipes() }; return true; }
+  const metals = METALS.filter(metal => count(player, `${metal.id}_bar`) > 0);
+  if (!metals.length) { message(game, "You need bars to smith; the golem's furnace smelts them.", "warn"); return false; }
+  game.ui.production = { title: "What would you like to make on the golem's anvil?", recipes: metals.flatMap(metal => smithingRecipes(metal.id)) };
+  return true;
 }
 
 /**
@@ -2754,6 +2832,7 @@ export type SaveData = {
   antidoteUntil?: number; antifireUntil?: number; stealthUntil?: number; tonicUntil?: number; mixture?: { family: number; until: number } | null;
   firsts?: Record<string, number>; friendKinds?: Record<string, 1>; rumours?: Record<string, 1>; orders?: Record<string, WorkOrder>; activities?: unknown; card?: Record<string, string>; collectible?: unknown; lockbox?: unknown; settled?: unknown; notices?: unknown; camp?: unknown; campXpAt?: number; cards?: Record<string, number>; rarian?: boolean; mizukai?: boolean; orashai?: boolean; mana?: number; mysteries?: unknown; spiritWardUntil?: number; home?: unknown; restedTicks?: number; sigilBag?: Record<string, number>; ward?: { defence: number; flat: number; reduce: number } | null; wardUntil?: number; renew?: number; renewUntil?: number; belts?: Record<string, Record<string, number>>; followerWorn?: string[];
   name?: string | null; fellowship?: { name: string; tag: string; logo?: string; banner?: string; colors?: string[] } | null; title?: string | null; visited?: Record<string, number>; regionTicks?: Record<string, number>; talked?: Record<string, 1>; emotesUsed?: Record<string, 1>; outfits?: Record<string, 1>; friendTicks?: number; mounts?: string[]; mount?: string | null; daily?: unknown; seenUpdate?: number;
+  lastMount?: string | null; saddlebags?: unknown; mountReady?: number;
 };
 export function serialize(game: Game): SaveData {
   const player = game.player;
@@ -2766,6 +2845,7 @@ export function serialize(game: Game): SaveData {
     referredBy: player.referredBy, referrals: [...player.referrals], referralTimes: [...player.referralTimes], boostTicks: player.boostTicks, coalBag: player.coalBag, stoneBoxGrades: { ...player.stoneBoxGrades }, stoneBox: player.stoneBox, boneBag: { ...player.boneBag }, boosts: { ...player.boosts }, poison: player.poison ? { ...player.poison } : null, weaponPoison: player.weaponPoison ? { ...player.weaponPoison } : null,
     antidoteUntil: Math.max(0, player.antidoteUntil - game.tick), antifireUntil: Math.max(0, player.antifireUntil - game.tick), stealthUntil: Math.max(0, player.stealthUntil - game.tick), tonicUntil: Math.max(0, player.tonicUntil - game.tick), mixture: player.mixture ? { family: player.mixture.family, until: Math.max(0, player.mixture.until - game.tick) } : null,
     firsts: { ...player.firsts } as Record<string, number>, friendKinds: { ...player.friendKinds } as Record<string, 1>, rumours: { ...player.rumours } as Record<string, 1>, orders: { ...player.orders }, activities: { run: player.activities.run ? { ...player.activities.run, target: { ...player.activities.run.target }, marks: { ...player.activities.run.marks } } : null, records: { ...player.activities.records } }, card: { ...player.card }, collectible: { layout: player.collectible.layout, show: [...player.collectible.show] }, lockbox: player.lockbox.map(slot => ({ ...slot })), settled: [...player.settled], notices: [...player.notices], camp: player.camp ? { ...player.camp } : null, campXpAt: player.campXpAt, cards: { ...player.cards }, rarian: player.rarian, mizukai: player.mizukai, orashai: player.orashai, mana: player.mana, mysteries: { found: { ...player.mysteries.found }, glyphs: { ...player.mysteries.glyphs }, read: { ...player.mysteries.read } }, spiritWardUntil: Math.max(0, player.spiritWardUntil - game.tick), home: player.home ? { ...player.home, furniture: { ...player.home.furniture } } : null, restedTicks: player.restedTicks, sigilBag: { ...player.sigilBag }, ward: player.ward ? { ...player.ward } : null, wardUntil: Math.max(0, player.wardUntil - game.tick), renew: player.renew, renewUntil: Math.max(0, player.renewUntil - game.tick), belts: Object.fromEntries(Object.entries(player.belts).map(([id, contents]) => [id, { ...contents }])), followerWorn: [...player.followerWorn],
+    lastMount: player.lastMount ?? null, saddlebags: Object.fromEntries(Object.entries(player.saddlebags).map(([id, bags]) => [id, bags.map(slot => slot ? { ...slot } : null)])), mountReady: Math.max(0, player.mountReady - game.tick),
     name: player.name, fellowship: player.fellowship ? { ...player.fellowship } : null, title: player.title, visited: { ...player.visited } as Record<string, number>, regionTicks: { ...player.regionTicks } as Record<string, number>, talked: { ...player.talked } as Record<string, 1>, emotesUsed: { ...player.emotesUsed } as Record<string, 1>, outfits: { ...player.outfits } as Record<string, 1>, friendTicks: player.friendTicks, mounts: [...player.mounts], mount: player.mount, met: JSON.parse(JSON.stringify(player.met)), achievements: { ...player.achievements }, pets: [...player.pets], petOut: player.petOut, killLog: { ...player.killLog }, lore: Object.fromEntries(Object.entries(player.lore).map(([id, entry]) => [id, { ...entry, d: [...entry.d] }])), stats: { ...player.stats }, daily: JSON.parse(JSON.stringify(player.daily)), seenUpdate: player.seenUpdate,
   };
 }
@@ -2896,6 +2976,10 @@ export function restore(game: Game, raw: unknown): boolean {
   player.referralTimes = (Array.isArray(save.referralTimes) ? save.referralTimes : []).filter((at): at is number => typeof at === "number" && Number.isFinite(at) && at > 0).slice(-REFERRALS_PER_DAY);
   player.mounts = MOUNTS.filter(mount => Array.isArray(save.mounts) && save.mounts.includes(mount.id)).map(mount => mount.id);
   player.mount = typeof save.mount === "string" && player.mounts.includes(save.mount) ? save.mount : null;
+  player.lastMount = typeof save.lastMount === "string" && player.mounts.includes(save.lastMount) ? save.lastMount : undefined;
+  player.mountReady = game.tick + int(save.mountReady, 0, 1000, 0);
+  player.saddlebags = {};
+  if (save.saddlebags && typeof save.saddlebags === "object") for (const [id, bags] of Object.entries(save.saddlebags as Record<string, unknown>)) { const def = mountDef(id); if (def?.bags && Array.isArray(bags)) player.saddlebags[id] = Array.from({ length: def.bags }, (_, i) => slotOf(bags[i])); }
   player.daily = cleanDaily(save.daily, SKILLS); player.orders = cleanOrders(save.orders); player.activities = cleanActivities(save.activities, game.tick); player.card = cleanCard(save.card); player.collectible = cleanCollectible(save.collectible); player.lockbox = cleanLockbox(save.lockbox);
   player.settled = Array.isArray(save.settled) ? save.settled.filter((entry): entry is number => typeof entry === "number" && Number.isSafeInteger(entry)).slice(-50) : [];
   // What the save service settled while this adventure was away (a card redeemed): said once, here, then forgotten.

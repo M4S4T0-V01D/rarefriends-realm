@@ -24,7 +24,7 @@ import { TEX_PER_HEIGHT, TEX_PER_TILE, beginTextures, groundTexture, textureStat
 import { campfireLogs, decorArt, fireArt, rockArt, treeArt , herbArt } from "./scenery.ts";
 import { beginSprites, recordSprites, noteSprite, replaySprites, stampSprites, sendSprites, sinkSprite, type SpriteDraw } from "./pixel.ts";
 import { spellArt } from "./spellart.ts";
-import { SADDLE, mountArt, type MountView } from "./mountart.ts";
+import { saddleHeight, mountArt, type MountView } from "./mountart.ts";
 import { petArt } from "./petart.ts";
 import { burst, cloudShadows, drawCloudShadows, drawEffects, hush, playerPose, puff, treeShake, updateEffects, type Pose } from "./effects.ts";
 import { gloomSky, LightField, hexRgb, rgbCss, skyFor, type PointLight, type RGB , resetLighting } from "./lighting.ts";
@@ -1795,6 +1795,10 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
         }
         return hit(56, 40);
       case "hay": box(ctx, camera, ox, oy, 0.7, 0.5, 14, "#e2d7ad", "#d6c58f", "#c9b77f"); return hit(20);
+      // The stables' things: a trough brim-full of water, and a hitching post with its rail and a rope hanging.
+      case "trough": box(ctx, camera, ox, oy, 0.9, 0.45, 9, "#9fb4d0", "#8a7563", "#75624f"); return hit(16);
+      case "hitching_post": { ctx.strokeStyle = "#8a7563"; ctx.lineWidth = 2.5 * z; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx, sy - 18 * z); ctx.moveTo(sx - 7 * z, sy - 15 * z); ctx.lineTo(sx + 7 * z, sy - 15 * z); ctx.stroke();
+        ctx.strokeStyle = "#c9b77f"; ctx.lineWidth = 1.2 * z; ctx.beginPath(); ctx.moveTo(sx + 5 * z, sy - 15 * z); ctx.quadraticCurveTo(sx + 9 * z, sy - 9 * z, sx + 6 * z, sy - 4 * z); ctx.stroke(); return hit(20, 18); }
       case "ruin_wall": {
         // A crumbling stretch of old wall: weathered brick to its own height, a jagged broken top, moss (sand-bleached in
         // the dunes, snow-capped up north) on what's left.
@@ -3030,7 +3034,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     const emote = player.emote && game.tick < player.emote.until ? player.emote : null, emoteT = emote ? (game.tick - emote.start + alpha) * TICK_MS / 1000 : 0;
     const motion = emote ? emoteMotion(emote.id, emoteT, playerFacing, scene.reducedMotion) : null;
     const mount = riding(player), walking = at.moving || (!!player.path.length && alpha < 1);
-    const s = toScreen(camera, at.x, at.y, pose.hop + (motion?.hop ?? 0) + (mount ? riderLift(camera) : 0)), feet = toScreen(camera, at.x, at.y), px = 3.2 * z;
+    const s = toScreen(camera, at.x, at.y, pose.hop + (motion?.hop ?? 0) + (mount ? riderLift(camera, mount.coat) : 0)), feet = toScreen(camera, at.x, at.y), px = 3.2 * z;
     const facing: Facing = motion?.facing ?? (pose.target ? (pose.side < 0 ? "left" : "right") : playerFacing);
     if (emote) { const capeColor = player.equipment.cape && isItem(player.equipment.cape) ? item(player.equipment.cape).icon.color : undefined; emoteParticles(emote.id, emoteT, at.x, at.y, scene.reducedMotion, capeColor); if (emote.id === "skillcape" || emote.id === "friendship") skillcapeRays(ctx, feet.x, feet.y - 30 * z, z, now, capeColor ?? "#e2d49e", scene.reducedMotion);
       if (emote.id === "friendship" && !scene.reducedMotion) for (let i = 0; i < 3; i++) { const a = now / 500 + i * 2.1, hx = feet.x + Math.cos(a) * 26 * z, hy = feet.y - 44 * z + Math.sin(a) * 10 * z; heart(ctx, hx, hy, 5 * z); } }
@@ -3617,7 +3621,7 @@ function drawPet(ctx: CanvasRenderingContext2D, id: string, x: number, y: number
 /** How far a rider sits above the ground (world pixels, for toScreen's lift): on the saddle, legs astride. */
 /** Mounts are drawn a little larger than the scenery's pixel scale, so a Friend on top doesn't hide its horse. */
 const MOUNT_SCALE = 1.35;
-const riderLift = (camera: Camera) => (SADDLE - 4) * ART * MOUNT_SCALE / liftScale(camera);
+const riderLift = (camera: Camera, coat: Coat) => (saddleHeight(coat) - 4) * ART * MOUNT_SCALE / liftScale(camera);
 /** A mount standing or walking with its hooves on (x, y), turned to a screen facing. */
 function drawMount(ctx: CanvasRenderingContext2D, coat: Coat, facing: Facing, moving: boolean, now: number, x: number, y: number, z: number, saddle: boolean, reduced: boolean) {
   const view: MountView = facing === "down" ? "front" : facing === "up" ? "back" : "side", frame = moving && !reduced ? Math.floor(now / 110) % 4 : -1;
@@ -3676,6 +3680,7 @@ function peerHeld(scene: Scene, peer: PeerView): Held | null {
 }
 function drawNpc(ctx: CanvasRenderingContext2D, scene: Scene, npc: Npc, at: { x: number; y: number; moving: boolean }, hits: Hit[]) {
   const { camera, now, game } = scene, z = camera.zoom, s = toScreen(camera, at.x, at.y), def = NPCS[npc.id];
+  if (def.gone?.(game)) return;
   ellipse(ctx, s.x, s.y, 12 * z, 4.5 * z, "rgba(22,22,22,0.16)", null);
   let rect;
   const horse = mountDef(def.mount);
@@ -3879,7 +3884,7 @@ function citizenLook(uid: number): readonly string[] {
 function drawPeer(ctx: CanvasRenderingContext2D, scene: Scene, peer: PeerView, hits: Hit[]) {
   const { camera, now } = scene, z = camera.zoom, turned = screenFacing(camera, { x: peer.p.hx, y: peer.p.hy || 1 });
   const mount = mountDef(peer.p.mount), motion = peer.p.emote ? emoteMotion(peer.p.emote, peer.emoteT, turned, scene.reducedMotion) : null;
-  const s = toScreen(camera, peer.x, peer.y, (motion?.hop ?? 0) + (mount ? riderLift(camera) : 0)), feet = toScreen(camera, peer.x, peer.y), facing = motion?.facing ?? turned;
+  const s = toScreen(camera, peer.x, peer.y, (motion?.hop ?? 0) + (mount ? riderLift(camera, mount.coat) : 0)), feet = toScreen(camera, peer.x, peer.y), facing = motion?.facing ?? turned;
   if (peer.p.emote) emoteParticles(peer.p.emote, peer.emoteT, peer.x, peer.y, scene.reducedMotion, peer.p.cape && isItem(peer.p.cape) ? item(peer.p.cape).icon.color : undefined);
   const sprites = scene.peerSprites?.(peer.p.id) ?? null, stride = peer.moving ? Math.floor(now / 80) % 8 : 0;
   const rows = sprites ? friendRows(sprites, facing, peer.moving && !mount, mount ? 0 : stride) : peer.moving && Math.floor(now / 160) % 2 ? friendSprite(peer.p.family, peer.p.id).step : friendSprite(peer.p.family, peer.p.id).idle;

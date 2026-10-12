@@ -17,6 +17,7 @@ import { OVERLAYS } from "./overlays/index.ts";
 import { buildHearthkinCountry } from "./hearthkinworld.ts";
 import { buildDungeonIdentity } from "./dungeonworld.ts";
 import { buildSettlements } from "./settlementsworld.ts";
+import { buildMountCountry } from "./mountworld.ts";
 
 /**
  * The far west (Return of Raria): the world grew by WEST_DX columns on its west side for a second continent, Raria and
@@ -106,7 +107,9 @@ export type DecorKind =
   // The Hearthkin's Strong Friend: a squat stone figure, a hammer across its knees (hearthkin.ts).
   | "strong_friend"
   // The dungeons' own things (dungeonworld.ts): a cluster of pale mineral, and a sigil circle cut into a floor.
-  | "crystal" | "rune_circle";
+  | "crystal" | "rune_circle"
+  // The stables grown (mountworld.ts): a water trough and a hitching post.
+  | "trough" | "hitching_post";
 /** A monument's state: whole on its plinth, toppled and lying, broken off at the waist, or sunk to the chest in the ground. */
 export type MonumentState = "whole" | "toppled" | "broken" | "buried";
 export type WorldObject = {
@@ -1191,16 +1194,21 @@ function buildMainland(seed: number) {
   add({ kind: "sign", ...(([x, y]) => ({ x, y }))(land0(56, 50)), blocks: true, name: "Signpost", text: "Wyrmreach. Dragons. Their breath burns through anything but a Wyrmward shield: King Hollis keeps a few." });
   // The bone collector, by the chapel.
   { const [bx, by] = land0(104, 134); npc("bone_collector", bx, by, 1); }
-  // The Friendhollow stables, beside the Rare Market with the door on the path: a timber stable with the stablemaster,
-  // hay and a trough, and a fenced paddock to its west where a chestnut, a grey and a unicorn graze.
+  // The Friendhollow stables, beside the Rare Market with the door on the path: a long timber stable with the stablemaster
+  // and the tack, a cobbled yard before it with a trough, hitching posts and a bay tied up, lamps at the corners, and the
+  // fenced paddock to its west where a chestnut, a grey and a unicorn graze round a trough of their own (the stranger
+  // mounts the stables sell come out of caskets, not the paddock).
   for (let y = 107; y <= 116; y++) for (let x = 81; x <= 98; x++) clearAt(x, y);
-  building(90, 108, 97, 112, "s", T.WOOD, undefined, { name: "Friendhollow stables", color: "#b0673e" });
-  npc("stablemaster", 93, 110); decor(91, 109, "hay"); decor(96, 109, "hay"); decor(91, 111, "barrel"); decor(96, 111, "hay");
-  add({ kind: "sign", x: 95, y: 114, blocks: true, name: "Signpost", text: "The Friendhollow stables. Horses and unicorns for sale: ask Marigold inside. Stroke the horses in the paddock!" });
+  for (let y = 112; y <= 115; y++) for (let x = 89; x <= 98; x++) put(x, y, T.COBBLE);
+  building(90, 107, 97, 111, "s", T.WOOD, undefined, { name: "Friendhollow stables", color: "#b0673e", walls: "timber" });
+  npc("stablemaster", 93, 109); decor(91, 108, "hay"); decor(96, 108, "hay"); decor(91, 110, "shelf", true, "Tack: saddles, bridles, brushes, and a bag of apples"); decor(96, 110, "barrel");
+  add({ kind: "sign", x: 95, y: 114, blocks: true, name: "Signpost", text: "The Friendhollow stables. Horses, unicorns and stranger mounts for sale: ask Marigold inside. Stroke the horses in the paddock!" });
+  decor(90, 113, "trough"); decor(96, 113, "hitching_post"); decor(97, 113, "hitching_post"); npc("paddock_bay", 97, 114, 0);
+  decor(89, 112, "lamp"); decor(98, 112, "lamp"); decor(89, 115, "hay"); decor(98, 115, "barrel");
   for (let x = 81; x <= 88; x++) { decor(x, 108, "fence"); decor(x, 116, "fence"); }
   for (let y = 108; y <= 116; y++) { decor(81, y, "fence"); if (y < 112 || y > 113) decor(88, y, "fence"); }
   npc("paddock_horse", 83, 110, 2); npc("paddock_grey", 86, 113, 2); npc("paddock_unicorn", 84, 114, 2);
-  decor(82, 115, "hay"); decor(89, 114, "barrel");
+  decor(82, 115, "hay"); decor(86, 109, "trough"); decor(82, 109, "flowers", false);
   // General stores in the other towns, so there's somewhere to sell anything wherever you are.
   for (const [id, gx, gy] of [["trader_ember", 170, 45], ["trader_frost", 195, 34], ["trader_oasis", 178, 110]] as const) {
     const [x, y] = land0(gx, gy); npc(id, x, y); decor(x + 1, y - 1, "crate");
@@ -1523,6 +1531,7 @@ export function generateWorld(seed = WORLD_SEED): { world: World; lift: Float32A
   // The dungeons' identities (dungeonworld.ts): the Rime Galleries, the Sigil Vault, and every dungeon dressed in its family's things, in the world's own frame, last of all.
   buildDungeonIdentity({ ...south, random: mulberry(seed + 909) }, seed);
   buildSettlements({ ...south, random: mulberry(seed + 919) });   // Gravesend's mausoleums and vault, Fernwick's forester, Southshore's wreck and beach (settlementsworld.ts)
+  buildMountCountry({ ...south, random: mulberry(seed + 929) }); // the poachers' camp and the tiger's cage, the drakes' nest (mountworld.ts)
   for (const object of objects) if (object.name === "__removed") object.blocks = false;
   const buildingAt = new Uint16Array(W * H);
   buildings.forEach((b, index) => { if (b.roof === "none") return; for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) buildingAt[y * W + x] = index + 1; });
@@ -1586,6 +1595,7 @@ const SIDES = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
 export const ROOF_COLORS = ["#c99a96", "#9aab92", "#8f9cb2", "#cdb98a", "#a996b5"];
 export const TREE_NAMES: Record<TreeKind, string> = { tree: "Tree", oak: "Oak", willow: "Willow", maple: "Maple tree", yew: "Yew", ashwood: "Ashwood", palm: "Palm tree", pine: "Pine tree", deadwood: "Dead tree", redwood: "Redwood", ironbark: "Ironbark", cedar: "Cedar", sakura: "Blossom tree", bamboo: "Bamboo" };
 export const DECOR_NAMES: Record<DecorKind, string> = {
+  trough: "Water trough", hitching_post: "Hitching post",
   strong_friend: "The Strong Friend", crystal: "Crystal", rune_circle: "Sigil circle", monument: "Statue", god_diamond: "Statue of the Good Friend", god_ink: "Statue of the Squid Friend", god_sol: "Statue of the Weird Friend", god_hood: "Statue of the Hood Friend", god_ember: "The Ember, in its brazier",
   god_dusk: "Statue of the Wise Friend, blindfolded", wise_friend: "The Wise Friend", bell: "Great bell", canopy: "Old roofing", cannon: "Magical cannon", device: "Federation device", wagon: "Supply wagon", watchtower: "Watchtower", stake: "Stake wall", plaque: "Inscribed plaque", banner_fff: "The Federation's banner", banner_rrr: "The Regiment's banner", banner_hollowmere: "Hollowmere's banner", banner_diamond: "The Order of the Diamond's banner", banner_ink: "The Order of the Ink's banner", banner_sol: "The Order of the Sol's banner", banner_hood: "The Order of the Hood's banner", banner_ember: "The Order of the Ember's banner", banner_dusk: "The Order of Dusk's banner",
   flowers: "Flowers", bush: "Bush", boulder: "Boulder", lamp: "Lamp post", bench: "Bench", crate: "Crate", barrel: "Water barrel", tent: "Tent",

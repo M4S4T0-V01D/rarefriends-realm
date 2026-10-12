@@ -713,6 +713,7 @@ const OTHER_ITEMS: Item[] = [
   // The settlements' things (settlements.ts): what the tide leaves, what the graves keep, what the wreck held, a chart and a necklace.
   { id: "sea_shell", name: "Sea shell", examine: "A good shell, the kind the tide leaves in the crates it strands. Old Sal collects them.", value: 12, stackable: true, icon: { shape: "orb", color: "#efe6d6", accent: "#d8b6b4" } },
   { id: "grave_token", name: "Grave token", examine: "A little stone disc Gravesend buries with its own, so the dead know the way back if they want it. The robbers dropped them: not gold.", value: 1, stackable: true, tradeable: false, icon: { shape: "sigil", color: "#8f8a83" } },
+  { id: "drake_egg", name: "Drake egg", examine: "The size of a bucket, warm from the lava, and faintly ticking. Ysolde at Wyrmreach wants it before it goes cold.", value: 0, tradeable: false, icon: { shape: "egg", color: "#7fa86a", accent: "#4f8a4a" } },
   { id: "gullwing_bell", name: "The Gullwing's bell", examine: "Brass, green with the sea, the Gullwing's name round the rim. It still rings.", value: 1, tradeable: false, icon: { shape: "orb", color: "#6f9468", accent: "#c9a24a" } },
   { id: "nells_tide_chart", name: "Nell's tide chart", examine: "The currents south of Southshore, as far as Nell has rowed them, drawn fair. For a boat that isn't built yet.", value: 1, tradeable: false, icon: { shape: "tablet", color: "#e8dfc6", accent: "#5d6f84" } },
   { id: "shell_necklace", name: "Shell necklace", examine: "Six good shells on a cord, strung by Old Sal. Hold one to your ear when the beach is empty.", value: 90, icon: { shape: "amulet", color: "#efe6d6", kind: "strung" }, equip: { slot: "neck", bonuses: { prayer: 1 } } },
@@ -1920,33 +1921,75 @@ export const PETS: readonly PetDef[] = [
 export const petDef = (id: string | null | undefined) => PETS.find(pet => pet.id === id);
 
 // ---------- Mounts (the Friendhollow stables) ----------
-/** A horse's coat: body, mane and tail, hooves, and markings. */
-export type Coat = { body: string; mane: string; hoof: string; socks?: string; blaze?: string; pattern?: "dapple" | "piebald" | "stars"; horn?: string; rainbow?: boolean };
+/**
+ * A mount's coat: body, mane and tail, hooves, and markings. The kind says what beast it is (a horse unless said):
+ * stags wear antlers (`accent`), cats stripes (`mane`), wolves a darker saddle of fur, spiders a marking (`accent`),
+ * dragons wings (`mane`) and horns (`accent`), golems a furnace glow (`accent`); `belly` is the paler underside.
+ */
+export type MountKind = "horse" | "stag" | "tiger" | "wolf" | "spider" | "dragon" | "golem";
+export type Coat = { body: string; mane: string; hoof: string; socks?: string; blaze?: string; pattern?: "dapple" | "piebald" | "stars"; horn?: string; rainbow?: boolean; kind?: MountKind; accent?: string; belly?: string; eye?: string };
+/**
+ * A mount's own attack, used now and then (a cooldown in ticks between uses) on the creature you're fighting: a kick, a
+ * pounce, a gout of fire. `damage` is the most it hits, `heal` mends you as well, `web` and `stun` hold the creature's
+ * next attack back that many ticks, `fire` draws it as dragonfire and `reach` is how far it strikes (adjacent unless said).
+ */
+export type MountAttack = { name: string; cooldown: number; damage?: number; heal?: number; web?: number; stun?: number; fire?: boolean; reach?: number; text: string };
 /**
  * Mounts, bought from the stablemaster with simulated RF (each buys Rare Caskets, like the Rare Market's bundles, and the
- * mount comes with them). Riding carries you `speed` tiles a tick without run energy, and each mount has its own gifts.
+ * mount comes with them), or earned on a quest (`quest`, not for sale). Riding carries you `speed` tiles a tick without run
+ * energy, and each mount has its own gifts: a bonus, a light, saddlebags (`bags` slots of its own, reached while you
+ * ride it), a sneak-footed gait, a hide poison or dragonfire doesn't trouble, a forge on its back (`forge`: a furnace and
+ * an anvil wherever you are), and an attack of its own.
  */
 export type MountDef = {
   id: string; name: string; caskets: number; speed: 2 | 3; coat: Coat; text: string;
-  xp?: number; gather?: number; coins?: number; defence?: number; heal?: number; light?: boolean;
+  xp?: number; gather?: number; coins?: number; defence?: number; strength?: number; heal?: number; light?: boolean;
+  skillXp?: Partial<Record<Skill, number>>; sneak?: boolean; poisonProof?: boolean; fireproof?: boolean; bags?: number; forge?: boolean; quest?: string; attack: MountAttack;
 };
+const KICK: MountAttack = { name: "Kick", cooldown: 50, damage: 6, text: "A kick at what you're fighting: up to 6, every 30 seconds." };
 export const MOUNTS: readonly MountDef[] = [
-  { id: "chestnut_horse", name: "Chestnut horse", caskets: 2, speed: 2, coat: { body: "#b0673e", mane: "#6f3a24", hoof: "#3b2a22", blaze: "#f3ece0" },
+  { id: "chestnut_horse", name: "Chestnut horse", caskets: 2, speed: 2, coat: { body: "#b0673e", mane: "#6f3a24", hoof: "#3b2a22", blaze: "#f3ece0" }, attack: KICK,
     text: "A steady gallop: two tiles a tick without tiring." },
-  { id: "piebald_pony", name: "Piebald pony", caskets: 2, speed: 2, coat: { body: "#f3efe6", mane: "#3b3a38", hoof: "#3b3a38", pattern: "piebald" }, heal: 20,
+  { id: "piebald_pony", name: "Piebald pony", caskets: 2, speed: 2, coat: { body: "#f3efe6", mane: "#3b3a38", hoof: "#3b3a38", pattern: "piebald" }, heal: 20, attack: KICK,
     text: "Gallops without tiring, and a cuddle mends you: 1 HP every 12 seconds." },
-  { id: "bay_horse", name: "Bay horse", caskets: 3, speed: 2, coat: { body: "#8a4f33", mane: "#2e2522", hoof: "#2e2522", socks: "#2e2522" }, gather: 0.05,
-    text: "Gallops without tiring, and carries your tools: gather 5% faster." },
-  { id: "grey_horse", name: "Dapple grey", caskets: 3, speed: 2, coat: { body: "#c9c7c2", mane: "#8a8782", hoof: "#57555a", pattern: "dapple" }, coins: 0.1,
+  { id: "bay_horse", name: "Bay horse", caskets: 3, speed: 2, coat: { body: "#8a4f33", mane: "#2e2522", hoof: "#2e2522", socks: "#2e2522" }, gather: 0.05, bags: 8, attack: KICK,
+    text: "Gallops without tiring, and carries your tools: gather 5% faster, and eight saddlebag slots of its own." },
+  { id: "grey_horse", name: "Dapple grey", caskets: 3, speed: 2, coat: { body: "#c9c7c2", mane: "#8a8782", hoof: "#57555a", pattern: "dapple" }, coins: 0.1, attack: KICK,
     text: "Gallops without tiring, and has a nose for loot: +10% coins from drops and pickpocketing." },
-  { id: "palomino", name: "Palomino", caskets: 4, speed: 2, coat: { body: "#e2b56a", mane: "#f6ecd6", hoof: "#6f5440", socks: "#f6ecd6" }, xp: 0.05,
+  { id: "palomino", name: "Palomino", caskets: 4, speed: 2, coat: { body: "#e2b56a", mane: "#f6ecd6", hoof: "#6f5440", socks: "#f6ecd6" }, xp: 0.05, attack: KICK,
     text: "Gallops without tiring, and everyone learns a little faster in golden company: +5% XP." },
-  { id: "black_warhorse", name: "Black warhorse", caskets: 4, speed: 2, coat: { body: "#3a3638", mane: "#1d1b1c", hoof: "#1d1b1c", blaze: "#e8e4da" }, defence: 8,
-    text: "Gallops without tiring, and never flinches: +8 Defence bonus while you ride." },
+  { id: "black_warhorse", name: "Black warhorse", caskets: 4, speed: 2, coat: { body: "#3a3638", mane: "#1d1b1c", hoof: "#1d1b1c", blaze: "#e8e4da" }, defence: 8, bags: 6,
+    attack: { name: "Trample", cooldown: 60, damage: 10, text: "Rears and comes down on what you're fighting: up to 10, every 36 seconds." },
+    text: "Gallops without tiring, and never flinches: +8 Defence bonus while you ride, and six saddlebag slots." },
   { id: "unicorn", name: "Unicorn", caskets: 6, speed: 3, coat: { body: "#f7f5f0", mane: "#e7a9b0", hoof: "#c9c2b6", horn: "#ebc26b", rainbow: true }, xp: 0.1, heal: 10,
+    attack: { name: "Horn light", cooldown: 80, damage: 8, heal: 15, text: "Its horn flares: up to 8 to what you're fighting and 15 HP mended, every 48 seconds." },
     text: "Canters three tiles a tick, +10% XP, and its horn mends you: 1 HP every 6 seconds." },
-  { id: "moon_unicorn", name: "Moonlit unicorn", caskets: 8, speed: 3, coat: { body: "#3d4263", mane: "#c6d4f0", hoof: "#23263a", horn: "#dfe7f5", pattern: "stars" }, xp: 0.1, gather: 0.1, light: true,
-    text: "Canters three tiles a tick, +10% XP, gathers 10% faster, and lights the dark around you." },
+  { id: "moon_unicorn", name: "Moonlit unicorn", caskets: 8, speed: 3, coat: { body: "#3d4263", mane: "#c6d4f0", hoof: "#23263a", horn: "#dfe7f5", pattern: "stars" }, xp: 0.1, gather: 0.1, light: true, bags: 6,
+    attack: { name: "Moonlight", cooldown: 80, damage: 10, heal: 15, text: "Its horn flares silver: up to 10 to what you're fighting and 15 HP mended, every 48 seconds." },
+    text: "Canters three tiles a tick, +10% XP, gathers 10% faster, lights the dark around you, and has six saddlebag slots." },
+  // The stranger beasts, dearer: a cave spider, a dire wolf, a great stag, an ember dragon, and the forge golem.
+  { id: "cave_spider", name: "Cave spider", caskets: 10, speed: 2, coat: { kind: "spider", body: "#4a4552", mane: "#2b2730", hoof: "#1d1b1e", accent: "#8c3b4a", eye: "#e0463c" }, sneak: true, poisonProof: true, bags: 8,
+    attack: { name: "Web", cooldown: 60, damage: 4, web: 5, text: "Spits a web over what you're fighting: up to 4, and it can't strike for 3 seconds; every 36 seconds." },
+    text: "Scuttles two tiles a tick without tiring, lets you sneak in the saddle, keeps every poison off you, and spins eight silk pockets to carry things in." },
+  { id: "dire_wolf", name: "Dire wolf", caskets: 10, speed: 3, coat: { kind: "wolf", body: "#7c7873", mane: "#55514d", hoof: "#2e2a28", belly: "#b8b3ac", eye: "#e6c04a" }, skillXp: { slayer: 0.15 },
+    attack: { name: "Savage bite", cooldown: 50, damage: 12, text: "Goes for the throat of what you're fighting: up to 12, every 30 seconds." },
+    text: "Lopes three tiles a tick without tiring, and knows the hunt: +15% Pursuance XP." },
+  { id: "great_stag", name: "Great stag", caskets: 10, speed: 3, coat: { kind: "stag", body: "#8d6a48", mane: "#5e4530", hoof: "#2f2622", belly: "#d9c9a8", accent: "#e8dcc4" }, skillXp: { woodcutting: 0.15 }, heal: 12, bags: 12,
+    attack: { name: "Charge", cooldown: 50, damage: 10, stun: 3, text: "Lowers its antlers into what you're fighting: up to 10, and it staggers; every 30 seconds." },
+    text: "Bounds three tiles a tick without tiring, the wood's own: +15% Woodcutting XP, it mends you 1 HP every 7 seconds, and twelve panniers hang across its back." },
+  { id: "ember_dragon", name: "Ember dragon", caskets: 14, speed: 3, coat: { kind: "dragon", body: "#9b3a2e", mane: "#e9733f", hoof: "#3a2420", belly: "#e8c08a", accent: "#f2b544", eye: "#f6d36b" }, light: true, fireproof: true, defence: 10, coins: 0.1, bags: 6,
+    attack: { name: "Dragonfire", cooldown: 80, damage: 18, fire: true, reach: 4, text: "Breathes fire four tiles at what you're fighting: up to 18, every 48 seconds." },
+    text: "Flies low three tiles a tick without tiring, lights the dark, turns dragonfire aside like a Wyrmward shield, +10 Defence, a hoard's nose (+10% coins), and six saddlebag slots." },
+  { id: "forge_golem", name: "Forge golem", caskets: 16, speed: 2, coat: { kind: "golem", body: "#8f8578", mane: "#5a524a", hoof: "#3a3531", accent: "#f0a040", belly: "#b5aa9a", eye: "#f6d36b" }, bags: 16, forge: true, defence: 6,
+    attack: { name: "Slam", cooldown: 80, damage: 16, stun: 4, text: "Brings a stone fist down on what you're fighting: up to 16, and it reels; every 48 seconds." },
+    text: "Walks two tiles a tick without tiring, carries a furnace and an anvil on its back (smelt and smith wherever you are), sixteen slots in the chest it carries, and +6 Defence." },
+  // Earned, not sold: the tiger from the poachers' cage in The Wilds, and the little dragon hatched at Wyrmreach.
+  { id: "tiger", name: "Tiger", caskets: 0, speed: 3, quest: "striped_one", coat: { kind: "tiger", body: "#d98a3a", mane: "#2a2118", hoof: "#3a2a1e", belly: "#f1e3c8", eye: "#e9b547" }, strength: 8,
+    attack: { name: "Pounce", cooldown: 50, damage: 14, text: "Springs at what you're fighting: up to 14, every 30 seconds." },
+    text: "Runs three tiles a tick without tiring, and fights beside you: +8 Strength bonus while you ride." },
+  { id: "little_dragon", name: "Little green dragon", caskets: 0, speed: 2, quest: "drake_of_your_own", coat: { kind: "dragon", body: "#4f8a4a", mane: "#7fbf6a", hoof: "#2d3a28", belly: "#d9e2a8", accent: "#e8d98a", eye: "#f4e27a" }, light: true, fireproof: true, heal: 12,
+    attack: { name: "Flame", cooldown: 60, damage: 10, fire: true, reach: 3, text: "A gout of flame three tiles at what you're fighting: up to 10, every 36 seconds." },
+    text: "Trots two tiles a tick without tiring, lights the dark, turns dragonfire aside, and its warmth mends you: 1 HP every 7 seconds." },
 ];
 export const mountDef = (id: string | null | undefined) => MOUNTS.find(mount => mount.id === id);
 

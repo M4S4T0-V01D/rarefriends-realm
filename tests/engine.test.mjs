@@ -608,7 +608,7 @@ test("A Friend's Feast from start to finish", () => {
   assert.equal(g.player.quests.friends_feast, 2);
   assert.equal(questPoints(g), 1);
   assert(level(g, "cooking") >= 10, "Quest XP");
-  assert.equal(QUESTS.length, 101); assert.equal(MAX_QUEST_POINTS, 178);
+  assert.equal(QUESTS.length, 103); assert.equal(MAX_QUEST_POINTS, 180);
 });
 
 test("Grumblin Trouble counts kills and pays out", () => {
@@ -1954,7 +1954,7 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   assert.equal(p.quests.dawn_against_hollow, 2); assert(has(p, "dawnplate_cuirass"));
   assert.equal(count(p, "hollow_essence"), 0);
   assert.equal(capeProblem(g, "dawnplate_cuirass"), null, "the armoury sells Dawnplate once earned");
-  assert.equal(QUESTS.length, 101); assert.equal(MAX_QUEST_POINTS, 178);
+  assert.equal(QUESTS.length, 103); assert.equal(MAX_QUEST_POINTS, 180);
 });
 
 test("Boots and gauntlets in every metal, smithed at the anvil; the clothier's shirts, dresses, trousers and skirts", () => {
@@ -4193,4 +4193,65 @@ test("The settlements grown: Gravesend's mausoleums and the Disturbed Row (the g
   // The Vault: its stair is in the mausoleum, its theme is the burial places', its hoard deep.
   const { dungeonTheme } = await import("../games/rarefriends-realm/dungeontheme.ts"); const { cofferTier } = await import("../games/rarefriends-realm/dungeons.ts");
   assert.equal(dungeonTheme(world, stair.to.x, stair.to.y).id, "ossuary"); assert.equal(cofferTier(g, named("Ashworth hoard")), "deep");
+});
+
+test("Mounts grown: seven new beasts (quest ones not for sale), the chosen mount saved, attacks on cooldowns (a web holds a blow), sneaking on the spider, saddlebags stowed and saved, the golem's forge, the stables' yard, and the two quests (the poachers' cage, the drakes' nest)", async () => {
+  const { chooseMount, mountAttack, mountAttackProblem, saddlebags, stow, unstow, forgeMenu } = await import("../games/rarefriends-realm/engine.ts");
+  const { STRIPED_ONE, DRAKE_OF_YOUR_OWN, onMountKill, POACHERS, NEST_DRAKES } = await import("../games/rarefriends-realm/mounts.ts");
+  const { POACHER_CAMP } = await import("../games/rarefriends-realm/mountworld.ts");
+  const { QUESTS, questDone, NPCS, talk } = await import("../games/rarefriends-realm/content.ts");
+  const { saddleHeight } = await import("../games/rarefriends-realm/mountart.ts");
+  const g = newGame(), p = g.player, world = g.world;
+  // The data: fifteen mounts, each with an attack; the tiger and the little dragon come from quests that exist.
+  assert.equal(MOUNTS.length, 15); assert.ok(MOUNTS.every(m => m.attack.cooldown > 0 && m.attack.name));
+  for (const id of ["tiger", "little_dragon"]) { const m = MOUNTS.find(x => x.id === id); assert.equal(m.caskets, 0); assert.ok(QUESTS.some(q => q.id === m.quest), `${id}'s quest`); }
+  assert.ok(MOUNTS.filter(m => m.bags).length >= 6 && MOUNTS.some(m => m.forge) && MOUNTS.some(m => m.sneak && m.poisonProof) && MOUNTS.filter(m => m.fireproof).length === 2);
+  assert.ok(saddleHeight(MOUNTS.find(m => m.id === "tiger").coat) < saddleHeight(MOUNTS[0].coat), "a cat sits lower than a horse");
+  // The stables' yard and the quest places are in the world.
+  assert.ok(world.objects.some(o => o.decor === "trough") && world.objects.filter(o => o.decor === "hitching_post").length === 2 && world.spawns.some(s => s.id === "paddock_bay"));
+  assert.ok(world.buildings.find(b => b.name === "Friendhollow stables")?.walls === "timber");
+  assert.ok(world.spawns.some(s => s.id === "caged_tiger") && world.objects.some(o => o.clue === "drake_nest") && world.objects.filter(o => o.clue === "tiger_tracks").length === 2);
+  // The chosen mount is remembered in the save, and H rides it.
+  grantMount(g, "bay_horse"); p.mount = null; p.mounts.push("tiger", "cave_spider", "forge_golem");
+  chooseMount(g, "tiger"); assert.equal(p.lastMount, "tiger"); assert.equal(p.mount, null, "choosing doesn't mount you");
+  let save = JSON.parse(JSON.stringify(serialize(g))), fresh = newGame(); assert(restore(fresh, save)); assert.equal(fresh.player.lastMount, "tiger");
+  save.lastMount = "dragon_bus"; fresh = newGame(); restore(fresh, save); assert.equal(fresh.player.lastMount, undefined, "an unknown choice is dropped");
+  toggleMount(g); assert.equal(p.mount, "tiger", "H rides the chosen mount"); assert.ok(bonuses(p).strength >= 8, "the tiger's +8 Strength");
+  chooseMount(g, "bay_horse"); assert.equal(p.mount, "bay_horse", "choosing while riding swaps you over");
+  // The attack: nothing to hit, then a hit on the creature you're fighting, then the cooldown.
+  assert.match(mountAttackProblem(g), /not fighting/);
+  const foe = g.monsters.find(m => !m.dead && m.y < 800 && m.hp > 20); assert.ok(foe); p.combat = foe.uid; teleport(g, foe.x + 1, foe.y); const hp = foe.hp;
+  g.rng = () => 0.5; assert.equal(mountAttackProblem(g), null); assert.ok(mountAttack(g)); assert.equal(hp - foe.hp, 3, "a kick for half of six"); assert.equal(p.mountReady, g.tick + 50);
+  assert.match(mountAttackProblem(g), /isn't ready/); assert.equal(mountAttack(g), false); g.tick += 50; assert.equal(mountAttackProblem(g), null);
+  teleport(g, foe.x + 3, foe.y); assert.match(mountAttackProblem(g), /reach/); teleport(g, foe.x + 1, foe.y);
+  // The spider's web holds the creature's next blow; you can sneak in its saddle (not a horse's).
+  chooseMount(g, "cave_spider"); foe.attackTimer = 0; assert.ok(mountAttack(g)); assert.ok(foe.attackTimer >= 5, "webbed");
+  toggleSneak(g); assert.equal(p.sneak, true, "sneaking on the spider"); chooseMount(g, "bay_horse"); assert.equal(p.sneak, false, "a horse can't"); toggleSneak(g); assert.equal(p.sneak, false);
+  p.combat = null;
+  // Saddlebags: the bay's eight slots, reached while you ride it; a stowed thing comes back; saved with the mount.
+  const bags = saddlebags(g); assert.equal(bags.length, 8); give(p, "feather", 3); const slot = p.inventory.findIndex(s => s?.id === "feather");
+  assert.ok(stow(g, slot)); assert.equal(p.inventory[slot], null); assert.deepEqual(bags[0], { id: "feather", n: 3 }); assert.ok(p.inventory.some(s => s?.id === "feather") === false);
+  chooseMount(g, "tiger"); assert.equal(saddlebags(g), null, "the tiger carries nothing"); chooseMount(g, "bay_horse");
+  save = JSON.parse(JSON.stringify(serialize(g))); fresh = newGame(); assert(restore(fresh, save)); assert.deepEqual(fresh.player.saddlebags.bay_horse[0], { id: "feather", n: 3 });
+  assert.ok(unstow(g, 0)); assert.equal(bags[0], null); assert.equal(count(p, "feather"), 3);
+  // The forge golem: its furnace and anvil wherever you are.
+  assert.equal(forgeMenu(g, "furnace"), false, "not on the bay"); chooseMount(g, "forge_golem"); assert.ok(forgeMenu(g, "furnace")); assert.match(g.ui.production.title, /golem's furnace/);
+  assert.equal(forgeMenu(g, "anvil"), false, "no bars yet"); give(p, "pewter_bar", 1); assert.ok(forgeMenu(g, "anvil")); assert.ok(g.ui.production.recipes.length > 0);
+  give(p, "pewter_ore", 1); const bars = count(p, "pewter_bar"); g.rng = () => 0.99; startProduction(g, smeltingRecipes()[0], 1); for (let i = 0; i < 8; i++) tick(g); assert.equal(count(p, "pewter_bar"), bars + 1, "smelted in the open, on the golem's back");
+  p.mount = null; p.mounts.length = 0; p.lastMount = undefined;
+  // The Striped One: after the tracks; the cage won't open while the poachers stand; three poachers at the camp (not bandits elsewhere); the tiger follows you to Fenn.
+  const use = (object, option) => { teleport(g, object.x, object.y + 1); const n = g.messages.length; setTarget(g, { kind: "object", id: object.id, option }); until(g, () => g.dialogue !== null || g.messages.length > n, 30); };
+  assert.equal(talk(g, "caged_tiger").lines[0].text.includes("lock"), true);
+  p.quests.tallgrass_tracks = 2; let d = talk(g, "tallgrass_huntmaster"); assert.match(d.lines[0].text, /Poachers/); d = d.options.find(o => o.label === "I'll do it.").then(); d.onEnd?.(); assert.equal(p.quests[STRIPED_ONE], 1);
+  assert.match(talk(g, "caged_tiger").lines[0].text, /too close/);
+  onMountKill(g, "bandit", 100, 100); assert.equal(p.questData.so_poachers ?? 0, 0); for (let i = 0; i < POACHERS; i++) onMountKill(g, "bandit", POACHER_CAMP.x0 + 4, POACHER_CAMP.y0 + 5); assert.equal(p.questData.so_poachers, POACHERS);
+  d = talk(g, "caged_tiger"); d = d.options.find(o => o.label === "Open the cage.").then(); assert.equal(p.questData.so_freed, 1); assert.equal(NPCS.caged_tiger.gone(g), true, "the cage is empty now");
+  d = talk(g, "tallgrass_huntmaster"); assert.match(d.lines[0].text, /followed you back/); d.onEnd?.(); assert.ok(questDone(g, STRIPED_ONE)); assert.ok(p.mounts.includes("tiger")); assert.equal(p.lastMount, "tiger");
+  // A Drake of Your Own: four drakes off the nest in Wyrmreach, the egg, ten cooked meat; the hatchling.
+  d = talk(g, "drake_hunter"); assert.match(d.lines[0].text, /nest/); d = d.options.find(o => o.label === "I'll do it.").then(); d.onEnd?.(); assert.equal(p.quests[DRAKE_OF_YOUR_OWN], 1);
+  const nest = world.objects.find(o => o.clue === "drake_nest"); use(nest, "Search"); assert.equal(count(p, "drake_egg"), 0, "the drakes roost over it");
+  for (let i = 0; i < NEST_DRAKES; i++) onMountKill(g, "ash_drake", nest.x, nest.y); assert.equal(p.questData.dy_drakes, NEST_DRAKES);
+  use(nest, "Search"); assert.equal(count(p, "drake_egg"), 1); use(nest, "Search"); assert.equal(count(p, "drake_egg"), 1, "one egg"); assert.equal(item("drake_egg").tradeable, false);
+  give(p, "cooked_meat", 10); d = talk(g, "drake_hunter"); assert.match(d.lines[0].text, /shell going/); d.onEnd?.(); assert.ok(questDone(g, DRAKE_OF_YOUR_OWN)); assert.ok(p.mounts.includes("little_dragon")); assert.equal(count(p, "drake_egg"), 0); assert.equal(count(p, "cooked_meat"), 0);
+  assert.ok(MOUNTS.find(m => m.id === "little_dragon").fireproof, "the hatchling turns dragonfire");
 });

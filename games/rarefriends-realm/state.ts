@@ -112,6 +112,8 @@ export type Player = {
   referralCapNoted?: boolean;
   /** Mounts you own from the stables, and the one you're riding. */
   mounts: string[]; mount: string | null;
+  /** What each mount carries in its saddlebags (by mount id), and the tick your mount's own attack is ready again. */
+  saddlebags: Record<string, (Slot | null)[]>; mountReady: number;
   /** Players you've met online, for the hiscores; and your achievements (id → the UTC day you earned it). */
   met: Record<number, { total: number; combat: number; seen: number }>; achievements: Record<string, number>;
   /** Pets you've found, and the one following you. */
@@ -156,7 +158,7 @@ export type Player = {
   camp: Camp | null; campXpAt: number;
   /** A level-up to celebrate (not saved): other players see its fireworks while it lasts. */
   celebrate?: { skill: Skill; level: number; until: number };
-  /** The mount you rode last (not saved), for the ride button. */
+  /** The mount you ride by default (the Mount tab's choice, remembered in your save), for the ride button and H. */
   lastMount?: string;
   /** Mysteries techniques (techniques.ts, not saved): the tick each is ready again, and the preparation in force. */
   techniqueReady: Partial<Record<string, number>>; preparation: Preparation | null;
@@ -303,7 +305,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
     style: "accurate", autocast: null, prayers: [], target: null, activity: null, combat: null,
     attackTimer: 0, eatTimer: 0, stunned: 0, regenTimer: 0, quests: {}, questData: {},
     wardrobe: [], worn: [], follower: null, courseStep: -1, kills: 0, deaths: 0, overhead: null, music: ["theme"],
-    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, stoneBoxGrades: {}, boneBag: {}, sigilBag: {}, belts: {}, followerWorn: [], orders: {}, activities: { run: null, records: {} }, collectible: { layout: "classic", show: ["skills", "combat", "quests", "generation"] }, lockbox: [], settled: [], notices: [], card: { bg: "paper", frame: "rose", skills: "boxes", font: "mono", ink: "ink", layout: "classic" }, cards: {}, rarian: false, mizukai: false, orashai: false, mana: 10, mysteries: { found: {}, glyphs: {}, read: {} }, techniqueReady: {}, preparation: null, spiritWardUntil: 0, home: null, restedTicks: 0, camp: null, campXpAt: -100000, ward: null, wardUntil: 0, renew: 0, renewUntil: 0, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, friendVillage: null, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, lore: {}, trail: null, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false, rerolls: 0 }, seenUpdate: LATEST_UPDATE,
+    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, stoneBoxGrades: {}, boneBag: {}, sigilBag: {}, belts: {}, followerWorn: [], orders: {}, activities: { run: null, records: {} }, collectible: { layout: "classic", show: ["skills", "combat", "quests", "generation"] }, lockbox: [], settled: [], notices: [], card: { bg: "paper", frame: "rose", skills: "boxes", font: "mono", ink: "ink", layout: "classic" }, cards: {}, rarian: false, mizukai: false, orashai: false, mana: 10, mysteries: { found: {}, glyphs: {}, read: {} }, techniqueReady: {}, preparation: null, spiritWardUntil: 0, home: null, restedTicks: 0, camp: null, campXpAt: -100000, ward: null, wardUntil: 0, renew: 0, renewUntil: 0, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, friendVillage: null, referralTimes: [], mounts: [], mount: null, saddlebags: {}, mountReady: 0, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, lore: {}, trail: null, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false, rerolls: 0 }, seenUpdate: LATEST_UPDATE,
     lastHitBy: null, created: Date.now(), queuedSpell: null, castTimer: 0,
   };
 }
@@ -387,7 +389,7 @@ export function followerBonus(player: Player) {
 /** Award XP (already scaled by the caller with `scaled`) and announce level-ups. */
 export function addXp(game: Game, skill: Skill, base: number, options: { raw?: boolean } = {}) {
   const player = game.player, before = levelForXp(player.xp[skill]);
-  const amount = options.raw ? base : base * xpMultiplier(player) * earlyXp(before, skill) * (mixtureOn(game, 7) ? 1.15 : 1);
+  const amount = options.raw ? base : base * xpMultiplier(player) * earlyXp(before, skill) * (mixtureOn(game, 7) ? 1.15 : 1) * (1 + (riding(player)?.skillXp?.[skill] ?? 0));
   if (amount <= 0) return;
   player.xp[skill] = Math.min(MAX_XP, player.xp[skill] + amount);
   emit(game, { type: "xp", skill, amount, tick: game.tick });
@@ -670,7 +672,7 @@ export function bonuses(player: Player): Bonuses {
     if (!equip) continue;
     for (const key of Object.keys(total) as (keyof Bonuses)[]) total[key] += equip.bonuses[key] ?? 0;
   }
-  total.defence += riding(player)?.defence ?? 0;
+  total.defence += riding(player)?.defence ?? 0; total.strength += riding(player)?.strength ?? 0;
   total.strength += heft(player) + renown(player);
   // Wildfur, the Ring's highest tier: below a third of your health, every piece's strength counts twice.
   if (player.hp < maxHp(player) * 0.35) for (const id of Object.values(player.equipment)) if (id?.startsWith("wildfur_")) total.strength += item(id).equip?.bonuses.strength ?? 0;

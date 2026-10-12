@@ -12,6 +12,7 @@ import { QUESTS, questPoints, MAX_QUEST_POINTS } from "./content.ts";
 import { TICK_MS, attackSpeed, combatLevel, createGame, giveOrDrop, message, totalLevel, type Game, type Projectile } from "./state.ts";
 import {
   chooseOption, closeInterfaces, collectFromCasket, creditReferral, emoteProblem, performEmote, syncMonster, continueDialogue, grantBundle, menuFor, tailorChoices, unlockMusic, restore, serialize, setFollower, setHeld, setRelics, tick, toggleRun, toggleSneak, toggleMount, grantMount, walkTo, sailTo, atSea, type OwnedFriend, type Selection,
+  mountAttack,
 } from "./engine.ts";
 import { DOCKS } from "./boats.ts";
 import { LANGUAGES, languageOf, setLanguage } from "./i18n.ts";
@@ -903,7 +904,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       const key = event.key.toLowerCase();
       if (KEY_DIRECTIONS[key]) { held.current.add(key); setHeld(state, heldDirection(held.current, camera.current.angle)); event.preventDefault(); return; }
       if (CAMERA_KEYS.has(key)) { held.current.add(key); event.preventDefault(); return; }
-      const fn = /^f(10|[1-9])$/.exec(key);
+      const fn = /^f(1[01]|[1-9])$/.exec(key);
       if (fn) { setTab(TABS[Number(fn[1]) - 1].id); setSideOpen(true); event.preventDefault(); return; }
       if (key === "escape") { setMenu(null); setModal(null); setDailyTab(null); setGuide(null); setSelection(null); closeInterfaces(state); setLevelUps([]); refresh(); return; }
       if (key === " " || key === "spacebar") {
@@ -918,6 +919,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       if (key === "r") { toggleRun(state); refresh(); return; }
       if (key === "c") { toggleSneak(state); refresh(); return; }
       if (key === "h") { toggleMount(state); refresh(); return; }
+      if (key === "j") { mountAttack(state); refresh(); return; }
       if (key === "m") { setModal(modal => modal === "map" ? null : "map"); return; }
       if (key === "enter") { (root.current?.querySelector("[data-chat]") as HTMLInputElement | null)?.focus(); event.preventDefault(); return; }
       const hot: Record<string, Tab> = { i: "inventory", k: "skills", l: "quests", p: "prayer", n: "magic", o: "equipment" };
@@ -1276,12 +1278,13 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           {state.ui.shop === "__stable" && (
             <Modal title="Friendhollow Stables" onClose={() => { state.ui.shop = null; refresh(); }} wide>
               <p className="realm-sim">Simulated $RAREFRIENDS. No real tokens, contracts or transactions. Balance: <b>{snapshot ? rf(snapshot.rfBalance) : "…"}</b></p>
-              <p className="realm-market-intro">Every mount gallops without using run energy (unicorns go faster still) and has a gift of its own. Like the Rare Market, RF buys Rare Caskets and the mount comes with them. Ride or dismount with the saddle button by your run orb, or <b>H</b>.</p>
+              <p className="realm-market-intro">Every mount carries you without using run energy and has gifts of its own: a bonus, saddlebags, an attack it makes now and then (<b>J</b>), a forge on its back. Like the Rare Market, RF buys Rare Caskets and the mount comes with them. Ride or dismount with the saddle button by your run orb, or <b>H</b>; choose and manage your mounts on the Mount tab (<b>F11</b>). Two more are earned on quests, not sold.</p>
               <ul className="realm-market stable">{MOUNTS.map(mount => {
                 const owned = state.player.mounts.includes(mount.id), ridingNow = state.player.mount === mount.id;
                 return <li key={mount.id}><PixelIcon art={mountArt(mount.coat, "side", -1, true)} size={58} label={mount.name} />
                   <div><b>{mount.name}</b><small>{mount.text} {owned ? "Yours." : `Includes ${mount.caskets} Rare Caskets.`}</small></div>
                   {owned ? <button type="button" aria-pressed={ridingNow} onClick={() => { toggleMount(state, mount.id); refresh(); }}>{ridingNow ? "Dismount" : "Ride"}</button>
+                    : mount.quest ? <small className="realm-muted">{mount.quest === "striped_one" ? "Earned from Huntmaster Fenn at Tallgrass." : "Earned from Ysolde the drake hunter at Wyrmreach."}</small>
                     : <button type="button" className="realm-primary" disabled={busy || paused}
                       {...rightClick((x, y, entries) => setMenu({ x, y, entries }), () => [{ verb: "Examine", noun: mount.name, run: () => { message(state, `${mount.name}: ${mount.text}`); refresh(); } }])}
                       onClick={() => void casket(() => client.buy(BigInt(mount.caskets)), () => { grantMount(state, mount.id); audio.current?.sfx("coins"); refresh(); })}>Buy · {rf(definition.price * BigInt(mount.caskets))}</button>}</li>;

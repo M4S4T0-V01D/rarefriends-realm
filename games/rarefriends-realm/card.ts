@@ -1,7 +1,7 @@
 /** The shareable adventurer card: your Friend, levels and quests on a 1200 × 675 picture (the X card size), in the style you've chosen. */
 import type { GenerationSprites } from "@rarefriends/friendsdk/sprites";
 import { FAMILY_NAMES, SKILLS, SKILL_NAMES, WARDROBE, levelForXp, mountDef, type Skill } from "./data.ts";
-import { SADDLE, mountArt } from "./mountart.ts";
+import { saddleHeight, mountArt } from "./mountart.ts";
 import { MAX_QUEST_POINTS, questPoints } from "./content.ts";
 import { ACHIEVEMENTS, achieved } from "./achievements.ts";
 import { combatLevel, totalLevel, type Game } from "./state.ts";
@@ -105,7 +105,7 @@ export function renderCard(game: Game, friend: GenerationSprites | null, fellows
     // (the mount's body behind, its head in front, as when you ride towards the camera).
     const dressed = [...player.worn, ...(["cape", "head", "shield", "weapon", "neck", "body", "legs", "hands", "feet"] as const).flatMap(slot => player.equipment[slot] ? [player.equipment[slot]!] : [])];
     const art = figureArt(friendRows(friend, "down", false, 0), dressed, "down"), mount = mountDef(player.mount);
-    const ratio = 2 * 1.35 / 1.6, lift = mount ? (SADDLE - 4) * ratio : 0, fitW = inner.w - 8, fitH = inner.h - 4;
+    const ratio = 2 * 1.35 / 1.6, lift = mount ? (saddleHeight(mount.coat) - 4) * ratio : 0, fitW = inner.w - 8, fitH = inner.h - 4;
     const px = Math.max(1, Math.floor(Math.min(fitW / art.width, fitH / (art.height + lift + (mount ? 4 : 0))) * (mount ? 2 : 1)) / (mount ? 2 : 1)), ground = mount ? inner.y + inner.h - 10 : inner.y + inner.h / 2 + art.height * px / 2 + px * 2;
     ctx.imageSmoothingEnabled = false;
     // Your follower stands at your right hand, a little behind and smaller, in the clothes you gave it.

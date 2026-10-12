@@ -5,7 +5,7 @@ import { PursuanceJournal } from "./journal.tsx";
 import type { GenerationSprites } from "@rarefriends/friendsdk/sprites";
 import { SPELL_TABS, RARIAN_SPELL_TABS, MIZUKAI_SPELL_TABS, ORASHAI_SPELL_TABS, spellInBook, MONSTERS, type Spell, type Prayer, type Tradition, ITEM_LIST, isItem,
   EMOTES, EQUIP_SLOTS, FAMILY_NAMES, FAMILY_PERKS, PRAYERS, RELICS, SHOPS, SKILLS, SKILL_ICONS, SKILL_NAMES, SPELLS, WARDROBE, XP_TABLE, item, levelForXp,
-  type EquipSlot, type Skill, mountDef, PETS, CARVINGS, CARVING_REACH,
+  type EquipSlot, type Skill, MOUNTS, mountDef, PETS, CARVINGS, CARVING_REACH,
 } from "./data.ts";
 import { mountArt } from "./mountart.ts";
 import { CHEST_REWARD, DAY_MS, challengeProgress, challengeReward, challengeText, claimChallenge, claimChest, claimStreak, completeDaily, dailyWaiting, rerollDaily, rewardText, rollDaily, streakReward, streakStatus } from "./daily.ts";
@@ -38,7 +38,7 @@ import {
 import {
   bestArrow, bowRange, emoteProblem, performEmote, signetTeleport, applyReferral, shopBuys, buy, buyPrice, canCast, capeProblem, castSpell, rangedMaxHit, rubLamp, chooseOption, continueDialogue, dialogueAtOptions, itemOptions, playerMaxHit, recipeProblem, mostMakeable, sell, sellPrice,
   castOnItem, satchelCheck, satchelEmpty, satchelFill, setFollower, setPet, setStyle, startProduction, swapSlots, toggleRun, toggleSneak, togglePrayer, toggleWorn, unequip, useItemOnItem, type OwnedFriend, type Selection,
- beltCheck, beltFill, beltEmpty, sipBelt, toggleFollowerWorn } from "./engine.ts";
+ beltCheck, beltFill, beltEmpty, sipBelt, toggleFollowerWorn, chooseMount, forgeMenu, mountAttack, mountAttackProblem, saddlebags, toggleMount, unstow } from "./engine.ts";
 import { friendRows, renderWorldMap } from "./render.ts";
 import { DUNGEON_Y, FLOOR_Y, OVERWORLD_H, W, isUnderground, mainlandToWorld, realPoint } from "./world.ts";
 import type { NetState } from "./net.ts";
@@ -124,12 +124,12 @@ export function ContextMenu({ x, y, entries, onClose }: { x: number; y: number; 
 }
 
 // ---------- Side panel ----------
-export type Tab = "combat" | "skills" | "quests" | "inventory" | "equipment" | "prayer" | "magic" | "friends" | "settings" | "emotes";
+export type Tab = "combat" | "skills" | "quests" | "inventory" | "equipment" | "prayer" | "magic" | "friends" | "settings" | "emotes" | "mount";
 export const TABS: readonly { id: Tab; label: string; glyph: string; key: string }[] = [
   { id: "combat", label: "Combat options", glyph: "⚔", key: "F1" }, { id: "skills", label: "Skills", glyph: "▦", key: "F2" }, { id: "quests", label: "Quest journal", glyph: "✎", key: "F3" },
   { id: "inventory", label: "Inventory", glyph: "▣", key: "F4" }, { id: "equipment", label: "Worn equipment", glyph: "⛨", key: "F5" }, { id: "prayer", label: "Faith", glyph: "✚", key: "F6" },
   { id: "magic", label: "Magic", glyph: "✦", key: "F7" }, { id: "friends", label: "Friends and wardrobe", glyph: "☺", key: "F8" }, { id: "settings", label: "Settings", glyph: "⚙", key: "F9" },
-  { id: "emotes", label: "Emotes", glyph: "☺", key: "F10" },
+  { id: "emotes", label: "Emotes", glyph: "☺", key: "F10" }, { id: "mount", label: "Mount", glyph: "♞", key: "F11" },
 ];
 export type Settings = { friendSpeech?: "full" | "reduced" | "rare" | "off"; /** Nameplates over players: name, tag and token id; the name alone; or nothing. */ nameplates?: "full" | "name" | "off"; music: boolean; sfx: boolean; musicVolume: number; sfxVolume: number; zoom: number; shiftDrop: boolean; autoMusic: boolean; dayNight?: boolean; weather?: boolean;
   /** Graphics quality: high (the default), low, or custom (every knob set by hand: `custom`). */
@@ -185,6 +185,7 @@ export function SidePanel(props: PanelProps & { open: boolean; setOpen: (open: b
         {tab === "friends" && <FriendsTab {...props} />}
         {tab === "settings" && <SettingsTab {...props} />}
         {tab === "emotes" && <EmotesTab {...props} />}
+        {tab === "mount" && <MountTab {...props} />}
       </div>}
       <div className="realm-tabs" role="tablist">
         {TABS.map(entry => (
@@ -1562,6 +1563,46 @@ export function Orbs({ game, onRun, onSneak, onRide, onMap, onZoom, onRotate, op
   );
 }
 
+/** Who hands out a quest's mount, for the stable list before you have it. */
+const MOUNT_FROM: Record<string, string> = { striped_one: "Earned from Huntmaster Fenn at Tallgrass.", drake_of_your_own: "Earned from Ysolde the drake hunter at Wyrmreach." };
+/**
+ * The Mount tab: the mount you ride by default (remembered in your save), ridden or not; while you ride, its attack
+ * with the cooldown counting down, the forge golem's furnace and anvil, and the saddlebags of mounts that have them
+ * (right-click a pack item: Stow); then every mount of the Realm, yours or still to come.
+ */
+function MountTab({ game, refresh, openMenu, paused }: PanelProps) {
+  const player = game.player, owned = player.mounts.map(id => mountDef(id)!), chosen = mountDef(player.mount ?? player.lastMount ?? player.mounts[0]), riding = mountDef(player.mount);
+  const bags = saddlebags(game), problem = riding ? mountAttackProblem(game) : null, wait = Math.max(0, player.mountReady - game.tick);
+  const stable = <>
+    <h4>Every mount <small>({owned.length}/{MOUNTS.length})</small></h4>
+    <div className="realm-pets realm-stable">{MOUNTS.map(mount => { const have = player.mounts.includes(mount.id);
+      return <button key={mount.id} type="button" disabled={!have || paused} aria-pressed={player.mount === mount.id} aria-label={have ? mount.name : `Undiscovered mount (${mount.quest ? "a quest" : "the stables"})`}
+        title={have ? `${mount.name}: ${mount.text}` : mount.quest ? `${mount.name}: ${MOUNT_FROM[mount.quest]}` : `${mount.name}: from the Friendhollow stables, for ${mount.caskets} Rare Caskets.`}
+        onClick={() => { chooseMount(game, mount.id); toggleMount(game, mount.id); refresh(); }}
+        {...rightClick(openMenu, () => have ? [{ verb: player.mount === mount.id ? "Dismount" : "Ride", noun: mount.name, run: () => { chooseMount(game, mount.id); toggleMount(game, mount.id); refresh(); } }, { verb: "Examine", noun: mount.name, run: () => { message(game, `${mount.name}: ${mount.text}`); refresh(); } }] : [{ verb: "Examine", noun: "Undiscovered mount", run: () => { message(game, mount.quest ? MOUNT_FROM[mount.quest] : "A mount the Friendhollow stables sell."); refresh(); } }])}>
+        {have ? <PixelIcon art={mountArt(mount.coat, "side", -1, true)} size={34} /> : <span className="realm-mystery">?</span>}<small>{have ? mount.name : mount.quest ? "A quest" : "The stables"}</small></button>; })}</div>
+  </>;
+  if (!owned.length) return <div className="realm-mount"><h3>Mounts</h3><p className="realm-muted">You don't own a mount yet. The Friendhollow stables sell horses, unicorns and stranger beasts for RF; a tiger and a little dragon are earned on quests.</p>{stable}</div>;
+  return (
+    <div className="realm-mount">
+      <h3>Mounts</h3>
+      <label className="realm-mount-choice">Your mount <select aria-label="Your mount" value={chosen?.id ?? ""} disabled={paused} onChange={event => { chooseMount(game, event.target.value || null); refresh(); }}>
+        {owned.map(mount => <option key={mount.id} value={mount.id}>{mount.name}</option>)}</select></label>
+      {chosen && <div className="realm-mount-card"><PixelIcon art={mountArt(chosen.coat, "side", -1, true)} size={68} label={chosen.name} />
+        <div><b>{chosen.name}</b><small>{chosen.text}</small>
+          <button type="button" className={riding?.id === chosen.id ? "realm-dark" : "realm-primary"} disabled={paused} onClick={() => { toggleMount(game, chosen.id); refresh(); }}>{riding?.id === chosen.id ? "Dismount (H)" : "Ride (H)"}</button></div></div>}
+      {riding ? <>
+        <h4>{riding.attack.name} <small>· {riding.attack.text}</small></h4>
+        <button type="button" className="realm-primary" disabled={paused || !!problem} title={problem ?? riding.attack.text} onClick={() => { mountAttack(game); refresh(); }}>{wait > 0 ? `${riding.attack.name} in ${Math.ceil(wait * TICK_MS / 1000)}s` : `${riding.attack.name} (J)`}</button>
+        {riding.forge && <><h4>The forge on its back</h4><div className="realm-buttons"><button type="button" disabled={paused} onClick={() => { forgeMenu(game, "furnace"); refresh(); }}>Smelt</button><button type="button" disabled={paused} onClick={() => { forgeMenu(game, "anvil"); refresh(); }}>Smith</button></div></>}
+        {bags && <><h4>Saddlebags <small>({bags.filter(Boolean).length}/{bags.length}) · right-click a pack item: Stow</small></h4>
+          <div className="realm-inventory bags" onContextMenu={event => event.preventDefault()}>{bags.map((slot, index) => <button key={index} type="button" className="realm-slot" aria-label={slot ? `Take back ${item(slot.id).name}${slot.n > 1 ? ` × ${slot.n}` : ""}` : `Empty saddlebag ${index + 1}`} disabled={paused} onClick={() => { if (slot) { unstow(game, index); refresh(); } }}
+            {...rightClick(openMenu, () => slot ? [{ verb: "Take-back", noun: item(slot.id).name, tone: "item", run: () => { unstow(game, index); refresh(); } }, { verb: "Examine", noun: item(slot.id).name, run: () => { message(game, item(slot.id).examine); refresh(); } }] : [])}>{slot && <ItemIcon slot={slot} size={40} />}</button>)}</div></>}
+      </> : <p className="realm-muted">Ride to use your mount's attack{chosen?.bags ? ", reach its saddlebags" : ""}{chosen?.forge ? ", and work its forge" : ""}.</p>}
+      {stable}
+    </div>
+  );
+}
 /** Your mount's orb, on the right of the minimap (Faith's column keeps the Orashai's mana under it). */
 export function MountOrb({ game, onRide, openMenu }: { game: Game; onRide?: (id?: string) => void; openMenu?: OpenMenu }) {
   const player = game.player;

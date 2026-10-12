@@ -980,7 +980,7 @@ export function skillEmblem(skill: Skill, size: number): Pixels {
   return out;
 }
 export const skillArt = (skill: Skill) => pixelArt(`skill24:${skill}`, 24, 24, p => { SKILL24[skill](p); p.outline(); p.halo(); });
-export type TabIcon = "combat" | "skills" | "quests" | "inventory" | "equipment" | "prayer" | "magic" | "friends" | "settings" | "emotes";
+export type TabIcon = "combat" | "skills" | "quests" | "inventory" | "equipment" | "prayer" | "magic" | "friends" | "settings" | "emotes" | "mount";
 /** Side-panel tab icons: 24 pixels, shaded like the items, each a distinct silhouette so they read at a glance. */
 const TAB_PAINTERS: Record<TabIcon, Painter> = {
   // Crossed swords with gold guards.
@@ -1034,6 +1034,12 @@ const TAB_PAINTERS: Record<TabIcon, Painter> = {
     part(p, poly([[12, 7], [13.5, 10.5], [17, 11], [13.5, 12.5], [12, 16], [10.5, 12.5], [7, 11], [10.5, 10.5]]), "#e2d49e", "glow");
   },
   // Two Friends side by side: one dark, one pale.
+  // A horse's head and neck, with a dark mane and a pricked ear.
+  mount: p => {
+    part(p, all(poly([[4, 22], [6, 12], [9, 6], [14, 3], [19, 5], [20, 9], [16, 11], [14, 15], [14, 22]]), poly([[13, 4], [15, 0], [17, 4]])), "#b0673e", "cloth");
+    part(p, stroke([[9, 7], [6, 13], [5, 19]], 2), "#6f3a24", "flat");
+    p.rect(16, 7, 2, 2, INK);
+  },
   friends: p => {
     const friend = (x: number, color: string, eye: string) => {
       part(p, all(poly([[x - 5, 9], [x - 4, 4], [x - 2, 7], [x + 2, 7], [x + 4, 4], [x + 5, 9], [x + 5, 17], [x - 5, 17]]), box(x - 4, 17, 2, 4), box(x + 2, 17, 2, 4)), color, "cloth");
