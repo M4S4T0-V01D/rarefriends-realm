@@ -659,3 +659,11 @@
 .realm-mount-choice { display: flex; align-items: center; gap: 6px; font-size: 12px; margin: 4px 0; } .realm-mount-choice select { flex: 1; min-width: 0; }
 .realm-mount-card { display: flex; gap: 8px; align-items: center; margin: 6px 0; padding: 6px; border: 2px solid var(--ink, #161616); background: #fbfaf6; } .realm-mount-card > div { display: grid; gap: 4px; } .realm-mount-card small { font-size: 11px; }
 .realm-inventory.bags { grid-template-columns: repeat(4, 1fr); margin: 4px 0; }
+
+/* A skill guide's filters, down the right of its list: groups of toggle buttons (a count each), the way an old-school skill guide sorts itself. */
+.realm-guide-layout { display: grid; grid-template-columns: minmax(0, 1fr) 150px; gap: 8px; align-items: start; }
+.realm-guide-filters { max-height: 372px; overflow-y: auto; display: grid; gap: 6px; align-content: start; padding-right: 2px; }
+.realm-guide-filters section { display: grid; gap: 2px; } .realm-guide-filters h4 { margin: 2px 0 1px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: #5a5650; }
+.realm-guide-filters button { display: flex; justify-content: space-between; align-items: center; gap: 4px; padding: 2px 6px !important; min-height: 0 !important; font-size: 11px; text-align: left; }
+.realm-guide-filters button small { opacity: 0.6; font-size: 10px; } .realm-guide-filters button[aria-pressed="true"] { background: #e2d7ad !important; }
+@media (max-width: 640px) { .realm-guide-layout { grid-template-columns: 1fr; } .realm-guide-filters { max-height: 120px; grid-template-columns: 1fr 1fr; } }

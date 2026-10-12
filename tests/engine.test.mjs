@@ -4255,3 +4255,24 @@ test("Mounts grown: seven new beasts (quest ones not for sale), the chosen mount
   give(p, "cooked_meat", 10); d = talk(g, "drake_hunter"); assert.match(d.lines[0].text, /shell going/); d.onEnd?.(); assert.ok(questDone(g, DRAKE_OF_YOUR_OWN)); assert.ok(p.mounts.includes("little_dragon")); assert.equal(count(p, "drake_egg"), 0); assert.equal(count(p, "cooked_meat"), 0);
   assert.ok(MOUNTS.find(m => m.id === "little_dragon").fireproof, "the hatchling turns dragonfire");
 });
+
+test("Skill guide filters: every entry tagged, the groups a skill offers (metals in Smithing, elements in Magic, boosts in Faith, methods in Fishing, traditions in Mysteries), any-of within a group and all-of across groups, named buttons", async () => {
+  const { skillGuide, guideFilters, filterGuide, tagName, GUIDE_GROUPS } = await import("../games/rarefriends-realm/guide.ts");
+  for (const skill of SKILLS) for (const entry of skillGuide(skill)) assert.ok(entry.tags?.length, `${skill}: ${entry.name} is tagged`);
+  const groupsOf = skill => Object.fromEntries(guideFilters(skillGuide(skill)).map(group => [group.id, group.tags]));
+  const smithing = groupsOf("smithing"); assert.equal(smithing.metal.length, METALS.length, "every metal in Smithing"); assert.ok(smithing.type.some(t => t.id === "type:weapon") && smithing.type.some(t => t.id === "type:armour") && smithing.slot);
+  const magic = groupsOf("magic"); assert.ok(magic.element.length >= 10 && magic.element.some(t => t.id === "element:fire")); assert.ok(!magic.method, "no methods in Magic");
+  const faith = groupsOf("prayer"); assert.ok(faith.boost.some(t => t.id === "boost:protect") && faith.type.some(t => t.id === "type:prayer") && faith.type.some(t => t.id === "type:order"));
+  const fishing = groupsOf("fishing"); assert.ok(fishing.method.length >= 4 && fishing.method.some(t => t.id === "method:Net")); assert.ok(!fishing.metal);
+  const mysteries = groupsOf("mysteries"); assert.ok(mysteries.tradition.length >= 5 && mysteries.tradition.some(t => t.id === "tradition:orashai"));
+  assert.ok(groupsOf("sigilcraft").type.length >= 2 && !groupsOf("sigilcraft").slot, "a single-tag group isn't offered");
+  // Filtering: metal pewter alone; pewter or blackiron (any of); pewter weapons (all of); counts match.
+  const entries = skillGuide("smithing"), pewter = filterGuide(entries, new Set(["metal:pewter"]));
+  assert.ok(pewter.length > 0 && pewter.every(e => e.tags.includes("metal:pewter"))); assert.equal(pewter.length, smithing.metal.find(t => t.id === "metal:pewter").count);
+  const two = filterGuide(entries, new Set(["metal:pewter", "metal:blackiron"])); assert.ok(two.length > pewter.length && two.every(e => e.tags.includes("metal:pewter") || e.tags.includes("metal:blackiron")));
+  const weapons = filterGuide(entries, new Set(["metal:pewter", "type:weapon"])); assert.ok(weapons.length > 0 && weapons.length < pewter.length && weapons.every(e => e.tags.includes("metal:pewter") && e.tags.includes("type:weapon")));
+  assert.equal(filterGuide(entries, new Set()).length, entries.length, "no choice shows all");
+  // Names: a metal's own name, a slot, an element, a type; the groups in their order.
+  assert.equal(tagName("metal:pewter"), METALS.find(m => m.id === "pewter").name); assert.equal(tagName("slot:head"), "Head"); assert.equal(tagName("element:fire"), "Fire"); assert.equal(tagName("type:weapon"), "Weapons"); assert.equal(tagName("method:Net"), "Net");
+  assert.deepEqual(GUIDE_GROUPS.map(g => g.id), ["type", "metal", "slot", "element", "boost", "method", "tradition"]);
+});

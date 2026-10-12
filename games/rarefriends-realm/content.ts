@@ -1,7 +1,7 @@
 /**
  * NPCs, their dialogue and the Realm's quests. Dialogue is built on demand from the player's quest state.
  */
-import { COURSES, FAMILY_NAMES, FAMILY_PERKS, ITEM_LIST, SLAYER_REWARDS, SKILLS, WAYFARER_MARK, WAYFARER_REWARDS, item , REGIONAL_CLOTHING, SKILL_NAMES, type Skill } from "./data.ts";
+import { COURSES, FAMILY_NAMES, FAMILY_PERKS, ITEM_LIST, SLAYER_REWARDS, SKILLS, WAYFARER_MARK, WAYFARER_REWARDS, item , REGIONAL_CLOTHING, SKILL_NAMES, type Skill, SHOP_SELL } from "./data.ts";
 import type { OverlayQuest } from "./overlay.ts";
 import { OVERLAYS } from "./overlays/index.ts";
 import { assignTask, buySlayerReward, currentTask, eligibleTasks, slayerPoints, slayerStreak, taskText } from "./slayer.ts";
@@ -1465,4 +1465,5 @@ export function tanHides(game: Game) {
   take(player, "cowhide", n); take(player, "coins", n * 2); give(player, "leather", n);
   message(game, `Tessa tans ${n} cowhide${n > 1 ? "s" : ""} into leather.`); sound(game, "coins");
 }
-export const examineItem = (id: string) => item(id).examine;
+/** What Examine says of an item: its own line, and what a shop would give for it (a guess at its worth), where it can be sold. */
+export const examineItem = (id: string) => { const def = item(id), worth = Math.floor(def.value * SHOP_SELL); return def.value > 0 && def.tradeable !== false ? `${def.examine} A shop would give about ${worth.toLocaleString()} coins for ${def.stackable ? "each" : "it"}.` : def.examine; };

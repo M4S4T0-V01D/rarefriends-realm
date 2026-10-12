@@ -347,7 +347,7 @@ export function itemOptions(game: Game, slotIndex: number): ItemOption[] {
   if (slot.id === BONE_BAG) out.push({ verb: "Check", run: bagCheck }, { verb: "Fill", run: bagFill }, { verb: "Empty", run: bagEmpty });
   out.push({ verb: "Use", run: () => ({ kind: "item", slot: slotIndex }) });
   out.push({ verb: "Drop", run: g => drop(g, slotIndex) });
-  out.push({ verb: "Examine", run: g => message(g, slot.n >= 100_000 ? `${slot.n.toLocaleString()} x ${definition.name}` : definition.examine) });
+  out.push({ verb: "Examine", run: g => message(g, slot.n >= 100_000 ? `${slot.n.toLocaleString()} x ${definition.name}` : examineItem(slot.id)) });
   return out;
 }
 export function satchelCheck(game: Game) { message(game, `Your inkcoal satchel holds ${game.player.coalBag} of ${SATCHEL_SIZE} inkcoal.`); }

@@ -15,7 +15,7 @@ import { bossWindow } from "./worldboss.ts";
 import { ACHIEVEMENTS, achieved } from "./achievements.ts";
 import { hiscores } from "./hiscores.ts";
 import { petArt } from "./petart.ts";
-import { MAX_QUEST_POINTS, NPCS, QUESTS, finalStage, questDone, questPoints, type QuestDef } from "./content.ts";
+import { MAX_QUEST_POINTS, NPCS, QUESTS, examineItem, finalStage, questDone, questPoints, type QuestDef } from "./content.ts";
 import { CARDS, CARD_KINDS, CARD_KIND_NAMES, cardFound, cardsFound, orderOpen, type CardDef } from "./codex.ts";
 import { decorArt } from "./scenery.ts";
 import { HIGH_QUALITY, LOW_QUALITY, type Quality } from "./render.ts";
@@ -43,7 +43,7 @@ import { friendRows, renderWorldMap } from "./render.ts";
 import { DUNGEON_Y, FLOOR_Y, OVERWORLD_H, W, isUnderground, mainlandToWorld, realPoint } from "./world.ts";
 import type { NetState } from "./net.ts";
 import type { TradeView } from "./trade.ts";
-import { recipeBook, skillGuide } from "./guide.ts";
+import { recipeBook, skillGuide, guideFilters, filterGuide } from "./guide.ts";
 import { MysteriesJournal } from "./mysteriesui.tsx";
 import { TECHNIQUES, cooldownLeft, preparation, techniqueLocked, useTechnique, type TechniqueId } from "./techniques.ts";
 import { artUrl, emoteArt, itemArt, orbArt, prayerArt, skillArt, spellArt, tabArt, type TabIcon } from "./icons.ts";
@@ -100,7 +100,7 @@ export function rightClick(openMenu: OpenMenu | undefined, entries: () => MenuEn
     onTouchEnd: cancelLongPress, onTouchMove: cancelLongPress,
   };
 }
-const examine = (game: Game, id: string, refresh: () => void): MenuEntry => ({ verb: "Examine", noun: item(id).name, tone: "item", run: () => { message(game, item(id).examine); refresh(); } });
+const examine = (game: Game, id: string, refresh: () => void): MenuEntry => ({ verb: "Examine", noun: item(id).name, tone: "item", run: () => { message(game, examineItem(id)); refresh(); } });
 export function ContextMenu({ x, y, entries, onClose }: { x: number; y: number; entries: MenuEntry[]; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ x, y });
@@ -1386,6 +1386,45 @@ export function TradeModal({ game, view, onOffer, onAccept, onDecline, openMenu 
   );
 }
 /** Skill guides (what unlocks at each level) and the recipe book (everything you can make). */
+/**
+ * One skill's guide: its unlocks in level order, with filters down the right (the tags its entries carry, guide.ts: type,
+ * metal, slot, element…; any chosen tag within a group will do, every group chosen must be met), a search, and a switch
+ * for only what's unlocked. The next unlock is outlined.
+ */
+function SkillGuide({ game, skill, onSkill }: { game: Game; skill: Skill; onSkill: (skill: Skill | null) => void }) {
+  const player = game.player, level = levelForXp(player.xp[skill]), [chosen, setChosen] = useState<Set<string>>(() => new Set()), [search, setSearch] = useState(""), [unlocked, setUnlocked] = useState(false);
+  const entries = skillGuide(skill), next = entries.find(entry => entry.level > level), groups = guideFilters(entries);
+  const shown = filterGuide(entries, chosen).filter(entry => (!unlocked || level >= entry.level) && (!search || `${entry.name} ${entry.detail}`.toLowerCase().includes(search.toLowerCase())));
+  const toggle = (tag: string) => setChosen(before => { const after = new Set(before); if (after.has(tag)) after.delete(tag); else after.add(tag); return after; });
+  return <>
+    {skill === "presence" && <ProfilePanel game={game} refresh={() => onSkill("presence")} />}
+    <p className="realm-muted">Your level: <b>{level}</b>{next ? ` · next unlock at ${next.level}: ${next.name}` : " · everything unlocked!"}</p>
+    <div className="realm-guide-layout">
+      <div className="realm-guide-main">
+        <div className="realm-bank-bar"><input type="search" placeholder="Search this guide" value={search} onChange={event => setSearch(event.target.value)} aria-label="Search this guide" />
+          <label className="realm-check"><input type="checkbox" checked={unlocked} onChange={event => setUnlocked(event.target.checked)} /> Unlocked only</label>
+          {(chosen.size > 0 || search || unlocked) && <button type="button" className="realm-dark" onClick={() => { setChosen(new Set()); setSearch(""); setUnlocked(false); }}>Clear</button>}</div>
+        <ul className="realm-guide">
+          {shown.map((entry, index) => {
+            const open = level >= entry.level;
+            return <li key={index} data-open={open} data-next={entry === next}>
+              <b className="realm-guide-level">{entry.level}</b>
+              {entry.icon ? <ItemIcon slot={{ id: entry.icon, n: 1 }} size={30} bare /> : entry.spell ? (() => { const spell = SPELLS.find(s => s.id === entry.spell)!; return <PixelIcon art={spellArt(spell.id, spell.element, spell.kind)} size={24} />; })() : <PixelIcon art={skillArt(skill)} size={22} />}
+              <span><b>{entry.name}</b><small>{entry.detail}</small></span>
+              {open && <i aria-label="Unlocked">✓</i>}
+            </li>;
+          })}
+          {!shown.length && <li className="realm-muted">Nothing matches.</li>}
+        </ul>
+      </div>
+      {groups.length > 0 && <aside className="realm-guide-filters" aria-label="Filters">
+        {groups.map(group => <section key={group.id}><h4>{group.name}</h4>
+          {group.tags.map(tag => <button key={tag.id} type="button" aria-pressed={chosen.has(tag.id)} onClick={() => toggle(tag.id)}>{tag.name} <small>{tag.count}</small></button>)}
+        </section>)}
+      </aside>}
+    </div>
+  </>;
+}
 export function GuideModal({ game, skill, onSkill, onClose }: { game: Game; skill: Skill | null; onSkill: (skill: Skill | null) => void; onClose: () => void }) {
   const player = game.player, [search, setSearch] = useState(""), [makeable, setMakeable] = useState(false), [bookSkill, setBookSkill] = useState<Skill | "all">("all");
   const levelOf = (s: Skill) => levelForXp(player.xp[s]);
@@ -1395,27 +1434,7 @@ export function GuideModal({ game, skill, onSkill, onClose }: { game: Game; skil
       <button type="button" role="tab" aria-selected={skill === null} className="realm-guide-book" onClick={() => onSkill(null)}>Recipe book</button>
     </div>
   );
-  if (skill) {
-    const entries = skillGuide(skill), level = levelOf(skill), next = entries.find(entry => entry.level > level);
-    return (
-      <Modal title={`${SKILL_NAMES[skill]} guide`} onClose={onClose} wide>
-        {tabs}
-        {skill === "presence" && <ProfilePanel game={game} refresh={() => onSkill("presence")} />}
-        <p className="realm-muted">Your level: <b>{level}</b>{next ? ` · next unlock at ${next.level}: ${next.name}` : " · everything unlocked!"}</p>
-        <ul className="realm-guide">
-          {entries.map((entry, index) => {
-            const open = level >= entry.level;
-            return <li key={index} data-open={open} data-next={entry === next}>
-              <b className="realm-guide-level">{entry.level}</b>
-              {entry.icon ? <ItemIcon slot={{ id: entry.icon, n: 1 }} size={30} bare /> : entry.spell ? (() => { const spell = SPELLS.find(s => s.id === entry.spell)!; return <PixelIcon art={spellArt(spell.id, spell.element, spell.kind)} size={24} />; })() : <PixelIcon art={skillArt(skill)} size={22} />}
-              <span><b>{entry.name}</b><small>{entry.detail}</small></span>
-              {open && <i aria-label="Unlocked">✓</i>}
-            </li>;
-          })}
-        </ul>
-      </Modal>
-    );
-  }
+  if (skill) return <Modal title={`${SKILL_NAMES[skill]} guide`} onClose={onClose} wide>{tabs}<SkillGuide key={skill} game={game} skill={skill} onSkill={onSkill} /></Modal>;
   const has = (id: string, n: number) => count(player, id) >= n;
   const recipes = recipeBook().filter(recipe => (bookSkill === "all" || recipe.skill === bookSkill) && (!search || recipe.label.toLowerCase().includes(search.toLowerCase()) || Object.keys(recipe.inputs).some(id => item(id).name.toLowerCase().includes(search.toLowerCase())))
     && (!makeable || (levelOf(recipe.skill) >= recipe.level && Object.entries(recipe.inputs).every(([id, n]) => has(id, n)))));
@@ -1597,7 +1616,7 @@ function MountTab({ game, refresh, openMenu, paused }: PanelProps) {
         {riding.forge && <><h4>The forge on its back</h4><div className="realm-buttons"><button type="button" disabled={paused} onClick={() => { forgeMenu(game, "furnace"); refresh(); }}>Smelt</button><button type="button" disabled={paused} onClick={() => { forgeMenu(game, "anvil"); refresh(); }}>Smith</button></div></>}
         {bags && <><h4>Saddlebags <small>({bags.filter(Boolean).length}/{bags.length}) · right-click a pack item: Stow</small></h4>
           <div className="realm-inventory bags" onContextMenu={event => event.preventDefault()}>{bags.map((slot, index) => <button key={index} type="button" className="realm-slot" aria-label={slot ? `Take back ${item(slot.id).name}${slot.n > 1 ? ` × ${slot.n}` : ""}` : `Empty saddlebag ${index + 1}`} disabled={paused} onClick={() => { if (slot) { unstow(game, index); refresh(); } }}
-            {...rightClick(openMenu, () => slot ? [{ verb: "Take-back", noun: item(slot.id).name, tone: "item", run: () => { unstow(game, index); refresh(); } }, { verb: "Examine", noun: item(slot.id).name, run: () => { message(game, item(slot.id).examine); refresh(); } }] : [])}>{slot && <ItemIcon slot={slot} size={40} />}</button>)}</div></>}
+            {...rightClick(openMenu, () => slot ? [{ verb: "Take-back", noun: item(slot.id).name, tone: "item", run: () => { unstow(game, index); refresh(); } }, { verb: "Examine", noun: item(slot.id).name, run: () => { message(game, examineItem(slot.id)); refresh(); } }] : [])}>{slot && <ItemIcon slot={slot} size={40} />}</button>)}</div></>}
       </> : <p className="realm-muted">Ride to use your mount's attack{chosen?.bags ? ", reach its saddlebags" : ""}{chosen?.forge ? ", and work its forge" : ""}.</p>}
       {stable}
     </div>
