@@ -3,6 +3,7 @@
  * world (cloud shadows, birds, butterflies, leaves, snow, dust, fireflies, fish, forge smoke).
  * Particles live in world coordinates with a height, so they follow the camera, its rotation and the hills.
  */
+import { dungeonTheme } from "./dungeontheme.ts";
 import type { Game } from "./state.ts";
 import { item } from "./data.ts";
 import { T, W, groundHeight, inBounds, isUnderground, isWater, regionAt, type World } from "./world.ts";
@@ -166,7 +167,18 @@ export function updateEffects(game: Game, camera: { x: number; y: number }, dt: 
   while (spawnClock > 0.12) {
     spawnClock -= 0.12;
     const at = around(), terrain = inBounds(Math.round(at.x), Math.round(at.y)) ? world.tiles[Math.round(at.y) * W + Math.round(at.x)] : T.VOID;
-    if (underground) { if (Math.random() < 0.25) add({ ...at, h: 20 + Math.random() * 40, vx: 0.05, vy: 0.02, vh: 2, gravity: 0, life: 4, color: "#9a968f", size: 1.5, kind: "dust" }); continue; }
+    if (underground) {
+      // Each dungeon family's air (dungeontheme.ts): dust that hangs, embers that rise, frost that falls, sparks and glows that drift, spores.
+      const motes = dungeonTheme(world, camera.x, camera.y)?.motes ?? { kind: "dust" as const, color: "#9a968f", rate: 0.25 };
+      if (Math.random() < motes.rate) {
+        if (motes.kind === "ember") add({ ...at, h: 4 + Math.random() * 10, vx: 0.1, vy: -0.05, vh: 14, gravity: -2, life: 3, color: motes.color, size: 1.5, kind: "spark" });
+        else if (motes.kind === "frost") add({ ...at, h: 60 + Math.random() * 30, vx: 0.08, vy: 0.04, vh: -14, gravity: 0, life: 5, color: motes.color, size: 2, kind: "flake" });
+        else if (motes.kind === "spark" || motes.kind === "glow") add({ ...at, h: 10 + Math.random() * 30, vx: 0, vy: 0, vh: 0, gravity: 0, life: 3.5, color: motes.color, size: motes.kind === "glow" ? 2 : 1.5, kind: "glow" });
+        else if (motes.kind === "spore") add({ ...at, h: 30 + Math.random() * 30, vx: 0.1, vy: 0.05, vh: -6, gravity: 0, life: 5, color: motes.color, size: 1.5, kind: "leaf" });
+        else add({ ...at, h: 20 + Math.random() * 40, vx: 0.05, vy: 0.02, vh: 2, gravity: 0, life: 4, color: motes.color, size: 1.5, kind: "dust" });
+      }
+      continue;
+    }
     if (region === "frostpeak" || terrain === T.SNOW) add({ ...at, h: 120, vx: 0.15, vy: 0.1, vh: -28, gravity: 0, life: 5, color: "#ffffff", size: 2, kind: "flake" });
     else if ((region === "whisperwood" || region === "fernwick" || region === "mossy_ruins") && Math.random() < 0.35) add({ ...at, h: 70, vx: 0.1, vy: 0.05, vh: -16, gravity: 0, life: 5, color: Math.random() < 0.5 ? "#c9a36f" : "#a9b59c", size: 2, kind: "leaf" });
     else if ((region === "pale_dunes" || region === "oasis") && Math.random() < 0.4) add({ ...at, h: 4 + Math.random() * 10, vx: 1.4, vy: 0.3, vh: 0, gravity: 0, life: 2.2, color: "#d9c9a3", size: 1.5, kind: "dust" });

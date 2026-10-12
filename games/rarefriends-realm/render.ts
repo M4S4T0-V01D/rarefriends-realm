@@ -12,6 +12,7 @@ import { NPCS, npcHere } from "./content.ts";
 import { TICK_MS, attackSpeed, riding, type Facing, type Game, type Monster, type Npc, type Projectile } from "./state.ts";
 import { npcOverhead, veiled, type Pick } from "./engine.ts";
 import { knows, maxHpOf as creatureMaxHp } from "./pursuance.ts";
+import { FAMILIES, dungeonTheme } from "./dungeontheme.ts";
 import { gloomAt, inDeadwood, DUNGEON_Y, FLOOR_Y, OVERWORLD_H, REGIONS, STOREY, T, W, H, complexAt, cornerHeight, floorAt, groundHeight, inBounds, isUnderground, objectAtTile, onLevel, realPoint, type Building, type DecorKind, type Floor, type World, type WorldObject } from "./world.ts";
 import { itemArt } from "./icons.ts";
 import type { PeerView } from "./social.ts";
@@ -50,6 +51,14 @@ const GROUND_STYLE: Partial<Record<number, GroundStyle>> = {
   [T.GRASS]: "grass", [T.DARK_GRASS]: "lush", [T.PATH]: "dirt", [T.GRAVEL]: "gravel", [T.COBBLE]: "cobble", [T.STONE]: "flag", [T.SAND]: "sand", [T.SNOW]: "snow",
   [T.WOOD]: "plank", [T.BRIDGE]: "plank", [T.FARMLAND]: "furrow", [T.DUNGEON]: "dungeon", [T.ICE]: "ice", [T.CARPET]: "carpet", [T.ASH]: "ash", [T.SWAMP]: "swamp", [T.BRICK]: "brick",
 };
+/**
+ * The dungeon families' floors (dungeontheme.ts) are looked up like terrains of their own, past the real ones: a DUNGEON
+ * tile under themed ground takes its family's colour and detail for the fill and the texture (its edges and everything
+ * else stay a dungeon floor's).
+ */
+const THEME_BASE = 100, THEME_LIST = Object.values(FAMILIES);
+THEME_LIST.forEach((family, i) => { TERRAIN_COLORS[THEME_BASE + i] = family.floor.color; GROUND_STYLE[THEME_BASE + i] = family.floor.style as GroundStyle; });
+const lookOf = (world: World, x: number, y: number, terrain: number) => { if (terrain !== T.DUNGEON || !isUnderground(y)) return terrain; const theme = dungeonTheme(world, x, y); return theme ? THEME_BASE + THEME_LIST.indexOf(theme) : terrain; };
 /** Terrain classes for inked edges: a line is drawn where the class changes. */
 const EDGE_CLASS: Record<number, number> = {
   [T.GRASS]: 1, [T.DARK_GRASS]: 1, [T.PATH]: 2, [T.COBBLE]: 3, [T.SAND]: 4, [T.WATER]: 5, [T.DEEP]: 5, [T.SWAMP]: 6, [T.SNOW]: 7,
@@ -355,7 +364,7 @@ function groundChunkMesh(glr: RealmGL, world: World, cx: number, cy: number): Fl
     const hA = cornerHeight(world, x, y), hB = cornerHeight(world, x + 1, y), hC = cornerHeight(world, x + 1, y + 1), hD = cornerHeight(world, x, y + 1);
     const slope = Math.max(-0.22, Math.min(0.22, ((hA + hD) - (hB + hC) + (hA + hB) - (hD + hC)) * 0.011));
     const shadeAmount = (hash(x, y) - 0.5) * 0.035 + slope - (inDeadwood(world, x, y) ? 0.3 : 0);
-    const layer = groundLayer(glr, terrain, Math.floor(hash(y, x) * 4)), mine = EDGE_CLASS[terrain];
+    const layer = groundLayer(glr, lookOf(world, x, y, terrain), Math.floor(hash(y, x) * 4)), mine = EDGE_CLASS[terrain];
     const other = (nx: number, ny: number) => inBounds(nx, ny) ? world.tiles[ny * W + nx] : T.VOID;
     // Natural ground blends into natural ground of another kind (no ink line between them); anything else is inked.
     const blendTo = (nx: number, ny: number) => { const o = other(nx, ny); return SOFT_GROUND.has(terrain) && SOFT_GROUND.has(o) && o !== terrain ? groundLayer(glr, o, Math.floor(hash(ny, nx) * 4)) : -1; };
@@ -587,7 +596,7 @@ function terrainOrder(camera: Camera, x0: number, y0: number, x1: number, y1: nu
  * that has to cover something standing behind it. Returns its corners on screen.
  */
 function groundTile(ctx: CanvasRenderingContext2D, scene: Scene, x: number, y: number, draw = true): [number, number][] {
-  const { camera, game } = scene, world = game.world, z = camera.zoom, terrain = world.tiles[y * W + x];
+  const { camera, game } = scene, world = game.world, z = camera.zoom, terrain = world.tiles[y * W + x], look = lookOf(world, x, y, terrain);
   const flat = (dx: number, dy: number) => { const { rx, ry } = rotate(camera, dx, dy); return { x: (rx - ry) * TILE_W / 2 * z, y: (rx + ry) * TILE_W / 2 * camera.pitch * z }; };
   const ex = flat(0.5, 0), ey = flat(0, 0.5), lifted = liftScale(camera) * z, { x: sx, y: sy } = toScreen(camera, x, y);
   const hA = cornerHeight(world, x, y), hB = cornerHeight(world, x + 1, y), hC = cornerHeight(world, x + 1, y + 1), hD = cornerHeight(world, x, y + 1), hMid = (hA + hB + hC + hD) / 4;
@@ -597,9 +606,9 @@ function groundTile(ctx: CanvasRenderingContext2D, scene: Scene, x: number, y: n
   if (!draw) return corners;
   const slope = Math.max(-0.22, Math.min(0.22, ((hA + hD) - (hB + hC) + (hA + hB) - (hD + hC)) * 0.011));
   ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.lineTo(cx, cy); ctx.lineTo(dx, dy); ctx.closePath();
-  ctx.fillStyle = terrainFill(terrain, (hash(x, y) - 0.5) * 0.035 + slope - (inDeadwood(world, x, y) ? 0.3 : 0)); ctx.fill();
-  const style = GROUND_STYLE[terrain], hh = TILE_W / 2 * z * camera.pitch;
-  if (texturesOn && style && hh >= 5) texturedQuad(ctx, groundTexture(style, TERRAIN_COLORS[terrain], Math.floor(hash(y, x) * 4)), { x: ax, y: ay }, { x: bx, y: by }, { x: dx, y: dy }, TEX_PER_TILE, TEX_PER_TILE);
+  ctx.fillStyle = terrainFill(look, (hash(x, y) - 0.5) * 0.035 + slope - (inDeadwood(world, x, y) ? 0.3 : 0)); ctx.fill();
+  const style = GROUND_STYLE[look], hh = TILE_W / 2 * z * camera.pitch;
+  if (texturesOn && style && hh >= 5) texturedQuad(ctx, groundTexture(style, TERRAIN_COLORS[look], Math.floor(hash(y, x) * 4)), { x: ax, y: ay }, { x: bx, y: by }, { x: dx, y: dy }, TEX_PER_TILE, TEX_PER_TILE);
   if (bare) return corners;
   const edges = new Path2D(), contours = new Path2D(), mine = EDGE_CLASS[terrain];
   const edge = (nx: number, ny: number, px: number, py: number, qx: number, qy: number) => {
@@ -663,14 +672,14 @@ function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, camera: Camera
     const cx = sx + ex.x + ey.x, cy = sy + ex.y + ey.y - (hC - hMid) * lifted, dx = sx - ex.x + ey.x, dy = sy - ex.y + ey.y - (hD - hMid) * lifted;
     if (mode !== "motion") {
       ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.lineTo(cx, cy); ctx.lineTo(dx, dy); ctx.closePath();
-      ctx.fillStyle = terrainFill(terrain, variation); ctx.fill();
+      ctx.fillStyle = terrainFill(lookOf(world, x, y, terrain), variation); ctx.fill();
     }
     // Texture details.
-    const h = hash(y, x), detailed = !small && Math.abs(x - camera.x) + Math.abs(y - camera.y) < near, style = GROUND_STYLE[terrain];
+    const h = hash(y, x), detailed = !small && Math.abs(x - camera.x) + Math.abs(y - camera.y) < near, look = lookOf(world, x, y, terrain), style = GROUND_STYLE[look];
     if (detailed && (mode === "still" ? moving : mode === "motion" ? !moving : false)) { /* the other pass draws it */ }
     else if (detailed && texturesOn && style) {
       // Pixel texture mapped onto the tile (corners a, b along x, d along y), in the same style as the buildings.
-      texturedQuad(ctx, groundTexture(style, TERRAIN_COLORS[terrain], Math.floor(h * 4)), { x: ax, y: ay }, { x: bx, y: by }, { x: dx, y: dy }, TEX_PER_TILE, TEX_PER_TILE);
+      texturedQuad(ctx, groundTexture(style, TERRAIN_COLORS[look], Math.floor(h * 4)), { x: ax, y: ay }, { x: bx, y: by }, { x: dx, y: dy }, TEX_PER_TILE, TEX_PER_TILE);
     } else if (detailed) {
       ctx.strokeStyle = "rgba(22,22,22,0.22)"; ctx.fillStyle = "rgba(22,22,22,0.18)"; ctx.lineWidth = Math.max(0.6, z * 0.8);
       switch (terrain) {
@@ -1658,6 +1667,21 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
         ctx.fillStyle = "rgba(214,208,196,0.55)"; ctx.fillRect(sx - 2 * px, top - 3 * px, 4 * px, px); ctx.fillRect(sx - 1 * px, top - 2 * px, 2.5 * px, px);
         return hit(68, 48);
       }
+      case "crystal": {
+        // A cluster of pale mineral: three shards leaning out of the rock, lit from within, a cold glow on the ground round them.
+        ellipse(ctx, sx, sy + 1 * z, 16 * z, 7 * z, "rgba(191,244,255,0.16)", null);
+        for (const [dx, hgt, w, tint] of [[-7, 22, 5, "#dfe7ec"], [2, 32, 6, "#eef7fb"], [9, 18, 4, "#c7d3dc"]] as const) {
+          poly(ctx, [[sx + (dx - w) * z, sy + 2 * z], [sx + dx * z, sy - hgt * z], [sx + (dx + w) * z, sy + 2 * z]], tint, INK, 1);
+          poly(ctx, [[sx + dx * z, sy - hgt * z], [sx + (dx + w) * z, sy + 2 * z], [sx + (dx + w * 0.4) * z, sy - hgt * 0.45 * z]], "rgba(120,150,170,0.35)", null);
+        }
+        return hit(34, 36);
+      }
+      case "rune_circle": {
+        // A circle cut into the floor, a lozenge inside it, the grooves alight; it lies flat, so it's drawn before anything stands on it.
+        ellipse(ctx, sx, sy, 22 * z, 11 * z, "rgba(154,130,224,0.12)", "#b4a0ff", 1.5); ellipse(ctx, sx, sy, 14 * z, 7 * z, null, "#9a82e0", 1);
+        poly(ctx, [[sx, sy - 9 * z], [sx + 16 * z, sy], [sx, sy + 9 * z], [sx - 16 * z, sy]], null, "#d7c9ff", 1);
+        return hit(4, 44);
+      }
       case "grave": box(ctx, camera, ox, oy, 0.3, 0.6, 18, "#c8c5be", "#a9a59e", "#9a968f"); return hit(24, 24);
       case "canopy": {
         // A slab of the old roof over the Ring's walk, up on its pillars; it turns see-through over you.
@@ -2481,7 +2505,9 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   roofGL = glr; roofLayer = glr ? ctx : null;
   lap("setup"); if (!glr) drawGround(ctx, scene, x0, y0, x1, y1, reach); lap("terrain"); RENDER_PROFILE.groundQuads = textureStats.frame;
   // The sky's light for the time of day and the weather; the sun's share of it decides how dark shadows are.
-  const weather = scene.weather ?? null, sky = gloomSky(skyFor(scene.time, weather, underground), gloomAt(world, game.player.x, game.player.y)), lit = true;
+  const weather = scene.weather ?? null, sky0 = gloomSky(skyFor(scene.time, weather, underground), gloomAt(world, game.player.x, game.player.y)), lit = true;
+  // Under themed ground the dark has a colour of its own (dungeontheme.ts).
+  const under = underground ? dungeonTheme(world, game.player.x, game.player.y) : null, sky = under ? { ...sky0, ambient: under.ambient } : sky0;
   windowGlow = underground ? 0 : Math.max(0, Math.min(1, (sky.night - 0.3) / 0.45));
   if ((seenVersion.get(world) ?? 0) !== (game.worldVersion ?? 0)) { seenVersion.set(world, game.worldVersion ?? 0); roomLightCache.delete(world); resetLighting(world); }
   const rooms = roomLights(world);
@@ -2534,12 +2560,13 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       ctx.globalAlpha = near ? 0.3 : 1;
       const mizukai = style === "mizukai", shrine = style === "lacquer";
       const sand = style === "sandstone", mud = style === "mudbrick";
-      const [top, left, right] = dungeon ? ["#4a4950", "#3a3940", "#2f2e35"] : timber ? ["#8a6a50", "#e6dcc6", "#cfc4ab"] : mizukai ? ["#3d2e26", "#efe9dc", "#d9d1c0"] : shrine ? ["#5a2a22", "#efe6d6", "#d9cfbc"] : style === "plank" ? ["#8a6a50", "#b89c7e", "#9c8266"] : style === "marble" ? ["#eee8db", "#e0d8c7", "#cbc2af"]
+      const theme = dungeon ? dungeonTheme(world, Math.round(x), Math.round(y)) : null;
+      const [top, left, right] = dungeon ? (theme ? [theme.wall.top, theme.wall.left, theme.wall.right] : ["#4a4950", "#3a3940", "#2f2e35"]) : timber ? ["#8a6a50", "#e6dcc6", "#cfc4ab"] : mizukai ? ["#3d2e26", "#efe9dc", "#d9d1c0"] : shrine ? ["#5a2a22", "#efe6d6", "#d9cfbc"] : style === "plank" ? ["#8a6a50", "#b89c7e", "#9c8266"] : style === "marble" ? ["#eee8db", "#e0d8c7", "#cbc2af"]
         : sand ? ["#d9b98a", "#d4a874", "#b98c5c"] : mud ? ["#d8c4a0", "#cdb48c", "#b39a74"] : ["#b9b4ab", "#a39e95", "#8f8a82"];
       const plain: WallStyle = dungeon ? "dungeon" : timber ? "timber" : mizukai ? "mizukai" : shrine ? "lacquer" : style === "plank" ? "plank" : sand ? "sandstone" : mud ? "mudbrick" : "brick";
       // At night most windows glow with the lamps inside (a Mizukai window is a paper lattice; a shrine's walls have none).
       const glazed = (k: number): WallStyle => sand || mud ? (windowGlow > 0.02 && hash(x * 5 + 3, y + k * 11) < 0.8 ? (sand ? "sandstone_window_lit" : "mudbrick_window_lit") : sand ? "sandstone_window" : "mudbrick_window") : shrine ? "lacquer" : mizukai ? (windowGlow > 0.02 && hash(x * 5 + 3, y + k * 11) < 0.8 ? "mizukai_window_lit" : "mizukai_window") : windowGlow > 0.02 && hash(x * 5 + 3, y + k * 11) < 0.8 ? (timber ? "timber_window_lit" : "window_lit") : timber ? "timber_window" : "window";
-      if (dungeon) box(ctx, camera, x, y, 1, 1, 34, top, left, right, 0, INK, "dungeon");
+      if (dungeon) box(ctx, camera, x, y, 1, 1, 34, top, left, right, 0, INK, theme?.wall.style ?? "dungeon");
       else if (cut) box(ctx, camera, x, y, 1, 1, 9, top, left, right, 0, INK, plain);
       else if (battlement) { box(ctx, camera, x, y, 1, 1, 12, top, left, right, 0, INK, "brick"); if ((Math.round(x) + Math.round(y)) % 2 === 0) box(ctx, camera, x, y, 0.62, 0.62, 10, top, left, right, 12, INK, "brick"); }
       else {
@@ -2597,7 +2624,8 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     const object = objectAtTile(world, x, y);
     if (!object || object.name === "__removed") return;
     if (object.kind === "decor" && SMALL_DECOR.has(object.decor!) && Math.abs(x - camera.x) + Math.abs(y - camera.y) > HAZE_START) return;
-    if (object.decor === "lamp") glow(x, y, 48, 150, "#f2b261", 0.9); else if (object.decor === "stone_lantern" || object.decor === "paper_lantern") glow(x, y, object.decor === "stone_lantern" ? 30 : 50, 110, "#f2b261", 0.75); else if (object.decor === "torch") glow(x, y, 32, 130, "#ef9a4c", 1, true); else if (object.decor === "hearth" || object.decor === "campfire") glow(x, y, 14, 170, "#f0a050", 1, true);
+    if (object.decor === "crystal") glow(x, y, 14, 70, "#bff4ff", 0.55); else if (object.decor === "rune_circle") glow(x, y, 2, 90, "#a48cf0", 0.6);
+    else if (object.decor === "lamp") glow(x, y, 48, 150, "#f2b261", 0.9); else if (object.decor === "stone_lantern" || object.decor === "paper_lantern") glow(x, y, object.decor === "stone_lantern" ? 30 : 50, 110, "#f2b261", 0.75); else if (object.decor === "torch") glow(x, y, 32, 130, (isUnderground(y) && dungeonTheme(world, x, y)?.torch) || "#ef9a4c", 1, true); else if (object.decor === "hearth" || object.decor === "campfire") glow(x, y, 14, 170, "#f0a050", 1, true);
     else if (object.kind === "furnace" || object.kind === "range") glow(x, y, 16, 110); else if (object.kind === "altar") glow(x, y, 26, 70); else if (object.kind === "fountain" && objectAtTile(world, x - 1, y)?.kind !== "fountain" && objectAtTile(world, x, y - 1)?.kind !== "fountain") glow(x + 0.5, y + 0.5, 12, 110, "#a9d4f2", 0.55); else if (object.kind === "sigil_altar") glow(x, y, 30, 90);
     // The fountain is 2 × 2: sorted by its centre (a little forward, for its rim), not its back tile, so Friends beside it
     // stand behind its rim rather than on it, at any camera angle.

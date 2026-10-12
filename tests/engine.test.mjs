@@ -4068,3 +4068,129 @@ test("The Hearthkin: Emberforge's Fellows of Metal (the trial, the Deep behind a
   // Saved and restored: the gauge, the quests, the touch.
   give(p, "oddhands_gauge"); const k = newGame(); restore(k, serialize(g)); assert.ok(questDone(k, COLD_QUENCH) && questDone(k, FELLOWS_TRIAL) && has(k.player, "oddhands_gauge"));
 });
+
+test("Dungeon identity: every underground region has a theme of a family, each family's stone and floor paint differently, the Rime Galleries hang under Frostpeak's shelf and the Sigil Vault under the Wizards' Tower, and every dungeon is dressed in its family's things", async () => {
+  const { DUNGEON_THEMES, FAMILIES, dungeonTheme } = await import("../games/rarefriends-realm/dungeontheme.ts");
+  const { themedWall, themedGround } = await import("../games/rarefriends-realm/dungeontextures.ts");
+  const { REGIONS, regionAt, mainlandToWorld } = await import("../games/rarefriends-realm/world.ts");
+  const { cofferTier } = await import("../games/rarefriends-realm/dungeons.ts");
+  const g = newGame(), world = g.world;
+  // Coverage: every underground region, a theme; six families among them.
+  for (const region of REGIONS.filter(r => r.underground)) assert.ok(DUNGEON_THEMES[region.id], `${region.name} has a theme`);
+  assert.ok(new Set(Object.values(FAMILIES).map(t => t.family)).size >= 6);
+  // The painters: a fake canvas records what each family's stone and floor paint (past the plain fill); no two families paint alike.
+  const paint = (fn, families, pick, ...dims) => families.map(family => { const set = new Set(); let n = 0; const p = { rect: (x, y, w, h, c) => { if (w >= dims[0] && h >= dims[dims.length - 1]) return; for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) set.add(`${i},${j},${c}`); n++; }, set: (x, y, c) => { set.add(`${x},${y},${c}`); n++; }, line: (x0, y0, x1, y1, c) => { set.add(`l${x0},${y0},${x1},${y1},${c}`); n++; }, polyline: (pts, c) => { set.add(`p${pts.join("|")},${c}`); n++; }, disc: (cx, cy, rx, ry, f, s) => { set.add(`d${cx},${cy},${rx},${ry},${f},${s}`); n++; } };
+    const noise = (x, y, salt) => ((x * 7 + y * 13 + salt * 31) % 100) / 100, shade = (hex, amount) => `${hex}@${amount.toFixed(2)}`, [style, color] = pick(family);
+    const painted = fn(p, style, color, 0, noise, shade, ...dims); if (painted) assert.ok(n > 10, `${family.id} paints something`); return [family.id, set, painted]; });
+  const list = Object.values(FAMILIES), walls = paint(themedWall, list, f => [f.wall.style, f.wall.top], 16, 24), floors = paint(themedGround, list, f => [f.floor.style, f.floor.color], 16);
+  assert.ok(walls.filter(w => w[2]).length >= 12 && floors.filter(f => f[2]).length >= 12, "most families have stone and floors of their own (the rest keep the old styles)");
+  // A family's identity is its stone and its floor together (two families may share a floor's detail and differ in everything else).
+  const identity = walls.map(([id, wall, painted], i) => [id, new Set([...[...wall].map(k => `w${k}`), ...[...floors[i][1]].map(k => `f${k}`)]), painted || floors[i][2]]);
+  const differ = (a, b) => { let same = 0; for (const k of a) if (b.has(k)) same++; return same / new Set([...a, ...b]).size < 0.7; };
+  for (let i = 0; i < identity.length; i++) for (let j = i + 1; j < identity.length; j++) if (identity[i][2] && identity[j][2]) assert.ok(differ(identity[i][1], identity[j][1]), `${identity[i][0]} and ${identity[j][0]} look different`);
+  assert.ok(!themedWall({ rect() {}, set() {}, line() {}, polyline() {}, disc() {} }, "brick", "#fff", 0, () => 0, h => h, 16, 24), "the old styles are left to textures.ts");
+  // The places: the Rime Galleries' ladder on the shelf, the Vault's stairs in the tower; their themes; their coffers deep.
+  const rime = world.objects.find(o => o.name === "The Rime Galleries"), vault = world.objects.find(o => o.name === "Vault stairs");
+  const shelf = mainlandToWorld(261, 38), tower = mainlandToWorld(160, 132);
+  assert.deepEqual([rime.x, rime.y], shelf); assert.deepEqual([vault.x, vault.y], tower);
+  assert.equal(regionAt(world, rime.to.x, rime.to.y).id, "rime_galleries"); assert.equal(regionAt(world, vault.to.x, vault.to.y).id, "sigil_vault");
+  assert.equal(dungeonTheme(world, rime.to.x, rime.to.y).id, "rime"); assert.equal(dungeonTheme(world, vault.to.x, vault.to.y).id, "arcane"); assert.equal(dungeonTheme(world, rime.x, rime.y), null, "no theme above ground");
+  assert.ok(world.objects.some(o => o.name === "The cold forge") && world.objects.some(o => o.name === "Frosted anvil") && world.objects.some(o => o.decor === "rune_circle"));
+  assert.ok(world.objects.filter(o => o.decor === "crystal" && regionAt(world, o.x, o.y).id === "rime_galleries").length >= 6);
+  assert.ok(world.spawns.filter(s => s.id === "frost_wisp" && regionAt(world, s.x, s.y).id === "sigil_vault").length >= 4, "the wisps keep the vault");
+  assert.equal(cofferTier(g, world.objects.find(o => o.name === "The vault's coffer")), "deep"); assert.equal(cofferTier(g, world.objects.find(o => o.name === "Frostsmith's old chest")), "deep");
+  // The dressing: the catacombs have their sarcophagi and bones, the deep mine its carts and props, the sea cave its barnacled rock, the Hollow its pale obelisks; nothing dressed stands in a doorway.
+  const inRegion = (id, test) => world.objects.filter(o => o.kind === "decor" && regionAt(world, o.x, o.y).id === id && test(o)).length;
+  assert.ok(inRegion("catacombs", o => o.name === "Sarcophagus") >= 6 && inRegion("catacombs", o => o.decor === "bones") >= 8);
+  assert.ok(inRegion("deep_mine", o => o.name === "Ore cart") >= 4 && inRegion("deep_mine", o => o.name === "Pit prop") >= 6);
+  assert.ok(inRegion("sea_cave", o => o.name === "Barnacled rock") >= 6 && inRegion("hollow_depths", o => o.decor === "obelisk") >= 4 && inRegion("deepglass", o => o.decor === "crystal") >= 10);
+  const walls2 = (x, y) => [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => world.tiles[(y + dy) * W + x + dx] === T.WALL);
+  for (const o of world.objects) if (o.kind === "decor" && o.blocks && ["Sarcophagus", "Ore cart", "Pit prop"].includes(o.name)) { const [e, w, s, n] = walls2(o.x, o.y); assert.ok(!((e && w) || (s && n)), `${o.name} at ${o.x},${o.y} doesn't block a passage`); }
+});
+
+test("Activities: a challenge set by its host runs on the game's own mechanics, is timed, scored, paid once and remembered; the Quarry Call counts only the quarry's rock, the Assay Run only the guild furnaces' bars and counts the failures, the Hot Tunnel wants the gem rock and a live return, the Pass Run is on foot; a death or the clock fails it, a failure shortens the wait, and it all survives a save", async () => {
+  const { ACTIVITIES, ACTIVITY_HOSTS, activityProblem, startActivity, cancelActivity, activityEvent, activityTick, activityRecord, cleanActivities } = await import("../games/rarefriends-realm/activities.ts");
+  const { GUILD_FURNACE } = await import("../games/rarefriends-realm/hearthkinnames.ts");
+  const { mainlandToWorld } = await import("../games/rarefriends-realm/world.ts");
+  const g = newGame(), p = g.player;
+  assert.deepEqual(Object.keys(ACTIVITIES), ["quarry_call", "assay_run", "hot_tunnel", "pass_run"]); assert.deepEqual(ACTIVITY_HOSTS.quarry_master, ["quarry_call", "hot_tunnel"]);
+  // The host offers it in talk; the level gates it.
+  let d = talk(g, "quarry_master"); assert.ok(d.options?.some(o => /Quarry Call/.test(o.label)), "the quarrymaster offers the Quarry Call");
+  p.xp.mining = 0; assert.match(activityProblem(g, "quarry_call"), /Mining level of 10/);
+  p.xp.mining = XP_TABLE[20]; assert.equal(activityProblem(g, "quarry_call"), null);
+  // The Quarry Call: pewter rolled at Mining 20 (the rng pinned); ten of it, from the quarry's own faces; rock mined elsewhere doesn't count.
+  g.rng = () => 0; assert.ok(startActivity(g, "quarry_call")); const run = p.activities.run; assert.equal(run.id, "quarry_call"); assert.equal(run.target.rock, "pewter"); assert.equal(run.target.count, 10);
+  assert.match(activityProblem(g, "assay_run"), /on The Quarry Call already/);
+  const [qx, qy] = mainlandToWorld(110, 52), [fx, fy] = mainlandToWorld(121, 123);
+  activityEvent(g, { kind: "mine", rock: "pewter", x: fx, y: fy }); assert.equal(run.progress, 0, "the fountain square isn't the quarry");
+  activityEvent(g, { kind: "mine", rock: "blackiron", x: qx, y: qy }); assert.equal(run.progress, 0, "the wrong rock");
+  for (let i = 0; i < 9; i++) activityEvent(g, { kind: "mine", rock: "pewter", x: qx, y: qy }); assert.equal(run.progress, 9); assert.ok(p.activities.run, "not done at nine");
+  const xp = p.xp.mining, coins = count(p, "coins"); activityEvent(g, { kind: "mine", rock: "pewter", x: qx, y: qy });
+  assert.equal(p.activities.run, null, "done at ten"); assert.ok(p.xp.mining > xp + 100 && count(p, "coins") > coins, "paid"); assert.equal(activityRecord(g, "quarry_call").done, 1); assert.ok(activityRecord(g, "quarry_call").best > 0.9, "a fast run scores high");
+  assert.match(activityProblem(g, "quarry_call"), /Not yet/, "the cooldown holds"); assert.equal(p.stats.activities, 1);
+  // The Assay Run: the best metal you can smelt; bars from the guild furnace count, failures count against, other furnaces don't count.
+  p.xp.smithing = XP_TABLE[25]; startActivity(g, "assay_run"); const assay = p.activities.run; assert.equal(assay.target.metal, "moonsilver"); assert.equal(assay.target.count, 4);
+  activityEvent(g, { kind: "produce", station: "Furnace", metal: "moonsilver", failed: false }); assert.equal(assay.progress, 0);
+  activityEvent(g, { kind: "produce", station: GUILD_FURNACE, metal: "moonsilver", failed: true }); assert.equal(assay.failed, 1);
+  for (let i = 0; i < 4; i++) activityEvent(g, { kind: "produce", station: GUILD_FURNACE, metal: "moonsilver", failed: false });
+  assert.equal(p.activities.run, null); const assayRecord = activityRecord(g, "assay_run"); assert.ok(assayRecord.best < 0.95 && assayRecord.best > 0.5, `a failure costs (${assayRecord.best})`);
+  // The clock: a run that times out fails, pays nothing, and shortens the wait to a third.
+  g.tick += 5000; p.xp.mining = XP_TABLE[45]; give(p, "cooked_meat"); startActivity(g, "hot_tunnel"); const tunnel = p.activities.run; const before = p.xp.mining;
+  g.tick = tunnel.until; activityTick(g); assert.equal(p.activities.run, null); assert.equal(p.xp.mining, before, "nothing paid"); assert.equal(activityRecord(g, "hot_tunnel").done, 0);
+  const wait = activityRecord(g, "hot_tunnel").lastAt + ACTIVITIES.hot_tunnel.cooldown - g.tick; assert.ok(wait > 0 && wait <= ACTIVITIES.hot_tunnel.cooldown / 3 + 1, `a third of the wait (${wait})`);
+  // The Hot Tunnel done: the gem rock in the shaft's region, then standing in the quarry again; a death on the way fails it.
+  g.tick += 5000; startActivity(g, "hot_tunnel"); activityEvent(g, { kind: "death" }); assert.equal(p.activities.run, null, "a death fails it");
+  g.tick += 5000; startActivity(g, "hot_tunnel"); const gem = g.world.objects.find(o => o.rock === "gem" && o.y >= 880);
+  teleport(g, gem.x, gem.y + 1); activityEvent(g, { kind: "mine", rock: "gem", x: gem.x, y: gem.y }); assert.equal(p.activities.run.marks.gem, 1); activityTick(g); assert.ok(p.activities.run, "still down there");
+  teleport(g, qx, qy); activityTick(g); assert.equal(p.activities.run, null, "back up: done"); assert.ok(has(p, "rough_moonstone"), "the moonstone");
+  // The Pass Run: from the lodge to the square on foot; a jump of more than three tiles in a tick is not running.
+  g.tick += 5000; p.xp.agility = XP_TABLE[30]; const [lx, ly] = mainlandToWorld(195, 32); teleport(g, lx, ly); startActivity(g, "pass_run"); activityTick(g);
+  const square = g.world.places.frostpeak; teleport(g, square.x, square.y); activityTick(g); assert.equal(p.activities.run, null, "a glide to the square is not running"); assert.equal(activityRecord(g, "pass_run").done, 0);
+  g.tick += 5000; teleport(g, lx, ly); startActivity(g, "pass_run"); activityTick(g);
+  for (let x = lx; x < square.x; x += 2) { teleport(g, x, ly); activityTick(g); } for (let y = ly; y > square.y; y -= 2) { teleport(g, square.x, y); activityTick(g); } teleport(g, square.x, square.y); activityTick(g);
+  assert.equal(p.activities.run, null); assert.equal(activityRecord(g, "pass_run").done, 1);
+  // Cancelled, and saved: the run and the records come back; a run older than its clock is dropped.
+  g.tick += 5000; startActivity(g, "quarry_call"); cancelActivity(g); assert.equal(p.activities.run, null);
+  g.tick += 5000; startActivity(g, "quarry_call"); const saved = serialize(g), h = newGame(); restore(h, saved); assert.equal(h.player.activities.run?.id, "quarry_call"); assert.equal(h.player.activities.records.pass_run.done, 1);
+  const stale = cleanActivities({ run: { ...p.activities.run, until: 5 }, records: { nope: { done: 1 }, quarry_call: { done: 2, best: 2, lastAt: 1 } } }, 100); assert.equal(stale.run, null); assert.deepEqual(Object.keys(stale.records), ["quarry_call"]); assert.equal(stale.records.quarry_call.best, 1);
+});
+
+test("The settlements grown: Gravesend's mausoleums and the Disturbed Row (the graves searched, the robbers put down at their camp, the Vault's stair unchained), Fernwick's forester and the Old Yew, Southshore's wreck and the Gullwing's Bell, Old Sal's shells from the crates the tide fills", async () => {
+  const { DISTURBED_ROW, OLD_YEW, GULLWINGS_BELL, SHELLS_FOR_SAL, onSettlementsKill, CRATE_TICKS } = await import("../games/rarefriends-realm/settlements.ts");
+  const { QUESTS, questDone, NPCS } = await import("../games/rarefriends-realm/content.ts");
+  const { regionAt } = await import("../games/rarefriends-realm/world.ts");
+  const { PATRONS } = await import("../games/rarefriends-realm/orders.ts");
+  const g = newGame(), p = g.player, world = g.world, named = name => world.objects.find(o => o.name === name);
+  for (const id of ["sexton", "stonemason", "forester", "beachcomber", "hermit"]) assert.ok(NPCS[id] && world.spawns.some(s => s.id === id), `${id} is placed`);
+  for (const id of [DISTURBED_ROW, OLD_YEW, GULLWINGS_BELL, SHELLS_FOR_SAL]) assert.ok(QUESTS.some(q => q.id === id));
+  assert.ok(world.buildings.some(b => b.name === "Ashworth Mausoleum") && world.buildings.some(b => b.name === "Nell's hut") && world.buildings.some(b => b.name === "The forester's house"));
+  const stair = named("Vault stair"); assert.deepEqual(stair.requires, { quest: DISTURBED_ROW }); assert.equal(regionAt(world, stair.to.x, stair.to.y).id, "ashworth_vault");
+  assert.ok(PATRONS.forester.items().some(i => i.id === "yew_logs" && i.level === 60), "the forester orders the woods' logs");
+  // The Disturbed Row: three graves searched for their tokens, three robbers at the camp (not bandits elsewhere), then the sexton.
+  const graves = world.objects.filter(o => o.clue === "disturbed_grave"); assert.equal(graves.length, 3);
+  const use = (object, option) => { teleport(g, object.x, object.y + 1); setTarget(g, { kind: "object", id: object.id, option }); until(g, () => g.dialogue !== null || g.messages.some(m => /token|been through/.test(m.text)), 30); };
+  use(graves[0], "Search"); assert.equal(count(p, "grave_token"), 0, "not before the quest");
+  let d = talk(g, "sexton"); d = d.options.find(o => o.label === "I'll do it.").then(); d.onEnd?.(); assert.equal(p.quests[DISTURBED_ROW], 1);
+  for (const grave of graves) use(grave, "Search"); assert.equal(count(p, "grave_token"), 3); use(graves[0], "Search"); assert.equal(count(p, "grave_token"), 3, "once each");
+  onSettlementsKill(g, "bandit", 100, 100); assert.equal(p.questData.dr_robbers ?? 0, 0, "a bandit elsewhere doesn't count");
+  for (let i = 0; i < 3; i++) onSettlementsKill(g, "bandit", 785, 120); assert.equal(p.questData.dr_robbers, 3);
+  d = talk(g, "sexton"); assert.match(d.lines[0].text, /Three tokens/); d.onEnd?.(); assert.ok(questDone(g, DISTURBED_ROW)); assert.equal(count(p, "grave_token"), 0);
+  // The Old Yew: Woodcutting 30 first; the stone read only on the quest; the logs.
+  assert.match(talk(g, "forester").lines[0].text, /Woodcutting of 30/); p.xp.woodcutting = XP_TABLE[30];
+  d = talk(g, "forester"); d = d.options.find(o => o.label === "I'll do it.").then(); d.onEnd?.();
+  const stone = world.objects.find(o => o.clue === "witness_stone"); use(stone, "Read"); assert.equal(p.questData.oy_stone, 1); give(p, "yew_logs", 5);
+  d = talk(g, "forester"); assert.match(d.lines[0].text, /two of us/); d.onEnd?.(); assert.ok(questDone(g, OLD_YEW)); assert.ok(has(p, "forest_feathered_cap"));
+  // The Gullwing's Bell: the bell out of the wreck once, ten rivets; the chart at the end (a keepsake, not for sale).
+  p.xp.smithing = XP_TABLE[10]; d = talk(g, "beachcomber"); d = d.options.find(o => o.label === "I'll do it.").then(); d.onEnd?.();
+  const wreck = world.objects.find(o => o.clue === "gullwing_wreck"); use(wreck, "Search"); assert.ok(has(p, "gullwing_bell")); use(wreck, "Search"); assert.equal(count(p, "gullwing_bell"), 1);
+  give(p, "pewter_rivets", 10); d = talk(g, "beachcomber"); assert.match(d.lines[0].text, /Hung, and rung/); d.onEnd?.(); assert.ok(questDone(g, GULLWINGS_BELL)); assert.ok(has(p, "nells_tide_chart")); assert.equal(item("nells_tide_chart").tradeable, false);
+  // Shells for Old Sal: the crates give a shell or two, once each until the tide; the necklace is worn at the neck.
+  d = talk(g, "hermit"); d = d.options.find(o => o.label === "I'll do it.").then(); d.onEnd?.();
+  const crates = world.objects.filter(o => o.clue === "washed_crate"); assert.ok(crates.length >= 5);
+  g.rng = () => 0.9; for (const crate of crates) use(crate, "Search"); const shells = count(p, "sea_shell"); assert.ok(shells >= 5, `shells from the crates (${shells})`);
+  use(crates[0], "Search"); assert.equal(count(p, "sea_shell"), shells, "empty until the tide"); g.tick += CRATE_TICKS + 1; use(crates[0], "Search"); assert.ok(count(p, "sea_shell") > shells, "the tide fills it again");
+  d = talk(g, "hermit"); assert.match(d.lines[0].text, /Six/); d.onEnd?.(); assert.ok(questDone(g, SHELLS_FOR_SAL)); assert.ok(has(p, "shell_necklace")); assert.equal(item("shell_necklace").equip.slot, "neck");
+  // The Vault: its stair is in the mausoleum, its theme is the burial places', its hoard deep.
+  const { dungeonTheme } = await import("../games/rarefriends-realm/dungeontheme.ts"); const { cofferTier } = await import("../games/rarefriends-realm/dungeons.ts");
+  assert.equal(dungeonTheme(world, stair.to.x, stair.to.y).id, "ossuary"); assert.equal(cofferTier(g, named("Ashworth hoard")), "deep");
+});

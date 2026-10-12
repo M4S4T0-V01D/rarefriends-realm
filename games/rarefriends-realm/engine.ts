@@ -304,6 +304,7 @@ function examineObject(game: Game, object: WorldObject): string {
   return OBJECT_EXAMINE[object.kind] ?? object.name;
 }
 const DECOR_EXAMINE: Partial<Record<string, string>> = {
+  crystal: "A cluster of pale mineral grown out of the rock, cold to the touch, with a light of its own in the dark.", rune_circle: "A circle cut into the floor, and a figure inside it, its grooves alight. Whatever it holds, it's holding it still.",
   rock_spire: "A tower of red sandstone, wind-carved, taller than a house. There are thousands of them.", campfire: "Somebody's keeping it in.", bedroll: "Somebody slept here.",
   statue: "A statue of the First Friend. It looks a lot like yours.", windmill: "Its sails creak in the wind.", snowman: "A Friend made of snow. Its carrot is a pinecone.",
   tent: "Smells of Grumblin.", grave: "Here lies a Friend.", chest: "An old chest.", boat: "It's seen better days.", pillar: "Old stone. Older than the Realm.",

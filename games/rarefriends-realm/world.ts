@@ -15,6 +15,7 @@ import { buildSouth } from "./south.ts";
 import { applyOverlay } from "./overlay.ts";
 import { OVERLAYS } from "./overlays/index.ts";
 import { buildHearthkinCountry } from "./hearthkinworld.ts";
+import { buildDungeonIdentity } from "./dungeonworld.ts";
 
 /**
  * The far west (Return of Raria): the world grew by WEST_DX columns on its west side for a second continent, Raria and
@@ -102,7 +103,9 @@ export type DecorKind =
   // The Land Before Stone: the Sunteeth's sandstone towers, camp fires, trodden ground, a bedroll, the Underway's counterweight.
   | "rock_spire" | "campfire" | "campfire_cold" | "scuffs" | "bedroll" | "counterweight"
   // The Hearthkin's Strong Friend: a squat stone figure, a hammer across its knees (hearthkin.ts).
-  | "strong_friend";
+  | "strong_friend"
+  // The dungeons' own things (dungeonworld.ts): a cluster of pale mineral, and a sigil circle cut into a floor.
+  | "crystal" | "rune_circle";
 /** A monument's state: whole on its plinth, toppled and lying, broken off at the waist, or sunk to the chest in the ground. */
 export type MonumentState = "whole" | "toppled" | "broken" | "buried";
 export type WorldObject = {
@@ -143,6 +146,8 @@ export type RegionId =
   | "deepglass" | "drowned_archive" | "howling_vault"
   // The Skill overhaul: the Fellows of Metal's Deep under Emberforge, and the Ashen quarry's shaft with its hot tunnel.
   | "fellows_deep" | "ashen_shaft"
+  // The dungeon identity update: the Rime Galleries under Frostpeak's shelf, the Sigil Vault under the Wizards' Tower (dungeonworld.ts).
+  | "rime_galleries" | "sigil_vault"
   // The Rare Friends Ring (2026-10): the arena west of the Deadwood.
   | "friends_ring"
   // Two more dungeons (2026-10): one for new heroes, one for the middle levels.
@@ -197,6 +202,8 @@ export const REGIONS: readonly Region[] = [
   { id: "hollow_depths", name: "Hollow Depths", label: { x: 150, y: 220 }, danger: 4, underground: true },
   { id: "fellows_deep", name: "The Fellows' Deep", label: { x: 90, y: 230 }, danger: 2, underground: true },
   { id: "ashen_shaft", name: "The Ashen Shaft", label: { x: 12, y: 220 }, danger: 3, underground: true },
+  { id: "rime_galleries", name: "The Rime Galleries", label: { x: 268, y: 893 }, danger: 3, underground: true, far: true },
+  { id: "sigil_vault", name: "The Sigil Vault", label: { x: 125, y: 895 }, danger: 2, underground: true, far: true },
   // The wider world. Labels here are in world coordinates (the mainland's above are moved by createWorld).
   { id: "deadwood", name: "The Deadwood", label: { x: 330, y: 62 }, danger: 3 },
   { id: "gravesend", name: "Gravesend", label: { x: 300, y: 128 }, danger: 0 },
@@ -1509,6 +1516,8 @@ export function generateWorld(seed = WORLD_SEED): { world: World; lift: Float32A
   growSouth(ctx, floors, places);
   const south: GenContext = { ...ctx, H, random: mulberry(seed + 5151), noise: makeNoise(seed + 131, 13), noise2: makeNoise(seed + 137, 4) };
   buildSouth(south, worldTools(south), places, floors);
+  // The dungeons' identities (dungeonworld.ts): the Rime Galleries, the Sigil Vault, and every dungeon dressed in its family's things, in the world's own frame, last of all.
+  buildDungeonIdentity({ ...south, random: mulberry(seed + 909) }, seed);
   for (const object of objects) if (object.name === "__removed") object.blocks = false;
   const buildingAt = new Uint16Array(W * H);
   buildings.forEach((b, index) => { if (b.roof === "none") return; for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) buildingAt[y * W + x] = index + 1; });
@@ -1572,7 +1581,7 @@ const SIDES = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
 export const ROOF_COLORS = ["#c99a96", "#9aab92", "#8f9cb2", "#cdb98a", "#a996b5"];
 export const TREE_NAMES: Record<TreeKind, string> = { tree: "Tree", oak: "Oak", willow: "Willow", maple: "Maple tree", yew: "Yew", ashwood: "Ashwood", palm: "Palm tree", pine: "Pine tree", deadwood: "Dead tree", redwood: "Redwood", ironbark: "Ironbark", cedar: "Cedar", sakura: "Blossom tree", bamboo: "Bamboo" };
 export const DECOR_NAMES: Record<DecorKind, string> = {
-  strong_friend: "The Strong Friend", monument: "Statue", god_diamond: "Statue of the Good Friend", god_ink: "Statue of the Squid Friend", god_sol: "Statue of the Weird Friend", god_hood: "Statue of the Hood Friend", god_ember: "The Ember, in its brazier",
+  strong_friend: "The Strong Friend", crystal: "Crystal", rune_circle: "Sigil circle", monument: "Statue", god_diamond: "Statue of the Good Friend", god_ink: "Statue of the Squid Friend", god_sol: "Statue of the Weird Friend", god_hood: "Statue of the Hood Friend", god_ember: "The Ember, in its brazier",
   god_dusk: "Statue of the Wise Friend, blindfolded", wise_friend: "The Wise Friend", bell: "Great bell", canopy: "Old roofing", cannon: "Magical cannon", device: "Federation device", wagon: "Supply wagon", watchtower: "Watchtower", stake: "Stake wall", plaque: "Inscribed plaque", banner_fff: "The Federation's banner", banner_rrr: "The Regiment's banner", banner_hollowmere: "Hollowmere's banner", banner_diamond: "The Order of the Diamond's banner", banner_ink: "The Order of the Ink's banner", banner_sol: "The Order of the Sol's banner", banner_hood: "The Order of the Hood's banner", banner_ember: "The Order of the Ember's banner", banner_dusk: "The Order of Dusk's banner",
   flowers: "Flowers", bush: "Bush", boulder: "Boulder", lamp: "Lamp post", bench: "Bench", crate: "Crate", barrel: "Water barrel", tent: "Tent",
   cactus: "Cactus", pine: "Pine tree", dead_tree: "Dead tree", statue: "Statue", grave: "Grave", fence: "Fence", reeds: "Reeds", table: "Table",

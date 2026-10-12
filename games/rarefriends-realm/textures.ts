@@ -4,6 +4,7 @@
  * one affine transform (no smoothing), then the face gets its ink edge as before.
  */
 import { Pixels, pixelArt, shadeHex } from "./pixel.ts";
+import { themedGround, themedWall } from "./dungeontextures.ts";
 
 /** Texture pixels per tile width (a tile edge is 32 world pixels at 2 world pixels per texture pixel). */
 export const TEX_PER_TILE = 16;
@@ -13,7 +14,9 @@ export type WallStyle = "brick" | "window" | "timber" | "timber_window" | "windo
   // The Mizukai Isles: white plaster between dark posts over a dark board skirt, with paper-latticed windows; and a shrine's vermilion.
   | "mizukai" | "mizukai_window" | "mizukai_window_lit" | "lacquer"
   // Kharaveth: dressed sandstone ashlar with a carved lintel over each window; and plastered mudbrick with a latticed window.
-  | "sandstone" | "sandstone_window" | "sandstone_window_lit" | "mudbrick" | "mudbrick_window" | "mudbrick_window_lit";
+  | "sandstone" | "sandstone_window" | "sandstone_window_lit" | "mudbrick" | "mudbrick_window" | "mudbrick_window_lit"
+  // The dungeon families (dungeontheme.ts, painted in dungeontextures.ts): burial niches, scorched rock shored with timber, frost and icicles, carved sigils, cracked black stone, rough cave.
+  | "ossuary" | "scorched" | "rime" | "arcane" | "hollow" | "cave";
 /** Where a window's glass sits on a 16-wide wall texture (x0, width) and, per wall kind, its top row and height. */
 export const PANE = { x0: 5, w: 6, h: 7, top: (timber: boolean) => timber ? 3 : 5 };
 const BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
@@ -23,6 +26,7 @@ const noise = (x: number, y: number, seed: number) => { let h = Math.imul(x * 37
 export function wallTexture(style: WallStyle, color: string, variant = 0): HTMLCanvasElement {
   return pixelArt(`wall:${style}:${color}:${variant}`, TEX_PER_TILE, 24, p => {
     const W = TEX_PER_TILE, H = 24, mortar = shadeHex(color, -0.2), light = shadeHex(color, 0.07), dark = shadeHex(color, -0.08);
+    if (themedWall(p, style, color, variant, noise, shadeHex, W, H)) return;
     if (style === "mizukai" || style === "mizukai_window" || style === "mizukai_window_lit" || style === "lacquer") { mizukaiWall(p, style, color, variant); return; }
     if (style.startsWith("sandstone") || style.startsWith("mudbrick")) { desertWall(p, style, color, variant); return; }
     const lit = style === "window_lit" || style === "timber_window_lit", glazed = lit || style === "window" || style === "timber_window";
@@ -182,7 +186,9 @@ export function texturedTriangle(ctx: CanvasRenderingContext2D, texture: HTMLCan
 }
 
 // ---------- Ground ----------
-export type GroundStyle = "grass" | "lush" | "dirt" | "gravel" | "cobble" | "flag" | "sand" | "snow" | "plank" | "furrow" | "dungeon" | "ice" | "carpet" | "ash" | "swamp" | "brick";
+export type GroundStyle = "grass" | "lush" | "dirt" | "gravel" | "cobble" | "flag" | "sand" | "snow" | "plank" | "furrow" | "dungeon" | "ice" | "carpet" | "ash" | "swamp" | "brick"
+  // The dungeon families' floors (dungeontextures.ts).
+  | "ossuary" | "mine" | "rime" | "sigil" | "cave" | "mossy";
 /**
  * A ground tile's detail, 16 × 16, on a transparent background: the tile's own shaded fill shows through, and the
  * texture adds the pixels (blades, pebbles, setts, planks) in tones of the ground's colour. Each tile draws one of four
@@ -192,6 +198,7 @@ export function groundTexture(style: GroundStyle, color: string, variant: number
   return pixelArt(`ground:${style}:${color}:${variant}`, TEX_PER_TILE, TEX_PER_TILE, p => {
     const S = TEX_PER_TILE, r = (i: number, salt: number) => noise(i, salt, variant + 11);
     const tone = (amount: number) => shadeHex(color, amount * 1.4);
+    if (themedGround(p, style, color, variant, noise, shadeHex, S)) return;
     const speckle = (n: number, amount: number, salt = 0) => { for (let i = 0; i < n; i++) p.set(Math.floor(r(i, 1 + salt) * S), Math.floor(r(i, 2 + salt) * S), tone(amount)); };
     switch (style) {
       case "grass": case "lush": {
