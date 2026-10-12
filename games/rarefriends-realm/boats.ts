@@ -83,7 +83,9 @@ export function fare(game: Game, from: string, to: string): number {
   if (!a || !b) return 0;
   const distance = Math.hypot(a.x - b.x, a.y - b.y), risk = 1 + 0.25 * Math.max(DANGER(from), DANGER(to));
   const known = level(game, "presence") >= 40 ? 0.9 : 1;
-  return Math.max(10, Math.round((12 + distance * 0.8) * risk * known / 5) * 5);
+  // A shipwright's friend: a hull fitting carried takes a fifth off, the ship's bell a third (the Expeditionary Shipwright's Hardware).
+  const hardware = game.player.inventory.some(slot => slot?.id === "rarite_ships_bell") ? 0.65 : game.player.inventory.some(slot => slot?.id.endsWith("_hull_fitting")) ? 0.8 : 1;
+  return Math.max(10, Math.round((12 + distance * 0.8) * risk * known * hardware / 5) * 5);
 }
 /** Every landing, from where you're boarding: its fare and whether you can go. */
 export function routesFrom(game: Game, from: string): Route[] {

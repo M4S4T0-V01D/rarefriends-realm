@@ -27,7 +27,7 @@ import { signetCharges, signetTeleport } from "../games/rarefriends-realm/engine
 import { COFFER_TICKS } from "../games/rarefriends-realm/dungeons.ts";
 import { gloomAt, inDeadwood } from "../games/rarefriends-realm/world.ts";
 import { DUNGEON_Y, FLOOR_Y, H, MAINLAND, OVERWORLD_H, SOUTH_DY, southShift, REGIONS, T, W, WEST_DX, createWorld, floorAt, isUnderground, mainlandToWorld, objectAtTile, onLevel, realPoint, regionAt, terrainAt } from "../games/rarefriends-realm/world.ts";
-import { addXp, emptyToBank, fillFromBank, bankDeposit, bankInOrder, bankMove, bankTabs, bankWithdraw, bonuses, bagBones, combatLevel, count, dropItem, earlyXp, give, has, heft, level, maxHp, xpMultiplier, BONE_BAG, BONE_BAG_SIZE } from "../games/rarefriends-realm/state.ts";
+import { addXp, take, emptyToBank, fillFromBank, bankDeposit, bankInOrder, bankMove, bankTabs, bankWithdraw, bonuses, bagBones, combatLevel, count, dropItem, earlyXp, give, has, heft, level, maxHp, xpMultiplier, BONE_BAG, BONE_BAG_SIZE } from "../games/rarefriends-realm/state.ts";
 import game from "../games/rarefriends-realm/game.json" with { type: "json" };
 
 const fletchingRecipesFor = (g, log) => { const knife = g.player.inventory.findIndex(slot => slot?.id === "knife"), logs = g.player.inventory.findIndex(slot => slot?.id === log); useItemOnItem(g, knife, logs); const recipes = g.ui.production.recipes; g.ui.production = null; return recipes; };
@@ -3850,4 +3850,76 @@ test("World overlays: a layer over the baked world, applied deterministically; b
   // Applying the same overlay to a fresh world gives the same result.
   const h = newGame({ world: createWorld() }), again = applyOverlay(h.world, overlay, WORLD_SEED, [], NPCS);
   assert.deepEqual([...again.objects.keys()], [...placed.objects.keys()]); assert.equal(h.world.tiles[11 * W + 12], T.STONE);
+});
+
+test("The four smithed families: recipes at the anvil from the ordinary metals; a prospector's pick mines surer and doubles ore; hardware cuts the boatmen's fares; a resonance fitting makes a carving stand longer, once", async () => {
+  const { fare, DOCKS } = await import("../games/rarefriends-realm/boats.ts");
+  const { fitCarving, setCarving } = await import("../games/rarefriends-realm/engine.ts");
+  const families = ITEM_LIST.filter(entry => entry.family);
+  assert.deepEqual([...new Set(families.map(entry => entry.family))].sort(), ["fieldcraft", "prospector", "resonance", "shipwright"], "exactly four families");
+  assert.equal(families.filter(entry => entry.family === "prospector").length, 6); assert.equal(families.filter(entry => entry.family === "fieldcraft").length, 6);
+  assert.equal(families.filter(entry => entry.family === "shipwright").length, 11); assert.equal(families.filter(entry => entry.family === "resonance").length, 4);
+  const pewter = smithingRecipes("pewter"), rarite = smithingRecipes("rarite");
+  assert.ok(pewter.some(r => r.outputs.pewter_prospectors_pick === 1 && r.inputs.pewter_bar === 3 && r.inputs.logs === 1), "a prospector's pick: three bars and a handle");
+  assert.ok(pewter.some(r => r.outputs.pewter_camp_kit === 1), "the camp kit is pewter"); assert.ok(pewter.some(r => r.outputs.pewter_rivets === 10), "ten rivets a bar");
+  assert.ok(rarite.some(r => r.outputs.rarite_ships_bell === 1 && r.inputs.rarite_bar === 5)); assert.ok(rarite.some(r => r.outputs.rarite_resonance_fitting === 1));
+  assert.ok(!pewter.some(r => r.outputs.pewter_hull_fitting), "hull fittings start at moonsilver"); assert.ok(!smithingRecipes("frostsilver").some(r => r.label.includes("prospector")), "forged metals make none of them");
+  // The prospector's pick is a pickaxe of its metal's tier, usable at the metal's Mining level plus three.
+  const pick = ITEM_LIST.find(entry => entry.id === "moonsilver_prospectors_pick");
+  assert.deepEqual(pick.tool, { kind: "pickaxe", tier: 4, level: 23 }); assert.equal(pick.power, 4);
+  // Fares: a hull fitting carried takes a fifth off, the bell a third.
+  const g = newGame(), p = g.player;
+  // The farthest two landings (the minimum fare of 10 would hide a cut on a short crossing).
+  let a = DOCKS[0], b = DOCKS[1], best = 0;
+  for (const x of DOCKS) for (const y of DOCKS) { const f = fare(g, x.id, y.id); if (f > best) { best = f; a = x; b = y; } }
+  const base = fare(g, a.id, b.id); give(p, "glimmer_hull_fitting"); const cut = fare(g, a.id, b.id);
+  assert.ok(base > 0 && cut < base, `a fifth off (${base} → ${cut})`); take(p, "glimmer_hull_fitting"); give(p, "rarite_ships_bell"); assert.ok(fare(g, a.id, b.id) < cut, "a third off with the bell");
+  // A resonance fitting on a carving: longer, once.
+  give(p, "carving_hearth"); setCarving(g, p.inventory.findIndex(slot => slot?.id === "carving_hearth"));
+  const carving = g.carvings[0], before = carving.until - carving.placed;
+  give(p, "glimmer_resonance_fitting"); fitCarving(g, p.inventory.findIndex(slot => slot?.id === "glimmer_resonance_fitting"));
+  assert.equal(carving.until - carving.placed, before * 2, "glimmer: twice as long"); assert.equal(carving.fitted, "glimmer_resonance_fitting"); assert.ok(!has(p, "glimmer_resonance_fitting"));
+  give(p, "ashsteel_resonance_fitting"); fitCarving(g, p.inventory.findIndex(slot => slot?.id === "ashsteel_resonance_fitting"));
+  assert.equal(carving.until - carving.placed, before * 2, "one fitting a carving"); assert.ok(has(p, "ashsteel_resonance_fitting"), "the second isn't used up");
+});
+
+test("Camping: a camp kit pitches a tent and a fire in the wild (not in town, not underground, not among the dragons); rest, pack up; a lantern and Wayfaring 25 make it where you wake; a field altar takes bones for less; XP once in a while; it all survives a save", async () => {
+  const { CAMP_RULES, campAllowed, packUpCamp, restAtCamp, setUpCamp, setUpFieldAltar, toggleRespawn } = await import("../games/rarefriends-realm/camping.ts");
+  const { offerBones, FIELD_ALTAR_RATE } = await import("../games/rarefriends-realm/engine.ts");
+  const g = newGame(), p = g.player, world = g.world;
+  // The fountain is no place for a tent; the wild is.
+  assert.ok(campAllowed(g, p.x, p.y), "the fountain square is no place for a tent");
+  const wild = (() => { for (let y = 20; y < 300; y++) for (let x = 20; x < 500; x++) if (campAllowed(g, x, y) === null) return { x, y }; return null; })();
+  assert.ok(wild, "somewhere to camp");
+  teleport(g, wild.x, wild.y);
+  assert.ok(!setUpCamp(g), "no kit, no camp"); give(p, "pewter_camp_kit");
+  p.xp.agility = 0; assert.ok(!setUpCamp(g), "Wayfaring 5 first"); p.xp.agility = XP_TABLE[5];
+  const xpBefore = p.xp.agility;
+  assert.ok(setUpCamp(g), "pitched"); assert.ok(p.camp && p.camp.x === wild.x && p.camp.y === wild.y && p.camp.tier === 1);
+  assert.ok(p.xp.agility > xpBefore, "Wayfaring XP for pitching"); assert.ok(world.objects.some(o => o.name === "Your tent" && o.x === wild.x), "the tent stands in the world"); assert.ok(g.fires.some(f => f.expires === Infinity), "a fire to cook on");
+  assert.ok(!(p.x === wild.x && p.y === wild.y), "you stand beside it");
+  // Not where you'd wake without a lantern; with one, and the level, yes.
+  toggleRespawn(g); assert.equal(p.camp.respawn, false);
+  packUpCamp(g); assert.equal(p.camp, null); assert.ok(!world.objects.some(o => o.name === "Your tent"), "packed away");
+  const xpAfterFirst = p.xp.agility; teleport(g, wild.x, wild.y); assert.ok(setUpCamp(g)); assert.equal(p.xp.agility, xpAfterFirst, "no XP for pitching again so soon");
+  packUpCamp(g); give(p, "ashsteel_camp_lantern"); teleport(g, wild.x, wild.y); assert.ok(setUpCamp(g)); assert.equal(p.camp.tier, 3);
+  p.xp.agility = XP_TABLE[25]; toggleRespawn(g); assert.equal(p.camp.respawn, true);
+  // Fall: you wake by your fire.
+  const { die } = await import("../games/rarefriends-realm/engine.ts");
+  teleport(g, world.places.spawn.x + 30, world.places.spawn.y + 30); die(g);
+  assert.ok(Math.abs(p.x - wild.x) <= 1 && Math.abs(p.y - wild.y) <= 1, `woke at the camp (${p.x},${p.y} vs ${wild.x},${wild.y})`);
+  // A field altar: bones for half again a burial (an altar gives twice).
+  teleport(g, wild.x - 1, wild.y); give(p, "moonsilver_field_altar"); setUpFieldAltar(g, p.inventory.findIndex(slot => slot?.id === "moonsilver_field_altar"));
+  assert.ok(p.camp.altar && world.objects.some(o => o.kind === "altar" && o.text === "field"), "the field altar stands beside the tent");
+  p.familyId = 1; p.xp.prayer = XP_TABLE[40];
+  give(p, "bones"); const f0 = p.xp.prayer; offerBones(g, p.inventory.findIndex(slot => slot?.id === "bones"), false, true); const field = p.xp.prayer - f0;
+  give(p, "bones"); const a0 = p.xp.prayer; offerBones(g, p.inventory.findIndex(slot => slot?.id === "bones"), false, false); const altar = p.xp.prayer - a0;
+  assert.ok(Math.abs(field / altar - FIELD_ALTAR_RATE / 2) < 1e-6, `a field altar gives ${FIELD_ALTAR_RATE} to an altar's 2 (${field} vs ${altar})`);
+  // Saved and restored: the camp, its altar, its waking place.
+  const save = serialize(g); assert.deepEqual(save.camp, { x: wild.x, y: wild.y, tier: 3, respawn: true, altar: true });
+  const h = newGame(); assert.ok(restore(h, save)); assert.deepEqual(h.player.camp, save.camp); assert.ok(h.world.objects.some(o => o.name === "Your tent"), "painted back in at load");
+  packUpCamp(h); assert.ok(has(h.player, "moonsilver_field_altar"), "the altar comes back when the camp is packed");
+  // Nowhere forbidden: underground, in a dangerous region, in the Ring.
+  assert.match(campAllowed(g, 10, OVERWORLD_H + 5) ?? "", /sky/);
+  assert.ok(CAMP_RULES.danger <= 4);
 });

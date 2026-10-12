@@ -1425,6 +1425,8 @@ function buildMiningCountry(ctx: GenContext, toWorld: (x: number, y: number) => 
   // The quarry's gear: ore carts on the floor, pit props, a tool shed by the gate, and the mine's own smithy.
   for (const [x, y] of [[109, 49], [117, 57], [113, 53]]) { const p = freeSpot(x, y); if (p) decor(p[0], p[1], "wagon", true, "Ore cart"); }
   for (const [x, y] of [[121, 55], [106, 58]]) { const p = freeSpot(x, y); if (p) decor(p[0], p[1], "logpile", true, "Pit props, stacked"); }
+  // Moonsilver in the quarry's upper terrace: the first a miner meets, at Mining 20.
+  for (const [x, y] of [[110, 46], [119, 58]]) if (free(x, y)) rock(x, y, "moonsilver");
   building(126, 64, 130, 67, "w", T.WOOD, undefined, { name: "Tool shed", color: "#8f8a83", chimney: false }); decor(129, 65, "crate", true, "Picks, wedges, hammers, rope");
   building(99, 63, 104, 67, "e", T.STONE, undefined, { name: "The Ashen smithy", color: "#8f8a83", chimney: true });   // beside the Stone altar, not over it
   add({ kind: "furnace", x: 101, y: 64, blocks: true, name: "Furnace" }); add({ kind: "anvil", x: 103, y: 66, blocks: true, name: "Anvil" });
@@ -1437,6 +1439,8 @@ function buildMiningCountry(ctx: GenContext, toWorld: (x: number, y: number) => 
     const t = get(x, y); if ((t === T.ASH || t === T.GRASS || t === T.DARK_GRASS) && objectAt[tileIndex(x, y)] < 0 && Math.hypot((x - cx) / rx, (y - cy) / ry) < 1) put(x, y, T.LAVA);
   }
   fillRect(173, 39, 180, 42, T.STONE); for (let y = 39; y <= 42; y++) for (let x = 173; x <= 180; x++) clearAt(x, y);
+  // Moonsilver where the lava has cooked it out of the rock: beside the pools, for those who'll stand the heat.
+  for (const [x, y] of [[187, 47], [188, 55], [174, 60]]) if (free(x, y)) rock(x, y, "moonsilver");
   add({ kind: "furnace", x: 175, y: 40, blocks: true, name: "Furnace" }); add({ kind: "furnace", x: 178, y: 40, blocks: true, name: "Furnace" }); add({ kind: "anvil", x: 180, y: 42, blocks: true, name: "Anvil" });
   for (const [x, y, kind, name] of [[172, 40, "wagon", "Ore cart"], [178, 43, "wagon", "Ore cart"], [173, 43, "logpile", "A heap of inkcoal for the furnaces"], [176, 44, "torch", ""]] as const) { const p = freeSpot(x, y); if (p) decor(p[0], p[1], kind, true, name || undefined); }
   // The mountain: the snowfield climbs from the camp to a summit above the yetis, with a scree track up it, crags on the
@@ -1456,6 +1460,9 @@ function buildMiningCountry(ctx: GenContext, toWorld: (x: number, y: number) => 
       if (get(x, y) === T.SNOW && raise[i] > 2.4 && noise2(x * 1.7, y * 1.7) > 0.62 && objectAt[i] < 0 && Math.hypot(x - SX, y - SY) > 3 && !(y >= 12 && y <= 20 && x <= 224)) put(x, y, T.CLIFF);
     }
     if (free(SX, SY)) decor(SX, SY, "rubble", true, "Summit cairn");
+    // Moonsilver on the mountain: three faces along the scree track (safe, for the climb), three on the summit among the yetis (the remote veins).
+    for (const [x, y] of [[212, 24], [218, 19], [221, 13]]) if (free(x, y)) rock(x, y, "moonsilver");   // (never in the ice course: it runs along y 16)
+    for (const [x, y] of [[230, 9], [233, 13], [227, 9]]) if (free(x, y) && get(x, y) === T.SNOW) rock(x, y, "moonsilver");
     clearAt(192, 36); clearAt(194, 36); add({ kind: "furnace", x: 192, y: 36, blocks: true, name: "Furnace" }); add({ kind: "anvil", x: 194, y: 36, blocks: true, name: "Anvil" }); if (free(196, 36)) decor(196, 36, "torch", true);
   }
 }

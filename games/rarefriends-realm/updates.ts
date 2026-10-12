@@ -4,6 +4,11 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 109, date: "2026-10-12", title: "Four smithed families, camping, and sigil stone that never runs out", items: [
+    "Sigil stone of every grade never runs out now, and the sigil stone box takes every grade (plain, Refined, Charged and Primal share its hundred and twenty). Moonsilver shows in more places: the Ashen quarry's upper terrace, along Frostpeak's scree track and on its summit among the yetis, and beside Emberforge's lava.",
+    "Four new families at the anvil, from the ordinary metals. Prospector's Implements: a pick with a prospector's tooth for each metal, surer strikes and now and then a second ore. The Wayfarer's Fieldcraft: a camp kit, a field stove, a camp lantern, a field altar, an expedition frame and a wayfarer's compass. The Expeditionary Shipwright's Hardware: rivets, hull fittings, an anchor chain and a ship's bell, parts for the vessels to come, and a fifth (or a third) off the boatmen's fares meanwhile. The Warden's Resonance Fittings: fitted to a carving you've set down, it stands half again to twice as long.",
+    "Camping (Wayfaring 5, with a camp kit): pitch a tent and a fire in the wild, where the ground allows and not by a town, a dungeon's door or the dragons. Rest there; cook on its fire. With a camp lantern carried when it's pitched and Wayfaring 25, make the camp your waking place: fall, and you wake by your own fire; pack it up or lose it, and the Realm tells you you'd wake by the fountain. A field altar set beside the tent takes bones for half again a burial, less than a standing altar's twice. Pitching a camp earns Wayfaring XP once in a while, not every time.",
+  ] },
   { id: 108, date: "2026-10-11", title: "The collectible card: a portrait, playing-card picture of your adventurer", items: [
     "Beside the adventurer card you share, a second picture: portrait, playing-card shaped, for your collection, with six layouts (Classic Adventurer, Skill Master, Legendary Build, Quest Champion, Collector's Edition, Minimalist; some open with Presence, a quest or achievements) and your choice of what it shows. The adventurer card is untouched. Minting it as a card in the Realm's own collection comes later.",
   ] },

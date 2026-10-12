@@ -12,6 +12,7 @@ import type { Daily } from "./daily.ts";
 import type { Lore, Track } from "./pursuance.ts";
 import type { MysteriesRecord } from "./mysteries.ts";
 import type { Preparation } from "./techniques.ts";
+import type { Camp } from "./camping.ts";
 import { LATEST_UPDATE } from "./updates.ts";
 
 export const TICK_MS = 600;
@@ -80,6 +81,8 @@ export type Player = {
   referredBy: number | null; referrals: number[]; boostTicks: number;
   /** Inkcoal kept in the inkcoal satchel, and sigil stones in the sigil stone box. */
   coalBag: number; stoneBox: number;
+  /** The sigil stone box's better grades (refined, charged, primal stone, by item id); the plain stones are `stoneBox`. One box, one capacity. */
+  stoneBoxGrades: Record<string, number>;
   /** The sigil satchel's contents: sigil id → count. */
   sigilBag: Record<string, number>;
   /** Each belt's contents (belt id → item id → count). Only the worn belt is in reach. */
@@ -146,6 +149,8 @@ export type Player = {
   spiritWardUntil: number;
   /** Your home, if you hold a deed, and the ticks of Well Rested left after sleeping in it. */
   home: Home | null; restedTicks: number;
+  /** Your camp (camping.ts), and the ticks played when pitching one last earned Wayfaring XP. */
+  camp: Camp | null; campXpAt: number;
   /** A level-up to celebrate (not saved): other players see its fireworks while it lasts. */
   celebrate?: { skill: Skill; level: number; until: number };
   /** The mount you rode last (not saved), for the ride button. */
@@ -213,7 +218,7 @@ export type SoundName =
 export type Message = { text: string; tone: "game" | "info" | "warn" | "quest" | "level" | "npc" | "public" | "private"; tick: number };
 
 /** A Craftwork carving set down in the world: what it is, where, and when it crumbles (not saved: it'd crumble anyway). */
-export type Carving = { uid: number; id: string; x: number; y: number; placed: number; until: number };
+export type Carving = { uid: number; id: string; x: number; y: number; placed: number; until: number; fitted?: string };
 export type Game = {
   /** Bumped whenever the world is rebuilt in part (a home painted in), so renderers drop their caches. */
   worldVersion?: number;
@@ -295,7 +300,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
     style: "accurate", autocast: null, prayers: [], target: null, activity: null, combat: null,
     attackTimer: 0, eatTimer: 0, stunned: 0, regenTimer: 0, quests: {}, questData: {},
     wardrobe: [], worn: [], follower: null, courseStep: -1, kills: 0, deaths: 0, overhead: null, music: ["theme"],
-    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, boneBag: {}, sigilBag: {}, belts: {}, followerWorn: [], orders: {}, collectible: { layout: "classic", show: ["skills", "combat", "quests", "generation"] }, lockbox: [], settled: [], notices: [], card: { bg: "paper", frame: "rose", skills: "boxes", font: "mono", ink: "ink", layout: "classic" }, cards: {}, rarian: false, mizukai: false, orashai: false, mana: 10, mysteries: { found: {}, glyphs: {}, read: {} }, techniqueReady: {}, preparation: null, spiritWardUntil: 0, home: null, restedTicks: 0, ward: null, wardUntil: 0, renew: 0, renewUntil: 0, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, friendVillage: null, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, lore: {}, trail: null, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false, rerolls: 0 }, seenUpdate: LATEST_UPDATE,
+    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, stoneBoxGrades: {}, boneBag: {}, sigilBag: {}, belts: {}, followerWorn: [], orders: {}, collectible: { layout: "classic", show: ["skills", "combat", "quests", "generation"] }, lockbox: [], settled: [], notices: [], card: { bg: "paper", frame: "rose", skills: "boxes", font: "mono", ink: "ink", layout: "classic" }, cards: {}, rarian: false, mizukai: false, orashai: false, mana: 10, mysteries: { found: {}, glyphs: {}, read: {} }, techniqueReady: {}, preparation: null, spiritWardUntil: 0, home: null, restedTicks: 0, camp: null, campXpAt: -100000, ward: null, wardUntil: 0, renew: 0, renewUntil: 0, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, friendVillage: null, referralTimes: [], mounts: [], mount: null, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, lore: {}, trail: null, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false, rerolls: 0 }, seenUpdate: LATEST_UPDATE,
     lastHitBy: null, created: Date.now(), queuedSpell: null, castTimer: 0,
   };
 }
@@ -457,6 +462,10 @@ export const SATCHEL = "inkcoal_satchel", SATCHEL_SIZE = 120, STONE_BOX = "sigil
 export const hasSatchel = (player: Player) => player.equipment.cape === SATCHEL || has(player, SATCHEL);
 /** Carried in your pack, the sigil stone box catches the stones you mine and empties itself into the altar. */
 export const hasStoneBox = (player: Player) => has(player, STONE_BOX);
+/** Every stone in the box, of every grade. */
+export const boxTotal = (player: Player) => player.stoneBox + Object.values(player.stoneBoxGrades).reduce((sum, n) => sum + n, 0);
+/** Whether an item is a sigil stone of some grade (the box holds them all). */
+export const isSigilStone = (id: string) => id === "sigil_stone" || id.endsWith("_sigil_stone");
 // ---------- The sigil satchel: a mage's bag ----------
 export const SIGIL_BAG = "sigil_satchel", SIGIL_BAG_SIZE = 2000;
 /** Worn on your back or carried, the sigil satchel holds every kind of sigil and your spells draw from it. */
@@ -577,11 +586,12 @@ export function bagTakeAll(player: Player) {
   return out;
 }
 /** How many of an item you can use in a recipe: your pack, plus the satchel's inkcoal. */
-export const stock = (player: Player, id: string) => count(player, id) + (id === "inkcoal" && hasSatchel(player) ? player.coalBag : 0) + (id === "sigil_stone" && hasStoneBox(player) ? player.stoneBox : 0) + beltStock(player, id);
+export const stock = (player: Player, id: string) => count(player, id) + (id === "inkcoal" && hasSatchel(player) ? player.coalBag : 0) + (id === "sigil_stone" && hasStoneBox(player) ? player.stoneBox : 0) + (id !== "sigil_stone" && isSigilStone(id) && hasStoneBox(player) ? player.stoneBoxGrades[id] ?? 0 : 0) + beltStock(player, id);
 /** Use up items for a recipe, taking inkcoal from the satchel first. */
 export function useUp(player: Player, id: string, n: number) {
   if (id === "inkcoal" && hasSatchel(player)) { const fromBag = Math.min(n, player.coalBag); player.coalBag -= fromBag; n -= fromBag; }
   if (id === "sigil_stone" && hasStoneBox(player)) { const fromBox = Math.min(n, player.stoneBox); player.stoneBox -= fromBox; n -= fromBox; }
+  if (id !== "sigil_stone" && isSigilStone(id) && hasStoneBox(player)) { const fromBox = Math.min(n, player.stoneBoxGrades[id] ?? 0); if (fromBox) { player.stoneBoxGrades[id] = (player.stoneBoxGrades[id] ?? 0) - fromBox; if (!player.stoneBoxGrades[id]) delete player.stoneBoxGrades[id]; n -= fromBox; } }
   n = beltUse(player, id, n);
   if (n > 0) take(player, id, n);
 }

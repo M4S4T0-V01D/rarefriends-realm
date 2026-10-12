@@ -92,6 +92,10 @@ export type IconShape =
 export type Item = {
   id: string; name: string; examine: string; value: number; icon: Icon;
   stackable?: boolean; tradeable?: boolean;
+  /** The four smithed families of the Skill overhaul (fieldGear): which, and how strong a piece (1 up). */
+  family?: "prospector" | "fieldcraft" | "shipwright" | "resonance"; power?: number;
+  /** Shipwright's hardware for the Seafaring to come: what part of a vessel it is. */
+  vessel?: "rivets" | "hull" | "anchor" | "bell";
   /** Food that does more than heal: a skill boost that wears off a point a minute. */
   food?: Partial<Record<Skill, number>>;
   /** What it weighs worn (kg): running drains faster under a load, less so with Wayfaring. */
@@ -373,6 +377,41 @@ function heartguardGear(): Item[] {
 }
 
 // ---------- Equipment ----------
+/**
+ * The four smithed families (the Skill overhaul): Prospector's Implements (picks with a prospector's tooth), the
+ * Wayfarer's Fieldcraft (a camp and its gear; camping.ts), the Expeditionary Shipwright's Hardware (parts for the
+ * vessels to come, and fares cut for the boats there are), and the Warden's Resonance Fittings (fitted to a standing
+ * carving, it lasts longer). Ordinary ore metals only; each piece's power is its metal's tier.
+ */
+export const ORE_METALS = ["pewter", "blackiron", "ashsteel", "moonsilver", "glimmer", "rarite"] as const;
+export function fieldGear(): Item[] {
+  const out: Item[] = [];
+  const tierOf = (metal: string) => METALS.find(entry => entry.id === metal)!;
+  for (const id of ORE_METALS) {
+    const metal = tierOf(id), name = metal.name, t = metal.tier;
+    out.push({ id: `${id}_prospectors_pick`, name: `${name} prospector's pick`, examine: `A ${name.toLowerCase()} pick with a prospector's tooth: strikes land ${4 * t}% surer, and one ore in ${Math.round(100 / (4 * t))} comes up double.`,
+      value: metal.value * 4, weight: 2.2, icon: { shape: "pickaxe", color: metal.color }, family: "prospector", power: t, tool: { kind: "pickaxe", tier: t, level: Math.min(99, metal.level + 3) },
+      equip: { slot: "weapon", bonuses: { attack: 2 + t, strength: 3 + t, defence: 0 }, requires: { attack: Math.min(99, metal.level) }, speed: 5 } } as Item);
+    out.push({ id: `${id}_rivets`, name: `${name} rivets`, examine: `Ten ${name.toLowerCase()} rivets, for a hull or a hinge. Shipwrights pay for them.`, value: Math.round(metal.value * 0.8), stackable: true, icon: { shape: "bar", color: metal.color }, family: "shipwright", power: t, vessel: "rivets" } as Item);
+  }
+  // Fieldcraft, one piece a metal, each with its own use (camping.ts).
+  const field: [typeof ORE_METALS[number], string, string, string, number][] = [
+    ["pewter", "camp_kit", "Camp kit", "Pegs, poles, a bedroll and a tin kettle: a camp, wherever the ground allows. Set-up-camp to pitch it.", 3],
+    ["blackiron", "field_stove", "Field stove", "A blackiron stove for the camp: carried when it's pitched, resting there gives back a little Faith too.", 3.5],
+    ["ashsteel", "camp_lantern", "Camp lantern", "An ashsteel lantern. Carried when a camp is pitched, it makes a camp you can wake up at (Wayfaring 25).", 1.5],
+    ["moonsilver", "field_altar", "Field altar", "A folding moonsilver altar for the road: set it up at your camp and offer bones there, for less than a standing altar gives.", 4],
+    ["glimmer", "expedition_frame", "Expedition frame", "A glimmer pack frame. Carried, a quarter of your load weighs nothing.", 2],
+    ["rarite", "wayfarers_compass", "Wayfarer's compass", "A rarite compass that always knows the way. Carried, running costs a tenth less.", 0.5],
+  ];
+  for (const [id, piece, label, examine, weight] of field) { const metal = tierOf(id); out.push({ id: `${id}_${piece}`, name: label, examine, value: metal.value * 5, weight, icon: { shape: piece === "field_altar" ? "orb" : piece === "camp_lantern" ? "lamp" : "key", color: metal.color }, family: "fieldcraft", power: metal.tier } as Item); }
+  // Shipwright's hardware beyond rivets: hull fittings (moonsilver up), an anchor chain, a ship's bell.
+  for (const id of ["moonsilver", "glimmer", "rarite"] as const) { const metal = tierOf(id); out.push({ id: `${id}_hull_fitting`, name: `${metal.name} hull fitting`, examine: `A ${metal.name.toLowerCase()} fitting for a hull that isn't built yet. Carried, the boatmen take a fifth off: they know a shipwright's friend.`, value: metal.value * 6, weight: 3, icon: { shape: "shield", color: metal.color }, family: "shipwright", power: metal.tier, vessel: "hull" } as Item); }
+  out.push({ id: "blackiron_anchor_chain", name: "Anchor chain", examine: "Blackiron links, heavy as sin. An anchor's worth, for a ship to come.", value: 400, weight: 8, icon: { shape: "key", color: "#5f5e66" }, family: "shipwright", power: 2, vessel: "anchor" } as Item);
+  out.push({ id: "rarite_ships_bell", name: "Ship's bell", examine: "A rarite bell that rings clear across water. Carried, the boatmen take a third off the fare.", value: 9000, weight: 4, icon: { shape: "orb", color: "#d8b6b4" }, family: "shipwright", power: 6, vessel: "bell" } as Item);
+  // Resonance fittings: fitted to a carving standing in the world, it lasts longer (once a carving).
+  for (const [id, more] of [["ashsteel", 50], ["moonsilver", 75], ["glimmer", 100], ["rarite", 125]] as const) { const metal = tierOf(id); out.push({ id: `${id}_resonance_fitting`, name: `${metal.name} resonance fitting`, examine: `A ${metal.name.toLowerCase()} band tuned to carved wood: fitted to a standing carving, it lasts ${more}% longer. One fitting a carving.`, value: metal.value * 3, weight: 0.5, icon: { shape: "amulet", color: metal.color }, family: "resonance", power: metal.tier } as Item); }
+  return out;
+}
 function metalGear(): Item[] {
   const out: Item[] = [];
   for (const metal of METALS) {
@@ -1022,7 +1061,7 @@ function dyedItem(id: string): Item | undefined {
   DYED.set(id, made);
   return made;
 }
-export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...DYE_POTS, ...CARVING_ITEMS, ...BAR_ITEMS, ...metalGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...ORDER_ARMOUR, ...orderGear(), ...slayerGear(), ...heartguardGear(), ...REGIONAL_ITEMS, ...APOTHECARY_ITEMS, ...factionGear(), ...mizukaiGear(), ...MIZUKAI_ITEMS, ...KHARAVETH_ITEMS, ...KHARAVETH_GEAR, ...STEPPE_CLOTHES, ...HEARTLAND_ITEMS, ...HEARTLAND_GEAR, ...ORASHAI_ITEMS, ...ORASHAI_GEAR, ...ORASHAI_QUEST_ITEMS, ...MEGHAVAN_ITEMS, ...MEGHAVAN_GEAR, ...MEGHAVAN_QUEST_ITEMS, ...PYRAMID_ITEMS, ...PORTS_ITEMS, ...PYRAMID_GEAR, ...PORTS_GEAR]);
+export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...DYE_POTS, ...CARVING_ITEMS, ...BAR_ITEMS, ...metalGear(), ...fieldGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...ORDER_ARMOUR, ...orderGear(), ...slayerGear(), ...heartguardGear(), ...REGIONAL_ITEMS, ...APOTHECARY_ITEMS, ...factionGear(), ...mizukaiGear(), ...MIZUKAI_ITEMS, ...KHARAVETH_ITEMS, ...KHARAVETH_GEAR, ...STEPPE_CLOTHES, ...HEARTLAND_ITEMS, ...HEARTLAND_GEAR, ...ORASHAI_ITEMS, ...ORASHAI_GEAR, ...ORASHAI_QUEST_ITEMS, ...MEGHAVAN_ITEMS, ...MEGHAVAN_GEAR, ...MEGHAVAN_QUEST_ITEMS, ...PYRAMID_ITEMS, ...PORTS_ITEMS, ...PYRAMID_GEAR, ...PORTS_GEAR]);
 const ITEM_MAP = new Map(ITEM_LIST.map(item => [item.id, item]));
 export function item(id: string): Item {
   const found = ITEM_MAP.get(id) ?? dyedItem(id);

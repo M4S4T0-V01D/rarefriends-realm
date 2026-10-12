@@ -83,7 +83,7 @@ export function skillGuide(skill: Skill): GuideEntry[] {
       for (const axe of ITEM_LIST.filter(entry => entry.tool?.kind === "axe")) add(axe.tool!.level, axe.name, "Chops faster", axe.id);
       break;
     case "mining":
-      for (const [kind, rock] of Object.entries(ROCKS)) add(rock.level, rock.name, `${rock.xp} XP${kind === "sigil" ? " (Wizards' Tower, never runs out)" : ""}`, rock.ore);
+      for (const [kind, rock] of Object.entries(ROCKS)) add(rock.level, rock.name, `${rock.xp} XP${kind === "sigil" ? " (Wizards' Tower, never runs out)" : kind.startsWith("sigil") ? " (the mines' faces, never runs out)" : ""}`, rock.ore);
       for (const pick of ITEM_LIST.filter(entry => entry.tool?.kind === "pickaxe")) add(pick.tool!.level, pick.name, "Mines faster", pick.id);
       break;
     case "fishing":
@@ -131,6 +131,9 @@ export function skillGuide(skill: Skill): GuideEntry[] {
       add(1, "Carrying weight", "Everything worn weighs something (Worn equipment shows it): forty kilograms doubles how fast running drains. Round shields and plate are the heavy things.");
       add(30, "Packhorse", "A quarter of your load no longer counts against your run energy"); add(60, "Long strides", "Half of it"); add(90, "Light as a Friend", "Three quarters of it");
       add(20, "Murkmire stepping stones", "A shortcut over the bog river");
+      add(5, "Camping", "With a camp kit (smithed from pewter): a tent and a fire in the wild, where the ground allows and not by a town, a dungeon's door or the dragons. Rest and cook there. Wayfaring XP for pitching one, once in a while.", "pewter_camp_kit");
+      add(25, "A camp to wake at", "With a camp lantern carried when the camp is pitched: fall, and you wake by your own fire while it stands", "ashsteel_camp_lantern");
+      add(5, "Field altar", "Set beside the tent, it takes bones for one and a half times a burial (an altar gives twice)", "moonsilver_field_altar");
       for (const reward of WAYFARER_REWARDS) if (reward.id !== "waybread") add(item(reward.id).equip?.requires?.agility ?? 1, reward.name, `${reward.cost} marks from Coach Skip · ${reward.text.replace(/ \(Wayfaring \d+\)/, "")}`, reward.id);
       add(1, "Waybread", "1 mark for 3 from Coach Skip · 40 run energy each", "waybread");
       break;
