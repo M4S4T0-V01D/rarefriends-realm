@@ -175,4 +175,4 @@ export const DEV_CATALOG = "rarefriends-realm:dev-catalog";
 export const DEV_REPORT = "rarefriends-realm:dev-report";
 export const DEV_TELEPORT = "rarefriends-realm:dev-teleport";
 export type DevPick = { x: number; y: number; tile: number; lift: number; object: { id: number; kind: string; name: string; uid?: string } | null; building: { index: number; name: string } | null; region: string };
-export type DevCatalog = { tiles: Record<string, number>; decor: string[]; trees: string[]; rocks: string[]; spots: string[]; npcs: { id: string; name: string }[]; monsters: { id: string; name: string; level: number }[]; items: { id: string; name: string }[]; kinds: string[]; spawn: { x: number; y: number } };
+export type DevCatalog = { tiles: Record<string, number>; decor: string[]; trees: string[]; rocks: string[]; spots: string[]; npcs: { id: string; name: string }[]; monsters: { id: string; name: string; level: number; art: number }[]; items: { id: string; name: string }[]; skills: string[]; quests: { id: string; name: string }[]; kinds: string[]; spawn: { x: number; y: number } };

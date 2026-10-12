@@ -10,6 +10,8 @@ import { ITEM_LIST, item } from "./data.ts";
 import { addXp, freeSlots, has, level, maxHp, message, sound, take, type Game, type Player } from "./state.ts";
 import { OVERWORLD_H, T, W, isUnderground, regionAt, terrainAt, type World, type WorldObject } from "./world.ts";
 import { inRingBuilding } from "./world.ts";
+import { campZones, type CampZone, type Overlay } from "./overlay.ts";
+import { OVERLAYS } from "./overlays/index.ts";
 
 export type Camp = { x: number; y: number; tier: number; respawn: boolean; altar: boolean };
 /** The Fieldcraft family, by what each piece is for: the kit makes a camp; the rest raise its tier (and have their own uses). */
@@ -29,8 +31,10 @@ export const CAMP_RULES = {
   fromTown: 9, fromLadder: 6, danger: 4, wayfaring: 5, respawnWayfaring: 25, respawnTier: 3,
   /** Wayfaring XP for setting up, and how long (ticks played) before it's earned again. */
   xp: 45, xpEvery: 3000,
-  overrides: [] as { x0: number; y0: number; x1: number; y1: number; allow: boolean; why?: string }[],
+  overrides: campZones(OVERLAYS) as CampZone[],
 };
+/** The development world's zones laid over the promoted ones (devlayer.ts, on every rebuild); null takes them away. */
+export function setDevCampZones(overlay: Overlay | null) { CAMP_RULES.overrides = [...campZones(OVERLAYS), ...(overlay ? campZones([overlay]) : [])]; }
 const TOWN_KINDS = new Set(["bank", "altar", "furnace", "anvil", "range", "wheel", "still", "stall", "mill", "dock", "sigil_altar"]);
 /** Why a camp can't stand at a tile, or null when it can. */
 export function campAllowed(game: Game, x: number, y: number): string | null {

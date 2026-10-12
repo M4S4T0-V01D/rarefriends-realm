@@ -39,7 +39,7 @@ try {
   browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 1320, height: 900 } }), page = await context.newPage();
   page.setDefaultTimeout(30_000);
-  const errors = []; page.on("pageerror", error => errors.push(error.message));
+  const errors = []; page.on("pageerror", error => { errors.push(error.message); console.log("page error:", error.message); }); page.on("console", entry => { if (entry.type() === "error") console.log("console error:", entry.text()); });
   await installFixture(page, origin, { artworkCall });
   // The editor's service calls are answered here (the Worker isn't running): an empty world to load, saves accepted.
   // (Registered after the fixture's routes, so it's asked first.)
@@ -90,7 +90,35 @@ try {
   // Undo takes it back (the game rebuilds again).
   await editor.getByRole("button", { name: "Undo" }).click();
   await editor.getByText(/Undone/).waitFor();
-  console.log("PASS development game: the editor beside the public build, overlays applied and saved, edit mode picking, undo");
+  // The define tab: a person of the overlay's own, then an errand they give, both in the overlay and known to the game.
+  await editor.getByRole("button", { name: "define", exact: true }).click();
+  await editor.getByRole("button", { name: "npc", exact: true }).click();
+  const field = label => editor.locator("h4", { hasText: label }).locator("xpath=following-sibling::*[1]");
+  await field("Id (dev_…)").fill("dev_tess"); await field("Name").fill("Tess"); await field("Examine").fill("A tester.");
+  await editor.getByRole("button", { name: "Define npc" }).click();
+  await editor.getByText(/npc dev_tess defined/).waitFor();
+  await editor.getByRole("button", { name: "quest", exact: true }).click();
+  await field("Id (dev_…)").fill("dev_two_logs"); await field("Name").fill("Two Logs");
+  await field("Given by").selectOption("dev_tess"); await field("Wants").selectOption("logs"); await field("How many").fill("2");
+  await field("The ask (a line each)").fill("Two logs, please."); await field("When you say yes").fill("Thanks."); await field("While you're at it").fill("Logs?"); await field("When you deliver (a line each)").fill("Lovely.");
+  await editor.getByRole("button", { name: "Define quest" }).click();
+  await editor.getByText(/quest dev_two_logs defined/).waitFor();
+  await editor.getByText(/Defined \(2\)/).waitFor();
+  await editor.getByRole("button", { name: "tools", exact: true }).click();
+  await editor.getByText(/2 ops applied/).waitFor();
+  await editor.getByRole("button", { name: "Save" }).click();
+  await editor.getByText(/Saved v5/).waitFor();
+  assert.ok(saved.overlay.ops.some(op => op.op === "npc" && op.def.id === "dev_tess" && op.def.art.family === 9) && saved.overlay.ops.some(op => op.op === "quest" && op.def.giver === "dev_tess" && op.def.item === "logs" && op.def.count === 2), "the person and the errand are in the saved overlay");
+  // The camp zone tool: two corners make a rectangle where camping is forbidden, with its reason.
+  await editor.getByRole("button", { name: "Camp zone" }).click();
+  await editor.getByRole("button", { name: "Forbid camping" }).click();
+  await editor.getByPlaceholder("Camping isn't allowed here.").fill("The warden says no.");
+  await page.mouse.click(box.x + box.width / 2 - 80, box.y + box.height / 2 - 60);
+  await editor.getByText(/First corner/).waitFor();
+  await page.mouse.click(box.x + box.width / 2 + 80, box.y + box.height / 2 + 60);
+  await editor.getByText(/Camping forbidden from/).waitFor();
+  await editor.getByText(/3 ops applied/).waitFor();
+  console.log("PASS development game: the editor beside the public build, overlays applied and saved, edit mode picking, undo, definitions (a person, an errand), a camp zone");
   assert.deepEqual(errors, [], "no page errors");
   // The public build: nothing of the editor in it.
   execFileSync("node", ["scripts/build.mjs", "--outdir", join(outdir, "public")], { stdio: "ignore" });

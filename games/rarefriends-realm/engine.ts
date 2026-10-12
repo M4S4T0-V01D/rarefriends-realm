@@ -2754,7 +2754,7 @@ export function serialize(game: Game): SaveData {
   };
 }
 /** Every quest the Realm has (so a save keeps them all: the hand-kept list this used to be lost the dungeon, Ring, Orders and Maidens quests on reload). */
-const QUEST_IDS = QUESTS.map(quest => quest.id);
+const questIds = () => QUESTS.map(quest => quest.id);   // (at restore time: an overlay's quests register after this module loads)
 const cleanCamp = (raw: unknown): Camp | null => { if (!raw || typeof raw !== "object") return null; const c = raw as Record<string, unknown>; if (typeof c.x !== "number" || typeof c.y !== "number" || !Number.isInteger(c.x) || !Number.isInteger(c.y)) return null; return { x: c.x, y: c.y, tier: int(c.tier, 0, 6, 1), respawn: c.respawn === true, altar: c.altar === true }; };
 const int = (value: unknown, min: number, max: number, fallback: number) => typeof value === "number" && Number.isFinite(value) ? Math.max(min, Math.min(max, Math.floor(value))) : fallback;
 /** Item and spell ids from saves made before the Realm's own names (old id → new id). */
@@ -2837,7 +2837,7 @@ export function restore(game: Game, raw: unknown): boolean {
   const autocast = typeof save.autocast === "string" ? migrateId(save.autocast) : null;
   player.autocast = autocast && SPELLS.some(spell => spell.id === autocast && spell.maxHit) && isStaffEquipped(player) ? autocast : null;
   player.quests = {}; player.questData = {};
-  for (const id of QUEST_IDS) { const value = int(save.quests?.[id], 0, 4, 0); if (value) player.quests[id] = value; }
+  for (const id of questIds()) { const value = int(save.quests?.[id], 0, 4, 0); if (value) player.quests[id] = value; }
   for (const [key, value] of Object.entries(save.questData ?? {})) if (/^[a-z_]{1,24}$/.test(key)) player.questData[key] = int(value, 0, 1000, 0);
   player.wardrobe = (save.wardrobe ?? []).filter((id): id is WardrobeId => WARDROBE.some(entry => entry.id === id)).filter((id, index, list) => list.indexOf(id) === index);
   player.worn = (save.worn ?? []).filter((id): id is WardrobeId => player.wardrobe.includes(id as WardrobeId));

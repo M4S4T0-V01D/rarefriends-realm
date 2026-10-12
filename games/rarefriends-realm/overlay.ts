@@ -14,6 +14,15 @@ import { DECOR_NAMES, FLOOR_Y, H, OVERWORLD_H, ROOF_COLORS, T, TREE_NAMES, W, WA
 
 /** An NPC an overlay defines: who they are, and what they say (plain lines; the game's own people have scripted talk). */
 export type OverlayNpc = { id: string; name: string; examine: string; options: readonly string[]; art: { canonical: 7730 | 3412 } | { family: number; seed: number }; lines?: string[] };
+/**
+ * A quest an overlay defines: an errand, the Realm's commonest shape (content.ts fetchQuest). Someone (`giver`, one of
+ * the game's people or the overlay's own) asks for `count` of an item, in their words (`offer`, then `accept`, then
+ * `progress` until you have them, then `done`), and pays in coins, XP in a skill and items. Registered by content.ts
+ * (registerDevQuest), which has the quest machinery this module can't import.
+ */
+export type OverlayQuest = { id: string; name: string; giver: string; item: string; count: number; offer: string[]; accept: string; progress: string; done: string[]; points?: number; difficulty?: string; rewards: { coins?: number; xp?: { skill: string; amount: number }; items?: { id: string; n: number }[] } };
+/** Where camping is allowed or forbidden regardless of the rules (camping.ts CAMP_RULES.overrides). */
+export type CampZone = { x0: number; y0: number; x1: number; y1: number; allow: boolean; why?: string };
 
 export const OVERLAY_VERSION = 1;
 export type Op =
@@ -26,7 +35,9 @@ export type Op =
   | { op: "spawn"; uid: string; kind: "npc" | "monster"; id: string; x: number; y: number; wander?: number }
   | { op: "monster"; def: MonsterDef }
   | { op: "npc"; def: OverlayNpc }
-  | { op: "item"; def: (typeof ITEM_LIST)[number] };
+  | { op: "item"; def: (typeof ITEM_LIST)[number] }
+  | { op: "quest"; def: OverlayQuest }
+  | { op: "campzone"; uid: string; x0: number; y0: number; x1: number; y1: number; allow: boolean; why?: string };
 export type Overlay = { v: 1; name?: string; ops: Op[] };
 export const emptyOverlay = (name = "Development world"): Overlay => ({ v: 1, name, ops: [] });
 export const LIMITS = { ops: 200_000, bytes: 4_000_000, fillTiles: 40_000 } as const;
@@ -73,6 +84,16 @@ export function cleanOverlay(raw: unknown, why: string[] = []): Overlay {
       case "monster": if (op.def && typeof op.def === "object" && UID((op.def as MonsterDef).id)) out.ops.push({ op: "monster", def: op.def as MonsterDef }); else bad("bad monster"); break;
       case "npc": if (op.def && typeof op.def === "object" && UID((op.def as OverlayNpc).id)) out.ops.push({ op: "npc", def: op.def as OverlayNpc }); else bad("bad npc"); break;
       case "item": if (op.def && typeof op.def === "object" && UID((op.def as { id: string }).id)) out.ops.push({ op: "item", def: op.def as (typeof ITEM_LIST)[number] }); else bad("bad item"); break;
+      case "quest": {
+        const d = op.def as Record<string, unknown> | undefined, lines = (v: unknown) => Array.isArray(v) && v.length > 0 && v.every(l => TEXT(l, 300));
+        if (!d || typeof d !== "object" || !UID(d.id) || !TEXT(d.name, 60) || !TEXT(d.giver, 48) || !TEXT(d.item, 48) || !NUM(d.count, 1, 1000) || !lines(d.offer) || !TEXT(d.accept, 300) || !TEXT(d.progress, 300) || !lines(d.done) || !d.rewards || typeof d.rewards !== "object") { bad("bad quest"); break; }
+        const r = d.rewards as Record<string, unknown>, rewards: OverlayQuest["rewards"] = {};
+        if (NUM(r.coins, 0, 1_000_000)) rewards.coins = Math.floor(r.coins as number);
+        const xp = r.xp as Record<string, unknown> | undefined; if (xp && TEXT(xp.skill, 20) && NUM(xp.amount, 0, 1_000_000)) rewards.xp = { skill: xp.skill as string, amount: Math.floor(xp.amount as number) };
+        if (Array.isArray(r.items)) rewards.items = (r.items as Record<string, unknown>[]).filter(e => e && TEXT(e.id, 48) && NUM(e.n, 1, 1000)).slice(0, 8).map(e => ({ id: e.id as string, n: Math.floor(e.n as number) }));
+        out.ops.push({ op: "quest", def: { id: d.id as string, name: d.name as string, giver: d.giver as string, item: d.item as string, count: Math.floor(d.count as number), offer: d.offer as string[], accept: d.accept as string, progress: d.progress as string, done: d.done as string[], ...(NUM(d.points, 0, 5) ? { points: Math.floor(d.points as number) } : {}), ...(TEXT(d.difficulty, 20) ? { difficulty: d.difficulty as string } : {}), rewards } }); break;
+      }
+      case "campzone": if (UID(op.uid) && NUM(op.x0, 0, W - 1) && NUM(op.y0, 0, H - 1) && NUM(op.x1, 0, W - 1) && NUM(op.y1, 0, H - 1) && typeof op.allow === "boolean") out.ops.push({ op: "campzone", uid: op.uid as string, x0: Math.min(op.x0 as number, op.x1 as number), y0: Math.min(op.y0 as number, op.y1 as number), x1: Math.max(op.x0 as number, op.x1 as number), y1: Math.max(op.y0 as number, op.y1 as number), allow: op.allow, ...(TEXT(op.why, 120) && op.why ? { why: op.why as string } : {}) }); else bad("bad campzone"); break;
       default: bad("unknown op");
     }
   }
@@ -91,6 +112,9 @@ export function registerDefinitions(overlay: Overlay, npcs: Record<string, unkno
     if (op.op === "item") { if (!op.def.id.startsWith(DEV_PREFIX)) { why.push(`item ${op.def.id}: ids of the overlay's own start with ${DEV_PREFIX}`); continue; } if (!ITEM_LIST.some(item => item.id === op.def.id)) (ITEM_LIST as unknown as unknown[]).push(op.def); }
   }
 }
+
+/** The camping overrides some overlays carry, in order (camping.ts lays them over its rules). */
+export const campZones = (overlays: readonly Overlay[]): CampZone[] => overlays.flatMap(overlay => overlay.ops.flatMap(op => op.op === "campzone" ? [{ x0: op.x0, y0: op.y0, x1: op.x1, y1: op.y1, allow: op.allow, ...(op.why ? { why: op.why } : {}) }] : []));
 
 /** Where the overlay's placed things are in a world, by uid: object index, building index or spawn index. */
 export type Placed = { objects: Map<string, number>; buildings: Map<string, number>; spawns: Map<string, number> };

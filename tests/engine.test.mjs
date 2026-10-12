@@ -3923,3 +3923,71 @@ test("Camping: a camp kit pitches a tent and a fire in the wild (not in town, no
   assert.match(campAllowed(g, 10, OVERWORLD_H + 5) ?? "", /sky/);
   assert.ok(CAMP_RULES.danger <= 4);
 });
+
+test("Overlay definitions: an errand quest an overlay defines is offered by its giver, logged, delivered and paid like any other; a camp zone overrides the camping rules with its reason; the promotion script writes the overlay as a listed module", async () => {
+  const { cleanOverlay } = await import("../games/rarefriends-realm/overlay.ts");
+  const { registerDevQuest, QUESTS, questDone, NPCS } = await import("../games/rarefriends-realm/content.ts");
+  const { CAMP_RULES, campAllowed, setDevCampZones } = await import("../games/rarefriends-realm/camping.ts");
+  const { registerDefinitions } = await import("../games/rarefriends-realm/overlay.ts");
+  const why = [], overlay = cleanOverlay({ v: 1, name: "Errands", ops: [
+    { op: "npc", def: { id: "dev_tester", name: "Tess the Tester", examine: "Tests.", options: ["Talk-to"], art: { family: 9, seed: 3 }, lines: ["Hello.", "Still here."] } },
+    { op: "quest", def: { id: "dev_errand", name: "Two Logs", giver: "dev_tester", item: "logs", count: 2, offer: ["Could you bring me two logs?", "For the fire."], accept: "Thank you.", progress: "Two logs, when you have them.", done: ["Lovely.", "Here's something for your trouble."], points: 1, rewards: { coins: 50, xp: { skill: "woodcutting", amount: 100 }, items: [{ id: "logs", n: 1 }] } } },
+    { op: "quest", def: { id: "dev_bad", name: "Bad", giver: "nobody_here", item: "logs", count: 1, offer: ["?"], accept: "?", progress: "?", done: ["?"], rewards: {} } },
+    { op: "quest", def: { id: "dev_worse", name: "Worse", giver: "dev_tester", item: "logs", count: 0, offer: [], accept: "?", progress: "?", done: ["?"], rewards: {} } },
+    { op: "campzone", uid: "zone1", x0: 100, y0: 100, x1: 90, y1: 110, allow: false, why: "The warden forbids fires here." },
+    { op: "campzone", uid: "zone2", x0: 200, y0: 200, x1: 204, y1: 204, allow: true },
+    { op: "campzone", uid: "zone3", x0: 1, y0: 1, x1: 2, y1: 2 },
+  ] }, why);
+  assert.equal(overlay.ops.length, 5, "the quest with no lines and the zone with no allow are dropped"); assert.ok(why.some(w => /bad quest/.test(w)) && why.some(w => /bad campzone/.test(w)));
+  const zone = overlay.ops.find(op => op.op === "campzone"); assert.deepEqual([zone.x0, zone.y0, zone.x1, zone.y1], [90, 100, 100, 110], "corners put in order");
+  // Registered: the NPC through the game's table, the quest through content.ts (the giver has to exist; so does the item).
+  const problems = []; registerDefinitions(overlay, NPCS, problems);
+  for (const op of overlay.ops) if (op.op === "quest") registerDevQuest(op.def, problems);
+  assert.ok(problems.some(p => /nobody called nobody_here/.test(p)), "a quest without its giver is refused");
+  assert.ok(NPCS.dev_tester?.dev && QUESTS.some(q => q.id === "dev_errand" && q.dev) && !QUESTS.some(q => q.id === "dev_bad"));
+  const quest = QUESTS.find(q => q.id === "dev_errand"); assert.deepEqual(quest.rewards, ["1 Quest Point", "50 coins", "100 Woodcutting XP", "1 Logs"]);
+  try {
+    const g = newGame(), p = g.player;
+    assert.deepEqual(quest.journal(g), ["I can start this quest by talking to Tess the Tester."]);
+    // The giver offers it (their own lines wait), you accept, bring the logs, and are paid; then they say their lines.
+    let d = talk(g, "dev_tester"); assert.equal(d.lines[0].text, "Could you bring me two logs?"); assert.equal(d.lines[1].text, "For the fire.");
+    d = d.options.find(o => o.label === "I'll do it.").then(); assert.equal(d.lines[0].text, "Thank you."); d.onEnd?.();
+    assert.equal(p.quests.dev_errand, 1); assert.ok(quest.journal(g)[1].includes("0 of 2"));
+    d = talk(g, "dev_tester"); assert.equal(d.lines[0].text, "Two logs, when you have them.");
+    give(p, "logs", 2); assert.ok(quest.journal(g)[1].startsWith("✓"));
+    const coins = count(p, "coins"), xp = p.xp.woodcutting;
+    d = talk(g, "dev_tester"); assert.equal(d.lines[0].text, "Lovely."); d.onEnd?.();
+    assert.ok(questDone(g, "dev_errand")); assert.equal(count(p, "coins"), coins + 50); assert.equal(p.xp.woodcutting, xp + 100); assert.equal(count(p, "logs"), 1, "two taken, one given back");
+    d = talk(g, "dev_tester"); assert.equal(d.lines[0].text, "Hello.", "the errand done, their own lines");
+    // Saved and restored like any other quest (the list is read at restore time, so an overlay's quests count).
+    const h = newGame(); restore(h, serialize(g)); assert.ok(questDone(h, "dev_errand"));
+    // Camp zones: the forbidding rectangle says why; the allowing one lets a camp stand even by a bank; the rules hold elsewhere.
+    setDevCampZones(overlay);
+    assert.equal(CAMP_RULES.overrides.length, 2); assert.equal(campAllowed(g, 95, 105), "The warden forbids fires here.");
+    assert.equal(campAllowed(g, 202, 202), null, "allowed whatever the ground");
+    assert.ok(campAllowed(g, p.x, p.y), "the fountain square is still no place for a tent");
+    setDevCampZones(null); assert.equal(CAMP_RULES.overrides.length, 0);
+  } finally {
+    // (The shared tables: the next tests see the Realm as it was.)
+    delete NPCS.dev_tester; for (const id of ["dev_errand"]) { const at = QUESTS.findIndex(q => q.id === id); if (at >= 0) QUESTS.splice(at, 1); }
+    setDevCampZones(null);
+  }
+  // The promotion script: the overlay becomes a module under overlays/, listed in index.ts, and loads as code.
+  const { mkdtempSync, writeFileSync, readFileSync: read, rmSync } = await import("node:fs"), { tmpdir } = await import("node:os"), { join } = await import("node:path"), { execFileSync } = await import("node:child_process");
+  const dir = mkdtempSync(join(tmpdir(), "realm-promote-"));
+  try {
+    writeFileSync(join(dir, "index.ts"), read("games/rarefriends-realm/overlays/index.ts", "utf8").replace('from "../overlay.ts"', `from "${process.cwd()}/games/rarefriends-realm/overlay.ts"`));
+    writeFileSync(join(dir, "errands.json"), JSON.stringify({ ...overlay, ops: overlay.ops.filter(op => op.op === "campzone") }));
+    const out = execFileSync("node", ["--no-warnings", "scripts/dev-promote.mjs", join(dir, "errands.json"), "errands"], { env: { ...process.env, REALM_OVERLAYS_DIR: dir } }).toString();
+    assert.match(out, /2 camp zones/); assert.match(out, /Wrote .*errands\.ts and listed it/);
+    const index = read(join(dir, "index.ts"), "utf8"); assert.match(index, /import errands from "\.\/errands\.ts";/); assert.match(index, /OVERLAYS: readonly Overlay\[\] = \[errands\];/);
+    const module = await import(join(dir, "errands.ts")); assert.equal(module.default.ops.length, 2); assert.equal(module.default.name, "Errands");
+    const listed = await import(join(dir, "index.ts")); assert.equal(listed.OVERLAYS.length, 1);
+    // Again: listed once.
+    execFileSync("node", ["--no-warnings", "scripts/dev-promote.mjs", join(dir, "errands.json"), "errands"], { env: { ...process.env, REALM_OVERLAYS_DIR: dir } });
+    assert.equal((read(join(dir, "index.ts"), "utf8").match(/errands/g) ?? []).length, 3);
+    // An overlay with a problem is refused (--check says so; without --force the files aren't written).
+    writeFileSync(join(dir, "bad.json"), JSON.stringify({ v: 1, ops: [{ op: "spawn", uid: "s1", kind: "monster", id: "no_such_monster", x: 10, y: 10 }] }));
+    assert.throws(() => execFileSync("node", ["--no-warnings", "scripts/dev-promote.mjs", join(dir, "bad.json"), "--check"], { stdio: "pipe" }), /Command failed/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

@@ -4,8 +4,9 @@
  * host is laid over a fresh copy of it, so every edit (and every undo) is the bake plus the overlay, never a stack of
  * edits on edits. The public host never opens the frame this way, and never sends these messages.
  */
-import { ITEM_LIST, MONSTERS, ROCKS, TREES } from "./data.ts";
-import { NPCS } from "./content.ts";
+import { ITEM_LIST, MONSTERS, ROCKS, SKILLS, TREES } from "./data.ts";
+import { NPCS, QUESTS, registerDevQuest } from "./content.ts";
+import { applyCamp, setDevCampZones } from "./camping.ts";
 import { DECOR_NAMES, T, W, WORLD_SEED, regionAt, type World } from "./world.ts";
 import { applyOverlay, registerDefinitions, validatePlacements, type Overlay, type Placed } from "./overlay.ts";
 import { realmWorld, setSharedWorld, spawnCreatures, type Game } from "./state.ts";
@@ -29,10 +30,14 @@ export function rebuildWorld(game: Game, overlay: Overlay): { problems: string[]
   keepPristine();
   const world = cloneWorld(pristine!), problems: string[] = [];
   registerDefinitions(overlay, NPCS as Record<string, unknown>, problems);
+  for (const op of overlay.ops) if (op.op === "quest") registerDevQuest(op.def, problems);
+  // (A quest taken out of the overlay is taken out of the list, and out of the player's log.)
+  for (const quest of [...QUESTS]) if (quest.dev && !overlay.ops.some(op => op.op === "quest" && op.def.id === quest.id)) { (QUESTS as unknown[]).splice(QUESTS.indexOf(quest), 1); delete game.player.quests[quest.id]; }
+  setDevCampZones(overlay);
   placed = applyOverlay(world, overlay, WORLD_SEED, problems, NPCS as Record<string, unknown>);
   const unreachable = validatePlacements(world, overlay, placed);
   setSharedWorld(world); game.world = world;
-  spawnCreatures(game); applyHome(game);
+  spawnCreatures(game); applyHome(game); applyCamp(game);
   game.worldVersion = (game.worldVersion ?? 0) + 1; resetLighting(world);
   return { problems, unreachable };
 }
@@ -41,8 +46,8 @@ export function catalog(game: Game): DevCatalog {
   const uniq = (list: string[]) => [...new Set(list)];
   return {
     tiles: { ...T }, decor: Object.keys(DECOR_NAMES), trees: Object.keys(TREES), rocks: Object.keys(ROCKS), spots: ["net", "bait", "lure", "cage", "harpoon", "deep"],
-    npcs: Object.values(NPCS).map(n => ({ id: n.id, name: n.name })), monsters: Object.values(MONSTERS).map(m => ({ id: m.id, name: m.name, level: m.level })),
-    items: ITEM_LIST.map(i => ({ id: i.id, name: i.name })),
+    npcs: Object.values(NPCS).map(n => ({ id: n.id, name: n.name })), monsters: Object.values(MONSTERS).map(m => ({ id: m.id, name: m.name, level: m.level, art: m.art })),
+    items: ITEM_LIST.map(i => ({ id: i.id, name: i.name })), skills: [...SKILLS], quests: QUESTS.map(q => ({ id: q.id, name: q.name })),
     kinds: uniq(["decor", "tree", "rock", "spot", "furnace", "anvil", "range", "altar", "bank", "ladder", "sign", "well", "chest", ...game.world.objects.map(o => o.kind)]),
     spawn: { ...game.world.places.spawn },
   };

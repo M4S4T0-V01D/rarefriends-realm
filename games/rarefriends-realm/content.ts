@@ -1,7 +1,9 @@
 /**
  * NPCs, their dialogue and the Realm's quests. Dialogue is built on demand from the player's quest state.
  */
-import { COURSES, FAMILY_NAMES, FAMILY_PERKS, SLAYER_REWARDS, WAYFARER_MARK, WAYFARER_REWARDS, item , REGIONAL_CLOTHING, SKILL_NAMES } from "./data.ts";
+import { COURSES, FAMILY_NAMES, FAMILY_PERKS, ITEM_LIST, SLAYER_REWARDS, SKILLS, WAYFARER_MARK, WAYFARER_REWARDS, item , REGIONAL_CLOTHING, SKILL_NAMES, type Skill } from "./data.ts";
+import type { OverlayQuest } from "./overlay.ts";
+import { OVERLAYS } from "./overlays/index.ts";
 import { assignTask, buySlayerReward, currentTask, eligibleTasks, slayerPoints, slayerStreak, taskText } from "./slayer.ts";
 import { TROPHY_POINTS, research, researchCost, researchable } from "./pursuance.ts";
 import { buyWayfarerReward } from "./wayfaring.ts";
@@ -177,7 +179,7 @@ export const NPCS: Record<string, NpcDef> = {
 export const npcDef = (id: string) => NPCS[id];
 
 // ---------- Quests ----------
-export type QuestDef = { id: string; name: string; points: number; difficulty: string; start: string; requirements: string[]; rewards: string[]; journal: (game: Game) => string[] };
+export type QuestDef = { id: string; name: string; points: number; difficulty: string; start: string; requirements: string[]; rewards: string[]; journal: (game: Game) => string[]; /** An overlay's errand (overlay.ts OverlayQuest): talkInner runs it from its words. */ dev?: OverlayQuest };
 export const stage = (game: Game, quest: string) => game.player.quests[quest] ?? 0;
 export const data = (game: Game, key: string) => game.player.questData[key] ?? 0;
 export const QUESTS: readonly QuestDef[] = [
@@ -556,6 +558,36 @@ export function completeQuest(game: Game, quest: string) {
   emit(game, { type: "quest", quest, tick: game.tick }); sound(game, "quest");
 }
 
+/**
+ * A quest an overlay defines (overlay.ts OverlayQuest): registered where the Realm keeps its quests, with a journal
+ * written from its words, so the log, the points and the saves treat it as any other. Ids are the overlay's own
+ * (dev_…); registering the same id again replaces it (the development world rebuilds often). The giver and the item
+ * are checked when the quest is registered, and said why when they're not there.
+ */
+export function registerDevQuest(def: OverlayQuest, why: string[] = []): boolean {
+  if (!def.id.startsWith("dev_")) { why.push(`quest ${def.id}: ids of the overlay's own start with dev_`); return false; }
+  if (!NPCS[def.giver]) { why.push(`quest ${def.id}: nobody called ${def.giver} to give it`); return false; }
+  if (!ITEM_LIST.some(entry => entry.id === def.item)) { why.push(`quest ${def.id}: no item called ${def.item}`); return false; }
+  if (def.rewards.xp && !(SKILLS as readonly string[]).includes(def.rewards.xp.skill)) { why.push(`quest ${def.id}: no skill called ${def.rewards.xp.skill}`); return false; }
+  for (const reward of def.rewards.items ?? []) if (!ITEM_LIST.some(entry => entry.id === reward.id)) { why.push(`quest ${def.id}: no item called ${reward.id} to give`); return false; }
+  const giver = NPCS[def.giver].name, wanted = item(def.item).name, points = def.points ?? 1;
+  const rewards = [`${points} Quest Point${points === 1 ? "" : "s"}`, ...(def.rewards.coins ? [`${def.rewards.coins.toLocaleString()} coins`] : []), ...(def.rewards.xp ? [`${def.rewards.xp.amount.toLocaleString()} ${SKILL_NAMES[def.rewards.xp.skill as Skill]} XP`] : []), ...(def.rewards.items ?? []).map(reward => `${reward.n} ${item(reward.id).name}`)];
+  const entry: QuestDef = { id: def.id, name: def.name, points, difficulty: def.difficulty ?? "Novice", start: `Talk to ${giver}.`, requirements: [], rewards, dev: def,
+    journal: game => { const s = stage(game, def.id); return s === 0 ? [`I can start this quest by talking to ${giver}.`] : s === 1 ? [`${giver} wants ${def.count} × ${wanted}.`, `${has(game.player, def.item, def.count) ? "✓" : "•"} ${count(game.player, def.item)} of ${def.count} in my pack.`] : [`I brought ${giver} what they asked for.`]; } };
+  const list = QUESTS as QuestDef[], at = list.findIndex(quest => quest.id === def.id);
+  if (at >= 0) list[at] = entry; else list.push(entry);
+  return true;
+}
+// The promoted overlays' quests are part of the public game.
+for (const overlay of OVERLAYS) for (const op of overlay.ops) if (op.op === "quest") registerDevQuest(op.def);
+/** An overlay's errand, run from its words: offered, taken, delivered, paid. */
+function talkDevQuest(game: Game, giver: string, name: string): Dialogue | null {
+  const quest = QUESTS.find(entry => entry.dev?.giver === giver); if (!quest?.dev) return null;
+  const def = quest.dev, player = game.player;
+  return fetchQuest(game, name, quest.id, { offer: def.offer, accept: def.accept, progress: def.progress, done: def.done, have: () => has(player, def.item, def.count), take: () => { take(player, def.item, def.count); },
+    reward: () => { if (def.rewards.coins) giveOrDrop(game, "coins", def.rewards.coins); if (def.rewards.xp) addXp(game, def.rewards.xp.skill as Skill, def.rewards.xp.amount, { raw: true }); for (const reward of def.rewards.items ?? []) giveOrDrop(game, reward.id, reward.n); } });
+}
+
 // ---------- Dialogue helpers ----------
 export const npcSays = (npc: string, ...texts: string[]): DialogueLine[] => texts.map(text => ({ who: "npc", text, npc }));
 export const playerSays = (...texts: string[]): DialogueLine[] => texts.map(text => ({ who: "player", text }));
@@ -771,6 +803,8 @@ function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
   const player = game.player, def = NPCS[npcId.split(":")[0]], name = def.name;
   // Someone the development world made (overlay.ts): they say their lines, in turn.
   const made = def as NpcDef & { dev?: boolean; lines?: string[] };
+  // An overlay's errand, from whoever gives it (the game's own people too), until it's done; then their usual talk.
+  if (!everyday && !npcId.includes(":")) { const errand = QUESTS.find(entry => entry.dev?.giver === def.id); if (errand && !questDone(game, errand.id)) { const dialogue = talkDevQuest(game, def.id, name); if (dialogue) return dialogue; } }
   if (made.dev) { const lines = made.lines?.length ? made.lines : ["…"]; const said = player.questData[`dev_said_${def.id}`] ?? 0; player.questData[`dev_said_${def.id}`] = (said + 1) % lines.length; return { npc: npcId, lines: npcSays(name, lines[said % lines.length]), index: 0 }; }
   // The bars' people: barkeeps with their quests (until they're done), the quiet traders.
   if (!everyday) { const bar = talkBar(game, npcId, name, () => talkInner(game, npcId, true)); if (bar) return bar; }
