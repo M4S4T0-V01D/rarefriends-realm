@@ -300,6 +300,7 @@ const ITEMS: Item[] = [
   { id: "glimmer_shard", name: "Glimmer shard", examine: "A shard of the lost Glimmer. It hums when you face north.", value: 0, tradeable: false, icon: { shape: "gem", color: "#e2d7ad", accent: "#161616" } },
   { id: "forge_ember", name: "Forge ember", examine: "An ember that never cools. Emberforge's heart.", value: 0, tradeable: false, icon: { shape: "orb", color: "#e3a58c" } },
   { id: "hollow_crown", name: "Hollow crown", examine: "The crown of the Hollow King. It weighs nothing at all.", value: 0, tradeable: false, icon: { shape: "crown", color: "#efede7", accent: "#161616" } },
+  { id: "first_copy", name: "First copy of the agreement", examine: "The old agreement in both peoples' hands, as it was first sworn: each to keep both passes and both roads, and to stand by the other.", value: 0, tradeable: false, icon: { shape: "scroll", color: "#e9dcb4", accent: "#7d2f26" } },
   { id: "realm_scroll", name: "Realm scroll", examine: "A map fragment of the Realm.", value: 0, tradeable: false, icon: { shape: "scroll", color: "#efe3c4" } },
 ];
 
@@ -1918,6 +1919,12 @@ export const SHOPS: Record<string, ShopDef> = {
   wizards: { id: "wizards", name: "The Tower Stores", buys: ["sigil", "magic"], rate: 0.6, stock: ["sigil_box", "breeze_sigil", "tide_sigil", "stone_sigil", "ember_sigil", "thought_sigil", "shade_sigil", "star_sigil",
     "staff", "breeze_staff", "tide_staff", "stone_staff", "ember_staff", "scholar_hat", "scholar_robe", "scholar_skirt", "tablet_hollow_square"] },
   bones: { id: "bones", name: "Bone Collector", buys: ["bones", "hide"], rate: 0.65, stock: ["bones", "large_bones"] },
+  // A Place to the North (northquest.ts): each trader carries the other people's goods once the Oathgate's open; the Redwake's stores if it's shut for good.
+  skarnholm_quay: { id: "skarnholm_quay", name: "The Skarnholm quay", stock: ["raw_carp", "carp", "raw_inkcrab", "inkcrab", "small_net", "harpoon", "fishing_bait", "pine_logs", "pelt_cape"] },
+  skarnholm_quay_open: { id: "skarnholm_quay_open", name: "The Skarnholm quay", stock: ["raw_carp", "carp", "raw_inkcrab", "inkcrab", "small_net", "harpoon", "fishing_bait", "pine_logs", "pelt_cape", "blackiron_ore", "blackiron_bar", "inkcoal", "moonsilver_ore", "oak_logs"] },
+  krasnogor_market: { id: "krasnogor_market", name: "Krasnogor market", stock: ["fur_hood", "pelt_cape", "frosthide_coif", "frosthide_bracers", "blackiron_ore", "inkcoal", "oak_logs", "pine_logs"] },
+  krasnogor_market_open: { id: "krasnogor_market_open", name: "Krasnogor market", stock: ["fur_hood", "pelt_cape", "frosthide_coif", "frosthide_bracers", "blackiron_ore", "inkcoal", "oak_logs", "pine_logs", "raw_inkcrab", "inkcrab", "raw_sailfish", "sailfish"] },
+  redwake_stores: { id: "redwake_stores", name: "The Redwake company's stores", stock: ["ashsteel_sabre", "ashsteel_greatsword", "ashsteel_battleaxe", "ashsteel_helm", "ashsteel_cuirass", "ashsteel_greaves", "ashsteel_roundshield", "moonsilver_sabre", "moonsilver_battleaxe", "moonsilver_roundshield"] },
   wyrmwright: { id: "wyrmwright", name: "Ysolde's wyrmwright trade", currency: "wyrm_scale", stock: ["wyrmward_roundshield", "wyrmward_aegis", "drakeward_shield", "drakeward_roundshield", "drakeward_aegis", "wyrmbane_sabre", "wyrmbane_wand", "wyrmbane_bow"] },
   capes: { id: "capes", name: "The Keeper of Capes", stock: [...SKILLS.map(skill => `${skill}_cape`), "grandmaster_cape"] },
 };

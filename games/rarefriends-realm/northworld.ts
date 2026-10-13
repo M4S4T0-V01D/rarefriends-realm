@@ -11,12 +11,15 @@
  * The north joins the old world overland: a long road climbs out of Raria's north into the Vargskeld foothills, and another
  * runs up from the Deadwood through the Zoryavik forest.
  */
-import { REGIONS, T, W, NORTH_DY, isWater, regionIndex, worldTools, type GenContext, type RegionId, type World } from "./world.ts";
+import { REGIONS, T, W, WALKABLE, NORTH_DY, isWater, regionIndex, worldTools, type GenContext, type RegionId, type World } from "./world.ts";
 
 /** The north's columns: the old world's breadth (the Mizukai sea beyond it stays sea). */
 export const NORTH_X1 = 1150;
 /** Where the peoples' lands meet: the Varn Ridge's spine (x), and its two passes (the Oathgate in the south, the Wolfsback in the north). */
 export const RIDGE = { x: 640, half: 34, oathgate: { x: 640, y: 236 }, wolfsback: { x: 652, y: 118 } } as const;
+/** The Oathgate road's trouble (northquest.ts): the wrecked caravan by the road, and the raiders' den up in the hills above it. */
+export const OATH_ROAD = { wreck: { x: 478, y: 241 }, den: { x: 494, y: 216 }, hills: { x0: 440, y0: 196, x1: 545, y1: 262 } } as const;
+const WOLFSBACK_SIGN = "THE WOLFSBACK. A goat-track over the Varn Ridge, the only way across when the Oathgate's shut. Carts can't take it. Yetis can.";
 
 /** Value noise in [0, 1), periodic over 64 cells of `scale` tiles (as world.ts's own). */
 function noiseOf(seed: number, scale: number) {
@@ -103,6 +106,13 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
       tiles[i] = mid(x + 11, y) > 0.55 ? T.DARK_GRASS : T.GRASS; lift[i] = 0.1; t.setRegion(x, y, id);
     }
   }
+  // ---------- The spine: a wall of crag down the ridge's middle, coast to strait, that nobody walks over ----------
+  // (The ridge is crossed at its passes, carved through it below: the Oathgate road and the Wolfsback's goat-track.)
+  const spineAt = (y: number) => ({ c: Math.round(RIDGE.x + (ridgeN(RIDGE.x, y) - 0.5) * 34), w: 3 + Math.round(mid(RIDGE.x * 0.3 + 400, y) * 4) });
+  for (let y = 0; y < N; y++) {
+    const { c, w } = spineAt(y);
+    for (let x = c - w; x <= c + w; x++) { const i = idx(x, y); if (isWater(tiles[i]) || tiles[i] === T.VOID) continue; tiles[i] = T.CLIFF; raise[i] = Math.max(raise[i], 3.2); lift[i] = Math.max(lift[i], 0.9); }
+  }
   // ---------- Rivers in the Zoryavik, north to the sea; lakes in the forest ----------
   const RIVERS: readonly (readonly [number, number])[][] = [
     [[880, N - 2], [872, 300], [884, 250], [866, 214], [880, 160], [868, 110], [884, 60], [874, 10]],     // the Krasna, through Krasnogor
@@ -151,6 +161,15 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
     t.building(x0, y0, x1, y1, door, floor, undefined, { ...STYLE[style], name, ...extra });
   const sign = (x: number, y: number, name: string, text: string) => { t.clearAt(x, y); t.add({ kind: "sign", x, y, blocks: true, name, text }); };
   const put2 = (x: number, y: number, kind: Parameters<typeof t.decor>[2], name?: string, blocks = true) => { if (t.inBounds(x, y) && !isWater(tiles[idx(x, y)])) { t.clearAt(x, y); t.decor(x, y, kind, blocks, name); } };
+  /** Marks the object standing at (x, y) as a clue (northquest.ts says what it does). */
+  const clue = (x: number, y: number, id: string) => { const at = ctx.objectAt[idx(x, y)]; if (at >= 0) ctx.objects[at] = { ...ctx.objects[at], clue: id }; };
+  /** The nearest open, walkable tile (no object, no road) to (x, y), rings outwards. */
+  const openNear = (x: number, y: number) => {
+    for (let r = 0; r < 14; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) === r && t.free(x + dx, y + dy) && [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([ex, ey]) => WALKABLE.has(tiles[idx(x + dx + ex, y + dy + ey)]))) return { x: x + dx, y: y + dy };
+    }
+    return { x, y };
+  };
   const npc = (id: string, x: number, y: number, wander = 0) => { t.clearAt(x, y); t.npc(id, x, y, wander); };
   /** A plank pier from (x, y) out over the water, `length` tiles in direction (dx, dy). */
   const pier = (x: number, y: number, dx: number, dy: number, length: number) => { for (let k = 0; k < length; k++) for (const s of [0, 1]) { const px = x + dx * k + (dy ? s : 0), py = y + dy * k + (dx ? s : 0); tiles[idx(px, py)] = T.WOOD; lift[idx(px, py)] = 0; raise[idx(px, py)] = 0; } };
@@ -239,15 +258,55 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
     sign(X1 + 1, Y0 + 9, "The Redwake camp", "THE REDWAKE COMPANY. Contracts taken, honoured, and finished. Ask the Captain about our code; we have one, which is more than some.");
   }
 
+  // ---------- The Oathgate road's trouble: a caravan wrecked below the hills, and the raiders' hideout above them ----------
+  {
+    const wreck = openNear(OATH_ROAD.wreck.x, OATH_ROAD.wreck.y);
+    t.add({ kind: "decor", decor: "wagon", x: wreck.x, y: wreck.y, blocks: true, name: "A wrecked caravan wagon", clue: "oa_wreck" });
+    const den = openNear(OATH_ROAD.den.x, OATH_ROAD.den.y);
+    for (const [dx, dy] of [[-3, -1], [3, -1], [-2, 2]] as const) put2(den.x + dx, den.y + dy, "tent", "A raiders' lean-to");
+    put2(den.x + 1, den.y + 2, "campfire", "A raiders' fire, banked", false);
+    t.add({ kind: "decor", decor: "chest", x: den.x, y: den.y, blocks: true, name: "The raiders' strongbox", clue: "oa_strongbox" });
+  }
+
   // ---------- The Oathgate Pass: the road through the ridge, the Agreement Stone, the ruined fort ----------
   {
     const P = RIDGE.oathgate;
     for (let y = P.y - 8; y <= P.y + 8; y++) for (let x = P.x - 48; x <= P.x + 48; x++) { const i = idx(x, y); if (Math.abs(y - P.y) <= 2 + Math.abs(x - P.x) / 24) { t.clearAt(x, y); tiles[i] = T.GRAVEL; raise[i] = Math.min(raise[i], 1.2); t.setRegion(x, y, "oathgate_pass"); } }
-    put2(P.x, P.y - 3, "monument", "The Agreement Stone");
-    put2(P.x - 2, P.y - 3, "plaque", "The Agreement Stone's west face: Vargskeld runes, worn");
-    put2(P.x + 2, P.y - 3, "plaque", "The Agreement Stone's east face: Zoryavik letters, recut");
+    put2(P.x, P.y - 3, "monument", "The Agreement Stone"); clue(P.x, P.y - 3, "oa_stone");
+    put2(P.x - 2, P.y - 3, "plaque", "The Agreement Stone's west face: Vargskeld runes, worn"); clue(P.x - 2, P.y - 3, "oa_west");
+    put2(P.x + 2, P.y - 3, "plaque", "The Agreement Stone's east face: Zoryavik letters, recut"); clue(P.x + 2, P.y - 3, "oa_east");
     for (const [dx, dy] of [[-8, -5], [-6, -5], [-4, -5], [6, -5], [8, -5], [-8, 4], [8, 4]] as const) put2(P.x + dx, P.y + dy, "ruin_wall", "The old fort's wall, fallen to the height of a knee");
     sign(P.x - 5, P.y + 3, "The Oathgate", "THE OATHGATE. The old agreement was sworn here: the passes kept open by both, the roads kept by both, each to stand by the other. Both sides say the other broke it.");
+    // The Oathgate's bar: a timber gate in a wall across the pass, inside the spine, east of the stone. The Hearthwardens keep
+    // it barred until the agreement's settled (northquest.ts decides, for each player). Above and below the road the wall runs
+    // on as crag until it meets the spine, so there's no going round.
+    // The pass is a saddle, not a slot: snowy shoulders either side of the road, the crag set back from it and falling away
+    // towards it, so the camera sees down into the pass (cliff tiles stand tall, and a row of them hides whoever's behind).
+    for (let y = P.y - 7; y <= P.y + 7; y++) for (let x = P.x - 48; x <= P.x + 48; x++) {
+      const i = idx(x, y), d = Math.abs(y - P.y);
+      if (d > 2 && tiles[i] === T.CLIFF) tiles[i] = d >= 5 ? T.SNOW : T.GRAVEL;
+    }
+    for (let y = P.y - 16; y <= P.y + 16; y++) for (let x = P.x - 52; x <= P.x + 52; x++) { const d = Math.abs(y - P.y); if (d > 2) { const i = idx(x, y); raise[i] = Math.min(raise[i], 0.6 + (d - 2) * 0.14); } }
+    const sp = spineAt(P.y), gx = Math.max(P.x + 5, sp.c + sp.w - 1);
+    const inSpine = (y: number) => { const r = spineAt(y); return gx >= r.c - r.w && gx <= r.c + r.w; };
+    for (let y = P.y - 7; y <= P.y + 7; y++) { const i = idx(gx, y); if (WALKABLE.has(tiles[i])) { t.clearAt(gx, y); tiles[i] = y === P.y ? T.PATH : T.WALL; } }
+    for (const dir of [-1, 1]) for (let y = P.y + dir * 8; Math.abs(y - P.y) < 48 && !inSpine(y); y += dir) { const i = idx(gx, y); if (!isWater(tiles[i])) { t.clearAt(gx, y); tiles[i] = T.CLIFF; raise[i] = Math.max(raise[i], 3.2); } }
+    t.add({ kind: "gate", axis: "ns", x: gx, y: P.y, blocks: true, name: "The Oathgate bar", action: "Open", to: { x: gx + 1, y: P.y }, clue: "oa_gate" });
+  }
+
+  // ---------- The Wolfsback: a goat-track over the ridge's spine, snow underfoot, for those who climb ----------
+  {
+    const F = RIDGE.wolfsback;
+    for (let x = F.x - 50; x <= F.x + 50; x++) {
+      const cy = F.y + Math.round(Math.sin((x - F.x) / 9) * 3);
+      for (let y = cy - 1; y <= cy + 1; y++) { const i = idx(x, y); if (isWater(tiles[i])) continue; t.clearAt(x, y); tiles[i] = Math.abs(x - F.x) < 30 ? T.SNOW : T.GRAVEL; raise[i] = Math.min(raise[i], 2.2); }
+    }
+    const end = (x: number) => ({ x, y: F.y + Math.round(Math.sin((x - F.x) / 9) * 3) });
+    // A sign at each foot of the track, on the first dry ground in from its end.
+    for (const side of [-1, 1]) for (let d = 47; d > 20; d--) {
+      const at = end(F.x + side * d), spot = [at.y - 2, at.y + 2].find(y => WALKABLE.has(tiles[idx(at.x, y)]) && WALKABLE.has(tiles[idx(at.x, at.y)]));
+      if (spot !== undefined) { sign(at.x, spot, "The Wolfsback", WOLFSBACK_SIGN); break; }
+    }
   }
 
   // ---------- Hearthwatch: the Hearthwardens' fort on the pass's eastern side ----------
@@ -380,6 +439,9 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
 
   // ---------- Labels (in the grown world: the north is built after everything else has moved) ----------
   const label = (id: RegionId, x: number, y: number) => { const entry = REGIONS.find(region => region.id === id) as { label: { x: number; y: number } } | undefined; if (entry) { entry.label = { x, y }; labels[id] = { x, y }; } };
+  // The north's lift and raise on the bake's own steps (bake.ts keeps them to 1/64), so the baked world rebuilds its heights
+  // exactly: the ridge's crag stands tall, and a rounding there shows as a ledge.
+  for (let i = 0; i < W * N; i++) { lift[i] = Math.round(lift[i] * 64) / 64; raise[i] = Math.round(raise[i] * 64) / 64; }
   label("vargskeld", 420, 170); label("zoryavik", 960, 290); label("varn_ridge", RIDGE.x, 170); label("vargskeld_sea", 260, 24); label("zoryavik_coast", 1100, 30);
   for (const [id, x, y] of [["skarnholm", 304, 200], ["ravnsvik", 69, 124], ["oathsworn_hall", 534, 92], ["embermoot", 216, 274], ["redwake_camp", 573, 256], ["oathgate_pass", 640, 236],
     ["hearthwatch", 696, 232], ["krasnogor", 879, 184], ["bereslav", 1034, 108], ["zlatna_gora", 745, 300], ["svetloye", 1071, 254], ["old_bough", 820, 76]] as const) label(id, x, y);

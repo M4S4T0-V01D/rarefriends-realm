@@ -26,6 +26,7 @@ import { SETTLEMENT_NPCS, SETTLEMENT_QUESTS, onSettlementsKill, talkSettlements 
 import { MOUNT_NPCS, MOUNT_QUESTS, onMountKill, talkMounts } from "./mounts.ts";
 import { DRAGON_QUESTS, onDragonsKill, talkDragons } from "./dragons.ts";
 import { NORTH_NPCS, talkNorth } from "./north.ts";
+import { NORTH_QUESTS, onNorthKill, talkNorthQuest } from "./northquest.ts";
 import { ACTIVITIES, ACTIVITY_HOSTS, activityProblem, cancelActivity, startActivity } from "./activities.ts";
 import { MEGHAVAN_NPCS, talkMeghavan } from "./meghavanpeople.ts";
 import { MEGHAVAN_QUESTS, MEGHAVAN_QUEST_NPCS, onMeghavanKill, talkMeghavanQuests } from "./meghavanquests.ts";
@@ -505,6 +506,7 @@ export const QUESTS: readonly QuestDef[] = [
   ...SETTLEMENT_QUESTS,
   ...MOUNT_QUESTS,
   ...DRAGON_QUESTS,
+  ...NORTH_QUESTS,
   ...MEGHAVAN_QUESTS,
   ...MEGHAVAN_SCHOOL_QUESTS,
   ...PORTS_QUESTS,
@@ -615,7 +617,7 @@ export function chat(npc: string, lines: DialogueLine[], options?: Dialogue["opt
 /** Pickpocket and quest hooks the engine calls. */
 export function onMonsterKilled(game: Game, monsterId: string, x: number, y: number) {
   const player = game.player;
-  onWestKill(game, monsterId); onMizukaiKill(game, monsterId); onKharavethKill(game, monsterId); onHeartlandsKill(game, monsterId); onOrashaiKill(game, monsterId); onHiddenRoadKill(game, monsterId); onSettlementsKill(game, monsterId, x, y); onMountKill(game, monsterId, x, y); onDragonsKill(game, monsterId); onMeghavanKill(game, monsterId); onPortsKill(game, monsterId); onBountyKill(game, monsterId); onPyramidsKill(game, monsterId);
+  onWestKill(game, monsterId); onMizukaiKill(game, monsterId); onKharavethKill(game, monsterId); onHeartlandsKill(game, monsterId); onOrashaiKill(game, monsterId); onHiddenRoadKill(game, monsterId); onSettlementsKill(game, monsterId, x, y); onMountKill(game, monsterId, x, y); onDragonsKill(game, monsterId); onNorthKill(game, monsterId, x, y); onMeghavanKill(game, monsterId); onPortsKill(game, monsterId); onBountyKill(game, monsterId); onPyramidsKill(game, monsterId);
   // The wider world's village quests count their kills wherever they fall.
   const tally = (quest: string, key: string, goal: number, done: string) => {
     if (stage(game, quest) !== 1) return;
@@ -841,6 +843,7 @@ function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
   const road = talkHiddenRoad(game, npcId, name); if (road) return road;
   const hearthkin = talkHearthkin(game, npcId, name); if (hearthkin) return hearthkin;
   const settlements = talkSettlements(game, npcId, name); if (settlements) return settlements;
+  const northQuest = talkNorthQuest(game, npcId, name, () => talkNorth(game, npcId, name)); if (northQuest) return northQuest;   // The Old Agreement (northquest.ts)
   const north = talkNorth(game, npcId, name); if (north) return north;   // A Place to the North's people (north.ts)
   const dragons = talkDragons(game, npcId, name); if (dragons) return dragons;   // Ysolde's second errand comes before her everyday lines (and after her first, mounts.ts)
   const mounts = talkMounts(game, npcId, name); if (mounts) return mounts;

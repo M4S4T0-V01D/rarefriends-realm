@@ -25,6 +25,7 @@ import { MEGHAVAN_QUEST_CLUES } from "./meghavanquests.ts";
 import { MEGHAVAN_SCHOOL_CLUES } from "./meghavanschools.ts";
 import { PYRAMID_CLUES, onPyramidsTick } from "./pyramidsclues.ts";
 import { PORTS_QUEST_CLUES } from "./portsquests.ts";
+import { NORTH_CLUES } from "./northquest.ts";
 
 const art = (family: number, seed: number) => ({ family, seed });
 const person = (id: string, name: string, examine: string, seed: number, extra: Partial<NpcDef> = {}): NpcDef => ({ id, name, examine, options: ["Talk-to"], art: art(9, seed), ...extra });
@@ -184,6 +185,8 @@ export const CLUES: Record<string, Clue> = {
   ...PYRAMID_CLUES,
   // The sea ports' quests (portsquests.ts).
   ...PORTS_QUEST_CLUES,
+  // A Place to the North: the Old Agreement's wreck, strongbox, stone and gate (northquest.ts).
+  ...NORTH_CLUES,
 };
 
 /** A clue's options, examine text and use (null if the object isn't one). */

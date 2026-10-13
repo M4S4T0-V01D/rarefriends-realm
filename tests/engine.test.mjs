@@ -621,7 +621,7 @@ test("A Friend's Feast from start to finish", () => {
   assert.equal(g.player.quests.friends_feast, 2);
   assert.equal(questPoints(g), 1);
   assert(level(g, "cooking") >= 10, "Quest XP");
-  assert.equal(QUESTS.length, 108); assert.equal(MAX_QUEST_POINTS, 186);
+  assert.equal(QUESTS.length, 109); assert.equal(MAX_QUEST_POINTS, 189);
 });
 
 test("Grumblin Trouble counts kills and pays out", () => {
@@ -1041,7 +1041,7 @@ test("Presence: a name for your Friend (the token stays), fellowships, titles, a
   // Titles by Presence level and by deed; you can only wear one you've earned.
   assert(unlockedTitles(g).some(title => title.id === "newcomer")); assert(!unlockedTitles(g).some(title => title.id === "dragonfriend"));
   assert(!chooseTitle(g, "dragonfriend")); p.quests.ashfall_embers = 2; assert(chooseTitle(g, "dragonfriend")); assert.equal(profile(g).title, "Dragonfriend");
-  p.xp.presence = XP_TABLE[40]; assert(unlockedTitles(g).some(title => title.id === "adventurer")); assert.equal(TITLES.length, 20);
+  p.xp.presence = XP_TABLE[40]; assert(unlockedTitles(g).some(title => title.id === "adventurer")); assert.equal(TITLES.length, 21);
   // XP from living here: discovering a region, meeting someone, an emote, clothes worn for the first time, a quest.
   const before = p.xp.presence;
   teleport(g, ...M(34, 70)); run(g, 6); assert(p.visited.fernwick, "Fernwick discovered"); assert(p.xp.presence > before, "and worth Presence");
@@ -1967,7 +1967,7 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   assert.equal(p.quests.dawn_against_hollow, 2); assert(has(p, "dawnplate_cuirass"));
   assert.equal(count(p, "hollow_essence"), 0);
   assert.equal(capeProblem(g, "dawnplate_cuirass"), null, "the armoury sells Dawnplate once earned");
-  assert.equal(QUESTS.length, 108); assert.equal(MAX_QUEST_POINTS, 186);
+  assert.equal(QUESTS.length, 109); assert.equal(MAX_QUEST_POINTS, 189);
 });
 
 test("Boots and gauntlets in every metal, smithed at the anvil; the clothier's shirts, dresses, trousers and skirts", () => {
@@ -4465,4 +4465,69 @@ test("A Place to the North: the Vargskeld and the Zoryavik above the old map, ea
   d = d.options.find(o => o.label === "What is the old agreement?").then(); assert.match(d.lines[0].text, /The Zoryavik stopped keeping their half/);
   d = talk(g, "prince_radomir");
   assert.ok(d.options.some(o => o.label === "What is the old agreement?" || o.label === "Who rules the Zoryavik?"), "the prince answers too");
+});
+
+test("The Old Agreement: the wreck, the raiders and their strongbox, six accounts of the agreement, the first copy from the Old Bough, and a choice at the stone that the north remembers (the Oathgate bar, the traders, the leaders); the ridge is crossed only at its passes", async () => {
+  const Q = await import("../games/rarefriends-realm/northquest.ts");
+  const { OATH_ROAD, RIDGE } = await import("../games/rarefriends-realm/northworld.ts");
+  const { talk, questDone } = await import("../games/rarefriends-realm/content.ts");
+  const { item } = await import("../games/rarefriends-realm/data.ts"); const { WALKABLE } = await import("../games/rarefriends-realm/world.ts");
+  const g = newGame(), p = g.player, world = g.world;
+  const obj = clue => world.objects.find(o => o.clue === clue);
+  const gate = obj("oa_gate"), stone = obj("oa_stone"), P = RIDGE.oathgate;
+  const use = (object, option) => { standBy(g, object); const n = g.messages.length; setTarget(g, { kind: "object", id: object.id, option }); until(g, () => g.dialogue !== null || g.messages.length > n, 30); };
+  const lastMessage = () => g.messages.slice(-4).map(m => m.text).join(" | ");
+  const choose = (d, label) => { const o = d.options?.find(x => x.label === label); assert.ok(o, `"${label}" offered`); return o.then(); };
+  // The pass: a wall across the road east of the stone, its gate the only way through; above and below it, crag.
+  assert.ok(gate && gate.kind === "gate" && gate.y === P.y && gate.x > P.x + 2, "the bar stands across the road, east of the stone");
+  for (let y = P.y - 7; y <= P.y + 7; y++) if (y !== P.y) assert.ok(!WALKABLE.has(world.tiles[y * W + gate.x]), `no way round the bar at row ${y}`);
+  const near = new Set(); { const q = [[gate.x - 1, P.y]]; near.add(`${gate.x - 1},${P.y}`);
+    while (q.length) { const [x, y] = q.pop(); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy, k = `${nx},${ny}`; if (near.has(k) || Math.abs(nx - P.x) > 70 || Math.abs(ny - P.y) > 70 || !canWalk(g, nx, ny)) continue; near.add(k); q.push([nx, ny]); } } }
+  assert.ok(!near.has(`${gate.x + 1},${P.y}`), "with the bar down, the east side of the pass is out of reach from the west (within a day's walk of it)");
+  assert.equal(world.objects.filter(o => o.kind === "sign" && o.name === "The Wolfsback").length, 2, "the Wolfsback's goat-track is signed at both feet");
+  for (const id of ["skarnholm_quay", "skarnholm_quay_open", "krasnogor_market", "krasnogor_market_open", "redwake_stores"]) assert.ok(SHOPS[id].stock.every(i => item(i)), `${id} sells real things`);
+  assert.ok(SHOPS.skarnholm_quay_open.stock.includes("blackiron_ore") && !SHOPS.skarnholm_quay.stock.includes("blackiron_ore"), "Zoryavik iron only with the pass open");
+  // Before the quest: the strongbox is none of your business, the gate is barred.
+  use(obj("oa_strongbox"), "Open"); assert.match(lastMessage(), /Not yours/);
+  use(gate, "Open"); assert.match(lastMessage(), /Barred/); 
+  // Torvald offers it.
+  let d = choose(talk(g, "farwake_master"), "I'll look into it."); d.onEnd?.(); assert.equal(p.quests[Q.OLD_AGREEMENT], 1);
+  assert.match(talk(g, "farwake_master").lines[0].text, /road below the hills/);
+  use(obj("oa_wreck"), "Search"); assert.equal(p.questData.oa_wreck, 1); assert.match(lastMessage(), /Leave this one/);
+  use(obj("oa_strongbox"), "Open"); assert.match(lastMessage(), /Put them down first \(0\/5\)/); assert.ok(!p.questData.oa_box);
+  onMonsterKilled(g, "bandit", 100, 100); assert.ok(!p.questData.oa_raiders, "raiders elsewhere don't count");
+  for (let k = 0; k < 6; k++) onMonsterKilled(g, "bandit", OATH_ROAD.den.x, OATH_ROAD.den.y);
+  assert.equal(p.questData.oa_raiders, Q.OA_RAIDERS, "five, and no more counted");
+  use(obj("oa_strongbox"), "Open"); assert.equal(p.questData.oa_box, 1);
+  d = talk(g, "farwake_master"); assert.match(d.lines[0].text, /Zoryavik silver and a Vargskeld arm-ring/); d.onEnd?.(); assert.equal(p.questData.oa_step, 2);
+  // Six accounts.
+  choose(talk(g, "jarl_hallveig"), "About the raiders' strongbox…"); choose(talk(g, "prince_radomir"), "About the raiders' strongbox…");
+  choose(talk(g, "ember_skald"), "Tell me the verse of the agreement."); choose(talk(g, "archivist_bozhena"), "Show me the copies of the agreement.");
+  assert.equal(p.questData.oa_step, 2, "not yet: the stone");
+  use(obj("oa_west"), "Read"); use(obj("oa_east"), "Read"); assert.match(lastMessage(), /recut by a newer hand/);
+  assert.equal(p.questData.oa_step, 3, "all six heard: the first copy next");
+  assert.ok(Q.NORTH_QUESTS[0].journal(g).some(line => /Old Dobromir/.test(line)));
+  d = talk(g, "old_bough_keeper"); assert.match(d.lines[0].text, /behind the carved face/); d.onEnd?.();
+  assert.ok(has(p, "first_copy") && p.questData.oa_step === 4);
+  use(gate, "Open"); assert.match(lastMessage(), /Barred/, "still barred until it's decided");
+  // The choice: restore it.
+  const coins = count(p, "coins"), mysteries = p.xp.mysteries;
+  use(stone, "Read-aloud"); d = g.dialogue; assert.ok(d && d.options.length === 4, "four answers at the stone");
+  d = choose(d, "Restore it, as it was sworn."); d.onEnd?.(); g.dialogue = null;
+  assert.ok(questDone(g, Q.OLD_AGREEMENT)); assert.equal(p.questData.oa_choice, Q.OA_RESTORE); assert.ok(!has(p, "first_copy"));
+  assert.equal(count(p, "coins"), coins + 5000); assert.ok(p.xp.mysteries > mysteries); assert.ok(unlockedTitles(g).some(t => t.id === "oathwitness"));
+  assert.ok(Q.NORTH_QUESTS[0].journal(g).some(line => /QUEST COMPLETE/.test(line)));
+  standBy(g, gate); const side = Math.sign(p.x - gate.x); use(gate, "Open"); assert.equal(Math.sign(p.x - gate.x), -side, "through the bar to the other side"); assert.match(lastMessage(), /wave you through/);
+  choose(talk(g, "skarnholm_trader"), "Let's trade."); assert.equal(g.ui.shop, "skarnholm_quay_open"); g.ui.shop = null;
+  choose(talk(g, "krasnogor_trader"), "Let's trade."); assert.equal(g.ui.shop, "krasnogor_market_open"); g.ui.shop = null;
+  assert.match(talk(g, "jarl_hallveig").lines[0].text, /swore the whole thing again/); assert.match(talk(g, "prince_radomir").lines[0].text, /paid for the garrison/);
+  // The other two answers, and what they change.
+  const g2 = newGame(); g2.player.quests[Q.OLD_AGREEMENT] = 2; g2.player.questData.oa_choice = Q.OA_NEW;
+  d = talk(g2, "prince_radomir"); assert.match(d.lines[0].text, /nothing to say to each other/); assert.ok(!d.options?.length, "the prince won't talk");
+  assert.match(talk(g2, "freeholds_speaker").lines[0].text, /drinking to you/); assert.equal(Q.NORTH_CLUES.oa_gate.use(g2, gate, "Open").to.y, gate.y, "the bar opens for a new agreement too");
+  const g3 = newGame(); g3.player.quests[Q.OLD_AGREEMENT] = 2; g3.player.questData.oa_choice = Q.OA_BURN;
+  assert.match(Q.NORTH_CLUES.oa_gate.use(g3, gate, "Open").text, /barred for good/); assert.ok(!Q.NORTH_CLUES.oa_gate.use(g3, gate, "Open").to);
+  choose(talk(g3, "redwake_captain"), "Show me the company's stores."); assert.equal(g3.ui.shop, "redwake_stores");
+  choose(talk(g3, "skarnholm_trader"), "Let's trade."); assert.equal(g3.ui.shop, "skarnholm_quay", "no Zoryavik iron with the pass shut");
+  assert.match(Q.NORTH_CLUES.oa_stone.examine(g3, stone), /ash/);
 });

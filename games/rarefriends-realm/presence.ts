@@ -107,6 +107,7 @@ export const TITLES: readonly TitleDef[] = [
   { id: "dragonfriend", name: "Dragonfriend", quest: "ashfall_embers", text: "Clear Ashfall's passes for Ember Tamsin." },
   { id: "lanternkeeper", name: "Lanternkeeper", quest: "gravesend_lanterns", text: "Light Gravesend's lanterns." },
   { id: "tithed", name: "Sea-tithed", quest: "saltmarrow_tithe", text: "Pay the Salt Tithe." },
+  { id: "oathwitness", name: "Oathwitness", quest: "old_agreement", text: "Find the first copy of the old agreement, and decide what it's worth." },
   // The Mizukai Isles.
   { id: "isles_guest", name: "Guest of the Isles", quest: "landfall", text: "Be presented at the Hall of Takamori." },
   { id: "lantern_friend", name: "Friend of the Lanterns", quest: "lanterns_drowned", text: "Relight Torojima's great lantern." },
