@@ -4,6 +4,12 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 128, date: "2026-10-13", title: "Fitting out: supply barrels, the resupply lever, cabins and galleys", items: [
+    "A shipwright can fit out your vessel: supply barrels (the hold marked out in barrels, each with a job, drawn on or kept), a resupply lever on a barge or a longship, a cabin to rest in, a galley to cook in, a repair bench to mend her yourself. Room is room: a cabin or a galley takes space the hold had.",
+    "Loadouts: set what you want to carry (an item and how many) and pull the lever: the barrels top your pack up to it. Only what's in the barrels you draw on, only what fits, and it tells you what's short. One loadout on a skiff, three on a barge, six on a longship.",
+    "Name your vessel, and dye a skiff's or a longship's sails with any Dyemoor dye. Pick your rowboat up and carry it on your back, and launch it at any water; a rowboat can go out on the deep water by the coast now.",
+    "Olena has a proper yard up the bank north of Bereslav, and Tamsin one north of the Gullwick Light: boat sheds with hulls on the stocks, slipways, timber and tar. The anchor for going ashore sits on the minimap's ring, and putting things away (Stow, Load, Stash) is never what a left-click does.",
+  ] },
   { id: 127, date: "2026-10-13", title: "The land rises", items: [
     "The Realm isn't flat any more: the ground climbs from the sea. Friendhollow sits low by the water, the Ashen Hills and the mine rise above it, Emberforge stands higher again, and Frostpeak is up on its mountain. Every range stands high, the coasts come down to the sea, and every lake lies level.",
     "Every building stands on its own level ground: a house by a hill no longer has its roof pulled up the slope while its walls stay down.",

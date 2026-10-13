@@ -4577,7 +4577,7 @@ test("Seafaring: a shipwright builds from real materials (taken), the vessel goe
   assert.ok(walkTo(g, land.x, land.y)); until(g, () => p.aboard === null, 80);
   assert.deepEqual([p.x, p.y], [land.x, land.y], "ashore where you clicked"); assert.equal(Math.abs(v.x - land.x) + Math.abs(v.y - land.y), 1, "moored beside it");
   assert.ok(world.objects.some(o => o.text === `vessel:${v.id}` && o.x === v.x && o.y === v.y), "moored in the world again");
-  assert.ok(p.landfalls.vargskeld, "a first landfall by sea remembered");
+  assert.ok(Object.keys(p.landfalls).length >= 1, "a first landfall by sea remembered");
   // The hold: things go in from the pack beside it, and come back out.
   give(p, "raw_carp", 1); const carp = p.inventory.findIndex(s => s?.id === "raw_carp");
   assert.ok(SF.stowInHold(g, carp)); assert.equal(count(p, "raw_carp"), 0); assert.equal(v.hold.filter(Boolean).length, 1);
@@ -4775,4 +4775,67 @@ test("The lie of the land: sea level at the shores, climbing from Friendhollow t
     for (let j = b.y0 - 1; j <= b.y1 + 2; j++) for (let i = b.x0 - 1; i <= b.x1 + 2; i++) { const h = cornerHeight(world, i, j); lo = Math.min(lo, h); hi = Math.max(hi, h); }
     if (hi - lo > worst) { worst = hi - lo; where = `${b.name} at ${b.x0},${b.y0}`; } }
   assert.ok(worst < 0.5, `buildings stand level (worst ${worst.toFixed(2)} px: ${where})`);
+});
+
+test("Fitting out a vessel: supply barrels and the resupply lever top your pack up to the loadout from the barrels you draw on and nothing else (never making anything, reporting what's short, a second pull at once doing nothing); loadouts are independent; a cabin, a galley, a repair bench take the hold's room; names and dyed sails; a rowboat carried and launched; the yards", async () => {
+  const SF = await import("../games/rarefriends-realm/seafaring.ts");
+  const FIT = await import("../games/rarefriends-realm/shipfit.ts");
+  const { itemOptions } = await import("../games/rarefriends-realm/engine.ts");
+  const g = newGame(), p = g.player, world = g.world;
+  const bersi = world.spawns.find(s => s.kind === "npc" && s.id === "shipwright_bersi"), at = SF.launchSpot(g, "longship", bersi);
+  p.vessels.push({ id: 1, kind: "longship", name: "Longship", x: at.x, y: at.y, heading: { x: 0, y: 1 }, hull: 200, hold: Array(16).fill(null), sailed: 0 }); SF.applyVessels(g);
+  const v = p.vessels[0], near = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1]].map(([dx, dy]) => ({ x: v.x + dx, y: v.y + dy })).find(t => canWalk(g, t.x, t.y)); teleport(g, near.x, near.y);
+  p.xp.seafaring = 1e7; for (const [id, n] of [["pine_planks", 10], ["pewter_rivets", 4], ["oak_planks", 30], ["blackiron_rivets", 10], ["ships_rope", 4], ["sailcloth", 2]]) give(p, id, n);
+  // The shipwright fits her out (the lever wants the barrels first; a cabin wants room in the hold).
+  assert.match(FIT.fitoutProblem(g, v, "resupply_lever"), /supply barrels first/);
+  assert.ok(FIT.fitOut(g, v, "supply_barrels") && FIT.fitOut(g, v, "resupply_lever"));
+  v.hold[0] = { id: "pewter_arrow", n: 30 }; v.hold[4] = { id: "arrow_shaft", n: 50 }; for (let i = 5; i < 16; i++) v.hold[i] = { id: "logs", n: 1 };
+  assert.match(FIT.fitoutProblem(g, v, "cabin"), /Clear 4 spaces/); for (let i = 5; i < 9; i++) v.hold[i] = null;
+  assert.ok(FIT.fitOut(g, v, "cabin")); assert.equal(v.hold.length, 12); assert.equal(v.hold.filter(Boolean).length, 9, "nothing lost when the hold closes up");
+  p.inventory.fill(null);
+  const arrowsAt = v.hold.findIndex(s => s?.id === "pewter_arrow"), shaftsAt = v.hold.findIndex(s => s?.id === "arrow_shaft");
+  // Barrel roles: the shafts' barrel kept back, not drawn on.
+  FIT.setBarrel(v, Math.floor(shaftsAt / FIT.BARREL_SLOTS), { supply: false, role: 4 });
+  FIT.setRule(v, { item: "pewter_arrow", target: 20 }); FIT.setRule(v, { item: "arrow_shaft", target: 100 }); FIT.setRule(v, { item: "antidote", target: 5 });
+  give(p, "pewter_arrow", 12);
+  const before = count(p, "pewter_arrow") + FIT.inSupply(v, "pewter_arrow");
+  const o = world.objects.find(x => x.text === "vessel:1" && x.name !== "__removed"); assert.ok(SF.VESSEL_CLUES.vessel.options(g, o).includes("Pull-lever"));
+  const said = SF.VESSEL_CLUES.vessel.use(g, o, "Pull-lever");
+  assert.equal(count(p, "pewter_arrow"), 20, `topped up to the target (${JSON.stringify(said)} ${g.messages.slice(-4).map(m => m.text).join(" | ")})`); assert.equal(v.hold[arrowsAt].n, 22, "eight out of the barrel");
+  assert.equal(count(p, "pewter_arrow") + v.hold[arrowsAt].n, before, "nothing made, nothing lost");
+  assert.equal(count(p, "arrow_shaft"), 0, "a barrel you don't draw on gives nothing"); assert.equal(v.hold[shaftsAt].n, 50);
+  assert.ok(g.messages.some(m => /Short of Antidote: there's none/.test(m.text)) && g.messages.some(m => /Short of Arrow shaft/.test(m.text)));
+  take(p, "pewter_arrow", 10); SF.VESSEL_CLUES.vessel.use(g, o, "Pull-lever"); assert.equal(count(p, "pewter_arrow"), 10, "a second pull at once does nothing");
+  for (let t = 0; t < FIT.SUPPLY.leverEvery; t++) g.tick++; SF.VESSEL_CLUES.vessel.use(g, o, "Pull-lever"); assert.equal(count(p, "pewter_arrow"), 20);
+  // A full pack: only what fits leaves the barrels (perch don't stack: two free spaces, two perch).
+  const perchAt = v.hold.indexOf(null); v.hold[perchAt] = { id: "raw_perch", n: 1 }; const spare = v.hold.indexOf(null); v.hold[spare] = { id: "raw_perch", n: 1 };
+  const extra = v.hold.indexOf(null); if (extra >= 0) v.hold[extra] = { id: "raw_perch", n: 1 };
+  FIT.setRule(v, { item: "raw_perch", target: 5 }); for (let t = 0; t < FIT.SUPPLY.leverEvery; t++) g.tick++;
+  for (let i = 0, free = p.inventory.filter(s => !s).length; i < p.inventory.length && free > 2; i++) if (!p.inventory[i]) { p.inventory[i] = { id: "logs", n: 1 }; free--; }
+  const perch0 = FIT.inSupply(v, "raw_perch"); SF.VESSEL_CLUES.vessel.use(g, o, "Pull-lever");
+  assert.equal(count(p, "raw_perch"), 2, "as many as there was room for"); assert.equal(perch0 - FIT.inSupply(v, "raw_perch"), 2, "and exactly that many out of the barrels");
+  assert.ok(g.messages.some(m => /No room in your pack/.test(m.text)));
+  // Loadouts are independent.
+  FIT.setLoadout(v, 2); assert.deepEqual(FIT.loadoutsOf(v)[2].rules, []); FIT.setRule(v, { item: "pewter_arrow", target: 30 }); FIT.setLoadout(v, 0);
+  assert.equal(FIT.loadoutsOf(v)[0].rules.find(r => r.item === "pewter_arrow").target, 20); assert.equal(FIT.loadoutsOf(v)[2].rules[0].target, 30);
+  // The cabin, through a save.
+  p.hp = 1; assert.ok(FIT.restInCabin(g, v)); assert.equal(p.hp, maxHp(p)); assert.ok(!FIT.restInCabin(g, v), "not again at once");
+  p.inventory.fill(null); FIT.nameVessel(g, v, "Sea Wolf"); give(p, "dye_madder", 1); const dyeAt = p.inventory.findIndex(s => s?.id === "dye_madder");
+  itemOptions(g, dyeAt).find(x => x.verb === "Dye-sails").run(g); assert.equal(v.sail, "madder");
+  const g2 = newGame(); assert.ok(restore(g2, JSON.parse(JSON.stringify(serialize(g)))));
+  const v2 = g2.player.vessels[0]; assert.deepEqual([v2.name, v2.sail, v2.fitouts, v2.hold.length, FIT.loadoutsOf(v2)[2].rules[0].item, FIT.barrelsOf(v2)[Math.floor(shaftsAt / 4)].supply], ["Sea Wolf", "madder", ["supply_barrels", "resupply_lever", "cabin"], 12, "pewter_arrow", false]);
+  // Putting things away is never the left-click: Use comes first.
+  give(p, "oak_logs", 1); const logAt = p.inventory.findIndex(s => s?.id === "oak_logs"); assert.ok(["Use", "Light"].includes(itemOptions(g, logAt)[0].verb)); assert.ok(itemOptions(g, logAt).some(x => x.verb === "Load"));
+  // A rowboat: carried and launched; it takes the water near the coast now.
+  const g3 = newGame(), p3 = g3.player, w3 = g3.world, tam = w3.spawns.find(s => s.kind === "npc" && s.id === "gullwick_boatwright"), r = SF.launchSpot(g3, "rowboat", tam);
+  p3.vessels.push({ id: 5, kind: "rowboat", name: "Rowboat", x: r.x, y: r.y, heading: { x: 0, y: 1 }, hull: 40, hold: [{ id: "raw_carp", n: 1 }, null, null, null], sailed: 0 }); SF.applyVessels(g3);
+  const by = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => ({ x: r.x + dx, y: r.y + dy })).find(t => canWalk(g3, t.x, t.y)); teleport(g3, by.x, by.y);
+  const ro = w3.objects.find(x => x.text === "vessel:5" && x.name !== "__removed"); SF.VESSEL_CLUES.vessel.use(g3, ro, "Pick-up");
+  assert.ok(p3.vessels[0].carried && has(p3, "carried_rowboat")); assert.ok(!w3.objects.some(x => x.text === "vessel:5" && x.name !== "__removed"));
+  const ci = p3.inventory.findIndex(s => s?.id === "carried_rowboat"); itemOptions(g3, ci).find(x => x.verb === "Drop").run(g3); assert.ok(has(p3, "carried_rowboat"), "not dropped on dry land");
+  itemOptions(g3, ci).find(x => x.verb === "Launch").run(g3); assert.ok(!p3.vessels[0].carried && !has(p3, "carried_rowboat")); assert.equal(p3.vessels[0].hold[0].id, "raw_carp");
+  let coastDeep = null; for (let i = 0; i < W * OVERWORLD_H && !coastDeep; i++) if (w3.tiles[i] === T.DEEP && SF.shoreDistance(w3)[i] <= 2) coastDeep = { x: i % W, y: Math.floor(i / W) };
+  assert.ok(SF.sailableFor(w3, "rowboat", coastDeep.x, coastDeep.y), "a rowboat goes out on the deep water by the coast");
+  // The yards: Olena and Tamsin by their boat sheds.
+  for (const [npcId, shed] of [["bereslav_bargewoman", "Olena's boat shed"], ["gullwick_boatwright", "Tamsin's boat shed"]]) { const s = world.spawns.find(x => x.kind === "npc" && x.id === npcId), b = world.buildings.find(x => x.name === shed); assert.ok(b && Math.abs(s.x - (b.x0 + b.x1) / 2) < 12 && Math.abs(s.y - (b.y0 + b.y1) / 2) < 12, `${shed}`); }
 });

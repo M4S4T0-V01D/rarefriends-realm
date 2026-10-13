@@ -169,7 +169,7 @@ export type WorldObject = {
   /** A crumbling ruin wall's height (pixels). */
   height?: number;
   /** A moored vessel: its kind and the way its bow points (seafaring.ts). */
-  ship?: string; heading?: { x: number; y: number };
+  ship?: string; heading?: { x: number; y: number }; /** A moored vessel's sail dye (shipfit.ts). */ sail?: string;
   /** A herb patch: which herb grows here (Apothecary). */
   herb?: string;
   /** A Mizukai boat: which dock it serves (boats.ts DOCKS). Its `to` is where you stand to board it, and where you arrive. */

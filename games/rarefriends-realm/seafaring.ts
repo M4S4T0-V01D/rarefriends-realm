@@ -18,6 +18,7 @@ import { addXp, count, give, has, level, message, sound, take, type Dialogue, ty
 import { OVERWORLD_H, T, W, H, WALKABLE, regionAt, type World, type WorldObject } from "./world.ts";
 import { chat, npcSays, questDone } from "./content.ts";
 import { DOCKS, dockLocked } from "./boats.ts";
+import { FITOUTS, FITOUT_IDS, cleanFitting, fitOut, fitoutProblem, hasFitout, holdSize, removeFitout, resupply, restInCabin, type Barrel, type FitoutId, type Loadout } from "./shipfit.ts";
 
 export type VesselKind = "rowboat" | "skiff" | "barge" | "longship";
 /** Which water a hull takes: the shallows only, the sea near the coast as well, or any water at all. */
@@ -31,7 +32,7 @@ export type VesselDef = {
   build: readonly (readonly [string, number])[]; examine: string;
 };
 export const VESSELS: Record<VesselKind, VesselDef> = {
-  rowboat: { kind: "rowboat", name: "Rowboat", level: 1, speed: 1, hull: 40, hold: 4, waters: "shallow", beach: true, sailXp: 6, buildXp: 80,
+  rowboat: { kind: "rowboat", name: "Rowboat", level: 1, speed: 1, hull: 40, hold: 4, waters: "coastal", beach: true, sailXp: 6, buildXp: 80,
     build: [["pine_planks", 6], ["pewter_rivets", 1], ["ships_rope", 1]], examine: "Two oars, three planks to sit on, and enough room for what you caught." },
   skiff: { kind: "skiff", name: "Fishing skiff", level: 15, speed: 2, hull: 70, hold: 8, waters: "coastal", beach: true, sailXp: 10, buildXp: 320,
     build: [["oak_planks", 12], ["blackiron_rivets", 2], ["sailcloth", 1], ["ships_rope", 2]], examine: "A single lugsail and a deep keel: out past the shallows, home before the weather." },
@@ -44,7 +45,10 @@ export const VESSELS: Record<VesselKind, VesselDef> = {
 export const VESSEL_KINDS = Object.keys(VESSELS) as VesselKind[];
 export type Vessel = { id: number; kind: VesselKind; name: string; x: number; y: number; /** Which way its bow points (a world heading, like a walker's). */ heading: Point; hull: number; hold: (Slot | null)[]; /** Tiles sailed (all time). */ sailed: number;
   /** The hull fitting fitted, by metal (moonsilver, glimmer or rarite), or none. */ fitting?: string | null;
-  /** Your waking place: if you fall, you wake aboard it (a barge's deckhouse, a longship's awning). */ berth?: boolean };
+  /** Your waking place: if you fall, you wake aboard it (a barge's deckhouse, a longship's awning). */ berth?: boolean;
+  /** What a shipwright has fitted out in her (shipfit.ts), the hold's barrels, the supply loadouts and which is set, her sails' dye; when the lever was last pulled and the cabin last slept in. */
+  /** Carried on your back (a rowboat, picked up): not in the water anywhere until you launch it. */ carried?: boolean;
+  fitouts?: FitoutId[]; barrels?: Barrel[]; loadouts?: Loadout[]; loadout?: number; sail?: string | null; leverAt?: number; restAt?: number };
 /** What a hull fitting does: the hull it adds (a share of the kind's) and how much longer deep water takes to wear it. */
 export const FITTINGS: Record<string, { hull: number; wear: number }> = { moonsilver: { hull: 0.25, wear: 1.5 }, glimmer: { hull: 0.5, wear: 2 }, rarite: { hull: 1, wear: 3 } };
 const FITTING_ORDER = ["moonsilver", "glimmer", "rarite"];
@@ -127,9 +131,9 @@ export function applyVessels(game: Game) {
   for (const id of vesselObjects.get(world) ?? []) removeObject(world, id);
   const ids: number[] = [];
   for (const v of player.vessels) {
-    if (v.id === player.aboard) continue;
+    if (v.id === player.aboard || v.carried) continue;
     if (world.objectAt[v.y * W + v.x] >= 0) continue;
-    ids.push(addObject(world, { kind: "decor", decor: "vessel", ship: v.kind, heading: { ...v.heading }, x: v.x, y: v.y, blocks: true, name: v.name, text: `vessel:${v.id}`, clue: "vessel" }));
+    ids.push(addObject(world, { kind: "decor", decor: "vessel", ship: v.kind, ...(v.sail ? { sail: v.sail } : {}), heading: { ...v.heading }, x: v.x, y: v.y, blocks: true, name: v.name, text: `vessel:${v.id}`, clue: "vessel" }));
   }
   vesselObjects.set(world, ids); game.worldVersion = (game.worldVersion ?? 0) + 1;
 }
@@ -231,8 +235,37 @@ export function sailed(game: Game) {
   }
 }
 /** Each tick: if you've been taken off the water some other way (a teleport, a death, a door), the vessel stays where it was. */
+/** Pick a rowboat up out of the water: it goes on your back (its hold with it), to be launched wherever there's water it takes. */
+export function pickUpVessel(game: Game, v: Vessel): boolean {
+  const player = game.player;
+  if (v.kind !== "rowboat") { message(game, `A ${VESSELS[v.kind].name.toLowerCase()} is a long way past carrying.`, "warn"); return false; }
+  if (player.aboard !== null) { message(game, "Not while you're in it.", "warn"); return false; }
+  if (player.mount) { message(game, "Get down off your mount first.", "warn"); return false; }
+  if (has(player, "carried_rowboat")) { message(game, "You've one on your back already.", "warn"); return false; }
+  if (give(player, "carried_rowboat", 1)) { message(game, "Your pack's full: there's no room to carry it.", "warn"); return false; }
+  v.carried = true; applyVessels(game); sound(game, "click");
+  message(game, "You haul your rowboat out of the water and get it up over your shoulders.");
+  return true;
+}
+/** Launch the rowboat you're carrying at water beside you it can take. */
+export function launchCarried(game: Game): boolean {
+  const player = game.player, v = player.vessels.find(x => x.carried);
+  if (!v || !has(player, "carried_rowboat")) return false;
+  let spot: { x: number; y: number } | null = null;
+  for (let r = 1; r <= 2 && !spot; r++) for (let dy = -r; dy <= r && !spot; dy++) for (let dx = -r; dx <= r && !spot; dx++) {
+    const x = player.x + dx, y = player.y + dy;
+    if (sailableFor(game.world, v.kind, x, y, v.hull <= 0) && game.world.objectAt[y * W + x] < 0 && !player.vessels.some(o => o !== v && !o.carried && o.x === x && o.y === y)) spot = { x, y };
+  }
+  if (!spot) { message(game, "There's no water here it can take: get to the edge of some.", "warn"); return false; }
+  take(player, "carried_rowboat", 1); v.carried = false; v.x = spot.x; v.y = spot.y; v.heading = { x: Math.sign(spot.x - player.x), y: Math.sign(spot.y - player.y) };
+  applyVessels(game); sound(game, "click");
+  message(game, "You set your rowboat down on the water.");
+  return true;
+}
 export function vesselTick(game: Game) {
   const player = game.player, vessel = aboard(player);
+  // A carried rowboat whose place on your back is gone (dropped, lost): it's back where you picked it up, never lost.
+  if (game.tick % 25 === 0) for (const v of player.vessels) if (v.carried && !has(player, "carried_rowboat") && !player.bank.some(slot => slot?.id === "carried_rowboat")) { v.carried = false; applyVessels(game); message(game, "Your rowboat is back where you picked it up.", "info"); }
   if (!vessel) return;
   const there = player.x === vessel.x && player.y === vessel.y, near = Math.max(Math.abs(player.x - vessel.x), Math.abs(player.y - vessel.y)) <= 4;
   if ((there || near) && onWater(game.world, player.x, player.y)) return;
@@ -245,7 +278,7 @@ export function vesselTick(game: Game) {
 export function holdAt(game: Game): Vessel | null {
   const player = game.player, here = aboard(player);
   if (here) return here;
-  return player.vessels.find(v => v.id !== player.aboard && Math.abs(v.x - player.x) + Math.abs(v.y - player.y) <= 2) ?? null;
+  return player.vessels.find(v => v.id !== player.aboard && !v.carried && Math.abs(v.x - player.x) + Math.abs(v.y - player.y) <= 2) ?? null;
 }
 export function stowInHold(game: Game, slotIndex: number): boolean {
   const player = game.player, slot = player.inventory[slotIndex], vessel = holdAt(game);
@@ -270,13 +303,25 @@ export function takeFromHold(game: Game, index: number): boolean {
 type ClueOutcome = { to?: { x: number; y: number }; text?: string } | null;
 export const VESSEL_CLUES: Record<string, { options: (game: Game, object: WorldObject) => readonly string[]; examine: (game: Game, object: WorldObject) => string; use: (game: Game, object: WorldObject, option: string) => ClueOutcome }> = {
   vessel: {
-    options: (game, object) => { const v = vesselOf(game, object); return v && SEA.berths.includes(v.kind) ? ["Board", "Hold", v.berth ? "Unmake-waking-place" : "Make-waking-place"] : ["Board", "Hold"]; },
+    options: (game, object) => {
+      const v = vesselOf(game, object); if (!v) return ["Board"];
+      return ["Board", "Hold", ...(hasFitout(v, "supply_barrels") ? ["Supplies", hasFitout(v, "resupply_lever") ? "Pull-lever" : "Draw-supplies"] : []), ...(hasFitout(v, "cabin") ? ["Rest-in-cabin"] : []),
+        ...(v.kind === "rowboat" ? ["Pick-up"] : []), ...(hasFitout(v, "galley") ? ["Cook-in-galley"] : []), ...(hasFitout(v, "repair_bench") ? ["Mend-hull"] : []), ...(SEA.berths.includes(v.kind) ? [v.berth ? "Unmake-waking-place" : "Make-waking-place"] : []), "Name-vessel"];
+    },
     examine: (game, object) => { const v = vesselOf(game, object); return v ? `Your ${VESSELS[v.kind].name.toLowerCase()}, ${v.name === VESSELS[v.kind].name ? "unnamed" : `the ${v.name}`}. Hull ${Math.round(100 * v.hull / maxHull(v))}%. ${VESSELS[v.kind].examine}` : "A vessel."; },
     use: (game, object, option) => {
       const v = vesselOf(game, object);
       if (!v) return { text: "That isn't yours." };
       if (option === "Hold") { if (holdAt(game)?.id === v.id) { game.ui.hold = v.id; sound(game, "click"); return null; } return { text: "Get beside it to reach the hold." }; }
       if (option === "Make-waking-place" || option === "Unmake-waking-place") { toggleBerth(game, v); return null; }
+      const near = holdAt(game)?.id === v.id;
+      if (["Supplies", "Pull-lever", "Draw-supplies", "Rest-in-cabin", "Mend-hull", "Name-vessel"].includes(option) && !near) return { text: "Get beside her first." };
+      if (option === "Supplies") { game.ui.supplies = v.id; sound(game, "click"); return null; }
+      if (option === "Pull-lever" || option === "Draw-supplies") { resupply(game, v); return null; }
+      if (option === "Rest-in-cabin") { restInCabin(game, v); return null; }
+      if (option === "Mend-hull") { if (hasFitout(v, "repair_bench")) repairVessel(game, v); return null; }
+      if (option === "Name-vessel") { game.ui.vesselName = v.id; sound(game, "click"); return null; }
+      if (option === "Pick-up") { if (near) pickUpVessel(game, v); else return { text: "Get beside her first." }; return null; }
       board(game, v); return null;
     },
   },
@@ -364,11 +409,24 @@ export function talkShipwright(game: Game, npcId: string, name: string, usual: (
     { label: "Not now.", then: () => null },
   ]);
   const near = player.vessels.filter(v => v.id !== player.aboard && Math.hypot(v.x - player.x, v.y - player.y) <= 24 && v.hull < maxHull(v));
+  // Fitting out: the vessel of yours moored nearest the yard.
+  const moored = player.vessels.filter(v => v.id !== player.aboard && Math.hypot(v.x - player.x, v.y - player.y) <= 24).sort((a, b) => Math.hypot(a.x - player.x, a.y - player.y) - Math.hypot(b.x - player.x, b.y - player.y))[0] ?? null;
+  const fitting = (v: Vessel): Dialogue => chat(name, npcSays(name, `What'll she have? Room's room: a cabin or a galley takes space the hold had (${holdSize(v)} spaces now).`), [
+    ...FITOUT_IDS.filter(id => FITOUTS[id].kinds.includes(v.kind)).map(id => {
+      const def = FITOUTS[id];
+      if (hasFitout(v, id)) return { label: `Take out the ${def.name.toLowerCase()}.`, then: () => { removeFitout(game, v, id); return null; } };
+      const why = fitoutProblem(game, v, id);
+      return { label: `${def.name} (Seafaring ${def.level}${def.space ? `, ${def.space} spaces of hold` : ""}): ${def.cost.map(([c, n]) => `${n} × ${item(c).name}`).join(", ")}`, then: () => why ? says(why) : chat(name, npcSays(name, def.examine), [
+        { label: "Fit it.", then: () => { fitOut(game, v, id); return null; } }, { label: "Not yet.", then: () => null }]) };
+    }),
+    { label: "Not now.", then: () => null },
+  ]);
   return chat(name, npcSays(name, npcId === "shipwright_bersi" ? "Keel, strakes, ribs, and a crew that wants to sail her. Bring me the timber and the iron and I'll give you the rest."
     : npcId === "gullwick_boatwright" ? "Rowboats and skiffs, built on the hard and launched on the tide. Bring the timber and the iron and I'll do the rest." : "Barges, mostly, and rowboats for the ones who fish. Bring the timber and the iron."), [
     { label: "Build me a vessel.", then: build },
     { label: "Saw some planks.", then: saw },
     ...(near.length ? [{ label: "Mend my vessel.", then: () => { repairVessel(game, near[0]); return null; } }] : []),
+    ...(moored ? [{ label: `Fit out my ${VESSELS[moored.kind].name.toLowerCase()}.`, then: () => fitting(moored) }] : []),
     { label: "Show me the ship's stores.", then: () => { game.ui.shop = "ship_stores"; return null; } },
     { label: "Something else.", then: () => usual() },
   ]);
@@ -418,6 +476,7 @@ export function ringBell(game: Game): boolean {
   if (!has(player, "rarite_ships_bell")) return false;
   if (level(game, "seafaring") < SEA.bellLevel) { message(game, `It rings clear, and nothing answers. (Seafaring ${SEA.bellLevel} to call a vessel.)`, "warn"); return false; }
   if (!vessel) { message(game, "It rings clear across the water. You have no vessel to answer it.", "warn"); return false; }
+  if (vessel.carried) { message(game, "It's on your back.", "warn"); return false; }
   if (player.aboard !== null) { message(game, "You're aboard already.", "warn"); return false; }
   if (player.y >= OVERWORLD_H) { message(game, "The bell's no use underground.", "warn"); return false; }
   if (game.tick - player.bellAt < SEA.bellEvery) { message(game, "The bell's still humming from the last time. Give it a while.", "warn"); return false; }
@@ -447,10 +506,11 @@ export function cleanVessels(raw: unknown, isItem: (id: string) => boolean): Ves
     const v = entry as Record<string, unknown>, kind = v.kind as VesselKind;
     if (!VESSELS[kind] || typeof v.id !== "number" || !Number.isInteger(v.id) || out.some(o => o.id === v.id)) continue;
     if (typeof v.x !== "number" || typeof v.y !== "number" || !Number.isInteger(v.x) || !Number.isInteger(v.y) || v.x < 0 || v.y < 0 || v.x >= W || v.y >= H) continue;
-    const def = VESSELS[kind], hold = Array.from({ length: def.hold }, (_, i) => { const s = cleanSlot(Array.isArray(v.hold) ? v.hold[i] : null); return s && isItem(s.id) ? s : null; });
+    const def = VESSELS[kind], fitting = cleanFitting(v, kind), size = def.hold - fitting.fitouts.reduce((n, f) => n + FITOUTS[f].space, 0);
+    const hold = Array.from({ length: size }, (_, i) => { const s = cleanSlot(Array.isArray(v.hold) ? v.hold[i] : null); return s && isItem(s.id) ? s : null; });
     out.push({ id: v.id, kind, name: typeof v.name === "string" && v.name.length <= 24 ? v.name : def.name, x: v.x, y: v.y, heading: headingOf(v.heading),
       hull: 0, hold, sailed: typeof v.sailed === "number" && Number.isFinite(v.sailed) ? Math.max(0, Math.floor(v.sailed)) : 0, fitting: typeof v.fitting === "string" && FITTINGS[v.fitting] ? v.fitting : null,
-      berth: v.berth === true && SEA.berths.includes(kind) && !out.some(o => o.berth) });
+      berth: v.berth === true && SEA.berths.includes(kind) && !out.some(o => o.berth), carried: v.carried === true && kind === "rowboat", ...fitting });
     const kept = out[out.length - 1]; kept.hull = typeof v.hull === "number" && Number.isFinite(v.hull) ? Math.max(0, Math.min(maxHull(kept), Math.floor(v.hull))) : maxHull(kept);
   }
   return out;

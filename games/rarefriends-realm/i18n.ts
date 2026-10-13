@@ -209,7 +209,7 @@ const VERBS = new Set([
   "Search", "Pickpocket", "Steal-from", "Enter", "Bank", "Smelt", "Smith", "Pray-at", "Climb-up", "Climb-down", "Go-through", "Jump-across", "Sail-to", "Unlock",
   "Cook-at", "Read", "Read-journal", "Spin", "Tan-hides", "Shear", "Rub", "Sip", "Cast", "Call", "Claim", "Clean", "Break", "Coat-weapon", "Set-down", "Look-at",
   "Stroke", "Ride", "Dismount", "Deposit", "Withdraw", "Buy", "Sell", "Invite-to-party", "Add-friend", "Remove-friend", "Ignore", "Follow-me", "Dismiss", "Send-home",
-  "Craft-sigil", "Play", "Perform", "Guide", "Select", "Skip", "Start-at", "Deactivate", "Stow", "Take-back", "Keep-vigil", "Read-aloud", "Load", "Fit-to-vessel", "Ring-bell", "Note-the-way",
+  "Craft-sigil", "Play", "Perform", "Guide", "Select", "Skip", "Start-at", "Deactivate", "Stow", "Take-back", "Keep-vigil", "Read-aloud", "Load", "Fit-to-vessel", "Ring-bell", "Note-the-way", "Launch", "Dye-sails", "Cook-in-galley", "Pull-lever", "Draw-supplies", "Rest-in-cabin", "Pick-up", "Mend-hull", "Name-vessel", "Supplies",
 ]);
 /** Short-hand for the game's own code: a phrase in the language now chosen. */
 export const t = (text: string) => translate(text, current);

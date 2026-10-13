@@ -21,12 +21,16 @@ export const SHIP_SIZE: Record<VesselKind, Record<ShipView, { w: number; h: numb
 /** How high the deck stands above the waterline (art pixels): where you stand aboard. */
 export const deckHeight = (kind: VesselKind) => ({ rowboat: 6, skiff: 7, barge: 10, longship: 14 } as const)[kind];
 
-const PINE = "#c9a066", OAK = "#9a6a3e", TAR = "#4a3424", DARK = "#6e4528", SAIL = "#efe6d0", RED = "#b3301f", FOAM = "#eaf6fb";
+const PINE = "#c9a066", OAK = "#9a6a3e", TAR = "#4a3424", DARK = "#6e4528", CANVAS = "#efe6d0", RED = "#b3301f", FOAM = "#eaf6fb";
+/** The sail being painted, and its stripes (set for each picture: canvas and red unless dyed). */
+let SAIL = CANVAS, STRIPE = RED;
 const SHIELDS = ["#b3301f", "#e3b23c", "#2f5f7a", "#efe6d0"];
 
-export function shipArt(kind: VesselKind, view: ShipView, frame: number, layer: ShipLayer = "all"): HTMLCanvasElement {
+export function shipArt(kind: VesselKind, view: ShipView, frame: number, layer: ShipLayer = "all", sail: string | null = null): HTMLCanvasElement {
   const { w, h } = SHIP_SIZE[kind][view];
-  return pixelArt(`ship:${kind}:${view}:${frame}:${layer}`, w, h, p => {
+  return pixelArt(`ship:${kind}:${view}:${frame}:${layer}:${sail ?? ""}`, w, h, p => {
+    // (A dyed sail: the dye for the canvas, a darker shade of it for the stripes and the patch.)
+    SAIL = sail ?? CANVAS; STRIPE = sail ? shadeHex(sail, -0.32) : RED;
     if (view === "side") SIDE[kind](p, frame); else FRONT[kind](p, frame, view === "back");
     p.outline();
     // Aboard: the near side from the deck down, drawn again over you.
@@ -52,7 +56,7 @@ const SIDE: Record<VesselKind, (p: Pixels, frame: number) => void> = {
     const fill = frame < 0 ? 0 : frame & 1;
     p.line(27, 3, 27, 28, DARK, 2);
     p.poly([[13, 8], [28, 4], [30 + fill, 24], [12, 25]], SAIL);
-    p.line(14, 15, 29, 14, shadeHex(SAIL, -0.12)); p.rect(18, 9, 4, 4, RED);
+    p.line(14, 15, 29, 14, shadeHex(SAIL, -0.12)); p.rect(18, 9, 4, 4, STRIPE);
     p.line(12, 8, 29, 3, TAR, 1);
     p.poly([[2, 26], [6, 28], [36, 28], [40, 23], [38, 30], [32, 34], [9, 34], [4, 30]], OAK);
     p.line(5, 30, 37, 30, shadeHex(OAK, -0.2)); p.line(8, 32, 33, 32, shadeHex(OAK, -0.3)); p.line(6, 28, 36, 28, shadeHex(OAK, 0.18));
@@ -76,7 +80,7 @@ const SIDE: Record<VesselKind, (p: Pixels, frame: number) => void> = {
     const fill = frame < 0 ? 0 : frame & 1;
     p.line(38, 2, 38, 31, TAR, 2);
     p.rect(24, 5 + fill, 28, 20 - fill, SAIL);
-    for (let x = 24; x < 52; x += 8) p.rect(x, 5 + fill, 4, 20 - fill, RED);
+    for (let x = 24; x < 52; x += 8) p.rect(x, 5 + fill, 4, 20 - fill, STRIPE);
     p.line(22, 4, 54, 4, TAR, 1);
     p.poly([[1, 22], [6, 31], [62, 31], [68, 21], [66, 30], [60, 38], [11, 38], [4, 32]], OAK);
     p.line(5, 34, 63, 34, shadeHex(OAK, -0.22)); p.line(9, 36, 59, 36, shadeHex(OAK, -0.32)); p.line(6, 31, 62, 31, shadeHex(OAK, 0.18));
@@ -101,7 +105,7 @@ const FRONT: Record<VesselKind, (p: Pixels, frame: number, back: boolean) => voi
   skiff: (p, frame, back) => {
     const fill = frame < 0 ? 0 : frame & 1;
     p.line(13, 3, 13, 28, DARK, 2);
-    p.poly([[8 - fill, 6], [18 + fill, 5], [19 + fill, 24], [7 - fill, 25]], SAIL); p.rect(11, 9, 4, 4, RED);
+    p.poly([[8 - fill, 6], [18 + fill, 5], [19 + fill, 24], [7 - fill, 25]], SAIL); p.rect(11, 9, 4, 4, STRIPE);
     if (back) p.poly([[3, 27], [23, 27], [22, 34], [4, 34]], OAK); else p.poly([[3, 27], [23, 27], [20, 32], [13, 35], [6, 32]], OAK);
     p.rect(5, 27, 16, 2, shadeHex(OAK, -0.35)); p.line(3, 27, 23, 27, shadeHex(OAK, 0.18));
     if (back) p.line(13, 29, 13, 35, TAR, 1); else wake(p, 12, 35, frame);
@@ -117,7 +121,7 @@ const FRONT: Record<VesselKind, (p: Pixels, frame: number, back: boolean) => voi
   longship: (p, frame, back) => {
     const fill = frame < 0 ? 0 : frame & 1;
     p.line(17, 2, 17, 30, TAR, 2);
-    p.rect(3, 5 + fill, 28, 19 - fill, SAIL); for (let x = 3; x < 31; x += 8) p.rect(x, 5 + fill, 4, 19 - fill, RED);
+    p.rect(3, 5 + fill, 28, 19 - fill, SAIL); for (let x = 3; x < 31; x += 8) p.rect(x, 5 + fill, 4, 19 - fill, STRIPE);
     p.line(2, 4, 32, 4, TAR, 1);
     if (frame >= 0) { const s = sweep(frame); p.line(6, 33, 0, 40 + s / 2, DARK, 1); p.line(28, 33, 33, 40 + s / 2, DARK, 1); }
     p.poly([[5, 30], [29, 30], [27, 37], [17, 42], [7, 37]], OAK);

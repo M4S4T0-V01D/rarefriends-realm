@@ -435,6 +435,12 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
         line(p, [[8, 4], [8, 11], [12, 16], [16, 18], [20, 16], [24, 11], [24, 4]], icon.kind === "strung" ? "#e8dcc0" : GOLD_C, icon.kind === "strung" ? 2 : 1);
         if (icon.kind === "strung") { part(p, disc(16, 24, 4.6, 5.2), color, "gem"); dot(p, 16, 18, "#c9b58f"); break; }
         part(p, disc(16, 23, 6, 6.5), GOLD_C, "metal"); part(p, disc(16, 23, 4, 4.5), color, "gem"); break;
+      case "boat":
+        // An upturned rowboat, keel up, an oar across it.
+        part(p, poly([[3, 18], [8, 11], [24, 11], [29, 18], [27, 22], [5, 22]]), color, "wood");
+        line(p, [[6, 15], [26, 15]], shadeHex(color, -0.22)); line(p, [[5, 19], [27, 19]], shadeHex(color, -0.3));
+        line(p, [[16, 11], [16, 22]], shadeHex(color, -0.35));
+        part(p, poly([[4, 26], [28, 7], [29, 9], [6, 28]]), accent ?? shadeHex(color, -0.4), "wood"); break;
       case "log":
         part(p, poly([[7, 11], [24, 5], [30, 11], [28, 20], [9, 26]]), color, "wood");
         for (const [a, b] of [[[12, 13], [25, 9]], [[13, 18], [27, 14]], [[14, 22], [26, 19]]] as [Pt, Pt][]) line(p, [a, b], shadeHex(color, -0.22));

@@ -10,6 +10,7 @@ import { SPELL_TABS, RARIAN_SPELL_TABS, MIZUKAI_SPELL_TABS, ORASHAI_SPELL_TABS, 
 import { mountArt } from "./mountart.ts";
 import { cacheAt, unstash } from "./camping.ts";
 import { VESSELS, canLandHere, holdAt, takeFromHold } from "./seafaring.ts";
+import { BARREL_ROLES, BARREL_SLOTS, LOADOUT_NAMES, SUPPLY, activeLoadout, barrelsOf, hasFitout, inSupply, loadoutsOf, nameVessel, setBarrel, setLoadout, setRule } from "./shipfit.ts";
 import { CHEST_REWARD, DAY_MS, challengeProgress, challengeReward, challengeText, claimChallenge, claimChest, claimStreak, completeDaily, dailyWaiting, rerollDaily, rewardText, rollDaily, streakReward, streakStatus } from "./daily.ts";
 import { LATEST_UPDATE, UPDATES } from "./updates.ts";
 import { FIRST_STEPS, currentStep } from "./firststeps.ts";
@@ -1647,14 +1648,60 @@ export function HoldModal({ game, refresh, openMenu, onClose }: { game: Game; re
       {slot && <ItemIcon slot={slot} size={40} />}</button>)}</div>
   </Modal>;
 }
+/** A vessel's supplies (shipfit.ts): the barrels (what each is for, drawn on or kept), the loadout the lever works, and its rules. */
+export function SupplyModal({ game, refresh, onClose }: { game: Game; refresh: () => void; onClose: () => void }) {
+  const vessel = holdAt(game), [pick, setPick] = useState("");
+  if (!vessel || vessel.id !== game.ui.supplies || !hasFitout(vessel, "supply_barrels")) return null;
+  const barrels = barrelsOf(vessel), loadouts = loadoutsOf(vessel), k = activeLoadout(vessel), rules = loadouts[k]?.rules ?? [], lever = hasFitout(vessel, "resupply_lever");
+  const choices = [...new Set([...vessel.hold, ...game.player.inventory].flatMap(slot => slot && slot.id !== "carried_rowboat" ? [slot.id] : []))].filter(id => !rules.some(r => r.item === id));
+  const change = (fn: () => void) => { fn(); refresh(); };
+  return <Modal title={`Supplies: ${vessel.name}`} onClose={onClose}>
+    <p className="realm-muted">{lever ? "Pull the lever (right-click her: Pull-lever) and the barrels you draw on fill your pack up to the loadout. Nothing's made: only what's in those barrels, only what fits." : "Right-click her: Draw-supplies, and the barrels you draw on fill your pack up to the loadout. Nothing's made: only what's in those barrels, only what fits."}</p>
+    {loadouts.length > 1 && <label className="realm-supply-row">Loadout <select value={k} onChange={event => change(() => setLoadout(vessel, Number(event.target.value)))}>{loadouts.map((_, i) => <option key={i} value={i}>{LOADOUT_NAMES[i]}</option>)}</select></label>}
+    <h3 className="realm-supply-head">{`${LOADOUT_NAMES[k]}: what to carry`}</h3>
+    {!rules.length && <p className="realm-muted">Nothing set yet: add an item below.</p>}
+    {rules.map((rule, i) => <div key={rule.item} className="realm-supply-row">
+      <ItemIcon slot={{ id: rule.item, n: 1 }} size={28} /><span className="realm-supply-name">{item(rule.item).name}</span>
+      <input type="number" min={0} max={SUPPLY.target} value={rule.target} aria-label={`How many ${item(rule.item).name}`} onChange={event => change(() => setRule(vessel, { item: rule.item, target: Number(event.target.value) }))} />
+      <span className="realm-muted">{`in the barrels: ${inSupply(vessel, rule.item).toLocaleString()}`}</span>
+      <label><input type="checkbox" checked={rule.on} onChange={event => change(() => setRule(vessel, { item: rule.item, on: event.target.checked }))} /> On</label>
+      <button type="button" disabled={i === 0} onClick={() => change(() => setRule(vessel, { item: rule.item, up: true }))} aria-label="First">↑</button>
+      <button type="button" onClick={() => change(() => setRule(vessel, { item: rule.item, remove: true }))} aria-label="Remove">✕</button>
+    </div>)}
+    {rules.length < SUPPLY.rules && choices.length > 0 && <div className="realm-supply-row">
+      <select value={pick} onChange={event => setPick(event.target.value)} aria-label="Item"><option value="">Add an item…</option>{choices.map(id => <option key={id} value={id}>{item(id).name}</option>)}</select>
+      <button type="button" disabled={!pick} onClick={() => change(() => { setRule(vessel, { item: pick, target: Math.max(1, count(game.player, pick)) }); setPick(""); })}>Add</button>
+    </div>}
+    <h3 className="realm-supply-head">The barrels</h3>
+    {barrels.map((barrel, b) => <div key={b} className="realm-supply-row">
+      <span className="realm-supply-name">{`Barrel ${b + 1}`}</span>
+      <select value={barrel.role} onChange={event => change(() => setBarrel(vessel, b, { role: Number(event.target.value) }))} aria-label={`Barrel ${b + 1}`}>{BARREL_ROLES.map((role, r) => <option key={role} value={r}>{role}</option>)}</select>
+      <label><input type="checkbox" checked={barrel.supply} onChange={event => change(() => setBarrel(vessel, b, { supply: event.target.checked }))} /> Draw on it</label>
+      <span className="realm-supply-items">{vessel.hold.slice(b * BARREL_SLOTS, b * BARREL_SLOTS + BARREL_SLOTS).map((slot, i) => slot ? <ItemIcon key={i} slot={slot} size={24} /> : null)}</span>
+    </div>)}
+  </Modal>;
+}
+/** Naming a vessel: painted on the bow. */
+export function VesselNameModal({ game, refresh, onClose }: { game: Game; refresh: () => void; onClose: () => void }) {
+  const vessel = game.player.vessels.find(v => v.id === game.ui.vesselName), [name, setName] = useState(vessel?.name ?? "");
+  if (!vessel) return null;
+  const submit = () => { if (nameVessel(game, vessel, name)) onClose(); else refresh(); };
+  return <Modal title={`Name your ${VESSELS[vessel.kind].name.toLowerCase()}`} onClose={onClose}>
+    <p className="realm-muted">Painted on her bow: 3 to 20 letters, numbers, spaces, hyphens or apostrophes.</p>
+    <form className="realm-supply-row" onSubmit={event => { event.preventDefault(); submit(); }}>
+      <input value={name} maxLength={20} onChange={event => setName(event.target.value)} aria-label="Her name" autoFocus />
+      <button type="submit">Name her</button>
+    </form>
+  </Modal>;
+}
 /** Your mount's orb, on the right of the minimap (Faith's column keeps the Orashai's mana under it). */
 export function MountOrb({ game, onRide, onAshore, openMenu }: { game: Game; onRide?: (id?: string) => void; onAshore?: () => void; openMenu?: OpenMenu }) {
   const player = game.player;
   // Aboard a vessel, getting off is what this place is for: Go ashore at the nearest beach or pier (H does the same).
   // Dark at sea (it sails you to the nearest landing); lit, with a glow, when a shore you can step onto is right beside you.
   if (player.aboard !== null) { const ready = canLandHere(game), tip = ready ? "Go ashore (H)" : "Sail to the nearest landing (H)";
-    return onAshore ? <button type="button" className={`realm-ashore${ready ? " ready" : ""}`} onClick={() => onAshore()} title={tip} aria-label={tip}>
-      <span aria-hidden="true">⚓</span> Go ashore</button> : null; }
+    return onAshore ? <button type="button" className={`realm-orb map realm-ashore${ready ? " ready" : ""}`} onClick={() => onAshore()} title={tip} aria-label={tip}>
+      <span aria-hidden="true">⚓</span></button> : null; }
   return <>
       {onRide && player.mounts.length > 0 && (() => { const shown = mountDef(player.mount ?? player.lastMount ?? player.mounts[0])!;
         return <button type="button" className="realm-orb map ride realm-mount-orb" onClick={() => onRide()} aria-pressed={!!player.mount} aria-label={player.mount ? `Dismount (H)` : `Ride your ${shown.name.toLowerCase()} (H)`} title={player.mount ? "Dismount (H)" : "Ride (H)"}

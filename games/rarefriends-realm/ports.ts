@@ -146,7 +146,18 @@ export function buildPorts(ctx: GenContext, t: Tools, places: World["places"], k
     for (const by of [442, 444]) add({ kind: "bank", x: 572, y: by, blocks: true, name: "Counting-house desk" }); npc("banker", 575, 443);
     // The fish market on the quay.
     for (const [sx, name] of [[539, "Herring stall"], [542, "Crab stall"], [545, "Sailfish stall"]] as const) add({ kind: "stall", stall: "fish", x: sx, y: 453, blocks: true, name });
-    npcAt("gullwick_boatwright", 538, 459); put2(536, 457, "boat", "A skiff on the hard, half planked");
+    put2(536, 457, "boat", "A skiff on the hard, half planked");
+    // Tamsin's yard, north of the Light where the river comes out: a boat shed with a skiff on the stocks, a slip down
+    // into the river mouth, timber, the steam-box for bending planks, and her sign.
+    for (let y = 433; y <= 440; y++) for (let x = 524; x <= 532; x++) { clearAt(x, y); if (!isWater(get(x, y))) put(x, y, T.GRASS); }
+    timber(525, 434, 531, 438, "s", "Tamsin's boat shed", { color: ROOF.tar });
+    decor(528, 436, "boat", true, "A skiff on the stocks, her strakes going on one a day"); decor(526, 435, "table", true, "The bench: planes, a caulking iron, and a mallet worn to the shape of her hand");
+    decor(530, 435, "shelf", true, "Copper nails, oakum, a tin of tallow, and a book of half-models, every hull she's drawn");
+    for (let x = 521; x <= 524; x++) { clearAt(x, 436); put(x, 436, T.WOOD); }
+    put2(533, 436, "logpile", "Larch and oak for strakes, stickered to dry"); put2(533, 439, "barrel", "The steam-box's water butt: planks go in stiff and come out willing");
+    put2(525, 440, "nets", "Tarred rope and a coil of new hemp");
+    sign(530, 440, "Tamsin's Yard", "TAMSIN'S YARD, GULLWICK. Rowboats and skiffs, built on the slip and launched on the tide, from your timber and your iron. Planks sawn. Hulls mended. Fitting out: ask.");
+    npcAt("gullwick_boatwright", 528, 440);
     npcAt("gullwick_fishmonger", 543, 455); put2(548, 453, "barrel", "A barrel of salted herring, the lid weighted with a stone"); put2(531, 452, "nets", "Nets drying on the quay rail");
     // The chandlery, the tailor, the houses, and the ropewalk: a long low shed where the rope is laid, the length of a cable.
     stone(544, 456, 551, 461, "n", "Oake's Chandlery", { color: ROOF.tar });

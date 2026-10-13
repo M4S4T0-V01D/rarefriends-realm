@@ -12,6 +12,7 @@ import { ESSENCES, HERBS, MIXTURES, POTIONS } from "./apothecary.ts";
 import { NPCS } from "./content.ts";
 import { TECHNIQUES } from "./techniques.ts";
 import { SEA, SHIPWRIGHTS, VESSELS, VESSEL_KINDS } from "./seafaring.ts";
+import { FITOUTS, FITOUT_IDS, LOADOUT_NAMES } from "./shipfit.ts";
 /** Which quest teaches a tradition's techniques (the common ones need only the level). */
 const TAUGHT_BY: Partial<Record<string, string>> = { orashai: " (The Orashai Mysteries)", mizukai: " (The Hidden Road)", inner_measure: " (The Counted Breath)", living_patterns: " (Patterns in the Water)", thresholds: " (The Keepers' Door)", unfinished: " (The Unfinished Page)" };
 import { AMULETS, STALLS, amuletRecipe, carvingRecipes, arrowRecipe, boltRecipe, craftingRecipes, crossbowRecipe, spinningRecipes, stringingRecipe, fletchingRecipes, headlessRecipe, smeltingRecipes, smithingRecipes } from "./engine.ts";
@@ -225,7 +226,11 @@ export function skillGuide(skill: Skill): GuideEntry[] {
     case "seafaring":
       add(1, "Seafaring", "Vessels of your own, built by a shipwright from your materials, sailed over the water the world has, moored where you leave them and found there again. Trained by sailing, by landing somewhere new by sea, and by building and mending.", undefined, T("ability"));
       for (const kind of VESSEL_KINDS) { const v = VESSELS[kind]; add(v.level, v.name, `${v.examine} Speed ${v.speed}, hold ${v.hold}, ${v.waters === "shallow" ? "the shallows, rivers and lakes" : v.waters === "coastal" ? `the shallows and the sea within ${SEA.coastal} of land` : "any water"}${v.beach ? ", beaches anywhere" : ", needs a pier"}. Built by ${Object.entries(SHIPWRIGHTS).filter(([, y]) => y.builds.includes(kind)).map(([id]) => NPCS[id]?.name ?? id).join(" or ")}: ${v.build.map(([id, n]) => `${n} ${item(id).name.toLowerCase()}`).join(", ")}.`, undefined, T("vessel")); }
-      add(1, "Going ashore", "Aboard, click the shore: you sail beside it and step off, where the vessel can be beached or there's a pier. The vessel stays moored there, its hold with it.", undefined, T("ability"));
+      add(1, "Going ashore", "Aboard, click the shore, or press the anchor on the minimap's ring (or H): you sail to the nearest place she can land and step off. The anchor lights up when you can step off right there. The vessel stays moored, its hold with it.", undefined, T("ability"));
+      add(1, "Carrying a rowboat", "Pick up your rowboat from beside it and carry it on your back; Launch it at any water it can take. Its hold goes with it.", "carried_rowboat", T("ability"));
+      add(1, "Her name and her sails", "Name your vessel from beside her, and use a Dyemoor dye on a skiff or a longship to dye her sails (a pot of lye washes them).", undefined, T("ability"));
+      for (const id of FITOUT_IDS) { const f = FITOUTS[id]; add(f.level, f.name, `${f.examine} Fitted by a shipwright${f.space ? `, taking ${f.space} spaces of the hold` : ""}: ${f.cost.map(([c, n]) => `${n} × ${item(c).name}`).join(", ")}. On a ${f.kinds.map(k => VESSELS[k].name.toLowerCase()).join(", ")}.`, undefined, T("ability")); }
+      add(20, "Loadouts", `With supply barrels: set what you want to carry (an item and how many), and the barrels top your pack up to it. One loadout on a skiff, three on a barge, six on a longship: ${LOADOUT_NAMES.join(", ")}.`, undefined, T("ability"));
       add(1, "The hold", "Each vessel has a hold: Load from your pack aboard or beside it, take things back from the Hold.", undefined, T("ability"));
       add(1, "Planks", "A shipwright saws logs into planks for a fee: pine, oak and ironbark.", "oak_planks", T("ability"));
       add(SEA.berthLevel, "A berth", "A barge's deckhouse or a longship's awning can be your waking place: if you fall, you wake aboard it, wherever it's moored. One waking place at a time, a camp or a vessel.", undefined, T("ability"));

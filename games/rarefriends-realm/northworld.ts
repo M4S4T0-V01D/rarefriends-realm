@@ -436,7 +436,32 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
     house(cx - 7, Y0 + 3, cx + 7, Y0 + 11, "s", "The Freeholds Compact's hall", "terem");
     for (const [hx, hy] of [[X0 + 2, Y0 + 2], [X1 - 9, Y0 + 2], [X0 + 2, Y1 - 8], [X1 - 9, Y1 - 8], [cx - 4, Y1 - 7]] as const) house(hx, hy, hx + 7, hy + 5, "n", "A log house", "izba");
     pier(X0 - 2, Y0 + 14, -1, 0, 5); put2(X0 - 6, Y0 + 13, "boat", "A river barge, laden with timber"); put2(X0 + 4, Y0 + 15, "logpile", "Timber for the river");
-    npc("freeholds_speaker", cx, Y0 + 13); npc("bereslav_bargewoman", X0 + 2, Y0 + 15); npc("zoryavik_villager", cx + 6, Y1 - 10, 5);
+    npc("freeholds_speaker", cx, Y0 + 13); npc("zoryavik_villager", cx + 6, Y1 - 10, 5);
+    // Olena's yard, up the bank north of the town: a long boat shed with a barge on the stocks, a slipway down into the
+    // Bereza, timber seasoning under a lean-to, a sawpit, the pitch pot, rope, and her sign.
+    {
+      const YX = X0 - 3, YY = Y0 - 11;   // the yard's corner (west, by the river)
+      ground(YX, YY, YX + 22, Y0 - 2, "bereslav");
+      house(YX + 4, YY + 1, YX + 15, YY + 6, "s", "Olena's boat shed", "izba", T.WOOD, { color: "#6e4a2c" });
+      put2(YX + 9, YY + 3, "boat", "A barge on the stocks, half planked, her ribs still showing aft");
+      put2(YX + 6, YY + 2, "table", "The workbench: adzes, augers, a bevel gauge, and a pot of pitch keeping warm");
+      put2(YX + 13, YY + 2, "shelf", "Treenails by the thousand, oakum in hanks, and a drawer of rivets sorted by metal");
+      put2(YX + 14, YY + 5, "chest", "The yard's tool chest, its lid carved with every barge she's launched");
+      // The slipway: planks from the shed's west end down to the water, greased.
+      for (let x = YX; x <= YX + 3; x++) for (const y of [YY + 3, YY + 4]) { const i = idx(x, y); tiles[i] = T.WOOD; lift[i] = 0; raise[i] = 0; }
+      pier(YX - 1, YY + 3, -1, 0, 3);
+      // The yard itself, outside: timber under a lean-to, the sawpit, the pitch pot, rope, a cart.
+      put2(YX + 17, YY + 1, "canopy", "A lean-to over the seasoning timber");
+      for (const [lx, ly] of [[YX + 17, YY + 2], [YX + 18, YY + 2], [YX + 19, YY + 3]] as const) put2(lx, ly, "logpile", "Oak and pine, seasoning: a year for every inch");
+      put2(YX + 20, YY + 6, "logpile", "The sawpit: a log on the trestles, one sawyer above and one below");
+      put2(YX + 6, YY + 8, "barrel", "The pitch pot over a slow fire. It smells like every boatyard there ever was");
+      put2(YX + 9, YY + 8, "nets", "Coils of tarred rope, and a hawser for the next launch");
+      put2(YX + 12, YY + 8, "crate", "Crates of iron from the smiths: rivets, chain, a rudder's pintles");
+      put2(YX + 18, YY + 8, "wagon", "A timber cart, its shafts down");
+      put2(YX + 15, YY + 9, "drying_rack", "Sailcloth stretched to dry, mended where the last one tore");
+      sign(YX + 2, Y0 - 3, "Olena's Yard", "OLENA'S YARD, BERESLAV. Barges built to order and rowboats for the fishing, from your timber and your iron. Planks sawn. Hulls mended. Fitting out: ask.");
+      npc("bereslav_bargewoman", YX + 9, YY + 7);
+    }
     sign(cx + 3, Y1 + 1, "Bereslav", "BERESLAV, a free town of the Compact. No prince's toll on this river. Ask the Speaker why, and have an afternoon free.");
   }
 

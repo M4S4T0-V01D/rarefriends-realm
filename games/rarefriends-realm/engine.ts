@@ -37,7 +37,8 @@ import { cleanMysteries, studySherd } from "./mysteries.ts";
 import { clueExamine, clueOptions, onKharavethTick, useClue } from "./kharaveth.ts";
 import { studySeal } from "./dynasties.ts";
 import { cleanTrails } from "./wayfinding.ts";
-import { VESSELS, aboard, applyVessels, berthRespawn, canStow, cleanVessels, fitToVessel, goAshore, holdAt, nearestLanding, ringBell, sailable, sailed, settleAboard, stowInHold, vesselTick } from "./seafaring.ts";
+import { dyeSails, hasFitout } from "./shipfit.ts";
+import { launchCarried, VESSELS, aboard, applyVessels, berthRespawn, canStow, cleanVessels, fitToVessel, goAshore, holdAt, nearestLanding, ringBell, sailable, sailed, settleAboard, stowInHold, vesselTick } from "./seafaring.ts";
 import {
   BANK_SIZE, BANK_TABS, DAY_MS, SATCHEL, SATCHEL_SIZE, STONE_BOX, STONE_BOX_SIZE, boxTotal, isSigilStone, BONE_BAG, BONE_BAG_SIZE, bagAdd, bagBones, bagTakeAll, hasBoneBag, SIGIL_BAG, BELTS, beltAdd, beltContents, beltDef, wornBelt, SIGIL_BAG_SIZE, hasSigilBag, isSigil, sigilBagAdd, sigilBagTotal, sigilStock, useSigils, setPieces, wayfarerPieces, fullSlayerSet, heartguardPieces, mixtureOn, compactBankTabs, hasSatchel, hasStoneBox, stock, useUp, INVENTORY_SIZE, REFERRAL_COINS, REFERRALS_PER_DAY, REFERRAL_TICKS, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
   level, maxHp, maxPrayer, maxMana, manaCost, faithStaff, traditionOf, message, prayerBoost, riding, sound, take, weapon, combatLevel, createGame, TICK_MS,
@@ -342,16 +343,14 @@ export function itemOptions(game: Game, slotIndex: number): ItemOption[] {
   else if (definition.potion) out.push({ verb: "Drink", run: g => drink(g, slotIndex) });
   if (definition.equip) out.push({ verb: definition.equip.slot === "weapon" || definition.equip.slot === "shield" ? "Wield" : "Wear", run: g => equip(g, slotIndex) });
   if (FIREMAKING[slot.id]) out.push({ verb: "Light", run: g => lightFire(g, slotIndex) });
-  if (riding(game.player)?.bags) out.push({ verb: "Stow", run: g => { stow(g, slotIndex); return null; } });
   if (CARVINGS.some(carving => carving.id === slot.id)) out.push({ verb: "Set-down", run: g => setCarving(g, slotIndex) });
   if (slot.id === "pewter_camp_kit") out.push({ verb: "Set-up-camp", run: g => { setUpCamp(g); } });
   if (slot.id === "moonsilver_field_altar") out.push({ verb: "Set-up-altar", run: g => setUpFieldAltar(g, slotIndex) });
   if (slot.id === "frostsilver_camp_cache") out.push({ verb: "Set-up-cache", run: g => setUpCache(g, slotIndex) });
   if (slot.id === "wyrmscale_waystone") out.push({ verb: "Walk-the-way", run: g => { walkTheWay(g); } });
-  if (cacheAt(game) && !FIELDCRAFT_IDS.has(slot.id)) out.push({ verb: "Stash", run: g => { stash(g, slotIndex); } });
-  if (canStow(game)) out.push({ verb: "Load", run: g => { stowInHold(g, slotIndex); } });
   if (slot.id.endsWith("_hull_fitting") && holdAt(game)) out.push({ verb: "Fit-to-vessel", run: g => { fitToVessel(g, slotIndex); } });
   if (slot.id === "rarite_ships_bell") out.push({ verb: "Ring-bell", run: g => { ringBell(g); } });
+  if (slot.id === "carried_rowboat") out.push({ verb: "Launch", run: g => { launchCarried(g); } });
   if (definition.family === "resonance") out.push({ verb: "Fit-to-carving", run: g => fitCarving(g, slotIndex) });
   if (slot.id === "glimmer_shard") out.push({ verb: "Look-at", run: g => message(g, "The shard hums. Old Glimmer will want it back.") });
   // An inscribed sherd from Kharaveth: study it for a glyph you haven't seen (Mysteries); the sherd crumbles either way.
@@ -367,6 +366,11 @@ export function itemOptions(game: Game, slotIndex: number): ItemOption[] {
   if (slot.id === STONE_BOX) out.push({ verb: "Check", run: boxCheck }, { verb: "Fill", run: boxFill }, { verb: "Empty", run: boxEmpty });
   if (slot.id === BONE_BAG) out.push({ verb: "Check", run: bagCheck }, { verb: "Fill", run: bagFill }, { verb: "Empty", run: bagEmpty });
   out.push({ verb: "Use", run: () => ({ kind: "item", slot: slotIndex }) });
+  // Putting it away (saddlebags, a camp cache, a vessel's hold) is never what a left-click does: after Use, before Drop.
+  if (riding(game.player)?.bags) out.push({ verb: "Stow", run: g => { stow(g, slotIndex); return null; } });
+  if (cacheAt(game) && !FIELDCRAFT_IDS.has(slot.id)) out.push({ verb: "Stash", run: g => { stash(g, slotIndex); } });
+  if (canStow(game)) out.push({ verb: "Load", run: g => { stowInHold(g, slotIndex); } });
+  if ((slot.id.startsWith("dye_")) && holdAt(game)) out.push({ verb: "Dye-sails", run: g => { const v = holdAt(g); if (v) dyeSails(g, v, slot.id); } });
   out.push({ verb: "Drop", run: g => drop(g, slotIndex) });
   out.push({ verb: "Examine", run: g => message(g, slot.n >= 100_000 ? `${slot.n.toLocaleString()} x ${definition.name}` : examineItem(slot.id)) });
   return out;
@@ -653,6 +657,7 @@ function offerTick(game: Game, activity: Extract<Activity, { kind: "offer" }>) {
 export function drop(game: Game, slotIndex: number) {
   const player = game.player, slot = player.inventory[slotIndex];
   if (!slot) return;
+  if (slot.id === "carried_rowboat") { message(game, "Launch it at the water instead: a rowboat on dry ground is no use to anyone.", "warn"); return; }
   player.inventory[slotIndex] = null;
   // Tradeable things you drop are shared: other players see them and can pick them up.
   dropItem(game, slot.id, slot.n, player.x, player.y, 200, item(slot.id).tradeable !== false); sound(game, "drop");
@@ -1067,6 +1072,10 @@ export const STALLS = {
 
 function interactObject(game: Game, object: WorldObject, option: string, use?: number) {
   const player = game.player;
+  // A vessel's galley is a range (shipfit.ts): cook there, or use the raw food on her.
+  const galley = object.clue === "vessel" ? player.vessels.find(v => `vessel:${v.id}` === object.text && hasFitout(v, "galley")) : undefined;
+  if (galley && use !== undefined && COOKING[player.inventory[use]?.id ?? ""]) { startCooking(game, "range", object.id, player.inventory[use]!.id); return; }
+  if (galley && option === "Cook-in-galley") { startCooking(game, "range", object.id, firstRaw(game)); return; }
   if (use !== undefined) { useItemOnObject(game, object, use); return; }
   // Something to look into (The Land Before Stone): it decides what happens, and where you go if anywhere.
   const clue = useClue(game, object, option);

@@ -91,7 +91,7 @@ export type IconShape =
   | "amulet" | "log" | "fish" | "ore" | "bar" | "bones" | "sigil" | "staff" | "net" | "rod" | "harpoon" | "pot" | "bucket" | "egg" | "flour"
   | "milk" | "tinderbox" | "hammer" | "knife" | "needle" | "thread" | "chisel" | "gem" | "hide" | "leather" | "meat" | "feather" | "bait"
   | "cake" | "bread" | "berries" | "key" | "wheat" | "lamp" | "scroll" | "silk" | "hood" | "bracer" | "burnt" | "hat" | "crown" | "orb" | "trophy"
-  | "bow" | "arrow" | "tablet" | "arrowheads" | "material" | "quiver" | "satchel" | "mask" | "stonebox" | "wool" | "string" | "shears" | "greatsword" | "battleaxe" | "warhammer" | "mace" | "flail" | "roundshield" | "aegis" | "spear" | "warbow" | "crossbow" | "bolts" | "limbs" | "stock" | "herb" | "mushroom" | "vial" | "mortar" | "ring";
+  | "bow" | "arrow" | "tablet" | "arrowheads" | "material" | "quiver" | "satchel" | "mask" | "stonebox" | "boat" | "wool" | "string" | "shears" | "greatsword" | "battleaxe" | "warhammer" | "mace" | "flail" | "roundshield" | "aegis" | "spear" | "warbow" | "crossbow" | "bolts" | "limbs" | "stock" | "herb" | "mushroom" | "vial" | "mortar" | "ring";
 export type Item = {
   id: string; name: string; examine: string; value: number; icon: Icon;
   stackable?: boolean; tradeable?: boolean;
@@ -309,6 +309,7 @@ const ITEMS: Item[] = [
   { id: "ironbark_planks", name: "Ironbark planks", examine: "Ironbark, sawn at great cost to the saw. Nothing gets through a hull of it.", value: 1100, stackable: true, icon: { shape: "log", color: "#6a5a4c", accent: "#3e342c" } },
   { id: "sailcloth", name: "Sailcloth", examine: "A bolt of heavy canvas, for a sail.", value: 180, stackable: true, icon: { shape: "silk", color: "#efe6d0", accent: "#b3301f" } },
   { id: "ships_rope", name: "Ship's rope", examine: "A coil of tarred rope: rigging, mooring lines, everything that holds.", value: 60, stackable: true, icon: { shape: "string", color: "#9c7a4a", accent: "#5a4228" } },
+  { id: "carried_rowboat", name: "Rowboat (carried)", examine: "Your rowboat, upside down over your shoulders, its oars inside. Launch it at any water it can take.", value: 0, tradeable: false, icon: { shape: "boat", color: "#c9a066", accent: "#6e4528" } },
   { id: "first_copy", name: "First copy of the agreement", examine: "The old agreement in both peoples' hands, as it was first sworn: each to keep both passes and both roads, and to stand by the other.", value: 0, tradeable: false, icon: { shape: "scroll", color: "#e9dcb4", accent: "#7d2f26" } },
   { id: "realm_scroll", name: "Realm scroll", examine: "A map fragment of the Realm.", value: 0, tradeable: false, icon: { shape: "scroll", color: "#efe3c4" } },
 ];

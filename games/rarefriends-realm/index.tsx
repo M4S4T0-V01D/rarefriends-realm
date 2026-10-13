@@ -22,7 +22,7 @@ import { logoSvg } from "./logo.ts";
 const TITLE_LOGO = logoSvg("horizontal");
 import { HIGH_QUALITY, PITCH, RENDER_PROFILE, VIEW, ZOOM, addPrint, daylight, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
 import {
-  BankModal, BoatModal, CardsModal, CarvingBuffs, MountOrb, FeedbackModal, ChatBox, ContextMenu, DailyModal, FellowshipModal, HomeModal, JoinModal, RfActionModal, FirstStepsCard, GuideModal, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, NamingModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
+  BankModal, BoatModal, CardsModal, SupplyModal, VesselNameModal, CarvingBuffs, MountOrb, FeedbackModal, ChatBox, ContextMenu, DailyModal, FellowshipModal, HomeModal, JoinModal, RfActionModal, FirstStepsCard, GuideModal, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, NamingModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
   cancelLongPress, longPress, rightClick, NerdSettings, LanguagePicker, customFrom, type CustomGraphics, type MenuEntry, type Settings, type Tab, CampCacheModal, HoldModal, MOUNT_FROM } from "./panels.tsx";
 import { REGULAR_SPRITES } from "./regulars.ts";
 import { NET_ACT, NET_ACT_IN, NET_CHAT, NET_CHAT_IN, NET_ONLINE, NET_PRESENCE, NET_SOCIAL, NET_STATE, cleanAct, cleanChat, cleanId, cleanPresence, type Act, type NetState, type Presence } from "./net.ts";
@@ -1244,6 +1244,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           {guide && <GuideModal game={state} skill={guide.skill} onSkill={skill => setGuide({ skill })} onClose={() => setGuide(null)} />}
           <FellowshipModal key={`${state.ui.fellowship ? 1 : 0}:${state.player.fellowship?.name ?? ""}`} game={state} refresh={refresh} onRecruit={recruit} shareStatus={shareStatus} />
           <JoinModal game={state} refresh={refresh} />
+          {state.ui.supplies != null && <SupplyModal game={state} refresh={refresh} onClose={() => { state.ui.supplies = null; refresh(); }} />}
+          {state.ui.vesselName != null && <VesselNameModal game={state} refresh={refresh} onClose={() => { state.ui.vesselName = null; refresh(); }} />}
           {state.ui.hold != null && <HoldModal game={state} refresh={refresh} openMenu={(x, y, entries) => setMenu({ x, y, entries })} onClose={() => { state.ui.hold = null; refresh(); }} />}
           {state.ui.cache && <CampCacheModal game={state} refresh={refresh} openMenu={(x, y, entries) => setMenu({ x, y, entries })} onClose={() => { state.ui.cache = false; refresh(); }} />}
           <BoatModal game={state} refresh={refresh} onSail={(from, to) => { sailTo(state, from, to); refresh(); }} />
