@@ -4,6 +4,10 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 127, date: "2026-10-13", title: "The land rises", items: [
+    "The Realm isn't flat any more: the ground climbs from the sea. Friendhollow sits low by the water, the Ashen Hills and the mine rise above it, Emberforge stands higher again, and Frostpeak is up on its mountain. Every range stands high, the coasts come down to the sea, and every lake lies level.",
+    "Every building stands on its own level ground: a house by a hill no longer has its roof pulled up the slope while its walls stay down.",
+  ] },
   { id: 126, date: "2026-10-13", title: "The Outer Sea: sail round the whole Realm", items: [
     "The Outer Sea runs all the way round the map, so a vessel can sail right round the Realm, from the north's coasts down past the west and Kharaveth to the Mizukai Isles and back. Where land ran into the edge of the world it's cut back into beach.",
     "Straits join the big inland seas to it: the Deadwood's sea out through the Zoryavik to the Ilm, the Wyrmreach bay into the Deadwood's sea, the Southshore water and Glass Lake out to the south sea, the Vargskeld lake down to Skarnholm Bay, and the Grimfell tarn to the Skarn. Roads cross them on bridges.",

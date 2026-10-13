@@ -24,6 +24,7 @@ import { buildDragons } from "./dragonsworld.ts";
 import { buildQuestMounts } from "./questmountsworld.ts";
 import { buildNorth } from "./northworld.ts";
 import { openSeas } from "./seaways.ts";
+import { buildElevation } from "./elevation.ts";
 
 /**
  * The far west (Return of Raria): the world grew by WEST_DX columns on its west side for a second continent, Raria and
@@ -428,6 +429,8 @@ export type World = {
   ramparts?: Rampart[];
   /** The hill lift and the raise the heights were built from (kept so an overlay can rebuild them after a change; overlay.ts). */
   lift?: Float32Array; raise?: Float32Array;
+  /** The land's own floor under the hills, per tile (elevation.ts). */
+  base?: Float32Array;
   /** Ground height (world pixels) at every tile corner: (W + 1) × (H + 1), corner (i, j) sits at (i − ½, j − ½). */
   heights: Float32Array;
   /** Where each dungeon went when it settled under its ground (its strip rectangle and the move), for whatever still speaks in strip coordinates: movedPoint. */
@@ -1630,7 +1633,9 @@ export function generateWorld(seed = WORLD_SEED): { world: World; lift: Float32A
   { const entry = REGIONS.find(region => region.id === "outer_sea") as { label: { x: number; y: number } } | undefined; if (entry) { entry.label = { x: 860, y: 4 }; labels.outer_sea = { x: 860, y: 4 }; } }
   const buildingAt = new Uint16Array(W * FINAL_H);
   buildings.forEach((b, index) => { if (b.roof === "none") return; for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) buildingAt[y * W + x] = index + 1; });
-  const world: World = { tiles: grown.tiles, region: grown.region, objects, objectAt: grown.objectAt, spawns, places, heights: buildHeights(grown.tiles, seed, grown.lift, grown.raise), buildings, buildingAt, floors, ramparts: ctx.ramparts, lift: grown.lift, raise: grown.raise, under, labels };
+  // The lie of the land under it all: sea level at the shores, climbing inland, a level terrace under every building (elevation.ts).
+  const base = buildElevation(grownCtx, buildings);
+  const world: World = { tiles: grown.tiles, region: grown.region, objects, objectAt: grown.objectAt, spawns, places, heights: buildHeights(grown.tiles, seed, grown.lift, grown.raise, base, buildings), buildings, buildingAt, floors, ramparts: ctx.ramparts, lift: grown.lift, raise: grown.raise, base, under, labels };
   // Content promoted from the development world (overlays/): the editable layer, applied last of all (an overlay written in the strip's coordinates follows its dungeon down).
   for (const overlay of OVERLAYS) applyOverlay(world, (overlay as { frame?: 2 }).frame === 2 ? overlay : movedOverlay(world, overlay), seed);
   return { world, lift: grown.lift, raise: grown.raise };
@@ -1888,7 +1893,7 @@ const FLAT = new Set<number>([T.LAVA, T.VOID, T.WATER, T.DEEP, T.BRIDGE, T.COBBL
  * Rolling hills from two noise octaves, scaled by each terrain's relief, eased to flat ground near water, towns,
  * buildings and bridges (so shores and streets stay level), then blurred once for gentle slopes.
  */
-export function buildHeights(tiles: Uint8Array, seed: number, lift?: Float32Array, raise?: Float32Array): Float32Array {
+export function buildHeights(tiles: Uint8Array, seed: number, lift?: Float32Array, raise?: Float32Array, base?: Float32Array, buildings?: readonly Building[]): Float32Array {
   const broad = makeNoise(seed + 21, 13), fine = makeNoise(seed + 33, 5);
   // Distance (in tiles, capped) from every tile to the nearest flat tile.
   const distance = new Uint8Array(W * H).fill(255), queue = new Int32Array(W * H);
@@ -1929,6 +1934,30 @@ export function buildHeights(tiles: Uint8Array, seed: number, lift?: Float32Arra
     let total = 0, n = 0;
     for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const x = i + di, y = j + dj; if (x >= 0 && y >= 0 && x <= W && y <= H) { total += raw[y * CW + x]; n++; } }
     heights[j * CW + i] = total / n;
+  }
+  // The land's own floor under all of it (elevation.ts).
+  if (base) for (let j = 0; j <= H; j++) for (let i = 0; i <= W; i++) {
+    let total = 0, n = 0;
+    for (let k = 0; k < 4; k++) { const tx = k & 1 ? i : i - 1, ty = k & 2 ? j : j - 1; if (tx < 0 || ty < 0 || tx >= W || ty >= H) continue; total += base[ty * W + tx]; n++; }
+    if (n) heights[j * CW + i] += total / n;
+  }
+  // Every building stands on level ground: under it and two tiles round it (where its roof reaches out) the ground is
+  // one height, the height of the land round it (a shelf, a terrace, the hill it's dug into), easing back a few tiles
+  // out. Buildings close enough to share that ground share one level, so a town stands level.
+  if (buildings) {
+    const list = buildings.filter(b => b.y0 < OVERWORLD_H), parent = list.map((_, k) => k), find = (k: number): number => parent[k] === k ? k : (parent[k] = find(parent[k]));
+    const gap = 10;
+    for (let a = 0; a < list.length; a++) for (let c = a + 1; c < list.length; c++) { const A = list[a], C = list[c]; if (A.x0 - gap <= C.x1 && C.x0 - gap <= A.x1 && A.y0 - gap <= C.y1 && C.y0 - gap <= A.y1) parent[find(a)] = find(c); }
+    const dOf = (b: Building, i: number, j: number) => Math.max(b.x0 - i, i - (b.x1 + 1), b.y0 - j, j - (b.y1 + 1), 0);
+    // The land round each group: the ring of corners three to five out from its buildings, as it lies.
+    const sums = new Map<number, { total: number; n: number }>();
+    list.forEach((b, k) => { const root = find(k), e = sums.get(root) ?? { total: 0, n: 0 };
+      for (let j = Math.max(0, b.y0 - 5); j <= Math.min(H, b.y1 + 6); j++) for (let i = Math.max(0, b.x0 - 5); i <= Math.min(W, b.x1 + 6); i++) { const d = dOf(b, i, j); if (d >= 3 && d <= 5) { e.total += heights[j * CW + i]; e.n++; } }
+      sums.set(root, e); });
+    const nearest = new Float32Array(CW * (H + 1)).fill(Infinity), levelAt = new Float32Array(CW * (H + 1));
+    list.forEach((b, k) => { const e = sums.get(find(k))!, level = e.n ? e.total / e.n : 0;
+      for (let j = Math.max(0, b.y0 - 5); j <= Math.min(H, b.y1 + 6); j++) for (let i = Math.max(0, b.x0 - 5); i <= Math.min(W, b.x1 + 6); i++) { const d = dOf(b, i, j), k2 = j * CW + i; if (d < nearest[k2]) { nearest[k2] = d; levelAt[k2] = level; } } });
+    for (let k = 0; k < nearest.length; k++) if (nearest[k] !== Infinity) { const t = Math.max(0, Math.min(1, (nearest[k] - 2) / 3)), e = t * t * (3 - 2 * t); heights[k] = levelAt[k] + (heights[k] - levelAt[k]) * e; }
   }
   return heights;
 }

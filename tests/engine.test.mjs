@@ -4759,3 +4759,20 @@ test("The seaways: the Outer Sea runs round the whole map, so a longship from Sk
   // The Deadwood coast's sea, the Southshore water and Glass Lake are part of it now.
   for (const id of ["glass_lake", "southshore"]) { let any = false; for (let i = 0; i < W * OVERWORLD_H && !any; i++) if (seen[i] && world.region[i] === REGIONS.indexOf(REGIONS.find(r => r.id === id))) any = true; assert.ok(any, `${id}'s water is on the sea`); }
 });
+
+test("The lie of the land: sea level at the shores, climbing from Friendhollow through the Ashen Hills to Emberforge and up to Frostpeak; every building stands level, its roof's overhang included", async () => {
+  const { cornerHeight, OVERWORLD_H: OH } = await import("../games/rarefriends-realm/world.ts");
+  const g = newGame(), world = g.world;
+  const mean = id => { const k = REGIONS.findIndex(r => r.id === id); let sum = 0, n = 0; for (let i = 0; i < W * OH; i++) if (world.region[i] === k) { sum += world.base[i]; n++; } return sum / n; };
+  const [fh, ah, ef, fp] = ["friendhollow", "ashen_hills", "emberforge", "frostpeak"].map(mean);
+  assert.ok(fh < ah && ah < ef && ef < fp, `going up: Friendhollow ${fh.toFixed(0)} < Ashen Hills ${ah.toFixed(0)} < Emberforge ${ef.toFixed(0)} < Frostpeak ${fp.toFixed(0)}`);
+  assert.ok(fp - fh > 100, "Frostpeak stands well above Friendhollow");
+  // The open sea lies at sea level.
+  const outer = REGIONS.findIndex(r => r.id === "outer_sea"); let seaTop = 0; for (let i = 0; i < W * OH; i++) if (world.region[i] === outer && world.tiles[i] === T.DEEP) seaTop = Math.max(seaTop, world.base[i]); assert.equal(seaTop, 0);
+  // Every building in the overworld: the corners under it and a tile round it are level (walls and roof on one ground).
+  let worst = 0, where = "";
+  for (const b of world.buildings) { if (b.y1 >= OH) continue; let lo = Infinity, hi = -Infinity;
+    for (let j = b.y0 - 1; j <= b.y1 + 2; j++) for (let i = b.x0 - 1; i <= b.x1 + 2; i++) { const h = cornerHeight(world, i, j); lo = Math.min(lo, h); hi = Math.max(hi, h); }
+    if (hi - lo > worst) { worst = hi - lo; where = `${b.name} at ${b.x0},${b.y0}`; } }
+  assert.ok(worst < 0.5, `buildings stand level (worst ${worst.toFixed(2)} px: ${where})`);
+});

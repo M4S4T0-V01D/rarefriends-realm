@@ -166,7 +166,7 @@ export function applyOverlay(world: World, overlay: Overlay, seed: number, why: 
   }
   if (objectsChanged) world.objectAt = indexObjects(world.objects);
   if (buildingsChanged) world.buildingAt = indexBuildings(world.buildings);
-  if (tilesChanged) world.heights = buildHeights(world.tiles, seed, lift, raise);
+  if (tilesChanged) world.heights = buildHeights(world.tiles, seed, lift, raise, world.base, world.buildings);
   return placed;
 }
 
