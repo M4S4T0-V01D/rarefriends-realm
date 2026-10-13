@@ -46,7 +46,7 @@ export const NORTH_QUESTS: readonly QuestDef[] = [
     id: OLD_AGREEMENT, name: "The Old Agreement", points: 3, difficulty: "Experienced",
     start: "Talk to Guildmaster Torvald of the Farwake in Skarnholm, or Hearthwarden-Captain Milena at Hearthwatch.",
     requirements: ["The roads north, from the Vesperwold or the Deadwood", "Combat 30 recommended"],
-    rewards: ["3 Quest Points", "6,000 Mysteries XP", "2,500 Attack XP", "5,000 coins", "The title Oathwitness", "The north remembers what you chose: the Oathgate, its traders and its leaders"],
+    rewards: ["3 Quest Points", "6,000 Mysteries XP", "2,500 Attack XP", "5,000 Frens", "The title Oathwitness", "The north remembers what you chose: the Oathgate, its traders and its leaders"],
     journal: game => {
       const s = stage(game, OLD_AGREEMENT), at = step(game);
       if (s === 0) return ["A caravan of Zoryavik iron, bound from Krasnogor to Skarnholm, never came through the Oathgate. Guildmaster Torvald in Skarnholm and Captain Milena at Hearthwatch would both like to know why."];

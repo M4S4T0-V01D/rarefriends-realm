@@ -73,7 +73,7 @@ export const HEARTLAND_QUESTS: readonly QuestDef[] = [
   {
     id: SEAL, name: "The Matriarch's Seal", points: 3, difficulty: "Intermediate", start: "Talk to Vizier Tamun Orrel in the Palace of the Gilded Court, Sefrah.",
     requirements: ["A Foothold in the Stone", "Mysteries: you'll have to read Azhurak glyphs"],
-    rewards: ["3 Quest Points", "6,000 Presence XP", "3,000 Wayfaring XP", "5,000 coins", "The Sash of the Three Suns", "The heirs' Council of Three"],
+    rewards: ["3 Quest Points", "6,000 Presence XP", "3,000 Wayfaring XP", "5,000 Frens", "The Sash of the Three Suns", "The heirs' Council of Three"],
     journal: game => {
       const s = stage(game, SEAL);
       if (s === 0) return ["The Grand Matriarch of House Khasreth is forty days dead, and her seal is missing. Her vizier in Sefrah wants somebody with no stake in it to look."];
@@ -93,7 +93,7 @@ export const HEARTLAND_QUESTS: readonly QuestDef[] = [
   {
     id: SALT, name: "Salt and Blue Smoke", points: 1, difficulty: "Novice", start: "Talk to Rider-Captain Halzir at the Ouresh salt camp, in the Sea of Dunes.",
     requirements: ["A Foothold in the Stone", "Combat 45 recommended"],
-    rewards: ["1 Quest Point", "2,500 Pursuance XP", "1,500 Presence XP", "1,500 coins", "A Blue Smoke turban and a salt rider's turban"],
+    rewards: ["1 Quest Point", "2,500 Pursuance XP", "1,500 Presence XP", "1,500 Frens", "A Blue Smoke turban and a salt rider's turban"],
     journal: game => {
       const s = stage(game, SALT);
       if (s === 0) return ["The Ouresh salt riders camp in the Sea of Dunes. Their captain looks like a man with a grievance."];
@@ -109,7 +109,7 @@ export const HEARTLAND_QUESTS: readonly QuestDef[] = [
   {
     id: QUARRY, name: "What the Quarry Woke", points: 2, difficulty: "Intermediate", start: "Talk to Quarry-master Haddrem Vell at the Tamesh quarry.",
     requirements: ["A Foothold in the Stone", "Mining 30", "Combat 60 recommended"],
-    rewards: ["2 Quest Points", "5,000 Mining XP", "3,500 Pursuance XP", "2,500 coins", "The obsidian mattock"],
+    rewards: ["2 Quest Points", "5,000 Mining XP", "3,500 Pursuance XP", "2,500 Frens", "The obsidian mattock"],
     journal: game => {
       const s = stage(game, QUARRY);
       if (s === 0) return ["Tamesh's quarry-master looks like he hasn't slept since something happened at the Black Stair."];

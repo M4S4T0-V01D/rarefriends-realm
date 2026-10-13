@@ -68,7 +68,7 @@ export const tr: Dictionary = {
   "Heartwood": "Öz Orman", "Last Orders": "Son Siparişler", "The Seventh Toast": "Yedinci Kadeh", "A Crooked Vintage": "Eğri Bir Bağbozumu", "The Hound's Bite": "Tazının Isırığı", "Kettle Black": "Kara Çaydanlık", "Free Cider": "Bedava Elma Şarabı",
   "A Name Worth Knowing": "Bilinmeye Değer Bir İsim", "Known in Every Hall": "Her Salonda Tanınan", "The Remembered": "Hatırlanan",
   // ---------- Inventory and equipment ----------
-  "Empty slot {n}": "Boş yuva {n}", "Coins": "Altın", "{item} × {n}": "{item} × {n}",
+  "Empty slot {n}": "Boş yuva {n}", "Frens": "Fren", "{item} × {n}": "{item} × {n}",
   "Head": "Baş", "Cape": "Pelerin", "Neck": "Boyun", "Ring": "Yüzük", "Weapon": "Silah", "Body": "Gövde", "Shield": "Kalkan", "Legs": "Bacaklar", "Belt": "Kemer", "Hands": "Eller", "Feet": "Ayaklar",
   "{slot}: empty": "{slot}: boş", "Weight": "Ağırlık", "kg": "kg", "· running drains": "· koşmak", "% faster": "% daha hızlı tüketir",
   "Adventurer card · Share on X": "Maceracı kartı · X'te paylaş", "Adventurer card": "Maceracı kartı", "Adventurer Cards": "Maceracı Kartları", "Adventurer Cards ·": "Maceracı Kartları ·", "found": "bulundu",
@@ -80,7 +80,7 @@ export const tr: Dictionary = {
   // ---------- Magic ----------
   "Combat": "Savaş", "Curses": "Lanetler", "Wards": "Korumalar", "Utility": "Yardımcı", "Teleports": "Işınlanmalar", "Magic level": "Büyü seviyesi", "Spellbook": "Büyü kitabı",
   // ---------- Friends ----------
-  "Referrals": "Davetler", "Your code:": "Kodun:", ". A friend who enters it and you each get": ". Kodu giren arkadaşın ve sen ayrı ayrı alırsınız:", "250 coins": "250 altın", "Friendship cape": "Dostluk pelerini",
+  "Referrals": "Davetler", "Your code:": "Kodun:", ". A friend who enters it and you each get": ". Kodu giren arkadaşın ve sen ayrı ayrı alırsınız:", "250 Frens": "250 Fren", "Friendship cape": "Dostluk pelerini",
   "(with its own emote) and": "(kendi ifadesiyle) ve", "+15% XP": "+%15 XP", "for an hour of play.": "bir saatlik oyun boyunca.", "Friend's code": "Arkadaşın kodu", "Party": "Grup",
   "· +10% XP with a party member within": "· yakında bir grup üyesiyle +%10 XP (menzil", "tiles · fellows within 12 give +5%": "kare) · 12 kare içindeki kardeşler +%5 verir",
   "No party yet. Right-click a player (or one below) to invite them; \"/p\" in chat talks to the party.": "Henüz grup yok. Davet etmek için bir oyuncuya (ya da aşağıdakine) sağ tıkla; sohbette \"/p\" grupla konuşur.",
@@ -90,7 +90,7 @@ export const tr: Dictionary = {
   "Followers": "Takipçiler", "Pets": "Evcil hayvanlar", "Dragons": "Ejderhalar", "Hiscores": "Skor tablosu", "(you and the players you've met)": "(sen ve tanıştığın oyuncular)", "Friend": "Friend", "Total": "Toplam", "You": "Sen",
   "Play online to meet other players: they'll show up here.": "Diğer oyuncularla tanışmak için çevrimiçi oyna: burada görünecekler.",
   "Wardrobe": "Gardırop", "Rare Relics": "Nadir Kalıntılar", "Plain Relic": "Sade Kalıntı", "+2% XP in every skill per relic (max 5)": "Kalıntı başına her yetenekte +%2 XP (en fazla 5)", "Silver Relic": "Gümüş Kalıntı",
-  "+10% coins from drops and pickpockets per relic (max 3)": "Kalıntı başına ganimet ve yankesicilikten +%10 altın (en fazla 3)", "Moonlit Relic": "Ay Işığı Kalıntısı", "Gather 10% faster per relic (max 3)": "Kalıntı başına %10 daha hızlı toplama (en fazla 3)",
+  "+10% Frens from drops and pickpockets per relic (max 3)": "Kalıntı başına ganimet ve yankesicilikten +%10 Fren (en fazla 3)", "Moonlit Relic": "Ay Işığı Kalıntısı", "Gather 10% faster per relic (max 3)": "Kalıntı başına %10 daha hızlı toplama (en fazla 3)",
   "Golden Relic": "Altın Kalıntı", "+10% XP and a golden aura while kept": "Saklandığı sürece +%10 XP ve altın bir aura", "Rare Caskets (simulated RF)": "Nadir Sandıklar (simüle RF)",
   "A friend's referral code": "Bir arkadaşın davet kodu", "Friend number to add": "Eklenecek Friend numarası",
   "Undiscovered: found while training {skill}": "Keşfedilmedi: {skill} çalışırken bulunur", "Undiscovered pet ({x})": "Keşfedilmemiş evcil hayvan ({x})", "Undiscovered: found while fighting {x}": "Keşfedilmedi: {x} ile savaşırken bulunur",
@@ -145,7 +145,7 @@ export const tr: Dictionary = {
   "Best": "En iyi", "days · a new day in": "gün · yeni güne kalan", "(midnight UTC)": "(UTC gece yarısı)", "World boss:": "Dünya patronu:", "Claim day": "Günü al", "Claim": "Al", "Today's challenges": "Bugünün görevleri",
   "(yours alone; everyone's differ)": "(yalnızca senin; herkesinki farklı)", "🎁 Daily chest": "🎁 Günlük sandık", "Finish all three challenges:": "Üç görevi de bitir:",
   "Simulated $RAREFRIENDS: the caskets are yours to open as well.": "Simüle $RAREFRIENDS: sandıkları da açabilirsin.", "Work orders:": "İş siparişleri:", "(something to claim)": "(alınacak bir şey var)",
-  "Day {n}: {r}": "{n}. gün: {r}", "Gain {n} {skill} XP": "{n} {skill} XP kazan", "Defeat {n} monsters": "{n} canavar yen", "{n} coins": "{n} altın", "+ {n} XP": "+ {n} XP",
+  "Day {n}: {r}": "{n}. gün: {r}", "Gain {n} {skill} XP": "{n} {skill} XP kazan", "Defeat {n} monsters": "{n} canavar yen", "{n} Frens": "{n} Fren", "+ {n} XP": "+ {n} XP",
   "Reroll challenges · {n} casket": "Görevleri yenile · {n} sandık", "Complete all three · {n} caskets": "Üçünü de tamamla · {n} sandık",
   "Simulated RF buys a Rare Casket; the day's three challenges are rolled afresh (claimed ones stay claimed)": "Simüle RF bir Nadir Sandık alır; günün üç görevi yeniden belirlenir (alınanlar kalır)",
   "Simulated RF buys two Rare Caskets; every challenge pays out as finished and the chest opens": "Simüle RF iki Nadir Sandık alır; her görev tamamlanmış sayılır ve sandık açılır",
@@ -157,7 +157,7 @@ export const tr: Dictionary = {
   "New tab (drop an item here)": "Yeni sekme (bir eşyayı buraya bırak)", "Search the bank": "Bankada ara", "Search": "Ara", "Bank": "Banka", "Withdraw {item} ({n})": "{item} çek ({n})", "Deposit {item}": "{item} yatır",
   "Inventory (click to deposit)": "Envanter (yatırmak için tıkla)", "Buy/sell:": "Al/sat:",
   "Click the stock to buy; click your pack (right) to sell. A general store buys almost anything. What you sell goes on the shelves, to buy back.": "Almak için stoğa, satmak için (sağdaki) çantana tıkla. Bakkal neredeyse her şeyi alır. Sattığın şeyler rafa konur, geri alabilirsin.",
-  "Shop stock": "Dükkân stoğu", "{item}: {n} coins": "{item}: {n} altın", "Buy {item} for {n} coins": "{item} al, {n} altın", "Sell for {n} coins": "{n} altına sat", "Sell {item} for {n} coins": "{item} sat, {n} altın",
+  "Shop stock": "Dükkân stoğu", "{item}: {n} Frens": "{item}: {n} Fren", "Buy {item} for {n} Frens": "{item} al, {n} Fren", "Sell for {n} Frens": "{n} Fren'e sat", "Sell {item} for {n} Frens": "{item} sat, {n} Fren",
   "Inventory (click to sell)": "Envanter (satmak için tıkla)", "Rare Market": "Nadir Pazar", "Rare Casket": "Nadir Sandık", "Rare Relic": "Nadir Kalıntı", "Relic": "Kalıntı", "Kept bonus": "Saklama bonusu", "Chance": "Şans", "RF value": "RF değeri", "Simulated RF": "Simüle RF",
   // ---------- Menus ----------
   "Choose Option": "Seçenek seç", "Select an option": "Bir seçenek seç", "Walk here": "Buraya yürü", "{x} / {n} more options": "{x} / {n} seçenek daha", "{x} / 1 more option": "{x} / 1 seçenek daha",

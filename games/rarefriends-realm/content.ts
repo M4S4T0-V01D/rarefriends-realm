@@ -65,7 +65,7 @@ export const NPCS: Record<string, NpcDef> = {
   ring_chaplain: { id: "ring_chaplain", name: "Chaplain Orrin", examine: "Keeps the Ring's chapel stores: faith for those who fight by it.", options: ["Talk-to", "Trade"], shop: "ring_faith", art: art(2, 703) },
   ring_sigilist: { id: "ring_sigilist", name: "Thessaly Vane", examine: "Sigils and staffs for the Ring's mages.", options: ["Talk-to", "Trade"], shop: "ring_mage", art: art(5, 704) },
   ring_fletcher: { id: "ring_fletcher", name: "Brisk Arrowyn", examine: "Bows and arrows for the Ring's archers.", options: ["Talk-to", "Trade"], shop: "ring_range", art: art(4, 705) },
-  ring_armourer: { id: "ring_armourer", name: "Gorm Ironhand", examine: "Metal armour and blades, for coin.", options: ["Talk-to", "Trade"], shop: "ring_armour", art: art(6, 706) },
+  ring_armourer: { id: "ring_armourer", name: "Gorm Ironhand", examine: "Metal armour and blades, for Frens.", options: ["Talk-to", "Trade"], shop: "ring_armour", art: art(6, 706) },
   ring_weaponsmith: { id: "ring_weaponsmith", name: "Hilde Edgewright", examine: "Sharpens everything twice. Sells it once.", options: ["Talk-to", "Trade"], shop: "ring_weapons", art: art(1, 709) },
   ring_quartermaster: { id: "ring_quartermaster", name: "The Pit Quartermaster", examine: "Takes bloodmarks and nothing else. Sells the Ring's own armour.", options: ["Talk-to", "Trade"], shop: "ring_pit", art: art(0, 707) },
   ring_champion: { id: "ring_champion", name: "Laurel Keeper Ismay", examine: "Keeps the Champions' Hall. Takes laurels, the coin of Friend Fights.", options: ["Talk-to", "Trade"], shop: "ring_champions", art: art(7, 708) },
@@ -199,7 +199,7 @@ export const stage = (game: Game, quest: string) => game.player.quests[quest] ??
 export const data = (game: Game, key: string) => game.player.questData[key] ?? 0;
 export const QUESTS: readonly QuestDef[] = [
   {
-    id: "friends_feast", name: "A Friend's Feast", points: 1, difficulty: "Novice", start: "Talk to Cook Mabel in the castle kitchen.", requirements: [], rewards: ["1 Quest Point", "1,500 Cooking XP", "300 coins", "2 cakes"],
+    id: "friends_feast", name: "A Friend's Feast", points: 1, difficulty: "Novice", start: "Talk to Cook Mabel in the castle kitchen.", requirements: [], rewards: ["1 Quest Point", "1,500 Cooking XP", "300 Frens", "2 cakes"],
     journal: game => {
       const s = stage(game, "friends_feast");
       if (s === 0) return ["I can start this quest by talking to Cook Mabel in the castle kitchen, north of the fountain."];
@@ -211,7 +211,7 @@ export const QUESTS: readonly QuestDef[] = [
     },
   },
   {
-    id: "grumblin_trouble", name: "Grumblin Trouble", points: 1, difficulty: "Novice", start: "Talk to Captain Rook in the castle.", requirements: [], rewards: ["1 Quest Point", "1,200 Attack XP", "1,200 Strength XP", "Blackiron sabre", "200 coins"],
+    id: "grumblin_trouble", name: "Grumblin Trouble", points: 1, difficulty: "Novice", start: "Talk to Captain Rook in the castle.", requirements: [], rewards: ["1 Quest Point", "1,200 Attack XP", "1,200 Strength XP", "Blackiron sabre", "200 Frens"],
     journal: game => {
       const s = stage(game, "grumblin_trouble");
       if (s === 0) return ["Captain Rook in the castle might need a hand."];
@@ -320,7 +320,7 @@ export const QUESTS: readonly QuestDef[] = [
     },
   },
   {
-    id: "hollow_king", name: "The Hollow King", points: 3, difficulty: "Grandmaster", start: "Talk to Old Glimmer after The Lost Glimmer and Hollow Whispers.", requirements: ["The Lost Glimmer", "Hollow Whispers", "Combat 60+ strongly recommended"], rewards: ["3 Quest Points", "Crown of the Realm", "Cape of the Hollow", "10,000 coins", "5,000 XP in five combat skills"],
+    id: "hollow_king", name: "The Hollow King", points: 3, difficulty: "Grandmaster", start: "Talk to Old Glimmer after The Lost Glimmer and Hollow Whispers.", requirements: ["The Lost Glimmer", "Hollow Whispers", "Combat 60+ strongly recommended"], rewards: ["3 Quest Points", "Crown of the Realm", "Cape of the Hollow", "10,000 Frens", "5,000 XP in five combat skills"],
     journal: game => {
       const s = stage(game, "hollow_king");
       if (s === 0) return ["Old Glimmer will have more to say once the Glimmer is whole and the crypt is quiet."];
@@ -332,7 +332,7 @@ export const QUESTS: readonly QuestDef[] = [
   // ---------- The wider world's village quests (2026-10) ----------
   {
     id: "gravesend_lanterns", name: "Lanterns for the Dead", points: 1, difficulty: "Novice", start: "Talk to Warden Mira Thorne in Gravesend, north of the mainland at the Deadwood's edge.", requirements: ["Combat 20 recommended"],
-    rewards: ["1 Quest Point", "Mourner's hood", "2,000 Faith XP", "1,500 Attack XP", "400 coins"],
+    rewards: ["1 Quest Point", "Mourner's hood", "2,000 Faith XP", "1,500 Attack XP", "400 Frens"],
     journal: game => {
       const s = stage(game, "gravesend_lanterns");
       if (s === 0) return ["Warden Mira Thorne keeps the graves at Gravesend, where the Deadwood begins. The dead there don't stay put."];
@@ -343,7 +343,7 @@ export const QUESTS: readonly QuestDef[] = [
   },
   {
     id: "saltmarrow_tithe", name: "The Salt Tithe", points: 1, difficulty: "Novice", start: "Talk to Harbourmaster Brine on the docks at Saltmarrow, on the south coast.", requirements: ["Fishing 15 (carp)"],
-    rewards: ["1 Quest Point", "Sou'wester", "2,500 Fishing XP", "1,500 Cooking XP", "500 coins"],
+    rewards: ["1 Quest Point", "Sou'wester", "2,500 Fishing XP", "1,500 Cooking XP", "500 Frens"],
     journal: game => {
       const s = stage(game, "saltmarrow_tithe");
       if (s === 0) return ["Harbourmaster Brine at Saltmarrow owes the sea a tithe of fish and is a boat short."];
@@ -353,7 +353,7 @@ export const QUESTS: readonly QuestDef[] = [
   },
   {
     id: "hollyhock_errand", name: "The Apothecary's Errand", points: 1, difficulty: "Novice", start: "Talk to Mother Yarrow in Hollyhock, in the Thistle Vale south-west of the mainland.", requirements: [],
-    rewards: ["1 Quest Point", "Herbalist's hat", "1,500 Apothecary XP", "1,000 Woodcutting XP", "300 coins"],
+    rewards: ["1 Quest Point", "Herbalist's hat", "1,500 Apothecary XP", "1,000 Woodcutting XP", "300 Frens"],
     journal: game => {
       const s = stage(game, "hollyhock_errand");
       if (s === 0) return ["Mother Yarrow, Hollyhock's apothecary, could use a pair of hands in the garden."];
@@ -364,7 +364,7 @@ export const QUESTS: readonly QuestDef[] = [
   },
   {
     id: "dyemoor_dye", name: "A Dye to Remember", points: 1, difficulty: "Novice", start: "Talk to Master Dyer Indigo Vell in Dyemoor, on the river south of the mainland.", requirements: ["Craftwork 10 recommended"],
-    rewards: ["1 Quest Point", "Dyemoor cloak", "2,000 Craftwork XP", "400 coins"],
+    rewards: ["1 Quest Point", "Dyemoor cloak", "2,000 Craftwork XP", "400 Frens"],
     journal: game => {
       const s = stage(game, "dyemoor_dye");
       if (s === 0) return ["Master Dyer Indigo Vell of Dyemoor is trying for a colour nobody has made."];
@@ -375,7 +375,7 @@ export const QUESTS: readonly QuestDef[] = [
   },
   {
     id: "tallgrass_tracks", name: "Tracks in the Tallgrass", points: 1, difficulty: "Intermediate", start: "Talk to Huntmaster Fenn at Tallgrass, the hunters' camp east of Southshore.", requirements: ["Combat 30 recommended"],
-    rewards: ["1 Quest Point", "Pelt cape", "3,000 Ranged XP", "2,000 Strength XP", "600 coins"],
+    rewards: ["1 Quest Point", "Pelt cape", "3,000 Ranged XP", "2,000 Strength XP", "600 Frens"],
     journal: game => {
       const s = stage(game, "tallgrass_tracks");
       if (s === 0) return ["Huntmaster Fenn at Tallgrass says The Wilds are overrun this season."];
@@ -386,7 +386,7 @@ export const QUESTS: readonly QuestDef[] = [
   },
   {
     id: "cragmaw_shaft", name: "The Foreman's Shaft", points: 1, difficulty: "Intermediate", start: "Talk to Foreman Durga Pike at Cragmaw, in the Ironreach pass east of the mainland.", requirements: ["Mining 15", "Combat 40 recommended"],
-    rewards: ["1 Quest Point", "Ironreach greatcoat", "3,500 Mining XP", "2,000 Smithing XP", "800 coins"],
+    rewards: ["1 Quest Point", "Ironreach greatcoat", "3,500 Mining XP", "2,000 Smithing XP", "800 Frens"],
     journal: game => {
       const s = stage(game, "cragmaw_shaft");
       if (s === 0) return ["Foreman Durga Pike's deep mine under Cragmaw has stopped sending ore up."];
@@ -397,7 +397,7 @@ export const QUESTS: readonly QuestDef[] = [
   },
   {
     id: "quillhaven_folio", name: "The Missing Folio", points: 1, difficulty: "Intermediate", start: "Talk to Archivist Perrin Quill in Quillhaven, on the headland in the far south-east.", requirements: ["Magic 20 recommended"],
-    rewards: ["1 Quest Point", "Archivist's robe", "3,000 Magic XP", "1,500 Sigilcraft XP", "500 coins"],
+    rewards: ["1 Quest Point", "Archivist's robe", "3,000 Magic XP", "1,500 Sigilcraft XP", "500 Frens"],
     journal: game => {
       const s = stage(game, "quillhaven_folio");
       if (s === 0) return ["Archivist Perrin Quill of Quillhaven is restoring a folio, and the ink has run dry."];
@@ -408,7 +408,7 @@ export const QUESTS: readonly QuestDef[] = [
   },
   {
     id: "ashfall_embers", name: "Embers in the Ash", points: 2, difficulty: "Experienced", start: "Talk to Ember Tamsin at her camp at the end of the Drakespine, before Ashfall.", requirements: ["Combat 70 recommended", "A Wyrmward shield helps"],
-    rewards: ["2 Quest Points", "Scorched cloak", "6,000 Attack XP", "6,000 Defence XP", "2,000 coins"],
+    rewards: ["2 Quest Points", "Scorched cloak", "6,000 Attack XP", "6,000 Defence XP", "2,000 Frens"],
     journal: game => {
       const s = stage(game, "ashfall_embers");
       if (s === 0) return ["Ember Tamsin camps where the Drakespine ends and Ashfall begins. She wants something from the dragons."];
@@ -430,7 +430,7 @@ export const QUESTS: readonly QuestDef[] = [
   // ---------- The dungeon update: what's under the lake, the library and the stones ----------
   {
     id: "deepglass_heart", name: "The Heart of the Lake", points: 2, difficulty: "Intermediate", start: "Talk to the Old fisher on the Friendhollow pier, with a combat level of 30 or so.",
-    requirements: ["Combat 30 recommended"], rewards: ["2 Quest Points", "Lakeglass charm", "3,000 Fishing XP", "2,500 Attack XP", "800 coins"],
+    requirements: ["Combat 30 recommended"], rewards: ["2 Quest Points", "Lakeglass charm", "3,000 Fishing XP", "2,500 Attack XP", "800 Frens"],
     journal: game => {
       const s = stage(game, "deepglass_heart"), p = game.player;
       if (s === 0) return ["The Old fisher says Glass Lake has gone cloudy on the east shore, and there's a crack in the rock there that glows at night."];
@@ -442,7 +442,7 @@ export const QUESTS: readonly QuestDef[] = [
   },
   {
     id: "drowned_archive", name: "The Drowned Archive", points: 2, difficulty: "Intermediate", start: "Talk to Archivist Perrin Quill in Quillhaven after The Missing Folio, with Magic 40.",
-    requirements: ["Magic 40", "The Missing Folio"], rewards: ["2 Quest Points", "Lamp of insight", "5,000 Magic XP", "2,000 Sigilcraft XP", "1,500 coins"],
+    requirements: ["Magic 40", "The Missing Folio"], rewards: ["2 Quest Points", "Lamp of insight", "5,000 Magic XP", "2,000 Sigilcraft XP", "1,500 Frens"],
     journal: game => {
       const s = stage(game, "drowned_archive"), p = game.player;
       if (s === 0) return ["Perrin says the library's bottom floor flooded a hundred years ago, and the first archivist went down to save the books and never came up. There's a trapdoor."];
@@ -453,7 +453,7 @@ export const QUESTS: readonly QuestDef[] = [
   },
   {
     id: "howling_vault", name: "What the Stones Keep", points: 3, difficulty: "Long", start: "Talk to Huntmaster Fenn in Tallgrass after Tracks in the Tallgrass, with a combat level of 70 or so.",
-    requirements: ["Combat 70 recommended", "Tracks in the Tallgrass"], rewards: ["3 Quest Points", "8,000 Attack XP", "4,000 Pursuance XP", "6,000 coins"],
+    requirements: ["Combat 70 recommended", "Tracks in the Tallgrass"], rewards: ["3 Quest Points", "8,000 Attack XP", "4,000 Pursuance XP", "6,000 Frens"],
     journal: game => {
       const s = stage(game, "howling_vault");
       if (s === 0) return ["Fenn says the ring of stones in The Wilds has a hole in the middle now, and the game won't go within a mile of it. He's stopped pretending it was always there."];
@@ -465,12 +465,12 @@ export const QUESTS: readonly QuestDef[] = [
   // ---------- The oaths of the four Orders, and the Maidens' truce ----------
   ...ORDER_IDS.map(id => { const order = ORDERS[id]; return {
     id: `oath_${id}`, name: `The ${order.short} Oath`, points: 1, difficulty: "Intermediate" as const, start: `Talk to the commander in the ${order.short} Hall, with Faith 20.`,
-    requirements: ["Faith 20", `${order.oath.n.toLocaleString()} ${order.oath.item === "coins" ? "coins" : order.oath.item.replace(/_/g, " ")}`], rewards: ["1 Quest Point", `${order.short} cape`, "3,000 Faith XP", `The ${order.name}'s armoury opens to you`],
+    requirements: ["Faith 20", `${order.oath.n.toLocaleString()} ${order.oath.item === "coins" ? "Frens" : order.oath.item.replace(/_/g, " ")}`], rewards: ["1 Quest Point", `${order.short} cape`, "3,000 Faith XP", `The ${order.name}'s armoury opens to you`],
     journal: (game: Game) => {
       const s = stage(game, `oath_${id}`), p = game.player;
       if (s === 0) return [`The ${order.name} serves ${order.godName}. Its commander swears in those who prove their faith.`];
       if (s === 1) return [`To swear the ${order.short} Oath I must pray at the ${order.short} altar and bring ${order.oath.text}.`,
-        `${data(game, `prayed_${id}`) ? "✓" : "•"} Prayed at the ${order.short} altar`, `${count(p, order.oath.item) >= order.oath.n ? "✓" : "•"} ${order.oath.item === "coins" ? "Coins" : order.oath.item.replace(/_/g, " ")}: ${Math.min(order.oath.n, count(p, order.oath.item)).toLocaleString()}/${order.oath.n.toLocaleString()}`];
+        `${data(game, `prayed_${id}`) ? "✓" : "•"} Prayed at the ${order.short} altar`, `${count(p, order.oath.item) >= order.oath.n ? "✓" : "•"} ${order.oath.item === "coins" ? "Frens" : order.oath.item.replace(/_/g, " ")}: ${Math.min(order.oath.n, count(p, order.oath.item)).toLocaleString()}/${order.oath.n.toLocaleString()}`];
       return [`I swore the ${order.short} Oath. The ${order.name}'s armoury is open to me, and I wear its cape. QUEST COMPLETE!`];
     },
   }; }),
@@ -515,7 +515,7 @@ export const QUESTS: readonly QuestDef[] = [
   // ---------- The quests of being known: long ones, for Presence, with gear only they give ----------
   {
     id: "name_worth_knowing", name: "A Name Worth Knowing", points: 2, difficulty: "Long", start: "Talk to Namekeeper Elian by the Friendhollow square, once your Presence is 20 and your Friend has a name.",
-    requirements: ["Presence 20", "A name for your Friend"], rewards: ["2 Quest Points", "Wanderer's cloak (Presence 20: Presence grows a fifth faster)", "3,000 coins", "2,000 Presence XP"],
+    requirements: ["Presence 20", "A name for your Friend"], rewards: ["2 Quest Points", "Wanderer's cloak (Presence 20: Presence grows a fifth faster)", "3,000 Frens", "2,000 Presence XP"],
     journal: game => {
       const s = stage(game, "name_worth_knowing"), k = KNOWN(game);
       if (s === 0) return ["Namekeeper Elian says a name is only worth what the Realm knows of it. He'd write more beside mine, if there were more to write."];
@@ -527,7 +527,7 @@ export const QUESTS: readonly QuestDef[] = [
   },
   {
     id: "known_hall", name: "Known in Every Hall", points: 3, difficulty: "Long", start: "Talk to Archivist Perrin Quill in Quillhaven, after The Quillhaven Folio and A Name Worth Knowing, with Presence 40.",
-    requirements: ["Presence 40", "A Name Worth Knowing", "The Quillhaven Folio"], rewards: ["3 Quest Points", "Chronicler's mantle (Presence 40: work orders pay 15% more)", "Storyteller's hat", "6,000 coins", "3,000 Presence XP"],
+    requirements: ["Presence 40", "A Name Worth Knowing", "The Quillhaven Folio"], rewards: ["3 Quest Points", "Chronicler's mantle (Presence 40: work orders pay 15% more)", "Storyteller's hat", "6,000 Frens", "3,000 Presence XP"],
     journal: game => {
       const s = stage(game, "known_hall"), k = KNOWN(game);
       if (s === 0) return ["Archivist Perrin keeps a shelf for people the whole Realm knows. It's nearly empty. He thinks I could fill a page of it."];
@@ -539,7 +539,7 @@ export const QUESTS: readonly QuestDef[] = [
   },
   {
     id: "the_remembered", name: "The Remembered", points: 4, difficulty: "Long", start: "Talk to King Hollis in Friendhollow Castle, after Known in Every Hall, with Presence 60.",
-    requirements: ["Presence 60", "Known in Every Hall", "Attack 60 to wield the reward"], rewards: ["4 Quest Points", "Blade of Renown (Presence 60: strength grows with Presence)", "Cape of Renown (Presence grows a third faster)", "12,000 coins", "5,000 Presence XP"],
+    requirements: ["Presence 60", "Known in Every Hall", "Attack 60 to wield the reward"], rewards: ["4 Quest Points", "Blade of Renown (Presence 60: strength grows with Presence)", "Cape of Renown (Presence grows a third faster)", "12,000 Frens", "5,000 Presence XP"],
     journal: game => {
       const s = stage(game, "the_remembered"), k = KNOWN(game);
       if (s === 0) return ["King Hollis says the Realm remembers very few, and that the ones it does are not always the ones who deserved it. He means to see to it, this once."];
@@ -591,7 +591,7 @@ export function registerDevQuest(def: OverlayQuest, why: string[] = []): boolean
   if (def.rewards.xp && !(SKILLS as readonly string[]).includes(def.rewards.xp.skill)) { why.push(`quest ${def.id}: no skill called ${def.rewards.xp.skill}`); return false; }
   for (const reward of def.rewards.items ?? []) if (!ITEM_LIST.some(entry => entry.id === reward.id)) { why.push(`quest ${def.id}: no item called ${reward.id} to give`); return false; }
   const giver = NPCS[def.giver].name, wanted = item(def.item).name, points = def.points ?? 1;
-  const rewards = [`${points} Quest Point${points === 1 ? "" : "s"}`, ...(def.rewards.coins ? [`${def.rewards.coins.toLocaleString()} coins`] : []), ...(def.rewards.xp ? [`${def.rewards.xp.amount.toLocaleString()} ${SKILL_NAMES[def.rewards.xp.skill as Skill]} XP`] : []), ...(def.rewards.items ?? []).map(reward => `${reward.n} ${item(reward.id).name}`)];
+  const rewards = [`${points} Quest Point${points === 1 ? "" : "s"}`, ...(def.rewards.coins ? [`${def.rewards.coins.toLocaleString()} Frens`] : []), ...(def.rewards.xp ? [`${def.rewards.xp.amount.toLocaleString()} ${SKILL_NAMES[def.rewards.xp.skill as Skill]} XP`] : []), ...(def.rewards.items ?? []).map(reward => `${reward.n} ${item(reward.id).name}`)];
   const entry: QuestDef = { id: def.id, name: def.name, points, difficulty: def.difficulty ?? "Novice", start: `Talk to ${giver}.`, requirements: [], rewards, dev: def,
     journal: game => { const s = stage(game, def.id); return s === 0 ? [`I can start this quest by talking to ${giver}.`] : s === 1 ? [`${giver} wants ${def.count} × ${wanted}.`, `${has(game.player, def.item, def.count) ? "✓" : "•"} ${count(game.player, def.item)} of ${def.count} in my pack.`] : [`I brought ${giver} what they asked for.`]; } };
   const list = QUESTS as QuestDef[], at = list.findIndex(quest => quest.id === def.id);
@@ -771,7 +771,7 @@ function orderDialogue(game: Game, npc: string, name: string): Dialogue {
   if (!order) return chat(name, npcSays(name, `Nothing you could make for me yet. Come back when your ${SKILL_NAMES[patron.skill]} is better.`));
   if (order.done) return chat(name, npcSays(name, "You've done today's. Come back tomorrow; there's always more."));
   if (count(player, order.item) >= order.n) return chat(name, npcSays(name, `${orderText(order)}! ${patron.thanks}`), undefined, () => { fillOrder(game, npc); });
-  return chat(name, npcSays(name, askText(npc, order), `I'll pay ${order.pay.toLocaleString()} coins, well over what any shop gives, and you'll be the better ${SKILL_NAMES[patron.skill].toLowerCase() === "wayfaring" ? "for it" : "at it"}.`));
+  return chat(name, npcSays(name, askText(npc, order), `I'll pay ${order.pay.toLocaleString()} Frens, well over what any shop gives, and you'll be the better ${SKILL_NAMES[patron.skill].toLowerCase() === "wayfaring" ? "for it" : "at it"}.`));
 }
 export function fetchQuest(game: Game, name: string, quest: string, q: { offer: string[]; accept: string; progress: string; have: () => boolean; take: () => void; done: string[]; reward: () => void; onAccept?: () => void }): Dialogue {
   const s = stage(game, quest), def = QUESTS.find(entry => entry.id === quest)!;
@@ -949,9 +949,9 @@ function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
       { label: "Trade.", then: () => { game.ui.shop = "bones"; return null; } }, { label: "I won't ask.", then: () => null }]);
     case "cape_keeper": {
       const mastered = (Object.keys(player.xp) as (keyof typeof player.xp)[]).filter(skill => player.xp[skill] >= 13_034_431);
-      if (!mastered.length) return chat(name, npcSays(name, "Every skill has a cape, and every cape has one price: 99,000 coins, and level 99. Come back when you've mastered something.",
+      if (!mastered.length) return chat(name, npcSays(name, "Every skill has a cape, and every cape has one price: 99,000 Frens, and level 99. Come back when you've mastered something.",
         "Master two skills and I'll trim every cape you buy. Master them all and there's something special."));
-      return chat(name, npcSays(name, `A master of ${mastered.length === 1 ? "a skill" : `${mastered.length} skills`}! Pick your cape: 99,000 coins each${mastered.length > 1 ? ", trimmed" : ""}.`), [
+      return chat(name, npcSays(name, `A master of ${mastered.length === 1 ? "a skill" : `${mastered.length} skills`}! Pick your cape: 99,000 Frens each${mastered.length > 1 ? ", trimmed" : ""}.`), [
         { label: "Let me see the capes.", then: () => { game.ui.shop = "capes"; return null; } },
         { label: "Not today.", then: () => null },
       ]);
@@ -1256,7 +1256,7 @@ function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
     case "maidens_villager": return chat(name, npcSays(name, questDone(game, "maidens_truce") ? "Truce-keeper. Mind the dead past the fence; they don't keep it." : "Keep walking. The matriarch said you could pass, not stay."));
     case "ringmaster": {
       if (game.arena) return chat(name, npcSays(name, "A match is on. Finish it, or walk out of the Ring to give it up."));
-      const offer = (match: { id: string; name: string; level: number; coins: number; marks: number }) => ({ label: `${match.name} (level ${match.level}: pays ${match.coins.toLocaleString()} coins and ${match.marks} bloodmarks; ${entryFee(match.coins).toLocaleString()} to enter)`, then: () => { startMatch(game, match.id); return null; } });
+      const offer = (match: { id: string; name: string; level: number; coins: number; marks: number }) => ({ label: `${match.name} (level ${match.level}: pays ${match.coins.toLocaleString()} Frens and ${match.marks} bloodmarks; ${entryFee(match.coins).toLocaleString()} to enter)`, then: () => { startMatch(game, match.id); return null; } });
       const chooseFoes = (): Dialogue => chat(name, npcSays(name, "Name the kind, then the creature. The purse goes by its level, and the gate costs a quarter of the purse."), [
         ...FOE_GROUPS.map(group => ({ label: group.name, then: () => chat(name, npcSays(name, `${group.name}. Which?`), [
           ...group.foes.map(foe => customMatch(foe)!).map(offer),
@@ -1297,7 +1297,7 @@ function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
     case "ring_chaplain": return chat(name, npcSays(name, "The Ringmaker fought by faith, they say. Faith potions, sigils for the holy spells, the Acolyte's vestments, maces and the aegis: all here."));
     case "ring_sigilist": return chat(name, npcSays(name, "Sigils for every element, and the elemental staffs. Mages win more matches than you'd think; the creatures can't dodge."));
     case "ring_fletcher": return chat(name, npcSays(name, "Bows and arrows, and the hunter's leathers. The archers in the Vault's Dead match are the only ones who'll shoot back."));
-    case "ring_armourer": return chat(name, npcSays(name, "Pewter to glimmer, helm to boots, for coin. The Quartermaster across the way sells the Ring's own, for bloodmarks."));
+    case "ring_armourer": return chat(name, npcSays(name, "Pewter to glimmer, helm to boots, for Frens. The Quartermaster across the way sells the Ring's own, for bloodmarks."));
     case "ring_weaponsmith": return chat(name, npcSays(name, "Daggers, swords and sabres for the quick; greatswords, battleaxes and war hammers for the strong. Pewter to glimmer, every one of them honed.", "Maces and flails too, from Dawnhold. The chaplain blesses them; I only sharpen."));
     case "ring_quartermaster": return chat(name, npcSays(name, "Bloodmarks. Nothing else. Pitfighter for the new, ringsteel for the proven, Wildfur for the ones who fight hardest when they're nearly done. Skull masks for everyone."));
     case "ring_champion": return chat(name, npcSays(name, "Laurels, won from other Friends in the courtyard. The crown, the cape, the gauntlets and the gilded mask: the Hall sells them for nothing else."));
@@ -1310,7 +1310,7 @@ function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
         reward: () => { giveOrDrop(game, "glass_charm"); give(player, "coins", 800); addXp(game, "fishing", 3000, { raw: true }); addXp(game, "attack", 2500, { raw: true }); },
       });
       return chat(name, npcSays(name, "Cages for inkcrabs, harpoons for sailfish, off the end of the pier. Inksharks in the deep bit, if you've the skill. And there's a deep spot up on the Frostpeak tarn."));
-    case "tanner": return chat(name, npcSays(name, "I'll tan cowhides into leather for 2 coins each. Then use a needle and thread on the leather to craft armour."), [
+    case "tanner": return chat(name, npcSays(name, "I'll tan cowhides into leather for 2 Frens each. Then use a needle and thread on the leather to craft armour."), [
       { label: "Tan my hides.", then: () => { tanHides(game); return null; } },
       { label: "Trade.", then: () => { game.ui.shop = "crafting"; return null; } },
       { label: "Bye.", then: () => null },
@@ -1334,8 +1334,8 @@ function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
         ...(questDone(game, "known_hall") && (stage(game, "the_remembered") > 0 || presenceLevel(player) >= 60) ? [{ label: stage(game, "the_remembered") === 0 ? "They say the Realm forgets." : "About being remembered…", then: () => theRemembered(game, name) }] : []),
         { label: "Goodbye, Your Majesty.", then: () => null },
       ];
-      if (!data(game, "royal_audience")) return chat(name, npcSays(name, "A visitor! Welcome to Friendhollow Castle. Here: every Friend on the road should have a little coin."), undefined, () => {
-        player.questData.royal_audience = 1; giveOrDrop(game, "coins", 250); message(game, "King Hollis gives you 250 coins.");
+      if (!data(game, "royal_audience")) return chat(name, npcSays(name, "A visitor! Welcome to Friendhollow Castle. Here: every Friend on the road should have a few Frens."), undefined, () => {
+        player.questData.royal_audience = 1; giveOrDrop(game, "coins", 250); message(game, "King Hollis gives you 250 Frens.");
       });
       if (questDone(game, "hollow_king")) return chat(name, npcSays(name, "The hero of the Hollow Depths, in my throne room! Sit anywhere. Not there, that's the Queen's."), talk);
       return chat(name, npcSays(name, "Welcome back, friend. What can the crown do for you?"), talk);
@@ -1418,9 +1418,9 @@ function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
     });
     case "steward": {
       const { home, next, presence, coins } = homeDeed(game);
-      const buy = { label: home ? `Upgrade to a ${next!.name.toLowerCase()} (${next!.coins.toLocaleString()} coins, Presence ${next!.presence}).` : `Buy the cottage (${HOME_TIERS[0].coins.toLocaleString()} coins, Presence ${HOME_TIERS[0].presence}).`, then: () => { buyHome(game); return null; } };
+      const buy = { label: home ? `Upgrade to a ${next!.name.toLowerCase()} (${next!.coins.toLocaleString()} Frens, Presence ${next!.presence}).` : `Buy the cottage (${HOME_TIERS[0].coins.toLocaleString()} Frens, Presence ${HOME_TIERS[0].presence}).`, then: () => { buyHome(game); return null; } };
       const furnish = { label: "Furnish and decorate.", then: () => { game.ui.home = true; return null; } };
-      if (!home) return chat(name, npcSays(name, "Homestead Row. One plot, the one behind me, and a deed with no name on it yet.", `A cottage is ${HOME_TIERS[0].coins.toLocaleString()} coins, and I'll want a name the Realm knows: Presence ${HOME_TIERS[0].presence}. You have Presence ${presence} and ${coins.toLocaleString()} coins.`),
+      if (!home) return chat(name, npcSays(name, "Homestead Row. One plot, the one behind me, and a deed with no name on it yet.", `A cottage is ${HOME_TIERS[0].coins.toLocaleString()} Frens, and I'll want a name the Realm knows: Presence ${HOME_TIERS[0].presence}. You have Presence ${presence} and ${coins.toLocaleString()} Frens.`),
         [buy, { label: "What's a home for?", then: () => chat(name, npcSays(name, "Sleeping. Properly. A bed of your own sends you out well rested, and the XP comes a little quicker for a while.", "Then there's the hearth, the shelves, a bank chest if you're known enough, an altar if you're known better. And the look of the place is yours: walls, floor, roof, garden.")) }, { label: "Not today.", then: () => null }]);
       return chat(name, npcSays(name, `Your ${HOME_TIERS[home.tier - 1].name.toLowerCase()} is behind me. ${next ? `There's room on the plot for a ${next.name.toLowerCase()}.` : "There's no grander house on the Row."}`),
         [...(next ? [buy] : []), furnish, { label: "Not today.", then: () => null }]);
@@ -1429,7 +1429,7 @@ function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
       const p = game.player;
       return chat(name, npcSays(name, p.name ? `${p.name}. Friend #${p.friendId}. Both written here, in that order.` : `Friend #${p.friendId}. A number tells me which Friend you are. A name would tell me who you became.`,
         "Every Friend deserves a name. The first is a gift. After that, the register charges for the ink."), [
-        { label: p.name ? `Change my Friend's name (${RENAME_COST.toLocaleString()} coins).` : "Name my Friend.", then: () => { game.ui.naming = p.name ? "rename" : "first"; return null; } },
+        { label: p.name ? `Change my Friend's name (${RENAME_COST.toLocaleString()} Frens).` : "Name my Friend.", then: () => { game.ui.naming = p.name ? "rename" : "first"; return null; } },
         { label: "What's the difference?", then: () => chat(name, npcSays(name, "The number is the token: it never changes, and it's how the Realm knows you. The name is yours: it's how the Realm remembers you.", `Right now the Realm knows you as ${playerName(p)}.`)) },
         ...(p.name && (stage(game, "name_worth_knowing") > 0 || presenceLevel(p) >= 20) ? [{ label: stage(game, "name_worth_knowing") === 0 ? "Is a name all the register holds?" : "About the register…", then: () => nameWorthKnowing(game, name) }] : []),
         { label: "Not today.", then: () => null },
@@ -1444,7 +1444,7 @@ function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
     case "hollyhock_clothier": return chat(name, npcSays(name, "Hats with a brim, aprons with pockets, and a leaf on everything. Gardening clothes, dear, but pretty."));
     case "hollyhock_villager": return chat(name, npcSays(name, (["Mother Yarrow can tell what a plant is by the smell of the soil it grew in.", "Everything in the vale grows twice as fast. Nobody knows why. Nobody asks.", "The river's the Thistle. It runs down to Dyemoor and turns blue there.", "Mind the spiders in the hedges."] as const)[Math.floor(game.rng() * 4)]));
     case "dyemoor_clothier": return chat(name, npcSays(name, "Frocks, turbans, trousers and cloaks in the moor's own indigo and madder. Nobody in the Realm dresses like Dyemoor. Nobody dares."));
-    case "vat_keeper": return chat(name, npcSays(name, (["Madder wine, from a crooked vat, by a crooked woman. Everything here's red, love. Even the wine.", "The board's by the door: bounties from the moor and errands for the guild. Pays in coin, not in colours."] as const)[game.tick % 2]));
+    case "vat_keeper": return chat(name, npcSays(name, (["Madder wine, from a crooked vat, by a crooked woman. Everything here's red, love. Even the wine.", "The board's by the door: bounties from the moor and errands for the guild. Pays in Frens, not in colours."] as const)[game.tick % 2]));
     case "freepour_keeper": return chat(name, npcSays(name, (["The Federation says drink should be free. I agree. I also say it should be paid for. We're working it out.", "The board's got work on it: wolves, lurkers, and things the fortress wants brought. Real work. For coin."] as const)[game.tick % 2]));
     case "dyemoor_guildmistress": return chat(name, npcSays(name, "The Dyers' Guild keeps the colours of the Realm. Every red you've ever admired was boiled in our vats. Buy a pot of dye from Master Vell at the Dyeworks and use it on anything of cloth or leather you wear; a pot of lye washes it out again."));
     case "dyemoor_wardrober": return chat(name, npcSays(name, "Gravesend's mourning coats, Saltmarrow's oilskins, the hunters' longcoats, the Quillhaven caps: every village's clothes, on one rail. Dye them how you like afterwards; everyone does."));
@@ -1456,7 +1456,7 @@ function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
     case "tallgrass_clothier": return chat(name, npcSays(name, "Hoods, longcoats and pelt capes in grass colours. Stand still in them and the deer walk into you."));
     case "tallgrass_villager": return chat(name, npcSays(name, (["There's a ring of standing stones out in The Wilds. The game won't cross it.", "Thornbacks in the thickets. Don't hit them bare-handed.", "Fenn once tracked a wolf from here to the Ironreach snow and back.", "The river from Ironreach comes down through The Wilds. Good water, bad crossing."] as const)[Math.floor(game.rng() * 4)]));
     case "cragmaw_armourer": return chat(name, npcSays(name, "Glimmer and rarite, every piece a smith can make: helms to greaves, daggers to war hammers. Nobody else works rarite. Nobody else is this far from anywhere.", "The mainland armouries stop at helms and boots in those metals. If you want the plate, you walk to Cragmaw."));
-    case "cragmaw_ore": return chat(name, npcSays(name, "Ore in, coin out. Pickaxes, bars and inkcoal if you're buying. I weigh honest and sell dear."));
+    case "cragmaw_ore": return chat(name, npcSays(name, "Ore in, Frens out. Pickaxes, bars and inkcoal if you're buying. I weigh honest and sell dear."));
     case "cragmaw_clothier": return chat(name, npcSays(name, "Fur hoods, greatcoats, quilted trousers and a red cape so we can dig you out of the drifts. Sit by the fire first."));
     case "cragmaw_villager": return chat(name, npcSays(name, (["The deep mine's the richest in the Realm. Also the loudest, lately.", "Snow on the peaks all year. Yetis too.", "Pike came up from the mainland with one pickaxe and a grudge. Now look.", "The road to Quillhaven goes down the whole east side. Two days, if the golems let you."] as const)[Math.floor(game.rng() * 4)]));
     case "quillhaven_scribe": return chat(name, npcSays(name, "Sigils copied fair, books bound, and a box to keep your stones in. The scriptorium buys sigils too."));
@@ -1474,9 +1474,9 @@ function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
 export function tanHides(game: Game) {
   const player = game.player, hides = count(player, "cowhide"), affordable = Math.floor(count(player, "coins") / 2), n = Math.min(hides, affordable);
   if (!hides) { message(game, "You don't have any cowhides to tan."); return; }
-  if (!n) { message(game, "You need 2 coins per hide."); return; }
+  if (!n) { message(game, "You need 2 Frens per hide."); return; }
   take(player, "cowhide", n); take(player, "coins", n * 2); give(player, "leather", n);
   message(game, `Tessa tans ${n} cowhide${n > 1 ? "s" : ""} into leather.`); sound(game, "coins");
 }
 /** What Examine says of an item: its own line, and what a shop would give for it (a guess at its worth), where it can be sold. */
-export const examineItem = (id: string) => { const def = item(id), worth = Math.floor(def.value * SHOP_SELL); return def.value > 0 && def.tradeable !== false ? `${def.examine} A shop would give about ${worth.toLocaleString()} coins for ${def.stackable ? "each" : "it"}.` : def.examine; };
+export const examineItem = (id: string) => { const def = item(id), worth = Math.floor(def.value * SHOP_SELL); return def.value > 0 && def.tradeable !== false ? `${def.examine} A shop would give about ${worth.toLocaleString()} Frens for ${def.stackable ? "each" : "it"}.` : def.examine; };

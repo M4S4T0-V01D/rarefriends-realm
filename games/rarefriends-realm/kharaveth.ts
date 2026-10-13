@@ -63,7 +63,7 @@ export const KHARAVETH_QUESTS: readonly QuestDef[] = [
   {
     id: QUEST, name: "A Foothold in the Stone", points: 2, difficulty: "Intermediate", start: "Talk to Commander Ysolde Marrow in the command tent at Foothold Camp, south of the Sunteeth.",
     requirements: ["Combat 40 recommended", "The Sunteeth: cross the maze from the mainland's south coast, between Hollyhock and Dyemoor"],
-    rewards: ["2 Quest Points", "4,000 Wayfaring XP", "2,500 Pursuance XP", "2,000 Presence XP", "3,000 coins", "The Foothold cloak", "Foothold's south gate opens: Kharaveth beyond"],
+    rewards: ["2 Quest Points", "4,000 Wayfaring XP", "2,500 Pursuance XP", "2,000 Presence XP", "3,000 Frens", "The Foothold cloak", "Foothold's south gate opens: Kharaveth beyond"],
     journal: game => {
       const s = stage(game, QUEST), p = game.player;
       if (s === 0) return ["Hollowmere has an expedition camp at the south mouth of the Sunteeth, the maze of sandstone between the mainland and Kharaveth. Its supply party is six days overdue."];

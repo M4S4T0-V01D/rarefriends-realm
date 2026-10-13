@@ -53,7 +53,7 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   { id: "caped", group: "Collecting", icon: "★", name: "Caped crusader", text: "Own a mastery cape.", check: g => owns(g, id => !!item(id).mastery) },
   { id: "fashion", group: "Collecting", icon: "♔", name: "Fashion Friend", text: "Collect 6 wardrobe pieces.", check: g => g.player.wardrobe.length >= 6 },
   { id: "wardrobe", group: "Collecting", icon: "♔", name: "Complete wardrobe", text: `Collect all ${WARDROBE.length} wardrobe pieces.`, check: g => g.player.wardrobe.length >= WARDROBE.length },
-  { id: "rich", group: "Collecting", icon: "¤", name: "Coin purse", text: "Hold 100,000 coins between your pack and bank.", check: g => count(g.player, "coins") + (g.player.bank.find(slot => slot.id === "coins")?.n ?? 0) >= 100_000 },
+  { id: "rich", group: "Collecting", icon: "¤", name: "Fren purse", text: "Hold 100,000 Frens between your pack and bank.", check: g => count(g.player, "coins") + (g.player.bank.find(slot => slot.id === "coins")?.n ?? 0) >= 100_000 },
   { id: "social", group: "Together", icon: "☻", name: "Social butterfly", text: "Meet 5 other players online.", check: g => Object.keys(g.player.met).length >= 5 },
   { id: "recruiter", group: "Together", icon: "♥", name: "Recruiter", text: "Bring a friend with your referral code.", check: g => g.player.referrals.length >= 1 },
   { id: "trader", group: "Together", icon: "⇄", name: "Trader", text: "Complete a trade with another player.", check: g => stat(g, "trades") >= 1 },

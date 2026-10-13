@@ -32,7 +32,7 @@ export const PORTS_QUESTS: readonly QuestDef[] = [
   {
     id: LIGHTS, name: "Lights Out at Gullwick", points: 1, difficulty: "Novice", start: "Talk to Harbourmaster Wenna Coyle in her office on Gullwick's harbour street.",
     requirements: ["Combat 20 recommended"],
-    rewards: ["1 Quest Point", "1,500 Fishing XP", "800 Presence XP", "800 coins", "The keeper's oilskin"],
+    rewards: ["1 Quest Point", "1,500 Fishing XP", "800 Presence XP", "800 Frens", "The keeper's oilskin"],
     journal: game => {
       const s = stage(game, LIGHTS);
       if (s === 0) return ["Gullwick's harbourmaster is looking at the lighthouse as if it had insulted her."];
@@ -50,7 +50,7 @@ export const PORTS_QUESTS: readonly QuestDef[] = [
   {
     id: SALT, name: "The King's Salt", points: 1, difficulty: "Novice", start: "Talk to Mother Brannagh by the salt pans at Saltreach.",
     requirements: [],
-    rewards: ["1 Quest Point", "1,500 Stealth XP", "1,000 Presence XP", "1,000 coins", "The Ring of the True Weight"],
+    rewards: ["1 Quest Point", "1,500 Stealth XP", "1,000 Presence XP", "1,000 Frens", "The Ring of the True Weight"],
     journal: game => {
       const s = stage(game, SALT);
       if (s === 0) return ["The salt-panners of Saltreach and the King's Salt-House are not speaking, which in Raria is said very loudly."];
@@ -67,7 +67,7 @@ export const PORTS_QUESTS: readonly QuestDef[] = [
   {
     id: PEARLS, name: "The Pearl-Divers' Debt", points: 2, difficulty: "Intermediate", start: "Talk to Head diver Yamina on Merrab's quay.",
     requirements: ["A Foothold in the Stone", "Combat 45 recommended"],
-    rewards: ["2 Quest Points", "3,000 Pursuance XP", "2,000 Presence XP", "2,500 coins", "A Merrab pearl pendant"],
+    rewards: ["2 Quest Points", "3,000 Pursuance XP", "2,000 Presence XP", "2,500 Frens", "A Merrab pearl pendant"],
     journal: game => {
       const s = stage(game, PEARLS);
       if (s === 0) return ["Merrab's divers sit on the quay mending nets they don't need, looking at the sea."];
@@ -82,7 +82,7 @@ export const PORTS_QUESTS: readonly QuestDef[] = [
   {
     id: TELL, name: "What the Tell Remembers", points: 1, difficulty: "Novice", start: "Talk to Elder Hazane in her house on top of the tell at Tel Ashun.",
     requirements: ["A Foothold in the Stone"],
-    rewards: ["1 Quest Point", "2,000 Mysteries XP", "1,000 Craftwork XP", "1,000 coins", "Brickmaker's gloves"],
+    rewards: ["1 Quest Point", "2,000 Mysteries XP", "1,000 Craftwork XP", "1,000 Frens", "Brickmaker's gloves"],
     journal: game => {
       const s = stage(game, TELL);
       if (s === 0) return ["Tel Ashun digs its bricks out of the mound it stands on. Lately the digging has stopped every few baskets for an argument."];
@@ -96,7 +96,7 @@ export const PORTS_QUESTS: readonly QuestDef[] = [
   {
     id: WELL, name: "The Well's Share", points: 1, difficulty: "Novice", start: "Talk to Well-keeper Saliha at Ennu's Well.",
     requirements: ["A Foothold in the Stone", "Combat 25 recommended"],
-    rewards: ["1 Quest Point", "1,500 Pursuance XP", "1,200 Presence XP", "1,000 coins", "A well-keeper's headcloth"],
+    rewards: ["1 Quest Point", "1,500 Pursuance XP", "1,200 Presence XP", "1,000 Frens", "A well-keeper's headcloth"],
     journal: game => {
       const s = stage(game, WELL);
       if (s === 0) return ["The pool at Ennu's Well is lower than the mark on the nearest palm, and the well-keeper keeps looking at the mark."];

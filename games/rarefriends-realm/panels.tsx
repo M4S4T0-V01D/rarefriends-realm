@@ -9,7 +9,7 @@ import { SPELL_TABS, RARIAN_SPELL_TABS, MIZUKAI_SPELL_TABS, ORASHAI_SPELL_TABS, 
 } from "./data.ts";
 import { mountArt } from "./mountart.ts";
 import { cacheAt, unstash } from "./camping.ts";
-import { VESSELS, holdAt, takeFromHold } from "./seafaring.ts";
+import { VESSELS, canLandHere, holdAt, takeFromHold } from "./seafaring.ts";
 import { CHEST_REWARD, DAY_MS, challengeProgress, challengeReward, challengeText, claimChallenge, claimChest, claimStreak, completeDaily, dailyWaiting, rerollDaily, rewardText, rollDaily, streakReward, streakStatus } from "./daily.ts";
 import { LATEST_UPDATE, UPDATES } from "./updates.ts";
 import { FIRST_STEPS, currentStep } from "./firststeps.ts";
@@ -606,7 +606,7 @@ function FriendsTab({ game, refresh, roster, rosterState, friendSprites, loadFri
   return (
     <div className="realm-friends">
       <h3>Referrals</h3>
-      <p className="realm-muted">Your code: <b className="realm-code">RF-{player.friendId}</b>. A friend who enters it and you each get <b>250 coins</b>, a <b>Friendship cape</b> (with its own emote) and <b>+15% XP</b> for an hour of play.</p>
+      <p className="realm-muted">Your code: <b className="realm-code">RF-{player.friendId}</b>. A friend who enters it and you each get <b>250 Frens</b>, a <b>Friendship cape</b> (with its own emote) and <b>+15% XP</b> for an hour of play.</p>
       {player.boostTicks > 0 && <p className="realm-note">Referral boost: +15% XP for {Math.ceil(player.boostTicks / 100)} more minute{player.boostTicks > 100 ? "s" : ""} of play.</p>}
       {player.referrals.length > 0 && <p className="realm-note">Friends who joined with your code: {player.referrals.map(id => `#${id}`).join(", ")}</p>}
       {player.referredBy === null ? <label className="realm-add-friend">Friend's code <input value={referral} onChange={event => { setReferral(event.target.value.slice(0, 24)); setReferralNote(""); }} placeholder="RF-1234" aria-label="A friend's referral code"
@@ -1081,13 +1081,13 @@ export function ShopModal({ game, shopId, refresh, onClose, openMenu }: { game: 
   return (
     <Modal title={shop.name} onClose={onClose} wide>
       <div className="realm-bank-bar"><span>Buy/sell:</span>{[1, 5, 10, 50].map(n => <button key={n} type="button" aria-pressed={amount === n} onClick={() => setAmount(n)}>{n}</button>)}
-        <span className="realm-coins">{shop.currency ? `${item(shop.currency).name}s` : "Coins"}: <b>{count(player, shop.currency ?? "coins").toLocaleString()}</b></span></div>
+        <span className="realm-coins">{shop.currency ? `${item(shop.currency).name}s` : "Frens"}: <b>{count(player, shop.currency ?? "coins").toLocaleString()}</b></span></div>
       <div className="realm-bank">
         <div className="realm-bank-grid" aria-label="Shop stock">
           {[...shop.stock.map(id => ({ id, n: 0 })), ...(game.shopStock[shopId] ?? [])].map(({ id, n: have }) => { const locked = capeProblem(game, id); return (
             <button key={`${id}${have ? ":sold" : ""}`} type="button" className={`realm-slot shop${locked ? " locked" : ""}`} aria-label={`Buy ${item(id).name} for ${buyPrice(game, id)} ${shop.currency ? `${item(shop.currency).name.toLowerCase()}s` : "coins"}${have ? ` (${have} in stock, sold by you)` : ""}${locked ? ` (${locked})` : ""}`}
               title={`${item(id).name}: ${buyPrice(game, id).toLocaleString()} ${shop.currency ? `${item(shop.currency).name.toLowerCase()}s` : "coins"}${locked ? `. ${locked}` : ""}`} onClick={() => { buy(game, shopId, id, amount); refresh(); }}
-              {...rightClick(openMenu, () => [{ verb: "Value", noun: item(id).name, tone: "item", run: () => { message(game, `${item(id).name}: currently costs ${buyPrice(game, id).toLocaleString()} coins.`); refresh(); } },
+              {...rightClick(openMenu, () => [{ verb: "Value", noun: item(id).name, tone: "item", run: () => { message(game, `${item(id).name}: currently costs ${buyPrice(game, id).toLocaleString()} Frens.`); refresh(); } },
                 ...[1, 5, 10, 50].map(n => ({ verb: `Buy-${n}`, noun: item(id).name, tone: "item", run: () => { buy(game, shopId, id, n); refresh(); } })), examine(game, id, refresh)])}>
               <ItemIcon slot={{ id, n: have || 1 }} size={40} /><small>{buyPrice(game, id) >= 10_000 ? `${Math.round(buyPrice(game, id) / 1000)}K` : buyPrice(game, id).toLocaleString()}</small>
             </button>
@@ -1095,10 +1095,10 @@ export function ShopModal({ game, shopId, refresh, onClose, openMenu }: { game: 
         </div>
         <div className="realm-inventory small" aria-label="Inventory (click to sell)">
           {player.inventory.map((slot, index) => (
-            <button key={index} type="button" aria-label={slot ? (shopBuys(shopId, slot.id) ? `Sell ${item(slot.id).name} for ${sellPrice(slot.id, shopId)} coins` : `${item(slot.id).name}: this shop won't buy it`) : `Empty slot ${index + 1}`}
-              title={slot ? (shopBuys(shopId, slot.id) ? `Sell for ${sellPrice(slot.id, shopId)} coins` : "Not wanted here") : undefined} className={`realm-slot${slot && !shopBuys(shopId, slot.id) ? " locked" : ""}`}
+            <button key={index} type="button" aria-label={slot ? (shopBuys(shopId, slot.id) ? `Sell ${item(slot.id).name} for ${sellPrice(slot.id, shopId)} Frens` : `${item(slot.id).name}: this shop won't buy it`) : `Empty slot ${index + 1}`}
+              title={slot ? (shopBuys(shopId, slot.id) ? `Sell for ${sellPrice(slot.id, shopId)} Frens` : "Not wanted here") : undefined} className={`realm-slot${slot && !shopBuys(shopId, slot.id) ? " locked" : ""}`}
               onClick={() => { if (slot) { sell(game, shopId, index, amount); refresh(); } }}
-              {...rightClick(openMenu, () => slot ? [{ verb: "Value", noun: item(slot.id).name, tone: "item", run: () => { message(game, shopBuys(shopId, slot.id) ? `${item(slot.id).name}: this shop will buy it for ${sellPrice(slot.id, shopId).toLocaleString()} coins.` : `This shop won't buy ${item(slot.id).name.toLowerCase()}.`); refresh(); } },
+              {...rightClick(openMenu, () => slot ? [{ verb: "Value", noun: item(slot.id).name, tone: "item", run: () => { message(game, shopBuys(shopId, slot.id) ? `${item(slot.id).name}: this shop will buy it for ${sellPrice(slot.id, shopId).toLocaleString()} Frens.` : `This shop won't buy ${item(slot.id).name.toLowerCase()}.`); refresh(); } },
                 ...(shopBuys(shopId, slot.id) ? [1, 5, 10, 50].map(n => ({ verb: `Sell-${n}`, noun: item(slot.id).name, tone: "item", run: () => { sell(game, shopId, index, n); refresh(); } })) : []), examine(game, slot.id, refresh)] : [])}>
               {slot && <ItemIcon slot={slot} size={38} />}
             </button>
@@ -1118,11 +1118,11 @@ export function HomeModal({ game, refresh, onRf, rfPrice, rfBusy }: { game: Game
   const { home, next, presence, coins } = homeDeed(game);
   return (
     <Modal title={home ? `Your ${HOME_TIERS[home.tier - 1].name.toLowerCase()} on Homestead Row` : "Homestead Row"} onClose={close} wide>
-      <p className="realm-muted">{home ? `A ${HOME_TIERS[home.tier - 1].name.toLowerCase()} west of Friendhollow on the Westmarch road. Sleep in your bed to wake Well Rested (+${Math.round(HOME_TIERS[home.tier - 1].rested * 100)}% XP for ten minutes).` : "Steward Alder keeps the deed. A home takes Presence and coins; its furniture takes coins; its looks take simulated RF, a Rare Casket each."} You have Presence <b>{presence}</b> and <b>{coins.toLocaleString()}</b> coins.</p>
-      {next && <div className="realm-buttons"><button type="button" className="realm-primary" disabled={presence < next.presence || coins < next.coins} onClick={() => { buyHome(game); refresh(); }}>{home ? `Upgrade to a ${next.name.toLowerCase()}` : "Buy the cottage"} · {next.coins.toLocaleString()} coins · Presence {next.presence}</button>
+      <p className="realm-muted">{home ? `A ${HOME_TIERS[home.tier - 1].name.toLowerCase()} west of Friendhollow on the Westmarch road. Sleep in your bed to wake Well Rested (+${Math.round(HOME_TIERS[home.tier - 1].rested * 100)}% XP for ten minutes).` : "Steward Alder keeps the deed. A home takes Presence and Frens; its furniture takes Frens; its looks take simulated RF, a Rare Casket each."} You have Presence <b>{presence}</b> and <b>{coins.toLocaleString()}</b> Frens.</p>
+      {next && <div className="realm-buttons"><button type="button" className="realm-primary" disabled={presence < next.presence || coins < next.coins} onClick={() => { buyHome(game); refresh(); }}>{home ? `Upgrade to a ${next.name.toLowerCase()}` : "Buy the cottage"} · {next.coins.toLocaleString()} Frens · Presence {next.presence}</button>
         <small className="realm-muted">{next.w - 2} × {next.h - 2} floor tiles{home ? ", more slots for furniture" : ""}.</small></div>}
       {home && <>
-        <h3>Furniture (coins)</h3>
+        <h3>Furniture (Frens)</h3>
         <ul className="realm-challenges realm-home-slots">
           {SLOTS.map(slot => { const current = furnishingOf(home, slot), open = slotOpen(home, slot);
             return <li key={slot.id} className={current ? "claimed" : ""}>
@@ -1171,13 +1171,13 @@ export function BoatModal({ game, refresh, onSail }: { game: Game; refresh: () =
   const routes = routesFrom(game, from), here = routes.find(route => route.here), pick = routes.find(route => route.id === chosen && route.open), coins = count(game.player, "coins");
   return (
     <Modal title="Boats from here" onClose={close} wide kind="realm-boats">
-      <p className="realm-muted">{here ? `${here.name}. ${DOCK_TEXT[from] ?? ""}` : ""} You have <b>{coins.toLocaleString()}</b> coins.</p>
+      <p className="realm-muted">{here ? `${here.name}. ${DOCK_TEXT[from] ?? ""}` : ""} You have <b>{coins.toLocaleString()}</b> Frens.</p>
       {pick ? (
         <div className="realm-boat-confirm">
           <h3>{pick.name}</h3><p>{pick.text}</p>
           <p className="realm-boat-fare">Fare: <b>{pick.fare.toLocaleString()} coins</b>{coins < pick.fare ? " (you can't afford it)" : ""}</p>
           <div className="realm-buttons">
-            <button type="button" className="realm-primary" disabled={coins < pick.fare} onClick={() => { const to = pick.id; setChosen(null); onSail(from, to); }}>Pay {pick.fare.toLocaleString()} coins and sail</button>
+            <button type="button" className="realm-primary" disabled={coins < pick.fare} onClick={() => { const to = pick.id; setChosen(null); onSail(from, to); }}>Pay {pick.fare.toLocaleString()} Frens and sail</button>
             <button type="button" className="realm-dark" onClick={() => setChosen(null)}>Back to the list</button>
           </div>
         </div>
@@ -1185,8 +1185,8 @@ export function BoatModal({ game, refresh, onSail }: { game: Game; refresh: () =
         <ul className="realm-boat-list">
           {routes.filter(route => !route.here).map(route => (
             <li key={route.id} data-open={route.open}>
-              <button type="button" disabled={!route.open} onClick={() => setChosen(route.id)} aria-label={route.open ? `${route.name}: ${route.fare} coins` : `${route.name}: ${route.why ?? ""}`}>
-                <b>{route.name}</b><span className="realm-boat-fare">{route.open ? `${route.fare.toLocaleString()} coins` : "Not yet"}</span>
+              <button type="button" disabled={!route.open} onClick={() => setChosen(route.id)} aria-label={route.open ? `${route.name}: ${route.fare} Frens` : `${route.name}: ${route.why ?? ""}`}>
+                <b>{route.name}</b><span className="realm-boat-fare">{route.open ? `${route.fare.toLocaleString()} Frens` : "Not yet"}</span>
                 <small>{route.open ? route.text : route.why}</small>
               </button>
             </li>
@@ -1204,7 +1204,7 @@ export function JoinModal({ game, refresh }: { game: Game; refresh: () => void }
   const colors = invite.colors ?? DEFAULT_FELLOWSHIP_COLORS, coins = count(game.player, "coins");
   return (
     <Modal title={`Join ${invite.name} [${invite.tag}]?`} onClose={close}>
-      <p className="realm-muted">A fellow sent you this link. Joining costs {FELLOWSHIP_JOIN_COST.toLocaleString()} coins (the Realm's registrar) and puts [{invite.tag}] under your name; the fellowship's look comes with it.{game.player.fellowship ? ` You'd leave ${game.player.fellowship.name}.` : ""}</p>
+      <p className="realm-muted">A fellow sent you this link. Joining costs {FELLOWSHIP_JOIN_COST.toLocaleString()} Frens (the Realm's registrar) and puts [{invite.tag}] under your name; the fellowship's look comes with it.{game.player.fellowship ? ` You'd leave ${game.player.fellowship.name}.` : ""}</p>
       <div className="realm-look-grid"><PixelIcon art={previewArt("logo", invite.logo ?? "shield", colors, 48, 48)} size={48} label="emblem" /><PixelIcon art={previewArt("banner", invite.banner ?? "plain", colors, 160, 36)} size={160} label="banner" /></div>
       <div className="realm-buttons">
         <button type="button" className="realm-primary" disabled={coins < FELLOWSHIP_JOIN_COST && !game.player.fellowship} onClick={() => { if (game.player.fellowship) game.player.fellowship = null; if (joinFellowship(game, invite.name, invite.tag, invite)) { remember(game, "first_fellowship"); friendSays(game, "fellowship"); } close(); }}>Join {invite.name}</button>
@@ -1227,7 +1227,7 @@ export function FellowshipModal({ game, refresh, onRecruit, shareStatus }: { gam
       <h3>Name</h3>
       <div className="realm-fellowship-form">
         <input type="text" maxLength={NAME_MAX} value={name} onChange={event => setName(event.target.value)} aria-label="Fellowship name" />
-        <button type="button" className="realm-dark" disabled={!cleanName(name) || name === fellowship.name} onClick={() => { if (renameFellowship(game, name)) refresh(); }}>Rename ({FELLOWSHIP_RENAME_COST.toLocaleString()} coins)</button>
+        <button type="button" className="realm-dark" disabled={!cleanName(name) || name === fellowship.name} onClick={() => { if (renameFellowship(game, name)) refresh(); }}>Rename ({FELLOWSHIP_RENAME_COST.toLocaleString()} Frens)</button>
       </div>
       <h3>Colours</h3>
       <div className="realm-graphics realm-card-row">
@@ -1320,7 +1320,7 @@ export function ProfilePanel({ game, refresh }: { game: Game; refresh: () => voi
         : <div className="realm-fellowship-form">
           <input type="text" placeholder="Fellowship name" maxLength={NAME_MAX} value={fname} onChange={event => setFname(event.target.value)} />
           <input type="text" placeholder="TAG" maxLength={5} value={ftag} onChange={event => setFtag(event.target.value.toUpperCase())} />
-          <button type="button" disabled={!cleanName(fname) || !cleanTag(ftag)} onClick={() => { if (joinFellowship(game, fname, ftag)) { remember(game, "first_fellowship"); friendSays(game, "fellowship"); } refresh(); }}>Stand with them ({FELLOWSHIP_COST.toLocaleString()} coins)</button>
+          <button type="button" disabled={!cleanName(fname) || !cleanTag(ftag)} onClick={() => { if (joinFellowship(game, fname, ftag)) { remember(game, "first_fellowship"); friendSays(game, "fellowship"); } refresh(); }}>Stand with them ({FELLOWSHIP_COST.toLocaleString()} Frens)</button>
           <small className="realm-muted">Found one, or declare the one your friends made: the tag is what the Realm sees under your name.</small>
         </div>}
       <p className="realm-note">Presence grows by living here: new regions, quests, bosses, rare finds, people met, rumours heard, work orders filled, emotes, clothes worn for the first time, your name, your fellowship, and time with your Friend behind you. Open the skill guide (click Presence on the Skills tab) for what each level brings.</p>
@@ -1351,7 +1351,7 @@ export function TradeModal({ game, view, onOffer, onAccept, onDecline, openMenu 
       {slots.map(slot => <button key={slot.id} type="button" className="realm-slot" disabled={!mine || view.stage !== 1} aria-label={`${mine ? "Remove " : ""}${item(slot.id).name} × ${slot.n}`}
         onClick={() => mine && onOffer(slot.id, -1)}
         {...rightClick(openMenu, () => [...(mine && view.stage === 1 ? [1, 5, 10, Infinity].map(n => ({ verb: `Remove-${n === Infinity ? "All" : n}`, noun: item(slot.id).name, tone: "item", run: () => onOffer(slot.id, n === Infinity ? -1e9 : -n) })) : []),
-          { verb: "Value", noun: item(slot.id).name, tone: "item", run: () => message(game, `${item(slot.id).name}: worth about ${item(slot.id).value.toLocaleString()} coins each.`) }, examine(game, slot.id, () => {})])}>
+          { verb: "Value", noun: item(slot.id).name, tone: "item", run: () => message(game, `${item(slot.id).name}: worth about ${item(slot.id).value.toLocaleString()} Frens each.`) }, examine(game, slot.id, () => {})])}>
         <ItemIcon slot={slot} size={38} /></button>)}
       {!slots.length && <p className="realm-muted">Nothing yet.</p>}
     </div>
@@ -1362,8 +1362,8 @@ export function TradeModal({ game, view, onOffer, onAccept, onDecline, openMenu 
         {status && <span className="realm-note" role="status">{status}</span>}</div>
       {view.stage === 1 ? <>
         <div className="realm-trade">
-          <section><h3>Your offer <small>({worth(view.mine).toLocaleString()} coins)</small></h3>{grid(view.mine, true)}</section>
-          <section><h3>Their offer <small>({worth(view.theirs).toLocaleString()} coins)</small></h3>{grid(view.theirs, false)}</section>
+          <section><h3>Your offer <small>({worth(view.mine).toLocaleString()} Frens)</small></h3>{grid(view.mine, true)}</section>
+          <section><h3>Their offer <small>({worth(view.theirs).toLocaleString()} Frens)</small></h3>{grid(view.theirs, false)}</section>
           <section><h3>Your pack <small>click to offer</small></h3>
             <div className="realm-inventory small">
               {player.inventory.map((slot, index) => {
@@ -1648,8 +1648,13 @@ export function HoldModal({ game, refresh, openMenu, onClose }: { game: Game; re
   </Modal>;
 }
 /** Your mount's orb, on the right of the minimap (Faith's column keeps the Orashai's mana under it). */
-export function MountOrb({ game, onRide, openMenu }: { game: Game; onRide?: (id?: string) => void; openMenu?: OpenMenu }) {
+export function MountOrb({ game, onRide, onAshore, openMenu }: { game: Game; onRide?: (id?: string) => void; onAshore?: () => void; openMenu?: OpenMenu }) {
   const player = game.player;
+  // Aboard a vessel, getting off is what this place is for: Go ashore at the nearest beach or pier (H does the same).
+  // Dark at sea (it sails you to the nearest landing); lit, with a glow, when a shore you can step onto is right beside you.
+  if (player.aboard !== null) { const ready = canLandHere(game), tip = ready ? "Go ashore (H)" : "Sail to the nearest landing (H)";
+    return onAshore ? <button type="button" className={`realm-ashore${ready ? " ready" : ""}`} onClick={() => onAshore()} title={tip} aria-label={tip}>
+      <span aria-hidden="true">⚓</span> Go ashore</button> : null; }
   return <>
       {onRide && player.mounts.length > 0 && (() => { const shown = mountDef(player.mount ?? player.lastMount ?? player.mounts[0])!;
         return <button type="button" className="realm-orb map ride realm-mount-orb" onClick={() => onRide()} aria-pressed={!!player.mount} aria-label={player.mount ? `Dismount (H)` : `Ride your ${shown.name.toLowerCase()} (H)`} title={player.mount ? "Dismount (H)" : "Ride (H)"}
@@ -1760,7 +1765,7 @@ export function FirstStepsCard({ game, onSkip, openMenu }: { game: Game; onSkip:
         <button type="button" aria-label={open ? "Hide the guide" : "Show the guide"} onClick={() => setOpen(!open)}>{open ? "–" : "+"}</button></header>
       {open && <><h4>{step.title}</h4><p>{step.text}</p>
         <div className="realm-steps-bar" aria-hidden="true">{FIRST_STEPS.map((entry, i) => <i key={entry.id} className={i < index ? "done" : i === index ? "now" : ""} />)}</div>
-        <p className="realm-steps-foot">{step.target ? "Follow the gold arrow. " : ""}Finish for 500 coins and a Lamp of insight. <button type="button" className="realm-link" onClick={onSkip}>Skip guide</button></p></>}
+        <p className="realm-steps-foot">{step.target ? "Follow the gold arrow. " : ""}Finish for 500 Frens and a Lamp of insight. <button type="button" className="realm-link" onClick={onSkip}>Skip guide</button></p></>}
     </aside>
   );
 }

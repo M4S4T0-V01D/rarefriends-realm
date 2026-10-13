@@ -69,7 +69,7 @@ export const zhCN: Dictionary = {
   "Heartwood": "心木林", "Last Orders": "最后一轮", "The Seventh Toast": "第七次举杯", "A Crooked Vintage": "歪酿", "The Hound's Bite": "猎犬一口", "Kettle Black": "黑水壶", "Free Cider": "免费苹果酒",
   "A Name Worth Knowing": "值得知晓的名字", "Known in Every Hall": "名满诸厅", "The Remembered": "被铭记者",
   // ---------- Inventory and equipment ----------
-  "Empty slot {n}": "空格 {n}", "Coins": "金币", "{item} × {n}": "{item} × {n}",
+  "Empty slot {n}": "空格 {n}", "Frens": "友币", "{item} × {n}": "{item} × {n}",
   "Head": "头部", "Cape": "披风", "Neck": "颈部", "Ring": "戒指", "Weapon": "武器", "Body": "身体", "Shield": "盾牌", "Legs": "腿部", "Belt": "腰带", "Hands": "手部", "Feet": "脚部",
   "{slot}: empty": "{slot}:空", "Weight": "重量", "kg": "公斤", "· running drains": "· 奔跑消耗", "% faster": "% 更快",
   "Adventurer card · Share on X": "冒险者卡片 · 分享到 X", "Adventurer card": "冒险者卡片", "Adventurer Cards": "冒险者卡片", "Adventurer Cards ·": "冒险者卡片 ·", "found": "已发现",
@@ -81,7 +81,7 @@ export const zhCN: Dictionary = {
   // ---------- Magic ----------
   "Combat": "战斗", "Curses": "诅咒", "Wards": "守护", "Utility": "辅助", "Teleports": "传送", "Magic level": "魔法等级", "Spellbook": "法术书",
   // ---------- Friends ----------
-  "Referrals": "邀请", "Your code:": "你的邀请码:", ". A friend who enters it and you each get": "。输入邀请码的好友和你都会获得", "250 coins": "250 金币", "Friendship cape": "友谊披风",
+  "Referrals": "邀请", "Your code:": "你的邀请码:", ". A friend who enters it and you each get": "。输入邀请码的好友和你都会获得", "250 Frens": "250 友币", "Friendship cape": "友谊披风",
   "(with its own emote) and": "(附带专属表情)以及", "+15% XP": "+15% 经验", "for an hour of play.": "(持续一小时游戏时间)。", "Friend's code": "好友的邀请码", "Party": "队伍",
   "· +10% XP with a party member within": "· 队友在附近时 +10% 经验(范围", "tiles · fellows within 12 give +5%": "格)· 12 格内的同伴 +5%",
   "No party yet. Right-click a player (or one below) to invite them; \"/p\" in chat talks to the party.": "还没有队伍。右键点击玩家(或下方列表)来邀请;在聊天中输入 \"/p\" 与队伍对话。",
@@ -91,7 +91,7 @@ export const zhCN: Dictionary = {
   "Followers": "随从", "Pets": "宠物", "Dragons": "巨龙", "Hiscores": "排行榜", "(you and the players you've met)": "(你和你遇到过的玩家)", "Friend": "伙伴", "Total": "总计", "You": "你",
   "Play online to meet other players: they'll show up here.": "在线游玩即可遇到其他玩家,他们会显示在这里。",
   "Wardrobe": "衣橱", "Rare Relics": "稀有遗物", "Plain Relic": "朴素遗物", "+2% XP in every skill per relic (max 5)": "每个遗物所有技能 +2% 经验(最多 5 个)", "Silver Relic": "白银遗物",
-  "+10% coins from drops and pickpockets per relic (max 3)": "每个遗物掉落与扒窃金币 +10%(最多 3 个)", "Moonlit Relic": "月光遗物", "Gather 10% faster per relic (max 3)": "每个遗物采集速度 +10%(最多 3 个)",
+  "+10% Frens from drops and pickpockets per relic (max 3)": "每个遗物掉落与扒窃友币 +10%(最多 3 个)", "Moonlit Relic": "月光遗物", "Gather 10% faster per relic (max 3)": "每个遗物采集速度 +10%(最多 3 个)",
   "Golden Relic": "黄金遗物", "+10% XP and a golden aura while kept": "持有时 +10% 经验并获得金色光环", "Rare Caskets (simulated RF)": "稀有宝匣(模拟 RF)",
   "A friend's referral code": "好友的邀请码", "Friend number to add": "要添加的伙伴编号",
   "Undiscovered: found while training {skill}": "未发现:修炼{skill}时可能找到", "Undiscovered pet ({x})": "未发现的宠物({x})", "Undiscovered: found while fighting {x}": "未发现:与{x}战斗时可能找到",
@@ -146,7 +146,7 @@ export const zhCN: Dictionary = {
   "Best": "最佳", "days · a new day in": "天 · 距下一天", "(midnight UTC)": "(UTC 零点)", "World boss:": "世界首领:", "Claim day": "领取:", "Claim": "领取", "Today's challenges": "今日挑战",
   "(yours alone; everyone's differ)": "(你专属的,每人不同)", "🎁 Daily chest": "🎁 每日宝箱", "Finish all three challenges:": "完成全部三个挑战:",
   "Simulated $RAREFRIENDS: the caskets are yours to open as well.": "模拟的 $RAREFRIENDS:宝匣也归你打开。", "Work orders:": "工作订单:", "(something to claim)": "(有可领取的)",
-  "Day {n}: {r}": "第 {n} 天:{r}", "Gain {n} {skill} XP": "获得 {n} {skill}经验", "Defeat {n} monsters": "击败 {n} 只怪物", "{n} coins": "{n} 金币", "+ {n} XP": "+ {n} 经验",
+  "Day {n}: {r}": "第 {n} 天:{r}", "Gain {n} {skill} XP": "获得 {n} {skill}经验", "Defeat {n} monsters": "击败 {n} 只怪物", "{n} Frens": "{n} 友币", "+ {n} XP": "+ {n} 经验",
   "Reroll challenges · {n} casket": "重新抽取挑战 · {n} 个宝匣", "Complete all three · {n} caskets": "全部完成 · {n} 个宝匣",
   "Simulated RF buys a Rare Casket; the day's three challenges are rolled afresh (claimed ones stay claimed)": "用模拟 RF 购买一个稀有宝匣;今日三个挑战重新抽取(已领取的保留)",
   "Simulated RF buys two Rare Caskets; every challenge pays out as finished and the chest opens": "用模拟 RF 购买两个稀有宝匣;所有挑战按完成结算,宝箱打开",
@@ -158,7 +158,7 @@ export const zhCN: Dictionary = {
   "New tab (drop an item here)": "新标签页(把物品放到这里)", "Search the bank": "搜索银行", "Search": "搜索", "Bank": "银行", "Withdraw {item} ({n})": "取出{item}({n})", "Deposit {item}": "存入{item}",
   "Inventory (click to deposit)": "背包(点击存入)", "Buy/sell:": "买入/卖出:",
   "Click the stock to buy; click your pack (right) to sell. A general store buys almost anything. What you sell goes on the shelves, to buy back.": "点击库存购买,点击右侧背包出售。杂货店几乎什么都收。卖出的东西会上架,可以买回。",
-  "Shop stock": "商店库存", "{item}: {n} coins": "{item}:{n} 金币", "Buy {item} for {n} coins": "以 {n} 金币购买{item}", "Sell for {n} coins": "以 {n} 金币出售", "Sell {item} for {n} coins": "以 {n} 金币出售{item}",
+  "Shop stock": "商店库存", "{item}: {n} Frens": "{item}:{n} 友币", "Buy {item} for {n} Frens": "以 {n} 友币购买{item}", "Sell for {n} Frens": "以 {n} 友币出售", "Sell {item} for {n} Frens": "以 {n} 友币出售{item}",
   "Inventory (click to sell)": "背包(点击出售)", "Rare Market": "稀有市场", "Rare Casket": "稀有宝匣", "Rare Relic": "稀有遗物", "Relic": "遗物", "Kept bonus": "持有加成", "Chance": "概率", "RF value": "RF 价值", "Simulated RF": "模拟 RF",
   // ---------- Menus ----------
   "Choose Option": "选择选项", "Select an option": "选择一个选项", "Walk here": "走到这里", "{x} / {n} more options": "{x} / 另外 {n} 个选项", "{x} / 1 more option": "{x} / 另外 1 个选项",

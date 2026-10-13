@@ -29,7 +29,7 @@ export const PATRONS: Record<string, Patron> = {
     items: () => Object.values(COOKING).map(entry => ({ id: entry.cooked, level: entry.level })) },
   rowan: { skill: "woodcutting", ask: "The yard's low. {n} {item}, and I'll pay yard rate and then some.", thanks: "Stacked and tallied. Fernwick thanks you.",
     items: () => Object.values(TREES).map(entry => ({ id: entry.log, level: entry.level })) },
-  fisher: { skill: "fishing", ask: "My knees are gone and the pier's not getting shorter. {n} {item}?", thanks: "Fresh as the tide. Here, coin for your trouble.",
+  fisher: { skill: "fishing", ask: "My knees are gone and the pier's not getting shorter. {n} {item}?", thanks: "Fresh as the tide. Here, Frens for your trouble.",
     items: () => Object.values(FISHING_SPOTS).flatMap(spot => spot.catches.map(entry => ({ id: entry.fish, level: entry.level }))) },
   saltmarrow_fishmonger: { skill: "fishing", ask: "The boats came in light. {n} {item} and I'll pay better than the boats do.", thanks: "That's the stall filled. Brine owes you a drink.",
     items: () => Object.values(FISHING_SPOTS).flatMap(spot => spot.catches.map(entry => ({ id: entry.fish, level: entry.level }))) },
@@ -71,7 +71,7 @@ export function fillOrder(game: Game, npc: string, now = Date.now()): boolean {
   const pay = Math.round(order.pay * (player.equipment.body === "chroniclers_mantle" ? 1.15 : 1));
   giveOrDrop(game, "coins", pay); addXp(game, patron.skill, order.xp, { raw: true }); presenceXp(game, 40);
   order.done = 1; player.stats.orders = (player.stats.orders ?? 0) + 1;
-  message(game, `Work order filled: ${orderText(order)}. ${pay.toLocaleString()} coins and ${order.xp.toLocaleString()} ${SKILL_NAMES[patron.skill]} XP.`, "quest"); sound(game, "coins");
+  message(game, `Work order filled: ${orderText(order)}. ${pay.toLocaleString()} Frens and ${order.xp.toLocaleString()} ${SKILL_NAMES[patron.skill]} XP.`, "quest"); sound(game, "coins");
   return true;
 }
 /** Orders from a save, checked. */

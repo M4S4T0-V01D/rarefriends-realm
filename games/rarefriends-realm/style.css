@@ -591,6 +591,17 @@
 .realm-feedback-btn:hover { background: #fff !important; }
 /* The mount orb sits on the minimap's right edge, between the feedback button and full screen (Faith's column keeps mana under it). */
 .realm-mount-orb { position: absolute; right: -8px; top: 106px; z-index: 3; }
+.realm-ashore { position: absolute; right: 4px; top: 232px; z-index: 3; display: flex; align-items: center; gap: 5px; padding: 5px 10px; border: 2px solid #0d1620; border-radius: 999px; background: linear-gradient(#24364a, #142232); color: #c3d2e0; font: 700 12px/1 ui-monospace, Menlo, Consolas, monospace; white-space: nowrap; cursor: pointer; box-shadow: 2px 2px 0 #0d1620; transition: background-color .6s ease, color .6s ease, border-color .6s ease, box-shadow .6s ease, filter .6s ease; }
+.realm-ashore::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(#fff6dc, #f1d98f); opacity: 0; transition: opacity .6s ease; z-index: -1; }
+.realm-ashore { isolation: isolate; }
+.realm-ashore span { transition: transform .6s ease, filter .6s ease; }
+.realm-ashore.ready { color: #3a2a12; border-color: var(--ink); box-shadow: 2px 2px 0 var(--ink), 0 0 12px 3px rgba(255, 214, 120, .75); animation: realm-ashore-glow 2.4s ease-in-out infinite; }
+.realm-ashore.ready::before { opacity: 1; }
+.realm-ashore.ready span { transform: rotate(-12deg) scale(1.15); filter: drop-shadow(0 0 3px rgba(255, 200, 90, .9)); }
+@keyframes realm-ashore-glow { 0%, 100% { box-shadow: 2px 2px 0 var(--ink), 0 0 8px 2px rgba(255, 214, 120, .55); } 50% { box-shadow: 2px 2px 0 var(--ink), 0 0 16px 5px rgba(255, 214, 120, .9); } }
+.realm-ashore:hover { filter: brightness(1.12); }
+.realm-ashore:active { transform: translate(1px, 1px); }
+@media (prefers-reduced-motion: reduce) { .realm-ashore, .realm-ashore::before, .realm-ashore span { transition: none; } .realm-ashore.ready { animation: none; } }
 .realm-feedback-text { width: 100%; min-height: 110px; margin: 6px 0 2px; padding: 8px; border: 2px solid var(--ink); border-radius: 4px; font: 13px/1.4 ui-monospace, Menlo, Consolas, monospace; resize: vertical; background: #fff; color: var(--ink); user-select: text; -webkit-user-select: text; }
 
 /* The Adventurer card's styles: a grid of labelled dropdowns. */

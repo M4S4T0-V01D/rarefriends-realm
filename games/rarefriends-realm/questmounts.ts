@@ -46,7 +46,7 @@ export const QUEST_MOUNT_NPCS: Record<string, NpcDef> = {
 export const QUEST_MOUNT_QUESTS: readonly QuestDef[] = [
   {
     id: DAWNS_CHARGER, name: "The Dawn's Charger", points: 1, difficulty: "Experienced", start: "Talk to Brother Corwin, the Order of the Dawn's ostler at Dawnhold, after Dawn Against the Hollow.",
-    requirements: ["Dawn Against the Hollow completed", "A faith weapon"], rewards: ["1 Quest Point", "3,000 Faith XP", "1,500 Defence XP", "800 coins", "The Dawn charger to ride"],
+    requirements: ["Dawn Against the Hollow completed", "A faith weapon"], rewards: ["1 Quest Point", "3,000 Faith XP", "1,500 Defence XP", "800 Frens", "The Dawn charger to ride"],
     journal: game => {
       const s = stage(game, DAWNS_CHARGER);
       if (s === 0) return ["Brother Corwin keeps the Order of the Dawn's stable at Dawnhold. There's a white mare in it who won't take a rider."];
@@ -57,7 +57,7 @@ export const QUEST_MOUNT_QUESTS: readonly QuestDef[] = [
   },
   {
     id: STAG_AT_DUSK, name: "The Stag at Dusk", points: 1, difficulty: "Experienced", start: "Talk to Warden Ysmay of the Order of Dusk at the Vesperholm abbey in the Silent Peaks.",
-    requirements: ["Combat 60 recommended"], rewards: ["1 Quest Point", "3,000 Ranged XP", "1,500 Faith XP", "800 coins", "The Dusk stag to ride"],
+    requirements: ["Combat 60 recommended"], rewards: ["1 Quest Point", "3,000 Ranged XP", "1,500 Faith XP", "800 Frens", "The Dusk stag to ride"],
     journal: game => {
       const s = stage(game, STAG_AT_DUSK);
       if (s === 0) return ["Warden Ysmay keeps the Order of Dusk's abbey on the mountain. She says a stag comes down from the peaks at the last hour, for those who keep the vigil."];
@@ -68,7 +68,7 @@ export const QUEST_MOUNT_QUESTS: readonly QuestDef[] = [
   },
   {
     id: WHITE_CALF, name: "The White Calf", points: 1, difficulty: "Experienced", start: "Talk to Rider-Captain Halzir at the Ouresh camp, after Salt and Blue Smoke.",
-    requirements: ["Salt and Blue Smoke completed", `${CALF_GRAIN} grain`, "Combat 70 recommended"], rewards: ["1 Quest Point", "3,000 Wayfaring XP", "1,500 Slayer XP", "800 coins", "The white camel to ride"],
+    requirements: ["Salt and Blue Smoke completed", `${CALF_GRAIN} grain`, "Combat 70 recommended"], rewards: ["1 Quest Point", "3,000 Wayfaring XP", "1,500 Slayer XP", "800 Frens", "The white camel to ride"],
     journal: game => {
       const s = stage(game, WHITE_CALF);
       if (s === 0) return ["Halzir hasn't stopped thinking about the camel calf Bitter-Laugh stole from him two summers ago. Somebody saw a white camel at Qeshet."];
@@ -80,7 +80,7 @@ export const QUEST_MOUNT_QUESTS: readonly QuestDef[] = [
   },
   {
     id: THREE_TAILS, name: "Three Tails", points: 1, difficulty: "Experienced", start: "Talk to Fox-keeper Tamao at the fox shrine on Morishima, after A Thousand Gates.",
-    requirements: ["A Thousand Gates completed", "A tinderbox", "Combat 40 recommended"], rewards: ["1 Quest Point", "3,000 Magic XP", "1,500 Faith XP", "800 coins", "The three-tailed fox to ride"],
+    requirements: ["A Thousand Gates completed", "A tinderbox", "Combat 40 recommended"], rewards: ["1 Quest Point", "3,000 Magic XP", "1,500 Faith XP", "800 Frens", "The three-tailed fox to ride"],
     journal: game => {
       const s = stage(game, THREE_TAILS);
       if (s === 0) return ["Fox-keeper Tamao says the shrine's lanterns have been dark since the old keeper died, and a fox with three tails used to come to them."];

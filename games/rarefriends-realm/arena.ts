@@ -70,7 +70,7 @@ export function startMatch(game: Game, id: string): boolean {
   if (game.arena) { message(game, "A match is already under way. Finish it, or walk out of the Ring to give it up.", "warn"); return false; }
   if (!inRingBuilding(game.player.x, game.player.y)) { message(game, "Matches are fought in the Ring.", "warn"); return false; }
   const fee = entryFee(match.coins);
-  if (count(game.player, "coins") < fee) { message(game, `The Ringmaster wants ${fee.toLocaleString()} coins to open the gate for ${match.name} (a quarter of the purse).`, "warn"); return false; }
+  if (count(game.player, "coins") < fee) { message(game, `The Ringmaster wants ${fee.toLocaleString()} Frens to open the gate for ${match.name} (a quarter of the purse).`, "warn"); return false; }
   take(game.player, "coins", fee);
   const taken = new Set<number>(), uids: number[] = [];
   for (const [monsterId, n] of match.waves) for (let k = 0; k < n; k++) {
@@ -81,7 +81,7 @@ export function startMatch(game: Game, id: string): boolean {
     game.monsters.push(monster); uids.push(uid);
   }
   game.arena = { match: id, name: match.name, uids, startedAt: game.tick, coins: match.coins, marks: match.marks, level: match.level };
-  message(game, `${match.name}! ${fee.toLocaleString()} coins paid; ${uids.length} creature${uids.length === 1 ? "" : "s"} enter the Ring. Fight!`, "quest"); sound(game, "quest");
+  message(game, `${match.name}! ${fee.toLocaleString()} Frens paid; ${uids.length} creature${uids.length === 1 ? "" : "s"} enter the Ring. Fight!`, "quest"); sound(game, "quest");
   return true;
 }
 /** Take the summoned creatures out of the world (the match is over, won or given up). */
@@ -104,7 +104,7 @@ export function arenaTick(game: Game) {
   give(game.player, "coins", coins); giveOrDrop(game, "bloodmark", marks);
   game.player.stats.matches = (game.player.stats.matches ?? 0) + 1;
   addXp(game, "hitpoints", 20 * level, { raw: true }); presenceXp(game, 10 + level / 4);
-  message(game, `${name} is won! The Ringmaster pays ${coins.toLocaleString()} coins and ${marks} bloodmarks.`, "quest"); sound(game, "rare");
+  message(game, `${name} is won! The Ringmaster pays ${coins.toLocaleString()} Frens and ${marks} bloodmarks.`, "quest"); sound(game, "rare");
 }
 /** You fell in the Ring: its magic stands you up in the lobby, and whatever you were fighting is gone. */
 export function arenaRevive(game: Game) {

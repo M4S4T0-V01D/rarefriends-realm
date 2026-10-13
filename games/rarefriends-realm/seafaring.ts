@@ -145,7 +145,7 @@ export function board(game: Game, vessel: Vessel): boolean {
   // The vessel you last took is the one the ship's bell calls.
   player.vessels = [vessel, ...player.vessels.filter(v => v !== vessel)];
   applyVessels(game); sound(game, "click");
-  message(game, vessel.hull <= 0 ? `You climb into the ${vessel.name.toLowerCase()}. The hull's stove in: it'll keep to the shallows until it's mended.` : `You climb aboard the ${vessel.name.toLowerCase()}. Click the water to sail, the shore to land.`);
+  message(game, vessel.hull <= 0 ? `You climb into the ${vessel.name.toLowerCase()}. The hull's stove in: it'll keep to the shallows until it's mended.` : `You climb aboard the ${vessel.name.toLowerCase()}. Click the water to sail; to land, click the shore or press Go ashore (H).`);
   return true;
 }
 /** Whether you can step ashore onto a land tile beside you: a vessel that beaches, or a pier, jetty or landing to step onto. */
@@ -153,6 +153,11 @@ export function ashoreProblem(game: Game, x: number, y: number): string | null {
   const player = game.player, vessel = aboard(player);
   if (!vessel) return "You're not aboard anything.";
   if (Math.abs(player.x - x) + Math.abs(player.y - y) !== 1) return "Sail up beside it first.";
+  return landProblem(game, vessel, x, y);
+}
+/** Whether a vessel lying beside a land tile could put you ashore onto it. */
+function landProblem(game: Game, vessel: Vessel, x: number, y: number): string | null {
+  if (x < 0 || y < 0 || x >= W || y >= OVERWORLD_H) return "There's no stepping off there.";
   const tile = game.world.tiles[y * W + x];
   if (!WALKABLE.has(tile) || isWaterTile(tile)) return "There's no stepping off there.";
   const o = game.world.objectAt[y * W + x]; if (o >= 0 && game.world.objects[o].blocks && game.world.objects[o].name !== "__removed") return "There's something in the way.";
@@ -171,6 +176,32 @@ export function landingProblem(game: Game, x: number, y: number): string | null 
   if (dock) { const why = dockLocked(game, dock.id); if (why) return `The ${region.name} shore won't have you yet. ${why}`; }
   // (The Sunteeth and Foothold Camp are walked to before it; everything beyond Foothold's south gate waits on it.)
   if (region.south && !["sunward_strait", "sunteeth", "foothold"].includes(region.id) && !questDone(game, "foothold_in_the_stone")) return "Kharaveth's coast is watched from the Sunteeth, and nobody lands on it until Foothold says the road south is safe.";
+  return null;
+}
+/** Whether you could step ashore right now, from where the vessel lies (the Go ashore button lights up). */
+export function canLandHere(game: Game): boolean {
+  const player = game.player, vessel = aboard(player);
+  return !!vessel && ([[0, 1], [1, 0], [0, -1], [-1, 0]] as const).some(([dx, dy]) => !sailable(game, player.x + dx, player.y + dy) && !landProblem(game, vessel, player.x + dx, player.y + dy));
+}
+/**
+ * The nearest place you can go ashore (Go ashore, or H, while aboard): outwards over the water your vessel can take,
+ * the first shore beside it that will have you. `from` is the water you'd step off from.
+ */
+export function nearestLanding(game: Game): { land: { x: number; y: number }; from: { x: number; y: number } } | null {
+  const player = game.player, vessel = aboard(player);
+  if (!vessel) return null;
+  const seen = new Set<number>([player.y * W + player.x]);
+  let ring: [number, number][] = [[player.x, player.y]];
+  while (ring.length && seen.size < 12_000) {
+    const next: [number, number][] = [];
+    for (const [x, y] of ring) for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]] as const) {
+      const nx = x + dx, ny = y + dy, i = ny * W + nx;
+      if (seen.has(i)) continue;
+      if (sailable(game, nx, ny)) { seen.add(i); next.push([nx, ny]); }
+      else if (!landProblem(game, vessel, nx, ny)) return { land: { x: nx, y: ny }, from: { x, y } };
+    }
+    ring = next;
+  }
   return null;
 }
 /** Step ashore: the vessel stays moored where it is. */
@@ -296,9 +327,9 @@ export function buildVessel(game: Game, kind: VesselKind, yard: { x: number; y: 
 export function sawPlanks(game: Game, plank: string): number {
   const player = game.player, logs = PLANK_FROM[plank], fee = SEA.sawFee[plank];
   const n = Math.min(count(player, logs), Math.floor(count(player, "coins") / fee));
-  if (!n) { message(game, count(player, logs) ? `Sawing ${item(plank).name.toLowerCase()} costs ${fee} coins a plank.` : `Bring ${item(logs).name.toLowerCase()} to saw.`, "warn"); return 0; }
+  if (!n) { message(game, count(player, logs) ? `Sawing ${item(plank).name.toLowerCase()} costs ${fee} Frens a plank.` : `Bring ${item(logs).name.toLowerCase()} to saw.`, "warn"); return 0; }
   take(player, logs, n); take(player, "coins", n * fee); give(player, plank, n);
-  message(game, `${n} × ${item(plank).name} sawn, for ${n * fee} coins.`); sound(game, "click");
+  message(game, `${n} × ${item(plank).name} sawn, for ${n * fee} Frens.`); sound(game, "click");
   return n;
 }
 /** Mend a vessel moored near the yard: a plank and a pewter rivet for each tenth of its hull. */
@@ -329,7 +360,7 @@ export function talkShipwright(game: Game, npcId: string, name: string, usual: (
     { label: "Not now.", then: () => null },
   ]);
   const saw = (): Dialogue => chat(name, npcSays(name, "Logs to planks: pine for hulls that float high, oak for hulls that last, ironbark for hulls nothing gets through. A fee by the plank."), [
-    ...Object.keys(PLANK_FROM).map(plank => ({ label: `${item(plank).name} (${SEA.sawFee[plank]} coins each, from ${item(PLANK_FROM[plank]).name.toLowerCase()})`, then: () => { sawPlanks(game, plank); return null; } })),
+    ...Object.keys(PLANK_FROM).map(plank => ({ label: `${item(plank).name} (${SEA.sawFee[plank]} Frens each, from ${item(PLANK_FROM[plank]).name.toLowerCase()})`, then: () => { sawPlanks(game, plank); return null; } })),
     { label: "Not now.", then: () => null },
   ]);
   const near = player.vessels.filter(v => v.id !== player.aboard && Math.hypot(v.x - player.x, v.y - player.y) <= 24 && v.hull < maxHull(v));

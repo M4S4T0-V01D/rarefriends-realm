@@ -68,7 +68,7 @@ export const es: Dictionary = {
   "Heartwood": "Corazón del bosque", "Last Orders": "Última ronda", "The Seventh Toast": "El séptimo brindis", "A Crooked Vintage": "Una cosecha torcida", "The Hound's Bite": "El mordisco del sabueso", "Kettle Black": "Tetera negra", "Free Cider": "Sidra gratis",
   "A Name Worth Knowing": "Un nombre que conviene conocer", "Known in Every Hall": "Conocido en todos los salones", "The Remembered": "El recordado",
   // ---------- Inventory and equipment ----------
-  "Empty slot {n}": "Hueco vacío {n}", "Coins": "Monedas", "{item} × {n}": "{item} × {n}",
+  "Empty slot {n}": "Hueco vacío {n}", "Frens": "Frens", "{item} × {n}": "{item} × {n}",
   "Head": "Cabeza", "Cape": "Capa", "Neck": "Cuello", "Ring": "Anillo", "Weapon": "Arma", "Body": "Torso", "Shield": "Escudo", "Legs": "Piernas", "Belt": "Cinturón", "Hands": "Manos", "Feet": "Pies",
   "{slot}: empty": "{slot}: vacío", "Weight": "Peso", "kg": "kg", "· running drains": "· correr gasta un", "% faster": "% más rápido",
   "Adventurer card · Share on X": "Carta de aventurero · Compartir en X", "Adventurer card": "Carta de aventurero", "Adventurer Cards": "Cartas de Aventurero", "Adventurer Cards ·": "Cartas de Aventurero ·", "found": "encontradas",
@@ -80,7 +80,7 @@ export const es: Dictionary = {
   // ---------- Magic ----------
   "Combat": "Combate", "Curses": "Maldiciones", "Wards": "Protecciones", "Utility": "Utilidad", "Teleports": "Teletransportes", "Magic level": "Nivel de magia", "Spellbook": "Libro de hechizos",
   // ---------- Friends ----------
-  "Referrals": "Invitaciones", "Your code:": "Tu código:", ". A friend who enters it and you each get": ". Un amigo que lo introduzca y tú recibís cada uno", "250 coins": "250 monedas", "Friendship cape": "Capa de la Amistad",
+  "Referrals": "Invitaciones", "Your code:": "Tu código:", ". A friend who enters it and you each get": ". Un amigo que lo introduzca y tú recibís cada uno", "250 Frens": "250 Frens", "Friendship cape": "Capa de la Amistad",
   "(with its own emote) and": "(con su propio gesto) y", "+15% XP": "+15% de XP", "for an hour of play.": "durante una hora de juego.", "Friend's code": "Código del amigo", "Party": "Grupo",
   "· +10% XP with a party member within": "· +10% de XP con un miembro del grupo a menos de", "tiles · fellows within 12 give +5%": "casillas · los compañeros a menos de 12 dan +5%",
   "No party yet. Right-click a player (or one below) to invite them; \"/p\" in chat talks to the party.": "Aún no tienes grupo. Haz clic derecho en un jugador (o en uno de abajo) para invitarlo; \"/p\" en el chat habla al grupo.",
@@ -90,7 +90,7 @@ export const es: Dictionary = {
   "Followers": "Acompañantes", "Pets": "Mascotas", "Dragons": "Dragones", "Hiscores": "Clasificación", "(you and the players you've met)": "(tú y los jugadores que has conocido)", "Friend": "Friend", "Total": "Total", "You": "Tú",
   "Play online to meet other players: they'll show up here.": "Juega en línea para conocer a otros jugadores: aparecerán aquí.",
   "Wardrobe": "Vestuario", "Rare Relics": "Reliquias raras", "Plain Relic": "Reliquia sencilla", "+2% XP in every skill per relic (max 5)": "+2% de XP en todas las habilidades por reliquia (máx. 5)", "Silver Relic": "Reliquia de plata",
-  "+10% coins from drops and pickpockets per relic (max 3)": "+10% de monedas de botines y robos por reliquia (máx. 3)", "Moonlit Relic": "Reliquia lunar", "Gather 10% faster per relic (max 3)": "Recolectas un 10% más rápido por reliquia (máx. 3)",
+  "+10% Frens from drops and pickpockets per relic (max 3)": "+10% de Frens de botines y robos por reliquia (máx. 3)", "Moonlit Relic": "Reliquia lunar", "Gather 10% faster per relic (max 3)": "Recolectas un 10% más rápido por reliquia (máx. 3)",
   "Golden Relic": "Reliquia dorada", "+10% XP and a golden aura while kept": "+10% de XP y un aura dorada mientras la tengas", "Rare Caskets (simulated RF)": "Cofres raros (RF simulado)",
   "A friend's referral code": "Código de invitación de un amigo", "Friend number to add": "Número de Friend a añadir",
   "Undiscovered: found while training {skill}": "Sin descubrir: se encuentra entrenando {skill}", "Undiscovered pet ({x})": "Mascota sin descubrir ({x})", "Undiscovered: found while fighting {x}": "Sin descubrir: se encuentra luchando contra {x}",
@@ -145,7 +145,7 @@ export const es: Dictionary = {
   "Best": "Mejor", "days · a new day in": "días · nuevo día en", "(midnight UTC)": "(medianoche UTC)", "World boss:": "Jefe mundial:", "Claim day": "Reclamar día", "Claim": "Reclamar", "Today's challenges": "Retos de hoy",
   "(yours alone; everyone's differ)": "(solo tuyos; los de cada uno son distintos)", "🎁 Daily chest": "🎁 Cofre diario", "Finish all three challenges:": "Completa los tres retos:",
   "Simulated $RAREFRIENDS: the caskets are yours to open as well.": "$RAREFRIENDS simulados: los cofres también puedes abrirlos tú.", "Work orders:": "Encargos:", "(something to claim)": "(hay algo que reclamar)",
-  "Day {n}: {r}": "Día {n}: {r}", "Gain {n} {skill} XP": "Gana {n} de XP de {skill}", "Defeat {n} monsters": "Derrota a {n} monstruos", "{n} coins": "{n} monedas", "+ {n} XP": "+ {n} de XP",
+  "Day {n}: {r}": "Día {n}: {r}", "Gain {n} {skill} XP": "Gana {n} de XP de {skill}", "Defeat {n} monsters": "Derrota a {n} monstruos", "{n} Frens": "{n} Frens", "+ {n} XP": "+ {n} de XP",
   "Reroll challenges · {n} casket": "Cambiar retos · {n} cofre", "Complete all three · {n} caskets": "Completar los tres · {n} cofres",
   "Simulated RF buys a Rare Casket; the day's three challenges are rolled afresh (claimed ones stay claimed)": "El RF simulado compra un Cofre raro; los tres retos del día se renuevan (los reclamados se quedan)",
   "Simulated RF buys two Rare Caskets; every challenge pays out as finished and the chest opens": "El RF simulado compra dos Cofres raros; todos los retos cuentan como completados y el cofre se abre",
@@ -157,7 +157,7 @@ export const es: Dictionary = {
   "New tab (drop an item here)": "Pestaña nueva (suelta un objeto aquí)", "Search the bank": "Buscar en el banco", "Search": "Buscar", "Bank": "Banco", "Withdraw {item} ({n})": "Sacar {item} ({n})", "Deposit {item}": "Ingresar {item}",
   "Inventory (click to deposit)": "Inventario (clic para ingresar)", "Buy/sell:": "Comprar/vender:",
   "Click the stock to buy; click your pack (right) to sell. A general store buys almost anything. What you sell goes on the shelves, to buy back.": "Haz clic en el género para comprar y en tu mochila (derecha) para vender. Una tienda general compra casi de todo. Lo que vendes va a los estantes y puedes recomprarlo.",
-  "Shop stock": "Género de la tienda", "{item}: {n} coins": "{item}: {n} monedas", "Buy {item} for {n} coins": "Comprar {item} por {n} monedas", "Sell for {n} coins": "Vender por {n} monedas", "Sell {item} for {n} coins": "Vender {item} por {n} monedas",
+  "Shop stock": "Género de la tienda", "{item}: {n} Frens": "{item}: {n} Frens", "Buy {item} for {n} Frens": "Comprar {item} por {n} Frens", "Sell for {n} Frens": "Vender por {n} Frens", "Sell {item} for {n} Frens": "Vender {item} por {n} Frens",
   "Inventory (click to sell)": "Inventario (clic para vender)", "Rare Market": "Mercado raro", "Rare Casket": "Cofre raro", "Rare Relic": "Reliquia rara", "Relic": "Reliquia", "Kept bonus": "Bonificación al tenerla", "Chance": "Probabilidad", "RF value": "Valor en RF", "Simulated RF": "RF simulado",
   // ---------- Menus ----------
   "Choose Option": "Elegir opción", "Select an option": "Elige una opción", "Walk here": "Caminar aquí", "{x} / {n} more options": "{x} / {n} opciones más", "{x} / 1 more option": "{x} / 1 opción más",

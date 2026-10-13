@@ -179,12 +179,12 @@ try {
   await b.game.getByRole("button", { name: "Trade", exact: true }).click();
   await a.game.getByRole("dialog", { name: "Trading with Friend #3412" }).waitFor();
   await b.game.getByRole("dialog", { name: "Trading with Friend #7730" }).waitFor();
-  const offerCoins = a.game.getByRole("button", { name: "Offer Coins" });
+  const offerCoins = a.game.getByRole("button", { name: "Offer Frens" });
   const coinBox = await offerCoins.boundingBox();
   await a.page.mouse.click(coinBox.x + coinBox.width / 2, coinBox.y + coinBox.height / 2, { button: "right" });
-  await a.game.getByRole("menuitem", { name: /^Offer-10 Coins/ }).click();
+  await a.game.getByRole("menuitem", { name: /^Offer-10 Frens/ }).click();
   await b.game.getByRole("button", { name: "Offer Yew bow" }).click();
-  await b.game.getByRole("button", { name: /Remove Coins|Coins × 10/ }).waitFor().catch(() => {});
+  await b.game.getByRole("button", { name: /Remove Frens|Frens × 10/ }).waitFor().catch(() => {});
   await a.game.getByText("Their offer").waitFor();
   await a.page.waitForTimeout(500);
   await a.page.locator(".rf-game-frame").screenshot({ path: "./artifacts/trade.png" });

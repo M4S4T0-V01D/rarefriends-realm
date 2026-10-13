@@ -2021,7 +2021,7 @@ test("Work orders: craftsfolk pay above market for what you can make, one order 
   const hazel = g.npcs.find(npc => npc.id === "hazel"); standNear(g, hazel.x, hazel.y, 1); setTarget(g, { kind: "npc", uid: hazel.uid, option: "Talk-to" }); until(g, () => g.dialogue !== null, 30);
   while (g.dialogue.index < g.dialogue.lines.length) continueDialogue(g);
   const work = g.dialogue.options.findIndex(option => option.label === "Any work going?"); assert(work >= 0, "Hazel offers work"); chooseOption(g, work);
-  assert(g.dialogue.lines.some(line => /coins|done today's/.test(line.text)), `and names her price: ${JSON.stringify(g.dialogue.lines.map(line => line.text))}`); while (g.dialogue) continueDialogue(g);
+  assert(g.dialogue.lines.some(line => /Frens|done today's/.test(line.text)), `and names her price: ${JSON.stringify(g.dialogue.lines.map(line => line.text))}`); while (g.dialogue) continueDialogue(g);
   const save = JSON.parse(JSON.stringify(serialize(g))), fresh = newGame(); assert(restore(fresh, save)); assert.deepEqual(fresh.player.orders.hazel, p.orders.hazel, "orders are saved");
   assert.deepEqual(cleanOrders({ hazel: { day: "x" }, nobody: { day: 1, item: "maple_bow", n: 3, pay: 10, xp: 5 }, smith: { day: 1, item: "not_an_item", n: 3, pay: 10, xp: 5 } }), {}, "odd orders are dropped");
 });
@@ -3964,7 +3964,7 @@ test("Overlay definitions: an errand quest an overlay defines is offered by its 
   for (const op of overlay.ops) if (op.op === "quest") registerDevQuest(op.def, problems);
   assert.ok(problems.some(p => /nobody called nobody_here/.test(p)), "a quest without its giver is refused");
   assert.ok(NPCS.dev_tester?.dev && QUESTS.some(q => q.id === "dev_errand" && q.dev) && !QUESTS.some(q => q.id === "dev_bad"));
-  const quest = QUESTS.find(q => q.id === "dev_errand"); assert.deepEqual(quest.rewards, ["1 Quest Point", "50 coins", "100 Woodcutting XP", "1 Logs"]);
+  const quest = QUESTS.find(q => q.id === "dev_errand"); assert.deepEqual(quest.rewards, ["1 Quest Point", "50 Frens", "100 Woodcutting XP", "1 Logs"]);
   try {
     const g = newGame(), p = g.player;
     assert.deepEqual(quest.journal(g), ["I can start this quest by talking to Tess the Tester."]);
@@ -4716,4 +4716,24 @@ test("North wayfinding and dress: waymarks along four trails (note them all and 
     assert.equal(regionAt(world, at.x, at.y).id, set.region === "vargskeld" ? "skarnholm" : "krasnogor");
     for (let k = 0; k < 4; k++) assert.ok(talk(g, keeper.id).lines[0].text.length > 20);
   }
+});
+
+test("Going ashore: aboard, H (or the Go ashore button) sails you to the nearest shore your vessel can land on and puts you on it; the button lights when you can step off right there; the vessel stays moored", async () => {
+  const SF = await import("../games/rarefriends-realm/seafaring.ts");
+  const { goAshoreNearest, toggleMount } = await import("../games/rarefriends-realm/engine.ts");
+  const g = newGame(), p = g.player, world = g.world;
+  const bersi = world.spawns.find(s => s.kind === "npc" && s.id === "shipwright_bersi"), a = SF.launchSpot(g, "rowboat", bersi);
+  p.vessels.push({ id: 1, kind: "rowboat", name: "Rowboat", x: a.x, y: a.y, heading: { x: 0, y: 1 }, hull: 40, hold: Array(4).fill(null), sailed: 0 });
+  assert.ok(!goAshoreNearest(g), "not aboard: nothing to do");
+  // Out on the water, a few strokes from any shore: the button is dark, and H finds the way in.
+  const seen = new Set([a.y * W + a.x]); let ring = [[a.x, a.y]], out = null;
+  teleport(g, a.x, a.y); p.aboard = 1; SF.applyVessels(g);
+  for (let d = 0; d < 40 && ring.length && !out; d++) { const next = []; for (const [x, y] of ring) for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) { const i = (y + dy) * W + x + dx; if (seen.has(i) || !SF.sailable(g, x + dx, y + dy)) continue; seen.add(i); next.push([x + dx, y + dy]); teleport(g, x + dx, y + dy); if (d >= 3 && !SF.canLandHere(g)) out ??= [x + dx, y + dy]; } ring = next; }
+  assert.ok(out, "somewhere off the shore"); teleport(g, out[0], out[1]); p.vessels[0].x = out[0]; p.vessels[0].y = out[1];
+  assert.ok(!SF.canLandHere(g), "dark at sea"); const at = SF.nearestLanding(g); assert.ok(at, "a landing within reach");
+  toggleMount(g); assert.ok(p.aboard === 1 && (p.path.length > 0), "H sails you there");
+  for (let t = 0; t < 300 && p.aboard !== null; t++) { if (p.path.length === 1 && SF.canLandHere(g)) assert.ok(true); tick(g); }
+  assert.equal(p.aboard, null, "ashore"); assert.ok(!SF.sailable(g, p.x, p.y) && canWalk(g, p.x, p.y), "standing on land");
+  const v = p.vessels[0]; assert.ok(Math.abs(v.x - p.x) + Math.abs(v.y - p.y) === 1, "the rowboat moored beside you");
+  assert.ok(world.objects.some(o => o.text === "vessel:1" && o.name !== "__removed"));
 });

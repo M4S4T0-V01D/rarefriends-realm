@@ -137,7 +137,7 @@ export const WEST_QUESTS: readonly QuestDef[] = [
   },
   {
     id: "cog_federation", name: "Eyes on the Federation", points: 3, difficulty: "Long", start: "Talk to Colonel Severin Marsh at the Regimental Barracks in Raria, after The Ledger of Names.",
-    requirements: ["The Ledger of Names"], rewards: ["3 Quest Points", "RRR banner", "6,000 coins", "4,000 Ranged XP"],
+    requirements: ["The Ledger of Names"], rewards: ["3 Quest Points", "RRR banner", "6,000 Frens", "4,000 Ranged XP"],
     journal: game => {
       const s = stage(game, "cog_federation");
       if (s === 0) return ["Colonel Marsh wants the Federation counted: its devices, its cannon, its people. Someone who can walk into the FFF Fortress. Me, apparently."];
@@ -207,7 +207,7 @@ export const WEST_QUESTS: readonly QuestDef[] = [
   },
   {
     id: "candlemere_tithe", name: "The Candlemere Tithe", points: 2, difficulty: "Intermediate", start: "Talk to Reeve Odo Tallow in Candlemere, in the Crownlands, after Papers of Passage.",
-    requirements: ["Papers of Passage"], rewards: ["2 Quest Points", "10 crown sigils", "5,000 coins", "3,000 Cooking XP", "The reeve's gratitude, which is entered in the Ledger"],
+    requirements: ["Papers of Passage"], rewards: ["2 Quest Points", "10 crown sigils", "5,000 Frens", "3,000 Cooking XP", "The reeve's gratitude, which is entered in the Ledger"],
     journal: game => {
       const s = stage(game, "candlemere_tithe"), p = game.player;
       if (s === 0) return ["The Crown's tithe from Candlemere is short, and the reeve answers for it. He'd take help, from someone who isn't from Candlemere."];

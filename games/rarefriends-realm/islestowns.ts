@@ -92,7 +92,7 @@ export function buildMizukaiTowns(ctx: GenContext, t: Tools, isle: Isle, places:
     house(cx + 9, cy + 14, cx + 14, cy + 20, "n", "A Kurohama house"); homeInside(cx + 9, cy + 14, cx + 14, cy + 20, "n");
     // The harbour shrine: a gate, two lanterns, a little hall to the sea's Friend.
     house(cx + 19, cy + 15, cx + 24, cy + 20, "n", "The Harbour Shrine", { walls: "lacquer", color: R.copper });
-    add({ kind: "altar", x: cx + 21, y: cy + 18, blocks: true, name: "Harbour shrine altar", text: "mizukai" }); decor(cx + 21, cy + 17, "sacred_rope", true, "The harbour's sacred stone, roped, salt-white with spray. The sea's Friend is honoured here."); decor(cx + 23, cy + 17, "offering_box", true, "An offering box: coins for safe crossings, and a fish-hook or two");
+    add({ kind: "altar", x: cx + 21, y: cy + 18, blocks: true, name: "Harbour shrine altar", text: "mizukai" }); decor(cx + 21, cy + 17, "sacred_rope", true, "The harbour's sacred stone, roped, salt-white with spray. The sea's Friend is honoured here."); decor(cx + 23, cy + 17, "offering_box", true, "An offering box: Frens for safe crossings, and a fish-hook or two");
     torii(cx + 21, cy + 13, "The harbour shrine's gate"); lanterns([[cx + 19, cy + 13], [cx + 24, cy + 13]]);
     // Lanterns down the harbour road, people on it, the dockhand on the quay, guards at the east end.
     for (let x = cx - 8; x <= cx + 26; x += 6) { if (!occupied(x, cy - 2)) decor(x, cy - 2, "paper_lantern"); if (!occupied(x + 3, cy + 2)) decor(x + 3, cy + 2, "paper_lantern"); }
@@ -377,7 +377,7 @@ export function buildMizukaiTowns(ctx: GenContext, t: Tools, isle: Isle, places:
   }
   // Turtle Rock: a wish shrine on a rock like a turtle's back.
   {
-    put2(1548, 371, "wayside_statue", "A stone turtle, polished on the nose by every hand that ever wished"); put2(1546, 373, "offering_box", "An offering box for wishes: one coin, one wish, and the turtle decides"); put2(1550, 373, "torii", "A small shrine gate on Turtle Rock", false);
+    put2(1548, 371, "wayside_statue", "A stone turtle, polished on the nose by every hand that ever wished"); put2(1546, 373, "offering_box", "An offering box for wishes: one Fren, one wish, and the turtle decides"); put2(1550, 373, "torii", "A small shrine gate on Turtle Rock", false);
   }
   // Hakkotsu: the white island, its bone gate, and the shrine underneath.
   {

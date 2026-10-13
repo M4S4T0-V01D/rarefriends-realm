@@ -74,7 +74,7 @@ export const MEGHAVAN_NPCS: Record<string, NpcDef> = {
   suvarnatira_scholar: person("suvarnatira_scholar", "Assembly scholar", "A scholar of the Assembly with a satchel of palm-leaf books, reading as they walk.", 1753),
   suvarnatira_merchant: trader("suvarnatira_merchant", "Anselm Dray", "A ship's chandler from somewhere across the sea, who came to Suvarnatira for a season twenty years ago.", 1754, "suvarnatira_general"),
   suvarnatira_clothier: trader("suvarnatira_clothier", "Roshni the silk-seller", "Sells silk from the far east and cotton from the valley, and dyes the Assembly's stoles in a vat she won't let anyone see.", 1755, "suvarnatira_clothier"),
-  suvarnatira_innkeeper: trader("suvarnatira_innkeeper", "Farida", "Keeps the Inkwell Inn, where scholars pay in coin and merchants pay in news.", 1756, "suvarnatira_inn"),
+  suvarnatira_innkeeper: trader("suvarnatira_innkeeper", "Farida", "Keeps the Inkwell Inn, where scholars pay in Frens and merchants pay in news.", 1756, "suvarnatira_inn"),
   suvarnatira_smith: trader("suvarnatira_smith", "Kavya the smith", "Suvarnatira's smith: anchors, hinges, sabres for the harbour watch, and the Archive's brass lamps.", 1757, "suvarnatira_forge"),
   suvarnatira_guard: soldier("suvarnatira_guard", "Harbour watch", "A guard of the free port's harbour watch, sea-green sash, sabre, and a whistle she isn't afraid to use.", 1758),
   suvarnatira_sailor: person("suvarnatira_sailor", "Sailor", "A sailor off a trading dhow, salt in the beard and tar on the hands.", 1759),
@@ -143,7 +143,7 @@ export function talkMeghavan(game: Game, npcId: string, name: string): Dialogue 
     case "suvarnatira_scholar": return say(pick(game, ["Sorry, I was reading. I'm always reading. Did you know the Kanthari count in twelves?", "The Archive's open to anyone with clean hands and a reason. My reason is that I can't stop."]));
     case "suvarnatira_merchant": return say("Rope, tar, biscuit, oil, charts. A port's needs are simple; it's the sailors who aren't.");
     case "suvarnatira_clothier": return say("Silk from the east, cotton from the valley, and the Assembly's ink-dye, which is a secret. A good one.");
-    case "suvarnatira_innkeeper": return say(pick(game, ["Scholars pay in coin, merchants pay in news. Sailors pay in songs, mostly, which is why they eat at the back.", "Sit by the window, you'll see every ship come in. Sit by the door, you'll hear what's on them."]));
+    case "suvarnatira_innkeeper": return say(pick(game, ["Scholars pay in Frens, merchants pay in news. Sailors pay in songs, mostly, which is why they eat at the back.", "Sit by the window, you'll see every ship come in. Sit by the door, you'll hear what's on them."]));
     case "suvarnatira_smith": return say("Anchors, hinges, sabres and lamps. The Archive orders the lamps by the hundred. Reading is hard on brass.");
     case "suvarnatira_guard": return say(pick(game, ["Harbour watch. The corsairs work the shore south of here. If you see a low black boat, don't wave.", "No crown, no toll on books. Plenty of tolls on everything else, though."]));
     case "suvarnatira_sailor": return say(pick(game, ["Monsoon wind takes us east in summer and brings us home in winter. You don't sail against it; you wait.", "Seen the far islands, I have. Seen the Mizukai ships too, way off. They don't stop here. Yet."]));

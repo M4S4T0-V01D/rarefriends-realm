@@ -39,7 +39,7 @@ export function streakReward(streak: number): Reward {
   const base = STREAK_REWARDS[(Math.max(1, streak) - 1) % 7], weeks = Math.min(4, Math.floor((Math.max(1, streak) - 1) / 7));
   return { ...base, coins: base.coins ? Math.round(base.coins * (1 + weeks * 0.25)) : undefined };
 }
-export const rewardText = (reward: Reward) => [...(reward.coins ? [`${reward.coins.toLocaleString()} coins`] : []), ...(reward.items ?? []).map(([id, n]) => `${n > 1 ? `${n} × ` : ""}${item(id).name.toLowerCase()}`)].join(", ");
+export const rewardText = (reward: Reward) => [...(reward.coins ? [`${reward.coins.toLocaleString()} Frens`] : []), ...(reward.items ?? []).map(([id, n]) => `${n > 1 ? `${n} × ` : ""}${item(id).name.toLowerCase()}`)].join(", ");
 function grant(game: Game, reward: Reward) {
   if (reward.coins) giveOrDrop(game, "coins", reward.coins);
   for (const [id, n] of reward.items ?? []) giveOrDrop(game, id, n);

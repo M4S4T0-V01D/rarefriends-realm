@@ -202,7 +202,7 @@ const FISH_COLORS: Record<string, [string, string]> = {
   grayling: ["#9aa3b5", "#c49a6c"], inkcrab: ["#4f6680", "#d9774a"], sailfish: ["#5f86b4", "#c2915c"], inkshark: ["#7d8894", "#b89068"],
 };
 const ITEMS: Item[] = [
-  { id: "coins", name: "Coins", examine: "Lovely money!", value: 1, stackable: true, icon: { shape: "coins", color: "#d9c27a" } },
+  { id: "coins", name: "Frens", examine: "Lovely money!", value: 1, stackable: true, icon: { shape: "coins", color: "#d9c27a" } },
   // Tools
   { id: "small_net", name: "Small fishing net", examine: "Useful for catching small fish.", value: 5, icon: { shape: "net", color: "#9a8f80" } },
   { id: "fishing_rod", name: "Fishing rod", examine: "Useful for catching perch and carp.", value: 5, icon: { shape: "rod", color: "#9c8672" } },
@@ -1340,7 +1340,7 @@ export const SPELLS: readonly Spell[] = [
   { id: "bonebloom", name: "Bonebloom", level: 15, xp: 25, sigils: { bloom_sigil: 1, stone_sigil: 2, tide_sigil: 2 }, kind: "bloom", element: "earth", target: "self", description: "Turns every bone in your pack into sweetberries." },
   { id: "breeze_lance", name: "Breeze Lance", level: 17, xp: 13.5, sigils: { breeze_sigil: 2, storm_sigil: 1 }, kind: "bolt", element: "wind", target: "monster", maxHit: 9, description: "A low level air missile." },
   { id: "bind", name: "Rootsnare", level: 20, xp: 30, sigils: { bloom_sigil: 2, stone_sigil: 3, tide_sigil: 3 }, kind: "bind", element: "earth", target: "monster", description: "Roots a monster in place for ten seconds." },
-  { id: "gilded_touch", name: "Gilded Touch", level: 21, xp: 31, sigils: { bloom_sigil: 1, ember_sigil: 3 }, kind: "alchemy", element: "fire", target: "item", description: "Turns an item into coins: 40% of its value." },
+  { id: "gilded_touch", name: "Gilded Touch", level: 21, xp: 31, sigils: { bloom_sigil: 1, ember_sigil: 3 }, kind: "alchemy", element: "fire", target: "item", description: "Turns an item into Frens: 40% of its value." },
   { id: "tide_lance", name: "Tide Lance", level: 23, xp: 16.5, sigils: { tide_sigil: 2, breeze_sigil: 2, storm_sigil: 1 }, kind: "bolt", element: "water", target: "monster", maxHit: 10, description: "A low level water missile." },
   { id: "glide_friendhollow", name: "Glide to Friendhollow", level: 25, xp: 35, sigils: { path_sigil: 1, breeze_sigil: 3, ember_sigil: 1 }, kind: "teleport", element: "moon", target: "self", teleport: "hollow_square", description: "Teleports you to Friendhollow square." },
   { id: "curse", name: "Brittle", level: 27, xp: 29, sigils: { shade_sigil: 1, tide_sigil: 2, stone_sigil: 3 }, kind: "curse", element: "hollow", target: "monster", curse: { stat: "defence", amount: 0.12 }, description: "Lowers a monster's defence by 12% for a minute." },
@@ -1365,7 +1365,7 @@ export const SPELLS: readonly Spell[] = [
   { id: "glide_quillhaven", name: "Glide to Quillhaven", level: 62, xp: 74, sigils: { path_sigil: 2, thought_sigil: 3, star_sigil: 1 }, kind: "teleport", element: "moon", target: "self", teleport: "quillhaven", quest: "quillhaven_folio", description: "Teleports you to the Quillhaven library. Learnt from Archivist Quill." },
   { id: "glide_ashfall", name: "Glide to Ashfall", level: 75, xp: 90, sigils: { path_sigil: 3, ember_sigil: 3, hollow_sigil: 1 }, kind: "teleport", element: "fire", target: "self", teleport: "ashfall", quest: "ashfall_embers", description: "Teleports you to Ember Tamsin's camp at the edge of Ashfall. Learnt from her, after the drakes." },
   { id: "enchant_rosestone", name: "Enchant Rosestone", level: 49, xp: 59, sigils: { star_sigil: 1, ember_sigil: 5 }, kind: "enchant", element: "fire", target: "item", description: "Turns a rosestone amulet (a rosestone on a string) into a rosestone pendant." },
-  { id: "golden_touch", name: "Golden Touch", level: 55, xp: 65, sigils: { bloom_sigil: 1, ember_sigil: 5 }, kind: "alchemy", element: "gold", target: "item", description: "Turns an item into coins: 60% of its value." },
+  { id: "golden_touch", name: "Golden Touch", level: 55, xp: 65, sigils: { bloom_sigil: 1, ember_sigil: 5 }, kind: "alchemy", element: "gold", target: "item", description: "Turns an item into Frens: 60% of its value." },
   { id: "ember_burst", name: "Ember Burst", level: 59, xp: 34.5, sigils: { ember_sigil: 5, breeze_sigil: 4, hollow_sigil: 1 }, kind: "blast", element: "fire", target: "monster", maxHit: 16, description: "A medium level fire missile." },
   // ---------- Wards: the Realm's own magic turned to defence ----------
   { id: "stone_skin", name: "Stone Skin", level: 20, xp: 30, sigils: { stone_sigil: 3, thought_sigil: 1 }, kind: "ward", element: "earth", target: "self", ward: { defence: 0.15, flat: 8, ticks: 100 }, description: "Your skin takes on the stillness of stone: +15% defence bonus and +8 for a minute." },
@@ -1390,7 +1390,7 @@ export const SPELLS: readonly Spell[] = [
   { id: "judgement_of_stillness", name: "Judgement of Stillness", level: 50, xp: 40, sigils: { law_sigil: 3, dusk_sigil: 1 }, kind: "bind", element: "dusk", target: "monster", rarian: true, description: "The Law holds a creature where it stands for a time." },
   { id: "vigil_of_law", name: "Vigil of the Law", level: 25, xp: 32, sigils: { law_sigil: 2, stone_sigil: 1 }, kind: "ward", element: "law", target: "self", ward: { defence: 0.2, flat: 10, ticks: 100 }, rarian: true, description: "A Rarian vigil kept over yourself: +20% defence bonus and +10 for a minute and a half." },
   { id: "vigil_of_dusk", name: "Vigil of Dusk", level: 55, xp: 58, sigils: { dusk_sigil: 2, law_sigil: 2 }, kind: "ward", element: "dusk", target: "self", ward: { reduce: 0.3, ticks: 80 }, rarian: true, description: "The Order of Dusk's vigil: a third of the damage you take is turned aside for eighty ticks." },
-  { id: "office_of_tithes", name: "Office of Tithes", level: 40, xp: 48, sigils: { law_sigil: 2, ember_sigil: 1 }, kind: "alchemy", element: "law", target: "item", rarian: true, description: "The Crown's office: an item in your pack is assessed and turned to coin, the tithe already taken." },
+  { id: "office_of_tithes", name: "Office of Tithes", level: 40, xp: 48, sigils: { law_sigil: 2, ember_sigil: 1 }, kind: "alchemy", element: "law", target: "item", rarian: true, description: "The Crown's office: an item in your pack is assessed and turned to Frens, the tithe already taken." },
   { id: "summons_to_raria", name: "Summons to Raria", level: 35, xp: 38, sigils: { law_sigil: 2, path_sigil: 1 }, kind: "teleport", element: "law", target: "self", teleport: "raria", rarian: true, description: "The Law summons you to Raria's square, before the palace." },
   { id: "rite_of_censure", name: "Rite of Censure", level: 20, xp: 16, sigils: { dusk_sigil: 1, law_sigil: 1 }, kind: "smite", element: "dusk", target: "monster", skill: "prayer", faith: 2, maxHit: 12, rarian: true, description: "A rite of the Wise Friend spoken against a creature (max hit 12, half as much again against the undead). Costs 2 faith." },
   { id: "rite_of_mending", name: "Rite of Mending", level: 32, xp: 38, sigils: { law_sigil: 2, tide_sigil: 1 }, kind: "mend", element: "law", target: "self", skill: "prayer", faith: 4, heal: { now: 22 }, rarian: true, description: "The Law mends what obeys it: heals 22 at once. Costs 4 faith." },
@@ -2013,7 +2013,7 @@ export const MOUNTS: readonly MountDef[] = [
   { id: "bay_horse", name: "Bay horse", caskets: 3, speed: 2, coat: { body: "#8a4f33", mane: "#2e2522", hoof: "#2e2522", socks: "#2e2522" }, gather: 0.05, bags: 8, attack: KICK,
     text: "Gallops without tiring, and carries your tools: gather 5% faster, and eight saddlebag slots of its own." },
   { id: "grey_horse", name: "Dapple grey", caskets: 3, speed: 2, coat: { body: "#c9c7c2", mane: "#8a8782", hoof: "#57555a", pattern: "dapple" }, coins: 0.1, attack: KICK,
-    text: "Gallops without tiring, and has a nose for loot: +10% coins from drops and pickpocketing." },
+    text: "Gallops without tiring, and has a nose for loot: +10% Frens from drops and pickpocketing." },
   { id: "palomino", name: "Palomino", caskets: 4, speed: 2, coat: { body: "#e2b56a", mane: "#f6ecd6", hoof: "#6f5440", socks: "#f6ecd6" }, xp: 0.05, attack: KICK,
     text: "Gallops without tiring, and everyone learns a little faster in golden company: +5% XP." },
   { id: "black_warhorse", name: "Black warhorse", caskets: 4, speed: 2, coat: { body: "#3a3638", mane: "#1d1b1c", hoof: "#1d1b1c", blaze: "#e8e4da" }, defence: 8, bags: 6,
@@ -2037,7 +2037,7 @@ export const MOUNTS: readonly MountDef[] = [
     text: "Bounds three tiles a tick without tiring, the wood's own: +15% Woodcutting XP, it mends you 1 HP every 7 seconds, and twelve panniers hang across its back." },
   { id: "ember_dragon", name: "Ember dragon", caskets: 14, speed: 3, coat: { kind: "dragon", body: "#9b3a2e", mane: "#e9733f", hoof: "#3a2420", belly: "#e8c08a", accent: "#f2b544", eye: "#f6d36b" }, light: true, fireproof: true, defence: 10, coins: 0.1, bags: 6,
     attack: { name: "Dragonfire", cooldown: 80, damage: 18, fire: true, reach: 4, text: "Breathes fire four tiles at what you're fighting: up to 18, every 48 seconds." },
-    text: "Flies low three tiles a tick without tiring, lights the dark, turns dragonfire aside like a Wyrmward shield, +10 Defence, a hoard's nose (+10% coins), and six saddlebag slots." },
+    text: "Flies low three tiles a tick without tiring, lights the dark, turns dragonfire aside like a Wyrmward shield, +10 Defence, a hoard's nose (+10% Frens), and six saddlebag slots." },
   { id: "forge_golem", name: "Forge golem", caskets: 16, speed: 2, coat: { kind: "golem", body: "#8f8578", mane: "#5a524a", hoof: "#3a3531", accent: "#f0a040", belly: "#b5aa9a", eye: "#f6d36b" }, bags: 16, forge: true, defence: 6,
     attack: { name: "Slam", cooldown: 80, damage: 16, stun: 4, text: "Brings a stone fist down on what you're fighting: up to 16, and it reels; every 48 seconds." },
     text: "Walks two tiles a tick without tiring, carries a furnace and an anvil on its back (smelt and smith wherever you are), sixteen slots in the chest it carries, and +6 Defence." },
@@ -2071,7 +2071,7 @@ export const SHOP_BUY = 1.3, SHOP_SELL = 0.4;
 /** Kept Rare Relic bonuses, one per casket tier (index = outcome id − 1). */
 export const RELICS = [
   { name: "Plain Relic", text: "+2% XP in every skill per relic (max 5)", xpPer: 0.02, max: 5 },
-  { name: "Silver Relic", text: "+10% coins from drops and pickpockets per relic (max 3)", coinsPer: 0.1, max: 3 },
+  { name: "Silver Relic", text: "+10% Frens from drops and pickpockets per relic (max 3)", coinsPer: 0.1, max: 3 },
   { name: "Moonlit Relic", text: "Gather 10% faster per relic (max 3)", gatherPer: 0.1, max: 3 },
   { name: "Golden Relic", text: "+10% XP and a golden aura while kept", xpPer: 0.1, max: 1 },
 ] as const;

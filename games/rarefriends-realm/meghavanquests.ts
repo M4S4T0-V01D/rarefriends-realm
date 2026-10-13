@@ -38,7 +38,7 @@ export const MEGHAVAN_QUESTS: readonly QuestDef[] = [
   {
     id: CARAVAN, name: "Caravan of the Rains", points: 1, difficulty: "Novice", start: "Talk to Caravan-master Iddo Saraf outside Khetmar's east gate.",
     requirements: ["A Foothold in the Stone", "Combat 45 recommended"],
-    rewards: ["1 Quest Point", "2,000 Wayfaring XP", "1,000 Presence XP", "1,500 coins", "A monsoon cloak"],
+    rewards: ["1 Quest Point", "2,000 Wayfaring XP", "1,000 Presence XP", "1,500 Frens", "A monsoon cloak"],
     journal: game => {
       const s = stage(game, CARAVAN);
       if (s === 0) return ["Outside Khetmar's east gate a caravan is waiting to go east into the Rain Country. Its master looks like he's counting the mules again."];
@@ -51,7 +51,7 @@ export const MEGHAVAN_QUESTS: readonly QuestDef[] = [
   {
     id: SILT, name: "The Silted Tank", points: 3, difficulty: "Experienced", start: "Talk to Queen Saumitra in the Palace of the Tanks, Sarovan.",
     requirements: ["A Foothold in the Stone", "Combat 80 recommended (the Great Stepwell)"],
-    rewards: ["3 Quest Points", "6,000 Presence XP", "4,000 Pursuance XP", "5,000 coins", "The Ring of the Kept Tank", "The Great Stepwell, opened"],
+    rewards: ["3 Quest Points", "6,000 Presence XP", "4,000 Pursuance XP", "5,000 Frens", "The Ring of the Kept Tank", "The Great Stepwell, opened"],
     journal: game => {
       const s = stage(game, SILT);
       if (s === 0) return ["Queen Saumitra of Ilavarta is crowned at the Great Tank, and keeps her crown by keeping the tanks. The tanks are silting up."];
@@ -68,7 +68,7 @@ export const MEGHAVAN_QUESTS: readonly QuestDef[] = [
   {
     id: PARASOLS, name: "Seven Parasols, One Shade", points: 2, difficulty: "Intermediate", start: "Talk to Speaker Hemavati in the Mandapa at Mandapur.",
     requirements: ["A Foothold in the Stone"],
-    rewards: ["2 Quest Points", "4,000 Presence XP", "2,500 Thieving XP", "3,000 coins", "The Speaker's parasol"],
+    rewards: ["2 Quest Points", "4,000 Presence XP", "2,500 Thieving XP", "3,000 Frens", "The Speaker's parasol"],
     journal: game => {
       const s = stage(game, PARASOLS);
       if (s === 0) return ["The League of Seven Parasols is meeting in the Mandapa, and Speaker Hemavati looks like someone holding seven arguments at once."];
@@ -83,7 +83,7 @@ export const MEGHAVAN_QUESTS: readonly QuestDef[] = [
   {
     id: PASS, name: "The Pass Toll", points: 2, difficulty: "Experienced", start: "Talk to Lord Varanjit in his hall at Shailagarh.",
     requirements: ["A Foothold in the Stone", "Combat 70 recommended"],
-    rewards: ["2 Quest Points", "5,000 Pursuance XP", "2,000 Presence XP", "3,000 coins", "The pass-warden's helm"],
+    rewards: ["2 Quest Points", "5,000 Pursuance XP", "2,000 Presence XP", "3,000 Frens", "The pass-warden's helm"],
     journal: game => {
       const s = stage(game, PASS);
       if (s === 0) return ["Lord Varanjit holds the passes. Somebody, it seems, is holding one of them back."];
@@ -98,7 +98,7 @@ export const MEGHAVAN_QUESTS: readonly QuestDef[] = [
   {
     id: FOLIO, name: "The Missing Folio", points: 2, difficulty: "Intermediate", start: "Talk to Archivist Mahir in the Archive of Suvarnatira.",
     requirements: ["A Foothold in the Stone"],
-    rewards: ["2 Quest Points", "3,000 Mysteries XP", "2,000 Presence XP", "2,500 coins", "A reader's stole"],
+    rewards: ["2 Quest Points", "3,000 Mysteries XP", "2,000 Presence XP", "2,500 Frens", "A reader's stole"],
     journal: game => {
       const s = stage(game, FOLIO);
       if (s === 0) return ["Something is wrong in the Archive of Suvarnatira: the Archivist is counting the leaves of the star chart, again."];
@@ -112,7 +112,7 @@ export const MEGHAVAN_QUESTS: readonly QuestDef[] = [
   {
     id: FOREST, name: "What the Forest Keeps", points: 2, difficulty: "Intermediate", start: "Talk to Grandmother Sukesh in Kanthar, in the Deepgreen.",
     requirements: ["A Foothold in the Stone"],
-    rewards: ["2 Quest Points", "4,000 Woodcutting XP", "2,500 Presence XP", "2,000 coins", "A Kanthari seed charm"],
+    rewards: ["2 Quest Points", "4,000 Woodcutting XP", "2,500 Presence XP", "2,000 Frens", "A Kanthari seed charm"],
     journal: game => {
       const s = stage(game, FOREST);
       if (s === 0) return ["The Kanthari of Kanthar don't want to be anybody's province. Grandmother Sukesh looks as if somebody has been trying."];

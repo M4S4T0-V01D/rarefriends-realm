@@ -68,7 +68,7 @@ export const vi: Dictionary = {
   "Heartwood": "Lõi rừng", "Last Orders": "Lượt gọi cuối", "The Seventh Toast": "Lần nâng ly thứ bảy", "A Crooked Vintage": "Mẻ rượu méo", "The Hound's Bite": "Cú cắn của chó săn", "Kettle Black": "Ấm đen", "Free Cider": "Rượu táo miễn phí",
   "A Name Worth Knowing": "Một cái tên đáng biết", "Known in Every Hall": "Nổi danh khắp các sảnh", "The Remembered": "Người được nhớ đến",
   // ---------- Inventory and equipment ----------
-  "Empty slot {n}": "Ô trống {n}", "Coins": "Xu", "{item} × {n}": "{item} × {n}",
+  "Empty slot {n}": "Ô trống {n}", "Frens": "Fren", "{item} × {n}": "{item} × {n}",
   "Head": "Đầu", "Cape": "Áo choàng", "Neck": "Cổ", "Ring": "Nhẫn", "Weapon": "Vũ khí", "Body": "Thân", "Shield": "Khiên", "Legs": "Chân", "Belt": "Thắt lưng", "Hands": "Tay", "Feet": "Bàn chân",
   "{slot}: empty": "{slot}: trống", "Weight": "Trọng lượng", "kg": "kg", "· running drains": "· chạy hao", "% faster": "% nhanh hơn",
   "Adventurer card · Share on X": "Thẻ Nhà thám hiểm · Chia sẻ lên X", "Adventurer card": "Thẻ Nhà thám hiểm", "Adventurer Cards": "Thẻ Nhà thám hiểm", "Adventurer Cards ·": "Thẻ Nhà thám hiểm ·", "found": "đã tìm thấy",
@@ -80,7 +80,7 @@ export const vi: Dictionary = {
   // ---------- Magic ----------
   "Combat": "Chiến đấu", "Curses": "Lời nguyền", "Wards": "Bảo hộ", "Utility": "Tiện ích", "Teleports": "Dịch chuyển", "Magic level": "Cấp phép thuật", "Spellbook": "Sách phép",
   // ---------- Friends ----------
-  "Referrals": "Giới thiệu", "Your code:": "Mã của bạn:", ". A friend who enters it and you each get": ". Người bạn nhập mã và bạn đều nhận", "250 coins": "250 xu", "Friendship cape": "Áo choàng Tình bạn",
+  "Referrals": "Giới thiệu", "Your code:": "Mã của bạn:", ". A friend who enters it and you each get": ". Người bạn nhập mã và bạn đều nhận", "250 Frens": "250 Fren", "Friendship cape": "Áo choàng Tình bạn",
   "(with its own emote) and": "(kèm biểu cảm riêng) và", "+15% XP": "+15% XP", "for an hour of play.": "trong một giờ chơi.", "Friend's code": "Mã của bạn bè", "Party": "Tổ đội",
   "· +10% XP with a party member within": "· +10% XP khi có đồng đội trong vòng", "tiles · fellows within 12 give +5%": "ô · đồng bang trong vòng 12 ô cho +5%",
   "No party yet. Right-click a player (or one below) to invite them; \"/p\" in chat talks to the party.": "Chưa có tổ đội. Nhấp phải vào người chơi (hoặc ai đó bên dưới) để mời; gõ \"/p\" trong trò chuyện để nói với tổ đội.",
@@ -90,7 +90,7 @@ export const vi: Dictionary = {
   "Followers": "Người theo", "Pets": "Thú cưng", "Dragons": "Rồng", "Hiscores": "Bảng xếp hạng", "(you and the players you've met)": "(bạn và những người chơi bạn đã gặp)", "Friend": "Friend", "Total": "Tổng", "You": "Bạn",
   "Play online to meet other players: they'll show up here.": "Chơi trực tuyến để gặp người chơi khác: họ sẽ xuất hiện ở đây.",
   "Wardrobe": "Tủ đồ", "Rare Relics": "Thánh tích hiếm", "Plain Relic": "Thánh tích thường", "+2% XP in every skill per relic (max 5)": "+2% XP mọi kỹ năng mỗi thánh tích (tối đa 5)", "Silver Relic": "Thánh tích bạc",
-  "+10% coins from drops and pickpockets per relic (max 3)": "+10% xu từ vật rơi và móc túi mỗi thánh tích (tối đa 3)", "Moonlit Relic": "Thánh tích ánh trăng", "Gather 10% faster per relic (max 3)": "Thu thập nhanh hơn 10% mỗi thánh tích (tối đa 3)",
+  "+10% Frens from drops and pickpockets per relic (max 3)": "+10% Fren từ vật rơi và móc túi mỗi thánh tích (tối đa 3)", "Moonlit Relic": "Thánh tích ánh trăng", "Gather 10% faster per relic (max 3)": "Thu thập nhanh hơn 10% mỗi thánh tích (tối đa 3)",
   "Golden Relic": "Thánh tích vàng", "+10% XP and a golden aura while kept": "+10% XP và hào quang vàng khi giữ", "Rare Caskets (simulated RF)": "Rương hiếm (RF mô phỏng)",
   "A friend's referral code": "Mã giới thiệu của bạn bè", "Friend number to add": "Số Friend cần thêm",
   "Undiscovered: found while training {skill}": "Chưa khám phá: tìm được khi luyện {skill}", "Undiscovered pet ({x})": "Thú cưng chưa khám phá ({x})", "Undiscovered: found while fighting {x}": "Chưa khám phá: tìm được khi chiến đấu với {x}",
@@ -145,7 +145,7 @@ export const vi: Dictionary = {
   "Best": "Tốt nhất", "days · a new day in": "ngày · ngày mới sau", "(midnight UTC)": "(nửa đêm UTC)", "World boss:": "Trùm thế giới:", "Claim day": "Nhận ngày", "Claim": "Nhận", "Today's challenges": "Thử thách hôm nay",
   "(yours alone; everyone's differ)": "(của riêng bạn; mỗi người khác nhau)", "🎁 Daily chest": "🎁 Rương hằng ngày", "Finish all three challenges:": "Hoàn thành cả ba thử thách:",
   "Simulated $RAREFRIENDS: the caskets are yours to open as well.": "$RAREFRIENDS mô phỏng: bạn cũng có thể mở các rương.", "Work orders:": "Đơn đặt hàng:", "(something to claim)": "(có thứ để nhận)",
-  "Day {n}: {r}": "Ngày {n}: {r}", "Gain {n} {skill} XP": "Nhận {n} XP {skill}", "Defeat {n} monsters": "Hạ {n} quái vật", "{n} coins": "{n} xu", "+ {n} XP": "+ {n} XP",
+  "Day {n}: {r}": "Ngày {n}: {r}", "Gain {n} {skill} XP": "Nhận {n} XP {skill}", "Defeat {n} monsters": "Hạ {n} quái vật", "{n} Frens": "{n} Fren", "+ {n} XP": "+ {n} XP",
   "Reroll challenges · {n} casket": "Đổi thử thách · {n} rương", "Complete all three · {n} caskets": "Hoàn thành cả ba · {n} rương",
   "Simulated RF buys a Rare Casket; the day's three challenges are rolled afresh (claimed ones stay claimed)": "RF mô phỏng mua một Rương hiếm; ba thử thách hôm nay được đổi mới (cái đã nhận vẫn giữ)",
   "Simulated RF buys two Rare Caskets; every challenge pays out as finished and the chest opens": "RF mô phỏng mua hai Rương hiếm; mọi thử thách được tính là hoàn thành và rương được mở",
@@ -157,7 +157,7 @@ export const vi: Dictionary = {
   "New tab (drop an item here)": "Thẻ mới (thả vật phẩm vào đây)", "Search the bank": "Tìm trong ngân hàng", "Search": "Tìm", "Bank": "Ngân hàng", "Withdraw {item} ({n})": "Rút {item} ({n})", "Deposit {item}": "Gửi {item}",
   "Inventory (click to deposit)": "Túi đồ (nhấp để gửi)", "Buy/sell:": "Mua/bán:",
   "Click the stock to buy; click your pack (right) to sell. A general store buys almost anything. What you sell goes on the shelves, to buy back.": "Nhấp vào hàng để mua; nhấp vào túi (bên phải) để bán. Tạp hóa mua gần như mọi thứ. Đồ bạn bán được bày lên kệ, có thể mua lại.",
-  "Shop stock": "Hàng trong tiệm", "{item}: {n} coins": "{item}: {n} xu", "Buy {item} for {n} coins": "Mua {item} với {n} xu", "Sell for {n} coins": "Bán với {n} xu", "Sell {item} for {n} coins": "Bán {item} với {n} xu",
+  "Shop stock": "Hàng trong tiệm", "{item}: {n} Frens": "{item}: {n} Fren", "Buy {item} for {n} Frens": "Mua {item} với {n} Fren", "Sell for {n} Frens": "Bán với {n} Fren", "Sell {item} for {n} Frens": "Bán {item} với {n} Fren",
   "Inventory (click to sell)": "Túi đồ (nhấp để bán)", "Rare Market": "Chợ hiếm", "Rare Casket": "Rương hiếm", "Rare Relic": "Thánh tích hiếm", "Relic": "Thánh tích", "Kept bonus": "Thưởng khi giữ", "Chance": "Tỉ lệ", "RF value": "Giá trị RF", "Simulated RF": "RF mô phỏng",
   // ---------- Menus ----------
   "Choose Option": "Chọn", "Select an option": "Chọn một lựa chọn", "Walk here": "Đi tới đây", "{x} / {n} more options": "{x} / thêm {n} lựa chọn", "{x} / 1 more option": "{x} / thêm 1 lựa chọn",

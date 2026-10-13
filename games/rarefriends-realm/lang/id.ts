@@ -68,7 +68,7 @@ export const id: Dictionary = {
   "Heartwood": "Inti Hutan", "Last Orders": "Pesanan Terakhir", "The Seventh Toast": "Bersulang Ketujuh", "A Crooked Vintage": "Anggur yang Bengkok", "The Hound's Bite": "Gigitan Anjing Pemburu", "Kettle Black": "Ketel Hitam", "Free Cider": "Sari Apel Gratis",
   "A Name Worth Knowing": "Nama yang Patut Diketahui", "Known in Every Hall": "Dikenal di Setiap Aula", "The Remembered": "Yang Dikenang",
   // ---------- Inventory and equipment ----------
-  "Empty slot {n}": "Slot kosong {n}", "Coins": "Koin", "{item} × {n}": "{item} × {n}",
+  "Empty slot {n}": "Slot kosong {n}", "Frens": "Fren", "{item} × {n}": "{item} × {n}",
   "Head": "Kepala", "Cape": "Jubah", "Neck": "Leher", "Ring": "Cincin", "Weapon": "Senjata", "Body": "Badan", "Shield": "Perisai", "Legs": "Kaki", "Belt": "Sabuk", "Hands": "Tangan", "Feet": "Telapak kaki",
   "{slot}: empty": "{slot}: kosong", "Weight": "Berat", "kg": "kg", "· running drains": "· lari menguras", "% faster": "% lebih cepat",
   "Adventurer card · Share on X": "Kartu Petualang · Bagikan ke X", "Adventurer card": "Kartu Petualang", "Adventurer Cards": "Kartu Petualang", "Adventurer Cards ·": "Kartu Petualang ·", "found": "ditemukan",
@@ -80,7 +80,7 @@ export const id: Dictionary = {
   // ---------- Magic ----------
   "Combat": "Tempur", "Curses": "Kutukan", "Wards": "Pelindung", "Utility": "Utilitas", "Teleports": "Teleportasi", "Magic level": "Level sihir", "Spellbook": "Buku mantra",
   // ---------- Friends ----------
-  "Referrals": "Referal", "Your code:": "Kodemu:", ". A friend who enters it and you each get": ". Teman yang memasukkannya dan kamu masing-masing dapat", "250 coins": "250 koin", "Friendship cape": "Jubah Persahabatan",
+  "Referrals": "Referal", "Your code:": "Kodemu:", ". A friend who enters it and you each get": ". Teman yang memasukkannya dan kamu masing-masing dapat", "250 Frens": "250 Fren", "Friendship cape": "Jubah Persahabatan",
   "(with its own emote) and": "(dengan emote khusus) dan", "+15% XP": "+15% XP", "for an hour of play.": "selama satu jam bermain.", "Friend's code": "Kode teman", "Party": "Party",
   "· +10% XP with a party member within": "· +10% XP dengan anggota party dalam jarak", "tiles · fellows within 12 give +5%": "petak · rekan dalam 12 petak memberi +5%",
   "No party yet. Right-click a player (or one below) to invite them; \"/p\" in chat talks to the party.": "Belum ada party. Klik kanan pemain (atau yang di bawah) untuk mengundang; ketik \"/p\" di obrolan untuk bicara ke party.",
@@ -90,7 +90,7 @@ export const id: Dictionary = {
   "Followers": "Pengikut", "Pets": "Peliharaan", "Dragons": "Naga", "Hiscores": "Papan skor", "(you and the players you've met)": "(kamu dan pemain yang pernah kamu temui)", "Friend": "Friend", "Total": "Total", "You": "Kamu",
   "Play online to meet other players: they'll show up here.": "Main online untuk bertemu pemain lain: mereka akan muncul di sini.",
   "Wardrobe": "Lemari", "Rare Relics": "Relik Langka", "Plain Relic": "Relik Biasa", "+2% XP in every skill per relic (max 5)": "+2% XP di semua keahlian per relik (maks 5)", "Silver Relic": "Relik Perak",
-  "+10% coins from drops and pickpockets per relic (max 3)": "+10% koin dari jarahan dan copet per relik (maks 3)", "Moonlit Relic": "Relik Cahaya Bulan", "Gather 10% faster per relic (max 3)": "Mengumpulkan 10% lebih cepat per relik (maks 3)",
+  "+10% Frens from drops and pickpockets per relic (max 3)": "+10% Fren dari jarahan dan copet per relik (maks 3)", "Moonlit Relic": "Relik Cahaya Bulan", "Gather 10% faster per relic (max 3)": "Mengumpulkan 10% lebih cepat per relik (maks 3)",
   "Golden Relic": "Relik Emas", "+10% XP and a golden aura while kept": "+10% XP dan aura emas selama disimpan", "Rare Caskets (simulated RF)": "Peti Langka (RF simulasi)",
   "A friend's referral code": "Kode referal teman", "Friend number to add": "Nomor Friend yang ditambahkan",
   "Undiscovered: found while training {skill}": "Belum ditemukan: didapat saat melatih {skill}", "Undiscovered pet ({x})": "Peliharaan belum ditemukan ({x})", "Undiscovered: found while fighting {x}": "Belum ditemukan: didapat saat melawan {x}",
@@ -145,7 +145,7 @@ export const id: Dictionary = {
   "Best": "Terbaik", "days · a new day in": "hari · hari baru dalam", "(midnight UTC)": "(tengah malam UTC)", "World boss:": "Bos dunia:", "Claim day": "Klaim hari", "Claim": "Klaim", "Today's challenges": "Tantangan hari ini",
   "(yours alone; everyone's differ)": "(khusus untukmu; tiap orang berbeda)", "🎁 Daily chest": "🎁 Peti harian", "Finish all three challenges:": "Selesaikan ketiga tantangan:",
   "Simulated $RAREFRIENDS: the caskets are yours to open as well.": "$RAREFRIENDS simulasi: peti-petinya juga boleh kamu buka.", "Work orders:": "Pesanan kerja:", "(something to claim)": "(ada yang bisa diklaim)",
-  "Day {n}: {r}": "Hari {n}: {r}", "Gain {n} {skill} XP": "Dapatkan {n} XP {skill}", "Defeat {n} monsters": "Kalahkan {n} monster", "{n} coins": "{n} koin", "+ {n} XP": "+ {n} XP",
+  "Day {n}: {r}": "Hari {n}: {r}", "Gain {n} {skill} XP": "Dapatkan {n} XP {skill}", "Defeat {n} monsters": "Kalahkan {n} monster", "{n} Frens": "{n} Fren", "+ {n} XP": "+ {n} XP",
   "Reroll challenges · {n} casket": "Acak ulang tantangan · {n} peti", "Complete all three · {n} caskets": "Selesaikan ketiganya · {n} peti",
   "Simulated RF buys a Rare Casket; the day's three challenges are rolled afresh (claimed ones stay claimed)": "RF simulasi membeli satu Peti Langka; tiga tantangan hari ini diacak ulang (yang sudah diklaim tetap)",
   "Simulated RF buys two Rare Caskets; every challenge pays out as finished and the chest opens": "RF simulasi membeli dua Peti Langka; semua tantangan dihitung selesai dan peti terbuka",
@@ -157,7 +157,7 @@ export const id: Dictionary = {
   "New tab (drop an item here)": "Tab baru (lepas barang di sini)", "Search the bank": "Cari di bank", "Search": "Cari", "Bank": "Bank", "Withdraw {item} ({n})": "Tarik {item} ({n})", "Deposit {item}": "Setor {item}",
   "Inventory (click to deposit)": "Tas (klik untuk menyetor)", "Buy/sell:": "Beli/jual:",
   "Click the stock to buy; click your pack (right) to sell. A general store buys almost anything. What you sell goes on the shelves, to buy back.": "Klik stok untuk membeli; klik tasmu (kanan) untuk menjual. Toko kelontong membeli hampir apa saja. Barang yang kamu jual dipajang di rak dan bisa dibeli kembali.",
-  "Shop stock": "Stok toko", "{item}: {n} coins": "{item}: {n} koin", "Buy {item} for {n} coins": "Beli {item} seharga {n} koin", "Sell for {n} coins": "Jual seharga {n} koin", "Sell {item} for {n} coins": "Jual {item} seharga {n} koin",
+  "Shop stock": "Stok toko", "{item}: {n} Frens": "{item}: {n} Fren", "Buy {item} for {n} Frens": "Beli {item} seharga {n} Fren", "Sell for {n} Frens": "Jual seharga {n} Fren", "Sell {item} for {n} Frens": "Jual {item} seharga {n} Fren",
   "Inventory (click to sell)": "Tas (klik untuk menjual)", "Rare Market": "Pasar Langka", "Rare Casket": "Peti Langka", "Rare Relic": "Relik Langka", "Relic": "Relik", "Kept bonus": "Bonus disimpan", "Chance": "Peluang", "RF value": "Nilai RF", "Simulated RF": "RF simulasi",
   // ---------- Menus ----------
   "Choose Option": "Pilih", "Select an option": "Pilih sebuah opsi", "Walk here": "Jalan ke sini", "{x} / {n} more options": "{x} / {n} pilihan lain", "{x} / 1 more option": "{x} / 1 pilihan lain",

@@ -646,7 +646,7 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
     // The statue as a landmark: braziers either side of it, the Order's plaque before it, offerings at its foot, and its banners flanking the way in.
     decor(cx - 2, y1 + 4, "torch", true, `A brazier of the ${order.name}, lit`); decor(cx + 2, y1 + 4, "torch", true, `A brazier of the ${order.name}, lit`);
     decor(cx, y1 + 5, "plaque", true, { diamond: "A plaque: 'THE GOOD FRIEND KEPT EVERY PROMISE. SO DO WE.' Under it, the Diamond's oath, cut deep.", ink: "A plaque: 'WHAT IS WRITTEN IS KEPT.' Under it, a line in a script nobody else in the Realm can read.", sol: "A plaque, cut at a slant: 'THE WEIRD FRIEND LAUGHED AT THE HOLLOW AND LIVED.' Somebody has added a smiling face.", hood: "A plaque: 'TAKEN FROM THE HOARD, GIVEN TO THE VILLAGES.' Under it, a ledger of favours, still being added to.", ember: "A plaque of black iron: 'THE FIRE HAS NOT GONE OUT. IT WILL NOT GO OUT.'", dusk: "A plaque." }[id]);
-    decor(cx - 1, y1 + 4, "flowers", false, `Offerings at the foot of ${order.godName}'s statue`); decor(cx + 1, y1 + 4, "flowers", false, `Offerings: ${({ diamond: "crystal shards, left in a row", ink: "folded pages and a quill", sol: "a little of everything, in no order", hood: "coins, which go to the villages by morning", ember: "ash hearts, still warm", dusk: "nothing" } as Record<string, string>)[id]}`);
+    decor(cx - 1, y1 + 4, "flowers", false, `Offerings at the foot of ${order.godName}'s statue`); decor(cx + 1, y1 + 4, "flowers", false, `Offerings: ${({ diamond: "crystal shards, left in a row", ink: "folded pages and a quill", sol: "a little of everything, in no order", hood: "Frens, which go to the villages by morning", ember: "ash hearts, still warm", dusk: "nothing" } as Record<string, string>)[id]}`);
     decor(cx - 4, y1 + 5, `banner_${id}`, true, `The ${order.name}'s banner`); decor(cx + 4, y1 + 5, `banner_${id}`, true, `The ${order.name}'s banner`);
     decor(x0, y1 + 2, `banner_${id}`, true, `The ${order.name}'s banner`); decor(x1, y1 + 2, `banner_${id}`, true, `The ${order.name}'s banner`);
   }
@@ -779,7 +779,7 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
       put1(x0 + 1, y1 - 1, "chest", "The laurel strongbox"); put1(x1 - 1, y1 - 1, "chest", "The laurel strongbox"); for (const x of [x0 + 1, x1 - 1]) put1(x, y0 + 1, "lamp");
     });
     // East: the Ring Armoury, coin-paid metal: an anvil and a forge that work, armour on stands, blades on racks.
-    room(0, 11, 9, "The Ring Armoury", "#6d6b67", T.STONE, "ring_armourer", ["The Ring Armoury", "THE RING ARMOURY. Metal armour and blades, pewter to rarite, for coin. Gorm Ironhand, smith.", "rarite_cuirass"], (x0, y0, x1, y1) => {
+    room(0, 11, 9, "The Ring Armoury", "#6d6b67", T.STONE, "ring_armourer", ["The Ring Armoury", "THE RING ARMOURY. Metal armour and blades, pewter to rarite, for Frens. Gorm Ironhand, smith.", "rarite_cuirass"], (x0, y0, x1, y1) => {
       add({ kind: "anvil", x: x1 - 2, y: y0 + 2, blocks: true, name: "Anvil" }); add({ kind: "furnace", x: x1 - 2, y: y1 - 2, blocks: true, name: "Furnace" });
       for (let x = x0 + 1; x <= x0 + 6; x += 2) { put1(x, y0 + 1, "armour", "A suit of Ring armour on a stand"); put1(x, y1 - 1, "armour", "Blades on a rack, edges out"); }
       put1(x0 + 1, y0 + 4, "table", "The armourer's bench"); put1(x1 - 1, y0 + 4, "crate", "Ingots, sorted by metal"); put1(x1 - 4, y0 + 1, "barrel", "Quench barrel"); put1(x1 - 1, y1 - 1, "torch");
@@ -815,7 +815,7 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
     });
     // North-north-east: Hilde Edgewright's blade shop, coin-paid weapons: racks of blades on every wall, the two-handers
     // on stands, a grindstone, a straw dummy to try an edge on, and an anvil to put one back.
-    room(Math.PI * 5 / 3, 11, 9, "Edgewright's Blades", "#8a5e52", T.STONE, "ring_weaponsmith", ["Edgewright's Blades", "EDGEWRIGHT'S BLADES. Daggers to war hammers, pewter to glimmer, for coin. Every edge honed twice.", "glimmer_greatsword"], (x0, y0, x1, y1) => {
+    room(Math.PI * 5 / 3, 11, 9, "Edgewright's Blades", "#8a5e52", T.STONE, "ring_weaponsmith", ["Edgewright's Blades", "EDGEWRIGHT'S BLADES. Daggers to war hammers, pewter to glimmer, for Frens. Every edge honed twice.", "glimmer_greatsword"], (x0, y0, x1, y1) => {
       for (const x of [x0 + 1, x0 + 3, x0 + 5, x1 - 1]) put1(x, y0 + 1, "armour", x === x1 - 1 ? "Greatswords on a stand, taller than you" : "Blades on a rack, edges out");
       for (const x of [x0 + 1, x0 + 3]) put1(x, y1 - 1, "armour", "Battleaxes and war hammers, hung by their heads");
       add({ kind: "anvil", x: x1 - 2, y: y1 - 2, blocks: true, name: "Anvil" }); put1(x1 - 4, y1 - 1, "table", "A grindstone on its trestle, the stone worn hollow");

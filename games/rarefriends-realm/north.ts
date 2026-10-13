@@ -78,7 +78,7 @@ export function talkNorth(game: Game, npcId: string, name: string): Dialogue | n
     case "ember_skald": return says(pick(game, ["Ask me for a name and I'll tell you the life that goes with it. Ask me for the truth and I'll tell you which version.", "Hallveig's grandmother swore the agreement at the Oathgate. I have the verse. So does the Zoryavik archive, and our verses don't match."]));
     case "redwake_captain": return ask(["The Redwake fights for pay and keeps its code. We've fought for jarls, for princes and for both against each other. The code says we finish a contract, and we never take one against our own."], [
       ["Who are you fighting for now?", ["Nobody, yet. Three jarls and two princes have asked. When the pass closes properly, someone will pay a great deal, and we'll read the contracts very carefully."]]]);
-    case "redwake_sellsword": return says("Coin, a code, and a company. More than most people have.");
+    case "redwake_sellsword": return says("Frens, a code, and a company. More than most people have.");
     case "vargskeld_villager": return says(pick(game, ["Cold this year. Colder without the carts from over the ridge.", "The jarl asked us at the Thing. We said keep the agreement. Then we said don't. It was a long Thing.", "Free people, the Vargskeld. Free to be hungry, if the pass stays shut."]));
     case "vargskeld_housecarl": return says("I chose Hallveig. Mind her hall, and mind yourself in it.");
     case "prince_radomir": return ask(["Krasnogor welcomes you. You'll have heard the Vargskeld say we abandoned the agreement. We never left the Oathgate. They left it, when it stopped making them rich."], [

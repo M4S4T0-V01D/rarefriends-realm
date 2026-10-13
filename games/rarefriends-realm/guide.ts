@@ -179,7 +179,7 @@ export function skillGuide(skill: Skill): GuideEntry[] {
       add(50, "Light-footed", "Aggressive monsters notice you from 3 tiles instead of 4, even when you aren't sneaking", undefined, T("ability"));
       add(80, "Shadow-footed", "They notice you from only 2 tiles", undefined, T("ability"));
       add(60, "Veilweave hood (rare)", "Found in the shadows while slipping past monsters of level 38+; wear it from 70 and stand still to vanish", "veilweave_hood", [...T("armour"), "slot:head"]);
-      for (const npc of Object.values(NPCS)) if (npc.pickpocket) add(npc.pickpocket.level, `Pickpocket ${npc.name.toLowerCase()}`, `${npc.pickpocket.xp} XP · ${npc.pickpocket.coins[0]}–${npc.pickpocket.coins[1]} coins`, undefined, T("pickpocket"));
+      for (const npc of Object.values(NPCS)) if (npc.pickpocket) add(npc.pickpocket.level, `Pickpocket ${npc.name.toLowerCase()}`, `${npc.pickpocket.xp} XP · ${npc.pickpocket.coins[0]}–${npc.pickpocket.coins[1]} Frens`, undefined, T("pickpocket"));
       for (const [name, stall] of Object.entries(STALLS)) add(stall.level, `${name[0].toUpperCase()}${name.slice(1)} stall`, `${stall.xp} XP · the Oasis market`, undefined, T("stall"));
       break;
     case "agility":
@@ -268,7 +268,7 @@ export function skillGuide(skill: Skill): GuideEntry[] {
       for (const set of SLAYER_SETS) add(set.slayer, `${set.name} armour`, `Dropped by ${MONSTERS[set.monster].name.toLowerCase()}s · ${set.effect}`, `${set.id}_${set.pieces[0].suffix}`, T("set", "armour"));
       break;
   }
-  add(99, `${SKILL_NAMES[skill]} mastery cape`, "99,000 coins from the Keeper of Capes (trimmed with two 99s)", `${skill}_cape`, [...T("cape"), "slot:cape"]);
+  add(99, `${SKILL_NAMES[skill]} mastery cape`, "99,000 Frens from the Keeper of Capes (trimmed with two 99s)", `${skill}_cape`, [...T("cape"), "slot:cape"]);
   return byLevel(out);
 }
 

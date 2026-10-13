@@ -87,8 +87,14 @@ export function mainlandToWorld(x: number, y: number): [number, number] { const 
 export function mainlandAt(x: number, y: number): { x: number; y: number } { const [wx, wy] = mainlandToWorld(x, y); return { x: wx, y: northShift(wy) }; }
 /** The mainland's overworld rectangle in the legacy frame (inclusive; generation code only). */
 export const MAINLAND_RECT = { x0: MAINLAND.x, y0: MAINLAND.y, x1: MAINLAND.x + MAINLAND.w - 1, y1: MAINLAND.y + MAINLAND.h - 1 } as const;
-/** One storey, in world pixels (the height of a wall). */
-export const STOREY = 42;
+/** A block of wall, in world pixels: about a tile's cube. */
+export const BLOCK = 32;
+/** One storey, in world pixels (the height of a wall): a block taller than it was, so rooms stand well over your head. */
+export const STOREY = 42 + BLOCK;
+/** A building's storey height (most use STOREY; the Ring stands taller). */
+export const storeyHeight = (building?: Building | null) => building?.storeyH ?? STOREY;
+/** How high a storey's floor is lifted (its level of storeys, unless it says otherwise: the Ring's roof walk). */
+export const floorLift = (floor: Floor) => floor.lift ?? floor.level * STOREY;
 export const T = {
   VOID: 0, GRASS: 1, DARK_GRASS: 2, PATH: 3, COBBLE: 4, SAND: 5, WATER: 6, DEEP: 7, SWAMP: 8, SNOW: 9,
   STONE: 10, WOOD: 11, GRAVEL: 12, DUNGEON: 13, BRIDGE: 14, CLIFF: 15, WALL: 16, FARMLAND: 17, ICE: 18, CARPET: 19, ASH: 20, LAVA: 21,
@@ -371,6 +377,8 @@ export const isStorey = (y: number) => y >= FLOOR_Y - 0.5 && y < UNDER_Y - 0.5;
 export type Building = {
   x0: number; y0: number; x1: number; y1: number; roof: "gable" | "flat" | "cone" | "none"; color: string; chimney: boolean; name: string;
   storeys?: number; complex?: string;
+  /** Pixels per storey, when not STOREY (the Rare Friends Ring stands a block taller than a house). */
+  storeyH?: number;
   /** Extra wall height (pixels) seen only from outside, above the top storey (a tower taller than its floors), and a cone roof's height. */
   tall?: number; spire?: number;
   /**
@@ -403,7 +411,7 @@ export type Building = {
   sign?: string;
 };
 /** An upper storey: the real rectangle it covers and where its tiles are stored (real + (dx, dy)). */
-export type Floor = { complex: string; level: number; x0: number; y0: number; x1: number; y1: number; dx: number; dy: number };
+export type Floor = { complex: string; level: number; x0: number; y0: number; x1: number; y1: number; dx: number; dy: number; /** Pixels up, when not `level` storeys (on taller walls). */ lift?: number };
 /** A city wall standing taller than a storey: the outline of the rectangle, `storeys` high, battlemented. */
 export type Rampart = { x0: number; y0: number; x1: number; y1: number; storeys: number; /** What it's built of (stone unless said). */ walls?: Building["walls"] };
 export type World = {

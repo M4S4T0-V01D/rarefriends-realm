@@ -13,7 +13,7 @@ import { TICK_MS, attackSpeed, riding, type Facing, type Game, type Monster, typ
 import { npcOverhead, veiled, type Pick } from "./engine.ts";
 import { knows, maxHpOf as creatureMaxHp } from "./pursuance.ts";
 import { FAMILIES, dungeonTheme } from "./dungeontheme.ts";
-import { gloomAt, inDeadwood, UNDER_Y, FLOOR_Y, OVERWORLD_H, REGIONS, STOREY, T, W, H, isStorey, complexAt, cornerHeight, floorAt, groundHeight, inBounds, isUnderground, objectAtTile, onLevel, realPoint, type Building, type DecorKind, type Floor, type World, type WorldObject } from "./world.ts";
+import { gloomAt, inDeadwood, UNDER_Y, FLOOR_Y, OVERWORLD_H, REGIONS, STOREY, floorLift, storeyHeight, T, W, H, isStorey, complexAt, cornerHeight, floorAt, groundHeight, inBounds, isUnderground, objectAtTile, onLevel, realPoint, type Building, type DecorKind, type Floor, type World, type WorldObject } from "./world.ts";
 import { itemArt } from "./icons.ts";
 import type { PeerView } from "./social.ts";
 import type { Strike, Weather } from "./weather.ts";
@@ -177,7 +177,7 @@ const groundAt = (x: number, y: number) => ground ? groundHeight(ground, x, y) :
 let viewFloor: Floor | null = null;
 /** World point → screen, standing on the ground (`lift` is extra height above it). Stored upper-storey tiles are drawn on their building, a storey up per level. */
 export function toScreen(camera: Camera, x: number, y: number, lift = 0) {
-  if (isStorey(y) && ground) { const floor = floorAt(ground, x, y); if (floor) { x -= floor.dx; y -= floor.dy; lift += floor.level * STOREY; } }
+  if (isStorey(y) && ground) { const floor = floorAt(ground, x, y); if (floor) { x -= floor.dx; y -= floor.dy; lift += floorLift(floor); } }
   const { rx, ry } = rotate(camera, x - camera.x, y - camera.y), half = TILE_W / 2, height = lift + groundAt(x, y) - (camera.base ?? 0);
   return { x: (rx - ry) * half * camera.zoom + VIEW.width / 2, y: ((rx + ry) * half * camera.pitch - height * liftScale(camera)) * camera.zoom + VIEW.height / 2 };
 }
@@ -195,7 +195,7 @@ export function toTile(camera: Camera, sx: number, sy: number, floors = true) {
     return { x: Math.round(x), y: Math.round(y) };
   };
   if (floors && viewFloor && ground) {
-    const up = solve(viewFloor.level * STOREY), stored = onLevel(ground, up.x, up.y, viewFloor.level, viewFloor.complex);
+    const up = solve(floorLift(viewFloor)), stored = onLevel(ground, up.x, up.y, viewFloor.level, viewFloor.complex);
     if (stored.x !== up.x || stored.y !== up.y) return stored;
   }
   return solve(0);
@@ -327,7 +327,7 @@ function rgbOf(color: string): readonly number[] {
 function captureBox(ctx: CanvasRenderingContext2D, camera: Camera, x: number, y: number, w: number, d: number, h: number, top: string, left: string, right: string, lift: number, pattern: WallStyle | null, stroke: string | null = INK) {
   const gl = capturing!;
   let rx = x, ry = y, rlift = lift;
-  if (isStorey(y) && ground) { const floor = floorAt(ground, x, y); if (floor) { rx -= floor.dx; ry -= floor.dy; rlift += floor.level * STOREY; } }
+  if (isStorey(y) && ground) { const floor = floorAt(ground, x, y); if (floor) { rx -= floor.dx; ry -= floor.dy; rlift += floorLift(floor); } }
   const variant = Math.abs(Math.floor(x * 7 + y * 13)) % 4;
   const face = (fill: string) => pattern && fill.startsWith("#") ? gl.wallLayers.layer(wallTexture(pattern, fill, variant)) : -1;
   const lid = pattern === "cap" && top.startsWith("#") ? gl.wallLayers.layer(wallTexture("cap", top, variant)) : -1;
@@ -528,7 +528,7 @@ function cliffLook(x: number, y: number): [number, string, string, string] {
 }
 /** A world point's depth as the GPU's camera has it (gl.ts `project`), upstairs points moved to their real place. */
 function glDepth(camera: Camera, x: number, y: number, lift = 0) {
-  if (isStorey(y) && ground) { const floor = floorAt(ground, x, y); if (floor) { x -= floor.dx; y -= floor.dy; lift += floor.level * STOREY; } }
+  if (isStorey(y) && ground) { const floor = floorAt(ground, x, y); if (floor) { x -= floor.dx; y -= floor.dy; lift += floorLift(floor); } }
   const { rx, ry } = rotate(camera, x - camera.x, y - camera.y), h = lift + groundAt(x, y) - (camera.base ?? 0);
   return (rx + ry) * 32 * Math.sqrt(Math.max(0, 1 - camera.pitch * camera.pitch)) + h * camera.pitch / 0.8660254;
 }
@@ -1896,9 +1896,9 @@ function drawIcon(ctx: CanvasRenderingContext2D, icon: Icon, x: number, y: numbe
 /** A soft sky haze over the far distance (visible when the camera looks low across the land). */
 
 // ---------- Buildings ----------
-const WALL_H = 42, PLINTH_H = 12;
+const WALL_H = STOREY, PLINTH_H = 12;
 /** How high a building's roof reaches (for its shadow and its draw order). */
-const roofTop = (building: Building) => building.pyramid ? roofGeometry(building).top : (building.storeys ?? 1) * WALL_H + (building.tall ?? 0) + (building.roof === "flat" ? 0 : 26) + (building.spire ?? 0) * 0.35;
+const roofTop = (building: Building) => building.pyramid ? roofGeometry(building).top : (building.storeys ?? 1) * storeyHeight(building) + (building.tall ?? 0) + (building.roof === "flat" ? 0 : 26) + (building.spire ?? 0) * 0.35;
 /** Floors inside buildings (a wall face onto one of these, under a roof, can't be seen). */
 const INDOOR_FLOORS = new Set<number>([T.WOOD, T.STONE, T.CARPET]);
 const roofAlpha = new Map<number, number>();
@@ -1984,7 +1984,7 @@ function roofGeometry(building: Building) {
   // (A pyramid's faces start from its plinth, close in over it, and climb to a point at about fifty degrees.)
   const mizukai = building.style === "mizukai", o = building.pyramid ? 0.1 : mizukai ? 0.62 : 0.3, X0 = building.x0 - 0.5 - o, X1 = building.x1 + 0.5 + o, Y0 = building.y0 - 0.5 - o, Y1 = building.y1 + 0.5 + o;
   const alongX = X1 - X0 >= Y1 - Y0, half = (alongX ? Y1 - Y0 : X1 - X0) / 2, rise = building.pyramid ? half * (building.unfinished ? 38 * UNFINISHED_CUT : 38) : building.roof === "cone" ? building.spire ?? 118 : Math.max(20, Math.min(mizukai ? 60 : 48, half * (mizukai ? 13 : 11)));
-  const base = building.pyramid ? PLINTH_H : WALL_H * (building.storeys ?? 1) + (building.tall ?? 0), top = base + rise, mid = alongX ? (Y0 + Y1) / 2 : (X0 + X1) / 2;
+  const base = building.pyramid ? PLINTH_H : storeyHeight(building) * (building.storeys ?? 1) + (building.tall ?? 0), top = base + rise, mid = alongX ? (Y0 + Y1) / 2 : (X0 + X1) / 2;
   const A: RoofVertex = [X0, Y0, base], B: RoofVertex = [X1, Y0, base], C: RoofVertex = [X1, Y1, base], D: RoofVertex = [X0, Y1, base];
   // A hipped roof's ridge stops short of the ends by half the span (a square one comes to a point).
   const inset = building.hip ? Math.min(half, (alongX ? X1 - X0 : Y1 - Y0) / 2) : 0;
@@ -2195,7 +2195,7 @@ function pointInPolygon(x: number, y: number, polygon: readonly [number, number]
 }
 /** One tile of a flat roof: a slab at the top of the walls, with a merlon on every other edge tile. */
 function flatRoofTile(ctx: CanvasRenderingContext2D, camera: Camera, building: Building, x: number, y: number, edge: boolean, alpha: number, covered?: (nx: number, ny: number) => boolean) {
-  const base = WALL_H * (building.storeys ?? 1), color = building.color;
+  const base = storeyHeight(building) * (building.storeys ?? 1), color = building.color;
   ctx.globalAlpha = alpha;
   // The roof's sides only show at its edges: a side against more of the same roof is covered by it.
   box(ctx, camera, x, y, 1, 1, 5, shadeHex(color, 0.08), shadeHex(color, -0.06), shadeHex(color, -0.14), base, "rgba(22,22,22,0.35)", "cap", covered);
@@ -2496,7 +2496,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   // Where you really are: the storey (level) and the building complex you're in, if any.
   const here = realPoint(world, game.player.x, game.player.y), floor = floorAt(world, game.player.x, game.player.y), level = here.level;
   const inside = floor ? floor.complex : complexAt(world, here.x, here.y);
-  const liftGoal = level * STOREY; liftNow = scene.reducedMotion || Math.abs(liftGoal - liftNow) > STOREY * 2 ? liftGoal : liftNow + (liftGoal - liftNow) * Math.min(1, dt * 8);
+  const liftGoal = floor ? floorLift(floor) : level * STOREY; liftNow = scene.reducedMotion || Math.abs(liftGoal - liftNow) > STOREY * 2 ? liftGoal : liftNow + (liftGoal - liftNow) * Math.min(1, dt * 8);
   setGround(world); viewFloor = floor; camera.base = groundHeight(world, camera.x, camera.y) + liftNow;
   const low = !!scene.low, q = scene.quality ?? (low ? LOW_QUALITY : HIGH_QUALITY);
   DRAW_DISTANCE = Math.max(24, Math.min(110, Math.round(q.drawDistance))); HAZE_START = Math.round(DRAW_DISTANCE * 2 / 3);
@@ -2561,12 +2561,12 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     if (plinth) { storeys = 0; tall = PLINTH_H; windows = false; }
     const d = depth(x, y), dungeon = isUnderground(y), timber = style === "timber";
     // Under a roof you can see, a wall's inward faces can't be seen: skip them (they're half the work).
-    const owner = !dungeon && inBounds(x, y) ? world.buildingAt[y * W + x] : 0, roofed = owner > 0 && (roofAlpha.get(owner - 1) ?? 0) > 0.95 && !cut;
+    const owner = !dungeon && inBounds(x, y) ? world.buildingAt[y * W + x] : 0, per = owner ? storeyHeight(world.buildings[owner - 1]) : WALL_H, roofed = owner > 0 && (roofAlpha.get(owner - 1) ?? 0) > 0.95 && !cut;
     // (Only faces onto a real floor inside: a round tower's footprint square has open ground in its corners.)
     const inward = roofed ? (nx: number, ny: number) => { const tx = x + nx, ty = y + ny; return inBounds(tx, ty) && world.buildingAt[ty * W + tx] === owner && INDOOR_FLOORS.has(world.tiles[ty * W + tx]); } : undefined;
     const hidden = inward && joined ? (nx: number, ny: number) => inward(nx, ny) || joined(nx, ny) : inward ?? joined;
-    drawables.push({ depth: d, at: { x, y, h: 20 }, size: [(cut ? 9 : dungeon ? 34 : storeys * WALL_H + tall) + 24, 52, 30],
-      exact: true, hull: () => near ? null : boxHull(camera, x, y, 1, 1, cut ? 9 : dungeon ? 34 : battlement ? 22 : storeys * WALL_H + tall), draw: () => {
+    drawables.push({ depth: d, at: { x, y, h: 20 }, size: [(cut ? 9 : dungeon ? 34 : storeys * per + tall) + 24, 52, 30],
+      exact: true, hull: () => near ? null : boxHull(camera, x, y, 1, 1, cut ? 9 : dungeon ? 34 : battlement ? 22 : storeys * per + tall), draw: () => {
       // (On the GPU unless it's see-through: a wall you're standing behind.)
       capturing = glr && !near && ctx === target ? glr : null;
       ctx.globalAlpha = near ? 0.3 : 1;
@@ -2582,11 +2582,11 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       else if (cut) box(ctx, camera, x, y, 1, 1, 9, top, left, right, 0, INK, plain);
       else if (battlement) { box(ctx, camera, x, y, 1, 1, 12, top, left, right, 0, INK, "brick"); if ((Math.round(x) + Math.round(y)) % 2 === 0) box(ctx, camera, x, y, 0.62, 0.62, 10, top, left, right, 12, INK, "brick"); }
       else {
-        for (let k = 0; k < storeys; k++) box(ctx, camera, x, y, 1, 1, WALL_H, top, left, right, k * WALL_H, INK, windows && hash(x, y + k * 7) < 0.34 ? glazed(k) : plain, hidden);
+        for (let k = 0; k < storeys; k++) box(ctx, camera, x, y, 1, 1, per, top, left, right, k * per, INK, windows && hash(x, y + k * 7) < 0.34 ? glazed(k) : plain, hidden);
         // A tower taller than its floors: more wall above, with a string course of stone between.
         // A rampart: a wall-walk's coping, and a merlon on every other tile.
-        if (crown) { box(ctx, camera, x, y, 1.06, 1.06, 5, top, shadeHex(left, 0.06), shadeHex(right, 0.06), storeys * WALL_H, INK, "brick", hidden); if ((Math.round(x) + Math.round(y)) % 2 === 0) box(ctx, camera, x, y, 0.62, 0.62, 12, top, left, right, storeys * WALL_H + 5, INK, "brick"); }
-        else if (tall) { box(ctx, camera, x, y, 1.04, 1.04, 4, top, shadeHex(left, 0.06), shadeHex(right, 0.06), storeys * WALL_H, INK, null, hidden); box(ctx, camera, x, y, 1, 1, tall - 4, top, left, right, storeys * WALL_H + 4, INK, windows && hash(x, y + 91) < 0.28 ? glazed(storeys) : plain, hidden); }
+        if (crown) { box(ctx, camera, x, y, 1.06, 1.06, 5, top, shadeHex(left, 0.06), shadeHex(right, 0.06), storeys * per, INK, "brick", hidden); if ((Math.round(x) + Math.round(y)) % 2 === 0) box(ctx, camera, x, y, 0.62, 0.62, 12, top, left, right, storeys * WALL_H + 5, INK, "brick"); }
+        else if (tall) { box(ctx, camera, x, y, 1.04, 1.04, 4, top, shadeHex(left, 0.06), shadeHex(right, 0.06), storeys * per, INK, null, hidden); box(ctx, camera, x, y, 1, 1, tall - 4, top, left, right, storeys * WALL_H + 4, INK, windows && hash(x, y + 91) < 0.28 ? glazed(storeys) : plain, hidden); }
       }
       ctx.globalAlpha = 1; capturing = null;
     } });
@@ -2695,15 +2695,15 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       const rampart = building || mine ? 0 : rampartAt(world, x, y);
       wall(x, y, mine ? 1 : building?.storeys ?? (rampart || 1), cut, near, !!owner && !cut && !building?.pyramid, false, building?.walls ?? (rampart > 0 ? rampartWalls(world, x, y) : "stone"), mine ? 0 : building?.tall ?? 0, joined, rampart > 0, !!building?.pyramid && !mine);
       // Walls not under a roof cast their own shadows (a building's are cast whole).
-      if (!building || building.roof === "none") blockers.push([x, y, (building?.storeys ?? (rampart || 1)) * WALL_H]);
+      if (!building || building.roof === "none") blockers.push([x, y, (building?.storeys ?? (rampart || 1)) * storeyHeight(building)]);
     } else if (y < FLOOR_Y && !isUnderground(y) && world.buildingAt[y * W + x] && (world.buildings[world.buildingAt[y * W + x] - 1].storeys ?? 1) > 1 && !world.buildings[world.buildingAt[y * W + x] - 1].pyramid && edgeOf(world.buildings[world.buildingAt[y * W + x] - 1], x, y)
       && !(inside !== null && complexAt(world, x, y) === inside) && !(Math.abs(x - pp.x) + Math.abs(y - pp.y) < 7 && depth(x, y) > playerDepth + 0.5 && !floor)) {
       // A doorway in a tall building is one storey high: the wall carries on above it.
-      const building = world.buildings[world.buildingAt[y * W + x] - 1], h = ((building.storeys ?? 1) - 1) * WALL_H + (building.tall ?? 0);
-      drawables.push({ depth: depth(x, y), at: { x, y, h: WALL_H + 20 }, size: [h + WALL_H + 24, 52, 30], exact: true, hull: () => boxHull(camera, x, y, 1, 1, h, WALL_H), draw: () => {
+      const building = world.buildings[world.buildingAt[y * W + x] - 1], per = storeyHeight(building), h = ((building.storeys ?? 1) - 1) * per + (building.tall ?? 0);
+      drawables.push({ depth: depth(x, y), at: { x, y, h: per + 20 }, size: [h + per + 24, 52, 30], exact: true, hull: () => boxHull(camera, x, y, 1, 1, h, per), draw: () => {
         capturing = glr && ctx === target ? glr : null;
-        box(ctx, camera, x, y, 1, 1, 6, "#b9b4ab", "#b3ada4", "#9d978e", WALL_H, INK, null);
-        box(ctx, camera, x, y, 1, 1, h - 6, "#b9b4ab", "#a39e95", "#8f8a82", WALL_H + 6, INK, hash(x, y + 5) < 0.4 ? (windowGlow > 0.02 ? "window_lit" : "window") : "brick");
+        box(ctx, camera, x, y, 1, 1, 6, "#b9b4ab", "#b3ada4", "#9d978e", per, INK, null);
+        box(ctx, camera, x, y, 1, 1, h - 6, "#b9b4ab", "#a39e95", "#8f8a82", per + 6, INK, hash(x, y + 5) < 0.4 ? (windowGlow > 0.02 ? "window_lit" : "window") : "brick");
         capturing = null;
       } });
     } else if (terrain === T.CLIFF) {
@@ -2904,13 +2904,13 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
         const edge = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => !own(x + dx, y + dy) && complexAt(world, x + dx, y + dy) !== complex);
         const covered = (nx: number, ny: number) => own(x + nx, y + ny);
         // (A box: lit by its outline, slab and coping; the merlons on top take the light behind them.)
-        drawables.push({ depth: depth(x, y) + 0.45, at: { x, y, h: (building.storeys ?? 1) * WALL_H + 8 }, size: [(building.storeys ?? 1) * WALL_H + 40, 52, 30], exact: true,
-          hull: () => alphaNow > 0.95 ? boxHull(camera, x, y, 1, 1, edge ? 9 : 5, (building.storeys ?? 1) * WALL_H) : null,
+        drawables.push({ depth: depth(x, y) + 0.45, at: { x, y, h: (building.storeys ?? 1) * storeyHeight(building) + 8 }, size: [(building.storeys ?? 1) * storeyHeight(building) + 40, 52, 30], exact: true,
+          hull: () => alphaNow > 0.95 ? boxHull(camera, x, y, 1, 1, edge ? 9 : 5, (building.storeys ?? 1) * storeyHeight(building)) : null,
           draw: () => { capturing = glr && alphaNow > 0.95 && ctx === target ? glr : null; flatRoofTile(ctx, camera, building, x, y, edge, alphaNow, covered); capturing = null; } });
       }
       return;
     }
-    drawables.push({ depth: front, at: { x: (building.x0 + building.x1) / 2, y: (building.y0 + building.y1) / 2, h: (building.storeys ?? 1) * WALL_H + 24 }, rect: () => roofRect(building), exact: !!glr, tag: "roof",
+    drawables.push({ depth: front, at: { x: (building.x0 + building.x1) / 2, y: (building.y0 + building.y1) / 2, h: (building.storeys ?? 1) * storeyHeight(building) + 24 }, rect: () => roofRect(building), exact: !!glr, tag: "roof",
       hull: () => (roofAlpha.get(index) ?? 0) > 0.95 ? roofHull(camera, building) : null, draw: () => { const next = fade(); if (next > 0.02) drawRoof(ctx, camera, building, next, now, scene.reducedMotion); } });
   });
   // ---------- Fronts: shops' awnings and signs, inns' signs, banks' and halls' columns and pediments ----------
@@ -2984,7 +2984,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
    */
   function grandFront(building: Building, door: DoorGroup) {
     const { nx, ny, face } = door, alongX = ny !== 0, min = (alongX ? building.x0 : building.y0) - 0.5, max = (alongX ? building.x1 : building.y1) + 0.5;
-    const H = WALL_H * (building.storeys ?? 1) + (building.tall ?? 0), length = max - min, mid = (min + max) / 2;
+    const H = storeyHeight(building) * (building.storeys ?? 1) + (building.tall ?? 0), length = max - min, mid = (min + max) / 2;
     const pt = (a: number, out: number, h: number): RoofVertex => alongX ? [a, face + ny * out, h] : [face + nx * out, a, h];
     const P = (v: RoofVertex) => { const q = toScreen(camera, v[0], v[1], v[2]); return [q.x, q.y] as const; };
     const [fx, fy] = alongX ? [mid, face] : [face, mid], facing = depth(fx + nx, fy + ny) > depth(fx, fy);
@@ -3246,7 +3246,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       for (const building of world.buildings) {
         if (building.roof === "none" || building.x1 < x0 - 12 || building.x0 > x1 + 12 || building.y1 < y0 - 12 || building.y0 > y1 + 12) continue;
         shadowBox(building.x0 - 0.5, building.y0 - 0.5, building.x1 + 0.5, building.y1 + 0.5, roofTop(building), pyramidInset(building));
-        if (building.keep) { const kx = (building.x0 + building.x1) / 2, ky = (building.y0 + building.y1) / 2, kh = building.keep.size / 2; shadowBox(kx - kh, ky - kh, kx + kh, ky + kh, (building.storeys ?? 1) * WALL_H + (building.spire ?? 0) + building.keep.storeys * WALL_H + building.keep.spire * 0.35); }
+        if (building.keep) { const kx = (building.x0 + building.x1) / 2, ky = (building.y0 + building.y1) / 2, kh = building.keep.size / 2; shadowBox(kx - kh, ky - kh, kx + kh, ky + kh, (building.storeys ?? 1) * storeyHeight(building) + (building.spire ?? 0) + building.keep.storeys * WALL_H + building.keep.spire * 0.35); }
       }
       for (const [bx, by, height] of blockers) shadowBox(bx - 0.5, by - 0.5, bx + 0.5, by + 0.5, height);
       if (q.spriteShadows) {
@@ -3317,7 +3317,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
         if (building.roof === "none" || building.x1 < x0 - 12 || building.x0 > x1 + 12 || building.y1 < y0 - 12 || building.y0 > y1 + 12) continue;
         shadowBox(building.x0 - 0.5, building.y0 - 0.5, building.x1 + 0.5, building.y1 + 0.5, roofTop(building), pyramidInset(building));
         // A palace's keep and spire throw their own, longer shadow.
-        if (building.keep) { const kx = (building.x0 + building.x1) / 2, ky = (building.y0 + building.y1) / 2, kh = building.keep.size / 2; shadowBox(kx - kh, ky - kh, kx + kh, ky + kh, (building.storeys ?? 1) * WALL_H + (building.spire ?? 0) + building.keep.storeys * WALL_H + building.keep.spire * 0.35); }
+        if (building.keep) { const kx = (building.x0 + building.x1) / 2, ky = (building.y0 + building.y1) / 2, kh = building.keep.size / 2; shadowBox(kx - kh, ky - kh, kx + kh, ky + kh, (building.storeys ?? 1) * storeyHeight(building) + (building.spire ?? 0) + building.keep.storeys * WALL_H + building.keep.spire * 0.35); }
       }
       for (const [bx, by, height] of blockers) shadowBox(bx - 0.5, by - 0.5, bx + 0.5, by + 0.5, height);
       // Everything else throws its own silhouette: drawn again, squashed flat onto the ground and slanted away from the sun.

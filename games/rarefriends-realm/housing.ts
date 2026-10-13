@@ -64,7 +64,7 @@ export function buyHome(game: Game): boolean {
   const player = game.player, next = tierAt(player.home ? player.home.tier : 0);
   if (!next) { message(game, "Your manor is as grand as the Realm allows."); return false; }
   if (presenceLevel(player) < next.presence) { message(game, `The steward wants a name the Realm knows: Presence ${next.presence} for a ${next.name.toLowerCase()}.`, "warn"); return false; }
-  if (count(player, "coins") < next.coins) { message(game, `A ${next.name.toLowerCase()} costs ${next.coins.toLocaleString()} coins.`, "warn"); return false; }
+  if (count(player, "coins") < next.coins) { message(game, `A ${next.name.toLowerCase()} costs ${next.coins.toLocaleString()} Frens.`, "warn"); return false; }
   take(player, "coins", next.coins);
   if (!player.home) { player.home = DEFAULT_HOME(); presenceXp(game, 300); message(game, "The deed is yours: a cottage on Homestead Row, west of Friendhollow on the Westmarch road.", "quest"); }
   else { player.home.tier = next.tier as 1 | 2 | 3; presenceXp(game, 200); message(game, `Your home is a ${next.name.toLowerCase()} now.`, "quest"); }
@@ -77,7 +77,7 @@ export function buyFurnishing(game: Game, slotId: string, optionId: string): boo
   if (!slotOpen(home, slot)) { message(game, `That needs a ${HOME_TIERS[slot.tier - 1].name.toLowerCase()}.`, "warn"); return false; }
   if (home.furniture[slot.id] === option.id) return false;
   if (option.presence && presenceLevel(player) < option.presence) { message(game, `${option.name} needs Presence ${option.presence}.`, "warn"); return false; }
-  if (count(player, "coins") < option.coins) { message(game, `${option.name} costs ${option.coins.toLocaleString()} coins.`, "warn"); return false; }
+  if (count(player, "coins") < option.coins) { message(game, `${option.name} costs ${option.coins.toLocaleString()} Frens.`, "warn"); return false; }
   take(player, "coins", option.coins);
   home.furniture[slot.id] = option.id; message(game, `${option.name}: placed.`, "quest"); sound(game, "coins"); applyHome(game);
   return true;

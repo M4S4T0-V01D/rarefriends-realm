@@ -33,7 +33,7 @@ export const MOUNT_NPCS: Record<string, NpcDef> = {
 export const MOUNT_QUESTS: readonly QuestDef[] = [
   {
     id: STRIPED_ONE, name: "The Striped One", points: 1, difficulty: "Intermediate", start: "Talk to Huntmaster Fenn at Tallgrass, once the tracks there are quiet (and the Howling Vault, if he has that for you first).",
-    requirements: ["Tracks in the Tallgrass completed", "Combat 40 recommended"], rewards: ["1 Quest Point", "3,000 Pursuance XP", "1,500 Strength XP", "800 coins", "A tiger to ride"],
+    requirements: ["Tracks in the Tallgrass completed", "Combat 40 recommended"], rewards: ["1 Quest Point", "3,000 Pursuance XP", "1,500 Strength XP", "800 Frens", "A tiger to ride"],
     journal: game => {
       const s = stage(game, STRIPED_ONE);
       if (s === 0) return ["Huntmaster Fenn says poachers came through The Wilds with a tiger in a cage, and are camped at the Wilds' east edge waiting on a buyer."];
@@ -44,7 +44,7 @@ export const MOUNT_QUESTS: readonly QuestDef[] = [
   },
   {
     id: DRAKE_OF_YOUR_OWN, name: "A Drake of Your Own", points: 1, difficulty: "Experienced", start: "Talk to Ysolde the drake hunter at Wyrmreach.",
-    requirements: ["Combat 50 recommended", "Ten cooked meat"], rewards: ["1 Quest Point", "3,000 Pursuance XP", "2,000 Firemaking XP", "800 coins", "A little green dragon to ride"],
+    requirements: ["Combat 50 recommended", "Ten cooked meat"], rewards: ["1 Quest Point", "3,000 Pursuance XP", "2,000 Firemaking XP", "800 Frens", "A little green dragon to ride"],
     journal: game => {
       const s = stage(game, DRAKE_OF_YOUR_OWN);
       if (s === 0) return ["Ysolde the drake hunter at Wyrmreach has an egg on her mind: one the drakes left in a nest up by the lava, that won't last another winter cold."];

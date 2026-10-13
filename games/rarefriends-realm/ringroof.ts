@@ -8,7 +8,7 @@
  * inside the roof lifts away like any other. The walk is that complex's first storey (a Floor), stored in the storey
  * rows like the castle's.
  */
-import { FRAME_ARENA as ARENA, GEN_FLOOR_Y as FLOOR_Y, T, type Floor, type GenContext, type worldTools } from "./world.ts";
+import { BLOCK, FRAME_ARENA as ARENA, GEN_FLOOR_Y as FLOOR_Y, STOREY, T, type Floor, type GenContext, type worldTools } from "./world.ts";
 
 type Tools = ReturnType<typeof worldTools>;
 export const RING_COMPLEX = "friends_ring";
@@ -17,6 +17,9 @@ const STORE_X = 128;
 
 export function roofRing(ctx: GenContext, t: Tools, floors: Floor[]) {
   const { get, put, add, decor, tileIndex } = t, STORE_Y = FLOOR_Y + 1;
+  // The Ring stands a block taller than a house: its walls (and the walk on them) are a storey and a block high.
+  // (Worked out here, not at load: world.ts loads this module before its own constants are set.)
+  const RING_STOREY = STOREY + BLOCK;
   const { x: cx, y: cy, outer, inner } = ARENA, dist = (x: number, y: number) => Math.hypot(x - cx, y - cy);
   const x0 = cx - outer - 1, y0 = cy - outer - 1, x1 = cx + outer + 1, y1 = cy + outer + 1;
   // Under the roof: the walls and everything between them.
@@ -28,13 +31,13 @@ export function roofRing(ctx: GenContext, t: Tools, floors: Floor[]) {
       const covered = x <= x1 && under(x, y) && (get(x, y) === T.WALL || get(x, y) === T.STONE || get(x, y) === T.CARPET);
       if (covered && start === null) start = x;
       if (!covered && start !== null) {
-        ctx.buildings.push({ x0: start, y0: y, x1: x - 1, y1: y, roof: "flat", color: "#7d6f62", chimney: false, name: "The Rare Friends Ring", storeys: 1, complex: RING_COMPLEX, walls: "stone" });
+        ctx.buildings.push({ x0: start, y0: y, x1: x - 1, y1: y, roof: "flat", color: "#7d6f62", chimney: false, name: "The Rare Friends Ring", storeys: 1, storeyH: RING_STOREY, complex: RING_COMPLEX, walls: "stone" });
         start = null;
       }
     }
   }
   // The walk on top: a storey covering the Ring's square, stone between the parapets, nothing over the pit or outside.
-  const floor: Floor = { complex: RING_COMPLEX, level: 1, x0, y0, x1, y1, dx: STORE_X - x0, dy: STORE_Y - y0 };
+  const floor: Floor = { complex: RING_COMPLEX, level: 1, x0, y0, x1, y1, dx: STORE_X - x0, dy: STORE_Y - y0, lift: RING_STOREY };
   floors.push(floor);
   const up = (x: number, y: number) => ({ x: x + floor.dx, y: y + floor.dy });
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {

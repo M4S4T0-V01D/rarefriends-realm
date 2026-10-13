@@ -90,7 +90,7 @@ const combat = (game: Game) => combatLevel(game.player);
 export const MIZUKAI_QUESTS: readonly QuestDef[] = [
   {
     id: "landfall", name: "Landfall at Kurohama", points: 1, difficulty: "Novice", start: "Talk to Harbourmaster Isamu Kaneda at the harbour office in Kurohama, on Hinode.",
-    requirements: [], rewards: ["1 Quest Point", "1,500 coins", "2,000 Presence XP", "Boats to Kibi, Hanazono, Morishima, Iwaoka, Kusabana and Torojima"],
+    requirements: [], rewards: ["1 Quest Point", "1,500 Frens", "2,000 Presence XP", "Boats to Kibi, Hanazono, Morishima, Iwaoka, Kusabana and Torojima"],
     journal: game => {
       const s = stage(game, "landfall");
       if (s === 0) return ["Everyone who comes to the Isles from the mainland is presented at the Hall of Takamori. Harbourmaster Kaneda in Kurohama arranges it."];
@@ -111,7 +111,7 @@ export const MIZUKAI_QUESTS: readonly QuestDef[] = [
   },
   {
     id: "drowned_paddies", name: "The Drowned Paddies", points: 1, difficulty: "Novice", start: "Talk to Headman Sakuji in Tanabe, on Hinode's southern terraces.",
-    requirements: ["Combat 18 recommended"], rewards: ["1 Quest Point", "1,200 Cooking XP", "800 coins", "10 rice balls", "A straw kasa"],
+    requirements: ["Combat 18 recommended"], rewards: ["1 Quest Point", "1,200 Cooking XP", "800 Frens", "10 rice balls", "A straw kasa"],
     journal: game => {
       const s = stage(game, "drowned_paddies");
       if (s === 0) return ["The river imps are stealing Tanabe's rice, and the headman is losing count."];
@@ -121,7 +121,7 @@ export const MIZUKAI_QUESTS: readonly QuestDef[] = [
   },
   {
     id: "bath_house_pass", name: "The Bath-House Pass", points: 1, difficulty: "Novice", start: "Talk to Okami Fumi at the Steaming Moon in Yumoto Springs.",
-    requirements: [], rewards: ["1 Quest Point", "1,500 Wayfaring XP", "A long soak: rested for a while (more XP)", "500 coins"],
+    requirements: [], rewards: ["1 Quest Point", "1,500 Wayfaring XP", "A long soak: rested for a while (more XP)", "500 Frens"],
     journal: game => {
       const s = stage(game, "bath_house_pass");
       if (s === 0) return ["Something's wrong at the Steaming Moon in Yumoto. The monkeys look pleased with themselves."];
@@ -174,7 +174,7 @@ export const MIZUKAI_QUESTS: readonly QuestDef[] = [
   },
   {
     id: "lanterns_drowned", name: "Lanterns for the Drowned", points: 3, difficulty: "Experienced", start: "Talk to Old Mother Hotaru, the Lantern Keeper, on Torojima.",
-    requirements: ["Landfall at Kurohama", "Combat 30 recommended"], rewards: ["3 Quest Points", "6,000 Faith XP", "2,000 coins", "The Lantern Keeper's trust"],
+    requirements: ["Landfall at Kurohama", "Combat 30 recommended"], rewards: ["3 Quest Points", "6,000 Faith XP", "2,000 Frens", "The Lantern Keeper's trust"],
     journal: game => {
       const s = stage(game, "lanterns_drowned");
       if (s === 0) return ["The lanterns on Torojima are going out, one a night, and the Keeper can't relight them fast enough."];
@@ -225,7 +225,7 @@ export const MIZUKAI_QUESTS: readonly QuestDef[] = [
   },
   {
     id: "sea_gave_back", name: "What the Sea Gave Back", points: 4, difficulty: "Master", start: "Talk to Old Mother Hotaru on Torojima, after Lanterns for the Drowned and The Broken Treaty.",
-    requirements: ["Lanterns for the Drowned", "The Broken Treaty", "Combat 90 recommended"], rewards: ["4 Quest Points", "20,000 coins", "15,000 Faith XP", "5,000 Presence XP", "The title 'Who the Sea Gave Back'"],
+    requirements: ["Lanterns for the Drowned", "The Broken Treaty", "Combat 90 recommended"], rewards: ["4 Quest Points", "20,000 Frens", "15,000 Faith XP", "5,000 Presence XP", "The title 'Who the Sea Gave Back'"],
     journal: game => {
       const s = stage(game, "sea_gave_back");
       if (s === 0) return ["The Lantern Keeper knows what holds the drowned, and she will not say it until she trusts you, and the Hall, both."];
@@ -277,7 +277,7 @@ export function talkMizukai(game: Game, npcId: string, name: string): Dialogue |
         });
         return chat(name, npcSays(name, "The Hall of Takamori first: Lady Suzu. Then the Thousand Steps to Kumoyama. Then back here."));
       }
-      return chat(name, npcSays(name, pick(game, ["Boats every day to every island that wants visitors. The pilot on the pier sells the passage.", "The black sand is iron. The smith pays children a coin a bucket for it, and they're richer than I am.", "There's a patch on my chart west of Ashigane that I've never inked in. Every harbourmaster before me left it blank too.", "Your mainland's ferry comes in at Eastport. That's what you call it, anyway. We call it 'the mainland pier', and don't think about it."])), [
+      return chat(name, npcSays(name, pick(game, ["Boats every day to every island that wants visitors. The pilot on the pier sells the passage.", "The black sand is iron. The smith pays children a Fren a bucket for it, and they're richer than I am.", "There's a patch on my chart west of Ashigane that I've never inked in. Every harbourmaster before me left it blank too.", "Your mainland's ferry comes in at Eastport. That's what you call it, anyway. We call it 'the mainland pier', and don't think about it."])), [
         { label: "Anywhere else worth sailing?", then: () => { flag(game, "dock_three_stones"); flag(game, "dock_turtle_rock"); return chat(name, npcSays(name, "Turtle Rock, if you've a wish; the fishers row out to it from Shiogama. And the Three Stones, south of Kibi: an old watch-post, nobody remembers what for. Fisher Wataru will take you. Those two are on the charts now, for you.")); } },
         { label: "Goodbye.", then: () => null },
       ]);
@@ -322,7 +322,7 @@ export function talkMizukai(game: Game, npcId: string, name: string): Dialogue |
     ])));
     case "kuro_innkeeper": return chat(name, npcSays(name, pick(game, ["The Sleeping Crane: rice, soup, eel, tea, rice wine, and a mat for the night. The cranes are painted on the screens; the real ones don't sleep here.", "Everyone from the mainland asks for bread. We have bread. It's made of rice.", "Mind the rice wine. It's warm and it's small and that's how it gets you."])));
     case "kuro_fishmonger": return chat(name, npcSays(name, pick(game, ["Eel's best grilled. Everything's best grilled. Except what's best raw.", "The sea monks off the north cape ate a whole boat last spring. Didn't even spit out the oars.", "Fish from Shiogama, fish from Isohama, fish from wherever the sea's in a good mood."])));
-    case "kuro_merchant": return chat(name, npcSays(name, pick(game, ["Rice, soup, cucumbers, hats, nets, everything a traveller forgets, and paper seals, if you're learning.", "Cucumbers sell well in Tanabe. Not to the farmers.", "Mainland coins are good here. So are mainland manners, when people remember them."])));
+    case "kuro_merchant": return chat(name, npcSays(name, pick(game, ["Rice, soup, cucumbers, hats, nets, everything a traveller forgets, and paper seals, if you're learning.", "Cucumbers sell well in Tanabe. Not to the farmers.", "Mainland Frens are good here. So are mainland manners, when people remember them."])));
     case "kuro_clothier": return chat(name, npcSays(name, pick(game, ["Indigo for the street, white for the shrine, black for the castle, and never wrap your kimono left over right unless someone's died.", "A haori with a crane on the back. For visiting. Everyone visits eventually.", "Straw sandals and split-toed socks. You'll walk quieter, I promise."])));
     case "kuro_apothecary": return chat(name, npcSays(name, pick(game, ["Tea leaf for faith, shiso for poison, moon mugwort for spirits, Kumo root for the long rites, and spirit bell for the things I won't brew myself.", "Mugwort smoke keeps the wayward ones off. Burn it in a vial and breathe it: five minutes of peace. Spirit incense, I call it. You can call it what you like.", "Kusabana has the best herbs. Midori grows them. She doesn't like visitors, but she likes people who bring her news."])));
     case "mizukai_villager": return chat(name, npcSays(name, pick(game, ["Good day. You're from the mainland? It shows, in a good way. Mostly.", "The castle's up the Harbour Road; the shrine's up the Thousand Steps from the castle. Everyone gets lost the first time and blames the steps.", "If a parasol hops at you, it's lonely, not dangerous. Mostly.", "The lord is young. The lord's sister is not. That's why things work.", "Josaki? We don't talk about Josaki. My grandmother did, once, and then she went quiet for a week.", "The sun comes up over the sea out there, every morning, first in the world. It's why the Isles are called what they're called, whatever your mainland calls them."])));
@@ -556,7 +556,7 @@ const BOAT_LINES: Record<string, string> = {
   boat_ashigane: "Ashigane. You're sure? Everyone's sure until they see the ogres.",
   boat_smugglers_cove: "You know where you're going? Then I don't, and that's how we both like it.",
   boat_three_stones: "The Three Stones. Lovely for an afternoon. Nobody knows what the watch-post watched for.",
-  boat_turtle_rock: "Turtle Rock! One coin in the box, one wish. Mine came true twice.",
+  boat_turtle_rock: "Turtle Rock! One Fren in the box, one wish. Mine came true twice.",
   boat_hakkotsu: "…",
   // The sea ports' packets (ports.ts).
   boat_gullwick: "Gullwick packet, for anywhere the sea goes and a few places it shouldn't. Fares by the league, paid at the plank.",

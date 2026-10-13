@@ -66,32 +66,32 @@ const journalItems = (game: Game, items: readonly (readonly [string, number])[])
 type BarQuest = { bar: string; name: string; start: string; wants: readonly (readonly [string, number])[]; rewards: string[]; reward: (game: Game) => void; intro: string; offer: string[]; accept: string; done: string[] };
 export const BAR_QUESTS: Record<string, BarQuest> = {
   bar_sleepy: { bar: "sleepy", name: "Last Orders", start: "Talk to Bram at the Sleepy Friend, Friendhollow's bar.", wants: [["grain", 6], ["sweetberry", 10]],
-    rewards: ["1 Quest Point", "600 coins", "1,500 Cooking XP", "4 Sleepy stouts"], reward: g => { give(g.player, "coins", 600); addXp(g, "cooking", 1500, { raw: true }); giveOrDrop(g, "sleepy_stout", 4); },
+    rewards: ["1 Quest Point", "600 Frens", "1,500 Cooking XP", "4 Sleepy stouts"], reward: g => { give(g.player, "coins", 600); addXp(g, "cooking", 1500, { raw: true }); giveOrDrop(g, "sleepy_stout", 4); },
     intro: "Bram's cellar is dry, and the harvest fair's in three days.",
     offer: ["The fair's in three days and my cellar's dry. Dry! The Sleepy Friend, dry, at the fair.", "Six grain for the mash and ten sweetberries for the berry stout. Bring them and the first round's yours. The first four rounds."],
     accept: "Six grain, ten sweetberries. The mill's west; the berries grow wild all over.", done: ["That'll mash. That'll mash beautifully.", "Four of the first stouts out of the barrel, as promised. Don't drink them before noon. I mean it."] },
   bar_prayer: { bar: "prayer", name: "The Seventh Toast", start: "Talk to Mother Constance at the Seventh Prayer, in Raria.", wants: [["char", 5], ["bread", 5]],
-    rewards: ["1 Quest Point", "900 coins", "2,000 Faith XP", "2,000 Cooking XP", "4 Lawful small beers"], reward: g => { give(g.player, "coins", 900); addXp(g, "prayer", 2000, { raw: true }); addXp(g, "cooking", 2000, { raw: true }); giveOrDrop(g, "lawful_beer", 4); },
+    rewards: ["1 Quest Point", "900 Frens", "2,000 Faith XP", "2,000 Cooking XP", "4 Lawful small beers"], reward: g => { give(g.player, "coins", 900); addXp(g, "prayer", 2000, { raw: true }); addXp(g, "cooking", 2000, { raw: true }); giveOrDrop(g, "lawful_beer", 4); },
     intro: "On the seventh day the Law's toast is drunk at the Seventh Prayer, with char and bread, at the hour.",
     offer: ["On the seventh day, at the hour, the Law's toast is drunk here: char from the Vesper, bread from the Crown's ovens, one measure each.", "The fishmonger is ill, which is not lawful but is true. Five cooked char and five loaves, before the hour. You'll be thanked correctly."],
     accept: "Five char, cooked. Five loaves. The hour does not wait; I will, a little.", done: ["Five and five. Correct.", "Four measures of our small beer, to the Law's strength exactly. Drink them one at a time, as is proper."] },
   bar_vat: { bar: "vat", name: "A Crooked Vintage", start: "Talk to Ottilie Crane at the Crooked Vat, in Dyemoor.", wants: [["sweetberry", 12], ["willow_logs", 4]],
-    rewards: ["1 Quest Point", "700 coins", "2,500 Craftwork XP", "4 Madder wines"], reward: g => { give(g.player, "coins", 700); addXp(g, "crafting", 2500, { raw: true }); giveOrDrop(g, "madder_wine", 4); },
+    rewards: ["1 Quest Point", "700 Frens", "2,500 Craftwork XP", "4 Madder wines"], reward: g => { give(g.player, "coins", 700); addXp(g, "crafting", 2500, { raw: true }); giveOrDrop(g, "madder_wine", 4); },
     intro: "Ottilie makes madder wine in an old dye vat, and the vat's split.",
     offer: ["They call it the Crooked Vat because the vat's crooked. I make the wine in it. Made. It's split down the stave.", "Four willow logs for new staves, and twelve sweetberries for the sweetening, and I'll have it running red again by the guild's feast."],
     accept: "Four willow, twelve sweetberries. The willows grow by the river.", done: ["Willow staves, sweet berries. Listen to that vat hold.", "First four bottles of the new madder. It goes to your head. That's rather the point."] },
   bar_hound: { bar: "hound", name: "The Hound's Bite", start: "Talk to Hester Vane at the Obedient Hound, in Lawgate.", wants: [["pine_logs", 6], ["large_bones", 6]],
-    rewards: ["1 Quest Point", "800 coins", "3,000 Attack XP", "4 Hound's bites"], reward: g => { give(g.player, "coins", 800); addXp(g, "attack", 3000, { raw: true }); giveOrDrop(g, "hounds_bite", 4); },
+    rewards: ["1 Quest Point", "800 Frens", "3,000 Attack XP", "4 Hound's bites"], reward: g => { give(g.player, "coins", 800); addXp(g, "attack", 3000, { raw: true }); giveOrDrop(g, "hounds_bite", 4); },
     intro: "Hester's whiskey is smoked over pine and bone char, and the Regiment drinks it faster than she can smoke it.",
     offer: ["The Regiment drinks my whiskey by the measure, one measure each, and there are a great many of them.", "It's smoked over pine and bone char. Six pine logs and six large bones, and I'll have a cask by the change of the watch."],
     accept: "Six pine, six large bones. Goats and golems on the slopes have the bones; the pines are everywhere.", done: ["That'll smoke a cask. That'll smoke two.", "Four bottles of the Hound's Bite. Don't drink it on the walls."] },
   bar_kettle: { bar: "kettle", name: "Kettle Black", start: "Talk to Oda at the Stone Kettle, in Highcairn.", wants: [["inkcoal", 10], ["raw_grayling", 4]],
-    rewards: ["1 Quest Point", "800 coins", "3,000 Mining XP", "4 Cairn porters"], reward: g => { give(g.player, "coins", 800); addXp(g, "mining", 3000, { raw: true }); giveOrDrop(g, "cairn_porter", 4); },
+    rewards: ["1 Quest Point", "800 Frens", "3,000 Mining XP", "4 Cairn porters"], reward: g => { give(g.player, "coins", 800); addXp(g, "mining", 3000, { raw: true }); giveOrDrop(g, "cairn_porter", 4); },
     intro: "The Stone Kettle's stove has gone out, and the miners want their porter.",
     offer: ["The stove's out, the kettle's cold and the porter wants boiling. In Highcairn! The miners will riot. Politely, but they will.", "Ten inkcoal for the stove, and four raw grayling for the miners' supper while it heats. Quick as you can."],
     accept: "Ten inkcoal, four raw grayling. The inkcoal's in the rocks up the pass.", done: ["That's a fire. That's a proper fire.", "Four porters, first from the new boil. Good for the arms. Good for the pick."] },
   bar_freepour: { bar: "freepour", name: "Free Cider", start: "Talk to Pip Freeman at the Free Pour, in Freehold.", wants: [["sweetberry", 15], ["moonsilver_ore", 2]],
-    rewards: ["1 Quest Point", "800 coins", "2,000 Smithing XP", "4 Free ciders"], reward: g => { give(g.player, "coins", 800); addXp(g, "smithing", 2000, { raw: true }); giveOrDrop(g, "free_cider", 4); },
+    rewards: ["1 Quest Point", "800 Frens", "2,000 Smithing XP", "4 Free ciders"], reward: g => { give(g.player, "coins", 800); addXp(g, "smithing", 2000, { raw: true }); giveOrDrop(g, "free_cider", 4); },
     intro: "The Free Pour's cider press has broken a spring, and the Federation says a new one is 'in the pipeline'.",
     offer: ["The press broke a spring. I asked the Federation for a new one. They said it was 'in the pipeline'. The pipeline is a device. The device is in a room. The room is locked.", "Two moonsilver ore and I'll have the artificer's apprentice forge me a spring the honest way, and fifteen sweetberries to press."],
     accept: "Two moonsilver ore, fifteen sweetberries. The moonsilver's in the outcrops west of the fortress.", done: ["A spring! An actual spring, made by an actual person.", "Four ciders, free. Well. Free to you. The Federation can pay for them; I'll send them the bill."] },
@@ -162,21 +162,21 @@ export function jobBoard(game: Game, barId: string): Dialogue {
       if (job.kind === "kill") addXp(game, "slayer", Math.round(job.reward * 0.6), { raw: true });
       addXp(game, "presence", Math.round(job.reward * 0.4), { raw: true });
       data.jobs_done = (data.jobs_done ?? 0) + 1; clearJob(game); sound(game, "coins");
-      message(game, `Job done: ${job.reward.toLocaleString()} coins.`, "quest");
-      return chat(name, npcSays(name, `${bar.name}'s barkeep pays out ${job.reward.toLocaleString()} coins, and pins up a fresh notice.`));
+      message(game, `Job done: ${job.reward.toLocaleString()} Frens.`, "quest");
+      return chat(name, npcSays(name, `${bar.name}'s barkeep pays out ${job.reward.toLocaleString()} Frens, and pins up a fresh notice.`));
     };
     if (ready) return chat(name, npcSays(name, `Your job: ${jobName(bar, job)} (${progress}). Done.`), [
       { label: job.kind === "fetch" ? "Hand it in." : "Collect the reward.", then: collect },
       { label: "Not yet.", then: () => null },
     ]);
-    return chat(name, npcSays(name, `Your job: ${jobName(bar, job)} (${progress}). ${job.kind === "kill" ? "Come back when it's done." : "Bring them here."} Reward: ${job.reward.toLocaleString()} coins.`), [
+    return chat(name, npcSays(name, `Your job: ${jobName(bar, job)} (${progress}). ${job.kind === "kill" ? "Come back when it's done." : "Bring them here."} Reward: ${job.reward.toLocaleString()} Frens.`), [
       { label: "Give it up.", then: () => { clearJob(game); return chat(name, npcSays(name, "You take your notice down. Someone else can have it.")); } },
       { label: "Leave the board.", then: () => null },
     ]);
   }
   const jobs = boardJobs(game, barIndex);
-  return chat(name, npcSays(name, `${bar.name}'s board: bounties and errands, paid in coin at this board. One at a time.`), [
-    ...jobs.map(job => ({ label: `${jobName(bar, job)} (${job.reward.toLocaleString()} coins)`, then: () => {
+  return chat(name, npcSays(name, `${bar.name}'s board: bounties and errands, paid in Frens at this board. One at a time.`), [
+    ...jobs.map(job => ({ label: `${jobName(bar, job)} (${job.reward.toLocaleString()} Frens)`, then: () => {
       Object.assign(data, { job_bar: barIndex + 1, job_kind: job.kind === "kill" ? 1 : 2, job_target: job.target, job_count: job.count, job_done: 0, job_reward: job.reward });
       message(game, `Job taken: ${jobName(bar, job)}.`, "quest"); sound(game, "quest");
       return chat(name, playerSays(`I'll ${jobName(bar, job).toLowerCase()}.`));

@@ -40,7 +40,7 @@ export const PLAIN: Readonly<Record<string, Row>> = {
   "Ruins.": ["廃墟だ。", "폐허다.", "废墟。", "廢墟。", "Phế tích.", "Reruntuhan.", "ซากปรักหักพัง", "Harabeler.", "Ruinas.", "Ruínas.", "Руины.", "Руїни."],
   "Water.": ["水だ。", "물이다.", "水。", "水。", "Nước.", "Air.", "น้ำ", "Su.", "Agua.", "Água.", "Вода.", "Вода."],
   "Full.": ["いっぱいだ。", "꽉 찼다.", "满了。", "滿了。", "Đầy rồi.", "Penuh.", "เต็ม", "Dolu.", "Lleno.", "Cheio.", "Полно.", "Повно."],
-  "Coins.": ["お金だ。", "돈이다.", "钱。", "錢。", "Tiền.", "Koin.", "เหรียญ", "Para.", "Monedas.", "Moedas.", "Монеты.", "Монети."],
+  "Frens.": ["お金だ。", "돈이다.", "钱。", "錢。", "Tiền.", "Fren.", "เฟรน", "Para.", "Frens.", "Frens.", "Френы.", "Френи."],
   "A shop.": ["店だ。", "가게다.", "商店。", "商店。", "Cửa hàng.", "Toko.", "ร้านค้า", "Bir dükkân.", "Una tienda.", "Uma loja.", "Лавка.", "Крамниця."],
   "The bank.": ["銀行だ。", "은행이다.", "银行。", "銀行。", "Ngân hàng.", "Bank.", "ธนาคาร", "Banka.", "El banco.", "O banco.", "Банк.", "Банк."],
   "A pet.": ["ペットだ。", "펫이다.", "宠物。", "寵物。", "Thú cưng.", "Peliharaan.", "สัตว์เลี้ยง", "Bir evcil hayvan.", "Una mascota.", "Um bichinho.", "Питомец.", "Улюбленець."],

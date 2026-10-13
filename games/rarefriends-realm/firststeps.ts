@@ -47,7 +47,7 @@ export function updateFirstSteps(game: Game) {
   }
   if (advanced && !step) {
     giveOrDrop(game, "coins", FIRST_STEPS_REWARD.coins); giveOrDrop(game, "insight_lamp", FIRST_STEPS_REWARD.lamp);
-    message(game, `First steps complete! The Realm Guide sends 500 coins and a Lamp of insight (rub it for XP in any skill). The Realm is yours: try a quest, ride, or find other players.`, "quest");
+    message(game, `First steps complete! The Realm Guide sends 500 Frens and a Lamp of insight (rub it for XP in any skill). The Realm is yours: try a quest, ride, or find other players.`, "quest");
     sound(game, "level");
     return true;
   }

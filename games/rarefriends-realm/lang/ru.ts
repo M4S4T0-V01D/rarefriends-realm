@@ -68,7 +68,7 @@ export const ru: Dictionary = {
   "Heartwood": "Сердцевина леса", "Last Orders": "Последний заказ", "The Seventh Toast": "Седьмой тост", "A Crooked Vintage": "Кривой урожай", "The Hound's Bite": "Укус гончей", "Kettle Black": "Чёрный чайник", "Free Cider": "Бесплатный сидр",
   "A Name Worth Knowing": "Имя, которое стоит знать", "Known in Every Hall": "Известен в каждом зале", "The Remembered": "Памятный",
   // ---------- Inventory and equipment ----------
-  "Empty slot {n}": "Пустая ячейка {n}", "Coins": "Монеты", "{item} × {n}": "{item} × {n}",
+  "Empty slot {n}": "Пустая ячейка {n}", "Frens": "Френы", "{item} × {n}": "{item} × {n}",
   "Head": "Голова", "Cape": "Плащ", "Neck": "Шея", "Ring": "Кольцо", "Weapon": "Оружие", "Body": "Тело", "Shield": "Щит", "Legs": "Ноги", "Belt": "Пояс", "Hands": "Руки", "Feet": "Ступни",
   "{slot}: empty": "{slot}: пусто", "Weight": "Вес", "kg": "кг", "· running drains": "· бег тратит на", "% faster": "% быстрее",
   "Adventurer card · Share on X": "Карта искателя · Поделиться в X", "Adventurer card": "Карта искателя", "Adventurer Cards": "Карты искателя", "Adventurer Cards ·": "Карты искателя ·", "found": "найдено",
@@ -80,7 +80,7 @@ export const ru: Dictionary = {
   // ---------- Magic ----------
   "Combat": "Бой", "Curses": "Проклятия", "Wards": "Обереги", "Utility": "Полезное", "Teleports": "Телепорты", "Magic level": "Уровень магии", "Spellbook": "Книга заклинаний",
   // ---------- Friends ----------
-  "Referrals": "Приглашения", "Your code:": "Ваш код:", ". A friend who enters it and you each get": ". Друг, который его введёт, и вы получите по", "250 coins": "250 монет", "Friendship cape": "Плащ Дружбы",
+  "Referrals": "Приглашения", "Your code:": "Ваш код:", ". A friend who enters it and you each get": ". Друг, который его введёт, и вы получите по", "250 Frens": "250 френов", "Friendship cape": "Плащ Дружбы",
   "(with its own emote) and": "(со своей эмоцией) и", "+15% XP": "+15% опыта", "for an hour of play.": "на час игры.", "Friend's code": "Код друга", "Party": "Отряд",
   "· +10% XP with a party member within": "· +10% опыта, если член отряда в пределах", "tiles · fellows within 12 give +5%": "клеток · соратники в пределах 12 дают +5%",
   "No party yet. Right-click a player (or one below) to invite them; \"/p\" in chat talks to the party.": "Отряда пока нет. Нажмите правой кнопкой на игрока (или на кого-то ниже), чтобы пригласить; \"/p\" в чате — сообщение отряду.",
@@ -90,7 +90,7 @@ export const ru: Dictionary = {
   "Followers": "Спутники", "Pets": "Питомцы", "Dragons": "Драконы", "Hiscores": "Рекорды", "(you and the players you've met)": "(вы и встреченные вами игроки)", "Friend": "Friend", "Total": "Всего", "You": "Вы",
   "Play online to meet other players: they'll show up here.": "Играйте онлайн, чтобы встречать других игроков: они появятся здесь.",
   "Wardrobe": "Гардероб", "Rare Relics": "Редкие реликвии", "Plain Relic": "Простая реликвия", "+2% XP in every skill per relic (max 5)": "+2% опыта ко всем навыкам за реликвию (макс. 5)", "Silver Relic": "Серебряная реликвия",
-  "+10% coins from drops and pickpockets per relic (max 3)": "+10% монет с добычи и карманных краж за реликвию (макс. 3)", "Moonlit Relic": "Лунная реликвия", "Gather 10% faster per relic (max 3)": "Сбор на 10% быстрее за реликвию (макс. 3)",
+  "+10% Frens from drops and pickpockets per relic (max 3)": "+10% френов с добычи и карманных краж за реликвию (макс. 3)", "Moonlit Relic": "Лунная реликвия", "Gather 10% faster per relic (max 3)": "Сбор на 10% быстрее за реликвию (макс. 3)",
   "Golden Relic": "Золотая реликвия", "+10% XP and a golden aura while kept": "+10% опыта и золотая аура, пока хранится", "Rare Caskets (simulated RF)": "Редкие шкатулки (симуляция RF)",
   "A friend's referral code": "Код приглашения друга", "Friend number to add": "Номер Friend для добавления",
   "Undiscovered: found while training {skill}": "Не найдено: выпадает при тренировке навыка «{skill}»", "Undiscovered pet ({x})": "Неизвестный питомец ({x})", "Undiscovered: found while fighting {x}": "Не найдено: выпадает в бою с {x}",
@@ -145,7 +145,7 @@ export const ru: Dictionary = {
   "Best": "Рекорд", "days · a new day in": "дн. · новый день через", "(midnight UTC)": "(полночь UTC)", "World boss:": "Мировой босс:", "Claim day": "Забрать день", "Claim": "Забрать", "Today's challenges": "Испытания дня",
   "(yours alone; everyone's differ)": "(только ваши; у всех разные)", "🎁 Daily chest": "🎁 Ежедневный сундук", "Finish all three challenges:": "Выполните все три испытания:",
   "Simulated $RAREFRIENDS: the caskets are yours to open as well.": "Симуляция $RAREFRIENDS: шкатулки тоже можно открыть.", "Work orders:": "Заказы:", "(something to claim)": "(есть что забрать)",
-  "Day {n}: {r}": "День {n}: {r}", "Gain {n} {skill} XP": "Получите {n} опыта ({skill})", "Defeat {n} monsters": "Победите {n} монстров", "{n} coins": "{n} монет", "+ {n} XP": "+ {n} опыта",
+  "Day {n}: {r}": "День {n}: {r}", "Gain {n} {skill} XP": "Получите {n} опыта ({skill})", "Defeat {n} monsters": "Победите {n} монстров", "{n} Frens": "{n} френов", "+ {n} XP": "+ {n} опыта",
   "Reroll challenges · {n} casket": "Сменить испытания · шкатулок: {n}", "Complete all three · {n} caskets": "Выполнить все три · шкатулок: {n}",
   "Simulated RF buys a Rare Casket; the day's three challenges are rolled afresh (claimed ones stay claimed)": "Симулированные RF покупают Редкую шкатулку; три испытания дня выпадают заново (полученные награды остаются)",
   "Simulated RF buys two Rare Caskets; every challenge pays out as finished and the chest opens": "Симулированные RF покупают две Редкие шкатулки; все испытания засчитываются, и сундук открывается",
@@ -157,7 +157,7 @@ export const ru: Dictionary = {
   "New tab (drop an item here)": "Новая вкладка (бросьте сюда предмет)", "Search the bank": "Поиск в банке", "Search": "Поиск", "Bank": "Банк", "Withdraw {item} ({n})": "Снять: {item} ({n})", "Deposit {item}": "Внести: {item}",
   "Inventory (click to deposit)": "Инвентарь (клик — внести)", "Buy/sell:": "Купить/продать:",
   "Click the stock to buy; click your pack (right) to sell. A general store buys almost anything. What you sell goes on the shelves, to buy back.": "Нажмите на товар, чтобы купить; на свою сумку (справа) — чтобы продать. Лавка покупает почти всё. Проданное попадает на полки, его можно выкупить.",
-  "Shop stock": "Товары лавки", "{item}: {n} coins": "{item}: {n} монет", "Buy {item} for {n} coins": "Купить {item} за {n} монет", "Sell for {n} coins": "Продать за {n} монет", "Sell {item} for {n} coins": "Продать {item} за {n} монет",
+  "Shop stock": "Товары лавки", "{item}: {n} Frens": "{item}: {n} френов", "Buy {item} for {n} Frens": "Купить {item} за {n} френов", "Sell for {n} Frens": "Продать за {n} френов", "Sell {item} for {n} Frens": "Продать {item} за {n} френов",
   "Inventory (click to sell)": "Инвентарь (клик — продать)", "Rare Market": "Редкий рынок", "Rare Casket": "Редкая шкатулка", "Rare Relic": "Редкая реликвия", "Relic": "Реликвия", "Kept bonus": "Бонус при хранении", "Chance": "Шанс", "RF value": "Ценность в RF", "Simulated RF": "Симуляция RF",
   // ---------- Menus ----------
   "Choose Option": "Выберите действие", "Select an option": "Выберите вариант", "Walk here": "Идти сюда", "{x} / {n} more options": "{x} / ещё вариантов: {n}", "{x} / 1 more option": "{x} / ещё 1 вариант",

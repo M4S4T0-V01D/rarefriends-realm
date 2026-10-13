@@ -37,7 +37,7 @@ export const SETTLEMENT_NPCS: Record<string, NpcDef> = {
 export const SETTLEMENT_QUESTS: readonly QuestDef[] = [
   {
     id: DISTURBED_ROW, name: "The Disturbed Row", points: 1, difficulty: "Novice", start: "Talk to Sexton Dunstan Howe at his hut by Gravesend's mausoleums.",
-    requirements: ["Combat 15 recommended"], rewards: ["1 Quest Point", "2,000 Faith XP", "500 coins", "The Ashworth Vault: the stair in the first mausoleum, unchained"],
+    requirements: ["Combat 15 recommended"], rewards: ["1 Quest Point", "2,000 Faith XP", "500 Frens", "The Ashworth Vault: the stair in the first mausoleum, unchained"],
     journal: game => {
       const s = stage(game, DISTURBED_ROW);
       if (s === 0) return ["East of Gravesend's graves stand three mausoleums, and a sexton who keeps their keys. Three graves in the east row have been dug at."];
@@ -48,7 +48,7 @@ export const SETTLEMENT_QUESTS: readonly QuestDef[] = [
   },
   {
     id: OLD_YEW, name: "The Old Yew", points: 1, difficulty: "Novice", start: "Talk to Forester Tamsin Larch at her house on Fernwick's east side.",
-    requirements: ["Woodcutting 30"], rewards: ["1 Quest Point", "3,000 Woodcutting XP", "400 coins", "A forest feathered cap"],
+    requirements: ["Woodcutting 30"], rewards: ["1 Quest Point", "3,000 Woodcutting XP", "400 Frens", "A forest feathered cap"],
     journal: game => {
       const s = stage(game, OLD_YEW);
       if (s === 0) return ["Fernwick's forester has a job for someone with Woodcutting 30: the south wood's yews, and the oldest of them."];
@@ -59,7 +59,7 @@ export const SETTLEMENT_QUESTS: readonly QuestDef[] = [
   },
   {
     id: GULLWINGS_BELL, name: "The Gullwing's Bell", points: 1, difficulty: "Novice", start: "Talk to Nell Tidewater at her hut on Southshore's beach.",
-    requirements: ["Smithing 5"], rewards: ["1 Quest Point", "1,200 Smithing XP", "600 coins", "Nell's tide chart"],
+    requirements: ["Smithing 5"], rewards: ["1 Quest Point", "1,200 Smithing XP", "600 Frens", "Nell's tide chart"],
     journal: game => {
       const s = stage(game, GULLWINGS_BELL);
       if (s === 0) return ["The Gullwing, Saltmarrow's tithe boat, came ashore on Southshore's beach, broken. Nell Tidewater keeps the hut nearest the wreck."];
@@ -70,7 +70,7 @@ export const SETTLEMENT_QUESTS: readonly QuestDef[] = [
   },
   {
     id: SHELLS_FOR_SAL, name: "Shells for Old Sal", points: 1, difficulty: "Novice", start: "Talk to Old Sal under the old light on Southshore's headland.",
-    requirements: [], rewards: ["1 Quest Point", "600 Crafting XP", "200 coins", "A shell necklace"],
+    requirements: [], rewards: ["1 Quest Point", "600 Crafting XP", "200 Frens", "A shell necklace"],
     journal: game => {
       const s = stage(game, SHELLS_FOR_SAL);
       if (s === 0) return ["Under the old light on Southshore's headland sits Old Sal, who collects shells and can't walk the sand for them any more."];

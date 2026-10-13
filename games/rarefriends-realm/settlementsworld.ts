@@ -72,7 +72,7 @@ export function buildSettlements(ctx: GenContext) {
     for (let y = 447; y <= 459; y++) for (let x = 780; x <= 796; x++) if (tiles[idx(x, y)] === T.GRASS || tiles[idx(x, y)] === T.DARK_GRASS) { tiles[idx(x, y)] = T.SAND; t.clearAt(x, y); }
     clue(787, 452, "boat", "The Gullwing", "gullwing_wreck"); place(790, 454, "boat", true, "The Gullwing's stern, stove in");
     for (const [x, y] of [[784, 450], [793, 451], [785, 456], [792, 457]] as const) t.add({ kind: "decor", decor: "ruin_wall", x, y, blocks: true, name: "A ship's timber", height: 20 });
-    place(788, 457, "barrel", true, "A cask, split, the tithe's coins long gone"); place(782, 453, "bones", false, "A drowned sailor's bones");
+    place(788, 457, "barrel", true, "A cask, split, the tithe's Frens long gone"); place(782, 453, "bones", false, "A drowned sailor's bones");
     t.monsters("skeleton", 781, 448, 795, 458, 4);
     // The beachcomber's hut, the hermit's shelter on the headland under the old light, the rock pools, the crates the tide leaves.
     t.building(798, 451, 803, 455, "w", T.WOOD, undefined, { name: "Nell's hut", color: "#b9a37a", walls: "plank", chimney: true });

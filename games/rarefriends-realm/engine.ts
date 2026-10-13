@@ -37,7 +37,7 @@ import { cleanMysteries, studySherd } from "./mysteries.ts";
 import { clueExamine, clueOptions, onKharavethTick, useClue } from "./kharaveth.ts";
 import { studySeal } from "./dynasties.ts";
 import { cleanTrails } from "./wayfinding.ts";
-import { VESSELS, aboard, applyVessels, berthRespawn, canStow, cleanVessels, fitToVessel, goAshore, holdAt, ringBell, sailable, sailed, settleAboard, stowInHold, vesselTick } from "./seafaring.ts";
+import { VESSELS, aboard, applyVessels, berthRespawn, canStow, cleanVessels, fitToVessel, goAshore, holdAt, nearestLanding, ringBell, sailable, sailed, settleAboard, stowInHold, vesselTick } from "./seafaring.ts";
 import {
   BANK_SIZE, BANK_TABS, DAY_MS, SATCHEL, SATCHEL_SIZE, STONE_BOX, STONE_BOX_SIZE, boxTotal, isSigilStone, BONE_BAG, BONE_BAG_SIZE, bagAdd, bagBones, bagTakeAll, hasBoneBag, SIGIL_BAG, BELTS, beltAdd, beltContents, beltDef, wornBelt, SIGIL_BAG_SIZE, hasSigilBag, isSigil, sigilBagAdd, sigilBagTotal, sigilStock, useSigils, setPieces, wayfarerPieces, fullSlayerSet, heartguardPieces, mixtureOn, compactBankTabs, hasSatchel, hasStoneBox, stock, useUp, INVENTORY_SIZE, REFERRAL_COINS, REFERRALS_PER_DAY, REFERRAL_TICKS, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
   level, maxHp, maxPrayer, maxMana, manaCost, faithStaff, traditionOf, message, prayerBoost, riding, sound, take, weapon, combatLevel, createGame, TICK_MS,
@@ -854,7 +854,7 @@ export function recipeProblem(game: Game, recipe: Recipe): string | null {
   if (level(game, recipe.skill) < recipe.level) return `You need a ${SKILL_NAMES[recipe.skill]} level of ${recipe.level} to make that.`;
   for (const tool of recipe.tools ?? []) if (!hasTool(player, tool)) return `You need a ${item(tool).name.toLowerCase()} to do that.`;
   for (const [id, n] of Object.entries(recipe.inputs)) if (stock(player, id) < n) return `You don't have enough ${item(id).name.toLowerCase()} to make that.`;
-  if (recipe.coins && count(player, "coins") < recipe.coins) return "You don't have enough coins.";
+  if (recipe.coins && count(player, "coins") < recipe.coins) return "You don't have enough Frens.";
   return null;
 }
 /** How many of a recipe one go can make (up to 28): what the satchel and belts hold counts, as the furnace reaches into them. */
@@ -1418,7 +1418,7 @@ export function sailTo(game: Game, from: string, to: string): string | null {
   if ("problem" in ok) { message(game, ok.problem, "warn"); return ok.problem; }
   const player = game.player;
   take(player, "coins", ok.cost);
-  travel(game, ok.arrive, `You pay ${ok.cost.toLocaleString()} coins, and the boat carries you to ${ok.name}.`);
+  travel(game, ok.arrive, `You pay ${ok.cost.toLocaleString()} Frens, and the boat carries you to ${ok.name}.`);
   player.stats.voyages = (player.stats.voyages ?? 0) + 1;
   game.voyage = { from, to, tick: game.tick }; game.ui.boat = null;
   sound(game, "splash");
@@ -2384,11 +2384,11 @@ export function castOnItem(game: Game, spellId: string, slotIndex: number) {
   if (problem) { message(game, problem, "warn"); return false; }
   const definition = item(slot.id);
   if (spell.kind === "alchemy") {
-    if (slot.id === "coins") { message(game, "Coins are already made of gold.", "warn"); return false; }
+    if (slot.id === "coins") { message(game, "Frens are already made of gold.", "warn"); return false; }
     if (definition.tradeable === false) { message(game, "You can't cast that on this item.", "warn"); return false; }
     const coins = Math.max(1, Math.floor(definition.value * (spell.id === "golden_touch" ? 0.6 : 0.4)));
     payRunes(game, spell); take(player, slot.id, 1); give(player, "coins", coins);
-    message(game, `The ${definition.name.toLowerCase()} turns into ${coins} coins.`); sound(game, "coins");
+    message(game, `The ${definition.name.toLowerCase()} turns into ${coins} Frens.`); sound(game, "coins");
   } else if (spell.kind === "superheat") {
     const metal = METALS.slice().reverse().find(entry => SMELTING[entry.id].ores[slot.id] !== undefined && Object.entries(SMELTING[entry.id].ores).every(([id, n]) => stock(player, id) >= n) && level(game, "smithing") >= SMELTING[entry.id].level);
     if (!metal) { message(game, slot.id.endsWith("_ore") || slot.id === "inkcoal" ? "You need the right ores (and Smithing level) for Forgeheart to work." : "Forgeheart only works on ore.", "warn"); return false; }
@@ -2434,7 +2434,7 @@ export function applyReferral(game: Game, code: string) {
   if (player.referredBy !== null) return `You've already used Friend #${player.referredBy}'s code.`;
   if (player.referrals.includes(id)) return `Friend #${id} used your code, so you can't use theirs.`;
   player.referredBy = id; referralReward(game);
-  message(game, `Referral used! You and Friend #${id} each get 250 coins, a Friendship cape and +15% XP for an hour of play. They get theirs next time you're both online.`, "quest");
+  message(game, `Referral used! You and Friend #${id} each get 250 Frens, a Friendship cape and +15% XP for an hour of play. They get theirs next time you're both online.`, "quest");
   return null;
 }
 /**
@@ -2451,7 +2451,7 @@ export function creditReferral(game: Game, from: number, now = Date.now()) {
   }
   player.referralCapNoted = false;
   player.referrals.push(from); player.referralTimes.push(now); referralReward(game);
-  message(game, `Friend #${from} joined with your referral code! +250 coins, +15% XP for an hour of play${player.referrals.length === 1 ? ", and a Friendship cape" : ""}.`, "quest");
+  message(game, `Friend #${from} joined with your referral code! +250 Frens, +15% XP for an hour of play${player.referrals.length === 1 ? ", and a Friendship cape" : ""}.`, "quest");
   return true;
 }
 
@@ -2544,7 +2544,7 @@ export function capeProblem(game: Game, id: string) {
 function buyCape(game: Game, id: string) {
   const player = game.player, mastery = item(id).mastery!, problem = capeProblem(game, id), price = buyPrice(game, id);
   if (problem) { message(game, problem, "warn"); return 0; }
-  if (count(player, "coins") < price) { message(game, `A mastery cape costs ${price.toLocaleString()} coins.`, "warn"); return 0; }
+  if (count(player, "coins") < price) { message(game, `A mastery cape costs ${price.toLocaleString()} Frens.`, "warn"); return 0; }
   if (freeSlots(player) === 0) { message(game, "You don't have enough inventory space.", "warn"); return 0; }
   // Master more than one skill and your capes come trimmed.
   const given = mastery.skill !== "all" && masteredSkills(game).length > 1 ? `${mastery.skill}_cape_t` : id;
@@ -2660,7 +2660,7 @@ export function collectFromCasket(game: Game, tier: number): { wardrobe: Wardrob
     message(game, `Wardrobe unlocked: ${pick.name}!`, "level"); return { wardrobe: pick.id, coins: 0 };
   }
   const coins = [250, 600, 1500, 5000][tier] ?? 250;
-  giveOrDrop(game, "coins", coins); message(game, `A duplicate wardrobe piece turns into ${coins} coins.`); return { wardrobe: null, coins };
+  giveOrDrop(game, "coins", coins); message(game, `A duplicate wardrobe piece turns into ${coins} Frens.`); return { wardrobe: null, coins };
 }
 /** Dress your follower from your own wardrobe: one piece of each kind. */
 export function toggleFollowerWorn(game: Game, id: WardrobeId) {
@@ -2720,8 +2720,17 @@ function friendMilestones(game: Game) {
   const player = game.player, mastered = masteredSkills(game).length;
   if (mastered > (player.stats.mastered ?? 0)) { player.stats.mastered = mastered; remember(game, "first_99"); friendSays(game, "mastery"); }
 }
+/** Go ashore at the nearest place your vessel can land: step off if it's beside you, or sail there first. */
+export function goAshoreNearest(game: Game): boolean {
+  if (game.player.aboard === null) return false;
+  const at = nearestLanding(game);
+  if (!at) { message(game, "There's nowhere near here this vessel can put you ashore. Sail closer to a beach or a pier.", "warn"); return false; }
+  return walkTo(game, at.land.x, at.land.y);
+}
 export function toggleMount(game: Game, id?: string) {
   const player = game.player;
+  // (Aboard, H puts you ashore: getting off is getting off.)
+  if (player.aboard !== null && !id) { goAshoreNearest(game); return; }
   if (player.mount && (!id || id === player.mount)) { message(game, `You climb down from your ${mountDef(player.mount)!.name.toLowerCase()}.`); player.mount = null; sound(game, "click"); return; }
   const choice = id ?? player.lastMount ?? player.mounts[0];
   if (!choice || !player.mounts.includes(choice)) { message(game, "You don't own a mount. The Friendhollow stables sell them.", "warn"); return; }

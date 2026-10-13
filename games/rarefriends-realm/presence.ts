@@ -44,7 +44,7 @@ export function nameFriend(game: Game, raw: string, paid = false): boolean {
   const player = game.player, name = cleanName(raw);
   if (!name) { message(game, `A name is ${NAME_MIN} to ${NAME_MAX} letters, digits, spaces, apostrophes, hyphens or underscores.`, "warn"); return false; }
   if (player.name && paid) {
-    if (count(player, "coins") < RENAME_COST) { message(game, `The Namekeeper asks ${RENAME_COST.toLocaleString()} coins to change a name.`, "warn"); return false; }
+    if (count(player, "coins") < RENAME_COST) { message(game, `The Namekeeper asks ${RENAME_COST.toLocaleString()} Frens to change a name.`, "warn"); return false; }
     take(player, "coins", RENAME_COST);
   }
   const first = !player.name;
@@ -60,7 +60,7 @@ export function joinFellowship(game: Game, rawName: string, rawTag: string, look
   // Founding one costs the registrar's fee; joining one a fellow invited you to costs a tenth of it.
   if (!player.fellowship) {
     const cost = look ? FELLOWSHIP_JOIN_COST : FELLOWSHIP_COST;
-    if (count(player, "coins") < cost) { message(game, `${look ? "Joining" : "Founding"} a fellowship costs ${cost.toLocaleString()} coins (the Realm's registrar is not cheap).`, "warn"); return false; }
+    if (count(player, "coins") < cost) { message(game, `${look ? "Joining" : "Founding"} a fellowship costs ${cost.toLocaleString()} Frens (the Realm's registrar is not cheap).`, "warn"); return false; }
     take(player, "coins", cost); presenceXp(game, 120);
   }
   player.fellowship = { name, tag, since: look?.since ?? Math.floor(Date.now() / 86_400_000), ...(look?.logo ? { logo: look.logo } : {}), ...(look?.banner ? { banner: look.banner } : {}), ...(look?.colors ? { colors: look.colors } : {}) };
@@ -73,7 +73,7 @@ export function renameFellowship(game: Game, rawName: string): boolean {
   if (!player.fellowship) return false;
   if (!name) { message(game, "A fellowship needs a name of 2–16 letters, digits, spaces, apostrophes, dashes or underscores.", "warn"); return false; }
   if (name === player.fellowship.name) return false;
-  if (count(player, "coins") < FELLOWSHIP_RENAME_COST) { message(game, `Renaming a fellowship costs ${FELLOWSHIP_RENAME_COST.toLocaleString()} coins.`, "warn"); return false; }
+  if (count(player, "coins") < FELLOWSHIP_RENAME_COST) { message(game, `Renaming a fellowship costs ${FELLOWSHIP_RENAME_COST.toLocaleString()} Frens.`, "warn"); return false; }
   take(player, "coins", FELLOWSHIP_RENAME_COST);
   message(game, `${player.fellowship.name} is now ${name} [${player.fellowship.tag}].`, "quest"); sound(game, "quest");
   player.fellowship = { ...player.fellowship, name };

@@ -59,7 +59,7 @@ export const ACTIVITIES: Record<string, ActivityDef> = {
     goal: (_game, run) => Math.min(1, run.progress / n(run.target.count)),
     status: (_game, run) => `${run.progress} of ${run.target.count} ${ROCKS[run.target.rock as keyof typeof ROCKS].name.toLowerCase()} so far.`,
     score: (game, run) => 0.5 + 0.5 * timeLeft(game, run),
-    reward: (game, run, score) => { const xp = Math.round(ROCKS[run.target.rock as keyof typeof ROCKS].xp * n(run.target.count) * (0.6 + score)), coins = Math.round(40 * n(run.target.count) * score); addXp(game, "mining", xp, { raw: true }); give(game.player, "coins", coins); return `${xp} Mining XP and ${coins} coins`; },
+    reward: (game, run, score) => { const xp = Math.round(ROCKS[run.target.rock as keyof typeof ROCKS].xp * n(run.target.count) * (0.6 + score)), coins = Math.round(40 * n(run.target.count) * score); addXp(game, "mining", xp, { raw: true }); give(game.player, "coins", coins); return `${xp} Mining XP and ${coins} Frens`; },
     promise: "Mining XP on top of the rock's own, and quarry pay, the quicker the better.",
   },
   assay_run: {
@@ -69,7 +69,7 @@ export const ACTIVITIES: Record<string, ActivityDef> = {
     goal: (_game, run) => Math.min(1, run.progress / n(run.target.count)),
     status: (_game, run) => `${run.progress} of ${run.target.count} bars, ${run.failed} lost to the fire.`,
     score: (game, run) => Math.max(0.2, (run.progress / Math.max(1, run.progress + run.failed)) * (0.6 + 0.4 * timeLeft(game, run))),
-    reward: (game, run, score) => { const smelt = SMELTING[run.target.metal as keyof typeof SMELTING], xp = Math.round(smelt.xp * n(run.target.count) * (0.8 + score)), coins = Math.round(METALS.find(m => m.id === run.target.metal)!.value * n(run.target.count) * 0.4 * score); addXp(game, "smithing", xp, { raw: true }); give(game.player, "coins", coins); return `${xp} Smithing XP and ${coins} coins`; },
+    reward: (game, run, score) => { const smelt = SMELTING[run.target.metal as keyof typeof SMELTING], xp = Math.round(smelt.xp * n(run.target.count) * (0.8 + score)), coins = Math.round(METALS.find(m => m.id === run.target.metal)!.value * n(run.target.count) * 0.4 * score); addXp(game, "smithing", xp, { raw: true }); give(game.player, "coins", coins); return `${xp} Smithing XP and ${coins} Frens`; },
     promise: "Smithing XP over the furnace's own, and the Fellows' rate for a clean run.",
   },
   hot_tunnel: {
@@ -79,7 +79,7 @@ export const ACTIVITIES: Record<string, ActivityDef> = {
     goal: (game, run) => (run.marks.gem ? 0.5 : 0) + (run.marks.gem && regionAt(game.world, game.player.x, game.player.y).id === "ashen_hills" ? 0.5 : 0),
     status: (_game, run) => run.marks.gem ? "The gem rock's mined. Now back up, alive." : "Not yet at the gem rock.",
     score: (game, run) => 0.5 + 0.5 * timeLeft(game, run),
-    reward: (game, _run, score) => { const xp = Math.round(1500 * (0.5 + score)); addXp(game, "mining", xp, { raw: true }); giveOrDrop(game, "rough_moonstone", 1); give(game.player, "coins", Math.round(600 * score)); return `${xp} Mining XP, a rough moonstone and ${Math.round(600 * score)} coins`; },
+    reward: (game, _run, score) => { const xp = Math.round(1500 * (0.5 + score)); addXp(game, "mining", xp, { raw: true }); giveOrDrop(game, "rough_moonstone", 1); give(game.player, "coins", Math.round(600 * score)); return `${xp} Mining XP, a rough moonstone and ${Math.round(600 * score)} Frens`; },
     promise: "Mining XP, a rough moonstone of the quarry's, and danger money.",
   },
   pass_run: {

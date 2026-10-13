@@ -598,7 +598,7 @@ export const NAMES: Readonly<Record<string, Row>> = {
   "Crown altar": ["王冠の祭壇", "왕관 제단", "王冠祭坛", "王冠祭壇", "Bàn thờ Vương Miện", "Altar Mahkota", "แท่นบูชามงกุฎ", "Taç sunağı", "Altar de Corona", "Altar de Coroa", "Алтарь Короны", "Вівтар Корони"],
   "{x} mastery cape": ["{x}の達人マント", "{x} 숙련 망토", "{x}大师披风", "{x}大師披風", "Áo choàng bậc thầy {x}", "Mantel ahli {x}", "ผ้าคลุมปรมาจารย์{x}", "{x} ustalık pelerini", "Capa de maestría: {x}", "Capa de maestria: {x}", "Плащ мастера: {x}", "Плащ майстра: {x}"],
   "{x} mastery cape (t)": ["{x}の達人マント(縁取り)", "{x} 숙련 망토 (장식)", "{x}大师披风(镶边)", "{x}大師披風(鑲邊)", "Áo choàng bậc thầy {x} (viền)", "Mantel ahli {x} (berlis)", "ผ้าคลุมปรมาจารย์{x} (ขลิบ)", "{x} ustalık pelerini (süslü)", "Capa de maestría: {x} (ribeteada)", "Capa de maestria: {x} (debruada)", "Плащ мастера: {x} (с каймой)", "Плащ майстра: {x} (з облямівкою)"],
-  "Coins": ["コイン", "코인", "金币", "金幣", "Xu", "Koin", "เหรียญ", "Altın", "Monedas", "Moedas", "Монеты", "Монети"],
+  "Frens": ["フレン", "프렌", "友币", "友幣", "Fren", "Fren", "เฟรน", "Fren", "Frens", "Frens", "Френы", "Френи"],
   "Small fishing net": ["小さな漁網", "작은 어망", "小渔网", "小漁網", "Lưới đánh cá nhỏ", "Jaring ikan kecil", "แหจับปลาเล็ก", "Küçük balık ağı", "Red de pesca pequeña", "Rede de pesca pequena", "Малая рыболовная сеть", "Мала рибальська сітка"],
   "Fishing rod": ["釣り竿", "낚싯대", "钓竿", "釣竿", "Cần câu", "Joran pancing", "คันเบ็ด", "Olta", "Caña de pescar", "Vara de pesca", "Удочка", "Вудка"],
   "Fly fishing rod": ["フライ用釣り竿", "플라이 낚싯대", "飞蝇钓竿", "飛蠅釣竿", "Cần câu ruồi", "Joran pancing umpan bulu", "คันเบ็ดตกปลาด้วยเหยื่อปลอม", "Sinek oltası", "Caña de pesca con mosca", "Vara de pesca com mosca", "Нахлыстовая удочка", "Нахлистова вудка"],

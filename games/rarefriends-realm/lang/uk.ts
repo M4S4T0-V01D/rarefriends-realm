@@ -68,7 +68,7 @@ export const uk: Dictionary = {
   "Heartwood": "Серцевина лісу", "Last Orders": "Останнє замовлення", "The Seventh Toast": "Сьомий тост", "A Crooked Vintage": "Кривий урожай", "The Hound's Bite": "Укус гончака", "Kettle Black": "Чорний чайник", "Free Cider": "Безкоштовний сидр",
   "A Name Worth Knowing": "Ім'я, яке варто знати", "Known in Every Hall": "Відомий у кожній залі", "The Remembered": "Той, кого пам'ятають",
   // ---------- Inventory and equipment ----------
-  "Empty slot {n}": "Порожня комірка {n}", "Coins": "Монети", "{item} × {n}": "{item} × {n}",
+  "Empty slot {n}": "Порожня комірка {n}", "Frens": "Френи", "{item} × {n}": "{item} × {n}",
   "Head": "Голова", "Cape": "Плащ", "Neck": "Шия", "Ring": "Перстень", "Weapon": "Зброя", "Body": "Тіло", "Shield": "Щит", "Legs": "Ноги", "Belt": "Пояс", "Hands": "Руки", "Feet": "Ступні",
   "{slot}: empty": "{slot}: порожньо", "Weight": "Вага", "kg": "кг", "· running drains": "· біг витрачає на", "% faster": "% швидше",
   "Adventurer card · Share on X": "Картка шукача · Поділитися в X", "Adventurer card": "Картка шукача", "Adventurer Cards": "Картки шукача", "Adventurer Cards ·": "Картки шукача ·", "found": "знайдено",
@@ -80,7 +80,7 @@ export const uk: Dictionary = {
   // ---------- Magic ----------
   "Combat": "Бій", "Curses": "Прокляття", "Wards": "Обереги", "Utility": "Корисне", "Teleports": "Телепорти", "Magic level": "Рівень магії", "Spellbook": "Книга заклять",
   // ---------- Friends ----------
-  "Referrals": "Запрошення", "Your code:": "Ваш код:", ". A friend who enters it and you each get": ". Друг, який його введе, і ви отримаєте по", "250 coins": "250 монет", "Friendship cape": "Плащ Дружби",
+  "Referrals": "Запрошення", "Your code:": "Ваш код:", ". A friend who enters it and you each get": ". Друг, який його введе, і ви отримаєте по", "250 Frens": "250 френів", "Friendship cape": "Плащ Дружби",
   "(with its own emote) and": "(із власною емоцією) і", "+15% XP": "+15% досвіду", "for an hour of play.": "на годину гри.", "Friend's code": "Код друга", "Party": "Загін",
   "· +10% XP with a party member within": "· +10% досвіду, якщо член загону в межах", "tiles · fellows within 12 give +5%": "клітинок · соратники в межах 12 дають +5%",
   "No party yet. Right-click a player (or one below) to invite them; \"/p\" in chat talks to the party.": "Загону ще немає. Натисніть правою кнопкою на гравця (або на когось нижче), щоб запросити; \"/p\" у чаті — повідомлення загону.",
@@ -90,7 +90,7 @@ export const uk: Dictionary = {
   "Followers": "Супутники", "Pets": "Улюбленці", "Dragons": "Дракони", "Hiscores": "Рекорди", "(you and the players you've met)": "(ви та гравці, яких ви зустріли)", "Friend": "Friend", "Total": "Усього", "You": "Ви",
   "Play online to meet other players: they'll show up here.": "Грайте онлайн, щоб зустрічати інших гравців: вони з'являться тут.",
   "Wardrobe": "Гардероб", "Rare Relics": "Рідкісні реліквії", "Plain Relic": "Проста реліквія", "+2% XP in every skill per relic (max 5)": "+2% досвіду до всіх навичок за реліквію (макс. 5)", "Silver Relic": "Срібна реліквія",
-  "+10% coins from drops and pickpockets per relic (max 3)": "+10% монет зі здобичі й кишенькових крадіжок за реліквію (макс. 3)", "Moonlit Relic": "Місячна реліквія", "Gather 10% faster per relic (max 3)": "Збирання на 10% швидше за реліквію (макс. 3)",
+  "+10% Frens from drops and pickpockets per relic (max 3)": "+10% френів зі здобичі й кишенькових крадіжок за реліквію (макс. 3)", "Moonlit Relic": "Місячна реліквія", "Gather 10% faster per relic (max 3)": "Збирання на 10% швидше за реліквію (макс. 3)",
   "Golden Relic": "Золота реліквія", "+10% XP and a golden aura while kept": "+10% досвіду й золота аура, поки зберігається", "Rare Caskets (simulated RF)": "Рідкісні скриньки (симуляція RF)",
   "A friend's referral code": "Код запрошення друга", "Friend number to add": "Номер Friend для додавання",
   "Undiscovered: found while training {skill}": "Не знайдено: випадає під час тренування навички «{skill}»", "Undiscovered pet ({x})": "Невідомий улюбленець ({x})", "Undiscovered: found while fighting {x}": "Не знайдено: випадає в бою з {x}",
@@ -145,7 +145,7 @@ export const uk: Dictionary = {
   "Best": "Рекорд", "days · a new day in": "дн. · новий день через", "(midnight UTC)": "(північ UTC)", "World boss:": "Світовий бос:", "Claim day": "Забрати день", "Claim": "Забрати", "Today's challenges": "Випробування дня",
   "(yours alone; everyone's differ)": "(лише ваші; у всіх різні)", "🎁 Daily chest": "🎁 Щоденна скриня", "Finish all three challenges:": "Виконайте всі три випробування:",
   "Simulated $RAREFRIENDS: the caskets are yours to open as well.": "Симуляція $RAREFRIENDS: скриньки теж можна відкрити.", "Work orders:": "Замовлення:", "(something to claim)": "(є що забрати)",
-  "Day {n}: {r}": "День {n}: {r}", "Gain {n} {skill} XP": "Отримайте {n} досвіду ({skill})", "Defeat {n} monsters": "Переможіть {n} монстрів", "{n} coins": "{n} монет", "+ {n} XP": "+ {n} досвіду",
+  "Day {n}: {r}": "День {n}: {r}", "Gain {n} {skill} XP": "Отримайте {n} досвіду ({skill})", "Defeat {n} monsters": "Переможіть {n} монстрів", "{n} Frens": "{n} френів", "+ {n} XP": "+ {n} досвіду",
   "Reroll challenges · {n} casket": "Змінити випробування · скриньок: {n}", "Complete all three · {n} caskets": "Виконати всі три · скриньок: {n}",
   "Simulated RF buys a Rare Casket; the day's three challenges are rolled afresh (claimed ones stay claimed)": "Симульовані RF купують Рідкісну скриньку; три випробування дня випадають заново (отримані нагороди лишаються)",
   "Simulated RF buys two Rare Caskets; every challenge pays out as finished and the chest opens": "Симульовані RF купують дві Рідкісні скриньки; усі випробування зараховуються, і скриня відкривається",
@@ -157,7 +157,7 @@ export const uk: Dictionary = {
   "New tab (drop an item here)": "Нова вкладка (киньте сюди предмет)", "Search the bank": "Пошук у банку", "Search": "Пошук", "Bank": "Банк", "Withdraw {item} ({n})": "Зняти: {item} ({n})", "Deposit {item}": "Внести: {item}",
   "Inventory (click to deposit)": "Інвентар (клік — внести)", "Buy/sell:": "Купити/продати:",
   "Click the stock to buy; click your pack (right) to sell. A general store buys almost anything. What you sell goes on the shelves, to buy back.": "Натисніть на товар, щоб купити; на свою торбу (праворуч) — щоб продати. Крамниця купує майже все. Продане потрапляє на полиці, його можна викупити.",
-  "Shop stock": "Товари крамниці", "{item}: {n} coins": "{item}: {n} монет", "Buy {item} for {n} coins": "Купити {item} за {n} монет", "Sell for {n} coins": "Продати за {n} монет", "Sell {item} for {n} coins": "Продати {item} за {n} монет",
+  "Shop stock": "Товари крамниці", "{item}: {n} Frens": "{item}: {n} френів", "Buy {item} for {n} Frens": "Купити {item} за {n} френів", "Sell for {n} Frens": "Продати за {n} френів", "Sell {item} for {n} Frens": "Продати {item} за {n} френів",
   "Inventory (click to sell)": "Інвентар (клік — продати)", "Rare Market": "Рідкісний ринок", "Rare Casket": "Рідкісна скринька", "Rare Relic": "Рідкісна реліквія", "Relic": "Реліквія", "Kept bonus": "Бонус за зберігання", "Chance": "Шанс", "RF value": "Цінність у RF", "Simulated RF": "Симуляція RF",
   // ---------- Menus ----------
   "Choose Option": "Виберіть дію", "Select an option": "Виберіть варіант", "Walk here": "Іти сюди", "{x} / {n} more options": "{x} / ще варіантів: {n}", "{x} / 1 more option": "{x} / ще 1 варіант",

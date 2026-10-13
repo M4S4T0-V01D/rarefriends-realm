@@ -68,7 +68,7 @@ export const th: Dictionary = {
   "Heartwood": "ใจกลางพงไพร", "Last Orders": "สั่งรอบสุดท้าย", "The Seventh Toast": "ชนแก้วครั้งที่เจ็ด", "A Crooked Vintage": "ไวน์บิดเบี้ยว", "The Hound's Bite": "รอยกัดของหมาล่าเนื้อ", "Kettle Black": "กาน้ำดำ", "Free Cider": "ไซเดอร์ฟรี",
   "A Name Worth Knowing": "ชื่อที่ควรค่าแก่การรู้จัก", "Known in Every Hall": "เป็นที่รู้จักทุกหอ", "The Remembered": "ผู้ถูกจดจำ",
   // ---------- Inventory and equipment ----------
-  "Empty slot {n}": "ช่องว่าง {n}", "Coins": "เหรียญ", "{item} × {n}": "{item} × {n}",
+  "Empty slot {n}": "ช่องว่าง {n}", "Frens": "เฟรน", "{item} × {n}": "{item} × {n}",
   "Head": "ศีรษะ", "Cape": "ผ้าคลุม", "Neck": "คอ", "Ring": "แหวน", "Weapon": "อาวุธ", "Body": "ลำตัว", "Shield": "โล่", "Legs": "ขา", "Belt": "เข็มขัด", "Hands": "มือ", "Feet": "เท้า",
   "{slot}: empty": "{slot}: ว่าง", "Weight": "น้ำหนัก", "kg": "กก.", "· running drains": "· วิ่งหมดเร็วขึ้น", "% faster": "%",
   "Adventurer card · Share on X": "การ์ดนักผจญภัย · แชร์บน X", "Adventurer card": "การ์ดนักผจญภัย", "Adventurer Cards": "การ์ดนักผจญภัย", "Adventurer Cards ·": "การ์ดนักผจญภัย ·", "found": "ที่พบ",
@@ -80,7 +80,7 @@ export const th: Dictionary = {
   // ---------- Magic ----------
   "Combat": "ต่อสู้", "Curses": "คำสาป", "Wards": "ป้องกัน", "Utility": "อเนกประสงค์", "Teleports": "เทเลพอร์ต", "Magic level": "เลเวลเวทมนตร์", "Spellbook": "ตำราเวท",
   // ---------- Friends ----------
-  "Referrals": "การแนะนำ", "Your code:": "โค้ดของคุณ:", ". A friend who enters it and you each get": " เพื่อนที่กรอกโค้ดและคุณจะได้รับ", "250 coins": "250 เหรียญ", "Friendship cape": "ผ้าคลุมมิตรภาพ",
+  "Referrals": "การแนะนำ", "Your code:": "โค้ดของคุณ:", ". A friend who enters it and you each get": " เพื่อนที่กรอกโค้ดและคุณจะได้รับ", "250 Frens": "250 เฟรน", "Friendship cape": "ผ้าคลุมมิตรภาพ",
   "(with its own emote) and": "(พร้อมท่าทางพิเศษ) และ", "+15% XP": "+15% XP", "for an hour of play.": "เป็นเวลาเล่นหนึ่งชั่วโมง", "Friend's code": "โค้ดของเพื่อน", "Party": "ปาร์ตี้",
   "· +10% XP with a party member within": "· +10% XP เมื่อมีสมาชิกปาร์ตี้ในระยะ", "tiles · fellows within 12 give +5%": "ช่อง · พวกพ้องในระยะ 12 ช่องให้ +5%",
   "No party yet. Right-click a player (or one below) to invite them; \"/p\" in chat talks to the party.": "ยังไม่มีปาร์ตี้ คลิกขวาที่ผู้เล่น (หรือรายชื่อด้านล่าง) เพื่อชวน พิมพ์ \"/p\" ในแชทเพื่อคุยกับปาร์ตี้",
@@ -90,7 +90,7 @@ export const th: Dictionary = {
   "Followers": "ผู้ติดตาม", "Pets": "สัตว์เลี้ยง", "Dragons": "มังกร", "Hiscores": "อันดับคะแนน", "(you and the players you've met)": "(คุณและผู้เล่นที่คุณเคยพบ)", "Friend": "Friend", "Total": "รวม", "You": "คุณ",
   "Play online to meet other players: they'll show up here.": "เล่นออนไลน์เพื่อพบผู้เล่นคนอื่น พวกเขาจะแสดงที่นี่",
   "Wardrobe": "ตู้เสื้อผ้า", "Rare Relics": "วัตถุโบราณหายาก", "Plain Relic": "วัตถุโบราณธรรมดา", "+2% XP in every skill per relic (max 5)": "+2% XP ทุกทักษะต่อชิ้น (สูงสุด 5)", "Silver Relic": "วัตถุโบราณเงิน",
-  "+10% coins from drops and pickpockets per relic (max 3)": "+10% เหรียญจากของดรอปและการล้วงกระเป๋าต่อชิ้น (สูงสุด 3)", "Moonlit Relic": "วัตถุโบราณแสงจันทร์", "Gather 10% faster per relic (max 3)": "เก็บของเร็วขึ้น 10% ต่อชิ้น (สูงสุด 3)",
+  "+10% Frens from drops and pickpockets per relic (max 3)": "+10% เฟรนจากของดรอปและการล้วงกระเป๋าต่อชิ้น (สูงสุด 3)", "Moonlit Relic": "วัตถุโบราณแสงจันทร์", "Gather 10% faster per relic (max 3)": "เก็บของเร็วขึ้น 10% ต่อชิ้น (สูงสุด 3)",
   "Golden Relic": "วัตถุโบราณทองคำ", "+10% XP and a golden aura while kept": "+10% XP และออร่าสีทองขณะถือไว้", "Rare Caskets (simulated RF)": "หีบหายาก (RF จำลอง)",
   "A friend's referral code": "โค้ดแนะนำของเพื่อน", "Friend number to add": "หมายเลข Friend ที่จะเพิ่ม",
   "Undiscovered: found while training {skill}": "ยังไม่ค้นพบ: พบได้ระหว่างฝึก{skill}", "Undiscovered pet ({x})": "สัตว์เลี้ยงที่ยังไม่ค้นพบ ({x})", "Undiscovered: found while fighting {x}": "ยังไม่ค้นพบ: พบได้ระหว่างต่อสู้กับ{x}",
@@ -145,7 +145,7 @@ export const th: Dictionary = {
   "Best": "ดีที่สุด", "days · a new day in": "วัน · วันใหม่ในอีก", "(midnight UTC)": "(เที่ยงคืน UTC)", "World boss:": "บอสโลก:", "Claim day": "รับวันที่", "Claim": "รับ", "Today's challenges": "ภารกิจวันนี้",
   "(yours alone; everyone's differ)": "(ของคุณคนเดียว แต่ละคนไม่เหมือนกัน)", "🎁 Daily chest": "🎁 หีบรายวัน", "Finish all three challenges:": "ทำภารกิจครบทั้งสาม:",
   "Simulated $RAREFRIENDS: the caskets are yours to open as well.": "$RAREFRIENDS จำลอง: คุณเปิดหีบเองได้ด้วย", "Work orders:": "ใบสั่งงาน:", "(something to claim)": "(มีของให้รับ)",
-  "Day {n}: {r}": "วันที่ {n}: {r}", "Gain {n} {skill} XP": "รับ XP {skill} {n}", "Defeat {n} monsters": "กำจัดมอนสเตอร์ {n} ตัว", "{n} coins": "{n} เหรียญ", "+ {n} XP": "+ {n} XP",
+  "Day {n}: {r}": "วันที่ {n}: {r}", "Gain {n} {skill} XP": "รับ XP {skill} {n}", "Defeat {n} monsters": "กำจัดมอนสเตอร์ {n} ตัว", "{n} Frens": "{n} เฟรน", "+ {n} XP": "+ {n} XP",
   "Reroll challenges · {n} casket": "สุ่มภารกิจใหม่ · {n} หีบ", "Complete all three · {n} caskets": "สำเร็จทั้งสาม · {n} หีบ",
   "Simulated RF buys a Rare Casket; the day's three challenges are rolled afresh (claimed ones stay claimed)": "RF จำลองซื้อหีบหายากหนึ่งใบ ภารกิจทั้งสามของวันนี้จะสุ่มใหม่ (ที่รับแล้วยังคงอยู่)",
   "Simulated RF buys two Rare Caskets; every challenge pays out as finished and the chest opens": "RF จำลองซื้อหีบหายากสองใบ ทุกภารกิจนับว่าสำเร็จและหีบจะเปิด",
@@ -157,7 +157,7 @@ export const th: Dictionary = {
   "New tab (drop an item here)": "แท็บใหม่ (วางไอเท็มที่นี่)", "Search the bank": "ค้นหาในธนาคาร", "Search": "ค้นหา", "Bank": "ธนาคาร", "Withdraw {item} ({n})": "ถอน {item} ({n})", "Deposit {item}": "ฝาก {item}",
   "Inventory (click to deposit)": "กระเป๋า (คลิกเพื่อฝาก)", "Buy/sell:": "ซื้อ/ขาย:",
   "Click the stock to buy; click your pack (right) to sell. A general store buys almost anything. What you sell goes on the shelves, to buy back.": "คลิกสินค้าเพื่อซื้อ คลิกกระเป๋า (ขวา) เพื่อขาย ร้านค้าทั่วไปรับซื้อแทบทุกอย่าง ของที่คุณขายจะวางบนชั้นให้ซื้อคืนได้",
-  "Shop stock": "สินค้าในร้าน", "{item}: {n} coins": "{item}: {n} เหรียญ", "Buy {item} for {n} coins": "ซื้อ {item} ราคา {n} เหรียญ", "Sell for {n} coins": "ขายได้ {n} เหรียญ", "Sell {item} for {n} coins": "ขาย {item} ได้ {n} เหรียญ",
+  "Shop stock": "สินค้าในร้าน", "{item}: {n} Frens": "{item}: {n} เฟรน", "Buy {item} for {n} Frens": "ซื้อ {item} ราคา {n} เฟรน", "Sell for {n} Frens": "ขายได้ {n} เฟรน", "Sell {item} for {n} Frens": "ขาย {item} ได้ {n} เฟรน",
   "Inventory (click to sell)": "กระเป๋า (คลิกเพื่อขาย)", "Rare Market": "ตลาดหายาก", "Rare Casket": "หีบหายาก", "Rare Relic": "วัตถุโบราณหายาก", "Relic": "วัตถุโบราณ", "Kept bonus": "โบนัสขณะถือ", "Chance": "โอกาส", "RF value": "มูลค่า RF", "Simulated RF": "RF จำลอง",
   // ---------- Menus ----------
   "Choose Option": "เลือก", "Select an option": "เลือกตัวเลือก", "Walk here": "เดินมาที่นี่", "{x} / {n} more options": "{x} / อีก {n} ตัวเลือก", "{x} / 1 more option": "{x} / อีก 1 ตัวเลือก",

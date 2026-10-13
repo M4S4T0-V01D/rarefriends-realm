@@ -11,7 +11,7 @@ import { FAMILY_NAMES, FAMILY_PERKS, MOUNTS, RELICS, RF_BUNDLES, SKILL_COLORS, S
 import { QUESTS, questPoints, MAX_QUEST_POINTS } from "./content.ts";
 import { TICK_MS, attackSpeed, combatLevel, createGame, giveOrDrop, message, totalLevel, type Game, type Projectile } from "./state.ts";
 import {
-  chooseOption, closeInterfaces, collectFromCasket, creditReferral, emoteProblem, performEmote, syncMonster, continueDialogue, grantBundle, menuFor, tailorChoices, unlockMusic, restore, serialize, setFollower, setHeld, setRelics, tick, toggleRun, toggleSneak, toggleMount, grantMount, walkTo, sailTo, atSea, type OwnedFriend, type Selection,
+  chooseOption, closeInterfaces, collectFromCasket, creditReferral, emoteProblem, performEmote, syncMonster, continueDialogue, grantBundle, menuFor, tailorChoices, unlockMusic, restore, serialize, setFollower, setHeld, setRelics, tick, toggleRun, toggleSneak, toggleMount, goAshoreNearest, grantMount, walkTo, sailTo, atSea, type OwnedFriend, type Selection,
   mountAttack,
 } from "./engine.ts";
 import { DOCKS } from "./boats.ts";
@@ -1191,7 +1191,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
                 {...rightClick((x, y, entries) => setMenu({ x, y, entries }), () => ([["North", 0], ["East", -Math.PI / 2], ["South", Math.PI], ["West", Math.PI / 2]] as const).map(([name, turn]) => ({ verb: `Look ${name}`, noun: "", run: () => {
                   const from = cameraGoal.current?.angle ?? camera.current.angle, goal = NORTH + turn; cameraGoal.current = { angle: goal + Math.round((from - goal) / (Math.PI * 2)) * Math.PI * 2, pitch: cameraGoal.current?.pitch ?? camera.current.pitch }; } })))}
                 onClick={() => { const from = cameraGoal.current?.angle ?? camera.current.angle; cameraGoal.current = { angle: NORTH + Math.round((from - NORTH) / (Math.PI * 2)) * Math.PI * 2, pitch: cameraGoal.current?.pitch ?? camera.current.pitch }; }}><i aria-hidden="true">▲</i><b>N</b></button>
-              <MountOrb game={state} openMenu={(x, y, entries) => setMenu({ x, y, entries })} onRide={id => { toggleMount(state, id); refresh(); }} />
+              <MountOrb game={state} openMenu={(x, y, entries) => setMenu({ x, y, entries })} onRide={id => { toggleMount(state, id); refresh(); }} onAshore={() => { goAshoreNearest(state); refresh(); }} />
               <button type="button" className="realm-feedback-btn" aria-label="Send feedback" title="Send feedback: a bug, an idea, anything" onClick={() => { setFeedbackStatus(""); setModal("feedback"); }}>💬</button>
               <button type="button" className="realm-logout-btn" aria-label="Save and log out" title="Save and log out" onClick={logOut}
                 {...rightClick((x, y, entries) => setMenu({ x, y, entries }), () => [{ verb: "Save-and-log-out", noun: "", run: logOut }])}>⏻</button>
@@ -1298,7 +1298,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           {(modal === "caskets" || state.ui.shop === "__caskets") && (
             <Modal title="Rare Caskets" onClose={() => { setModal(null); state.ui.shop = null; setReveal(null); refresh(); }} wide>
               <p className="realm-sim">Simulated $RAREFRIENDS. No real tokens, contracts or transactions. Balance: <b>{snapshot ? rf(snapshot.rfBalance) : "…"}</b></p>
-              <p>Each casket costs <b>{rf(definition.price)}</b> and holds a <b>Rare Relic</b> (keep it for a bonus, or redeem it for RF) plus a <b>wardrobe piece</b> for your Friend. Duplicates become coins.</p>
+              <p>Each casket costs <b>{rf(definition.price)}</b> and holds a <b>Rare Relic</b> (keep it for a bonus, or redeem it for RF) plus a <b>wardrobe piece</b> for your Friend. Duplicates become Frens.</p>
               <table className="realm-odds">
                 <thead><tr><th>Relic</th><th>Chance</th><th>RF value</th><th>Kept bonus</th><th>Wardrobe</th></tr></thead>
                 <tbody>{definition.outcomes.map((outcome, index) => <tr key={outcome.name}><td>{outcome.name}</td><td>{(outcome.chanceBps / 100).toFixed(0)}%</td><td>{rf(outcome.reward)}</td><td>{RELICS[index].text}</td>
@@ -1313,7 +1313,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
               {casketError && <p className="realm-error" role="alert">{casketError}</p>}
               {reveal && <div className="realm-reveal">{reveal.map(result => {
                 const outcome = definition.outcomes[result.outcomeId - 1], piece = WARDROBE.find(entry => entry.id === result.wardrobe);
-                return <div key={result.play.toString()} className={`tier-${result.outcomeId}`}><b>{outcome.name}</b><small>{piece ? `Wardrobe: ${piece.name}` : `+${result.coins} coins`}</small>
+                return <div key={result.play.toString()} className={`tier-${result.outcomeId}`}><b>{outcome.name}</b><small>{piece ? `Wardrobe: ${piece.name}` : `+${result.coins} Frens`}</small>
                   <button type="button" disabled={busy || result.redeemed} onClick={() => void casket(() => client.redeem(result.outcomeId, 1n), () => { setReveal(list => list?.map(item => item.play === result.play ? { ...item, redeemed: true } : item) ?? null); audio.current?.sfx("coins"); })}>{result.redeemed ? "Redeemed" : `Redeem · ${rf(outcome.reward)}`}</button></div>;
               })}</div>}
               <h3>Your relics</h3>

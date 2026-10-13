@@ -121,7 +121,7 @@ export function passage(game: Game, from: string, to: string): { cost: number; a
   if (game.arena) return { problem: "Not in the middle of a match." };
   if (player.combat !== null) return { problem: "Not with a fight on your hands." };
   const cost = fare(game, from, to);
-  if (count(player, "coins") < cost) return { problem: `The fare is ${cost.toLocaleString()} coins, and you have ${count(player, "coins").toLocaleString()}.` };
+  if (count(player, "coins") < cost) return { problem: `The fare is ${cost.toLocaleString()} Frens, and you have ${count(player, "coins").toLocaleString()}.` };
   return { cost, arrive: { x: there.to.x, y: there.to.y }, name: DOCKS.find(dock => dock.id === to)?.name ?? to };
 }
 /** Whether a voyage is still being shown. */
