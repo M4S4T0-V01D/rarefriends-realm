@@ -214,6 +214,7 @@ export type RegionId =
   // A Place to the North (northworld.ts): the Vargskeld, the Varn Ridge and the Oathgate between, the Zoryavik; their towns and places.
   | "vargskeld" | "vargskeld_sea" | "skarnholm" | "ravnsvik" | "oathsworn_hall" | "embermoot" | "redwake_camp" | "varn_ridge" | "oathgate_pass"
   | "zoryavik" | "zoryavik_coast" | "hearthwatch" | "krasnogor" | "bereslav" | "zlatna_gora" | "svetloye" | "old_bough"
+  | "skarnholm_bay" | "grimfell" | "sokol_hills"
   // The sea ports: Gullwick on the mainland, Saltreach below Raria, and Merrab, Tel Ashun and Ennu's Well in Kharaveth's east.
   | "gullwick" | "saltreach" | "merrab" | "tel_ashun" | "ennus_well";
 export type Region = { id: RegionId; name: string; label: { x: number; y: number }; danger: number; underground?: boolean;
@@ -342,6 +343,7 @@ export const REGIONS: readonly Region[] = [
     ["embermoot", "Embermoot", 0], ["redwake_camp", "The Redwake Camp", 2], ["varn_ridge", "The Varn Ridge", 5], ["oathgate_pass", "The Oathgate", 3],
     ["zoryavik", "The Zoryavik", 4], ["zoryavik_coast", "The Zoryavik Coast", 3], ["hearthwatch", "Hearthwatch", 0], ["krasnogor", "Krasnogor", 0], ["bereslav", "Bereslav", 0],
     ["zlatna_gora", "Zlatna Gora", 1], ["svetloye", "Svetloye", 0], ["old_bough", "The Old Bough", 1],
+    ["skarnholm_bay", "Skarnholm Bay", 3], ["grimfell", "The Grimfell", 4], ["sokol_hills", "The Sokol Hills", 4],
   ] as const).map(([id, name, danger]) => ({ id, name, label: { x: 0, y: 0 }, danger, far: true }) as Region),
 ];
 export const regionIndex = (id: RegionId) => REGIONS.findIndex(region => region.id === id);

@@ -27,6 +27,7 @@ import { PYRAMID_CLUES, onPyramidsTick } from "./pyramidsclues.ts";
 import { PORTS_QUEST_CLUES } from "./portsquests.ts";
 import { NORTH_CLUES } from "./northquest.ts";
 import { VESSEL_CLUES } from "./seafaring.ts";
+import { WAYMARK_CLUES } from "./wayfinding.ts";
 
 const art = (family: number, seed: number) => ({ family, seed });
 const person = (id: string, name: string, examine: string, seed: number, extra: Partial<NpcDef> = {}): NpcDef => ({ id, name, examine, options: ["Talk-to"], art: art(9, seed), ...extra });
@@ -190,6 +191,8 @@ export const CLUES: Record<string, Clue> = {
   ...NORTH_CLUES,
   // Your vessels, moored (seafaring.ts).
   ...VESSEL_CLUES,
+  // The north's trails' waymarks (wayfinding.ts).
+  ...WAYMARK_CLUES,
 };
 
 /** A clue's options, examine text and use (null if the object isn't one). */

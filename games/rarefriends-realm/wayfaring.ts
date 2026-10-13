@@ -6,6 +6,7 @@
 import { WAYFARER_MARK, WAYFARER_REWARDS, item } from "./data.ts";
 import { count, giveOrDrop, level, message, sound, take, wayfarerPieces, wornWeight, type Game } from "./state.ts";
 import { carriesCompass, carriesFrame } from "./camping.ts";
+import { onKnownTrail } from "./wayfinding.ts";
 
 /**
  * The chance of slipping on an obstacle: none on the easiest (level 1) ones or in the Wayfarer's gloves, a fifth at the
@@ -15,10 +16,10 @@ export function slipChance(game: Game, obstacle: { level: number }) {
   if (obstacle.level <= 1 || game.player.equipment.hands === "wayfarer_gloves") return 0;
   return Math.max(0, Math.min(0.2, (obstacle.level + 12 - level(game, "agility")) / 60));
 }
-/** Running drains less the better your Wayfaring (40% less at 99), and less again in the Wayfarer's cape (20%, 40% in the full outfit). */
+/** Running drains less the better your Wayfaring (40% less at 99), and less again in the Wayfarer's cape (20%, 40% in the full outfit), and half on a trail you know (wayfinding.ts). */
 export function runDrain(game: Game) {
   const player = game.player, cape = player.equipment.cape === "wayfarer_cape" ? (wayfarerPieces(player) >= 4 ? 0.6 : 0.8) : 1;
-  return (player.familyId === 5 ? 0.36 : 0.6) * (1 - level(game, "agility") * 0.004) * cape * (carriesCompass(player) ? 0.9 : 1) * (1 + weightPenalty(game));
+  return (player.familyId === 5 ? 0.36 : 0.6) * (1 - level(game, "agility") * 0.004) * cape * (carriesCompass(player) ? 0.9 : 1) * (1 + weightPenalty(game)) * (onKnownTrail(game) ? 0.5 : 1);
 }
 /**
  * The load you carry: every worn thing weighs something, and running under forty kilograms drains twice as fast.

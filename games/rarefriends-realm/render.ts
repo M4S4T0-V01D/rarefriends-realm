@@ -3736,6 +3736,19 @@ function personFigure(ctx: CanvasRenderingContext2D, scene: Scene, id: string, u
 }
 /** What some NPCs wear, composited into their sprite like your own gear: the King's regalia, and the guards' helms, battleaxes and red capes. */
 const NPC_WEAR: Record<string, readonly string[]> = {
+  // A Place to the North: the Vargskeld in wool and fur, the Zoryavik in embroidered linen and red (northgear.ts).
+  jarl_hallveig: ["apron_dress", "fur_mantle", "turnshoes"], lawspeaker_signy: ["vargskeld_hood", "apron_dress", "turnshoes"], farwake_master: ["wolf_fur_hat", "vargskeld_tunic", "wrapped_trousers", "fur_mantle", "turnshoes"],
+  shipwright_bersi: ["vargskeld_tunic", "wrapped_trousers", "turnshoes"], skarnholm_innkeeper: ["apron_dress", "turnshoes"], skarnholm_trader: ["vargskeld_hood", "vargskeld_tunic", "wrapped_trousers"],
+  skarnholm_weaver: ["vargskeld_hood", "apron_dress", "turnshoes"], ravnsvik_netmender: ["vargskeld_hood", "apron_dress"], oathmaster_brand: ["vargskeld_tunic", "wrapped_trousers", "fur_mantle"],
+  oathsworn_warrior: ["wolf_fur_hat", "vargskeld_tunic", "wrapped_trousers", "turnshoes"], ember_keeper_yrsa: ["vargskeld_hood", "apron_dress", "fur_mantle"], ember_skald: ["vargskeld_tunic", "wrapped_trousers", "fur_mantle"],
+  redwake_captain: ["wolf_fur_hat", "vargskeld_tunic", "wrapped_trousers", "turnshoes"], redwake_sellsword: ["vargskeld_tunic", "wrapped_trousers"], vargskeld_villager: ["vargskeld_hood", "vargskeld_tunic", "wrapped_trousers", "turnshoes"],
+  vargskeld_housecarl: ["wolf_fur_hat", "vargskeld_tunic", "wrapped_trousers", "fur_mantle", "turnshoes"],
+  prince_radomir: ["fur_kolpak", "rubakha", "linen_porty", "wool_svita", "red_boots"], princess_vesna: ["kokoshnik", "sarafan", "red_boots"], hearth_father_ilya: ["fur_kolpak", "rubakha", "linen_porty", "bast_shoes"],
+  krasnogor_innkeeper: ["kokoshnik", "sarafan", "bast_shoes"], krasnogor_trader: ["fur_kolpak", "rubakha", "linen_porty", "red_boots"], krasnogor_tailor: ["kokoshnik", "sarafan", "red_boots"],
+  zoryavik_villager: ["rubakha", "linen_porty", "bast_shoes"], zoryavik_druzhina: ["fur_kolpak", "rubakha", "linen_porty", "wool_svita", "red_boots"], hearthwarden_captain: ["fur_kolpak", "rubakha", "linen_porty", "wool_svita"],
+  hearthwarden: ["fur_kolpak", "rubakha", "linen_porty", "bast_shoes"], freeholds_speaker: ["sarafan", "wool_svita", "bast_shoes"], bereslav_bargewoman: ["rubakha", "linen_porty", "bast_shoes"],
+  zlatna_foreman: ["fur_kolpak", "rubakha", "linen_porty", "bast_shoes"], archivist_bozhena: ["kokoshnik", "sarafan", "red_boots"], archive_copyist: ["rubakha", "linen_porty", "bast_shoes"],
+  old_bough_keeper: ["rubakha", "linen_porty", "wool_svita", "bast_shoes"],
   // The four Orders: commanders in Paladin plate, quartermasters and guards in Knight.
   ...Object.fromEntries((["diamond", "ink", "sol", "hood", "ember", "dusk"] as const).flatMap(order => [
     [`${order}_commander`, [`${order}_paladin_helm`, `${order}_paladin_body`, `${order}_paladin_legs`, `${order}_paladin_boots`, `${order}_cape`, `${order}_paladin_mace`]],

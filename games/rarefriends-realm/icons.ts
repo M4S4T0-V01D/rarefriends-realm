@@ -320,6 +320,18 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
           for (const x of [12, 20]) part(p, disc(x, 11, 1.5, 1.5), accent ?? "#2a2730", "cloth");
           part(p, disc(15, 19, 5, 2.5), accent ?? "#2a2730", "cloth"); part(p, poly([[19, 19], [23, 16], [23, 22]]), accent ?? "#2a2730", "cloth"); dot(p, 12, 19, color); break;
         }
+        if (icon.kind === "fur") {
+          // A northern fur hat: a round crown, a thick band of fur.
+          part(p, poly([[7, 20], [8, 9], [13, 5], [19, 5], [24, 9], [25, 20]]), color, "cloth");
+          part(p, box(4, 18, 24, 8), accent ?? "#7a6450", "cloth");
+          for (const x of [6, 10, 14, 18, 22, 26]) line(p, [[x, 19], [x - 1, 25]], shadeHex(accent ?? "#7a6450", -0.2)); break;
+        }
+        if (icon.kind === "kokoshnik") {
+          // A kokoshnik: a tall arch, pearled, a jewel at the brow.
+          part(p, poly([[4, 27], [4, 17], [8, 9], [16, 4], [24, 9], [28, 17], [28, 27]]), color, "cloth");
+          for (let k = 0; k <= 8; k++) { const a = Math.PI * k / 8; part(p, disc(16 - Math.cos(a) * 11, 17 - Math.sin(a) * 11, 1.2), accent ?? WHITE, "gem"); }
+          part(p, disc(16, 18, 2.4), GOLD_C, "gem"); line(p, [[4, 26], [28, 26]], accent ?? WHITE, 2); break;
+        }
         if (icon.kind === "turban") {
           // A wrapped turban: turns of cloth, a fold across, a tail.
           part(p, poly([[5, 24], [5, 14], [9, 8], [16, 6], [23, 8], [27, 14], [27, 24]]), color, "cloth");

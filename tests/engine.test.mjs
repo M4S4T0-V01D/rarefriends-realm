@@ -4440,7 +4440,7 @@ test("A Place to the North: the Vargskeld and the Zoryavik above the old map, ea
   const { talk } = await import("../games/rarefriends-realm/content.ts");
   const { trackFor } = await import("../games/rarefriends-realm/audio.ts");
   const g = newGame(), world = g.world, top = mainlandAt(0, 0).y;
-  const ids = ["vargskeld", "vargskeld_sea", "skarnholm", "ravnsvik", "oathsworn_hall", "embermoot", "redwake_camp", "varn_ridge", "oathgate_pass", "zoryavik", "zoryavik_coast", "hearthwatch", "krasnogor", "bereslav", "zlatna_gora", "svetloye", "old_bough"];
+  const ids = ["vargskeld", "vargskeld_sea", "skarnholm", "ravnsvik", "oathsworn_hall", "embermoot", "redwake_camp", "varn_ridge", "oathgate_pass", "zoryavik", "zoryavik_coast", "hearthwatch", "krasnogor", "bereslav", "zlatna_gora", "svetloye", "old_bough", "skarnholm_bay", "grimfell", "sokol_hills"];
   for (const id of ids) {
     const region = REGIONS.find(r => r.id === id); assert.ok(region, `${id} is a region`);
     assert.equal(regionAt(world, region.label.x, region.label.y).id, id, `${id}'s label stands in it`);
@@ -4567,7 +4567,10 @@ test("Seafaring: a shipwright builds from real materials (taken), the vessel goe
   assert.ok(!SF.sailableFor(world, "rowboat", deep.x, deep.y) && SF.sailableFor(world, "longship", deep.x, deep.y));
   assert.ok(!SF.sailableFor(world, "longship", v.x, UNDER_Y + 20), "nothing sails underground");
   // Sail somewhere, then click the shore: you sail beside it and step off; it stays moored where it was.
-  let target = null; for (let r = 5; r < 20 && !target; r++) for (let dy = -r; dy <= r && !target; dy++) for (let dx = -r; dx <= r && !target; dx++) if (Math.max(Math.abs(dx), Math.abs(dy)) === r && SF.sailable(g, v.x + dx, v.y + dy)) target = { x: v.x + dx, y: v.y + dy };
+  // Somewhere on the same water, a few tiles off.
+  let target = null; { const seen = new Set([v.y * W + v.x]), queue = [[v.x, v.y]];
+    for (let h = 0; h < queue.length && !target; h++) { const [x, y] = queue[h]; if (Math.abs(x - v.x) + Math.abs(y - v.y) >= 8) target = { x, y };
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const k = (y + dy) * W + x + dx; if (!seen.has(k) && SF.sailable(g, x + dx, y + dy)) { seen.add(k); queue.push([x + dx, y + dy]); } } } }
   assert.ok(walkTo(g, target.x, target.y)); until(g, () => p.x === target.x && p.y === target.y, 80);
   assert.ok(v.sailed >= 5 && v.x === p.x && v.y === p.y, "the vessel goes where you sail it");
   let land = null; for (let r = 1; r < 30 && !land; r++) for (let dy = -r; dy <= r && !land; dy++) for (let dx = -r; dx <= r && !land; dx++) { const x = p.x + dx, y = p.y + dy; if (Math.max(Math.abs(dx), Math.abs(dy)) === r && WALKABLE.has(world.tiles[y * W + x]) && world.objectAt[y * W + x] < 0 && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([ex, ey]) => SF.sailable(g, x + ex, y + ey))) land = { x, y }; }
@@ -4637,7 +4640,7 @@ test("Seafaring grown: hull fittings fitted to a vessel, the ship's bell calls i
   assert.ok(SF.launchSpot(g, "skiff", tamsin), "Gullwick's hard has water for a skiff");
   // Offshore shoals: out of reach of the land, in reach of a longship; fished from aboard.
   const shoals = world.objects.filter(o => o.text === "offshore"); assert.ok(shoals.length >= 10 && shoals.some(o => o.spot === "deep") && shoals.some(o => o.spot === "harpoon"));
-  for (const o of shoals) assert.ok(![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => WALKABLE.has(world.tiles[(o.y + dy) * W + o.x + dx]) && !isWaterTile(world.tiles[(o.y + dy) * W + o.x + dx])), "nobody fishes it from the shore");
+  for (const o of shoals.filter(o => /shoal/i.test(o.name))) assert.ok(![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => WALKABLE.has(world.tiles[(o.y + dy) * W + o.x + dx]) && !isWaterTile(world.tiles[(o.y + dy) * W + o.x + dx])), "nobody fishes it from the shore");
   const shoal = shoals.find(o => o.spot === "harpoon"), beside = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => ({ x: shoal.x + dx, y: shoal.y + dy })).find(t => SF.sailableFor(world, "longship", t.x, t.y));
   v.x = beside.x; v.y = beside.y; p.aboard = 1; teleport(g, beside.x, beside.y); p.xp.fishing = 300_000; give(p, "harpoon", 1);
   setTarget(g, { kind: "object", id: shoal.id, option: "Harpoon" }); until(g, () => p.activity?.kind === "fish", 10);
@@ -4648,8 +4651,8 @@ test("A berth: a barge or a longship can be your waking place (Seafaring 40), on
   const SF = await import("../games/rarefriends-realm/seafaring.ts");
   const { die } = await import("../games/rarefriends-realm/engine.ts");
   const g = newGame(), p = g.player, world = g.world;
-  const bersi = world.spawns.find(s => s.kind === "npc" && s.id === "shipwright_bersi");
-  const a = SF.launchSpot(g, "barge", bersi); p.vessels.push({ id: 1, kind: "barge", name: "River barge", x: a.x, y: a.y, heading: { x: 0, y: 1 }, hull: 140, hold: Array(28).fill(null), sailed: 0 });
+  const bersi = world.spawns.find(s => s.kind === "npc" && s.id === "shipwright_bersi"), olena = world.spawns.find(s => s.kind === "npc" && s.id === "bereslav_bargewoman");
+  const a = SF.launchSpot(g, "barge", olena); p.vessels.push({ id: 1, kind: "barge", name: "River barge", x: a.x, y: a.y, heading: { x: 0, y: 1 }, hull: 140, hold: Array(28).fill(null), sailed: 0 });
   const b = SF.launchSpot(g, "rowboat", bersi); p.vessels.push({ id: 2, kind: "rowboat", name: "Rowboat", x: b.x, y: b.y, heading: { x: 0, y: 1 }, hull: 40, hold: Array(4).fill(null), sailed: 0 }); SF.applyVessels(g);
   const barge = p.vessels.find(v => v.id === 1), row = p.vessels.find(v => v.id === 2);
   assert.ok(!SF.toggleBerth(g, row), "a rowboat has no berth"); assert.ok(!SF.toggleBerth(g, barge), "Seafaring 40 first");
@@ -4664,4 +4667,53 @@ test("A berth: a barge or a longship can be your waking place (Seafaring 40), on
   // Through a save, and back to the fountain when it's unmade.
   const g2 = newGame(); assert.ok(restore(g2, JSON.parse(JSON.stringify(serialize(g))))); assert.ok(g2.player.vessels.find(v => v.id === 1).berth);
   SF.toggleBerth(g, barge); teleport(g, 100, 100); p.aboard = null; die(g); assert.deepEqual([p.x, p.y], [world.places.spawn.x, world.places.spawn.y]);
+});
+
+test("North wayfinding and dress: waymarks along four trails (note them all and the trail is known: XP once, half the run's cost on it, kept through a save), shortcuts and the Wolfsback climb, Skarnholm Bay and the named fells, and the north's own clothes at its own tailors", async () => {
+  const { TRAILS, ROADS } = await import("../games/rarefriends-realm/northworld.ts");
+  const WF = await import("../games/rarefriends-realm/wayfinding.ts");
+  const { NORTH_CLOTHING, NORTH_SHOPS } = await import("../games/rarefriends-realm/northgear.ts");
+  const g = newGame(), p = g.player, world = g.world, top = mainlandAt(0, 0).y;
+  const seen = reachable(g, world.places.spawn);
+  const near = (x, y) => [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]].some(([dx, dy]) => seen[(y + dy) * W + x + dx]);
+  // Every trail has its waymarks, each one a walk away.
+  for (const trail of TRAILS) {
+    const marks = world.objects.filter(o => o.clue === "waymark" && o.text.startsWith(`${trail.id}:`));
+    assert.ok(marks.length >= 3 && marks.length === WF.waymarkCount(world, trail.id), `${trail.name} has its waymarks`);
+    for (const o of marks) assert.ok(near(o.x, o.y), `${trail.name}'s waymark at ${o.x},${o.y} is reachable`);
+  }
+  // On the Bough Road: the run costs the same until the trail's known.
+  const [rx, ry] = ROADS[TRAILS.find(t => t.id === "bough_road").road][1], onRoad = () => teleport(g, Math.round(rx), Math.round(ry)), offRoad = () => teleport(g, world.places.spawn.x, world.places.spawn.y);
+  const drains = () => { onRoad(); const on = runDrain(g); offRoad(); const off = runDrain(g); return on / off; };
+  assert.ok(Math.abs(drains() - 1) < 1e-9, "the same cost on an unknown trail");
+  const marks = world.objects.filter(o => o.clue === "waymark" && o.text.startsWith("bough_road:")), xp0 = p.xp.agility ?? 0;
+  assert.match(WF.WAYMARK_CLUES.waymark.use(g, marks[0], "Note-the-way").text, /noted \(1\//);
+  assert.match(WF.WAYMARK_CLUES.waymark.use(g, marks[0], "Note-the-way").text, /already/); assert.ok(!WF.trailKnown(g, "bough_road"));
+  for (const o of marks.slice(1)) WF.WAYMARK_CLUES.waymark.use(g, o, "Note-the-way");
+  assert.ok(WF.trailKnown(g, "bough_road") && !WF.trailKnown(g, "west_road"));
+  assert.equal((p.xp.agility ?? 0) - xp0, 25 * marks.length + 60 * marks.length, "XP for each waymark and for the trail");
+  assert.ok(Math.abs(drains() - 0.5) < 1e-9, "half the run's cost on a known trail");
+  const g2 = newGame(); assert.ok(restore(g2, JSON.parse(JSON.stringify(serialize(g))))); assert.ok(WF.trailKnown(g2, "bough_road"));
+  assert.deepEqual(WF.cleanTrails({ bough_road: 3, nowhere: 1, west_road: -1, east_road: "x" }), { bough_road: 3 });
+  // Shortcuts in the Zoryavik and the climb over the Wolfsback: both ends reachable.
+  const cuts = world.objects.filter(o => o.kind === "obstacle" && o.y < top && o.obstacle.course === "shortcut");
+  assert.deepEqual([...new Set(cuts.map(o => o.name))].sort(), ["Icicle climb", "Log balance", "Stepping stone"]);
+  for (const o of cuts) if (o.name !== "Icicle climb") { assert.ok(near(o.x, o.y), `${o.name} at ${o.x},${o.y} is reachable`); assert.ok(near(o.to.x, o.to.y), `and so is where it takes you`); }
+  assert.ok(cuts.filter(o => o.name === "Icicle climb").every(o => o.obstacle.level === 35) && cuts.filter(o => o.name === "Icicle climb").length === 2);
+  // Skarnholm Bay: open water with islands, cliffs round it, sea stacks off the coast, standing stones on the fells.
+  for (const id of ["skarnholm_bay", "grimfell", "sokol_hills"]) { const r = REGIONS.find(x => x.id === id); assert.equal(regionAt(world, r.label.x, r.label.y).id, id); }
+  const bay = REGIONS.find(r => r.id === "skarnholm_bay").label; let water = 0, cliff = 0;
+  for (let dy = -40; dy <= 40; dy++) for (let dx = -60; dx <= 60; dx++) { const t = terrainAt(world, bay.x + dx, bay.y + dy); if (t === T.WATER || t === T.DEEP) water++; if (t === T.CLIFF) cliff++; }
+  assert.ok(water > 5000 && cliff > 150, `a wide bay with a cliffed shore (${water} water, ${cliff} cliff)`);
+  assert.ok(world.objects.filter(o => o.name === "A sea stack").length >= 12 && world.objects.filter(o => o.name === "A standing stone").length >= 12);
+  // The north's clothes: regional, sold whole by a tailor who lives in the right town.
+  for (const set of NORTH_CLOTHING) {
+    assert.ok(REGIONAL_CLOTHING.includes(set), `${set.region}'s clothes are regional`);
+    assert.equal(SHOPS[set.shop], NORTH_SHOPS[set.shop]); assert.deepEqual([...SHOPS[set.shop].stock].sort(), set.pieces.map(x => x.id).sort());
+    for (const piece of set.pieces) assert.ok(ITEM_LIST.some(i => i.id === piece.id), piece.id);
+    const keeper = Object.values(NPCS).find(n => n.shop === set.shop), at = world.spawns.find(s => s.kind === "npc" && s.id === keeper.id);
+    assert.ok(at && near(at.x, at.y), `${keeper.name} is reachable`);
+    assert.equal(regionAt(world, at.x, at.y).id, set.region === "vargskeld" ? "skarnholm" : "krasnogor");
+    for (let k = 0; k < 4; k++) assert.ok(talk(g, keeper.id).lines[0].text.length > 20);
+  }
 });

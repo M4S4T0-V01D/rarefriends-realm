@@ -4,6 +4,12 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 124, date: "2026-10-13", title: "Trails, northern dress, and Skarnholm Bay", items: [
+    "The north's land, redrawn. The Skarn Sound opens into Skarnholm Bay: wide water ringed with sea cliffs, islands and skerries out in it, sea stacks off the coast. Fells rise across the Vargskeld with tors and standing stones on their tops, the Skarn runs down off the Grimfell to the bay, the Sokol Hills roll through the Zoryavik, and the high ground holds snow and ice.",
+    "Trails: waymarks stand beside the West Road, the East Road, the Oathgate Road and the Bough Road. Note every waymark along one and you know that trail: Wayfaring XP, and running along it costs half.",
+    "Wayfaring shortcuts in the north: stepping stones by the Zoryavik coast and over the Ilm, a log over the Bereza by Bereslav, and the Wolfsback climb (Wayfaring 35), an icy way over the Varn Ridge for when the Oathgate's barred.",
+    "The north dresses as the north. Ragnhild weaves the Vargskeld's wool in Skarnholm: hoods, wolf-fur hats, tunics, apron dresses, fur-trimmed mantles. Yaroslava embroiders the Zoryavik's linen in Krasnogor: rubakhas, sarafans, kokoshniks, fur kolpaks, red boots. Everyone in the north wears them.",
+  ] },
   { id: 123, date: "2026-10-13", title: "A berth aboard: wake in your own vessel", items: [
     "A barge's deckhouse or a longship's awning can be your waking place (Seafaring 40): Make-waking-place on it where it's moored, and if you fall, you wake aboard it, wherever it is. One waking place at a time, a camp or a vessel. A vessel you fall aboard stays moored where it was.",
   ] },

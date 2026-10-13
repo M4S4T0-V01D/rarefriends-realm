@@ -76,6 +76,7 @@ import { HEARTLAND_GEAR, HEARTLAND_ITEMS, HEARTLAND_MONSTERS, HEARTLAND_SHOPS, O
 import { MEGHAVAN_CLOTHING, MEGHAVAN_GEAR, MEGHAVAN_ITEMS, MEGHAVAN_MONSTERS, MEGHAVAN_QUEST_ITEMS, MEGHAVAN_SHOPS } from "./meghavangear.ts";
 import { PYRAMID_GEAR, PYRAMID_ITEMS, PYRAMID_MONSTERS } from "./pyramidsgear.ts";
 import { PORTS_CLOTHING, PORTS_GEAR, PORTS_ITEMS, PORTS_MONSTERS, PORTS_SHOPS } from "./portsgear.ts";
+import { NORTH_CLOTHING, NORTH_SHOPS } from "./northgear.ts";
 import { ORASHAI_GEAR, ORASHAI_ITEMS, ORASHAI_MONSTERS, ORASHAI_PRAYERS, ORASHAI_QUEST_ITEMS, ORASHAI_SPELLS, ORASHAI_SPELL_TABS } from "./orashai.ts";
 export { ORASHAI_SPELL_TABS };
 import { SOLDIERS } from "./skirmish.ts";
@@ -918,6 +919,8 @@ export const REGIONAL_CLOTHING: readonly RegionalSet[] = [
   ...MEGHAVAN_CLOTHING,
   // The sea ports: Gullwick's, Saltreach's and Merrab's own clothes (portsgear.ts).
   ...PORTS_CLOTHING,
+  // A Place to the North: the Vargskeld's wool and the Zoryavik's embroidered linen (northgear.ts).
+  ...NORTH_CLOTHING,
 ];
 const REGIONAL_ITEMS: Item[] = REGIONAL_CLOTHING.flatMap(set => set.pieces.map((piece): Item => ({
   id: piece.id, name: piece.name, examine: piece.examine, value: piece.value, icon: { shape: piece.shape, color: piece.color, accent: piece.accent, ...(piece.kind ? { kind: piece.kind } : {}) },
@@ -1799,6 +1802,7 @@ export const SHOPS: Record<string, ShopDef> = {
   ...HEARTLAND_SHOPS,
   ...MEGHAVAN_SHOPS,
   ...PORTS_SHOPS,
+  ...NORTH_SHOPS,
   // The Orashai: the Keeper's scriptorium (inks, reeds, rods, the ibis mask) and the Temple of the Hidden Sun (inks).
   keeper_scriptorium: { id: "keeper_scriptorium", name: "The Keeper's scriptorium", buys: ["other"], rate: 0.5, stock: ["ochre_ink", "lapis_ink", "scribes_reed", "lapis_rod", "ibis_mask"] },
   hidden_sun_temple: { id: "hidden_sun_temple", name: "The Temple of the Hidden Sun", buys: ["other"], rate: 0.5, stock: ["ochre_ink", "lapis_ink", "vial_of_water"] },

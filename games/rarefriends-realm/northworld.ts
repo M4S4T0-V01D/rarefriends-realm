@@ -17,6 +17,28 @@ import { REGIONS, T, W, WALKABLE, NORTH_DY, isWater, regionIndex, worldTools, ty
 export const NORTH_X1 = 1150;
 /** Where the peoples' lands meet: the Varn Ridge's spine (x), and its two passes (the Oathgate in the south, the Wolfsback in the north). */
 export const RIDGE = { x: 640, half: 34, oathgate: { x: 640, y: 236 }, wolfsback: { x: 652, y: 118 } } as const;
+/** The north's roads (grown coordinates), each a line of points: the trails (wayfinding.ts) follow the first three and the eastern three. */
+export const ROADS: readonly (readonly (readonly [number, number])[])[] = [
+  // From Vesperwold's road, north over the land-bridge, past Embermoot, on to Skarnholm.
+  [[186, 464], [190, 420], [204, 380], [196, 340], [214, 310], [216, 297], [226, 268], [258, 246], [300, 228]],
+  // From the Deadwood's road, north over the eastern land-bridge, past Zlatna Gora, to Krasnogor.
+  [[743, 478], [756, 440], [748, 400], [764, 362], [748, 324], [762, 296], [800, 268], [834, 240], [879, 231]],
+  // Skarnholm east, past the Redwake camp, through the Oathgate, past Hearthwatch, to Krasnogor's west gate.
+  [[338, 204], [392, 214], [446, 238], [508, 252], [556, 262], [600, 240], [640, 236], [684, 241], [708, 241], [760, 230], [810, 210], [845, 203]],
+  // Skarnholm west to Ravnsvik; Skarnholm north-east to the Oathsworn headland.
+  [[270, 204], [222, 196], [170, 170], [120, 150], [86, 128]],
+  [[336, 190], [392, 168], [446, 140], [490, 120], [534, 115]],
+  // Krasnogor north to the Old Bough and on to Bereslav; Krasnogor east to Svetloye.
+  [[879, 176], [868, 140], [840, 110], [826, 94]],
+  [[912, 190], [956, 160], [990, 134], [1016, 117]],
+  [[912, 214], [960, 236], [1010, 252], [1056, 262]],
+];
+/** The trails: a road walked end to end and known (wayfinding.ts). Waymarks stand beside each, one every `every` tiles. */
+export const TRAILS = [
+  { id: "west_road", name: "The West Road", road: 0 }, { id: "east_road", name: "The East Road", road: 1 },
+  { id: "oathgate_road", name: "The Oathgate Road", road: 2 }, { id: "bough_road", name: "The Bough Road", road: 6 },
+] as const;
+export const WAYMARK_EVERY = 34;
 /** The Oathgate road's trouble (northquest.ts): the wrecked caravan by the road, and the raiders' den up in the hills above it. */
 export const OATH_ROAD = { wreck: { x: 478, y: 241 }, den: { x: 494, y: 216 }, hills: { x0: 440, y0: 196, x1: 545, y1: 262 } } as const;
 const WOLFSBACK_SIGN = "THE WOLFSBACK. A goat-track over the Varn Ridge, the only way across when the Oathgate's shut. Carts can't take it. Yetis can.";
@@ -48,7 +70,7 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
   // ---------- The fjords: long inlets cut in from the north sea, wandering south into the Vargskeld coast ----------
   const FJORDS: readonly (readonly [number, number])[][] = [
     [[96, 0], [104, 40], [92, 78], [110, 112]],
-    [[214, 0], [226, 46], [252, 92], [270, 140], [290, 176]],            // Skarnfjord: the great one, Skarnholm at its head
+    [[236, 0], [244, 22], [254, 50]],                                    // the Skarn Sound, out of Skarnholm Bay to the sea
     [[366, 0], [352, 52], [372, 96], [360, 128]],
     [[470, 0], [482, 38], [462, 74]],
   ];
@@ -57,12 +79,30 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
     for (const line of FJORDS) for (let k = 0; k + 1 < line.length; k++) {
       const [ax, ay] = line[k], [bx, by] = line[k + 1], L = (bx - ax) ** 2 + (by - ay) ** 2, u = Math.max(0, Math.min(1, ((x - ax) * (bx - ax) + (y - ay) * (by - ay)) / L));
       // The inlet narrows towards its head.
-      const along = (k + u) / (line.length - 1), d = Math.hypot(x - (ax + u * (bx - ax)), y - (ay + u * (by - ay))) / (line === FJORDS[1] ? 13 - 8 * along : 9 - 5 * along);
+      const along = (k + u) / (line.length - 1), d = Math.hypot(x - (ax + u * (bx - ax)), y - (ay + u * (by - ay))) / (line === FJORDS[1] ? 15 - 2 * along : 9 - 5 * along);
       if (d < best) best = d;
     }
     return best;
   };
 
+  // ---------- Skarnholm Bay: a great bay behind the Skarn Sound, Skarnholm on its southern shore, islands out in it ----------
+  const BAY = { x: 262, y: 112, rx: 80, ry: 64 };
+  // The shore wanders in coves and points (two scales of noise), and a harbour lobe reaches down to Skarnholm's quay.
+  const bayAt = (x: number, y: number) => Math.min(
+    Math.hypot((x - BAY.x) / BAY.rx, (y - BAY.y) / BAY.ry) / (0.74 + mid(x * 1.3 + 300, y * 1.3) * 0.36 + fine(x * 1.5 + 17, y * 1.5) * 0.18),
+    Math.hypot((x - 298) / 30, (y - 168) / 13));
+  /** The bay's islands: the Gull Holm, the Ness, a couple of skerries [x, y, rx, ry]. */
+  const ISLES = [[236, 94, 11, 7], [292, 118, 8, 6], [212, 134, 5, 4], [274, 78, 4, 3], [310, 92, 3, 3]] as const;
+  const isleAt = (x: number, y: number) => Math.min(...ISLES.map(([ix, iy, rx, ry]) => Math.hypot((x - ix) / rx, (y - iy) / ry) / (0.8 + fine(x + 5, y + 9) * 0.4)));
+  // ---------- Fells and hills: high ground with tors on top, so the land rises and falls instead of lying flat ----------
+  /** [x, y, rx, ry, height]: the Vargskeld's fells (bare, snow-capped in the north) and the Zoryavik's rounded hills. */
+  const HILLS = [[130, 238, 34, 24, 3.0], [418, 278, 30, 20, 2.4], [152, 58, 30, 20, 3.2], [470, 300, 22, 16, 2.0], [60, 300, 28, 24, 2.6],
+    [982, 304, 40, 26, 2.2], [826, 334, 26, 20, 2.8], [900, 58, 40, 24, 2.0], [1100, 160, 30, 30, 2.4], [1060, 70, 26, 18, 1.8]] as const;
+  const hillAt = (x: number, y: number) => { let best = 0, height = 0;
+    for (const [hx, hy, rx, ry, h] of HILLS) { const d = Math.hypot((x - hx) / rx, (y - hy) / ry) / (0.8 + mid(x * 2 + 70, y * 2) * 0.4); if (d < 1) { const f = (1 - d * d) ** 1.4; if (f > best) { best = f; height = h; } } }
+    return { f: best, h: height }; };
+  /** Whether a tile is on one of the hills (by its index in HILLS): the Grimfell is the first, the Sokol Hills the sixth. */
+  const inHill = (k: number, x: number, y: number) => { const [hx, hy, rx, ry] = HILLS[k]; return Math.hypot((x - hx) / rx, (y - hy) / ry) < 0.95; };
   /** How far a tile is from the ridge's spine, in half-widths (under 1: on the ridge). */
   const ridgeAt = (x: number, y: number) => Math.abs(x - (RIDGE.x + (ridgeN(x, y) - 0.5) * 34)) / (RIDGE.half * (0.65 + mid(x * 0.3 + 400, y) * 0.8));
   // ---------- Land and sea, height and ground ----------
@@ -79,6 +119,10 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
     if (ridgeD < 1 && y > 22) land = Math.max(land, 0.08 * (1 - ridgeD) + 0.02);
     // The fjords cut through it on the Vargskeld side.
     if (x < 560 && nearFjord(x, y) < 1) land = Math.min(land, -0.05);
+    // Skarnholm Bay, deepest in the middle, and its islands.
+    const b = bayAt(x, y);
+    if (b < 1) land = Math.min(land, -0.03 - (1 - b) * 0.3);
+    if (isleAt(x, y) < 1) land = Math.max(land, 0.03 + (1 - isleAt(x, y)) * 0.1);
     // The top rows are open sea, always: the north's coasts all open onto it, so a vessel can go round from one to another.
     if (y < 4) land = Math.min(land, -0.1 + y * 0.01);
     if (land <= 0) { tiles[i] = land < -0.06 ? T.DEEP : T.WATER; continue; }
@@ -92,8 +136,32 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
       raise[i] = Math.max(raise[i], peak * 3.6); lift[i] = Math.max(lift[i], peak * 0.9);
     } else if (x < RIDGE.x) tiles[i] = y < 44 && fine(x, y + 13) > 0.74 ? T.SNOW : mid(x + 50, y) > 0.72 ? T.GRAVEL : wetness > 0.62 ? T.DARK_GRASS : T.GRASS;
     else tiles[i] = wetness > 0.7 ? T.SWAMP : mid(x + 90, y) > 0.55 ? T.DARK_GRASS : T.GRASS;
-    lift[i] = Math.max(lift[i], (e - 0.45) * (x < RIDGE.x ? 1.4 : 0.9));
+    // The fells and hills: scree and heather going up, a bare or snowy top, tors of crag standing out of it.
+    const hill = shore ? { f: 0, h: 0 } : hillAt(x, y);
+    if (hill.f > 0.12) {
+      raise[i] = Math.max(raise[i], hill.f * hill.h); lift[i] = Math.max(lift[i], hill.f * 0.8);
+      const west = x < RIDGE.x, top = hill.f > 0.72, tor = hill.f > 0.5 && fine(x + 51, y + 7) > 0.74;
+      tiles[i] = tor ? T.CLIFF : top ? (west ? (y < 140 ? T.SNOW : T.GRAVEL) : (fine(x + 3, y) > 0.5 ? T.GRAVEL : T.DARK_GRASS)) : hill.f > 0.4 ? (west ? (mid(x + 9, y) > 0.5 ? T.GRAVEL : T.DARK_GRASS) : T.DARK_GRASS) : tiles[i];
+    }
+    // The Zoryavik rolls: long swells under the forest, where the Vargskeld is broken and rocky.
+    lift[i] = Math.max(lift[i], (e - 0.45) * (x < RIDGE.x ? 1.4 : 1.5));
   }
+
+  // ---------- The Vargskeld's sea cliffs: where deep water comes close, the coast stands up out of it ----------
+  // (Not at the towns' shores: Skarnholm's quay, Ravnsvik's beach, the Oathsworn headland's landing.)
+  const sheltered = (x: number, y: number) => (x > 246 && x < 350 && y > 158 && y < 236) || (x > 40 && x < 130 && y > 100 && y < 160) || (x > 510 && x < 560 && y > 90 && y < 130);
+  for (let y = 4; y < N - 60; y++) for (let x = 2; x < RIDGE.x - 40; x++) {
+    const i = idx(x, y);
+    if (isWater(tiles[i]) || tiles[i] === T.CLIFF || sheltered(x, y) || fine(x * 2 + 11, y * 2) < 0.42) continue;
+    // (Round Skarnholm Bay its shore stands up too, wherever it isn't Skarnholm's.)
+    const inBay = bayAt(x, y) < 1.25;
+    let deep = false; for (let dy = -2; dy <= 2 && !deep; dy++) for (let dx = -2; dx <= 2 && !deep; dx++) { const tt = tiles[idx(x + dx, y + dy)]; deep = tt === T.DEEP || (inBay && Math.abs(dx) + Math.abs(dy) <= 1 && isWater(tt)); }
+    if (deep) { tiles[i] = T.CLIFF; raise[i] = Math.max(raise[i], 1.4 + fine(x, y) * 1.2); lift[i] = Math.max(lift[i], 0.6); }
+  }
+  // ---------- The Skarn: down off the Grimfell, north to the bay ----------
+  t.river([[136, 226], [150, 214], [168, 204], [186, 196], [200, 186], [214, 174], [226, 160]], 3);
+  // ---------- Ice on the ridge's northern shoulders: snow that never melted, packed hard ----------
+  for (let y = 22; y < 150; y++) for (let x = RIDGE.x - 60; x <= RIDGE.x + 60; x++) { const i = idx(x, y); if (tiles[i] === T.SNOW && raise[i] > 2.2 && fine(x * 2 + 5, y * 2 + 3) > 0.5) tiles[i] = T.ICE; }
 
   // ---------- The land runs on into the old world: above Raria in the west, above the Deadwood in the east ----------
   // (Elsewhere a strait divides them: the Wyrmreach bay, and the sea off the Cragmaw Heights.) Down each column the sea between
@@ -135,7 +203,12 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
     const i = idx(x, y), tile = tiles[i];
     if (tile === T.VOID || x > NORTH_X1 + 30) continue;
     const ridgeD = ridgeAt(x, y);
-    const id: RegionId = isWater(tile) ? (x < RIDGE.x ? "vargskeld_sea" : "zoryavik_coast") : ridgeD < 1 ? "varn_ridge" : x < RIDGE.x ? "vargskeld" : "zoryavik";
+    let id: RegionId = isWater(tile) ? (x < RIDGE.x ? "vargskeld_sea" : "zoryavik_coast") : ridgeD < 1 ? "varn_ridge" : x < RIDGE.x ? "vargskeld" : "zoryavik";
+    // Named ground of its own: Skarnholm Bay (its water and islands), the Grimfell, the Sokol Hills.
+    const b = bayAt(x, y);
+    if (b < 1 || (isWater(tile) && b < 1.2 && y > 40)) id = "skarnholm_bay";
+    else if (inHill(0, x, y)) id = "grimfell";
+    else if (inHill(5, x, y)) id = "sokol_hills";
     t.setRegion(x, y, id);
   }
 
@@ -205,7 +278,7 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
     put2(X0 + 2, Y0 + 2, "nets", "Nets drying"); put2(X0 + 4, Y0 + 2, "drying_rack", "Cod drying on the rack"); put2(X1 - 2, Y0 + 2, "banner", "The Skarnholm banner: a grey gull on a blue field");
     t.shoreSpots(X0 - 10, Y0 - 20, X0 + 34, Y0 - 1, "lure", 4);
     npc("jarl_hallveig", X0 + 9, Y0 + 16); npc("lawspeaker_signy", cx + 18, Y0 + 32); npc("farwake_master", X0 + 23, Y0 + 6); npc("shipwright_bersi", X0 + 13, Y0 + 6);
-    npc("skarnholm_innkeeper", X1 - 8, Y0 + 6); npc("skarnholm_trader", cx + 4, Y0 + 25, 2);
+    npc("skarnholm_innkeeper", X1 - 8, Y0 + 6); npc("skarnholm_trader", cx + 4, Y0 + 25, 2); { const at = openNear(cx - 6, Y0 + 25); npc("skarnholm_weaver", at.x, at.y); }
     for (let k = 0; k < 6; k++) npc(k % 2 ? "vargskeld_housecarl" : "vargskeld_villager", cx - 14 + k * 5, (Y0 + Y1 >> 1) + 2, 6);
     sign(cx + 2, Y1 + 1, "Skarnholm", "SKARNHOLM, at the head of the Skarnfjord. The Thing meets at midsummer and when it must. Speak at the Law Rock, not in the street. The Farwake keeps the charts; the jarl keeps the rest.");
   }
@@ -304,6 +377,11 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
       for (let y = cy - 1; y <= cy + 1; y++) { const i = idx(x, y); if (isWater(tiles[i])) continue; t.clearAt(x, y); tiles[i] = Math.abs(x - F.x) < 30 ? T.SNOW : T.GRAVEL; raise[i] = Math.min(raise[i], 2.2); }
     }
     const end = (x: number) => ({ x, y: F.y + Math.round(Math.sin((x - F.x) / 9) * 3) });
+    // At the spine the track gives out: an icy step of crag, climbed over (Wayfaring), the same either way.
+    const sp = spineAt(F.y), c = sp.c, top = end(c), west = end(c - 2), east = end(c + 2);
+    for (let x = c - 1; x <= c + 1; x++) for (let y = top.y - 2; y <= top.y + 2; y++) { t.clearAt(x, y); tiles[idx(x, y)] = T.CLIFF; }
+    t.add({ kind: "obstacle", x: c - 1, y: top.y, blocks: true, name: "Icicle climb", action: "Climb-over", to: { x: east.x, y: east.y }, obstacle: { course: "shortcut", step: 0, level: 35, xp: 45, ticks: 5 } });
+    t.add({ kind: "obstacle", x: c + 1, y: top.y, blocks: true, name: "Icicle climb", action: "Climb-over", to: { x: west.x, y: west.y }, obstacle: { course: "shortcut", step: 0, level: 35, xp: 45, ticks: 5 } });
     // A sign at each foot of the track, on the first dry ground in from its end.
     for (const side of [-1, 1]) for (let d = 47; d > 20; d--) {
       const at = end(F.x + side * d), spot = [at.y - 2, at.y + 2].find(y => WALKABLE.has(tiles[idx(at.x, y)]) && WALKABLE.has(tiles[idx(at.x, at.y)]));
@@ -346,7 +424,7 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
     house(X1 - 15, Y1 - 12, X1 - 4, Y1 - 4, "n", "The Bear and Bell", "izba");
     for (const [hx, hy] of [[X0 + 18, Y1 - 12], [cx + 4, Y1 - 12], [X0 + 4, cy + 4], [X1 - 14, cy + 4], [X0 + 18, Y0 + 4]] as const) house(hx, hy, hx + 7, hy + 5, "s", "A log house", "izba");
     npc("prince_radomir", cx - 3, Y0 + 9); npc("princess_vesna", cx + 4, Y0 + 9); npc("hearth_father_ilya", X0 + 10, Y0 + 9);
-    npc("krasnogor_innkeeper", X1 - 10, Y1 - 8); npc("krasnogor_trader", cx, cy + 6, 2);
+    npc("krasnogor_innkeeper", X1 - 10, Y1 - 8); npc("krasnogor_trader", cx, cy + 6, 2); { const at = openNear(cx + 8, cy + 6); npc("krasnogor_tailor", at.x, at.y); }
     for (let k = 0; k < 6; k++) npc(k % 2 ? "zoryavik_druzhina" : "zoryavik_villager", X0 + 8 + k * 9, cy + 2, 6);
     sign(cx + 2, Y1 + 2, "Krasnogor", "KRASNOGOR, on the Krasna. The princes sit in the Terem, when they sit together. The Hearth-Fathers keep the House; the market keeps the rest.");
   }
@@ -397,21 +475,6 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
 
   // ---------- Roads: north from Raria, north from the Deadwood, and through the pass between the peoples ----------
   // (t.road bridges water as it crosses it.)
-  const ROADS: readonly (readonly (readonly [number, number])[])[] = [
-    // From Vesperwold's road, north over the land-bridge, past Embermoot, on to Skarnholm.
-    [[186, 464], [190, 420], [204, 380], [196, 340], [214, 310], [216, 297], [226, 268], [258, 246], [300, 228]],
-    // From the Deadwood's road, north over the eastern land-bridge, past Zlatna Gora, to Krasnogor.
-    [[743, 478], [756, 440], [748, 400], [764, 362], [748, 324], [762, 296], [800, 268], [834, 240], [879, 231]],
-    // Skarnholm east, past the Redwake camp, through the Oathgate, past Hearthwatch, to Krasnogor's west gate.
-    [[338, 204], [392, 214], [446, 238], [508, 252], [556, 262], [600, 240], [640, 236], [684, 241], [708, 241], [760, 230], [810, 210], [845, 203]],
-    // Skarnholm west to Ravnsvik; Skarnholm north-east to the Oathsworn headland.
-    [[270, 204], [222, 196], [170, 170], [120, 150], [86, 128]],
-    [[336, 190], [392, 168], [446, 140], [490, 120], [534, 115]],
-    // Krasnogor north to the Old Bough and on to Bereslav; Krasnogor east to Svetloye.
-    [[879, 176], [868, 140], [840, 110], [826, 94]],
-    [[912, 190], [956, 160], [990, 134], [1016, 117]],
-    [[912, 214], [960, 236], [1010, 252], [1056, 262]],
-  ];
   // The roads run clear: an old ruin wall or a tree the new road crosses (the eastern road climbs through the Deadwood's ruins) comes down.
   for (const points of ROADS) {
     t.road(points, 2.4, T.PATH);
@@ -448,20 +511,104 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
 
   // ---------- Forest: cold pine in the Vargskeld, deep mixed forest in the Zoryavik, thinning on the heights ----------
   // (Only on the north's own ground, the land-bridges included, and never in a settlement.)
-  const wild = new Set((["vargskeld", "zoryavik", "varn_ridge"] as const).map(id => regionIndex(id)));
+  const wild = new Set((["vargskeld", "zoryavik", "varn_ridge", "skarnholm_bay", "grimfell", "sokol_hills"] as const).map(id => regionIndex(id)));
   const open = (x: number, y: number) => t.free(x, y) && (tiles[idx(x, y)] === T.GRASS || tiles[idx(x, y)] === T.DARK_GRASS) && wild.has(ctx.region[idx(x, y)])
     && !settled.some(([x0, y0, x1, y1]) => x >= x0 && x <= x1 && y >= y0 && y <= y1);
   t.scatter(20, 30, RIDGE.x - 40, N + 70, 2900, (x, y) => { const r = random(); t.tree(x, y, r > 0.45 ? "pine" : r > 0.2 ? "tree" : "ashwood"); }, (x, y) => open(x, y) && mid(x + 3, y) > 0.42);
   t.scatter(RIDGE.x + 40, 20, NORTH_X1 - 10, N + 70, 5600, (x, y) => { const r = random(); t.tree(x, y, r > 0.55 ? "pine" : r > 0.3 ? "oak" : r > 0.12 ? "tree" : "ironbark"); }, (x, y) => open(x, y) && mid(x + 3, y) > 0.34);
   t.scatter(RIDGE.x - 60, 20, RIDGE.x + 60, N - 6, 500, (x, y) => t.tree(x, y, "pine"), (x, y) => open(x, y));
   t.scatter(20, 20, NORTH_X1, N + 70, 700, (x, y) => t.decor(x, y, "boulder"), (x, y) => open(x, y) && random() > 0.5);
+  // Willows along the Zoryavik's rivers and lakes; meadows of flowers in the forest's clearings.
+  const byWater = (x: number, y: number) => { for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (isWater(tiles[idx(x + dx, y + dy)])) return true; return false; };
+  t.scatter(RIDGE.x + 40, 20, NORTH_X1 - 10, N + 40, 900, (x, y) => t.tree(x, y, "willow"), (x, y) => open(x, y) && byWater(x, y));
+  t.scatter(RIDGE.x + 40, 20, NORTH_X1 - 10, N + 40, 1400, (x, y) => t.decor(x, y, "flowers", false), (x, y) => open(x, y) && mid(x + 3, y) <= 0.34 && fine(x, y + 40) > 0.55);
+  // Sea stacks off the Vargskeld's cliffs: pillars of rock the sea cut loose.
+  for (let tries = 0, n = 0; tries < 6000 && n < 26; tries++) {
+    const x = 4 + Math.floor(random() * (RIDGE.x - 50)), y = 6 + Math.floor(random() * (N - 70)), i = idx(x, y);
+    if (tiles[i] !== T.WATER || ctx.objectAt[i] >= 0) continue;
+    let cliff = false; for (let dy = -2; dy <= 2 && !cliff; dy++) for (let dx = -2; dx <= 2 && !cliff; dx++) cliff = tiles[idx(x + dx, y + dy)] === T.CLIFF;
+    if (cliff) { t.decor(x, y, "rock_spire", true, "A sea stack"); n++; }
+  }
+  // Standing stones on the Vargskeld's fell tops, a ring on each, whoever raised them.
+  for (const [hx, hy] of HILLS) if (hx < RIDGE.x) for (let k = 0; k < 6; k++) {
+    const a = k / 6 * Math.PI * 2, x = Math.round(hx + Math.cos(a) * 4), y = Math.round(hy + Math.sin(a) * 3);
+    if (t.free(x, y) && WALKABLE.has(tiles[idx(x, y)])) t.decor(x, y, "obelisk", true, "A standing stone");
+  }
+  // The bay's islands: pine and rock.
+  for (const [ix, iy, rx, ry] of ISLES) t.scatter(ix - rx, iy - ry, ix + rx, iy + ry, Math.round(rx * ry * 0.4), (x, y) => { if (random() > 0.35) t.tree(x, y, "pine"); else t.decor(x, y, "boulder"); }, (x, y) => t.free(x, y) && WALKABLE.has(tiles[idx(x, y)]) && !isWater(tiles[idx(x, y)]));
 
   // ---------- Labels (in the grown world: the north is built after everything else has moved) ----------
   const label = (id: RegionId, x: number, y: number) => { const entry = REGIONS.find(region => region.id === id) as { label: { x: number; y: number } } | undefined; if (entry) { entry.label = { x, y }; labels[id] = { x, y }; } };
+  // ---------- Waymarks: a cairn beside a trail every so often, read to learn the way (wayfinding.ts) ----------
+  TRAILS.forEach(trail => {
+    const pts = ROADS[trail.road]; let n = 0, carried = WAYMARK_EVERY;
+    const markAt = (x: number, y: number, dx: number, dy: number) => {
+      const len = Math.hypot(dx, dy) || 1, px = Math.round(x - dy / len * 3), py = Math.round(y + dx / len * 3), at = openNear(px, py);
+      t.add({ kind: "decor", decor: "obelisk", x: at.x, y: at.y, blocks: true, name: "A waymark", text: `${trail.id}:${n++}`, clue: "waymark" });
+    };
+    for (let k = 0; k + 1 < pts.length; k++) {
+      const [ax, ay] = pts[k], [bx, by] = pts[k + 1], len = Math.hypot(bx - ax, by - ay);
+      for (let d = carried; d < len; d += WAYMARK_EVERY) markAt(ax + (bx - ax) * d / len, ay + (by - ay) * d / len, bx - ax, by - ay);
+      carried = WAYMARK_EVERY - ((len - carried) % WAYMARK_EVERY + WAYMARK_EVERY) % WAYMARK_EVERY;
+      if (k === pts.length - 2) markAt(bx, by, bx - ax, by - ay);
+    }
+  });
+
+  // ---------- Wayfaring shortcuts: a short crossing where the walk round is long ----------
+  // Each is found where the land gives it: two banks facing each other across a few tiles of water (or crag), free on both
+  // sides, that are a long walk apart. Never across the ridge's spine: the Oathgate and the Wolfsback are its crossings.
+  {
+    const walk = (i: number) => WALKABLE.has(tiles[i]) && tiles[i] !== T.BRIDGE && (ctx.objectAt[i] < 0 || !ctx.objects[ctx.objectAt[i]].blocks);
+    const inSpine = (x: number, y: number) => { const r = spineAt(y); return Math.abs(x - r.c) <= r.w + 6; };
+    // The land you can walk to: both ends of a shortcut must be on it (no shortcut to an island nobody reaches).
+    const reached = new Uint8Array(W * (N + 60)), queue0: number[] = [];
+    // (Seeded from the roads, which every town is on.)
+    for (let i = 0; i < W * N; i++) if (tiles[i] === T.PATH && ctx.objectAt[i] < 0) { reached[i] = 1; queue0.push(i); }
+    for (let head = 0; head < queue0.length; head++) { const i = queue0[head], x = i % W, y = (i - x) / W;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy, k = idx(nx, ny); if (nx < 0 || ny < 0 || nx >= W || ny >= N + 60 || reached[k] || !walk(k)) continue; reached[k] = 1; queue0.push(k); } }
+    /** Steps on foot from a to b, if it's under `cap`; otherwise cap. */
+    const walkSteps = (ax: number, ay: number, bx: number, by: number, cap: number) => {
+      const seen = new Map<number, number>(), queue: number[] = [idx(ax, ay)]; seen.set(queue[0], 0);
+      for (let head = 0; head < queue.length; head++) {
+        const i = queue[head], d = seen.get(i)!, x = i % W, y = (i - x) / W;
+        if (x === bx && y === by) return d;
+        if (d >= cap) continue;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy, k = idx(nx, ny); if (nx < 0 || ny < 0 || nx >= W || ny >= N + 60 || seen.has(k) || !walk(k)) continue; seen.set(k, d + 1); queue.push(k); }
+      }
+      return cap;
+    };
+    // A fishing spot with no walkable land beside it (by an island, under a cliff) is fished from a boat: offshore, like the shoals.
+    for (const o of ctx.objects) if (o.kind === "spot" && o.y < N + 60 && o.text !== "offshore" && ![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => reached[idx(o.x + dx, o.y + dy)])) o.text = "offshore";
+    const shortcut = (x0: number, y0: number, x1: number, y1: number, gap: "water" | "crag", name: string, action: string, level: number, xp: number) => {
+      const across = (i: number) => gap === "water" ? isWater(tiles[i]) : tiles[i] === T.CLIFF;
+      let best: { ax: number; ay: number; bx: number; by: number; dx: number; dy: number; k: number; score: number } | null = null;
+      for (let y = y0; y <= y1; y += 2) for (let x = x0; x <= x1; x += 2) {
+        if (!walk(idx(x, y)) || !reached[idx(x, y)]) continue;
+        // Water: at least three tiles across, so a vessel still passes between the two ends; crag: two or more.
+        for (const [dx, dy] of [[1, 0], [0, 1], [-1, 0], [0, -1]]) for (let k = gap === "water" ? 3 : 2; k <= 7; k++) {
+          let ok = true; for (let j = 1; j <= k && ok; j++) { const gx = x + dx * j, gy = y + dy * j; ok = across(idx(gx, gy)) && ctx.objectAt[idx(gx, gy)] < 0 && !inSpine(gx, gy); }
+          const bx = x + dx * (k + 1), by = y + dy * (k + 1);
+          if (!ok || !walk(idx(bx, by)) || !reached[idx(bx, by)]) continue;
+          const score = walkSteps(x, y, bx, by, 160) - k * 4;
+          if (score > 40 && (!best || score > best.score)) best = { ax: x, ay: y, bx, by, dx, dy, k, score };
+          break;
+        }
+      }
+      if (!best) return;
+      const { ax, ay, bx, by, dx, dy, k } = best;
+      t.add({ kind: "obstacle", x: ax + dx, y: ay + dy, blocks: true, name, action, to: { x: bx, y: by }, obstacle: { course: "shortcut", step: 0, level, xp, ticks: 3 + Math.ceil(k / 2) } });
+      t.add({ kind: "obstacle", x: bx - dx, y: by - dy, blocks: true, name, action, to: { x: ax, y: ay }, obstacle: { course: "shortcut", step: 0, level, xp, ticks: 3 + Math.ceil(k / 2) } });
+    };
+    shortcut(840, 236, 905, 320, "water", "Stepping stone", "Jump-across", 15, 20);   // the Krasna, below Krasnogor
+    shortcut(985, 120, 1035, 230, "water", "Log balance", "Walk-across", 25, 30);     // the Bereza, by Bereslav
+    shortcut(755, 140, 805, 280, "water", "Stepping stone", "Jump-across", 20, 25);   // the Ilm, down from the ridge
+  }
+
   // The north's lift and raise on the bake's own steps (bake.ts keeps them to 1/64), so the baked world rebuilds its heights
   // exactly: the ridge's crag stands tall, and a rounding there shows as a ledge.
   for (let i = 0; i < W * N; i++) { lift[i] = Math.round(lift[i] * 64) / 64; raise[i] = Math.round(raise[i] * 64) / 64; }
-  label("vargskeld", 420, 170); label("zoryavik", 960, 290); label("varn_ridge", RIDGE.x, 170); label("vargskeld_sea", 260, 24); label("zoryavik_coast", 1100, 30);
+  label("vargskeld", 420, 170); label("zoryavik", 960, 260); label("varn_ridge", RIDGE.x, 170); label("vargskeld_sea", 260, 24); label("zoryavik_coast", 1100, 30);
+  label("skarnholm_bay", 258, 116); label("grimfell", 124, 244); label("sokol_hills", 990, 312);
   for (const [id, x, y] of [["skarnholm", 304, 200], ["ravnsvik", 69, 124], ["oathsworn_hall", 534, 92], ["embermoot", 216, 274], ["redwake_camp", 573, 256], ["oathgate_pass", 640, 236],
     ["hearthwatch", 696, 232], ["krasnogor", 879, 184], ["bereslav", 1034, 108], ["zlatna_gora", 745, 300], ["svetloye", 1071, 254], ["old_bough", 820, 76]] as const) label(id, x, y);
 }

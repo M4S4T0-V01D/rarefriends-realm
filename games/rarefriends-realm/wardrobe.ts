@@ -519,6 +519,24 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
           }
           break;
         }
+        if (piece.style === "fur") {
+          // A northern fur hat: a round cloth crown, and a thick band of fur all round it (its trim), tufted.
+          const fur = piece.trim ?? "#7a6450", band = top + 1;
+          p.poly([[l, band], [l + 1, top - 5], [Math.round(cx) - 2, top - 7], [Math.round(cx) + 2, top - 7], [r - 1, top - 5], [r, band]], color, null);
+          p.line(l + 2, top - 6, r - 3, top - 6, light);
+          p.rect(l - 2, top - 2, r - l + 5, 4, fur);
+          for (let x = l - 2; x <= r + 2; x += 2) { p.set(x, top - 3, shadeHex(fur, 0.12)); p.set(x + 1, top + 2, shadeHex(fur, -0.18)); }
+          break;
+        }
+        if (piece.style === "kokoshnik") {
+          // A Zoryavik kokoshnik: a tall arch standing up from the brow, pearled along its edge (its trim), a veil behind.
+          const brow = top + 1, pearl = piece.trim ?? "#f7f5f0";
+          if (back) p.poly([[l - 1, brow], [r + 1, brow], [r + 2, neckY + 6], [l - 2, neckY + 6]], shadeHex(color, -0.1), null);
+          p.poly([[l - 2, brow + 1], [l - 2, top - 3], [l, top - 8], [Math.round(cx), top - 11], [r, top - 8], [r + 2, top - 3], [r + 2, brow + 1]], color, null);
+          for (let k = 0; k <= 8; k++) { const a = Math.PI * k / 8, x = Math.round(cx - Math.cos(a) * (headHalf + 2)), y = Math.round(top - 3 - Math.sin(a) * 7); p.set(x, y, pearl); }
+          p.line(l - 1, brow, r + 1, brow, pearl); if (!back) p.disc(cx, top - 4, 1.4, 1.4, piece.trim ?? "#d9b866", null);
+          break;
+        }
         if (piece.style === "turban") {
           // A wrapped turban: turns of cloth round the crown, a darker fold across, a loose tail behind.
           const brimY = top + 1, tail = piece.trim ?? shadeHex(color, -0.15);

@@ -252,12 +252,21 @@ export const VESSEL_CLUES: Record<string, { options: (game: Game, object: WorldO
 };
 
 // ---------- Building, sawing, repairs: the shipwrights ----------
-/** Where a new vessel goes into the water: the nearest water it can take, near the yard. */
+/** Whether water a vessel can take opens out from a tile (a pond or a ditch won't do for launching). */
+function openWater(world: World, kind: VesselKind, x: number, y: number, need = 600): boolean {
+  const seen = new Set<number>([y * W + x]), queue = [y * W + x];
+  for (let head = 0; head < queue.length && seen.size < need; head++) {
+    const i = queue[head], cx = i % W, cy = (i - cx) / W;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = cx + dx, ny = cy + dy, k = ny * W + nx; if (!seen.has(k) && sailableFor(world, kind, nx, ny)) { seen.add(k); queue.push(k); } }
+  }
+  return seen.size >= need;
+}
+/** Where a new vessel goes into the water: the nearest open water it can take, near the yard. */
 export function launchSpot(game: Game, kind: VesselKind, from: { x: number; y: number }): { x: number; y: number } | null {
   for (let r = 1; r <= 24; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
     if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
     const x = from.x + dx, y = from.y + dy;
-    if (sailableFor(game.world, kind, x, y) && !game.player.vessels.some(v => v.x === x && v.y === y)) return { x, y };
+    if (sailableFor(game.world, kind, x, y) && !game.player.vessels.some(v => v.x === x && v.y === y) && openWater(game.world, kind, x, y)) return { x, y };
   }
   return null;
 }

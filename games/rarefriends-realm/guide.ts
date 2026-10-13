@@ -189,6 +189,11 @@ export function skillGuide(skill: Skill): GuideEntry[] {
       add(1, "Carrying weight", "Everything worn weighs something (Worn equipment shows it): forty kilograms doubles how fast running drains. Round shields and plate are the heavy things.", undefined, T("ability"));
       add(30, "Packhorse", "A quarter of your load no longer counts against your run energy", undefined, T("ability")); add(60, "Long strides", "Half of it", undefined, T("ability")); add(90, "Light as a Friend", "Three quarters of it", undefined, T("ability"));
       add(20, "Murkmire stepping stones", "A shortcut over the bog river", undefined, T("place"));
+      add(15, "Stepping stones by the Zoryavik coast", "A shortcut over the inlet below Krasnogor", undefined, T("place"));
+      add(20, "The Ilm stepping stones", "A shortcut over the river Ilm, down from the ridge", undefined, T("place"));
+      add(25, "The Bereza log", "A shortcut over the Bereza, by Bereslav", undefined, T("place"));
+      add(35, "The Wolfsback climb", "An icy step of crag at the top of the Wolfsback, the goat-track over the Varn Ridge: the way across when the Oathgate's barred", undefined, T("place"));
+      add(1, "Trails", "Waymarks stand beside the north's roads. Note every one along a road and you know that trail: Wayfaring XP, and running along it costs half. The West Road, the East Road, the Oathgate Road and the Bough Road.", undefined, T("ability"));
       add(5, "Camping", "With a camp kit (smithed from pewter): a tent and a fire in the wild, where the ground allows and not by a town, a dungeon's door or the dragons. Rest and cook there. Wayfaring XP for pitching one, once in a while.", "pewter_camp_kit", T("camp"));
       add(25, "A camp to wake at", "With a camp lantern carried when the camp is pitched: fall, and you wake by your own fire while it stands", "ashsteel_camp_lantern", T("camp"));
       add(5, "Field altar", "Set beside the tent, it takes bones for one and a half times a burial (an altar gives twice)", "moonsilver_field_altar", T("camp"));
