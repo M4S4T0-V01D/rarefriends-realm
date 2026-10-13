@@ -20,7 +20,6 @@ const table: Readonly<Record<string, Row>> = {
   "Caskets": ["カスケット", "상자", "宝匣", "寶匣", "Rương", "Peti", "หีบ", "Sandıklar", "Cofres", "Baús", "Шкатулки", "Скриньки"],
   "Skill guides": ["スキルガイド", "스킬 가이드", "技能指南", "技能指南", "Hướng dẫn kỹ năng", "Panduan keahlian", "คู่มือทักษะ", "Yetenek rehberleri", "Guías de habilidades", "Guias de habilidades", "Гайды по навыкам", "Посібники з навичок"],
   "Play": ["プレイ", "플레이", "开始游戏", "開始遊戲", "Chơi", "Main", "เล่น", "Oyna", "Jugar", "Jogar", "Играть", "Грати"],
-  "Play (WebGL)": ["プレイ (WebGL)", "플레이 (WebGL)", "开始游戏 (WebGL)", "開始遊戲 (WebGL)", "Chơi (WebGL)", "Main (WebGL)", "เล่น (WebGL)", "Oyna (WebGL)", "Jugar (WebGL)", "Jogar (WebGL)", "Играть (WebGL)", "Грати (WebGL)"],
   "Preview": ["紹介", "소개", "介绍", "介紹", "Giới thiệu", "Pratinjau", "แนะนำ", "Tanıtım", "Presentación", "Apresentação", "Обзор", "Огляд"],
 
   // ---------- The video carousel ----------
@@ -317,7 +316,6 @@ const table: Readonly<Record<string, Row>> = {
     "Тот же Realm и тот же персонаж, отрисованные видеокартой: режим отрисовки WebGL",
     "Той самий Realm і той самий персонаж, намальовані відеокартою: режим відтворення WebGL",
   ],
-  "✦ Play (WebGL) <span class=\"badge\">beta</span>": ["✦ プレイ (WebGL) <span class=\"badge\">ベータ</span>", "✦ 플레이 (WebGL) <span class=\"badge\">베타</span>", "✦ 开始游戏 (WebGL) <span class=\"badge\">测试版</span>", "✦ 開始遊戲 (WebGL) <span class=\"badge\">測試版</span>", "✦ Chơi (WebGL) <span class=\"badge\">beta</span>", "✦ Main (WebGL) <span class=\"badge\">beta</span>", "✦ เล่น (WebGL) <span class=\"badge\">เบต้า</span>", "✦ Oyna (WebGL) <span class=\"badge\">beta</span>", "✦ Jugar (WebGL) <span class=\"badge\">beta</span>", "✦ Jogar (WebGL) <span class=\"badge\">beta</span>", "✦ Играть (WebGL) <span class=\"badge\">бета</span>", "✦ Грати (WebGL) <span class=\"badge\">бета</span>"],
   "♪ Hear the main theme": ["♪ メインテーマを聴く", "♪ 메인 테마 듣기", "♪ 聆听主题曲", "♪ 聆聽主題曲", "♪ Nghe nhạc chủ đề", "♪ Dengarkan lagu tema", "♪ ฟังเพลงธีมหลัก", "♪ Ana temayı dinle", "♪ Escucha el tema principal", "♪ Ouça o tema principal", "♪ Послушать главную тему", "♪ Послухати головну тему"],
   "Needs a browser wallet on Robinhood mainnet holding a hardwired Rare Friends Generations NFT. $RAREFRIENDS is simulated: no contracts, signatures or transactions.": [
     "Robinhood メインネットのブラウザウォレットと、hardwired の Rare Friends Generations NFT が必要です。$RAREFRIENDS はシミュレーションです。コントラクト、署名、取引は一切ありません。",
