@@ -102,7 +102,7 @@ test("a fresh adventurer: level 3, 10 hitpoints, a starter kit", () => {
   assert.equal(level(g, "hitpoints"), 10);
   assert.equal(g.player.hp, 10);
   for (const id of ["pewter_axe", "pewter_pickaxe", "small_net", "tinderbox"]) assert(has(g.player, id), id);
-  assert.equal(SKILLS.length, 23, "the twenty-one, Mysteries and Seafaring");
+  assert.equal(SKILLS.length, 24, "the twenty-one, Mysteries, Seafaring and Beastkeeping");
 });
 
 test("the world is large, deterministic and every landmark is reachable on foot", () => {
@@ -3857,7 +3857,7 @@ test("World overlays: a layer over the baked world, applied deterministically; b
   // On worlds of their own: the shared world stays as it is for every other test.
   const g = newGame({ world: createWorld() }), world = g.world, problems = [];
   const placed = applyOverlay(world, overlay, WORLD_SEED, problems, NPCS);
-  assert.equal(world.tiles[5 * W + 5], T.GRASS); assert.equal(world.tiles[11 * W + 12], T.STONE); assert.equal(world.lift[11 * W + 12], 2);
+  assert.equal(world.tiles[5 * W + 5], T.GRASS); assert.equal(world.tiles[11 * W + 12], T.STONE); assert.ok(world.base[11 * W + 12] > createWorld().base[11 * W + 12], "a raise lifts the land's own floor");
   assert.ok(placed.objects.has("tree-1")); assert.equal(world.objects[placed.objects.get("tree-1")].tree, "oak"); assert.equal(world.objectAt[11 * W + 12], placed.objects.get("tree-1"));
   assert.ok(placed.buildings.has("hut")); const hut = world.buildings[placed.buildings.get("hut")]; assert.equal(hut.name, "The hut"); assert.equal(world.tiles[20 * W + 20], T.WALL); assert.equal(world.tiles[22 * W + 23], T.WOOD); assert.equal(world.tiles[25 * W + 23], T.WOOD, "the door gap"); assert.equal(world.buildingAt[22 * W + 23], placed.buildings.get("hut") + 1);
   assert.ok(placed.spawns.has("guide-2")); assert.ok(!placed.spawns.has("nobody")); assert.ok(problems.some(p => /no monster called no_such_monster/.test(p)));
@@ -3869,6 +3869,19 @@ test("World overlays: a layer over the baked world, applied deterministically; b
   // Applying the same overlay to a fresh world gives the same result.
   const h = newGame({ world: createWorld() }), again = applyOverlay(h.world, overlay, WORLD_SEED, [], NPCS);
   assert.deepEqual([...again.objects.keys()], [...placed.objects.keys()]); assert.equal(h.world.tiles[11 * W + 12], T.STONE);
+  // Raising ground (the editor's raise): a hill where it's raised, softened at its edges; and the development frame's
+  // quick rebuild (only the ground round the change, from the ground kept before the buildings were levelled) gives
+  // exactly the heights a full rebuild does.
+  const { groundHeights } = await import("../games/rarefriends-realm/world.ts");
+  const spawn = createWorld().places.spawn, sx = spawn.x + 20, sy = spawn.y + 20, CW = W + 1;
+  const hill = { v: 1, ops: [...Array.from({ length: 49 }, (_, k) => ({ op: "lift", x: sx + (k % 7), y: sy + Math.floor(k / 7), v: 4 })), { op: "tile", x: sx + 9, y: sy, t: T.WATER }] };
+  const plain = newGame({ world: createWorld() }).world, before = plain.heights[(sy + 3) * CW + sx + 3];
+  applyOverlay(plain, hill, WORLD_SEED);
+  const quick = newGame({ world: createWorld() }).world; quick.ground = groundHeights(quick.tiles, WORLD_SEED, quick.lift, quick.raise, quick.base);
+  applyOverlay(quick, hill, WORLD_SEED);
+  assert.ok(plain.heights[(sy + 3) * CW + sx + 3] - before > 40, `a 7×7 raised by 4 stands well up (${before.toFixed(1)} → ${plain.heights[(sy + 3) * CW + sx + 3].toFixed(1)})`);
+  assert.ok(plain.heights[sy * CW + sx] - before < plain.heights[(sy + 3) * CW + sx + 3] - before, "softer at its edge");
+  assert.ok(quick.heights.every((v, i) => v === plain.heights[i]), "the quick rebuild matches the full one");
 });
 
 test("The four smithed families: recipes at the anvil from the ordinary metals; a prospector's pick mines surer and doubles ore; hardware cuts the boatmen's fares; a resonance fitting makes a carving stand longer, once", async () => {
@@ -4838,4 +4851,100 @@ test("Fitting out a vessel: supply barrels and the resupply lever top your pack 
   assert.ok(SF.sailableFor(w3, "rowboat", coastDeep.x, coastDeep.y), "a rowboat goes out on the deep water by the coast");
   // The yards: Olena and Tamsin by their boat sheds.
   for (const [npcId, shed] of [["bereslav_bargewoman", "Olena's boat shed"], ["gullwick_boatwright", "Tamsin's boat shed"]]) { const s = world.spawns.find(x => x.kind === "npc" && x.id === npcId), b = world.buildings.find(x => x.name === shed); assert.ok(b && Math.abs(s.x - (b.x0 + b.x1) / 2) < 12 && Math.abs(s.y - (b.y0 + b.y1) / 2) < 12, `${shed}`); }
+});
+
+test("Beastkeeping: each species won its own way (fed, earned, haltered, spared, rescued, known, by rite), never a boss; a companion is a real creature that fights what you fight with the real rolls, runs when it's frightened (settled for a fee), holds fast only when bonded deep, and falls for good with a keepsake; kept through saves, carried by vessels with room, home when you fall", async () => {
+  const B = await import("../games/rarefriends-realm/beasts.ts");
+  const SF = await import("../games/rarefriends-realm/seafaring.ts");
+  const { die, menuFor } = await import("../games/rarefriends-realm/engine.ts");
+  const g = newGame(), p = g.player;
+  const wild = (id) => g.monsters.find(m => m.def.id === id && !m.dead);
+  const near = (m) => { teleport(g, m.x + 1, m.y); if (!canWalk(g, m.x + 1, m.y)) teleport(g, m.x, m.y + 1); };
+  const use = (m, id, n = 1) => { give(p, id, n); const at = p.inventory.findIndex(s => s?.id === id); return B.useOnCreature(g, m, at); };
+  // Not everything is anyone's.
+  const boss = g.monsters.find(m => m.def.boss); assert.equal(B.speciesOfWild(boss), null); assert.ok(!B.useOnCreature(g, boss, 0));
+  // A young salamander: fed inkcoal, visit after visit.
+  let sal = wild("ember_salamander_young"); near(sal);
+  assert.ok(use(sal, "inkcoal")); assert.equal(p.trust.salamander.n, 1); assert.ok(use(sal, "inkcoal")); assert.equal(p.trust.salamander.n, 1, "not again so soon");
+  for (let k = 0; k < 2; k++) { g.tick += B.KEEP.trustGap; use(sal, "inkcoal"); }
+  assert.equal(p.companions.length, 1); const salC = p.companions[0]; assert.equal(salC.species, "salamander"); assert.equal(salC.state, "out"); assert.ok(has(p, "companion_whistle"));
+  tick(g); const ally = B.allyOf(g); assert.ok(ally && ally.ally === salC.id && Math.max(Math.abs(ally.x - p.x), Math.abs(ally.y - p.y)) <= 3, "it's out beside you");
+  assert.ok(!menuFor(g, [{ kind: "monster", id: ally.uid }], null).some(o => o.verb === "Attack"), "you can't attack your own"); assert.ok(menuFor(g, [{ kind: "monster", id: ally.uid }], null).some(o => o.verb === "Send-home"));
+  // It fights what you fight, with the real rolls, and earns Beastkeeping.
+  const foe = g.monsters.find(m => !m.dead && m.ally === undefined && m.def.id === "ink_rat") ?? g.monsters.find(m => !m.dead && m.ally === undefined && !m.def.boss && m.def.level < 20);
+  teleport(g, foe.x + 1, foe.y); tick(g); p.combat = foe.uid; foe.target = true; const bk0 = p.xp.beastkeeping ?? 0, hp0 = foe.hp + 0;
+  for (let t = 0; t < 60 && !foe.dead && (p.xp.beastkeeping ?? 0) === bk0; t++) { p.stunned = 5; p.combat = foe.dead ? null : foe.uid; tick(g); }
+  assert.ok((p.xp.beastkeeping ?? 0) > bk0, "it bit what you fought (you stood stunned), and Beastkeeping paid for it"); p.stunned = 0;
+  // Frightened, a skittish one runs home; a beastkeeper settles it, later, for a fee.
+  const m1 = B.allyOf(g) ?? B.placeCompanion(g); m1.hp = Math.floor(m1.def.hp * 0.3); m1.foe = foe.uid; B.companionTick(g, m1, { strike: () => {}, step: () => {} });
+  assert.equal(salC.state, "fled"); assert.ok(!B.settle(g, salC), "still shaking"); g.tick += B.KEEP.settleAfter; give(p, "coins", 10_000); assert.ok(B.settle(g, salC)); assert.equal(salC.state, "kennel");
+  // Earned: a hound pup from Halla; haltered: a goat; through a save.
+  p.xp.beastkeeping = XP_TABLE[60]; give(p, "cooked_meat", 5); assert.ok(B.houndPup(g)); const hound = p.companions.find(c => c.species === "hound"); assert.equal(hound.state, "out");
+  const goat = wild("highland_goat"); near(goat); assert.ok(use(goat, "goat_halter")); assert.equal(p.companions.length, 3);
+  const g2 = newGame(); assert.ok(restore(g2, JSON.parse(JSON.stringify(serialize(g))))); assert.deepEqual(g2.player.companions.map(c => [c.species, c.state]), p.companions.map(c => [c.species, c.state]));
+  // Three at most: the fourth waits until one's left with a keeper for good.
+  const boar = wild("boar"); boar.hp = 1; assert.ok(B.canSpare(g, boar)); assert.ok(!B.spare(g, boar), "no room for a fourth");
+  B.release(g, p.companions.find(c => c.species === "goat")); boar.dead = false; boar.hp = 1; assert.ok(B.spare(g, boar)); assert.ok(p.companions.some(c => c.species === "boar"));
+  // A steady hound holds fast only when bonded deep; a fierce boar never runs.
+  B.setOrder(g, hound, { fast: true }); assert.equal(hound.fast, false); hound.bond = 85; B.setOrder(g, hound, { fast: true }); assert.equal(hound.fast, true);
+  // Falling: gone for good, a keepsake kept.
+  B.bringOut(g, p.companions.find(c => c.species === "boar")); tick(g); const bm = B.allyOf(g); assert.equal(bm.def.id, "companion_boar");
+  bm.hp = 1; B.companionFell(g, bm); assert.ok(!p.companions.some(c => c.species === "boar")); assert.ok(has(p, "companion_keepsake")); assert.equal(p.stats.companionsLost, 1);
+  // Vessels with room: a rowboat has none (home it goes), a longship has room.
+  B.bringOut(g, hound); tick(g);
+  const bersi = g.world.spawns.find(s => s.kind === "npc" && s.id === "shipwright_bersi"), at = SF.launchSpot(g, "longship", bersi);
+  p.vessels.push({ id: 1, kind: "rowboat", name: "Rowboat", x: at.x, y: at.y, heading: { x: 0, y: 1 }, hull: 40, hold: Array(4).fill(null), sailed: 0 });
+  teleport(g, at.x + 1, at.y); if (!canWalk(g, at.x + 1, at.y)) teleport(g, at.x - 1, at.y); SF.board(g, p.vessels[0]); assert.equal(hound.state, "kennel", "no room in a rowboat");
+  p.aboard = null; p.vessels[0].kind = "longship"; B.bringOut(g, hound); SF.board(g, p.vessels[0]); assert.equal(hound.state, "aboard");
+  B.landWith(g); assert.equal(hound.state, "out");
+  // Falling yourself: your companion goes home (it doesn't die with you).
+  p.aboard = null; teleport(g, g.world.places.spawn.x, g.world.places.spawn.y); tick(g); die(g); assert.equal(hound.state, "kennel");
+  // Rescued, known, by rite: the wolf, the stag, the vixen ask for what they ask for.
+  const snared = wild("snared_wolf"); near(snared); B.release(g, salC); assert.ok(!B.freeSnared(g, snared), "a tonic first"); give(p, "healing_tonic", 1); assert.ok(B.freeSnared(g, snared));
+  B.release(g, p.companions.find(c => c.species === "wolf"));
+  const stag = wild("greatstag"); near(stag); assert.ok(use(stag, "bread")); assert.ok(!p.companions.some(c => c.species === "stag"), "not without knowing its ways");
+  p.lore.greatstag = { k: 0xff, a: 0 }; assert.ok(use(stag, "bread")); assert.ok(p.companions.some(c => c.species === "stag"));
+  B.bringOut(g, p.companions.find(c => c.species === "stag")); const easy = runDrain(g); B.sendHome(g); assert.ok(Math.abs(easy / runDrain(g) - 0.8) < 1e-9, "a stag eases the road");
+});
+
+test("Heal Other: two tiers of faith (24 and 62) that heal your companion or another player within reach; never someone unhurt (so never XP for nothing), never in the ring; what another player's game sends is checked (near, capped by the spell, not too often)", async () => {
+  const B = await import("../games/rarefriends-realm/beasts.ts");
+  const { menuFor, castSpell, healPeer, takeHeal, HEAL_RANGE, HEAL_GAP } = await import("../games/rarefriends-realm/engine.ts");
+  const { inRing } = await import("../games/rarefriends-realm/world.ts");
+  const heal = SPELLS.find(s => s.id === "heal_other"), greater = SPELLS.find(s => s.id === "greater_heal_other");
+  assert.equal(heal.level, 24); assert.equal(greater.level, 62); assert.equal(heal.skill, "prayer"); assert.equal(heal.target, "ally"); assert.ok(greater.heal.now > heal.heal.now);
+  const g = newGame(), p = g.player;
+  for (const [id, n] of [["star_sigil", 50], ["tide_sigil", 50], ["bloom_sigil", 50]]) give(p, id, n);
+  p.prayer = 99;
+  // Too low a Faith level: it won't even be chosen.
+  assert.equal(castSpell(g, "heal_other"), null);
+  p.xp.prayer = XP_TABLE[24];
+  assert.deepEqual(castSpell(g, "heal_other"), { kind: "spell", spell: "heal_other" }, "chosen, then cast on someone");
+  // A companion: a hound pup, out and hurt.
+  p.xp.beastkeeping = XP_TABLE[99]; give(p, "cooked_meat", 5); B.houndPup(g); tick(g);
+  const m = B.allyOf(g); assert.ok(m, "the hound is out");
+  const cast = () => menuFor(g, [{ kind: "monster", id: m.uid }], null, { kind: "spell", spell: "heal_other" });
+  m.hp = m.def.hp; const unhurtXp = p.xp.prayer; cast()[0].run(g); assert.equal(p.xp.prayer, unhurtXp, "nobody unhurt is healed, and no XP for it");
+  m.hp = m.def.hp - 20; const faith = p.prayer, xp = p.xp.prayer;
+  const option = cast()[0]; assert.match(option.verb, /^Cast Heal Other ->/); option.run(g);
+  assert.equal(m.hp, m.def.hp - 20 + heal.heal.now); assert.equal(p.prayer, faith - heal.faith); assert.ok(p.xp.prayer > xp, "Faith XP");
+  // Another player: near and hurt, or not at all.
+  const peer = { x: p.x + 2, y: p.y, hp: 5, maxHp: 40 };
+  assert.equal(healPeer(g, "heal_other", peer, "Friend #2"), heal.heal.now);
+  assert.equal(healPeer(g, "heal_other", { ...peer, hp: 38 }, "Friend #2"), 2, "no more than they're missing");
+  assert.equal(healPeer(g, "heal_other", { ...peer, hp: 40 }, "Friend #2"), 0, "unhurt");
+  assert.equal(healPeer(g, "heal_other", { ...peer, x: p.x + HEAL_RANGE + 1 }, "Friend #2"), 0, "too far");
+  assert.equal(healPeer(g, "greater_heal_other", peer, "Friend #2"), 0, "Faith 62 for the greater");
+  p.xp.prayer = XP_TABLE[62]; assert.equal(healPeer(g, "greater_heal_other", peer, "Friend #2"), greater.heal.now, "the greater heals 28");
+  assert.equal(healPeer(g, "mend", peer, "Friend #2"), 0, "a spell for yourself isn't one for others");
+  // Being healed: checked on the way in.
+  const from = { id: 2, x: p.x + 1, y: p.y }; p.xp.hitpoints = XP_TABLE[50]; p.hp = 1;
+  assert.equal(takeHeal(g, from, "Friend #2", "heal_other", 999), heal.heal.now, "capped by the spell");
+  assert.equal(takeHeal(g, from, "Friend #2", "heal_other", 5), 0, "not twice in one go");
+  g.tick += HEAL_GAP;
+  assert.equal(takeHeal(g, { ...from, x: p.x + HEAL_RANGE + 6 }, "Friend #2", "heal_other", 5), 0, "not from far off");
+  assert.equal(takeHeal(g, from, "Friend #2", "mend", 5), 0, "not a spell that heals others");
+  assert.equal(takeHeal(g, from, "Friend #2", "heal_other", 5), 5);
+  // Never in the ring.
+  const ring = g.world.places.ring; if (ring && inRing(ring.x, ring.y)) { g.tick += HEAL_GAP; teleport(g, ring.x, ring.y); assert.equal(takeHeal(g, { id: 2, x: ring.x + 1, y: ring.y }, "Friend #2", "heal_other", 5), 0, "no healing in the ring"); }
 });

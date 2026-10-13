@@ -172,7 +172,7 @@ function Editor() {
         <div style={S.row}>{TOOLS.map(([id, label]) => <button key={id} type="button" style={S.btn(tool === id)} onClick={() => { setTool(id); corner.current = null; }}>{label}</button>)}</div>
         {(tool === "tile" || tool === "fill") && <><h4 style={S.h}>Tile</h4><select style={S.input} value={tile} onChange={e => setTile(Number(e.target.value))}>{Object.entries(catalog?.tiles ?? {}).map(([n, v]) => <option key={n} value={v}>{n.toLowerCase()}</option>)}</select></>}
         {(tool === "tile" || tool === "lift") && <><h4 style={S.h}>Brush</h4><div style={S.row}>{[1, 2, 3, 4].map(b => <button key={b} type="button" style={S.btn(brush === b)} onClick={() => setBrush(b)}>{2 * b - 1}×{2 * b - 1}</button>)}</div></>}
-        {tool === "lift" && <><h4 style={S.h}>Raise to (shift-click flattens)</h4><input style={S.input} type="number" min={0} max={8} step={0.25} value={lift} onChange={e => setLift(Number(e.target.value))} /></>}
+        {tool === "lift" && <><h4 style={S.h}>Raise by, in steps (shift-click takes it back)</h4><input style={S.input} type="number" min={0} max={8} step={0.25} value={lift} onChange={e => setLift(Number(e.target.value))} /></>}
         {tool === "place" && <>
           <h4 style={S.h}>Kind</h4><select style={S.input} value={kind} onChange={e => { setKind(e.target.value); setSub(""); }}>{(catalog?.kinds ?? ["decor"]).map(k => <option key={k} value={k}>{k}</option>)}</select>
           {subs && <><h4 style={S.h}>Which</h4><select style={S.input} value={sub} onChange={e => setSub(e.target.value)}><option value="">—</option>{subs.map(s => <option key={s} value={s}>{s}</option>)}</select></>}

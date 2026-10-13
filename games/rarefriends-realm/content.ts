@@ -34,6 +34,7 @@ import { MEGHAVAN_QUESTS, MEGHAVAN_QUEST_NPCS, onMeghavanKill, talkMeghavanQuest
 import { MEGHAVAN_SCHOOL_NPCS, MEGHAVAN_SCHOOL_QUESTS, talkMeghavanSchools } from "./meghavanschools.ts";
 import { onPyramidsKill } from "./pyramidsclues.ts";
 import { PORTS_NPCS, talkPorts } from "./portspeople.ts";
+import { BEAST_NPCS, talkBeastkeepers } from "./beastfolk.ts";
 import { PORTS_FINAL, PORTS_QUESTS, onPortsKill, talkPortsQuests } from "./portsquests.ts";
 import { BAR_NPCS, BAR_QUEST_DEFS, jobBoard, onBountyKill, talkBar } from "./bars.ts";
 /** A bar's job board (bars.ts), for the engine (which reaches the bars through here, so they load after this module). */
@@ -93,6 +94,7 @@ export const NPCS: Record<string, NpcDef> = {
   ...MEGHAVAN_QUEST_NPCS,
   ...MEGHAVAN_SCHOOL_NPCS,
   ...PORTS_NPCS,
+  ...BEAST_NPCS,
   ...BAR_NPCS,
   mender: { id: "mender", name: "Mender Hale", examine: "The chapel's mender. Her hands are always clean and her apron never is.", options: ["Talk-to", "Trade"], shop: "mender", art: art(3, 318) },
   // The wider world's villages (2026-10). Each village's people wear its own clothes (NPC_WEAR / regionalLook in render.ts).
@@ -844,6 +846,7 @@ function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
   const road = talkHiddenRoad(game, npcId, name); if (road) return road;
   const hearthkin = talkHearthkin(game, npcId, name); if (hearthkin) return hearthkin;
   const settlements = talkSettlements(game, npcId, name); if (settlements) return settlements;
+  const beasts = talkBeastkeepers(game, npcId, name); if (beasts) return beasts;   // Beastkeeping (beastfolk.ts)
   const shipwright = talkShipwright(game, npcId, name, () => talkNorthQuest(game, npcId, name, () => talkNorth(game, npcId, name)) ?? talkNorth(game, npcId, name) ?? talkPorts(game, npcId, name)); if (shipwright) return shipwright;   // Seafaring (seafaring.ts)
   const northQuest = talkNorthQuest(game, npcId, name, () => talkNorth(game, npcId, name)); if (northQuest) return northQuest;   // The Old Agreement (northquest.ts)
   const north = talkNorth(game, npcId, name); if (north) return north;   // A Place to the North's people (north.ts)

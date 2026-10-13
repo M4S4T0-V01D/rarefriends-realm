@@ -18,6 +18,7 @@ import { addXp, count, give, has, level, message, sound, take, type Dialogue, ty
 import { OVERWORLD_H, T, W, H, WALKABLE, regionAt, type World, type WorldObject } from "./world.ts";
 import { chat, npcSays, questDone } from "./content.ts";
 import { DOCKS, dockLocked } from "./boats.ts";
+import { boardWith, landWith } from "./beasts.ts";
 import { FITOUTS, FITOUT_IDS, cleanFitting, fitOut, fitoutProblem, hasFitout, holdSize, removeFitout, resupply, restInCabin, type Barrel, type FitoutId, type Loadout } from "./shipfit.ts";
 
 export type VesselKind = "rowboat" | "skiff" | "barge" | "longship";
@@ -145,6 +146,7 @@ export function board(game: Game, vessel: Vessel): boolean {
   if (player.aboard !== null) { message(game, "You're aboard already.", "warn"); return false; }
   if (Math.abs(player.x - vessel.x) + Math.abs(player.y - vessel.y) > 2) { message(game, "Get closer to it first.", "warn"); return false; }
   player.mount = null; player.path = []; player.target = null; player.activity = null; player.landing = null;
+  boardWith(game, vessel.kind);   // (your companion comes aboard if there's room for it, or goes home: beasts.ts)
   player.aboard = vessel.id; player.prev = { x: vessel.x, y: vessel.y }; player.x = vessel.x; player.y = vessel.y; player.moved = game.tick;
   // The vessel you last took is the one the ship's bell calls.
   player.vessels = [vessel, ...player.vessels.filter(v => v !== vessel)];
@@ -220,6 +222,7 @@ export function goAshore(game: Game, x: number, y: number): boolean {
   // A first landfall by sea in a region: worth something.
   if (!player.landfalls[region.id]) { player.landfalls[region.id] = 1; addXp(game, "seafaring", 40 + 10 * VESSELS[vessel.kind].level, { raw: true }); message(game, `Your first landfall by sea in ${region.name}.`, "info"); }
   message(game, `You step ashore. Your ${vessel.name.toLowerCase()} stays moored here.`);
+  landWith(game);
   return true;
 }
 /** A tile sailed: XP now and then, and wear on deep water (engine.ts moveTo calls this while aboard). */

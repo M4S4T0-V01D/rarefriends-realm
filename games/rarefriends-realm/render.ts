@@ -2837,7 +2837,12 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     if (monster.dead || !shown(monster.x, monster.y, 2)) continue;
     const at = interpolate(monster, game, alpha), size = monster.def.size ?? 1;
     const center = { x: at.x + (size - 1) / 2, y: at.y + (size - 1) / 2 };
-    drawables.push({ depth: depth(center.x, center.y) + (size - 1) / 2 + 0.1, at: center, cast: true, sprite: true, size: [80 + 90 * size, 40 + 50 * size, 20 + 10 * size], draw: () => drawMonster(ctx, scene, monster, at, hits) });
+    // Your companion (beasts.ts): a soft green ring at its feet, so you know it's yours.
+    const yours = monster.ally !== undefined;
+    drawables.push({ depth: depth(center.x, center.y) + (size - 1) / 2 + 0.1, at: center, cast: true, sprite: true, size: [80 + 90 * size, 40 + 50 * size, 20 + 10 * size], draw: () => {
+      if (yours) { const feet = toScreen(camera, at.x, at.y), z = camera.zoom; ellipse(ctx, feet.x, feet.y, 15 * z, 6 * z, "rgba(120,200,130,0.18)", "rgba(159,224,168,0.85)", 1.5); }
+      drawMonster(ctx, scene, monster, at, hits);
+    } });
   }
   // Other players, walking their own adventures through yours.
   const home = game.player.home ? homeRect(game.player.home.tier) : null;
@@ -3745,7 +3750,7 @@ const NPC_WEAR: Record<string, readonly string[]> = {
   redwake_captain: ["wolf_fur_hat", "vargskeld_tunic", "wrapped_trousers", "turnshoes"], redwake_sellsword: ["vargskeld_tunic", "wrapped_trousers"], vargskeld_villager: ["vargskeld_hood", "vargskeld_tunic", "wrapped_trousers", "turnshoes"],
   vargskeld_housecarl: ["wolf_fur_hat", "vargskeld_tunic", "wrapped_trousers", "fur_mantle", "turnshoes"],
   prince_radomir: ["fur_kolpak", "rubakha", "linen_porty", "wool_svita", "red_boots"], princess_vesna: ["kokoshnik", "sarafan", "red_boots"], hearth_father_ilya: ["fur_kolpak", "rubakha", "linen_porty", "bast_shoes"],
-  krasnogor_innkeeper: ["kokoshnik", "sarafan", "bast_shoes"], krasnogor_trader: ["fur_kolpak", "rubakha", "linen_porty", "red_boots"], krasnogor_tailor: ["kokoshnik", "sarafan", "red_boots"],
+  krasnogor_innkeeper: ["kokoshnik", "sarafan", "bast_shoes"], krasnogor_trader: ["fur_kolpak", "rubakha", "linen_porty", "red_boots"], krasnogor_tailor: ["kokoshnik", "sarafan", "red_boots"], houndmaster_halla: ["wolf_fur_hat", "vargskeld_tunic", "wrapped_trousers", "turnshoes"], beastward_mstislav: ["fur_kolpak", "rubakha", "wool_svita", "red_boots"],
   zoryavik_villager: ["rubakha", "linen_porty", "bast_shoes"], zoryavik_druzhina: ["fur_kolpak", "rubakha", "linen_porty", "wool_svita", "red_boots"], hearthwarden_captain: ["fur_kolpak", "rubakha", "linen_porty", "wool_svita"],
   hearthwarden: ["fur_kolpak", "rubakha", "linen_porty", "bast_shoes"], freeholds_speaker: ["sarafan", "wool_svita", "bast_shoes"], bereslav_bargewoman: ["rubakha", "linen_porty", "bast_shoes"],
   zlatna_foreman: ["fur_kolpak", "rubakha", "linen_porty", "bast_shoes"], archivist_bozhena: ["kokoshnik", "sarafan", "red_boots"], archive_copyist: ["rubakha", "linen_porty", "bast_shoes"],

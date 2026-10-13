@@ -4,6 +4,15 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 130, date: "2026-10-13", title: "Heal Other", items: [
+    "Two new Faith spells pass the Old Friend's light on: Heal Other at Faith 24 (heals 12) and Greater Heal Other at Faith 62 (heals 28). Choose one from the Faith tab, then click another player or your own companion within eight tiles.",
+    "Only someone hurt can be healed (so there's no Faith XP in healing the healthy), and nobody in the sparring ring or the Ring: a fight there is between the two of you.",
+  ] },
+  { id: 129, date: "2026-10-13", title: "Beastkeeping: companions who fight beside you", items: [
+    "A new skill, Beastkeeping. Eight creatures can be won, each its own way: feed a young ember salamander inkcoal until it trusts you, earn a Vargskeld hound pup from Halla in Skarnholm, halter a highland goat, beat a boar or a crag bear to its knees and spare it, free a wolf from a hunter's snare, know a great stag's ways, or offer a foxfire vixen the old rites.",
+    "One companion goes about with you at a time and fights what you fight, with its own health; what it bites turns on it. A goat carries panniers, a stag makes running easier, a vixen finds an extra herb. Feed one what it eats to heal it and deepen the bond.",
+    "The beastkeepers (Bramble on the Friendhollow farm, Halla in Skarnholm, Mstislav in Krasnogor) keep the rest, up to three, settle one that ran home frightened, and sell halters, feed and the whistle. A companion that falls is gone for good: keep them out of fights you'd not take yourself.",
+  ] },
   { id: 128, date: "2026-10-13", title: "Fitting out: supply barrels, the resupply lever, cabins and galleys", items: [
     "A shipwright can fit out your vessel: supply barrels (the hold marked out in barrels, each with a job, drawn on or kept), a resupply lever on a barge or a longship, a cabin to rest in, a galley to cook in, a repair bench to mend her yourself. Room is room: a cabin or a galley takes space the hold had.",
     "Loadouts: set what you want to carry (an item and how many) and pull the lever: the barrels top your pack up to it. Only what's in the barrels you draw on, only what fits, and it tells you what's short. One loadout on a skiff, three on a barge, six on a longship.",

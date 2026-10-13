@@ -434,7 +434,7 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
   monsters("highland_goat", 40, 120, 120, 270, 10); monsters("stone_golem", 40, 140, 110, 240, 5); monsters("frost_wisp", 40, 110, 100, 200, 4);
   monsters("ash_drake", 20, 40, 120, 140, 8); monsters("cinder_drake", 30, 50, 110, 130, 5);
   monsters("boar", 160, 370, 540, 500, 12); monsters("bandit", 300, 380, 520, 440, 8); monsters("forest_spider", 90, 390, 240, 490, 8);
-  monsters("boar", 500, 380, 660, 480, 10); monsters("wolf", 500, 380, 660, 480, 8); monsters("highland_goat", 500, 380, 660, 480, 6); monsters("thornback", 520, 400, 660, 480, 5);
+  monsters("boar", 500, 380, 660, 480, 10); monsters("wolf", 500, 380, 660, 480, 8); monsters("snared_wolf", 500, 380, 660, 480, 2); monsters("highland_goat", 500, 380, 660, 480, 6); monsters("thornback", 520, 400, 660, 480, 5);
   monsters("stone_golem", 560, 130, 700, 330, 10); monsters("frost_yeti", 560, 130, 700, 320, 6); monsters("cairn_wight", 560, 140, 700, 320, 6); monsters("highland_goat", 540, 130, 700, 340, 10);
   monsters("sand_scorpion", 60, 480, 140, 519, 4); monsters("skeleton", 540, 40, 600, 100, 4);
 

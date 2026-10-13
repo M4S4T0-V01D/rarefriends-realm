@@ -8,7 +8,7 @@ import { ITEM_LIST, MONSTERS, ROCKS, SKILLS, TREES } from "./data.ts";
 import { NPCS, QUESTS, registerDevQuest } from "./content.ts";
 import { applyCamp, setDevCampZones } from "./camping.ts";
 import { applyVessels } from "./seafaring.ts";
-import { DECOR_NAMES, T, W, WORLD_SEED, regionAt, type World } from "./world.ts";
+import { DECOR_NAMES, T, W, WORLD_SEED, groundHeights, regionAt, type World } from "./world.ts";
 import { applyOverlay, registerDefinitions, validatePlacements, type Overlay, type Placed } from "./overlay.ts";
 import { realmWorld, setSharedWorld, spawnCreatures, type Game } from "./state.ts";
 import { applyHome } from "./housing.ts";
@@ -23,7 +23,12 @@ function cloneWorld(world: World): World {
     buildings: world.buildings.map(b => ({ ...b })), buildingAt: new Uint16Array(world.buildingAt), heights: new Float32Array(world.heights), lift: world.lift ? new Float32Array(world.lift) : undefined, raise: world.raise ? new Float32Array(world.raise) : undefined };
 }
 /** Keep the world as it came (before the player's home or any overlay touches it). Called once, at the start, in a dev frame. */
-export function keepPristine() { if (!pristine) pristine = cloneWorld(realmWorld()); }
+export function keepPristine() {
+  if (pristine) return;
+  pristine = cloneWorld(realmWorld());
+  // The ground before the buildings were levelled, worked out once: an edit then rebuilds only the ground round it.
+  pristine.ground = groundHeights(pristine.tiles, WORLD_SEED, pristine.lift, pristine.raise, pristine.base);
+}
 /** Where the overlay's things landed in the current world, by uid (for the editor's inspector). */
 export let placed: Placed = { objects: new Map(), buildings: new Map(), spawns: new Map() };
 /** Lay an overlay over a fresh copy of the pristine world and make it the game's: what couldn't be done, and what can't be reached. */
@@ -58,6 +63,7 @@ export function pick(game: Game, x: number, y: number, overlay: Overlay): DevPic
   const world = game.world, i = y * W + x, id = world.objectAt[i], object = id >= 0 ? world.objects[id] : null;
   const uid = object ? [...placed.objects.entries()].find(([, index]) => index === id)?.[0] : undefined;
   const b = world.buildingAt[i] ? world.buildings[world.buildingAt[i] - 1] : null, bindex = world.buildingAt[i] - 1;
-  void overlay;
-  return { x, y, tile: world.tiles[i], lift: world.lift?.[i] ?? 0, object: object ? { id, kind: object.kind, name: object.name, ...(uid ? { uid } : {}) } : null, building: b ? { index: bindex, name: b.name } : null, region: regionAt(world, x, y).name };
+  // (The lift shown is the editor's raise on the tile, in steps.)
+  const raised = [...overlay.ops].reverse().find(op => op.op === "lift" && op.x === x && op.y === y);
+  return { x, y, tile: world.tiles[i], lift: raised?.op === "lift" ? raised.v : 0, object: object ? { id, kind: object.kind, name: object.name, ...(uid ? { uid } : {}) } : null, building: b ? { index: bindex, name: b.name } : null, region: regionAt(world, x, y).name };
 }

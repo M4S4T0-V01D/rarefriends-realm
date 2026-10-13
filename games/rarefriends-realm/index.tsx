@@ -12,7 +12,7 @@ import { QUESTS, questPoints, MAX_QUEST_POINTS } from "./content.ts";
 import { TICK_MS, attackSpeed, combatLevel, createGame, giveOrDrop, message, totalLevel, type Game, type Projectile } from "./state.ts";
 import {
   chooseOption, closeInterfaces, collectFromCasket, creditReferral, emoteProblem, performEmote, syncMonster, continueDialogue, grantBundle, menuFor, tailorChoices, unlockMusic, restore, serialize, setFollower, setHeld, setRelics, tick, toggleRun, toggleSneak, toggleMount, goAshoreNearest, grantMount, walkTo, sailTo, atSea, type OwnedFriend, type Selection,
-  mountAttack,
+  mountAttack, healPeer, takeHeal,
 } from "./engine.ts";
 import { DOCKS } from "./boats.ts";
 import { LANGUAGES, languageOf, setLanguage } from "./i18n.ts";
@@ -186,7 +186,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const lastMinimapPoint = useRef<React.MouseEvent<HTMLCanvasElement> | null>(null);
   const [snapshot, setSnapshot] = useState<GameSnapshot | null>(null), [busy, setBusy] = useState(false), [casketError, setCasketError] = useState(""), [reveal, setReveal] = useState<CasketResult[] | null>(null);
   const [size, setSize] = useState({ width: 960, height: 640, scale: 1 }), [sideOpen, setSideOpen] = useState(true), [fullscreen, setFullscreen] = useState(false), [pip, setPip] = useState(false), [shareStatus, setShareStatus] = useState(""), [feedbackStatus, setFeedbackStatus] = useState(""), [cardUrl, setCardUrl] = useState<string | null>(null), [collectibleUrl, setCollectibleUrl] = useState<string | null>(null);
-  const devFrame = isDevFrame(), devEdit = useRef(false), devOverlay = useRef(cleanOverlay(null, []));
+  const devFrame = isDevFrame(), devEdit = useRef(false), devOverlay = useRef(cleanOverlay(null, [])), devRebuild = useRef<number | null>(null);
   const pendingSave = useRef<unknown>(null), cardBlob = useRef<Blob | null>(null), collectibleBlob = useRef<Blob | null>(null), generation = useRef<number | null>(null), resizeRef = useRef<() => void>(() => {}), saveNow = useRef<(claim?: boolean, importHash?: string) => void>(() => {});
   const [cloud, setCloud] = useState<CloudState | null>(null), cloudWas = useRef<CloudState["status"] | null>(null), milestone = useRef("");
   /** Logged out: back on the title screen with the adventure saved. */
@@ -389,6 +389,11 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           if (result === "lost") { sendAct(from, { kind: "duel-won", u: state.tick }); duel.current = null; }
           else if (!duel.current && state.autoRetaliate) duel.current = { target: from, nextSwing: state.tick + 1 };
           refresh();
+        } else if (act.kind === "heal" && act.id && act.n !== undefined) {
+          // Another player's Heal Other: the checks (near, capped, not too often, not in the ring) are takeHeal's.
+          const them = players.current.state.peers.find(peer => peer.id === from);
+          if (them) takeHeal(state, them, players.current.name(from), act.id, act.n);
+          refresh();
         } else if (act.kind === "duel-won") {
           if (lastDuel.current?.with === from && performance.now() - lastDuel.current.at < 30_000) {
             wonDuel(state, from); duel.current = null; lastDuel.current = null;
@@ -431,7 +436,15 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       // The development layer (devlayer.ts): only in a frame opened with ?dev=1, and only from the page around it.
       if (devFrame && event.source === window.parent) {
         const state = game.current;
-        if (event.data?.type === DEV_WORLD && state) { const overlay = cleanOverlay(event.data.overlay, []); devOverlay.current = overlay; const report = rebuildWorld(state, overlay); refresh(); window.parent.postMessage({ type: DEV_REPORT, ...report, ops: overlay.ops.length }, "*"); return; }
+        if (event.data?.type === DEV_WORLD && state) {
+          // (A burst of edits is one rebuild: the newest overlay, once the messages queued behind it are in.)
+          devOverlay.current = cleanOverlay(event.data.overlay, []);
+          if (!devRebuild.current) devRebuild.current = window.setTimeout(() => {
+            devRebuild.current = null; const overlay = devOverlay.current, now = game.current; if (!overlay || !now) return;
+            const report = rebuildWorld(now, overlay); refresh(); window.parent.postMessage({ type: DEV_REPORT, ...report, ops: overlay.ops.length }, "*");
+          }, 0);
+          return;
+        }
         if (event.data?.type === DEV_MODE) { devEdit.current = event.data.edit === true; return; }
         if (event.data?.type === DEV_TELEPORT && state && typeof event.data.x === "number" && typeof event.data.y === "number") { const p = state.player; p.x = Math.round(event.data.x); p.y = Math.round(event.data.y); p.prev = { x: p.x, y: p.y }; p.path = []; p.target = null; const at = realPoint(state.world, p.x, p.y); camera.current.x = at.x; camera.current.y = at.y; refresh(); return; }
       }
@@ -797,6 +810,14 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     const options = menuFor(state, picks.filter(pick => pick.kind !== "peer"), tile, live.current.selection);
     // Other players: Follow, Add-friend, Message, Wave, Ignore, Examine (after the first option, so a left-click still walks).
     const peers = picks.filter(pick => pick.kind === "peer").flatMap(pick => { const p = players.current.get(pick.id); return p ? [p] : []; });
+    // A Heal Other chosen from the spellbook: cast on the player clicked (the only thing on offer while it's chosen).
+    const chosen = live.current.selection?.kind === "spell" ? SPELLS.find(spell => spell.id === (live.current.selection as { spell: string }).spell) : null;
+    const casts = chosen?.target === "ally" ? peers.map(p => ({ verb: `Cast ${chosen.name} ->`, noun: `${players.current.name(p.id)} (level-${p.combat})`, tone: "plain" as const, run: () => {
+      const healed = healPeer(state, chosen.id, p, players.current.name(p.id));
+      if (healed) sendAct(p.id, { kind: "heal", id: chosen.id, n: healed });
+      refresh();
+    } })) : [];
+    if (casts.length) return [...casts, ...options];
     const social = peers.flatMap(p => {
       const noun = `${players.current.name(p.id)} (level-${p.combat})`, friend = players.current.isFriend(p.id);
       return [

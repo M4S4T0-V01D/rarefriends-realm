@@ -847,6 +847,8 @@ const SKILL_PAINTERS: Record<Skill, Painter> = {
   // Mysteries: the eye in the triangle.
   // Seafaring: an anchor, its ring at the top and its flukes curling up.
   seafaring: p => { p.disc(8.5, 2.5, 1.8, 1.8, "#2f5f7a"); p.disc(8.5, 2.5, 0.8, 0.8, "#e9dcb4"); p.line(8, 4, 8, 14, "#2f5f7a", 2); p.line(5, 6, 12, 6, "#2f5f7a", 2); p.polyline([[2, 9], [3, 13], [8, 15], [13, 13], [14, 9]], "#2f5f7a", 2); p.poly([[1, 9], [3, 7], [4, 10]], "#2f5f7a"); p.poly([[15, 9], [13, 7], [12, 10]], "#2f5f7a"); },
+  // Beastkeeping: a leather collar, its buckle and a gold tag hanging from it.
+  beastkeeping: p => { const ring = Array.from({ length: 13 }, (_, k) => [8 + Math.cos(k / 12 * Math.PI * 2) * 5.5, 7 + Math.sin(k / 12 * Math.PI * 2) * 4] as [number, number]); p.polyline(ring, "#6b4a2c", 2); p.rect(2, 5, 3, 3, "#d9b866"); p.line(8, 11, 8, 12.5, "#3b2a18", 1); p.disc(8, 14, 2, 2, "#d9b866"); p.disc(8, 14, 0.8, 0.8, "#8a6a2a"); },
   mysteries: p => { p.poly([[8, 1], [15, 14], [1, 14]], "#d9b866"); p.poly([[8, 4], [12.5, 12], [3.5, 12]], "#2f3f66", null); p.poly([[4.5, 9.5], [8, 7.5], [11.5, 9.5], [8, 11.5]], "#f7f5f0", null); p.disc(8, 9.5, 1.5, 1.5, "#3b8a8a"); p.set(8, 9, INK); },
   slayer: p => { p.disc(6.5, 10, 3, 2.5, "#7a5a3c"); for (const [x, y] of [[2.5, 6.5], [5, 4], [8, 4], [10.5, 6.5]]) p.disc(x, y, 1.3, 1.3, "#7a5a3c"); p.disc(11.5, 11.5, 3.2, 3.2, "#9aa6ad"); p.disc(11.5, 11.5, 2, 2, "#cfe8f2"); p.line(13.5, 13.5, 15.5, 15.5, "#5a3e28", 2); },
 };
@@ -958,6 +960,13 @@ const SKILL24: Record<Skill, Painter> = {
     part(p, poly([[8, 9], [16, 9], [18, 19], [6, 19]]), "#4a3a60", "cloth"); part(p, poly([[6, 9], [9, 9], [8, 19], [3, 19]]), "#b0443c", "cloth");
     part(p, disc(12, 6, 3.2), "#e8c9a0", "cloth"); part(p, box(6, 3, 12, 2), "#5f5a52", "cloth"); part(p, box(9, 1, 6, 3), "#5f5a52", "cloth");
     part(p, box(13, 10, 4, 6), "#9c8672", "wood"); line(p, [[19, 7], [19, 20]], "#c49a74", 2); part(p, box(9, 19, 2, 3), "#3b3a38", "cloth"); part(p, box(13, 19, 2, 3), "#3b3a38", "cloth");
+  },
+  beastkeeping: p => {
+    // Beastkeeping: a hound's leather collar with a brass buckle and a tag, and a paw print beside it.
+    part(p, all(stroke([[5, 9], [7, 5], [12, 3.5], [17, 5], [19, 9], [17, 13], [12, 14.5], [7, 13], [5, 9]], 2.6)), "#6b4a2c", "cloth");
+    part(p, poly([[3.5, 7.5], [7.5, 7.5], [7.5, 11], [3.5, 11]]), "#d9b866", "metal"); line(p, [[12, 14.5], [12, 16.5]], "#3b2a18");
+    part(p, disc(12, 18.5, 2.4, 2.4), "#e3b23c", "metal");
+    part(p, all(disc(18.5, 19.5, 2.2, 1.8), disc(16.4, 16.4, 0.9, 0.9), disc(18.5, 15.6, 0.9, 0.9), disc(20.6, 16.4, 0.9, 0.9)), "#8a6a46", "flat");
   },
   seafaring: p => {
     // Seafaring: a ship's anchor in iron, a coil of rope through its ring.

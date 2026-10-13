@@ -13,6 +13,7 @@ import type { Daily } from "./daily.ts";
 import type { Lore, Track } from "./pursuance.ts";
 import type { MysteriesRecord } from "./mysteries.ts";
 import type { Vessel } from "./seafaring.ts";
+import type { Companion } from "./beasts.ts";
 import type { Preparation } from "./techniques.ts";
 import type { Camp } from "./camping.ts";
 import { LATEST_UPDATE } from "./updates.ts";
@@ -158,6 +159,8 @@ export type Player = {
   /** Your camp (camping.ts), and the ticks played when pitching one last earned Wayfaring XP. */
   camp: Camp | null; campXpAt: number;
   /** Your vessels (seafaring.ts): moored where you left them, or under you (aboard: its id); where you're sailing to land (a shore tile); regions first reached by sea. */
+  /** Beastkeeping (beasts.ts): your companions (one out at a time), the last id given, and the trust you've built with wild ones by feeding. */
+  companions: Companion[]; companionSeq: number; trust: Record<string, { n: number; at: number }>;
   vessels: Vessel[]; aboard: number | null; landing: Point | null; landfalls: Record<string, 1>; /** When the ship's bell last called a vessel (ticks; not saved). */ bellAt: number;
   /** The trails' waymarks you've noted, a bit each, by trail (wayfinding.ts). */ trails: Record<string, number>;
   /** Camps pitched by region (the trail log), and when the fire was last tended, the camp last slept at, the waystone last walked (ticks). */
@@ -198,6 +201,8 @@ export type Monster = {
   marked?: boolean;
   /** Summoned for a match in the Rare Friends Ring: it hunts you from the start and never comes back. */
   arena?: boolean;
+  /** One of yours (beasts.ts): your companion, by its id. */
+  ally?: number;
 };
 export type Npc = { uid: number; id: string; x: number; y: number; prev: Point; spawn: Point; wander: number; heading: Point; moved: number; busy: number;
   /** A soldier fighting: the uid of its fighting self (skirmish.ts), while it's out; the soldier itself is put away meanwhile. */
@@ -311,7 +316,7 @@ export function createPlayer(world: World, familyId: number, friendId: number): 
     style: "accurate", autocast: null, prayers: [], target: null, activity: null, combat: null,
     attackTimer: 0, eatTimer: 0, stunned: 0, regenTimer: 0, quests: {}, questData: {},
     wardrobe: [], worn: [], follower: null, courseStep: -1, kills: 0, deaths: 0, overhead: null, music: ["theme"],
-    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, stoneBoxGrades: {}, boneBag: {}, sigilBag: {}, belts: {}, followerWorn: [], orders: {}, activities: { run: null, records: {} }, collectible: { layout: "classic", show: ["skills", "combat", "quests", "generation"] }, lockbox: [], settled: [], notices: [], card: { bg: "paper", frame: "rose", skills: "boxes", font: "mono", ink: "ink", layout: "classic" }, cards: {}, rarian: false, mizukai: false, orashai: false, mana: 10, mysteries: { found: {}, glyphs: {}, read: {} }, techniqueReady: {}, preparation: null, spiritWardUntil: 0, home: null, restedTicks: 0, camp: null, campXpAt: -100000, vessels: [], aboard: null, landing: null, landfalls: {}, bellAt: -1e9, trails: {}, camps: {}, campTendAt: -1e9, campSleptAt: -1e9, waystoneAt: -1e9, ward: null, wardUntil: 0, renew: 0, renewUntil: 0, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, friendVillage: null, referralTimes: [], mounts: [], mount: null, saddlebags: {}, mountReady: 0, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, lore: {}, trail: null, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false, rerolls: 0 }, seenUpdate: LATEST_UPDATE,
+    familyId: Math.max(0, Math.min(FAMILY_NAMES.length - 1, familyId)), friendId, relics: [0, 0, 0, 0], followerGeneration: null, tutorial: 0, guide: 0, referredBy: null, referrals: [], boostTicks: 0, coalBag: 0, stoneBox: 0, stoneBoxGrades: {}, boneBag: {}, sigilBag: {}, belts: {}, followerWorn: [], orders: {}, activities: { run: null, records: {} }, collectible: { layout: "classic", show: ["skills", "combat", "quests", "generation"] }, lockbox: [], settled: [], notices: [], card: { bg: "paper", frame: "rose", skills: "boxes", font: "mono", ink: "ink", layout: "classic" }, cards: {}, rarian: false, mizukai: false, orashai: false, mana: 10, mysteries: { found: {}, glyphs: {}, read: {} }, techniqueReady: {}, preparation: null, spiritWardUntil: 0, home: null, restedTicks: 0, camp: null, campXpAt: -100000, companions: [], companionSeq: 0, trust: {}, vessels: [], aboard: null, landing: null, landfalls: {}, bellAt: -1e9, trails: {}, camps: {}, campTendAt: -1e9, campSleptAt: -1e9, waystoneAt: -1e9, ward: null, wardUntil: 0, renew: 0, renewUntil: 0, boosts: {}, boostTimer: 0, poison: null, weaponPoison: null, antidoteUntil: 0, antifireUntil: 0, stealthUntil: 0, tonicUntil: 0, mixture: null, name: null, fellowship: null, title: null, visited: {}, regionTicks: {}, talked: {}, emotesUsed: {}, outfits: {}, friendTicks: 0, firsts: {}, friendKinds: {}, rumours: {}, friendLast: -1e9, friendEventAt: {}, friendRegion: null, friendNight: false, friendRain: false, friendSeen: null, combatSaid: null, friendVillage: null, referralTimes: [], mounts: [], mount: null, saddlebags: {}, mountReady: 0, met: {}, achievements: {}, pets: [], petOut: null, killLog: {}, lore: {}, trail: null, stats: {}, daily: { day: -1, streak: 0, best: 0, challengeDay: -1, challenges: [], base: [], claimed: [], chest: false, rerolls: 0 }, seenUpdate: LATEST_UPDATE,
     lastHitBy: null, created: Date.now(), queuedSpell: null, castTimer: 0,
   };
 }

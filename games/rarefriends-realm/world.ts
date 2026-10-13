@@ -431,6 +431,8 @@ export type World = {
   lift?: Float32Array; raise?: Float32Array;
   /** The land's own floor under the hills, per tile (elevation.ts). */
   base?: Float32Array;
+  /** The heights before the buildings were levelled (kept only in the development frame, so an edit rebuilds just the ground round it). */
+  ground?: Float32Array;
   /** Ground height (world pixels) at every tile corner: (W + 1) × (H + 1), corner (i, j) sits at (i − ½, j − ½). */
   heights: Float32Array;
   /** Where each dungeon went when it settled under its ground (its strip rectangle and the move), for whatever still speaks in strip coordinates: movedPoint. */
@@ -871,6 +873,8 @@ function buildMainland(seed: number) {
   decor(77, 118, "hay"); decor(70, 123, "barrel", true); decor(77, 123, "crate");
   decor(78, 122, "windmill", true, "Windmill"); add({ kind: "mill", x: 79, y: 124, blocks: true, name: "Mill hopper" }); npc("miller", 80, 125, 1);
   decor(87, 120, "hay"); decor(94, 120, "hay"); decor(80, 118, "crate");
+  // Bramble the beastkeeper, by the coop: she keeps the farm's beasts and anyone else's (Beastkeeping: beastfolk.ts).
+  npc("beastkeeper_bramble", 82, 123, 1); decor(83, 121, "trough", true, "A water trough for the beasts she keeps");
 
   // ---------- Whisperwood ----------
   scatter(56, 70, 82, 118, 90, (x, y) => tree(x, y, "tree"));
@@ -1894,72 +1898,85 @@ const FLAT = new Set<number>([T.LAVA, T.VOID, T.WATER, T.DEEP, T.BRIDGE, T.COBBL
  * buildings and bridges (so shores and streets stay level), then blurred once for gentle slopes.
  */
 export function buildHeights(tiles: Uint8Array, seed: number, lift?: Float32Array, raise?: Float32Array, base?: Float32Array, buildings?: readonly Building[]): Float32Array {
+  const heights = groundHeights(tiles, seed, lift, raise, base);
+  if (buildings) levelBuildings(heights, buildings);
+  return heights;
+}
+/** The heights before the buildings are levelled: the whole map, or (with `into`, the ground as it was) just the corners round a changed rectangle of tiles. */
+export function groundHeights(tiles: Uint8Array, seed: number, lift?: Float32Array, raise?: Float32Array, base?: Float32Array, area?: { x0: number; y0: number; x1: number; y1: number }, into?: Float32Array): Float32Array {
+  const CW = W + 1, heights = into ?? new Float32Array(CW * (H + 1));
+  // The corners worked out (a changed tile reaches seven out through the distance to flat ground, one more through the blur), the raw relief a corner further, the distance a tile further, and the flat tiles it's measured from six further again.
+  const ci0 = area ? Math.max(0, area.x0 - 8) : 0, cj0 = area ? Math.max(0, area.y0 - 8) : 0, ci1 = area ? Math.min(W, area.x1 + 9) : W, cj1 = area ? Math.min(H, area.y1 + 9) : H;
+  const ri0 = Math.max(0, ci0 - 1), rj0 = Math.max(0, cj0 - 1), ri1 = Math.min(W, ci1 + 1), rj1 = Math.min(H, cj1 + 1);
+  const tx0 = Math.max(0, ri0 - 1 - 6), ty0 = Math.max(0, rj0 - 1 - 6), tx1 = Math.min(W - 1, ri1 + 6), ty1 = Math.min(H - 1, rj1 + 6), TW = tx1 - tx0 + 1, TH = ty1 - ty0 + 1;
   const broad = makeNoise(seed + 21, 13), fine = makeNoise(seed + 33, 5);
   // Distance (in tiles, capped) from every tile to the nearest flat tile.
-  const distance = new Uint8Array(W * H).fill(255), queue = new Int32Array(W * H);
+  const distance = new Uint8Array(TW * TH).fill(255), queue = new Int32Array(TW * TH);
   let tail = 0;
-  for (let i = 0; i < W * H; i++) if (FLAT.has(tiles[i])) { distance[i] = 0; queue[tail++] = i; }
+  for (let y = ty0; y <= ty1; y++) for (let x = tx0; x <= tx1; x++) if (FLAT.has(tiles[y * W + x])) { const l = (y - ty0) * TW + x - tx0; distance[l] = 0; queue[tail++] = l; }
   const visit = (next: number, d: number) => { if (distance[next] > d + 1) { distance[next] = d + 1; queue[tail++] = next; } };
   for (let head = 0; head < tail; head++) {
-    const index = queue[head], x = index % W, y = (index - x) / W, d = distance[index];
+    const index = queue[head], x = index % TW, y = (index - x) / TW, d = distance[index];
     if (d >= 6) continue;
-    if (x + 1 < W) visit(index + 1, d);
+    if (x + 1 < TW) visit(index + 1, d);
     if (x > 0) visit(index - 1, d);
-    if (y + 1 < H) visit(index + W, d);
-    if (y > 0) visit(index - W, d);
+    if (y + 1 < TH) visit(index + TW, d);
+    if (y > 0) visit(index - TW, d);
   }
   // Relief per tile (its terrain's, raised by the lift), so each corner below just sums its four tiles.
   // The raise is relief too, but it stands clear of the hill noise below: a mountain is where it was put, not where the noise allows.
-  const relief = new Float64Array(W * H), raised = new Float64Array(W * H);
-  for (let i = 0; i < W * H; i++) { const r = RELIEF[tiles[i]] ?? 0; relief[i] = r * (1 + (lift?.[i] ?? 0)); raised[i] = r * (raise?.[i] ?? 0); }
-  const CW = W + 1, raw = new Float32Array(CW * (H + 1));
-  for (let j = 0; j <= H; j++) for (let i = 0; i <= W; i++) {
+  const RW = ri1 - ri0 + 1, raw = new Float32Array(RW * (rj1 - rj0 + 1));
+  for (let j = rj0; j <= rj1; j++) for (let i = ri0; i <= ri1; i++) {
     let sum = 0, up = 0, near = 255, count = 0;
     // The four tiles round the corner, in the same order as ever (so the sums, and the heights, come out the same).
     for (let k = 0; k < 4; k++) {
       const tx = k & 1 ? i : i - 1, ty = k & 2 ? j : j - 1;
       if (tx < 0 || ty < 0 || tx >= W || ty >= H) { near = 0; continue; }
-      const t = ty * W + tx;
-      sum += relief[t]; up += raised[t]; count++; if (distance[t] < near) near = distance[t];
+      const t = ty * W + tx, r = RELIEF[tiles[t]] ?? 0, dt = distance[(ty - ty0) * TW + tx - tx0];
+      sum += r * (1 + (lift?.[t] ?? 0)); up += r * (raise?.[t] ?? 0); count++; if (dt < near) near = dt;
     }
     if (!count || (sum === 0 && up === 0) || near === 0) continue;
     const ease = Math.min(1, near / 4), smooth = ease * ease * (3 - 2 * ease);
     // The hill noise is sampled in the mainland's own coordinates (and the frame's rows: the north moved everything down), so its relief is exactly what it always was (the wider world sees the same field, shifted).
     const fj = northUnshift(j) - MAINLAND.y, shape = broad(i - MAINLAND.x, fj) * 0.75 + fine(i - MAINLAND.x, fj) * 0.25;
-    raw[j * CW + i] = ((sum / count) * (0.12 + 0.88 * Math.pow(Math.max(0, shape), 1.6)) + up / count) * smooth;
+    raw[(j - rj0) * RW + i - ri0] = ((sum / count) * (0.12 + 0.88 * Math.pow(Math.max(0, shape), 1.6)) + up / count) * smooth;
   }
-  const heights = new Float32Array(raw.length);
-  for (let j = 0; j <= H; j++) for (let i = 0; i <= W; i++) {
-    if (raw[j * CW + i] === 0) continue;
-    let total = 0, n = 0;
-    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const x = i + di, y = j + dj; if (x >= 0 && y >= 0 && x <= W && y <= H) { total += raw[y * CW + x]; n++; } }
-    heights[j * CW + i] = total / n;
-  }
-  // The land's own floor under all of it (elevation.ts).
-  if (base) for (let j = 0; j <= H; j++) for (let i = 0; i <= W; i++) {
-    let total = 0, n = 0;
-    for (let k = 0; k < 4; k++) { const tx = k & 1 ? i : i - 1, ty = k & 2 ? j : j - 1; if (tx < 0 || ty < 0 || tx >= W || ty >= H) continue; total += base[ty * W + tx]; n++; }
-    if (n) heights[j * CW + i] += total / n;
-  }
-  // Every building stands on level ground: under it and two tiles round it (where its roof reaches out) the ground is
-  // one height, the height of the land round it (a shelf, a terrace, the hill it's dug into), easing back a few tiles
-  // out. Buildings close enough to share that ground share one level, so a town stands level.
-  if (buildings) {
-    const list = buildings.filter(b => b.y0 < OVERWORLD_H), parent = list.map((_, k) => k), find = (k: number): number => parent[k] === k ? k : (parent[k] = find(parent[k]));
-    const gap = 10;
-    for (let a = 0; a < list.length; a++) for (let c = a + 1; c < list.length; c++) { const A = list[a], C = list[c]; if (A.x0 - gap <= C.x1 && C.x0 - gap <= A.x1 && A.y0 - gap <= C.y1 && C.y0 - gap <= A.y1) parent[find(a)] = find(c); }
-    const dOf = (b: Building, i: number, j: number) => Math.max(b.x0 - i, i - (b.x1 + 1), b.y0 - j, j - (b.y1 + 1), 0);
-    // The land round each group: the ring of corners three to five out from its buildings, as it lies.
-    const sums = new Map<number, { total: number; n: number }>();
-    list.forEach((b, k) => { const root = find(k), e = sums.get(root) ?? { total: 0, n: 0 };
-      for (let j = Math.max(0, b.y0 - 5); j <= Math.min(H, b.y1 + 6); j++) for (let i = Math.max(0, b.x0 - 5); i <= Math.min(W, b.x1 + 6); i++) { const d = dOf(b, i, j); if (d >= 3 && d <= 5) { e.total += heights[j * CW + i]; e.n++; } }
-      sums.set(root, e); });
-    const nearest = new Float32Array(CW * (H + 1)).fill(Infinity), levelAt = new Float32Array(CW * (H + 1));
-    list.forEach((b, k) => { const e = sums.get(find(k))!, level = e.n ? e.total / e.n : 0;
-      for (let j = Math.max(0, b.y0 - 5); j <= Math.min(H, b.y1 + 6); j++) for (let i = Math.max(0, b.x0 - 5); i <= Math.min(W, b.x1 + 6); i++) { const d = dOf(b, i, j), k2 = j * CW + i; if (d < nearest[k2]) { nearest[k2] = d; levelAt[k2] = level; } } });
-    for (let k = 0; k < nearest.length; k++) if (nearest[k] !== Infinity) { const t = Math.max(0, Math.min(1, (nearest[k] - 2) / 3)), e = t * t * (3 - 2 * t); heights[k] = levelAt[k] + (heights[k] - levelAt[k]) * e; }
+  for (let j = cj0; j <= cj1; j++) for (let i = ci0; i <= ci1; i++) {
+    heights[j * CW + i] = 0;
+    if (raw[(j - rj0) * RW + i - ri0] !== 0) {
+      let total = 0, n = 0;
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const x = i + di, y = j + dj; if (x >= 0 && y >= 0 && x <= W && y <= H) { total += raw[(y - rj0) * RW + x - ri0]; n++; } }
+      heights[j * CW + i] = total / n;
+    }
+    // The land's own floor under all of it (elevation.ts).
+    if (base) {
+      let total = 0, n = 0;
+      for (let k = 0; k < 4; k++) { const tx = k & 1 ? i : i - 1, ty = k & 2 ? j : j - 1; if (tx < 0 || ty < 0 || tx >= W || ty >= H) continue; total += base[ty * W + tx]; n++; }
+      if (n) heights[j * CW + i] += total / n;
+    }
   }
   return heights;
+}
+/**
+ * Every building stands on level ground: under it and two tiles round it (where its roof reaches out) the ground is
+ * one height, the height of the land round it (a shelf, a terrace, the hill it's dug into), easing back a few tiles
+ * out. Buildings close enough to share that ground share one level, so a town stands level. (In place.)
+ */
+export function levelBuildings(heights: Float32Array, buildings: readonly Building[]) {
+  const CW = W + 1;
+  const list = buildings.filter(b => b.y0 < OVERWORLD_H), parent = list.map((_, k) => k), find = (k: number): number => parent[k] === k ? k : (parent[k] = find(parent[k]));
+  const gap = 10;
+  for (let a = 0; a < list.length; a++) for (let c = a + 1; c < list.length; c++) { const A = list[a], C = list[c]; if (A.x0 - gap <= C.x1 && C.x0 - gap <= A.x1 && A.y0 - gap <= C.y1 && C.y0 - gap <= A.y1) parent[find(a)] = find(c); }
+  const dOf = (b: Building, i: number, j: number) => Math.max(b.x0 - i, i - (b.x1 + 1), b.y0 - j, j - (b.y1 + 1), 0);
+  // The land round each group: the ring of corners three to five out from its buildings, as it lies.
+  const sums = new Map<number, { total: number; n: number }>();
+  list.forEach((b, k) => { const root = find(k), e = sums.get(root) ?? { total: 0, n: 0 };
+    for (let j = Math.max(0, b.y0 - 5); j <= Math.min(H, b.y1 + 6); j++) for (let i = Math.max(0, b.x0 - 5); i <= Math.min(W, b.x1 + 6); i++) { const d = dOf(b, i, j); if (d >= 3 && d <= 5) { e.total += heights[j * CW + i]; e.n++; } }
+    sums.set(root, e); });
+  const nearest = new Float32Array(CW * (H + 1)).fill(Infinity), levelAt = new Float32Array(CW * (H + 1));
+  list.forEach((b, k) => { const e = sums.get(find(k))!, level = e.n ? e.total / e.n : 0;
+    for (let j = Math.max(0, b.y0 - 5); j <= Math.min(H, b.y1 + 6); j++) for (let i = Math.max(0, b.x0 - 5); i <= Math.min(W, b.x1 + 6); i++) { const d = dOf(b, i, j), k2 = j * CW + i; if (d < nearest[k2]) { nearest[k2] = d; levelAt[k2] = level; } } });
+  for (let k = 0; k < nearest.length; k++) if (nearest[k] !== Infinity) { const t = Math.max(0, Math.min(1, (nearest[k] - 2) / 3)), e = t * t * (3 - 2 * t); heights[k] = levelAt[k] + (heights[k] - levelAt[k]) * e; }
 }
 /** Which building (1 + its index, 0 for none) covers each tile: the last one listed wins where they overlap. */
 export function indexBuildings(buildings: readonly Building[]): Uint16Array {

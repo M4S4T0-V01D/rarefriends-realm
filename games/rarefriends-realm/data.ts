@@ -11,13 +11,15 @@ export const SKILLS = [
   "mysteries",
   // A Place to the North: vessels of your own, built, sailed, moored and mended (seafaring.ts).
   "seafaring",
+  // Beastkeeping (beasts.ts): bonding with creatures, keeping them, and working beside them.
+  "beastkeeping",
 ] as const;
 export type Skill = typeof SKILLS[number];
 export const SKILL_NAMES: Record<Skill, string> = {
   attack: "Attack", strength: "Strength", defence: "Defence", ranged: "Ranged", hitpoints: "Hitpoints", magic: "Magic", prayer: "Faith",
   woodcutting: "Woodcutting", fishing: "Fishing", cooking: "Cooking", firemaking: "Firemaking", mining: "Mining",
   smithing: "Smithing", crafting: "Craftwork", thieving: "Stealth", agility: "Wayfaring", slayer: "Pursuance",
-  sigilcraft: "Sigilcraft", fletching: "Fletching", apothecary: "Apothecary", presence: "Presence", mysteries: "Mysteries", seafaring: "Seafaring",
+  sigilcraft: "Sigilcraft", fletching: "Fletching", apothecary: "Apothecary", presence: "Presence", mysteries: "Mysteries", seafaring: "Seafaring", beastkeeping: "Beastkeeping",
 };
 /** Each skill's colour: its mastery cape, and its trim. */
 export const SKILL_COLORS: Record<Skill, [string, string]> = {
@@ -25,12 +27,12 @@ export const SKILL_COLORS: Record<Skill, [string, string]> = {
   hitpoints: ["#e8e4dc", "#cf6e6e"], magic: ["#6f7ea6", "#e2d49e"], prayer: ["#efede7", "#e2d49e"], woodcutting: ["#8e9f7a", "#c49a74"],
   fishing: ["#8fb3c9", "#efede7"], cooking: ["#9c7aa6", "#e8d4c0"], firemaking: ["#e9a07a", "#e2d49e"], mining: ["#8b8e92", "#c9c2b6"],
   smithing: ["#6d6b67", "#e3a58c"], crafting: ["#b89c86", "#efede7"], thieving: ["#6d6b8a", "#c6bed4"], agility: ["#8f9cb2", "#efede7"],
-  slayer: ["#3b3a38", "#cf6e6e"], sigilcraft: ["#c6bed4", "#6f7ea6"], fletching: ["#7d9a86", "#e8d4c0"], apothecary: ["#8fbf9a", "#c98f95"], presence: ["#e2d49e", "#6e4a8a"], mysteries: ["#2f3f66", "#d9b866"], seafaring: ["#2f5f7a", "#e9dcb4"],
+  slayer: ["#3b3a38", "#cf6e6e"], sigilcraft: ["#c6bed4", "#6f7ea6"], fletching: ["#7d9a86", "#e8d4c0"], apothecary: ["#8fbf9a", "#c98f95"], presence: ["#e2d49e", "#6e4a8a"], mysteries: ["#2f3f66", "#d9b866"], seafaring: ["#2f5f7a", "#e9dcb4"], beastkeeping: ["#6b4a2c", "#d9b866"],
 };
 /** Small glyphs for XP drops and the skills tab (drawn as text). */
 export const SKILL_ICONS: Record<Skill, string> = {
   attack: "⚔", strength: "✊", defence: "⛨", hitpoints: "♥", magic: "✦", prayer: "✚", woodcutting: "🪓", fishing: "🐟",
-  cooking: "🍳", firemaking: "🔥", mining: "⛏", smithing: "⚒", crafting: "✂", thieving: "👣", agility: "➶", ranged: "➹", slayer: "⌖", sigilcraft: "◈", fletching: "➴", apothecary: "⚗", presence: "✧", mysteries: "◬", seafaring: "⚓",
+  cooking: "🍳", firemaking: "🔥", mining: "⛏", smithing: "⚒", crafting: "✂", thieving: "👣", agility: "➶", ranged: "➹", slayer: "⌖", sigilcraft: "◈", fletching: "➴", apothecary: "⚗", presence: "✧", mysteries: "◬", seafaring: "⚓", beastkeeping: "🐾",
 };
 export const MAX_LEVEL = 99;
 /** The classic old-school curve: XP needed for each level, index = level. */
@@ -310,6 +312,10 @@ const ITEMS: Item[] = [
   { id: "sailcloth", name: "Sailcloth", examine: "A bolt of heavy canvas, for a sail.", value: 180, stackable: true, icon: { shape: "silk", color: "#efe6d0", accent: "#b3301f" } },
   { id: "ships_rope", name: "Ship's rope", examine: "A coil of tarred rope: rigging, mooring lines, everything that holds.", value: 60, stackable: true, icon: { shape: "string", color: "#9c7a4a", accent: "#5a4228" } },
   { id: "carried_rowboat", name: "Rowboat (carried)", examine: "Your rowboat, upside down over your shoulders, its oars inside. Launch it at any water it can take.", value: 0, tradeable: false, icon: { shape: "boat", color: "#c9a066", accent: "#6e4528" } },
+  // Beastkeeping (beasts.ts): a halter for a goat, the whistle that calls a companion, and what's left when one falls.
+  { id: "goat_halter", name: "Goat halter", examine: "Rope and leather, sized for a highland goat. Use it on one: Beastkeeping 15.", value: 120, icon: { shape: "string", color: "#8a6a46", accent: "#d9b866" } },
+  { id: "companion_whistle", name: "Companion whistle", examine: "A bone whistle. Whistle, and the next of your companions waiting at the beastkeepers comes; or send the one that's out home.", value: 40, tradeable: false, icon: { shape: "key", color: "#e8dcc0", accent: "#8a6a46" } },
+  { id: "companion_keepsake", name: "Keepsake", examine: "The collar of a companion that fell beside you. It doesn't come back. You keep this instead.", value: 0, tradeable: false, icon: { shape: "amulet", color: "#6b4a2c", accent: "#d9b866" } },
   { id: "first_copy", name: "First copy of the agreement", examine: "The old agreement in both peoples' hands, as it was first sworn: each to keep both passes and both roads, and to stand by the other.", value: 0, tradeable: false, icon: { shape: "scroll", color: "#e9dcb4", accent: "#7d2f26" } },
   { id: "realm_scroll", name: "Realm scroll", examine: "A map fragment of the Realm.", value: 0, tradeable: false, icon: { shape: "scroll", color: "#efe3c4" } },
 ];
@@ -1267,7 +1273,8 @@ export const GEM_CUTTING: Record<string, { cut: string; level: number; xp: numbe
 export type SpellKind = "strike" | "bolt" | "blast" | "curse" | "bind" | "teleport" | "alchemy" | "superheat" | "grab" | "enchant" | "bloom" | "ward" | "smite" | "mend" | "aegis" | "bless"
   /** The Mizukai Isles: a mist that hides you (Mist Veil), a seal that shows a creature's nature (Spirit Sight), a rite that calms a wayward spirit. */
   | "veil" | "reveal" | "pacify";
-export type SpellTarget = "monster" | "item" | "ground" | "self";
+/** (An ally: another player, or your own companion; Heal Other.) */
+export type SpellTarget = "monster" | "item" | "ground" | "self" | "ally";
 export type Spell = {
   id: string; name: string; level: number; xp: number; sigils: Readonly<Record<string, number>>; kind: SpellKind; element: string; target: SpellTarget;
   maxHit?: number; teleport?: TeleportPlace; curse?: { stat: "attack" | "strength" | "defence"; amount: number };
@@ -1377,11 +1384,13 @@ export const SPELLS: readonly Spell[] = [
   { id: "mend", name: "Mend", level: 5, xp: 12, sigils: { star_sigil: 1 }, kind: "mend", element: "holy", target: "self", skill: "prayer", faith: 2, heal: { now: 8 }, description: "A touch of the Old Friend's light: heals 8. Costs 2 faith." },
   { id: "holy_dart", name: "Holy Dart", level: 10, xp: 11, sigils: { star_sigil: 1, breeze_sigil: 1 }, kind: "smite", element: "holy", target: "monster", skill: "prayer", faith: 1, maxHit: 8, description: "A dart of light (max hit 8, half as much again against the undead). Costs 1 faith a cast." },
   { id: "ward_of_light", name: "Ward of Light", level: 15, xp: 24, sigils: { star_sigil: 2 }, kind: "aegis", element: "holy", target: "self", skill: "prayer", faith: 3, ward: { defence: 0.2, flat: 6, ticks: 100 }, description: "Light settles on your shoulders: +20% defence bonus and +6 for a minute. Costs 3 faith." },
+  { id: "heal_other", name: "Heal Other", level: 24, xp: 30, sigils: { star_sigil: 2, tide_sigil: 1 }, kind: "mend", element: "holy", target: "ally", skill: "prayer", faith: 3, heal: { now: 12 }, description: "The Old Friend's light passed on: heals another player, or your companion, by 12. Costs 3 faith." },
   { id: "greater_mend", name: "Greater Mend", level: 30, xp: 36, sigils: { star_sigil: 2, tide_sigil: 1 }, kind: "mend", element: "holy", target: "self", skill: "prayer", faith: 4, heal: { now: 20 }, description: "Heals 20. Costs 4 faith." },
   { id: "smite", name: "Smite", level: 35, xp: 28, sigils: { star_sigil: 2, ember_sigil: 1 }, kind: "smite", element: "holy", target: "monster", skill: "prayer", faith: 2, maxHit: 16, description: "A hammer of light (max hit 16, half as much again against the undead). Costs 2 faith a cast." },
   { id: "sanctuary", name: "Sanctuary", level: 45, xp: 54, sigils: { star_sigil: 3, stone_sigil: 1 }, kind: "aegis", element: "holy", target: "self", skill: "prayer", faith: 6, ward: { reduce: 0.5, ticks: 50 }, description: "Half of every blow falls on the light instead of you, for half a minute. Costs 6 faith." },
   { id: "blessing", name: "Blessing", level: 50, xp: 60, sigils: { star_sigil: 2, path_sigil: 1 }, kind: "bless", element: "holy", target: "self", skill: "prayer", faith: 4, heal: { now: 6, energy: 100, cure: true }, description: "Run energy restored, poison cured, and a little healing. Costs 4 faith." },
   { id: "radiance", name: "Radiance", level: 60, xp: 44, sigils: { star_sigil: 3, ember_sigil: 2 }, kind: "smite", element: "holy", target: "monster", skill: "prayer", faith: 3, maxHit: 24, description: "A burst of the Old Friend's light (max hit 24, half as much again against the undead). Costs 3 faith a cast." },
+  { id: "greater_heal_other", name: "Greater Heal Other", level: 62, xp: 72, sigils: { star_sigil: 3, tide_sigil: 2, bloom_sigil: 1 }, kind: "mend", element: "holy", target: "ally", skill: "prayer", faith: 6, heal: { now: 28 }, description: "Heals another player, or your companion, by 28. Costs 6 faith." },
   { id: "renewal", name: "Renewal", level: 70, xp: 84, sigils: { star_sigil: 3, bloom_sigil: 1 }, kind: "mend", element: "holy", target: "self", skill: "prayer", faith: 6, heal: { now: 5, perTick: 3, ticks: 20 }, description: "Heals 5 now and 3 a tick for twenty ticks. Costs 6 faith." },
   // ---------- The Wise Friend's Law (Return of Raria): Raria's edicts, judgements, vigils, offices, summons and rites ----------
   { id: "edict_of_silence", name: "Edict of Silence", level: 20, xp: 20, sigils: { law_sigil: 2, thought_sigil: 1 }, kind: "strike", element: "law", target: "monster", maxHit: 12, rarian: true, description: "A Rarian edict spoken at a creature: a bolt of grey law that strikes it quiet (max hit 12)." },
@@ -1605,6 +1614,9 @@ Object.assign(MONSTERS, {
   ember_salamander_young: { id: "ember_salamander_young", name: "Ember salamander", level: 7, hp: 10, attack: 6, strength: 6, defence: 4, magicDef: 2, attackBonus: 3, defenceBonus: 2, maxHit: 2, speed: 5, respawn: 30, wander: 4,
     examine: "A young ember salamander, no bigger than a dog. Its belly glows like a coal.", aggressive: false,
     always: [one("bones", 1)], drops: [coins(3, 30, 0.5), one("inkcoal", 0.2, 1, 3), one("ember_sigil", 0.15, 2, 6), one("pewter_ore", 0.1, 1, 2), one("cinder_core", 0.005)], art: 125, ink: "#c2603c" },
+  // A wolf caught in a hunter's snare (Beastkeeping: free it and treat its leg, beasts.ts): it can't move, and doesn't fight.
+  snared_wolf: { id: "snared_wolf", name: "Wolf in a snare", level: 32, hp: 40, attack: 1, strength: 1, defence: 20, attackBonus: 0, defenceBonus: 10, maxHit: 0, speed: 6, respawn: 600, wander: 0, slayer: 1,
+    examine: "A wolf with its leg in a snare, too tired to snarl. Free it, and treat the leg: a healing tonic would do.", aggressive: false, art: 108, drops: [], always: [] },
   hollow_weaver: { id: "hollow_weaver", undead: true, poisonImmune: true, name: "Hollow weaver", level: 88, hp: 120, attack: 74, strength: 70, defence: 66, magicDef: 60, attackBonus: 44, defenceBonus: 52, maxHit: 13, speed: 5, respawn: 55, wander: 3, slayer: 75, attackStyle: "magic",
     examine: "It spins the dark into thread. The thread is looking at you.", aggressive: true,
     always: [one("ink_bones", 1)], drops: [one("hollowthread_hood", 0.014), one("hollowthread_robe", 0.01), one("hollowthread_skirt", 0.012), coins(150, 700, 0.7), one("hollow_essence", 0.15), one("gloom_shard", 0.1), one("hollow_sigil", 0.15, 5, 12), one("shade_sigil", 0.12, 4, 10), one("rosestone_pendant", 0.005)], art: 126, ink: "#2a2438" },
@@ -1804,6 +1816,8 @@ export const SHOPS: Record<string, ShopDef> = {
   ...MEGHAVAN_SHOPS,
   ...PORTS_SHOPS,
   ...NORTH_SHOPS,
+  // The beastkeepers (beastfolk.ts): feed, halters and whistles.
+  beastkeeper: { id: "beastkeeper", name: "The beastkeeper's stores", buys: ["other"], rate: 0.4, stock: ["goat_halter", "companion_whistle", "bread", "raw_beef", "cooked_meat", "inkcoal"] },
   // The Orashai: the Keeper's scriptorium (inks, reeds, rods, the ibis mask) and the Temple of the Hidden Sun (inks).
   keeper_scriptorium: { id: "keeper_scriptorium", name: "The Keeper's scriptorium", buys: ["other"], rate: 0.5, stock: ["ochre_ink", "lapis_ink", "scribes_reed", "lapis_rod", "ibis_mask"] },
   hidden_sun_temple: { id: "hidden_sun_temple", name: "The Temple of the Hidden Sun", buys: ["other"], rate: 0.5, stock: ["ochre_ink", "lapis_ink", "vial_of_water"] },

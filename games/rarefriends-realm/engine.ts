@@ -38,6 +38,7 @@ import { clueExamine, clueOptions, onKharavethTick, useClue } from "./kharaveth.
 import { studySeal } from "./dynasties.ts";
 import { cleanTrails } from "./wayfinding.ts";
 import { dyeSails, hasFitout } from "./shipfit.ts";
+import { allyOf, callNext, cleanCompanions, cleanTrust, findsHerbs, canSpare, companionFell, companionMenu, companionOut, companionTick, drawsFire, freeSnared, homeOnDeath, placeCompanion, sendHome, spare, speciesOfWild, useOnCreature } from "./beasts.ts";
 import { launchCarried, VESSELS, aboard, applyVessels, berthRespawn, canStow, cleanVessels, fitToVessel, goAshore, holdAt, nearestLanding, ringBell, sailable, sailed, settleAboard, stowInHold, vesselTick } from "./seafaring.ts";
 import {
   BANK_SIZE, BANK_TABS, DAY_MS, SATCHEL, SATCHEL_SIZE, STONE_BOX, STONE_BOX_SIZE, boxTotal, isSigilStone, BONE_BAG, BONE_BAG_SIZE, bagAdd, bagBones, bagTakeAll, hasBoneBag, SIGIL_BAG, BELTS, beltAdd, beltContents, beltDef, wornBelt, SIGIL_BAG_SIZE, hasSigilBag, isSigil, sigilBagAdd, sigilBagTotal, sigilStock, useSigils, setPieces, wayfarerPieces, fullSlayerSet, heartguardPieces, mixtureOn, compactBankTabs, hasSatchel, hasStoneBox, stock, useUp, INVENTORY_SIZE, REFERRAL_COINS, REFERRALS_PER_DAY, REFERRAL_TICKS, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
@@ -45,7 +46,7 @@ import {
   type Activity, type CombatStyle, type Dialogue, type Game, type Monster, type Npc, type Player, type Point, type Recipe, type Slot, type BankSlot, type Target,
  type WorkOrder,
 } from "./state.ts";
-import { DUNGEON_Y, FLOOR_Y, GEN_H, MAINLAND, T, W, WEST_DX, H, isStorey, movedPoint, southShift, inArena, inBounds, inRingBuilding, isUnderground, isWater, mainlandToWorld, objectAtTile, realPoint, regionAt, terrainAt, tileIndex, walkable, type WorldObject } from "./world.ts";
+import { DUNGEON_Y, FLOOR_Y, GEN_H, MAINLAND, T, W, WEST_DX, H, isStorey, movedPoint, southShift, inArena, inBounds, inRing, inRingBuilding, isUnderground, isWater, mainlandToWorld, objectAtTile, realPoint, regionAt, terrainAt, tileIndex, walkable, type WorldObject } from "./world.ts";
 
 export { createGame };
 
@@ -253,9 +254,16 @@ export function menuFor(game: Game, picks: readonly Pick[], tile: Point | null, 
     if (pick.kind === "monster") {
       const monster = monsterByUid(game, pick.id);
       if (!monster) continue;
+      // Your companion: its own orders, food from your pack, never an attack.
+      if (monster.ally !== undefined) {
+        if (spell) { if (spell.target === "ally") out.push({ verb: useLabel!, noun: monster.def.name, tone: "monster", run: g => { healCompanion(g, monster, spell.id); } }); continue; }
+        out.push(...companionMenu(game, monster, used ? player.inventory.indexOf(used) : null)); continue;
+      }
       const noun = `${monster.marked ? `Marked ${monster.def.name}` : monster.def.name}  (level-${monster.def.level})`;
       if (spell) { if (spell.target === "monster") out.push({ verb: useLabel!, noun, tone: "monster", run: g => setTarget(g, { kind: "monster", uid: monster.uid, option: "Cast", spell: spell.id }) }); continue; }
-      if (used) { out.push({ verb: useLabel!, noun, tone: "monster", run: g => message(g, "Nothing interesting happens.") }); continue; }
+      if (used) { const slotIndex = player.inventory.indexOf(used); out.push({ verb: useLabel!, noun, tone: "monster", run: g => { if (!useOnCreature(g, monster, slotIndex)) message(g, "Nothing interesting happens."); } }); continue; }
+      if (canSpare(game, monster)) out.push({ verb: "Spare", noun: monster.def.name, tone: "monster", run: g => { spare(g, monster); } });
+      if (speciesOfWild(monster)?.bonding === "rescue") out.push({ verb: "Free", noun: monster.def.name, tone: "monster", run: g => { freeSnared(g, monster); } });
       if (monster.def.shear) out.push({ verb: "Shear", noun: monster.def.name, tone: "monster", run: g => setTarget(g, { kind: "monster", uid: monster.uid, option: "Shear" }) });
       out.push({ verb: "Attack", noun, tone: "monster", run: g => setTarget(g, { kind: "monster", uid: monster.uid, option: "Attack" }) });
       out.push({ verb: "Examine", noun: monster.def.name, tone: "monster", run: g => message(g, examineCreature(g, monster)) });
@@ -351,6 +359,7 @@ export function itemOptions(game: Game, slotIndex: number): ItemOption[] {
   if (slot.id.endsWith("_hull_fitting") && holdAt(game)) out.push({ verb: "Fit-to-vessel", run: g => { fitToVessel(g, slotIndex); } });
   if (slot.id === "rarite_ships_bell") out.push({ verb: "Ring-bell", run: g => { ringBell(g); } });
   if (slot.id === "carried_rowboat") out.push({ verb: "Launch", run: g => { launchCarried(g); } });
+  if (slot.id === "companion_whistle") out.push({ verb: "Whistle", run: g => { callNext(g); } }, { verb: "Send-home", run: g => { sendHome(g); } });
   if (definition.family === "resonance") out.push({ verb: "Fit-to-carving", run: g => fitCarving(g, slotIndex) });
   if (slot.id === "glimmer_shard") out.push({ verb: "Look-at", run: g => message(g, "The shard hums. Old Glimmer will want it back.") });
   // An inscribed sherd from Kharaveth: study it for a glyph you haven't seen (Mysteries); the sherd crumbles either way.
@@ -1328,6 +1337,7 @@ export function tick(game: Game) {
   playerCombat(game);
   skirmishScan(game);
   trackTick(game);
+  if (companionOut(game.player) && !allyOf(game) && game.player.aboard === null) placeCompanion(game);
   for (const monster of game.monsters) monsterTick(game, monster);
   for (const twin of game.monsters.filter(monster => monster.sheathe)) sheathe(game, twin);
   for (const npc of game.npcs) if (!npc.drawn) npcTick(game, npc);
@@ -1514,6 +1524,7 @@ function gatherTick(game: Game, activity: Extract<Activity, { kind: "gather" }>)
   if (game.rng() >= chance) return;
   give(player, herb.id); addXp(game, "apothecary", herb.xp); presenceXp(game, 0.5);
   if (mixtureOn(game, 3) && game.rng() < 0.25 && freeSlots(player)) { give(player, herb.id); message(game, "The Division brew splits the pick in two."); }
+  if (findsHerbs(game) && freeSlots(player)) { give(player, herb.id); addXp(game, "beastkeeping", 10, { raw: true }); message(game, "Your vixen noses out another."); }
   message(game, `You pick some ${herb.name.toLowerCase()}.`); sound(game, "pickup");
   const picked = (game.herbPicks.get(object.id) ?? 0) + 1; game.herbPicks.set(object.id, picked);
   if (picked >= herb.picks) { game.herbPicks.delete(object.id); game.depleted.set(object.id, game.tick + herb.respawn + Math.floor(game.rng() * herb.respawn)); player.activity = null; return; }
@@ -1867,6 +1878,7 @@ function rangedAttack(game: Game, monster: Monster, boost: number, art = { accur
 }
 const SPELL_COLORS: Record<string, string> = { breeze_dart: "#dfe6ea", tide_dart: "#9fb4d0", stone_dart: "#a89479", ember_dart: "#e3a58c", breeze_lance: "#eef2f4", tide_lance: "#8fa3c9", ember_lance: "#e39a7c", breeze_burst: "#ffffff", ember_burst: "#f0a080" };
 function damageMonster(game: Game, monster: Monster, damage: number, missed: boolean, melee = false) {
+  if (monster.ally !== undefined) return;   // (your companion: nothing of yours hurts it)
   const dealt = Math.min(damage, monster.hp), player = game.player;
   monster.hp -= dealt;
   if (dealt > 0) monster.mine = true;
@@ -1937,6 +1949,7 @@ function damagePlayer(game: Game, damage: number, from: Monster | null) {
 }
 export function die(game: Game) {
   activityEvent(game, { kind: "death" });
+  homeOnDeath(game);   // (your companion goes home: it doesn't die with you)
   const player = game.player, spawn = game.world.places.spawn;
   message(game, "Oh dear, you are dead!", "warn"); emit(game, { type: "death", tick: game.tick }); remember(game, "first_death"); friendSays(game, "death"); sound(game, "death");
   player.deaths++; stopAll(game); closeInterfaces(game); player.prayers = []; player.preparation = null; player.hp = maxHp(player); player.energy = 100;
@@ -1954,6 +1967,8 @@ export function die(game: Game) {
   message(game, camp ? "You wake up by your own fire. Your items are safe." : "You wake up by the Friendhollow fountain. Your items are safe: the Realm is kind to new heroes.", "info");
 }
 function monsterTick(game: Game, monster: Monster) {
+  // One of yours (beasts.ts): it follows you, and fights beside you.
+  if (monster.ally !== undefined) { companionTick(game, monster, { strike, step: (g, m, to) => stepMonsterToward(g, m, to) }); return; }
   // Poison on the creature: four doses, eight ticks apart.
   if (monster.poison && !monster.dead && --monster.poison.timer <= 0) {
     monster.poison.timer = 8; monster.poison.left--;
@@ -2005,6 +2020,9 @@ function monsterTick(game: Game, monster: Monster) {
         // Below a third of its health an enraged thing hits half as hard again, and faster.
         const enraged = !!monster.def.enrage && !patternBroken(game, monster) && monster.hp <= maxHpOf(monster) / 3;
         monster.attackTimer = Math.max(2, monster.def.speed - (enraged ? 1 : 0));
+        // Your companion beside it draws its attention now and then (beasts.ts).
+        const shield = drawsFire(game, monster);
+        if (shield) { strike(game, monster, shield); return; }
         const boost = prayerBoost(player), style = STYLE_BONUS[player.style];
         let breathed = false;
         const attack = (monster.def.attack * cursed(game, monster, "attack") + 9) * (monster.def.attackBonus + 64);
@@ -2166,6 +2184,8 @@ function strike(game: Game, attacker: Monster, victim: Monster) {
   // Struck, it turns on whoever struck it (unless it's busy with you).
   if (!victim.target && victim.foe == null) { victim.foe = attacker.uid; victim.idle = 0; }
   if (victim.hp > 0) return;
+  // Your companion, fallen (beasts.ts): gone for good.
+  if (victim.ally !== undefined) { attacker.foe = null; companionFell(game, victim); return; }
   // You wounded it, so it's yours whoever finished it; otherwise it simply falls (and leaves nothing).
   if (victim.mine) { attacker.foe = null; killMonster(game, victim); return; }
   victim.dead = true; victim.target = false; victim.foe = null; victim.respawnAt = game.tick + victim.def.respawn; attacker.foe = null;
@@ -2371,6 +2391,57 @@ function castOnSelf(game: Game, spell: Spell) {
   addXp(game, spell.skill ?? "magic", spell.xp);
   message(game, `You cast ${spell.name}. It ${notes.join(", ") || "settles over you"}.`); sound(game, "spell");
   emit(game, { type: "projectile", projectile: { from: { x: player.x, y: player.y }, to: { x: player.x, y: player.y - 0.01 }, start: game.tick, end: game.tick + 1, color: SPELL_COLORS[spell.id] ?? ELEMENT_COLORS[spell.element] ?? "#f2e28f", style: "magic", element: spell.element } });
+}
+// ---------- Heal Other: the Old Friend's light passed on ----------
+/** How near (tiles) you must stand to heal another, and how often one player's healing is taken (ticks). */
+export const HEAL_RANGE = 8, HEAL_GAP = 2;
+const healOf = (id: string) => { const spell = SPELLS.find(entry => entry.id === id); return spell?.target === "ally" && spell.heal?.now ? spell : null; };
+/**
+ * Cast a Heal Other on someone hurt within reach (a companion, or another player): paid for, Faith XP, and how much it
+ * heals (0 if it couldn't be cast). Nobody is healed who isn't hurt (so it's never XP for nothing), and nobody inside
+ * the sparring ring or the Ring.
+ */
+function healAlly(game: Game, spell: Spell, at: { x: number; y: number }, missing: number, name: string, ringed: boolean): number {
+  const player = game.player, problem = canCast(game, spell);
+  if (problem) { message(game, problem, "warn"); return 0; }
+  if (game.arena || ringed || inRing(player.x, player.y)) { message(game, "No healing in the ring: a fight there is between the two of you.", "warn"); return 0; }
+  if (Math.max(Math.abs(at.x - player.x), Math.abs(at.y - player.y)) > HEAL_RANGE || isUnderground(at.y) !== isUnderground(player.y)) { message(game, `You need to be closer to heal ${name}.`, "warn"); return 0; }
+  if (missing <= 0) { message(game, `${name} isn't hurt.`); return 0; }
+  payRunes(game, spell); payFaith(game, spell); addXp(game, "prayer", spell.xp);
+  const healed = Math.min(spell.heal!.now!, missing);
+  player.heading = { x: Math.sign(at.x - player.x), y: Math.sign(at.y - player.y) || 1 };
+  message(game, `You cast ${spell.name} on ${name}: it heals ${healed}.`); sound(game, "spell");
+  emit(game, { type: "projectile", projectile: { from: { x: player.x, y: player.y }, to: { x: at.x, y: at.y }, start: game.tick, end: game.tick + 2, color: SPELL_COLORS[spell.id] ?? ELEMENT_COLORS[spell.element] ?? "#f2e28f", style: "magic", element: spell.element } });
+  return healed;
+}
+/** Heal your companion (out with you). */
+export function healCompanion(game: Game, monster: Monster, spellId: string): number {
+  const spell = healOf(spellId), c = game.player.companions.find(entry => entry.id === monster.ally);
+  if (!spell || !c || monster.dead) return 0;
+  const healed = healAlly(game, spell, monster, monster.def.hp - monster.hp, c.name, false);
+  if (healed) { monster.hp += healed; c.hp = monster.hp; }
+  return healed;
+}
+/** Heal another player (what the presence says of them): the amount to send them, 0 if nothing was cast. */
+export function healPeer(game: Game, spellId: string, them: { x: number; y: number; hp: number; maxHp: number; arena?: unknown }, name: string): number {
+  const spell = healOf(spellId);
+  return spell ? healAlly(game, spell, them, them.maxHp - them.hp, name, !!them.arena || inRing(them.x, them.y)) : 0;
+}
+const healsTaken = new WeakMap<Game, Map<number, number>>();
+/**
+ * Another player's Heal Other reaching you: only from someone near (a little slack for the network), a spell that
+ * heals others, no more than that spell heals, not too often from one player, never in the ring. What it healed.
+ */
+export function takeHeal(game: Game, from: { id: number; x: number; y: number }, name: string, spellId: string, amount: number): number {
+  const spell = healOf(spellId), player = game.player, seen = healsTaken.get(game) ?? new Map<number, number>(); healsTaken.set(game, seen);
+  if (!spell || !Number.isFinite(amount) || amount <= 0 || player.hp <= 0) return 0;
+  if (Math.max(Math.abs(from.x - player.x), Math.abs(from.y - player.y)) > HEAL_RANGE + 3 || isUnderground(from.y) !== isUnderground(player.y)) return 0;
+  if (game.arena || inRing(player.x, player.y) || inRing(from.x, from.y)) return 0;
+  if (game.tick - (seen.get(from.id) ?? -1e9) < HEAL_GAP) return 0;
+  seen.set(from.id, game.tick);
+  const before = player.hp; player.hp = Math.min(maxHp(player), player.hp + Math.min(Math.floor(amount), spell.heal!.now!));
+  if (player.hp > before) { message(game, `${name} casts ${spell.name} on you: it heals ${player.hp - before}.`); sound(game, "spell"); }
+  return player.hp - before;
 }
 function payRunes(game: Game, spell: Spell) {
   for (const [sigil, n] of Object.entries(spellCost(game, spell))) useSigils(game.player, sigil, n);
@@ -2883,7 +2954,7 @@ export type SaveData = {
   name?: string | null; fellowship?: { name: string; tag: string; logo?: string; banner?: string; colors?: string[] } | null; title?: string | null; visited?: Record<string, number>; regionTicks?: Record<string, number>; talked?: Record<string, 1>; emotesUsed?: Record<string, 1>; outfits?: Record<string, 1>; friendTicks?: number; mounts?: string[]; mount?: string | null; daily?: unknown; seenUpdate?: number;
   lastMount?: string | null; saddlebags?: unknown; mountReady?: number;
   camps?: Record<string, number>; campTendAt?: number; campSleptAt?: number; waystoneAt?: number;
-  vessels?: unknown; aboard?: number | null; landfalls?: Record<string, number>; trails?: Record<string, number>;
+  vessels?: unknown; aboard?: number | null; landfalls?: Record<string, number>; trails?: Record<string, number>; companions?: unknown; companionSeq?: number; trust?: unknown;
 };
 export function serialize(game: Game): SaveData {
   const player = game.player;
@@ -2895,7 +2966,7 @@ export function serialize(game: Game): SaveData {
     playTicks: game.playTicks, retaliate: game.autoRetaliate, music: [...player.music],
     referredBy: player.referredBy, referrals: [...player.referrals], referralTimes: [...player.referralTimes], boostTicks: player.boostTicks, coalBag: player.coalBag, stoneBoxGrades: { ...player.stoneBoxGrades }, stoneBox: player.stoneBox, boneBag: { ...player.boneBag }, boosts: { ...player.boosts }, poison: player.poison ? { ...player.poison } : null, weaponPoison: player.weaponPoison ? { ...player.weaponPoison } : null,
     antidoteUntil: Math.max(0, player.antidoteUntil - game.tick), antifireUntil: Math.max(0, player.antifireUntil - game.tick), stealthUntil: Math.max(0, player.stealthUntil - game.tick), tonicUntil: Math.max(0, player.tonicUntil - game.tick), mixture: player.mixture ? { family: player.mixture.family, until: Math.max(0, player.mixture.until - game.tick) } : null,
-    firsts: { ...player.firsts } as Record<string, number>, friendKinds: { ...player.friendKinds } as Record<string, 1>, rumours: { ...player.rumours } as Record<string, 1>, orders: { ...player.orders }, activities: { run: player.activities.run ? { ...player.activities.run, target: { ...player.activities.run.target }, marks: { ...player.activities.run.marks } } : null, records: { ...player.activities.records } }, card: { ...player.card }, collectible: { layout: player.collectible.layout, show: [...player.collectible.show] }, lockbox: player.lockbox.map(slot => ({ ...slot })), settled: [...player.settled], notices: [...player.notices], camp: player.camp ? { ...player.camp, cache: player.camp.cache ? player.camp.cache.map(slot => slot ? { ...slot } : null) : null } : null, campXpAt: player.campXpAt, camps: { ...player.camps }, vessels: player.vessels.map(v => ({ ...v, heading: { ...v.heading }, hold: v.hold.map(slot => slot ? { ...slot } : null) })), aboard: player.aboard, landfalls: { ...player.landfalls }, trails: { ...player.trails }, campTendAt: player.campTendAt, campSleptAt: player.campSleptAt, waystoneAt: Math.min(0, player.waystoneAt - game.tick), cards: { ...player.cards }, rarian: player.rarian, mizukai: player.mizukai, orashai: player.orashai, mana: player.mana, mysteries: { found: { ...player.mysteries.found }, glyphs: { ...player.mysteries.glyphs }, read: { ...player.mysteries.read } }, spiritWardUntil: Math.max(0, player.spiritWardUntil - game.tick), home: player.home ? { ...player.home, furniture: { ...player.home.furniture } } : null, restedTicks: player.restedTicks, sigilBag: { ...player.sigilBag }, ward: player.ward ? { ...player.ward } : null, wardUntil: Math.max(0, player.wardUntil - game.tick), renew: player.renew, renewUntil: Math.max(0, player.renewUntil - game.tick), belts: Object.fromEntries(Object.entries(player.belts).map(([id, contents]) => [id, { ...contents }])), followerWorn: [...player.followerWorn],
+    firsts: { ...player.firsts } as Record<string, number>, friendKinds: { ...player.friendKinds } as Record<string, 1>, rumours: { ...player.rumours } as Record<string, 1>, orders: { ...player.orders }, activities: { run: player.activities.run ? { ...player.activities.run, target: { ...player.activities.run.target }, marks: { ...player.activities.run.marks } } : null, records: { ...player.activities.records } }, card: { ...player.card }, collectible: { layout: player.collectible.layout, show: [...player.collectible.show] }, lockbox: player.lockbox.map(slot => ({ ...slot })), settled: [...player.settled], notices: [...player.notices], camp: player.camp ? { ...player.camp, cache: player.camp.cache ? player.camp.cache.map(slot => slot ? { ...slot } : null) : null } : null, campXpAt: player.campXpAt, camps: { ...player.camps }, vessels: player.vessels.map(v => ({ ...v, heading: { ...v.heading }, hold: v.hold.map(slot => slot ? { ...slot } : null) })), aboard: player.aboard, landfalls: { ...player.landfalls }, companions: player.companions.map(c => ({ ...c, pack: c.pack.map(slot => slot ? { ...slot } : null) })), companionSeq: player.companionSeq, trust: Object.fromEntries(Object.entries(player.trust).map(([k, v]) => [k, { n: v.n }])), trails: { ...player.trails }, campTendAt: player.campTendAt, campSleptAt: player.campSleptAt, waystoneAt: Math.min(0, player.waystoneAt - game.tick), cards: { ...player.cards }, rarian: player.rarian, mizukai: player.mizukai, orashai: player.orashai, mana: player.mana, mysteries: { found: { ...player.mysteries.found }, glyphs: { ...player.mysteries.glyphs }, read: { ...player.mysteries.read } }, spiritWardUntil: Math.max(0, player.spiritWardUntil - game.tick), home: player.home ? { ...player.home, furniture: { ...player.home.furniture } } : null, restedTicks: player.restedTicks, sigilBag: { ...player.sigilBag }, ward: player.ward ? { ...player.ward } : null, wardUntil: Math.max(0, player.wardUntil - game.tick), renew: player.renew, renewUntil: Math.max(0, player.renewUntil - game.tick), belts: Object.fromEntries(Object.entries(player.belts).map(([id, contents]) => [id, { ...contents }])), followerWorn: [...player.followerWorn],
     lastMount: player.lastMount ?? null, saddlebags: Object.fromEntries(Object.entries(player.saddlebags).map(([id, bags]) => [id, bags.map(slot => slot ? { ...slot } : null)])), mountReady: Math.max(0, player.mountReady - game.tick),
     name: player.name, fellowship: player.fellowship ? { ...player.fellowship } : null, title: player.title, visited: { ...player.visited } as Record<string, number>, regionTicks: { ...player.regionTicks } as Record<string, number>, talked: { ...player.talked } as Record<string, 1>, emotesUsed: { ...player.emotesUsed } as Record<string, 1>, outfits: { ...player.outfits } as Record<string, 1>, friendTicks: player.friendTicks, mounts: [...player.mounts], mount: player.mount, met: JSON.parse(JSON.stringify(player.met)), achievements: { ...player.achievements }, pets: [...player.pets], petOut: player.petOut, killLog: { ...player.killLog }, lore: Object.fromEntries(Object.entries(player.lore).map(([id, entry]) => [id, { ...entry, d: [...entry.d] }])), stats: { ...player.stats }, daily: JSON.parse(JSON.stringify(player.daily)), seenUpdate: player.seenUpdate,
   };
@@ -3043,7 +3114,7 @@ export function restore(game: Game, raw: unknown): boolean {
   player.notices = []; player.cards = Object.fromEntries(Object.entries(save.cards && typeof save.cards === "object" ? save.cards : {}).filter(([id, day]) => /^[a-z0-9_]{1,40}$/.test(id) && typeof day === "number" && Number.isFinite(day)).slice(0, 2000).map(([id, day]) => [id, Math.max(0, Math.floor(day))])); player.rarian = save.rarian === true; player.mizukai = !player.rarian && save.mizukai === true; player.orashai = !player.rarian && !player.mizukai && save.orashai === true; player.mana = typeof save.mana === "number" && Number.isFinite(save.mana) ? Math.max(0, Math.min(maxMana(player), save.mana)) : maxMana(player); player.mysteries = cleanMysteries(save.mysteries); player.spiritWardUntil = game.tick + int(save.spiritWardUntil, 0, 1000, 0); player.home = cleanHome(save.home); player.restedTicks = int(save.restedTicks, 0, 100000, 0); applyHome(game); player.camp = cleanCamp(save.camp); if (player.camp && save.world !== 6) Object.assign(player.camp, movedPoint(game.world, player.camp.x, player.camp.y)); player.campXpAt = int(save.campXpAt, -100000, 1e9, -100000); applyCamp(game);
   // Seafaring: the vessels, where they're moored (older worlds' coordinates moved like everything else), whether you're aboard one.
   player.vessels = cleanVessels(save.vessels, isItem); if (save.world !== 6) for (const v of player.vessels) Object.assign(v, movedPoint(game.world, v.x, v.y));
-  player.aboard = typeof save.aboard === "number" && player.vessels.some(v => v.id === save.aboard) ? save.aboard : null; player.landing = null; player.bellAt = -1e9; player.trails = cleanTrails(save.trails);
+  player.aboard = typeof save.aboard === "number" && player.vessels.some(v => v.id === save.aboard) ? save.aboard : null; player.landing = null; player.bellAt = -1e9; player.trails = cleanTrails(save.trails); player.companions = cleanCompanions(save.companions, isItem); player.companionSeq = Number.isInteger(save.companionSeq) ? Math.max(0, save.companionSeq as number) : 0; player.trust = cleanTrust(save.trust);
   player.landfalls = Object.fromEntries(Object.keys(save.landfalls && typeof save.landfalls === "object" ? save.landfalls : {}).filter(id => /^[a-z0-9_]{1,40}$/.test(id)).slice(0, 400).map(id => [id, 1])) as Record<string, 1>;
   settleAboard(game);
   player.sigilBag = {}; for (const [id, n] of Object.entries(save.sigilBag ?? {})) if (isItem(id) && isSigil(id)) { const v = int(n, 0, SIGIL_BAG_SIZE, 0); if (v) player.sigilBag[id] = v; }

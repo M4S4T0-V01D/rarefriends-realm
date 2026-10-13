@@ -13,6 +13,7 @@ import { NPCS } from "./content.ts";
 import { TECHNIQUES } from "./techniques.ts";
 import { SEA, SHIPWRIGHTS, VESSELS, VESSEL_KINDS } from "./seafaring.ts";
 import { FITOUTS, FITOUT_IDS, LOADOUT_NAMES } from "./shipfit.ts";
+import { SPECIES, SPECIES_IDS } from "./beasts.ts";
 /** Which quest teaches a tradition's techniques (the common ones need only the level). */
 const TAUGHT_BY: Partial<Record<string, string>> = { orashai: " (The Orashai Mysteries)", mizukai: " (The Hidden Road)", inner_measure: " (The Counted Breath)", living_patterns: " (Patterns in the Water)", thresholds: " (The Keepers' Door)", unfinished: " (The Unfinished Page)" };
 import { AMULETS, STALLS, amuletRecipe, carvingRecipes, arrowRecipe, boltRecipe, craftingRecipes, crossbowRecipe, spinningRecipes, stringingRecipe, fletchingRecipes, headlessRecipe, smeltingRecipes, smithingRecipes } from "./engine.ts";
@@ -235,6 +236,13 @@ export function skillGuide(skill: Skill): GuideEntry[] {
       add(1, "Planks", "A shipwright saws logs into planks for a fee: pine, oak and ironbark.", "oak_planks", T("ability"));
       add(SEA.berthLevel, "A berth", "A barge's deckhouse or a longship's awning can be your waking place: if you fall, you wake aboard it, wherever it's moored. One waking place at a time, a camp or a vessel.", undefined, T("ability"));
       add(1, "Hulls", `Deep water wears a hull a point every ${SEA.wearEvery} tiles. A stove-in hull keeps to the shallows until a shipwright mends it with planks and pewter rivets.`, undefined, T("ability"));
+      break;
+    case "beastkeeping":
+      add(1, "Beastkeeping", "Creatures won one way each and kept beside you: fed until they trust you, rescued, spared, haltered, earned. One out at a time, the rest kept by the beastkeepers (Bramble on the Friendhollow farm, Halla in Skarnholm, Mstislav in Krasnogor). Trained by bonding, by caring for them, and by what they do beside you.", undefined, T("ability"));
+      for (const id of SPECIES_IDS) { const sp = SPECIES[id]; add(sp.level, sp.name, `${sp.how} ${sp.examine}`, undefined, T("ability")); }
+      add(1, "Fighting beside you", "A companion fights what you fight, with its own health and its own blows; what it bites turns on it, and what's at you may turn on it instead. Use food it eats on it to heal it and deepen the bond. Hold-back keeps it out of your fights.", undefined, T("ability"));
+      add(1, "When it's hurt", "A skittish one runs home early, a steady one later, a fierce one never. A beastkeeper settles one that ran, for a fee. A steady one bonded deep (80) can be told to hold fast: then it fights to the end. One that falls is gone for good: you keep a keepsake.", "companion_keepsake", T("ability"));
+      add(1, "The whistle", "Whistle for the next companion waiting at the beastkeepers, or send the one that's out home. A vessel takes companions only with room for them: a skiff a small one, a barge or a longship two.", "companion_whistle", T("ability"));
       break;
     case "presence":
       add(1, "Presence", "The mark you leave on the world. Earned by discovering regions, finishing quests, felling bosses, rare finds, people met, rumours heard, work orders filled, your Friend, your name and the clothes you're seen in. The slowest skill in the Realm.", undefined, T("ability"));

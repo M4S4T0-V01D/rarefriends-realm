@@ -278,6 +278,8 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
     put2(X0 + 2, Y0 + 2, "nets", "Nets drying"); put2(X0 + 4, Y0 + 2, "drying_rack", "Cod drying on the rack"); put2(X1 - 2, Y0 + 2, "banner", "The Skarnholm banner: a grey gull on a blue field");
     t.shoreSpots(X0 - 10, Y0 - 20, X0 + 34, Y0 - 1, "lure", 4);
     npc("jarl_hallveig", X0 + 9, Y0 + 16); npc("lawspeaker_signy", cx + 18, Y0 + 32); npc("farwake_master", X0 + 23, Y0 + 6); npc("shipwright_bersi", X0 + 13, Y0 + 6);
+    // Halla the houndmaster and her yard of hounds (Beastkeeping: beastfolk.ts).
+    { const at = openNear(cx - 14, Y0 + 30); npc("houndmaster_halla", at.x, at.y); put2(at.x + 1, at.y + 1, "trough", "A water trough, chewed at the corners"); put2(at.x - 1, at.y + 1, "hay", "Straw for the kennels"); }
     npc("skarnholm_innkeeper", X1 - 8, Y0 + 6); npc("skarnholm_trader", cx + 4, Y0 + 25, 2); { const at = openNear(cx - 6, Y0 + 25); npc("skarnholm_weaver", at.x, at.y); }
     for (let k = 0; k < 6; k++) npc(k % 2 ? "vargskeld_housecarl" : "vargskeld_villager", cx - 14 + k * 5, (Y0 + Y1 >> 1) + 2, 6);
     sign(cx + 2, Y1 + 1, "Skarnholm", "SKARNHOLM, at the head of the Skarnfjord. The Thing meets at midsummer and when it must. Speak at the Law Rock, not in the street. The Farwake keeps the charts; the jarl keeps the rest.");
@@ -424,7 +426,7 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
     house(X1 - 15, Y1 - 12, X1 - 4, Y1 - 4, "n", "The Bear and Bell", "izba");
     for (const [hx, hy] of [[X0 + 18, Y1 - 12], [cx + 4, Y1 - 12], [X0 + 4, cy + 4], [X1 - 14, cy + 4], [X0 + 18, Y0 + 4]] as const) house(hx, hy, hx + 7, hy + 5, "s", "A log house", "izba");
     npc("prince_radomir", cx - 3, Y0 + 9); npc("princess_vesna", cx + 4, Y0 + 9); npc("hearth_father_ilya", X0 + 10, Y0 + 9);
-    npc("krasnogor_innkeeper", X1 - 10, Y1 - 8); npc("krasnogor_trader", cx, cy + 6, 2); { const at = openNear(cx + 8, cy + 6); npc("krasnogor_tailor", at.x, at.y); }
+    npc("krasnogor_innkeeper", X1 - 10, Y1 - 8); npc("krasnogor_trader", cx, cy + 6, 2); { const at = openNear(cx + 8, cy + 6); npc("krasnogor_tailor", at.x, at.y); } { const at = openNear(cx - 12, cy + 8); npc("beastward_mstislav", at.x, at.y); put2(at.x + 1, at.y + 1, "trough", "A trough for the beasts in his keeping"); }
     for (let k = 0; k < 6; k++) npc(k % 2 ? "zoryavik_druzhina" : "zoryavik_villager", X0 + 8 + k * 9, cy + 2, 6);
     sign(cx + 2, Y1 + 2, "Krasnogor", "KRASNOGOR, on the Krasna. The princes sit in the Terem, when they sit together. The Hearth-Fathers keep the House; the market keeps the rest.");
   }
@@ -511,9 +513,9 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
   ] as const) sign(x, y, "Signpost", text);
 
   // ---------- What lives in the north (until the north's own creatures come) ----------
-  t.monsters("wolf", 60, 140, 560, 330, 26); t.monsters("crag_bear", 380, 60, 600, 200, 6); t.monsters("cairn_wight", 150, 250, 260, 330, 6);
+  t.monsters("wolf", 60, 140, 560, 330, 26); t.monsters("snared_wolf", 60, 140, 560, 330, 3); t.monsters("crag_bear", 380, 60, 600, 200, 6); t.monsters("cairn_wight", 150, 250, 260, 330, 6);
   t.monsters("highland_goat", RIDGE.x - 30, 60, RIDGE.x + 30, 320, 12); t.monsters("frost_yeti", RIDGE.x - 20, 40, RIDGE.x + 20, 160, 5);
-  t.monsters("boar", 700, 60, 1120, 330, 26); t.monsters("greatstag", 700, 40, 1120, 330, 18); t.monsters("wolf", 700, 60, 1120, 330, 16); t.monsters("crag_bear", 940, 40, 1120, 200, 6);
+  t.monsters("boar", 700, 60, 1120, 330, 26); t.monsters("greatstag", 700, 40, 1120, 330, 18); t.monsters("wolf", 700, 60, 1120, 330, 16); t.monsters("snared_wolf", 700, 60, 1120, 330, 3); t.monsters("crag_bear", 940, 40, 1120, 200, 6);
   t.monsters("bandit", 440, 200, 540, 260, 5);
   t.shoreSpots(150, 40, 560, 140, "deep", 8); t.shoreSpots(700, 40, 1140, 120, "net", 8);
   // Offshore shoals, out of reach of the shore (Seafaring): harpoon shoals a few tiles out, where a skiff can go, and deep

@@ -10,7 +10,7 @@
  * module has no DOM: the engine, the bake and the tests all load it.
  */
 import { ITEM_LIST, MONSTERS, type MonsterDef, type RockKind, type SpotKind, type TreeKind } from "./data.ts";
-import { DECOR_NAMES, FLOOR_Y, H, OVERWORLD_H, ROOF_COLORS, T, TREE_NAMES, W, WALKABLE, buildHeights, indexBuildings, indexObjects, type Building, type DecorKind, type ObjectKind, type World, type WorldObject } from "./world.ts";
+import { DECOR_NAMES, FLOOR_Y, H, OVERWORLD_H, ROOF_COLORS, T, TREE_NAMES, W, WALKABLE, buildHeights, groundHeights, indexBuildings, levelBuildings, indexObjects, type Building, type DecorKind, type ObjectKind, type World, type WorldObject } from "./world.ts";
 
 /** An NPC an overlay defines: who they are, and what they say (plain lines; the game's own people have scripted talk). */
 export type OverlayNpc = { id: string; name: string; examine: string; options: readonly string[]; art: { canonical: 7730 | 3412 } | { family: number; seed: number }; lines?: string[] };
@@ -124,20 +124,26 @@ export type Placed = { objects: Map<string, number>; buildings: Map<string, numb
 /**
  * Apply an overlay to a live world, in place: tiles, lifts, removals, objects, buildings, spawns, then the indexes and
  * the heights rebuilt. Returns where things landed, and a list of what couldn't be done (an object on an occupied
- * tile, a building off the overworld). The world's `lift`/`raise` (kept from generation or the bake) make the heights.
+ * tile, a building off the overworld). The world's `lift`/`raise`/`base` (kept from generation or the bake) make the
+ * heights; a `lift` op raises the land's own floor by so many steps (HEAVE_STEP each), softened two tiles round.
  */
+/** How far one step of a `lift` op raises the ground (world pixels): a step a quarter of a storey or so. */
+export const HEAVE_STEP = 16;
 export function applyOverlay(world: World, overlay: Overlay, seed: number, why: string[] = [], npcs: Record<string, unknown> | null = null): Placed {
   const placed: Placed = { objects: new Map(), buildings: new Map(), spawns: new Map() };
   const index = (x: number, y: number) => y * W + x, lift = world.lift ?? (world.lift = new Float32Array(W * H)), raise = world.raise ?? (world.raise = new Float32Array(W * H));
   let tilesChanged = false, objectsChanged = false, buildingsChanged = false;
+  // The rectangle of tiles changed (so the development frame rebuilds just the ground round it), and the raises by tile.
+  const box = { x0: W, y0: H, x1: -1, y1: -1 }, touch = (x0: number, y0: number, x1: number, y1: number) => { box.x0 = Math.min(box.x0, x0, x1); box.y0 = Math.min(box.y0, y0, y1); box.x1 = Math.max(box.x1, x0, x1); box.y1 = Math.max(box.y1, y0, y1); };
+  const heave = new Map<number, number>();
   const removeAt = (x: number, y: number) => {
     const id = world.objectAt[index(x, y)];
     if (id >= 0) { world.objects[id] = { ...world.objects[id], kind: "decor", decor: "flowers", blocks: false, name: "__removed" }; world.objectAt[index(x, y)] = -1; objectsChanged = true; }
   };
   for (const op of overlay.ops) {
-    if (op.op === "tile") { world.tiles[index(op.x, op.y)] = op.t; tilesChanged = true; }
-    else if (op.op === "fill") { for (let y = Math.min(op.y0, op.y1); y <= Math.max(op.y0, op.y1); y++) for (let x = Math.min(op.x0, op.x1); x <= Math.max(op.x0, op.x1); x++) world.tiles[index(x, y)] = op.t; tilesChanged = true; }
-    else if (op.op === "lift") { lift[index(op.x, op.y)] = op.v; tilesChanged = true; }
+    if (op.op === "tile") { world.tiles[index(op.x, op.y)] = op.t; tilesChanged = true; touch(op.x, op.y, op.x, op.y); }
+    else if (op.op === "fill") { for (let y = Math.min(op.y0, op.y1); y <= Math.max(op.y0, op.y1); y++) for (let x = Math.min(op.x0, op.x1); x <= Math.max(op.x0, op.x1); x++) world.tiles[index(x, y)] = op.t; tilesChanged = true; touch(op.x0, op.y0, op.x1, op.y1); }
+    else if (op.op === "lift") { if (op.v > 0) heave.set(index(op.x, op.y), op.v); else heave.delete(index(op.x, op.y)); tilesChanged = true; touch(op.x - 2, op.y - 2, op.x + 2, op.y + 2); }
     else if (op.op === "remove") removeAt(op.x, op.y);
     else if (op.op === "object") {
       if (world.objectAt[index(op.x, op.y)] >= 0) { why.push(`${op.uid}: the tile ${op.x},${op.y} is taken`); continue; }
@@ -156,7 +162,7 @@ export function applyOverlay(world: World, overlay: Overlay, seed: number, why: 
       const mx = Math.floor((x0 + x1) / 2), my = Math.floor((y0 + y1) / 2), gap = (x: number, y: number) => { world.tiles[index(x, y)] = floor; };
       if (op.door === "s") { gap(mx, y1); gap(mx + 1, y1); } if (op.door === "n") { gap(mx, y0); gap(mx + 1, y0); }
       if (op.door === "e") { gap(x1, my); gap(x1, my + 1); } if (op.door === "w") { gap(x0, my); gap(x0, my + 1); }
-      tilesChanged = true; buildingsChanged = true;
+      tilesChanged = true; buildingsChanged = true; touch(x0, y0, x1, y1);
     }
     else if (op.op === "spawn") {
       const known = op.kind === "npc" ? (npcs ? !!npcs[op.id] : true) : !!MONSTERS[op.id];
@@ -166,7 +172,22 @@ export function applyOverlay(world: World, overlay: Overlay, seed: number, why: 
   }
   if (objectsChanged) world.objectAt = indexObjects(world.objects);
   if (buildingsChanged) world.buildingAt = indexBuildings(world.buildings);
-  if (tilesChanged) world.heights = buildHeights(world.tiles, seed, lift, raise, world.base, world.buildings);
+  // Raised ground: the steps, softened over the five by five round each tile, on the land's own floor.
+  if (heave.size) {
+    const floor = world.base = world.base ? new Float32Array(world.base) : new Float32Array(W * H);
+    for (let y = Math.max(0, box.y0); y <= Math.min(H - 1, box.y1); y++) for (let x = Math.max(0, box.x0); x <= Math.min(W - 1, box.x1); x++) {
+      let total = 0;
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) total += heave.get(index(x + dx, y + dy)) ?? 0;
+      if (total) floor[index(x, y)] += total / 25 * HEAVE_STEP;
+    }
+  }
+  if (tilesChanged) {
+    // (The development frame keeps the ground before the buildings were levelled: only the corners round the change are worked out again.)
+    if (world.ground && box.x1 >= 0) {
+      const ground = world.ground = groundHeights(world.tiles, seed, lift, raise, world.base, { x0: Math.max(0, box.x0), y0: Math.max(0, box.y0), x1: Math.min(W - 1, box.x1), y1: Math.min(H - 1, box.y1) }, new Float32Array(world.ground));
+      world.heights = new Float32Array(ground); levelBuildings(world.heights, world.buildings);
+    } else world.heights = buildHeights(world.tiles, seed, lift, raise, world.base, world.buildings);
+  }
   return placed;
 }
 

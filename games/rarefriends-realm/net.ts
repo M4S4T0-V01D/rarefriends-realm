@@ -20,7 +20,7 @@ export const NET_CHAT_IN = "rarefriends-realm:net-chat-in";
 /** A direct message between two players' games (trades, taking a dropped item): NET_ACT out, NET_ACT_IN in. */
 export const NET_ACT = "rarefriends-realm:net-act";
 export const NET_ACT_IN = "rarefriends-realm:net-act-in";
-export const ACT_KINDS = ["trade-request", "trade-open", "trade-offer", "trade-accept", "trade-decline", "trade-done", "take", "give", "gone", "duel-hit", "duel-won", "party-invite", "party-accept", "party-decline", "party-leave", "party-roster"] as const;
+export const ACT_KINDS = ["trade-request", "trade-open", "trade-offer", "trade-accept", "trade-decline", "trade-done", "take", "give", "gone", "duel-hit", "duel-won", "heal", "party-invite", "party-accept", "party-decline", "party-leave", "party-roster"] as const;
 export type Act = { kind: typeof ACT_KINDS[number]; trade?: string; rev?: number; stage?: number; items?: { id: string; n: number }[]; u?: number; id?: string; n?: number; ids?: number[] };
 /** A shared ground item (something a player dropped from their pack). */
 export type Drop = { u: number; id: string; n: number; x: number; y: number };
