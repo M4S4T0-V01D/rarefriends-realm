@@ -174,5 +174,13 @@ export const DEV_PICK = "rarefriends-realm:dev-pick";
 export const DEV_CATALOG = "rarefriends-realm:dev-catalog";
 export const DEV_REPORT = "rarefriends-realm:dev-report";
 export const DEV_TELEPORT = "rarefriends-realm:dev-teleport";
-export type DevPick = { x: number; y: number; tile: number; lift: number; object: { id: number; kind: string; name: string; uid?: string } | null; building: { index: number; name: string } | null; region: string };
-export type DevCatalog = { tiles: Record<string, number>; decor: string[]; trees: string[]; rocks: string[]; spots: string[]; npcs: { id: string; name: string }[]; monsters: { id: string; name: string; level: number; art: number }[]; items: { id: string; name: string }[]; skills: string[]; quests: { id: string; name: string }[]; kinds: string[]; spawn: { x: number; y: number } };
+/** The dashboard's commands (devtools.ts: teleport, give, levels, quests, god mode…), and what each did, back. */
+export const DEV_COMMAND = "rarefriends-realm:dev-command";
+/** The game as the dashboard shows it (devtools.ts DevState), sent twice a second. */
+export const DEV_STATE = "rarefriends-realm:dev-state";
+/** A search of the world, and what was found. */
+export const DEV_FIND = "rarefriends-realm:dev-find";
+/** The whole map, as a picture. */
+export const DEV_MAP = "rarefriends-realm:dev-map";
+export type DevPick = { x: number; y: number; tile: number; lift: number; height: number; base: number; object: { id: number; kind: string; name: string; uid?: string } | null; building: { index: number; name: string } | null; region: string };
+export type DevCatalog = { tiles: Record<string, number>; decor: string[]; trees: string[]; rocks: string[]; spots: string[]; npcs: { id: string; name: string }[]; monsters: { id: string; name: string; level: number; art: number }[]; items: { id: string; name: string }[]; skills: string[]; quests: { id: string; name: string }[]; kinds: string[]; spawn: { x: number; y: number }; regions: { id: string; name: string }[] };

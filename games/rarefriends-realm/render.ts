@@ -173,7 +173,12 @@ const liftScale = (camera: Camera) => Math.sqrt(1 - camera.pitch * camera.pitch)
 /** The ground under the scene (set each frame), so everything stands on the hills. */
 let ground: World | null = null;
 export function setGround(world: World | null) { ground = world; }
-const groundAt = (x: number, y: number) => ground ? groundHeight(ground, x, y) : 0;
+/** The ground under a point as drawn: on water, its surface (WATER_DROP below the land's corners), so whatever floats or stands in it (a boat, a lily, a fishing spot) sits on the water. */
+const groundAt = (x: number, y: number) => {
+  if (!ground) return 0;
+  const tx = Math.round(x), ty = Math.round(y), wet = inBounds(tx, ty) && isWaterTerrain(ground.tiles[ty * W + tx]);
+  return groundHeight(ground, x, y) - (wet ? WATER_DROP : 0);
+};
 /** The storey you're on (set each frame): clicks land on its floor. */
 let viewFloor: Floor | null = null;
 /** World point → screen, standing on the ground (`lift` is extra height above it). Stored upper-storey tiles are drawn on their building, a storey up per level. */
@@ -360,6 +365,18 @@ function groundLayer(glr: RealmGL, terrain: number, variant: number) {
 /** The ground of one chunk (CHUNK × CHUNK tiles) for the GPU: four vertices a tile (see GROUND_FLOATS in gl.ts). */
 function groundChunkMesh(glr: RealmGL, world: World, cx: number, cy: number): Float32Array {
   const out: number[] = [];
+  // How far each corner is from the shore (in tiles, up to SHORE_MAX): 0 where any of the four tiles round it is land.
+  const SHORE_MAX = 6, near = new Map<number, number>();
+  const shoreAt = (i: number, j: number) => {
+    const key = j * (W + 1) + i, known = near.get(key); if (known !== undefined) return known;
+    let best = SHORE_MAX;
+    for (let dy = -SHORE_MAX; dy < SHORE_MAX; dy++) for (let dx = -SHORE_MAX; dx < SHORE_MAX; dx++) {
+      const tx = i + dx, ty = j + dy; if (!inBounds(tx, ty) || !bankedBy(world.tiles[ty * W + tx])) continue;
+      // (From a corner to the nearest point of that tile.)
+      const d = Math.hypot(Math.max(0, dx < 0 ? -dx - 1 : dx), Math.max(0, dy < 0 ? -dy - 1 : dy)); if (d < best) best = d;
+    }
+    near.set(key, best); return best;
+  };
   for (let y = cy * CHUNK; y < (cy + 1) * CHUNK; y++) for (let x = cx * CHUNK; x < (cx + 1) * CHUNK; x++) {
     if (!inBounds(x, y)) continue;
     const terrain = world.tiles[y * W + x];
@@ -375,6 +392,19 @@ function groundChunkMesh(glr: RealmGL, world: World, cx: number, cy: number): Fl
     const edgeTo = (nx: number, ny: number, k: number) => { const o = other(nx, ny); return blend[k] < 0 && !(o === T.VOID || EDGE_CLASS[o] === mine || o === T.WALL || o === T.CLIFF); };
     const edges = (edgeTo(x, y - 1, 0) ? 1 : 0) | (edgeTo(x + 1, y, 1) ? 2 : 0) | (edgeTo(x, y + 1, 2) ? 4 : 0) | (edgeTo(x - 1, y, 3) ? 8 : 0);
     const kind = terrain === T.WATER ? 1 : terrain === T.DEEP ? 2 : terrain === T.LAVA ? 3 : 0;
+    if (kind === 1 || kind === 2) {
+      // Water: below the land (WATER_DROP), its shade the distance to the shore at each corner (10 + tiles, for the
+      // shader's shallows, depths and foam), and a bank (kind 4, the land's own texture) down to it from each shore.
+      const corners = [[-0.5, -0.5, hA, 0, 0], [0.5, -0.5, hB, 1, 0], [0.5, 0.5, hC, 1, 1], [-0.5, 0.5, hD, 0, 1]] as const;
+      corners.forEach(([dx, dy, h, u, v], k) => out.push(x + dx, y + dy, h - WATER_DROP, u, v, layer, 10 + shoreAt(x + (k === 1 || k === 2 ? 1 : 0), y + (k >= 2 ? 1 : 0)), edges, kind, -1, -1, -1, -1));
+      for (const [ox, oy, i, j] of TILE_EDGES) {
+        const nx = x + ox, ny = y + oy, o = other(nx, ny); if (!bankedBy(o)) continue;
+        const bank = groundLayer(glr, lookOf(world, nx, ny, o), Math.floor(hash(ny, nx) * 4)), a = corners[i], b = corners[j];
+        out.push(x + a[0], y + a[1], a[2], 0, 0, bank, -0.18, 0, 4, -1, -1, -1, -1, x + b[0], y + b[1], b[2], 1, 0, bank, -0.18, 0, 4, -1, -1, -1, -1,
+          x + b[0], y + b[1], b[2] - WATER_DROP, 1, 1, bank, -0.18, 0, 4, -1, -1, -1, -1, x + a[0], y + a[1], a[2] - WATER_DROP, 0, 1, bank, -0.18, 0, 4, -1, -1, -1, -1);
+      }
+      continue;
+    }
     for (const [dx, dy, h, u, v] of [[-0.5, -0.5, hA, 0, 0], [0.5, -0.5, hB, 1, 0], [0.5, 0.5, hC, 1, 1], [-0.5, 0.5, hD, 0, 1]] as const) out.push(x + dx, y + dy, h, u, v, layer, shadeAmount, edges, kind, blend[0], blend[1], blend[2], blend[3]);
   }
   return new Float32Array(out);
@@ -579,6 +609,15 @@ const terrainFill = (terrain: number, variation: number) => {
 };
 const isWaterTerrain = (terrain: number) => terrain === T.WATER || terrain === T.DEEP;
 /**
+ * Water lies below the land: its surface WATER_DROP under the ground's corners, with a bank of earth down to it wherever
+ * it meets land (both renderers), so a shore reads as land ending and water beginning, not one sheet in two colours.
+ */
+export const WATER_DROP = 7;
+/** Whether a tile is land a bank stands for (anything but water and the void). */
+const bankedBy = (terrain: number) => terrain !== T.VOID && !isWaterTerrain(terrain);
+/** The four edges of a tile: the neighbour across each, and its two corners (0 a, 1 b, 2 c, 3 d: north-west, north-east, south-east, south-west). */
+const TILE_EDGES = [[0, -1, 0, 1], [1, 0, 1, 2], [0, 1, 2, 3], [-1, 0, 3, 0]] as const;
+/**
  * The tiles x0–x1, y0–y1 back to front for the camera's angle (packed as index into the rectangle), so a hill or a
  * snowy peak is never painted over by the land behind it however the camera is turned. A counting sort on depth.
  */
@@ -664,7 +703,8 @@ function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, camera: Camera
     // Water and lava move: the cached ground leaves them to the frame.
     const moving = animate && (terrain === T.WATER || terrain === T.DEEP || terrain === T.LAVA);
     if (mode === "motion" && !moving) continue;
-    const { x: sx, y: sy } = toScreen(camera, x, y);
+    // (On water, toScreen is already at its surface.)
+    const wet = isWaterTerrain(terrain), { x: sx, y: sy } = toScreen(camera, x, y);
     if (sx < -hw * 2 - pad || sx > VIEW.width + hw * 2 + pad || sy < -hh * 2 - pad || sy > VIEW.height + hh * 4 + pad) continue;
     // Corner heights lift each corner off the tile centre; slopes facing the north-west light are brighter.
     const hA = cornerHeight(world, x, y), hB = cornerHeight(world, x + 1, y), hC = cornerHeight(world, x + 1, y + 1), hD = cornerHeight(world, x, y + 1), hMid = (hA + hB + hC + hD) / 4;
@@ -676,6 +716,18 @@ function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, camera: Camera
     if (mode !== "motion") {
       ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.lineTo(cx, cy); ctx.lineTo(dx, dy); ctx.closePath();
       ctx.fillStyle = terrainFill(lookOf(world, x, y, terrain), variation); ctx.fill();
+      // The banks: earth from the land's edge down to the water, darker and wet at the foot, a line of foam where it meets the water.
+      if (wet) {
+        const foot: [number, number][] = [[ax, ay], [bx, by], [cx, cy], [dx, dy]], up = WATER_DROP * lifted;
+        for (const [ox, oy, i, j] of TILE_EDGES) {
+          const nx = x + ox, ny = y + oy, other = inBounds(nx, ny) ? world.tiles[ny * W + nx] : T.VOID; if (!bankedBy(other)) continue;
+          const [x0, y0] = foot[i], [x1, y1] = foot[j];
+          ctx.beginPath(); ctx.moveTo(x0, y0 - up); ctx.lineTo(x1, y1 - up); ctx.lineTo(x1, y1); ctx.lineTo(x0, y0); ctx.closePath();
+          ctx.fillStyle = terrainFill(lookOf(world, nx, ny, other), -0.32); ctx.fill();
+          ctx.fillStyle = "rgba(20,30,40,0.28)"; ctx.beginPath(); ctx.moveTo(x0, y0 - up * 0.45); ctx.lineTo(x1, y1 - up * 0.45); ctx.lineTo(x1, y1); ctx.lineTo(x0, y0); ctx.closePath(); ctx.fill();
+          ctx.strokeStyle = "rgba(236,244,248,0.7)"; ctx.lineWidth = Math.max(0.8, z * 1.2); ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+        }
+      }
     }
     // Texture details.
     const h = hash(y, x), detailed = !small && Math.abs(x - camera.x) + Math.abs(y - camera.y) < near, look = lookOf(world, x, y, terrain), style = GROUND_STYLE[look];
@@ -4066,7 +4118,7 @@ function drawMonster(ctx: CanvasRenderingContext2D, scene: Scene, monster: Monst
 
 // ---------- Minimap and world map ----------
 /** Map colours: clearer than the land's pastels, so roads, water, walls and floors read at a glance. */
-const MAP_COLORS: Record<number, [number, number, number]> = {
+export const MAP_COLORS: Record<number, [number, number, number]> = {
   [T.VOID]: [14, 14, 16], [T.GRASS]: [150, 178, 122], [T.DARK_GRASS]: [118, 150, 98], [T.PATH]: [214, 186, 136], [T.COBBLE]: [196, 190, 178], [T.SAND]: [232, 212, 158],
   [T.WATER]: [96, 142, 196], [T.DEEP]: [66, 108, 170], [T.SWAMP]: [118, 130, 94], [T.SNOW]: [246, 246, 242], [T.STONE]: [176, 172, 164], [T.WOOD]: [184, 146, 104],
   [T.GRAVEL]: [168, 158, 142], [T.DUNGEON]: [84, 82, 92], [T.BRIDGE]: [150, 108, 70], [T.CLIFF]: [96, 90, 82], [T.WALL]: [34, 32, 30], [T.FARMLAND]: [176, 142, 90],

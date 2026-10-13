@@ -3884,6 +3884,50 @@ test("World overlays: a layer over the baked world, applied deterministically; b
   assert.ok(quick.heights.every((v, i) => v === plain.heights[i]), "the quick rebuild matches the full one");
 });
 
+test("The dashboard's ground and paint ops: checked, deterministic, the quick rebuild matches the full one, and the world bakes as it's seen", async () => {
+  const { applyOverlay, cleanOverlay } = await import("../games/rarefriends-realm/overlay.ts");
+  const { FLOOR_MAX } = await import("../games/rarefriends-realm/terrainops.ts");
+  const { WORLD_SEED, groundHeights, buildHeights, regionIndex } = await import("../games/rarefriends-realm/world.ts");
+  // Open country: no building within reach of the ops (a building's ground is levelled, and the ground round it eased to it), nothing but grass where the brushes go.
+  const open = createWorld(), CW = W + 1, clear = (x, y) => open.buildings.every(b => b.x1 < x - 12 || b.x0 > x + 62 || b.y1 < y - 12 || b.y0 > y + 52);
+  const grassy = (x, y) => [[0, 0], [12, 0], [24, 0], [0, 12], [5, 20], [20, 40]].every(([dx, dy]) => open.tiles[(y + dy) * W + x + dx] === T.GRASS);
+  let sx = 0, sy = 0;
+  for (let k = 0; k < 4000 && !sx; k++) { const x = open.places.spawn.x + ((k * 37) % 400) - 200, y = open.places.spawn.y + Math.floor(k / 11) * 7 % 300 - 150; if (x > 20 && y > 20 && clear(x, y) && grassy(x, y)) { sx = x; sy = y; } }
+  assert.ok(sx, "somewhere open to try the tools");
+  const why = [], overlay = cleanOverlay({ v: 1, frame: 2, ops: [
+    { op: "terrain", x: sx, y: sy, r: 4, shape: "circle", mode: "raise", amount: 3, falloff: 0.5 },
+    { op: "terrain", x: sx, y: sy, r: 2, shape: "square", mode: "smooth", amount: 2, falloff: 0.3 },
+    { op: "terrain", x: sx + 12, y: sy, r: 3, shape: "circle", mode: "level", amount: 1, falloff: 0.4, target: 120 },
+    { op: "terrain", x: sx + 24, y: sy, r: 3, shape: "circle", mode: "lower", amount: 16, falloff: 0 },
+    { op: "terrain", x: sx, y: sy + 12, r: 3, shape: "circle", mode: "roughen", amount: 2, falloff: 0.2, seed: 7 },
+    { op: "slope", x0: sx, y0: sy + 20, x1: sx + 10, y1: sy + 20, w: 3, h0: 40, h1: 90 },
+    { op: "fill", x0: sx + 30, y0: sy + 30, x1: sx + 34, y1: sy + 34, t: T.ICE }, { op: "flood", x: sx + 32, y: sy + 32, t: T.SAND, limit: 1000 },
+    { op: "paint", x: sx + 40, y: sy, r: 2, shape: "circle", t: T.SNOW }, { op: "line", x0: sx + 40, y0: sy + 10, x1: sx + 50, y1: sy + 10, w: 3, t: T.PATH },
+    { op: "region", x0: sx + 40, y0: sy + 20, x1: sx + 42, y1: sy + 22, region: "frostpeak" },
+    { op: "scatter", uid: "wood", x: sx + 20, y: sy + 40, r: 6, kind: "tree", sub: "oak", density: 0.3, seed: 11 },
+    { op: "object", uid: "a-rock", kind: "decor", decor: "boulder", x: sx + 50, y: sy + 40 }, { op: "clear", x0: sx + 48, y0: sy + 38, x1: sx + 52, y1: sy + 42 },
+    { op: "terrain", x: sx, y: sy, r: 99, shape: "circle", mode: "raise", amount: 1, falloff: 0 }, { op: "terrain", x: sx, y: sy, r: 2, shape: "circle", mode: "dig", amount: 1, falloff: 0 },
+    { op: "flood", x: sx, y: sy, t: T.SAND, limit: 99_999 }, { op: "region", x0: 0, y0: 0, x1: 900, y1: 900, region: "coast" },
+  ] }, why);
+  assert.equal(overlay.ops.length, 14, "a brush too wide, an unknown mode, a flood too big and a region too wide are dropped"); assert.ok(why.some(w => /bad terrain/.test(w)) && why.some(w => /bad flood/.test(w)) && why.some(w => /bad region/.test(w)));
+  const fresh = createWorld(), plain = newGame({ world: createWorld() }).world, quick = newGame({ world: createWorld() }).world;
+  quick.ground = groundHeights(quick.tiles, WORLD_SEED, quick.lift, quick.raise, quick.base);
+  const problems = []; applyOverlay(plain, overlay, WORLD_SEED, problems); applyOverlay(quick, overlay, WORLD_SEED);
+  const tileHeight = (w, x, y) => (w.heights[y * CW + x] + w.heights[y * CW + x + 1] + w.heights[(y + 1) * CW + x] + w.heights[(y + 1) * CW + x + 1]) / 4;
+  assert.ok(tileHeight(plain, sx, sy) - tileHeight(fresh, sx, sy) > 30, `a raise of 3 steps stands up (${tileHeight(fresh, sx, sy).toFixed(1)} → ${tileHeight(plain, sx, sy).toFixed(1)})`);
+  assert.ok(Math.abs(tileHeight(plain, sx + 12, sy) - 120) < 3, `levelled to 120 (${tileHeight(plain, sx + 12, sy).toFixed(1)})`);
+  assert.ok(Math.abs(tileHeight(plain, sx + 10, sy + 20) - 90) < 8 && Math.abs(tileHeight(plain, sx, sy + 20) - 40) < 8, "a slope from 40 to 90");
+  assert.ok(plain.base.every(v => v >= 0 && v <= FLOOR_MAX && Math.round(v * 64) === v * 64), "the floor stays in the bake's range, in its 1/64 steps (dug as low as it goes, no lower)");
+  assert.equal(plain.tiles[(sy + 32) * W + sx + 32], T.SAND); assert.equal(plain.tiles[(sy + 30) * W + sx + 34], T.SAND, "the flood fills the connected ground");
+  assert.equal(plain.tiles[sy * W + sx + 40], T.SNOW); assert.equal(plain.tiles[(sy + 10) * W + sx + 45], T.PATH); assert.equal(plain.region[(sy + 21) * W + sx + 41], regionIndex("frostpeak"));
+  const scattered = plain.objects.filter(o => o.tree === "oak" && Math.hypot(o.x - sx - 20, o.y - sy - 40) <= 6.5 && !fresh.objects.some(f => f.x === o.x && f.y === o.y)).length;
+  assert.ok(scattered > 3, `a scatter of oaks (${scattered})`); assert.ok(plain.objectAt[(sy + 40) * W + sx + 50] < 0, "cleared");
+  assert.equal(quick.objects.filter(o => o.tree === "oak").length, plain.objects.filter(o => o.tree === "oak").length, "the same scatter every time");
+  assert.ok(quick.heights.every((v, i) => v === plain.heights[i]), "the quick rebuild matches the full one");
+  const baked = buildHeights(plain.tiles, WORLD_SEED, plain.lift, plain.raise, plain.base, plain.buildings);
+  assert.ok(baked.every((v, i) => v === plain.heights[i]), "built again from its tiles and its floor (what the bake keeps), the world stands exactly as it was seen");
+});
+
 test("The four smithed families: recipes at the anvil from the ordinary metals; a prospector's pick mines surer and doubles ore; hardware cuts the boatmen's fares; a resonance fitting makes a carving stand longer, once", async () => {
   const { fare, DOCKS } = await import("../games/rarefriends-realm/boats.ts");
   const { fitCarving, setCarving } = await import("../games/rarefriends-realm/engine.ts");

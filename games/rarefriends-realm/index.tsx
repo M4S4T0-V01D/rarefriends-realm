@@ -20,7 +20,7 @@ import { logoSvg } from "./logo.ts";
 
 /** The Realm's logo on the title screen: the castle shield and RAREFRIENDS REALM, in pixels (logo.ts). */
 const TITLE_LOGO = logoSvg("horizontal");
-import { HIGH_QUALITY, PITCH, RENDER_PROFILE, VIEW, ZOOM, addPrint, daylight, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
+import { HIGH_QUALITY, MAP_COLORS, PITCH, RENDER_PROFILE, VIEW, ZOOM, addPrint, daylight, minimapTile, northAngle, pickAt, renderMinimap, renderScene, toScreen, toTile, type Camera, type ClickMarker, type Firework, type HitSplat } from "./render.ts";
 import {
   BankModal, BoatModal, CardsModal, SupplyModal, VesselNameModal, CarvingBuffs, MountOrb, FeedbackModal, ChatBox, ContextMenu, DailyModal, FellowshipModal, HomeModal, JoinModal, RfActionModal, FirstStepsCard, GuideModal, TradeModal, DialogueBox, FriendPortrait, HelpModal, LampModal, NamingModal, LevelUpBox, Modal, Orbs, PixelIcon, ProductionBox, ShopModal, SidePanel, TABS, WorldMapModal,
   cancelLongPress, longPress, rightClick, NerdSettings, LanguagePicker, customFrom, type CustomGraphics, type MenuEntry, type Settings, type Tab, CampCacheModal, HoldModal, MOUNT_FROM } from "./panels.tsx";
@@ -31,7 +31,9 @@ import { Trades } from "./trade.ts";
 import { FELLOW_RANGE, PARTY_RANGE, Party, nearby } from "./party.ts";
 import { makeSaveCode, restoreSaveCode } from "./savecode.ts";
 import { strikeAt, weatherAt, type Weather } from "./weather.ts";
-import { DEV_CATALOG, DEV_MODE, DEV_PICK, DEV_REPORT, DEV_TELEPORT, DEV_WORLD } from "./roster.ts";
+import { DEV_CATALOG, DEV_COMMAND, DEV_FIND, DEV_MAP, DEV_MODE, DEV_PICK, DEV_REPORT, DEV_STATE, DEV_TELEPORT, DEV_WORLD } from "./roster.ts";
+import { devCommand, devFind, devMapImage, devState } from "./devtools.ts";
+import { devFlags } from "./devflags.ts";
 import { catalog as devCatalog, isDevFrame, keepPristine, pick as devPick, rebuildWorld } from "./devlayer.ts";
 import { cleanOverlay } from "./overlay.ts";
 import { SETTINGS_STATE, SETTINGS_WRITE, parseRenderer, type RendererMode, CLOUD_ACTION, CLOUD_STATE, FEEDBACK_REQUEST, FEEDBACK_RESULT, FULLSCREEN_REQUEST, FULLSCREEN_STATE, JOIN_INVITE, TEXT_COPY, TEXT_COPY_RESULT, HOST_HELLO, HOST_STATE, SAVE_ELSEWHERE, SAVE_EXPORT, SAVE_EXPORT_RESULT, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, parseCloudState, parseRoster, type CloudAction, type CloudState, type ShareAction, type ShareOutcome } from "./roster.ts";
@@ -186,7 +188,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const lastMinimapPoint = useRef<React.MouseEvent<HTMLCanvasElement> | null>(null);
   const [snapshot, setSnapshot] = useState<GameSnapshot | null>(null), [busy, setBusy] = useState(false), [casketError, setCasketError] = useState(""), [reveal, setReveal] = useState<CasketResult[] | null>(null);
   const [size, setSize] = useState({ width: 960, height: 640, scale: 1 }), [sideOpen, setSideOpen] = useState(true), [fullscreen, setFullscreen] = useState(false), [pip, setPip] = useState(false), [shareStatus, setShareStatus] = useState(""), [feedbackStatus, setFeedbackStatus] = useState(""), [cardUrl, setCardUrl] = useState<string | null>(null), [collectibleUrl, setCollectibleUrl] = useState<string | null>(null);
-  const devFrame = isDevFrame(), devEdit = useRef(false), devOverlay = useRef(cleanOverlay(null, [])), devRebuild = useRef<number | null>(null);
+  const devFrame = isDevFrame(), devEdit = useRef(false), devOverlay = useRef(cleanOverlay(null, [])), devRebuild = useRef<number | null>(null), devDrag = useRef<string | null>(null);
   const pendingSave = useRef<unknown>(null), cardBlob = useRef<Blob | null>(null), collectibleBlob = useRef<Blob | null>(null), generation = useRef<number | null>(null), resizeRef = useRef<() => void>(() => {}), saveNow = useRef<(claim?: boolean, importHash?: string) => void>(() => {});
   const [cloud, setCloud] = useState<CloudState | null>(null), cloudWas = useRef<CloudState["status"] | null>(null), milestone = useRef("");
   /** Logged out: back on the title screen with the adventure saved. */
@@ -446,6 +448,16 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           return;
         }
         if (event.data?.type === DEV_MODE) { devEdit.current = event.data.edit === true; return; }
+        // The dashboard's commands (devtools.ts): what they did goes back to its log; the time and the weather are the page's.
+        if (event.data?.type === DEV_COMMAND && state) {
+          const done = devCommand(state, event.data.command);
+          if (done.effect && "time" in done.effect) fixedTime = done.effect.time ?? null;
+          if (done.effect?.weather) fixedWeather = done.effect.weather === "auto" ? null : { rain: done.effect.weather === "rain" || done.effect.weather === "storm" ? 1 : 0, storm: done.effect.weather === "storm", fog: done.effect.weather === "fog" ? 1 : 0 };
+          if ((event.data.command as { cmd?: string } | null)?.cmd === "teleport") { const at = realPoint(state.world, state.player.x, state.player.y); camera.current.x = at.x; camera.current.y = at.y; state.player.target = null; }
+          refresh(); window.parent.postMessage({ type: DEV_COMMAND, said: done.said }, "*"); return;
+        }
+        if (event.data?.type === DEV_FIND && state) { window.parent.postMessage({ type: DEV_FIND, found: devFind(state, String(event.data.query ?? "")) }, "*"); return; }
+        if (event.data?.type === DEV_MAP && state) { window.parent.postMessage({ type: DEV_MAP, url: devMapImage(state.world, MAP_COLORS) }, "*"); return; }
         if (event.data?.type === DEV_TELEPORT && state && typeof event.data.x === "number" && typeof event.data.y === "number") { const p = state.player; p.x = Math.round(event.data.x); p.y = Math.round(event.data.y); p.prev = { x: p.x, y: p.y }; p.path = []; p.target = null; const at = realPoint(state.world, p.x, p.y); camera.current.x = at.x; camera.current.y = at.y; refresh(); return; }
       }
       if (event.data?.type !== HOST_STATE) return;
@@ -493,6 +505,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
       if (pendingSave.current) { applyHost(pendingSave.current as { ids?: unknown; save?: unknown }); pendingSave.current = null; }
       window.parent.postMessage({ type: HOST_HELLO, friend: friendId.toString() }, "*");
       if (devFrame) { keepPristine(); window.parent.postMessage({ type: DEV_CATALOG, catalog: devCatalog(state) }, "*"); }
+      // (The dashboard's view of the game, twice a second.)
+      if (devFrame) { const timer = window.setInterval(() => { const now = game.current; if (!now || version !== epoch.current) { clearInterval(timer); return; } window.parent.postMessage({ type: DEV_STATE, state: devState(now) }, "*"); }, 500); }
     }).catch(() => { if (version === epoch.current) { setPhase("failed"); setStatus("Your Friend's artwork couldn't be loaded. Check your connection and try again."); } });
     return () => { clearTimeout(hostTimer); window.removeEventListener("message", receive); audio.current?.dispose(); audio.current = null; };
   }, [friendId, client]);
@@ -513,6 +527,8 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     const save = (claim?: unknown, importHash?: unknown) => {
       const state = game.current, claiming = claim === true;
       if (!state || !linked.current || (elsewhere.current && !claiming) || live.current.phase !== "playing") return;
+      // (A development session changed by hand, devtools.ts, is never saved.)
+      if (devFlags.sandbox) return;
       const data = serialize(state), raw = JSON.stringify(data);
       if (raw === lastSave.current && !claiming) return;
       if (elsewhere.current) { elsewhere.current = false; setHosted("linked"); }
@@ -590,7 +606,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
             }
           }
           // Playing together: tell the others where we are, follow whoever we're following, and count friends nearby.
-          if (players.current.state.status !== "offline") window.parent.postMessage({ type: NET_PRESENCE, presence: presenceOf(state) }, "*");
+          if (players.current.state.status !== "offline" && !devFlags.sandbox) window.parent.postMessage({ type: NET_PRESENCE, presence: presenceOf(state) }, "*");
           state.player.nearFriends = players.current.nearFriends(state);
           if (state.player.fellowship && state.tick % 10 === 0) { const tag = state.player.fellowship.tag, day = Math.floor(Date.now() / 86_400_000), seen = state.player.fellowship.seen ?? (state.player.fellowship.seen = {}); for (const peer of players.current.state.peers) if (peer.tag === tag) seen[peer.id] = day; }
           { const peers = players.current.state.peers, tag = state.player.fellowship?.tag ?? null; state.player.nearParty = nearby(state, peers, peer => party.current.members.has(peer.id), PARTY_RANGE); state.player.nearFellows = tag ? nearby(state, peers, peer => peer.tag === tag && !party.current.members.has(peer.id), FELLOW_RANGE) : 0; party.current.tidy(performance.now()); }
@@ -864,6 +880,11 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const onPointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
     if (!game.current || phase !== "playing") return;
     const p = logicalPoint(event.clientX, event.clientY); pointer.current = p;
+    if (devDrag.current && devEdit.current && event.buttons & 1) {
+      const tile = toTile(camera.current, p.x, p.y), key = `${tile.x},${tile.y}`;
+      if (key !== devDrag.current) { devDrag.current = key; window.parent.postMessage({ type: DEV_PICK, pick: devPick(game.current, tile.x, tile.y, devOverlay.current), button: 0, shift: event.shiftKey, drag: true }, "*"); }
+      return;
+    }
     // Middle-button drag turns (left/right) and tilts (up/down) the camera.
     if (orbit.current && event.buttons & 4) {
       const start = orbit.current; cameraGoal.current = null;
@@ -880,7 +901,12 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     canvas.current?.focus({ preventScroll: true });
     const p = logicalPoint(event.clientX, event.clientY);
     // The development game in edit mode: a click reports the tile to the host's editor instead of acting (the middle button still orbits).
-    if (devEdit.current && event.button !== 1 && game.current) { const tile = toTile(camera.current, p.x, p.y); window.parent.postMessage({ type: DEV_PICK, pick: devPick(game.current, tile.x, tile.y, devOverlay.current), button: event.button, shift: event.shiftKey }, "*"); return; }
+    if (devEdit.current && event.button !== 1 && game.current) {
+      const tile = toTile(camera.current, p.x, p.y); window.parent.postMessage({ type: DEV_PICK, pick: devPick(game.current, tile.x, tile.y, devOverlay.current), button: event.button, shift: event.shiftKey }, "*");
+      // (Held, the left button keeps brushing: every new tile the pointer crosses is a drag pick.)
+      if (event.button === 0) { devDrag.current = `${tile.x},${tile.y}`; canvas.current?.setPointerCapture(event.pointerId); }
+      return;
+    }
     if (event.button === 1) { event.preventDefault(); orbit.current = { x: p.x, y: p.y, angle: camera.current.angle, pitch: camera.current.pitch }; canvas.current?.setPointerCapture(event.pointerId); return; }
     if (event.pointerType === "touch") { longPress(() => openContext(p.x, p.y)); touchStart.current = { ...p, at: performance.now() }; return; }
     if (event.button === 0) {
@@ -911,6 +937,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
     if (was && game.current) setHeld(game.current, heldDirection(held.current, camera.current.angle));
   };
   const onPointerUp = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (devDrag.current) { devDrag.current = null; return; }
     if (event.button === 1) { orbit.current = null; return; }
     if (event.button === 0 && mouseWalk.current) { endMouseWalk(); return; }
     if (event.pointerType !== "touch" || !touchStart.current) return;

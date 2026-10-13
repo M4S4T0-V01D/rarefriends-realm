@@ -4,6 +4,10 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 134, date: "2026-10-13", title: "Water and land", items: [
+    "Water now lies below the land: every shore has a bank of earth down to the water, so lakes, rivers and seas read as water, not as ground of another colour.",
+    "In the WebGL rendering mode the water is new: pale shallows by the shore deepening to dark water, a swell with light running along it, the odd glint, and foam washing along the banks.",
+  ] },
   { id: 133, date: "2026-10-13", title: "The Farwake Guild and the Freeholds Compact", items: [
     "The True Chart (Guildmaster Torvald, Skarnholm): the Grey Heron wrecked on a reef her Farwake chart left off. Sail out to her wreck in Skarnholm Bay, take soundings at the survey cairns on the bay's islands, and decide what the guild does with the true chart: give it away, sell it to anyone, or keep it the guild's.",
     "The Free Weight (Speaker Zdenka, Bereslav): the princes' tithe-scale at Zlatna Gora weighs a tenth that's really an eighth. Test it, hear the reeve and the miners, help cast the Compact's own free weight, and decide: pay on honest scales, refuse the tithe (the Compact's stores open in Bereslav), or let the miners strike.",

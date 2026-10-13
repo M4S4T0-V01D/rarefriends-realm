@@ -39,6 +39,7 @@ import { studySeal } from "./dynasties.ts";
 import { cleanTrails } from "./wayfinding.ts";
 import { dyeSails, hasFitout } from "./shipfit.ts";
 import { cleanStanding } from "./northfactions.ts";
+import { devFlags } from "./devflags.ts";
 import { blessingFood, blessingHerb, blessingRegen, blessingTaken, blessingTick, cleanBlessing, rememberedName, saveBlessing } from "./northfaith.ts";
 import { allyOf, callNext, cleanCompanions, cleanTrust, findsHerbs, canSpare, companionFell, companionMenu, companionOut, companionTick, drawsFire, freeSnared, homeOnDeath, placeCompanion, sendHome, spare, speciesOfWild, useOnCreature } from "./beasts.ts";
 import { launchCarried, VESSELS, aboard, applyVessels, berthRespawn, canStow, cleanVessels, fitToVessel, goAshore, holdAt, nearestLanding, ringBell, sailable, sailed, settleAboard, stowInHold, vesselTick } from "./seafaring.ts";
@@ -54,7 +55,7 @@ export { createGame };
 
 // ---------- Movement ----------
 export function fireAt(game: Game, x: number, y: number) { return game.fires.find(fire => fire.x === x && fire.y === y) ?? null; }
-export function canWalk(game: Game, x: number, y: number) { return game.player.aboard !== null ? sailable(game, x, y) : walkable(game.world, x, y) && !fireAt(game, x, y); }
+export function canWalk(game: Game, x: number, y: number) { if (devFlags.noclip) return x >= 0 && y >= 0 && x < W && y < H; return game.player.aboard !== null ? sailable(game, x, y) : walkable(game.world, x, y) && !fireAt(game, x, y); }
 function canStep(game: Game, x: number, y: number, dx: number, dy: number) {
   if (!canWalk(game, x + dx, y + dy)) return false;
   if (dx && dy) return canWalk(game, x + dx, y) && canWalk(game, x, y + dy);
@@ -1310,6 +1311,8 @@ export function successChance(skillLevel: number, low: number, high: number) {
 export function tick(game: Game) {
   updateFirstSteps(game);
   game.tick++; game.playTicks++;
+  // (The development game's god mode, devflags.ts: whatever else hurts, you stay whole.)
+  if (devFlags.god) game.player.hp = Math.max(game.player.hp, maxHp(game.player));
   arenaTick(game);
   activityTick(game);
   const player = game.player;
@@ -1934,6 +1937,7 @@ export const fireFactor = (player: Player, game?: Game) => (1 - 0.05 * orderPiec
 export const thorns = (player: Player) => setPieces(player, "bramble");
 function damagePlayer(game: Game, damage: number, from: Monster | null) {
   const player = game.player;
+  if (devFlags.god) damage = 0;
   if (player.ward?.reduce && game.tick < player.wardUntil && damage > 0) damage = Math.max(0, Math.round(damage * (1 - player.ward.reduce)));
   // A carving's shelter (an oak bulwark, a yew warden…).
   if (damage > 0 && game.carvings.length) { const taken = carvingEffect(game).taken; if (taken) damage = Math.max(0, Math.round(damage * (1 - taken))); }

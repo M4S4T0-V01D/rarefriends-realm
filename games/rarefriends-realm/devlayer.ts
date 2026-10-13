@@ -8,7 +8,7 @@ import { ITEM_LIST, MONSTERS, ROCKS, SKILLS, TREES } from "./data.ts";
 import { NPCS, QUESTS, registerDevQuest } from "./content.ts";
 import { applyCamp, setDevCampZones } from "./camping.ts";
 import { applyVessels } from "./seafaring.ts";
-import { DECOR_NAMES, T, W, WORLD_SEED, groundHeights, regionAt, type World } from "./world.ts";
+import { DECOR_NAMES, REGIONS, T, W, WORLD_SEED, cornerHeight, groundHeights, regionAt, type World } from "./world.ts";
 import { applyOverlay, registerDefinitions, validatePlacements, type Overlay, type Placed } from "./overlay.ts";
 import { realmWorld, setSharedWorld, spawnCreatures, type Game } from "./state.ts";
 import { applyHome } from "./housing.ts";
@@ -55,7 +55,7 @@ export function catalog(game: Game): DevCatalog {
     npcs: Object.values(NPCS).map(n => ({ id: n.id, name: n.name })), monsters: Object.values(MONSTERS).map(m => ({ id: m.id, name: m.name, level: m.level, art: m.art })),
     items: ITEM_LIST.map(i => ({ id: i.id, name: i.name })), skills: [...SKILLS], quests: QUESTS.map(q => ({ id: q.id, name: q.name })),
     kinds: uniq(["decor", "tree", "rock", "spot", "furnace", "anvil", "range", "altar", "bank", "ladder", "sign", "well", "chest", ...game.world.objects.map(o => o.kind)]),
-    spawn: { ...game.world.places.spawn },
+    spawn: { ...game.world.places.spawn }, regions: REGIONS.map(r => ({ id: r.id, name: r.name })),
   };
 }
 /** What's under a tile, for the editor's inspector. */
@@ -65,5 +65,7 @@ export function pick(game: Game, x: number, y: number, overlay: Overlay): DevPic
   const b = world.buildingAt[i] ? world.buildings[world.buildingAt[i] - 1] : null, bindex = world.buildingAt[i] - 1;
   // (The lift shown is the editor's raise on the tile, in steps.)
   const raised = [...overlay.ops].reverse().find(op => op.op === "lift" && op.x === x && op.y === y);
-  return { x, y, tile: world.tiles[i], lift: raised?.op === "lift" ? raised.v : 0, object: object ? { id, kind: object.kind, name: object.name, ...(uid ? { uid } : {}) } : null, building: b ? { index: bindex, name: b.name } : null, region: regionAt(world, x, y).name };
+  // (The height is the tile's, the average of its corners; the floor is the land's own under it, which the ground ops move.)
+  const height = (cornerHeight(world, x, y) + cornerHeight(world, x + 1, y) + cornerHeight(world, x, y + 1) + cornerHeight(world, x + 1, y + 1)) / 4;
+  return { x, y, tile: world.tiles[i], lift: raised?.op === "lift" ? raised.v : 0, height, base: world.base?.[i] ?? 0, object: object ? { id, kind: object.kind, name: object.name, ...(uid ? { uid } : {}) } : null, building: b ? { index: bindex, name: b.name } : null, region: regionAt(world, x, y).name };
 }

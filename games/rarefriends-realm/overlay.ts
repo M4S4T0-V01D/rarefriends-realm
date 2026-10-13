@@ -10,7 +10,8 @@
  * module has no DOM: the engine, the bake and the tests all load it.
  */
 import { ITEM_LIST, MONSTERS, type MonsterDef, type RockKind, type SpotKind, type TreeKind } from "./data.ts";
-import { DECOR_NAMES, FLOOR_Y, H, OVERWORLD_H, ROOF_COLORS, T, TREE_NAMES, W, WALKABLE, buildHeights, groundHeights, indexBuildings, levelBuildings, indexObjects, type Building, type DecorKind, type ObjectKind, type World, type WorldObject } from "./world.ts";
+import { BRUSH_MAX, FLOOD_MAX, LINE_WIDTH_MAX, REGION_TILES_MAX, scatterable, applyPaint, applyTerrain, tileHash, type PaintOp, type TerrainMode, type TerrainOp } from "./terrainops.ts";
+import { DECOR_NAMES, FLOOR_Y, H, OVERWORLD_H, ROOF_COLORS, T, TREE_NAMES, W, WALKABLE, groundHeights, indexBuildings, levelBuildings, indexObjects, type Building, type DecorKind, type ObjectKind, type World, type WorldObject } from "./world.ts";
 
 /** An NPC an overlay defines: who they are, and what they say (plain lines; the game's own people have scripted talk). */
 export type OverlayNpc = { id: string; name: string; examine: string; options: readonly string[]; art: { canonical: 7730 | 3412 } | { family: number; seed: number }; lines?: string[] };
@@ -37,7 +38,11 @@ export type Op =
   | { op: "npc"; def: OverlayNpc }
   | { op: "item"; def: (typeof ITEM_LIST)[number] }
   | { op: "quest"; def: OverlayQuest }
-  | { op: "campzone"; uid: string; x0: number; y0: number; x1: number; y1: number; allow: boolean; why?: string };
+  | { op: "campzone"; uid: string; x0: number; y0: number; x1: number; y1: number; allow: boolean; why?: string }
+  | TerrainOp | PaintOp
+  | { op: "scatter"; uid: string; x: number; y: number; r: number; kind: "tree" | "rock" | "decor"; sub?: string; density: number; seed: number }
+  | { op: "clear"; x0: number; y0: number; x1: number; y1: number };
+export type { TerrainMode };
 /** `frame: 2`: written in the grown world (after the north); an overlay without it is from before, and is moved down with the world when it's read (northframe.ts). */
 export type Overlay = { v: 1; frame?: 2; name?: string; ops: Op[] };
 export const emptyOverlay = (name = "Development world"): Overlay => ({ v: 1, frame: 2, name, ops: [] });
@@ -96,6 +101,18 @@ export function cleanOverlay(raw: unknown, why: string[] = []): Overlay {
         out.ops.push({ op: "quest", def: { id: d.id as string, name: d.name as string, giver: d.giver as string, item: d.item as string, count: Math.floor(d.count as number), offer: d.offer as string[], accept: d.accept as string, progress: d.progress as string, done: d.done as string[], ...(NUM(d.points, 0, 5) ? { points: Math.floor(d.points as number) } : {}), ...(TEXT(d.difficulty, 20) ? { difficulty: d.difficulty as string } : {}), rewards } }); break;
       }
       case "campzone": if (UID(op.uid) && NUM(op.x0, 0, W - 1) && NUM(op.y0, 0, H - 1) && NUM(op.x1, 0, W - 1) && NUM(op.y1, 0, H - 1) && typeof op.allow === "boolean") out.ops.push({ op: "campzone", uid: op.uid as string, x0: Math.min(op.x0 as number, op.x1 as number), y0: Math.min(op.y0 as number, op.y1 as number), x1: Math.max(op.x0 as number, op.x1 as number), y1: Math.max(op.y0 as number, op.y1 as number), allow: op.allow, ...(TEXT(op.why, 120) && op.why ? { why: op.why as string } : {}) }); else bad("bad campzone"); break;
+      case "terrain": {
+        const modes: readonly string[] = ["raise", "lower", "flatten", "level", "smooth", "roughen"];
+        if (!inWorld || !NUM(op.r, 0, BRUSH_MAX) || (op.shape !== "circle" && op.shape !== "square") || !modes.includes(op.mode as string) || !NUM(op.amount, 0, 16) || !NUM(op.falloff, 0, 1) || (op.target !== undefined && !NUM(op.target, -100, 2000))) { bad("bad terrain"); break; }
+        out.ops.push({ op: "terrain", x: op.x as number, y: op.y as number, r: Math.floor(op.r as number), shape: op.shape, mode: op.mode as TerrainMode, amount: op.amount as number, falloff: op.falloff as number, ...(op.target !== undefined ? { target: op.target as number } : {}), ...(NUM(op.seed, -2147483648, 2147483647) ? { seed: Math.floor(op.seed as number) } : {}) }); break;
+      }
+      case "slope": if (NUM(op.x0, 0, W - 1) && NUM(op.y0, 0, H - 1) && NUM(op.x1, 0, W - 1) && NUM(op.y1, 0, H - 1) && NUM(op.w, 1, LINE_WIDTH_MAX) && NUM(op.h0, -100, 2000) && NUM(op.h1, -100, 2000) && Math.hypot((op.x1 as number) - (op.x0 as number), (op.y1 as number) - (op.y0 as number)) <= 400) out.ops.push({ op: "slope", x0: op.x0 as number, y0: op.y0 as number, x1: op.x1 as number, y1: op.y1 as number, w: op.w as number, h0: op.h0 as number, h1: op.h1 as number }); else bad("bad slope"); break;
+      case "paint": if (inWorld && NUM(op.r, 0, BRUSH_MAX) && (op.shape === "circle" || op.shape === "square") && TILES.has(op.t as number)) out.ops.push({ op: "paint", x: op.x as number, y: op.y as number, r: Math.floor(op.r as number), shape: op.shape, t: op.t as number }); else bad("bad paint"); break;
+      case "flood": if (inWorld && TILES.has(op.t as number) && NUM(op.limit, 1, FLOOD_MAX)) out.ops.push({ op: "flood", x: op.x as number, y: op.y as number, t: op.t as number, limit: Math.floor(op.limit as number) }); else bad("bad flood"); break;
+      case "line": if (NUM(op.x0, 0, W - 1) && NUM(op.y0, 0, H - 1) && NUM(op.x1, 0, W - 1) && NUM(op.y1, 0, H - 1) && NUM(op.w, 1, LINE_WIDTH_MAX) && TILES.has(op.t as number) && Math.hypot((op.x1 as number) - (op.x0 as number), (op.y1 as number) - (op.y0 as number)) <= 800) out.ops.push({ op: "line", x0: op.x0 as number, y0: op.y0 as number, x1: op.x1 as number, y1: op.y1 as number, w: op.w as number, t: op.t as number }); else bad("bad line"); break;
+      case "region": if (NUM(op.x0, 0, W - 1) && NUM(op.y0, 0, H - 1) && NUM(op.x1, 0, W - 1) && NUM(op.y1, 0, H - 1) && TEXT(op.region, 32) && (Math.abs((op.x1 as number) - (op.x0 as number)) + 1) * (Math.abs((op.y1 as number) - (op.y0 as number)) + 1) <= REGION_TILES_MAX) out.ops.push({ op: "region", x0: op.x0 as number, y0: op.y0 as number, x1: op.x1 as number, y1: op.y1 as number, region: op.region as string }); else bad("bad region"); break;
+      case "scatter": if (inWorld && UID(op.uid) && NUM(op.r, 1, BRUSH_MAX) && (op.kind === "tree" || op.kind === "rock" || op.kind === "decor") && (op.sub === undefined || TEXT(op.sub, 32)) && NUM(op.density, 0.01, 1) && NUM(op.seed, 0, 2147483647)) out.ops.push({ op: "scatter", uid: op.uid as string, x: op.x as number, y: op.y as number, r: Math.floor(op.r as number), kind: op.kind, ...(op.sub ? { sub: op.sub as string } : {}), density: op.density as number, seed: Math.floor(op.seed as number) }); else bad("bad scatter"); break;
+      case "clear": if (NUM(op.x0, 0, W - 1) && NUM(op.y0, 0, H - 1) && NUM(op.x1, 0, W - 1) && NUM(op.y1, 0, H - 1) && (Math.abs((op.x1 as number) - (op.x0 as number)) + 1) * (Math.abs((op.y1 as number) - (op.y0 as number)) + 1) <= LIMITS.fillTiles) out.ops.push({ op: "clear", x0: Math.min(op.x0 as number, op.x1 as number), y0: Math.min(op.y0 as number, op.y1 as number), x1: Math.max(op.x0 as number, op.x1 as number), y1: Math.max(op.y0 as number, op.y1 as number) }); else bad("bad clear"); break;
       default: bad("unknown op");
     }
   }
@@ -135,7 +152,7 @@ export function applyOverlay(world: World, overlay: Overlay, seed: number, why: 
   let tilesChanged = false, objectsChanged = false, buildingsChanged = false;
   // The rectangle of tiles changed (so the development frame rebuilds just the ground round it), and the raises by tile.
   const box = { x0: W, y0: H, x1: -1, y1: -1 }, touch = (x0: number, y0: number, x1: number, y1: number) => { box.x0 = Math.min(box.x0, x0, x1); box.y0 = Math.min(box.y0, y0, y1); box.x1 = Math.max(box.x1, x0, x1); box.y1 = Math.max(box.y1, y0, y1); };
-  const heave = new Map<number, number>();
+  const heave = new Map<number, number>(), terrain: TerrainOp[] = [];
   const removeAt = (x: number, y: number) => {
     const id = world.objectAt[index(x, y)];
     if (id >= 0) { world.objects[id] = { ...world.objects[id], kind: "decor", decor: "flowers", blocks: false, name: "__removed" }; world.objectAt[index(x, y)] = -1; objectsChanged = true; }
@@ -145,6 +162,19 @@ export function applyOverlay(world: World, overlay: Overlay, seed: number, why: 
     else if (op.op === "fill") { for (let y = Math.min(op.y0, op.y1); y <= Math.max(op.y0, op.y1); y++) for (let x = Math.min(op.x0, op.x1); x <= Math.max(op.x0, op.x1); x++) world.tiles[index(x, y)] = op.t; tilesChanged = true; touch(op.x0, op.y0, op.x1, op.y1); }
     else if (op.op === "lift") { if (op.v > 0) heave.set(index(op.x, op.y), op.v); else heave.delete(index(op.x, op.y)); tilesChanged = true; touch(op.x - 2, op.y - 2, op.x + 2, op.y + 2); }
     else if (op.op === "remove") removeAt(op.x, op.y);
+    else if (op.op === "paint" || op.op === "flood" || op.op === "line" || op.op === "region") { applyPaint(world, op, touch, why); if (op.op !== "region") tilesChanged = true; }
+    else if (op.op === "terrain" || op.op === "slope") terrain.push(op);
+    else if (op.op === "clear") { for (let y = op.y0; y <= op.y1; y++) for (let x = op.x0; x <= op.x1; x++) removeAt(x, y); }
+    else if (op.op === "scatter") {
+      // Things scattered on open ground in the brush, one tile in so many (the same ones every time, from the seed); none on a taken tile.
+      const kinds = op.kind === "tree" ? Object.keys(TREE_NAMES) : op.kind === "decor" ? SCATTER_DECOR : SCATTER_ROCKS, at = (n: number) => kinds[Math.floor(n * kinds.length) % kinds.length];
+      for (let y = Math.max(0, op.y - op.r); y <= Math.min(H - 1, op.y + op.r); y++) for (let x = Math.max(0, op.x - op.r); x <= Math.min(W - 1, op.x + op.r); x++) {
+        if (Math.hypot(x - op.x, y - op.y) > op.r + 0.5 || tileHash(x, y, op.seed) >= op.density || !scatterable(world.tiles[index(x, y)]) || world.objectAt[index(x, y)] >= 0 || world.buildingAt[index(x, y)]) continue;
+        const sub = op.sub ?? at(tileHash(y, x, op.seed + 1)), name = op.kind === "decor" ? DECOR_NAMES[sub as DecorKind] ?? "Thing" : op.kind === "tree" ? TREE_NAMES[sub as TreeKind] ?? "Tree" : "Rocks";
+        const object: WorldObject = { id: world.objects.length, kind: op.kind, x, y, name, blocks: !(op.kind === "decor" && (sub === "flowers" || sub === "lily" || sub === "reeds")), [op.kind]: sub } as WorldObject;
+        world.objects.push(object); world.objectAt[index(x, y)] = object.id; objectsChanged = true;
+      }
+    }
     else if (op.op === "object") {
       if (world.objectAt[index(op.x, op.y)] >= 0) { why.push(`${op.uid}: the tile ${op.x},${op.y} is taken`); continue; }
       const name = op.name ?? (op.kind === "decor" && op.decor ? DECOR_NAMES[op.decor] : op.kind === "tree" && op.tree ? TREE_NAMES[op.tree as TreeKind] : op.kind === "rock" ? "Rocks" : op.kind[0].toUpperCase() + op.kind.slice(1));
@@ -181,17 +211,23 @@ export function applyOverlay(world: World, overlay: Overlay, seed: number, why: 
       if (total) floor[index(x, y)] += total / 25 * HEAVE_STEP;
     }
   }
-  if (tilesChanged) {
+  const clip = (b: { x0: number; y0: number; x1: number; y1: number }) => ({ x0: Math.max(0, b.x0), y0: Math.max(0, b.y0), x1: Math.min(W - 1, b.x1), y1: Math.min(H - 1, b.y1) });
+  if (tilesChanged || terrain.length) {
     // (The development frame keeps the ground before the buildings were levelled: only the corners round the change are worked out again.)
-    if (world.ground && box.x1 >= 0) {
-      const ground = world.ground = groundHeights(world.tiles, seed, lift, raise, world.base, { x0: Math.max(0, box.x0), y0: Math.max(0, box.y0), x1: Math.min(W - 1, box.x1), y1: Math.min(H - 1, box.y1) }, new Float32Array(world.ground));
-      world.heights = new Float32Array(ground); levelBuildings(world.heights, world.buildings);
-    } else world.heights = buildHeights(world.tiles, seed, lift, raise, world.base, world.buildings);
+    let ground = world.ground && box.x1 >= 0 ? groundHeights(world.tiles, seed, lift, raise, world.base, clip(box), new Float32Array(world.ground))
+      : world.ground ? new Float32Array(world.ground) : groundHeights(world.tiles, seed, lift, raise, world.base);
+    // The ground ops move the floor; the corners over it are worked out again the same way the bake will (so it bakes as it's seen).
+    const moved = applyTerrain(world, ground, terrain);
+    if (moved) ground = groundHeights(world.tiles, seed, lift, raise, world.base, clip(moved), ground);
+    if (world.ground) world.ground = ground;
+    world.heights = world.ground ? new Float32Array(ground) : ground; levelBuildings(world.heights, world.buildings);
   }
   return placed;
 }
 
 /** Whether a tile can be walked on in a world (terrain and blocking objects; no creatures). */
+/** What a scatter of rocks or decorations picks from when it isn't told which. */
+const SCATTER_ROCKS = ["pewter", "clay", "blackiron"], SCATTER_DECOR = ["bush", "flowers", "reeds", "stump", "boulder"];
 export const walkableAt = (world: World, x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && WALKABLE.has(world.tiles[y * W + x]) && (world.objectAt[y * W + x] < 0 || !world.objects[world.objectAt[y * W + x]].blocks);
 /** Every tile on foot from a start (no corner cutting), as a bitmap; the editor's reachability check. */
 export function reachableFrom(world: World, sx: number, sy: number): Uint8Array {

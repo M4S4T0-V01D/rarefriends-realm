@@ -47,8 +47,9 @@ export type Lighting = {
   hazy: boolean; here: readonly [number, number]; start: number; end: number; haze: readonly number[]; sky: readonly number[]; windowGlow: number;
 };
 /**
- * Floats per ground vertex: x, y, h; u, v; layer; shade; edges; kind; and the texture layers of the ground it blends
- * into to the north, east, south and west (−1: an inked edge, or none).
+ * Floats per ground vertex: x, y, h; u, v; layer; shade; edges; kind (0 ground, 1 water, 2 deep water, 3 lava, 4 a
+ * bank down to the water); and the texture layers of the ground it blends into to the north, east, south and west (−1:
+ * an inked edge, or none). On water the shade is 10 plus the distance to the shore, in tiles.
  */
 export const GROUND_FLOATS = 13;
 /**
@@ -105,18 +106,39 @@ void main() {
     if (r < best) layer = best == w.x ? vBlend.x : best == w.y ? vBlend.y : best == w.z ? vBlend.z : vBlend.w;
   }
 #endif
-  vec3 color = texture(uGround, vec3(vUv, layer)).rgb + vShade;
-  // Water: slow ripples catching the light; lava: a pulsing glow.
+  vec3 color = texture(uGround, vec3(vUv, layer)).rgb + (vKind == 1 || vKind == 2 ? 0.0 : vShade);
   if (vKind == 1 || vKind == 2) {
-    float t = uTime;
-    float w = sin(vWorld.x * 2.3 + vWorld.y * 1.4 + t * 1.6) * sin(vWorld.y * 2.9 - vWorld.x * 0.8 + t * 1.1);
-    color += vec3(smoothstep(0.82, 0.98, w)) * (vKind == 2 ? 0.16 : 0.28);
+    // Water, on the texture's own pixel grid: pale shallows by the shore deepening to dark water out from it (the shade
+    // carries the distance to the shore), a swell of three wave trains crossing, crests catching the sky, the odd glint,
+    // and foam washing in and out along the banks.
+    float t = uTime, shore = clamp(vShade - 10.0, 0.0, 6.0);
+    vec2 cell = floor(vWorld * 16.0 + 8.0), q = cell / 16.0;
+    float depth = clamp(smoothstep(0.0, 4.5, shore) * 0.85 + (vKind == 2 ? 0.35 : 0.0), 0.0, 1.0);
+    vec3 water = mix(vec3(0.42, 0.72, 0.76), vec3(0.09, 0.22, 0.40), depth);
+    color = mix(color, water, 0.6);
+    float w1 = sin(dot(q, vec2(1.9, 1.1)) * 1.7 + t * 1.3), w2 = sin(dot(q, vec2(-1.3, 2.3)) * 1.9 - t * 1.05), w3 = sin(dot(q, vec2(3.1, -0.7)) * 2.6 + t * 2.1);
+    float wave = (w1 + w2 * 0.8 + w3 * 0.45) / 2.25;
+    color *= 0.95 + 0.07 * wave;
+    // Light on the swell: short bright dashes a texel thick along the wave rows, drifting and breaking with it.
+    float row = q.y * 3.0 + sin(q.x * 0.9 + t * 0.5) * 0.8 + wave * 0.5;
+    float dash = smoothstep(0.9, 0.98, sin(row * 3.14159)) * smoothstep(0.75, 0.97, sin(q.x * 3.7 - t * 0.8 + floor(row) * 2.3)) * step(0.35, fract(sin(floor(row) * 91.7 + floor(q.x * 0.6) * 13.1) * 437.5));
+    color += vec3(0.85, 0.94, 1.0) * dash * (0.16 + 0.08 * (1.0 - depth));
+    float n = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
+    color += vec3(step(0.985, n) * pow(max(0.0, sin(t * 2.6 + n * 60.0)), 14.0) * 0.6);
+    float lap = 0.5 + 0.28 * sin(t * 1.15 + vWorld.x * 0.7 + vWorld.y * 0.9), speck = fract(sin(dot(cell + floor(t * 2.0), vec2(39.3, 11.7))) * 9137.1);
+    float foam = (1.0 - smoothstep(lap * 0.55, lap, shore)) * (0.5 + 0.5 * step(0.45, speck));
+    color = mix(color, vec3(0.93, 0.96, 0.98), foam * 0.75);
+  } else if (vKind == 4) {
+    // A bank: the land's own ground turned down to the water, in its shadow, darker and wet towards its foot, a lap of foam at it.
+    float wet = smoothstep(0.4, 1.0, vUv.y), lap = 0.86 + 0.06 * sin(uTime * 1.6 + (vWorld.x + vWorld.y) * 2.7);
+    color = mix(color * 0.62, color * 0.38 + vec3(0.02, 0.04, 0.06), wet);
+    color = mix(color, vec3(0.92, 0.95, 0.97), step(lap, vUv.y) * 0.7);
   } else if (vKind == 3) {
     float glow = 0.5 + 0.5 * sin(uTime * 2.0 + vWorld.x * 1.3 + vWorld.y * 0.7);
     color = mix(color, vec3(0.98, 0.78 + glow * 0.15, 0.47), 0.25 + glow * 0.25);
   }
-  // Contour lines every 10 px of height, like a map's (not on water).
-  if (vKind != 1 && vKind != 2) {
+  // Contour lines every 10 px of height, like a map's (not on water, nor down a bank).
+  if (vKind != 1 && vKind != 2 && vKind != 4) {
     float level = vHeight / 10.0, band = abs(fract(level + 0.5) - 0.5) / max(fwidth(level), 1e-4);
     if (vHeight > 0.5) color = mix(color, vec3(0.086), (1.0 - smoothstep(0.0, 1.0, band)) * 0.16);
   }

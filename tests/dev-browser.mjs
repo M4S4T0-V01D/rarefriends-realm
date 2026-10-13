@@ -37,7 +37,7 @@ try {
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
   const origin = `http://127.0.0.1:${server.address().port}`;
   browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({ viewport: { width: 1320, height: 900 } }), page = await context.newPage();
+  const context = await browser.newContext({ viewport: { width: 1760, height: 1180 } }), page = await context.newPage();
   page.setDefaultTimeout(30_000);
   const errors = []; page.on("pageerror", error => { errors.push(error.message); console.log("page error:", error.message); }); page.on("console", entry => { if (entry.type() === "error") console.log("console error:", entry.text()); });
   await installFixture(page, origin, { artworkCall });
@@ -56,9 +56,10 @@ try {
   await page.getByRole("button", { name: /^Friend #7730\b/ }).click();
   const game = page.frameLocator("iframe");
   await game.locator('.realm-game[data-phase="title"]').waitFor();
-  const editor = page.getByRole("complementary", { name: "Development editor" });
+  // The dashboard round the game: the tools down the left (the editor), the panels down the right, the bar along the top.
+  const editor = page.getByRole("complementary", { name: "Development editor" }), panels = page.getByRole("complementary", { name: "Development panels" });
   await editor.waitFor();
-  await editor.getByText(/Loaded v3/).waitFor();
+  await page.getByText(/Loaded v3/).waitFor();
   const frame = () => page.frames().find(entry => entry !== page.mainFrame() && entry.url().includes("dev=1"));
   assert.ok(frame(), "the frame is opened as a development frame");
   await game.getByRole("button", { name: "Begin your adventure" }).click();
@@ -71,54 +72,87 @@ try {
   await frame().waitForFunction(([x, y]) => { const g = window.__realm?.game(); return !!g && g.world.objects.some(o => o.x === x && o.y === y && o.tree === "oak"); }, [spawn.x + 3, spawn.y]);
   const after = await frame().evaluate(() => window.__realm.game().world.objects.length);
   assert.ok(after >= before, "the world was rebuilt from the bake with the overlay");
-  await editor.getByText(/1 ops applied/).waitFor();
+  await page.getByText(/1 ops applied/).waitFor();
   // Edit mode: a click on the canvas reports what's under it instead of walking; play mode again walks.
-  await editor.getByRole("button", { name: /Play mode \(F2: edit\)/ }).click();
-  await editor.getByRole("button", { name: /Edit mode \(F2: play\)/ }).waitFor();
+  await page.getByRole("button", { name: /Play mode \(F2: edit\)/ }).click();
+  await page.getByRole("button", { name: /Edit mode \(F2: play\)/ }).waitFor();
   const box = await game.locator("canvas.realm-view").boundingBox();
   await page.mouse.click(box.x + box.width / 2 + 40, box.y + box.height / 2 + 20);
-  await editor.getByText(/tile \w+ · lift/).waitFor();
+  await panels.getByText(/ground \w+ · height [\d.]+ · floor/).waitFor();
   // The place tool: an oak where the click lands, then saved with the version the world was loaded at.
-  await editor.getByRole("button", { name: "Place thing" }).click();
+  await editor.getByRole("button", { name: "Place", exact: true }).click();
   await editor.getByRole("combobox").first().selectOption("tree");
   await editor.getByRole("combobox").nth(1).selectOption("oak");
   await page.mouse.click(box.x + box.width / 2 - 60, box.y + box.height / 2 + 40);
-  await editor.getByText(/Placed oak at/).waitFor();
-  await editor.getByRole("button", { name: "Save" }).click();
-  await editor.getByText(/Saved v4/).waitFor();
+  await page.getByText(/Placed oak at/).waitFor();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByText(/Saved v4/).waitFor();
   assert.equal(saved.baseVersion, 3); assert.ok(saved.overlay.ops.some(op => op.op === "object" && op.tree === "oak"), "the placed oak is in the saved overlay");
   // Undo takes it back (the game rebuilds again).
-  await editor.getByRole("button", { name: "Undo" }).click();
-  await editor.getByText(/Undone/).waitFor();
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await page.getByText(/Undone/).waitFor();
   // The define tab: a person of the overlay's own, then an errand they give, both in the overlay and known to the game.
-  await editor.getByRole("button", { name: "define", exact: true }).click();
-  await editor.getByRole("button", { name: "npc", exact: true }).click();
-  const field = label => editor.locator("h4", { hasText: label }).locator("xpath=following-sibling::*[1]");
+  await panels.getByRole("button", { name: "define", exact: true }).click();
+  await panels.getByRole("button", { name: "npc", exact: true }).click();
+  const field = label => panels.locator("h4", { hasText: label }).locator("xpath=following-sibling::*[1]");
   await field("Id (dev_…)").fill("dev_tess"); await field("Name").fill("Tess"); await field("Examine").fill("A tester.");
-  await editor.getByRole("button", { name: "Define npc" }).click();
-  await editor.getByText(/npc dev_tess defined/).waitFor();
-  await editor.getByRole("button", { name: "quest", exact: true }).click();
+  await panels.getByRole("button", { name: "Define npc" }).click();
+  await page.getByText(/npc dev_tess defined/).waitFor();
+  await panels.getByRole("button", { name: "quest", exact: true }).click();
   await field("Id (dev_…)").fill("dev_two_logs"); await field("Name").fill("Two Logs");
   await field("Given by").selectOption("dev_tess"); await field("Wants").selectOption("logs"); await field("How many").fill("2");
   await field("The ask (a line each)").fill("Two logs, please."); await field("When you say yes").fill("Thanks."); await field("While you're at it").fill("Logs?"); await field("When you deliver (a line each)").fill("Lovely.");
-  await editor.getByRole("button", { name: "Define quest" }).click();
-  await editor.getByText(/quest dev_two_logs defined/).waitFor();
-  await editor.getByText(/Defined \(2\)/).waitFor();
-  await editor.getByRole("button", { name: "tools", exact: true }).click();
-  await editor.getByText(/2 ops applied/).waitFor();
-  await editor.getByRole("button", { name: "Save" }).click();
-  await editor.getByText(/Saved v5/).waitFor();
+  await panels.getByRole("button", { name: "Define quest" }).click();
+  await page.getByText(/quest dev_two_logs defined/).waitFor();
+  await page.getByText(/Defined \(2\)/).waitFor();
+  await panels.getByRole("button", { name: "inspect", exact: true }).click();
+  await page.getByText(/2 ops applied/).waitFor();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByText(/Saved v5/).waitFor();
   assert.ok(saved.overlay.ops.some(op => op.op === "npc" && op.def.id === "dev_tess" && op.def.art.family === 9) && saved.overlay.ops.some(op => op.op === "quest" && op.def.giver === "dev_tess" && op.def.item === "logs" && op.def.count === 2), "the person and the errand are in the saved overlay");
   // The camp zone tool: two corners make a rectangle where camping is forbidden, with its reason.
   await editor.getByRole("button", { name: "Camp zone" }).click();
   await editor.getByRole("button", { name: "Forbid camping" }).click();
   await editor.getByPlaceholder("Camping isn't allowed here.").fill("The warden says no.");
   await page.mouse.click(box.x + box.width / 2 - 80, box.y + box.height / 2 - 60);
-  await editor.getByText(/First corner/).waitFor();
+  await page.getByText(/First point/).waitFor();
   await page.mouse.click(box.x + box.width / 2 + 80, box.y + box.height / 2 + 60);
-  await editor.getByText(/Camping forbidden from/).waitFor();
-  await editor.getByText(/3 ops applied/).waitFor();
-  console.log("PASS development game: the editor beside the public build, overlays applied and saved, edit mode picking, undo, definitions (a person, an errand), a camp zone");
+  await page.getByText(/Camping forbidden from/).waitFor();
+  await page.getByText(/3 ops applied/).waitFor();
+  // The terrain tools: a raise lifts the land's own floor where it's clicked.
+  const floorSum = () => frame().evaluate(() => { const b = window.__realm.game().world.base; let s = 0; for (let i = 0; i < b.length; i++) s += b[i]; return s; });
+  const floorBefore = await floorSum();
+  await editor.getByRole("button", { name: "Raise", exact: true }).click();
+  await page.mouse.click(box.x + box.width / 2 - 40, box.y + box.height / 2 + 30);
+  await page.getByText(/raise at \d+,\d+ \(r 2\)/).waitFor();
+  await page.getByText(/4 ops applied/).waitFor();
+  assert.ok(await floorSum() > floorBefore + 50, "the raise lifted the ground");
+  // The paint brush, dragged: every tile crossed is painted (one op each), snow here.
+  await editor.getByRole("button", { name: "Brush", exact: true }).click();
+  await editor.getByRole("button", { name: "snow", exact: true }).click();
+  await page.mouse.move(box.x + box.width / 2 - 120, box.y + box.height / 2 + 80); await page.mouse.down();
+  for (let k = 1; k <= 12; k++) { await page.mouse.move(box.x + box.width / 2 - 120 + k * 14, box.y + box.height / 2 + 80, { steps: 2 }); await page.waitForTimeout(30); }
+  await page.mouse.up();
+  await page.getByRole("button", { name: "Save", exact: true }).click(); await page.getByText(/Saved v6/).waitFor();
+  const painted = saved.overlay.ops.filter(op => op.op === "paint" && op.t === 9).length;
+  assert.ok(painted >= 3, `a drag paints as it goes (${painted} dabs)`); assert.ok(saved.overlay.ops.some(op => op.op === "terrain" && op.mode === "raise"), "the raise is in the saved overlay");
+  // The panels: a search finds the bank, and its Go teleports there.
+  await page.getByPlaceholder("Find (things, people, places)…").fill("bank");
+  await page.getByText(/[1-9]\d* found/).waitFor();
+  // The player's tools: Frens given puts the session in the sandbox, which stops it saving.
+  await page.evaluate(() => { window.__writes = 0; window.addEventListener("message", event => { if (event.data?.type === "rarefriends-realm:save") window.__writes++; }); });
+  await page.getByRole("button", { name: "player", exact: true }).click();
+  await page.getByRole("button", { name: "+1,000", exact: true }).click();
+  await page.getByText(/Given 1,000 Frens/).waitFor();
+  await page.getByText("SANDBOX", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "Heal", exact: true }).click();
+  await page.waitForTimeout(6500);
+  assert.equal(await page.evaluate(() => window.__writes), 0, "a sandboxed session sends no saves");
+  assert.ok(await frame().evaluate(() => window.__realm.game().player.inventory.some(slot => slot?.id === "coins" && slot.n >= 1000)), "the Frens were given");
+  // The map: the whole world comes over as a picture.
+  await page.getByRole("button", { name: "map", exact: true }).click();
+  await page.getByRole("button", { name: "Centre on me" }).waitFor();
+  console.log("PASS development game: the dashboard round the public build, overlays applied and saved, edit mode picking, undo, definitions (a person, an errand), a camp zone, raising ground, a dragged paint brush, the search, the sandbox (no saves)");
   assert.deepEqual(errors, [], "no page errors");
   // The public build: nothing of the editor in it.
   execFileSync("node", ["scripts/build.mjs", "--outdir", join(outdir, "public")], { stdio: "ignore" });
