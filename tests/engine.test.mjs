@@ -622,7 +622,7 @@ test("A Friend's Feast from start to finish", () => {
   assert.equal(g.player.quests.friends_feast, 2);
   assert.equal(questPoints(g), 1);
   assert(level(g, "cooking") >= 10, "Quest XP");
-  assert.equal(QUESTS.length, 111); assert.equal(MAX_QUEST_POINTS, 193);
+  assert.equal(QUESTS.length, 113); assert.equal(MAX_QUEST_POINTS, 197);
 });
 
 test("Grumblin Trouble counts kills and pays out", () => {
@@ -1968,7 +1968,7 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   assert.equal(p.quests.dawn_against_hollow, 2); assert(has(p, "dawnplate_cuirass"));
   assert.equal(count(p, "hollow_essence"), 0);
   assert.equal(capeProblem(g, "dawnplate_cuirass"), null, "the armoury sells Dawnplate once earned");
-  assert.equal(QUESTS.length, 111); assert.equal(MAX_QUEST_POINTS, 193);
+  assert.equal(QUESTS.length, 113); assert.equal(MAX_QUEST_POINTS, 197);
 });
 
 test("Boots and gauntlets in every metal, smithed at the anvil; the clothier's shirts, dresses, trousers and skirts", () => {
@@ -4145,7 +4145,7 @@ test("Activities: a challenge set by its host runs on the game's own mechanics, 
   const { GUILD_FURNACE } = await import("../games/rarefriends-realm/hearthkinnames.ts");
   const { regionAt } = await import("../games/rarefriends-realm/world.ts");
   const g = newGame(), p = g.player;
-  assert.deepEqual(Object.keys(ACTIVITIES), ["quarry_call", "assay_run", "hot_tunnel", "pass_run"]); assert.deepEqual(ACTIVITY_HOSTS.quarry_master, ["quarry_call", "hot_tunnel"]);
+  assert.deepEqual(Object.keys(ACTIVITIES), ["quarry_call", "assay_run", "hot_tunnel", "pass_run", "barrow_watch", "road_patrol"]); assert.deepEqual(ACTIVITY_HOSTS.quarry_master, ["quarry_call", "hot_tunnel"]);
   // The host offers it in talk; the level gates it.
   let d = talk(g, "quarry_master"); assert.ok(d.options?.some(o => /Quarry Call/.test(o.label)), "the quarrymaster offers the Quarry Call");
   p.xp.mining = 0; assert.match(activityProblem(g, "quarry_call"), /Mining level of 10/);
@@ -4957,7 +4957,8 @@ test("The north's faiths: a blessing asked at a sacred place with a loaf (one at
   const obj = clue => world.objects.find(o => o.clue === clue);
   for (const id of ["ember_hearth", "ember_stone", "ember_pot", "gull_hearth", "house_hearth", "bough_post", "white_spring", "ancestors_howe"]) assert.ok(obj(id), `${id} is in the world`);
   const use = (object, option) => { standBy(g, object); const n = g.messages.length; setTarget(g, { kind: "object", id: object.id, option }); for (let k = 0; k < 30 && g.dialogue === null && g.messages.length === n; k++) tick(g); };
-  const choose = (d, label) => { const o = d.options?.find(x => x.label === label); assert.ok(o, `"${label}" offered`); const next = o.then(); next?.onEnd?.(); return next; };
+  // (An option may sit behind another's "Something else.": the factions' talk comes before the faiths'.)
+  const choose = (d, label) => { let o; for (let k = 0; k < 4 && d && !(o = d.options?.find(x => x.label === label)); k++) d = d.options?.find(x => x.label === "Something else.")?.then(); assert.ok(o, `"${label}" offered`); const next = o.then(); next?.onEnd?.(); return next; };
   // Before either quest: guest-right at the Last Ember, hearth-warmth at either of the Zoryavik's places; nothing at Eyvind's pot.
   assert.deepEqual(F.siteBlessings(g, "ember_hearth").give, ["guest_right"]); assert.deepEqual(F.siteBlessings(g, "ember_pot").give, []);
   assert.deepEqual(F.siteBlessings(g, "house_hearth").give, ["hearth_warmth"]); assert.deepEqual(F.siteBlessings(g, "bough_post").give, ["hearth_warmth"]);
@@ -4988,4 +4989,51 @@ test("The north's faiths: a blessing asked at a sacred place with a loaf (one at
   // Kept through a save; gone when it's worn out.
   const fresh = newGame(); restore(fresh, serialize(g)); assert.equal(fresh.player.blessing?.id, "ancestors_watch"); assert.ok(fresh.player.blessing.until - fresh.tick <= F.BLESSING_TICKS);
   g.tick += F.BLESSING_TICKS + 1; tick(g); assert.equal(p.blessing, null);
+});
+
+test("The north's factions: the Third Oath (Oathsworn Hall) and the Long Patrol (the Hearthwardens), each a quarrel settled, membership, a members' activity paid in standing, and the gear standing brings; the north's own creatures", async () => {
+  const F = await import("../games/rarefriends-realm/northfactions.ts");
+  const A = await import("../games/rarefriends-realm/activities.ts");
+  const { talk, questDone, onMonsterKilled } = await import("../games/rarefriends-realm/content.ts");
+  const g = newGame(), p = g.player, world = g.world;
+  for (const id of ["draugr", "fjord_troll", "rusalka", "leshy", "likho"]) assert.ok(MONSTERS[id] && world.spawns.some(s => s.kind === "monster" && s.id === id), `${id} lives in the north`);
+  const obj = clue => world.objects.find(o => o.clue === clue);
+  const use = (object, option) => { standBy(g, object); const n = g.messages.length; setTarget(g, { kind: "object", id: object.id, option }); for (let k = 0; k < 30 && g.dialogue === null && g.messages.length === n; k++) tick(g); };
+  // (An option may sit behind another's "Something else.": the Old Agreement's talk comes first.)
+  const choose = (d, label) => { let o; for (let k = 0; k < 4 && d && !(o = d.options?.find(x => x.label === label)); k++) d = d.options?.find(x => x.label === "Something else.")?.then(); assert.ok(o, `"${label}" offered`); const next = o.then(); next?.onEnd?.(); return next; };
+  // Not a member: no Barrow Watch.
+  p.xp.attack = XP_TABLE[60]; p.xp.defence = XP_TABLE[60]; p.xp.strength = XP_TABLE[60];
+  assert.match(A.activityProblem(g, "barrow_watch"), /Swear to the Hall first/);
+  // The Third Oath: the trial, four accounts, the judgement.
+  choose(talk(g, "oathmaster_brand"), "Let me speak at the stone."); assert.equal(p.quests[F.THIRD_OATH], 1);
+  onMonsterKilled(g, "draugr", 466, 150); assert.ok(has(p, "grave_ring"), "a grave-ring off a draugr");
+  talk(g, "oathmaster_brand").onEnd?.(); assert.equal(p.questData.to_step, 2); assert.ok(!has(p, "grave_ring"));
+  use(obj("oath_stone"), "Read"); choose(talk(g, "oathsworn_hallvard"), "Why did you refuse?"); choose(talk(g, "ravnsvik_netmender"), "What would losing the skerries mean?");
+  assert.equal(p.questData.to_step, 2); choose(talk(g, "steward_ketil"), "Who gave the order about the skerries?"); assert.equal(p.questData.to_step, 3);
+  choose(talk(g, "oathmaster_brand"), "He kept the oath he swore. The order wasn't the Hall's."); assert.ok(questDone(g, F.THIRD_OATH));
+  assert.equal(p.questData.oath_member, 1); assert.equal(F.standingOf(g, "oathsworn"), 10);
+  assert.ok(NPCS.steward_ketil.gone(g), "Ketil's dismissed"); assert.ok(!NPCS.oathsworn_hallvard.gone(g), "Hallvard stays");
+  // The Barrow Watch: six draugr, paid in standing.
+  assert.equal(A.activityProblem(g, "barrow_watch"), null); assert.ok(A.startActivity(g, "barrow_watch"));
+  for (let k = 0; k < 6; k++) A.activityEvent(g, { kind: "kill", monster: "draugr", x: 466, y: 150 });
+  assert.equal(p.activities.run, null, "the watch is done"); assert.ok(F.standingOf(g, "oathsworn") >= 16);
+  // Standing's gear: the shield at 20, once; a lost one replaced for a fee.
+  let d = talk(g, "oathmaster_brand"); d = choose(d, "My standing with the Hall."); assert.ok(!d.options.some(o => /shield/i.test(o.label)) || F.standingOf(g, "oathsworn") >= 20);
+  p.standing.oathsworn = 25; d = choose(talk(g, "oathmaster_brand"), "My standing with the Hall."); choose(d, "I've earned the Oathsworn shield."); assert.ok(has(p, "oathsworn_shield"));
+  d = choose(talk(g, "oathmaster_brand"), "My standing with the Hall."); assert.ok(!d.options.some(o => /earned the Oathsworn shield/.test(o.label)), "once");
+  take(p, "oathsworn_shield"); give(p, "coins", F.REPLACE_FEE); d = choose(talk(g, "oathmaster_brand"), "My standing with the Hall."); choose(d, `I've lost my Oathsworn shield (${F.REPLACE_FEE.toLocaleString()} Frens).`); assert.ok(has(p, "oathsworn_shield"));
+  // The Long Patrol: three posts, the foreman, the Likho, the council.
+  choose(talk(g, "hearthwarden_captain"), "I'll walk the patrol."); assert.equal(p.quests[F.LONG_PATROL], 1);
+  for (const k of [1, 2, 3]) use(obj(`lp_post${k}`), "Look-at"); assert.equal(p.questData.lp_step, 2);
+  talk(g, "foreman_stanimir").onEnd?.(); onMonsterKilled(g, "likho", 976, 300); assert.ok(has(p, "likho_eye")); assert.equal(p.questData.lp_step, 3);
+  choose(talk(g, "hearthwarden_captain"), "Take the prince's silver, and say nothing."); assert.ok(questDone(g, F.LONG_PATROL)); assert.equal(p.questData.warden_member, 1);
+  // The prince's silver: the spear at 10 standing, not 20.
+  d = choose(talk(g, "hearthwarden_captain"), "My standing with the Hearthwardens."); choose(d, "I've earned the Hearthwarden spear."); assert.ok(has(p, "hearthwarden_spear"));
+  // The Road Patrol: three posts and four seen off on the road.
+  assert.ok(A.startActivity(g, "road_patrol"));
+  for (const k of [1, 2, 3]) use(obj(`lp_post${k}`), "Look-at");
+  for (let k = 0; k < 4; k++) A.activityEvent(g, { kind: "kill", monster: "wolf", x: 760, y: 220 });
+  assert.equal(p.activities.run, null, "the patrol is done"); assert.ok(F.standingOf(g, "hearthwardens") > 10);
+  // Kept through a save.
+  const fresh = newGame(); restore(fresh, serialize(g)); assert.equal(fresh.player.standing.hearthwardens, p.standing.hearthwardens);
 });

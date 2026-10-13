@@ -41,6 +41,8 @@ export const TRAILS = [
 export const WAYMARK_EVERY = 34;
 /** The Oathgate road's trouble (northquest.ts): the wrecked caravan by the road, and the raiders' den up in the hills above it. */
 export const OATH_ROAD = { wreck: { x: 478, y: 241 }, den: { x: 494, y: 216 }, hills: { x0: 440, y0: 196, x1: 545, y1: 262 } } as const;
+/** The Barrowfield (the draugr's howes, south-west of Oathsworn Hall), the Cut (the felled firs south of Krasnogor) and the columns of the Hearthwardens' three patrol posts on the Krasnogor road (northfactions.ts). */
+export const BARROWFIELD = { x: 466, y: 150 } as const, THE_CUT = { x: 975, y: 300 } as const, PATROL_XS = [728, 772, 818] as const;
 const WOLFSBACK_SIGN = "THE WOLFSBACK. A goat-track over the Varn Ridge, the only way across when the Oathgate's shut. Carts can't take it. Yetis can.";
 
 /** Value noise in [0, 1), periodic over 64 cells of `scale` tiles (as world.ts's own). */
@@ -278,7 +280,7 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
     t.add({ kind: "well", x: cx + 3, y: (Y0 + Y1 >> 1) + 3, blocks: true, name: "The town well" });
     put2(X0 + 2, Y0 + 2, "nets", "Nets drying"); put2(X0 + 4, Y0 + 2, "drying_rack", "Cod drying on the rack"); put2(X1 - 2, Y0 + 2, "banner", "The Skarnholm banner: a grey gull on a blue field");
     t.shoreSpots(X0 - 10, Y0 - 20, X0 + 34, Y0 - 1, "lure", 4);
-    npc("jarl_hallveig", X0 + 9, Y0 + 16); npc("lawspeaker_signy", cx + 18, Y0 + 32); npc("farwake_master", X0 + 23, Y0 + 6); npc("shipwright_bersi", X0 + 13, Y0 + 6);
+    npc("jarl_hallveig", X0 + 9, Y0 + 16); { const at = openNear(X0 + 12, Y0 + 17); npc("steward_ketil", at.x, at.y); } npc("lawspeaker_signy", cx + 18, Y0 + 32); npc("farwake_master", X0 + 23, Y0 + 6); npc("shipwright_bersi", X0 + 13, Y0 + 6);
     // Halla the houndmaster and her yard of hounds (Beastkeeping: beastfolk.ts).
     { const at = openNear(cx - 14, Y0 + 30); npc("houndmaster_halla", at.x, at.y); put2(at.x + 1, at.y + 1, "trough", "A water trough, chewed at the corners"); put2(at.x - 1, at.y + 1, "hay", "Straw for the kennels"); }
     npc("skarnholm_innkeeper", X1 - 8, Y0 + 6); npc("skarnholm_trader", cx + 4, Y0 + 25, 2); { const at = openNear(cx - 6, Y0 + 25); npc("skarnholm_weaver", at.x, at.y); }
@@ -308,7 +310,8 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
     for (let y = Y0 + 2; y <= Y1 - 2; y++) for (const x of [X0 + 2, X1 - 2]) tiles[idx(x, y)] = T.WALL;
     for (let d = -1; d <= 1; d++) tiles[idx(cx + d, Y1 - 2)] = T.PATH;
     house(cx - 10, Y0 + 5, cx + 10, Y0 + 15, "s", "Oathsworn Hall", "hall");
-    put2(cx, Y0 + 19, "obelisk", "The oath-stone: every name sworn on it, and the oath beside each, in the sworn one's own words");
+    put2(cx, Y0 + 19, "obelisk", "The oath-stone: every name sworn on it, and the oath beside each, in the sworn one's own words"); clue(cx, Y0 + 19, "oath_stone");
+    { const at = openNear(cx + 3, Y0 + 21); npc("oathsworn_hallvard", at.x, at.y); }
     for (const [tx, ty] of [[X0 + 6, Y1 - 7], [X0 + 9, Y1 - 7], [X1 - 9, Y1 - 7], [X1 - 6, Y1 - 7]] as const) put2(tx, ty, "target", "A practice post, hacked half through");
     put2(X0 + 5, Y0 + 5, "armour", "A rack of shields, each painted by its bearer"); put2(X1 - 5, Y0 + 5, "banner", "The Oathsworn banner: two hands clasped over a sword");
     npc("oathmaster_brand", cx, Y0 + 18); for (let k = 0; k < 4; k++) npc("oathsworn_warrior", X0 + 8 + k * 9, Y1 - 9, 3);
@@ -404,7 +407,7 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
     for (let d = -1; d <= 1; d++) { tiles[idx(X0, cx - X0 + Y0 + d)] = T.PATH; tiles[idx(X1, cx - X0 + Y0 + d)] = T.PATH; }
     house(X0 + 2, Y0 + 2, X0 + 7, Y0 + 7, "s", "A watchtower of Hearthwatch", "tower"); house(X1 - 7, Y0 + 2, X1 - 2, Y0 + 7, "s", "A watchtower of Hearthwatch", "tower");
     house(cx - 5, Y1 - 9, cx + 5, Y1 - 3, "n", "The Hearthwardens' barracks", "izba");
-    npc("hearthwarden_captain", cx, Y0 + 9); npc("hearthwarden", cx - 4, Y0 + 12, 4); npc("hearthwarden", cx + 4, Y0 + 12, 4);
+    npc("hearthwarden_captain", cx, Y0 + 9); { const at = openNear(cx + 6, Y0 + 13); npc("warden_bogdan", at.x, at.y); } npc("hearthwarden", cx - 4, Y0 + 12, 4); npc("hearthwarden", cx + 4, Y0 + 12, 4);
     sign(X0 - 1, cx - X0 + Y0 + 3, "Hearthwatch", "HEARTHWATCH. The Hearthwardens keep this pass, and the roads east of it, for whoever needs them kept. State your business; we'll still help you if it's bad.");
   }
 
@@ -520,11 +523,35 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
     [748, 470, "NORTH: the Zoryavik, through the forest: Zlatna Gora under the ridge, then Krasnogor on the Krasna. Keep to the road; the forest keeps itself."],
   ] as const) sign(x, y, "Signpost", text);
 
-  // ---------- What lives in the north (until the north's own creatures come) ----------
+  // ---------- The Barrowfield: the Vargskeld's old howes, south-west of Oathsworn Hall, where the draugr walk (northfactions.ts) ----------
+  {
+    const { x: bx, y: by } = BARROWFIELD;
+    for (let k = 0; k < 14; k++) { const a = k / 14 * Math.PI * 2, r = 6 + (k % 3) * 4, at = openNear(Math.round(bx + Math.cos(a) * r * 1.4), Math.round(by + Math.sin(a) * r)); put2(at.x, at.y, k % 4 ? "grave" : "obelisk", k % 4 ? "A howe, its door-stone pushed out from inside" : "A barrow-stone, its runes worn to shadows"); }
+    { const at = openNear(bx, by + 18); sign(at.x, at.y, "The Barrowfield", "THE BARROWFIELD. The old howes. The dead here don't stay down. Oathsworn Hall keeps the watch; keep out of their way, or keep it with them."); }
+    t.monsters("draugr", bx - 22, by - 16, bx + 22, by + 16, 9);
+  }
+  // ---------- The Hearthwardens' patrol posts on the road from Hearthwatch to Krasnogor ----------
+  PATROL_XS.forEach((px, k) => {
+    let best = -1; for (let y = 170; y <= 262; y++) if (tiles[idx(px, y)] === T.PATH && (best < 0 || Math.abs(y - 220) < Math.abs(best - 220))) best = y;
+    const at = openNear(px, (best < 0 ? 220 : best) - 3); put2(at.x, at.y, "banner", "A Hearthwardens' patrol post"); clue(at.x, at.y, `lp_post${k + 1}`);
+  });
+  // ---------- The Cut: where the prince's men felled the old firs, south of Krasnogor, and Likho One-Eye woke ----------
+  {
+    const { x: cx, y: cy } = THE_CUT;
+    for (let y = cy - 8; y <= cy + 8; y++) for (let x = cx - 10; x <= cx + 10; x++) { const id = ctx.objectAt[idx(x, y)]; if (id >= 0 && ctx.objects[id].kind === "tree") t.clearAt(x, y); }
+    for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2, x = Math.round(cx + Math.cos(a) * (6 + (k % 2) * 3)), y = Math.round(cy + Math.sin(a) * (4 + (k % 2) * 2)); if (t.free(x, y) && WALKABLE.has(tiles[idx(x, y)])) t.decor(x, y, "stump", true, "The stump of an old fir, wider than a cart"); }
+    for (const [dx, dy] of [[-3, -1], [3, 2]] as const) put2(cx + dx, cy + dy, "logpile", "Fir trunks, stacked for the Terem's roof");
+    { const at = openNear(cx - 5, cy + 1); npc("foreman_stanimir", at.x, at.y); }
+    t.monsters("likho", cx + 1, cy - 2, cx + 4, cy + 2, 1);
+  }
+
+  // ---------- What lives in the north ----------
   t.monsters("wolf", 60, 140, 560, 330, 26); t.monsters("snared_wolf", 60, 140, 560, 330, 3); t.monsters("crag_bear", 380, 60, 600, 200, 6); t.monsters("cairn_wight", 150, 250, 260, 330, 6);
   t.monsters("highland_goat", RIDGE.x - 30, 60, RIDGE.x + 30, 320, 12); t.monsters("frost_yeti", RIDGE.x - 20, 40, RIDGE.x + 20, 160, 5);
   t.monsters("boar", 700, 60, 1120, 330, 26); t.monsters("greatstag", 700, 40, 1120, 330, 18); t.monsters("wolf", 700, 60, 1120, 330, 16); t.monsters("snared_wolf", 700, 60, 1120, 330, 3); t.monsters("crag_bear", 940, 40, 1120, 200, 6);
   t.monsters("bandit", 440, 200, 540, 260, 5);
+  // The north's own: fjord trolls on the northern coast, rusalki on the Krasna's banks, leshies in the deep forest of the north-east.
+  t.monsters("fjord_troll", 380, 20, 500, 70, 5); t.monsters("rusalka", 855, 236, 905, 330, 5); t.monsters("leshy", 1080, 30, 1180, 120, 4);
   t.shoreSpots(150, 40, 560, 140, "deep", 8); t.shoreSpots(700, 40, 1140, 120, "net", 8);
   // Offshore shoals, out of reach of the shore (Seafaring): harpoon shoals a few tiles out, where a skiff can go, and deep
   // shoals far out on the open sea, for a longship. Marked offshore: nobody fishes them from the land.

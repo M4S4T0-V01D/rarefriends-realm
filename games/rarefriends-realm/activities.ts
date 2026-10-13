@@ -4,7 +4,8 @@
  * talking to its host, judged by what the engine reports as you play (every rock mined, every bar smelted, every
  * tile walked, a death) through `activityEvent`, timed by the tick (`activityTick`), scored when its goal is met, paid
  * once, and remembered (player.activities.records: times done, the best score, when last run) so a cooldown holds
- * and a best stands. A run that times out, that you die in, or that you cancel is a failure: nothing paid, the
+ * and a best stands. The north's factions set two of their own (northfactions.ts): the Barrow Watch and the Road Patrol, for
+ * members only, paid in standing as well. A run that times out, that you die in, or that you cancel is a failure: nothing paid, the
  * cooldown shortened, try again. Nothing here hands out a reward without the actions that earn it, and a reload
  * changes nothing (the run and the records are saved with the rest).
  *
@@ -21,6 +22,7 @@ import { GUILD_FURNACE } from "./hearthkinnames.ts";
 export type ActivityEvent =
   | { kind: "mine"; rock: string; x: number; y: number }
   | { kind: "produce"; station: string | null; metal: string | null; failed: boolean }
+  | { kind: "kill"; monster: string; x: number; y: number }
   | { kind: "death" };
 export type ActivityRun = { id: string; startedAt: number; until: number; target: Record<string, number | string>; progress: number; failed: number; marks: Record<string, number> };
 export type ActivityRecord = { done: number; best: number; lastAt: number };
@@ -31,6 +33,8 @@ export type ActivityDef = {
   id: string; name: string; skill: Skill; host: string;
   /** What it takes to start: a level, and what to carry. */
   requires: { level: number; items?: readonly [string, number][] };
+  /** Who may run it at all (a faction's own: its members), and why not; null when they may. */
+  unlocked?: (game: Game) => string | null;
   /** Ticks allowed, and ticks between runs (a failed run shortens the wait to a third). */
   limit: number; cooldown: number;
   /** The target rolled at the start (the rock, the metal, the count), and the brief in the host's words. */
@@ -51,6 +55,9 @@ const timeLeft = (game: Game, run: ActivityRun) => Math.max(0, run.until - game.
 const n = (v: number | string | undefined) => typeof v === "number" ? v : Number(v ?? 0);
 const QUARRY_ROCKS = ["pewter", "blackiron", "inkcoal", "moonsilver"] as const;
 
+/** Standing with a northern faction, earned (northfactions.ts spends it). */
+const raiseStanding = (game: Game, faction: string, n: number) => { game.player.standing[faction] = (game.player.standing[faction] ?? 0) + n; };
+const PATROL_POSTS = ["post1", "post2", "post3"] as const;
 export const ACTIVITIES: Record<string, ActivityDef> = {
   quarry_call: {
     id: "quarry_call", name: "The Quarry Call", skill: "mining", host: "quarry_master", requires: { level: 10 }, limit: 900, cooldown: 2400,
@@ -92,6 +99,28 @@ export const ACTIVITIES: Record<string, ActivityDef> = {
     reward: (game, _run, score) => { const xp = Math.round(900 * (0.5 + score)); addXp(game, "agility", xp, { raw: true }); if (score > 0.7) giveOrDrop(game, WAYFARER_MARK, 1); return `${xp} Wayfaring XP${score > 0.7 ? " and a Wayfarer's mark" : ""}`; },
     promise: "Wayfaring XP, and a Wayfarer's mark for a fast one.",
   },
+  barrow_watch: {
+    id: "barrow_watch", name: "The Barrow Watch", skill: "attack", host: "oathmaster_brand", requires: { level: 40 }, limit: 1200, cooldown: 3000,
+    unlocked: game => game.player.questData.oath_member ? null : "The Barrow Watch is the Hall's own. Swear to the Hall first.",
+    roll: () => ({ count: 6 }),
+    brief: (_game, target) => `Down to the Barrowfield, and put ${target.count} draugr back in their howes before the tide turns: a quarter of an hour. The Hall has kept that watch since there was a Hall.`,
+    goal: (_game, run) => Math.min(1, run.progress / n(run.target.count)),
+    status: (_game, run) => `${run.progress} of ${run.target.count} draugr put back.`,
+    score: (game, run) => 0.5 + 0.5 * timeLeft(game, run),
+    reward: (game, _run, score) => { const xp = Math.round(1400 * (0.5 + score)), standing = Math.round(6 + 6 * score); addXp(game, "attack", xp, { raw: true }); addXp(game, "strength", Math.round(xp / 2), { raw: true }); raiseStanding(game, "oathsworn", standing); give(game.player, "coins", Math.round(500 * score)); return `${xp} Attack XP, ${Math.round(xp / 2)} Strength XP and ${standing} standing with the Hall`; },
+    promise: "Attack and Strength XP, the Hall's pay, and standing with the Hall.",
+  },
+  road_patrol: {
+    id: "road_patrol", name: "The Road Patrol", skill: "defence", host: "hearthwarden_captain", requires: { level: 40 }, limit: 1500, cooldown: 3000,
+    unlocked: game => game.player.questData.warden_member ? null : "The patrol's for Hearthwardens. Walk the Long Patrol with us first.",
+    roll: () => ({ count: 4 }),
+    brief: (_game, target) => `The road from Hearthwatch to Krasnogor: check all three patrol posts, and see off ${target.count} of whatever's preying on it (wolves, bandits, worse) on the way. A quarter of an hour.`,
+    goal: (_game, run) => PATROL_POSTS.filter(key => run.marks[key]).length / PATROL_POSTS.length * 0.5 + Math.min(1, run.progress / n(run.target.count)) * 0.5,
+    status: (_game, run) => `${PATROL_POSTS.filter(key => run.marks[key]).length} of 3 posts checked, ${run.progress} of ${run.target.count} seen off.`,
+    score: (game, run) => 0.5 + 0.5 * timeLeft(game, run),
+    reward: (game, _run, score) => { const xp = Math.round(1400 * (0.5 + score)), standing = Math.round(6 + 6 * score); addXp(game, "defence", xp, { raw: true }); addXp(game, "agility", Math.round(xp / 3), { raw: true }); raiseStanding(game, "hearthwardens", standing); give(game.player, "coins", Math.round(500 * score)); return `${xp} Defence XP, ${Math.round(xp / 3)} Wayfaring XP and ${standing} standing with the Hearthwardens`; },
+    promise: "Defence and Wayfaring XP, the Wardens' pay, and standing with the Hearthwardens.",
+  },
 };
 /** The activities each host sets. */
 export const ACTIVITY_HOSTS: Record<string, string[]> = Object.values(ACTIVITIES).reduce((out, def) => { (out[def.host] ??= []).push(def.id); return out; }, {} as Record<string, string[]>);
@@ -102,6 +131,7 @@ export const activityRecord = (game: Game, id: string): ActivityRecord => game.p
 export function activityProblem(game: Game, id: string): string | null {
   const def = ACTIVITIES[id], player = game.player, record = activityRecord(game, id);
   if (player.activities.run) return player.activities.run.id === id ? "You're on it already." : `You're on ${ACTIVITIES[player.activities.run.id].name} already. Finish that, or give it up.`;
+  const locked = def.unlocked?.(game); if (locked) return locked;
   if (level(game, def.skill) < def.requires.level) return `You need a ${SKILL_NAMES[def.skill]} level of ${def.requires.level} for that.`;
   for (const [itemId, count] of def.requires.items ?? []) if (player.inventory.reduce((sum, slot) => sum + (slot?.id === itemId ? slot.n : 0), 0) < count) return `Bring ${count} ${item(itemId).name.toLowerCase()} first.`;
   const wait = record.lastAt + def.cooldown - game.tick;
@@ -140,7 +170,15 @@ export function activityEvent(game: Game, event: ActivityEvent) {
   if (run.id === "quarry_call" && event.kind === "mine" && event.rock === run.target.rock && regionAt(game.world, event.x, event.y).id === "ashen_hills") { run.progress++; if (run.progress < n(run.target.count)) message(game, `${def.name}. ${def.status(game, run)}`); }
   if (run.id === "assay_run" && event.kind === "produce" && event.station === GUILD_FURNACE && event.metal === run.target.metal) { if (event.failed) run.failed++; else run.progress++; }
   if (run.id === "hot_tunnel" && event.kind === "mine" && event.rock === "gem" && regionAt(game.world, event.x, event.y).id === "ashen_shaft" && !run.marks.gem) { run.marks.gem = 1; message(game, `${def.name}. ${def.status(game, run)}`, "quest"); }
+  if (run.id === "barrow_watch" && event.kind === "kill" && event.monster === "draugr") { run.progress++; if (run.progress < n(run.target.count)) message(game, `${def.name}. ${def.status(game, run)}`); }
+  if (run.id === "road_patrol" && event.kind === "kill" && ["wolf", "bandit", "rusalka", "leshy", "boar"].includes(event.monster) && event.x >= 690 && event.x <= 900 && event.y >= 160 && event.y <= 280) { run.progress++; message(game, `${def.name}. ${def.status(game, run)}`); }
   if (def.goal(game, run) >= 1) finishActivity(game);
+}
+/** A place an activity wants you to reach (a patrol post read): marked on the run, and the run finished if that was the last of it. */
+export function activityMark(game: Game, id: string, key: string) {
+  const run = game.player.activities.run; if (!run || run.id !== id || run.marks[key]) return;
+  run.marks[key] = 1; const def = ACTIVITIES[id];
+  if (def.goal(game, run) >= 1) finishActivity(game); else message(game, `${def.name}. ${def.status(game, run)}`);
 }
 /** Every tick: the clock, the places that count (the pass run's end; a jump that isn't running), and the finish. */
 export function activityTick(game: Game) {

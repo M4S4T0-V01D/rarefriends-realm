@@ -4,6 +4,12 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 132, date: "2026-10-13", title: "Oathsworn Hall and the Hearthwardens", items: [
+    "The Third Oath (Oathmaster Brand, Oathsworn Hall): Hallvard of the Hall refused an order given under his oath of service. Stand the Hall's oldest trial in the Barrowfield, hear everyone, and speak at the oath-stone. What you say decides who stays in the Hall, and what's cut on the stone.",
+    "The Long Patrol (Captain Milena, Hearthwatch): travellers and cattle lost on the forest road. Walk the patrol posts, follow the tracks to the Cut, put down Likho One-Eye, and decide who answers for the felled firs.",
+    "Each quest swears you to its faction. Members run its own activity (the Barrow Watch for the Hall, the Road Patrol for the Wardens) and earn standing, and standing brings the faction's gear: the Oathsworn shield and the Oath-helm, the Hearthwarden spear and cloak.",
+    "The north's own creatures: draugr in the Barrowfield's howes, fjord trolls on the northern coast, rusalki on the Krasna's banks, leshies in the deep forest of the north-east, and Likho One-Eye in the Cut.",
+  ] },
   { id: 131, date: "2026-10-13", title: "The north's faiths: the Last Ember, and the Hearth and the Bough", items: [
     "The north keeps its own faiths, and nobody has to convert to one. Ask a blessing at a sacred place, with a loaf of bread as a guest brings to a hearth, and carry it about twenty minutes. One blessing at a time, from either faith.",
     "The Last Ember, kept at Embermoot: Guest-right (food heals a quarter more, Faith 10), the Crossing Oath (running tires you a quarter less, Faith 25), the Remembered Name (once, a blow that would fell you leaves you standing, Faith 45).",

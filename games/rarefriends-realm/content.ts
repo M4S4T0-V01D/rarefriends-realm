@@ -28,6 +28,7 @@ import { DRAGON_QUESTS, onDragonsKill, talkDragons } from "./dragons.ts";
 import { NORTH_NPCS, talkNorth } from "./north.ts";
 import { NORTH_QUESTS, onNorthKill, talkNorthQuest } from "./northquest.ts";
 import { FAITH_NPCS, FAITH_QUESTS, talkNorthFaith } from "./northfaith.ts";
+import { FACTION_NPCS, FACTION_QUESTS, onFactionKill, talkNorthFactions } from "./northfactions.ts";
 import { talkShipwright } from "./seafaring.ts";
 import { ACTIVITIES, ACTIVITY_HOSTS, activityProblem, cancelActivity, startActivity } from "./activities.ts";
 import { MEGHAVAN_NPCS, talkMeghavan } from "./meghavanpeople.ts";
@@ -97,6 +98,7 @@ export const NPCS: Record<string, NpcDef> = {
   ...PORTS_NPCS,
   ...BEAST_NPCS,
   ...FAITH_NPCS,
+  ...FACTION_NPCS,
   ...BAR_NPCS,
   mender: { id: "mender", name: "Mender Hale", examine: "The chapel's mender. Her hands are always clean and her apron never is.", options: ["Talk-to", "Trade"], shop: "mender", art: art(3, 318) },
   // The wider world's villages (2026-10). Each village's people wear its own clothes (NPC_WEAR / regionalLook in render.ts).
@@ -513,6 +515,7 @@ export const QUESTS: readonly QuestDef[] = [
   ...DRAGON_QUESTS,
   ...NORTH_QUESTS,
   ...FAITH_QUESTS,
+  ...FACTION_QUESTS,
   ...MEGHAVAN_QUESTS,
   ...MEGHAVAN_SCHOOL_QUESTS,
   ...PORTS_QUESTS,
@@ -623,7 +626,7 @@ export function chat(npc: string, lines: DialogueLine[], options?: Dialogue["opt
 /** Pickpocket and quest hooks the engine calls. */
 export function onMonsterKilled(game: Game, monsterId: string, x: number, y: number) {
   const player = game.player;
-  onWestKill(game, monsterId); onMizukaiKill(game, monsterId); onKharavethKill(game, monsterId); onHeartlandsKill(game, monsterId); onOrashaiKill(game, monsterId); onHiddenRoadKill(game, monsterId); onSettlementsKill(game, monsterId, x, y); onMountKill(game, monsterId, x, y); onDragonsKill(game, monsterId); onNorthKill(game, monsterId, x, y); onMeghavanKill(game, monsterId); onPortsKill(game, monsterId); onBountyKill(game, monsterId); onPyramidsKill(game, monsterId);
+  onWestKill(game, monsterId); onFactionKill(game, monsterId); onMizukaiKill(game, monsterId); onKharavethKill(game, monsterId); onHeartlandsKill(game, monsterId); onOrashaiKill(game, monsterId); onHiddenRoadKill(game, monsterId); onSettlementsKill(game, monsterId, x, y); onMountKill(game, monsterId, x, y); onDragonsKill(game, monsterId); onNorthKill(game, monsterId, x, y); onMeghavanKill(game, monsterId); onPortsKill(game, monsterId); onBountyKill(game, monsterId); onPyramidsKill(game, monsterId);
   // The wider world's village quests count their kills wherever they fall.
   const tally = (quest: string, key: string, goal: number, done: string) => {
     if (stage(game, quest) !== 1) return;
@@ -851,9 +854,13 @@ function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
   const settlements = talkSettlements(game, npcId, name); if (settlements) return settlements;
   const beasts = talkBeastkeepers(game, npcId, name); if (beasts) return beasts;   // Beastkeeping (beastfolk.ts)
   const shipwright = talkShipwright(game, npcId, name, () => talkNorthQuest(game, npcId, name, () => talkNorth(game, npcId, name)) ?? talkNorth(game, npcId, name) ?? talkPorts(game, npcId, name)); if (shipwright) return shipwright;   // Seafaring (seafaring.ts)
-  // The Old Agreement first (its "Something else." leads on to the faiths' talk, then the north's own).
-  const northQuest = talkNorthQuest(game, npcId, name, () => talkNorthFaith(game, npcId, name, () => talkNorth(game, npcId, name)) ?? talkNorth(game, npcId, name)); if (northQuest) return northQuest;
-  const faith = talkNorthFaith(game, npcId, name, () => talkNorth(game, npcId, name)); if (faith) return faith;   // the north's faiths (northfaith.ts)   // The Old Agreement (northquest.ts)
+  // The north: the Old Agreement first, then the factions (northfactions.ts), the faiths (northfaith.ts) and the north's own
+  // talk, each one's "Something else." leading on to the next.
+  const northOwn = () => talkNorth(game, npcId, name), faithTalk = () => talkNorthFaith(game, npcId, name, northOwn) ?? northOwn();
+  const factionTalk = () => talkNorthFactions(game, npcId, name, faithTalk) ?? faithTalk();
+  const northQuest = talkNorthQuest(game, npcId, name, factionTalk); if (northQuest) return northQuest;
+  const faction = talkNorthFactions(game, npcId, name, faithTalk); if (faction) return faction;
+  const faith = talkNorthFaith(game, npcId, name, northOwn); if (faith) return faith;   // The Old Agreement (northquest.ts)
   const north = talkNorth(game, npcId, name); if (north) return north;   // A Place to the North's people (north.ts)
   const dragons = talkDragons(game, npcId, name); if (dragons) return dragons;   // Ysolde's second errand comes before her everyday lines (and after her first, mounts.ts)
   const mounts = talkMounts(game, npcId, name); if (mounts) return mounts;
