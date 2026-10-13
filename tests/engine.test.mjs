@@ -622,7 +622,7 @@ test("A Friend's Feast from start to finish", () => {
   assert.equal(g.player.quests.friends_feast, 2);
   assert.equal(questPoints(g), 1);
   assert(level(g, "cooking") >= 10, "Quest XP");
-  assert.equal(QUESTS.length, 109); assert.equal(MAX_QUEST_POINTS, 189);
+  assert.equal(QUESTS.length, 111); assert.equal(MAX_QUEST_POINTS, 193);
 });
 
 test("Grumblin Trouble counts kills and pays out", () => {
@@ -1968,7 +1968,7 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   assert.equal(p.quests.dawn_against_hollow, 2); assert(has(p, "dawnplate_cuirass"));
   assert.equal(count(p, "hollow_essence"), 0);
   assert.equal(capeProblem(g, "dawnplate_cuirass"), null, "the armoury sells Dawnplate once earned");
-  assert.equal(QUESTS.length, 109); assert.equal(MAX_QUEST_POINTS, 189);
+  assert.equal(QUESTS.length, 111); assert.equal(MAX_QUEST_POINTS, 193);
 });
 
 test("Boots and gauntlets in every metal, smithed at the anvil; the clothier's shirts, dresses, trousers and skirts", () => {
@@ -4947,4 +4947,45 @@ test("Heal Other: two tiers of faith (24 and 62) that heal your companion or ano
   assert.equal(takeHeal(g, from, "Friend #2", "heal_other", 5), 5);
   // Never in the ring.
   const ring = g.world.places.ring; if (ring && inRing(ring.x, ring.y)) { g.tick += HEAL_GAP; teleport(g, ring.x, ring.y); assert.equal(takeHeal(g, { id: 2, x: ring.x + 1, y: ring.y }, "Friend #2", "heal_other", 5), 0, "no healing in the ring"); }
+});
+
+test("The north's faiths: a blessing asked at a sacred place with a loaf (one at a time, from either faith, nobody converts); the Last Ember and the Turning Year, each a quarrel the player settles, and the blessings go where the choice leaves them; the Remembered Name keeps you standing once", async () => {
+  const F = await import("../games/rarefriends-realm/northfaith.ts");
+  const { talk, questDone } = await import("../games/rarefriends-realm/content.ts");
+  const { die } = await import("../games/rarefriends-realm/engine.ts");
+  const g = newGame(), p = g.player, world = g.world;
+  const obj = clue => world.objects.find(o => o.clue === clue);
+  for (const id of ["ember_hearth", "ember_stone", "ember_pot", "gull_hearth", "house_hearth", "bough_post", "white_spring", "ancestors_howe"]) assert.ok(obj(id), `${id} is in the world`);
+  const use = (object, option) => { standBy(g, object); const n = g.messages.length; setTarget(g, { kind: "object", id: object.id, option }); for (let k = 0; k < 30 && g.dialogue === null && g.messages.length === n; k++) tick(g); };
+  const choose = (d, label) => { const o = d.options?.find(x => x.label === label); assert.ok(o, `"${label}" offered`); const next = o.then(); next?.onEnd?.(); return next; };
+  // Before either quest: guest-right at the Last Ember, hearth-warmth at either of the Zoryavik's places; nothing at Eyvind's pot.
+  assert.deepEqual(F.siteBlessings(g, "ember_hearth").give, ["guest_right"]); assert.deepEqual(F.siteBlessings(g, "ember_pot").give, []);
+  assert.deepEqual(F.siteBlessings(g, "house_hearth").give, ["hearth_warmth"]); assert.deepEqual(F.siteBlessings(g, "bough_post").give, ["hearth_warmth"]);
+  assert.ok(!F.askBlessing(g, "ember_hearth", "crossing_oath"), "not one this place gives yet");
+  take(p, "bread", count(p, "bread")); assert.ok(!F.askBlessing(g, "ember_hearth", "guest_right"), "Faith 10 first"); p.xp.prayer = XP_TABLE[50];
+  assert.ok(!F.askBlessing(g, "ember_hearth", "guest_right"), "and a loaf"); give(p, "bread", 10);
+  assert.ok(F.askBlessing(g, "ember_hearth", "guest_right")); assert.ok(F.blessed(g, "guest_right")); assert.equal(F.blessingFood(g), 1.25); assert.equal(count(p, "bread"), 9);
+  // The Last Ember: the hearth, Eyvind, three accounts, and Yrsa's question.
+  choose(talk(g, "ember_keeper_yrsa"), "I'll find out who."); assert.equal(p.quests[F.LAST_EMBER], 1);
+  use(obj("ember_hearth"), "Search"); assert.equal(p.questData.le_hearth, 1);
+  talk(g, "ember_carrier_eyvind").onEnd?.(); assert.equal(p.questData.le_step, 2);
+  use(obj("ember_stone"), "Read"); choose(talk(g, "ember_skald"), "Tell me the oldest verse about the Ember."); assert.equal(p.questData.le_step, 2);
+  choose(talk(g, "oathmaster_brand"), "What do you make of the Last Ember?"); assert.equal(p.questData.le_step, 3);
+  choose(talk(g, "ember_keeper_yrsa"), "Every hearth. Thora carried it; let it be carried."); assert.ok(questDone(g, F.LAST_EMBER));
+  assert.deepEqual(F.siteBlessings(g, "ember_hearth").give, [], "Yrsa won't bless you"); assert.equal(F.siteBlessings(g, "ember_pot").give.length, 3); assert.equal(F.siteBlessings(g, "gull_hearth").give.length, 3);
+  // The Remembered Name: once, you stand back up; then death is death.
+  assert.ok(F.askBlessing(g, "ember_pot", "remembered_name")); assert.ok(!F.blessed(g, "guest_right"), "one blessing at a time");
+  const deaths = p.deaths; p.hp = 0; die(g); assert.equal(p.deaths, deaths, "kept standing"); assert.ok(p.hp > 0 && p.hp <= Math.ceil(maxHp(p) / 4));
+  p.hp = 0; die(g); assert.equal(p.deaths, deaths + 1, "only once");
+  // The Turning Year: the spring, the howes, Ilya; the Archive's liturgy; Dobromir's midsummer night.
+  choose(talk(g, "old_bough_keeper"), "Can I help keep the rite?"); assert.equal(p.quests[F.TURNING_YEAR], 1);
+  use(obj("white_spring"), "Draw-water"); use(obj("ancestors_howe"), "Leave-bread"); assert.equal(count(p, "bread"), 7);
+  choose(talk(g, "hearth_father_ilya"), "Why forbid the fires at the oak?"); assert.equal(p.questData.ty_step, 2);
+  choose(talk(g, "archivist_bozhena"), "Show me the oldest liturgy."); assert.equal(p.questData.ty_step, 3);
+  choose(talk(g, "old_bough_keeper"), "Carry the hearth's fire to the oak, and home again."); assert.ok(questDone(g, F.TURNING_YEAR));
+  assert.deepEqual(F.siteBlessings(g, "house_hearth").give, ["hearth_warmth", "ancestors_watch"]); assert.deepEqual(F.siteBlessings(g, "bough_post").give, ["hearth_warmth", "boughs_year"]);
+  assert.ok(F.askBlessing(g, "house_hearth", "ancestors_watch")); assert.equal(F.blessingTaken(g), 0.1);
+  // Kept through a save; gone when it's worn out.
+  const fresh = newGame(); restore(fresh, serialize(g)); assert.equal(fresh.player.blessing?.id, "ancestors_watch"); assert.ok(fresh.player.blessing.until - fresh.tick <= F.BLESSING_TICKS);
+  g.tick += F.BLESSING_TICKS + 1; tick(g); assert.equal(p.blessing, null);
 });

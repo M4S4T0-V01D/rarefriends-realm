@@ -269,6 +269,7 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
     put2(cx + 18, Y0 + 30, "plaque", "The Law Rock: where the Lawspeaker stands to say the law aloud");
     house(X0 + 3, Y0 + 12, X0 + 15, Y0 + 20, "e", "Jarl Hallveig's hall", "hall");
     house(X1 - 14, Y0 + 3, X1 - 3, Y0 + 9, "s", "The Mead Hall of the Grey Gull", "longhouse");
+    put2(X1 - 11, Y0 + 6, "hearth", "The Grey Gull's long hearth", false); clue(X1 - 11, Y0 + 6, "gull_hearth");
     house(X0 + 4, Y1 - 10, X0 + 13, Y1 - 4, "n", "The Skarnholm smithy", "longhouse", T.STONE);
     t.add({ kind: "furnace", x: X0 + 6, y: Y1 - 7, blocks: true, name: "Furnace" }); t.add({ kind: "anvil", x: X0 + 10, y: Y1 - 7, blocks: true, name: "Anvil" });
     house(X1 - 13, Y1 - 10, X1 - 3, Y1 - 4, "n", "The Skarnholm counting-house", "longhouse");
@@ -293,7 +294,8 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
     for (const [dx, dy] of [[24, 4], [26, 8], [22, 14]] as const) put2(X0 + dx, Y0 + dy, dx === 24 ? "nets" : "drying_rack", dx === 24 ? "Nets, mended and drying" : "Fish drying on the rack");
     pier(X0 - 1, Y0 + 8, -1, 0, 6); put2(X0 - 6, Y0 + 7, "boat", "A fishing boat, pulled up");
     t.shoreSpots(X0 - 20, Y0 - 10, X0 + 4, Y1 + 10, "net", 3); t.shoreSpots(X0 - 20, Y0 - 10, X0 + 4, Y1 + 10, "harpoon", 2);
-    npc("ravnsvik_netmender", X0 + 23, Y0 + 6); npc("vargskeld_villager", X0 + 10, Y0 + 9, 4); npc("vargskeld_villager", X0 + 18, Y0 + 15, 4);
+    npc("ravnsvik_netmender", X0 + 23, Y0 + 6);
+    { const at = openNear(X0 + 26, Y0 + 12); npc("ember_carrier_eyvind", at.x, at.y); const pot = openNear(at.x + 2, at.y); put2(pot.x, pot.y, "campfire", "Eyvind's pot of coals", false); clue(pot.x, pot.y, "ember_pot"); } npc("vargskeld_villager", X0 + 10, Y0 + 9, 4); npc("vargskeld_villager", X0 + 18, Y0 + 15, 4);
     sign(X1 + 1, Y0 + 9, "Ravnsvik", "RAVNSVIK. Cod, herring, and the news from the sea before Skarnholm has it.");
   }
 
@@ -318,8 +320,9 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
     const X0 = 196, Y0 = 268, X1 = 236, Y1 = 296, cx = (X0 + X1) >> 1;
     ground(X0, Y0, X1, Y1, "embermoot");
     house(cx - 7, Y0 + 3, cx + 7, Y0 + 12, "s", "The Hall of the Last Ember", "hall", T.STONE);
-    put2(cx, Y0 + 7, "hearth", "The Last Ember: a fire that has not gone out since the first ship came", false);
-    for (let k = 0; k < 14; k++) { const x = X0 + 3 + (k % 7) * 5, y = Y0 + 17 + Math.floor(k / 7) * 5; put2(x, y, "obelisk", k % 3 ? "A runestone for the remembered dead" : "A runestone, its runes recut by a different hand"); }
+    put2(cx, Y0 + 7, "hearth", "The Last Ember: a fire that has not gone out since the first ship came", false); clue(cx, Y0 + 7, "ember_hearth");
+    for (let k = 0; k < 14; k++) { const x = X0 + 3 + (k % 7) * 5, y = Y0 + 17 + Math.floor(k / 7) * 5; put2(x, y, "obelisk", k % 3 ? "A runestone for the remembered dead" : k ? "A runestone, its runes recut by a different hand" : "Thora's runestone, the oldest, its runes recut by a newer hand"); }
+    clue(X0 + 3, Y0 + 17, "ember_stone");   // (the first: Thora's, northfaith.ts)
     for (let k = 0; k < 4; k++) put2(X1 - 3, Y0 + 4 + k * 4, "grave", "A howe, turf over stone");
     npc("ember_keeper_yrsa", cx + 2, Y0 + 14); npc("ember_skald", cx - 6, Y0 + 15, 2);
     sign(cx, Y1 + 1, "Embermoot", "EMBERMOOT. The Keepers of the Last Ember. Here the dead are remembered by name. Ask, and a skald will tell you theirs; tell yours, and it will be kept.");
@@ -419,6 +422,7 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
     for (const [tx, ty] of [[X0 - 2, Y0 - 2], [X1 - 3, Y0 - 2], [X0 - 2, Y1 - 3], [X1 - 3, Y1 - 3]] as const) house(tx, ty, tx + 5, ty + 5, "s", "A tower of Krasnogor's palisade", "tower");
     house(cx - 11, Y0 + 4, cx + 11, Y0 + 16, "s", "The Terem of Krasnogor", "terem", T.CARPET, { roof: "cone", keep: { size: 5, storeys: 1, spire: 18, dome: true }, color: "#7d2f26" });
     house(X0 + 4, Y0 + 4, X0 + 16, Y0 + 14, "e", "The House of the Hearth-Fathers", "terem", T.WOOD, { roof: "cone", keep: { size: 3, storeys: 1, spire: 14, dome: true }, color: "#3e5a3a" });
+    put2(X0 + 7, Y0 + 7, "hearth", "The House's hearth and the ancestors' corner", false); clue(X0 + 7, Y0 + 7, "house_hearth");
     put2(cx + 6, cy + 5, "table", "A trestle of honey and wax"); for (const [sx, sy] of [[cx - 8, cy + 4], [cx - 4, cy + 4], [cx + 4, cy + 4], [cx + 8, cy + 4]] as const) put2(sx, sy, "crate", "Furs, honey, wax and amber, for sale");
     t.add({ kind: "well", x: cx + 3, y: cy - 4, blocks: true, name: "The square's well" });
     house(X1 - 15, Y0 + 4, X1 - 4, Y0 + 11, "s", "The Krasnogor counting-house", "izba"); t.add({ kind: "bank", x: X1 - 10, y: Y0 + 7, blocks: true, name: "Bank chest" });
@@ -487,6 +491,8 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
     for (const [sx, sy] of [[cx - 7, Y0 + 5], [cx - 4, Y0 + 5], [cx + 4, Y0 + 5], [cx + 7, Y0 + 5]] as const) put2(sx, sy, "shelf", "Chronicles, shelved by year and disputed by the shelf");
     house(X0 + 2, Y1 - 8, X0 + 10, Y1 - 3, "n", "The scriptorium", "izba");
     npc("archivist_bozhena", cx, Y0 + 9); npc("archive_copyist", X0 + 6, Y1 - 5, 2);
+    // The ancestors' howes, west of the Archive (northfaith.ts: bread is left on them).
+    for (const [hx, hy] of [[X0 - 6, Y1 - 6], [X0 - 10, Y1 - 10], [X0 - 13, Y1 - 4]] as const) { const at = openNear(hx, hy); put2(at.x, at.y, "grave", "An ancestors' howe"); clue(at.x, at.y, "ancestors_howe"); }
     sign(cx + 3, Y1 + 1, "The Dawn Archive", "THE DAWN ARCHIVE at Svetloye. Every chronicle of the Zoryavik, and every chronicle that disagrees with it. Read here; do not take; argue quietly.");
   }
 
@@ -496,6 +502,8 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
     ground(cx - 12, cy - 9, cx + 12, cy + 9, "old_bough", T.DARK_GRASS);
     t.clearAt(cx, cy); t.tree(cx, cy, "oak");
     for (let k = 0; k < 12; k++) { const a = (k / 12) * Math.PI * 2; put2(Math.round(cx + Math.cos(a) * 8), Math.round(cy + Math.sin(a) * 6), k % 3 ? "stump" : "obelisk", k % 3 ? "A stump, ribbons tied round it" : "A carved post: a face in the wood, eyes closed"); }
+    for (let k = 0; k < 12; k += 3) { const a = (k / 12) * Math.PI * 2; clue(Math.round(cx + Math.cos(a) * 8), Math.round(cy + Math.sin(a) * 6), "bough_post"); }
+    { const at = openNear(cx + 4, cy + 13); put2(at.x, at.y, "boulder", "The White Spring"); clue(at.x, at.y, "white_spring"); }
     npc("old_bough_keeper", cx + 2, cy + 3, 2);
     sign(cx - 3, cy + 10, "The Old Bough", "THE OLD BOUGH. The Circle keeps this grove as their grandmothers did. Walk round, not through. The oak was old when the princes were young.");
   }

@@ -38,6 +38,7 @@ import { clueExamine, clueOptions, onKharavethTick, useClue } from "./kharaveth.
 import { studySeal } from "./dynasties.ts";
 import { cleanTrails } from "./wayfinding.ts";
 import { dyeSails, hasFitout } from "./shipfit.ts";
+import { blessingFood, blessingHerb, blessingRegen, blessingTaken, blessingTick, cleanBlessing, rememberedName, saveBlessing } from "./northfaith.ts";
 import { allyOf, callNext, cleanCompanions, cleanTrust, findsHerbs, canSpare, companionFell, companionMenu, companionOut, companionTick, drawsFire, freeSnared, homeOnDeath, placeCompanion, sendHome, spare, speciesOfWild, useOnCreature } from "./beasts.ts";
 import { launchCarried, VESSELS, aboard, applyVessels, berthRespawn, canStow, cleanVessels, fitToVessel, goAshore, holdAt, nearestLanding, ringBell, sailable, sailed, settleAboard, stowInHold, vesselTick } from "./seafaring.ts";
 import {
@@ -610,7 +611,7 @@ export function eat(game: Game, slotIndex: number) {
   const player = game.player, slot = player.inventory[slotIndex];
   if (!slot || !item(slot.id).heal) return;
   if (player.eatTimer > 0) return;
-  const heal = Math.round(item(slot.id).heal! * foodBoost(player, game)), before = player.hp;
+  const heal = Math.round(item(slot.id).heal! * foodBoost(player, game) * blessingFood(game)), before = player.hp;
   player.hp = Math.min(maxHp(player), player.hp + heal);
   const energy = item(slot.id).energy ?? 0;
   if (energy) player.energy = Math.min(100, player.energy + energy);
@@ -1323,6 +1324,7 @@ export function tick(game: Game) {
   if (player.restedTicks > 0) { player.restedTicks--; if (player.restedTicks === 0) message(game, "You no longer feel well rested."); }
   if (player.ward && game.tick >= player.wardUntil) { player.ward = null; message(game, "Your ward fades."); }
   if (player.renew > 0 && game.tick < player.renewUntil && player.hp < maxHp(player)) player.hp = Math.min(maxHp(player), player.hp + player.renew);
+  if (player.blessing) blessingTick(game);
   if (player.renew > 0 && game.tick >= player.renewUntil) player.renew = 0;
   // An emote ends when it's done, or when you walk off.
   if (player.emote && (game.tick >= player.emote.until || player.moved === game.tick || player.combat !== null || player.activity)) player.emote = null;
@@ -1525,6 +1527,7 @@ function gatherTick(game: Game, activity: Extract<Activity, { kind: "gather" }>)
   give(player, herb.id); addXp(game, "apothecary", herb.xp); presenceXp(game, 0.5);
   if (mixtureOn(game, 3) && game.rng() < 0.25 && freeSlots(player)) { give(player, herb.id); message(game, "The Division brew splits the pick in two."); }
   if (findsHerbs(game) && freeSlots(player)) { give(player, herb.id); addXp(game, "beastkeeping", 10, { raw: true }); message(game, "Your vixen noses out another."); }
+  if (blessingHerb(game) && freeSlots(player)) { give(player, herb.id); message(game, "The Bough's Year: another, beside the first."); }
   message(game, `You pick some ${herb.name.toLowerCase()}.`); sound(game, "pickup");
   const picked = (game.herbPicks.get(object.id) ?? 0) + 1; game.herbPicks.set(object.id, picked);
   if (picked >= herb.picks) { game.herbPicks.delete(object.id); game.depleted.set(object.id, game.tick + herb.respawn + Math.floor(game.rng() * herb.respawn)); player.activity = null; return; }
@@ -1932,6 +1935,8 @@ function damagePlayer(game: Game, damage: number, from: Monster | null) {
   if (player.ward?.reduce && game.tick < player.wardUntil && damage > 0) damage = Math.max(0, Math.round(damage * (1 - player.ward.reduce)));
   // A carving's shelter (an oak bulwark, a yew warden…).
   if (damage > 0 && game.carvings.length) { const taken = carvingEffect(game).taken; if (taken) damage = Math.max(0, Math.round(damage * (1 - taken))); }
+  // The Ancestors' Watch (the Hearth and the Bough's blessing, northfaith.ts).
+  if (damage > 0 && blessingTaken(game)) damage = Math.max(0, Math.round(damage * (1 - blessingTaken(game))));
   // The Order of the Diamond's steadfast blessing: 2% of a creature's blow turned aside for every piece worn.
   if (from && damage > 0) { const diamond = orderPieces(player.equipment, "diamond"); if (diamond) damage = Math.max(0, Math.round(damage * (1 - 0.02 * diamond))); }
   // A wayward spirit of the Isles strikes softer against the Mizukai wards, the spirit incense and the shrines' charms.
@@ -1948,6 +1953,8 @@ function damagePlayer(game: Game, damage: number, from: Monster | null) {
   if (player.hp <= 0) die(game);
 }
 export function die(game: Game) {
+  // The Remembered Name (the Last Ember's blessing, northfaith.ts): once, you're kept standing. (Not in the Ring, whose magic has its own way.)
+  if (!inRingBuilding(game.player.x, game.player.y) && rememberedName(game, maxHp(game.player))) return;
   activityEvent(game, { kind: "death" });
   homeOnDeath(game);   // (your companion goes home: it doesn't die with you)
   const player = game.player, spawn = game.world.places.spawn;
@@ -2261,7 +2268,7 @@ function upkeep(game: Game) {
   for (const carving of game.carvings) if (carving.until <= game.tick) crumble(game, carving);
   if (game.ground.length) game.ground = game.ground.filter(entry => entry.expires > game.tick);
   // Hitpoints regenerate slowly; Cellular Friends regrow twice as fast, and every Heartguard piece quickens it by 6% (the Hearth cordial, three times as fast).
-  if (++player.regenTimer >= Math.round(regenTicks(player) / (mixtureOn(game, 2) ? 3 : 1) / carvingEffect(game).regen / (byBrazier(game) ? 2 : 1))) { player.regenTimer = 0; if (player.hp < maxHp(player)) player.hp++; }
+  if (++player.regenTimer >= Math.round(regenTicks(player) / (mixtureOn(game, 2) ? 3 : 1) / carvingEffect(game).regen / (byBrazier(game) ? 2 : 1) / blessingRegen(game))) { player.regenTimer = 0; if (player.hp < maxHp(player)) player.hp++; }
   // Poison on you: four doses, ten ticks apart; an antidote ends it.
   if (player.poison && --player.poison.timer <= 0) {
     player.poison.timer = 10; player.poison.left--;
@@ -2954,7 +2961,7 @@ export type SaveData = {
   name?: string | null; fellowship?: { name: string; tag: string; logo?: string; banner?: string; colors?: string[] } | null; title?: string | null; visited?: Record<string, number>; regionTicks?: Record<string, number>; talked?: Record<string, 1>; emotesUsed?: Record<string, 1>; outfits?: Record<string, 1>; friendTicks?: number; mounts?: string[]; mount?: string | null; daily?: unknown; seenUpdate?: number;
   lastMount?: string | null; saddlebags?: unknown; mountReady?: number;
   camps?: Record<string, number>; campTendAt?: number; campSleptAt?: number; waystoneAt?: number;
-  vessels?: unknown; aboard?: number | null; landfalls?: Record<string, number>; trails?: Record<string, number>; companions?: unknown; companionSeq?: number; trust?: unknown;
+  vessels?: unknown; aboard?: number | null; landfalls?: Record<string, number>; trails?: Record<string, number>; companions?: unknown; companionSeq?: number; trust?: unknown; blessing?: unknown;
 };
 export function serialize(game: Game): SaveData {
   const player = game.player;
@@ -2966,7 +2973,7 @@ export function serialize(game: Game): SaveData {
     playTicks: game.playTicks, retaliate: game.autoRetaliate, music: [...player.music],
     referredBy: player.referredBy, referrals: [...player.referrals], referralTimes: [...player.referralTimes], boostTicks: player.boostTicks, coalBag: player.coalBag, stoneBoxGrades: { ...player.stoneBoxGrades }, stoneBox: player.stoneBox, boneBag: { ...player.boneBag }, boosts: { ...player.boosts }, poison: player.poison ? { ...player.poison } : null, weaponPoison: player.weaponPoison ? { ...player.weaponPoison } : null,
     antidoteUntil: Math.max(0, player.antidoteUntil - game.tick), antifireUntil: Math.max(0, player.antifireUntil - game.tick), stealthUntil: Math.max(0, player.stealthUntil - game.tick), tonicUntil: Math.max(0, player.tonicUntil - game.tick), mixture: player.mixture ? { family: player.mixture.family, until: Math.max(0, player.mixture.until - game.tick) } : null,
-    firsts: { ...player.firsts } as Record<string, number>, friendKinds: { ...player.friendKinds } as Record<string, 1>, rumours: { ...player.rumours } as Record<string, 1>, orders: { ...player.orders }, activities: { run: player.activities.run ? { ...player.activities.run, target: { ...player.activities.run.target }, marks: { ...player.activities.run.marks } } : null, records: { ...player.activities.records } }, card: { ...player.card }, collectible: { layout: player.collectible.layout, show: [...player.collectible.show] }, lockbox: player.lockbox.map(slot => ({ ...slot })), settled: [...player.settled], notices: [...player.notices], camp: player.camp ? { ...player.camp, cache: player.camp.cache ? player.camp.cache.map(slot => slot ? { ...slot } : null) : null } : null, campXpAt: player.campXpAt, camps: { ...player.camps }, vessels: player.vessels.map(v => ({ ...v, heading: { ...v.heading }, hold: v.hold.map(slot => slot ? { ...slot } : null) })), aboard: player.aboard, landfalls: { ...player.landfalls }, companions: player.companions.map(c => ({ ...c, pack: c.pack.map(slot => slot ? { ...slot } : null) })), companionSeq: player.companionSeq, trust: Object.fromEntries(Object.entries(player.trust).map(([k, v]) => [k, { n: v.n }])), trails: { ...player.trails }, campTendAt: player.campTendAt, campSleptAt: player.campSleptAt, waystoneAt: Math.min(0, player.waystoneAt - game.tick), cards: { ...player.cards }, rarian: player.rarian, mizukai: player.mizukai, orashai: player.orashai, mana: player.mana, mysteries: { found: { ...player.mysteries.found }, glyphs: { ...player.mysteries.glyphs }, read: { ...player.mysteries.read } }, spiritWardUntil: Math.max(0, player.spiritWardUntil - game.tick), home: player.home ? { ...player.home, furniture: { ...player.home.furniture } } : null, restedTicks: player.restedTicks, sigilBag: { ...player.sigilBag }, ward: player.ward ? { ...player.ward } : null, wardUntil: Math.max(0, player.wardUntil - game.tick), renew: player.renew, renewUntil: Math.max(0, player.renewUntil - game.tick), belts: Object.fromEntries(Object.entries(player.belts).map(([id, contents]) => [id, { ...contents }])), followerWorn: [...player.followerWorn],
+    firsts: { ...player.firsts } as Record<string, number>, friendKinds: { ...player.friendKinds } as Record<string, 1>, rumours: { ...player.rumours } as Record<string, 1>, orders: { ...player.orders }, activities: { run: player.activities.run ? { ...player.activities.run, target: { ...player.activities.run.target }, marks: { ...player.activities.run.marks } } : null, records: { ...player.activities.records } }, card: { ...player.card }, collectible: { layout: player.collectible.layout, show: [...player.collectible.show] }, lockbox: player.lockbox.map(slot => ({ ...slot })), settled: [...player.settled], notices: [...player.notices], camp: player.camp ? { ...player.camp, cache: player.camp.cache ? player.camp.cache.map(slot => slot ? { ...slot } : null) : null } : null, campXpAt: player.campXpAt, camps: { ...player.camps }, vessels: player.vessels.map(v => ({ ...v, heading: { ...v.heading }, hold: v.hold.map(slot => slot ? { ...slot } : null) })), aboard: player.aboard, landfalls: { ...player.landfalls }, companions: player.companions.map(c => ({ ...c, pack: c.pack.map(slot => slot ? { ...slot } : null) })), companionSeq: player.companionSeq, blessing: saveBlessing(game), trust: Object.fromEntries(Object.entries(player.trust).map(([k, v]) => [k, { n: v.n }])), trails: { ...player.trails }, campTendAt: player.campTendAt, campSleptAt: player.campSleptAt, waystoneAt: Math.min(0, player.waystoneAt - game.tick), cards: { ...player.cards }, rarian: player.rarian, mizukai: player.mizukai, orashai: player.orashai, mana: player.mana, mysteries: { found: { ...player.mysteries.found }, glyphs: { ...player.mysteries.glyphs }, read: { ...player.mysteries.read } }, spiritWardUntil: Math.max(0, player.spiritWardUntil - game.tick), home: player.home ? { ...player.home, furniture: { ...player.home.furniture } } : null, restedTicks: player.restedTicks, sigilBag: { ...player.sigilBag }, ward: player.ward ? { ...player.ward } : null, wardUntil: Math.max(0, player.wardUntil - game.tick), renew: player.renew, renewUntil: Math.max(0, player.renewUntil - game.tick), belts: Object.fromEntries(Object.entries(player.belts).map(([id, contents]) => [id, { ...contents }])), followerWorn: [...player.followerWorn],
     lastMount: player.lastMount ?? null, saddlebags: Object.fromEntries(Object.entries(player.saddlebags).map(([id, bags]) => [id, bags.map(slot => slot ? { ...slot } : null)])), mountReady: Math.max(0, player.mountReady - game.tick),
     name: player.name, fellowship: player.fellowship ? { ...player.fellowship } : null, title: player.title, visited: { ...player.visited } as Record<string, number>, regionTicks: { ...player.regionTicks } as Record<string, number>, talked: { ...player.talked } as Record<string, 1>, emotesUsed: { ...player.emotesUsed } as Record<string, 1>, outfits: { ...player.outfits } as Record<string, 1>, friendTicks: player.friendTicks, mounts: [...player.mounts], mount: player.mount, met: JSON.parse(JSON.stringify(player.met)), achievements: { ...player.achievements }, pets: [...player.pets], petOut: player.petOut, killLog: { ...player.killLog }, lore: Object.fromEntries(Object.entries(player.lore).map(([id, entry]) => [id, { ...entry, d: [...entry.d] }])), stats: { ...player.stats }, daily: JSON.parse(JSON.stringify(player.daily)), seenUpdate: player.seenUpdate,
   };
@@ -3114,7 +3121,7 @@ export function restore(game: Game, raw: unknown): boolean {
   player.notices = []; player.cards = Object.fromEntries(Object.entries(save.cards && typeof save.cards === "object" ? save.cards : {}).filter(([id, day]) => /^[a-z0-9_]{1,40}$/.test(id) && typeof day === "number" && Number.isFinite(day)).slice(0, 2000).map(([id, day]) => [id, Math.max(0, Math.floor(day))])); player.rarian = save.rarian === true; player.mizukai = !player.rarian && save.mizukai === true; player.orashai = !player.rarian && !player.mizukai && save.orashai === true; player.mana = typeof save.mana === "number" && Number.isFinite(save.mana) ? Math.max(0, Math.min(maxMana(player), save.mana)) : maxMana(player); player.mysteries = cleanMysteries(save.mysteries); player.spiritWardUntil = game.tick + int(save.spiritWardUntil, 0, 1000, 0); player.home = cleanHome(save.home); player.restedTicks = int(save.restedTicks, 0, 100000, 0); applyHome(game); player.camp = cleanCamp(save.camp); if (player.camp && save.world !== 6) Object.assign(player.camp, movedPoint(game.world, player.camp.x, player.camp.y)); player.campXpAt = int(save.campXpAt, -100000, 1e9, -100000); applyCamp(game);
   // Seafaring: the vessels, where they're moored (older worlds' coordinates moved like everything else), whether you're aboard one.
   player.vessels = cleanVessels(save.vessels, isItem); if (save.world !== 6) for (const v of player.vessels) Object.assign(v, movedPoint(game.world, v.x, v.y));
-  player.aboard = typeof save.aboard === "number" && player.vessels.some(v => v.id === save.aboard) ? save.aboard : null; player.landing = null; player.bellAt = -1e9; player.trails = cleanTrails(save.trails); player.companions = cleanCompanions(save.companions, isItem); player.companionSeq = Number.isInteger(save.companionSeq) ? Math.max(0, save.companionSeq as number) : 0; player.trust = cleanTrust(save.trust);
+  player.aboard = typeof save.aboard === "number" && player.vessels.some(v => v.id === save.aboard) ? save.aboard : null; player.landing = null; player.bellAt = -1e9; player.trails = cleanTrails(save.trails); player.companions = cleanCompanions(save.companions, isItem); player.companionSeq = Number.isInteger(save.companionSeq) ? Math.max(0, save.companionSeq as number) : 0; player.trust = cleanTrust(save.trust); player.blessing = cleanBlessing(save.blessing, game.tick);
   player.landfalls = Object.fromEntries(Object.keys(save.landfalls && typeof save.landfalls === "object" ? save.landfalls : {}).filter(id => /^[a-z0-9_]{1,40}$/.test(id)).slice(0, 400).map(id => [id, 1])) as Record<string, 1>;
   settleAboard(game);
   player.sigilBag = {}; for (const [id, n] of Object.entries(save.sigilBag ?? {})) if (isItem(id) && isSigil(id)) { const v = int(n, 0, SIGIL_BAG_SIZE, 0); if (v) player.sigilBag[id] = v; }

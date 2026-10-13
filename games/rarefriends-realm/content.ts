@@ -27,6 +27,7 @@ import { MOUNT_NPCS, MOUNT_QUESTS, onMountKill, talkMounts } from "./mounts.ts";
 import { DRAGON_QUESTS, onDragonsKill, talkDragons } from "./dragons.ts";
 import { NORTH_NPCS, talkNorth } from "./north.ts";
 import { NORTH_QUESTS, onNorthKill, talkNorthQuest } from "./northquest.ts";
+import { FAITH_NPCS, FAITH_QUESTS, talkNorthFaith } from "./northfaith.ts";
 import { talkShipwright } from "./seafaring.ts";
 import { ACTIVITIES, ACTIVITY_HOSTS, activityProblem, cancelActivity, startActivity } from "./activities.ts";
 import { MEGHAVAN_NPCS, talkMeghavan } from "./meghavanpeople.ts";
@@ -95,6 +96,7 @@ export const NPCS: Record<string, NpcDef> = {
   ...MEGHAVAN_SCHOOL_NPCS,
   ...PORTS_NPCS,
   ...BEAST_NPCS,
+  ...FAITH_NPCS,
   ...BAR_NPCS,
   mender: { id: "mender", name: "Mender Hale", examine: "The chapel's mender. Her hands are always clean and her apron never is.", options: ["Talk-to", "Trade"], shop: "mender", art: art(3, 318) },
   // The wider world's villages (2026-10). Each village's people wear its own clothes (NPC_WEAR / regionalLook in render.ts).
@@ -510,6 +512,7 @@ export const QUESTS: readonly QuestDef[] = [
   ...MOUNT_QUESTS,
   ...DRAGON_QUESTS,
   ...NORTH_QUESTS,
+  ...FAITH_QUESTS,
   ...MEGHAVAN_QUESTS,
   ...MEGHAVAN_SCHOOL_QUESTS,
   ...PORTS_QUESTS,
@@ -848,7 +851,9 @@ function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
   const settlements = talkSettlements(game, npcId, name); if (settlements) return settlements;
   const beasts = talkBeastkeepers(game, npcId, name); if (beasts) return beasts;   // Beastkeeping (beastfolk.ts)
   const shipwright = talkShipwright(game, npcId, name, () => talkNorthQuest(game, npcId, name, () => talkNorth(game, npcId, name)) ?? talkNorth(game, npcId, name) ?? talkPorts(game, npcId, name)); if (shipwright) return shipwright;   // Seafaring (seafaring.ts)
-  const northQuest = talkNorthQuest(game, npcId, name, () => talkNorth(game, npcId, name)); if (northQuest) return northQuest;   // The Old Agreement (northquest.ts)
+  // The Old Agreement first (its "Something else." leads on to the faiths' talk, then the north's own).
+  const northQuest = talkNorthQuest(game, npcId, name, () => talkNorthFaith(game, npcId, name, () => talkNorth(game, npcId, name)) ?? talkNorth(game, npcId, name)); if (northQuest) return northQuest;
+  const faith = talkNorthFaith(game, npcId, name, () => talkNorth(game, npcId, name)); if (faith) return faith;   // the north's faiths (northfaith.ts)   // The Old Agreement (northquest.ts)
   const north = talkNorth(game, npcId, name); if (north) return north;   // A Place to the North's people (north.ts)
   const dragons = talkDragons(game, npcId, name); if (dragons) return dragons;   // Ysolde's second errand comes before her everyday lines (and after her first, mounts.ts)
   const mounts = talkMounts(game, npcId, name); if (mounts) return mounts;

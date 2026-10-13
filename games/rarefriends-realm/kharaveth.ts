@@ -26,6 +26,7 @@ import { MEGHAVAN_SCHOOL_CLUES } from "./meghavanschools.ts";
 import { PYRAMID_CLUES, onPyramidsTick } from "./pyramidsclues.ts";
 import { PORTS_QUEST_CLUES } from "./portsquests.ts";
 import { NORTH_CLUES } from "./northquest.ts";
+import { FAITH_CLUES } from "./northfaith.ts";
 import { VESSEL_CLUES } from "./seafaring.ts";
 import { WAYMARK_CLUES } from "./wayfinding.ts";
 
@@ -189,6 +190,7 @@ export const CLUES: Record<string, Clue> = {
   ...PORTS_QUEST_CLUES,
   // A Place to the North: the Old Agreement's wreck, strongbox, stone and gate (northquest.ts).
   ...NORTH_CLUES,
+  ...FAITH_CLUES,
   // Your vessels, moored (seafaring.ts).
   ...VESSEL_CLUES,
   // The north's trails' waymarks (wayfinding.ts).

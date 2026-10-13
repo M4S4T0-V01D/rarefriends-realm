@@ -3,6 +3,7 @@
  * and drains slower the better you are, hard obstacles can be slipped on, and every lap of a course pays Wayfarer's marks
  * that Coach Skip trades for gear. The obstacle activity itself runs in engine.ts.
  */
+import { blessingRun } from "./northfaith.ts";
 import { WAYFARER_MARK, WAYFARER_REWARDS, item } from "./data.ts";
 import { count, giveOrDrop, level, message, sound, take, wayfarerPieces, wornWeight, type Game } from "./state.ts";
 import { carriesCompass, carriesFrame } from "./camping.ts";
@@ -20,7 +21,7 @@ export function slipChance(game: Game, obstacle: { level: number }) {
 /** Running drains less the better your Wayfaring (40% less at 99), and less again in the Wayfarer's cape (20%, 40% in the full outfit), and half on a trail you know (wayfinding.ts). */
 export function runDrain(game: Game) {
   const player = game.player, cape = player.equipment.cape === "wayfarer_cape" ? (wayfarerPieces(player) >= 4 ? 0.6 : 0.8) : 1;
-  return (player.familyId === 5 ? 0.36 : 0.6) * (1 - level(game, "agility") * 0.004) * cape * (carriesCompass(player) ? 0.9 : 1) * (1 + weightPenalty(game)) * (onKnownTrail(game) ? 0.5 : 1) * (easesTheRoad(player) ? 0.8 : 1);
+  return (player.familyId === 5 ? 0.36 : 0.6) * (1 - level(game, "agility") * 0.004) * cape * (carriesCompass(player) ? 0.9 : 1) * (1 + weightPenalty(game)) * (onKnownTrail(game) ? 0.5 : 1) * (easesTheRoad(player) ? 0.8 : 1) * blessingRun(game);
 }
 /**
  * The load you carry: every worn thing weighs something, and running under forty kilograms drains twice as fast.

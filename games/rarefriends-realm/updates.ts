@@ -4,6 +4,12 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 131, date: "2026-10-13", title: "The north's faiths: the Last Ember, and the Hearth and the Bough", items: [
+    "The north keeps its own faiths, and nobody has to convert to one. Ask a blessing at a sacred place, with a loaf of bread as a guest brings to a hearth, and carry it about twenty minutes. One blessing at a time, from either faith.",
+    "The Last Ember, kept at Embermoot: Guest-right (food heals a quarter more, Faith 10), the Crossing Oath (running tires you a quarter less, Faith 25), the Remembered Name (once, a blow that would fell you leaves you standing, Faith 45).",
+    "The Hearth and the Bough, kept in Krasnogor's House of the Hearth-Fathers and at the Old Bough: Hearth-warmth (hitpoints come back twice as fast, Faith 10), the Ancestors' Watch (a tenth of every blow turned aside, Faith 25), the Bough's Year (now and then a second herb, Faith 45).",
+    "Two new quests, each a quarrel inside a faith that you settle. The Last Ember (Ember-keeper Yrsa, Embermoot): who took the coals, and was the first ember ever the hall's? The Turning Year (Old Dobromir, the Old Bough): the midsummer fires are forbidden at the oak. Where the blessings are given afterwards, and who will give them to you, is what you chose.",
+  ] },
   { id: 130, date: "2026-10-13", title: "Heal Other", items: [
     "Two new Faith spells pass the Old Friend's light on: Heal Other at Faith 24 (heals 12) and Greater Heal Other at Faith 62 (heals 28). Choose one from the Faith tab, then click another player or your own companion within eight tiles.",
     "Only someone hurt can be healed (so there's no Faith XP in healing the healthy), and nobody in the sparring ring or the Ring: a fight there is between the two of you.",

@@ -4,6 +4,7 @@
  * an element, a method, a tradition, a boost) that the in-game guide offers as filters down its right-hand side, the way
  * an old-school skill guide lets you look at one kind of thing at a time.
  */
+import { BLESSINGS, BLESSING_IDS } from "./northblessings.ts";
 import {
   BOWS, COOKING, CRAFTING, CROSSBOWS, STOCKS, WAR_BOWS, FIREMAKING, FISHING_SPOTS, FLETCH_ARROWS, FLETCH_BOWS, GEM_CUTTING, ITEM_LIST, METALS, MONSTERS, PRAYERS, ROCKS, SIGILCRAFT,
   SKILL_NAMES, SLAYER_SETS, SLAYER_TASKS, COURSES, WAYFARER_REWARDS, FAMILY_NAMES, SMELTING, SPELLS, TREES, SIGIL_STONES, sigilsPerStone, item, type Skill, CARVINGS, type Prayer, type Spell,
@@ -124,6 +125,8 @@ export function skillGuide(skill: Skill): GuideEntry[] {
     case "magic": for (const spell of SPELLS) if (spell.skill !== "prayer") out.push({ level: spell.level, name: spell.name, detail: spell.description, spell: spell.id, tags: spellTags(spell) }); out.push(...gear("magic")); add(30, "Sigil satchel", "The Mage's Satchel (Archmage Solenne): a bag that holds 2,000 of every sigil and casts from them", "sigil_satchel", T("tool")); break;
     case "prayer":
       for (const prayer of PRAYERS) add(prayer.level, prayer.name, prayer.description, undefined, prayerTags(prayer));
+      // The north's blessings (northfaith.ts): asked at a faith's sacred places, with a loaf; one at a time.
+      for (const id of BLESSING_IDS) { const b = BLESSINGS[id]; add(b.level, b.name, `${b.text} ${b.faith === "ember" ? "A blessing of the Last Ember (Embermoot; the Last Ember quest decides where else)" : "A blessing of the Hearth and the Bough (Krasnogor's House, the Old Bough; the Turning Year quest decides which)"}, asked with a loaf of bread.`, undefined, T("ability")); }
       for (const spell of SPELLS) if (spell.skill === "prayer") out.push({ level: spell.level, name: `Spell: ${spell.name}`, detail: `${spell.description} (Faith tab of the spellbook)`, spell: spell.id, tags: spellTags(spell) });
       out.push(...gear("prayer"), ...orderArms("prayer"));
       for (const bones of ITEM_LIST.filter(entry => entry.bones)) add(1, `Bury ${bones.name.toLowerCase()}`, `${bones.bones} Faith XP (twice that offered on an altar, three times in the Dawnhold chapel)`, bones.id, T("bones"));
