@@ -211,10 +211,11 @@ try {
   // when the pointer moves, and stops when you let go.
   {
     const start = await state(() => ({ x: window.__realm.game().player.x, y: window.__realm.game().player.y }));
-    // Somewhere near with an open band of ground three rows deep (no objects, people, walls, water or cliffs) to walk along.
+    // Somewhere near with an open band of ground three rows deep (no objects, walls, water or cliffs, and nobody within a
+    // couple of tiles, whose sprite could stand over the pointer) to walk along.
     const spot = await state(() => {
       const g = window.__realm.game(), w = g.world, p = g.player, W = w.tiles.length / 2600;
-      const free = (x, y) => w.objectAt[y * W + x] < 0 && ![0, 6, 7, 15, 16, 21].includes(w.tiles[y * W + x]) && !g.npcs.some(n => n.x === x && n.y === y);
+      const free = (x, y) => w.objectAt[y * W + x] < 0 && ![0, 6, 7, 15, 16, 21].includes(w.tiles[y * W + x]) && !g.npcs.some(n => Math.abs(n.x - x) <= 2 && Math.abs(n.y - y) <= 3);
       for (let r = 0; r < 60; r++) for (let dy = -r; dy <= r; dy++) for (const dx of [-r, r]) {
         const x = p.x + dx, y = p.y + dy; let clear = true;
         for (let j = -1; j <= 1 && clear; j++) for (let i = -9; i <= 9 && clear; i++) clear = free(x + i, y + j);
