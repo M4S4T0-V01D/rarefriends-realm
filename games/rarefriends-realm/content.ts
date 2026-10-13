@@ -25,6 +25,7 @@ import { HEARTHKIN_NPCS, HEARTHKIN_QUESTS, talkHearthkin } from "./hearthkin.ts"
 import { SETTLEMENT_NPCS, SETTLEMENT_QUESTS, onSettlementsKill, talkSettlements } from "./settlements.ts";
 import { MOUNT_NPCS, MOUNT_QUESTS, onMountKill, talkMounts } from "./mounts.ts";
 import { DRAGON_QUESTS, onDragonsKill, talkDragons } from "./dragons.ts";
+import { NORTH_NPCS, talkNorth } from "./north.ts";
 import { ACTIVITIES, ACTIVITY_HOSTS, activityProblem, cancelActivity, startActivity } from "./activities.ts";
 import { MEGHAVAN_NPCS, talkMeghavan } from "./meghavanpeople.ts";
 import { MEGHAVAN_QUESTS, MEGHAVAN_QUEST_NPCS, onMeghavanKill, talkMeghavanQuests } from "./meghavanquests.ts";
@@ -85,6 +86,7 @@ export const NPCS: Record<string, NpcDef> = {
   ...HEARTHKIN_NPCS,
   ...SETTLEMENT_NPCS,
   ...MOUNT_NPCS,
+  ...NORTH_NPCS,
   ...MEGHAVAN_NPCS,
   ...MEGHAVAN_QUEST_NPCS,
   ...MEGHAVAN_SCHOOL_NPCS,
@@ -839,6 +841,7 @@ function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
   const road = talkHiddenRoad(game, npcId, name); if (road) return road;
   const hearthkin = talkHearthkin(game, npcId, name); if (hearthkin) return hearthkin;
   const settlements = talkSettlements(game, npcId, name); if (settlements) return settlements;
+  const north = talkNorth(game, npcId, name); if (north) return north;   // A Place to the North's people (north.ts)
   const dragons = talkDragons(game, npcId, name); if (dragons) return dragons;   // Ysolde's second errand comes before her everyday lines (and after her first, mounts.ts)
   const mounts = talkMounts(game, npcId, name); if (mounts) return mounts;
   const heartlands = talkHeartlands(game, npcId, name); if (heartlands) return heartlands;

@@ -4433,3 +4433,36 @@ test("Camping grown: the cache keeps twelve things and comes home with the kit, 
   teleport(g, spot.x, spot.y + 1); const free = p.inventory.filter(s => !s).length; p.inventory.fill(null); p.inventory[0] = { id: "pewter_camp_kit", n: 1 }; assert.ok(packUpCamp(g)); assert.equal(count(p, "frostsilver_camp_cache"), 1); assert.equal(count(p, "feather"), 5); assert.equal(p.camp, null); void free;
   applyCamp(g); assert.ok(!g.world.objects.some(o => o.text === "camp_cache" && o.name !== "__removed"));
 });
+
+test("A Place to the North: the Vargskeld and the Zoryavik above the old map, each region labelled on its own ground, the roads up from the Vesperwold and the Deadwood, every person and town service reachable on foot from Friendhollow, and their talk", async () => {
+  const { NORTH_NPCS } = await import("../games/rarefriends-realm/north.ts");
+  const { talk } = await import("../games/rarefriends-realm/content.ts");
+  const { trackFor } = await import("../games/rarefriends-realm/audio.ts");
+  const g = newGame(), world = g.world, top = mainlandAt(0, 0).y;
+  const ids = ["vargskeld", "vargskeld_sea", "skarnholm", "ravnsvik", "oathsworn_hall", "embermoot", "redwake_camp", "varn_ridge", "oathgate_pass", "zoryavik", "zoryavik_coast", "hearthwatch", "krasnogor", "bereslav", "zlatna_gora", "svetloye", "old_bough"];
+  for (const id of ids) {
+    const region = REGIONS.find(r => r.id === id); assert.ok(region, `${id} is a region`);
+    assert.equal(regionAt(world, region.label.x, region.label.y).id, id, `${id}'s label stands in it`);
+    assert.ok(region.label.y < top, `${id} lies above the old map`); assert.ok(trackFor(id, false), `${id} has music`);
+  }
+  // The roads north: a sign where each leaves the old map, in the Vesperwold and in the Deadwood.
+  const signs = world.objects.filter(o => o.kind === "sign" && /^NORTH: the (Vargskeld|Zoryavik)/.test(o.text));
+  assert.deepEqual(signs.map(o => regionAt(world, o.x, o.y).id).sort(), ["deadwood", "vesperwold"]);
+  // Everyone and every bank, furnace, anvil and well in the north is a walk from Friendhollow.
+  const seen = reachable(g, world.places.spawn);
+  const near = (x, y) => [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]].some(([dx, dy]) => seen[(y + dy) * W + x + dx]);
+  for (const id of Object.keys(NORTH_NPCS)) {
+    const at = world.spawns.filter(s => s.kind === "npc" && s.id === id); assert.ok(at.length, `${id} is placed`);
+    for (const s of at) { assert.ok(near(s.x, s.y), `${id} is reachable`); assert.ok(s.y < top, `${id} lives in the north`); }
+  }
+  const services = world.objects.filter(o => o.y < top && ["bank", "furnace", "anvil", "well"].includes(o.kind));
+  assert.ok(services.filter(o => o.kind === "bank").length >= 2 && services.length >= 8, "banks, smithies and wells in the towns");
+  for (const o of services) assert.ok(near(o.x, o.y), `the ${o.kind} at ${o.x},${o.y} is reachable`);
+  // Every person speaks; the leaders answer questions and let you go.
+  assert.ok(Object.keys(NORTH_NPCS).length >= 30);
+  for (const id of Object.keys(NORTH_NPCS)) { const d = talk(g, id); assert.ok(d && d.lines.length && d.lines[0].text, `${id} talks`); }
+  let d = talk(g, "jarl_hallveig"); assert.ok(d.options.some(o => o.label === "Goodbye."));
+  d = d.options.find(o => o.label === "What is the old agreement?").then(); assert.match(d.lines[0].text, /The Zoryavik stopped keeping their half/);
+  d = talk(g, "prince_radomir");
+  assert.ok(d.options.some(o => o.label === "What is the old agreement?" || o.label === "Who rules the Zoryavik?"), "the prince answers too");
+});

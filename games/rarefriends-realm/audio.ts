@@ -695,6 +695,10 @@ const KHARAVETH_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { sunteeth: "
   siruvet_pyramid: "kharaveth_azhurak", uncounted_deep: "kharaveth_underway", measured_vault: "kharaveth_underway" };
 /** The sea ports' pieces, borrowed from their neighbours: Saltmarrow's shanty for Gullwick, the Crownlands' hymn for Saltreach, Kharaveth's for the east. */
 /** The dragons' places (dragonsworld.ts) borrow their neighbours' pieces. */
+/** The north's places borrow pieces until they have their own: the cold coast and the high ground for the Vargskeld, the forest and the towns for the Zoryavik. */
+const NORTH_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { vargskeld: "frostpeak", vargskeld_sea: "coast", skarnholm: "saltmarrow", ravnsvik: "coast", oathsworn_hall: "greyhorn", embermoot: "silent_peaks",
+  redwake_camp: "westmarch", varn_ridge: "frostpeak", oathgate_pass: "drakespine", zoryavik: "barkreach", zoryavik_coast: "coast", hearthwatch: "greyhorn", krasnogor: "highcairn", bereslav: "fernwick",
+  zlatna_gora: "ironreach", svetloye: "crownlands", old_bough: "heartwood" };
 const DRAGON_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { bonefield: "deadwood", cragmaw_heights: "ironreach", qeshet: "kharaveth_dunes", sunken_halls: "kharaveth_underway" };
 const PORTS_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { gullwick: "saltmarrow", saltreach: "crownlands", merrab: "kharaveth_sefrah", tel_ashun: "kharaveth_azhurak", ennus_well: "kharaveth_dunes" };
 /** Which Mizukai piece plays where. */
@@ -718,7 +722,7 @@ export function trackFor(region: RegionId, nearBoss: boolean, mizukai: { sea?: b
   if (nearBoss) return "boss";
   // The Mizukai Isles: the place's own piece, the sea's on a crossing, and in a fight the battle (or, against one of the great spirits, theirs).
   if (mizukai.sea) return "mizukai_sea";
-  const south = KHARAVETH_REGION_TRACK[region] ?? MEGHAVAN_REGION_TRACK[region] ?? PORTS_REGION_TRACK[region] ?? DRAGON_REGION_TRACK[region];
+  const south = KHARAVETH_REGION_TRACK[region] ?? MEGHAVAN_REGION_TRACK[region] ?? PORTS_REGION_TRACK[region] ?? DRAGON_REGION_TRACK[region] ?? NORTH_REGION_TRACK[region];
   if (south) return south;
   const isles = MIZUKAI_REGION_TRACK[region];
   if (isles) return mizukai.spirit ? "mizukai_spirit" : mizukai.fight ? "mizukai_battle" : isles;

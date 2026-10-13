@@ -22,6 +22,7 @@ import { buildMountCountry } from "./mountworld.ts";
 import { buildWyrmreach } from "./wyrmreachworld.ts";
 import { buildDragons } from "./dragonsworld.ts";
 import { buildQuestMounts } from "./questmountsworld.ts";
+import { buildNorth } from "./northworld.ts";
 
 /**
  * The far west (Return of Raria): the world grew by WEST_DX columns on its west side for a second continent, Raria and
@@ -206,6 +207,9 @@ export type RegionId =
   | "siruvet_pyramid" | "uncounted_deep" | "measured_vault"
   // More dragons (dragonsworld.ts): the Bonefield in the Deadwood, the Cragmaw Heights north of Ironreach, Qeshet in the Sea of Dunes and the Sunken Halls under it.
   | "bonefield" | "cragmaw_heights" | "qeshet" | "sunken_halls"
+  // A Place to the North (northworld.ts): the Vargskeld, the Varn Ridge and the Oathgate between, the Zoryavik; their towns and places.
+  | "vargskeld" | "vargskeld_sea" | "skarnholm" | "ravnsvik" | "oathsworn_hall" | "embermoot" | "redwake_camp" | "varn_ridge" | "oathgate_pass"
+  | "zoryavik" | "zoryavik_coast" | "hearthwatch" | "krasnogor" | "bereslav" | "zlatna_gora" | "svetloye" | "old_bough"
   // The sea ports: Gullwick on the mainland, Saltreach below Raria, and Merrab, Tel Ashun and Ennu's Well in Kharaveth's east.
   | "gullwick" | "saltreach" | "merrab" | "tel_ashun" | "ennus_well";
 export type Region = { id: RegionId; name: string; label: { x: number; y: number }; danger: number; underground?: boolean;
@@ -328,6 +332,13 @@ export const REGIONS: readonly Region[] = [
   { id: "cragmaw_heights", name: "The Cragmaw Heights", label: { x: 1078, y: 80 }, danger: 6, far: true },
   { id: "qeshet", name: "Qeshet", label: { x: 150, y: 792 - 360 }, danger: 6, far: true },
   { id: "sunken_halls", name: "The Sunken Halls", label: { x: 150, y: FRAME_UNDER_Y + 805 - 360 }, danger: 8, underground: true, far: true },
+  // A Place to the North (northworld.ts sets their labels: the north is built in the grown world, after everything has moved).
+  ...([
+    ["vargskeld", "The Vargskeld", 4], ["vargskeld_sea", "The Vargskeld Sea", 3], ["skarnholm", "Skarnholm", 0], ["ravnsvik", "Ravnsvik", 0], ["oathsworn_hall", "Oathsworn Hall", 1],
+    ["embermoot", "Embermoot", 0], ["redwake_camp", "The Redwake Camp", 2], ["varn_ridge", "The Varn Ridge", 5], ["oathgate_pass", "The Oathgate", 3],
+    ["zoryavik", "The Zoryavik", 4], ["zoryavik_coast", "The Zoryavik Coast", 3], ["hearthwatch", "Hearthwatch", 0], ["krasnogor", "Krasnogor", 0], ["bereslav", "Bereslav", 0],
+    ["zlatna_gora", "Zlatna Gora", 1], ["svetloye", "Svetloye", 0], ["old_bough", "The Old Bough", 1],
+  ] as const).map(([id, name, danger]) => ({ id, name, label: { x: 0, y: 0 }, danger, far: true }) as Region),
 ];
 export const regionIndex = (id: RegionId) => REGIONS.findIndex(region => region.id === id);
 /** The mainland regions' labels were written in the mainland's own coordinates: move them with it (once, at load). */
@@ -1593,6 +1604,8 @@ export function generateWorld(seed = WORLD_SEED): { world: World; lift: Float32A
   const grown = growNorth(ctx, floors, places), labels: World["labels"] = {};
   for (const region of REGIONS) labels[region.id] = { x: region.label.x, y: northShift(region.label.y) };
   relabelRegions(labels);
+  // The north itself, in the rows made for it (northworld.ts: it sets its own regions' labels, in the grown world).
+  buildNorth({ ...ctx, H: FINAL_H, tiles: grown.tiles, region: grown.region, objectAt: grown.objectAt, lift: grown.lift, raise: grown.raise, random: mulberry(seed + 969), noise: makeNoise(seed + 971, 11), noise2: makeNoise(seed + 977, 4) }, labels);
   const buildingAt = new Uint16Array(W * FINAL_H);
   buildings.forEach((b, index) => { if (b.roof === "none") return; for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) buildingAt[y * W + x] = index + 1; });
   const world: World = { tiles: grown.tiles, region: grown.region, objects, objectAt: grown.objectAt, spawns, places, heights: buildHeights(grown.tiles, seed, grown.lift, grown.raise), buildings, buildingAt, floors, ramparts: ctx.ramparts, lift: grown.lift, raise: grown.raise, under, labels };
