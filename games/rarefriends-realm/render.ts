@@ -3797,7 +3797,7 @@ const NPC_WEAR: Record<string, readonly string[]> = {
   suvarnatira_smith: ["harbour_trousers", "hammer"], suvarnatira_guard: ["scholars_cap", "ink_silk_robe", "harbour_trousers", "ilavati_sabre"], suvarnatira_sailor: ["harbour_trousers", "harbour_sandals"],
   // The sea ports: Gullwick in ganseys and sailcloth, Saltreach in salt-white and its one violet, Merrab in the divers' sea-green; Tel Ashun in Tamesh's linen, Ennu's Well in the Zuri's indigo.
   gullwick_harbourmaster: ["gullwick_cap", "gansey", "canvas_breeches", "pilot_cloak", "sea_boots"], gullwick_collector: ["felt_wide_hat", "gansey", "canvas_breeches", "crimson_cape"],
-  gullwick_keeper: ["gullwick_cap", "gansey", "sea_boots", "teal_cape"], gullwick_innkeeper: ["gansey", "canvas_breeches"], gullwick_chandler: ["gullwick_cap", "gansey", "canvas_breeches"],
+  gullwick_keeper: ["gullwick_cap", "gansey", "sea_boots", "teal_cape"], gullwick_innkeeper: ["gansey", "canvas_breeches"], gullwick_chandler: ["gullwick_cap", "gansey", "canvas_breeches"], gullwick_boatwright: ["gullwick_cap", "gansey", "canvas_breeches"],
   gullwick_fishmonger: ["gullwick_cap", "gansey", "knife"], gullwick_ropemaker: ["gansey", "canvas_breeches", "sea_boots"], gullwick_clothier: ["gullwick_cap", "gansey", "pilot_cloak"],
   gullwick_nan: ["gansey", "canvas_breeches"], gullwick_fisher: ["gullwick_cap", "gansey", "canvas_breeches", "sea_boots"], gullwick_watch: ["leather_hood", "gansey", "canvas_breeches", "pilot_cloak"],
   boat_gullwick: ["gullwick_cap", "gansey", "pilot_cloak", "sea_boots"],

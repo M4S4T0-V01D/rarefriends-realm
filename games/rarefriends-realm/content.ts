@@ -844,7 +844,7 @@ function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
   const road = talkHiddenRoad(game, npcId, name); if (road) return road;
   const hearthkin = talkHearthkin(game, npcId, name); if (hearthkin) return hearthkin;
   const settlements = talkSettlements(game, npcId, name); if (settlements) return settlements;
-  const shipwright = talkShipwright(game, npcId, name, () => talkNorthQuest(game, npcId, name, () => talkNorth(game, npcId, name)) ?? talkNorth(game, npcId, name)); if (shipwright) return shipwright;   // Seafaring (seafaring.ts)
+  const shipwright = talkShipwright(game, npcId, name, () => talkNorthQuest(game, npcId, name, () => talkNorth(game, npcId, name)) ?? talkNorth(game, npcId, name) ?? talkPorts(game, npcId, name)); if (shipwright) return shipwright;   // Seafaring (seafaring.ts)
   const northQuest = talkNorthQuest(game, npcId, name, () => talkNorth(game, npcId, name)); if (northQuest) return northQuest;   // The Old Agreement (northquest.ts)
   const north = talkNorth(game, npcId, name); if (north) return north;   // A Place to the North's people (north.ts)
   const dragons = talkDragons(game, npcId, name); if (dragons) return dragons;   // Ysolde's second errand comes before her everyday lines (and after her first, mounts.ts)

@@ -36,7 +36,7 @@ import { patternBroken, techniqueGuard, techniqueStrike } from "./techniques.ts"
 import { cleanMysteries, studySherd } from "./mysteries.ts";
 import { clueExamine, clueOptions, onKharavethTick, useClue } from "./kharaveth.ts";
 import { studySeal } from "./dynasties.ts";
-import { VESSELS, aboard, canStow, cleanVessels, goAshore, sailable, sailed, settleAboard, stowInHold, vesselTick } from "./seafaring.ts";
+import { VESSELS, aboard, canStow, cleanVessels, fitToVessel, goAshore, holdAt, ringBell, sailable, sailed, settleAboard, stowInHold, vesselTick } from "./seafaring.ts";
 import {
   BANK_SIZE, BANK_TABS, DAY_MS, SATCHEL, SATCHEL_SIZE, STONE_BOX, STONE_BOX_SIZE, boxTotal, isSigilStone, BONE_BAG, BONE_BAG_SIZE, bagAdd, bagBones, bagTakeAll, hasBoneBag, SIGIL_BAG, BELTS, beltAdd, beltContents, beltDef, wornBelt, SIGIL_BAG_SIZE, hasSigilBag, isSigil, sigilBagAdd, sigilBagTotal, sigilStock, useSigils, setPieces, wayfarerPieces, fullSlayerSet, heartguardPieces, mixtureOn, compactBankTabs, hasSatchel, hasStoneBox, stock, useUp, INVENTORY_SIZE, REFERRAL_COINS, REFERRALS_PER_DAY, REFERRAL_TICKS, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
   level, maxHp, maxPrayer, maxMana, manaCost, faithStaff, traditionOf, message, prayerBoost, riding, sound, take, weapon, combatLevel, createGame, TICK_MS,
@@ -349,6 +349,8 @@ export function itemOptions(game: Game, slotIndex: number): ItemOption[] {
   if (slot.id === "wyrmscale_waystone") out.push({ verb: "Walk-the-way", run: g => { walkTheWay(g); } });
   if (cacheAt(game) && !FIELDCRAFT_IDS.has(slot.id)) out.push({ verb: "Stash", run: g => { stash(g, slotIndex); } });
   if (canStow(game)) out.push({ verb: "Load", run: g => { stowInHold(g, slotIndex); } });
+  if (slot.id.endsWith("_hull_fitting") && holdAt(game)) out.push({ verb: "Fit-to-vessel", run: g => { fitToVessel(g, slotIndex); } });
+  if (slot.id === "rarite_ships_bell") out.push({ verb: "Ring-bell", run: g => { ringBell(g); } });
   if (definition.family === "resonance") out.push({ verb: "Fit-to-carving", run: g => fitCarving(g, slotIndex) });
   if (slot.id === "glimmer_shard") out.push({ verb: "Look-at", run: g => message(g, "The shard hums. Old Glimmer will want it back.") });
   // An inscribed sherd from Kharaveth: study it for a glyph you haven't seen (Mysteries); the sherd crumbles either way.
@@ -3017,7 +3019,7 @@ export function restore(game: Game, raw: unknown): boolean {
   player.notices = []; player.cards = Object.fromEntries(Object.entries(save.cards && typeof save.cards === "object" ? save.cards : {}).filter(([id, day]) => /^[a-z0-9_]{1,40}$/.test(id) && typeof day === "number" && Number.isFinite(day)).slice(0, 2000).map(([id, day]) => [id, Math.max(0, Math.floor(day))])); player.rarian = save.rarian === true; player.mizukai = !player.rarian && save.mizukai === true; player.orashai = !player.rarian && !player.mizukai && save.orashai === true; player.mana = typeof save.mana === "number" && Number.isFinite(save.mana) ? Math.max(0, Math.min(maxMana(player), save.mana)) : maxMana(player); player.mysteries = cleanMysteries(save.mysteries); player.spiritWardUntil = game.tick + int(save.spiritWardUntil, 0, 1000, 0); player.home = cleanHome(save.home); player.restedTicks = int(save.restedTicks, 0, 100000, 0); applyHome(game); player.camp = cleanCamp(save.camp); if (player.camp && save.world !== 6) Object.assign(player.camp, movedPoint(game.world, player.camp.x, player.camp.y)); player.campXpAt = int(save.campXpAt, -100000, 1e9, -100000); applyCamp(game);
   // Seafaring: the vessels, where they're moored (older worlds' coordinates moved like everything else), whether you're aboard one.
   player.vessels = cleanVessels(save.vessels, isItem); if (save.world !== 6) for (const v of player.vessels) Object.assign(v, movedPoint(game.world, v.x, v.y));
-  player.aboard = typeof save.aboard === "number" && player.vessels.some(v => v.id === save.aboard) ? save.aboard : null; player.landing = null;
+  player.aboard = typeof save.aboard === "number" && player.vessels.some(v => v.id === save.aboard) ? save.aboard : null; player.landing = null; player.bellAt = -1e9;
   player.landfalls = Object.fromEntries(Object.keys(save.landfalls && typeof save.landfalls === "object" ? save.landfalls : {}).filter(id => /^[a-z0-9_]{1,40}$/.test(id)).slice(0, 400).map(id => [id, 1])) as Record<string, 1>;
   settleAboard(game);
   player.sigilBag = {}; for (const [id, n] of Object.entries(save.sigilBag ?? {})) if (isItem(id) && isSigil(id)) { const v = int(n, 0, SIGIL_BAG_SIZE, 0); if (v) player.sigilBag[id] = v; }

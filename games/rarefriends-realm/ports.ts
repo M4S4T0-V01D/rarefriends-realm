@@ -146,6 +146,7 @@ export function buildPorts(ctx: GenContext, t: Tools, places: World["places"], k
     for (const by of [442, 444]) add({ kind: "bank", x: 572, y: by, blocks: true, name: "Counting-house desk" }); npc("banker", 575, 443);
     // The fish market on the quay.
     for (const [sx, name] of [[539, "Herring stall"], [542, "Crab stall"], [545, "Sailfish stall"]] as const) add({ kind: "stall", stall: "fish", x: sx, y: 453, blocks: true, name });
+    npcAt("gullwick_boatwright", 538, 459); put2(536, 457, "boat", "A skiff on the hard, half planked");
     npcAt("gullwick_fishmonger", 543, 455); put2(548, 453, "barrel", "A barrel of salted herring, the lid weighted with a stone"); put2(531, 452, "nets", "Nets drying on the quay rail");
     // The chandlery, the tailor, the houses, and the ropewalk: a long low shed where the rope is laid, the length of a cable.
     stone(544, 456, 551, 461, "n", "Oake's Chandlery", { color: ROOF.tar });

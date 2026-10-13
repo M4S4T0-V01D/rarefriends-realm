@@ -127,7 +127,8 @@ test("the world is large, deterministic and every landmark is reachable on foot"
     if (docks.some(dock => ok(dock.to.x, dock.to.y))) for (const dock of docks) if (!taken.has(dock.id)) { taken.add(dock.id); grew = true; if (!ok(dock.to.x, dock.to.y)) areas.push(reachable(g, dock.to)); }
   }
   const reach = object => object.blocks ? [[0, 1], [1, 0], [0, -1], [-1, 0]].some(([dx, dy]) => ok(object.x + dx, object.y + dy)) : ok(object.x, object.y) || [[0, 1], [1, 0], [0, -1], [-1, 0]].some(([dx, dy]) => ok(object.x + dx, object.y + dy));
-  const interactive = world.objects.filter(object => object.kind !== "decor" && object.kind !== "stump" && object.name !== "__removed");
+  // (Offshore shoals are fished from a vessel: the Seafaring test sails to them.)
+  const interactive = world.objects.filter(object => object.kind !== "decor" && object.kind !== "stump" && object.name !== "__removed" && object.text !== "offshore");
   const stuck = interactive.filter(object => !reach(object)).map(object => `${object.name}@${object.x},${object.y}`);
   // Course obstacles after the first are reached by crossing the one before (covered by the lap tests); trees can sit deep in groves.
   const blocked = interactive.filter(object => !reach(object) && object.kind !== "tree" && !(object.kind === "obstacle" && COURSES[object.obstacle.course] && object.obstacle.step > 0))
@@ -4595,4 +4596,50 @@ test("Seafaring: a shipwright builds from real materials (taken), the vessel goe
   choose(talk(g, "shipwright_bersi"), "Mend my vessel."); assert.ok(v.hull > 10);
   // Three at most.
   p.vessels.push({ ...v, id: 2 }, { ...v, id: 3 }); assert.match(SF.buildProblem(g, "rowboat"), /3 vessels already/);
+});
+
+test("Seafaring grown: hull fittings fitted to a vessel, the ship's bell calls it to the shore, the shores a quest keeps closed stay closed by sea too, a boatwright at Gullwick, and offshore shoals fished from a longship", async () => {
+  const SF = await import("../games/rarefriends-realm/seafaring.ts");
+  const { talk } = await import("../games/rarefriends-realm/content.ts");
+  const { WALKABLE, regionAt } = await import("../games/rarefriends-realm/world.ts");
+  const g = newGame(), p = g.player, world = g.world;
+  const near = (x, y, ok, r = 30) => { for (let d = 0; d < r; d++) for (let dy = -d; dy <= d; dy++) for (let dx = -d; dx <= d; dx++) if (Math.max(Math.abs(dx), Math.abs(dy)) === d && ok(x + dx, y + dy)) return { x: x + dx, y: y + dy }; return null; };
+  const land = (x, y) => WALKABLE.has(world.tiles[y * W + x]) && !isWaterTile(world.tiles[y * W + x]) && world.objectAt[y * W + x] < 0;
+  const isWaterTile = t => t === T.WATER || t === T.DEEP;
+  // A longship of yours in the Skarnfjord.
+  const bersi = world.spawns.find(s => s.kind === "npc" && s.id === "shipwright_bersi");
+  const spot = SF.launchSpot(g, "longship", bersi); assert.ok(spot);
+  p.vessels.push({ id: 1, kind: "longship", name: "Longship", x: spot.x, y: spot.y, heading: { x: 0, y: 1 }, hull: 120, hold: Array(16).fill(null), sailed: 0 }); SF.applyVessels(g);
+  const v = p.vessels[0], shore = near(v.x, v.y, (x, y) => land(x, y) && Math.abs(x - v.x) + Math.abs(y - v.y) === 1, 2) ?? near(v.x, v.y, land); teleport(g, shore.x, shore.y);
+  // A hull fitting: the hull grows by its share, keeping the damage; a better one replaces a worse, which comes back.
+  give(p, "moonsilver_hull_fitting", 1); give(p, "glimmer_hull_fitting", 1);
+  assert.ok(SF.fitToVessel(g, p.inventory.findIndex(s => s?.id === "moonsilver_hull_fitting")));
+  assert.equal(SF.maxHull(v), 250); assert.equal(v.hull, 170, "the new strength added, the damage kept");
+  assert.ok(SF.fitToVessel(g, p.inventory.findIndex(s => s?.id === "glimmer_hull_fitting")));
+  assert.equal(v.fitting, "glimmer"); assert.equal(count(p, "moonsilver_hull_fitting"), 1, "the old one back"); assert.equal(SF.maxHull(v), 300);
+  assert.ok(!SF.fitToVessel(g, p.inventory.findIndex(s => s?.id === "moonsilver_hull_fitting")), "no going down a grade");
+  // The ship's bell: too little Seafaring, then it calls the vessel you last took to the water beside you.
+  give(p, "rarite_ships_bell", 1); const far = near(v.x, v.y, (x, y) => land(x, y) && Math.hypot(x - v.x, y - v.y) > 25 && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => SF.sailableFor(world, "longship", x + dx, y + dy)), 80);
+  assert.ok(far, "a shore somewhere else"); teleport(g, far.x, far.y);
+  assert.ok(!SF.ringBell(g)); p.xp.seafaring = 300_000;
+  assert.ok(SF.ringBell(g)); assert.ok(Math.abs(v.x - far.x) <= 10 && Math.abs(v.y - far.y) <= 10, "it came"); assert.ok(world.objects.some(o => o.text === "vessel:1" && o.x === v.x && o.y === v.y));
+  assert.ok(!SF.ringBell(g), "not again straight away");
+  // A shore a quest keeps closed: the Mizukai islands before you're presented at the Hall.
+  const kibi = (() => { for (let i = 0; i < W * 1240; i++) { const x = i % W, y = Math.floor(i / W); if (regionAt(world, x, y).id === "kibi" && land(x, y) && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => SF.sailableFor(world, "longship", x + dx, y + dy))) return { x, y }; } return null; })();
+  assert.ok(kibi, "the tea island has a shore");
+  assert.match(SF.landingProblem(g, kibi.x, kibi.y), /won't have you yet/); p.quests.landfall = 9; assert.equal(SF.landingProblem(g, kibi.x, kibi.y), null, "presented, it will");
+  const merrab = (() => { for (let i = 0; i < W * 1240; i++) { const x = i % W, y = Math.floor(i / W); if (regionAt(world, x, y).id === "sea_of_dunes" && land(x, y)) return { x, y }; } return null; })();
+  if (merrab) assert.match(SF.landingProblem(g, merrab.x, merrab.y), /Foothold/, "Kharaveth's coast waits on the road south");
+  // Gullwick's boatwright builds the small ones.
+  const tamsin = world.spawns.find(s => s.kind === "npc" && s.id === "gullwick_boatwright"); assert.ok(tamsin);
+  teleport(g, tamsin.x + 1, tamsin.y); const d = talk(g, "gullwick_boatwright"); assert.ok(d.options.some(o => o.label === "Build me a vessel."));
+  assert.ok(d.options.find(o => o.label === "Build me a vessel.").then().options.some(o => /^Fishing skiff/.test(o.label)));
+  assert.ok(SF.launchSpot(g, "skiff", tamsin), "Gullwick's hard has water for a skiff");
+  // Offshore shoals: out of reach of the land, in reach of a longship; fished from aboard.
+  const shoals = world.objects.filter(o => o.text === "offshore"); assert.ok(shoals.length >= 10 && shoals.some(o => o.spot === "deep") && shoals.some(o => o.spot === "harpoon"));
+  for (const o of shoals) assert.ok(![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => WALKABLE.has(world.tiles[(o.y + dy) * W + o.x + dx]) && !isWaterTile(world.tiles[(o.y + dy) * W + o.x + dx])), "nobody fishes it from the shore");
+  const shoal = shoals.find(o => o.spot === "harpoon"), beside = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => ({ x: shoal.x + dx, y: shoal.y + dy })).find(t => SF.sailableFor(world, "longship", t.x, t.y));
+  v.x = beside.x; v.y = beside.y; p.aboard = 1; teleport(g, beside.x, beside.y); p.xp.fishing = 300_000; give(p, "harpoon", 1);
+  setTarget(g, { kind: "object", id: shoal.id, option: "Harpoon" }); until(g, () => p.activity?.kind === "fish", 10);
+  assert.equal(p.aboard, 1, "still aboard, fishing");
 });

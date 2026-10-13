@@ -79,6 +79,8 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
     if (ridgeD < 1 && y > 22) land = Math.max(land, 0.08 * (1 - ridgeD) + 0.02);
     // The fjords cut through it on the Vargskeld side.
     if (x < 560 && nearFjord(x, y) < 1) land = Math.min(land, -0.05);
+    // The top rows are open sea, always: the north's coasts all open onto it, so a vessel can go round from one to another.
+    if (y < 4) land = Math.min(land, -0.1 + y * 0.01);
     if (land <= 0) { tiles[i] = land < -0.06 ? T.DEEP : T.WATER; continue; }
     // Ground: shingle at the shore; the Vargskeld's rock and heath, the ridge's crag and snow, the Zoryavik's forest floor.
     const shore = land < 0.025, wetness = wet(x, y);
@@ -426,6 +428,23 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
   t.monsters("boar", 700, 60, 1120, 330, 26); t.monsters("greatstag", 700, 40, 1120, 330, 18); t.monsters("wolf", 700, 60, 1120, 330, 16); t.monsters("crag_bear", 940, 40, 1120, 200, 6);
   t.monsters("bandit", 440, 200, 540, 260, 5);
   t.shoreSpots(150, 40, 560, 140, "deep", 8); t.shoreSpots(700, 40, 1140, 120, "net", 8);
+  // Offshore shoals, out of reach of the shore (Seafaring): harpoon shoals a few tiles out, where a skiff can go, and deep
+  // shoals far out on the open sea, for a longship. Marked offshore: nobody fishes them from the land.
+  {
+    const far = new Uint8Array(W * N).fill(255), queue = new Int32Array(W * N); let tail = 0;
+    for (let i = 0; i < W * N; i++) if (WALKABLE.has(tiles[i])) { far[i] = 0; queue[tail++] = i; }
+    for (let head = 0; head < tail; head++) { const i = queue[head], x = i % W, y = (i - x) / W, d = far[i] + 1; if (d > 14) continue;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= W || ny >= N) continue; const k = ny * W + nx; if (far[k] > d) { far[k] = d; queue[tail++] = k; } } }
+    const placed: { x: number; y: number }[] = [];
+    const shoals = (spot: "harpoon" | "deep", lo: number, hi: number, want: number) => {
+      for (let tries = 0, n = 0; tries < 4000 && n < want; tries++) {
+        const x = 20 + Math.floor(random() * (NORTH_X1 - 40)), y = 6 + Math.floor(random() * (N - 70)), i = idx(x, y);
+        if (tiles[i] !== T.DEEP || far[i] < lo || far[i] > hi || ctx.objectAt[i] >= 0 || placed.some(p => Math.hypot(p.x - x, p.y - y) < 24)) continue;
+        t.add({ kind: "spot", spot, x, y, blocks: true, name: spot === "deep" ? "Deep shoal" : "Offshore shoal", text: "offshore" }); placed.push({ x, y }); n++;
+      }
+    };
+    shoals("harpoon", 3, 4, 7); shoals("deep", 7, 13, 7);
+  }
 
   // ---------- Forest: cold pine in the Vargskeld, deep mixed forest in the Zoryavik, thinning on the heights ----------
   // (Only on the north's own ground, the land-bridges included, and never in a settlement.)

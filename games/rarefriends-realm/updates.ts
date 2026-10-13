@@ -4,6 +4,11 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 122, date: "2026-10-13", title: "Seafaring grown: hull fittings, the ship's bell, the open sea, and a boatyard at Gullwick", items: [
+    "The north's coasts open onto the sea along the top of the world, so a longship can sail from the Skarnfjord round to the Zoryavik, out to the Mizukai Isles and down to the old coasts. The shores a quest keeps closed stay closed by sea: the Mizukai islands until you're presented at the Hall, a sea port until you've walked there, Kharaveth beyond Foothold until the road south is safe.",
+    "The anvil's shipwright hardware finds its ships. Fit a hull fitting (moonsilver, glimmer or rarite) aboard or beside your vessel for a stronger hull that wears slower. Ring the ship's bell on a shore (Seafaring 60) and the vessel you last took comes to you.",
+    "Offshore shoals in the northern seas, fished only from a boat: harpoon shoals a skiff can reach, and deep shoals out where only a longship goes. Tamsin Hocking builds rowboats and skiffs on the hard at Gullwick, so the mainland has a boatyard too. Sailing a skiff or a longship out onto deep water no longer puts you ashore.",
+  ] },
   { id: 121, date: "2026-10-13", title: "Seafaring: a skill of its own, and vessels of your own, built, sailed and moored", items: [
     "Seafaring, a new skill. Bersi the shipwright in Skarnholm builds rowboats, fishing skiffs and longships; Olena the bargewoman in Bereslav builds rowboats and river barges. Bring the materials and they're used: planks (they'll saw your logs for a fee), rivets from the anvil, sailcloth and rope from the ship's stores. The vessel goes into the water at the yard.",
     "Board it from the shore. Aboard, click the water to sail and the shore to land: you sail beside it and step off, and the vessel stays moored where you left it, its hold with it, through logout and back. A rowboat keeps to the shallows, rivers and lakes; a skiff goes out to sea within reach of land; a barge keeps to rivers; a longship goes anywhere there's water. Deep water wears a hull, and a shipwright mends it.",
