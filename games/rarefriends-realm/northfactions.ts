@@ -31,15 +31,17 @@ export const LP_PRINCE_PAYS = 1, LP_SILVER = 2, LP_REPLANT = 3;
 export const TO_ACCOUNTS = [["to_stone", "Read Hallvard's oath on the oath-stone"], ["to_hallvard", "Hear Hallvard out"], ["to_asta", "Ask Asta at Ravnsvik about the skerries"], ["to_ketil", "Ask Steward Ketil in Skarnholm who gave the order"]] as const;
 export const LP_POSTS = [["lp_post1", "Check the first patrol post, east of Hearthwatch"], ["lp_post2", "Check the second patrol post"], ["lp_post3", "Check the third patrol post, below Krasnogor"]] as const;
 
-/** Standing's rewards: the gear each faction gives, and at what standing. (Taking the prince's silver lowers the Wardens' by 10.) */
+/** Standing's rewards: the gear each faction gives, and at what standing. (Taking the prince's silver lowers the Wardens' by 10, and keeping the true chart the Farwake's, the guild's.) */
 export const STANDING_GEAR: Record<string, readonly (readonly [string, number])[]> = {
   oathsworn: [["oathsworn_shield", 20], ["oath_helm", 50]],
   hearthwardens: [["hearthwarden_spear", 20], ["hearthwarden_cloak", 50]],
+  farwake: [["farwake_sea_cloak", 20], ["farwake_sea_boots", 50]],
+  freeholds: [["compact_hammer", 20], ["miners_helm", 50]],
 };
 /** Getting a lost piece back costs this. */
 export const REPLACE_FEE = 2000;
 export const standingOf = (game: Game, faction: string) => game.player.standing[faction] ?? 0;
-const gearNeeds = (game: Game, faction: string, need: number) => faction === "hearthwardens" && data(game, "lp_choice") === LP_SILVER ? need - 10 : need;
+const gearNeeds = (game: Game, faction: string, need: number) => (faction === "hearthwardens" && data(game, "lp_choice") === LP_SILVER) || (faction === "farwake" && data(game, "fc_choice") === 3) ? need - 10 : need;
 export const cleanStanding = (raw: unknown): Record<string, number> => Object.fromEntries(Object.entries(raw && typeof raw === "object" ? raw as Record<string, unknown> : {})
   .filter(([id, v]) => id in STANDING_GEAR && typeof v === "number" && Number.isFinite(v)).map(([id, v]) => [id, Math.max(0, Math.min(1e6, Math.floor(v as number)))]));
 
@@ -103,7 +105,7 @@ function finish(game: Game, id: string, key: string, choice: number) {
 }
 
 /** The standing talk: where you stand, and the gear it's earned (each piece once; a lost one replaced for a fee). */
-function standingTalk(game: Game, name: string, faction: string, usual: () => Dialogue | null): Dialogue {
+export function standingTalk(game: Game, name: string, faction: string, usual: () => Dialogue | null): Dialogue {
   const now = standingOf(game, faction), p = game.player;
   const options: NonNullable<Dialogue["options"]> = [];
   for (const [id, need] of STANDING_GEAR[faction]) {

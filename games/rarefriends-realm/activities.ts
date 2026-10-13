@@ -5,7 +5,7 @@
  * tile walked, a death) through `activityEvent`, timed by the tick (`activityTick`), scored when its goal is met, paid
  * once, and remembered (player.activities.records: times done, the best score, when last run) so a cooldown holds
  * and a best stands. The north's factions set two of their own (northfactions.ts): the Barrow Watch and the Road Patrol, for
- * members only, paid in standing as well. A run that times out, that you die in, or that you cancel is a failure: nothing paid, the
+ * members only, paid in standing as well; the guilds two more (northguilds.ts): the Farwake Survey and the Compact's Order. A run that times out, that you die in, or that you cancel is a failure: nothing paid, the
  * cooldown shortened, try again. Nothing here hands out a reward without the actions that earn it, and a reload
  * changes nothing (the run and the records are saved with the rest).
  *
@@ -57,7 +57,7 @@ const QUARRY_ROCKS = ["pewter", "blackiron", "inkcoal", "moonsilver"] as const;
 
 /** Standing with a northern faction, earned (northfactions.ts spends it). */
 const raiseStanding = (game: Game, faction: string, n: number) => { game.player.standing[faction] = (game.player.standing[faction] ?? 0) + n; };
-const PATROL_POSTS = ["post1", "post2", "post3"] as const;
+const PATROL_POSTS = ["post1", "post2", "post3"] as const, SURVEY_CAIRNS = ["cairn1", "cairn2", "cairn3"] as const;
 export const ACTIVITIES: Record<string, ActivityDef> = {
   quarry_call: {
     id: "quarry_call", name: "The Quarry Call", skill: "mining", host: "quarry_master", requires: { level: 10 }, limit: 900, cooldown: 2400,
@@ -120,6 +120,28 @@ export const ACTIVITIES: Record<string, ActivityDef> = {
     score: (game, run) => 0.5 + 0.5 * timeLeft(game, run),
     reward: (game, _run, score) => { const xp = Math.round(1400 * (0.5 + score)), standing = Math.round(6 + 6 * score); addXp(game, "defence", xp, { raw: true }); addXp(game, "agility", Math.round(xp / 3), { raw: true }); raiseStanding(game, "hearthwardens", standing); give(game.player, "coins", Math.round(500 * score)); return `${xp} Defence XP, ${Math.round(xp / 3)} Wayfaring XP and ${standing} standing with the Hearthwardens`; },
     promise: "Defence and Wayfaring XP, the Wardens' pay, and standing with the Hearthwardens.",
+  },
+  farwake_survey: {
+    id: "farwake_survey", name: "The Farwake Survey", skill: "seafaring", host: "farwake_master", requires: { level: 20 }, limit: 2400, cooldown: 3000,
+    unlocked: game => game.player.questData.farwake_member ? null : "The survey's for the guild's own. Make the bay's true chart with us first.",
+    roll: () => ({ cairns: 3 }),
+    brief: () => "The bay's three survey cairns, on the great island, the eastern and the northern: fresh soundings at each, before the light goes. Twenty minutes. Bring your own boat.",
+    goal: (_game, run) => SURVEY_CAIRNS.filter(key => run.marks[key]).length / SURVEY_CAIRNS.length,
+    status: (_game, run) => `${SURVEY_CAIRNS.filter(key => run.marks[key]).length} of 3 cairns sounded.`,
+    score: (game, run) => 0.5 + 0.5 * timeLeft(game, run),
+    reward: (game, _run, score) => { const xp = Math.round(1600 * (0.5 + score)), standing = Math.round(6 + 6 * score); addXp(game, "seafaring", xp, { raw: true }); raiseStanding(game, "farwake", standing); give(game.player, "coins", Math.round(600 * score)); return `${xp} Seafaring XP and ${standing} standing with the Farwake`; },
+    promise: "Seafaring XP, the guild's fee, and standing with the Farwake.",
+  },
+  compact_order: {
+    id: "compact_order", name: "The Compact's Order", skill: "smithing", host: "freeholds_speaker", requires: { level: 30 }, limit: 1800, cooldown: 3000,
+    unlocked: game => game.player.questData.freeholds_member ? null : "The Compact's orders go to the Compact's own. Help us cast the free weight first.",
+    roll: game => { const smithing = level(game, "smithing"), metals = METALS.filter(m => m.tier <= 6 && SMELTING[m.id].level <= smithing), metal = metals[metals.length - 1] ?? METALS[0]; return { metal: metal.id, count: 10 }; },
+    brief: (_game, target) => `${target.count} bars of ${item(`${target.metal}_bar`).name.replace(" bar", "").toLowerCase()} for the Compact's smiths, brought here to Bereslav, inside half an hour. Your own ore, your own fire.`,
+    goal: (_game, run) => run.marks.delivered ? 1 : 0,
+    status: (_game, run) => `${run.target.count} bars of ${item(`${run.target.metal}_bar`).name.replace(" bar", "").toLowerCase()} wanted, here at Bereslav.`,
+    score: (game, run) => 0.5 + 0.5 * timeLeft(game, run),
+    reward: (game, run, score) => { const smelt = SMELTING[run.target.metal as keyof typeof SMELTING], xp = Math.round(smelt.xp * n(run.target.count) * (1 + score)), standing = Math.round(6 + 6 * score); addXp(game, "smithing", xp, { raw: true }); raiseStanding(game, "freeholds", standing); give(game.player, "coins", Math.round(METALS.find(m => m.id === run.target.metal)!.tier * 120 * n(run.target.count) * score)); return `${xp} Smithing XP and ${standing} standing with the Compact`; },
+    promise: "Smithing XP over the furnace's own, the Compact's price for the bars, and standing with the Compact.",
   },
 };
 /** The activities each host sets. */

@@ -4,6 +4,11 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 133, date: "2026-10-13", title: "The Farwake Guild and the Freeholds Compact", items: [
+    "The True Chart (Guildmaster Torvald, Skarnholm): the Grey Heron wrecked on a reef her Farwake chart left off. Sail out to her wreck in Skarnholm Bay, take soundings at the survey cairns on the bay's islands, and decide what the guild does with the true chart: give it away, sell it to anyone, or keep it the guild's.",
+    "The Free Weight (Speaker Zdenka, Bereslav): the princes' tithe-scale at Zlatna Gora weighs a tenth that's really an eighth. Test it, hear the reeve and the miners, help cast the Compact's own free weight, and decide: pay on honest scales, refuse the tithe (the Compact's stores open in Bereslav), or let the miners strike.",
+    "Each swears you to its guild: members run the Farwake Survey (Seafaring) or the Compact's Order (Smithing) for standing, and standing brings the Farwake sea-cloak and sea-boots, or the Compact hammer and the Zlatna Gora miner's helm.",
+  ] },
   { id: 132, date: "2026-10-13", title: "Oathsworn Hall and the Hearthwardens", items: [
     "The Third Oath (Oathmaster Brand, Oathsworn Hall): Hallvard of the Hall refused an order given under his oath of service. Stand the Hall's oldest trial in the Barrowfield, hear everyone, and speak at the oath-stone. What you say decides who stays in the Hall, and what's cut on the stone.",
     "The Long Patrol (Captain Milena, Hearthwatch): travellers and cattle lost on the forest road. Walk the patrol posts, follow the tracks to the Cut, put down Likho One-Eye, and decide who answers for the felled firs.",

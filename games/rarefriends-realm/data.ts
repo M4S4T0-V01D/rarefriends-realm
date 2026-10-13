@@ -74,7 +74,7 @@ import { ORDER_IDS, orderGear, orderStock } from "./knights.ts";
 import { FACTION_MONSTERS, factionGear } from "./factions.ts";
 import { MIZUKAI_ITEMS, MIZUKAI_MONSTERS, mizukaiGear } from "./mizukaigear.ts";
 import { KHARAVETH_GEAR, KHARAVETH_ITEMS, KHARAVETH_MONSTERS, KHARAVETH_SHOPS, STEPPE_CLOTHES } from "./kharavethgear.ts";
-import { NORTH_FACTION_ITEMS, NORTH_FACTION_MONSTERS } from "./northfactiongear.ts";
+import { NORTH_FACTION_ITEMS, NORTH_FACTION_MONSTERS, NORTH_FACTION_SHOPS } from "./northfactiongear.ts";
 import { HEARTLAND_GEAR, HEARTLAND_ITEMS, HEARTLAND_MONSTERS, HEARTLAND_SHOPS, OURESH_GOODS, ZURI_GOODS } from "./heartlandsgear.ts";
 import { MEGHAVAN_CLOTHING, MEGHAVAN_GEAR, MEGHAVAN_ITEMS, MEGHAVAN_MONSTERS, MEGHAVAN_QUEST_ITEMS, MEGHAVAN_SHOPS } from "./meghavangear.ts";
 import { PYRAMID_GEAR, PYRAMID_ITEMS, PYRAMID_MONSTERS } from "./pyramidsgear.ts";
@@ -1815,6 +1815,7 @@ const QUEST_CLOTHES = new Set(["maiden_veil", "rarian_mantle", "scorched_cloak"]
 export const SHOPS: Record<string, ShopDef> = {
   ...KHARAVETH_SHOPS,
   ...HEARTLAND_SHOPS,
+  ...NORTH_FACTION_SHOPS,
   ...MEGHAVAN_SHOPS,
   ...PORTS_SHOPS,
   ...NORTH_SHOPS,

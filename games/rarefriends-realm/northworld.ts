@@ -280,7 +280,7 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
     t.add({ kind: "well", x: cx + 3, y: (Y0 + Y1 >> 1) + 3, blocks: true, name: "The town well" });
     put2(X0 + 2, Y0 + 2, "nets", "Nets drying"); put2(X0 + 4, Y0 + 2, "drying_rack", "Cod drying on the rack"); put2(X1 - 2, Y0 + 2, "banner", "The Skarnholm banner: a grey gull on a blue field");
     t.shoreSpots(X0 - 10, Y0 - 20, X0 + 34, Y0 - 1, "lure", 4);
-    npc("jarl_hallveig", X0 + 9, Y0 + 16); { const at = openNear(X0 + 12, Y0 + 17); npc("steward_ketil", at.x, at.y); } npc("lawspeaker_signy", cx + 18, Y0 + 32); npc("farwake_master", X0 + 23, Y0 + 6); npc("shipwright_bersi", X0 + 13, Y0 + 6);
+    npc("jarl_hallveig", X0 + 9, Y0 + 16); { const at = openNear(X0 + 26, Y0 + 3); npc("navigator_sigrun", at.x, at.y); } { const at = openNear(X0 + 12, Y0 + 17); npc("steward_ketil", at.x, at.y); } npc("lawspeaker_signy", cx + 18, Y0 + 32); npc("farwake_master", X0 + 23, Y0 + 6); npc("shipwright_bersi", X0 + 13, Y0 + 6);
     // Halla the houndmaster and her yard of hounds (Beastkeeping: beastfolk.ts).
     { const at = openNear(cx - 14, Y0 + 30); npc("houndmaster_halla", at.x, at.y); put2(at.x + 1, at.y + 1, "trough", "A water trough, chewed at the corners"); put2(at.x - 1, at.y + 1, "hay", "Straw for the kennels"); }
     npc("skarnholm_innkeeper", X1 - 8, Y0 + 6); npc("skarnholm_trader", cx + 4, Y0 + 25, 2); { const at = openNear(cx - 6, Y0 + 25); npc("skarnholm_weaver", at.x, at.y); }
@@ -482,7 +482,8 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
     house(X0 + 3, Y1 - 9, X0 + 12, Y1 - 3, "n", "The smelter", "izba", T.STONE); t.add({ kind: "furnace", x: X0 + 6, y: Y1 - 6, blocks: true, name: "Furnace" }); t.add({ kind: "anvil", x: X0 + 9, y: Y1 - 6, blocks: true, name: "Anvil" });
     for (const [hx, hy] of [[X1 - 10, Y0 + 3], [X1 - 10, Y1 - 9]] as const) house(hx, hy, hx + 7, hy + 5, "w", "A miner's house", "izba");
     t.rockCluster(X0 - 6, Y0 + 6, 3, "blackiron", 5); t.rockCluster(X0 - 4, Y1 - 2, 3, "inkcoal", 4); t.rockCluster(X1 + 6, Y0 + 4, 3, "moonsilver", 4);
-    npc("zlatna_foreman", cx, Y0 + 12); npc("zoryavik_villager", cx - 6, Y0 + 16, 4); npc("zoryavik_villager", cx + 6, Y0 + 16, 4);
+    npc("zlatna_foreman", cx, Y0 + 12);
+    { const at = openNear(cx + 5, Y0 + 12); put2(at.x, at.y, "table", "The princes' tithe-scale"); clue(at.x, at.y, "tithe_scale"); const reeve = openNear(at.x + 2, at.y + 1); npc("tithe_reeve_gorislav", reeve.x, reeve.y); } npc("zoryavik_villager", cx - 6, Y0 + 16, 4); npc("zoryavik_villager", cx + 6, Y0 + 16, 4);
     sign(cx + 2, Y1 + 1, "Zlatna Gora", "ZLATNA GORA. Iron, coal and a seam of silver the princes would like back. The Compact says it was never theirs.");
   }
 
@@ -596,6 +597,9 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
     const a = k / 6 * Math.PI * 2, x = Math.round(hx + Math.cos(a) * 4), y = Math.round(hy + Math.sin(a) * 3);
     if (t.free(x, y) && WALKABLE.has(tiles[idx(x, y)])) t.decor(x, y, "obelisk", true, "A standing stone");
   }
+  // The Farwake's survey cairns on the bay's three big islands, and the Grey Heron wrecked on the southern one (northguilds.ts).
+  ([[0, "survey_cairn_1"], [1, "survey_cairn_2"], [3, "survey_cairn_3"]] as const).forEach(([k, id]) => { const [ix, iy] = ISLES[k], at = openNear(ix, iy); put2(at.x, at.y, "obelisk", "A Farwake survey cairn"); clue(at.x, at.y, id); });
+  { const [ix, iy, rx] = ISLES[2], at = openNear(ix + rx - 1, iy); put2(at.x, at.y, "boat", "The wreck of the Grey Heron"); clue(at.x, at.y, "heron_wreck"); }
   // The bay's islands: pine and rock.
   for (const [ix, iy, rx, ry] of ISLES) t.scatter(ix - rx, iy - ry, ix + rx, iy + ry, Math.round(rx * ry * 0.4), (x, y) => { if (random() > 0.35) t.tree(x, y, "pine"); else t.decor(x, y, "boulder"); }, (x, y) => t.free(x, y) && WALKABLE.has(tiles[idx(x, y)]) && !isWater(tiles[idx(x, y)]));
 

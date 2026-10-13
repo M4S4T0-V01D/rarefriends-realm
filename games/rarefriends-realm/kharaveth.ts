@@ -28,6 +28,7 @@ import { PORTS_QUEST_CLUES } from "./portsquests.ts";
 import { NORTH_CLUES } from "./northquest.ts";
 import { FAITH_CLUES } from "./northfaith.ts";
 import { FACTION_CLUES } from "./northfactions.ts";
+import { GUILD_CLUES } from "./northguilds.ts";
 import { VESSEL_CLUES } from "./seafaring.ts";
 import { WAYMARK_CLUES } from "./wayfinding.ts";
 
@@ -193,6 +194,7 @@ export const CLUES: Record<string, Clue> = {
   ...NORTH_CLUES,
   ...FAITH_CLUES,
   ...FACTION_CLUES,
+  ...GUILD_CLUES,
   // Your vessels, moored (seafaring.ts).
   ...VESSEL_CLUES,
   // The north's trails' waymarks (wayfinding.ts).

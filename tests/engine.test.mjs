@@ -622,7 +622,7 @@ test("A Friend's Feast from start to finish", () => {
   assert.equal(g.player.quests.friends_feast, 2);
   assert.equal(questPoints(g), 1);
   assert(level(g, "cooking") >= 10, "Quest XP");
-  assert.equal(QUESTS.length, 113); assert.equal(MAX_QUEST_POINTS, 197);
+  assert.equal(QUESTS.length, 115); assert.equal(MAX_QUEST_POINTS, 201);
 });
 
 test("Grumblin Trouble counts kills and pays out", () => {
@@ -1968,7 +1968,7 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   assert.equal(p.quests.dawn_against_hollow, 2); assert(has(p, "dawnplate_cuirass"));
   assert.equal(count(p, "hollow_essence"), 0);
   assert.equal(capeProblem(g, "dawnplate_cuirass"), null, "the armoury sells Dawnplate once earned");
-  assert.equal(QUESTS.length, 113); assert.equal(MAX_QUEST_POINTS, 197);
+  assert.equal(QUESTS.length, 115); assert.equal(MAX_QUEST_POINTS, 201);
 });
 
 test("Boots and gauntlets in every metal, smithed at the anvil; the clothier's shirts, dresses, trousers and skirts", () => {
@@ -4145,7 +4145,7 @@ test("Activities: a challenge set by its host runs on the game's own mechanics, 
   const { GUILD_FURNACE } = await import("../games/rarefriends-realm/hearthkinnames.ts");
   const { regionAt } = await import("../games/rarefriends-realm/world.ts");
   const g = newGame(), p = g.player;
-  assert.deepEqual(Object.keys(ACTIVITIES), ["quarry_call", "assay_run", "hot_tunnel", "pass_run", "barrow_watch", "road_patrol"]); assert.deepEqual(ACTIVITY_HOSTS.quarry_master, ["quarry_call", "hot_tunnel"]);
+  assert.deepEqual(Object.keys(ACTIVITIES), ["quarry_call", "assay_run", "hot_tunnel", "pass_run", "barrow_watch", "road_patrol", "farwake_survey", "compact_order"]); assert.deepEqual(ACTIVITY_HOSTS.quarry_master, ["quarry_call", "hot_tunnel"]);
   // The host offers it in talk; the level gates it.
   let d = talk(g, "quarry_master"); assert.ok(d.options?.some(o => /Quarry Call/.test(o.label)), "the quarrymaster offers the Quarry Call");
   p.xp.mining = 0; assert.match(activityProblem(g, "quarry_call"), /Mining level of 10/);
@@ -5036,4 +5036,43 @@ test("The north's factions: the Third Oath (Oathsworn Hall) and the Long Patrol 
   assert.equal(p.activities.run, null, "the patrol is done"); assert.ok(F.standingOf(g, "hearthwardens") > 10);
   // Kept through a save.
   const fresh = newGame(); restore(fresh, serialize(g)); assert.equal(fresh.player.standing.hearthwardens, p.standing.hearthwardens);
+});
+
+test("The north's guilds: the True Chart (the Farwake, sailed and sounded) and the Free Weight (the Freeholds Compact, weighed and cast), each a quarrel settled, membership, a members' activity paid in standing, the gear it brings, and the Compact's stores when the tithe's refused", async () => {
+  const G = await import("../games/rarefriends-realm/northguilds.ts");
+  const A = await import("../games/rarefriends-realm/activities.ts");
+  const { talk, questDone } = await import("../games/rarefriends-realm/content.ts");
+  const g = newGame(), p = g.player, world = g.world;
+  const obj = clue => world.objects.find(o => o.clue === clue);
+  const use = (object, option) => { teleport(g, object.x + 1, object.y); if (!canWalk(g, object.x + 1, object.y)) standBy(g, object); const n = g.messages.length; setTarget(g, { kind: "object", id: object.id, option }); for (let k = 0; k < 30 && g.dialogue === null && g.messages.length === n; k++) tick(g); };
+  const reach = (d, label) => { let o; for (let k = 0; k < 5 && d && !(o = d.options?.find(x => x.label === label)); k++) d = d.options?.find(x => x.label === "Something else.")?.then(); return o; };
+  const choose = (d, label) => { const o = reach(d, label); assert.ok(o, `"${label}" offered`); const next = o.then(); next?.onEnd?.(); return next; };
+  for (const s of ["seafaring", "smithing", "mining"]) p.xp[s] = XP_TABLE[60];
+  assert.match(A.activityProblem(g, "farwake_survey"), /true chart with us first/);
+  // The True Chart: the wreck, Sigrun, three cairns, Torvald's choice.
+  choose(talk(g, "farwake_master"), "I'll find out."); assert.equal(p.quests[G.TRUE_CHART], 1);
+  use(obj("heron_wreck"), "Search"); assert.ok(has(p, "heron_log")); assert.equal(p.questData.fc_step, 2);
+  talk(g, "navigator_sigrun").onEnd?.(); for (const k of [1, 2, 3]) use(obj(`survey_cairn_${k}`), "Take-soundings");
+  assert.ok(has(p, "bay_soundings")); assert.equal(p.questData.fc_step, 3);
+  choose(talk(g, "farwake_master"), "Keep it the guild's. That's what the guild is."); assert.ok(questDone(g, G.TRUE_CHART)); assert.equal(p.questData.farwake_member, 1);
+  assert.ok(NPCS.navigator_sigrun.gone(g), "Sigrun leaves the guild");
+  // Kept secret: the sea-cloak at 10 standing, not 20.
+  let d = choose(talk(g, "farwake_master"), "My standing with the Farwake."); choose(d, "I've earned the Farwake sea-cloak."); assert.ok(has(p, "farwake_sea_cloak"));
+  // The Farwake Survey: the three cairns.
+  assert.ok(A.startActivity(g, "farwake_survey")); for (const k of [1, 2, 3]) use(obj(`survey_cairn_${k}`), "Take-soundings");
+  assert.equal(p.activities.run, null, "the survey is done"); assert.ok(p.standing.farwake > 10);
+  // The Free Weight: the scale (with a bar), the reeve, Kazimir; five bars; the Compact's choice.
+  choose(talk(g, "freeholds_speaker"), "I'll prove it."); assert.equal(p.quests[G.FREE_WEIGHT], 1);
+  use(obj("tithe_scale"), "Test-weight"); assert.ok(!p.questData.fw_scale, "not without a bar"); give(p, "blackiron_bar", 1); use(obj("tithe_scale"), "Test-weight"); assert.equal(p.questData.fw_scale, 1);
+  choose(talk(g, "tithe_reeve_gorislav"), "Whose scale is it?"); choose(talk(g, "zlatna_foreman"), "What do the miners want?"); assert.equal(p.questData.fw_step, 2);
+  give(p, "blackiron_bar", G.FREE_WEIGHT_BARS); { let t = talk(g, "freeholds_speaker"); for (let k = 0; k < 5 && t && !t.onEnd; k++) t = t.options?.find(x => x.label === "Something else.")?.then(); t.onEnd(); }
+  assert.equal(p.questData.fw_step, 3); assert.equal(count(p, "blackiron_bar"), 1);
+  choose(talk(g, "freeholds_speaker"), "Refuse it. Zlatna Gora's ore is the Compact's."); assert.ok(questDone(g, G.FREE_WEIGHT)); assert.equal(p.questData.freeholds_member, 1);
+  assert.ok(NPCS.tithe_reeve_gorislav.gone(g), "the reeve's driven out");
+  choose(talk(g, "freeholds_speaker"), "Show me the Compact's stores."); assert.equal(g.ui.shop, "compact_stores"); g.ui.shop = null;
+  // The Compact's Order: the bars, delivered at Bereslav.
+  assert.ok(A.startActivity(g, "compact_order")); const run = p.activities.run, bar = `${run.target.metal}_bar`;
+  give(p, bar, run.target.count); choose(talk(g, "freeholds_speaker"), `Here are the ${run.target.count} bars.`);
+  assert.equal(p.activities.run, null, "the order is done"); assert.ok(p.standing.freeholds > 10);
+  const fresh = newGame(); restore(fresh, serialize(g)); assert.equal(fresh.player.standing.freeholds, p.standing.freeholds);
 });
