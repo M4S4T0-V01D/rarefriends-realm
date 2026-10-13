@@ -412,6 +412,11 @@ test("The private development game: a password makes a session (hashed, rate-lim
   // Signed in: the site, and the world.
   const page = await call("GET", "/dev/", { cookie: session }); assert.equal(page.status, 200); assert.equal(page.text, "<!doctype html>the site"); assert.match(page.headers.get("content-type"), /text\/html/);
   const script = await call("GET", "/dev/game.js", { cookie: session }); assert.equal(script.text, "// the game"); assert.match(script.headers.get("content-type"), /javascript/);
+  // The sandboxed game frame's loads (Firefox sends them as Origin: null): its files, yes; the API or a write, no; nothing without the session.
+  assert.equal((await call("GET", "/dev/game.js", { cookie: session, origin: "null" })).text, "// the game");
+  assert.equal((await call("GET", "/dev/game.js", { origin: "null" })).status, 401);
+  assert.equal((await call("GET", "/dev/api/world/main", { cookie: session, origin: "null" })).status, 403);
+  assert.equal((await call("PUT", "/dev/api/world/main", { cookie: session, origin: "null", headers: { "x-realm-dev": "1" }, body: { baseVersion: 0, overlay: { v: 1, ops: [] } } })).status, 403);
   assert.equal((await call("GET", "/dev/no-such-file.txt", { cookie: session })).status, 404);
   const empty = await call("GET", "/dev/api/world/main", { cookie: session }); assert.equal(empty.body.version, 0); assert.deepEqual(empty.body.overlay.ops, []);
   const overlay = { v: 1, name: "Test", ops: [{ op: "tile", x: 1, y: 1, t: 1 }] };

@@ -387,7 +387,10 @@ export function createApp({ db, chain, clock = now, origins, chainId, attestKey 
     async fetch(request: Request): Promise<Response> {
       const url = new URL(request.url), origin = request.headers.get("origin");
       // The private development game lives on this Worker's own origin, behind its own login (dev.ts).
-      if (devRoute && url.pathname.startsWith("/dev")) { if (origin && origin !== url.origin) return json(null, 403, { error: "not from the development game" }); const response = await devRoute(request, url); if (response) return response; }
+      // (Firefox labels the sandboxed game frame's own loads of its files `Origin: null`: those reads are let through to the
+      // login check, but never the API, and never a write.)
+      const frameRead = origin === "null" && (request.method === "GET" || request.method === "HEAD") && !url.pathname.startsWith("/dev/api/");
+      if (devRoute && url.pathname.startsWith("/dev")) { if (origin && origin !== url.origin && !frameRead) return json(null, 403, { error: "not from the development game" }); const response = await devRoute(request, url); if (response) return response; }
       if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(origin) });
       // Browsers only: a request from a page that isn't the Realm's is refused outright.
       if (origin && !origins.includes(origin)) return json(origin, 403, { error: "this site can't use Realm cloud saves" });
