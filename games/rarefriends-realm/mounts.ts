@@ -8,7 +8,7 @@
 import { mountDef } from "./data.ts";
 import { addXp, combatLevel, count, give, giveOrDrop, has, message, sound, take, type Dialogue, type Game } from "./state.ts";
 import { chat, data, fetchQuest, npcSays, questDone, stage, type NpcDef, type QuestDef } from "./content.ts";
-import { regionAt } from "./world.ts";
+import { regionAt, northShift } from "./world.ts";
 import { POACHER_CAMP } from "./mountworld.ts";
 import { QUEST_MOUNT_CLUES, QUEST_MOUNT_NPCS, QUEST_MOUNT_QUESTS, onQuestMountKill, talkQuestMounts } from "./questmounts.ts";
 
@@ -120,7 +120,7 @@ export function talkMounts(game: Game, npcId: string, name: string): Dialogue | 
 /** Kills the quests count: the three poachers (bandits at their camp), and the drakes over the nest (in Wyrmreach). */
 export function onMountKill(game: Game, monsterId: string, x: number, y: number) {
   onQuestMountKill(game, monsterId, x, y);
-  if (monsterId === "bandit" && stage(game, STRIPED_ONE) === 1 && x >= POACHER_CAMP.x0 && x <= POACHER_CAMP.x1 && y >= POACHER_CAMP.y0 && y <= POACHER_CAMP.y1) {
+  if (monsterId === "bandit" && stage(game, STRIPED_ONE) === 1 && x >= POACHER_CAMP.x0 && x <= POACHER_CAMP.x1 && y >= northShift(POACHER_CAMP.y0) && y <= northShift(POACHER_CAMP.y1)) {
     const n = data(game, "so_poachers") + 1; game.player.questData.so_poachers = n;
     if (n === POACHERS) say(game, "That's the three poachers. The cage is yours to open; the tiger's been waiting.");
   }

@@ -1,6 +1,7 @@
 /**
  * NPCs, their dialogue and the Realm's quests. Dialogue is built on demand from the player's quest state.
  */
+import { northShift } from "./world.ts";
 import { COURSES, FAMILY_NAMES, FAMILY_PERKS, ITEM_LIST, SLAYER_REWARDS, SKILLS, WAYFARER_MARK, WAYFARER_REWARDS, item , REGIONAL_CLOTHING, SKILL_NAMES, type Skill, SHOP_SELL } from "./data.ts";
 import type { OverlayQuest } from "./overlay.ts";
 import { OVERLAYS } from "./overlays/index.ts";
@@ -619,7 +620,7 @@ export function onMonsterKilled(game: Game, monsterId: string, x: number, y: num
     const n = player.questData[key] = (player.questData[key] ?? 0) + 1;
     if (n === goal) { message(game, done, "quest"); sound(game, "quest"); }
   };
-  if ((monsterId === "skeleton" || monsterId === "shade" || monsterId === "cairn_wight") && x >= 335 && x <= 440 && y < 115) tally("maidens_truce", "mt_dead", 10, "Ten of the Deadwood's dead put down in the east. The matriarch wanted dust and bones besides.");
+  if ((monsterId === "skeleton" || monsterId === "shade" || monsterId === "cairn_wight") && x >= 335 && x <= 440 && y < northShift(115)) tally("maidens_truce", "mt_dead", 10, "Ten of the Deadwood's dead put down in the east. The matriarch wanted dust and bones besides.");
   if (monsterId === "glass_crab") tally("deepglass_heart", "dg_crabs", 6, "Six glass crabs cracked. The fisher wanted shards too, and the lake's heart stilled.");
   if (monsterId === "crystal_golem") tally("deepglass_heart", "dg_golem", 1, "The Crystal Golem comes apart in a shower of glass. The lake's heart is still.");
   if (monsterId === "archivist_below") tally("drowned_archive", "da_archivist", 1, "The Archivist Below closes his book at last. Perrin will want to hear it.");

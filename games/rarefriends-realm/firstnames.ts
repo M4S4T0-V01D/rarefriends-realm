@@ -9,7 +9,7 @@
  * The gods: the Weigher (Tamesh), the Gate-Mother (Khetmar), the Salt Twins (the Ouresh), the Smoke That Remembers (the
  * Zuri), the Hidden Sun (Sefrah's temple), and one nobody keeps a shrine for, who wanders with a paper bag on his head.
  */
-import { DUNGEON_Y, T, type GenContext, type World, type worldTools } from "./world.ts";
+import { FRAME_DUNGEON_Y as DUNGEON_Y, T, type GenContext, type World, type worldTools } from "./world.ts";
 import { KHETMAR, OURESH, SITES, TAMESH, ZURI, type SouthKit } from "./heartlands.ts";
 
 type Tools = ReturnType<typeof worldTools>;

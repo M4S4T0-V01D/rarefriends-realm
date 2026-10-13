@@ -41,7 +41,7 @@ import {
   castOnItem, satchelCheck, satchelEmpty, satchelFill, setFollower, setPet, setStyle, startProduction, swapSlots, toggleRun, toggleSneak, togglePrayer, toggleWorn, unequip, useItemOnItem, type OwnedFriend, type Selection,
  beltCheck, beltFill, beltEmpty, sipBelt, toggleFollowerWorn, chooseMount, forgeMenu, mountAttack, mountAttackProblem, saddlebags, toggleMount, unstow } from "./engine.ts";
 import { friendRows, renderWorldMap } from "./render.ts";
-import { UNDER_Y, OVERWORLD_H, W, isUnderground, mainlandToWorld, realPoint } from "./world.ts";
+import { UNDER_Y, OVERWORLD_H, W, isUnderground, mainlandToWorld, movedPoint, realPoint } from "./world.ts";
 import type { NetState } from "./net.ts";
 import type { TradeView } from "./trade.ts";
 import { recipeBook, skillGuide, guideFilters, filterGuide } from "./guide.ts";
@@ -1464,7 +1464,7 @@ export function GuideModal({ game, skill, onSkill, onClose }: { game: Game; skil
 }
 export function WorldMapModal({ game, onClose, onTravel }: { game: Game; onClose: () => void; onTravel: (x: number, y: number) => void }) {
   const canvas = useRef<HTMLCanvasElement>(null), underground = isUnderground(game.player.y), me = realPoint(game.world, game.player.x, game.player.y);
-  const [focus, setFocus] = useState(() => ({ x: underground ? mainlandToWorld(130, 220)[0] : me.x, y: underground ? mainlandToWorld(130, 220)[1] : me.y, zoom: underground ? 3.2 : 2.1 }));
+  const [focus, setFocus] = useState(() => ({ x: underground ? movedPoint(game.world, ...mainlandToWorld(130, 220)).x : me.x, y: underground ? movedPoint(game.world, ...mainlandToWorld(130, 220)).y : me.y, zoom: underground ? 3.2 : 2.1 }));
   const toTile = useRef<((x: number, y: number) => { x: number; y: number }) | null>(null), drag = useRef<{ x: number; y: number; fx: number; fy: number; moved: boolean } | null>(null);
   useEffect(() => {
     const node = canvas.current, ctx = node?.getContext("2d");

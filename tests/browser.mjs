@@ -4,10 +4,10 @@
 // restore, and a screenshot tour of every region (./artifacts). Automated test only: public builds always use the real
 // wallet and ownership gate.
 import assert from "node:assert/strict";
-import { FLOOR_Y, H, createWorld, mainlandToWorld, movedPoint } from "../games/rarefriends-realm/world.ts";
+import { FLOOR_Y, H, createWorld, mainlandAt, mainlandToWorld, movedPoint, northShift } from "../games/rarefriends-realm/world.ts";
 // Page-side functions below are serialized into the frame, so they carry these as literals: storeys start at row 940 (FLOOR_Y) and the castle's ground floor lies west of column 765 (mainland 140).
-if (FLOOR_Y !== 940 || mainlandToWorld(140, 0)[0] !== 765) throw new Error("world constants changed: update the literals in browser.mjs");
-if (H !== 1880) throw new Error("world height changed: update the 1880 in browser.mjs");
+if (FLOOR_Y !== 1300 || mainlandToWorld(140, 0)[0] !== 765) throw new Error("world constants changed: update the literals in browser.mjs");
+if (H !== 2600) throw new Error("world height changed: update the 2600 in browser.mjs");
 import { execFileSync } from "node:child_process";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -92,7 +92,7 @@ try {
     return { x: box.x + inner.x, y: box.y + inner.y };
   };
   /** Mainland places named in the mainland's own coordinates (the world puts the mainland at MAINLAND.x/y). */
-  const teleportM = (mx, my) => teleport(...mainlandToWorld(mx, my));
+  const teleportM = (mx, my) => { const at = mainlandAt(mx, my); return teleport(at.x, at.y); };
   // A mainland point in the old dungeon strip: where its dungeon settled (the same world, generated here once).
   const settled = createWorld(), teleportU = (mx, my) => { const at = movedPoint(settled, ...mainlandToWorld(mx, my)); return teleport(at.x, at.y); };
   const enter = async () => {
@@ -213,7 +213,7 @@ try {
     const start = await state(() => ({ x: window.__realm.game().player.x, y: window.__realm.game().player.y }));
     // Somewhere near with an open band of ground three rows deep (no objects, people, walls, water or cliffs) to walk along.
     const spot = await state(() => {
-      const g = window.__realm.game(), w = g.world, p = g.player, W = w.tiles.length / 1880;
+      const g = window.__realm.game(), w = g.world, p = g.player, W = w.tiles.length / 2600;
       const free = (x, y) => w.objectAt[y * W + x] < 0 && ![0, 6, 7, 15, 16, 21].includes(w.tiles[y * W + x]) && !g.npcs.some(n => n.x === x && n.y === y);
       for (let r = 0; r < 60; r++) for (let dy = -r; dy <= r; dy++) for (const dx of [-r, r]) {
         const x = p.x + dx, y = p.y + dy; let clear = true;
@@ -539,7 +539,7 @@ try {
       const g = window.__realm.game(), w = g.world, storey = o => w.floors.find(f => o.x >= f.x0 + f.dx && o.x <= f.x1 + f.dx && o.y >= f.y0 + f.dy && o.y <= f.y1 + f.dy && o.y >= 940)?.level ?? 0;
       const castle = o => storey(o) ? w.floors.some(f => f.complex === "castle" && o.x >= f.x0 + f.dx && o.x <= f.x1 + f.dx && o.y >= f.y0 + f.dy && o.y <= f.y1 + f.dy) : o.x < 765;
       const stairs = w.objects.filter(o => o.look === "stairs" && o.action === action && storey(o) === level && castle(o)).sort((a, b) => b.x - a.x)[0];
-      const WW = w.tiles.length / 1880, open = (x, y) => { const t = w.tiles[y * WW + x], id = w.objectAt[y * WW + x]; return t !== 0 && t !== 16 && (id < 0 || !w.objects[id].blocks); };
+      const WW = w.tiles.length / 2600, open = (x, y) => { const t = w.tiles[y * WW + x], id = w.objectAt[y * WW + x]; return t !== 0 && t !== 16 && (id < 0 || !w.objects[id].blocks); };
       const [dx, dy] = [[0, 1], [1, 0], [-1, 0], [0, -1]].find(([dx, dy]) => open(stairs.x + dx, stairs.y + dy));
       return { stairs, stand: { x: stairs.x + dx, y: stairs.y + dy } };
     }, [level, action]);
@@ -588,7 +588,7 @@ try {
   await teleportM(160, 139); await state(() => window.__realm.view(0.9, 0.45, -Math.PI / 4));
   await page.waitForTimeout(1500); await shot("wizards-tower");
   await state(() => { const p = window.__realm.game().player; p.xp.hitpoints = 13_034_431; p.hp = 99; p.xp.defence = 13_034_431; p.equipment.shield = "wyrmward_shield"; window.__realm.refresh(); });
-  await teleport(600, 142); await state(() => window.__realm.view(1.05, 0.4, 0.3));
+  await teleport(600, northShift(142)); await state(() => window.__realm.view(1.05, 0.4, 0.3));
   await page.waitForTimeout(1800); await shot("wyrmreach");
   await state(() => { const p = window.__realm.game().player; delete p.equipment.shield; p.hp = 99; for (const m of window.__realm.game().monsters) m.target = false; });
   await teleportM(121, 141); await state(() => window.__realm.view(1.8, 0.45, 0.5));
@@ -625,7 +625,7 @@ try {
     ["crypt", 44, 222, true], ["depths", 132, 222, true], ["throne", 190, 224, true],
   ];
   for (const [name, x, y, under] of tour) {
-    if (under === "world") await teleport(x, y); else if (under) await teleportU(x, y); else await teleportM(x, y);
+    if (under === "world") await teleport(x, northShift(y)); else if (under) await teleportU(x, y); else await teleportM(x, y);
     await state(() => { const p = window.__realm.game().player; p.hp = 99; });
     await page.waitForTimeout(1300);
     await shot(`region-${name}`);
@@ -633,7 +633,7 @@ try {
   assert.equal(await realm.getAttribute("data-region"), "hollow_depths");
 
   // ---------- Saved per wallet: reload and continue ----------
-  await teleport(561, 123);
+  await teleport(561, northShift(123));
   await page.waitForTimeout(6000);
   const key = `rarefriends-realm:save:v1:${OWNER.toLowerCase()}:7730`;
   const saved = JSON.parse(await page.evaluate(name => localStorage.getItem(name), key));

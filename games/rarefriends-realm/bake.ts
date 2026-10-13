@@ -10,7 +10,7 @@
  */
 import { H, W, buildHeights, indexBuildings, indexObjects, relabelRegions, type World } from "./world.ts";
 
-export const BAKE_VERSION = 4;
+export const BAKE_VERSION = 5;
 const LIFT_STEPS = 64;
 type Baked = { v: number; seed: number; w: number; h: number; tiles: string; region: string; lift: string; raise: string; data: Pick<World, "under" | "labels" | "objects" | "spawns" | "places" | "buildings" | "floors" | "ramparts"> };
 

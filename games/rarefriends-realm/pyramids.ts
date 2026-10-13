@@ -21,7 +21,7 @@
  * Built from heartlands.ts in the grown world's coordinates, in place of the old Unfinished Pyramid. Module constants are
  * literals (see south.ts).
  */
-import { DUNGEON_Y, FLOOR_Y, T, type DecorKind, type Floor, type GenContext, type RegionId, type WorldObject, type worldTools } from "./world.ts";
+import { FRAME_DUNGEON_Y as DUNGEON_Y, FRAME_FLOOR_Y as FLOOR_Y, T, type DecorKind, type Floor, type GenContext, type RegionId, type WorldObject, type worldTools } from "./world.ts";
 import type { SouthKit } from "./heartlands.ts";
 
 type Tools = ReturnType<typeof worldTools>;

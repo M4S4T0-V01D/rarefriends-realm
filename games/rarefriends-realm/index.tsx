@@ -52,9 +52,10 @@ import { LATEST_UPDATE } from "./updates.ts";
 import type { DailyTab } from "./panels.tsx";
 import { skillArt } from "./icons.ts";
 import { playerName } from "./presence.ts";
-import { T, groundHeight, isUnderground, isWater, mainlandToWorld, realPoint, regionAt, terrainAt, type World } from "./world.ts";
+import { T, groundHeight, isUnderground, isWater, mainlandAt, mainlandToWorld, movedPoint, realPoint, regionAt, terrainAt, type World } from "./world.ts";
 /** The Hollow King's throne room (its own music), in world coordinates. */
-const THRONE = { x: mainlandToWorld(177, 212)[0], y0: mainlandToWorld(177, 212)[1], y1: mainlandToWorld(177, 236)[1] };
+/** The Hollow King's throne room (the mainland's dungeon rows, wherever that dungeon settled): the boss music plays inside it. */
+const throneOf = (world: World) => { const a = movedPoint(world, ...mainlandToWorld(177, 212)), b = movedPoint(world, ...mainlandToWorld(177, 236)); return { x: a.x, y0: a.y, y1: b.y }; };
 import { burst } from "./effects.ts";
 import { textureStats } from "./textures.ts";
 import { adapt, newAdaptive } from "./adaptive.ts";
@@ -156,7 +157,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const glCanvas = useRef<HTMLCanvasElement>(null), glr = useRef<RealmGL | null | undefined>(undefined);
   const game = useRef<Game | null>(null), friend = useRef<GenerationSprites | null>(null), audio = useRef<RealmAudio | null>(null);
   const followerSprites = useRef(new Map<number, GenerationSprites>()), loadingSprites = useRef(new Set<number>());
-  const camera = useRef<Camera>({ x: mainlandToWorld(121, 121)[0], y: mainlandToWorld(121, 121)[1], zoom: DEFAULT_SETTINGS.zoom, angle: 0, pitch: PITCH.classic }), cameraGoal = useRef<{ angle: number; pitch: number } | null>(null),
+  const camera = useRef<Camera>({ x: mainlandAt(121, 121).x, y: mainlandAt(121, 121).y, zoom: DEFAULT_SETTINGS.zoom, angle: 0, pitch: PITCH.classic }), cameraGoal = useRef<{ angle: number; pitch: number } | null>(null),
     compass = useRef<HTMLButtonElement>(null), orbit = useRef<{ x: number; y: number; angle: number; pitch: number } | null>(null), miniZoom = useRef(3.2), tickAt = useRef(0), hits = useRef<HitSplat[]>([]), fireworks = useRef<Firework[]>([]);
   const projectiles = useRef<Projectile[]>([]), marker = useRef<ClickMarker | null>(null), hoverTile = useRef<{ x: number; y: number } | null>(null), chat = useRef<{ text: string; until: number } | null>(null);
   const held = useRef(new Set<string>()), linked = useRef(false), elsewhere = useRef(false), lastSave = useRef(""), region = useRef(""), playing = useRef(""), epoch = useRef(0), pointer = useRef<{ x: number; y: number } | null>(null);
@@ -622,7 +623,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           hits.current = hits.current.filter(hit => now - hit.at < 1300); projectiles.current = projectiles.current.filter(p => p.end >= state.tick - 1);
           fireworks.current = fireworks.current.filter(entry => now - entry.at < 2400);
           // Area music and the region banner.
-          const here = regionAt(state.world, state.player.x, state.player.y), throne = state.player.x >= THRONE.x && state.player.y >= THRONE.y0 && state.player.y <= THRONE.y1;
+          const here = regionAt(state.world, state.player.x, state.player.y), THRONE = throneOf(state.world), throne = state.player.x >= THRONE.x && state.player.y >= THRONE.y0 && state.player.y <= THRONE.y1;
           // (On the Mizukai Isles the music follows a crossing, a fight, and a fight with one of the great spirits.)
           const foe = state.player.combat !== null ? state.monsters.find(monster => monster.uid === state.player.combat && !monster.dead) : undefined;
           const track = trackById(trackFor(here.id, throne, { sea: atSea(state), fight: !!foe, spirit: !!foe?.def.spirit && !!foe.def.boss }));

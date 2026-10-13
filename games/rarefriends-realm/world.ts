@@ -4,6 +4,7 @@
  * Upper storeys of buildings (the castle's floors) are stored in the rows from FLOOR_Y down, and drawn stacked on the
  * building they belong to: a tile there stands for the real tile (x − dx, y − dy), `level` storeys up.
  */
+import { FRAME_UNDER_Y as NORTH_FRAME_UNDER_Y, NORTH_DY, northShift, northUnshift } from "./northframe.ts";
 import type { RockKind, SpotKind, TreeKind } from "./data.ts";
 import { buildExpansion } from "./expansion.ts";
 import { buildFarWest } from "./farwest.ts";
@@ -43,17 +44,31 @@ export const EAST_X = LEGACY_W + WEST_DX, EAST_W = 560;
 export const SOUTH_DY = 360;
 export const GEN_H = 640, GEN_OVERWORLD_H = 520, GEN_DUNGEON_Y = 520, GEN_FLOOR_Y = 580;
 export const W = EAST_X + EAST_W;
-/** The overworld is rows 0–879 (the south from row 520); then the strip the dungeons are built in (empty once they settle under their ground, from UNDER_Y); rows from FLOOR_Y hold upper storeys. */
-export const OVERWORLD_H = GEN_OVERWORLD_H + SOUTH_DY, DUNGEON_Y = GEN_DUNGEON_Y + SOUTH_DY, FLOOR_Y = GEN_FLOOR_Y + SOUTH_DY;
+/**
+ * A Place to the North: the world grew north. NORTH_DY rows of new overworld (the Vargskeld and the Zoryavik) lie above
+ * the old one, and the underground grew the same rows above its own. Everything older is still generated in the frame it
+ * had before (FRAME_: overworld 0–879, the dungeon strip, the storeys, the underground from FRAME_UNDER_Y), and
+ * `generateWorld` moves the whole of it down once it's built (northShift); at runtime everything is in the grown frame.
+ * Generation-time modules import the FRAME_ constants under the plain names; runtime code uses the plain ones.
+ */
+export { NORTH_DY };
+/** The frame everything before the north is generated in: the overworld rows 0–879 (the south from row 520), the strip the dungeons are built in, the storey rows, then the underground. */
+export const FRAME_OVERWORLD_H = GEN_OVERWORLD_H + SOUTH_DY, FRAME_DUNGEON_Y = GEN_DUNGEON_Y + SOUTH_DY, FRAME_FLOOR_Y = GEN_FLOOR_Y + SOUTH_DY;
+export const FRAME_UNDER_Y = GEN_H + SOUTH_DY, FRAME_H = FRAME_UNDER_Y + FRAME_OVERWORLD_H;
+if (FRAME_UNDER_Y !== NORTH_FRAME_UNDER_Y) throw new Error("northframe.ts's FRAME_UNDER_Y is out of step with world.ts");
+/** The overworld is rows 0–1239 (the north above row 360, the south from row 880); then the strip the dungeons were built in (empty once they settle under their ground, from UNDER_Y); rows from FLOOR_Y hold upper storeys. */
+export const OVERWORLD_H = FRAME_OVERWORLD_H + NORTH_DY, DUNGEON_Y = FRAME_DUNGEON_Y + NORTH_DY, FLOOR_Y = FRAME_FLOOR_Y + NORTH_DY;
 /**
  * The underground: a second copy of the overworld's rows, under the storeys, from UNDER_Y. The dungeons are built in the
  * strip (DUNGEON_Y to FLOOR_Y, as they always were) and then settled here, each beneath the ground its ladder stands on
  * (settleUnderground), so what you see down there lies where it lies up top, and nothing else: the black between is the
  * rock. The strip is empty once they've gone.
  */
-export const UNDER_Y = GEN_H + SOUTH_DY, H = UNDER_Y + OVERWORLD_H;
+export const UNDER_Y = FRAME_UNDER_Y + NORTH_DY, H = UNDER_Y + OVERWORLD_H;
 /** A row of the generation frame in the grown world (the dungeon and storey rows moved down; the old overworld didn't). */
 export const southShift = (y: number) => y >= GEN_OVERWORLD_H ? y + SOUTH_DY : y;
+/** A row of the frame in the grown world (everything above the underground moves NORTH_DY down, the underground twice that: it keeps mirroring the overworld, and has the north's rows above it too), and back (northframe.ts). */
+export { northShift, northUnshift };
 /**
  * Where the original Realm (the mainland, 350 × 200 with 40 dungeon rows and 40 storey rows) sits in the wider world.
  * Its content is generated in its own coordinates and set in here, so nothing on it moves relative to anything else.
@@ -67,6 +82,8 @@ export function legacyMainlandToWorld(x: number, y: number): [number, number] {
 }
 /** A mainland coordinate in world coordinates. */
 export function mainlandToWorld(x: number, y: number): [number, number] { const [lx, ly] = legacyMainlandToWorld(x, y); return [lx + WEST_DX, southShift(ly)]; }
+/** A mainland overworld point in the grown world, for runtime code (mainlandToWorld is the generation frame's; a dungeon point wants movedPoint, which knows where its dungeon settled). */
+export function mainlandAt(x: number, y: number): { x: number; y: number } { const [wx, wy] = mainlandToWorld(x, y); return { x: wx, y: northShift(wy) }; }
 /** The mainland's overworld rectangle in the legacy frame (inclusive; generation code only). */
 export const MAINLAND_RECT = { x0: MAINLAND.x, y0: MAINLAND.y, x1: MAINLAND.x + MAINLAND.w - 1, y1: MAINLAND.y + MAINLAND.h - 1 } as const;
 /** One storey, in world pixels (the height of a wall). */
@@ -81,7 +98,7 @@ export type Terrain = typeof T[keyof typeof T];
 export const WALKABLE = new Set<number>([T.GRASS, T.DARK_GRASS, T.PATH, T.COBBLE, T.SAND, T.SWAMP, T.SNOW, T.STONE, T.WOOD, T.GRAVEL, T.DUNGEON, T.BRIDGE, T.FARMLAND, T.ICE, T.CARPET, T.ASH, T.BRICK]);
 export const isWater = (terrain: number) => terrain === T.WATER || terrain === T.DEEP;
 /** The sparring ring east of Market Street: inside it, players may duel each other (safely: nobody dies or loses items). */
-export const RING = { x0: 138 + MAINLAND.x + WEST_DX, y0: 144 + MAINLAND.y, x1: 144 + MAINLAND.x + WEST_DX, y1: 149 + MAINLAND.y };
+export const RING = { x0: 138 + MAINLAND.x + WEST_DX, y0: northShift(144 + MAINLAND.y), x1: 144 + MAINLAND.x + WEST_DX, y1: northShift(149 + MAINLAND.y) };
 /**
  * The Rare Friends Ring, west of the Deadwood across the river: a round building (a Hoverer's shape) whose covered ring
  * holds the lobby and shops, and whose open courtyard is the arena. Fights happen inside `inner`; the lobby is on the
@@ -89,7 +106,9 @@ export const RING = { x0: 138 + MAINLAND.x + WEST_DX, y0: 144 + MAINLAND.y, x1: 
  */
 /** The Rare Friends Ring, in the legacy frame (generation) and in world coordinates (everything else). */
 export const ARENA_LEGACY = { x: 214, y: 72, outer: 24, inner: 16, lobby: { x: 214, y: 92 } } as const;
-export const ARENA = { ...ARENA_LEGACY, x: ARENA_LEGACY.x + WEST_DX, lobby: { x: ARENA_LEGACY.lobby.x + WEST_DX, y: ARENA_LEGACY.lobby.y } } as const;
+/** The Ring's arena where it's built (the generation frame: ringroof.ts), and where it is at runtime (ARENA: the grown world, for matches and duels). */
+export const FRAME_ARENA = { ...ARENA_LEGACY, x: ARENA_LEGACY.x + WEST_DX, lobby: { x: ARENA_LEGACY.lobby.x + WEST_DX, y: ARENA_LEGACY.lobby.y } } as const;
+export const ARENA = { ...FRAME_ARENA, y: northShift(FRAME_ARENA.y), lobby: { x: FRAME_ARENA.lobby.x, y: northShift(FRAME_ARENA.lobby.y) } } as const;
 export const arenaDistance = (x: number, y: number) => Math.hypot(x - ARENA.x, y - ARENA.y);
 /** Inside the Ring's courtyard, where matches are fought and Friends may duel. */
 export const inArena = (x: number, y: number) => arenaDistance(x, y) < ARENA.inner;
@@ -308,7 +327,7 @@ export const REGIONS: readonly Region[] = [
   { id: "bonefield", name: "The Bonefield", label: { x: 908, y: 27 }, danger: 6, far: true },
   { id: "cragmaw_heights", name: "The Cragmaw Heights", label: { x: 1078, y: 80 }, danger: 6, far: true },
   { id: "qeshet", name: "Qeshet", label: { x: 150, y: 792 - 360 }, danger: 6, far: true },
-  { id: "sunken_halls", name: "The Sunken Halls", label: { x: 150, y: UNDER_Y + 805 - 360 }, danger: 8, underground: true, far: true },
+  { id: "sunken_halls", name: "The Sunken Halls", label: { x: 150, y: FRAME_UNDER_Y + 805 - 360 }, danger: 8, underground: true, far: true },
 ];
 export const regionIndex = (id: RegionId) => REGIONS.findIndex(region => region.id === id);
 /** The mainland regions' labels were written in the mainland's own coordinates: move them with it (once, at load). */
@@ -317,6 +336,12 @@ for (const region of REGIONS as Region[]) {
   else if (!region.far) region.label = { x: region.label.x + WEST_DX, y: southShift(region.label.y) };
   else if (!region.south) region.label = { x: region.label.x, y: southShift(region.label.y) };
 }
+/**
+ * Every region's label in the generation frame, as the lines above leave them: generateWorld starts from these (some
+ * builders move a label as they build), and ends by moving them all into the grown frame (World.labels, which a bake
+ * keeps too), so making the world twice in one session starts from the same place both times.
+ */
+const FRAME_LABELS = new Map(REGIONS.map(region => [region.id, { ...region.label }]));
 export const isUnderground = (y: number) => y >= UNDER_Y - 0.5 && y < H;
 /** On an upper storey's stored rows (between the strip and the underground). */
 export const isStorey = (y: number) => y >= FLOOR_Y - 0.5 && y < UNDER_Y - 0.5;
@@ -1522,8 +1547,9 @@ function buildMiningCountry(ctx: GenContext, toWorld: (x: number, y: number) => 
 
 /** The world, and the hill lift it was raised with (which, with the tiles, is all its heights need: see `bakeWorld`). */
 export function generateWorld(seed = WORLD_SEED): { world: World; lift: Float32Array; raise: Float32Array } {
-  // Everything older is built as it always was, in the generation frame (GEN_H rows), in arrays already the grown size.
-  const old = buildLegacyWorld(seed), LW = LEGACY_W, OVERWORLD_H = GEN_OVERWORLD_H;
+  // Everything older is built as it always was, in the generation frame (GEN_H rows), in arrays the frame's size (the north grows them, last).
+  const old = buildLegacyWorld(seed), LW = LEGACY_W, OVERWORLD_H = GEN_OVERWORLD_H, H = FRAME_H;
+  for (const region of REGIONS as Region[]) { const label = FRAME_LABELS.get(region.id); if (label) region.label = { ...label }; }
   const tiles = new Uint8Array(W * H).fill(T.DEEP), region = new Uint8Array(W * H), objects: WorldObject[] = [], spawns: SpawnDef[] = [];
   const objectAt = new Int32Array(W * H).fill(-1), lift = new Float32Array(W * H), raise = new Float32Array(W * H), buildings: Building[] = [...old.buildings.map(b => ({ ...b, x0: b.x0 + WEST_DX, x1: b.x1 + WEST_DX }))];
   for (let y = OVERWORLD_H; y < H; y++) for (let x = 0; x < W; x++) tiles[y * W + x] = T.VOID;
@@ -1551,38 +1577,71 @@ export function generateWorld(seed = WORLD_SEED): { world: World; lift: Float32A
   varyBuildings(ctx, worldTools(ctx));
   // The Land Before Stone: the dungeon and storey rows move down, and the south is built in the room that makes (south.ts).
   growSouth(ctx, floors, places);
-  const south: GenContext = { ...ctx, H, random: mulberry(seed + 5151), noise: makeNoise(seed + 131, 13), noise2: makeNoise(seed + 137, 4) };
+  const south: GenContext = { ...ctx, H: FRAME_H, random: mulberry(seed + 5151), noise: makeNoise(seed + 131, 13), noise2: makeNoise(seed + 137, 4) };
   buildSouth(south, worldTools(south), places, floors);
   // The dungeons' identities (dungeonworld.ts): the Rime Galleries, the Sigil Vault, and every dungeon dressed in its family's things, in the world's own frame, last of all.
   buildDungeonIdentity({ ...south, random: mulberry(seed + 909) }, seed);
   buildSettlements({ ...south, random: mulberry(seed + 919) });   // Gravesend's mausoleums and vault, Fernwick's forester, Southshore's wreck and beach (settlementsworld.ts)
   buildMountCountry({ ...south, random: mulberry(seed + 929) }); // the poachers' camp and the tiger's cage (mountworld.ts)
-  buildWyrmreach({ ...south, random: mulberry(seed + 939) });
+  buildWyrmreach({ ...south, random: mulberry(seed + 939) });    // Wyrmreach moved up its mountain north-west of Fernwick, the forest grown over the old field, the drakes' nest (wyrmreachworld.ts)
   buildDragons({ ...south, random: mulberry(seed + 949) });      // the Bonefield, the Cragmaw Heights, Qeshet and the Sunken Halls under it (dragonsworld.ts)
-  buildQuestMounts({ ...south, random: mulberry(seed + 959) });  // the wider world's mount quests: Dawnhold's stable, the Dusk watchers, Qeshet's camel, the fox lanterns (questmountsworld.ts)    // Wyrmreach moved up its mountain north-west of Fernwick, the forest grown over the old field, the drakes' nest (wyrmreachworld.ts)
+  buildQuestMounts({ ...south, random: mulberry(seed + 959) });  // the wider world's mount quests: Dawnhold's stable, the Dusk watchers, Qeshet's camel, the fox lanterns (questmountsworld.ts)
   for (const object of objects) if (object.name === "__removed") object.blocks = false;
   // The dungeons settle under the ground they're reached from (the strip they were built in is left empty).
-  const labels: World["labels"] = {}, under = settleUnderground(ctx, places, floors, labels);
-  const buildingAt = new Uint16Array(W * H);
+  const frameLabels: World["labels"] = {}, under = settleUnderground(ctx, places, floors, frameLabels);
+  // A Place to the North: the whole frame moves down into the grown world, and the north is built in the rows that makes.
+  const grown = growNorth(ctx, floors, places), labels: World["labels"] = {};
+  for (const region of REGIONS) labels[region.id] = { x: region.label.x, y: northShift(region.label.y) };
+  relabelRegions(labels);
+  const buildingAt = new Uint16Array(W * FINAL_H);
   buildings.forEach((b, index) => { if (b.roof === "none") return; for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) buildingAt[y * W + x] = index + 1; });
-  const world: World = { tiles, region, objects, objectAt, spawns, places, heights: buildHeights(tiles, seed, lift, raise), buildings, buildingAt, floors, ramparts: ctx.ramparts, lift, raise, under, labels };
+  const world: World = { tiles: grown.tiles, region: grown.region, objects, objectAt: grown.objectAt, spawns, places, heights: buildHeights(grown.tiles, seed, grown.lift, grown.raise), buildings, buildingAt, floors, ramparts: ctx.ramparts, lift: grown.lift, raise: grown.raise, under, labels };
   // Content promoted from the development world (overlays/): the editable layer, applied last of all (an overlay written in the strip's coordinates follows its dungeon down).
-  for (const overlay of OVERLAYS) applyOverlay(world, movedOverlay(world, overlay), seed);
-  return { world, lift, raise };
+  for (const overlay of OVERLAYS) applyOverlay(world, (overlay as { frame?: 2 }).frame === 2 ? overlay : movedOverlay(world, overlay), seed);
+  return { world, lift: grown.lift, raise: grown.raise };
 }
-/** A strip point's place after the dungeons settled (unchanged if it isn't in a dungeon's rectangle, or isn't in the strip at all). */
-/** The underground regions' labels from a bake, put back where the settled world put them. */
+/** The grown world's height (the module's H, named for where generation's own frame-sized H is in scope). */
+const FINAL_H = H;
+/**
+ * Make room for the north: every row of the frame moves down into arrays the grown world's size (northShift: the
+ * overworld, strip and storeys by NORTH_DY, the underground by twice that), with every object, ladder, spawn, building,
+ * storey, rampart and place on them; the rows they leave are open sea above, solid rock below.
+ */
+function growNorth(ctx: GenContext, floors: Floor[], places: World["places"]) {
+  const size = W * FINAL_H, tiles = new Uint8Array(size).fill(T.DEEP), region = new Uint8Array(size), objectAt = new Int32Array(size).fill(-1), lift = new Float32Array(size), raise = new Float32Array(size);
+  for (let y = UNDER_Y; y < FINAL_H; y++) tiles.fill(T.VOID, y * W, (y + 1) * W);
+  // Two blocks of rows: everything above the underground, and the underground.
+  for (const [from, to, rows] of [[0, NORTH_DY, FRAME_UNDER_Y], [FRAME_UNDER_Y, FRAME_UNDER_Y + 2 * NORTH_DY, FRAME_OVERWORLD_H]] as const) {
+    const a = from * W, b = (from + rows) * W, at = to * W;
+    tiles.set(ctx.tiles.subarray(a, b), at); region.set(ctx.region.subarray(a, b), at); objectAt.set(ctx.objectAt.subarray(a, b), at); lift.set(ctx.lift.subarray(a, b), at); raise.set(ctx.raise.subarray(a, b), at);
+  }
+  for (const object of ctx.objects) { object.y = northShift(object.y); if (object.to) object.to = { x: object.to.x, y: northShift(object.to.y) }; }
+  for (const spawn of ctx.spawns) spawn.y = northShift(spawn.y);
+  for (const b of ctx.buildings) { b.y0 = northShift(b.y0); b.y1 = northShift(b.y1); }
+  for (const r of ctx.ramparts ?? []) { r.y0 = northShift(r.y0); r.y1 = northShift(r.y1); }
+  for (const d of ctx.doorways) d[1] = northShift(d[1]);
+  // A storey's tiles sit at real + (dx, dy): the real rectangle and the stored rows both move (by the same, both being above the underground).
+  for (const f of floors) { const y0 = northShift(f.y0); f.dy = northShift(f.y0 + f.dy) - y0; f.y1 = northShift(f.y1); f.y0 = y0; }
+  for (const key of Object.keys(places) as (keyof World["places"])[]) places[key] = { x: places[key].x, y: northShift(places[key].y) };
+  return { tiles, region, objectAt, lift, raise };
+}
+/** Every region's label from a bake (or a fresh world), put back where the world put them. */
 export function relabelRegions(labels: World["labels"]) { for (const [id, label] of Object.entries(labels)) { const entry = REGIONS.find(region => region.id === id) as { label: { x: number; y: number } } | undefined; if (entry && label) entry.label = label; } }
+/**
+ * A point of the frame (everything before the north: a save, an overlay, a tool) in the grown world: a point in the
+ * dungeon strip goes where its dungeon settled, and then everything moves down with the north (northShift).
+ */
 export function movedPoint(world: Pick<World, "under">, x: number, y: number): { x: number; y: number } {
-  if (y < DUNGEON_Y || y >= FLOOR_Y) return { x, y };
+  if (y < FRAME_DUNGEON_Y || y >= FRAME_FLOOR_Y) return { x, y: northShift(y) };
   const move = world.under.find(m => x >= m.x0 && x <= m.x1 && y >= m.y0 && y <= m.y1);
-  return move ? { x: x + move.dx, y: y + move.dy } : { x, y: y - DUNGEON_Y + UNDER_Y };
+  return move ? { x: x + move.dx, y: northShift(y + move.dy) } : { x, y: northShift(y - FRAME_DUNGEON_Y + FRAME_UNDER_Y) };
 }
-/** A settled point's place in the strip it was built in (for tools and tests that think in the strip; unchanged above ground). */
+/** A point of the grown world back in the frame, a settled dungeon's in the strip it was built in (for tools and tests that think in the frame). */
 export function unmovedPoint(world: Pick<World, "under">, x: number, y: number): { x: number; y: number } {
-  if (y < UNDER_Y) return { x, y };
-  const move = world.under.find(m => x - m.dx >= m.x0 && x - m.dx <= m.x1 && y - m.dy >= m.y0 && y - m.dy <= m.y1);
-  return move ? { x: x - move.dx, y: y - move.dy } : { x, y: y - UNDER_Y + DUNGEON_Y };
+  const fy = northUnshift(y);
+  if (fy < FRAME_UNDER_Y) return { x, y: fy };
+  const move = world.under.find(m => x - m.dx >= m.x0 && x - m.dx <= m.x1 && fy - m.dy >= m.y0 && fy - m.dy <= m.y1);
+  return move ? { x: x - move.dx, y: fy - move.dy } : { x, y: fy - FRAME_UNDER_Y + FRAME_DUNGEON_Y };
 }
 /** An overlay with every strip coordinate in it moved where its dungeon went (overlays written before the dungeons settled). */
 export function movedOverlay<O extends { ops: readonly unknown[] }>(world: Pick<World, "under">, overlay: O): O {
@@ -1607,6 +1666,8 @@ export function movedOverlay<O extends { ops: readonly unknown[] }>(world: Pick<
  * follow their tiles; and the moves are kept (World.under) for whatever still names strip coordinates.
  */
 function settleUnderground(ctx: GenContext, places: World["places"], floors: readonly Floor[], labels: World["labels"]): UnderMove[] {
+  // All in the generation frame (the north comes after).
+  const DUNGEON_Y = FRAME_DUNGEON_Y, FLOOR_Y = FRAME_FLOOR_Y, UNDER_Y = FRAME_UNDER_Y, OVERWORLD_H = FRAME_OVERWORLD_H, H = FRAME_H;
   const { tiles, region, objectAt, lift, raise, objects, spawns, buildings } = ctx, rows = FLOOR_Y - DUNGEON_Y;
   const inStrip = (x: number, y: number) => y >= DUNGEON_Y && y < FLOOR_Y && x >= 0 && x < W;
   // The pieces: every strip tile that isn't void, joined to its neighbours.
@@ -1823,8 +1884,8 @@ export function buildHeights(tiles: Uint8Array, seed: number, lift?: Float32Arra
     }
     if (!count || (sum === 0 && up === 0) || near === 0) continue;
     const ease = Math.min(1, near / 4), smooth = ease * ease * (3 - 2 * ease);
-    // The hill noise is sampled in the mainland's own coordinates, so its relief is exactly what it always was (the wider world sees the same field, shifted).
-    const shape = broad(i - MAINLAND.x, j - MAINLAND.y) * 0.75 + fine(i - MAINLAND.x, j - MAINLAND.y) * 0.25;
+    // The hill noise is sampled in the mainland's own coordinates (and the frame's rows: the north moved everything down), so its relief is exactly what it always was (the wider world sees the same field, shifted).
+    const fj = northUnshift(j) - MAINLAND.y, shape = broad(i - MAINLAND.x, fj) * 0.75 + fine(i - MAINLAND.x, fj) * 0.25;
     raw[j * CW + i] = ((sum / count) * (0.12 + 0.88 * Math.pow(Math.max(0, shape), 1.6)) + up / count) * smooth;
   }
   const heights = new Float32Array(raw.length);

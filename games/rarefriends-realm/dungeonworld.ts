@@ -7,7 +7,7 @@
  * candles, mines their props and carts, caves their boulders and crystal, the Hollow its pale obelisks), placed on a
  * random stream of its own, last of all, so the rest of the world stays exactly as it was.
  */
-import { DUNGEON_Y, FLOOR_Y, T, W, mainlandToWorld, regionIndex, worldTools, type DecorKind, type GenContext, type RegionId } from "./world.ts";
+import { FRAME_DUNGEON_Y as DUNGEON_Y, FRAME_FLOOR_Y as FLOOR_Y, T, W, mainlandToWorld, regionIndex, worldTools, type DecorKind, type GenContext, type RegionId } from "./world.ts";
 
 /** A small random stream of this module's own (the world's streams stay as they were). */
 function mulberry(seed: number) {

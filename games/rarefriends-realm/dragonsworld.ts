@@ -8,7 +8,7 @@
  * to the Sunken Halls, the old kings' halls under the ruin (built straight into the underground layer, beneath the
  * ruin), where the Sand Mother lies coiled round the only water for forty miles. Built in the world's own frame.
  */
-import { REGIONS, T, UNDER_Y, W, worldTools, type GenContext, type RegionId } from "./world.ts";
+import { REGIONS, T, FRAME_UNDER_Y as UNDER_Y, W, worldTools, type GenContext, type RegionId } from "./world.ts";
 
 /** The Bonefield: an ellipse (world coordinates) over the meadow north of the Deadwood maidens' village. */
 export const BONEFIELD = { x: 908, y: 28, rx: 20, ry: 14 } as const;

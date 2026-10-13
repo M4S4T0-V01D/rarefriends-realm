@@ -8,6 +8,7 @@
  * through the Rope and the Brush (the Mizukai tradition), out across the islands, into the old war with Josaki, and at
  * last to Hakkotsu, where the sea has been keeping something.
  */
+import { northShift } from "./world.ts";
 import { addXp, combatLevel, count, giveOrDrop, has, level, message, sound, take, type Dialogue, type Game } from "./state.ts";
 import { chat, completeQuest, data, fetchQuest, npcSays, questDone, stage, type NpcDef, type QuestDef } from "./content.ts";
 
@@ -596,7 +597,7 @@ export function onMizukaiAltar(game: Game, altar: { name: string; text?: string 
 /** Standing on Iwaoka's summit stone (The Silent Climb). */
 export function onMizukaiTick(game: Game) {
   const p = game.player;
-  if (stage(game, "silent_climb") === 1 && !data(game, "sc_summit") && Math.hypot(p.x - IWAOKA_SUMMIT.x, p.y - IWAOKA_SUMMIT.y) <= 3) { flag(game, "sc_summit"); say(game, "You touch the summit stone of Iwaoka. The wind stops, for exactly as long as you hold your breath."); }
+  if (stage(game, "silent_climb") === 1 && !data(game, "sc_summit") && Math.hypot(p.x - IWAOKA_SUMMIT.x, p.y - northShift(IWAOKA_SUMMIT.y)) <= 3) { flag(game, "sc_summit"); say(game, "You touch the summit stone of Iwaoka. The wind stops, for exactly as long as you hold your breath."); }
 }
 /** Iwaoka's summit, where the abbot sends climbers (world coordinates). */
 export const IWAOKA_SUMMIT = { x: 1648, y: 104 } as const;

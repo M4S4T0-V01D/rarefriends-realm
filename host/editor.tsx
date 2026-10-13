@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { DEV_CATALOG, DEV_MODE, DEV_PICK, DEV_REPORT, DEV_TELEPORT, DEV_WORLD, type DevCatalog, type DevPick } from "../games/rarefriends-realm/roster.ts";
 import type { Op, Overlay } from "../games/rarefriends-realm/overlay.ts";
+import { northOverlay } from "../games/rarefriends-realm/northframe.ts";
 import { devApi, type Revision } from "./dev.ts";
 
 const WORLD = "main";
@@ -61,7 +62,7 @@ const send = (message: unknown) => frames().forEach(frame => frame.postMessage(m
 const when = (at: number | null) => at ? new Date(at).toLocaleString() : "";
 
 function Editor() {
-  const [overlay, setOverlay] = useState<Overlay>({ v: 1, name: "Development world", ops: [] });
+  const [overlay, setOverlay] = useState<Overlay>({ v: 1, frame: 2, name: "Development world", ops: [] });
   const [version, setVersion] = useState(0), [dirty, setDirty] = useState(false), [status, setStatus] = useState("Loading the development world…");
   const [edit, setEdit] = useState(false), [tool, setTool] = useState<Tool>("inspect"), [catalog, setCatalog] = useState<DevCatalog | null>(null);
   const [pickInfo, setPick] = useState<DevPick | null>(null), [report, setReport] = useState<{ problems: string[]; unreachable: string[]; ops: number } | null>(null);
@@ -83,7 +84,7 @@ function Editor() {
 
   // The world, loaded once; the listeners, renewed whenever a tool setting changes (they close over the settings).
   useEffect(() => {
-    devApi.load(WORLD).then(loaded => { setOverlay(loaded.overlay); setVersion(loaded.version); setStatus(`Loaded v${loaded.version} (${loaded.overlay.ops.length} ops${loaded.updatedAt ? `, saved ${when(loaded.updatedAt)}` : ""}).`); send({ type: DEV_WORLD, overlay: loaded.overlay }); }).catch(error => setStatus(`Couldn't load: ${(error as Error).message}`));
+    devApi.load(WORLD).then(raw => { const loaded = { ...raw, overlay: northOverlay(raw.overlay) }; setOverlay(loaded.overlay); if (raw.overlay.frame !== 2 && raw.overlay.ops.length) setDirty(true); setVersion(loaded.version); setStatus(`Loaded v${loaded.version} (${loaded.overlay.ops.length} ops${loaded.updatedAt ? `, saved ${when(loaded.updatedAt)}` : ""}).`); send({ type: DEV_WORLD, overlay: loaded.overlay }); }).catch(error => setStatus(`Couldn't load: ${(error as Error).message}`));
   }, []);
   useEffect(() => {
     const receive = (event: MessageEvent) => {
@@ -132,8 +133,8 @@ function Editor() {
     catch (error) { setStatus(`Not saved: ${(error as Error).message}`); }
   };
   const loadRevisions = () => devApi.revisions(WORLD).then(r => setRevisions(r.revisions)).catch(error => setStatus(`Couldn't list revisions: ${(error as Error).message}`));
-  const take = (loaded: { version: number; overlay: Overlay }, what: string) => { past.current = []; future.current = []; setOverlay(loaded.overlay); setVersion(loaded.version); setDirty(false); send({ type: DEV_WORLD, overlay: loaded.overlay }); setStatus(`${what}: now v${loaded.version}.`); void loadRevisions(); };
-  const importFile = (file: File) => { void file.text().then(text => { const raw = JSON.parse(text) as Overlay; if (raw?.v !== 1 || !Array.isArray(raw.ops)) throw new Error("not an overlay"); push(raw.ops, `Imported ${file.name} (${raw.ops.length} ops); save to keep it.`); }).catch(error => setStatus(`Couldn't import: ${(error as Error).message}`)); };
+  const take = (raw: { version: number; overlay: Overlay }, what: string) => { const loaded = { ...raw, overlay: northOverlay(raw.overlay) }; past.current = []; future.current = []; setOverlay(loaded.overlay); setVersion(loaded.version); setDirty(false); send({ type: DEV_WORLD, overlay: loaded.overlay }); setStatus(`${what}: now v${loaded.version}.`); void loadRevisions(); };
+  const importFile = (file: File) => { void file.text().then(text => { const parsed = JSON.parse(text) as Overlay; if (parsed?.v !== 1 || !Array.isArray(parsed.ops)) throw new Error("not an overlay"); const raw = northOverlay(parsed); push(raw.ops, `Imported ${file.name} (${raw.ops.length} ops); save to keep it.`); }).catch(error => setStatus(`Couldn't import: ${(error as Error).message}`)); };
   /** The definitions tab: an op a definition (npc, monster, item, quest), one of each id; the form fills from one and makes one. */
   const defs = overlay.ops.filter(op => op.op === "npc" || op.op === "monster" || op.op === "item" || op.op === "quest") as Extract<Op, { def: { id: string } }>[];
   const chooseDef = (k: DefKind) => { setDefKind(k); setForm(DEF_DEFAULTS[k]); setDefError(""); };

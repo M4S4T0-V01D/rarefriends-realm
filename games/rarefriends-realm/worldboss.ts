@@ -5,9 +5,9 @@
  */
 import { MONSTERS } from "./data.ts";
 import { message, sound, type Game } from "./state.ts";
-import { mainlandToWorld, objectAtTile, walkable } from "./world.ts";
+import { mainlandAt, objectAtTile, walkable } from "./world.ts";
 
-export const BOSS_EVERY = 2 * 3_600_000, BOSS_LASTS = 20 * 60_000, BOSS_LAIR = { x: mainlandToWorld(44, 32)[0], y: mainlandToWorld(44, 32)[1] };
+export const BOSS_EVERY = 2 * 3_600_000, BOSS_LASTS = 20 * 60_000, BOSS_LAIR = mainlandAt(44, 32);
 /** The boss window a moment falls in: whether it's up, and when it rises next. */
 export function bossWindow(ms: number) {
   const index = Math.floor(ms / BOSS_EVERY), start = index * BOSS_EVERY;

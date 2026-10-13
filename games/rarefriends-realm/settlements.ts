@@ -8,6 +8,7 @@
  * shells from the crates the tide leaves. Low and mid quests, each with a prerequisite, a state, and a reward that
  * isn't a weapon handed over: a place, a keepsake, a chart for a skill that doesn't exist yet.
  */
+import { northShift } from "./world.ts";
 import { TREES, item } from "./data.ts";
 import { addXp, count, give, giveOrDrop, has, level, message, sound, take, type Dialogue, type Game } from "./state.ts";
 import { chat, data, fetchQuest, npcSays, questDone, stage, type NpcDef, type QuestDef } from "./content.ts";
@@ -177,7 +178,7 @@ export function talkSettlements(game: Game, npcId: string, name: string): Dialog
 }
 /** The grave robbers put down at their camp east of Gravesend's mausoleums count for the sexton (bandits anywhere else don't). */
 export function onSettlementsKill(game: Game, monsterId: string, x: number, y: number) {
-  if (monsterId !== "bandit" || stage(game, DISTURBED_ROW) !== 1 || x < 776 || x > 794 || y < 110 || y > 128) return;
+  if (monsterId !== "bandit" || stage(game, DISTURBED_ROW) !== 1 || x < 776 || x > 794 || y < northShift(110) || y > northShift(128)) return;
   const n = data(game, "dr_robbers") + 1; game.player.questData.dr_robbers = n;
   if (n === ROBBERS) say(game, "That's the three of them. Dunstan will want his tokens, and the row's quiet.");
 }

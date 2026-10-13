@@ -9,7 +9,7 @@
  * machine.
  */
 import { ORDERS } from "./knights.ts";
-import { WEST_DX } from "./world.ts";
+import { WEST_DX, northShift } from "./world.ts";
 import { addXp, combatLevel, count, give, giveOrDrop, has, level, message, setLaw, sound, take, type Dialogue, type Game } from "./state.ts";
 import { chat, completeQuest, data, fetchQuest, npcSays, questDone, stage, type NpcDef, type QuestDef } from "./content.ts";
 
@@ -264,7 +264,7 @@ export function onWestAltar(game: Game, altar: { name: string; text?: string }) 
 /** Standing in the Great Hall of the Federation with the Colonel's tally to make. */
 export function onWestTick(game: Game) {
   const p = game.player;
-  if (stage(game, "cog_federation") === 1 && !data(game, "ef_counted") && p.x >= 31 + WEST_DX && p.x <= 49 + WEST_DX && p.y >= 392 && p.y <= 402) {
+  if (stage(game, "cog_federation") === 1 && !data(game, "ef_counted") && p.x >= 31 + WEST_DX && p.x <= 49 + WEST_DX && p.y >= northShift(392) && p.y <= northShift(402)) {
     p.questData.ef_counted = 1; giveOrDrop(game, "federation_tally"); message(game, "You count what's running in the Great Hall. Fourteen devices, one cannon, one knight asleep, one chicken. You write it down. Nobody stops you, which is its own answer.", "quest"); sound(game, "quest");
   }
 }

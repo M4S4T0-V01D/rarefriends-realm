@@ -2,7 +2,9 @@
 // host's same-origin test channel (never the public relays): they see each other walk, chat in public and in private,
 // add each other as friends and earn the party bonus together. Automated test only.
 import assert from "node:assert/strict";
-import { mainlandToWorld } from "../games/rarefriends-realm/world.ts";
+import { mainlandAt, mainlandToWorld } from "../games/rarefriends-realm/world.ts";
+/** Where B stands in the Ring (the mainland's (141, 146), in the grown world). */
+const RING_ROW = mainlandAt(141, 146).y;
 // Page-side checks carry world columns as literals (the square at 746, the Sparring Ring at 766): mainland x + MAINLAND.x + WEST_DX.
 if (mainlandToWorld(121, 0)[0] !== 746) throw new Error("world constants changed: update the literals in multiplayer-browser.mjs");
 import { execFileSync } from "node:child_process";
@@ -91,7 +93,7 @@ try {
     const frame = () => page.frames().find(entry => entry !== page.mainFrame() && entry.url() !== "about:blank");
     const state = fn => frame().evaluate(fn);
     const until = async (fn, what, timeout = 20_000) => { const end = Date.now() + timeout; while (Date.now() < end) { if (await state(fn)) return; await page.waitForTimeout(200); } assert.fail(`#${friendId}: timed out waiting for ${what}`); };
-    const teleport = (mx, my) => frame().evaluate(([x, y]) => { const p = window.__realm.game().player; p.x = x; p.y = y; p.prev = { x, y }; p.path = []; window.__realm.refresh(); }, mainlandToWorld(mx, my));
+    const teleport = (mx, my) => frame().evaluate(([x, y]) => { const p = window.__realm.game().player; p.x = x; p.y = y; p.prev = { x, y }; p.path = []; window.__realm.refresh(); }, [mainlandAt(mx, my).x, mainlandAt(mx, my).y]);
     return { page, game, frame, state, until, teleport };
   };
   const a = await player(7730), b = await player(3412);
@@ -111,7 +113,7 @@ try {
     console.log(`PASS real relays${process.env.NO_DIRECT ? " (no direct links: the relay path alone)" : ""}: both players met and chatted`); process.exit(0);
   }
   // B walks; A sees it move.
-  await b.frame().evaluate(() => { const g = window.__realm.game(); g.player.path = [{ x: 749, y: 284 }, { x: 750, y: 284 }, { x: 751, y: 284 }]; });
+  await b.frame().evaluate(row => { const g = window.__realm.game(); g.player.path = [{ x: 749, y: row }, { x: 750, y: row }, { x: 751, y: row }]; }, mainlandAt(123, 124).y);
   await a.until(() => window.__realm.peers().some(peer => peer.id === 3412 && peer.x === 751), "#3412 walking");
 
   // A right-clicks B: the player menu, and Add-friend.
@@ -198,11 +200,12 @@ try {
   await a.teleport(139, 146); await b.teleport(141, 146);
   await b.frame().evaluate(() => { const p = window.__realm.game().player; p.hp = 2; p.inventory = p.inventory.map(slot => slot?.id === "coins" ? slot : null); window.__realm.refresh(); });
   await a.frame().evaluate(() => { const p = window.__realm.game().player; for (const s of ["attack", "strength"]) p.xp[s] = 200_000; });
-  await a.until(() => window.__realm.peers().some(peer => peer.id === 3412 && peer.x === 766 && peer.y === 306), "B in the ring");
+  await a.frame().evaluate(row => { window.__ringRow = row; }, RING_ROW);
+  await a.until(() => window.__realm.peers().some(peer => peer.id === 3412 && peer.x === 766 && peer.y === window.__ringRow), "B in the ring");
   // The camera may still be gliding after the teleport (slower under WebGL), so aim afresh and try again until B is under the pointer.
   const fight = a.game.getByRole("menuitem", { name: /^Fight .*#3412/ });
   for (let attempt = 0; ; attempt++) {
-    const ringAt = await a.frame().evaluate(() => window.__realm.screenOf(766, 306)), ringBox = await a.page.locator("iframe").boundingBox();
+    const ringAt = await a.frame().evaluate(row => window.__realm.screenOf(766, row), RING_ROW), ringBox = await a.page.locator("iframe").boundingBox();
     await a.page.mouse.click(ringBox.x + ringAt.x, ringBox.y + ringAt.y - 20, { button: "right" });
     if (await fight.waitFor({ timeout: 3000 }).then(() => true, () => false)) break;
     if (attempt >= 5) throw new Error("No Fight option on B in the ring");

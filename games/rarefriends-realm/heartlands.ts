@@ -15,7 +15,7 @@
  *
  * Built after the north (south.ts), in the grown world's own coordinates. Module constants are literals (see south.ts).
  */
-import { DUNGEON_Y, OVERWORLD_H, T, W, isWater, type Building, type DecorKind, type Floor, type GenContext, type RegionId, type World, type WorldObject, type worldTools } from "./world.ts";
+import { FRAME_DUNGEON_Y as DUNGEON_Y, FRAME_OVERWORLD_H as OVERWORLD_H, T, W, isWater, type Building, type DecorKind, type Floor, type GenContext, type RegionId, type World, type WorldObject, type worldTools } from "./world.ts";
 import type { RockKind } from "./data.ts";
 import { buildPyramids } from "./pyramids.ts";
 

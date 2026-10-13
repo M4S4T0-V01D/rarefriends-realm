@@ -14,7 +14,7 @@
  * Built after Kharaveth (south.ts), in the grown world's own coordinates. Only the sea is turned to land. Module
  * constants are literals (see south.ts).
  */
-import { DUNGEON_Y, OVERWORLD_H, T, W, isWater, type Building, type DecorKind, type GenContext, type RegionId, type World, type WorldObject, type worldTools } from "./world.ts";
+import { FRAME_DUNGEON_Y as DUNGEON_Y, FRAME_OVERWORLD_H as OVERWORLD_H, T, W, isWater, type Building, type DecorKind, type GenContext, type RegionId, type World, type WorldObject, type worldTools } from "./world.ts";
 import type { RockKind, TreeKind } from "./data.ts";
 import type { SouthKit } from "./heartlands.ts";
 

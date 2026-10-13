@@ -2845,7 +2845,7 @@ export type SaveData = {
 export function serialize(game: Game): SaveData {
   const player = game.player;
   return {
-    v: 1, world: 5, friendId: player.friendId, x: player.x, y: player.y, run: player.run, energy: Math.round(player.energy), xp: { ...player.xp }, hp: player.hp, prayer: Math.round(player.prayer * 10) / 10,
+    v: 1, world: 6, friendId: player.friendId, x: player.x, y: player.y, run: player.run, energy: Math.round(player.energy), xp: { ...player.xp }, hp: player.hp, prayer: Math.round(player.prayer * 10) / 10,
     inventory: player.inventory.map(slot => slot ? { ...slot } : null), equipment: { ...player.equipment } as Record<string, string>, bank: player.bank.map(slot => ({ ...slot })),
     style: player.style, autocast: player.autocast, quests: { ...player.quests }, questData: { ...player.questData }, wardrobe: [...player.wardrobe], worn: [...player.worn],
     follower: player.follower, followerGeneration: player.followerGeneration, kills: player.kills, deaths: player.deaths, tutorial: player.tutorial, guide: player.guide, created: player.created,
@@ -2934,9 +2934,10 @@ export function restore(game: Game, raw: unknown): boolean {
   // 4: the south grew under the old overworld (the dungeon and storey rows moved down SOUTH_DY); 3: the far west grew the
   // world WEST_DX columns on its west side; 2: the wider world before it; older: the mainland's own frame.
   if (save.world === 2 || save.world === 3) { y = int(save.y, 0, GEN_H - 1, -1); if (save.world === 2) x += WEST_DX; if (y >= 0) y = southShift(y); }
-  else if (save.world !== 4 && save.world !== 5 && x >= 0 && x < MAINLAND.w && y >= 0 && y < MAINLAND.h + MAINLAND.dungeonRows + MAINLAND.floorRows) [x, y] = mainlandToWorld(x, y);
-  // 5: the dungeons settled under their ground (the strip they were built in is empty): a save left down there follows its dungeon.
-  if (save.world !== 5 && y >= DUNGEON_Y && y < FLOOR_Y) ({ x, y } = movedPoint(game.world, x, y));
+  else if (save.world !== 4 && save.world !== 5 && save.world !== 6 && x >= 0 && x < MAINLAND.w && y >= 0 && y < MAINLAND.h + MAINLAND.dungeonRows + MAINLAND.floorRows) [x, y] = mainlandToWorld(x, y);
+  // 6: the world grew north, and everything before it moved down (northShift); 5: the dungeons settled under their ground. Every
+  // older save is in the frame before the north: movedPoint brings it into the grown world (a point left in the strip follows its dungeon).
+  if (save.world !== 6 && y >= 0) ({ x, y } = movedPoint(game.world, x, y));
   if (inBounds(x, y) && walkable(game.world, x, y)) { player.x = x; player.y = y; player.prev = { x, y }; }
   player.run = !!save.run; player.energy = int(save.energy, 0, 100, 100);
   player.style = (["accurate", "aggressive", "defensive", "controlled"] as const).includes(save.style as CombatStyle) ? save.style as CombatStyle : "accurate";
@@ -2996,7 +2997,7 @@ export function restore(game: Game, raw: unknown): boolean {
   const notices = Array.isArray(save.notices) ? save.notices.filter((entry): entry is string => typeof entry === "string").slice(0, 20) : [];
   for (const notice of notices) message(game, notice.slice(0, 300), "info");
   player.camps = keyed(save.camps, v => typeof v === "number" ? int(v, 1, 1e6, 1) : null) as Record<string, number>; player.campTendAt = -1e9; player.campSleptAt = -1e9; player.waystoneAt = game.tick + int(save.waystoneAt, -1e6, 0, -1e6);
-  player.notices = []; player.cards = Object.fromEntries(Object.entries(save.cards && typeof save.cards === "object" ? save.cards : {}).filter(([id, day]) => /^[a-z0-9_]{1,40}$/.test(id) && typeof day === "number" && Number.isFinite(day)).slice(0, 2000).map(([id, day]) => [id, Math.max(0, Math.floor(day))])); player.rarian = save.rarian === true; player.mizukai = !player.rarian && save.mizukai === true; player.orashai = !player.rarian && !player.mizukai && save.orashai === true; player.mana = typeof save.mana === "number" && Number.isFinite(save.mana) ? Math.max(0, Math.min(maxMana(player), save.mana)) : maxMana(player); player.mysteries = cleanMysteries(save.mysteries); player.spiritWardUntil = game.tick + int(save.spiritWardUntil, 0, 1000, 0); player.home = cleanHome(save.home); player.restedTicks = int(save.restedTicks, 0, 100000, 0); applyHome(game); player.camp = cleanCamp(save.camp); player.campXpAt = int(save.campXpAt, -100000, 1e9, -100000); applyCamp(game);
+  player.notices = []; player.cards = Object.fromEntries(Object.entries(save.cards && typeof save.cards === "object" ? save.cards : {}).filter(([id, day]) => /^[a-z0-9_]{1,40}$/.test(id) && typeof day === "number" && Number.isFinite(day)).slice(0, 2000).map(([id, day]) => [id, Math.max(0, Math.floor(day))])); player.rarian = save.rarian === true; player.mizukai = !player.rarian && save.mizukai === true; player.orashai = !player.rarian && !player.mizukai && save.orashai === true; player.mana = typeof save.mana === "number" && Number.isFinite(save.mana) ? Math.max(0, Math.min(maxMana(player), save.mana)) : maxMana(player); player.mysteries = cleanMysteries(save.mysteries); player.spiritWardUntil = game.tick + int(save.spiritWardUntil, 0, 1000, 0); player.home = cleanHome(save.home); player.restedTicks = int(save.restedTicks, 0, 100000, 0); applyHome(game); player.camp = cleanCamp(save.camp); if (player.camp && save.world !== 6) Object.assign(player.camp, movedPoint(game.world, player.camp.x, player.camp.y)); player.campXpAt = int(save.campXpAt, -100000, 1e9, -100000); applyCamp(game);
   player.sigilBag = {}; for (const [id, n] of Object.entries(save.sigilBag ?? {})) if (isItem(id) && isSigil(id)) { const v = int(n, 0, SIGIL_BAG_SIZE, 0); if (v) player.sigilBag[id] = v; }
   player.ward = save.ward && typeof save.ward === "object" ? { defence: Math.max(0, Math.min(1, Number(save.ward.defence) || 0)), flat: int(save.ward.flat, 0, 100, 0), reduce: Math.max(0, Math.min(0.9, Number(save.ward.reduce) || 0)) } : null; player.wardUntil = game.tick + int(save.wardUntil, 0, 1000, 0); if (!int(save.wardUntil, 0, 1000, 0)) player.ward = null;
   player.renew = int(save.renew, 0, 50, 0); player.renewUntil = game.tick + int(save.renewUntil, 0, 1000, 0);

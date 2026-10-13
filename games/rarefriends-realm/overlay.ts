@@ -38,8 +38,9 @@ export type Op =
   | { op: "item"; def: (typeof ITEM_LIST)[number] }
   | { op: "quest"; def: OverlayQuest }
   | { op: "campzone"; uid: string; x0: number; y0: number; x1: number; y1: number; allow: boolean; why?: string };
-export type Overlay = { v: 1; name?: string; ops: Op[] };
-export const emptyOverlay = (name = "Development world"): Overlay => ({ v: 1, name, ops: [] });
+/** `frame: 2`: written in the grown world (after the north); an overlay without it is from before, and is moved down with the world when it's read (northframe.ts). */
+export type Overlay = { v: 1; frame?: 2; name?: string; ops: Op[] };
+export const emptyOverlay = (name = "Development world"): Overlay => ({ v: 1, frame: 2, name, ops: [] });
 export const LIMITS = { ops: 200_000, bytes: 4_000_000, fillTiles: 40_000 } as const;
 
 const NUM = (v: unknown, lo: number, hi: number) => typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi;
@@ -53,6 +54,7 @@ export function cleanOverlay(raw: unknown, why: string[] = []): Overlay {
   if (!raw || typeof raw !== "object") { why.push("not an overlay"); return out; }
   const o = raw as Record<string, unknown>;
   if (TEXT(o.name, 80)) out.name = o.name as string;
+  if (o.frame !== 2) delete out.frame;
   if (!Array.isArray(o.ops)) { why.push("no ops"); return out; }
   for (const [i, raw] of (o.ops as unknown[]).entries()) {
     if (out.ops.length >= LIMITS.ops) { why.push("too many ops"); break; }

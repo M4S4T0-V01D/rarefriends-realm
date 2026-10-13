@@ -10,7 +10,7 @@
  *
  * (Module-level constants are literals: world.ts imports this module, so its values aren't ready while this one loads.)
  */
-import { DUNGEON_Y, OVERWORLD_H, T, W, isWater, type DecorKind, type Floor, type GenContext, type RegionId, type World, type WorldObject, type worldTools } from "./world.ts";
+import { FRAME_DUNGEON_Y as DUNGEON_Y, FRAME_OVERWORLD_H as OVERWORLD_H, T, W, isWater, type DecorKind, type Floor, type GenContext, type RegionId, type World, type WorldObject, type worldTools } from "./world.ts";
 
 import { ASHAR, SPINE, buildHeartlands } from "./heartlands.ts";
 import { buildFirstNames } from "./firstnames.ts";

@@ -58,7 +58,7 @@ try {
   const teleport = async (x, y) => { await frame().evaluate(([x, y]) => { const g = window.__realm.game(), p = g.player; p.x = x; p.y = y; p.prev = { x, y }; p.path = []; p.target = null; p.activity = null; p.combat = null; p.hp = 99; window.__realm.refresh(); }, [x, y]); await page.waitForTimeout(1400); };
   // The four views of a region, chosen from the same world the game runs: where its ladder up lands, a corridor (walls on two
   // opposite sides), the chamber (the floor tile with most floor round it), the deep end (farthest from the entrance).
-  const { createWorld, W, T, regionAt } = await import("../games/rarefriends-realm/world.ts");
+  const { createWorld, W, T, UNDER_Y, regionAt } = await import("../games/rarefriends-realm/world.ts");
   const world = createWorld();
   const choose = region => {
     const floors = []; for (let y = 0; y < world.tiles.length / W; y++) for (let x = 0; x < W; x++) { const i = y * W + x; if ((world.tiles[i] === T.DUNGEON || world.tiles[i] === T.STONE || world.tiles[i] === T.ASH) && regionAt(world, x, y).id === region && y >= 880) floors.push([x, y]); }
@@ -90,7 +90,7 @@ try {
     const at = choose(region), stats = [];
     for (const [view, [x, y]] of Object.entries(at)) {
       await teleport(x, y);
-      assert.equal(await frame().evaluate(() => window.__realm.game().player.y >= 880), true, `${family}: underground`);
+      assert.equal(await frame().evaluate(under => window.__realm.game().player.y >= under, UNDER_Y), true, `${family}: underground`);
       await game.locator("canvas.realm-view").screenshot({ path: `${OUT}/${family}-${view}.jpg`, type: "jpeg", quality: 82 });
       const m = await measure(); assert.ok(m, "a picture to measure"); stats.push(m);
       console.log(`${family} ${view} at ${x},${y}: mean ${m.mean.map(v => v.toFixed(0)).join("/")}`);
