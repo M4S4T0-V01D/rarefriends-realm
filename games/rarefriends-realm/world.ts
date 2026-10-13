@@ -23,6 +23,7 @@ import { buildWyrmreach } from "./wyrmreachworld.ts";
 import { buildDragons } from "./dragonsworld.ts";
 import { buildQuestMounts } from "./questmountsworld.ts";
 import { buildNorth } from "./northworld.ts";
+import { openSeas } from "./seaways.ts";
 
 /**
  * The far west (Return of Raria): the world grew by WEST_DX columns on its west side for a second continent, Raria and
@@ -221,6 +222,8 @@ export type RegionId =
   | "vargskeld" | "vargskeld_sea" | "skarnholm" | "ravnsvik" | "oathsworn_hall" | "embermoot" | "redwake_camp" | "varn_ridge" | "oathgate_pass"
   | "zoryavik" | "zoryavik_coast" | "hearthwatch" | "krasnogor" | "bereslav" | "zlatna_gora" | "svetloye" | "old_bough"
   | "skarnholm_bay" | "grimfell" | "sokol_hills"
+  // The seaways (seaways.ts): the ocean all the way round the map.
+  | "outer_sea"
   // The sea ports: Gullwick on the mainland, Saltreach below Raria, and Merrab, Tel Ashun and Ennu's Well in Kharaveth's east.
   | "gullwick" | "saltreach" | "merrab" | "tel_ashun" | "ennus_well";
 export type Region = { id: RegionId; name: string; label: { x: number; y: number }; danger: number; underground?: boolean;
@@ -350,6 +353,7 @@ export const REGIONS: readonly Region[] = [
     ["zoryavik", "The Zoryavik", 4], ["zoryavik_coast", "The Zoryavik Coast", 3], ["hearthwatch", "Hearthwatch", 0], ["krasnogor", "Krasnogor", 0], ["bereslav", "Bereslav", 0],
     ["zlatna_gora", "Zlatna Gora", 1], ["svetloye", "Svetloye", 0], ["old_bough", "The Old Bough", 1],
     ["skarnholm_bay", "Skarnholm Bay", 3], ["grimfell", "The Grimfell", 4], ["sokol_hills", "The Sokol Hills", 4],
+    ["outer_sea", "The Outer Sea", 3],
   ] as const).map(([id, name, danger]) => ({ id, name, label: { x: 0, y: 0 }, danger, far: true }) as Region),
 ];
 export const regionIndex = (id: RegionId) => REGIONS.findIndex(region => region.id === id);
@@ -1619,7 +1623,11 @@ export function generateWorld(seed = WORLD_SEED): { world: World; lift: Float32A
   for (const region of REGIONS) labels[region.id] = { x: region.label.x, y: northShift(region.label.y) };
   relabelRegions(labels);
   // The north itself, in the rows made for it (northworld.ts: it sets its own regions' labels, in the grown world).
-  buildNorth({ ...ctx, H: FINAL_H, tiles: grown.tiles, region: grown.region, objectAt: grown.objectAt, lift: grown.lift, raise: grown.raise, random: mulberry(seed + 969), noise: makeNoise(seed + 971, 11), noise2: makeNoise(seed + 977, 4) }, labels);
+  const grownCtx: GenContext = { ...ctx, H: FINAL_H, tiles: grown.tiles, region: grown.region, objectAt: grown.objectAt, lift: grown.lift, raise: grown.raise, random: mulberry(seed + 969), noise: makeNoise(seed + 971, 11), noise2: makeNoise(seed + 977, 4) };
+  buildNorth(grownCtx, labels);
+  // The seaways, last of all: the Outer Sea round the whole map and the straits out to it (seaways.ts).
+  openSeas({ ...grownCtx, random: mulberry(seed + 983), noise2: makeNoise(seed + 987, 4) }, places);
+  { const entry = REGIONS.find(region => region.id === "outer_sea") as { label: { x: number; y: number } } | undefined; if (entry) { entry.label = { x: 860, y: 4 }; labels.outer_sea = { x: 860, y: 4 }; } }
   const buildingAt = new Uint16Array(W * FINAL_H);
   buildings.forEach((b, index) => { if (b.roof === "none") return; for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) buildingAt[y * W + x] = index + 1; });
   const world: World = { tiles: grown.tiles, region: grown.region, objects, objectAt: grown.objectAt, spawns, places, heights: buildHeights(grown.tiles, seed, grown.lift, grown.raise), buildings, buildingAt, floors, ramparts: ctx.ramparts, lift: grown.lift, raise: grown.raise, under, labels };

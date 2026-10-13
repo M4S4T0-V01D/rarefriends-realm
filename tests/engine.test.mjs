@@ -4737,3 +4737,25 @@ test("Going ashore: aboard, H (or the Go ashore button) sails you to the nearest
   const v = p.vessels[0]; assert.ok(Math.abs(v.x - p.x) + Math.abs(v.y - p.y) === 1, "the rowboat moored beside you");
   assert.ok(world.objects.some(o => o.text === "vessel:1" && o.name !== "__removed"));
 });
+
+test("The seaways: the Outer Sea runs round the whole map, so a longship from Skarnholm reaches every edge and corner; the straits join the inland seas to it, bridged where a road crosses", async () => {
+  const SF = await import("../games/rarefriends-realm/seafaring.ts");
+  const { STRAITS, RING } = await import("../games/rarefriends-realm/seaways.ts");
+  const g = newGame(), world = g.world, sail = (x, y) => SF.sailableFor(world, "longship", x, y);
+  const bersi = world.spawns.find(s => s.kind === "npc" && s.id === "shipwright_bersi"), start = SF.launchSpot(g, "longship", bersi);
+  const seen = new Uint8Array(W * OVERWORLD_H), q = [start.y * W + start.x]; seen[q[0]] = 1;
+  while (q.length) { const i = q.pop(), x = i % W, y = (i - x) / W; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= W || ny >= OVERWORLD_H) continue; const k = ny * W + nx; if (!seen[k] && sail(nx, ny)) { seen[k] = 1; q.push(k); } } }
+  // Every stretch of every edge: some open water within the band, all one sea.
+  for (let p = 0; p < W; p += 40) for (const y of [2, OVERWORLD_H - 3]) { let ok = false; for (let d = 0; d < RING && !ok; d++) for (let dx = -20; dx <= 20 && !ok; dx++) { const x = Math.max(0, Math.min(W - 1, p + dx)), yy = y === 2 ? d : OVERWORLD_H - 1 - d; ok = !!seen[yy * W + x]; } assert.ok(ok, `the sea along the ${y === 2 ? "top" : "bottom"} at x ${p}`); }
+  for (let p = 0; p < OVERWORLD_H; p += 40) for (const left of [true, false]) { let ok = false; for (let d = 0; d < RING && !ok; d++) for (let dy = -20; dy <= 20 && !ok; dy++) { const y = Math.max(0, Math.min(OVERWORLD_H - 1, p + dy)), x = left ? d : W - 1 - d; ok = !!seen[y * W + x]; } assert.ok(ok, `the sea along the ${left ? "left" : "right"} at y ${p}`); }
+  // Each strait: water all along it, joined to the sea, and the roads it cuts carried over on bridges.
+  for (const strait of STRAITS) {
+    for (const [x, y] of strait.points) { const near = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => seen[(y + dy) * W + x + dx]); assert.ok(near, `${strait.name} at ${x},${y} is open sea`); }
+    if (/Southshore|Vargskeld lake/.test(strait.name)) { const xs = strait.points.map(p => p[0]), ys = strait.points.map(p => p[1]); let bridges = 0;
+      for (let y = Math.min(...ys) - 4; y <= Math.max(...ys) + 4; y++) for (let x = Math.min(...xs) - 4; x <= Math.max(...xs) + 4; x++) if (world.tiles[y * W + x] === T.BRIDGE) bridges++;
+      assert.ok(bridges >= 4, `${strait.name}: the road crosses on a bridge`); }
+  }
+  assert.ok(regionAt(world, REGIONS.find(r => r.id === "outer_sea").label.x, REGIONS.find(r => r.id === "outer_sea").label.y).id === "outer_sea");
+  // The Deadwood coast's sea, the Southshore water and Glass Lake are part of it now.
+  for (const id of ["glass_lake", "southshore"]) { let any = false; for (let i = 0; i < W * OVERWORLD_H && !any; i++) if (seen[i] && world.region[i] === REGIONS.indexOf(REGIONS.find(r => r.id === id))) any = true; assert.ok(any, `${id}'s water is on the sea`); }
+});

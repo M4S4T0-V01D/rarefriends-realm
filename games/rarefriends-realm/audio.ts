@@ -697,7 +697,7 @@ const KHARAVETH_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { sunteeth: "
 /** The dragons' places (dragonsworld.ts) borrow their neighbours' pieces. */
 /** The north's places borrow pieces until they have their own: the cold coast and the high ground for the Vargskeld, the forest and the towns for the Zoryavik. */
 const NORTH_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { vargskeld: "frostpeak", vargskeld_sea: "coast", skarnholm: "saltmarrow", ravnsvik: "coast", oathsworn_hall: "greyhorn", embermoot: "silent_peaks",
-  redwake_camp: "westmarch", varn_ridge: "frostpeak", oathgate_pass: "drakespine", zoryavik: "barkreach", zoryavik_coast: "coast", skarnholm_bay: "coast", grimfell: "frostpeak", sokol_hills: "barkreach", hearthwatch: "greyhorn", krasnogor: "highcairn", bereslav: "fernwick",
+  redwake_camp: "westmarch", varn_ridge: "frostpeak", oathgate_pass: "drakespine", zoryavik: "barkreach", zoryavik_coast: "coast", skarnholm_bay: "coast", grimfell: "frostpeak", sokol_hills: "barkreach", outer_sea: "coast", hearthwatch: "greyhorn", krasnogor: "highcairn", bereslav: "fernwick",
   zlatna_gora: "ironreach", svetloye: "crownlands", old_bough: "heartwood" };
 const DRAGON_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { bonefield: "deadwood", cragmaw_heights: "ironreach", qeshet: "kharaveth_dunes", sunken_halls: "kharaveth_underway" };
 const PORTS_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { gullwick: "saltmarrow", saltreach: "crownlands", merrab: "kharaveth_sefrah", tel_ashun: "kharaveth_azhurak", ennus_well: "kharaveth_dunes" };

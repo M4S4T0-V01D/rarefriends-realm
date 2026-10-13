@@ -115,7 +115,7 @@ export function buildHearthkinCountry(ctx: GenContext, toWorld: ToWorld) {
   for (const [x, y] of [[13, 218], [18, 221], [15, 220]] as const) put(x, y, T.LAVA);
   for (const [x, y] of [[7, 226], [18, 230], [9, 234]] as const) rock(x, y, "moonsilver");
   rock(18, 235, "gem"); decor(5, 225, "torch"); decor(19, 225, "torch"); decor(12, 235, "bones", false, "Somebody's pick, and somebody");
-  monsters("ember_salamander", 5, 225, 19, 235, 3); monsters("ember_salamander", 11, 217, 19, 222, 1);
+  monsters("ember_salamander_young", 5, 225, 19, 235, 3); monsters("ember_salamander_young", 11, 217, 19, 222, 1);   // (the young ones, level 7: the shaft is by Friendhollow, not the deep mine)
 
   // ---------- Frostpeak, moved up the mountain ----------
   // The old camp is the lower lodge now (world.ts). The town stands on a shelf cut into the mountain east of the summit,

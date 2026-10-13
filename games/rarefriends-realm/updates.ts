@@ -4,6 +4,11 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 126, date: "2026-10-13", title: "The Outer Sea: sail round the whole Realm", items: [
+    "The Outer Sea runs all the way round the map, so a vessel can sail right round the Realm, from the north's coasts down past the west and Kharaveth to the Mizukai Isles and back. Where land ran into the edge of the world it's cut back into beach.",
+    "Straits join the big inland seas to it: the Deadwood's sea out through the Zoryavik to the Ilm, the Wyrmreach bay into the Deadwood's sea, the Southshore water and Glass Lake out to the south sea, the Vargskeld lake down to Skarnholm Bay, and the Grimfell tarn to the Skarn. Roads cross them on bridges.",
+    "The salamanders in the quarry shaft's hot tunnel, by the Ashen Hills, are the young ones now (level 7), like the ones out on the hills.",
+  ] },
   { id: 125, date: "2026-10-13", title: "Frens, taller rooms, and a way ashore", items: [
     "The Realm's money is the Fren: one Fren, a pile of Frens. Everything you had is still yours, the same amounts and the same prices; only the name changed.",
     "Every house, shop, inn, bank and hall stands a block taller, so rooms are well over your head inside, and upper floors sit on the taller walls. The Rare Friends Ring stands taller again: its walls and the walk on top are two blocks higher than before.",
