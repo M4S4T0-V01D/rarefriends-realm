@@ -223,6 +223,7 @@ export function skillGuide(skill: Skill): GuideEntry[] {
       add(1, "Going ashore", "Aboard, click the shore: you sail beside it and step off, where the vessel can be beached or there's a pier. The vessel stays moored there, its hold with it.", undefined, T("ability"));
       add(1, "The hold", "Each vessel has a hold: Load from your pack aboard or beside it, take things back from the Hold.", undefined, T("ability"));
       add(1, "Planks", "A shipwright saws logs into planks for a fee: pine, oak and ironbark.", "oak_planks", T("ability"));
+      add(SEA.berthLevel, "A berth", "A barge's deckhouse or a longship's awning can be your waking place: if you fall, you wake aboard it, wherever it's moored. One waking place at a time, a camp or a vessel.", undefined, T("ability"));
       add(1, "Hulls", `Deep water wears a hull a point every ${SEA.wearEvery} tiles. A stove-in hull keeps to the shallows until a shipwright mends it with planks and pewter rivets.`, undefined, T("ability"));
       break;
     case "presence":

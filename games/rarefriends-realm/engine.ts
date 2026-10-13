@@ -36,7 +36,7 @@ import { patternBroken, techniqueGuard, techniqueStrike } from "./techniques.ts"
 import { cleanMysteries, studySherd } from "./mysteries.ts";
 import { clueExamine, clueOptions, onKharavethTick, useClue } from "./kharaveth.ts";
 import { studySeal } from "./dynasties.ts";
-import { VESSELS, aboard, canStow, cleanVessels, fitToVessel, goAshore, holdAt, ringBell, sailable, sailed, settleAboard, stowInHold, vesselTick } from "./seafaring.ts";
+import { VESSELS, aboard, applyVessels, berthRespawn, canStow, cleanVessels, fitToVessel, goAshore, holdAt, ringBell, sailable, sailed, settleAboard, stowInHold, vesselTick } from "./seafaring.ts";
 import {
   BANK_SIZE, BANK_TABS, DAY_MS, SATCHEL, SATCHEL_SIZE, STONE_BOX, STONE_BOX_SIZE, boxTotal, isSigilStone, BONE_BAG, BONE_BAG_SIZE, bagAdd, bagBones, bagTakeAll, hasBoneBag, SIGIL_BAG, BELTS, beltAdd, beltContents, beltDef, wornBelt, SIGIL_BAG_SIZE, hasSigilBag, isSigil, sigilBagAdd, sigilBagTotal, sigilStock, useSigils, setPieces, wayfarerPieces, fullSlayerSet, heartguardPieces, mixtureOn, compactBankTabs, hasSatchel, hasStoneBox, stock, useUp, INVENTORY_SIZE, REFERRAL_COINS, REFERRALS_PER_DAY, REFERRAL_TICKS, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
   level, maxHp, maxPrayer, maxMana, manaCost, faithStaff, traditionOf, message, prayerBoost, riding, sound, take, weapon, combatLevel, createGame, TICK_MS,
@@ -1933,7 +1933,12 @@ export function die(game: Game) {
   for (const monster of game.monsters) monster.target = false;
   // Fallen in the Rare Friends Ring: its magic revives you in the lobby instead.
   if (inRingBuilding(player.x, player.y)) { arenaRevive(game); player.moved = game.tick - 10; player.stunned = 0; return; }
-  // A camp you made your waking place (camping.ts), if it still stands; else the fountain, and a word why.
+  // A vessel you made your waking place (seafaring.ts): you wake aboard it, wherever it's moored.
+  const berth = berthRespawn(game);
+  if (berth) { player.moved = game.tick - 10; player.stunned = 0; message(game, `You wake up in your ${berth.name.toLowerCase()}'s berth. Your items are safe.`, "info"); return; }
+  // A camp you made your waking place (camping.ts), if it still stands; else the fountain, and a word why. A vessel you fell
+  // aboard stays moored where it was.
+  if (player.aboard !== null) { player.aboard = null; player.landing = null; applyVessels(game); }
   const camp = campRespawn(game), at = camp ?? spawn;
   player.prev = { ...at }; player.x = at.x; player.y = at.y; player.moved = game.tick - 10; player.stunned = 0;
   message(game, camp ? "You wake up by your own fire. Your items are safe." : "You wake up by the Friendhollow fountain. Your items are safe: the Realm is kind to new heroes.", "info");

@@ -209,6 +209,8 @@ export function toggleRespawn(game: Game) {
   if (camp.respawn) { camp.respawn = false; message(game, "You'd wake by the Friendhollow fountain again."); return; }
   if (camp.tier < CAMP_RULES.respawnTier) { message(game, "A camp you can wake up at needs a lantern (ashsteel, from the Fieldcraft family) carried when it's pitched.", "warn"); return; }
   if (level(game, "agility") < CAMP_RULES.respawnWayfaring) { message(game, `You need a Wayfaring level of ${CAMP_RULES.respawnWayfaring} to make a camp your waking place.`, "warn"); return; }
+  // One waking place at a time: a vessel's berth stops being it.
+  for (const v of player.vessels) v.berth = false;
   camp.respawn = true; message(game, "If you fall, you'll wake here, by your fire.", "info");
 }
 /** Where you wake: the camp, if it's yours to wake at and still stands where you can stand; otherwise null (and a word why). */

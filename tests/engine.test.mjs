@@ -4643,3 +4643,25 @@ test("Seafaring grown: hull fittings fitted to a vessel, the ship's bell calls i
   setTarget(g, { kind: "object", id: shoal.id, option: "Harpoon" }); until(g, () => p.activity?.kind === "fish", 10);
   assert.equal(p.aboard, 1, "still aboard, fishing");
 });
+
+test("A berth: a barge or a longship can be your waking place (Seafaring 40), one waking place at a time with a camp; you wake aboard it wherever it's moored, and a vessel you fall aboard stays where it was", async () => {
+  const SF = await import("../games/rarefriends-realm/seafaring.ts");
+  const { die } = await import("../games/rarefriends-realm/engine.ts");
+  const g = newGame(), p = g.player, world = g.world;
+  const bersi = world.spawns.find(s => s.kind === "npc" && s.id === "shipwright_bersi");
+  const a = SF.launchSpot(g, "barge", bersi); p.vessels.push({ id: 1, kind: "barge", name: "River barge", x: a.x, y: a.y, heading: { x: 0, y: 1 }, hull: 140, hold: Array(28).fill(null), sailed: 0 });
+  const b = SF.launchSpot(g, "rowboat", bersi); p.vessels.push({ id: 2, kind: "rowboat", name: "Rowboat", x: b.x, y: b.y, heading: { x: 0, y: 1 }, hull: 40, hold: Array(4).fill(null), sailed: 0 }); SF.applyVessels(g);
+  const barge = p.vessels.find(v => v.id === 1), row = p.vessels.find(v => v.id === 2);
+  assert.ok(!SF.toggleBerth(g, row), "a rowboat has no berth"); assert.ok(!SF.toggleBerth(g, barge), "Seafaring 40 first");
+  p.xp.seafaring = 40_000; p.camp = { x: 10, y: 10, tier: 3, respawn: true, altar: false, cache: null, brazier: false, waystone: false };
+  assert.ok(SF.toggleBerth(g, barge)); assert.ok(barge.berth && !p.camp.respawn, "one waking place: the camp stops being it");
+  const o = world.objects.find(x => x.text === "vessel:1" && x.name !== "__removed"); assert.ok(SF.VESSEL_CLUES.vessel.options(g, o).includes("Unmake-waking-place"));
+  // Fall aboard the rowboat: it stays moored where it was, and you wake in the barge's berth.
+  teleport(g, row.x, row.y); p.aboard = 2; SF.applyVessels(g); p.hp = 0; die(g);
+  assert.equal(p.aboard, 1); assert.deepEqual([p.x, p.y], [barge.x, barge.y]);
+  assert.ok(world.objects.some(x => x.text === "vessel:2" && x.name !== "__removed" && x.x === row.x && x.y === row.y), "the rowboat's still moored");
+  assert.match(g.messages[g.messages.length - 1].text, /berth/);
+  // Through a save, and back to the fountain when it's unmade.
+  const g2 = newGame(); assert.ok(restore(g2, JSON.parse(JSON.stringify(serialize(g))))); assert.ok(g2.player.vessels.find(v => v.id === 1).berth);
+  SF.toggleBerth(g, barge); teleport(g, 100, 100); p.aboard = null; die(g); assert.deepEqual([p.x, p.y], [world.places.spawn.x, world.places.spawn.y]);
+});

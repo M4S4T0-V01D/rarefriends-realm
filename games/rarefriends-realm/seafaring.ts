@@ -43,7 +43,8 @@ export const VESSELS: Record<VesselKind, VesselDef> = {
 };
 export const VESSEL_KINDS = Object.keys(VESSELS) as VesselKind[];
 export type Vessel = { id: number; kind: VesselKind; name: string; x: number; y: number; /** Which way its bow points (a world heading, like a walker's). */ heading: Point; hull: number; hold: (Slot | null)[]; /** Tiles sailed (all time). */ sailed: number;
-  /** The hull fitting fitted, by metal (moonsilver, glimmer or rarite), or none. */ fitting?: string | null };
+  /** The hull fitting fitted, by metal (moonsilver, glimmer or rarite), or none. */ fitting?: string | null;
+  /** Your waking place: if you fall, you wake aboard it (a barge's deckhouse, a longship's awning). */ berth?: boolean };
 /** What a hull fitting does: the hull it adds (a share of the kind's) and how much longer deep water takes to wear it. */
 export const FITTINGS: Record<string, { hull: number; wear: number }> = { moonsilver: { hull: 0.25, wear: 1.5 }, glimmer: { hull: 0.5, wear: 2 }, rarite: { hull: 1, wear: 3 } };
 const FITTING_ORDER = ["moonsilver", "glimmer", "rarite"];
@@ -57,6 +58,8 @@ export const SEA = {
   /** What a shipwright charges to saw a log into a plank, by the plank. */
   sawFee: { pine_planks: 15, oak_planks: 10, ironbark_planks: 60 } as Record<string, number>,
   /** A plank and rivets mend this much of a hull at a shipwright's. */ repairPerPlank: 10,
+  /** A berth to wake in: the Seafaring for it, and the kinds that have one. */
+  berthLevel: 40, berths: ["barge", "longship"] as readonly VesselKind[],
   /** The ship's bell: the Seafaring to ring a vessel to you, how far from you it comes to, and how often (ticks). */
   bellLevel: 60, bellReach: 10, bellEvery: 1000,
 };
@@ -236,12 +239,13 @@ export function takeFromHold(game: Game, index: number): boolean {
 type ClueOutcome = { to?: { x: number; y: number }; text?: string } | null;
 export const VESSEL_CLUES: Record<string, { options: (game: Game, object: WorldObject) => readonly string[]; examine: (game: Game, object: WorldObject) => string; use: (game: Game, object: WorldObject, option: string) => ClueOutcome }> = {
   vessel: {
-    options: () => ["Board", "Hold"],
+    options: (game, object) => { const v = vesselOf(game, object); return v && SEA.berths.includes(v.kind) ? ["Board", "Hold", v.berth ? "Unmake-waking-place" : "Make-waking-place"] : ["Board", "Hold"]; },
     examine: (game, object) => { const v = vesselOf(game, object); return v ? `Your ${VESSELS[v.kind].name.toLowerCase()}, ${v.name === VESSELS[v.kind].name ? "unnamed" : `the ${v.name}`}. Hull ${Math.round(100 * v.hull / maxHull(v))}%. ${VESSELS[v.kind].examine}` : "A vessel."; },
     use: (game, object, option) => {
       const v = vesselOf(game, object);
       if (!v) return { text: "That isn't yours." };
       if (option === "Hold") { if (holdAt(game)?.id === v.id) { game.ui.hold = v.id; sound(game, "click"); return null; } return { text: "Get beside it to reach the hold." }; }
+      if (option === "Make-waking-place" || option === "Unmake-waking-place") { toggleBerth(game, v); return null; }
       board(game, v); return null;
     },
   },
@@ -330,6 +334,28 @@ export function talkShipwright(game: Game, npcId: string, name: string, usual: (
   ]);
 }
 
+// ---------- A berth: waking aboard ----------
+/** Make a vessel your waking place (or stop): one waking place at a time, so a camp you'd wake at stops being it. */
+export function toggleBerth(game: Game, vessel: Vessel): boolean {
+  const player = game.player;
+  if (vessel.berth) { vessel.berth = false; message(game, "You'd wake by the Friendhollow fountain again."); return true; }
+  if (!SEA.berths.includes(vessel.kind)) { message(game, `A ${VESSELS[vessel.kind].name.toLowerCase()} has no berth to sleep in: a barge's deckhouse has, and a longship's awning.`, "warn"); return false; }
+  if (level(game, "seafaring") < SEA.berthLevel) { message(game, `You need a Seafaring level of ${SEA.berthLevel} to make a vessel your waking place.`, "warn"); return false; }
+  for (const v of player.vessels) v.berth = false;
+  vessel.berth = true; if (player.camp) player.camp.respawn = false;
+  message(game, `If you fall, you'll wake in your ${vessel.name.toLowerCase()}'s berth.`, "info");
+  return true;
+}
+/** Where you wake if your vessel's your waking place: aboard it, wherever it's moored (engine.ts die asks first). */
+export function berthRespawn(game: Game): Vessel | null {
+  const player = game.player, vessel = player.vessels.find(v => v.berth);
+  if (!vessel || !onWater(game.world, vessel.x, vessel.y)) return null;
+  player.aboard = vessel.id; player.landing = null; player.prev = { x: vessel.x, y: vessel.y }; player.x = vessel.x; player.y = vessel.y;
+  player.vessels = [vessel, ...player.vessels.filter(v => v !== vessel)];
+  applyVessels(game);
+  return vessel;
+}
+
 // ---------- Fittings and the bell: the shipwright's hardware the anvil makes ----------
 /** Fit a hull fitting from the pack to the vessel you're aboard or beside: a stronger hull that wears slower. A better one replaces a worse (which comes back). */
 export function fitToVessel(game: Game, slotIndex: number): boolean {
@@ -383,7 +409,8 @@ export function cleanVessels(raw: unknown, isItem: (id: string) => boolean): Ves
     if (typeof v.x !== "number" || typeof v.y !== "number" || !Number.isInteger(v.x) || !Number.isInteger(v.y) || v.x < 0 || v.y < 0 || v.x >= W || v.y >= H) continue;
     const def = VESSELS[kind], hold = Array.from({ length: def.hold }, (_, i) => { const s = cleanSlot(Array.isArray(v.hold) ? v.hold[i] : null); return s && isItem(s.id) ? s : null; });
     out.push({ id: v.id, kind, name: typeof v.name === "string" && v.name.length <= 24 ? v.name : def.name, x: v.x, y: v.y, heading: headingOf(v.heading),
-      hull: 0, hold, sailed: typeof v.sailed === "number" && Number.isFinite(v.sailed) ? Math.max(0, Math.floor(v.sailed)) : 0, fitting: typeof v.fitting === "string" && FITTINGS[v.fitting] ? v.fitting : null });
+      hull: 0, hold, sailed: typeof v.sailed === "number" && Number.isFinite(v.sailed) ? Math.max(0, Math.floor(v.sailed)) : 0, fitting: typeof v.fitting === "string" && FITTINGS[v.fitting] ? v.fitting : null,
+      berth: v.berth === true && SEA.berths.includes(kind) && !out.some(o => o.berth) });
     const kept = out[out.length - 1]; kept.hull = typeof v.hull === "number" && Number.isFinite(v.hull) ? Math.max(0, Math.min(maxHull(kept), Math.floor(v.hull))) : maxHull(kept);
   }
   return out;

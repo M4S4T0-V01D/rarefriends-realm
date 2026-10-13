@@ -4,6 +4,9 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 123, date: "2026-10-13", title: "A berth aboard: wake in your own vessel", items: [
+    "A barge's deckhouse or a longship's awning can be your waking place (Seafaring 40): Make-waking-place on it where it's moored, and if you fall, you wake aboard it, wherever it is. One waking place at a time, a camp or a vessel. A vessel you fall aboard stays moored where it was.",
+  ] },
   { id: 122, date: "2026-10-13", title: "Seafaring grown: hull fittings, the ship's bell, the open sea, and a boatyard at Gullwick", items: [
     "The north's coasts open onto the sea along the top of the world, so a longship can sail from the Skarnfjord round to the Zoryavik, out to the Mizukai Isles and down to the old coasts. The shores a quest keeps closed stay closed by sea: the Mizukai islands until you're presented at the Hall, a sea port until you've walked there, Kharaveth beyond Foothold until the road south is safe.",
     "The anvil's shipwright hardware finds its ships. Fit a hull fitting (moonsilver, glimmer or rarite) aboard or beside your vessel for a stronger hull that wears slower. Ring the ship's bell on a shore (Seafaring 60) and the vessel you last took comes to you.",
