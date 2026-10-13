@@ -827,6 +827,8 @@ const SKILL_PAINTERS: Record<Skill, Painter> = {
   presence: p => { p.rect(3, 13, 10, 2, "#8a6446"); p.rect(6, 6, 4, 6, "#4a3a60"); p.rect(5, 7, 1, 5, "#b0443c"); p.rect(10, 7, 1, 5, "#b0443c"); p.disc(8, 4, 2.2, 2.2, "#e8c9a0"); p.rect(4, 2, 8, 1, "#5f5a52"); p.rect(6, 1, 4, 2, "#5f5a52"); p.line(12, 5, 12, 13, "#9c8672", 1); p.rect(6, 12, 1, 2, "#3b3a38"); p.rect(9, 12, 1, 2, "#3b3a38"); },
   // Pursuance: a paw print, and the lens you read it with.
   // Mysteries: the eye in the triangle.
+  // Seafaring: an anchor, its ring at the top and its flukes curling up.
+  seafaring: p => { p.disc(8.5, 2.5, 1.8, 1.8, "#2f5f7a"); p.disc(8.5, 2.5, 0.8, 0.8, "#e9dcb4"); p.line(8, 4, 8, 14, "#2f5f7a", 2); p.line(5, 6, 12, 6, "#2f5f7a", 2); p.polyline([[2, 9], [3, 13], [8, 15], [13, 13], [14, 9]], "#2f5f7a", 2); p.poly([[1, 9], [3, 7], [4, 10]], "#2f5f7a"); p.poly([[15, 9], [13, 7], [12, 10]], "#2f5f7a"); },
   mysteries: p => { p.poly([[8, 1], [15, 14], [1, 14]], "#d9b866"); p.poly([[8, 4], [12.5, 12], [3.5, 12]], "#2f3f66", null); p.poly([[4.5, 9.5], [8, 7.5], [11.5, 9.5], [8, 11.5]], "#f7f5f0", null); p.disc(8, 9.5, 1.5, 1.5, "#3b8a8a"); p.set(8, 9, INK); },
   slayer: p => { p.disc(6.5, 10, 3, 2.5, "#7a5a3c"); for (const [x, y] of [[2.5, 6.5], [5, 4], [8, 4], [10.5, 6.5]]) p.disc(x, y, 1.3, 1.3, "#7a5a3c"); p.disc(11.5, 11.5, 3.2, 3.2, "#9aa6ad"); p.disc(11.5, 11.5, 2, 2, "#cfe8f2"); p.line(13.5, 13.5, 15.5, 15.5, "#5a3e28", 2); },
 };
@@ -938,6 +940,13 @@ const SKILL24: Record<Skill, Painter> = {
     part(p, poly([[8, 9], [16, 9], [18, 19], [6, 19]]), "#4a3a60", "cloth"); part(p, poly([[6, 9], [9, 9], [8, 19], [3, 19]]), "#b0443c", "cloth");
     part(p, disc(12, 6, 3.2), "#e8c9a0", "cloth"); part(p, box(6, 3, 12, 2), "#5f5a52", "cloth"); part(p, box(9, 1, 6, 3), "#5f5a52", "cloth");
     part(p, box(13, 10, 4, 6), "#9c8672", "wood"); line(p, [[19, 7], [19, 20]], "#c49a74", 2); part(p, box(9, 19, 2, 3), "#3b3a38", "cloth"); part(p, box(13, 19, 2, 3), "#3b3a38", "cloth");
+  },
+  seafaring: p => {
+    // Seafaring: a ship's anchor in iron, a coil of rope through its ring.
+    part(p, stroke([[12, 4], [12, 19]], 2.6), STEEL_C, "metal"); part(p, stroke([[7.5, 7.5], [16.5, 7.5]], 2.4), STEEL_C, "metal");
+    part(p, all(stroke([[3.5, 13.5], [5, 18.5], [12, 21.5], [19, 18.5], [20.5, 13.5]], 2.6)), STEEL_C, "metal");
+    part(p, poly([[1.5, 13.5], [4.5, 10.5], [6, 14.5]]), STEEL_C, "metal"); part(p, poly([[22.5, 13.5], [19.5, 10.5], [18, 14.5]]), STEEL_C, "metal");
+    part(p, all(stroke([[12, 1], [14.6, 2.4], [14.6, 4.6], [12, 6], [9.4, 4.6], [9.4, 2.4], [12, 1]], 1.8)), "#9c7a4a", "cloth");
   },
   mysteries: p => {
     // Mysteries: the Eye of Providence, its upper part only: one open eye inside a triangle of aged gold.

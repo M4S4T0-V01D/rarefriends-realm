@@ -36,6 +36,7 @@ import { patternBroken, techniqueGuard, techniqueStrike } from "./techniques.ts"
 import { cleanMysteries, studySherd } from "./mysteries.ts";
 import { clueExamine, clueOptions, onKharavethTick, useClue } from "./kharaveth.ts";
 import { studySeal } from "./dynasties.ts";
+import { VESSELS, aboard, canStow, cleanVessels, goAshore, sailable, sailed, settleAboard, stowInHold, vesselTick } from "./seafaring.ts";
 import {
   BANK_SIZE, BANK_TABS, DAY_MS, SATCHEL, SATCHEL_SIZE, STONE_BOX, STONE_BOX_SIZE, boxTotal, isSigilStone, BONE_BAG, BONE_BAG_SIZE, bagAdd, bagBones, bagTakeAll, hasBoneBag, SIGIL_BAG, BELTS, beltAdd, beltContents, beltDef, wornBelt, SIGIL_BAG_SIZE, hasSigilBag, isSigil, sigilBagAdd, sigilBagTotal, sigilStock, useSigils, setPieces, wayfarerPieces, fullSlayerSet, heartguardPieces, mixtureOn, compactBankTabs, hasSatchel, hasStoneBox, stock, useUp, INVENTORY_SIZE, REFERRAL_COINS, REFERRALS_PER_DAY, REFERRAL_TICKS, addXp, attackSpeed, bonuses, canHold, count, dropItem, emit, freeSlots, give, giveOrDrop, has, hasTool, isStaffEquipped,
   level, maxHp, maxPrayer, maxMana, manaCost, faithStaff, traditionOf, message, prayerBoost, riding, sound, take, weapon, combatLevel, createGame, TICK_MS,
@@ -48,7 +49,7 @@ export { createGame };
 
 // ---------- Movement ----------
 export function fireAt(game: Game, x: number, y: number) { return game.fires.find(fire => fire.x === x && fire.y === y) ?? null; }
-export function canWalk(game: Game, x: number, y: number) { return walkable(game.world, x, y) && !fireAt(game, x, y); }
+export function canWalk(game: Game, x: number, y: number) { return game.player.aboard !== null ? sailable(game, x, y) : walkable(game.world, x, y) && !fireAt(game, x, y); }
 function canStep(game: Game, x: number, y: number, dx: number, dy: number) {
   if (!canWalk(game, x + dx, y + dy)) return false;
   if (dx && dy) return canWalk(game, x + dx, y) && canWalk(game, x, y + dy);
@@ -101,6 +102,7 @@ function moveTo(game: Game, x: number, y: number) {
   game.trail.push({ x: player.x, y: player.y }); if (game.trail.length > 8) game.trail.shift();
   player.prev = { x: player.x, y: player.y }; player.heading = headingTo(x - player.x, y - player.y, player.heading);
   player.x = x; player.y = y; player.moved = game.tick;
+  if (player.aboard !== null) sailed(game);
 }
 function stopAll(game: Game) {
   const player = game.player;
@@ -110,6 +112,16 @@ function stopAll(game: Game) {
 export function walkTo(game: Game, x: number, y: number) {
   if (game.player.stunned > 0) { message(game, "You're stunned!", "warn"); return false; }
   stopAll(game); closeInterfaces(game);
+  // Aboard, a click on the shore sails you beside it and puts you ashore there (seafaring.ts).
+  if (game.player.aboard !== null && !sailable(game, x, y) && walkable(game.world, x, y)) {
+    const beside = (px: number, py: number) => Math.abs(px - x) + Math.abs(py - y) === 1;
+    if (beside(game.player.x, game.player.y)) { goAshore(game, x, y); return true; }
+    const path = findPath(game, game.player, beside, { x, y });
+    if (!path || !path.length || !beside(path[path.length - 1].x, path[path.length - 1].y)) { message(game, "You can't sail any closer to that.", "warn"); return false; }
+    game.player.path = path; game.player.landing = { x, y };
+    return true;
+  }
+  game.player.landing = null;
   const path = findPath(game, game.player, (px, py) => px === x && py === y, { x, y });
   if (!path) return false;
   game.player.path = path;
@@ -336,6 +348,7 @@ export function itemOptions(game: Game, slotIndex: number): ItemOption[] {
   if (slot.id === "frostsilver_camp_cache") out.push({ verb: "Set-up-cache", run: g => setUpCache(g, slotIndex) });
   if (slot.id === "wyrmscale_waystone") out.push({ verb: "Walk-the-way", run: g => { walkTheWay(g); } });
   if (cacheAt(game) && !FIELDCRAFT_IDS.has(slot.id)) out.push({ verb: "Stash", run: g => { stash(g, slotIndex); } });
+  if (canStow(game)) out.push({ verb: "Load", run: g => { stowInHold(g, slotIndex); } });
   if (definition.family === "resonance") out.push({ verb: "Fit-to-carving", run: g => fitCarving(g, slotIndex) });
   if (slot.id === "glimmer_shard") out.push({ verb: "Look-at", run: g => message(g, "The shard hums. Old Glimmer will want it back.") });
   // An inscribed sherd from Kharaveth: study it for a glyph you haven't seen (Mysteries); the sherd crumbles either way.
@@ -1283,6 +1296,7 @@ export function tick(game: Game) {
   if (player.attackTimer > 0) player.attackTimer--;
   if (player.overhead && player.overhead.until <= game.tick) player.overhead = null;
   movePlayer(game);
+  vesselTick(game);
   rideUpkeep(game);
   if (player.boostTicks > 0) { player.boostTicks--; if (player.boostTicks === 0) message(game, "Your referral XP boost has run out. Refer another friend for more!"); }
   if (player.restedTicks > 0) { player.restedTicks--; if (player.restedTicks === 0) message(game, "You no longer feel well rested."); }
@@ -1314,7 +1328,7 @@ function movePlayer(game: Game) {
   if (game.held) {
     // Held keys give a world-space direction (the UI turns screen keys into it for the camera angle); snap to 8 ways.
     const octant = Math.round(Math.atan2(game.held.dy, game.held.dx) / (Math.PI / 4)), tx = Math.round(Math.cos(octant * Math.PI / 4)), ty = Math.round(Math.sin(octant * Math.PI / 4));
-    const mount = riding(player), steps = mount ? (player.sneak ? 1 : mount.speed) : player.run && !player.sneak && player.energy >= 1 ? 2 : 1, start = { x: player.x, y: player.y };
+    const mount = riding(player), vessel = aboard(player), steps = vessel ? VESSELS[vessel.kind].speed : mount ? (player.sneak ? 1 : mount.speed) : player.run && !player.sneak && player.energy >= 1 ? 2 : 1, start = { x: player.x, y: player.y };
     let moved = 0;
     for (let i = 0; i < steps; i++) {
       const options: [number, number][] = [[tx, ty], [tx, 0], [0, ty]];
@@ -1323,12 +1337,12 @@ function movePlayer(game: Game) {
       moveTo(game, player.x + step[0], player.y + step[1]); moved++;
     }
     if (moved) player.prev = start;
-    if (moved >= 2 && !mount) drainRun(game);
+    if (moved >= 2 && !mount && !vessel) drainRun(game);
     if (moved && player.sneak) drainSneak(game);
     return;
   }
   if (!player.path.length) return;
-  const mount = riding(player), steps = mount ? (player.sneak ? 1 : mount.speed) : player.run && !player.sneak && player.energy >= 1 && player.path.length > 1 ? 2 : 1, start = { x: player.x, y: player.y };
+  const mount = riding(player), vessel = aboard(player), steps = vessel ? VESSELS[vessel.kind].speed : mount ? (player.sneak ? 1 : mount.speed) : player.run && !player.sneak && player.energy >= 1 && player.path.length > 1 ? 2 : 1, start = { x: player.x, y: player.y };
   for (let i = 0; i < steps && player.path.length; i++) {
     const next = player.path[0];
     if (!canStep(game, player.x, player.y, next.x - player.x, next.y - player.y)) {
@@ -1340,8 +1354,10 @@ function movePlayer(game: Game) {
     player.path.shift(); moveTo(game, next.x, next.y);
   }
   if (player.x !== start.x || player.y !== start.y) player.prev = start;
-  if (!mount && Math.max(Math.abs(player.x - start.x), Math.abs(player.y - start.y)) >= 2) drainRun(game);
+  if (!mount && !vessel && Math.max(Math.abs(player.x - start.x), Math.abs(player.y - start.y)) >= 2) drainRun(game);
   if (player.sneak && (player.x !== start.x || player.y !== start.y)) drainSneak(game);
+  // Sailed up to the shore you clicked: step ashore.
+  if (vessel && !player.path.length && player.landing) goAshore(game, player.landing.x, player.landing.y);
 }
 function drainRun(game: Game) {
   const player = game.player, drain = mixtureOn(game, 5) ? 0 : runDrain(game) * (prayerBoost(game.player).journey ? 0.5 : 1);
@@ -2841,6 +2857,7 @@ export type SaveData = {
   name?: string | null; fellowship?: { name: string; tag: string; logo?: string; banner?: string; colors?: string[] } | null; title?: string | null; visited?: Record<string, number>; regionTicks?: Record<string, number>; talked?: Record<string, 1>; emotesUsed?: Record<string, 1>; outfits?: Record<string, 1>; friendTicks?: number; mounts?: string[]; mount?: string | null; daily?: unknown; seenUpdate?: number;
   lastMount?: string | null; saddlebags?: unknown; mountReady?: number;
   camps?: Record<string, number>; campTendAt?: number; campSleptAt?: number; waystoneAt?: number;
+  vessels?: unknown; aboard?: number | null; landfalls?: Record<string, number>;
 };
 export function serialize(game: Game): SaveData {
   const player = game.player;
@@ -2852,7 +2869,7 @@ export function serialize(game: Game): SaveData {
     playTicks: game.playTicks, retaliate: game.autoRetaliate, music: [...player.music],
     referredBy: player.referredBy, referrals: [...player.referrals], referralTimes: [...player.referralTimes], boostTicks: player.boostTicks, coalBag: player.coalBag, stoneBoxGrades: { ...player.stoneBoxGrades }, stoneBox: player.stoneBox, boneBag: { ...player.boneBag }, boosts: { ...player.boosts }, poison: player.poison ? { ...player.poison } : null, weaponPoison: player.weaponPoison ? { ...player.weaponPoison } : null,
     antidoteUntil: Math.max(0, player.antidoteUntil - game.tick), antifireUntil: Math.max(0, player.antifireUntil - game.tick), stealthUntil: Math.max(0, player.stealthUntil - game.tick), tonicUntil: Math.max(0, player.tonicUntil - game.tick), mixture: player.mixture ? { family: player.mixture.family, until: Math.max(0, player.mixture.until - game.tick) } : null,
-    firsts: { ...player.firsts } as Record<string, number>, friendKinds: { ...player.friendKinds } as Record<string, 1>, rumours: { ...player.rumours } as Record<string, 1>, orders: { ...player.orders }, activities: { run: player.activities.run ? { ...player.activities.run, target: { ...player.activities.run.target }, marks: { ...player.activities.run.marks } } : null, records: { ...player.activities.records } }, card: { ...player.card }, collectible: { layout: player.collectible.layout, show: [...player.collectible.show] }, lockbox: player.lockbox.map(slot => ({ ...slot })), settled: [...player.settled], notices: [...player.notices], camp: player.camp ? { ...player.camp, cache: player.camp.cache ? player.camp.cache.map(slot => slot ? { ...slot } : null) : null } : null, campXpAt: player.campXpAt, camps: { ...player.camps }, campTendAt: player.campTendAt, campSleptAt: player.campSleptAt, waystoneAt: Math.min(0, player.waystoneAt - game.tick), cards: { ...player.cards }, rarian: player.rarian, mizukai: player.mizukai, orashai: player.orashai, mana: player.mana, mysteries: { found: { ...player.mysteries.found }, glyphs: { ...player.mysteries.glyphs }, read: { ...player.mysteries.read } }, spiritWardUntil: Math.max(0, player.spiritWardUntil - game.tick), home: player.home ? { ...player.home, furniture: { ...player.home.furniture } } : null, restedTicks: player.restedTicks, sigilBag: { ...player.sigilBag }, ward: player.ward ? { ...player.ward } : null, wardUntil: Math.max(0, player.wardUntil - game.tick), renew: player.renew, renewUntil: Math.max(0, player.renewUntil - game.tick), belts: Object.fromEntries(Object.entries(player.belts).map(([id, contents]) => [id, { ...contents }])), followerWorn: [...player.followerWorn],
+    firsts: { ...player.firsts } as Record<string, number>, friendKinds: { ...player.friendKinds } as Record<string, 1>, rumours: { ...player.rumours } as Record<string, 1>, orders: { ...player.orders }, activities: { run: player.activities.run ? { ...player.activities.run, target: { ...player.activities.run.target }, marks: { ...player.activities.run.marks } } : null, records: { ...player.activities.records } }, card: { ...player.card }, collectible: { layout: player.collectible.layout, show: [...player.collectible.show] }, lockbox: player.lockbox.map(slot => ({ ...slot })), settled: [...player.settled], notices: [...player.notices], camp: player.camp ? { ...player.camp, cache: player.camp.cache ? player.camp.cache.map(slot => slot ? { ...slot } : null) : null } : null, campXpAt: player.campXpAt, camps: { ...player.camps }, vessels: player.vessels.map(v => ({ ...v, heading: { ...v.heading }, hold: v.hold.map(slot => slot ? { ...slot } : null) })), aboard: player.aboard, landfalls: { ...player.landfalls }, campTendAt: player.campTendAt, campSleptAt: player.campSleptAt, waystoneAt: Math.min(0, player.waystoneAt - game.tick), cards: { ...player.cards }, rarian: player.rarian, mizukai: player.mizukai, orashai: player.orashai, mana: player.mana, mysteries: { found: { ...player.mysteries.found }, glyphs: { ...player.mysteries.glyphs }, read: { ...player.mysteries.read } }, spiritWardUntil: Math.max(0, player.spiritWardUntil - game.tick), home: player.home ? { ...player.home, furniture: { ...player.home.furniture } } : null, restedTicks: player.restedTicks, sigilBag: { ...player.sigilBag }, ward: player.ward ? { ...player.ward } : null, wardUntil: Math.max(0, player.wardUntil - game.tick), renew: player.renew, renewUntil: Math.max(0, player.renewUntil - game.tick), belts: Object.fromEntries(Object.entries(player.belts).map(([id, contents]) => [id, { ...contents }])), followerWorn: [...player.followerWorn],
     lastMount: player.lastMount ?? null, saddlebags: Object.fromEntries(Object.entries(player.saddlebags).map(([id, bags]) => [id, bags.map(slot => slot ? { ...slot } : null)])), mountReady: Math.max(0, player.mountReady - game.tick),
     name: player.name, fellowship: player.fellowship ? { ...player.fellowship } : null, title: player.title, visited: { ...player.visited } as Record<string, number>, regionTicks: { ...player.regionTicks } as Record<string, number>, talked: { ...player.talked } as Record<string, 1>, emotesUsed: { ...player.emotesUsed } as Record<string, 1>, outfits: { ...player.outfits } as Record<string, 1>, friendTicks: player.friendTicks, mounts: [...player.mounts], mount: player.mount, met: JSON.parse(JSON.stringify(player.met)), achievements: { ...player.achievements }, pets: [...player.pets], petOut: player.petOut, killLog: { ...player.killLog }, lore: Object.fromEntries(Object.entries(player.lore).map(([id, entry]) => [id, { ...entry, d: [...entry.d] }])), stats: { ...player.stats }, daily: JSON.parse(JSON.stringify(player.daily)), seenUpdate: player.seenUpdate,
   };
@@ -2998,6 +3015,11 @@ export function restore(game: Game, raw: unknown): boolean {
   for (const notice of notices) message(game, notice.slice(0, 300), "info");
   player.camps = keyed(save.camps, v => typeof v === "number" ? int(v, 1, 1e6, 1) : null) as Record<string, number>; player.campTendAt = -1e9; player.campSleptAt = -1e9; player.waystoneAt = game.tick + int(save.waystoneAt, -1e6, 0, -1e6);
   player.notices = []; player.cards = Object.fromEntries(Object.entries(save.cards && typeof save.cards === "object" ? save.cards : {}).filter(([id, day]) => /^[a-z0-9_]{1,40}$/.test(id) && typeof day === "number" && Number.isFinite(day)).slice(0, 2000).map(([id, day]) => [id, Math.max(0, Math.floor(day))])); player.rarian = save.rarian === true; player.mizukai = !player.rarian && save.mizukai === true; player.orashai = !player.rarian && !player.mizukai && save.orashai === true; player.mana = typeof save.mana === "number" && Number.isFinite(save.mana) ? Math.max(0, Math.min(maxMana(player), save.mana)) : maxMana(player); player.mysteries = cleanMysteries(save.mysteries); player.spiritWardUntil = game.tick + int(save.spiritWardUntil, 0, 1000, 0); player.home = cleanHome(save.home); player.restedTicks = int(save.restedTicks, 0, 100000, 0); applyHome(game); player.camp = cleanCamp(save.camp); if (player.camp && save.world !== 6) Object.assign(player.camp, movedPoint(game.world, player.camp.x, player.camp.y)); player.campXpAt = int(save.campXpAt, -100000, 1e9, -100000); applyCamp(game);
+  // Seafaring: the vessels, where they're moored (older worlds' coordinates moved like everything else), whether you're aboard one.
+  player.vessels = cleanVessels(save.vessels, isItem); if (save.world !== 6) for (const v of player.vessels) Object.assign(v, movedPoint(game.world, v.x, v.y));
+  player.aboard = typeof save.aboard === "number" && player.vessels.some(v => v.id === save.aboard) ? save.aboard : null; player.landing = null;
+  player.landfalls = Object.fromEntries(Object.keys(save.landfalls && typeof save.landfalls === "object" ? save.landfalls : {}).filter(id => /^[a-z0-9_]{1,40}$/.test(id)).slice(0, 400).map(id => [id, 1])) as Record<string, 1>;
+  settleAboard(game);
   player.sigilBag = {}; for (const [id, n] of Object.entries(save.sigilBag ?? {})) if (isItem(id) && isSigil(id)) { const v = int(n, 0, SIGIL_BAG_SIZE, 0); if (v) player.sigilBag[id] = v; }
   player.ward = save.ward && typeof save.ward === "object" ? { defence: Math.max(0, Math.min(1, Number(save.ward.defence) || 0)), flat: int(save.ward.flat, 0, 100, 0), reduce: Math.max(0, Math.min(0.9, Number(save.ward.reduce) || 0)) } : null; player.wardUntil = game.tick + int(save.wardUntil, 0, 1000, 0); if (!int(save.wardUntil, 0, 1000, 0)) player.ward = null;
   player.renew = int(save.renew, 0, 50, 0); player.renewUntil = game.tick + int(save.renewUntil, 0, 1000, 0);

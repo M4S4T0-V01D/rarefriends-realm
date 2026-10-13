@@ -25,6 +25,8 @@ import { campfireLogs, decorArt, fireArt, rockArt, treeArt , herbArt } from "./s
 import { beginSprites, recordSprites, noteSprite, replaySprites, stampSprites, sendSprites, sinkSprite, type SpriteDraw } from "./pixel.ts";
 import { spellArt } from "./spellart.ts";
 import { saddleHeight, mountArt, type MountView } from "./mountart.ts";
+import { deckHeight, shipArt, type ShipLayer, type ShipView } from "./shipart.ts";
+import { VESSEL_KINDS, aboard, type VesselKind } from "./seafaring.ts";
 import { petArt } from "./petart.ts";
 import { burst, cloudShadows, drawCloudShadows, drawEffects, hush, playerPose, puff, treeShake, updateEffects, type Pose } from "./effects.ts";
 import { gloomSky, LightField, hexRgb, rgbCss, skyFor, type PointLight, type RGB , resetLighting } from "./lighting.ts";
@@ -1531,6 +1533,12 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
   const hit = (height: number, w = 36) => ({ x: sx - w / 2 * z, y: sy - height * z, w: w * z, h: (height + 10) * z });
   const frame = object.decor === "torch" ? Math.floor(now / 160 + ox) % 2 : object.decor === "reeds" ? Math.floor(now / 900 + ox) % 2 : 0;
   if (object.decor === "banner") return drawFriendBanner(ctx, scene, object, sx, sy, hit, alpha);
+  // A vessel of yours, moored: its picture, the way its bow points, riding the swell (seafaring.ts).
+  if (object.decor === "vessel" && object.ship) {
+    const kind = object.ship as VesselKind, facing = screenFacing(camera, object.heading ?? { x: 0, y: 1 }), art = shipArt(kind, facing === "down" ? "front" : facing === "up" ? "back" : "side", -1);
+    drawShip(ctx, kind, facing, false, now + ox * 97, sx, sy, z, "all", scene.reducedMotion, alpha);
+    return hit(art.height * ART * SHIP_SCALE, art.width * ART * SHIP_SCALE);
+  }
   // (The Wise Friend's statues are carved in the world, below, not stood up as a picture.)
   const carvedStatue = object.decor === "wise_friend" || object.decor === "god_dusk";
   const art = carvedStatue ? null : scene.reducedMotion || object.decor !== "torch" ? decorArt(object.decor!, Math.floor(h * 3), frame) : decorArt("torch", 0, frame);
@@ -3033,15 +3041,16 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     if (player.activity?.kind === "obstacle") { const a = player.activity, total = world.objects[a.objectId].obstacle?.ticks ?? 3, k = Math.max(0, Math.min(1, 1 - (a.timer - alpha) / total)); at = { x: a.from.x + (a.to.x - a.from.x) * k, y: a.from.y + (a.to.y - a.from.y) * k, moving: true }; }
     const emote = player.emote && game.tick < player.emote.until ? player.emote : null, emoteT = emote ? (game.tick - emote.start + alpha) * TICK_MS / 1000 : 0;
     const motion = emote ? emoteMotion(emote.id, emoteT, playerFacing, scene.reducedMotion) : null;
-    const mount = riding(player), walking = at.moving || (!!player.path.length && alpha < 1);
-    const s = toScreen(camera, at.x, at.y, pose.hop + (motion?.hop ?? 0) + (mount ? riderLift(camera, mount.coat) : 0)), feet = toScreen(camera, at.x, at.y), px = 3.2 * z;
+    const mount = riding(player), ship = aboard(player), walking = at.moving || (!!player.path.length && alpha < 1);
+    const s = toScreen(camera, at.x, at.y, pose.hop + (motion?.hop ?? 0) + (mount ? riderLift(camera, mount.coat) : 0) + (ship ? deckLift(camera, ship.kind) : 0)), feet = toScreen(camera, at.x, at.y), px = 3.2 * z;
     const facing: Facing = motion?.facing ?? (pose.target ? (pose.side < 0 ? "left" : "right") : playerFacing);
     if (emote) { const capeColor = player.equipment.cape && isItem(player.equipment.cape) ? item(player.equipment.cape).icon.color : undefined; emoteParticles(emote.id, emoteT, at.x, at.y, scene.reducedMotion, capeColor); if (emote.id === "skillcape" || emote.id === "friendship") skillcapeRays(ctx, feet.x, feet.y - 30 * z, z, now, capeColor ?? "#e2d49e", scene.reducedMotion);
       if (emote.id === "friendship" && !scene.reducedMotion) for (let i = 0; i < 3; i++) { const a = now / 500 + i * 2.1, hx = feet.x + Math.cos(a) * 26 * z, hy = feet.y - 44 * z + Math.sin(a) * 10 * z; heart(ctx, hx, hy, 5 * z); } }
     ctx.globalAlpha = 1 - veilShown * 0.8;
-    ellipse(ctx, feet.x, feet.y, (mount ? 32 : 15) * z, (mount ? 10 : 6) * z, "rgba(22,22,22,0.2)", "rgba(255,255,255,0.75)", 1.5);
+    if (!ship) ellipse(ctx, feet.x, feet.y, (mount ? 32 : 15) * z, (mount ? 10 : 6) * z, "rgba(22,22,22,0.2)", "rgba(255,255,255,0.75)", 1.5);
     ctx.globalAlpha = 1;
     if (mount) drawMount(ctx, mount.coat, facing, walking, now + 0, feet.x, feet.y, z, true, scene.reducedMotion);
+    if (ship) drawShip(ctx, ship.kind, facing, walking, now, feet.x, feet.y, z, "hull", scene.reducedMotion);
     const bodyY = s.y - pose.bob * z;
     // Your Friend with its worn pieces composited into the same pixel frame (leaning and squashing for emotes).
     const restoreMotion = applyMotion(ctx, motion, s.x, s.y);
@@ -3053,7 +3062,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     if (scene.friend) {
       // Sneaking: crouched and a little faded. Veiled: all but gone, with a faint shimmer where you stand.
       const shown = pose.alpha * (1 - 0.84 * veilShown) * (player.sneak ? 0.8 : 1);
-      const art = figureArt(friendRows(scene.friend, facing, walking && !mount, mount ? 0 : stride), dressed, facing, cloth, INK, holding), rect = crouched(ctx, player.sneak && !mount, s.x, bodyY + 2 * z, () => drawFigure(ctx, art, s.x, bodyY + 2 * z, px, shown)), tip = heldTip(art);
+      const art = figureArt(friendRows(scene.friend, facing, walking && !mount && !ship, mount || ship ? 0 : stride), dressed, facing, cloth, INK, holding), rect = crouched(ctx, player.sneak && !mount, s.x, bodyY + 2 * z, () => drawFigure(ctx, art, s.x, bodyY + 2 * z, px, shown)), tip = heldTip(art);
       if (veilShown > 0.4 && !bare) for (let i = 0; i < 4; i++) {
         const t = ((now / 1600 + i / 4) % 1), a = i * 1.7 + now / 900;
         ctx.fillStyle = `rgba(200,192,240,${(0.5 * veilShown * Math.sin(t * Math.PI)).toFixed(3)})`;
@@ -3064,6 +3073,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     else ellipse(ctx, s.x, bodyY - 20 * z, 12 * z, 16 * z, INK);
     drawAuras(ctx, player.worn, s.x, bodyY, px, now, scene.reducedMotion, "front");
     if (mount) drawMountHead(ctx, mount.coat, facing, walking, now, feet.x, feet.y, z, scene.reducedMotion);
+    if (ship) drawShip(ctx, ship.kind, facing, walking, now, feet.x, feet.y, z, "over", scene.reducedMotion);
     restoreMotion();
     const plateH = player.name || player.fellowship ? nameplate(ctx, s.x, s.y - 52 * z, player.name, player.fellowship?.tag ?? null, player.friendId, z, "#e8e5de", scene.nameplates) : 0;
     if (motion?.text) overheadText(ctx, motion.text, s.x, s.y - 60 * z - plateH, "#ffffff");
@@ -3621,6 +3631,16 @@ function drawPet(ctx: CanvasRenderingContext2D, id: string, x: number, y: number
 /** How far a rider sits above the ground (world pixels, for toScreen's lift): on the saddle, legs astride. */
 /** Mounts are drawn a little larger than the scenery's pixel scale, so a Friend on top doesn't hide its horse. */
 const MOUNT_SCALE = 1.35;
+/** Vessels are drawn a little larger than their art, like the mounts; you stand on the deck. */
+const SHIP_SCALE = 1.35;
+const deckLift = (camera: Camera, kind: VesselKind) => (deckHeight(kind) + 2) * ART * SHIP_SCALE / liftScale(camera);
+/** A vessel: the whole of it moored, or aboard its hull under you and its near side over you; it rides the swell. */
+function drawShip(ctx: CanvasRenderingContext2D, kind: VesselKind, facing: Facing, moving: boolean, now: number, x: number, y: number, z: number, layer: ShipLayer, reduced: boolean, alpha = 1) {
+  const view: ShipView = facing === "down" ? "front" : facing === "up" ? "back" : "side", frame = moving && !reduced ? Math.floor(now / 170) % 4 : -1;
+  const art = shipArt(kind, view, frame, layer), bob = reduced ? 0 : Math.round(Math.sin(now / 650) * 1.2) * z;
+  if (facing === "left") { ctx.save(); ctx.translate(x, 0); ctx.scale(-1, 1); drawPixels(ctx, art, 0, y + 3 * z + bob, ART * z * SHIP_SCALE, alpha); ctx.restore(); }
+  else drawPixels(ctx, art, x, y + 3 * z + bob, ART * z * SHIP_SCALE, alpha);
+}
 const riderLift = (camera: Camera, coat: Coat) => (saddleHeight(coat) - 4) * ART * MOUNT_SCALE / liftScale(camera);
 /** A mount standing or walking with its hooves on (x, y), turned to a screen facing. */
 function drawMount(ctx: CanvasRenderingContext2D, coat: Coat, facing: Facing, moving: boolean, now: number, x: number, y: number, z: number, saddle: boolean, reduced: boolean) {
@@ -3885,19 +3905,22 @@ function citizenLook(uid: number): readonly string[] {
 function drawPeer(ctx: CanvasRenderingContext2D, scene: Scene, peer: PeerView, hits: Hit[]) {
   const { camera, now } = scene, z = camera.zoom, turned = screenFacing(camera, { x: peer.p.hx, y: peer.p.hy || 1 });
   const mount = mountDef(peer.p.mount), motion = peer.p.emote ? emoteMotion(peer.p.emote, peer.emoteT, turned, scene.reducedMotion) : null;
-  const s = toScreen(camera, peer.x, peer.y, (motion?.hop ?? 0) + (mount ? riderLift(camera, mount.coat) : 0)), feet = toScreen(camera, peer.x, peer.y), facing = motion?.facing ?? turned;
+  const ship = peer.p.ship && VESSEL_KINDS.includes(peer.p.ship as VesselKind) ? peer.p.ship as VesselKind : null;
+  const s = toScreen(camera, peer.x, peer.y, (motion?.hop ?? 0) + (mount ? riderLift(camera, mount.coat) : 0) + (ship ? deckLift(camera, ship) : 0)), feet = toScreen(camera, peer.x, peer.y), facing = motion?.facing ?? turned;
   if (peer.p.emote) emoteParticles(peer.p.emote, peer.emoteT, peer.x, peer.y, scene.reducedMotion, peer.p.cape && isItem(peer.p.cape) ? item(peer.p.cape).icon.color : undefined);
   const sprites = scene.peerSprites?.(peer.p.id) ?? null, stride = peer.moving ? Math.floor(now / 80) % 8 : 0;
-  const rows = sprites ? friendRows(sprites, facing, peer.moving && !mount, mount ? 0 : stride) : peer.moving && Math.floor(now / 160) % 2 ? friendSprite(peer.p.family, peer.p.id).step : friendSprite(peer.p.family, peer.p.id).idle;
+  const rows = sprites ? friendRows(sprites, facing, peer.moving && !mount && !ship, mount || ship ? 0 : stride) : peer.moving && Math.floor(now / 160) % 2 ? friendSprite(peer.p.family, peer.p.id).step : friendSprite(peer.p.family, peer.p.id).idle;
   const px = 3.2 * z, worn = [...peer.p.worn, ...(peer.p.cape ? [peer.p.cape] : []), ...(peer.p.head ? [peer.p.head] : []), ...(peer.p.shield ? [peer.p.shield] : []), ...(peer.p.weapon ? [peer.p.weapon] : []), ...(peer.p.neck ? [peer.p.neck] : []), ...(peer.p.body ? [peer.p.body] : []), ...(peer.p.legs ? [peer.p.legs] : []), ...(peer.p.hands ? [peer.p.hands] : []), ...(peer.p.feet ? [peer.p.feet] : [])], cloth = scene.reducedMotion ? 0 : peer.moving ? stride % 4 : Math.floor(now / 520) % 4;
-  ellipse(ctx, feet.x, feet.y, (mount ? 32 : 15) * z, (mount ? 10 : 6) * z, "rgba(22,22,22,0.18)", peer.friend ? "rgba(159,224,168,0.9)" : "rgba(255,255,255,0.6)", 1.5);
+  if (!ship) ellipse(ctx, feet.x, feet.y, (mount ? 32 : 15) * z, (mount ? 10 : 6) * z, "rgba(22,22,22,0.18)", peer.friend ? "rgba(159,224,168,0.9)" : "rgba(255,255,255,0.6)", 1.5);
   if (peer.p.pet && isPet(peer.p.pet)) { const behind = toScreen(camera, peer.x - (peer.p.hx || 0) * 0.9, peer.y - (peer.p.hy || 1) * 0.9); drawPet(ctx, peer.p.pet, behind.x, behind.y, facing, peer.moving, now + peer.p.id * 71, z, scene.reducedMotion); }
   if (mount) drawMount(ctx, mount.coat, facing, peer.moving, now, feet.x, feet.y, z, true, scene.reducedMotion);
+  if (ship) drawShip(ctx, ship, facing, peer.moving, now, feet.x, feet.y, z, "hull", scene.reducedMotion);
   const restoreMotion = applyMotion(ctx, motion, s.x, s.y);
   drawAuras(ctx, worn, s.x, s.y, px, now, scene.reducedMotion, "back");
   const rect = crouched(ctx, !!peer.p.sneak, s.x, s.y + 2 * z, () => drawFigure(ctx, figureArt(rows, worn, facing, cloth, INK, peerHeld(scene, peer)), s.x, s.y + 2 * z, px, peer.p.veiled ? 0.16 : peer.p.sneak ? 0.8 : 1));
   drawAuras(ctx, worn, s.x, s.y, px, now, scene.reducedMotion, "front");
   if (mount) drawMountHead(ctx, mount.coat, facing, peer.moving, now, feet.x, feet.y, z, scene.reducedMotion);
+  if (ship) drawShip(ctx, ship, facing, peer.moving, now, feet.x, feet.y, z, "over", scene.reducedMotion);
   restoreMotion();
   hits.push({ ...rect, pick: { kind: "peer", id: peer.p.id } });
   if (peer.p.fight) hpBar(ctx, s.x, rect.y - 22, peer.p.hp / Math.max(1, peer.p.maxHp), z);

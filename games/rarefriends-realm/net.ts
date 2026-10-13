@@ -59,6 +59,8 @@ export type Presence = {
   neck?: string | null; body?: string | null; legs?: string | null; hands?: string | null; feet?: string | null;
   /** The mount they're riding. */
   mount: string | null;
+  /** The vessel they're aboard, by kind (seafaring.ts; older clients don't send it). */
+  ship?: string | null;
   /** A level-up they're celebrating (`skill_level`), for its fireworks. */
   celebrate: string | null;
   /** The pet following them. */
@@ -92,7 +94,7 @@ export function cleanPresence(raw: unknown): Presence | null {
     region: typeof r.region === "string" ? r.region.slice(0, 32).replace(/[^\w' ]/g, "") : "",
     emote: word(r.emote),
     name: typeof r.name === "string" && /^[A-Za-z0-9 '_-]{2,16}$/.test(r.name) ? r.name : null, tag: typeof r.tag === "string" && /^[A-Z0-9]{2,5}$/.test(r.tag) ? r.tag : null, title: typeof r.title === "string" ? r.title.slice(0, 32).replace(/[^\w' -]/g, "") : null,
-    head: word(r.head, 40), shield: word(r.shield, 40), neck: word(r.neck, 40), body: word(r.body, 40), legs: word(r.legs, 40), hands: word(r.hands, 40), feet: word(r.feet, 40), mount: word(r.mount, 40), celebrate: word(r.celebrate, 24), pet: word(r.pet, 24), referredBy: id(r.referredBy),
+    head: word(r.head, 40), shield: word(r.shield, 40), neck: word(r.neck, 40), body: word(r.body, 40), legs: word(r.legs, 40), hands: word(r.hands, 40), feet: word(r.feet, 40), mount: word(r.mount, 40), ship: word(r.ship, 20), celebrate: word(r.celebrate, 24), pet: word(r.pet, 24), referredBy: id(r.referredBy),
     hp: int(r.hp, 0, 99) ?? 10, maxHp: int(r.maxHp, 1, 99) ?? 10, sneak: r.sneak === true, veiled: r.veiled === true,
     fight: (() => { const f = r.fight as Record<string, unknown> | null; if (!f || typeof f !== "object") return null; const u = int(f.u, 0, 1e9), fid = word(f.id, 40), fhp = int(f.hp, 0, 10_000), fx = int(f.x, 0, W - 1), fy = int(f.y, 0, H - 1);
       return u !== null && fid && fhp !== null && fx !== null && fy !== null ? { u, id: fid, hp: fhp, x: fx, y: fy } : null; })(),

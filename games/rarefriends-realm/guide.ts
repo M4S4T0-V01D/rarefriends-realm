@@ -11,6 +11,7 @@ import {
 import { ESSENCES, HERBS, MIXTURES, POTIONS } from "./apothecary.ts";
 import { NPCS } from "./content.ts";
 import { TECHNIQUES } from "./techniques.ts";
+import { SEA, SHIPWRIGHTS, VESSELS, VESSEL_KINDS } from "./seafaring.ts";
 /** Which quest teaches a tradition's techniques (the common ones need only the level). */
 const TAUGHT_BY: Partial<Record<string, string>> = { orashai: " (The Orashai Mysteries)", mizukai: " (The Hidden Road)", inner_measure: " (The Counted Breath)", living_patterns: " (Patterns in the Water)", thresholds: " (The Keepers' Door)", unfinished: " (The Unfinished Page)" };
 import { AMULETS, STALLS, amuletRecipe, carvingRecipes, arrowRecipe, boltRecipe, craftingRecipes, crossbowRecipe, spinningRecipes, stringingRecipe, fletchingRecipes, headlessRecipe, smeltingRecipes, smithingRecipes } from "./engine.ts";
@@ -31,7 +32,7 @@ const TYPE_NAMES: Record<string, string> = {
   bow: "Bows", crossbow: "Crossbows", arrow: "Arrows", bolt: "Bolts", stock: "Stocks", tree: "Trees", rock: "Rocks", gem: "Gems", herb: "Herbs", essence: "Essences", potion: "Potions", mixture: "Mixtures",
   technique: "Techniques", contract: "Contracts", creature: "Creatures", ability: "Abilities", course: "Courses", reward: "Rewards", title: "Titles", carving: "Carvings", leather: "Leatherwork", amulet: "Amulets",
   stone: "Sigil stones", sigil: "Sigils", pickpocket: "Pickpocketing", stall: "Stalls", camp: "Camping", order: "The Orders", set: "Armour sets", fish: "Fish", meat: "Meat", grain: "Grain", log: "Logs",
-  smith: "Smithing", arrowheads: "Arrowheads", plate: "Plates", holy: "Faith weapons", place: "Places", clothing: "Clothing", lore: "Lore", journal: "The journal",
+  smith: "Smithing", arrowheads: "Arrowheads", vessel: "Vessels", plate: "Plates", holy: "Faith weapons", place: "Places", clothing: "Clothing", lore: "Lore", journal: "The journal",
 };
 const SLOT_NAMES: Record<string, string> = { head: "Head", cape: "Cape", neck: "Neck", weapon: "Weapon", body: "Body", shield: "Shield", legs: "Legs", hands: "Hands", feet: "Feet", belt: "Belt", ring: "Ring" };
 const ELEMENT_NAMES: Record<string, string> = { wind: "Wind", water: "Water", earth: "Earth", fire: "Fire", holy: "Holy", law: "Law", paper: "Paper", dusk: "Dusk", moon: "Moon", hollow: "Hollow", gold: "Gold", stone: "Stone", home: "Home", shadow: "Shadow" };
@@ -215,6 +216,14 @@ export function skillGuide(skill: Skill): GuideEntry[] {
       add(1, "The Hidden Road", "The Mizukai Isles' own Mysteries: Ascetic Kōdō on Iwaoka teaches them, after The Silent Climb. The standing mist, the foxfire, the stone with no echo.", undefined, T("place"));
       // The techniques, in the Combat options tab (techniques.ts).
       for (const technique of TECHNIQUES) add(technique.level, technique.name, `${technique.description}${TAUGHT_BY[technique.tradition] ?? ""}`, undefined, [...T("technique"), `tradition:${technique.tradition}`]);
+      break;
+    case "seafaring":
+      add(1, "Seafaring", "Vessels of your own, built by a shipwright from your materials, sailed over the water the world has, moored where you leave them and found there again. Trained by sailing, by landing somewhere new by sea, and by building and mending.", undefined, T("ability"));
+      for (const kind of VESSEL_KINDS) { const v = VESSELS[kind]; add(v.level, v.name, `${v.examine} Speed ${v.speed}, hold ${v.hold}, ${v.waters === "shallow" ? "the shallows, rivers and lakes" : v.waters === "coastal" ? `the shallows and the sea within ${SEA.coastal} of land` : "any water"}${v.beach ? ", beaches anywhere" : ", needs a pier"}. Built by ${Object.entries(SHIPWRIGHTS).filter(([, y]) => y.builds.includes(kind)).map(([id]) => NPCS[id]?.name ?? id).join(" or ")}: ${v.build.map(([id, n]) => `${n} ${item(id).name.toLowerCase()}`).join(", ")}.`, undefined, T("vessel")); }
+      add(1, "Going ashore", "Aboard, click the shore: you sail beside it and step off, where the vessel can be beached or there's a pier. The vessel stays moored there, its hold with it.", undefined, T("ability"));
+      add(1, "The hold", "Each vessel has a hold: Load from your pack aboard or beside it, take things back from the Hold.", undefined, T("ability"));
+      add(1, "Planks", "A shipwright saws logs into planks for a fee: pine, oak and ironbark.", "oak_planks", T("ability"));
+      add(1, "Hulls", `Deep water wears a hull a point every ${SEA.wearEvery} tiles. A stove-in hull keeps to the shallows until a shipwright mends it with planks and pewter rivets.`, undefined, T("ability"));
       break;
     case "presence":
       add(1, "Presence", "The mark you leave on the world. Earned by discovering regions, finishing quests, felling bosses, rare finds, people met, rumours heard, work orders filled, your Friend, your name and the clothes you're seen in. The slowest skill in the Realm.", undefined, T("ability"));

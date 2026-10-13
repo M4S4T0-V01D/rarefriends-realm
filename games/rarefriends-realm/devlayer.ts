@@ -7,6 +7,7 @@
 import { ITEM_LIST, MONSTERS, ROCKS, SKILLS, TREES } from "./data.ts";
 import { NPCS, QUESTS, registerDevQuest } from "./content.ts";
 import { applyCamp, setDevCampZones } from "./camping.ts";
+import { applyVessels } from "./seafaring.ts";
 import { DECOR_NAMES, T, W, WORLD_SEED, regionAt, type World } from "./world.ts";
 import { applyOverlay, registerDefinitions, validatePlacements, type Overlay, type Placed } from "./overlay.ts";
 import { realmWorld, setSharedWorld, spawnCreatures, type Game } from "./state.ts";
@@ -37,7 +38,7 @@ export function rebuildWorld(game: Game, overlay: Overlay): { problems: string[]
   placed = applyOverlay(world, overlay, WORLD_SEED, problems, NPCS as Record<string, unknown>);
   const unreachable = validatePlacements(world, overlay, placed);
   setSharedWorld(world); game.world = world;
-  spawnCreatures(game); applyHome(game); applyCamp(game);
+  spawnCreatures(game); applyHome(game); applyCamp(game); applyVessels(game);
   game.worldVersion = (game.worldVersion ?? 0) + 1; resetLighting(world);
   return { problems, unreachable };
 }

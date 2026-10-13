@@ -9,6 +9,7 @@ import { SPELL_TABS, RARIAN_SPELL_TABS, MIZUKAI_SPELL_TABS, ORASHAI_SPELL_TABS, 
 } from "./data.ts";
 import { mountArt } from "./mountart.ts";
 import { cacheAt, unstash } from "./camping.ts";
+import { VESSELS, holdAt, takeFromHold } from "./seafaring.ts";
 import { CHEST_REWARD, DAY_MS, challengeProgress, challengeReward, challengeText, claimChallenge, claimChest, claimStreak, completeDaily, dailyWaiting, rerollDaily, rewardText, rollDaily, streakReward, streakStatus } from "./daily.ts";
 import { LATEST_UPDATE, UPDATES } from "./updates.ts";
 import { FIRST_STEPS, currentStep } from "./firststeps.ts";
@@ -1633,6 +1634,17 @@ export function CampCacheModal({ game, refresh, openMenu, onClose }: { game: Gam
     <p className="realm-muted">Twelve things keep here while the camp stands, and come back with the kit when you pack up. Click one to take it back; right-click a pack item: Stash.</p>
     <div className="realm-inventory bags" onContextMenu={event => event.preventDefault()}>{cache.map((slot, index) => <button key={index} type="button" className="realm-slot" aria-label={slot ? `Take back ${item(slot.id).name}${slot.n > 1 ? ` × ${slot.n}` : ""}` : `Empty cache slot ${index + 1}`} onClick={() => { if (slot) { unstash(game, index); refresh(); } }}
       {...rightClick(openMenu, () => slot ? [{ verb: "Take-back", noun: item(slot.id).name, tone: "item", run: () => { unstash(game, index); refresh(); } }, { verb: "Examine", noun: item(slot.id).name, run: () => { message(game, examineItem(slot.id)); refresh(); } }] : [])}>{slot && <ItemIcon slot={slot} size={40} />}</button>)}</div>
+  </Modal>;
+}
+/** A vessel's hold (seafaring.ts): what's in it, taken back with a click; pack items go in with Load. */
+export function HoldModal({ game, refresh, openMenu, onClose }: { game: Game; refresh: () => void; openMenu: OpenMenu; onClose: () => void }) {
+  const vessel = holdAt(game);
+  if (!vessel || vessel.id !== game.ui.hold) return null;
+  return <Modal title={`The hold: ${vessel.name}`} onClose={onClose}>
+    <p className="realm-muted">{`Your ${VESSELS[vessel.kind].name.toLowerCase()}'s hold keeps ${vessel.hold.length} things, aboard or moored, through logout and back. Click one to take it; right-click a pack item: Load.`}</p>
+    <div className="realm-inventory bags" onContextMenu={event => event.preventDefault()}>{vessel.hold.map((slot, index) => <button key={index} type="button" className="realm-slot" aria-label={slot ? `Take back ${item(slot.id).name}${slot.n > 1 ? ` × ${slot.n}` : ""}` : "Empty"} onClick={() => { if (slot) { takeFromHold(game, index); refresh(); } }}
+      {...rightClick(openMenu, () => slot ? [{ verb: "Take-back", noun: item(slot.id).name, tone: "item", run: () => { takeFromHold(game, index); refresh(); } }, { verb: "Examine", noun: item(slot.id).name, run: () => { message(game, examineItem(slot.id)); refresh(); } }] : [])}>
+      {slot && <ItemIcon slot={slot} size={40} />}</button>)}</div>
   </Modal>;
 }
 /** Your mount's orb, on the right of the minimap (Faith's column keeps the Orashai's mana under it). */

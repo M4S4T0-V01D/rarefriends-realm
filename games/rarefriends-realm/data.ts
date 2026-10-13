@@ -9,13 +9,15 @@ export const SKILLS = [
   "cooking", "firemaking", "mining", "smithing", "crafting", "thieving", "agility", "slayer", "apothecary", "presence",
   // The Land Before Stone: hidden laws, rites, true names and the techniques of the old traditions (mysteries.ts).
   "mysteries",
+  // A Place to the North: vessels of your own, built, sailed, moored and mended (seafaring.ts).
+  "seafaring",
 ] as const;
 export type Skill = typeof SKILLS[number];
 export const SKILL_NAMES: Record<Skill, string> = {
   attack: "Attack", strength: "Strength", defence: "Defence", ranged: "Ranged", hitpoints: "Hitpoints", magic: "Magic", prayer: "Faith",
   woodcutting: "Woodcutting", fishing: "Fishing", cooking: "Cooking", firemaking: "Firemaking", mining: "Mining",
   smithing: "Smithing", crafting: "Craftwork", thieving: "Stealth", agility: "Wayfaring", slayer: "Pursuance",
-  sigilcraft: "Sigilcraft", fletching: "Fletching", apothecary: "Apothecary", presence: "Presence", mysteries: "Mysteries",
+  sigilcraft: "Sigilcraft", fletching: "Fletching", apothecary: "Apothecary", presence: "Presence", mysteries: "Mysteries", seafaring: "Seafaring",
 };
 /** Each skill's colour: its mastery cape, and its trim. */
 export const SKILL_COLORS: Record<Skill, [string, string]> = {
@@ -23,12 +25,12 @@ export const SKILL_COLORS: Record<Skill, [string, string]> = {
   hitpoints: ["#e8e4dc", "#cf6e6e"], magic: ["#6f7ea6", "#e2d49e"], prayer: ["#efede7", "#e2d49e"], woodcutting: ["#8e9f7a", "#c49a74"],
   fishing: ["#8fb3c9", "#efede7"], cooking: ["#9c7aa6", "#e8d4c0"], firemaking: ["#e9a07a", "#e2d49e"], mining: ["#8b8e92", "#c9c2b6"],
   smithing: ["#6d6b67", "#e3a58c"], crafting: ["#b89c86", "#efede7"], thieving: ["#6d6b8a", "#c6bed4"], agility: ["#8f9cb2", "#efede7"],
-  slayer: ["#3b3a38", "#cf6e6e"], sigilcraft: ["#c6bed4", "#6f7ea6"], fletching: ["#7d9a86", "#e8d4c0"], apothecary: ["#8fbf9a", "#c98f95"], presence: ["#e2d49e", "#6e4a8a"], mysteries: ["#2f3f66", "#d9b866"],
+  slayer: ["#3b3a38", "#cf6e6e"], sigilcraft: ["#c6bed4", "#6f7ea6"], fletching: ["#7d9a86", "#e8d4c0"], apothecary: ["#8fbf9a", "#c98f95"], presence: ["#e2d49e", "#6e4a8a"], mysteries: ["#2f3f66", "#d9b866"], seafaring: ["#2f5f7a", "#e9dcb4"],
 };
 /** Small glyphs for XP drops and the skills tab (drawn as text). */
 export const SKILL_ICONS: Record<Skill, string> = {
   attack: "⚔", strength: "✊", defence: "⛨", hitpoints: "♥", magic: "✦", prayer: "✚", woodcutting: "🪓", fishing: "🐟",
-  cooking: "🍳", firemaking: "🔥", mining: "⛏", smithing: "⚒", crafting: "✂", thieving: "👣", agility: "➶", ranged: "➹", slayer: "⌖", sigilcraft: "◈", fletching: "➴", apothecary: "⚗", presence: "✧", mysteries: "◬",
+  cooking: "🍳", firemaking: "🔥", mining: "⛏", smithing: "⚒", crafting: "✂", thieving: "👣", agility: "➶", ranged: "➹", slayer: "⌖", sigilcraft: "◈", fletching: "➴", apothecary: "⚗", presence: "✧", mysteries: "◬", seafaring: "⚓",
 };
 export const MAX_LEVEL = 99;
 /** The classic old-school curve: XP needed for each level, index = level. */
@@ -300,6 +302,12 @@ const ITEMS: Item[] = [
   { id: "glimmer_shard", name: "Glimmer shard", examine: "A shard of the lost Glimmer. It hums when you face north.", value: 0, tradeable: false, icon: { shape: "gem", color: "#e2d7ad", accent: "#161616" } },
   { id: "forge_ember", name: "Forge ember", examine: "An ember that never cools. Emberforge's heart.", value: 0, tradeable: false, icon: { shape: "orb", color: "#e3a58c" } },
   { id: "hollow_crown", name: "Hollow crown", examine: "The crown of the Hollow King. It weighs nothing at all.", value: 0, tradeable: false, icon: { shape: "crown", color: "#efede7", accent: "#161616" } },
+  // Seafaring's materials (seafaring.ts): planks sawn from logs at a shipwright's, and the sailmaker's and roper's goods.
+  { id: "pine_planks", name: "Pine planks", examine: "Pine, sawn and seasoned: light, and it floats high. Hulls are made of these.", value: 160, stackable: true, icon: { shape: "log", color: "#d8b77c", accent: "#b08a52" } },
+  { id: "oak_planks", name: "Oak planks", examine: "Oak, sawn and seasoned: heavy, and it lasts. Keels and strakes.", value: 40, stackable: true, icon: { shape: "log", color: "#b98a56", accent: "#8a6236" } },
+  { id: "ironbark_planks", name: "Ironbark planks", examine: "Ironbark, sawn at great cost to the saw. Nothing gets through a hull of it.", value: 1100, stackable: true, icon: { shape: "log", color: "#6a5a4c", accent: "#3e342c" } },
+  { id: "sailcloth", name: "Sailcloth", examine: "A bolt of heavy canvas, for a sail.", value: 180, stackable: true, icon: { shape: "silk", color: "#efe6d0", accent: "#b3301f" } },
+  { id: "ships_rope", name: "Ship's rope", examine: "A coil of tarred rope: rigging, mooring lines, everything that holds.", value: 60, stackable: true, icon: { shape: "string", color: "#9c7a4a", accent: "#5a4228" } },
   { id: "first_copy", name: "First copy of the agreement", examine: "The old agreement in both peoples' hands, as it was first sworn: each to keep both passes and both roads, and to stand by the other.", value: 0, tradeable: false, icon: { shape: "scroll", color: "#e9dcb4", accent: "#7d2f26" } },
   { id: "realm_scroll", name: "Realm scroll", examine: "A map fragment of the Realm.", value: 0, tradeable: false, icon: { shape: "scroll", color: "#efe3c4" } },
 ];
@@ -1920,6 +1928,8 @@ export const SHOPS: Record<string, ShopDef> = {
     "staff", "breeze_staff", "tide_staff", "stone_staff", "ember_staff", "scholar_hat", "scholar_robe", "scholar_skirt", "tablet_hollow_square"] },
   bones: { id: "bones", name: "Bone Collector", buys: ["bones", "hide"], rate: 0.65, stock: ["bones", "large_bones"] },
   // A Place to the North (northquest.ts): each trader carries the other people's goods once the Oathgate's open; the Redwake's stores if it's shut for good.
+  // The shipwrights' stores (seafaring.ts): what a vessel needs that a forge or a forest doesn't give.
+  ship_stores: { id: "ship_stores", name: "The ship's stores", stock: ["sailcloth", "ships_rope", "pine_planks", "oak_planks", "pewter_rivets", "blackiron_rivets", "small_net", "harpoon"] },
   skarnholm_quay: { id: "skarnholm_quay", name: "The Skarnholm quay", stock: ["raw_carp", "carp", "raw_inkcrab", "inkcrab", "small_net", "harpoon", "fishing_bait", "pine_logs", "pelt_cape"] },
   skarnholm_quay_open: { id: "skarnholm_quay_open", name: "The Skarnholm quay", stock: ["raw_carp", "carp", "raw_inkcrab", "inkcrab", "small_net", "harpoon", "fishing_bait", "pine_logs", "pelt_cape", "blackiron_ore", "blackiron_bar", "inkcoal", "moonsilver_ore", "oak_logs"] },
   krasnogor_market: { id: "krasnogor_market", name: "Krasnogor market", stock: ["fur_hood", "pelt_cape", "frosthide_coif", "frosthide_bracers", "blackiron_ore", "inkcoal", "oak_logs", "pine_logs"] },

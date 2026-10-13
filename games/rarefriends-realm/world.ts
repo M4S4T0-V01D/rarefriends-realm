@@ -139,7 +139,9 @@ export type DecorKind =
   // The dungeons' own things (dungeonworld.ts): a cluster of pale mineral, and a sigil circle cut into a floor.
   | "crystal" | "rune_circle"
   // The stables grown (mountworld.ts): a water trough and a hitching post.
-  | "trough" | "hitching_post";
+  | "trough" | "hitching_post"
+  // Seafaring: a vessel of yours, moored (seafaring.ts; drawn from shipart.ts).
+  | "vessel";
 /** A monument's state: whole on its plinth, toppled and lying, broken off at the waist, or sunk to the chest in the ground. */
 export type MonumentState = "whole" | "toppled" | "broken" | "buried";
 export type WorldObject = {
@@ -158,6 +160,8 @@ export type WorldObject = {
   sigil?: string;
   /** A crumbling ruin wall's height (pixels). */
   height?: number;
+  /** A moored vessel: its kind and the way its bow points (seafaring.ts). */
+  ship?: string; heading?: { x: number; y: number };
   /** A herb patch: which herb grows here (Apothecary). */
   herb?: string;
   /** A Mizukai boat: which dock it serves (boats.ts DOCKS). Its `to` is where you stand to board it, and where you arrive. */
@@ -1830,7 +1834,7 @@ const SIDES = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
 export const ROOF_COLORS = ["#c99a96", "#9aab92", "#8f9cb2", "#cdb98a", "#a996b5"];
 export const TREE_NAMES: Record<TreeKind, string> = { tree: "Tree", oak: "Oak", willow: "Willow", maple: "Maple tree", yew: "Yew", ashwood: "Ashwood", palm: "Palm tree", pine: "Pine tree", deadwood: "Dead tree", redwood: "Redwood", ironbark: "Ironbark", cedar: "Cedar", sakura: "Blossom tree", bamboo: "Bamboo" };
 export const DECOR_NAMES: Record<DecorKind, string> = {
-  trough: "Water trough", hitching_post: "Hitching post",
+  trough: "Water trough", vessel: "Vessel", hitching_post: "Hitching post",
   strong_friend: "The Strong Friend", crystal: "Crystal", rune_circle: "Sigil circle", monument: "Statue", god_diamond: "Statue of the Good Friend", god_ink: "Statue of the Squid Friend", god_sol: "Statue of the Weird Friend", god_hood: "Statue of the Hood Friend", god_ember: "The Ember, in its brazier",
   god_dusk: "Statue of the Wise Friend, blindfolded", wise_friend: "The Wise Friend", bell: "Great bell", canopy: "Old roofing", cannon: "Magical cannon", device: "Federation device", wagon: "Supply wagon", watchtower: "Watchtower", stake: "Stake wall", plaque: "Inscribed plaque", banner_fff: "The Federation's banner", banner_rrr: "The Regiment's banner", banner_hollowmere: "Hollowmere's banner", banner_diamond: "The Order of the Diamond's banner", banner_ink: "The Order of the Ink's banner", banner_sol: "The Order of the Sol's banner", banner_hood: "The Order of the Hood's banner", banner_ember: "The Order of the Ember's banner", banner_dusk: "The Order of Dusk's banner",
   flowers: "Flowers", bush: "Bush", boulder: "Boulder", lamp: "Lamp post", bench: "Bench", crate: "Crate", barrel: "Water barrel", tent: "Tent",

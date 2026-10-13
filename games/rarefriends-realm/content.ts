@@ -27,6 +27,7 @@ import { MOUNT_NPCS, MOUNT_QUESTS, onMountKill, talkMounts } from "./mounts.ts";
 import { DRAGON_QUESTS, onDragonsKill, talkDragons } from "./dragons.ts";
 import { NORTH_NPCS, talkNorth } from "./north.ts";
 import { NORTH_QUESTS, onNorthKill, talkNorthQuest } from "./northquest.ts";
+import { talkShipwright } from "./seafaring.ts";
 import { ACTIVITIES, ACTIVITY_HOSTS, activityProblem, cancelActivity, startActivity } from "./activities.ts";
 import { MEGHAVAN_NPCS, talkMeghavan } from "./meghavanpeople.ts";
 import { MEGHAVAN_QUESTS, MEGHAVAN_QUEST_NPCS, onMeghavanKill, talkMeghavanQuests } from "./meghavanquests.ts";
@@ -843,6 +844,7 @@ function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
   const road = talkHiddenRoad(game, npcId, name); if (road) return road;
   const hearthkin = talkHearthkin(game, npcId, name); if (hearthkin) return hearthkin;
   const settlements = talkSettlements(game, npcId, name); if (settlements) return settlements;
+  const shipwright = talkShipwright(game, npcId, name, () => talkNorthQuest(game, npcId, name, () => talkNorth(game, npcId, name)) ?? talkNorth(game, npcId, name)); if (shipwright) return shipwright;   // Seafaring (seafaring.ts)
   const northQuest = talkNorthQuest(game, npcId, name, () => talkNorth(game, npcId, name)); if (northQuest) return northQuest;   // The Old Agreement (northquest.ts)
   const north = talkNorth(game, npcId, name); if (north) return north;   // A Place to the North's people (north.ts)
   const dragons = talkDragons(game, npcId, name); if (dragons) return dragons;   // Ysolde's second errand comes before her everyday lines (and after her first, mounts.ts)

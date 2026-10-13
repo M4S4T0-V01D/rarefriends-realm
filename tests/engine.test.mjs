@@ -102,7 +102,7 @@ test("a fresh adventurer: level 3, 10 hitpoints, a starter kit", () => {
   assert.equal(level(g, "hitpoints"), 10);
   assert.equal(g.player.hp, 10);
   for (const id of ["pewter_axe", "pewter_pickaxe", "small_net", "tinderbox"]) assert(has(g.player, id), id);
-  assert.equal(SKILLS.length, 22, "the twenty-one, and Mysteries");
+  assert.equal(SKILLS.length, 23, "the twenty-one, Mysteries and Seafaring");
 });
 
 test("the world is large, deterministic and every landmark is reachable on foot", () => {
@@ -4530,4 +4530,69 @@ test("The Old Agreement: the wreck, the raiders and their strongbox, six account
   choose(talk(g3, "redwake_captain"), "Show me the company's stores."); assert.equal(g3.ui.shop, "redwake_stores");
   choose(talk(g3, "skarnholm_trader"), "Let's trade."); assert.equal(g3.ui.shop, "skarnholm_quay", "no Zoryavik iron with the pass shut");
   assert.match(Q.NORTH_CLUES.oa_stone.examine(g3, stone), /ash/);
+});
+
+test("Seafaring: a shipwright builds from real materials (taken), the vessel goes into the water at the yard; aboard you sail the water your vessel can take and go ashore by clicking the shore; it stays moored with its hold through a save; teleported off, it stays where it was; planks sawn, hulls mended", async () => {
+  const SF = await import("../games/rarefriends-realm/seafaring.ts");
+  const { talk } = await import("../games/rarefriends-realm/content.ts");
+  const { SKILLS } = await import("../games/rarefriends-realm/data.ts");
+  const { WALKABLE, isWater } = await import("../games/rarefriends-realm/world.ts");
+  const g = newGame(), p = g.player, world = g.world;
+  assert.ok(SKILLS.includes("seafaring"), "a skill of its own");
+  const bersi = world.spawns.find(s => s.kind === "npc" && s.id === "shipwright_bersi");
+  teleport(g, bersi.x + 1, bersi.y);
+  const choose = (d, label) => { const o = d.options?.find(x => x.label.startsWith(label)); assert.ok(o, `"${label}" offered`); return o.then(); };
+  // Too little Seafaring for a longship; nothing to build a rowboat with yet.
+  let d = choose(talk(g, "shipwright_bersi"), "Build me a vessel.");
+  assert.match(choose(d, "Longship").lines[0].text, /Seafaring level of 50/);
+  assert.match(choose(choose(talk(g, "shipwright_bersi"), "Build me a vessel."), "Rowboat").lines[0].text, /Still wanted/);
+  // Planks sawn from logs, for a fee.
+  give(p, "pine_logs", 6); give(p, "coins", 1000); const coins = count(p, "coins");
+  choose(choose(talk(g, "shipwright_bersi"), "Saw some planks."), "Pine planks");
+  assert.equal(count(p, "pine_planks"), 6); assert.equal(count(p, "pine_logs"), 0); assert.equal(count(p, "coins"), coins - 6 * SF.SEA.sawFee.pine_planks);
+  give(p, "pewter_rivets", 3); give(p, "ships_rope", 1);
+  d = choose(choose(talk(g, "shipwright_bersi"), "Build me a vessel."), "Rowboat"); choose(d, "Build it.");
+  assert.equal(p.vessels.length, 1); const v = p.vessels[0];
+  assert.equal(count(p, "pine_planks"), 0, "the planks were used"); assert.equal(count(p, "ships_rope"), 0); assert.equal(count(p, "pewter_rivets"), 2);
+  assert.ok(p.xp.seafaring >= SF.VESSELS.rowboat.buildXp); assert.equal(world.tiles[v.y * W + v.x], T.WATER, "launched on water it can take (the shallows)");
+  const moored = world.objects.find(o => o.text === `vessel:${v.id}`); assert.ok(moored && moored.decor === "vessel" && moored.blocks);
+  // Board it from beside it; aboard, only water underfoot.
+  const shore = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => ({ x: v.x + dx, y: v.y + dy })).find(t => canWalk(g, t.x, t.y)); assert.ok(shore, "there's land beside the slip");
+  teleport(g, shore.x, shore.y); assert.equal(SF.VESSEL_CLUES.vessel.use(g, moored, "Board"), null);
+  assert.equal(p.aboard, v.id); assert.deepEqual([p.x, p.y], [v.x, v.y]);
+  assert.ok(!canWalk(g, shore.x, shore.y), "no walking on land from a boat"); assert.ok(!world.objects.some(o => o.text === `vessel:${v.id}` && o.name !== "__removed"), "not moored while you're in it");
+  // A rowboat keeps to the shallows; a longship goes anywhere there's water.
+  let deep = null; for (let i = 0; i < W * 400 && !deep; i++) if (world.tiles[i] === T.DEEP) deep = { x: i % W, y: Math.floor(i / W) };
+  assert.ok(!SF.sailableFor(world, "rowboat", deep.x, deep.y) && SF.sailableFor(world, "longship", deep.x, deep.y));
+  assert.ok(!SF.sailableFor(world, "longship", v.x, UNDER_Y + 20), "nothing sails underground");
+  // Sail somewhere, then click the shore: you sail beside it and step off; it stays moored where it was.
+  let target = null; for (let r = 5; r < 20 && !target; r++) for (let dy = -r; dy <= r && !target; dy++) for (let dx = -r; dx <= r && !target; dx++) if (Math.max(Math.abs(dx), Math.abs(dy)) === r && SF.sailable(g, v.x + dx, v.y + dy)) target = { x: v.x + dx, y: v.y + dy };
+  assert.ok(walkTo(g, target.x, target.y)); until(g, () => p.x === target.x && p.y === target.y, 80);
+  assert.ok(v.sailed >= 5 && v.x === p.x && v.y === p.y, "the vessel goes where you sail it");
+  let land = null; for (let r = 1; r < 30 && !land; r++) for (let dy = -r; dy <= r && !land; dy++) for (let dx = -r; dx <= r && !land; dx++) { const x = p.x + dx, y = p.y + dy; if (Math.max(Math.abs(dx), Math.abs(dy)) === r && WALKABLE.has(world.tiles[y * W + x]) && world.objectAt[y * W + x] < 0 && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([ex, ey]) => SF.sailable(g, x + ex, y + ey))) land = { x, y }; }
+  assert.ok(walkTo(g, land.x, land.y)); until(g, () => p.aboard === null, 80);
+  assert.deepEqual([p.x, p.y], [land.x, land.y], "ashore where you clicked"); assert.equal(Math.abs(v.x - land.x) + Math.abs(v.y - land.y), 1, "moored beside it");
+  assert.ok(world.objects.some(o => o.text === `vessel:${v.id}` && o.x === v.x && o.y === v.y), "moored in the world again");
+  assert.ok(p.landfalls.vargskeld, "a first landfall by sea remembered");
+  // The hold: things go in from the pack beside it, and come back out.
+  give(p, "raw_carp", 1); const carp = p.inventory.findIndex(s => s?.id === "raw_carp");
+  assert.ok(SF.stowInHold(g, carp)); assert.equal(count(p, "raw_carp"), 0); assert.equal(v.hold.filter(Boolean).length, 1);
+  assert.equal(SF.VESSEL_CLUES.vessel.use(g, world.objects.find(o => o.text === `vessel:${v.id}` && o.name !== "__removed"), "Hold"), null); assert.equal(g.ui.hold, v.id);
+  // Through a save: the vessel, where it's moored, its hold.
+  const save = JSON.parse(JSON.stringify(serialize(g))), g2 = newGame(); assert.ok(restore(g2, save));
+  assert.deepEqual(g2.player.vessels.map(x => [x.kind, x.x, x.y, x.hold.filter(Boolean).map(s => s.id)]), [["rowboat", v.x, v.y, ["raw_carp"]]]);
+  assert.ok(g2.world.objects.some(o => o.text === `vessel:${v.id}` && o.name !== "__removed"));
+  assert.ok(SF.takeFromHold(g, v.hold.findIndex(Boolean))); assert.equal(count(p, "raw_carp"), 1);
+  // Teleported off the water while aboard: it stays where it was.
+  teleport(g, shore.x, shore.y); SF.board(g, v); const at = { x: v.x, y: v.y };
+  teleport(g, world.places.spawn.x, world.places.spawn.y); tick(g);
+  assert.equal(p.aboard, null); assert.deepEqual({ x: v.x, y: v.y }, at);
+  // A save made standing on water with no vessel under you puts you on dry land.
+  const wet = JSON.parse(JSON.stringify(serialize(g))); wet.x = at.x; wet.y = at.y; wet.aboard = null; const g3 = newGame(); assert.ok(restore(g3, wet));
+  assert.ok(WALKABLE.has(g3.world.tiles[g3.player.y * W + g3.player.x]) && !isWater(g3.world.tiles[g3.player.y * W + g3.player.x]));
+  // Mended at the yard: planks and pewter rivets.
+  v.hull = 10; give(p, "pine_planks", 5); teleport(g, bersi.x + 1, bersi.y);
+  choose(talk(g, "shipwright_bersi"), "Mend my vessel."); assert.ok(v.hull > 10);
+  // Three at most.
+  p.vessels.push({ ...v, id: 2 }, { ...v, id: 3 }); assert.match(SF.buildProblem(g, "rowboat"), /3 vessels already/);
 });

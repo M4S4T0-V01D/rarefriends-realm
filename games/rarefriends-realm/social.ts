@@ -9,6 +9,7 @@ import type { NetState, Presence } from "./net.ts";
 import { TICK_MS, combatLevel, maxHp, totalLevel, type Game } from "./state.ts";
 import { currentFight, veiled } from "./engine.ts";
 import { isUnderground, realPoint, regionAt } from "./world.ts";
+import { aboard } from "./seafaring.ts";
 
 export type Avatar = { p: Presence; fromX: number; fromY: number; at: number; emoteAt: number };
 /** An avatar where it should be drawn right now. */
@@ -74,7 +75,7 @@ export function presenceOf(game: Game): Presence {
     region: regionAt(game.world, player.x, player.y).name,
     emote: player.emote && game.tick < player.emote.until ? player.emote.id : null,
     name: player.name, tag: player.fellowship?.tag ?? null, title: titleName(player.title),
-    head: player.equipment.head ?? null, shield: player.equipment.shield ?? null, neck: player.equipment.neck ?? null, body: player.equipment.body ?? null, legs: player.equipment.legs ?? null, hands: player.equipment.hands ?? null, feet: player.equipment.feet ?? null, mount: player.mount, pet: player.petOut, celebrate: player.celebrate && game.tick < player.celebrate.until ? `${player.celebrate.skill}_${player.celebrate.level}` : null, referredBy: player.referredBy, hp: player.hp, maxHp: maxHp(player), fight: currentFight(game), sneak: player.sneak, veiled: veiled(game),
+    head: player.equipment.head ?? null, shield: player.equipment.shield ?? null, neck: player.equipment.neck ?? null, body: player.equipment.body ?? null, legs: player.equipment.legs ?? null, hands: player.equipment.hands ?? null, feet: player.equipment.feet ?? null, mount: player.mount, ship: aboard(player)?.kind ?? null, pet: player.petOut, celebrate: player.celebrate && game.tick < player.celebrate.until ? `${player.celebrate.skill}_${player.celebrate.level}` : null, referredBy: player.referredBy, hp: player.hp, maxHp: maxHp(player), fight: currentFight(game), sneak: player.sneak, veiled: veiled(game),
     drops: game.ground.filter(entry => entry.shared).slice(-16).map(entry => ({ u: entry.uid, id: entry.id, n: entry.n, x: entry.x, y: entry.y })),
     arena: game.arena ? { match: game.arena.name, foes: arenaFoes(game) } : null,
   };
