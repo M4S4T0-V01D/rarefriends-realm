@@ -15,6 +15,7 @@ import { TECHNIQUES } from "./techniques.ts";
 import { SEA, SHIPWRIGHTS, VESSELS, VESSEL_KINDS } from "./seafaring.ts";
 import { FITOUTS, FITOUT_IDS, LOADOUT_NAMES } from "./shipfit.ts";
 import { SPECIES, SPECIES_IDS } from "./beasts.ts";
+import { COMMERCE } from "./commerce.ts";
 /** Which quest teaches a tradition's techniques (the common ones need only the level). */
 const TAUGHT_BY: Partial<Record<string, string>> = { orashai: " (The Orashai Mysteries)", mizukai: " (The Hidden Road)", inner_measure: " (The Counted Breath)", living_patterns: " (Patterns in the Water)", thresholds: " (The Keepers' Door)", unfinished: " (The Unfinished Page)" };
 import { AMULETS, STALLS, amuletRecipe, carvingRecipes, arrowRecipe, boltRecipe, craftingRecipes, crossbowRecipe, spinningRecipes, stringingRecipe, fletchingRecipes, headlessRecipe, smeltingRecipes, smithingRecipes } from "./engine.ts";
@@ -226,6 +227,17 @@ export function skillGuide(skill: Skill): GuideEntry[] {
       add(1, "The Hidden Road", "The Mizukai Isles' own Mysteries: Ascetic Kōdō on Iwaoka teaches them, after The Silent Climb. The standing mist, the foxfire, the stone with no echo.", undefined, T("place"));
       // The techniques, in the Combat options tab (techniques.ts).
       for (const technique of TECHNIQUES) add(technique.level, technique.name, `${technique.description}${TAUGHT_BY[technique.tradition] ?? ""}`, undefined, [...T("technique"), `tradition:${technique.tradition}`]);
+      break;
+    case "commerce":
+      add(1, "Commerce", "Trade, markets and the Realm's money, at the Frenderal Exchange in Gullwick: merchant orders filled, shares of five companies bought and sold, the companies' ledgers read, and the investors' questions answered. Trained by doing business, not by moving money about.", undefined, T("ability"));
+      add(1, "Merchant orders", `The order board at the Exchange asks for goods: bring them to the broker for Frens over what they're worth, and Commerce XP. ${COMMERCE.orders} at a time, new ones every ${COMMERCE.orderHours} hours.`, "coins", T("ability"));
+      add(1, "The market", "Shares of five companies, bought and sold at the market board. Prices are the same for everyone and move by the hour with each company's fortunes; there's a fee each way, shown before you confirm. The first trade in each company each day pays Commerce XP.", undefined, T("ability"));
+      add(1, "Holdings", `You may hold ${COMMERCE.sharesBase} shares of one company, and ${COMMERCE.sharesPerLevel} more for each Commerce level.`, undefined, T("ability"));
+      add(COMMERCE.pricesLevel, "Regional prices", "The Exchange's price lists: which shops buy a thing and what each pays, and who sells it.", undefined, T("ability"));
+      add(COMMERCE.reportsLevel, "Company reports", "The company ledgers: each company's output, debt and demand over the last week, its news and its price. Commerce XP for each report, once a day.", undefined, T("ability"));
+      add(COMMERCE.questionsLevel, "The investors", "The Whale, the Wolf, the Bull, the Bear and the Fox each ask a question a day. Answer it from the ledgers for Commerce XP.", undefined, T("ability"));
+      add(20, "Bulk orders", "One order on the board is a bulk order: more of a thing, at a better rate.", undefined, T("ability"));
+      add(COMMERCE.analysisLevel, "Production analysis", "The company reports estimate what a share is worth, from the company's own fundamentals.", undefined, T("ability"));
       break;
     case "seafaring":
       add(1, "Seafaring", "Vessels of your own, built by a shipwright from your materials, sailed over the water the world has, moored where you leave them and found there again. Trained by sailing, by landing somewhere new by sea, and by building and mending.", undefined, T("ability"));

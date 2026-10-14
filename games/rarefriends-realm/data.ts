@@ -13,13 +13,15 @@ export const SKILLS = [
   "seafaring",
   // Beastkeeping (beasts.ts): bonding with creatures, keeping them, and working beside them.
   "beastkeeping",
+  // Commerce (commerce.ts): trade, markets, contracts and the Frenderal Exchange.
+  "commerce",
 ] as const;
 export type Skill = typeof SKILLS[number];
 export const SKILL_NAMES: Record<Skill, string> = {
   attack: "Attack", strength: "Strength", defence: "Defence", ranged: "Ranged", hitpoints: "Hitpoints", magic: "Magic", prayer: "Faith",
   woodcutting: "Woodcutting", fishing: "Fishing", cooking: "Cooking", firemaking: "Firemaking", mining: "Mining",
   smithing: "Smithing", crafting: "Craftwork", thieving: "Stealth", agility: "Wayfaring", slayer: "Pursuance",
-  sigilcraft: "Sigilcraft", fletching: "Fletching", apothecary: "Apothecary", presence: "Presence", mysteries: "Mysteries", seafaring: "Seafaring", beastkeeping: "Beastkeeping",
+  sigilcraft: "Sigilcraft", fletching: "Fletching", apothecary: "Apothecary", presence: "Presence", mysteries: "Mysteries", seafaring: "Seafaring", beastkeeping: "Beastkeeping", commerce: "Commerce",
 };
 /** Each skill's colour: its mastery cape, and its trim. */
 export const SKILL_COLORS: Record<Skill, [string, string]> = {
@@ -27,12 +29,12 @@ export const SKILL_COLORS: Record<Skill, [string, string]> = {
   hitpoints: ["#e8e4dc", "#cf6e6e"], magic: ["#6f7ea6", "#e2d49e"], prayer: ["#efede7", "#e2d49e"], woodcutting: ["#8e9f7a", "#c49a74"],
   fishing: ["#8fb3c9", "#efede7"], cooking: ["#9c7aa6", "#e8d4c0"], firemaking: ["#e9a07a", "#e2d49e"], mining: ["#8b8e92", "#c9c2b6"],
   smithing: ["#6d6b67", "#e3a58c"], crafting: ["#b89c86", "#efede7"], thieving: ["#6d6b8a", "#c6bed4"], agility: ["#8f9cb2", "#efede7"],
-  slayer: ["#3b3a38", "#cf6e6e"], sigilcraft: ["#c6bed4", "#6f7ea6"], fletching: ["#7d9a86", "#e8d4c0"], apothecary: ["#8fbf9a", "#c98f95"], presence: ["#e2d49e", "#6e4a8a"], mysteries: ["#2f3f66", "#d9b866"], seafaring: ["#2f5f7a", "#e9dcb4"], beastkeeping: ["#6b4a2c", "#d9b866"],
+  slayer: ["#3b3a38", "#cf6e6e"], sigilcraft: ["#c6bed4", "#6f7ea6"], fletching: ["#7d9a86", "#e8d4c0"], apothecary: ["#8fbf9a", "#c98f95"], presence: ["#e2d49e", "#6e4a8a"], mysteries: ["#2f3f66", "#d9b866"], seafaring: ["#2f5f7a", "#e9dcb4"], beastkeeping: ["#6b4a2c", "#d9b866"], commerce: ["#c9a53a", "#2f4f3f"],
 };
 /** Small glyphs for XP drops and the skills tab (drawn as text). */
 export const SKILL_ICONS: Record<Skill, string> = {
   attack: "⚔", strength: "✊", defence: "⛨", hitpoints: "♥", magic: "✦", prayer: "✚", woodcutting: "🪓", fishing: "🐟",
-  cooking: "🍳", firemaking: "🔥", mining: "⛏", smithing: "⚒", crafting: "✂", thieving: "👣", agility: "➶", ranged: "➹", slayer: "⌖", sigilcraft: "◈", fletching: "➴", apothecary: "⚗", presence: "✧", mysteries: "◬", seafaring: "⚓", beastkeeping: "🐾",
+  cooking: "🍳", firemaking: "🔥", mining: "⛏", smithing: "⚒", crafting: "✂", thieving: "👣", agility: "➶", ranged: "➹", slayer: "⌖", sigilcraft: "◈", fletching: "➴", apothecary: "⚗", presence: "✧", mysteries: "◬", seafaring: "⚓", beastkeeping: "🐾", commerce: "⚖",
 };
 export const MAX_LEVEL = 99;
 /** The classic old-school curve: XP needed for each level, index = level. */

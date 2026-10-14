@@ -4,6 +4,12 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 137, date: "2026-10-14", title: "Commerce and the Frenderal Exchange", items: [
+    "A new skill, Commerce, at the Frenderal Exchange: a marble hall at the top of Gullwick's harbour street, with a broker, a market board, the company ledgers, an order board and the Realm's price lists.",
+    "Merchant orders: the order board asks for goods, and the broker pays more than they'd fetch in a shop, with Commerce XP. Three at a time, new ones every four hours; from Commerce 20 one is a bulk order.",
+    "The market: shares in five companies (a mine, a foundry, a shipping line, a merchant house and an expedition company), priced the same for everyone and moving by the hour with each company's fortunes. The fee is shown before you confirm; buying and selling straight back only costs.",
+    "From Commerce 5 the price lists show which shops pay most for a thing; from 10 the company ledgers open, and the Whale, the Wolf, the Bull, the Bear and the Fox each ask a question a day, answered from the ledgers.",
+  ] },
   { id: 136, date: "2026-10-14", title: "The Redwake and the Dawn Archive", items: [
     "The Red Wave (Captain Ulfa, the Redwake camp): the jarls pay the Redwake to open the Oathgate road, someone in Krasnogor pays the Greyhide to hold it shut, and Bjarte Half-Hand, twenty years a Redwake, rides with the Greyhide now. Read their contract, hear both captains, and decide: keep the code and fight, make one contract of the two, or tear it up and walk.",
     "The Fourth Copy (Archivist Bozhena, Svetloye): three copies of the Oathgate chronicle give the western pass to three different owners. Compare them (the princes' copy takes Presence to be let near), find the first copy in the Oathgate's ruined fort (it takes Mysteries to read), and decide what the Dawn Archive does with it.",

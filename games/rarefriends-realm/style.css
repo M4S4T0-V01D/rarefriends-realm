@@ -680,4 +680,15 @@
 .realm-supply-row select, .realm-supply-row input { font: inherit; }
 .realm-supply-name { min-width: 120px; font-weight: 600; }
 .realm-supply-head { margin: 12px 0 4px; font-size: 14px; }
+/* The Frenderal Exchange (exchange.tsx). */
+.realm-exchange-table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 6px 0; }
+.realm-exchange-table th, .realm-exchange-table td { text-align: left; padding: 3px 6px; border-bottom: 1px solid rgba(22, 22, 22, 0.12); }
+.realm-exchange-table tr.picked td { background: rgba(201, 165, 58, 0.18); }
+.realm-exchange-table td.up { color: #2f6f3f; } .realm-exchange-table td.down { color: #9a3b2c; }
+.realm-exchange-chart { width: 100%; max-width: 480px; height: 64px; display: block; margin: 4px 0; background: rgba(22, 22, 22, 0.04); }
+.realm-exchange-quotes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 8px 0; font-size: 13px; }
+.realm-exchange-quotes > div { padding: 8px; border: 1px solid rgba(22, 22, 22, 0.15); }
+.realm-exchange-table .realm-exchange-pick { all: unset; text-decoration: underline; cursor: pointer; }
+.realm-exchange-table .realm-exchange-pick:focus-visible { outline: 2px solid #c9a53a; }
+.realm-exchange-said { padding: 6px 8px; background: rgba(201, 165, 58, 0.15); font-size: 13px; }
 .realm-supply-items { display: flex; gap: 2px; }

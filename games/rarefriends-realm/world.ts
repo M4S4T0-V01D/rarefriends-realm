@@ -15,6 +15,7 @@ import { fitBars } from "./barfit.ts";
 import { buildSouth } from "./south.ts";
 import { applyOverlay } from "./overlay.ts";
 import { OVERLAYS } from "./overlays/index.ts";
+import { buildExchange } from "./commerceworld.ts";
 import { buildHearthkinCountry } from "./hearthkinworld.ts";
 import { buildDungeonIdentity } from "./dungeonworld.ts";
 import { buildSettlements } from "./settlementsworld.ts";
@@ -441,7 +442,7 @@ export type World = {
   labels: Partial<Record<RegionId, { x: number; y: number }>>;
   places: Record<"spawn" | "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier" | "crypt" | "depths" | "king" | "fernwick" | "highcairn" | "dawnhold" | "gravesend" | "saltmarrow" | "hollyhock" | "dyemoor" | "tallgrass" | "cragmaw" | "quillhaven" | "raria" | "fff_fortress" | "barkreach" | "ashfall" | "ring"
     | "kurohama" | "takamori" | "kumoyama" | "tanabe" | "yumoto" | "foothold" | "sefrah" | "tamesh" | "khetmar" | "zuri" | "ouresh" | "first_names"
-    | "tirthali" | "sarovan" | "shailagarh" | "mandapur" | "suvarnatira" | "kanthar" | "gullwick" | "saltreach" | "merrab" | "tel_ashun" | "ennus_well", { x: number; y: number }>;
+    | "tirthali" | "sarovan" | "shailagarh" | "mandapur" | "suvarnatira" | "kanthar" | "gullwick" | "saltreach" | "merrab" | "tel_ashun" | "ennus_well" | "exchange", { x: number; y: number }>;
 };
 
 function mulberry(seed: number) {
@@ -1633,6 +1634,8 @@ export function generateWorld(seed = WORLD_SEED, { overlays = true }: { overlays
   // The north itself, in the rows made for it (northworld.ts: it sets its own regions' labels, in the grown world).
   const grownCtx: GenContext = { ...ctx, H: FINAL_H, tiles: grown.tiles, region: grown.region, objectAt: grown.objectAt, lift: grown.lift, raise: grown.raise, random: mulberry(seed + 969), noise: makeNoise(seed + 971, 11), noise2: makeNoise(seed + 977, 4) };
   buildNorth(grownCtx, labels);
+  // The Frenderal Exchange at the top of Gullwick's harbour street (commerceworld.ts, Commerce).
+  buildExchange(grownCtx, places);
   // The seaways, last of all: the Outer Sea round the whole map and the straits out to it (seaways.ts).
   openSeas({ ...grownCtx, random: mulberry(seed + 983), noise2: makeNoise(seed + 987, 4) }, places);
   { const entry = REGIONS.find(region => region.id === "outer_sea") as { label: { x: number; y: number } } | undefined; if (entry) { entry.label = { x: 860, y: 4 }; labels.outer_sea = { x: 860, y: 4 }; } }

@@ -102,7 +102,7 @@ test("a fresh adventurer: level 3, 10 hitpoints, a starter kit", () => {
   assert.equal(level(g, "hitpoints"), 10);
   assert.equal(g.player.hp, 10);
   for (const id of ["pewter_axe", "pewter_pickaxe", "small_net", "tinderbox"]) assert(has(g.player, id), id);
-  assert.equal(SKILLS.length, 24, "the twenty-one, Mysteries, Seafaring and Beastkeeping");
+  assert.equal(SKILLS.length, 25, "the twenty-one, Mysteries, Seafaring, Beastkeeping and Commerce");
 });
 
 test("the world is large, deterministic and every landmark is reachable on foot", () => {
@@ -5218,4 +5218,77 @@ test("The Redwake and the Dawn Archive: the Red Wave (two companies, two codes, 
   for (const t of pieces) { assert.ok(t.notes.some(n => n.voice === "drone") && t.hits.some(h => h.drum === "deep"), `${t.name}: a drone and the deep drum`); }
   assert.equal(new Set(pieces.map(t => [...new Set(t.notes.map(n => n.voice))].sort().join())).size, 7, "each its own ensemble");
   for (const [region, id] of [["vargskeld", "north_vargskeld"], ["skarnholm", "north_skarnholm"], ["oathsworn_hall", "north_oath"], ["redwake_camp", "north_redwake"], ["zoryavik", "north_zoryavik"], ["krasnogor", "north_krasnogor"], ["old_bough", "north_old_bough"], ["svetloye", "north_old_bough"]]) assert.equal(trackFor(region, false), id);
+});
+
+test("Commerce: the Frenderal Exchange's market (prices the same for everyone, by the hour, bounded round each company's fortunes), trading at the quoted price with the fee shown and paid both ways (no profit from trading back and forth, no stale quotes, no turning the clock back, holdings capped), research and the investors' questions, merchant orders, saving, and the Exchange at Gullwick", async () => {
+  const C = await import("../games/rarefriends-realm/commerce.ts");
+  const { talk } = await import("../games/rarefriends-realm/content.ts");
+  const { COMMERCE_CLUES } = await import("../games/rarefriends-realm/commercetalk.ts");
+  const { sellPrice, buyPrice, shopBuys } = await import("../games/rarefriends-realm/engine.ts");
+  const H = C.MARKET_START + 24 * 30 + 9;
+  // Prices: the same every time asked, moving hour to hour, never wandering off.
+  for (const id of C.COMPANY_IDS) {
+    const base = C.COMPANIES[id].base, seen = new Set();
+    assert.equal(C.priceAt(id, H), C.priceAt(id, H), "the same price, asked twice");
+    for (let h = C.MARKET_START; h < C.MARKET_START + 24 * 60; h += 7) { const p = C.priceAt(id, h); assert.ok(p >= base / 4 && p <= base * 4, `${id} at ${h}: ${p} stays round its worth`); seen.add(p); }
+    assert.ok(seen.size > 8, `${id}'s price moves`);
+  }
+  assert.ok(C.newsUpTo(H).every(e => e.hour <= H), "the news is only what's happened");
+  assert.ok(C.newsUpTo(C.MARKET_START + 24 * 60, 60).length > 3, "things happen to the companies");
+  // Trading: the quote, the fee, the total; the trade at that quote; shares and Frens change hands together.
+  const g = newGame(), p = g.player; p.inventory.fill(null); give(p, "coins", 50000);
+  const id = "emberforge_works", q = C.quote(g, id, "buy", 10, H);
+  assert.equal(q.price, C.priceAt(id, H)); assert.equal(q.gross, q.price * 10); assert.equal(q.fee, Math.max(C.COMMERCE.feeMin, Math.ceil(q.gross * C.COMMERCE.feeRate))); assert.equal(q.total, q.gross + q.fee); assert.equal(q.problem, null);
+  assert.match(C.trade(g, id, "buy", 10, H - 1, H), /moved/, "a stale quote is refused"); assert.equal(count(p, "coins"), 50000);
+  const xp0 = p.xp.commerce ?? 0; assert.match(C.trade(g, id, "buy", 10, H, H), /You buy 10 shares/);
+  assert.equal(count(p, "coins"), 50000 - q.total); assert.equal(p.commerce.shares[id], 10); assert.ok((p.xp.commerce ?? 0) > xp0, "the first trade of the day pays XP");
+  const xp1 = p.xp.commerce; C.trade(g, id, "buy", 5, H, H); assert.equal(p.xp.commerce, xp1, "the second doesn't"); assert.equal(p.commerce.shares[id], 15);
+  // Selling straight back: always less than was paid.
+  const before = count(p, "coins") + 0, sale = C.quote(g, id, "sell", 15, H); C.trade(g, id, "sell", 15, H, H);
+  assert.equal(count(p, "coins"), before + sale.total); assert.ok(count(p, "coins") < 50000, "fees both ways: no Frens from trading back and forth"); assert.equal(p.commerce.shares[id], undefined);
+  for (let k = 0; k < 20; k++) { C.trade(g, "house_marigold", "buy", 3, H, H); C.trade(g, "house_marigold", "sell", 3, H, H); }
+  assert.ok(count(p, "coins") < before + sale.total, "round trips only cost");
+  // Refusals: nothing changes.
+  const coins = count(p, "coins");
+  for (const [side, n, why] of [["buy", 0, /Between 1/], ["buy", 2.5, /Between 1/], ["buy", -4, /Between 1/], ["sell", 1, /hold 0/], ["buy", C.sharesCap(g) + 1, /may hold/]]) assert.match(C.trade(g, id, side, n, H, H), why);
+  { const poor = newGame(); poor.player.inventory.fill(null); give(poor.player, "coins", 10); assert.match(C.trade(poor, id, "buy", 10, H, H), /That costs/); assert.equal(count(poor.player, "coins"), 10); }
+  assert.match(C.trade(g, id, "buy", 1, H - 2, H - 2), /later than that/, "the clock can't be turned back past an hour already seen"); assert.equal(count(p, "coins"), coins);
+  // Research: the ledgers at Commerce 10, XP once a day each; the analysis at 40; only what's happened.
+  assert.match(String(C.readReport(g, id, H)), /Commerce 10/);
+  p.xp.commerce = XP_TABLE[10]; const before2 = p.xp.commerce, r = C.readReport(g, id, H);
+  assert.equal(typeof r, "object"); assert.equal(r.days.length, 7); assert.ok(r.days.every(d => d.output > 0 && d.debt > 0 && d.demand > 0)); assert.equal(r.fair, undefined, "no analysis below 40");
+  assert.ok(p.xp.commerce > before2); const before3 = p.xp.commerce; C.readReport(g, id, H); assert.equal(p.xp.commerce, before3, "once a day");
+  p.xp.commerce = XP_TABLE[40]; const deep = C.readReport(g, "zlatna_mining", H); assert.ok(deep.fair && deep.fair[0] < deep.fair[1], "the analysis at 40");
+  // The investors: a question a day each, answered from the ledgers: right pays, wrong doesn't, and either way that's the day's.
+  for (const inv of ["investor_bear", "investor_bull", "investor_wolf", "investor_fox"]) {
+    const qn = C.questionFor(inv, H), right = qn.options.findIndex(o => o.right), wrong = qn.options.findIndex(o => !o.right);
+    assert.equal(qn.options.filter(o => o.right).length, 1, `${inv}: one right answer`);
+    const h2 = newGame(); h2.player.xp.commerce = XP_TABLE[20]; const x = h2.player.xp.commerce;
+    assert.match(C.answer(h2, inv, wrong, H), /No\./); assert.equal(h2.player.xp.commerce, x); assert.match(C.answer(h2, inv, right, H), /One question a day/, "no second guess");
+    const h3 = newGame(); h3.player.xp.commerce = XP_TABLE[20]; assert.match(C.answer(h3, inv, right, H), /Right/); assert.ok(h3.player.xp.commerce > x);
+  }
+  { const h4 = newGame(); h4.player.xp.commerce = XP_TABLE[20]; h4.player.inventory.fill(null); give(h4.player, "coins", 5000);
+    assert.match(C.answer(h4, "investor_whale", 0, H), /Not yet/); C.trade(h4, "house_marigold", "buy", 10, H, H);
+    assert.match(C.answer(h4, "investor_whale", 0, H + 80), /Right/, "held for three days"); }
+  // Merchant orders: three on the board, the goods taken and paid together, once each per period.
+  const o = C.ordersFor(g, H); assert.equal(o.length, 3); assert.deepEqual(C.ordersFor(g, H), o, "the same board for the period");
+  assert.match(C.fillOrder(g, 0, H), /wants/); give(p, o[0].item, o[0].n); const c0 = count(p, "coins"), x0 = p.xp.commerce;
+  assert.match(C.fillOrder(g, 0, H), /pays/); assert.equal(count(p, "coins"), c0 + o[0].pay); assert.equal(count(p, o[0].item), 0); assert.ok(p.xp.commerce > x0);
+  assert.ok(o[0].pay <= Math.ceil(item(o[0].item).value * o[0].n * 1.41), "paid a little over what the goods are worth");
+  give(p, o[0].item, o[0].n); assert.match(C.fillOrder(g, 0, H), /filled/); assert.notDeepEqual(C.ordersFor(g, H + 24), o, "new orders later");
+  // Regional prices: who pays what, from the shops' own prices.
+  const rp = C.regionalPrices("blackiron_ore", sellPrice, i => buyPrice(g, i), shopBuys); assert.ok(rp.general > 0); assert.ok(rp.buyers.every(b => b.pays >= 0));
+  // Saved, and cleaned on the way back in.
+  C.trade(g, "farwake_ventures", "buy", 7, H, H);
+  const fresh = newGame(); restore(fresh, JSON.parse(JSON.stringify(serialize(g)))); assert.equal(fresh.player.commerce.shares.farwake_ventures, 7); assert.equal(fresh.player.commerce.seen, p.commerce.seen);
+  const junk = C.cleanCommerce({ shares: { farwake_ventures: -5, no_such_co: 9, house_marigold: 3 }, history: [{ c: "nope" }], asked: [1, "investor_fox"], done: [7, 1] });
+  assert.deepEqual(junk.shares, { house_marigold: 3 }); assert.deepEqual(junk.history, []); assert.deepEqual(junk.asked, ["investor_fox"]); assert.deepEqual(junk.done, [1]);
+  // The Exchange at Gullwick: the hall, its furniture, its people, and the window it opens.
+  const w = g.world, hall = w.buildings.find(b => b.name === "The Frenderal Exchange"); assert.ok(hall, "the Exchange stands");
+  for (const clue of Object.keys(COMMERCE_CLUES)) { const obj = w.objects.find(x => x.clue === clue); assert.ok(obj, `${clue} is in the hall`); }
+  for (const npc of ["exchange_broker", "investor_whale", "investor_wolf", "investor_bull", "investor_bear", "investor_fox"]) assert.ok(w.spawns.some(s => s.kind === "npc" && s.id === npc), `${npc} is at the Exchange`);
+  const board = w.objects.find(x => x.clue === "exchange_board"); COMMERCE_CLUES.exchange_board.use(g, board, "Trade"); assert.equal(g.ui.exchange, "market");
+  assert.ok(talk(g, "exchange_broker").options.some(x => x.label === "Show me the market."));
+  const low = newGame(); assert.match(talk(low, "investor_bear").lines.map(l => l.text).join(" "), /Commerce 10/);
+  assert.ok(talk(g, "investor_fox").options.some(x => x.label === "Have you a question for me?"));
 });

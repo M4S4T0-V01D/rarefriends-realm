@@ -27,6 +27,7 @@ const INTRO: Record<Skill, string> = {
   presence: "The mark you leave on the world: discovery, quests, bosses, rare finds, your Friend, your outfits and your name. Shown as your character's profile.",
   mysteries: "Hidden laws, old inscriptions, true names and the techniques of the old traditions. Not Faith and not Magic: it's trained by finding things out, the first time each, never by repeating them.",
   beastkeeping: "Creatures won one way each and kept beside you: fed until they trust you, rescued, spared, haltered, earned. One out at a time, the rest kept by the beastkeepers (Bramble on the Friendhollow farm, Halla in Skarnholm, Mstislav in Krasnogor). Trained by bonding, by caring for them, and by what they do beside you.",
+  commerce: "Trade, markets and the Realm's money, at the Frenderal Exchange in Gullwick: merchant orders filled, shares of five companies bought and sold, the companies' ledgers read, and the investors' questions answered. Trained by doing business, not by moving money about.",
   seafaring: "Vessels of your own, built by a shipwright from your materials, sailed over the water the world has, moored where you leave them and found there again. Trained by sailing, by landing somewhere new by sea, and by building and mending.",
 };
 const img = (canvas: HTMLCanvasElement, alt = "") => `<img src="${artUrl(canvas)}" alt="${alt}" loading="lazy">`;

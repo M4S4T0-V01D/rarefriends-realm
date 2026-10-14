@@ -34,6 +34,7 @@ import { strikeAt, weatherAt, type Weather } from "./weather.ts";
 import { DEV_CATALOG, DEV_COMMAND, DEV_FIND, DEV_MAP, DEV_MODE, DEV_PICK, DEV_REPORT, DEV_STATE, DEV_TELEPORT, DEV_WORLD } from "./roster.ts";
 import { devCommand, devFind, devMapImage, devState } from "./devtools.ts";
 import { devFlags } from "./devflags.ts";
+import { ExchangeModal } from "./exchange.tsx";
 import { catalog as devCatalog, isDevFrame, keepPristine, pick as devPick, rebuildWorld } from "./devlayer.ts";
 import { cleanOverlay } from "./overlay.ts";
 import { SETTINGS_STATE, SETTINGS_WRITE, parseRenderer, type RendererMode, CLOUD_ACTION, CLOUD_STATE, FEEDBACK_REQUEST, FEEDBACK_RESULT, FULLSCREEN_REQUEST, FULLSCREEN_STATE, JOIN_INVITE, TEXT_COPY, TEXT_COPY_RESULT, HOST_HELLO, HOST_STATE, SAVE_ELSEWHERE, SAVE_EXPORT, SAVE_EXPORT_RESULT, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, parseCloudState, parseRoster, type CloudAction, type CloudState, type ShareAction, type ShareOutcome } from "./roster.ts";
@@ -1292,6 +1293,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
           {guide && <GuideModal game={state} skill={guide.skill} onSkill={skill => setGuide({ skill })} onClose={() => setGuide(null)} />}
           <FellowshipModal key={`${state.ui.fellowship ? 1 : 0}:${state.player.fellowship?.name ?? ""}`} game={state} refresh={refresh} onRecruit={recruit} shareStatus={shareStatus} />
           <JoinModal game={state} refresh={refresh} />
+          {state.ui.exchange && <ExchangeModal game={state} refresh={refresh} onClose={() => { state.ui.exchange = null; refresh(); }} />}
           {state.ui.supplies != null && <SupplyModal game={state} refresh={refresh} onClose={() => { state.ui.supplies = null; refresh(); }} />}
           {state.ui.vesselName != null && <VesselNameModal game={state} refresh={refresh} onClose={() => { state.ui.vesselName = null; refresh(); }} />}
           {state.ui.hold != null && <HoldModal game={state} refresh={refresh} openMenu={(x, y, entries) => setMenu({ x, y, entries })} onClose={() => { state.ui.hold = null; refresh(); }} />}
