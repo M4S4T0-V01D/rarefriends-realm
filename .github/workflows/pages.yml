@@ -39,6 +39,11 @@ jobs:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: check
     runs-on: ubuntu-latest
+    # One publish at a time, the newest last: two pushes close together (a deploy from the dev dashboard and a code
+    # change) can't race and leave the older one live.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     permissions:
       pages: write
       id-token: write

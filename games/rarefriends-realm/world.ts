@@ -1582,7 +1582,8 @@ function buildMiningCountry(ctx: GenContext, toWorld: (x: number, y: number) => 
 }
 
 /** The world, and the hill lift it was raised with (which, with the tiles, is all its heights need: see `bakeWorld`). */
-export function generateWorld(seed = WORLD_SEED): { world: World; lift: Float32Array; raise: Float32Array } {
+/** The world from its seed; `overlays: false` leaves out the promoted and deployed overlays (the development site's bake: its editor lays the whole development world over it). */
+export function generateWorld(seed = WORLD_SEED, { overlays = true }: { overlays?: boolean } = {}): { world: World; lift: Float32Array; raise: Float32Array } {
   // Everything older is built as it always was, in the generation frame (GEN_H rows), in arrays the frame's size (the north grows them, last).
   const old = buildLegacyWorld(seed), LW = LEGACY_W, OVERWORLD_H = GEN_OVERWORLD_H, H = FRAME_H;
   for (const region of REGIONS as Region[]) { const label = FRAME_LABELS.get(region.id); if (label) region.label = { ...label }; }
@@ -1641,7 +1642,7 @@ export function generateWorld(seed = WORLD_SEED): { world: World; lift: Float32A
   const base = buildElevation(grownCtx, buildings);
   const world: World = { tiles: grown.tiles, region: grown.region, objects, objectAt: grown.objectAt, spawns, places, heights: buildHeights(grown.tiles, seed, grown.lift, grown.raise, base, buildings), buildings, buildingAt, floors, ramparts: ctx.ramparts, lift: grown.lift, raise: grown.raise, base, under, labels };
   // Content promoted from the development world (overlays/): the editable layer, applied last of all (an overlay written in the strip's coordinates follows its dungeon down).
-  for (const overlay of OVERLAYS) applyOverlay(world, (overlay as { frame?: 2 }).frame === 2 ? overlay : movedOverlay(world, overlay), seed);
+  if (overlays) for (const overlay of OVERLAYS) applyOverlay(world, (overlay as { frame?: 2 }).frame === 2 ? overlay : movedOverlay(world, overlay), seed);
   return { world, lift: grown.lift, raise: grown.raise };
 }
 /** The grown world's height (the module's H, named for where generation's own frame-sized H is in scope). */

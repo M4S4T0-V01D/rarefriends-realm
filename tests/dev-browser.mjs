@@ -43,12 +43,14 @@ try {
   await installFixture(page, origin, { artworkCall });
   // The editor's service calls are answered here (the Worker isn't running): an empty world to load, saves accepted.
   // (Registered after the fixture's routes, so it's asked first.)
-  let saved = null;
+  let saved = null, deployed = null;
   await page.route(/\/dev\/api\//, async route => {
     const url = new URL(route.request().url()), method = route.request().method();
     if (url.pathname.endsWith("/world/main") && method === "GET") return route.fulfill({ json: { overlay: { v: 1, name: "Test", ops: [] }, version: 3, updatedAt: null, revisions: 0 } });
     if (url.pathname.endsWith("/world/main") && method === "PUT") { saved = route.request().postDataJSON(); return route.fulfill({ json: { version: saved.baseVersion + 1, updatedAt: Date.now() } }); }
-    if (url.pathname.endsWith("/revisions")) return route.fulfill({ json: { revisions: [] } });
+    if (url.pathname.endsWith("/revisions")) return route.fulfill({ json: { revisions: [{ id: 7, version: 6, name: null, note: null, size: 2048, at: Date.now() }] } });
+    if (url.pathname.endsWith("/deploys")) return route.fulfill({ json: { ready: true, deploys: deployed ? [{ id: 1, revision_id: 7, version: 6, name: null, ops: 3, sha: "c0ffee1".padEnd(40, "0"), url: "https://example.invalid/c", at: Date.now(), status: "deploying", run_url: null }] : [] } });
+    if (url.pathname.endsWith("/deploy") && method === "POST") { deployed = route.request().postDataJSON(); return route.fulfill({ json: { ok: true, sha: "c0ffee1".padEnd(40, "0"), url: "https://example.invalid/c" } }); }
     console.log("unexpected development call", method, url.pathname); return route.fulfill({ status: 404, json: { error: "not found" } });
   });
   await page.goto(`${origin}/`);
@@ -140,19 +142,30 @@ try {
   await page.getByPlaceholder("Find (things, people, places)…").fill("bank");
   await page.getByText(/[1-9]\d* found/).waitFor();
   // The player's tools: Frens given puts the session in the sandbox, which stops it saving.
-  await page.evaluate(() => { window.__writes = 0; window.addEventListener("message", event => { if (event.data?.type === "rarefriends-realm:save") window.__writes++; }); });
   await page.getByRole("button", { name: "player", exact: true }).click();
   await page.getByRole("button", { name: "+1,000", exact: true }).click();
   await page.getByText(/Given 1,000 Frens/).waitFor();
   await page.getByText("SANDBOX", { exact: true }).waitFor();
+  // (Counted from here: a save sent a moment before the sandbox began is fine.)
+  await page.evaluate(() => { window.__writes = 0; window.addEventListener("message", event => { if (event.data?.type === "rarefriends-realm:save") window.__writes++; }); });
   await page.getByRole("button", { name: "Heal", exact: true }).click();
   await page.waitForTimeout(6500);
   assert.equal(await page.evaluate(() => window.__writes), 0, "a sandboxed session sends no saves");
   assert.ok(await frame().evaluate(() => window.__realm.game().player.inventory.some(slot => slot?.id === "coins" && slot.n >= 1000)), "the Frens were given");
+  // Deploy: the list of saves, one chosen (and confirmed), sent to the service, and its check shown as under way.
+  page.once("dialog", dialog => dialog.accept());
+  await page.getByRole("button", { name: "Deploy…" }).click();
+  const deployPanel = page.getByRole("region", { name: "Deploy" });
+  await deployPanel.getByText("v6", { exact: true }).waitFor();
+  await deployPanel.getByRole("button", { name: "Deploy", exact: true }).click();
+  await page.getByText(/Deploying v6: committed c0ffee1/).waitFor();
+  assert.deepEqual(deployed, { revision: 7 }, "the chosen save is what's deployed");
+  await deployPanel.getByText("checking…").waitFor();
+  await deployPanel.getByRole("button", { name: "Close" }).click();
   // The map: the whole world comes over as a picture.
   await page.getByRole("button", { name: "map", exact: true }).click();
   await page.getByRole("button", { name: "Centre on me" }).waitFor();
-  console.log("PASS development game: the dashboard round the public build, overlays applied and saved, edit mode picking, undo, definitions (a person, an errand), a camp zone, raising ground, a dragged paint brush, the search, the sandbox (no saves)");
+  console.log("PASS development game: the dashboard round the public build, overlays applied and saved, edit mode picking, undo, definitions (a person, an errand), a camp zone, raising ground, a dragged paint brush, the search, the sandbox (no saves), deploying a save");
   assert.deepEqual(errors, [], "no page errors");
   // The public build: nothing of the editor in it.
   execFileSync("node", ["scripts/build.mjs", "--outdir", join(outdir, "public")], { stdio: "ignore" });

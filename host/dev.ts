@@ -6,6 +6,8 @@
 import type { Overlay } from "../games/rarefriends-realm/overlay.ts";
 
 export type Revision = { id: number; version: number; name: string | null; note: string | null; size: number; at: number };
+/** A deploy of the development world to the public game, and how its check went. */
+export type Deploy = { id: number; revision_id: number; version: number; name: string | null; ops: number; sha: string; url: string; at: number; status: "deploying" | "live" | "failed" | "replaced" | "was live"; run_url: string | null };
 const api = async (method: string, path: string, body?: unknown) => {
   const response = await fetch(`/dev/api${path}`, { method, headers: { "x-realm-dev": "1", ...(body !== undefined ? { "content-type": "application/json" } : {}) }, body: body !== undefined ? JSON.stringify(body) : undefined, credentials: "same-origin", cache: "no-store" });
   const data = await response.json().catch(() => ({})) as Record<string, unknown>;
@@ -25,4 +27,6 @@ export const devApi = {
   reset: (world: string) => api("POST", `/world/${world}/reset`) as Promise<{ version: number; overlay: Overlay }>,
   audit: () => api("GET", "/audit") as Promise<{ audit: { at: number; action: string; detail: string }[] }>,
   exportUrl: (world: string) => `/dev/api/world/${world}/export`,
+  deploys: (world: string) => api("GET", `/world/${world}/deploys`) as Promise<{ ready: boolean; deploys: Deploy[] }>,
+  deploy: (world: string, revision: number) => api("POST", `/world/${world}/deploy`, { revision }) as Promise<{ ok: boolean; sha: string; url: string }>,
 };

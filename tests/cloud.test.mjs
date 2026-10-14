@@ -383,6 +383,54 @@ test("Adventurer Cards: redeeming settles the snapshot exactly: the redeemer gai
   assert.equal((await w.call("POST", "/v1/cards/1/redeem", { token: tb, body: { txHash: burn, friend: 3412 } })).status, 404);
 });
 
+test("The development dashboard's Deploy button: a save, chosen, is committed on main as the deployed world with the Worker's GitHub token (never sent anywhere else); one a minute; its check's progress is read back from GitHub; without the token it says so", async () => {
+  const { hashPassword, DEPLOY_PATH } = await import("../cloud/src/dev.ts");
+  const w = world(), hash = await hashPassword("correct horse battery staple!", "00112233445566778899aabbccddeeff", 1000);
+  let now = Date.parse("2026-10-14T10:00:00Z"); const calls = [];
+  const github = async (url, init = {}) => {
+    calls.push({ url, method: init.method ?? "GET", auth: init.headers?.authorization, body: init.body ? JSON.parse(init.body) : null });
+    const reply = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+    if (url.includes("/contents/") && (init.method ?? "GET") === "GET") return reply(200, { sha: "oldfilesha" });
+    if (url.includes("/contents/") && init.method === "PUT") return reply(200, { commit: { sha: `c0ffee${calls.length}`.padEnd(40, "0"), html_url: "https://github.com/x/y/commit/c0ffee" } });
+    if (url.includes("/actions/runs")) return reply(200, { workflow_runs: [{ status: "completed", conclusion: "success", html_url: "https://github.com/x/y/actions/runs/1" }] });
+    return reply(404, { message: "Not Found" });
+  };
+  const make = token => createApp({ db: w.db, origins: [ORIGIN], chainId: 4663, clock: () => now, chain: { ownerOf: async () => null, verify: async () => false }, dev: { DB: w.db, DEV_PASSWORD_HASH: hash, bucket: null, DEV_DEPLOY_TOKEN: token, github } });
+  const call = async (app, method, path, { body, cookie } = {}) => {
+    const response = await app.fetch(new Request(`https://saves.example${path}`, { method, headers: { "x-realm-dev": "1", ...(cookie ? { cookie } : {}), ...(body !== undefined ? { "content-type": "application/json" } : {}) }, body: body !== undefined ? JSON.stringify(body) : undefined }));
+    return { status: response.status, body: await response.json().catch(() => null), headers: response.headers };
+  };
+  const app = make("ghp_secret_token"), login = await call(app, "POST", "/dev/api/login", { body: { password: "correct horse battery staple!" } }), cookie = login.headers.get("set-cookie").split(";")[0];
+  // Not signed in: nothing.
+  assert.equal((await call(app, "POST", "/dev/api/world/main/deploy", { body: { revision: 1 } })).status, 401);
+  const overlay = { v: 1, frame: 2, name: "Friendhollow hills", ops: [{ op: "terrain", x: 700, y: 600, r: 3, shape: "circle", mode: "raise", amount: 2, falloff: 0.5 }] };
+  assert.equal((await call(app, "PUT", "/dev/api/world/main", { cookie, body: { baseVersion: 0, overlay } })).status, 200);
+  const revision = (await call(app, "GET", "/dev/api/world/main/revisions", { cookie })).body.revisions[0];
+  assert.equal((await call(app, "POST", "/dev/api/world/main/deploy", { cookie, body: { revision: 9999 } })).status, 404, "no such save");
+  const deployed = await call(app, "POST", "/dev/api/world/main/deploy", { cookie, body: { revision: revision.id } });
+  assert.equal(deployed.status, 200, JSON.stringify(deployed.body)); assert.match(deployed.body.sha, /^c0ffee/);
+  const put = calls.find(c => c.method === "PUT");
+  assert.ok(put.url.endsWith(`/repos/M4S4T0-V01D/rarefriends-realm/contents/${DEPLOY_PATH}`) && put.body.branch === "main" && put.body.sha === "oldfilesha", "the deployed world's file, on main, replacing the last one");
+  const file = Buffer.from(put.body.content, "base64").toString("utf8");
+  assert.match(file, /const overlay: Overlay = \{"v":1,"frame":2,"name":"Friendhollow hills"/); assert.match(file, /export default overlay;/);
+  assert.ok(calls.every(c => c.auth === "Bearer ghp_secret_token"), "the token goes to GitHub");
+  assert.ok(!JSON.stringify(deployed.body).includes("ghp_secret"), "and nowhere else");
+  // One a minute.
+  assert.equal((await call(app, "POST", "/dev/api/world/main/deploy", { cookie, body: { revision: revision.id } })).status, 429);
+  // The list: the deploy, its check read back from GitHub (passed: live).
+  const list = (await call(app, "GET", "/dev/api/world/main/deploys", { cookie })).body;
+  assert.equal(list.ready, true); assert.equal(list.deploys.length, 1); assert.equal(list.deploys[0].status, "live"); assert.equal(list.deploys[0].ops, 1); assert.equal(list.deploys[0].revision_id, revision.id);
+  assert.ok(!JSON.stringify(list).includes("ghp_secret"));
+  // A second deploy a minute later: the newest live one is what players have; the older was live once.
+  now += 61_000; assert.equal((await call(app, "POST", "/dev/api/world/main/deploy", { cookie, body: { revision: revision.id } })).status, 200);
+  const again = (await call(app, "GET", "/dev/api/world/main/deploys", { cookie })).body.deploys; assert.deepEqual(again.map(d => d.status), ["live", "was live"]);
+  assert.ok(w.db.sqlite.prepare("SELECT COUNT(*) AS n FROM dev_audit WHERE action = 'deploy'").get().n === 2, "audited");
+  // Without the token: the list says so, and a deploy is refused (503) without calling GitHub.
+  now += 61_000; const before = calls.length, bare = make(undefined);
+  assert.equal((await call(bare, "GET", "/dev/api/world/main/deploys", { cookie })).body.ready, false);
+  assert.equal((await call(bare, "POST", "/dev/api/world/main/deploy", { cookie, body: { revision: revision.id } })).status, 503); assert.equal(calls.length, before);
+});
+
 test("The private development game: a password makes a session (hashed, rate-limited, cookie-bound); the built site is served only to it; the overlay saves with versions, revisions, restore, reset and export; everything is audited", async () => {
   const { hashPassword } = await import("../cloud/src/dev.ts");
   const w = world(), hash = await hashPassword("correct horse battery staple!", "00112233445566778899aabbccddeeff", 1000);

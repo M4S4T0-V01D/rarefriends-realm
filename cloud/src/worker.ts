@@ -39,7 +39,7 @@ export type Env = { DB: Database; RPC_URL: string; COLLECTION: string; CHAIN_ID:
   /** Adventurer Cards (cards.ts): the pictures' bucket, the signing key (a secret), the contract and its chain, and the game's address for the metadata. */
   CARDS?: Bucket; MINTER_KEY?: string; CARDS_CONTRACT?: string; CARDS_CHAIN_ID?: string; CARDS_RPC_URL?: string; GAME_URL?: string;
   /** The private development game (dev.ts): the owner's password hash (a secret); its site lives in the cards' bucket. */
-  DEV_PASSWORD_HASH?: string };
+  DEV_PASSWORD_HASH?: string; DEV_DEPLOY_TOKEN?: string; DEV_DEPLOY_REPO?: string };
 
 export const LIMITS = {
   /** A save's JSON, at most (today's saves are 20–90 KB). */
@@ -430,6 +430,6 @@ export default {
   fetch(request: Request, env: Env) {
     const cards: CardsOptions = { minterKey: env.MINTER_KEY ?? null, contract: env.CARDS_CONTRACT || null, chainId: Number(env.CARDS_CHAIN_ID ?? 46630), bucket: env.CARDS ?? null,
       chain: env.CARDS_CONTRACT && env.CARDS_RPC_URL ? cardsChainFor(env.CARDS_RPC_URL, env.CARDS_CONTRACT) : null, baseUrl: new URL(request.url).origin, gameUrl: env.GAME_URL ?? "https://m4s4t0-v01d.github.io/rarefriends-realm/" };
-    return createApp({ db: env.DB, chain: chainFor(env), origins: env.ORIGINS.split(",").map(origin => origin.trim()), chainId: Number(env.CHAIN_ID), attestKey: env.ATTEST_KEY ?? null, cards, dev: { DB: env.DB, DEV_PASSWORD_HASH: env.DEV_PASSWORD_HASH, bucket: env.CARDS ?? null } }).fetch(request);
+    return createApp({ db: env.DB, chain: chainFor(env), origins: env.ORIGINS.split(",").map(origin => origin.trim()), chainId: Number(env.CHAIN_ID), attestKey: env.ATTEST_KEY ?? null, cards, dev: { DB: env.DB, DEV_PASSWORD_HASH: env.DEV_PASSWORD_HASH, DEV_DEPLOY_TOKEN: env.DEV_DEPLOY_TOKEN, DEV_DEPLOY_REPO: env.DEV_DEPLOY_REPO, bucket: env.CARDS ?? null } }).fetch(request);
   },
 };

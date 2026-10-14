@@ -3960,6 +3960,22 @@ test("Water lies level: the sea and the low water joined to it at sea level, eac
   assert.ok(painted.every(h => Math.abs(h - level) < 0.01), `a channel painted out of the lake lies at its level (${painted.map(h => h.toFixed(1))} vs ${level.toFixed(1)})`);
 });
 
+test("Deployed world: every promoted overlay (the dashboard's deployed development world among them) applies to a fresh world with nothing it can't do and nothing out of reach of the spawn, so a broken deploy never reaches players", async () => {
+  const { OVERLAYS } = await import("../games/rarefriends-realm/overlays/index.ts");
+  const { applyOverlay, cleanOverlay, validatePlacements, registerDefinitions } = await import("../games/rarefriends-realm/overlay.ts");
+  const { WORLD_SEED, generateWorld } = await import("../games/rarefriends-realm/world.ts");
+  const { registerDevQuest } = await import("../games/rarefriends-realm/content.ts");
+  assert.ok(OVERLAYS.length >= 1, "the deployed development world is listed");
+  for (const raw of OVERLAYS) {
+    const why = [], overlay = cleanOverlay(raw, why), problems = [...why];
+    assert.equal(overlay.ops.length, raw.ops.length, `${raw.name}: every op is well formed (${why.slice(0, 3).join("; ")})`);
+    registerDefinitions(overlay, NPCS, problems); for (const op of overlay.ops) if (op.op === "quest") registerDevQuest(op.def, problems);
+    const world = generateWorld(WORLD_SEED, { overlays: false }).world, placed = applyOverlay(world, overlay, WORLD_SEED, problems, NPCS);
+    assert.deepEqual(problems, [], `${raw.name}: nothing it can't do`);
+    assert.deepEqual(validatePlacements(world, overlay, placed), [], `${raw.name}: everything it places can be reached`);
+  }
+});
+
 test("The four smithed families: recipes at the anvil from the ordinary metals; a prospector's pick mines surer and doubles ore; hardware cuts the boatmen's fares; a resonance fitting makes a carving stand longer, once", async () => {
   const { fare, DOCKS } = await import("../games/rarefriends-realm/boats.ts");
   const { fitCarving, setCarving } = await import("../games/rarefriends-realm/engine.ts");
@@ -4084,13 +4100,13 @@ test("Overlay definitions: an errand quest an overlay defines is offered by its 
   const { mkdtempSync, writeFileSync, readFileSync: read, rmSync } = await import("node:fs"), { tmpdir } = await import("node:os"), { join } = await import("node:path"), { execFileSync } = await import("node:child_process");
   const dir = mkdtempSync(join(tmpdir(), "realm-promote-"));
   try {
-    writeFileSync(join(dir, "index.ts"), read("games/rarefriends-realm/overlays/index.ts", "utf8").replace('from "../overlay.ts"', `from "${process.cwd()}/games/rarefriends-realm/overlay.ts"`));
+    for (const file of ["index.ts", "devworld.ts"]) writeFileSync(join(dir, file), read(`games/rarefriends-realm/overlays/${file}`, "utf8").replace('from "../overlay.ts"', `from "${process.cwd()}/games/rarefriends-realm/overlay.ts"`));
     writeFileSync(join(dir, "errands.json"), JSON.stringify({ ...overlay, ops: overlay.ops.filter(op => op.op === "campzone") }));
     const out = execFileSync("node", ["--no-warnings", "scripts/dev-promote.mjs", join(dir, "errands.json"), "errands"], { env: { ...process.env, REALM_OVERLAYS_DIR: dir } }).toString();
     assert.match(out, /2 camp zones/); assert.match(out, /Wrote .*errands\.ts and listed it/);
-    const index = read(join(dir, "index.ts"), "utf8"); assert.match(index, /import errands from "\.\/errands\.ts";/); assert.match(index, /OVERLAYS: readonly Overlay\[\] = \[errands\];/);
+    const index = read(join(dir, "index.ts"), "utf8"); assert.match(index, /import errands from "\.\/errands\.ts";/); assert.match(index, /OVERLAYS: readonly Overlay\[\] = \[devworld, errands\];/);
     const module = await import(join(dir, "errands.ts")); assert.equal(module.default.ops.length, 2); assert.equal(module.default.name, "Errands");
-    const listed = await import(join(dir, "index.ts")); assert.equal(listed.OVERLAYS.length, 1);
+    const listed = await import(join(dir, "index.ts")); assert.equal(listed.OVERLAYS.length, 2, "the deployed world and the promoted one");
     // Again: listed once.
     execFileSync("node", ["--no-warnings", "scripts/dev-promote.mjs", join(dir, "errands.json"), "errands"], { env: { ...process.env, REALM_OVERLAYS_DIR: dir } });
     assert.equal((read(join(dir, "index.ts"), "utf8").match(/errands/g) ?? []).length, 3);

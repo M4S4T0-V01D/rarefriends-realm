@@ -15,7 +15,7 @@ import { DEV_CATALOG, DEV_COMMAND, DEV_FIND, DEV_MAP, DEV_MODE, DEV_PICK, DEV_RE
 import type { Op, Overlay, TerrainMode } from "../games/rarefriends-realm/overlay.ts";
 import type { DevFound, DevState } from "../games/rarefriends-realm/devtools.ts";
 import { northOverlay } from "../games/rarefriends-realm/northframe.ts";
-import { devApi, type Revision } from "./dev.ts";
+import { devApi, type Deploy, type Revision } from "./dev.ts";
 
 const WORLD = "main";
 /** The definitions tab: what an overlay can define, and the form for each (overlay.ts). */
@@ -103,6 +103,18 @@ function Editor() {
   const [gameState, setGameState] = useState<DevState | null>(null), [mapUrl, setMapUrl] = useState<string | null>(null), [found, setFound] = useState<DevFound[]>([]), [query, setQuery] = useState("");
   const [log, setLog] = useState<string[]>([]), [opFilter, setOpFilter] = useState(""), [giveId, setGiveId] = useState(""), [giveN, setGiveN] = useState(1), [questFilter, setQuestFilter] = useState("");
   const [mapView, setMapView] = useState({ cx: 860, cy: 640, zoom: 1 });
+  // The Deploy list: the saves to choose from, and the deploys so far with how their checks went.
+  const [deployOpen, setDeployOpen] = useState(false), [deploys, setDeploys] = useState<{ ready: boolean; deploys: Deploy[] } | null>(null), [deploying, setDeploying] = useState(false);
+  const loadDeploys = () => devApi.deploys(WORLD).then(setDeploys).catch(error => say(`Couldn't list the deploys: ${(error as Error).message}`));
+  useEffect(() => { if (!deployOpen) return; void loadDeploys(); void loadRevisions(); const timer = window.setInterval(() => void loadDeploys(), 30_000); return () => clearInterval(timer); }, [deployOpen]);
+  const deployRevision = async (r: Revision) => {
+    const label = r.name ?? `v${r.version}`;
+    if (!confirm(`Deploy ${label} (saved ${when(r.at)}) to the live game?\n\nIt replaces the world players have now. It's committed to the game's code and goes live once every check passes (about 45 minutes); if a check fails, nothing changes for players.`)) return;
+    setDeploying(true);
+    try { const result = await devApi.deploy(WORLD, r.id); say(`Deploying ${label}: committed ${result.sha.slice(0, 7)}; live once the checks pass.`); await loadDeploys(); }
+    catch (error) { say(`Not deployed: ${(error as Error).message}`); }
+    finally { setDeploying(false); }
+  };
   // The bottom panel starts just under the game (and its links), whatever size the frame comes out at: all the space below is the panel's.
   const [bottomTop, setBottomTop] = useState<number | string>(`calc(100vh - ${BOTTOM}px)`);
   useEffect(() => {
@@ -279,11 +291,31 @@ function Editor() {
       <button type="button" style={S.btn(edit)} onClick={toggleEdit}>{edit ? "Edit mode (F2: play)" : "Play mode (F2: edit)"}</button>
       <button type="button" style={S.btn()} onClick={undo} disabled={!past.current.length}>Undo</button><button type="button" style={S.btn()} onClick={redo} disabled={!future.current.length}>Redo</button>
       <button type="button" style={S.btn(dirty)} onClick={() => void save()}>Save</button>
+      <button type="button" style={S.btn(deployOpen)} aria-expanded={deployOpen} onClick={() => setDeployOpen(open => !open)}>Deploy…</button>
       <span style={{ flex: 1, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", marginLeft: 8 }} role="status">{status}</span>
       {gameState?.flags.sandbox && <span style={{ color: C.warn }} title="Something was changed by hand: this session isn't saved, and other players don't see you.">SANDBOX</span>}
       {gameState && <span style={S.muted}>{gameState.x},{gameState.y} · {gameState.region} · h {gameState.height}</span>}
       <input style={{ ...S.input, width: 220 }} placeholder="Find (things, people, places)…" value={query} onChange={e => { setQuery(e.target.value); send({ type: DEV_FIND, query: e.target.value }); setBottomTab("find"); }} />
     </header>
+
+    {deployOpen && <section aria-label="Deploy" style={{ position: "fixed", top: BAR, left: LEFT + 20, width: 560, maxHeight: "70vh", overflow: "auto", zIndex: 70, background: C.panel, color: C.ink, border: `1px solid ${C.gold}`, boxShadow: "0 8px 30px rgba(0,0,0,0.5)", padding: 12, font: "12px ui-monospace, Menlo, Consolas, monospace", boxSizing: "border-box" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}><b style={{ color: C.gold, flex: 1 }}>Deploy a save to the live game</b><button type="button" style={S.btn()} onClick={() => setDeployOpen(false)}>Close</button></div>
+      <p style={S.muted}>Pick a save: it replaces the world players have now. It goes live once every check passes (about 45 minutes); if a check fails, players keep what they have. Deploying an older save is how you roll back.</p>
+      {dirty && <p style={{ color: C.warn }}>You have unsaved changes: they aren't in any save. Save first to deploy them.</p>}
+      {deploys && !deploys.ready && <p style={{ color: C.warn }}>Deploying isn't set up yet: the dev service needs its GitHub token (cloud/README.md, "Deploying").</p>}
+      {deploys && deploys.deploys.length > 0 && <><h4 style={S.h}>Deploys</h4>{deploys.deploys.map(d => <div key={d.id} style={S.item}>
+        <span style={{ flex: 1 }}>{d.name ? <b>{d.name}</b> : <b>v{d.version}</b>} <span style={S.muted}>{d.ops} ops · {when(d.at)}</span></span>
+        <span style={{ color: d.status === "live" ? "#7fd18b" : d.status === "failed" ? C.warn : d.status === "deploying" ? C.gold : C.dim }}>{d.status === "deploying" ? "checking…" : d.status}</span>
+        <a style={{ color: C.dim }} href={d.run_url ?? d.url} target="_blank" rel="noreferrer">{d.run_url ? "checks" : "commit"}</a>
+      </div>)}</>}
+      <h4 style={S.h}>Saves</h4>
+      {!revisions && <div style={S.muted}>Loading…</div>}
+      {revisions?.length === 0 && <div style={S.muted}>Nothing saved yet.</div>}
+      {revisions?.map(r => <div key={r.id} style={S.item}>
+        <span style={{ flex: 1 }}>{r.name ? <b>{r.name}</b> : <b>v{r.version}</b>}{r.note ? <span style={S.muted}> · {r.note}</span> : null} <span style={S.muted}>{when(r.at)} · {(r.size / 1024).toFixed(1)} KB</span>{deploys?.deploys.find(d => d.revision_id === r.id && d.status === "live") ? <span style={{ color: "#7fd18b" }}> · live now</span> : null}</span>
+        <button type="button" style={S.btn()} disabled={deploying || deploys?.ready === false} onClick={() => void deployRevision(r)}>Deploy</button>
+      </div>)}
+    </section>}
 
     <aside style={S.left} aria-label="Development editor">
       {TOOL_GROUPS.map(([group, tools]) => <div key={group}><h4 style={S.h}>{group}</h4><div style={S.row}>{tools.map(([id, label, title]) => <button key={id} type="button" title={title} style={S.btn(tool === id)} onClick={() => { setTool(id); corner.current = null; }}>{label}</button>)}</div></div>)}

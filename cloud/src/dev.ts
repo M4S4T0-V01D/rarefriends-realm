@@ -14,6 +14,11 @@
  *   POST /dev/api/world/:id/restore { revision } the overlay of that revision becomes the current one (the current one is kept as a revision first)
  *   POST /dev/api/world/:id/reset                back to the baseline: an empty overlay (the current one kept as a revision first)
  *   GET  /dev/api/world/:id/export               the overlay as a file, to commit under overlays/ (how content reaches the public game)
+ *   GET  /dev/api/world/:id/deploys              the deploys, newest first, each with how its check went (deploying, live, failed, replaced)
+ *   POST /dev/api/world/:id/deploy { revision }  that revision (a save or a checkpoint) becomes the public game's development world:
+ *                                                committed on main as games/rarefriends-realm/overlays/devworld.ts with the
+ *                                                GitHub token DEV_DEPLOY_TOKEN (a Worker secret); CI checks it as any change and
+ *                                                publishes it only if every test passes. One a minute.
  *   GET  /dev/api/audit                          what was done, newest first
  *
  * Authorization is the session cookie; writes also need the `x-realm-dev: 1` header (a cross-site form can't send it,
@@ -24,7 +29,14 @@ import type { Database } from "./worker.ts";
 import type { Bucket } from "./cards.ts";
 
 /** The built site lives in the bucket (scripts/dev-upload.mjs puts it there): a Worker's own assets are capped at 25 MiB a file, and the game is bigger. */
-export type DevEnv = { DB: Database; DEV_PASSWORD_HASH?: string; bucket?: Bucket | null };
+export type DevEnv = { DB: Database; DEV_PASSWORD_HASH?: string; bucket?: Bucket | null;
+  /** The deploy button's GitHub token (fine-grained: this repository only, Contents read and write, Actions read), and the repository. */
+  DEV_DEPLOY_TOKEN?: string; DEV_DEPLOY_REPO?: string;
+  /** (Tests answer GitHub's calls themselves.) */
+  github?: typeof fetch };
+/** Where a deployed development world goes in the repository (listed in overlays/index.ts). */
+export const DEPLOY_PATH = "games/rarefriends-realm/overlays/devworld.ts", DEPLOY_REPO = "M4S4T0-V01D/rarefriends-realm", DEPLOY_GAP_MS = 60_000;
+type DeployRow = { id: number; revision_id: number; version: number; name: string | null; ops: number; sha: string; url: string; at: number; status: string; run_url: string | null };
 const TYPES: Record<string, string> = { html: "text/html; charset=utf-8", js: "text/javascript; charset=utf-8", css: "text/css; charset=utf-8", json: "application/json", png: "image/png", jpg: "image/jpeg", svg: "image/svg+xml", webm: "video/webm", mp4: "video/mp4", wasm: "application/wasm", ico: "image/x-icon" };
 export const DEV_LIMITS = { sessionMs: 12 * 3_600_000, tries: 5, lockoutMs: 15 * 60_000, overlayBytes: 4_000_000, revisionsKeep: 200 } as const;
 const COOKIE = "realm_dev";
@@ -81,6 +93,14 @@ export function devRoutes(db: Database, env: DevEnv, clock: () => number) {
     db.prepare("INSERT INTO dev_revisions (world_id, version, name, note, overlay, size, at) VALUES (?, ?, ?, ?, ?, ?, ?)").bind(id, version, name, note, overlay, overlay.length, clock()),
     db.prepare("DELETE FROM dev_revisions WHERE world_id = ? AND name IS NULL AND id NOT IN (SELECT id FROM dev_revisions WHERE world_id = ? AND name IS NULL ORDER BY id DESC LIMIT ?)").bind(id, id, DEV_LIMITS.revisionsKeep),
   ]);
+  /** GitHub's API on the deploy repository, with the deploy token (never sent to the browser). */
+  async function github(method: string, path: string, body?: unknown) {
+    const response = await (env.github ?? fetch)(`https://api.github.com/repos/${env.DEV_DEPLOY_REPO ?? DEPLOY_REPO}${path}`, { method, headers: { authorization: `Bearer ${env.DEV_DEPLOY_TOKEN}`, accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28", "user-agent": "rarefriends-realm-dev", ...(body ? { "content-type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined });
+    const data = await response.json().catch(() => ({})) as Record<string, unknown>;
+    if (!response.ok) throw new HttpError(response.status === 404 && method === "GET" ? 404 : 502, `GitHub refused (${response.status}): ${String(data.message ?? "")}`.slice(0, 200));
+    return data;
+  }
+  const base64 = (text: string) => { const bytes = new TextEncoder().encode(text); let binary = ""; for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(binary); };
   const overlayText = (raw: unknown) => {
     if (!raw || typeof raw !== "object" || Array.isArray(raw) || (raw as { v?: unknown }).v !== 1 || !Array.isArray((raw as { ops?: unknown }).ops)) throw new HttpError(422, "not an overlay");
     const text = JSON.stringify(raw); if (text.length > DEV_LIMITS.overlayBytes) throw new HttpError(413, "the overlay is too large");
@@ -124,7 +144,7 @@ export function devRoutes(db: Database, env: DevEnv, clock: () => number) {
         return json(200, { audit: rows.results });
       }
       // ---------- The development world ----------
-      const world = /^\/dev\/api\/world\/([^/]+)(\/revisions|\/restore|\/reset|\/export)?$/.exec(path);
+      const world = /^\/dev\/api\/world\/([^/]+)(\/revisions|\/restore|\/reset|\/export|\/deploys|\/deploy)?$/.exec(path);
       if (world) {
         await session(request);
         const id = worldOf(world[1]), part = world[2] ?? "";
@@ -181,6 +201,41 @@ export function devRoutes(db: Database, env: DevEnv, clock: () => number) {
           const row = await current(id); if (!row) throw new HttpError(404, "nothing saved yet");
           await audit("export", `${id} v${row.version}`);
           return new Response(row.overlay, { status: 200, headers: { "content-type": "application/json", "content-disposition": `attachment; filename="${id}.overlay.json"`, "cache-control": "no-store" } });
+        }
+        if (part === "/deploys" && method === "GET") {
+          const rows = (await db.prepare("SELECT id, revision_id, version, name, ops, sha, url, at, status, run_url FROM dev_deploys WHERE world_id = ? ORDER BY id DESC LIMIT 20").bind(id).all<DeployRow>()).results;
+          // (The newest few still deploying: how their checks are going, from GitHub; a finished one is kept as it ended.)
+          if (env.DEV_DEPLOY_TOKEN) for (const row of rows.slice(0, 5)) if (row.status === "deploying") {
+            const runs = await github("GET", `/actions/runs?head_sha=${row.sha}&per_page=5`).catch(() => null) as { workflow_runs?: { status: string; conclusion: string | null; html_url: string }[] } | null;
+            const run = runs?.workflow_runs?.[0]; if (!run) continue;
+            const status = run.status !== "completed" ? "deploying" : run.conclusion === "success" ? "live" : run.conclusion === "cancelled" ? "replaced" : "failed";
+            row.status = status; row.run_url = run.html_url;
+            await db.prepare("UPDATE dev_deploys SET status = ?, run_url = ? WHERE id = ?").bind(status, run.html_url, row.id).run();
+          }
+          // (Only the newest live deploy is what players have; older ones were live once.)
+          let seenLive = false; for (const row of rows) if (row.status === "live") { if (seenLive) row.status = "was live"; seenLive = true; }
+          return json(200, { ready: !!env.DEV_DEPLOY_TOKEN, deploys: rows });
+        }
+        if (part === "/deploy" && method === "POST") {
+          writing(request);
+          if (!env.DEV_DEPLOY_TOKEN) throw new HttpError(503, "deploying isn't set up: the Worker has no DEV_DEPLOY_TOKEN (cloud/README.md, \"Deploying\")");
+          const body = await request.json().catch(() => null) as { revision?: unknown } | null;
+          if (!body || typeof body.revision !== "number") throw new HttpError(400, "which save?");
+          const last = await db.prepare("SELECT at FROM dev_deploys ORDER BY id DESC LIMIT 1").bind().first<{ at: number }>();
+          if (last && clock() - last.at < DEPLOY_GAP_MS) throw new HttpError(429, "one deploy a minute: wait a moment", { retryAfterMs: DEPLOY_GAP_MS - (clock() - last.at) });
+          const rev = await db.prepare("SELECT id, overlay, version, name FROM dev_revisions WHERE id = ? AND world_id = ?").bind(body.revision, id).first<{ id: number; overlay: string; version: number; name: string | null }>();
+          if (!rev) throw new HttpError(404, "no such save");
+          const overlay = JSON.parse(overlayText(JSON.parse(rev.overlay))) as { name?: string; ops: unknown[] }, at = clock(), date = new Date(at).toISOString().slice(0, 16).replace("T", " ");
+          const text = `/** The development world as deployed from the dashboard's Deploy button (cloud/src/dev.ts writes this file on main; CI checks it and publishes). Listed in index.ts. */\n/** Deployed ${date} UTC: v${rev.version}${rev.name ? ` (${rev.name})` : ""}, ${overlay.ops.length} ops. */\nimport type { Overlay } from "../overlay.ts";\n\nconst overlay: Overlay = ${JSON.stringify(overlay)};\nexport default overlay;\n`;
+          const existing = await github("GET", `/contents/${DEPLOY_PATH}?ref=main`).catch(() => null) as { sha?: string } | null;
+          const commit = await github("PUT", `/contents/${DEPLOY_PATH}`, {
+            message: `Deploy the development world: v${rev.version}${rev.name ? ` (${rev.name})` : ""}, ${overlay.ops.length} ops\n\nFrom the development dashboard's Deploy button (revision ${rev.id}). CI checks it like any change; players get it only if every test passes.`,
+            content: base64(text), branch: "main", ...(existing?.sha ? { sha: existing.sha } : {}),
+          }) as { commit?: { sha: string; html_url: string } };
+          if (!commit.commit) throw new HttpError(502, "GitHub didn't take the commit");
+          await db.prepare("INSERT INTO dev_deploys (world_id, revision_id, version, name, ops, sha, url, at, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'deploying')").bind(id, rev.id, rev.version, rev.name, overlay.ops.length, commit.commit.sha, commit.commit.html_url, at).run();
+          await audit("deploy", `${id} revision ${rev.id} v${rev.version} → ${commit.commit.sha.slice(0, 7)}`);
+          return json(200, { ok: true, sha: commit.commit.sha, url: commit.commit.html_url });
         }
       }
       if (path.startsWith("/dev/api/")) throw new HttpError(404, "not found");
