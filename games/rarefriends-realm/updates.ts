@@ -4,6 +4,12 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 136, date: "2026-10-14", title: "The Redwake and the Dawn Archive", items: [
+    "The Red Wave (Captain Ulfa, the Redwake camp): the jarls pay the Redwake to open the Oathgate road, someone in Krasnogor pays the Greyhide to hold it shut, and Bjarte Half-Hand, twenty years a Redwake, rides with the Greyhide now. Read their contract, hear both captains, and decide: keep the code and fight, make one contract of the two, or tear it up and walk.",
+    "The Fourth Copy (Archivist Bozhena, Svetloye): three copies of the Oathgate chronicle give the western pass to three different owners. Compare them (the princes' copy takes Presence to be let near), find the first copy in the Oathgate's ruined fort (it takes Mysteries to read), and decide what the Dawn Archive does with it.",
+    "Each signs you on: members run the Redwake Contract (Strength) or the Archive's Rubbings (Mysteries) for standing, and standing brings the Redwake falchion and brigandine, or the Archivist's robe and the Chronicler's lens.",
+    "The north has its own music: seven pieces, from the Vargskeld's fiddle and lyre and the quayside reel at Skarnholm to Oathsworn Hall's choir, the Redwake's march, the Zoryavik's gusli and pipe, Krasnogor's dance and the Old Bough's hymn.",
+  ] },
   { id: 135, date: "2026-10-14", title: "Level water", items: [
     "Water lies level everywhere: the sea and the low water joined to it at sea level, every lake at one height, and mountain rivers in level reaches with a waterfall between each and the next. Water never runs up or down a hill any more.",
     "The shore round all water is flat for two tiles; beyond it, low land comes back in a long slope and high land in a steep bank, a cliff where a castle or a town stands over the sea.",

@@ -622,7 +622,7 @@ test("A Friend's Feast from start to finish", () => {
   assert.equal(g.player.quests.friends_feast, 2);
   assert.equal(questPoints(g), 1);
   assert(level(g, "cooking") >= 10, "Quest XP");
-  assert.equal(QUESTS.length, 115); assert.equal(MAX_QUEST_POINTS, 201);
+  assert.equal(QUESTS.length, 117); assert.equal(MAX_QUEST_POINTS, 205);
 });
 
 test("Grumblin Trouble counts kills and pays out", () => {
@@ -1968,7 +1968,7 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   assert.equal(p.quests.dawn_against_hollow, 2); assert(has(p, "dawnplate_cuirass"));
   assert.equal(count(p, "hollow_essence"), 0);
   assert.equal(capeProblem(g, "dawnplate_cuirass"), null, "the armoury sells Dawnplate once earned");
-  assert.equal(QUESTS.length, 115); assert.equal(MAX_QUEST_POINTS, 201);
+  assert.equal(QUESTS.length, 117); assert.equal(MAX_QUEST_POINTS, 205);
 });
 
 test("Boots and gauntlets in every metal, smithed at the anvil; the clothier's shirts, dresses, trousers and skirts", () => {
@@ -3318,7 +3318,7 @@ test("Meghavan's music: tanpura, sitar, bansuri, shehnai and santoor, tabla and 
   assert.equal(ensembles.size, 5, "each its own ensemble");
   for (const [region, id] of [["rain_pass", "meghavan_rains"], ["ilavati_valley", "meghavan_rains"], ["sarovan", "meghavan_sarovan"], ["tirthali", "meghavan_sarovan"], ["shailagarh", "meghavan_shailagarh"],
     ["shaila_highlands", "meghavan_shailagarh"], ["suvarnatira", "meghavan_suvarnatira"], ["mandapur", "meghavan_suvarnatira"], ["deepgreen", "meghavan_deepgreen"], ["kanthar", "meghavan_deepgreen"]]) assert.equal(trackFor(region, false), id);
-  assert.equal(TRACKS.length, 81, "the jukebox's count");
+  assert.equal(TRACKS.length, 88, "the jukebox's count (the north's seven among them)");
 });
 
 test("The Rain Country rains more than anywhere else, and the Deepgreen is misty", async () => {
@@ -4237,7 +4237,7 @@ test("Activities: a challenge set by its host runs on the game's own mechanics, 
   const { GUILD_FURNACE } = await import("../games/rarefriends-realm/hearthkinnames.ts");
   const { regionAt } = await import("../games/rarefriends-realm/world.ts");
   const g = newGame(), p = g.player;
-  assert.deepEqual(Object.keys(ACTIVITIES), ["quarry_call", "assay_run", "hot_tunnel", "pass_run", "barrow_watch", "road_patrol", "farwake_survey", "compact_order"]); assert.deepEqual(ACTIVITY_HOSTS.quarry_master, ["quarry_call", "hot_tunnel"]);
+  assert.deepEqual(Object.keys(ACTIVITIES), ["quarry_call", "assay_run", "hot_tunnel", "pass_run", "barrow_watch", "road_patrol", "farwake_survey", "redwake_contract", "archive_rubbings", "compact_order"]); assert.deepEqual(ACTIVITY_HOSTS.quarry_master, ["quarry_call", "hot_tunnel"]);
   // The host offers it in talk; the level gates it.
   let d = talk(g, "quarry_master"); assert.ok(d.options?.some(o => /Quarry Call/.test(o.label)), "the quarrymaster offers the Quarry Call");
   p.xp.mining = 0; assert.match(activityProblem(g, "quarry_call"), /Mining level of 10/);
@@ -5167,4 +5167,55 @@ test("The north's guilds: the True Chart (the Farwake, sailed and sounded) and t
   give(p, bar, run.target.count); choose(talk(g, "freeholds_speaker"), `Here are the ${run.target.count} bars.`);
   assert.equal(p.activities.run, null, "the order is done"); assert.ok(p.standing.freeholds > 10);
   const fresh = newGame(); restore(fresh, serialize(g)); assert.equal(fresh.player.standing.freeholds, p.standing.freeholds);
+});
+
+test("The Redwake and the Dawn Archive: the Red Wave (two companies, two codes, a contract read and both captains heard) and the Fourth Copy (three copies compared, Presence to be let near the princes', Mysteries to read the first), each a choice with consequences, membership, a members' activity paid in standing, the gear it brings; the north's own music", async () => {
+  const C = await import("../games/rarefriends-realm/northcompanies.ts");
+  const A = await import("../games/rarefriends-realm/activities.ts");
+  const { TRACKS, NORTH_TRACKS, trackFor } = await import("../games/rarefriends-realm/audio.ts");
+  const { talk, questDone } = await import("../games/rarefriends-realm/content.ts");
+  const g = newGame(), p = g.player, world = g.world;
+  const obj = clue => world.objects.find(o => o.clue === clue);
+  const use = (object, option) => { teleport(g, object.x + 1, object.y); if (!canWalk(g, object.x + 1, object.y)) standBy(g, object); const n = g.messages.length; setTarget(g, { kind: "object", id: object.id, option }); for (let k = 0; k < 30 && g.dialogue === null && g.messages.length === n; k++) tick(g); g.dialogue = null; };
+  const reach = (d, label) => { let o; for (let k = 0; k < 6 && d && !(o = d.options?.find(x => x.label === label)); k++) d = d.options?.find(x => x.label === "Something else.")?.then(); return o; };
+  const choose = (d, label) => { const o = reach(d, label); assert.ok(o, `"${label}" offered`); const next = o.then(); next?.onEnd?.(); return next; };
+  const ending = id => { let t = talk(g, id); for (let k = 0; k < 6 && t && !t.onEnd; k++) t = t.options?.find(x => x.label === "Something else.")?.then(); assert.ok(t?.onEnd, `${id} has something to say`); t.onEnd(); };
+  for (const id of ["greyhide_contract", "archive_copy", "princes_copy", "first_copy", "record_stone_1", "record_stone_2", "record_stone_3"]) assert.ok(obj(id), `${id} is in the world`);
+  for (const id of ["greyhide_captain", "bjarte_half_hand"]) assert.ok(world.spawns.some(s => s.kind === "npc" && s.id === id), `${id} is in the Greyhide camp`);
+  for (const s of ["attack", "strength", "defence"]) p.xp[s] = XP_TABLE[60];
+  assert.match(A.activityProblem(g, "redwake_contract"), /Sign with the Redwake first/);
+  // The Red Wave: the contract, Bjarte, Hrolf; Ulfa's choice. One contract of the two: Bjarte lives, the gear comes cheaper.
+  choose(talk(g, "redwake_captain"), "I'll find out what you're up against."); assert.equal(p.quests[C.RED_WAVE], 1);
+  use(obj("greyhide_contract"), "Read"); ending("bjarte_half_hand"); ending("greyhide_captain"); assert.equal(p.questData.rw_step, 2);
+  choose(talk(g, "redwake_captain"), "Make one contract of the two. Hold the road together."); assert.ok(questDone(g, C.RED_WAVE)); assert.equal(p.questData.redwake_member, 1);
+  assert.ok(!NPCS.bjarte_half_hand.gone(g), "Bjarte lives under one contract");
+  let d = choose(talk(g, "redwake_captain"), "My standing with the Redwake."); choose(d, "I've earned the Redwake falchion."); assert.ok(has(p, "redwake_falchion"), "at 10 standing, the joint contract's discount");
+  // The Redwake Contract: the raiders on the Oathgate road, and only there.
+  assert.ok(A.startActivity(g, "redwake_contract")); A.activityEvent(g, { kind: "kill", monster: "bandit", x: 100, y: 100 }); assert.equal(p.activities.run.progress, 0, "a bandit elsewhere doesn't count");
+  for (let k = 0; k < 5; k++) A.activityEvent(g, { kind: "kill", monster: "bandit", x: 480, y: 220 });
+  assert.equal(p.activities.run, null, "the contract is done"); assert.ok(p.standing.redwake > 10);
+  // The other ending: walking away opens the company's spare kit; keeping the code costs Bjarte.
+  { const h = newGame(), q = h.player; q.questData.rw_choice = C.RW_WALK; q.quests[C.RED_WAVE] = 2; choose(talk(h, "redwake_captain"), "Show me the company's spare kit."); assert.equal(h.ui.shop, "redwake_kit");
+    q.questData.rw_choice = C.RW_CODE; assert.ok(NPCS.bjarte_half_hand.gone(h), "Bjarte falls when the code is kept"); }
+  // The Fourth Copy: three copies (Presence for the princes'), the copyist, the first copy (Mysteries), Bozhena's choice. To the prince: silver, and the copyist leaves.
+  p.xp.presence = XP_TABLE[10]; p.xp.mysteries = XP_TABLE[10];
+  assert.match(A.activityProblem(g, "archive_rubbings"), /Find us the first copy first/);
+  choose(talk(g, "archivist_bozhena"), "I'll compare them."); assert.equal(p.quests[C.FOURTH_COPY], 1);
+  use(obj("archive_copy"), "Read"); use(obj("princes_copy"), "Read"); assert.ok(!p.questData.dc_princes, "the steward won't let a stranger near");
+  p.xp.presence = XP_TABLE[60]; use(obj("princes_copy"), "Read"); ending("ember_skald"); assert.equal(p.questData.dc_step, 2);
+  ending("archive_copyist"); use(obj("first_copy"), "Search"); assert.ok(!has(p, "first_chronicle"), "the old hand is unreadable without Mysteries");
+  p.xp.mysteries = XP_TABLE[60]; use(obj("first_copy"), "Search"); assert.ok(has(p, "first_chronicle")); assert.equal(p.questData.dc_step, 3);
+  const before = count(p, "coins"); choose(talk(g, "archivist_bozhena"), "Give it to Prince Radomir. It's his chronicle.");
+  assert.ok(questDone(g, C.FOURTH_COPY)); assert.equal(p.questData.archive_member, 1); assert.ok(!has(p, "first_chronicle")); assert.equal(count(p, "coins") - before, C.PRINCE_PAYS);
+  assert.ok(NPCS.archive_copyist.gone(g), "the copyist leaves the Archive");
+  // The Archive's Rubbings: the three old stones.
+  assert.ok(A.startActivity(g, "archive_rubbings")); for (const k of [1, 2, 3]) use(obj(`record_stone_${k}`), "Take-rubbing");
+  assert.equal(p.activities.run, null, "the rubbings are done"); assert.ok(p.standing.dawn_archive > 10);
+  p.standing.dawn_archive = 60; d = choose(talk(g, "archivist_bozhena"), "My standing with the Archive."); choose(d, "I've earned the Archivist's robe."); assert.ok(has(p, "archivist_robe"));
+  const fresh = newGame(); restore(fresh, serialize(g)); assert.equal(fresh.player.standing.redwake, p.standing.redwake); assert.equal(fresh.player.standing.dawn_archive, 60);
+  // The north's own music: seven pieces, each with its drone and the deep drum, each its own ensemble, and every north region's piece.
+  const pieces = TRACKS.filter(t => NORTH_TRACKS.includes(t.id)); assert.equal(pieces.length, 7);
+  for (const t of pieces) { assert.ok(t.notes.some(n => n.voice === "drone") && t.hits.some(h => h.drum === "deep"), `${t.name}: a drone and the deep drum`); }
+  assert.equal(new Set(pieces.map(t => [...new Set(t.notes.map(n => n.voice))].sort().join())).size, 7, "each its own ensemble");
+  for (const [region, id] of [["vargskeld", "north_vargskeld"], ["skarnholm", "north_skarnholm"], ["oathsworn_hall", "north_oath"], ["redwake_camp", "north_redwake"], ["zoryavik", "north_zoryavik"], ["krasnogor", "north_krasnogor"], ["old_bough", "north_old_bough"], ["svetloye", "north_old_bough"]]) assert.equal(trackFor(region, false), id);
 });

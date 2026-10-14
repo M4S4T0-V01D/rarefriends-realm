@@ -42,6 +42,8 @@ export const WAYMARK_EVERY = 34;
 /** The Oathgate road's trouble (northquest.ts): the wrecked caravan by the road, and the raiders' den up in the hills above it. */
 export const OATH_ROAD = { wreck: { x: 478, y: 241 }, den: { x: 494, y: 216 }, hills: { x0: 440, y0: 196, x1: 545, y1: 262 } } as const;
 /** The Barrowfield (the draugr's howes, south-west of Oathsworn Hall), the Cut (the felled firs south of Krasnogor) and the columns of the Hearthwardens' three patrol posts on the Krasnogor road (northfactions.ts). */
+/** The Greyhide camp beside the Oathgate road, and the Dawn Archive's three old stones (by Hearthwatch, above Zlatna Gora, at Bereslav): northcompanies.ts. */
+export const GREYHIDE = { x0: 598, y0: 241, x1: 614, y1: 252 } as const, RECORD_STONES = [[696, 255], [1034, 133], [745, 327]] as const;
 export const BARROWFIELD = { x: 466, y: 150 } as const, THE_CUT = { x: 975, y: 300 } as const, PATROL_XS = [728, 772, 818] as const;
 const WOLFSBACK_SIGN = "THE WOLFSBACK. A goat-track over the Varn Ridge, the only way across when the Oathgate's shut. Carts can't take it. Yetis can.";
 
@@ -340,6 +342,15 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
     npc("redwake_captain", X0 + 15, Y0 + 11); for (let k = 0; k < 3; k++) npc("redwake_sellsword", X0 + 8 + k * 8, Y0 + 7, 4);
     sign(X1 + 1, Y0 + 9, "The Redwake camp", "THE REDWAKE COMPANY. Contracts taken, honoured, and finished. Ask the Captain about our code; we have one, which is more than some.");
   }
+  // ---------- The Greyhide camp, beside the Oathgate road west of the gate: paid to hold it shut (northcompanies.ts) ----------
+  {
+    const X0 = GREYHIDE.x0, Y0 = GREYHIDE.y0, X1 = GREYHIDE.x1, Y1 = GREYHIDE.y1;
+    ground(X0, Y0, X1, Y1, "redwake_camp", T.GRAVEL);
+    for (const [tx, ty] of [[X0 + 2, Y1 - 2], [X0 + 8, Y1 - 1], [X1 - 2, Y1 - 2]] as const) put2(tx, ty, "tent", "A Greyhide tent, wolf-grey");
+    put2(X0 + 9, Y0 + 5, "campfire", "The Greyhide fire", false); put2(X1 - 1, Y0 + 4, "banner", "The Greyhide banner: a grey wolf on white");
+    put2(X0 + 4, Y0 + 2, "wagon", "The Greyhide's wagon, their contract nailed to the side"); clue(X0 + 4, Y0 + 2, "greyhide_contract");
+    npc("greyhide_captain", X0 + 11, Y0 + 6); npc("bjarte_half_hand", X0 + 6, Y0 + 7); for (let k = 0; k < 2; k++) npc("greyhide_sellsword", X0 + 4 + k * 10, Y0 + 4, 3);
+  }
 
   // ---------- The Oathgate road's trouble: a caravan wrecked below the hills, and the raiders' hideout above them ----------
   {
@@ -433,6 +444,7 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
     house(X1 - 15, Y1 - 12, X1 - 4, Y1 - 4, "n", "The Bear and Bell", "izba");
     for (const [hx, hy] of [[X0 + 18, Y1 - 12], [cx + 4, Y1 - 12], [X0 + 4, cy + 4], [X1 - 14, cy + 4], [X0 + 18, Y0 + 4]] as const) house(hx, hy, hx + 7, hy + 5, "s", "A log house", "izba");
     npc("prince_radomir", cx - 3, Y0 + 9); npc("princess_vesna", cx + 4, Y0 + 9); npc("hearth_father_ilya", X0 + 10, Y0 + 9);
+    { const at = openNear(cx - 7, Y0 + 12); put2(at.x, at.y, "table", "The princes' lectern"); clue(at.x, at.y, "princes_copy"); }   // (the princes' copy of the Oathgate chronicle: northcompanies.ts)
     npc("krasnogor_innkeeper", X1 - 10, Y1 - 8); npc("krasnogor_trader", cx, cy + 6, 2); { const at = openNear(cx + 8, cy + 6); npc("krasnogor_tailor", at.x, at.y); } { const at = openNear(cx - 12, cy + 8); npc("beastward_mstislav", at.x, at.y); put2(at.x + 1, at.y + 1, "trough", "A trough for the beasts in his keeping"); }
     for (let k = 0; k < 6; k++) npc(k % 2 ? "zoryavik_druzhina" : "zoryavik_villager", X0 + 8 + k * 9, cy + 2, 6);
     sign(cx + 2, Y1 + 2, "Krasnogor", "KRASNOGOR, on the Krasna. The princes sit in the Terem, when they sit together. The Hearth-Fathers keep the House; the market keeps the rest.");
@@ -493,6 +505,7 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
     ground(X0, Y0, X1, Y1, "svetloye");
     house(cx - 9, Y0 + 3, cx + 9, Y0 + 13, "s", "The Dawn Archive", "stone", T.STONE, { roof: "cone", keep: { size: 3, storeys: 1, spire: 12, dome: true }, color: "#c9a53a" });
     for (const [sx, sy] of [[cx - 7, Y0 + 5], [cx - 4, Y0 + 5], [cx + 4, Y0 + 5], [cx + 7, Y0 + 5]] as const) put2(sx, sy, "shelf", "Chronicles, shelved by year and disputed by the shelf");
+    clue(cx - 7, Y0 + 5, "archive_copy");   // (the Oathgate chronicle's Archive copy: northcompanies.ts)
     house(X0 + 2, Y1 - 8, X0 + 10, Y1 - 3, "n", "The scriptorium", "izba");
     npc("archivist_bozhena", cx, Y0 + 9); npc("archive_copyist", X0 + 6, Y1 - 5, 2);
     // The ancestors' howes, west of the Archive (northfaith.ts: bread is left on them).
@@ -600,6 +613,9 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
   // The Farwake's survey cairns on the bay's three big islands, and the Grey Heron wrecked on the southern one (northguilds.ts).
   ([[0, "survey_cairn_1"], [1, "survey_cairn_2"], [3, "survey_cairn_3"]] as const).forEach(([k, id]) => { const [ix, iy] = ISLES[k], at = openNear(ix, iy); put2(at.x, at.y, "obelisk", "A Farwake survey cairn"); clue(at.x, at.y, id); });
   { const [ix, iy, rx] = ISLES[2], at = openNear(ix + rx - 1, iy); put2(at.x, at.y, "boat", "The wreck of the Grey Heron"); clue(at.x, at.y, "heron_wreck"); }
+  // The Dawn Archive's errands (northcompanies.ts): the first copy of the Oathgate chronicle in the fort's guardroom, and three old stones for rubbings.
+  { const at = openNear(RIDGE.oathgate.x + 6, RIDGE.oathgate.y + 6); t.clearAt(at.x, at.y); t.add({ kind: "decor", decor: "chest", x: at.x, y: at.y, blocks: true, name: "An iron-bound chest", clue: "first_copy" }); }
+  for (const [k, [sx, sy]] of RECORD_STONES.entries()) { const at = openNear(sx, sy); put2(at.x, at.y, "obelisk", k === 0 ? "A boundary stone" : k === 1 ? "An old waystone" : "The river stone"); clue(at.x, at.y, `record_stone_${k + 1}`); }
   // The bay's islands: pine and rock.
   for (const [ix, iy, rx, ry] of ISLES) t.scatter(ix - rx, iy - ry, ix + rx, iy + ry, Math.round(rx * ry * 0.4), (x, y) => { if (random() > 0.35) t.tree(x, y, "pine"); else t.decor(x, y, "boulder"); }, (x, y) => t.free(x, y) && WALKABLE.has(tiles[idx(x, y)]) && !isWater(tiles[idx(x, y)]));
 

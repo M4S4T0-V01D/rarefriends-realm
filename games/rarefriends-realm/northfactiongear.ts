@@ -1,6 +1,6 @@
 /**
- * A Place to the North: the factions' gear (Oathsworn Hall, the Hearthwardens, the Farwake Guild and the Freeholds
- * Compact: given for standing, northfactions.ts and northguilds.ts)
+ * A Place to the North: the factions' gear (Oathsworn Hall, the Hearthwardens, the Farwake Guild, the Freeholds
+ * Compact, the Redwake and the Dawn Archive: given for standing, northfactions.ts, northguilds.ts and northcompanies.ts)
  * and the north's own creatures: draugr in the Vargskeld barrows, fjord trolls on the northern coast, rusalki on the
  * Krasna's banks, leshies in the deep Zoryavik forest, and the Likho in the felled wood of the Cut. A leaf (types only),
  * so data.ts can list them.
@@ -31,10 +31,21 @@ export const NORTH_FACTION_ITEMS: readonly Item[] = [
     icon: { shape: "warhammer", color: "#6a6a72", accent: "#c98f5f" }, equip: { slot: "weapon", bonuses: { attack: 44, strength: 62 }, requires: { attack: 45, smithing: 40 } } },
   { id: "miners_helm", name: "Zlatna Gora miner's helm", examine: "A riveted iron cap with a candle-hook at the brow, as the miners of Zlatna Gora wear. Given by the Compact for long standing.", value: 6000, tradeable: false,
     icon: { shape: "helm", color: "#5a5a60", accent: "#e2c46a" }, equip: { slot: "head", bonuses: { defence: 24, strength: 2 }, requires: { mining: 50 } } },
+  { id: "redwake_falchion", name: "Redwake falchion", examine: "A broad, heavy-tipped blade with the red wave etched along it: the company's own, issued to swords in good standing. It's been sharpened more often than cleaned.", value: 15000, tradeable: false,
+    icon: { shape: "sabre", color: "#a8b0b8", accent: "#b03a2e" }, equip: { slot: "weapon", bonuses: { attack: 50, strength: 60 }, requires: { attack: 50, strength: 40 } } },
+  { id: "redwake_brigandine", name: "Redwake brigandine", examine: "A coat of plates riveted inside red-dyed leather, the company's colour, worn soft over many contracts. Given by the Redwake for long standing.", value: 12000, tradeable: false,
+    icon: { shape: "body", color: "#8a2e26", accent: "#c9c9c9" }, equip: { slot: "body", bonuses: { defence: 54, strength: 4, magic: -12 }, requires: { defence: 50 } } },
+  { id: "archivist_robe", name: "Archivist's robe", examine: "A long robe of undyed wool, ink on the cuffs, a dozen pockets for pens and slips. The Dawn Archive's own, given for standing.", value: 7000, tradeable: false,
+    icon: { shape: "body", color: "#d8cfb8", accent: "#c9a53a" }, equip: { slot: "body", bonuses: { defence: 14, magic: 12, prayer: 4 }, requires: { mysteries: 30 } } },
+  { id: "chroniclers_lens", name: "Chronicler's lens", examine: "A reading glass of clear crystal on a chain, for faded letters and small, deliberate lies. Given by the Dawn Archive for long standing.", value: 6000, tradeable: false,
+    icon: { shape: "amulet", color: "#c9a53a", accent: "#c9e4f0" }, equip: { slot: "neck", bonuses: { magic: 8, prayer: 3 }, requires: { mysteries: 50 } } },
+  { id: "first_chronicle", name: "The first copy", examine: "The first copy of the Oathgate chronicle, in the old hand: \"the western pass to be kept by both\". Archivist Bozhena should see it.", value: 0, icon: { shape: "scroll", color: "#d9c9a0", accent: "#7d2f26" }, tradeable: false },
 ];
 
 /** The Compact's stores at Bereslav (open when the Compact refuses the princes' tithe: its own iron, at its own price). */
 export const NORTH_FACTION_SHOPS: Record<string, ShopDef> = {
+  // (The Redwake's spare kit, sold off to pay for walking away from a contract: northcompanies.ts.)
+  redwake_kit: { id: "redwake_kit", name: "The Redwake's spare kit", buys: ["weapon", "armour"], rate: 0.5, stock: ["blackiron_sword", "blackiron_sabre", "blackiron_shield", "blackiron_helm", "blackiron_cuirass", "blackiron_boots", "ashsteel_sabre", "blackiron_arrow"] },
   compact_stores: { id: "compact_stores", name: "The Compact's stores", buys: ["ore", "bar"], rate: 0.6, stock: ["blackiron_ore", "inkcoal", "moonsilver_ore", "blackiron_bar", "moonsilver_bar", "hammer", "blackiron_pickaxe"] },
 };
 

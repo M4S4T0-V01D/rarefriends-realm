@@ -37,11 +37,15 @@ export const STANDING_GEAR: Record<string, readonly (readonly [string, number])[
   hearthwardens: [["hearthwarden_spear", 20], ["hearthwarden_cloak", 50]],
   farwake: [["farwake_sea_cloak", 20], ["farwake_sea_boots", 50]],
   freeholds: [["compact_hammer", 20], ["miners_helm", 50]],
+  redwake: [["redwake_falchion", 20], ["redwake_brigandine", 50]],
+  dawn_archive: [["archivist_robe", 20], ["chroniclers_lens", 50]],
 };
 /** Getting a lost piece back costs this. */
 export const REPLACE_FEE = 2000;
 export const standingOf = (game: Game, faction: string) => game.player.standing[faction] ?? 0;
-const gearNeeds = (game: Game, faction: string, need: number) => (faction === "hearthwardens" && data(game, "lp_choice") === LP_SILVER) || (faction === "farwake" && data(game, "fc_choice") === 3) ? need - 10 : need;
+// (Cheaper by ten where a choice made it so: the Wardens' silver, the Farwake's secret chart, the Redwake's joint contract, the Archive's shelf.)
+const gearNeeds = (game: Game, faction: string, need: number) => (faction === "hearthwardens" && data(game, "lp_choice") === LP_SILVER) || (faction === "farwake" && data(game, "fc_choice") === 3)
+  || (faction === "redwake" && data(game, "rw_choice") === 2) || (faction === "dawn_archive" && data(game, "dc_choice") === 2) ? need - 10 : need;
 export const cleanStanding = (raw: unknown): Record<string, number> => Object.fromEntries(Object.entries(raw && typeof raw === "object" ? raw as Record<string, unknown> : {})
   .filter(([id, v]) => id in STANDING_GEAR && typeof v === "number" && Number.isFinite(v)).map(([id, v]) => [id, Math.max(0, Math.min(1e6, Math.floor(v as number)))]));
 

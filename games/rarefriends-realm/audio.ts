@@ -12,6 +12,8 @@ export type TrackId = RegionId | "theme" | "boss"
   // Kharaveth's (The Land Before Stone).
   | "kharaveth_sunteeth" | "kharaveth_foothold" | "kharaveth_underway" | "kharaveth_steppe"
   | "kharaveth_sefrah" | "kharaveth_tamesh" | "kharaveth_khetmar" | "kharaveth_dunes" | "kharaveth_azhurak"
+  // A Place to the North's (the Vargskeld's fiddle, lyre and horn; the Zoryavik's gusli, pipe and bells).
+  | "north_vargskeld" | "north_skarnholm" | "north_oath" | "north_redwake" | "north_zoryavik" | "north_krasnogor" | "north_old_bough"
   // Meghavan's (the Rain Country).
   | "meghavan_rains" | "meghavan_sarovan" | "meghavan_shailagarh" | "meghavan_suvarnatira" | "meghavan_deepgreen";
 export type SfxName = SoundName | "slash" | "stab" | "crush" | "punch" | "step_grass" | "step_stone" | "step_wood" | "step_sand" | "step_snow" | "step_swamp"
@@ -687,6 +689,78 @@ const MEGHAVAN_REGION_TRACK: Partial<Record<RegionId, TrackId>> = {
   shaila_highlands: "meghavan_shailagarh", shailagarh: "meghavan_shailagarh", mandapur: "meghavan_suvarnatira", golden_shore: "meghavan_suvarnatira", suvarnatira: "meghavan_suvarnatira",
   deepgreen: "meghavan_deepgreen", kanthar: "meghavan_deepgreen", great_stepwell: "meghavan_deepgreen",
 };
+// ---------- A Place to the North ----------
+// The Vargskeld: a hardanger-like fiddle (the rebab's bow), a lyre (the harp), horns and the men's choir, over a drone,
+// with the deep drum pulling like oars. The Zoryavik: the gusli (the qanun's plucked strings), a shepherd's pipe (the
+// recorder), bells, the balalaika's quick strum (the lute), the choir. Every piece keeps a drone and a deep drum, as the
+// old country's do.
+const DORIAN = [0, 2, 3, 5, 7, 9, 10], AEOLIAN = [0, 2, 3, 5, 7, 8, 10], MIXOLYDIAN = [0, 2, 4, 5, 7, 9, 10], UKRAINIAN = [0, 2, 3, 6, 7, 9, 10], HARMONIC = [0, 2, 3, 5, 7, 8, 11];
+/** The deep drum on the given beats (the composer's hand drums are strokes(); the deep drum is the old country's). */
+const deepOn = (beats: readonly number[], velocity: number): Hit[] => beats.map(beat => ({ beat, drum: "deep" as Drum, velocity }));
+const held = (voice: Voice, midi: number, beats: number, velocity: number): Note => ({ beat: 0, voice, midi, length: beats - 0.5, velocity });
+const NORTH_PIECES: readonly MizukaiPiece[] = [
+  // The Vargskeld: the fiddle's tune in D dorian, the lyre turning under it, a drone of D and A, and the deep drum like oars.
+  { id: "north_vargskeld", name: "The Vargskeld", bpm: 76, beats: 64, tonic: 62, scale: DORIAN,
+    notes: () => {
+      const fiddle = phrase(`D4:2 E4:1 F4:1 | G4:2 A4:2 | C5:1 A4:1 G4:1 F4:1 | E4:3 D4:1 | F4:1 G4:1 A4:2 | C5:2 B4:1 A4:1 | G4:1 F4:1 E4:1 C4:1 | D4:4 |
+        A4:2 C5:1 D5:1 | E5:2 D5:2 | C5:1 A4:1 G4:1 A4:1 | F4:2 E4:2 | D4:1 F4:1 A4:2 | G4:1 F4:1 E4:2 | F4:1 E4:1 C4:1 E4:1 | D4:4`, "rebab", 0, 0.72);
+      const lyre = Array.from({ length: 16 }, (_, bar) => phrase("D3:1 A3:1 D4:1 A3:1", "harp", bar * 4, bar % 4 === 0 ? 0.5 : 0.4)).flat();
+      return [held("drone", 50, 64, 0.42), held("drone", 57, 64, 0.3), ...fiddle, ...lyre];
+    },
+    hits: () => [...strokes("wind:32 wind:32", 0, 0.45), ...deepOn(Array.from({ length: 32 }, (_, k) => k * 2), 0.5)] },
+  // Skarnholm: a quayside reel in A mixolydian, the fiddle alone and then the lute under it, the bass plucked, hands and the tambourine.
+  { id: "north_skarnholm", name: "Skarnholm", bpm: 128, beats: 64, tonic: 69, scale: MIXOLYDIAN,
+    notes: () => {
+      const reel = `A4:0.5 C#5:0.5 E5:0.5 C#5:0.5 A4:0.5 C#5:0.5 E5:1 | D5:0.5 C#5:0.5 B4:0.5 A4:0.5 G4:1 E4:1 | A4:0.5 B4:0.5 C#5:0.5 D5:0.5 E5:1 F#5:1 | G5:1 E5:1 D5:1 B4:1 |
+        A4:0.5 C#5:0.5 E5:0.5 A5:0.5 G5:1 E5:1 | D5:0.5 E5:0.5 D5:0.5 B4:0.5 G4:1 B4:1 | A4:0.5 G4:0.5 E4:0.5 G4:0.5 A4:0.5 B4:0.5 C#5:0.5 D5:0.5 | E5:1 C#5:1 A4:2`;
+      const first = phrase(reel, "rebab", 0, 0.7), second = phrase(reel, "rebab", 32, 0.74);
+      const bass = [45, 50, 45, 43, 45, 50, 45, 52, 45, 50, 45, 43, 45, 50, 45, 52].flatMap((midi, bar) => [{ beat: bar * 4, voice: "pizz" as Voice, midi, length: 1, velocity: 0.55 }, { beat: bar * 4 + 2, voice: "pizz" as Voice, midi: midi + 7, length: 1, velocity: 0.45 }]);
+      return [held("drone", 45, 64, 0.22), ...first, ...second, ...hetero(second, "lute", -12, 0.02, 0.5), ...bass];
+    },
+    hits: () => [...deepOn(Array.from({ length: 16 }, (_, k) => k * 4), 0.55), ...everyBar(16, 4, (b0, bar) => [...strokes("riq:0.5p riq:0.5 riq:0.5p riq:0.5 riq:0.5p riq:0.5 riq:0.5p riq:0.5", b0, 0.36), ...(bar >= 8 ? strokes("r:1 clap:1 r:1 clap:1", b0, 0.5) : [])])] },
+  // Oathsworn Hall: the men's choir, slow, in E aeolian, horn calls at the start and the middle, the war drum.
+  { id: "north_oath", name: "Oathsworn Hall", bpm: 70, beats: 48, tonic: 64, scale: AEOLIAN,
+    notes: () => {
+      const choir = phrase(`E3:4 | G3:2 A3:2 | B3:4 | A3:2 G3:2 | E3:4 | D3:2 E3:2 | G3:3 F#3:1 | E3:4 | B3:4 | C4:2 B3:2 | A3:4 | E3:4`, "choir", 0, 0.62);
+      const horn = [...phrase("B3:1 E4:1 B3:2", "brass", 0, 0.5), ...phrase("B3:1 E4:1 G4:1 E4:1", "brass", 24, 0.5)];
+      return [held("drone", 40, 48, 0.45), ...choir, ...hetero(choir, "choir", 12, 0.02, 0.3), ...horn];
+    },
+    hits: () => [...deepOn(Array.from({ length: 12 }, (_, k) => [k * 4, k * 4 + 2, k * 4 + 2.5]).flat(), 0.6), ...strokes("wind:24 wind:24", 0, 0.35)] },
+  // The Redwake Camp: a company march in D aeolian, the fiddle, then the horns taking the tune, the snare and the deep drum.
+  { id: "north_redwake", name: "The Redwake Camp", bpm: 112, beats: 64, tonic: 62, scale: AEOLIAN,
+    notes: () => {
+      const march = `D4:1 D4:0.5 F4:0.5 A4:1 D5:1 | C5:1 A4:1 F4:2 | G4:1 G4:0.5 Bb4:0.5 D5:1 C5:1 | A4:4 | D5:1 C5:1 Bb4:1 A4:1 | G4:1 F4:1 E4:2 | F4:1 G4:1 A4:1 C5:1 | D5:4`;
+      return [held("drone", 38, 64, 0.35), ...phrase(march, "rebab", 0, 0.7), ...phrase(march, "brass", 32, 0.55, -12), ...phrase(march, "rebab", 32, 0.5)];
+    },
+    hits: () => [...deepOn(Array.from({ length: 32 }, (_, k) => k * 2), 0.55), ...everyBar(16, 4, (b0, bar) => strokes(bar % 4 === 3 ? "snare:0.25 snare:0.25 snare:0.25 snare:0.25 snare:0.5 snare:0.5 snare:1!" : "snare:0.5 snare:0.25 snare:0.25 r:1 snare:0.5 snare:0.5 r:1", b0, 0.42))] },
+  // The Zoryavik: the shepherd's pipe in D (the Ukrainian dorian's raised fourth), the gusli rippling under it, the drone, a soft deep drum.
+  { id: "north_zoryavik", name: "The Zoryavik", bpm: 92, beats: 64, tonic: 62, scale: UKRAINIAN,
+    notes: () => {
+      const pipe = phrase(`A4:2 B4:1 C5:1 | B4:1 A4:1 G#4:2 | A4:1 F4:1 E4:1 D4:1 | E4:4 | D4:1 E4:1 F4:1 G#4:1 | A4:2 C5:2 | B4:1 A4:1 G#4:1 F4:1 | E4:4 |
+        A4:2 C5:1 D5:1 | C5:1 B4:1 A4:2 | G#4:1 A4:1 B4:1 G#4:1 | A4:4 | F4:1 E4:1 D4:1 E4:1 | F4:2 G#4:2 | A4:1 G#4:1 F4:1 E4:1 | D4:4`, "recorder", 0, 0.66);
+      const gusli = Array.from({ length: 16 }, (_, bar) => phrase("D3:0.5 A3:0.5 D4:0.5 F4:0.5 A4:0.5 F4:0.5 D4:0.5 A3:0.5", "qanun", bar * 4, 0.38)).flat();
+      return [held("drone", 50, 64, 0.3), ...pipe, ...gusli];
+    },
+    hits: () => [...deepOn(Array.from({ length: 8 }, (_, k) => k * 8), 0.4), ...everyBar(16, 4, b0 => strokes("r:1 bendir:1p r:1 bendir:1p", b0, 0.35))] },
+  // Krasnogor: a town dance in G harmonic minor, the balalaika's quick strum (the lute), then the choir with it, bells every other bar.
+  { id: "north_krasnogor", name: "Krasnogor", bpm: 104, beats: 64, tonic: 67, scale: HARMONIC,
+    notes: () => {
+      const dance = `G4:0.5 G4:0.5 Bb4:0.5 Bb4:0.5 D5:1 C5:1 | Bb4:0.5 A4:0.5 G4:0.5 F#4:0.5 G4:2 | D5:0.5 D5:0.5 Eb5:0.5 D5:0.5 C5:1 Bb4:1 | A4:4 |
+        G4:0.5 A4:0.5 Bb4:0.5 C5:0.5 D5:1 G5:1 | F#5:1 Eb5:1 D5:2 | C5:0.5 Bb4:0.5 A4:0.5 G4:0.5 F#4:1 A4:1 | G4:4`;
+      const lute = [...phrase(dance, "lute", 0, 0.66), ...phrase(dance, "lute", 32, 0.7)];
+      const bells = Array.from({ length: 8 }, (_, k) => ({ beat: k * 8, voice: "bell" as Voice, midi: k % 2 ? 74 : 67, length: 3, velocity: 0.4 }));
+      return [held("drone", 43, 64, 0.3), ...lute, ...hetero(lute.filter(note => note.beat >= 32), "choir", -12, 0.02, 0.4, note => note.length >= 1), ...bells];
+    },
+    hits: () => [...deepOn(Array.from({ length: 16 }, (_, k) => k * 4), 0.5), ...everyBar(16, 4, b0 => strokes("r:0.5 riq:0.5 r:0.5 riq:0.5 r:0.5 riq:0.5 r:0.5 riq:0.5", b0, 0.34))] },
+  // The Old Bough: the grove's hymn, slow, in A aeolian, the choir and then the pipe answering, the drum a heartbeat.
+  { id: "north_old_bough", name: "The Old Bough", bpm: 60, beats: 48, tonic: 69, scale: AEOLIAN,
+    notes: () => {
+      const choir = phrase(`A3:4 | C4:2 B3:2 | A3:4 | G3:2 E3:2 | A3:4 | C4:2 D4:2 | E4:4 | A3:4 | E4:3 D4:1 | C4:2 B3:2 | A3:4 | A3:4`, "choir", 0, 0.55);
+      const pipe = phrase(`E5:2 D5:1 C5:1 | B4:4 | C5:2 B4:1 A4:1 | G4:4 | A4:2 B4:1 C5:1 | B4:2 A4:2 | E4:4 | A4:4`, "recorder", 16, 0.5);
+      return [held("drone", 45, 48, 0.4), ...choir, ...pipe];
+    },
+    hits: () => [...deepOn(Array.from({ length: 12 }, (_, k) => [k * 4, k * 4 + 0.6]).flat(), 0.38), ...strokes("wind:24 wind:24", 0, 0.3)] },
+];
 /** Which Kharaveth piece plays where. */
 const KHARAVETH_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { sunteeth: "kharaveth_sunteeth", foothold: "kharaveth_foothold", underway: "kharaveth_underway", ochre_steppe: "kharaveth_steppe", sunward_strait: "kharaveth_steppe",
   ashar_valley: "kharaveth_steppe", ochre_spine: "kharaveth_steppe", khetmar_pass: "kharaveth_khetmar", zuri_camp: "kharaveth_steppe", ouresh_camp: "kharaveth_dunes", sea_of_dunes: "kharaveth_dunes",
@@ -695,10 +769,11 @@ const KHARAVETH_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { sunteeth: "
   siruvet_pyramid: "kharaveth_azhurak", uncounted_deep: "kharaveth_underway", measured_vault: "kharaveth_underway" };
 /** The sea ports' pieces, borrowed from their neighbours: Saltmarrow's shanty for Gullwick, the Crownlands' hymn for Saltreach, Kharaveth's for the east. */
 /** The dragons' places (dragonsworld.ts) borrow their neighbours' pieces. */
-/** The north's places borrow pieces until they have their own: the cold coast and the high ground for the Vargskeld, the forest and the towns for the Zoryavik. */
-const NORTH_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { vargskeld: "frostpeak", vargskeld_sea: "coast", skarnholm: "saltmarrow", ravnsvik: "coast", oathsworn_hall: "greyhorn", embermoot: "silent_peaks",
-  redwake_camp: "westmarch", varn_ridge: "frostpeak", oathgate_pass: "drakespine", zoryavik: "barkreach", zoryavik_coast: "coast", skarnholm_bay: "coast", grimfell: "frostpeak", sokol_hills: "barkreach", outer_sea: "coast", hearthwatch: "greyhorn", krasnogor: "highcairn", bereslav: "fernwick",
-  zlatna_gora: "ironreach", svetloye: "crownlands", old_bough: "heartwood" };
+/** Which of the north's pieces plays where (the outer sea keeps the coast's). */
+const NORTH_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { vargskeld: "north_vargskeld", varn_ridge: "north_vargskeld", grimfell: "north_vargskeld", embermoot: "north_vargskeld",
+  skarnholm: "north_skarnholm", ravnsvik: "north_skarnholm", skarnholm_bay: "north_skarnholm", vargskeld_sea: "north_skarnholm", oathsworn_hall: "north_oath", oathgate_pass: "north_oath",
+  redwake_camp: "north_redwake", zoryavik: "north_zoryavik", sokol_hills: "north_zoryavik", zoryavik_coast: "north_zoryavik", hearthwatch: "north_zoryavik",
+  krasnogor: "north_krasnogor", bereslav: "north_krasnogor", zlatna_gora: "north_krasnogor", svetloye: "north_old_bough", old_bough: "north_old_bough", outer_sea: "coast" };
 const DRAGON_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { bonefield: "deadwood", cragmaw_heights: "ironreach", qeshet: "kharaveth_dunes", sunken_halls: "kharaveth_underway" };
 const PORTS_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { gullwick: "saltmarrow", saltreach: "crownlands", merrab: "kharaveth_sefrah", tel_ashun: "kharaveth_azhurak", ennus_well: "kharaveth_dunes" };
 /** Which Mizukai piece plays where. */
@@ -711,11 +786,12 @@ const MIZUKAI_REGION_TRACK: Partial<Record<RegionId, TrackId>> = {
   mizukai_sea: "mizukai_sea", three_stones: "mizukai_sea", turtle_rock: "mizukai_sea",
 };
 
-export const TRACKS: readonly Track[] = [themeTrack(), ...STYLES.map(composeTrack), ...MIZUKAI_PIECES.map(composeMizukai), ...KHARAVETH_PIECES.map(composeMizukai), ...MEGHAVAN_PIECES.map(composeMizukai)];
+export const TRACKS: readonly Track[] = [themeTrack(), ...STYLES.map(composeTrack), ...MIZUKAI_PIECES.map(composeMizukai), ...KHARAVETH_PIECES.map(composeMizukai), ...MEGHAVAN_PIECES.map(composeMizukai), ...NORTH_PIECES.map(composeMizukai)];
 /** The Mizukai pieces (for tests). */
 export const MIZUKAI_TRACKS: readonly TrackId[] = MIZUKAI_PIECES.map(piece => piece.id);
 export const KHARAVETH_TRACKS: readonly TrackId[] = KHARAVETH_PIECES.map(piece => piece.id);
 export const MEGHAVAN_TRACKS: readonly TrackId[] = MEGHAVAN_PIECES.map(piece => piece.id);
+export const NORTH_TRACKS: readonly TrackId[] = NORTH_PIECES.map(piece => piece.id);
 export const trackById = (id: TrackId) => TRACKS.find(track => track.id === id) ?? TRACKS[0];
 /** Which track plays where: each region has its own, and the Hollow King's throne room its boss theme. */
 export function trackFor(region: RegionId, nearBoss: boolean, mizukai: { sea?: boolean; fight?: boolean; spirit?: boolean } = {}): TrackId {

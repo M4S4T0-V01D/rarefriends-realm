@@ -44,7 +44,8 @@ export const NORTH_NPCS: Record<string, NpcDef> = {
   bereslav_bargewoman: person("bereslav_bargewoman", "Olena the bargewoman", "Runs timber down the Bereza to the sea. Knows every shoal, and every toll the Compact doesn't pay.", 2126),
   zlatna_foreman: person("zlatna_foreman", "Foreman Kazimir", "Runs the mines at Zlatna Gora for the Compact. Has heard every argument for the princes' share, and lost interest in all of them.", 2127),
   archivist_bozhena: person("archivist_bozhena", "Archivist Bozhena", "Keeps the Dawn Archive's chronicles, including the ones that contradict each other. Especially those.", 2128),
-  archive_copyist: person("archive_copyist", "Archive copyist", "Copies the chronicles by hand, and notices when the copies don't match.", 2129),
+  // (Leaves the Archive if the first copy of the Oathgate chronicle goes to the prince: northcompanies.ts.)
+  archive_copyist: person("archive_copyist", "Archive copyist", "Copies the chronicles by hand, and notices when the copies don't match.", 2129, { gone: game => game.player.questData.dc_choice === 3 }),
   old_bough_keeper: person("old_bough_keeper", "Old Dobromir of the Bough", "Keeps the Circle's grove. Speaks to the oak more than to people, and is answered more often.", 2130),
 };
 

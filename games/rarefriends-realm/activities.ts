@@ -57,7 +57,7 @@ const QUARRY_ROCKS = ["pewter", "blackiron", "inkcoal", "moonsilver"] as const;
 
 /** Standing with a northern faction, earned (northfactions.ts spends it). */
 const raiseStanding = (game: Game, faction: string, n: number) => { game.player.standing[faction] = (game.player.standing[faction] ?? 0) + n; };
-const PATROL_POSTS = ["post1", "post2", "post3"] as const, SURVEY_CAIRNS = ["cairn1", "cairn2", "cairn3"] as const;
+const PATROL_POSTS = ["post1", "post2", "post3"] as const, SURVEY_CAIRNS = ["cairn1", "cairn2", "cairn3"] as const, RECORD_STONES = ["stone1", "stone2", "stone3"] as const;
 export const ACTIVITIES: Record<string, ActivityDef> = {
   quarry_call: {
     id: "quarry_call", name: "The Quarry Call", skill: "mining", host: "quarry_master", requires: { level: 10 }, limit: 900, cooldown: 2400,
@@ -132,6 +132,28 @@ export const ACTIVITIES: Record<string, ActivityDef> = {
     reward: (game, _run, score) => { const xp = Math.round(1600 * (0.5 + score)), standing = Math.round(6 + 6 * score); addXp(game, "seafaring", xp, { raw: true }); raiseStanding(game, "farwake", standing); give(game.player, "coins", Math.round(600 * score)); return `${xp} Seafaring XP and ${standing} standing with the Farwake`; },
     promise: "Seafaring XP, the guild's fee, and standing with the Farwake.",
   },
+  redwake_contract: {
+    id: "redwake_contract", name: "The Redwake Contract", skill: "strength", host: "redwake_captain", requires: { level: 40 }, limit: 1200, cooldown: 3000,
+    unlocked: game => game.player.questData.redwake_member ? null : "The company's contracts are for its own. Sign with the Redwake first.",
+    roll: () => ({ count: 5 }),
+    brief: (_game, target) => `The jarls pay by the head: ${target.count} of the raiders in the hills along the Oathgate road, before the contract runs out. A quarter of an hour, and the company's share is yours.`,
+    goal: (_game, run) => Math.min(1, run.progress / n(run.target.count)),
+    status: (_game, run) => `${run.progress} of ${run.target.count} raiders.`,
+    score: (game, run) => 0.5 + 0.5 * timeLeft(game, run),
+    reward: (game, _run, score) => { const xp = Math.round(1400 * (0.5 + score)), standing = Math.round(6 + 6 * score); addXp(game, "strength", xp, { raw: true }); addXp(game, "attack", Math.round(xp / 2), { raw: true }); raiseStanding(game, "redwake", standing); give(game.player, "coins", Math.round(700 * score)); return `${xp} Strength XP, ${Math.round(xp / 2)} Attack XP and ${standing} standing with the Redwake`; },
+    promise: "Strength and Attack XP, the company's share, and standing with the Redwake.",
+  },
+  archive_rubbings: {
+    id: "archive_rubbings", name: "The Archive's Rubbings", skill: "mysteries", host: "archivist_bozhena", requires: { level: 30 }, limit: 2400, cooldown: 3000,
+    unlocked: game => game.player.questData.archive_member ? null : "The Archive sends its own. Find us the first copy first.",
+    roll: () => ({ stones: 3 }),
+    brief: () => "Three old stones the Archive wants fresh rubbings of: the boundary stone on the Hearthwatch road, the waystone above Zlatna Gora, and the river stone at Bereslav. Twenty minutes; paper and charcoal are on the table.",
+    goal: (_game, run) => RECORD_STONES.filter(key => run.marks[key]).length / RECORD_STONES.length,
+    status: (_game, run) => `${RECORD_STONES.filter(key => run.marks[key]).length} of 3 stones rubbed.`,
+    score: (game, run) => 0.5 + 0.5 * timeLeft(game, run),
+    reward: (game, _run, score) => { const xp = Math.round(1500 * (0.5 + score)), standing = Math.round(6 + 6 * score); addXp(game, "mysteries", xp, { raw: true }); addXp(game, "presence", Math.round(xp / 3), { raw: true }); raiseStanding(game, "dawn_archive", standing); give(game.player, "coins", Math.round(500 * score)); return `${xp} Mysteries XP, ${Math.round(xp / 3)} Presence XP and ${standing} standing with the Archive`; },
+    promise: "Mysteries and Presence XP, the Archive's fee, and standing with the Archive.",
+  },
   compact_order: {
     id: "compact_order", name: "The Compact's Order", skill: "smithing", host: "freeholds_speaker", requires: { level: 30 }, limit: 1800, cooldown: 3000,
     unlocked: game => game.player.questData.freeholds_member ? null : "The Compact's orders go to the Compact's own. Help us cast the free weight first.",
@@ -192,6 +214,8 @@ export function activityEvent(game: Game, event: ActivityEvent) {
   if (run.id === "quarry_call" && event.kind === "mine" && event.rock === run.target.rock && regionAt(game.world, event.x, event.y).id === "ashen_hills") { run.progress++; if (run.progress < n(run.target.count)) message(game, `${def.name}. ${def.status(game, run)}`); }
   if (run.id === "assay_run" && event.kind === "produce" && event.station === GUILD_FURNACE && event.metal === run.target.metal) { if (event.failed) run.failed++; else run.progress++; }
   if (run.id === "hot_tunnel" && event.kind === "mine" && event.rock === "gem" && regionAt(game.world, event.x, event.y).id === "ashen_shaft" && !run.marks.gem) { run.marks.gem = 1; message(game, `${def.name}. ${def.status(game, run)}`, "quest"); }
+  // (The Redwake's contract: the raiders in the hills along the Oathgate road, northworld.ts OATH_ROAD.hills.)
+  if (run.id === "redwake_contract" && event.kind === "kill" && event.monster === "bandit" && event.x >= 440 && event.x <= 545 && event.y >= 196 && event.y <= 262) { run.progress++; if (run.progress < n(run.target.count)) message(game, `${def.name}. ${def.status(game, run)}`); }
   if (run.id === "barrow_watch" && event.kind === "kill" && event.monster === "draugr") { run.progress++; if (run.progress < n(run.target.count)) message(game, `${def.name}. ${def.status(game, run)}`); }
   if (run.id === "road_patrol" && event.kind === "kill" && ["wolf", "bandit", "rusalka", "leshy", "boar"].includes(event.monster) && event.x >= 690 && event.x <= 900 && event.y >= 160 && event.y <= 280) { run.progress++; message(game, `${def.name}. ${def.status(game, run)}`); }
   if (def.goal(game, run) >= 1) finishActivity(game);
