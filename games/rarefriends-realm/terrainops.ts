@@ -3,7 +3,7 @@
  * The ground ops work on the land's own floor (`world.base`, per tile), which every corner height is built on
  * (world.ts groundHeights: the relief of the tiles round a corner, plus the average floor under them), so a saved
  * world bakes exactly as it was seen: the floor is baked in steps of 1/64 (bake.ts), and never below 0, so every
- * value written here is quantized to that and kept in [0, FLOOR_MAX]. Nothing here draws from a random stream.
+ * value written here is quantized to that and kept in [FLOOR_MIN, FLOOR_MAX]. Nothing here draws from a random stream.
  */
 import { H, T, W, regionIndex, type RegionId, type World } from "./world.ts";
 
@@ -19,12 +19,15 @@ export type PaintOp =
 
 /** How far one step of strength moves the ground (world pixels): HEAVE_STEP, a quarter of a storey or so. */
 export const TERRAIN_STEP = 16;
-/** The floor's range: the bake keeps it in 16 bits of 1/64ths. */
-export const FLOOR_MAX = 1000;
+/** The floor's range: the bake keeps it in 16 bits of 1/64ths from FLOOR_MIN, so ground can be dug well below where the
+ * land lay (a pit, a gorge, a sunken valley) as well as raised. */
+export const FLOOR_MIN = -300, FLOOR_MAX = 720;
 export const BRUSH_MAX = 32, LINE_WIDTH_MAX = 15, FLOOD_MAX = 40_000, REGION_TILES_MAX = 250_000;
-const quantize = (v: number) => Math.round(Math.max(0, Math.min(FLOOR_MAX, v)) * 64) / 64;
-/** Water as the shore reckons it (elevation.ts): water, deep water, bridges over it. (Asked for lazily: T isn't there while modules load.) */
-export const isWaterlike = (t: number) => t === T.WATER || t === T.DEEP || t === T.BRIDGE;
+const quantize = (v: number) => Math.round(Math.max(FLOOR_MIN, Math.min(FLOOR_MAX, v)) * 64) / 64;
+/** Water as the shore reckons it (elevation.ts): water, deep water, bridges over it; and lava, which lies level the same way. (Asked for lazily: T isn't there while modules load.) */
+export const isWaterlike = (t: number) => t === T.WATER || t === T.DEEP || t === T.BRIDGE || t === T.LAVA;
+/** Which body a liquid tile belongs with: water with water, lava with lava. */
+const liquidKind = (t: number) => t === T.LAVA ? 2 : isWaterlike(t) ? 1 : 0;
 /** How far round water the shore lies flat at the water's level (elevation.ts WATER_FLAT): the ground tools leave it alone. */
 export const SHORE_FLAT = 2;
 /** Whether a tile is water or on its flat shore (within SHORE_FLAT of water, eight ways). */
@@ -33,7 +36,7 @@ export function onShore(tiles: Uint8Array, x: number, y: number) {
   return false;
 }
 /**
- * Painted water lies level: every body of water the painted rectangle touches takes the level of the water it was
+ * Painted water (or lava) lies level: every body of water the painted rectangle touches takes the level of the water it was
  * already (the median floor under its tiles outside the rectangle; a new pond, its own), its new tiles and their flat
  * shore set to it, the land easing back beyond. Returns the rectangle of tiles whose floor changed, or null.
  */
@@ -43,9 +46,9 @@ export function levelPaintedWater(world: World, box: { x0: number; y0: number; x
   const out = { x0: W, y0: H, x1: -1, y1: -1 };
   for (let y = Math.max(0, box.y0); y <= Math.min(H - 1, box.y1); y++) for (let x = Math.max(0, box.x0); x <= Math.min(W - 1, box.x1); x++) {
     const s = y * W + x; if (seen.has(s) || !isWaterlike(tiles[s])) continue;
-    const body = [s], outside: number[] = [], inside: number[] = []; seen.add(s);
+    const kind = liquidKind(tiles[s]), body = [s], outside: number[] = [], inside: number[] = []; seen.add(s);
     for (let k = 0; k < body.length && body.length < CAP; k++) { const i = body[k], bx = i % W, by = (i - bx) / W; (inBox(bx, by) ? inside : outside).push(base[i]);
-      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const nx = bx + dx, ny = by + dy; if ((!dx && !dy) || nx < 0 || ny < 0 || nx >= W || ny >= H) continue; const j = ny * W + nx; if (!seen.has(j) && isWaterlike(tiles[j])) { seen.add(j); body.push(j); } } }
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const nx = bx + dx, ny = by + dy; if ((!dx && !dy) || nx < 0 || ny < 0 || nx >= W || ny >= H) continue; const j = ny * W + nx; if (!seen.has(j) && liquidKind(tiles[j]) === kind) { seen.add(j); body.push(j); } } }
     const from = (outside.length ? outside : inside).sort((p, q) => p - q), level = from[from.length >> 1];
     // The body's tiles in the rectangle, then their shore and the slope back, by distance from them.
     const dist = new Map<number, number>(), queue: number[] = [];

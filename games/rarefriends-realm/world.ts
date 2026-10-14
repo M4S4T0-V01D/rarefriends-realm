@@ -1897,7 +1897,8 @@ const RELIEF: Record<number, number> = {
   [T.ASH]: 62, [T.GRASS]: 46, [T.DARK_GRASS]: 58, [T.PATH]: 26, [T.SAND]: 38, [T.SWAMP]: 10, [T.SNOW]: 84, [T.GRAVEL]: 60, [T.CLIFF]: 90, [T.FARMLAND]: 6,
 };
 /** Water, as the shore's flat apron reckons it (elevation.ts): water, deep water and bridges over it. */
-const WATERLIKE = new Set<number>([T.WATER, T.DEEP, T.BRIDGE]);
+/** Water and lava as the ground reckons them: level bodies with a flat shore, the hills kept off it (elevation.ts). */
+const WATERLIKE = new Set<number>([T.WATER, T.DEEP, T.BRIDGE, T.LAVA]);
 /** How far a river falls between its level reaches (elevation.ts FALL): a town nearer its water than this comes down to it. */
 const FALL_STEP = 30;
 const FLAT = new Set<number>([T.LAVA, T.VOID, T.WATER, T.DEEP, T.BRIDGE, T.COBBLE, T.WOOD, T.STONE, T.CARPET, T.WALL, T.DUNGEON, T.ICE, T.BRICK]);

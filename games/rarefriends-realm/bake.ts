@@ -9,8 +9,9 @@
  * JSON. The tile → object and tile → building maps are rebuilt from the lists.
  */
 import { H, W, buildHeights, indexBuildings, indexObjects, relabelRegions, type World } from "./world.ts";
+import { FLOOR_MIN } from "./terrainops.ts";
 
-export const BAKE_VERSION = 6;
+export const BAKE_VERSION = 7;
 const LIFT_STEPS = 64;
 type Baked = { v: number; seed: number; w: number; h: number; tiles: string; region: string; lift: string; raise: string; base: string; data: Pick<World, "under" | "labels" | "objects" | "spawns" | "places" | "buildings" | "floors" | "ramparts"> };
 
@@ -22,25 +23,25 @@ const toBase64 = (bytes: Uint8Array) => {
 const fromBase64 = (text: string) => { const binary = atob(text), bytes = new Uint8Array(binary.length); for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i); return bytes; };
 
 /** The world as one string (for the build). */
-const bakeSteps = (values: Float32Array, what: string) => {
+const bakeSteps = (values: Float32Array, what: string, from = 0) => {
   const steps = new Uint16Array(values.length);
   let previous = 0;
   for (let i = 0; i < values.length; i++) {
-    if (!(values[i] >= 0 && values[i] < 65535 / LIFT_STEPS)) throw new Error(`bakeWorld: ${what} ${values[i]} at ${i} is out of range`);
-    const value = Math.round(values[i] * LIFT_STEPS);
+    if (!(values[i] - from >= 0 && values[i] - from < 65535 / LIFT_STEPS)) throw new Error(`bakeWorld: ${what} ${values[i]} at ${i} is out of range`);
+    const value = Math.round((values[i] - from) * LIFT_STEPS);
     steps[i] = (value - previous) & 0xffff; previous = value;
   }
   return toBase64(new Uint8Array(steps.buffer));
 };
-const unbakeSteps = (text: string) => {
+const unbakeSteps = (text: string, from = 0) => {
   const stepBytes = fromBase64(text), steps = new Uint16Array(stepBytes.buffer, stepBytes.byteOffset, stepBytes.byteLength / 2), values = new Float32Array(steps.length);
   let value = 0;
-  for (let i = 0; i < steps.length; i++) { value = (value + steps[i]) & 0xffff; values[i] = value / LIFT_STEPS; }
+  for (let i = 0; i < steps.length; i++) { value = (value + steps[i]) & 0xffff; values[i] = value / LIFT_STEPS + from; }
   return values;
 };
 export function bakeWorld(world: World, lift: Float32Array, seed: number, raise = new Float32Array(lift.length)): string {
   const baked: Baked = {
-    v: BAKE_VERSION, seed, w: W, h: H, tiles: toBase64(world.tiles), region: toBase64(world.region), lift: bakeSteps(lift, "lift"), raise: bakeSteps(raise, "raise"), base: bakeSteps(world.base ?? new Float32Array(lift.length), "base"),
+    v: BAKE_VERSION, seed, w: W, h: H, tiles: toBase64(world.tiles), region: toBase64(world.region), lift: bakeSteps(lift, "lift"), raise: bakeSteps(raise, "raise"), base: bakeSteps(world.base ?? new Float32Array(lift.length), "base", FLOOR_MIN),
     data: { objects: world.objects, spawns: world.spawns, places: world.places, buildings: world.buildings, floors: world.floors, ramparts: world.ramparts, under: world.under, labels: world.labels },
   };
   return JSON.stringify(baked);
@@ -50,7 +51,7 @@ export function bakeWorld(world: World, lift: Float32Array, seed: number, raise 
 export function unbakeWorld(text: string): World | null {
   const baked = JSON.parse(text) as Baked;
   if (baked.v !== BAKE_VERSION || baked.w !== W || baked.h !== H) return null;
-  const tiles = fromBase64(baked.tiles), region = fromBase64(baked.region), lift = unbakeSteps(baked.lift), raise = unbakeSteps(baked.raise), base = unbakeSteps(baked.base);
+  const tiles = fromBase64(baked.tiles), region = fromBase64(baked.region), lift = unbakeSteps(baked.lift), raise = unbakeSteps(baked.raise), base = unbakeSteps(baked.base, FLOOR_MIN);
   const { objects, spawns, places, buildings, floors, ramparts, under, labels } = baked.data;
   relabelRegions(labels ?? {});
   return { tiles, region, objects, objectAt: indexObjects(objects), spawns, places, heights: buildHeights(tiles, baked.seed, lift, raise, base, buildings), buildings, buildingAt: indexBuildings(buildings), floors, ramparts, lift, raise, base, under: under ?? [], labels: labels ?? {} };

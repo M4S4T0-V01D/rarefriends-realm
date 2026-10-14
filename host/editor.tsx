@@ -430,7 +430,7 @@ function Editor() {
         <div style={S.row}>{([[true, "Allow camping"], [false, "Forbid camping"]] as const).map(([v, label]) => <button key={label} type="button" style={S.btn(allow === v)} onClick={() => setAllow(v)}>{label}</button>)}</div>
         <h4 style={S.h}>Why (said when forbidden)</h4><input style={S.input} value={why} onChange={e => setWhy(e.target.value)} placeholder="Camping isn't allowed here." />
       </>}
-      <p style={S.muted}>Edit mode (F2) turns clicks in the game into the tool; right-click inspects. Terrain changes the land's own floor, so a saved world bakes exactly as you see it; ground can't be dug below its floor.</p>
+      <p style={S.muted}>Edit mode (F2) turns clicks in the game into the tool; right-click inspects. Terrain changes the land's own floor, so a saved world bakes exactly as you see it; ground can be dug down to 300 below where the land lay.</p>
     </aside>
 
     <aside style={S.right} aria-label="Development panels">

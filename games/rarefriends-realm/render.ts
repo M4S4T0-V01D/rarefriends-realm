@@ -179,7 +179,7 @@ export function setGround(world: World | null) { ground = world; }
 const groundAt = (x: number, y: number) => {
   if (!ground) return 0;
   const tx = Math.round(x), ty = Math.round(y);
-  return inBounds(tx, ty) && isWaterTerrain(ground.tiles[ty * W + tx]) ? waterSurface(ground, tx, ty) : groundHeight(ground, x, y);
+  return inBounds(tx, ty) && isLiquid(ground.tiles[ty * W + tx]) ? waterSurface(ground, tx, ty) : groundHeight(ground, x, y);
 };
 /** The storey you're on (set each frame): clicks land on its floor. */
 let viewFloor: Floor | null = null;
@@ -369,11 +369,11 @@ function groundChunkMesh(glr: RealmGL, world: World, cx: number, cy: number): Fl
   const out: number[] = [];
   // How far each corner is from the shore (in tiles, up to SHORE_MAX): 0 where any of the four tiles round it is land.
   const SHORE_MAX = 6, near = new Map<number, number>();
-  const shoreAt = (i: number, j: number) => {
-    const key = j * (W + 1) + i, known = near.get(key); if (known !== undefined) return known;
+  const shoreAt = (i: number, j: number, liquid: number = T.WATER) => {
+    const key = (j * (W + 1) + i) * 2 + (liquid === T.LAVA ? 1 : 0), known = near.get(key); if (known !== undefined) return known;
     let best = SHORE_MAX;
     for (let dy = -SHORE_MAX; dy < SHORE_MAX; dy++) for (let dx = -SHORE_MAX; dx < SHORE_MAX; dx++) {
-      const tx = i + dx, ty = j + dy; if (!inBounds(tx, ty) || !bankedBy(world.tiles[ty * W + tx])) continue;
+      const tx = i + dx, ty = j + dy; if (!inBounds(tx, ty) || !bankedBy(world.tiles[ty * W + tx], liquid)) continue;
       // (From a corner to the nearest point of that tile.)
       const d = Math.hypot(Math.max(0, dx < 0 ? -dx - 1 : dx), Math.max(0, dy < 0 ? -dy - 1 : dy)); if (d < best) best = d;
     }
@@ -394,22 +394,24 @@ function groundChunkMesh(glr: RealmGL, world: World, cx: number, cy: number): Fl
     const edgeTo = (nx: number, ny: number, k: number) => { const o = other(nx, ny); return blend[k] < 0 && !(o === T.VOID || EDGE_CLASS[o] === mine || o === T.WALL || o === T.CLIFF); };
     const edges = (edgeTo(x, y - 1, 0) ? 1 : 0) | (edgeTo(x + 1, y, 1) ? 2 : 0) | (edgeTo(x, y + 1, 2) ? 4 : 0) | (edgeTo(x - 1, y, 3) ? 8 : 0);
     const kind = terrain === T.WATER ? 1 : terrain === T.DEEP ? 2 : terrain === T.LAVA ? 3 : 0;
-    if (kind === 1 || kind === 2) {
+    if (kind >= 1 && kind <= 3) {
       // Water: below the land (WATER_DROP), its shade the distance to the shore at each corner (10 + tiles, for the
       // shader's shallows, depths and foam), and a bank (kind 4, the land's own texture) down to it from each shore.
       // (Flat at its surface, whatever its corners; a bank up to higher land, a fall (kind 5) from higher water beside.)
+      // Lava the same way (LAVA_DROP; its crust thicker by the shore): a scorched bank (kind 6), a lava fall (kind 7).
+      const lava = kind === 3, bankKind = lava ? 6 : 4, fallKind = lava ? 7 : 5;
       const surface = waterSurface(world, x, y), corners = [[-0.5, -0.5, hA, 0, 0], [0.5, -0.5, hB, 1, 0], [0.5, 0.5, hC, 1, 1], [-0.5, 0.5, hD, 0, 1]] as const;
-      corners.forEach(([dx, dy, , u, v], k) => out.push(x + dx, y + dy, surface, u, v, layer, 10 + shoreAt(x + (k === 1 || k === 2 ? 1 : 0), y + (k >= 2 ? 1 : 0)), edges, kind, -1, -1, -1, -1));
+      corners.forEach(([dx, dy, , u, v], k) => out.push(x + dx, y + dy, surface, u, v, layer, 10 + shoreAt(x + (k === 1 || k === 2 ? 1 : 0), y + (k >= 2 ? 1 : 0), terrain), edges, kind, -1, -1, -1, -1));
       for (const [ox, oy, i, j] of TILE_EDGES) {
         const nx = x + ox, ny = y + oy, o = other(nx, ny), a = corners[i], b = corners[j];
-        if (bankedBy(o)) {
+        if (bankedBy(o, terrain)) {
           const bank = groundLayer(glr, lookOf(world, nx, ny, o), Math.floor(hash(ny, nx) * 4));
-          out.push(x + a[0], y + a[1], a[2], 0, 0, bank, -0.18, 0, 4, -1, -1, -1, -1, x + b[0], y + b[1], b[2], 1, 0, bank, -0.18, 0, 4, -1, -1, -1, -1,
-            x + b[0], y + b[1], surface, 1, 1, bank, -0.18, 0, 4, -1, -1, -1, -1, x + a[0], y + a[1], surface, 0, 1, bank, -0.18, 0, 4, -1, -1, -1, -1);
-        } else if (isWaterTerrain(o)) {
+          out.push(x + a[0], y + a[1], a[2], 0, 0, bank, -0.18, 0, bankKind, -1, -1, -1, -1, x + b[0], y + b[1], b[2], 1, 0, bank, -0.18, 0, bankKind, -1, -1, -1, -1,
+            x + b[0], y + b[1], surface, 1, 1, bank, -0.18, 0, bankKind, -1, -1, -1, -1, x + a[0], y + a[1], surface, 0, 1, bank, -0.18, 0, bankKind, -1, -1, -1, -1);
+        } else if (sameLiquid(terrain, o)) {
           const top = waterSurface(world, nx, ny); if (top - surface < 1) continue;
-          out.push(x + a[0], y + a[1], top, 0, 0, layer, 0, 0, 5, -1, -1, -1, -1, x + b[0], y + b[1], top, 1, 0, layer, 0, 0, 5, -1, -1, -1, -1,
-            x + b[0], y + b[1], surface, 1, 1, layer, 0, 0, 5, -1, -1, -1, -1, x + a[0], y + a[1], surface, 0, 1, layer, 0, 0, 5, -1, -1, -1, -1);
+          out.push(x + a[0], y + a[1], top, 0, 0, layer, 0, 0, fallKind, -1, -1, -1, -1, x + b[0], y + b[1], top, 1, 0, layer, 0, 0, fallKind, -1, -1, -1, -1,
+            x + b[0], y + b[1], surface, 1, 1, layer, 0, 0, fallKind, -1, -1, -1, -1, x + a[0], y + a[1], surface, 0, 1, layer, 0, 0, fallKind, -1, -1, -1, -1);
         }
       }
       continue;
@@ -617,15 +619,21 @@ const terrainFill = (terrain: number, variation: number) => {
   return fill;
 };
 const isWaterTerrain = (terrain: number) => terrain === T.WATER || terrain === T.DEEP;
+/** Water or lava: both lie flat below the land, with banks up to it and falls between levels. */
+const isLiquid = (terrain: number) => isWaterTerrain(terrain) || terrain === T.LAVA;
+/** Whether two tiles are the same liquid (water meets water, lava meets lava; anything else is a shore). */
+const sameLiquid = (a: number, b: number) => isWaterTerrain(a) ? isWaterTerrain(b) : a === T.LAVA && b === T.LAVA;
 /**
  * Water lies below the land: its surface WATER_DROP under the ground's corners, with a bank of earth down to it wherever
  * it meets land (both renderers), so a shore reads as land ending and water beginning, not one sheet in two colours.
  */
 export const WATER_DROP = 7;
-/** The water's surface on a water tile: flat, WATER_DROP under its lowest corner (whatever stands higher round it gets a bank, or a fall from higher water). */
-export function waterSurface(world: World, x: number, y: number) { return Math.min(cornerHeight(world, x, y), cornerHeight(world, x + 1, y), cornerHeight(world, x, y + 1), cornerHeight(world, x + 1, y + 1)) - WATER_DROP; }
+/** Lava lies a little higher in its banks than water: crusting over at the edges, it's always nearly brim-full. */
+export const LAVA_DROP = 5;
+/** The surface on a water (or lava) tile: flat, WATER_DROP (LAVA_DROP) under its lowest corner (whatever stands higher round it gets a bank, or a fall from a higher reach). */
+export function waterSurface(world: World, x: number, y: number) { return Math.min(cornerHeight(world, x, y), cornerHeight(world, x + 1, y), cornerHeight(world, x, y + 1), cornerHeight(world, x + 1, y + 1)) - (world.tiles[y * W + x] === T.LAVA ? LAVA_DROP : WATER_DROP); }
 /** Whether a tile is land a bank stands for (anything but water and the void). */
-const bankedBy = (terrain: number) => terrain !== T.VOID && !isWaterTerrain(terrain);
+const bankedBy = (terrain: number, liquid: number = T.WATER) => terrain !== T.VOID && !sameLiquid(liquid, terrain);
 /** The four edges of a tile: the neighbour across each, and its two corners (0 a, 1 b, 2 c, 3 d: north-west, north-east, south-east, south-west). */
 const TILE_EDGES = [[0, -1, 0, 1], [1, 0, 1, 2], [0, 1, 2, 3], [-1, 0, 3, 0]] as const;
 /**
@@ -715,7 +723,7 @@ function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, camera: Camera
     const moving = animate && (terrain === T.WATER || terrain === T.DEEP || terrain === T.LAVA);
     if (mode === "motion" && !moving) continue;
     // (On water, toScreen is already at its surface.)
-    const wet = isWaterTerrain(terrain), { x: sx, y: sy } = toScreen(camera, x, y);
+    const wet = isLiquid(terrain), lava = terrain === T.LAVA, { x: sx, y: sy } = toScreen(camera, x, y);
     if (sx < -hw * 2 - pad || sx > VIEW.width + hw * 2 + pad || sy < -hh * 2 - pad || sy > VIEW.height + hh * 4 + pad) continue;
     // Corner heights lift each corner off the tile centre; slopes facing the north-west light are brighter.
     // (Water is drawn flat at its surface: its corners all at the tile's centre height.)
@@ -735,14 +743,31 @@ function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, camera: Camera
         const foot: [number, number][] = [[ax, ay], [bx, by], [cx, cy], [dx, dy]], heightAt = [cornerHeight(world, x, y), cornerHeight(world, x + 1, y), cornerHeight(world, x + 1, y + 1), cornerHeight(world, x, y + 1)];
         for (const [ox, oy, i, j] of TILE_EDGES) {
           const nx = x + ox, ny = y + oy, other = inBounds(nx, ny) ? world.tiles[ny * W + nx] : T.VOID, [x0, y0] = foot[i], [x1, y1] = foot[j];
-          if (bankedBy(other)) {
+          if (bankedBy(other, terrain) && lava) {
+            // A lava bank: the land scorched black down to it, glowing hotter towards the foot, a crust of fire where it meets the lava.
+            const up0 = (heightAt[i] - surface) * lifted, up1 = (heightAt[j] - surface) * lifted, flick = 0.8 + 0.2 * Math.sin(t * 3.1 + nx * 1.7 + ny * 2.3);
+            ctx.beginPath(); ctx.moveTo(x0, y0 - up0); ctx.lineTo(x1, y1 - up1); ctx.lineTo(x1, y1); ctx.lineTo(x0, y0); ctx.closePath();
+            ctx.fillStyle = terrainFill(lookOf(world, nx, ny, other), -0.55); ctx.fill();
+            const hot0 = Math.min(up0, LAVA_DROP * lifted) * 0.7, hot1 = Math.min(up1, LAVA_DROP * lifted) * 0.7;
+            ctx.fillStyle = `rgba(255,${Math.round(96 + 40 * flick)},30,${(0.5 * flick).toFixed(3)})`; ctx.beginPath(); ctx.moveTo(x0, y0 - hot0); ctx.lineTo(x1, y1 - hot1); ctx.lineTo(x1, y1); ctx.lineTo(x0, y0); ctx.closePath(); ctx.fill();
+            ctx.strokeStyle = `rgba(255,${Math.round(200 + 40 * flick)},110,0.9)`; ctx.lineWidth = Math.max(0.8, z * 1.4); ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+          } else if (lava && sameLiquid(terrain, other)) {
+            // A lava fall from a higher pool: molten rock pouring over the lip, streaked, slower than water.
+            const above = waterSurface(world, nx, ny) - surface; if (above < 1) continue;
+            const up = above * lifted;
+            ctx.beginPath(); ctx.moveTo(x0, y0 - up); ctx.lineTo(x1, y1 - up); ctx.lineTo(x1, y1); ctx.lineTo(x0, y0); ctx.closePath();
+            ctx.fillStyle = "rgba(236,92,28,0.96)"; ctx.fill();
+            ctx.strokeStyle = "rgba(255,214,110,0.85)"; ctx.lineWidth = Math.max(0.8, z * 1.2); ctx.beginPath();
+            for (let k = 1; k < 4; k++) { const f = k / 4, px = x0 + (x1 - x0) * f, py = y0 + (y1 - y0) * f, run = ((t * 0.35 + k * 0.37) % 1) * up; ctx.moveTo(px, py - up); ctx.lineTo(px, py - up + run); }
+            ctx.stroke();
+          } else if (bankedBy(other, terrain)) {
             const up0 = (heightAt[i] - surface) * lifted, up1 = (heightAt[j] - surface) * lifted;
             ctx.beginPath(); ctx.moveTo(x0, y0 - up0); ctx.lineTo(x1, y1 - up1); ctx.lineTo(x1, y1); ctx.lineTo(x0, y0); ctx.closePath();
             ctx.fillStyle = terrainFill(lookOf(world, nx, ny, other), -0.32); ctx.fill();
             const wet0 = Math.min(up0, WATER_DROP * lifted) * 0.45, wet1 = Math.min(up1, WATER_DROP * lifted) * 0.45;
             ctx.fillStyle = "rgba(20,30,40,0.28)"; ctx.beginPath(); ctx.moveTo(x0, y0 - wet0); ctx.lineTo(x1, y1 - wet1); ctx.lineTo(x1, y1); ctx.lineTo(x0, y0); ctx.closePath(); ctx.fill();
             ctx.strokeStyle = "rgba(236,244,248,0.7)"; ctx.lineWidth = Math.max(0.8, z * 1.2); ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
-          } else if (isWaterTerrain(other)) {
+          } else if (sameLiquid(terrain, other)) {
             const above = waterSurface(world, nx, ny) - surface; if (above < 1) continue;
             const up = above * lifted;
             ctx.beginPath(); ctx.moveTo(x0, y0 - up); ctx.lineTo(x1, y1 - up); ctx.lineTo(x1, y1); ctx.lineTo(x0, y0); ctx.closePath();
@@ -788,8 +813,15 @@ function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, camera: Camera
           break;
         }
         case T.LAVA: {
-        const glowing = 0.5 + Math.sin(t * 2 + x * 1.3 + y * 0.7) * 0.5;
-        ctx.fillStyle = `rgba(250,${200 + Math.round(glowing * 40)},120,${0.25 + glowing * 0.35})`; ctx.beginPath(); ctx.ellipse(sx + (h - 0.5) * hw * 0.6, sy, 7 * z, 3 * z, 0, 0, Math.PI * 2); ctx.fill();
+        // Lava: plates of dark crust drifting on the melt, bright cracks breathing between them, now and then a bubble.
+        const heat = 0.5 + Math.sin(t * 1.7 + x * 1.3 + y * 0.7) * 0.5;
+        ctx.fillStyle = "rgba(58,22,12,0.55)";
+        for (let k = 0; k < 2; k++) { const px = (hash(x + k * 7, y) - 0.5) * hw * 0.9 + Math.sin(t * 0.3 + k * 2 + x) * 2 * z, py = (hash(x, y + k * 5) - 0.5) * hh * 0.8 + Math.cos(t * 0.25 + k + y) * z;
+          ctx.beginPath(); ctx.ellipse(sx + px, sy + py, (5 + 4 * hash(k, x)) * z, (2.5 + 2 * hash(y, k)) * z, 0.35, 0, Math.PI * 2); ctx.fill(); }
+        ctx.strokeStyle = `rgba(255,${200 + Math.round(heat * 50)},110,${(0.45 + heat * 0.4).toFixed(3)})`; ctx.lineWidth = Math.max(0.8, z); ctx.beginPath();
+        ctx.moveTo(sx - 9 * z, sy + (h - 0.5) * hh * 0.5); for (let k = 1; k <= 4; k++) ctx.lineTo(sx - 9 * z + k * 4.5 * z, sy + (hash(x + k, y - k) - 0.5) * hh * 0.7); ctx.stroke();
+        const life = (t * 0.4 + h * 7) % 1;
+        if (h < 0.45 && life < 0.8) { ctx.strokeStyle = `rgba(255,236,150,${(0.8 - life).toFixed(3)})`; ctx.beginPath(); ctx.ellipse(sx + (hash(y, x + 3) - 0.5) * hw * 0.6, sy + (hash(x + 3, y) - 0.5) * hh * 0.5, (1 + life * 4) * z, (0.6 + life * 2) * z, 0, 0, Math.PI * 2); ctx.stroke(); }
         break;
       }
       case T.ASH: if (h < 0.4) { ctx.fillStyle = "rgba(22,22,22,0.22)"; ctx.fillRect(sx + (h - 0.2) * hw, sy + (hash(x + 2, y) - 0.5) * hh, 2 * z, 1.5 * z); } break;
@@ -811,7 +843,7 @@ function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, camera: Camera
     edge(x, y + 1, cx, cy, dx, dy);
     edge(x - 1, y, dx, dy, ax, ay);
     // Contour lines every CONTOUR pixels of height (marching squares on the tile), like a topographic map.
-    if (!isWaterTerrain(terrain) && !small) {
+    if (!isLiquid(terrain) && !small) {
       const lo = Math.floor(Math.min(hA, hB, hC, hD) / CONTOUR), hi = Math.floor(Math.max(hA, hB, hC, hD) / CONTOUR);
       if (hi > lo) {
         const pts: [number, number][] = [[ax, ay], [bx, by], [cx, cy], [dx, dy]], hs = [hA, hB, hC, hD];
@@ -3185,7 +3217,8 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   lap("gather");
   // Hills and snowy ridges: the ground is drawn first, under everything, so rising ground between the camera and
   // something standing behind it (a Friend, a tree, a house on lower land) is drawn again in depth order to cover it.
-  // Skipped when the land in view is flat, and for scenery; the heights come from one table per frame.
+  // Skipped when the land in view is flat, and for what lies flat on the ground; the heights come from one table per frame.
+  // (Scenery too: a pillar or a ruined wall behind a hill is hidden by it like anything else.)
   if (!underground) {
     const vw = x1 - x0 + 1, vh = y1 - y0 + 1, tops = new Float32Array(vw * vh);
     let lowest = Infinity, highest = -Infinity;
@@ -3201,7 +3234,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       const ridges = new Set<number>();
       for (const drawable of drawables) {
         const at = drawable.at;
-        if (!at || drawable.scenery || drawable.depth === Infinity || isStorey(at.y) || isUnderground(at.y)) continue;
+        if (!at || drawable.flat || drawable.depth === Infinity || isStorey(at.y) || isUnderground(at.y)) continue;
         const feet = groundHeight(world, at.x, at.y);
         if ((highest - feet) * rise <= step - slack) continue;
         for (let k = 1; k <= 8; k++) {

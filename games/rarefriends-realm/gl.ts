@@ -106,7 +106,9 @@ void main() {
     if (r < best) layer = best == w.x ? vBlend.x : best == w.y ? vBlend.y : best == w.z ? vBlend.z : vBlend.w;
   }
 #endif
-  vec3 color = texture(uGround, vec3(vUv, layer)).rgb + (vKind == 1 || vKind == 2 ? 0.0 : vShade);
+  vec3 color = texture(uGround, vec3(vUv, layer)).rgb + (vKind == 1 || vKind == 2 || vKind == 3 ? 0.0 : vShade);
+  // (Lava gives its own light: how much of its colour comes through the night, after the light below.)
+  float emit = 0.0; vec3 glowColor = vec3(0.0);
   if (vKind == 1 || vKind == 2) {
     // Water, on the texture's own pixel grid: pale shallows by the shore deepening to dark water out from it (the shade
     // carries the distance to the shore), a swell of three wave trains crossing, crests catching the sky, the odd glint,
@@ -139,13 +141,51 @@ void main() {
     color = mix(color * 0.62, color * 0.38 + vec3(0.02, 0.04, 0.06), wet);
     color = mix(color, vec3(0.92, 0.95, 0.97), step(lap, vUv.y) * 0.7);
   } else if (vKind == 3) {
-    float glow = 0.5 + 0.5 * sin(uTime * 2.0 + vWorld.x * 1.3 + vWorld.y * 0.7);
-    color = mix(color, vec3(0.98, 0.78 + glow * 0.15, 0.47), 0.25 + glow * 0.25);
+    // Lava, on the texture's pixel grid: plates of black crust drifting slowly over the melt, the cracks between them
+    // bright and breathing, the crust thicker by the bank (the shade carries the distance to it), hot streaks moving
+    // under it, and now and then a bubble swelling and bursting.
+    float t = uTime, shore = clamp(vShade - 10.0, 0.0, 6.0);
+    vec2 cell = floor(vWorld * 16.0 + 8.0), q = cell / 16.0, flow = q * 1.5 + vec2(t * 0.05, t * 0.03);
+    vec2 g = floor(flow), f = fract(flow);
+    float d1 = 8.0, d2 = 8.0; vec2 near1 = vec2(0.0);
+    for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
+      vec2 o = vec2(float(i), float(j)), h = fract(sin(vec2(dot(g + o, vec2(127.1, 311.7)), dot(g + o, vec2(269.5, 183.3)))) * 43758.5453);
+      h = 0.5 + 0.38 * sin(t * 0.35 + 6.2831 * h);
+      float d = length(o + h - f);
+      if (d < d1) { d2 = d1; d1 = d; near1 = g + o; } else if (d < d2) d2 = d;
+    }
+    float crack = 1.0 - smoothstep(0.03, 0.14, d2 - d1);
+    float heat = 0.5 + 0.5 * sin(t * 1.6 + q.x * 0.9 - q.y * 0.7 + sin(q.y * 1.3 + t * 0.4) * 2.0);
+    vec3 molten = mix(vec3(0.96, 0.32, 0.05), vec3(1.0, 0.84, 0.32), clamp(heat * 0.55 + crack * 0.6, 0.0, 1.0));
+    float shadeOf = fract(sin(dot(near1, vec2(7.13, 3.31))) * 91.3);
+    vec3 crust = mix(vec3(0.13, 0.06, 0.05), vec3(0.30, 0.11, 0.06), shadeOf);
+    float thick = 1.0 - smoothstep(0.6, 3.0, shore), plate = (1.0 - crack) * clamp(0.5 + 0.4 * thick - 0.25 * heat, 0.0, 1.0);
+    color = mix(molten, crust, plate);
+    color += vec3(0.55, 0.16, 0.02) * (1.0 - plate) * 0.25;
+    // A bubble: somewhere in each patch of four tiles, swelling, then gone.
+    vec2 pool = floor(q / 2.0); float n = fract(sin(dot(pool, vec2(12.9898, 78.233))) * 43758.5453), life = fract(t * 0.22 + n * 7.0);
+    vec2 at = (pool + vec2(fract(n * 13.7), fract(n * 29.3))) * 2.0; float r = 0.06 + life * 0.22, bd = length(q - at);
+    float ring = step(bd, r) * step(r - 0.07, bd) * step(life, 0.8), core = step(bd, r * 0.6) * step(life, 0.8);
+    color = mix(color, vec3(1.0, 0.93, 0.55), ring * 0.85); color = mix(color, molten * 1.1, core * 0.5);
+    emit = 1.0 - plate * 0.6; glowColor = color;
+  } else if (vKind == 6) {
+    // A lava bank: the land scorched black, glowing hotter towards the foot, a lip of fire where it meets the lava.
+    float hot = smoothstep(0.35, 1.0, vUv.y), flick = 0.85 + 0.15 * sin(uTime * 3.1 + (vWorld.x - vWorld.y) * 2.3);
+    color = mix(color * 0.32 + vec3(0.03, 0.01, 0.0), vec3(0.9, 0.3, 0.06) * flick, hot * 0.75);
+    color = mix(color, vec3(1.0, 0.82, 0.38), step(0.9, vUv.y) * 0.85);
+    emit = hot * 0.8; glowColor = color;
+  } else if (vKind == 7) {
+    // A lava fall: molten rock pouring over the lip from the pool above, in slow streaks a texel wide, crust riding down it.
+    vec2 cell = floor(vec2(vUv.x * 16.0, vUv.y * 16.0));
+    float n = fract(sin(cell.x * 12.9898) * 43758.5453), run = fract(vUv.y * 1.5 - uTime * (0.35 + n * 0.3) + n);
+    color = mix(vec3(0.92, 0.3, 0.06), vec3(1.0, 0.86, 0.4), step(0.6, run) * 0.75 + smoothstep(0.8, 1.0, vUv.y) * 0.4);
+    color = mix(color, vec3(0.18, 0.07, 0.05), step(0.93, fract(run * 3.0 + n)) * 0.7);
+    emit = 0.95; glowColor = color;
   }
   // Contour lines every 10 px of height, like a map's (not on water, nor down a bank).
-  if (vKind != 1 && vKind != 2 && vKind != 4 && vKind != 5) {
+  if (vKind != 1 && vKind != 2 && vKind != 3 && vKind != 4 && vKind != 5 && vKind != 6 && vKind != 7) {
     float level = vHeight / 10.0, band = abs(fract(level + 0.5) - 0.5) / max(fwidth(level), 1e-4);
-    if (vHeight > 0.5) color = mix(color, vec3(0.086), (1.0 - smoothstep(0.0, 1.0, band)) * 0.16);
+    if (abs(vHeight) > 0.5) color = mix(color, vec3(0.086), (1.0 - smoothstep(0.0, 1.0, band)) * 0.16);
   }
   // Inked edges where one kind of ground meets another (north, east, south, west of the tile).
   vec2 px = max(fwidth(vUv), vec2(1e-4));
@@ -165,6 +205,7 @@ void main() {
     if (dot(q, q) < 1.0) light *= 1.0 - uCloudK;
   }
   color *= light;
+  color = mix(color, max(color, glowColor), emit);
   // Seen through the haze, further off.
   if (uHazy == 1) { float t = clamp((distance(vWorld, uHere) - uHazeRange.x) / (uHazeRange.y - uHazeRange.x), 0.0, 1.0), clear = 1.0 - 0.97 * t * t * (3.0 - 2.0 * t); color = color * clear + uHazeColor * (1.0 - clear); }
   outColor = vec4(color, 1.0);

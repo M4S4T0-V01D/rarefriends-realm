@@ -3886,7 +3886,7 @@ test("World overlays: a layer over the baked world, applied deterministically; b
 
 test("The dashboard's ground and paint ops: checked, deterministic, the quick rebuild matches the full one, and the world bakes as it's seen", async () => {
   const { applyOverlay, cleanOverlay } = await import("../games/rarefriends-realm/overlay.ts");
-  const { FLOOR_MAX } = await import("../games/rarefriends-realm/terrainops.ts");
+  const { FLOOR_MIN, FLOOR_MAX } = await import("../games/rarefriends-realm/terrainops.ts");
   const { WORLD_SEED, groundHeights, buildHeights, regionIndex } = await import("../games/rarefriends-realm/world.ts");
   // Open country: no building within reach of the ops (a building's ground is levelled, and the ground round it eased to it), nothing but grass where the brushes go.
   const open = createWorld(), CW = W + 1, clear = (x, y) => open.buildings.every(b => b.x1 < x - 12 || b.x0 > x + 62 || b.y1 < y - 12 || b.y0 > y + 52);
@@ -3917,7 +3917,7 @@ test("The dashboard's ground and paint ops: checked, deterministic, the quick re
   assert.ok(tileHeight(plain, sx, sy) - tileHeight(fresh, sx, sy) > 30, `a raise of 3 steps stands up (${tileHeight(fresh, sx, sy).toFixed(1)} → ${tileHeight(plain, sx, sy).toFixed(1)})`);
   assert.ok(Math.abs(tileHeight(plain, sx + 12, sy) - 120) < 3, `levelled to 120 (${tileHeight(plain, sx + 12, sy).toFixed(1)})`);
   assert.ok(Math.abs(tileHeight(plain, sx + 10, sy + 20) - 90) < 8 && Math.abs(tileHeight(plain, sx, sy + 20) - 40) < 8, "a slope from 40 to 90");
-  assert.ok(plain.base.every(v => v >= 0 && v <= FLOOR_MAX && Math.round(v * 64) === v * 64), "the floor stays in the bake's range, in its 1/64 steps (dug as low as it goes, no lower)");
+  assert.ok(plain.base.every(v => v >= FLOOR_MIN && v <= FLOOR_MAX && Math.round(v * 64) === v * 64), "the floor stays in the bake's range, in its 1/64 steps (dug as low as it goes, no lower)");
   assert.equal(plain.tiles[(sy + 32) * W + sx + 32], T.SAND); assert.equal(plain.tiles[(sy + 30) * W + sx + 34], T.SAND, "the flood fills the connected ground");
   assert.equal(plain.tiles[sy * W + sx + 40], T.SNOW); assert.equal(plain.tiles[(sy + 10) * W + sx + 45], T.PATH); assert.equal(plain.region[(sy + 21) * W + sx + 41], regionIndex("frostpeak"));
   const scattered = plain.objects.filter(o => o.tree === "oak" && Math.hypot(o.x - sx - 20, o.y - sy - 40) <= 6.5 && !fresh.objects.some(f => f.x === o.x && f.y === o.y)).length;
@@ -5352,4 +5352,44 @@ test("Development world tools: a conversation written for anyone (all they say, 
     const m = newGame(); m.player.hp = 1; devCommand(m, { cmd: "max" });
     assert.ok(SKILLS.every(s => levelForXp(m.player.xp[s]) === 99)); assert.ok(m.player.hp > 90);
   } finally { resetOverrides(); const { devFlags } = await import("../games/rarefriends-realm/devflags.ts"); devFlags.sandbox = false; }
+});
+
+test("Deep ground: the development world's floor can be dug FLOOR_MIN below where the land lay (and raised to FLOOR_MAX), and the bake keeps every value exactly", async () => {
+  const { generateWorld, WORLD_SEED, W } = await import("../games/rarefriends-realm/world.ts");
+  const { applyTerrain, FLOOR_MIN, FLOOR_MAX, onShore } = await import("../games/rarefriends-realm/terrainops.ts");
+  const { bakeWorld, unbakeWorld } = await import("../games/rarefriends-realm/bake.ts");
+  const { world, lift, raise } = generateWorld(WORLD_SEED);
+  assert.ok(FLOOR_MIN <= -300 && (FLOOR_MAX - FLOOR_MIN) * 64 < 65536, "deep enough, and still sixteen bits of 1/64ths");
+  const s = world.places.spawn, x = s.x - 44, y = s.y - 30, hole = y * W + x, hill = y * W + x + 12;
+  assert.ok(!onShore(world.tiles, x, y) && !onShore(world.tiles, x + 12, y));
+  const dig = { op: "terrain", x, y, r: 1, shape: "circle", mode: "lower", amount: 16, falloff: 0 }, heap = { ...dig, x: x + 12, mode: "raise" };
+  for (let k = 0; k < 4; k++) applyTerrain(world, new Float32Array(world.heights), [dig, heap]);
+  assert.equal(world.base[hole], FLOOR_MIN, "dug as deep as it goes"); assert.ok(world.base[hill] > 200, "and raised");
+  for (let k = 0; k < 4; k++) applyTerrain(world, new Float32Array(world.heights), [heap]);
+  assert.equal(world.base[hill], FLOOR_MAX, "raised as high as it goes");
+  const back = unbakeWorld(bakeWorld(world, lift, WORLD_SEED, raise));
+  assert.equal(back.base[hole], FLOOR_MIN); assert.equal(back.base[hill], FLOOR_MAX); assert.deepEqual(back.base, world.base, "every floor value comes back exactly");
+});
+
+test("Lava lies level, like water: every pool at one height with its flat shore, never joined to water; painted lava takes its pool's level; the ground tools leave it and its shore alone", async () => {
+  const { generateWorld, WORLD_SEED, W, H, T, cornerHeight } = await import("../games/rarefriends-realm/world.ts");
+  const { applyOverlay } = await import("../games/rarefriends-realm/overlay.ts");
+  const { onShore } = await import("../games/rarefriends-realm/terrainops.ts");
+  const { world } = generateWorld(WORLD_SEED, { overlays: false });
+  const low = (w, x, y) => Math.min(cornerHeight(w, x, y), cornerHeight(w, x + 1, y), cornerHeight(w, x, y + 1), cornerHeight(w, x + 1, y + 1));
+  const pools = (w) => { const seen = new Uint8Array(W * H), out = [];
+    for (let i = 0; i < W * H; i++) { if (seen[i] || w.tiles[i] !== T.LAVA) continue; const list = [i]; seen[i] = 1;
+      for (let k = 0; k < list.length; k++) { const j = list[k], x = j % W, y = (j - x) / W; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const n = (y + dy) * W + x + dx; if (n >= 0 && n < W * H && !seen[n] && w.tiles[n] === T.LAVA) { seen[n] = 1; list.push(n); } } }
+      out.push(list); }
+    return out; };
+  const all = pools(world); assert.ok(all.length > 20, "the Realm has its lava");
+  for (const pool of all) { const levels = new Set(pool.map(j => Math.round(low(world, j % W, (j - j % W) / W)))); assert.equal(levels.size, 1, `the pool at ${pool[0] % W},${Math.floor(pool[0] / W)} lies at one level (${[...levels].slice(0, 4)})`); }
+  // Lava and its shore are the ground tools' to leave alone.
+  const j = all[0][0], x = j % W, y = (j - x) / W; assert.ok(onShore(world.tiles, x, y) && onShore(world.tiles, x + 2, y));
+  // Painted onto the big pool's edge, lava lies at the pool's level.
+  const big = all.sort((a, b) => b.length - a.length)[0], level = Math.round(low(world, big[0] % W, Math.floor(big[0] / W)));
+  const edge = big.map(i => [i % W, Math.floor(i / W)]).find(([ex, ey]) => world.tiles[ey * W + ex + 1] !== T.LAVA && world.tiles[ey * W + ex + 2] !== T.LAVA && world.tiles[ey * W + ex + 3] !== T.LAVA);
+  applyOverlay(world, { v: 1, frame: 2, ops: [{ op: "paint", x: edge[0] + 2, y: edge[1], r: 1, shape: "square", t: T.LAVA }] }, WORLD_SEED, [], null);
+  assert.equal(world.tiles[edge[1] * W + edge[0] + 2], T.LAVA);
+  for (const pool of pools(world)) if (pool.includes(edge[1] * W + edge[0] + 2)) for (const i of pool) assert.equal(Math.round(low(world, i % W, Math.floor(i / W))), level, "the painted lava lies at its pool's level");
 });

@@ -6,7 +6,7 @@
  * and floor sits on that floor. This is the floor itself, tile by tile (`base`, world pixels): each region stands at its
  * own height (sea level on the coasts, the farmland a little above, climbing through the Ashen Hills to Emberforge and
  * up to Frostpeak; the ranges high everywhere), blurred into long slopes, brought down to the sea along every shore that
- * reaches it, with each inland lake lying level. Every building stands on a terrace of its own: its footprint and a
+ * reaches it, with each inland lake lying level, and each pool of lava too. Every building stands on a terrace of its own: its footprint and a
  * margin wider than its roof at one height, easing out into the slope, so walls and roof always stand on the same ground.
  *
  * Built once in generation, after the seaways (so the straits' seas come down to sea level), and baked (bake.ts).
@@ -54,6 +54,8 @@ export const WATER_FLAT = 2, SHORE_REACH = 32;
 export const FALL = 30;   // (world.ts FALL_STEP is the same)
 
 const isWet = (t: number) => t === T.WATER || t === T.DEEP || t === T.BRIDGE;
+/** What a tile is as a body lies: water (water, deep water, bridges over it), lava, or neither. Water joins only water, lava only lava. */
+const liquid = (t: number) => isWet(t) ? 1 : t === T.LAVA ? 2 : 0;
 const smoothstep = (v: number) => { const t = Math.max(0, Math.min(1, v)); return t * t * (3 - 2 * t); };
 
 /** The floor of the land, per tile (zero below the overworld). */
@@ -106,28 +108,36 @@ export function buildElevation(ctx: GenContext, buildings: readonly Building[]):
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const nx = x + dx, ny = y + dy; if ((!dx && !dy) || nx < 0 || ny < 0 || nx >= W || ny >= R) continue; visit(ny * W + nx); } };
   let bodies = 0;
   for (let s = 0; s < W * R; s++) {
-    if (connOf[s] >= 0 || !isWet(tiles[s])) continue;
+    const kind = liquid(tiles[s]); if (connOf[s] >= 0 || !kind) continue;
     const id = bodies++, list = [s]; connOf[s] = id;
-    for (let k = 0; k < list.length; k++) { const i = list[k], x = i % W; around(x, (i - x) / W, j => { if (connOf[j] < 0 && isWet(tiles[j])) { connOf[j] = id; list.push(j); } }); }
+    for (let k = 0; k < list.length; k++) { const i = list[k], x = i % W; around(x, (i - x) / W, j => { if (connOf[j] < 0 && liquid(tiles[j]) === kind) { connOf[j] = id; list.push(j); } }); }
   }
+  // (Lava is never split into reaches: lava touching lava lies at one level, however far it runs.)
   const step = (i: number) => sea[i] ? 0 : Math.floor(base[i] / FALL);
   const bodyOf = new Int32Array(W * R).fill(-1), levels: number[] = [], sizes: number[] = [], conn: number[] = [], members: number[][] = [], seaReach: boolean[] = [];
   for (let s = 0; s < W * R; s++) {
     if (bodyOf[s] >= 0 || connOf[s] < 0) continue;
     const id = levels.length, reach = [s], st = step(s); bodyOf[s] = id; let isSea = false;
-    for (let k = 0; k < reach.length; k++) { const i = reach[k], x = i % W; if (sea[i]) isSea = true; around(x, (i - x) / W, j => { if (bodyOf[j] < 0 && connOf[j] >= 0 && (step(j) === st || open[i] || open[j])) { bodyOf[j] = id; reach.push(j); } }); }
+    for (let k = 0; k < reach.length; k++) { const i = reach[k], x = i % W; if (sea[i]) isSea = true; around(x, (i - x) / W, j => { if (bodyOf[j] < 0 && connOf[j] === connOf[i] && (step(j) === st || open[i] || open[j] || tiles[i] === T.LAVA)) { bodyOf[j] = id; reach.push(j); } }); }
     if (isSea) levels.push(0); else { const under = reach.map(i => base[i]).sort((p, q) => p - q); levels.push(under[under.length >> 1]); }
     sizes.push(isSea ? Infinity : reach.length); conn.push(connOf[s]); members.push(reach); seaReach.push(isSea);
   }
+  const kindOf = members.map(m => liquid(tiles[m[0]]));
   const join = levels.map((_, k) => k), top = (k: number): number => join[k] === k ? k : (join[k] = top(join[k]));
   const unite = (p: number, q: number) => { p = top(p); q = top(q); if (p === q) return; const keep = sizes[p] >= sizes[q] ? p : q, gone = keep === p ? q : p; join[gone] = keep; sizes[keep] += sizes[gone]; seaReach[keep] ||= seaReach[gone]; };
   // (A reach of a few tiles isn't a reach: it lies with the biggest reach beside it.)
-  for (let k = 0; k < members.length; k++) if (sizes[k] < 12) { let best = -1; for (const i of members[k]) { const x = i % W; around(x, (i - x) / W, j => { const r = bodyOf[j]; if (r >= 0 && top(r) !== top(k) && (best < 0 || sizes[top(r)] > sizes[top(best)])) best = r; }); } if (best >= 0) unite(best, k); }
-  // (Two waters with a single tile of land between them would share its corners: they lie at one level, the bigger one's, the sea's above all.)
+  for (let k = 0; k < members.length; k++) if (sizes[k] < 12) { let best = -1; for (const i of members[k]) { const x = i % W; around(x, (i - x) / W, j => { const r = bodyOf[j]; if (r >= 0 && top(r) !== top(k) && kindOf[r] === kindOf[k] && (best < 0 || sizes[top(r)] > sizes[top(best)])) best = r; }); } if (best >= 0) unite(best, k); }
+  // (Lava running into water lies at the water's level: the corners they share can only be one height.)
+  for (let i = 0; i < W * R; i++) {
+    if (tiles[i] !== T.LAVA || bodyOf[i] < 0) continue;
+    const x = i % W;
+    around(x, (i - x) / W, j => { const r = bodyOf[j]; if (r < 0 || kindOf[r] !== 1) return; const water = top(r), lava = top(bodyOf[i]); if (water === lava) return; join[lava] = water; sizes[water] += sizes[lava]; });
+  }
+  // (Two waters (or two lavas: never a water and a lava) with a single tile of land between them would share its corners: they lie at one level, the bigger one's, the sea's above all.)
   for (let i = 0; i < W * R; i++) {
     if (connOf[i] >= 0) continue;
     const x = i % W; let first = -1;
-    around(x, (i - x) / W, j => { const r = bodyOf[j]; if (r < 0) return; if (first < 0) first = r; else if (conn[r] !== conn[first]) unite(first, r); });
+    around(x, (i - x) / W, j => { const r = bodyOf[j]; if (r < 0) return; if (first < 0) first = r; else if (conn[r] !== conn[first] && kindOf[r] === kindOf[first]) unite(first, r); });
   }
   // ---------- The towns: buildings whose terraces would touch share one level (a town's square is level), their mean
   // height; a town at the sea comes down to it, and water in a town (a moat, a canal, a pond by a house) lies at the
