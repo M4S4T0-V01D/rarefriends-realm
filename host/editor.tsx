@@ -12,7 +12,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { DEV_ASK, DEV_CATALOG, DEV_COMMAND, DEV_FIND, DEV_GHOST, DEV_MAP, DEV_MODE, DEV_PICK, DEV_REPORT, DEV_STATE, DEV_WORLD, type DevBuilding, type DevCatalog, type DevPick } from "../games/rarefriends-realm/roster.ts";
-import type { Op, Overlay, TerrainMode } from "../games/rarefriends-realm/overlay.ts";
+import type { BiomeItem, BiomeRules, Op, Overlay, TerrainMode } from "../games/rarefriends-realm/overlay.ts";
 import type { Furnish, Prefab, Side } from "../games/rarefriends-realm/overlaybuild.ts";
 import { DropTable, MonsterEditor, SearchList, TalkEditor, type Kit } from "./editor-panels.tsx";
 import type { DevFound, DevState } from "../games/rarefriends-realm/devtools.ts";
@@ -68,20 +68,35 @@ const when = (at: number | null) => at ? new Date(at).toLocaleString() : "";
 
 /** The tools, in the palette's groups: what each does on a click in the game (edit mode). */
 type Tool = "inspect" | "raise" | "lower" | "flatten" | "level" | "smooth" | "roughen" | "slope" | "height-dropper" | "paint" | "fill" | "flood" | "line" | "region" | "tile-dropper"
-  | "place" | "scatter" | "remove" | "clear" | "building" | "stamp" | "spawn" | "campzone" | "erase" | "teleport" | "measure";
+  | "place" | "scatter" | "biome" | "remove" | "clear" | "building" | "stamp" | "spawn" | "campzone" | "erase" | "teleport" | "measure";
 const TOOL_GROUPS: readonly (readonly [string, readonly (readonly [Tool, string, string])[]])[] = [
   ["Terrain", [["raise", "Raise", "Raise the ground (shift: lower)"], ["lower", "Lower", "Lower the ground (shift: raise)"], ["flatten", "Flatten", "Flatten to the height clicked"], ["level", "Level to", "Set the ground to a height"],
     ["smooth", "Smooth", "Smooth bumps away"], ["roughen", "Roughen", "Add natural noise"], ["slope", "Slope", "A ramp between two clicks"], ["height-dropper", "Pick height", "Take the height under the pointer"]]],
   ["Paint", [["paint", "Brush", "Paint ground with the brush"], ["fill", "Rectangle", "Fill a rectangle (two clicks)"], ["flood", "Flood", "Fill the connected ground of one kind"], ["line", "Line", "A line of ground (two clicks): roads, rivers"],
     ["region", "Region", "Set the region of a rectangle (two clicks)"], ["tile-dropper", "Pick ground", "Take the ground kind under the pointer"]]],
-  ["Things", [["place", "Place", "Place one thing"], ["scatter", "Scatter", "Scatter things in the brush (forests, rocks)"], ["remove", "Remove", "Remove the thing clicked"], ["clear", "Clear area", "Remove every thing in a rectangle"],
+  ["Things", [["place", "Place", "Place one thing"], ["scatter", "Scatter", "Scatter things in the brush (forests, rocks)"], ["biome", "Biome scatter", "Fill a rectangle by rules: what grows there, how thick, how spread, at what heights, on what ground"], ["remove", "Remove", "Remove the thing clicked"], ["clear", "Clear area", "Remove every thing in a rectangle"],
     ["spawn", "Spawn", "Place a person or a creature"], ["campzone", "Camp zone", "Allow or forbid camping (two corners)"]]],
   ["Buildings", [["building", "Draw building", "A new building from two corners: roof, walls, doors, furniture"], ["stamp", "Copy building", "Place a copy of one of the world's buildings (R turns it)"]]],
   ["Utility", [["inspect", "Inspect", "Just look"], ["erase", "Erase op", "Take back my ops here"], ["teleport", "Teleport", "Go there"], ["measure", "Measure", "Distance and height between two clicks"]]],
 ];
-const TWO_CLICK: ReadonlySet<Tool> = new Set(["fill", "line", "region", "slope", "clear", "building", "campzone", "measure"]);
+const TWO_CLICK: ReadonlySet<Tool> = new Set(["fill", "line", "region", "slope", "clear", "building", "campzone", "measure", "biome"]);
 /** The two-click tools that make a rectangle: outlined from the first corner to the pointer. */
-const RECTANGLES: ReadonlySet<Tool> = new Set(["fill", "region", "clear", "building", "campzone"]);
+const RECTANGLES: ReadonlySet<Tool> = new Set(["fill", "region", "clear", "building", "campzone", "biome"]);
+/** The biome scatter's starting points (all of it editable): what grows or lies about, how thick, how spread, on what ground. */
+type BiomePreset = Omit<BiomeRules, "ground"> & { ground?: string[] };
+const item = (kind: BiomeItem["kind"], sub: string, weight: number): BiomeItem => ({ kind, sub, weight });
+const BIOMES: Record<string, BiomePreset> = {
+  "Mixed woods": { items: [item("tree", "tree", 4), item("tree", "oak", 3), item("tree", "maple", 1), item("decor", "bush", 2), item("decor", "flowers", 1)], density: 0.18, spacing: 1, awayFromWater: 1, awayFromPaths: 1 },
+  "Pine forest": { items: [item("tree", "pine", 6), item("tree", "yew", 1), item("decor", "boulder", 1), item("decor", "bush", 1)], density: 0.22, spacing: 1, awayFromPaths: 1 },
+  "Meadow": { items: [item("decor", "flowers", 5), item("decor", "bush", 2), item("tree", "tree", 1)], density: 0.08, spacing: 1, awayFromPaths: 1 },
+  "Rocky scree": { items: [item("decor", "boulder", 5), item("decor", "rubble", 2), item("rock", "pewter", 1)], density: 0.1, spacing: 1 },
+  "Ruins": { items: [item("decor", "ruin_wall", 3), item("decor", "rubble", 3), item("decor", "broken_pillar", 2), item("decor", "fallen_pillar", 1), item("decor", "column_base", 1), item("decor", "carved_block", 1)], density: 0.06, spacing: 2, awayFromPaths: 1 },
+  "Desert": { items: [item("decor", "cactus", 4), item("decor", "boulder", 2), item("tree", "palm", 1), item("decor", "dead_tree", 1)], density: 0.05, spacing: 2, ground: ["SAND"] },
+  "Swamp": { items: [item("decor", "reeds", 4), item("tree", "willow", 2), item("decor", "dead_tree", 2), item("decor", "bush", 1)], density: 0.12, spacing: 1 },
+  "Snowfield": { items: [item("tree", "pine", 3), item("decor", "boulder", 2)], density: 0.07, spacing: 1, ground: ["SNOW"] },
+  "Deadwood": { items: [item("tree", "deadwood", 4), item("decor", "dead_tree", 2), item("decor", "bones", 1), item("decor", "grave", 1)], density: 0.15, spacing: 1 },
+};
+const BIOME_GROUND = ["GRASS", "DARK_GRASS", "SAND", "SNOW", "ASH", "GRAVEL", "SWAMP", "FARMLAND", "PATH"];
 const BRUSHED: ReadonlySet<Tool> = new Set(["raise", "lower", "flatten", "level", "smooth", "roughen", "paint", "scatter", "erase"]);
 /** Where an op is (its centre), for the ops list, the map and erasing. */
 function opAt(op: Op): { x: number; y: number; x0?: number; y0?: number; x1?: number; y1?: number } | null {
@@ -89,7 +104,7 @@ function opAt(op: Op): { x: number; y: number; x0?: number; y0?: number; x1?: nu
   if ("x" in op && "y" in op) { const r = "r" in op ? op.r : 0; return { x: op.x, y: op.y, x0: op.x - r, y0: op.y - r, x1: op.x + r, y1: op.y + r }; }
   return null;
 }
-const opLabel = (op: Op) => op.op === "object" ? `object ${op.decor ?? op.tree ?? op.rock ?? op.kind}` : op.op === "spawn" ? `spawn ${op.id}` : op.op === "terrain" ? `terrain ${op.mode}` : op.op === "building" ? `building ${op.name ?? ""}` : "def" in op ? `${op.op} ${op.def.id}` : op.op;
+const opLabel = (op: Op) => op.op === "biome" ? `biome ${op.rules.items.map(i => i.sub).slice(0, 3).join("/")}` : op.op === "template" ? `design ${op.def.name}` : op.op === "object" ? `object ${op.decor ?? op.tree ?? op.rock ?? op.kind}` : op.op === "spawn" ? `spawn ${op.id}` : op.op === "spawngroup" ? `spawn ${op.n} × ${op.id}` : op.op === "terrain" ? `terrain ${op.mode}` : op.op === "building" ? `building ${op.name ?? ""}` : "def" in op ? `${op.op} ${op.def.id}` : op.op;
 
 function Editor() {
   const [overlay, setOverlay] = useState<Overlay>({ v: 1, frame: 2, name: "Development world", ops: [] });
@@ -102,14 +117,16 @@ function Editor() {
   const [radius, setRadius] = useState(2), [shape, setShape] = useState<"circle" | "square">("circle"), [strength, setStrength] = useState(1), [falloff, setFalloff] = useState(0.6), [target, setTarget] = useState(40);
   const [tile, setTile] = useState(1), [regionId, setRegionId] = useState(""), [lineWidth, setLineWidth] = useState(3), [density, setDensity] = useState(0.25);
   const [kind, setKind] = useState("decor"), [sub, setSub] = useState("bush"), [name, setName] = useState("");
-  const [door, setDoor] = useState<"n" | "s" | "e" | "w">("s"), [floor, setFloor] = useState(11), [walls, setWalls] = useState("timber"), [spawnKind, setSpawnKind] = useState<"npc" | "monster">("npc"), [spawnId, setSpawnId] = useState(""), [wander, setWander] = useState(3);
+  const [door, setDoor] = useState<"n" | "s" | "e" | "w">("s"), [floor, setFloor] = useState(11), [walls, setWalls] = useState("timber"), [spawnKind, setSpawnKind] = useState<"npc" | "monster">("npc"), [spawnId, setSpawnId] = useState(""), [wander, setWander] = useState(3), [groupN, setGroupN] = useState(1), [groupR, setGroupR] = useState(4);
   const [allow, setAllow] = useState(false), [why, setWhy] = useState(""), [defKind, setDefKind] = useState<DefKind>("npc"), [form, setForm] = useState<Record<string, string>>(DEF_DEFAULTS.npc), [defError, setDefError] = useState("");
   // The building tools: a drawn building's roof, doors, storeys and furniture; a copied one, turned; the building being changed.
   const [roof, setRoof] = useState<"gable" | "hip" | "flat" | "cone" | "round" | "none">("gable"), [roofColor, setRoofColor] = useState(""), [chimney, setChimney] = useState(true), [storeys, setStoreys] = useState(1);
   const [extraDoors, setExtraDoors] = useState<Side[]>([]), [furnish, setFurnish] = useState<Furnish | "">(""), [facade, setFacade] = useState("");
-  const [prefab, setPrefab] = useState<Prefab | null>(null), [rot, setRot] = useState(0), [withPeople, setWithPeople] = useState(false), [changing, setChanging] = useState<string | null>(null);
+  const [prefab, setPrefab] = useState<Prefab | null>(null), [design, setDesign] = useState<string | null>(null), [rot, setRot] = useState(0), [withPeople, setWithPeople] = useState(false), [changing, setChanging] = useState<string | null>(null);
   // The bigger editors (editor-panels.tsx): who the conversation editor opens on.
   const [talkWho, setTalkWho] = useState<string | undefined>(undefined);
+  // The biome scatter's rules (a preset's, then edited) and its seed (Reroll for another arrangement).
+  const [biome, setBiome] = useState<BiomePreset>(BIOMES["Mixed woods"]), [biomeName, setBiomeName] = useState("Mixed woods"), [biomeSeed, setBiomeSeed] = useState(() => Math.floor(Math.random() * 1e9));
   // Keep the development character maxed (remembered in this browser): every time the game starts, every skill 99.
   const [keepMax, setKeepMax] = useState(() => { try { return localStorage.getItem("realm-dev-keep-max") === "1"; } catch { return false; } });
   const keepMaxRef = useRef(keepMax); keepMaxRef.current = keepMax;
@@ -147,7 +164,7 @@ function Editor() {
   const ask = (question: Record<string, unknown>) => new Promise<unknown>(resolve => { const nonce = uid(); asking.current.set(nonce, resolve); send({ type: DEV_ASK, nonce, ask: question }); window.setTimeout(() => { if (asking.current.delete(nonce)) resolve(null); }, 5000); });
   const ghost = (g: { w: number; h: number } | { ax: number; ay: number } | null) => send({ type: DEV_GHOST, ghost: g });
   /** A building to copy: asked of the game, then the Copy building tool holds it. */
-  const copyBuilding = (index: number) => void ask({ ask: "prefab", index }).then(answer => { const p = answer as Prefab | null; if (!p) { say("That building can't be copied (too big, or not on the land)."); return; } setPrefab(p); setRot(0); setTool("stamp"); say(`Copying ${p.name} (${p.w}×${p.h}): click where its top-left corner goes; R turns it.`); });
+  const copyBuilding = (index: number) => void ask({ ask: "prefab", index }).then(answer => { const p = answer as Prefab | null; if (!p) { say("That building can't be copied (too big, or not on the land)."); return; } setPrefab(p); setDesign(null); setRot(0); setTool("stamp"); say(`Copying ${p.name} (${p.w}×${p.h}): click where its top-left corner goes; R turns it.`); });
 
   const push = (ops: Op[], note?: string) => {
     past.current.push(current.current.ops); if (past.current.length > 200) past.current.shift(); future.current = [];
@@ -195,7 +212,7 @@ function Editor() {
     window.addEventListener("beforeunload", leaving);
     return () => { window.removeEventListener("message", receive); window.removeEventListener("keydown", keys); window.removeEventListener("beforeunload", leaving); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [edit, tool, tile, radius, shape, strength, falloff, target, regionId, lineWidth, density, kind, sub, name, door, floor, walls, spawnKind, spawnId, wander, allow, why, dirty, bottomTab, version, roof, roofColor, chimney, storeys, extraDoors, furnish, facade, prefab, rot, withPeople, changing]);
+  }, [edit, tool, tile, radius, shape, strength, falloff, target, regionId, lineWidth, density, kind, sub, name, door, floor, walls, spawnKind, spawnId, wander, groupN, groupR, biome, biomeName, biomeSeed, allow, why, dirty, bottomTab, version, roof, roofColor, chimney, storeys, extraDoors, furnish, facade, prefab, rot, withPeople, changing]);
   // The footprint under the pointer: a copied building's (turned), or none (a drawn one shows from its first corner).
   useEffect(() => { ghost(tool === "stamp" && prefab ? (rot % 2 ? { w: prefab.h, h: prefab.w } : { w: prefab.w, h: prefab.h }) : null); corner.current = null; }, [tool, prefab, rot]);
 
@@ -225,7 +242,10 @@ function Editor() {
         ops.push(op); push(ops, `Placed ${name || sub || kind} at ${p.x},${p.y}.`); return;
       }
       case "remove": if (p.object?.uid) { const i = ops.findIndex(op => op.op === "object" && op.uid === p.object!.uid); if (i >= 0) ops.splice(i, 1); push(ops, `Took back ${p.object.name}.`); } else if (p.object) { ops.push({ op: "remove", x: p.x, y: p.y }); push(ops, `Removed ${p.object.name} at ${p.x},${p.y}.`); } else say("Nothing there."); return;
-      case "spawn": if (!spawnId) { say("Choose who to spawn."); return; } ops.push({ op: "spawn", uid: uid(), kind: spawnKind, id: spawnId, x: p.x, y: p.y, wander }); push(ops, `${spawnKind} ${spawnId} at ${p.x},${p.y}.`); return;
+      case "spawn":
+        if (!spawnId) { say("Choose who to spawn."); return; }
+        if (spawnKind === "monster" && groupN > 1) { ops.push({ op: "spawngroup", uid: uid(), id: spawnId, x: p.x, y: p.y, r: groupR, n: groupN, wander }); push(ops, `A group of ${groupN} ${spawnId} round ${p.x},${p.y}.`); return; }
+        ops.push({ op: "spawn", uid: uid(), kind: spawnKind, id: spawnId, x: p.x, y: p.y, wander }); push(ops, `${spawnKind} ${spawnId} at ${p.x},${p.y}.`); return;
       case "erase": {
         const r = radius, before = ops.length;
         const kept = ops.filter(op => { const at = opAt(op); if (!at || "def" in op) return true; const x0 = at.x0 ?? at.x, x1 = at.x1 ?? at.x, y0 = at.y0 ?? at.y, y1 = at.y1 ?? at.y; return !(p.x + r >= x0 && p.x - r <= x1 && p.y + r >= y0 && p.y - r <= y1); });
@@ -234,7 +254,7 @@ function Editor() {
       case "teleport": command({ cmd: "teleport", x: p.x, y: p.y }); return;
       case "stamp": {
         if (!prefab) { say("Choose a building to copy first."); return; }
-        ops.push({ op: "stamp", uid: uid(), x: p.x, y: p.y, rot, prefab, ...(withPeople ? { people: true } : {}) }); push(ops, `Placed a copy of ${prefab.name} at ${p.x},${p.y}.`); return;
+        ops.push({ op: "stamp", uid: uid(), x: p.x, y: p.y, rot, ...(design ? { template: design } : { prefab }), ...(withPeople ? { people: true } : {}) }); push(ops, `Placed ${design ? "the design" : "a copy of"} ${prefab.name} at ${p.x},${p.y}.`); return;
       }
     }
     if (TWO_CLICK.has(tool)) {
@@ -247,6 +267,11 @@ function Editor() {
         case "region": if (!regionId) { say("Choose a region."); break; } ops.push({ op: "region", ...r, region: regionId }); push(ops, `Region ${regionId} from ${r.x0},${r.y0} to ${r.x1},${r.y1}.`); break;
         case "slope": ops.push({ op: "slope", x0: a.x, y0: a.y, x1: p.x, y1: p.y, w: lineWidth, h0: a.height, h1: p.height }); push(ops, `A slope from ${a.height.toFixed(1)} to ${p.height.toFixed(1)}.`); break;
         case "clear": ops.push({ op: "clear", ...r }); push(ops, `Cleared ${r.x0},${r.y0} to ${r.x1},${r.y1}.`); break;
+        case "biome": {
+          if ((r.x1 - r.x0 + 1) * (r.y1 - r.y0 + 1) > 60_000) { say("That's too big for one biome scatter (60,000 tiles at most): do it in pieces."); break; }
+          const ground = (biome.ground ?? []).flatMap(n => catalog?.tiles[n] !== undefined ? [catalog.tiles[n]] : []);
+          ops.push({ op: "biome", uid: uid(), ...r, seed: biomeSeed, rules: { ...biome, ...(ground.length ? { ground } : { ground: undefined }) } }); push(ops, `${biomeName} over ${r.x0},${r.y0} to ${r.x1},${r.y1}.`); setBiomeSeed(Math.floor(Math.random() * 1e9)); break;
+        }
         case "campzone": ops.push({ op: "campzone", uid: uid(), ...r, allow, ...(why.trim() ? { why: why.trim() } : {}) }); push(ops, `Camping ${allow ? "allowed" : "forbidden"} from ${r.x0},${r.y0} to ${r.x1},${r.y1}.`); break;
         case "building": {
           if (r.x1 - r.x0 < 2 || r.y1 - r.y0 < 2) { say("A building needs three tiles each way (walls round a room)."); break; }
@@ -274,6 +299,43 @@ function Editor() {
     ops[at] = buildingOp(changing, { x0: old.x0, y0: old.y0, x1: old.x1, y1: old.y1 }); push(ops, `Updated ${name || "the building"}.`); setChanging(null);
   };
   const takeOut = (id: string) => push(current.current.ops.filter(op => !((op.op === "building" || op.op === "stamp") && op.uid === id)), "Building taken out.");
+  // ---------- Designs: buildings of the world's own, placed by name, so changing one changes every copy ----------
+  const designs = overlay.ops.flatMap(op => op.op === "template" ? [op.def] : []);
+  const copiesOf = (id: string) => overlay.ops.filter(op => op.op === "stamp" && op.template === id).length;
+  const newDesignId = (name: string) => { const base = `d_${name.toLowerCase().replace(/[^a-z0-9]+/g, "_").slice(0, 24) || "design"}`; let id = base, k = 2; while (current.current.ops.some(op => op.op === "template" && op.def.id === id)) id = `${base}_${k++}`; return id; };
+  /** The chosen building (or a building in the world) kept as a design of this world's. */
+  const saveDesign = (from: Prefab) => {
+    const name = prompt("Name the design:", from.name.replace(/^A building at .*/, "") || "My building")?.trim(); if (!name) return;
+    const id = newDesignId(name); push([...current.current.ops, { op: "template", def: { id, name, prefab: { ...from, name } } }], `Design “${name}” saved; place it with Copy building.`);
+    setPrefab({ ...from, name }); setDesign(id); setRot(0); setTool("stamp");
+  };
+  const placeDesign = (id: string) => { const d = designs.find(entry => entry.id === id); if (!d) return; setPrefab({ ...d.prefab, name: d.name }); setDesign(id); setRot(0); setTool("stamp"); say(`Placing “${d.name}”: click where its top-left corner goes; R turns it.`); };
+  const renameDesign = (id: string) => { const d = designs.find(entry => entry.id === id); const name = d && prompt("Rename the design:", d.name)?.trim(); if (!d || !name) return; push(current.current.ops.map(op => op.op === "template" && op.def.id === id ? { ...op, def: { ...op.def, name, prefab: { ...op.def.prefab, name } } } : op), `Renamed to “${name}”.`); };
+  const dropDesign = (id: string) => {
+    const n = copiesOf(id), d = designs.find(entry => entry.id === id); if (!d) return;
+    if (!confirm(n ? `“${d.name}” is placed ${n} time${n === 1 ? "" : "s"}. Take the design and every copy of it out?` : `Take the design “${d.name}” out?`)) return;
+    push(current.current.ops.filter(op => !(op.op === "template" && op.def.id === id) && !(op.op === "stamp" && op.template === id)), `Design “${d.name}” taken out${n ? `, with its ${n} cop${n === 1 ? "y" : "ies"}` : ""}.`);
+    if (design === id) { setDesign(null); setPrefab(null); }
+  };
+  /** A copy of a design, changed where it stands (things placed in it, things taken out), made the design: every copy follows. */
+  const designFromCopy = (uidOf: string, index: number) => {
+    const stamp = current.current.ops.find(op => op.op === "stamp" && op.uid === uidOf) as Extract<Op, { op: "stamp" }> | undefined; if (!stamp?.template) return;
+    const d = designs.find(entry => entry.id === stamp.template); if (!d) return;
+    void ask({ ask: "prefab", index, unturn: stamp.rot }).then(answer => {
+      const p = answer as Prefab | null; if (!p) { say("Couldn't read that copy."); return; }
+      const w = stamp.rot % 2 ? d.prefab.h : d.prefab.w, h = stamp.rot % 2 ? d.prefab.w : d.prefab.h, inside = (x: number, y: number) => x >= stamp.x && x < stamp.x + w && y >= stamp.y && y < stamp.y + h;
+      // (The things placed in it, or taken out of it, are the design's now: their own ops go, or every copy would have them twice.)
+      const ops = current.current.ops.filter(op => !((op.op === "object" || op.op === "remove") && inside(op.x, op.y)) && !(op.op === "clear" && inside(op.x0, op.y0) && inside(op.x1, op.y1)))
+        .map(op => op.op === "template" && op.def.id === d.id ? { ...op, def: { ...op.def, prefab: { ...p, name: d.name } } } : op);
+      push(ops, `“${d.name}” is now this copy: all ${copiesOf(d.id)} cop${copiesOf(d.id) === 1 ? "y" : "ies"} changed.`);
+    });
+  };
+  /** A copy of a design made a building of its own (it no longer follows the design). */
+  const detach = (uidOf: string) => {
+    const stamp = current.current.ops.find(op => op.op === "stamp" && op.uid === uidOf) as Extract<Op, { op: "stamp" }> | undefined, d = designs.find(entry => entry.id === stamp?.template);
+    if (!stamp || !d) return;
+    push(current.current.ops.map(op => op === stamp ? { op: "stamp", uid: stamp.uid, x: stamp.x, y: stamp.y, rot: stamp.rot, prefab: { ...d.prefab, name: d.name }, ...(stamp.people ? { people: true } : {}) } : op), `This copy of “${d.name}” is its own building now.`);
+  };
   const turnStamp = (id: string) => push(current.current.ops.map(op => op.op === "stamp" && op.uid === id ? { ...op, rot: (op.rot + 1) % 4 } : op), "Turned.");
   /** Switch to the Spawn tool with someone chosen. */
   const placeSpawn = (k: "npc" | "monster", id: string) => { setSpawnKind(k); setSpawnId(id); setTool("spawn"); if (!edit) toggleEdit(); say(`Spawn tool: click where ${id} goes.`); };
@@ -414,7 +476,14 @@ function Editor() {
           <div style={S.row}><button type="button" style={S.btn()} onClick={() => setRot(r => (r + 3) % 4)}>⟲ turn</button><button type="button" style={S.btn()} onClick={() => setRot(r => (r + 1) % 4)}>turn ⟳</button><span style={S.muted}>{rot * 90}° (R)</span></div>
           {prefab.people.length > 0 && <label><input type="checkbox" checked={withPeople} onChange={e => setWithPeople(e.target.checked)} /> bring its people too</label>}
           <p style={S.muted}>Click where its top-left corner goes: the gold outline shows where it lands.</p>
+          {design ? <p style={{ color: C.gold }}>A design: every copy follows it.</p> : <button type="button" style={S.btn()} onClick={() => saveDesign(prefab)}>Save as a design…</button>}
         </div> : <p style={S.muted}>Choose a building to copy, or right-click one in the game and Copy it from the inspector.</p>}
+        <h4 style={S.h}>Your designs ({designs.length})</h4>
+        {designs.length === 0 && <p style={S.muted}>Save a building as a design (here, or from the inspector), then place it as often as you like. Change one copy where it stands (put things in it, take things out), then “Make this the design” in the inspector: every copy changes with it. Detach a copy to make it its own.</p>}
+        {designs.map(d => <div key={d.id} style={{ ...S.item, ...(design === d.id ? { color: C.gold } : {}) }}>
+          <span style={{ flex: 1 }}><b>{d.name}</b> <span style={S.muted}>{d.prefab.w}×{d.prefab.h} · {d.prefab.objects.length} things · placed {copiesOf(d.id)}</span></span>
+          <button type="button" style={S.btn(design === d.id)} onClick={() => placeDesign(d.id)}>Place</button><button type="button" style={S.btn()} onClick={() => renameDesign(d.id)}>Rename</button><button type="button" style={S.btn()} onClick={() => dropDesign(d.id)}>✕</button>
+        </div>)}
         <h4 style={S.h}>The world's buildings</h4>
         <SearchList S={S} items={(catalog?.buildings ?? []).map(b => ({ ...b, id: String(b.index) }))} placeholder="Find a building (name, town)…" height={360}
           label={(b: DevBuilding & { id: string }) => `${b.name || "unnamed"} · ${b.region} · ${b.w}×${b.h} ${b.walls}`} onPick={b => copyBuilding(b.index)} />
@@ -424,7 +493,28 @@ function Editor() {
         {spawnId && <div style={{ color: C.gold }}>Placing: {spawnable.find(p => p.id === spawnId)?.name ?? spawnId}</div>}
         <SearchList S={S} items={spawnable} chosen={spawnId} placeholder={spawnKind === "npc" ? "Find a person…" : "Find a creature…"} height={300} label={p => p.name} onPick={p => setSpawnId(p.id)} />
         {slider("Wander (tiles)", wander, setWander, 0, 40, 1)}
-        <p style={S.muted}>New people are made in the define tab; what they say in the talk tab (bottom).</p>
+        {spawnKind === "monster" && <>{slider("How many (a group)", groupN, setGroupN, 1, 20, 1)}{groupN > 1 && slider("Spread over (tiles)", groupR, setGroupR, 1, 16, 1)}</>}
+        <p style={S.muted}>New people are made in the define tab; what they say in the talk tab, and a creature's numbers, specials and drops in the monsters tab (bottom).</p>
+      </>}
+      {tool === "biome" && <>
+        <p style={S.muted}>Two corners: the rectangle is filled by these rules, on open ground only (never on paths, in buildings or on anything already there). The same seed gives the same arrangement; each fill takes a fresh one.</p>
+        <h4 style={S.h}>Start from</h4><div style={S.row}>{Object.keys(BIOMES).map(n => <button key={n} type="button" style={S.btn(biomeName === n)} onClick={() => { setBiome(BIOMES[n]); setBiomeName(n); }}>{n}</button>)}</div>
+        <h4 style={S.h}>What, and how often</h4>
+        {biome.items.map((it, i) => <div key={i} style={S.row}>
+          <select style={{ ...S.small, width: 64 }} value={it.kind} onChange={e => setBiome({ ...biome, items: biome.items.map((x, k) => k === i ? { ...x, kind: e.target.value as BiomeItem["kind"], sub: "" } : x) })}>{["tree", "rock", "decor"].map(k => <option key={k} value={k}>{k}</option>)}</select>
+          <select style={{ ...S.small, width: 110 }} value={it.sub} onChange={e => setBiome({ ...biome, items: biome.items.map((x, k) => k === i ? { ...x, sub: e.target.value } : x) })}><option value="">—</option>{((it.kind === "tree" ? catalog?.trees : it.kind === "rock" ? catalog?.rocks : catalog?.decor) ?? []).map(v => <option key={v} value={v}>{v}</option>)}</select>
+          <input style={{ ...S.small, width: 40 }} type="number" min={1} max={100} value={it.weight} title="How often, against the others" onChange={e => setBiome({ ...biome, items: biome.items.map((x, k) => k === i ? { ...x, weight: Math.max(1, Number(e.target.value) || 1) } : x) })} />
+          <button type="button" style={S.btn()} onClick={() => setBiome({ ...biome, items: biome.items.filter((_, k) => k !== i) })}>✕</button>
+        </div>)}
+        <button type="button" style={S.btn()} disabled={biome.items.length >= 16} onClick={() => setBiome({ ...biome, items: [...biome.items, { kind: "decor", sub: "bush", weight: 1 }] })}>+ thing</button>
+        {slider("Density (of tiles)", biome.density, v => setBiome({ ...biome, density: v }), 0.01, 0.6, 0.01)}
+        {slider("Spacing (tiles apart)", biome.spacing, v => setBiome({ ...biome, spacing: v }), 0, 8, 1)}
+        {slider("Off water and lava (tiles)", biome.awayFromWater ?? 0, v => setBiome({ ...biome, awayFromWater: v }), 0, 8, 1)}
+        {slider("Off paths and roads (tiles)", biome.awayFromPaths ?? 0, v => setBiome({ ...biome, awayFromPaths: v }), 0, 8, 1)}
+        <div style={S.row}><label>Height from <input style={S.small} placeholder="any" value={biome.minHeight ?? ""} onChange={e => setBiome({ ...biome, minHeight: e.target.value === "" ? undefined : Number(e.target.value) })} /></label><label>to <input style={S.small} placeholder="any" value={biome.maxHeight ?? ""} onChange={e => setBiome({ ...biome, maxHeight: e.target.value === "" ? undefined : Number(e.target.value) })} /></label></div>
+        <h4 style={S.h}>Only on (none ticked: any open ground)</h4>
+        <div style={S.row}>{BIOME_GROUND.map(g => <label key={g}><input type="checkbox" checked={(biome.ground ?? []).includes(g)} onChange={e => setBiome({ ...biome, ground: e.target.checked ? [...(biome.ground ?? []), g] : (biome.ground ?? []).filter(x => x !== g) })} /> {g.toLowerCase()}</label>)}</div>
+        <p style={S.muted}>Undo, or Erase op over it, takes a fill back whole. Pick height (Terrain) shows the heights round you.</p>
       </>}
       {tool === "campzone" && <>
         <div style={S.row}>{([[true, "Allow camping"], [false, "Forbid camping"]] as const).map(([v, label]) => <button key={label} type="button" style={S.btn(allow === v)} onClick={() => setAllow(v)}>{label}</button>)}</div>
@@ -446,6 +536,9 @@ function Editor() {
               <button type="button" style={S.btn()} onClick={() => copyBuilding(pickInfo.building!.index)}>Copy it</button>
               {pickInfo.building.uid && overlay.ops.some(op => op.op === "building" && op.uid === pickInfo.building!.uid) && <button type="button" style={S.btn()} onClick={() => changeBuilding(pickInfo.building!.uid!)}>Change it</button>}
               {pickInfo.building.uid && overlay.ops.some(op => op.op === "stamp" && op.uid === pickInfo.building!.uid) && <button type="button" style={S.btn()} onClick={() => turnStamp(pickInfo.building!.uid!)}>Turn it</button>}
+              {(() => { const st = overlay.ops.find(op => op.op === "stamp" && op.uid === pickInfo.building!.uid) as Extract<Op, { op: "stamp" }> | undefined, d = st?.template ? designs.find(entry => entry.id === st.template) : undefined;
+                return d ? <><span style={{ color: C.gold }}>a copy of “{d.name}”</span><button type="button" style={S.btn()} onClick={() => designFromCopy(st!.uid, pickInfo.building!.index)}>Make this the design</button><button type="button" style={S.btn()} onClick={() => detach(st!.uid)}>Detach</button></>
+                  : <button type="button" style={S.btn()} onClick={() => void ask({ ask: "prefab", index: pickInfo.building!.index, unturn: st?.rot ?? 0 }).then(a => { if (a) saveDesign(a as Prefab); })}>Save as a design…</button>; })()}
               {pickInfo.building.uid && <button type="button" style={S.btn()} onClick={() => takeOut(pickInfo.building!.uid!)}>Take it out</button>}
             </div></div>}
           <div style={S.row}><button type="button" style={S.btn()} onClick={() => command({ cmd: "teleport", x: pickInfo.x, y: pickInfo.y })}>Go there</button><button type="button" style={S.btn()} onClick={() => { setTarget(Math.round(pickInfo.height * 10) / 10); setTool("level"); }}>Level to this height</button><button type="button" style={S.btn()} onClick={() => { setTile(pickInfo.tile); setTool("paint"); }}>Paint this ground</button></div>

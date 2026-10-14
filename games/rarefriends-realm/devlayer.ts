@@ -9,8 +9,9 @@ import { NPCS, QUESTS, registerDevQuest } from "./content.ts";
 import { applyCamp, setDevCampZones } from "./camping.ts";
 import { applyVessels } from "./seafaring.ts";
 import { DECOR_NAMES, REGIONS, T, W, WORLD_SEED, cornerHeight, groundHeights, regionAt, type World } from "./world.ts";
-import { applyOverlay, originalMonster, registerDefinitions, resetOverrides, validatePlacements, type Overlay, type Placed } from "./overlay.ts";
-import { extractPrefab, type Prefab } from "./overlaybuild.ts";
+import { applyOverlay, cleanOverlay, editedMonster, originalMonster, registerDefinitions, resetOverrides, validatePlacements, type Overlay, type Placed } from "./overlay.ts";
+import { SIM_LIMITS, simulateDef } from "./combatsim.ts";
+import { extractPrefab, turned, type Prefab } from "./overlaybuild.ts";
 import { realmWorld, setSharedWorld, spawnCreatures, type Game } from "./state.ts";
 import { applyHome } from "./housing.ts";
 import { resetLighting } from "./lighting.ts";
@@ -81,6 +82,19 @@ export function buildingList(world: World): DevBuilding[] {
 /** The dashboard's questions: a creature as it was and as it is now; a copy of one of the world's buildings. */
 export function devAnswer(game: Game, ask: Record<string, unknown>): unknown {
   if (ask.ask === "monster" && typeof ask.id === "string" && MONSTERS[ask.id]) return { original: originalMonster(ask.id), current: { ...MONSTERS[ask.id] } };
-  if (ask.ask === "prefab" && typeof ask.index === "number") return extractPrefab(game.world, ask.index) satisfies Prefab | null;
+  if (ask.ask === "simulate" && typeof ask.id === "string" && MONSTERS[ask.id]) {
+    // The designer's creature as it stands in the form (an edit on the game's own), fought over and over off-screen.
+    const o = (ask.options ?? {}) as Record<string, unknown>, why: string[] = [];
+    const edit = ask.edit ? cleanOverlay({ v: 1, ops: [{ op: "monsteredit", def: ask.edit }] }, why).ops[0] : undefined;
+    if (why.length) return { error: why[0] };
+    const def = edit?.op === "monsteredit" ? editedMonster(originalMonster(ask.id)!, edit.def) : MONSTERS[ask.id];
+    const n = (v: unknown, lo: number, hi: number, d: number) => typeof v === "number" && Number.isFinite(v) ? Math.max(lo, Math.min(hi, Math.round(v))) : d;
+    return simulateDef(def, { level: n(o.level, 1, 99, 40), metal: typeof o.metal === "string" ? o.metal : "pewter", style: o.style === "magic" ? "magic" : "melee", food: typeof o.food === "string" ? o.food : "inkshark", foodN: n(o.foodN, 0, 27, 10), fights: n(o.fights, 1, SIM_LIMITS.fights, 100) });
+  }
+  if (ask.ask === "prefab" && typeof ask.index === "number") {
+    // (A placed copy turned `unturn` quarters comes back as it was before it was turned: a design is kept unturned.)
+    const p = extractPrefab(game.world, ask.index); if (!p) return null;
+    return (typeof ask.unturn === "number" && ask.unturn % 4 ? turned(p, (4 - (ask.unturn % 4)) % 4) : p) satisfies Prefab;
+  }
   return null;
 }

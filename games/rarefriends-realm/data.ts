@@ -1523,6 +1523,8 @@ export type MonsterDef = {
   drain?: { faith?: number; energy?: number };
   /** It mends itself this much every few ticks while below half health. */
   heals?: number;
+  /** How it hunts (the creature designer's): how near it notices you (tiles, 4 unless set), how far it follows you (16), how far it strays from home before giving up (its wander and 12), and whether it comes for you whatever your level. */
+  aggroRange?: number; chase?: number; leash?: number; alwaysAggressive?: boolean;
   /** Below a third of its health it enrages: it hits half as hard again and faster. */
   enrage?: boolean;
   /** Met only in the Rare Friends Ring (summoned for a match), never placed in the world. */

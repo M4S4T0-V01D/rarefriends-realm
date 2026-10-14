@@ -58,57 +58,116 @@ export function DropTable({ S, drops, onChange, wares, listId, always = false }:
 
 // ---------- Creatures ----------
 const STATS: readonly (readonly [string, string])[] = [["level", "Level"], ["hp", "Hitpoints"], ["attack", "Attack"], ["strength", "Strength"], ["defence", "Defence"], ["attackBonus", "Attack bonus"], ["defenceBonus", "Defence bonus"], ["maxHit", "Max hit"], ["speed", "Ticks a swing"], ["respawn", "Respawn (ticks)"], ["wander", "Wander (tiles)"]];
+/** The specials and the hunting, as the form keeps them (text, so empty means "none"). */
+const SPECIAL_NUMS: readonly (readonly [string, string, string])[] = [
+  ["magicDef", "Magic defence", "its defence unless set"], ["ranged", "Shoots from (tiles)", "an archer"], ["size", "Size (tiles)", "1"], ["slayer", "Slayer level to wound", ""],
+  ["breath", "Dragonfire (top hit)", "breathes fire"], ["heals", "Heals itself (a few ticks)", "below half health"], ["poisonDamage", "Poison damage", ""], ["poisonChance", "Poison chance %", ""],
+  ["drainFaith", "Drains faith a hit", ""], ["drainEnergy", "Drains energy a hit", ""],
+  ["aggroRange", "Notices you from (tiles)", "4"], ["chase", "Chases you (tiles)", "16"], ["leash", "Strays from home (tiles past wander)", "12"],
+];
+const SPECIAL_FLAGS: readonly (readonly [string, string])[] = [["enrage", "Enrages below a third"], ["undead", "Undead"], ["boss", "A boss"], ["alwaysAggressive", "Attacks whatever your level"]];
 type MonsterInfo = { original: Record<string, unknown> & { drops?: Drop[]; always?: Drop[] }; current: Record<string, unknown> & { drops?: Drop[]; always?: Drop[] } };
-type MonsterForm = { name: string; examine: string; aggressive: boolean; stats: Record<string, number>; drops: Drop[]; always: Drop[] };
-const formOf = (def: MonsterInfo["current"]): MonsterForm => ({ name: String(def.name ?? ""), examine: String(def.examine ?? ""), aggressive: !!def.aggressive, stats: Object.fromEntries(STATS.map(([k]) => [k, Number(def[k] ?? 0)])), drops: (def.drops ?? []).map(d => ({ ...d })), always: (def.always ?? []).map(d => ({ ...d })) });
+type MonsterForm = { name: string; examine: string; aggressive: boolean; stats: Record<string, number>; drops: Drop[]; always: Drop[]; weakness: string; attackStyle: string; nums: Record<string, string>; flags: Record<string, boolean> };
+const numsOf = (def: Record<string, unknown>): Record<string, string> => {
+  const poison = def.poison as { damage: number; chance: number } | undefined, drain = def.drain as { faith?: number; energy?: number } | undefined, s = (v: unknown) => v === undefined || v === null ? "" : String(v);
+  return { magicDef: s(def.magicDef), ranged: s(def.ranged), size: s(def.size), slayer: s(def.slayer), breath: s(def.breath), heals: s(def.heals), poisonDamage: s(poison?.damage), poisonChance: poison ? s(Math.round(poison.chance * 100)) : "", drainFaith: s(drain?.faith), drainEnergy: s(drain?.energy), aggroRange: s(def.aggroRange), chase: s(def.chase), leash: s(def.leash) };
+};
+const formOf = (def: MonsterInfo["current"]): MonsterForm => ({ name: String(def.name ?? ""), examine: String(def.examine ?? ""), aggressive: !!def.aggressive, stats: Object.fromEntries(STATS.map(([k]) => [k, Number(def[k] ?? 0)])), drops: (def.drops ?? []).map(d => ({ ...d })), always: (def.always ?? []).map(d => ({ ...d })),
+  weakness: String(def.weakness ?? ""), attackStyle: String(def.attackStyle ?? ""), nums: numsOf(def), flags: Object.fromEntries(SPECIAL_FLAGS.map(([k]) => [k, !!def[k]])) });
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
-/** Any creature, the game's own included: its numbers and its drops, changed by an overlay (and undone by taking the change out). */
+/** The edit a form makes against the creature as the game made it: only what differs. */
+function editOf(id: string, o: MonsterInfo["original"], form: MonsterForm): MonsterEdit {
+  const edit: MonsterEdit = { id }, stats: Record<string, number> = {};
+  if (form.name.trim() && form.name.trim() !== o.name) edit.name = form.name.trim();
+  if (form.examine !== (o.examine ?? "")) edit.examine = form.examine;
+  if (form.aggressive !== !!o.aggressive) edit.aggressive = form.aggressive;
+  for (const [k] of STATS) if (form.stats[k] !== Number(o[k] ?? 0)) stats[k] = form.stats[k];
+  if (Object.keys(stats).length) edit.stats = stats;
+  if (!same(form.drops, o.drops ?? [])) edit.drops = form.drops;
+  if (!same(form.always, o.always ?? [])) edit.always = form.always;
+  const sp: Record<string, unknown> = {}, was = numsOf(o), num = (k: string) => form.nums[k] === "" ? null : Number(form.nums[k]);
+  if (form.weakness !== String(o.weakness ?? "")) sp.weakness = form.weakness || null;
+  if (form.attackStyle !== String(o.attackStyle ?? "")) sp.attackStyle = form.attackStyle || null;
+  for (const k of ["magicDef", "ranged", "size", "slayer", "breath", "heals", "aggroRange", "chase", "leash"]) if (form.nums[k] !== was[k]) sp[k] = num(k);
+  if (form.nums.poisonDamage !== was.poisonDamage || form.nums.poisonChance !== was.poisonChance) sp.poison = form.nums.poisonDamage && form.nums.poisonChance ? { damage: Number(form.nums.poisonDamage), chance: Number(form.nums.poisonChance) / 100 } : null;
+  if (form.nums.drainFaith !== was.drainFaith || form.nums.drainEnergy !== was.drainEnergy) sp.drain = form.nums.drainFaith || form.nums.drainEnergy ? { ...(form.nums.drainFaith ? { faith: Number(form.nums.drainFaith) } : {}), ...(form.nums.drainEnergy ? { energy: Number(form.nums.drainEnergy) } : {}) } : null;
+  for (const [k] of SPECIAL_FLAGS) if (form.flags[k] !== !!o[k]) sp[k] = form.flags[k] ? true : null;
+  if (Object.keys(sp).length) edit.specials = sp as MonsterEdit["specials"];
+  return edit;
+}
+const METALS = ["pewter", "blackiron", "ashsteel", "moonsilver", "glimmer", "rarite", "frostsilver", "gloomsteel", "wyrmscale", "hollowsteel", "cindersteel", "ashenheart"];
+type SimResult = { error?: string; fights: number; kills: number; deaths: number; timeouts: number; ticks: { mean: number; min: number; max: number }; seconds: number; foodUsed: number; damageTaken: number; xpPerKill: number; killsPerHour: number; drops: { item: string; name: string; times: number; total: number }[] };
+/** Any creature, the game's own included: its numbers, specials, hunting and drops (an overlay's change, undone by taking it out), a fight simulator, and groups of it placed in the world. */
 export function MonsterEditor({ kit }: { kit: Kit }) {
   const { S } = kit, [chosen, setChosen] = useState(""), [info, setInfo] = useState<MonsterInfo | null>(null), [form, setForm] = useState<MonsterForm | null>(null);
+  const [sim, setSim] = useState({ level: 40, metal: "blackiron", style: "melee", food: "inkshark", foodN: 10, fights: 100 }), [result, setResult] = useState<SimResult | null>(null), [running, setRunning] = useState(false);
   const edits = new Map(kit.ops.flatMap(op => op.op === "monsteredit" ? [[op.def.id, op.def] as const] : []));
   const monsters = useMemo(() => {
     const own = kit.ops.flatMap(op => op.op === "monster" ? [{ id: op.def.id, name: op.def.name, level: op.def.level }] : []);
     return [...own, ...(kit.catalog?.monsters ?? []).filter(m => !own.some(o => o.id === m.id))];
   }, [kit.catalog, kit.ops]);
   const load = (id: string) => void kit.ask({ ask: "monster", id }).then(answer => { const a = answer as MonsterInfo | null; if (!a) { kit.say(`The game doesn't know ${id} yet.`); return; } setInfo(a); setForm(formOf(a.current)); });
-  useEffect(() => { if (chosen) load(chosen); }, [chosen]);
+  useEffect(() => { if (chosen) { load(chosen); setResult(null); } }, [chosen]);
   const apply = () => {
     if (!info || !form) return;
-    const o = info.original, edit: MonsterEdit = { id: chosen }, stats: Record<string, number> = {};
-    if (form.name.trim() && form.name.trim() !== o.name) edit.name = form.name.trim();
-    if (form.examine !== (o.examine ?? "")) edit.examine = form.examine;
-    if (form.aggressive !== !!o.aggressive) edit.aggressive = form.aggressive;
-    for (const [k] of STATS) if (form.stats[k] !== Number(o[k] ?? 0)) stats[k] = form.stats[k];
-    if (Object.keys(stats).length) edit.stats = stats;
-    if (!same(form.drops, o.drops ?? [])) edit.drops = form.drops;
-    if (!same(form.always, o.always ?? [])) edit.always = form.always;
-    const rest = kit.ops.filter(op => !(op.op === "monsteredit" && op.def.id === chosen));
-    if (Object.keys(edit).length === 1) { kit.push(rest, `${String(o.name)}: back to the game's own.`); }
-    else kit.push([...rest, { op: "monsteredit", def: edit }], `${String(o.name)} changed (${Object.keys(edit).filter(k => k !== "id").join(", ")}); save to keep it.`);
+    const edit = editOf(chosen, info.original, form), rest = kit.ops.filter(op => !(op.op === "monsteredit" && op.def.id === chosen));
+    if (Object.keys(edit).length === 1) kit.push(rest, `${String(info.original.name)}: back to the game's own.`);
+    else kit.push([...rest, { op: "monsteredit", def: edit }], `${String(info.original.name)} changed (${Object.keys(edit).filter(k => k !== "id").join(", ")}); save to keep it.`);
     window.setTimeout(() => load(chosen), 600);
   };
   const reset = () => { kit.push(kit.ops.filter(op => !(op.op === "monsteredit" && op.def.id === chosen)), `${chosen}: back to the game's own.`); window.setTimeout(() => load(chosen), 600); };
+  const run = () => { if (!info || !form) return; setRunning(true); setResult(null);
+    void kit.ask({ ask: "simulate", id: chosen, edit: editOf(chosen, info.original, form), options: sim }).then(r => { setRunning(false); const res = r as SimResult | null; if (!res) kit.say("The simulator didn't answer."); else if (res.error) kit.say(`Can't simulate: ${res.error}`); else setResult(res); }); };
+  const num = (k: string) => form?.nums[k] ?? "", setNum = (k: string, v: string) => form && setForm({ ...form, nums: { ...form.nums, [k]: v.replace(/[^0-9.]/g, "") } });
+  const changed = (k: string) => info && form && form.nums[k] !== numsOf(info.original)[k];
   return <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: 12, height: "100%" }}>
     <div>
-      <SearchList S={S} items={monsters} chosen={chosen} placeholder="Find a creature…" height={400} label={m => `${edits.has(m.id) ? "✎ " : ""}${m.name} (${m.level})`} onPick={m => setChosen(m.id)} />
+      <SearchList S={S} items={monsters} chosen={chosen} placeholder="Find a creature…" height={420} label={m => `${edits.has(m.id) ? "✎ " : ""}${m.name} (${m.level})`} onPick={m => setChosen(m.id)} />
       <p style={S.muted}>✎: changed by this world. Any creature can be changed, the game's own included; taking the change out puts it back as the game made it.</p>
     </div>
     {!form || !info ? <div style={S.muted}>Choose a creature.</div> : <div>
       <div style={S.row}><b>{String(info.original.name)}</b><span style={S.muted}>{chosen}</span>
         <button type="button" style={S.btn(true)} onClick={apply}>Apply</button>
         <button type="button" style={S.btn()} disabled={!edits.has(chosen)} onClick={reset}>Back to the game's</button>
-        <button type="button" style={S.btn()} onClick={() => kit.place("monster", chosen)}>Place one…</button></div>
+        <button type="button" style={S.btn()} onClick={() => kit.place("monster", chosen)}>Place…</button></div>
+      <h4 style={S.h}>Basics</h4>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "4px 10px" }}>
         <label>Name<input style={S.input} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></label>
         <label style={{ gridColumn: "span 2" }}>Examine<input style={S.input} value={form.examine} onChange={e => setForm({ ...form, examine: e.target.value })} /></label>
-        <label><input type="checkbox" checked={form.aggressive} onChange={e => setForm({ ...form, aggressive: e.target.checked })} /> Aggressive</label>
         {STATS.map(([k, label]) => <label key={k}>{label}{form.stats[k] !== Number(info.original[k] ?? 0) && <span style={{ color: kit.warn }}> (was {String(info.original[k] ?? 0)})</span>}<input style={S.input} type="number" value={form.stats[k]} onChange={e => setForm({ ...form, stats: { ...form.stats, [k]: Number(e.target.value) } })} /></label>)}
       </div>
+      <h4 style={S.h}>How it fights</h4>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "4px 10px" }}>
+        <label>Attacks with<select style={S.input} value={form.attackStyle} onChange={e => setForm({ ...form, attackStyle: e.target.value })}><option value="">melee</option><option value="magic">magic</option></select></label>
+        <label>Weak to<select style={S.input} value={form.weakness} onChange={e => setForm({ ...form, weakness: e.target.value })}><option value="">nothing</option>{["fire", "water", "wind", "earth", "holy"].map(w => <option key={w} value={w}>{w}</option>)}</select></label>
+        {SPECIAL_NUMS.map(([k, label, hint]) => <label key={k}>{label}{changed(k) && <span style={{ color: kit.warn }}> ✎</span>}<input style={S.input} placeholder={hint || "none"} value={num(k)} onChange={e => setNum(k, e.target.value)} /></label>)}
+      </div>
+      <div style={S.row}>
+        <label><input type="checkbox" checked={form.aggressive} onChange={e => setForm({ ...form, aggressive: e.target.checked })} /> Aggressive</label>
+        {SPECIAL_FLAGS.map(([k, label]) => <label key={k}><input type="checkbox" checked={form.flags[k]} onChange={e => setForm({ ...form, flags: { ...form.flags, [k]: e.target.checked } })} /> {label}</label>)}
+      </div>
+      <p style={S.muted}>Empty means it hasn't got it. Dragonfire hits up to its number (a Wyrmward shield turns it); poison lands on a hit at its chance; drains take faith or run energy each hit; an enraged creature hits half as hard again, and faster, below a third of its health.</p>
       <h4 style={S.h}>Drops {same(form.drops, info.original.drops ?? []) ? "" : "(changed)"}</h4>
       <p style={S.muted}>Each row rolls on its own when it dies: the chance is per kill.</p>
       <DropTable S={S} drops={form.drops} onChange={drops => setForm({ ...form, drops })} wares={kit.wares} listId="dev-drop-items" />
       <h4 style={S.h}>Always drops {same(form.always, info.original.always ?? []) ? "" : "(changed)"}</h4>
       <DropTable S={S} drops={form.always} onChange={always => setForm({ ...form, always })} wares={kit.wares} listId="dev-drop-items" always />
+      <h4 style={S.h}>Fight it (simulator)</h4>
+      <p style={S.muted}>Fights the creature as it stands in this form (applied or not) over and over, off-screen, with the game's own combat: a Friend with every skill at the level, the metal's sword and armour (or a staff and the best spell its level allows), eating below half health.</p>
+      <div style={S.row}>
+        <label>Level <input style={S.small} type="number" min={1} max={99} value={sim.level} onChange={e => setSim({ ...sim, level: Number(e.target.value) })} /></label>
+        <label>Gear <select style={{ ...S.small, width: 110 }} value={sim.metal} onChange={e => setSim({ ...sim, metal: e.target.value })}>{METALS.map(m => <option key={m} value={m}>{m}</option>)}</select></label>
+        <label>Style <select style={{ ...S.small, width: 80 }} value={sim.style} onChange={e => setSim({ ...sim, style: e.target.value })}><option value="melee">melee</option><option value="magic">magic</option></select></label>
+        <label>Food <select style={{ ...S.small, width: 100 }} value={sim.food} onChange={e => setSim({ ...sim, food: e.target.value })}><option value="inkshark">inkshark (20)</option><option value="sailfish">sailfish (14)</option><option value="cake">cake (12)</option></select></label>
+        <label>× <input style={{ ...S.small, width: 44 }} type="number" min={0} max={27} value={sim.foodN} onChange={e => setSim({ ...sim, foodN: Number(e.target.value) })} /></label>
+        <label>Fights <input style={{ ...S.small, width: 54 }} type="number" min={1} max={300} value={sim.fights} onChange={e => setSim({ ...sim, fights: Number(e.target.value) })} /></label>
+        <button type="button" style={S.btn(true)} disabled={running} onClick={run}>{running ? "Fighting…" : "Run"}</button>
+      </div>
+      {result && <div style={{ border: "1px solid #3a3940", borderRadius: 4, padding: 8 }}>
+        <div><b>{result.kills}</b> won, <b style={{ color: result.deaths ? kit.warn : undefined }}>{result.deaths}</b> lost{result.timeouts ? `, ${result.timeouts} ran out of time` : ""} of {result.fights} · a kill takes <b>{result.seconds}s</b> ({result.ticks.mean} ticks; {result.ticks.min}–{result.ticks.max})</div>
+        <div style={S.muted}>food {(result.foodUsed / result.fights).toFixed(1)} a fight · damage taken {Math.round(result.damageTaken / result.fights)} a fight · {result.xpPerKill.toLocaleString()} XP a kill · about {result.killsPerHour} kills an hour at one spawn (with its respawn)</div>
+        {result.drops.length > 0 && <table style={{ marginTop: 6, borderCollapse: "collapse" }}><tbody>{result.drops.map(d => <tr key={d.item}><td style={{ paddingRight: 12 }}>{d.name}</td><td style={{ paddingRight: 12 }} title="kills it dropped in">{Math.round(d.times / Math.max(1, result.kills) * 100)}%</td><td style={S.muted}>{d.total.toLocaleString()} in all</td></tr>)}</tbody></table>}
+      </div>}
     </div>}
   </div>;
 }

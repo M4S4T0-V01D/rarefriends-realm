@@ -5412,3 +5412,55 @@ test("Sigil shrines: every sigil has its altar; the first ones near Friendhollow
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const i = (a.y + dy) * W + a.x + dx; assert.ok(WALKABLE.has(world.tiles[i]) && (world.objectAt[i] < 0 || !world.objects[world.objectAt[i]].blocks), `${a.name}: room to stand at it`); }
   }
 });
+
+test("Creature designer, building designs and biome scatter: specials set and taken away, hunting ranges, spawn groups, the fight simulator; designs placed by name and changed everywhere at once; rule-based scatter, the same every time", async () => {
+  const { applyOverlay, cleanOverlay, editedMonster, registerDefinitions, resetOverrides } = await import("../games/rarefriends-realm/overlay.ts");
+  const { simulateDef } = await import("../games/rarefriends-realm/combatsim.ts");
+  const { extractPrefab } = await import("../games/rarefriends-realm/overlaybuild.ts");
+  const { WORLD_SEED, cornerHeight } = await import("../games/rarefriends-realm/world.ts");
+  try {
+    // Specials: set, and taken away with null; bad ones refused.
+    const id = Object.keys(MONSTERS).find(k => MONSTERS[k].breath), base = MONSTERS[id];
+    const why = [], edits = cleanOverlay({ v: 1, ops: [{ op: "monsteredit", def: { id, specials: { breath: null, weakness: "water", poison: { damage: 4, chance: 0.25 }, leash: 20, alwaysAggressive: true } } }, { op: "monsteredit", def: { id, specials: { weakness: "lava" } } }, { op: "monsteredit", def: { id, specials: { leash: 999 } } }] }, why);
+    assert.equal(edits.ops.length, 1); assert.ok(why.some(w => /weakness/.test(w)) && why.some(w => /leash/.test(w)));
+    const made = editedMonster(base, edits.ops[0].def);
+    assert.equal(made.breath, undefined, "its fire taken away"); assert.equal(made.weakness, "water"); assert.deepEqual(made.poison, { damage: 4, chance: 0.25 }); assert.equal(made.leash, 20); assert.ok(base.breath, "the base untouched");
+    registerDefinitions(edits, NPCS); assert.equal(MONSTERS[id].breath, undefined); resetOverrides(); assert.ok(MONSTERS[id].breath, "and back");
+    // Hunting: an aggressive creature notices you at four tiles, unless its range is shorter.
+    const watch = (aggroRange) => { const g = newGame(), p = g.player, def = { ...base, aggressive: true, alwaysAggressive: true, ...(aggroRange ? { aggroRange } : {}) };
+      const at = { x: p.x + 3, y: p.y }; g.monsters = [{ uid: 900, def, x: at.x, y: at.y, prev: { ...at }, spawn: { ...at }, hp: def.hp, heading: { x: 1, y: 1 }, target: false, attackTimer: 0, respawnAt: 0, dead: false, wander: 0, moved: 0, retreat: 0, curses: {} }]; g.npcs = [];
+      tick(g); return g.monsters[0].target; };
+    assert.equal(watch(0), true, "it notices you at three tiles"); assert.equal(watch(2), false, "not with a range of two");
+    // A spawn group: n of them on open ground in the circle, the same tiles every time.
+    const w = createWorld(), s = w.places.spawn, kind = Object.keys(MONSTERS).find(k => !MONSTERS[k].boss && MONSTERS[k].level < 10);
+    const group = { v: 1, ops: [{ op: "spawngroup", uid: "pack", id: kind, x: s.x - 44, y: s.y - 30, r: 5, n: 6 }] }, before = w.spawns.length;
+    applyOverlay(w, cleanOverlay(group), WORLD_SEED, [], NPCS);
+    const added = w.spawns.slice(before); assert.equal(added.length, 6); assert.ok(added.every(sp => sp.id === kind && Math.hypot(sp.x - (s.x - 44), sp.y - (s.y - 30)) <= 5.5));
+    const w2 = createWorld(); applyOverlay(w2, cleanOverlay(group), WORLD_SEED, [], NPCS); assert.deepEqual(w2.spawns.slice(before), added, "the same tiles every time");
+    // The simulator: a weak creature, fought by a strong Friend, always won, and its bones always left.
+    const weak = MONSTERS[kind], r = simulateDef(weak, { level: 60, metal: "ashsteel", style: "melee", food: "inkshark", foodN: 5, fights: 12 });
+    assert.equal(r.kills, 12); assert.equal(r.deaths, 0); assert.ok(r.ticks.mean > 0 && r.seconds > 0 && r.xpPerKill > 0);
+    for (const d of weak.always ?? []) assert.ok(r.drops.some(x => x.item === d.item && x.times === 12), `always ${d.item}`);
+    const hard = simulateDef({ ...weak, hp: 5000, maxHit: 60, attack: 400, strength: 400, defence: 400, defenceBonus: 400 }, { level: 5, metal: "pewter", style: "melee", food: "inkshark", foodN: 0, fights: 5 });
+    assert.equal(hard.deaths, 5, "and a hopeless one lost");
+    // Designs: two copies of one design; the design changed, both copies change; a copy of a design that isn't there is said.
+    const src = createWorld(), at = src.buildings.findIndex(b => b.name && b.x1 - b.x0 < 12 && b.y1 - b.y0 < 12 && b.y1 < 900), prefab = extractPrefab(src, at);
+    const design = (p) => ({ op: "template", def: { id: "cottage", name: "Cottage", prefab: p } }), stamps = [{ op: "stamp", uid: "c1", x: s.x - 60, y: s.y - 40, rot: 0, template: "cottage" }, { op: "stamp", uid: "c2", x: s.x - 40, y: s.y - 40, rot: 1, template: "cottage" }, { op: "stamp", uid: "c3", x: s.x - 20, y: s.y - 40, rot: 0, template: "nope" }];
+    const dw = createWorld(), problems = [], placed = applyOverlay(dw, cleanOverlay({ v: 1, ops: [design(prefab), ...stamps] }), WORLD_SEED, problems, NPCS);
+    assert.ok(placed.buildings.has("c1") && placed.buildings.has("c2") && !placed.buildings.has("c3")); assert.ok(problems.some(p => /no design called nope/.test(p)));
+    assert.equal(dw.buildings[placed.buildings.get("c1")].name, "Cottage");
+    const marble = { ...prefab, building: { ...prefab.building, walls: "marble" } }, dw2 = createWorld(), placed2 = applyOverlay(dw2, cleanOverlay({ v: 1, ops: [design(marble), ...stamps.slice(0, 2)] }), WORLD_SEED, [], NPCS);
+    assert.ok(["c1", "c2"].every(u => dw2.buildings[placed2.buildings.get(u)].walls === "marble"), "the design changed: every copy follows");
+    // Biome scatter: only where its rules allow, spaced, and the same every time.
+    const rules = { items: [{ kind: "tree", sub: "pine", weight: 3 }, { kind: "decor", sub: "boulder", weight: 1 }], density: 0.3, spacing: 2, awayFromPaths: 1 };
+    const fill = { v: 1, ops: [{ op: "biome", uid: "pines", x0: s.x - 70, y0: s.y - 60, x1: s.x - 30, y1: s.y - 25, seed: 42, rules }] };
+    const bw = createWorld(), n0 = bw.objects.length; applyOverlay(bw, cleanOverlay(fill), WORLD_SEED, [], NPCS);
+    const got = bw.objects.slice(n0); assert.ok(got.length > 10, `pines and boulders put down (${got.length})`);
+    assert.ok(got.every(o => o.tree === "pine" || o.decor === "boulder"));
+    for (const a of got) for (const b of got) if (a !== b) assert.ok(Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) > 2, "kept two tiles apart");
+    const bw2 = createWorld(); applyOverlay(bw2, cleanOverlay(fill), WORLD_SEED, [], NPCS); assert.deepEqual(bw2.objects.slice(n0).map(o => [o.x, o.y, o.tree ?? o.decor]), got.map(o => [o.x, o.y, o.tree ?? o.decor]), "the same every time");
+    const high = Math.max(...got.map(o => cornerHeight(bw, o.x, o.y))), capped = { v: 1, ops: [{ ...fill.ops[0], rules: { ...rules, maxHeight: high - 5 } }] }, bw3 = createWorld();
+    applyOverlay(bw3, cleanOverlay(capped), WORLD_SEED, [], NPCS); assert.ok(bw3.objects.length - n0 < got.length, "a height limit keeps them off the high ground");
+    assert.equal(cleanOverlay({ v: 1, ops: [{ ...fill.ops[0], x1: s.x + 400, y1: s.y + 400 }] }).ops.length, 0, "a fill too big is refused");
+  } finally { resetOverrides(); }
+});

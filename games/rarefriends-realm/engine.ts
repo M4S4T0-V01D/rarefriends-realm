@@ -2013,7 +2013,7 @@ function monsterTick(game: Game, monster: Monster) {
   // Aggression: attack players whose combat level is at most twice the monster's, unless they're sneaking past unseen
   // (each tick the monster may notice them) or veiled by the Veilweave hood (it can't).
   // Light feet: with Stealth 50 they only notice you (not sneaking) from 3 tiles, with 80 from 2.
-  const stealth = level(game, "thieving"), reach = player.sneak ? 4 : stealth >= 80 ? 2 : stealth >= 50 ? 3 : 4;
+  const stealth = level(game, "thieving"), notice = monster.def.aggroRange ?? 4, reach = player.sneak ? notice : stealth >= 80 ? Math.min(notice, 2) : stealth >= 50 ? Math.min(notice, 3) : notice;
   // A creature summoned for a match always comes for you, however strong you are.
   if (monster.arena && !monster.target && sameLayer) monster.target = true;
   // A people at truce with you keep their spears down.
@@ -2022,7 +2022,7 @@ function monsterTick(game: Game, monster: Monster) {
   // A spirit calmed by the Mizukai rite, or kept off by spirit incense or a mist veil, doesn't come for you.
   const calmed = (monster.curses.pacified ?? 0) > game.tick || (!!monster.def.spirit && (player.spiritWardUntil > game.tick));
   if (calmed && monster.target && (monster.curses.pacified ?? 0) > game.tick) { monster.target = false; monster.retreat = 2; }
-  const wouldAttack = !truce && !calmed && !monster.target && monster.def.aggressive && sameLayer && chebyshev(monster, player) <= reach && combatLevel(player) <= monster.def.level * 2;
+  const wouldAttack = !truce && !calmed && !monster.target && monster.def.aggressive && sameLayer && chebyshev(monster, player) <= reach && (monster.def.alwaysAggressive || combatLevel(player) <= monster.def.level * 2);
   if (wouldAttack && veiled(game)) { /* It looks straight through you. */ }
   else if (wouldAttack && player.sneak) { if (spots(game, monster)) caughtSneaking(game, monster); else if (!game.sneakingPast.has(monster.uid)) game.sneakingPast.set(monster.uid, game.tick); }
   else if (wouldAttack) { game.sneakingPast.delete(monster.uid); monster.target = true; creature(game, monster, "aggro"); }
@@ -2032,7 +2032,7 @@ function monsterTick(game: Game, monster: Monster) {
   if (monster.target) {
     monster.idle = 0;
     const leash = Math.max(Math.abs(monster.x - monster.spawn.x), Math.abs(monster.y - monster.spawn.y));
-    if (!monster.arena && (!sameLayer || leash > monster.wander + 12 || chebyshev(monster, player) > 16)) { monster.target = false; monster.retreat = 6; return; }
+    if (!monster.arena && (!sameLayer || leash > monster.wander + (monster.def.leash ?? 12) || chebyshev(monster, player) > (monster.def.chase ?? 16))) { monster.target = false; monster.retreat = 6; return; }
     // An archer shoots from where it stands once you're in its range; everything else closes in.
     const reach = monster.def.ranged ?? 0, shooting = reach > 0 && chebyshev(monster, player) <= reach;
     if (shooting || adjacentTo(player.x, player.y, monster.x, monster.y, footprint(monster))) {

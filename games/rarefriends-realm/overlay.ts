@@ -41,8 +41,34 @@ export const TALK_LIMITS = { nodes: 200, lines: 30, options: 10, acts: 10, needs
 /** A change to any creature, the game's own included: its name, examine, aggression and numbers, and its drops (the table replaced). */
 export const MONSTER_STATS = ["level", "hp", "attack", "strength", "defence", "attackBonus", "defenceBonus", "maxHit", "speed", "respawn", "wander"] as const;
 export const STAT_RANGE: Record<(typeof MONSTER_STATS)[number], readonly [number, number]> = { level: [1, 1000], hp: [1, 100_000], attack: [1, 500], strength: [1, 500], defence: [1, 500], attackBonus: [-100, 500], defenceBonus: [-100, 500], maxHit: [0, 1000], speed: [1, 20], respawn: [1, 10_000], wander: [0, 40] };
-export type MonsterEdit = { id: string; name?: string; examine?: string; aggressive?: boolean; stats?: Partial<Record<(typeof MONSTER_STATS)[number], number>>; drops?: Drop[]; always?: Drop[] };
+/**
+ * A creature's specials and how it hunts, as the creature designer sets them: each set to a value, or null to take it
+ * away (a drake that no longer breathes fire). Ranges below.
+ */
+export type MonsterSpecials = {
+  weakness?: MonsterDef["weakness"] | null; attackStyle?: "melee" | "magic" | null; magicDef?: number | null; ranged?: number | null; size?: number | null;
+  breath?: number | null; poison?: { damage: number; chance: number } | null; drain?: { faith?: number; energy?: number } | null; heals?: number | null;
+  enrage?: boolean | null; undead?: boolean | null; slayer?: number | null; boss?: boolean | null;
+  aggroRange?: number | null; chase?: number | null; leash?: number | null; alwaysAggressive?: boolean | null;
+};
+export const SPECIAL_RANGE = { magicDef: [1, 500], ranged: [1, 10], size: [1, 3], breath: [1, 200], heals: [1, 500], slayer: [1, 99], aggroRange: [0, 12], chase: [2, 40], leash: [2, 60] } as const;
+export const WEAKNESSES = ["fire", "water", "wind", "earth", "holy"] as const;
+export type MonsterEdit = { id: string; name?: string; examine?: string; aggressive?: boolean; stats?: Partial<Record<(typeof MONSTER_STATS)[number], number>>; drops?: Drop[]; always?: Drop[]; specials?: MonsterSpecials };
+/** A creature as an edit leaves it (a new definition; the base is untouched). */
+export function editedMonster(base: MonsterDef, edit: MonsterEdit): MonsterDef {
+  const def = { ...base, ...(edit.stats ?? {}), ...(edit.name ? { name: edit.name } : {}), ...(edit.examine !== undefined ? { examine: edit.examine } : {}), ...(edit.aggressive !== undefined ? { aggressive: edit.aggressive } : {}), ...(edit.drops ? { drops: edit.drops } : {}), ...(edit.always ? { always: edit.always } : {}) } as Record<string, unknown>;
+  for (const [key, value] of Object.entries(edit.specials ?? {})) { if (value === null) delete def[key]; else if (value !== undefined) def[key] = value; }
+  return def as MonsterDef;
+}
 export const DROPS_MAX = 40;
+/**
+ * What a biome scatter puts down, and where: things (trees, rocks, decorations, each with a weight), how many (one tile
+ * in so many), how far apart, between which heights, on which ground, how far from water and from paths. Only on open
+ * ground with nothing on it; never in a building.
+ */
+export type BiomeItem = { kind: "tree" | "rock" | "decor"; sub: string; weight: number };
+export type BiomeRules = { items: BiomeItem[]; density: number; spacing: number; minHeight?: number; maxHeight?: number; ground?: number[]; awayFromWater?: number; awayFromPaths?: number };
+export const BIOME_LIMITS = { items: 16, tiles: 60_000, spacing: 8, away: 8 } as const;
 
 export const OVERLAY_VERSION = 1;
 export type Op =
@@ -53,10 +79,14 @@ export type Op =
   | { op: "object"; uid: string; kind: ObjectKind; x: number; y: number; name?: string; blocks?: boolean; decor?: DecorKind; tree?: TreeKind; rock?: RockKind; spot?: SpotKind; text?: string; to?: { x: number; y: number }; look?: "stairs" | "gate"; sigil?: string; icon?: string }
   | { op: "building"; uid: string; x0: number; y0: number; x1: number; y1: number; door: Side; floor?: number; name?: string; color?: string; chimney?: boolean; walls?: Building["walls"]; roof?: Building["roof"]; hip?: boolean; round?: boolean; storeys?: number; doors?: Side[]; furnish?: Furnish; facade?: Building["facade"] }
   /** A copy of one of the world's buildings, its top-left corner at x, y, turned `rot` quarters clockwise; its people too if `people`. */
-  | { op: "stamp"; uid: string; x: number; y: number; rot: number; prefab: Prefab; people?: boolean }
+  | { op: "stamp"; uid: string; x: number; y: number; rot: number; prefab?: Prefab; template?: string; people?: boolean }
+  /** A building design of the world's own (a prefab with a name): placed by stamps that name it, so changing it changes every one. */
+  | { op: "template"; def: { id: string; name: string; prefab: Prefab } }
   | { op: "talk"; def: OverlayTalk }
   | { op: "monsteredit"; def: MonsterEdit }
   | { op: "spawn"; uid: string; kind: "npc" | "monster"; id: string; x: number; y: number; wander?: number }
+  /** A group of one creature: n of them on open ground within r of x, y (the same tiles every time, from the uid). */
+  | { op: "spawngroup"; uid: string; id: string; x: number; y: number; r: number; n: number; wander?: number }
   | { op: "monster"; def: MonsterDef }
   | { op: "npc"; def: OverlayNpc }
   | { op: "item"; def: (typeof ITEM_LIST)[number] }
@@ -64,7 +94,9 @@ export type Op =
   | { op: "campzone"; uid: string; x0: number; y0: number; x1: number; y1: number; allow: boolean; why?: string }
   | TerrainOp | PaintOp
   | { op: "scatter"; uid: string; x: number; y: number; r: number; kind: "tree" | "rock" | "decor"; sub?: string; density: number; seed: number }
-  | { op: "clear"; x0: number; y0: number; x1: number; y1: number };
+  | { op: "clear"; x0: number; y0: number; x1: number; y1: number }
+  /** A rectangle scattered by rules (BiomeRules): the same things in the same places every time, from the seed. */
+  | { op: "biome"; uid: string; x0: number; y0: number; x1: number; y1: number; seed: number; rules: BiomeRules };
 export type { TerrainMode };
 /** `frame: 2`: written in the grown world (after the north); an overlay without it is from before, and is moved down with the world when it's read (northframe.ts). */
 export type Overlay = { v: 1; frame?: 2; name?: string; ops: Op[] };
@@ -145,6 +177,21 @@ function cleanMonsterEdit(raw: unknown): MonsterEdit | string {
     for (const [key, value] of Object.entries(s)) { const range = STAT_RANGE[key as (typeof MONSTER_STATS)[number]]; if (!range || !NUM(value, range[0], range[1])) return `${key}: ${range ? `${range[0]} to ${range[1]}` : "not a number it has"}`; out.stats[key as (typeof MONSTER_STATS)[number]] = Math.round(value as number); }
   }
   for (const key of ["drops", "always"] as const) if (d[key] !== undefined) { const drops = cleanDrops(d[key]); if (!drops) return `${key}: up to ${DROPS_MAX} of {item, min, max, chance}`; out[key] = drops; }
+  if (d.specials !== undefined) {
+    const sp = d.specials as Record<string, unknown>; if (!sp || typeof sp !== "object") return "bad specials";
+    const o: MonsterSpecials = {}, set = (k: keyof MonsterSpecials, v: unknown) => { (o as Record<string, unknown>)[k] = v; };
+    for (const [k, v] of Object.entries(sp)) {
+      if (v === null) { if (["weakness", "attackStyle", "magicDef", "ranged", "size", "breath", "poison", "drain", "heals", "enrage", "undead", "slayer", "boss", "aggroRange", "chase", "leash", "alwaysAggressive"].includes(k)) set(k as keyof MonsterSpecials, null); else return `${k}: not a special`; continue; }
+      if (k in SPECIAL_RANGE) { const [lo, hi] = SPECIAL_RANGE[k as keyof typeof SPECIAL_RANGE]; if (!NUM(v, lo, hi)) return `${k}: ${lo} to ${hi}`; set(k as keyof MonsterSpecials, Math.round(v as number)); }
+      else if (k === "weakness") { if (!WEAKNESSES.includes(v as never)) return "weakness: fire, water, wind, earth or holy"; set(k, v); }
+      else if (k === "attackStyle") { if (v !== "melee" && v !== "magic") return "attack style: melee or magic"; set(k, v); }
+      else if (["enrage", "undead", "boss", "alwaysAggressive"].includes(k)) { if (typeof v !== "boolean") return `${k}: yes or no`; set(k as keyof MonsterSpecials, v); }
+      else if (k === "poison") { const q = v as Record<string, unknown>; if (!q || !NUM(q.damage, 1, 100) || !NUM(q.chance, 0.01, 1)) return "poison: damage 1 to 100, chance up to 1"; set(k, { damage: Math.round(q.damage as number), chance: q.chance as number }); }
+      else if (k === "drain") { const q = v as Record<string, unknown>; if (!q || (q.faith !== undefined && !NUM(q.faith, 1, 99)) || (q.energy !== undefined && !NUM(q.energy, 1, 100)) || (q.faith === undefined && q.energy === undefined)) return "drain: faith 1 to 99, energy 1 to 100"; set(k, { ...(q.faith !== undefined ? { faith: Math.round(q.faith as number) } : {}), ...(q.energy !== undefined ? { energy: Math.round(q.energy as number) } : {}) }); }
+      else return `${k}: not a special`;
+    }
+    out.specials = o;
+  }
   return out;
 }
 /** A prefab, checked: its size, its tiles real ones, its building's keys the known ones, its things and people inside it. */
@@ -199,13 +246,20 @@ export function cleanOverlay(raw: unknown, why: string[] = []): Overlay {
         out.ops.push(entry); break;
       }
       case "stamp": {
-        const prefab = cleanPrefab(op.prefab);
-        if (!inWorld || !UID(op.uid) || typeof prefab === "string") { bad(typeof prefab === "string" ? prefab : "bad stamp"); break; }
-        out.ops.push({ op: "stamp", uid: op.uid as string, x: op.x as number, y: op.y as number, rot: NUM(op.rot, 0, 3) ? Math.floor(op.rot as number) : 0, prefab, ...(op.people === true ? { people: true } : {}) }); break;
+        // A copy carries its building whole, or names a design of the overlay's (template).
+        const prefab = op.template === undefined ? cleanPrefab(op.prefab) : null;
+        if (!inWorld || !UID(op.uid) || typeof prefab === "string" || (op.template !== undefined && !UID(op.template))) { bad(typeof prefab === "string" ? prefab : "bad stamp"); break; }
+        out.ops.push({ op: "stamp", uid: op.uid as string, x: op.x as number, y: op.y as number, rot: NUM(op.rot, 0, 3) ? Math.floor(op.rot as number) : 0, ...(prefab ? { prefab } : { template: op.template as string }), ...(op.people === true ? { people: true } : {}) }); break;
+      }
+      case "template": {
+        const d = op.def as Record<string, unknown> | undefined, prefab = d ? cleanPrefab(d.prefab) : "no design";
+        if (!d || !UID(d.id) || !TEXT(d.name, 60) || !String(d.name).trim() || typeof prefab === "string") { bad(typeof prefab === "string" ? prefab : "bad design"); break; }
+        out.ops.push({ op: "template", def: { id: d.id as string, name: String(d.name).trim(), prefab } }); break;
       }
       case "talk": { const def = cleanTalk(op.def); if (typeof def === "string") bad(def); else out.ops.push({ op: "talk", def }); break; }
       case "monsteredit": { const def = cleanMonsterEdit(op.def); if (typeof def === "string") bad(def); else out.ops.push({ op: "monsteredit", def }); break; }
       case "spawn": if (inWorld && UID(op.uid) && (op.kind === "npc" || op.kind === "monster") && TEXT(op.id, 48)) out.ops.push({ op: "spawn", uid: op.uid as string, kind: op.kind, id: op.id as string, x: op.x as number, y: op.y as number, ...(NUM(op.wander, 0, 40) ? { wander: op.wander as number } : {}) }); else bad("bad spawn"); break;
+      case "spawngroup": if (inWorld && UID(op.uid) && TEXT(op.id, 48) && op.id && NUM(op.r, 1, 16) && NUM(op.n, 1, 30)) out.ops.push({ op: "spawngroup", uid: op.uid as string, id: op.id as string, x: op.x as number, y: op.y as number, r: Math.floor(op.r as number), n: Math.floor(op.n as number), ...(NUM(op.wander, 0, 40) ? { wander: Math.floor(op.wander as number) } : {}) }); else bad("bad spawn group"); break;
       case "monster": if (op.def && typeof op.def === "object" && UID((op.def as MonsterDef).id)) out.ops.push({ op: "monster", def: op.def as MonsterDef }); else bad("bad monster"); break;
       case "npc": if (op.def && typeof op.def === "object" && UID((op.def as OverlayNpc).id)) out.ops.push({ op: "npc", def: op.def as OverlayNpc }); else bad("bad npc"); break;
       case "item": if (op.def && typeof op.def === "object" && UID((op.def as { id: string }).id)) out.ops.push({ op: "item", def: op.def as (typeof ITEM_LIST)[number] }); else bad("bad item"); break;
@@ -231,6 +285,16 @@ export function cleanOverlay(raw: unknown, why: string[] = []): Overlay {
       case "region": if (NUM(op.x0, 0, W - 1) && NUM(op.y0, 0, H - 1) && NUM(op.x1, 0, W - 1) && NUM(op.y1, 0, H - 1) && TEXT(op.region, 32) && (Math.abs((op.x1 as number) - (op.x0 as number)) + 1) * (Math.abs((op.y1 as number) - (op.y0 as number)) + 1) <= REGION_TILES_MAX) out.ops.push({ op: "region", x0: op.x0 as number, y0: op.y0 as number, x1: op.x1 as number, y1: op.y1 as number, region: op.region as string }); else bad("bad region"); break;
       case "scatter": if (inWorld && UID(op.uid) && NUM(op.r, 1, BRUSH_MAX) && (op.kind === "tree" || op.kind === "rock" || op.kind === "decor") && (op.sub === undefined || TEXT(op.sub, 32)) && NUM(op.density, 0.01, 1) && NUM(op.seed, 0, 2147483647)) out.ops.push({ op: "scatter", uid: op.uid as string, x: op.x as number, y: op.y as number, r: Math.floor(op.r as number), kind: op.kind, ...(op.sub ? { sub: op.sub as string } : {}), density: op.density as number, seed: Math.floor(op.seed as number) }); else bad("bad scatter"); break;
       case "clear": if (NUM(op.x0, 0, W - 1) && NUM(op.y0, 0, H - 1) && NUM(op.x1, 0, W - 1) && NUM(op.y1, 0, H - 1) && (Math.abs((op.x1 as number) - (op.x0 as number)) + 1) * (Math.abs((op.y1 as number) - (op.y0 as number)) + 1) <= LIMITS.fillTiles) out.ops.push({ op: "clear", x0: Math.min(op.x0 as number, op.x1 as number), y0: Math.min(op.y0 as number, op.y1 as number), x1: Math.max(op.x0 as number, op.x1 as number), y1: Math.max(op.y0 as number, op.y1 as number) }); else bad("bad clear"); break;
+      case "biome": {
+        const r = op.rules as Record<string, unknown> | undefined, area = (Math.abs((op.x1 as number) - (op.x0 as number)) + 1) * (Math.abs((op.y1 as number) - (op.y0 as number)) + 1);
+        const items = Array.isArray(r?.items) ? (r!.items as Record<string, unknown>[]).filter(i => i && (i.kind === "tree" || i.kind === "rock" || i.kind === "decor") && TEXT(i.sub, 32) && i.sub && NUM(i.weight, 0.01, 100)).slice(0, BIOME_LIMITS.items).map(i => ({ kind: i.kind as BiomeItem["kind"], sub: i.sub as string, weight: i.weight as number })) : [];
+        if (!UID(op.uid) || !NUM(op.x0, 0, W - 1) || !NUM(op.y0, 0, H - 1) || !NUM(op.x1, 0, W - 1) || !NUM(op.y1, 0, H - 1) || area > BIOME_LIMITS.tiles || !NUM(op.seed, 0, 2147483647) || !r || !items.length || !NUM(r.density, 0.005, 1) || !NUM(r.spacing, 0, BIOME_LIMITS.spacing)) { bad("bad biome"); break; }
+        const rules: BiomeRules = { items, density: r.density as number, spacing: Math.floor(r.spacing as number) };
+        if (NUM(r.minHeight, -1000, 2000)) rules.minHeight = r.minHeight as number; if (NUM(r.maxHeight, -1000, 2000)) rules.maxHeight = r.maxHeight as number;
+        if (Array.isArray(r.ground)) rules.ground = (r.ground as unknown[]).filter(t => TILES.has(t as number)) as number[];
+        if (NUM(r.awayFromWater, 0, BIOME_LIMITS.away)) rules.awayFromWater = Math.floor(r.awayFromWater as number); if (NUM(r.awayFromPaths, 0, BIOME_LIMITS.away)) rules.awayFromPaths = Math.floor(r.awayFromPaths as number);
+        out.ops.push({ op: "biome", uid: op.uid as string, x0: Math.min(op.x0 as number, op.x1 as number), y0: Math.min(op.y0 as number, op.y1 as number), x1: Math.max(op.x0 as number, op.x1 as number), y1: Math.max(op.y0 as number, op.y1 as number), seed: Math.floor(op.seed as number), rules }); break;
+      }
       default: bad("unknown op");
     }
   }
@@ -266,7 +330,10 @@ export function registerDefinitions(overlay: Overlay, npcs: Record<string, unkno
       const def = MONSTERS[op.def.id] as MonsterDef | undefined; if (!def) { why.push(`monster edit ${op.def.id}: no creature called that`); continue; }
       const unknown = [...(op.def.drops ?? []), ...(op.def.always ?? [])].filter(d => !isItem(d.item)); if (unknown.length) { why.push(`monster edit ${op.def.id}: no item called ${unknown.map(d => d.item).join(", ")}`); continue; }
       if (!ORIGINAL_MONSTERS.has(op.def.id)) ORIGINAL_MONSTERS.set(op.def.id, { ...def });
-      Object.assign(def, op.def.stats ?? {}, op.def.name ? { name: op.def.name } : {}, op.def.examine !== undefined ? { examine: op.def.examine } : {}, op.def.aggressive !== undefined ? { aggressive: op.def.aggressive } : {}, op.def.drops ? { drops: op.def.drops } : {}, op.def.always ? { always: op.def.always } : {});
+      // (In place, so everything holding the definition sees it: cleared, then filled with the edited one.)
+      const next = editedMonster(def, op.def) as unknown as Record<string, unknown>, target = def as unknown as Record<string, unknown>;
+      for (const key of Object.keys(target)) if (!(key in next)) delete target[key];
+      Object.assign(target, next);
     }
     if (op.op === "talk") { if (npcs && !npcs[op.def.id] && !overlay.ops.some(entry => entry.op === "npc" && entry.def.id === op.def.id)) why.push(`talk ${op.def.id}: no one called that`); else OVERLAY_TALK.set(op.def.id, op.def); }
   }
@@ -288,6 +355,8 @@ export type Placed = { objects: Map<string, number>; buildings: Map<string, numb
 export const HEAVE_STEP = 16;
 export function applyOverlay(world: World, overlay: Overlay, seed: number, why: string[] = [], npcs: Record<string, unknown> | null = null): Placed {
   const placed: Placed = { objects: new Map(), buildings: new Map(), spawns: new Map() };
+  // The overlay's building designs, for the copies that name them (wherever in the overlay the design is).
+  const designs = new Map<string, Prefab>(); for (const op of overlay.ops) if (op.op === "template") designs.set(op.def.id, { ...op.def.prefab, name: op.def.name, building: { ...op.def.prefab.building, name: op.def.name } });
   const index = (x: number, y: number) => y * W + x, lift = world.lift ?? (world.lift = new Float32Array(W * H)), raise = world.raise ?? (world.raise = new Float32Array(W * H));
   let tilesChanged = false, objectsChanged = false, buildingsChanged = false;
   // The rectangle of tiles changed (so the development frame rebuilds just the ground round it), and the raises by tile.
@@ -341,7 +410,9 @@ export function applyOverlay(world: World, overlay: Overlay, seed: number, why: 
     }
     else if (op.op === "stamp") {
       // A copy of a building: its tiles, the building as drawn, its things and (if asked) its people, turned as placed.
-      const p = turned(op.prefab, op.rot), x0 = op.x, y0 = op.y, x1 = op.x + p.w - 1, y1 = op.y + p.h - 1;
+      const source = op.prefab ?? designs.get(op.template ?? "");
+      if (!source) { why.push(`${op.uid}: no design called ${op.template}`); continue; }
+      const p = turned(source, op.rot), x0 = op.x, y0 = op.y, x1 = op.x + p.w - 1, y1 = op.y + p.h - 1;
       if (!buildable(x0, y0, x1, y1)) { why.push(`${op.uid}: ${p.name} doesn't fit at ${x0},${y0}`); continue; }
       for (let dy = 0; dy < p.h; dy++) for (let dx = 0; dx < p.w; dx++) { world.tiles[index(x0 + dx, y0 + dy)] = p.tiles[dy * p.w + dx]; removeAt(x0 + dx, y0 + dy); }
       const building: Building = { roof: "gable", color: ROOF_COLORS[world.buildings.length % ROOF_COLORS.length], chimney: false, name: "", ...p.building, x0, y0, x1, y1 };
@@ -349,6 +420,16 @@ export function applyOverlay(world: World, overlay: Overlay, seed: number, why: 
       for (const o of p.objects) { const { dx, dy, ...rest } = o, object = { ...rest, id: world.objects.length, x: x0 + dx, y: y0 + dy } as WorldObject; world.objects.push(object); world.objectAt[index(object.x, object.y)] = object.id; objectsChanged = true; }
       if (op.people) for (const person of p.people) { if (npcs && !npcs[person.id]) { why.push(`${op.uid}: no one called ${person.id}`); continue; } world.spawns.push({ kind: "npc", id: person.id, x: x0 + person.dx, y: y0 + person.dy, ...(person.wander ? { wander: person.wander } : {}) }); }
       tilesChanged = true; buildingsChanged = true; touch(x0, y0, x1, y1);
+    }
+    else if (op.op === "spawngroup") {
+      if (!MONSTERS[op.id]) { why.push(`${op.uid}: no monster called ${op.id}`); continue; }
+      // The open tiles in the circle, in an order of their own (from the uid), the first n taken.
+      const seed = [...op.uid].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 7), spots: [number, number, number][] = [];
+      for (let y = op.y - op.r; y <= op.y + op.r; y++) for (let x = op.x - op.r; x <= op.x + op.r; x++) if (x >= 0 && y >= 0 && x < W && y < H && Math.hypot(x - op.x, y - op.y) <= op.r + 0.5 && walkableAt(world, x, y)) spots.push([tileHash(x, y, seed), x, y]);
+      spots.sort((a, b) => a[0] - b[0]);
+      if (spots.length < op.n) why.push(`${op.uid}: room for ${spots.length} of ${op.n} ${op.id}`);
+      for (const [, x, y] of spots.slice(0, op.n)) world.spawns.push({ kind: "monster", id: op.id, x, y, wander: op.wander ?? MONSTERS[op.id].wander });
+      placed.spawns.set(op.uid, world.spawns.length - 1);
     }
     else if (op.op === "spawn") {
       const known = op.kind === "npc" ? (npcs ? !!npcs[op.id] : true) : !!MONSTERS[op.id];
@@ -380,7 +461,39 @@ export function applyOverlay(world: World, overlay: Overlay, seed: number, why: 
     if (world.ground) world.ground = ground;
     world.heights = world.ground ? new Float32Array(ground) : ground; levelBuildings(world.heights, world.buildings, world.tiles);
   }
+  // The biome scatters, last of all: on the ground as the ops have left it (its heights now worked out).
+  for (const op of overlay.ops) if (op.op === "biome") scatterBiome(world, op, why);
   return placed;
+}
+/** A biome scatter's things put down: candidates in an order from the seed, kept where every rule holds and nothing's nearer than the spacing. */
+function scatterBiome(world: World, op: Extract<Op, { op: "biome" }>, why: string[]) {
+  const r = op.rules, CW = W + 1, total = r.items.reduce((a, i) => a + i.weight, 0), ground = r.ground?.length ? new Set(r.ground) : null;
+  const height = (x: number, y: number) => (world.heights[y * CW + x] + world.heights[y * CW + x + 1] + world.heights[(y + 1) * CW + x] + world.heights[(y + 1) * CW + x + 1]) / 4;
+  const within = (x: number, y: number, d: number, test: (t: number) => boolean) => { for (let dy = -d; dy <= d; dy++) for (let dx = -d; dx <= d; dx++) { const nx = x + dx, ny = y + dy; if (nx >= 0 && ny >= 0 && nx < W && ny < H && test(world.tiles[ny * W + nx])) return true; } return false; };
+  const wet = (t: number) => t === T.WATER || t === T.DEEP || t === T.LAVA || t === T.BRIDGE, path = (t: number) => t === T.PATH || t === T.COBBLE || t === T.BRIDGE;
+  const candidates: [number, number, number][] = [];
+  for (let y = op.y0; y <= op.y1; y++) for (let x = op.x0; x <= op.x1; x++) { const h = tileHash(x, y, op.seed); if (h < r.density) candidates.push([tileHash(y, x, op.seed + 7), x, y]); }
+  candidates.sort((a, b) => a[0] - b[0]);
+  // (Where things went, on a grid over the rectangle, for the spacing.)
+  const GW = op.x1 - op.x0 + 1, taken = new Uint8Array(GW * (op.y1 - op.y0 + 1)), near = (x: number, y: number) => { const d = r.spacing; for (let yy = Math.max(op.y0, y - d); yy <= Math.min(op.y1, y + d); yy++) for (let xx = Math.max(op.x0, x - d); xx <= Math.min(op.x1, x + d); xx++) if (taken[(yy - op.y0) * GW + xx - op.x0]) return true; return false; };
+  let placed = 0;
+  for (const [, x, y] of candidates) {
+    const i = y * W + x, t = world.tiles[i];
+    if (!scatterable(t) || world.objectAt[i] >= 0 || world.buildingAt[i]) continue;
+    if (ground && !ground.has(t)) continue;
+    const hgt = height(x, y); if ((r.minHeight !== undefined && hgt < r.minHeight) || (r.maxHeight !== undefined && hgt > r.maxHeight)) continue;
+    if (r.awayFromWater && within(x, y, r.awayFromWater, wet)) continue;
+    if (r.awayFromPaths && within(x, y, r.awayFromPaths, path)) continue;
+    if (r.spacing && near(x, y)) continue;
+    // Which thing: by weight, from the seed.
+    let pick = tileHash(x + 17, y + 29, op.seed) * total, item = r.items[r.items.length - 1];
+    for (const it of r.items) { if (pick < it.weight) { item = it; break; } pick -= it.weight; }
+    const name = item.kind === "decor" ? DECOR_NAMES[item.sub as DecorKind] ?? "Thing" : item.kind === "tree" ? TREE_NAMES[item.sub as TreeKind] ?? "Tree" : "Rocks";
+    const low = item.kind === "decor" && (item.sub === "flowers" || item.sub === "lily" || item.sub === "reeds" || item.sub === "rubble" || item.sub === "bones");
+    const object = { id: world.objects.length, kind: item.kind, x, y, name, blocks: !low, [item.kind]: item.sub, ...(item.sub === "ruin_wall" ? { height: 14 + Math.round(tileHash(x, y, op.seed + 3) * 14) } : {}) } as WorldObject;
+    world.objects.push(object); world.objectAt[i] = object.id; taken[(y - op.y0) * GW + x - op.x0] = 1; placed++;
+  }
+  if (!placed) why.push(`${op.uid}: the biome's rules left nowhere to put anything`);
 }
 
 /** Whether a tile can be walked on in a world (terrain and blocking objects; no creatures). */
@@ -406,8 +519,8 @@ export function validatePlacements(world: World, overlay: Overlay, placed: Place
   const near = (x: number, y: number) => [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => x + dx >= 0 && y + dy >= 0 && x + dx < W && y + dy < H && from[(y + dy) * W + x + dx]);
   for (const op of overlay.ops) {
     if (op.op === "object" && placed.objects.has(op.uid) && op.y < FLOOR_Y && !near(op.x, op.y)) out.push(`${op.name ?? op.kind} at ${op.x},${op.y} (${op.uid}) can't be reached from the spawn`);
-    if (op.op === "spawn" && placed.spawns.has(op.uid) && !near(op.x, op.y)) out.push(`${op.kind} ${op.id} at ${op.x},${op.y} (${op.uid}) can't be reached from the spawn`);
-    if ((op.op === "building" || op.op === "stamp") && placed.buildings.has(op.uid)) { const b = world.buildings[placed.buildings.get(op.uid)!]; let door = false; for (let y = b.y0; y <= b.y1 && !door; y++) for (let x = b.x0; x <= b.x1; x++) if ((x === b.x0 || x === b.x1 || y === b.y0 || y === b.y1) && walkableAt(world, x, y) && near(x, y)) { door = true; break; } if (!door) out.push(`building ${(op.op === "building" ? op.name : op.prefab.name) ?? op.uid}: its door can't be reached from the spawn`); }
+    if ((op.op === "spawn" || op.op === "spawngroup") && placed.spawns.has(op.uid) && !near(op.x, op.y)) out.push(`${op.op === "spawn" ? op.kind : "monsters"} ${op.id} at ${op.x},${op.y} (${op.uid}) can't be reached from the spawn`);
+    if ((op.op === "building" || op.op === "stamp") && placed.buildings.has(op.uid)) { const b = world.buildings[placed.buildings.get(op.uid)!]; let door = false; for (let y = b.y0; y <= b.y1 && !door; y++) for (let x = b.x0; x <= b.x1; x++) if ((x === b.x0 || x === b.x1 || y === b.y0 || y === b.y1) && walkableAt(world, x, y) && near(x, y)) { door = true; break; } if (!door) out.push(`building ${(op.op === "building" ? op.name : op.prefab?.name ?? op.template) ?? op.uid}: its door can't be reached from the spawn`); }
   }
   return out;
 }

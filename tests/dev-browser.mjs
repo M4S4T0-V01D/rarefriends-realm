@@ -208,10 +208,32 @@ try {
   assert.ok(saved.overlay.ops.some(op => op.op === "monsteredit" && op.def.id === beast && op.def.drops), "the creature's drops are saved");
   assert.ok(saved.overlay.ops.some(op => op.op === "stamp" && op.prefab.tiles.length === op.prefab.w * op.prefab.h), "the copied building is saved, whole");
   assert.ok(saved.overlay.ops.some(op => op.op === "building" && op.furnish === "smithy"), "the smithy is saved");
+  // The creature designer's simulator: the creature fought off-screen, the results shown.
+  await page.getByRole("button", { name: "monsters", exact: true }).click();
+  await bottom.getByPlaceholder("Find a creature…").fill(beast);
+  await bottom.getByRole("option").first().click();
+  await bottom.getByRole("button", { name: "Run", exact: true }).click();
+  await bottom.getByText(/won, \d+ lost/).waitFor();
+  // A design: the copied building saved under a name, then placed by it.
+  page.once("dialog", dialog => dialog.accept("Cottage"));
+  await editor.getByRole("button", { name: "Copy building", exact: true }).click();
+  await editor.getByRole("button", { name: "Save as a design…" }).click();
+  await page.getByText(/Design “Cottage” saved/).waitFor();
+  await page.mouse.click(box.x + box.width / 2 + 60, box.y + box.height / 2 - 150);
+  await page.getByText(/Placed the design Cottage/).waitFor();
+  // A biome scatter: a pine forest over a rectangle.
+  await editor.getByRole("button", { name: "Biome scatter", exact: true }).click();
+  await editor.getByRole("button", { name: "Pine forest", exact: true }).click();
+  await page.mouse.click(box.x + box.width / 2 + 20, box.y + box.height / 2 - 40);
+  await page.mouse.click(box.x + box.width / 2 + 140, box.y + box.height / 2 + 30);
+  await page.getByText(/Pine forest over/).waitFor();
+  await page.getByRole("button", { name: "Save", exact: true }).click(); await page.getByText(/Saved v8/).waitFor();
+  assert.ok(saved.overlay.ops.some(op => op.op === "template" && op.def.name === "Cottage") && saved.overlay.ops.some(op => op.op === "stamp" && op.template), "the design and a copy placed by it are saved");
+  assert.ok(saved.overlay.ops.some(op => op.op === "biome" && op.rules.items.some(i => i.sub === "pine")), "the biome scatter is saved");
   // The map: the whole world comes over as a picture.
   await page.getByRole("button", { name: "map", exact: true }).click();
   await page.getByRole("button", { name: "Centre on me" }).waitFor();
-  console.log("PASS development game: the dashboard round the public build, overlays applied and saved, edit mode picking, undo, definitions (a person, an errand), a camp zone, raising ground, a dragged paint brush, the search, the sandbox (no saves), deploying a save, Max me, a conversation written and tried, a creature's drops, a copied building, a furnished smithy");
+  console.log("PASS development game: the dashboard round the public build, overlays applied and saved, edit mode picking, undo, definitions (a person, an errand), a camp zone, raising ground, a dragged paint brush, the search, the sandbox (no saves), deploying a save, Max me, a conversation written and tried, a creature's drops, a copied building, a furnished smithy, the fight simulator, a design placed by name, a biome scatter");
   assert.deepEqual(errors, [], "no page errors");
   // The public build: nothing of the editor in it.
   execFileSync("node", ["scripts/build.mjs", "--outdir", join(outdir, "public")], { stdio: "ignore" });
