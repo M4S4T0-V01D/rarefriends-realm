@@ -10,13 +10,16 @@ import { themedGround, themedWall } from "./dungeontextures.ts";
 export const TEX_PER_TILE = 16;
 /** Texture rows per world pixel of height. */
 export const TEX_PER_HEIGHT = 0.5;
+import { propWall, type PropStyle } from "./proptextures.ts";
 export type WallStyle = "brick" | "window" | "timber" | "timber_window" | "window_lit" | "timber_window_lit" | "plank" | "cap" | "dungeon"
   // The Mizukai Isles: white plaster between dark posts over a dark board skirt, with paper-latticed windows; and a shrine's vermilion.
   | "mizukai" | "mizukai_window" | "mizukai_window_lit" | "lacquer"
   // Kharaveth: dressed sandstone ashlar with a carved lintel over each window; and plastered mudbrick with a latticed window.
   | "sandstone" | "sandstone_window" | "sandstone_window_lit" | "mudbrick" | "mudbrick_window" | "mudbrick_window_lit"
   // The dungeon families (dungeontheme.ts, painted in dungeontextures.ts): burial niches, scorched rock shored with timber, frost and icicles, carved sigils, cracked black stone, rough cave.
-  | "ossuary" | "scorched" | "rime" | "arcane" | "hollow" | "cave";
+  | "ossuary" | "scorched" | "rime" | "arcane" | "hollow" | "cave"
+  // Furniture and stonework (proptextures.ts): boards, a quilt, linen, a fluted column, a carved band, a coffin lid.
+  | PropStyle;
 /** Where a window's glass sits on a 16-wide wall texture (x0, width) and, per wall kind, its top row and height. */
 export const PANE = { x0: 5, w: 6, h: 7, top: (timber: boolean) => timber ? 3 : 5 };
 const BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
@@ -26,6 +29,7 @@ const noise = (x: number, y: number, seed: number) => { let h = Math.imul(x * 37
 export function wallTexture(style: WallStyle, color: string, variant = 0): HTMLCanvasElement {
   return pixelArt(`wall:${style}:${color}:${variant}`, TEX_PER_TILE, 24, p => {
     const W = TEX_PER_TILE, H = 24, mortar = shadeHex(color, -0.2), light = shadeHex(color, 0.07), dark = shadeHex(color, -0.08);
+    if (propWall(p, style, color, variant, noise, shadeHex, W, H)) return;
     if (themedWall(p, style, color, variant, noise, shadeHex, W, H)) return;
     if (style === "mizukai" || style === "mizukai_window" || style === "mizukai_window_lit" || style === "lacquer") { mizukaiWall(p, style, color, variant); return; }
     if (style.startsWith("sandstone") || style.startsWith("mudbrick")) { desertWall(p, style, color, variant); return; }

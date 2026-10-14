@@ -26,6 +26,7 @@ import { buildQuestMounts } from "./questmountsworld.ts";
 import { buildNorth } from "./northworld.ts";
 import { openSeas } from "./seaways.ts";
 import { buildElevation } from "./elevation.ts";
+import { buildSigilShrines } from "./sigilshrines.ts";
 
 /**
  * The far west (Return of Raria): the world grew by WEST_DX columns on its west side for a second continent, Raria and
@@ -135,6 +136,8 @@ export type DecorKind =
   | "flowers" | "bush" | "boulder" | "lamp" | "bench" | "crate" | "barrel" | "tent" | "cactus" | "pine" | "dead_tree" | "statue"
   | "grave" | "fence" | "reeds" | "table" | "bed" | "shelf" | "pillar" | "rubble" | "snowman" | "lily" | "banner" | "torch" | "palm" | "hay" | "windmill" | "boat" | "chest"
   | "throne" | "armour" | "logpile" | "stump" | "target" | "ruin_wall" | "old_friend" | "tomb" | "crypt" | "obelisk" | "bones" | "hearth" | "monument"
+  // The ruins' other stones (render.ts drawStonework, props.ts), and a stone coffin.
+  | "broken_pillar" | "fallen_pillar" | "column_base" | "ruin_arch" | "carved_block" | "stone_head" | "sarcophagus"
   | "god_diamond" | "god_ink" | "god_sol" | "god_hood" | "god_ember"
   // Return of Raria: the Wise Friend and the Order of Dusk's god, and the things factions leave about.
   | "god_dusk" | "wise_friend" | "bell" | "canopy" | "cannon" | "device" | "wagon" | "watchtower" | "stake" | "plaque" | "banner_fff" | "banner_rrr" | "banner_hollowmere"
@@ -1018,7 +1021,7 @@ function buildMainland(seed: number) {
   npc("witch", 26, 150, 2);
 
   // ---------- Mossy Ruins (and the Hollow Rift) ----------
-  scatter(100, 156, 144, 192, 34, (x, y) => decor(x, y, random() > 0.5 ? "rubble" : "pillar"), (x, y) => free(x, y));
+  scatter(100, 156, 144, 192, 34, (x, y) => decor(x, y, ruinPiece(random())), (x, y) => free(x, y));
   scatter(100, 156, 144, 192, 20, (x, y) => tree(x, y, random() > 0.5 ? "oak" : "tree"));
   monsters("moss_colossus", 108, 172, 136, 188, 6);
   blob(122, 186, 4, 3, T.STONE, 0.2);
@@ -1152,7 +1155,8 @@ function buildMainland(seed: number) {
     const random = mulberry(seed + 404), spawnTiles = new Set(spawns.map(spawn => tileIndex(spawn.x, spawn.y)));
     const open = (x: number, y: number) => inBounds(x, y) && free(x, y) && !spawnTiles.has(tileIndex(x, y));
     const stub = (x: number, y: number, height: number) => { if (open(x, y)) add({ kind: "decor", decor: "ruin_wall", x, y, blocks: true, name: "Crumbling wall", height: Math.round(height) }); };
-    const litter = (x: number, y: number) => { if (open(x, y) && random() < 0.5) decor(x, y, "rubble", false, "Rubble"); };
+    // (What lies about is mostly rubble; a broken column, a carved block, a column's base now and then, by where it lies, so the stream is as it was.)
+    const litter = (x: number, y: number) => { if (open(x, y) && random() < 0.5) { const r = ((Math.imul(x, 73856093) ^ Math.imul(y, 19349663)) >>> 0) % 100 / 100, kind = r < 0.7 ? "rubble" : ruinPiece(0.46 + (r - 0.7) / 0.3 * 0.42); decor(x, y, kind, false, kind === "rubble" ? "Rubble" : undefined); } };
     const flag = (x: number, y: number) => { if (open(x, y) && random() < 0.6 && get(x, y) !== T.SAND && get(x, y) !== T.SNOW) put(x, y, T.STONE); };
     /** Somewhere in the box with a clear w × h footprint (and a tile of space round it). */
     const site = (x0: number, y0: number, x1: number, y1: number, w: number, h: number) => {
@@ -1636,6 +1640,8 @@ export function generateWorld(seed = WORLD_SEED, { overlays = true }: { overlays
   buildNorth(grownCtx, labels);
   // The Frenderal Exchange at the top of Gullwick's harbour street (commerceworld.ts, Commerce).
   buildExchange(grownCtx, places);
+  // The sigil altars' shrines, and the deeper altars out across the Realm (sigilshrines.ts).
+  buildSigilShrines(grownCtx);
   // The seaways, last of all: the Outer Sea round the whole map and the straits out to it (seaways.ts).
   openSeas({ ...grownCtx, random: mulberry(seed + 983), noise2: makeNoise(seed + 987, 4) }, places);
   { const entry = REGIONS.find(region => region.id === "outer_sea") as { label: { x: number; y: number } } | undefined; if (entry) { entry.label = { x: 860, y: 4 }; labels.outer_sea = { x: 860, y: 4 }; } }
@@ -1864,6 +1870,11 @@ const SIDES = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
 /** Faded roof tiles in the Rare Friends accents. */
 export const ROOF_COLORS = ["#c99a96", "#9aab92", "#8f9cb2", "#cdb98a", "#a996b5"];
 export const TREE_NAMES: Record<TreeKind, string> = { tree: "Tree", oak: "Oak", willow: "Willow", maple: "Maple tree", yew: "Yew", ashwood: "Ashwood", palm: "Palm tree", pine: "Pine tree", deadwood: "Dead tree", redwood: "Redwood", ironbark: "Ironbark", cedar: "Cedar", sakura: "Blossom tree", bamboo: "Bamboo" };
+/**
+ * A piece of an old ruin, for variety (`r` in [0, 1), from a random stream or a hash): walls and rubble most often, then
+ * broken and fallen columns, their bases, carved blocks, an archway standing alone, now and then a great stone head.
+ */
+export const ruinPiece = (r: number): DecorKind => r < 0.26 ? "ruin_wall" : r < 0.46 ? "rubble" : r < 0.58 ? "broken_pillar" : r < 0.68 ? "fallen_pillar" : r < 0.78 ? "column_base" : r < 0.88 ? "carved_block" : r < 0.96 ? "ruin_arch" : "stone_head";
 export const DECOR_NAMES: Record<DecorKind, string> = {
   trough: "Water trough", vessel: "Vessel", hitching_post: "Hitching post",
   strong_friend: "The Strong Friend", crystal: "Crystal", rune_circle: "Sigil circle", monument: "Statue", god_diamond: "Statue of the Good Friend", god_ink: "Statue of the Squid Friend", god_sol: "Statue of the Weird Friend", god_hood: "Statue of the Hood Friend", god_ember: "The Ember, in its brazier",
@@ -1872,7 +1883,7 @@ export const DECOR_NAMES: Record<DecorKind, string> = {
   cactus: "Cactus", pine: "Pine tree", dead_tree: "Dead tree", statue: "Statue", grave: "Grave", fence: "Fence", reeds: "Reeds", table: "Table",
   bed: "Bed", shelf: "Shelves", pillar: "Pillar", rubble: "Rubble", snowman: "Snow Friend", lily: "Lily pad", banner: "Banner", torch: "Torch",
   palm: "Palm tree", hay: "Hay bales", windmill: "Windmill", boat: "Boat", chest: "Chest", throne: "Throne", armour: "Suit of armour",
-  logpile: "Log pile", stump: "Chopping block", target: "Archery target", ruin_wall: "Crumbling wall", old_friend: "Statue of the Old Friend",
+  logpile: "Log pile", stump: "Chopping block", target: "Archery target", ruin_wall: "Crumbling wall", broken_pillar: "Broken pillar", fallen_pillar: "Fallen pillar", column_base: "Column base", ruin_arch: "Ruined archway", carved_block: "Carved stone", stone_head: "Stone head", sarcophagus: "Stone coffin", old_friend: "Statue of the Old Friend",
   tomb: "Stone tomb", crypt: "Crypt", obelisk: "Obelisk", bones: "Bones", hearth: "Hearth",
   torii: "Shrine gate", stone_lantern: "Stone lantern", pagoda: "Pagoda", guardian: "Guardian lion-dog", sacred_rope: "Sacred rock", drying_rack: "Drying rack", steam: "Hot spring",
   castle_keep: "Castle keep", offering_box: "Offering box", paper_lantern: "Paper lantern", wish_board: "Wish board", wayside_statue: "Wayside statue", nets: "Fishing nets",

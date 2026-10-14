@@ -339,6 +339,10 @@ const DECOR_EXAMINE: Partial<Record<string, string>> = {
   statue: "A statue of the First Friend. It looks a lot like yours.", windmill: "Its sails creak in the wind.", snowman: "A Friend made of snow. Its carrot is a pinecone.",
   tent: "Smells of Grumblin.", grave: "Here lies a Friend.", chest: "An old chest.", boat: "It's seen better days.", pillar: "Old stone. Older than the Realm.",
   fence: "A wooden fence.", pine: "A snowy pine.", cactus: "Don't hug it.", palm: "Coconuts, out of reach.", torch: "It flickers.", banner: "The banner of Friendhollow Castle.",
+  broken_pillar: "A column snapped off at the height of a Friend. The rest of it is in the grass somewhere.", fallen_pillar: "A whole column, lying where it fell, its drums still in a row.",
+  column_base: "The foot of a column, square-cut, and nothing standing on it any more.", ruin_arch: "Two posts and the stones of an arch between them. The wall it went through is gone.",
+  carved_block: "A dressed block with a pattern cut into it, worn almost smooth. It meant something to somebody.", stone_head: "A great carved head, sunk to the chin. Whoever it was, they were looking that way.",
+  sarcophagus: "A stone coffin, its lid carved with a long cross. Whoever's in it has been there a long time.",
   throne: "Carved oak, gilded, and a cushion somebody sat on too long.", armour: "An empty suit of ashsteel armour. Probably empty.", bed: "Very soft. No time for naps.",
 };
 

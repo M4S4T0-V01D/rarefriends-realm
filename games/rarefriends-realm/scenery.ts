@@ -4,6 +4,7 @@
  */
 import { INK, Pixels, pixelArt, shadeHex } from "./pixel.ts";
 import { ORDERS } from "./knights.ts";
+import { propArt } from "./props.ts";
 
 function rng(seed: number) {
   return () => {
@@ -125,6 +126,8 @@ export function rockArt(ore: string, variant: number, depleted: boolean): HTMLCa
 const COLORS = { rose: "#d8b6b4", sage: "#b4c3ab", butter: "#e2d7ad", lavender: "#c6bed4", paper: "#efede7", wood: "#9c8672", woodLight: "#b89c86", stone: "#c8c5be", stoneDark: "#a9a59e" };
 /** Decor billboards. `frame` animates the few that move (torches, reeds, wheat). */
 export function decorArt(kind: string, variant: number, frame = 0): HTMLCanvasElement | null {
+  // The props drawn again (props.ts) first.
+  const prop = propArt(kind, variant, frame); if (prop) return prop;
   const key = `decor:${kind}:${variant}:${frame}`;
   const random = rng(variant * 71 + frame);
   switch (kind) {

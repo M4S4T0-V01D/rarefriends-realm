@@ -6,6 +6,8 @@ import type { GenerationSprites } from "@rarefriends/friendsdk/sprites";
 import { MONSTERS, COURSES, ROCKS, isItem, item, levelForXp, mountDef, petDef, regionalSetOf, type Coat, type Icon } from "./data.ts";
 import { herbDef } from "./apothecary.ts";
 import { doorwaysOf, dressWorld } from "./facades.ts";
+import { emblemArt, orbArt } from "./sigilart.ts";
+import { SHRINE_R, shrineBroken, shrineOf } from "./sigilshrines.ts";
 import type { RealmGL } from "./gl.ts";
 const isPet = (id: string) => !!petDef(id);
 import { NPCS, npcHere } from "./content.ts";
@@ -575,6 +577,8 @@ function glDepth(camera: Camera, x: number, y: number, lift = 0) {
   return (rx + ry) * 32 * Math.sqrt(Math.max(0, 1 - camera.pitch * camera.pitch)) + h * camera.pitch / 0.8660254;
 }
 /** An isometric box on a tile footprint (w, d in tiles) and height h (world px). With a `pattern`, its faces are pixel-art textured. */
+/** The patterns a box's top takes too (a wall's cap of stone; boards, a quilt, linen, carving, a coffin lid). */
+const LID_PATTERNS: ReadonlySet<string> = new Set(["cap", "planks", "quilt", "linen", "carved", "lid"]);
 function box(ctx: CanvasRenderingContext2D, camera: Camera, x: number, y: number, w: number, d: number, h: number, top: string, left: string, right: string, lift = 0, stroke: string | null = INK, pattern: WallStyle | null = null, hidden?: (nx: number, ny: number) => boolean) {
   if (capturing) { captureBox(ctx, camera, x, y, w, d, h, top, left, right, lift, pattern, stroke); return; }
   const p = (px: number, py: number, z: number) => { const s = toScreen(camera, px, py, z); return [s.x, s.y] as const; };
@@ -601,7 +605,7 @@ function box(ctx: CanvasRenderingContext2D, camera: Camera, x: number, y: number
     outline(corners);
   }
   const lid = [p(x0, y0, lift + h), p(x1, y0, lift + h), p(x1, y1, lift + h), p(x0, y1, lift + h)] as const;
-  if (pattern && texturesOn && pattern === "cap" && top.startsWith("#")) texturedQuad(ctx, wallTexture("cap", top, variant), q(x0, y0, lift + h), q(x1, y0, lift + h), q(x0, y1, lift + h), w * TEX_PER_TILE, d * TEX_PER_TILE);
+  if (pattern && texturesOn && LID_PATTERNS.has(pattern) && top.startsWith("#")) texturedQuad(ctx, wallTexture(pattern, top, variant), q(x0, y0, lift + h), q(x1, y0, lift + h), q(x0, y1, lift + h), w * TEX_PER_TILE, d * TEX_PER_TILE);
   else poly(ctx, lid, top, null);
   outline(lid);
   // Every face's ink edge in one stroke (shared edges would otherwise be drawn twice, and each stroke is a draw call).
@@ -1162,10 +1166,191 @@ function drawShelf(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
   poly(ctx, quad(at, -0.36, 0.36, 37, 39.5), shade(wood, 0.18), INK, 0.6);
 }
 /** A table on four legs, with something on it. */
+/** Two colours mixed (t of the second). */
+const mixHex = (a: string, b: string, t: number) => { const p = (h: string, i: number) => parseInt(h.slice(1 + i * 2, 3 + i * 2), 16), c = (i: number) => Math.round(p(a, i) * (1 - t) + p(b, i) * t).toString(16).padStart(2, "0"); return `#${c(0)}${c(1)}${c(2)}`; };
+/** A hex colour lit or shaded (shade() gives rgb(), which a texture won't take and shade() can't shade again). */
+const hexShade = (h: string, amount: number) => mixHex(h, amount > 0 ? "#ffffff" : "#000000", Math.abs(amount));
+/** A sigil's stone: grey marble tinted with the sigil's colour, in its lit, left and right faces. */
+const sigilStone = (sigil: string | undefined): readonly [string, string, string] => { const c = sigil && isItem(sigil) ? item(sigil).icon.color : "#c7d3dc", base = mixHex("#cfcac0", c, 0.42); return [hexShade(base, 0.12), base, hexShade(base, -0.16)]; };
+/**
+ * A sigil shrine's roof, over its four columns: a square band of the sigil's stone on the columns, then a dome of eight
+ * curved panels rising to a finial with the sigil's light in it, each panel shaded by which way it faces; an old shrine
+ * has lost its band over the broken column and a bite out of its dome there.
+ */
+function drawShrine(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObject) {
+  const { camera, now } = scene, z = camera.zoom, cx = object.x, cy = object.y, [lit, mid, dark] = sigilStone(object.sigil), broken = shrineBroken(object.sigil ?? "");
+  const color = object.sigil && isItem(object.sigil) ? item(object.sigil).icon.color : "#c7d3dc", R = SHRINE_R + 0.3, E = 67, P = (x: number, y: number, h: number) => { const q = toScreen(camera, x, y, h); return [q.x, q.y] as [number, number]; };
+  // The band: a beam on each side, the far ones first; the old shrine's north side gone.
+  const beams = [{ x: cx, y: cy - R + 0.15, w: 2 * R, d: 0.3, side: "n" }, { x: cx, y: cy + R - 0.15, w: 2 * R, d: 0.3, side: "s" }, { x: cx - R + 0.15, y: cy, w: 0.3, d: 2 * R, side: "w" }, { x: cx + R - 0.15, y: cy, w: 0.3, d: 2 * R, side: "e" }]
+    .filter(b => !(broken && b.side === "n")).sort((a, b) => depthOf(camera, a.x, a.y) - depthOf(camera, b.x, b.y));
+  for (const b of beams) box(ctx, camera, b.x, b.y, b.w, b.d, 6, lit, mid, dark, E, INK, "carved");
+  // The dome: eight panels from the band up to an open ring at its crown (an oculus), shaded by facing; the sigil's orb
+  // floats in the ring, drawn between the far panels and the near ones so it shows in the crown of the shrine.
+  const tile = mixHex(mid, color, 0.4), r0 = R - 0.15, r1 = R * 0.42, h0 = E + 6, h1 = E + 26;
+  const angle = (i: number) => i * Math.PI / 4 + Math.PI / 8;
+  const panel = (i: number) => {
+    const a = angle(i), b = angle(i + 1), m = (a + b) / 2, { rx, ry } = rotate(camera, Math.cos(m), Math.sin(m)), facing = rx - ry;
+    const fill = hexShade(tile, facing < 0 ? 0.14 - (rx + ry) * 0.06 : -0.1 - (rx + ry) * 0.06);
+    poly(ctx, [P(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0, h0), P(cx + Math.cos(b) * r0, cy + Math.sin(b) * r0, h0), P(cx + Math.cos(b) * r1, cy + Math.sin(b) * r1, h1), P(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1, h1)], fill, INK, 1);
+    ctx.strokeStyle = hexShade(fill, 0.2); ctx.lineWidth = Math.max(1, z); ctx.beginPath(); const [ax, ay] = P(cx + Math.cos(m) * r0, cy + Math.sin(m) * r0, h0), [bx, by] = P(cx + Math.cos(m) * r1, cy + Math.sin(m) * r1, h1); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+    // The oculus's lip along this panel's top.
+    poly(ctx, [P(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1, h1), P(cx + Math.cos(b) * r1, cy + Math.sin(b) * r1, h1), P(cx + Math.cos(b) * r1, cy + Math.sin(b) * r1, h1 + 2), P(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1, h1 + 2)], lit, INK, 1);
+  };
+  const panels = Array.from({ length: 8 }, (_, i) => i).filter(i => !(broken && (i === 6 || i === 7)));
+  const away = (i: number) => { const m = angle(i) + Math.PI / 8, { rx, ry } = rotate(camera, Math.cos(m), Math.sin(m)); return rx + ry; };
+  const order = panels.sort((a, b) => away(a) - away(b));
+  for (const i of order.filter(i => away(i) < 0)) panel(i);
+  // The orb, floating in the crown, haloed in its light.
+  const bob = scene.reducedMotion ? 0 : Math.sin(now / 520 + cx) * 3 * z, [ox2, oy2] = P(cx, cy, h1 - 6), oyS = oy2 + bob;
+  const g = ctx.createRadialGradient(ox2, oyS - 10 * z, 0, ox2, oyS - 10 * z, 34 * z); g.addColorStop(0, hexA(color, 0.55)); g.addColorStop(1, hexA(color, 0));
+  ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(ox2, oyS - 10 * z, 34 * z, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  drawPixels(ctx, orbArt(color, scene.reducedMotion ? 0 : Math.floor(now / 110 + cx)), ox2, oyS, ART * z * 1.3);
+  for (const i of order.filter(i => away(i) >= 0)) panel(i);
+  if (broken) { const [jx, jy] = P(cx + Math.cos(angle(6.5)) * r1, cy + Math.sin(angle(6.5)) * r1, h1 - 4); ctx.fillStyle = "rgba(22,22,22,0.35)"; ctx.fillRect(jx - 3 * z, jy, 6 * z, 2 * z); }
+}
+/** Parts of a thing drawn back to front for the camera (so its near post covers its mattress, its far one doesn't). */
+type Part = { x: number; y: number; draw: () => void };
+const inOrder = (camera: Camera, parts: Part[]) => parts.sort((a, b) => depthOf(camera, a.x, a.y) - depthOf(camera, b.x, b.y)).forEach(part => part.draw());
+/** A bed, built in the room: four turned posts (the head pair taller), a frame of boards, a linen mattress, a patchwork quilt turned down under the pillow, a panelled headboard. */
+function drawBed(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObject) {
+  const { camera } = scene, ox = object.x, oy = object.y, h = hash(ox * 7 + 1, oy * 3 + 2);
+  const quilt = ["#c98a8a", "#7f9cc9", "#8fae7a", "#b39ad8", "#c9a24a"][Math.floor(h * 5)], wood = h < 0.5 ? "#7a5a40" : "#8f6a48", wl = hexShade(wood, 0.14), wd = hexShade(wood, -0.14);
+  const parts: Part[] = [];
+  const post = (dx: number, dy: number, tall: number) => parts.push({ x: ox + dx, y: oy + dy, draw: () => { box(ctx, camera, ox + dx, oy + dy, 0.1, 0.1, tall, wl, wood, wd); box(ctx, camera, ox + dx, oy + dy, 0.14, 0.14, 2.5, wl, wood, wd, tall); } });
+  post(-0.36, -0.44, 26); post(0.36, -0.44, 26); post(-0.36, 0.44, 15); post(0.36, 0.44, 15);
+  parts.push({ x: ox, y: oy - 0.45, draw: () => { box(ctx, camera, ox, oy - 0.45, 0.64, 0.06, 18, wl, wood, wd, 5, INK, "planks"); box(ctx, camera, ox, oy - 0.45, 0.72, 0.09, 2.5, wl, wl, wood, 23); } });
+  parts.push({ x: ox, y: oy + 0.45, draw: () => box(ctx, camera, ox, oy + 0.45, 0.64, 0.05, 9, wl, wood, wd, 4, INK, "planks") });
+  parts.push({ x: ox, y: oy, draw: () => {
+    box(ctx, camera, ox, oy, 0.68, 0.84, 5, wl, wood, wd, 3, INK, "planks");
+    box(ctx, camera, ox, oy, 0.64, 0.8, 4, "#f2ede2", "#e2dccf", "#d0c9ba", 8, INK, "linen");
+    box(ctx, camera, ox, oy + 0.1, 0.7, 0.62, 2.5, quilt, hexShade(quilt, -0.08), hexShade(quilt, -0.16), 11, INK, "quilt");
+    box(ctx, camera, ox, oy - 0.22, 0.7, 0.1, 3, "#f6f2e8", "#e6e0d2", "#d6cfbf", 11, INK, "linen");
+    box(ctx, camera, ox, oy - 0.33, 0.48, 0.15, 4, "#ffffff", "#ecebe6", "#dcd9d0", 12, INK, "linen");
+  } });
+  inOrder(camera, parts);
+}
+const MARBLE = ["#d9d5cc", "#cdc8be", "#b9b5ae"] as const, OLD_STONE = ["#b4afa6", "#a19c93", "#8b867e"] as const;
+const mossy = (c: string, moss: boolean) => moss ? mixHex(c, "#8fa070", 0.45) : c;
+/** A column, standing whole: a carved plinth, a fluted shaft, a capital of two slabs. */
+function column(ctx: CanvasRenderingContext2D, camera: Camera, x: number, y: number, tall: number, stone: readonly [string, string, string], broken = 0, moss = false) {
+  box(ctx, camera, x, y, 0.58, 0.58, 5, mossy(stone[0], moss), stone[1], stone[2], 0, INK, "carved");
+  box(ctx, camera, x, y, 0.5, 0.5, 2, stone[0], stone[1], stone[2], 5);
+  const shaft = broken ? tall * broken : tall;
+  box(ctx, camera, x, y, 0.38, 0.38, shaft, stone[0], stone[1], stone[2], 7, INK, "fluted");
+  if (broken) {
+    // A jagged break: a couple of shards still standing off-centre, rubble at the foot.
+    const h = hash(x * 5, y * 11);
+    box(ctx, camera, x + (h - 0.5) * 0.14, y - 0.06, 0.18, 0.2, 4 + h * 5, stone[0], stone[1], stone[2], 7 + shaft);
+    box(ctx, camera, x - 0.1, y + (h - 0.5) * 0.12, 0.12, 0.14, 2 + h * 3, mossy(stone[0], moss), stone[1], stone[2], 7 + shaft);
+    return;
+  }
+  box(ctx, camera, x, y, 0.48, 0.48, 3, stone[0], stone[1], stone[2], 7 + tall);
+  box(ctx, camera, x, y, 0.6, 0.6, 3.5, mossy(stone[0], moss), stone[1], stone[2], 10 + tall, INK, "cap");
+}
+/**
+ * The ruins and the stonework of the world, built in it so they turn with the camera: whole columns, broken ones and
+ * fallen ones, column bases, archways standing on their own, carved blocks, stone coffins, and old walls crumbling in
+ * a few different ways. Returns its height for the hit box.
+ */
+function drawStonework(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObject): number {
+  const { camera } = scene, ox = object.x, oy = object.y, h = hash(ox + 3, oy + 7), moss = hash(ox * 3, oy) < 0.45;
+  const world = scene.game.world, same = (dx: number, dy: number) => { const o = objectAtTile(world, ox + dx, oy + dy); return !!o && o.kind === "decor" && o.decor === object.decor; };
+  switch (object.decor) {
+    case "pillar": {
+      // A shrine's column in its sigil's stone (render the dome over them: drawShrine); one in an old shrine snapped short.
+      if (object.sigil) { const tall = (object.height ?? 66) >= 40; column(ctx, camera, ox, oy, 53, sigilStone(object.sigil), tall ? 0 : 0.35); return tall ? 70 : 30; }
+      column(ctx, camera, ox, oy, 40, MARBLE); return 56;
+    }
+    case "broken_pillar": {
+      // A column snapped off, a drum of it lying beside its foot.
+      const along = h < 0.5, parts: Part[] = [{ x: ox, y: oy, draw: () => column(ctx, camera, ox, oy, 40, OLD_STONE, 0.35 + h * 0.3, moss) }];
+      parts.push({ x: ox + (along ? 0.42 : 0.1), y: oy + (along ? 0.12 : 0.42), draw: () => box(ctx, camera, ox + (along ? 0.42 : 0.1), oy + (along ? 0.12 : 0.42), along ? 0.36 : 0.3, along ? 0.3 : 0.36, 8, mossy(OLD_STONE[0], moss), OLD_STONE[1], OLD_STONE[2], 0, INK, "fluted") });
+      inOrder(camera, parts); return 34;
+    }
+    case "fallen_pillar": {
+      // A whole column lying where it fell, its drums in a row along the ground and its capital at the end.
+      const along = h < 0.5, parts: Part[] = [];
+      for (let k = -1; k <= 1; k++) { const x = ox + (along ? k * 0.36 : (h - 0.5) * 0.08 * k), y = oy + (along ? (h - 0.5) * 0.08 * k : k * 0.36); parts.push({ x, y, draw: () => box(ctx, camera, x, y, along ? 0.34 : 0.32, along ? 0.32 : 0.34, 10, k === 0 && moss ? "#8fa070" : OLD_STONE[0], OLD_STONE[1], OLD_STONE[2], 0, INK, "fluted") }); }
+      const cx = ox + (along ? 0.62 : 0), cy = oy + (along ? 0 : 0.62); parts.push({ x: cx, y: cy, draw: () => box(ctx, camera, cx, cy, along ? 0.16 : 0.5, along ? 0.5 : 0.16, 12, OLD_STONE[0], OLD_STONE[1], OLD_STONE[2], 0, INK, "carved") });
+      inOrder(camera, parts); return 16;
+    }
+    case "column_base": box(ctx, camera, ox, oy, 0.66, 0.66, 6, mossy(OLD_STONE[0], moss), OLD_STONE[1], OLD_STONE[2], 0, INK, "carved"); box(ctx, camera, ox, oy, 0.42, 0.42, 6 + h * 6, mossy(OLD_STONE[0], moss), OLD_STONE[1], OLD_STONE[2], 6, INK, "fluted"); return 20;
+    case "carved_block": box(ctx, camera, ox, oy, 0.72, 0.56, 13, mossy(OLD_STONE[0], moss), OLD_STONE[1], OLD_STONE[2], 0, INK, "carved"); return 20;
+    case "ruin_arch": {
+      // An archway on its own: two piers and the stones of the arch between them (one in three has lost half its arch),
+      // across whichever way the old wall ran.
+      const alongX = !(same(0, -1) || same(0, 1)) ? h < 0.5 || same(-1, 0) || same(1, 0) : false, half = h > 0.66;
+      const at = (u: number) => alongX ? [ox + u, oy] as const : [ox, oy + u] as const, parts: Part[] = [];
+      for (const u of [-0.42, 0.42]) { const [x, y] = at(u); parts.push({ x, y, draw: () => { box(ctx, camera, x, y, 0.3, 0.3, 44, OLD_STONE[0], OLD_STONE[1], OLD_STONE[2], 0, INK, "brick"); box(ctx, camera, x, y, 0.36, 0.36, 3, mossy(OLD_STONE[0], moss), OLD_STONE[1], OLD_STONE[2], 44); } }); }
+      // The arch: voussoirs stepping up to a keystone.
+      for (let k = -2; k <= 2; k++) {
+        if (half && k > 0) continue;
+        const [x, y] = at(k * 0.17), lift = 44 + 8 - Math.abs(k) * 3;
+        parts.push({ x, y, draw: () => box(ctx, camera, x, y, alongX ? 0.18 : 0.3, alongX ? 0.3 : 0.18, 6, k === 0 ? "#cfcac0" : OLD_STONE[0], OLD_STONE[1], OLD_STONE[2], lift - 4) });
+      }
+      inOrder(camera, parts); return 62;
+    }
+    case "sarcophagus": {
+      // A stone coffin: a carved chest on a low step, a lid with a cross cut down it; on some the lid's pushed aside.
+      const along = !(same(-1, 0) || same(1, 0)) && h < 0.5 ? false : true, askew = hash(ox + 9, oy + 1) < 0.28;
+      const w = along ? 0.92 : 0.58, d = along ? 0.58 : 0.92;
+      box(ctx, camera, ox, oy, w + 0.08, d + 0.08, 2, OLD_STONE[1], OLD_STONE[1], OLD_STONE[2]);
+      box(ctx, camera, ox, oy, w, d, 10, OLD_STONE[0], OLD_STONE[1], OLD_STONE[2], 2, INK, "carved");
+      if (askew) box(ctx, camera, ox, oy, w - 0.1, d - 0.1, 0.5, "#1e1c22", "#1e1c22", "#1e1c22", 12, null);
+      const lx = askew ? (along ? 0.18 : 0.08) : 0, ly = askew ? (along ? 0.08 : 0.18) : 0;
+      box(ctx, camera, ox + lx, oy + ly, w + 0.06, d + 0.06, 4, mossy("#c3beb4", moss && !askew), OLD_STONE[1], OLD_STONE[2], 12, INK, "lid");
+      return 22;
+    }
+    case "ruin_wall": {
+      // Old wall crumbling: a stub with a broken top, a stretch with the gap of a window in it, a stepped break, or a low
+      // course with its fallen blocks beside it, across whichever way the wall runs.
+      const terrain = world.tiles[oy * W + ox], sand = terrain === T.SAND, snow = terrain === T.SNOW, height = object.height ?? 20;
+      const [top, left, right] = sand ? ["#e0cfa6", "#d2bf92", "#bda97c"] : ["#b9b4ab", "#a39e95", "#8f8a82"];
+      const cap = snow ? "#f3f2ee" : sand ? "#ead9b0" : moss ? "#9fae8a" : top;
+      const alongX = same(-1, 0) || same(1, 0) || !(same(0, -1) || same(0, 1)), shape = /Crumbling wall|Ruined wall/.test(object.name) ? Math.floor(hash(ox + 13, oy + 5) * 4) : 0;
+      const lower = height * (0.55 + hash(ox + 3, oy) * 0.25);
+      if (shape === 1 && height > 18) {
+        // A window: the wall to sill height, its two jambs up either side, the lintel gone.
+        box(ctx, camera, ox, oy, 1, 1, height * 0.45, top, left, right, 0, INK, "brick");
+        for (const u of [-0.36, 0.36]) box(ctx, camera, ox + (alongX ? u : 0), oy + (alongX ? 0 : u), alongX ? 0.28 : 1, alongX ? 1 : 0.28, height * (u < 0 ? 0.55 : 0.4), cap, left, right, height * 0.45, INK, "brick");
+        return height + 8;
+      }
+      if (shape === 2) {
+        // A stepped break: three courses each shorter than the last.
+        for (let k = 0; k < 3; k++) { const u = -0.33 + k * 0.33; box(ctx, camera, ox + (alongX ? u : 0), oy + (alongX ? 0 : u), alongX ? 0.34 : 1, alongX ? 1 : 0.34, height * (1 - k * 0.28), k === 0 ? cap : top, left, right, 0, INK, "brick"); }
+        return height + 8;
+      }
+      if (shape === 3) {
+        // A low course, its upper stones fallen at its foot.
+        box(ctx, camera, ox, oy, 1, 1, lower * 0.6, cap, left, right, 0, INK, "brick");
+        for (const [dx, dy, s] of [[0.42, 0.38, 0.26], [-0.3, 0.46, 0.2]] as const) box(ctx, camera, ox + (alongX ? dx : dy), oy + (alongX ? dy : dx), s, s * 0.8, 5, top, left, right);
+        return lower + 8;
+      }
+      box(ctx, camera, ox, oy, 1, 1, lower, top, left, right, 0, INK, "brick");
+      const bx = ox + (hash(ox, oy + 5) - 0.5) * 0.45, by = oy + (hash(ox + 7, oy) - 0.5) * 0.45;
+      box(ctx, camera, bx, by, 0.55, 0.62, height - lower, cap, left, right, lower, INK, "brick");
+      if (hash(ox, oy + 11) < 0.5) box(ctx, camera, ox - (bx - ox), oy - (by - oy), 0.34, 0.34, 5 + hash(ox + 1, oy + 1) * 6, cap, left, right, lower, INK);
+      return height + 8;
+    }
+    case "tomb": {
+      // A stone tomb: a carved chest of weathered blocks on a step, its heavy lid pushed a little askew on some.
+      const askew = hash(ox + 2, oy + 9) < 0.3 ? 0.12 : 0;
+      box(ctx, camera, ox, oy, 0.94, 0.62, 2, OLD_STONE[1], OLD_STONE[1], OLD_STONE[2]);
+      box(ctx, camera, ox, oy, 0.84, 0.5, 9, "#aaa59d", "#8f8a82", "#7d7870", 2, INK, "carved");
+      if (askew) box(ctx, camera, ox - 0.2, oy, 0.3, 0.3, 1, "#1e1c22", "#1e1c22", "#1e1c22", 11, null);
+      box(ctx, camera, ox + askew, oy - askew * 0.5, 0.94, 0.6, 3, mossy("#c3bfb7", moss && !askew), "#a9a59e", "#9a968f", 11, INK, "lid");
+      return 20;
+    }
+  }
+  return 20;
+}
 function drawTable(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObject) {
-  const { camera } = scene, z = camera.zoom, ox = object.x, oy = object.y, top = "#c9ad8c";
-  for (const [dx, dy] of [[-0.34, -0.24], [0.34, -0.24], [-0.34, 0.24], [0.34, 0.24]] as const) box(ctx, camera, ox + dx, oy + dy, 0.07, 0.07, 10, "#7a6553", "#6b5848", "#5a4a3c");
-  box(ctx, camera, ox, oy, 0.84, 0.62, 2.5, top, "#9c8672", "#8a7563", 10);
+  const { camera } = scene, z = camera.zoom, ox = object.x, oy = object.y, top = "#c9ad8c", cloth = hash(ox * 5 + 3, oy * 7) < 0.3;
+  // Four stout legs, an apron of boards under a planked top; one table in three wears a linen cloth.
+  for (const [dx, dy] of [[-0.34, -0.24], [0.34, -0.24], [-0.34, 0.24], [0.34, 0.24]] as const) { box(ctx, camera, ox + dx, oy + dy, 0.09, 0.09, 10, "#8a6a50", "#7a5a40", "#5a4030"); box(ctx, camera, ox + dx, oy + dy, 0.12, 0.12, 1.5, "#8a6a50", "#7a5a40", "#5a4030", 0); }
+  box(ctx, camera, ox, oy, 0.76, 0.54, 2.5, "#8a6a50", "#7a5a40", "#5a4030", 7.5, INK, "planks");
+  box(ctx, camera, ox, oy, 0.86, 0.64, 2.5, top, "#9c8672", "#8a7563", 10, INK, "planks");
+  if (cloth) { box(ctx, camera, ox, oy, 0.9, 0.68, 0.6, "#f2ede2", "#e2dccf", "#d0c9ba", 12.5, INK, "linen"); box(ctx, camera, ox, oy + 0.33, 0.9, 0.04, 4, "#f2ede2", "#e2dccf", "#d0c9ba", 9); }
   const r = hash(ox * 3, oy * 5), s = toScreen(camera, ox, oy, 12.5);
   if (r < 0.33) { ellipse(ctx, s.x - 4 * z, s.y, 3.6 * z, 1.8 * z, "#efede7", INK, 0.6); ellipse(ctx, s.x + 5 * z, s.y - 1 * z, 1.6 * z, 1.6 * z, "#8a5a3c", INK, 0.6); }
   else if (r < 0.66) { box(ctx, camera, ox - 0.1, oy, 0.22, 0.16, 2, "#3d4f9c", "#2f3d7a", "#26315f", 12.5); box(ctx, camera, ox + 0.15, oy + 0.05, 0.16, 0.12, 1.5, "#efe6c8", "#d8cfb6", "#c4bba2", 12.5); }
@@ -1523,15 +1708,24 @@ function drawStation(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldO
       poly(ctx, [[sx - 14 * z, sy - 30 * z], [sx + 14 * z, sy - 26 * z], [sx + 14 * z, sy - 16 * z], [sx - 14 * z, sy - 20 * z]], "#e2d7ad"); return hit(34, 30);
     case "tanning": ctx.strokeStyle = "#8a7563"; ctx.lineWidth = 2 * z; ctx.strokeRect(sx - 12 * z, sy - 30 * z, 24 * z, 26 * z); poly(ctx, [[sx - 9 * z, sy - 27 * z], [sx + 9 * z, sy - 27 * z], [sx + 7 * z, sy - 8 * z], [sx - 7 * z, sy - 8 * z]], "#e8d9c8"); return hit(32, 30);
     case "sigil_altar": {
-      // A stone plinth ringed by standing stones, with the sigil's orb floating over it.
-      const color = object.sigil ? item(object.sigil).icon.color : "#c7d3dc", bob = scene.reducedMotion ? 0 : Math.sin(now / 500 + ox) * 3 * z;
-      const stones = [0, 1, 2, 3].map(i => { const a = i * Math.PI / 2 + Math.PI / 4; return { x: ox + Math.cos(a) * 0.36, y: oy + Math.sin(a) * 0.36 }; }).sort((a, b) => depthOf(camera, a.x, a.y) - depthOf(camera, b.x, b.y));
-      ellipse(ctx, sx, sy, 22 * z, 10 * z, `${color}55`, null);
-      for (const stone of stones.slice(0, 2)) box(ctx, camera, stone.x, stone.y, 0.14, 0.14, 22, "#b3aea6", "#9a958e", "#86817a");
-      box(ctx, camera, ox, oy, 0.5, 0.5, 10, "#c8c5be", "#a9a59e", "#9a968f");
-      ellipse(ctx, sx, sy - 30 * z + bob, 13 * z, 13 * z, `${color}44`, null); ellipse(ctx, sx, sy - 30 * z + bob, 6 * z, 6 * z, color, INK, 1.2); ellipse(ctx, sx - 2 * z, sy - 32 * z + bob, 1.6 * z, 1.6 * z, "#ffffff", null);
-      for (const stone of stones.slice(2)) box(ctx, camera, stone.x, stone.y, 0.14, 0.14, 22, "#b3aea6", "#9a958e", "#86817a");
-      return hit(44, 44);
+      // An altar of the sigil's own stone: a broad step, a carved block with the sigil's emblem cut in its face (the face
+      // towards you) and lit in its colour, a slab on top; the sigil's orb floating over it, turning, haloed.
+      const [lit, mid, dark] = sigilStone(object.sigil), color = object.sigil && isItem(object.sigil) ? item(object.sigil).icon.color : "#c7d3dc";
+      box(ctx, camera, ox, oy, 0.86, 0.86, 3, shade(mid, -0.06), shade(mid, -0.1), shade(mid, -0.2));
+      box(ctx, camera, ox, oy, 0.62, 0.62, 13, lit, mid, dark, 3, INK, "carved");
+      box(ctx, camera, ox, oy, 0.74, 0.74, 3, lit, mid, dark, 16, INK, "cap");
+      // The face nearest the camera carries the emblem.
+      const faces = [[0, 0.31], [0.31, 0], [0, -0.31], [-0.31, 0]] as const, [fx, fy] = faces.reduce((best, f) => depthOf(camera, ox + f[0], oy + f[1]) > depthOf(camera, ox + best[0], oy + best[1]) ? f : best);
+      const at = toScreen(camera, ox + fx, oy + fy, 4); if (object.sigil) drawPixels(ctx, emblemArt(object.sigil, color), at.x, at.y, ART * z * 0.75);
+      // (In a shrine its orb floats in the dome's crown: drawShrine.)
+      if (shrineOf((tx, ty) => objectAtTile(game.world, tx, ty), ox, oy, object.sigil)) { ellipse(ctx, sx, sy - 19 * z * liftScale(camera), 9 * z, 4 * z, hexA(color, 0.5), null); return hit(30, 40); }
+      const bob = scene.reducedMotion ? 0 : Math.sin(now / 520 + ox) * 3 * z, orb = toScreen(camera, ox, oy, 26), oyS = orb.y + bob;
+      const g = ctx.createRadialGradient(orb.x, oyS - 10 * z, 0, orb.x, oyS - 10 * z, 30 * z); g.addColorStop(0, hexA(color, 0.5)); g.addColorStop(1, hexA(color, 0));
+      ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(orb.x, oyS - 10 * z, 30 * z, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      drawPixels(ctx, orbArt(color, scene.reducedMotion ? 0 : Math.floor(now / 110 + ox)), orb.x, oyS, ART * z * 1.15);
+      // Motes of its light rising off the slab.
+      if (!scene.reducedMotion) for (let i = 0; i < 3; i++) { const h = hash(ox, oy), t = (now / 1400 + i / 3 + h) % 1, a = i * 2.1 + h * 6; ctx.fillStyle = hexA(color, 0.8 * (1 - t)); ctx.fillRect(Math.round(sx + Math.cos(a) * 8 * z), Math.round(sy - (18 + t * 26) * z), Math.max(1, 2 * z), Math.max(1, 2 * z)); }
+      return hit(56, 40);
     }
     case "well": box(ctx, camera, ox, oy, 0.9, 0.9, 12, "#3b3a38", "#c8c5be", "#b9b5ae");
       for (const px of [-12, 12]) { ctx.strokeStyle = "#8a7563"; ctx.lineWidth = 2 * z; ctx.beginPath(); ctx.moveTo(sx + px * z, sy - 12 * z); ctx.lineTo(sx + px * z, sy - 36 * z); ctx.stroke(); }
@@ -1649,8 +1843,8 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
     drawShip(ctx, kind, facing, false, now + ox * 97, sx, sy, z, "all", scene.reducedMotion, alpha, sailColor(object.sail));
     return hit(art.height * ART * SHIP_SCALE, art.width * ART * SHIP_SCALE);
   }
-  // (The Wise Friend's statues are carved in the world, below, not stood up as a picture.)
-  const carvedStatue = object.decor === "wise_friend" || object.decor === "god_dusk";
+  // (The Wise Friend's statue is carved in the world, below, not stood up as a picture.)
+  const carvedStatue = object.decor === "wise_friend";
   const art = carvedStatue ? null : scene.reducedMotion || object.decor !== "torch" ? decorArt(object.decor!, Math.floor(h * 3), frame) : decorArt("torch", 0, frame);
   if (art) {
     if (object.decor === "torch" || object.decor === "lamp") ellipse(ctx, sx, sy - (object.decor === "lamp" ? 54 : 36) * z, 16 * z, 11 * z, `rgba(242,220,160,${0.16 + Math.sin(now / 300 + ox) * 0.04})`, null);
@@ -1796,8 +1990,9 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
       }
       case "rune_circle": {
         // A circle cut into the floor, a lozenge inside it, the grooves alight; it lies flat, so it's drawn before anything stands on it.
-        ellipse(ctx, sx, sy, 22 * z, 11 * z, "rgba(154,130,224,0.12)", "#b4a0ff", 1.5); ellipse(ctx, sx, sy, 14 * z, 7 * z, null, "#9a82e0", 1);
-        poly(ctx, [[sx, sy - 9 * z], [sx + 16 * z, sy], [sx, sy + 9 * z], [sx - 16 * z, sy]], null, "#d7c9ff", 1);
+        ellipse(ctx, sx, sy, 22 * z, 11 * z, "rgba(154,130,224,0.18)", "#9a82e0", 2.2); ellipse(ctx, sx, sy, 14 * z, 7 * z, null, "#7f66c8", 1.6);
+        poly(ctx, [[sx, sy - 9 * z], [sx + 16 * z, sy], [sx, sy + 9 * z], [sx - 16 * z, sy]], null, "#c9b6ff", 1.6);
+        for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + (scene.reducedMotion ? 0 : now / 3000); ctx.fillStyle = "#e6dcff"; ctx.fillRect(Math.round(sx + Math.cos(a) * 18 * z), Math.round(sy + Math.sin(a) * 9 * z), Math.max(1, 2 * z), Math.max(1, 2 * z)); }
         return hit(4, 44);
       }
       case "grave": box(ctx, camera, ox, oy, 0.3, 0.6, 18, "#c8c5be", "#a9a59e", "#9a968f"); return hit(24, 24);
@@ -1831,19 +2026,14 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
         drawPixels(ctx, fireArt(scene.reducedMotion ? 0 : Math.floor(now / 110 + ox * 5) % 8, 11, 14, 6), mouth.x, mouth.y - 1 * z, ART * z, alpha);
         return hit(24, 40);
       }
-      case "tomb": {
-        // A stone tomb: a low chest of weathered blocks with a heavier lid, pushed a little askew on some.
-        const askew = hash(ox + 2, oy + 9) < 0.3 ? 0.12 : 0;
-        box(ctx, camera, ox, oy, 0.84, 0.5, 9, "#aaa59d", "#8f8a82", "#7d7870", 0, INK, "brick");
-        box(ctx, camera, ox + askew, oy - askew * 0.5, 0.94, 0.6, 3, "#c3bfb7", "#a9a59e", "#9a968f", 9);
-        if (askew) box(ctx, camera, ox - 0.2, oy, 0.3, 0.3, 1, "#1e1c22", "#1e1c22", "#1e1c22", 9, null);
-        return hit(18, 40);
-      }
+      case "tomb": return hit(drawStonework(ctx, scene, object), 40);
       case "crypt": {
         // A family crypt: a squat stone house for the dead, a stepped roof, a black door, a lintel with the frost in it.
-        box(ctx, camera, ox, oy, 1.3, 1.1, 30, "#9f9a92", "#8a857d", "#767169", 0, INK, "brick");
-        box(ctx, camera, ox, oy, 1.1, 0.9, 7, "#b3aea6", "#9a958d", "#8a857d", 30, INK);
-        box(ctx, camera, ox, oy, 0.7, 0.5, 5, "#c3bfb7", "#a9a59e", "#9a968f", 37, INK);
+        box(ctx, camera, ox, oy, 1.42, 1.22, 3, "#8f8a82", "#8a857d", "#767169");
+        box(ctx, camera, ox, oy, 1.3, 1.1, 30, "#9f9a92", "#8a857d", "#767169", 3, INK, "brick");
+        box(ctx, camera, ox, oy, 1.38, 1.18, 4, "#b3aea6", "#9a958d", "#8a857d", 30, INK, "carved");
+        box(ctx, camera, ox, oy, 1.1, 0.9, 5, "#b3aea6", "#9a958d", "#8a857d", 34, INK, "cap");
+        box(ctx, camera, ox, oy, 0.7, 0.5, 5, "#c3bfb7", "#a9a59e", "#9a968f", 39, INK, "cap");
         const door = (dx: number, zz: number) => { const s = toScreen(camera, ox + dx, oy + 0.56, zz); return [s.x, s.y] as const; };
         poly(ctx, [door(-0.22, 0), door(0.22, 0), door(0.22, 19), door(0, 23), door(-0.22, 19)], "#1e1c22", "#3b3a38");
         if (hash(ox, oy + 3) < 0.5) { const s = toScreen(camera, ox, oy + 0.56, 26); ellipse(ctx, s.x, s.y, 3.5 * z, 3.5 * z, "#f3f2ee", "#8a857d", 1); }
@@ -1851,9 +2041,10 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
       }
       case "obelisk": {
         // An obelisk nobody remembers raising, carved all over with the symbol from the standing stones.
-        box(ctx, camera, ox, oy, 0.5, 0.5, 6, "#b3aea6", "#9a958d", "#8a857d", 0, INK);
-        box(ctx, camera, ox, oy, 0.32, 0.32, 40, "#c3bfb7", "#a9a59e", "#8f8a82", 6, INK);
-        const tip = toScreen(camera, ox, oy, 56), a = toScreen(camera, ox - 0.16, oy + 0.16, 46), b = toScreen(camera, ox + 0.16, oy + 0.16, 46), c = toScreen(camera, ox + 0.16, oy - 0.16, 46);
+        box(ctx, camera, ox, oy, 0.62, 0.62, 3, "#a39e96", "#8f8a83", "#7d7870");
+        box(ctx, camera, ox, oy, 0.5, 0.5, 6, "#b3aea6", "#9a958d", "#8a857d", 3, INK, "carved");
+        box(ctx, camera, ox, oy, 0.32, 0.32, 40, "#c3bfb7", "#a9a59e", "#8f8a82", 9, INK, "carved");
+        const tip = toScreen(camera, ox, oy, 59), a = toScreen(camera, ox - 0.16, oy + 0.16, 49), b = toScreen(camera, ox + 0.16, oy + 0.16, 49), c = toScreen(camera, ox + 0.16, oy - 0.16, 49);
         poly(ctx, [[a.x, a.y], [b.x, b.y], [tip.x, tip.y]], "#a9a59e"); poly(ctx, [[b.x, b.y], [c.x, c.y], [tip.x, tip.y]], "#8f8a82");
         ctx.strokeStyle = "#6f6b64"; ctx.lineWidth = Math.max(1, z); for (let i = 0; i < 4; i++) { const s = toScreen(camera, ox, oy + 0.16, 14 + i * 7); ctx.beginPath(); ctx.moveTo(s.x - 3 * z, s.y); ctx.lineTo(s.x + 3 * z, s.y); ctx.stroke(); }
         return hit(62, 26);
@@ -1899,7 +2090,7 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
       case "reeds": ctx.strokeStyle = "#8e9887"; ctx.lineWidth = 1.2 * z; ctx.beginPath(); for (let i = -2; i <= 2; i++) { ctx.moveTo(sx + i * 3 * z, sy); ctx.lineTo(sx + i * 4 * z + Math.sin(now / 600 + i) * 2 * z, sy - (12 + (i % 2) * 4) * z); } ctx.stroke(); return hit(16, 20);
       case "table": drawTable(ctx, scene, object); return hit(18);
       case "shelf": drawShelf(ctx, scene, object); return hit(44);
-      case "pillar": box(ctx, camera, ox, oy, 0.45, 0.45, 50, "#d7d4cd", "#c8c5be", "#b9b5ae"); return hit(56, 26);
+      case "pillar": case "broken_pillar": case "fallen_pillar": case "column_base": case "carved_block": case "ruin_arch": case "sarcophagus": return hit(drawStonework(ctx, scene, object), 40);
       case "rubble": for (let i = 0; i < 3; i++) box(ctx, camera, ox + (hash(ox + i, oy) - 0.5) * 0.5, oy + (hash(ox, oy + i) - 0.5) * 0.5, 0.25, 0.25, 6, "#c8c5be", "#a9a59e", "#9a968f"); return hit(12);
       case "snowman": ellipse(ctx, sx, sy - 9 * z, 11 * z, 9 * z, "#fff"); ellipse(ctx, sx, sy - 24 * z, 8 * z, 7 * z, "#fff"); ellipse(ctx, sx - 3 * z, sy - 25 * z, 1.2 * z, 1.2 * z, INK, null); ellipse(ctx, sx + 3 * z, sy - 25 * z, 1.2 * z, 1.2 * z, INK, null); return hit(34, 26);
       case "lily": ellipse(ctx, sx, sy, 7 * z, 3.5 * z, "#a9b59c"); ellipse(ctx, sx + 2 * z, sy - 1 * z, 2 * z, 1.5 * z, C.rose, null); return hit(6, 16);
@@ -1917,31 +2108,26 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
       case "trough": box(ctx, camera, ox, oy, 0.9, 0.45, 9, "#9fb4d0", "#8a7563", "#75624f"); return hit(16);
       case "hitching_post": { ctx.strokeStyle = "#8a7563"; ctx.lineWidth = 2.5 * z; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx, sy - 18 * z); ctx.moveTo(sx - 7 * z, sy - 15 * z); ctx.lineTo(sx + 7 * z, sy - 15 * z); ctx.stroke();
         ctx.strokeStyle = "#c9b77f"; ctx.lineWidth = 1.2 * z; ctx.beginPath(); ctx.moveTo(sx + 5 * z, sy - 15 * z); ctx.quadraticCurveTo(sx + 9 * z, sy - 9 * z, sx + 6 * z, sy - 4 * z); ctx.stroke(); return hit(20, 18); }
-      case "ruin_wall": {
-        // A crumbling stretch of old wall: weathered brick to its own height, a jagged broken top, moss (sand-bleached in
-        // the dunes, snow-capped up north) on what's left.
-        const terrain = scene.game.world.tiles[oy * W + ox], sand = terrain === T.SAND, snow = terrain === T.SNOW, height = object.height ?? 20;
-        const [top, left, right] = sand ? ["#e0cfa6", "#d2bf92", "#bda97c"] : ["#b9b4ab", "#a39e95", "#8f8a82"];
-        const cap = snow ? "#f3f2ee" : sand ? "#ead9b0" : "#9fae8a", lower = height * (0.55 + hash(ox + 3, oy) * 0.25);
-        box(ctx, camera, ox, oy, 1, 1, lower, top, left, right, 0, INK, "brick");
-        // The broken top: one or two blocks left standing, off-centre.
-        const bx = ox + (hash(ox, oy + 5) - 0.5) * 0.45, by = oy + (hash(ox + 7, oy) - 0.5) * 0.45;
-        box(ctx, camera, bx, by, 0.55, 0.62, height - lower, cap, left, right, lower, INK, "brick");
-        if (hash(ox, oy + 11) < 0.5) box(ctx, camera, ox - (bx - ox), oy - (by - oy), 0.34, 0.34, 5 + hash(ox + 1, oy + 1) * 6, cap, left, right, lower, INK);
-        return hit(height + 8, 40);
-      }
+      case "ruin_wall": return hit(drawStonework(ctx, scene, object), 40);
       case "windmill": return drawWindmill(ctx, scene, ox, oy);
-      case "boat": poly(ctx, [[sx - 22 * z, sy - 4 * z], [sx + 22 * z, sy - 4 * z], [sx + 14 * z, sy + 6 * z], [sx - 14 * z, sy + 6 * z]], "#9c8672"); return hit(12, 44);
       case "chest": box(ctx, camera, ox, oy, 0.6, 0.45, 14, "#9c8672", "#8a7563", "#7a6553"); return hit(20);
-      case "bed": box(ctx, camera, ox, oy, 0.7, 0.9, 10, "#9c8672", "#8a7563", "#7a6553"); box(ctx, camera, ox, oy + 0.08, 0.64, 0.66, 3, C.lavender, shade(C.lavender, -0.08), shade(C.lavender, -0.14), 10);
-        box(ctx, camera, ox, oy - 0.3, 0.5, 0.2, 3, PAPER, "#d6d3cc", "#c8c5be", 10); box(ctx, camera, ox, oy - 0.42, 0.7, 0.08, 26, "#9c8672", "#8a7563", "#7a6553"); return hit(26);
+      case "bed": drawBed(ctx, scene, object); return hit(30);
       case "throne": {
-        // Carved and gilded, with a tall rose back on the north side of its tile.
-        const parts = [{ x: ox, y: oy - 0.3, draw: () => { box(ctx, camera, ox, oy - 0.3, 0.72, 0.14, 50, C.rose, shade(C.rose, -0.08), shade(C.rose, -0.14)); box(ctx, camera, ox, oy - 0.3, 0.8, 0.18, 5, C.butter, shade(C.butter, -0.1), shade(C.butter, -0.16), 50); } },
-          { x: ox, y: oy + 0.05, draw: () => { box(ctx, camera, ox, oy + 0.05, 0.72, 0.6, 14, "#b8964f", "#a3843f", "#8f7334"); box(ctx, camera, ox, oy + 0.05, 0.62, 0.52, 4, C.rose, shade(C.rose, -0.08), shade(C.rose, -0.14), 14); } }];
+        // A throne on a dais: carved dark wood gilded at its edges, a rose cushion, arms ending in gold, and a tall back
+        // with a gilded crest, on the north side of its tile.
+        const WOOD = "#5a3a28", wl = hexShade(WOOD, 0.14), wd = hexShade(WOOD, -0.14), GOLD = "#d9b04a", gl = hexShade(GOLD, 0.15), gd = hexShade(GOLD, -0.18), ROSE = C.rose, rl = hexShade(ROSE, -0.08), rd = hexShade(ROSE, -0.16);
+        box(ctx, camera, ox, oy, 0.96, 0.96, 3, "#b4afa6", "#a19c93", "#8b867e", 0, INK, "carved");
+        box(ctx, camera, ox, oy, 0.86, 0.86, 1.2, C.rose, shade(C.rose, -0.1), shade(C.rose, -0.18), 3);
+        const parts = [
+          { x: ox, y: oy - 0.3, draw: () => { box(ctx, camera, ox, oy - 0.3, 0.72, 0.12, 46, wl, WOOD, wd, 4, INK, "planks"); box(ctx, camera, ox, oy - 0.25, 0.56, 0.04, 30, ROSE, rl, rd, 18, INK, "quilt"); box(ctx, camera, ox, oy - 0.3, 0.8, 0.16, 3, gl, GOLD, gd, 50); } },
+          { x: ox - 0.3, y: oy + 0.02, draw: () => { box(ctx, camera, ox - 0.3, oy + 0.02, 0.12, 0.56, 14, wl, WOOD, wd, 4); box(ctx, camera, ox - 0.3, oy + 0.02, 0.15, 0.6, 2, gl, GOLD, gd, 18); } },
+          { x: ox + 0.3, y: oy + 0.02, draw: () => { box(ctx, camera, ox + 0.3, oy + 0.02, 0.12, 0.56, 14, wl, WOOD, wd, 4); box(ctx, camera, ox + 0.3, oy + 0.02, 0.15, 0.6, 2, gl, GOLD, gd, 18); } },
+          { x: ox, y: oy + 0.05, draw: () => { box(ctx, camera, ox, oy + 0.05, 0.5, 0.56, 9, wl, WOOD, wd, 4, INK, "planks"); box(ctx, camera, ox, oy + 0.05, 0.48, 0.5, 3, ROSE, rl, rd, 13, INK, "quilt"); } },
+        ];
         parts.sort((a, b) => depthOf(camera, a.x, a.y) - depthOf(camera, b.x, b.y)).forEach(part => part.draw());
-        const top = toScreen(camera, ox, oy - 0.3, 58); poly(ctx, [[top.x - 6 * z, top.y + 4 * z], [top.x - 6 * z, top.y - 3 * z], [top.x - 3 * z, top.y], [top.x, top.y - 5 * z], [top.x + 3 * z, top.y], [top.x + 6 * z, top.y - 3 * z], [top.x + 6 * z, top.y + 4 * z]], C.butter, INK, 1);
-        return hit(64, 40);
+        const top = toScreen(camera, ox, oy - 0.3, 53); poly(ctx, [[top.x - 7 * z, top.y + 4 * z], [top.x - 7 * z, top.y - 3 * z], [top.x - 3.5 * z, top.y], [top.x, top.y - 6 * z], [top.x + 3.5 * z, top.y], [top.x + 7 * z, top.y - 3 * z], [top.x + 7 * z, top.y + 4 * z]], GOLD, INK, 1);
+        ellipse(ctx, top.x, top.y - 1 * z, 1.6 * z, 1.6 * z, "#c94a52", null);
+        return hit(66, 40);
       }
       case "armour":
         box(ctx, camera, ox, oy, 0.4, 0.4, 3, "#8a7563", "#7a6553", "#6a5543");
@@ -2746,6 +2932,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     const object = objectAtTile(world, x, y);
     if (!object || object.name === "__removed") return;
     if (object.kind === "decor" && SMALL_DECOR.has(object.decor!) && Math.abs(x - camera.x) + Math.abs(y - camera.y) > HAZE_START) return;
+    if (object.kind === "sigil_altar") glow(x, y, 34, 90, object.sigil && isItem(object.sigil) ? item(object.sigil).icon.color : "#c7d3dc", 0.8, true);
     if (object.decor === "crystal") glow(x, y, 14, 70, "#bff4ff", 0.55); else if (object.decor === "rune_circle") glow(x, y, 2, 90, "#a48cf0", 0.6);
     else if (object.decor === "lamp") glow(x, y, 48, 150, "#f2b261", 0.9); else if (object.decor === "stone_lantern" || object.decor === "paper_lantern") glow(x, y, object.decor === "stone_lantern" ? 30 : 50, 110, "#f2b261", 0.75); else if (object.decor === "torch") glow(x, y, 32, 130, (isUnderground(y) && dungeonTheme(world, x, y)?.torch) || "#ef9a4c", 1, true); else if (object.decor === "hearth" || object.decor === "campfire") glow(x, y, 14, 170, "#f0a050", 1, true);
     else if (object.kind === "furnace" || object.kind === "range") glow(x, y, 16, 110); else if (object.kind === "altar") glow(x, y, 26, 70); else if (object.kind === "fountain" && objectAtTile(world, x - 1, y)?.kind !== "fountain" && objectAtTile(world, x, y - 1)?.kind !== "fountain") glow(x + 0.5, y + 0.5, 12, 110, "#a9d4f2", 0.55); else if (object.kind === "sigil_altar") glow(x, y, 30, 90);
@@ -2766,6 +2953,13 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
         drawToriiBeams(ctx, camera, plan); ctx.globalAlpha = 1;
       } });
       return;
+    }
+    // A sigil altar in its shrine: the dome over it drawn as a thing of its own, in front of the shrine's far columns and
+    // behind its near ones' fronts, see-through when you're under it or it hides you.
+    if (object.kind === "sigil_altar" && shrineOf((tx, ty) => objectAtTile(world, tx, ty), x, y, object.sigil)) {
+      const R = SHRINE_R + 0.3, front = Math.max(...[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([dx, dy]) => depth(x + dx * R, y + dy * R))) + 0.05;
+      const under = Math.abs(pp.x - x) <= SHRINE_R + 0.6 && Math.abs(pp.y - y) <= SHRINE_R + 0.6;
+      drawables.push({ depth: front, at: { x, y, h: 82 }, size: [110, 170, 50], cast: true, scenery: true, draw: () => { ctx.globalAlpha = under || (front > playerDepth + 0.3 && coversPlayer(x, y)) ? 0.32 : 1; drawShrine(ctx, scene, object); ctx.globalAlpha = 1; } });
     }
     const fountainMaster = object.kind === "fountain" && objectAtTile(world, x - 1, y)?.kind !== "fountain" && objectAtTile(world, x, y - 1)?.kind !== "fountain";
     const d = fountainMaster ? depth(x + 0.5, y + 0.5) + 0.3 : depth(x, y) + (object.kind === "wheat" || object.kind === "spot" ? -0.4 : 0);
@@ -3119,36 +3313,53 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       } });
     }
     const roofFront = Math.max(depth(building.x0, building.y0), depth(building.x1, building.y0), depth(building.x0, building.y1), depth(building.x1, building.y1)) + 0.5;
+    // The portico's roof: a small gable over the columns with its ridge running out from the wall, its slopes shingled in
+    // the building's roof colour and its gable end the pediment, marble, with the bank's coin or the hall's sun in it. From
+    // behind or the side its slopes read as the roof they are, peeking over the main roof.
+    const E = 7, rise = Math.min(30, 10 + length * 1.8), base = H + E, back = -0.25, front = 0.75;
+    const roofColor = building.color.startsWith("#") ? building.color : "#7a6a8a";
     drawables.push({ depth: facing ? roofFront + 0.02 : depth(fx, fy) - 0.2, at: { x: fx, y: fy, h: H + 20 }, rect: () => {
-      const a = P(pt(min, 0.6, H)), b = P(pt(max, 0.6, H)), c = P(pt(mid, 0.6, H + 60));
-      return [Math.min(a[0], b[0]) - 10, Math.min(a[1], b[1], c[1]) - 10, Math.max(a[0], b[0]) + 10, Math.max(a[1], b[1]) + 10];
+      const a = P(pt(min, front, H)), b = P(pt(max, front, H)), c = P(pt(mid, front, base + rise)), d = P(pt(mid, back, base + rise));
+      return [Math.min(a[0], b[0]) - 10, Math.min(a[1], b[1], c[1], d[1]) - 10, Math.max(a[0], b[0]) + 10, Math.max(a[1], b[1]) + 10];
     }, draw: () => {
-      const E = 7, rise = Math.min(42, 10 + length * 2.4), base = H + E;
-      // The entablature: a band of marble the length of the front, then the pediment's triangle and its tympanum.
-      const [bx, by] = alongX ? [mid, face + ny * 0.3] : [face + nx * 0.3, mid];
-      const left = P(pt(min + 0.05, 0.6, base)), right = P(pt(max - 0.05, 0.6, base)), apex = P(pt(mid, 0.6, base + rise));
+      const [bx, by] = alongX ? [mid, face + ny * (front + back) / 2] : [face + nx * (front + back) / 2, mid];
+      const L = pt(min + 0.05, front, base), Rr = pt(max - 0.05, front, base), A = pt(mid, front, base + rise), Lb = pt(min + 0.05, back, base), Rb = pt(max - 0.05, back, base), Ab = pt(mid, back, base + rise);
+      // The slopes: the one nearer the camera last; each lit or shaded by which way it faces.
+      const slopes = [[L, A, Ab, Lb], [Rr, A, Ab, Rb]] as RoofVertex[][], centre = (q: RoofVertex[]) => depthOf(camera, (q[0][0] + q[3][0]) / 2, (q[0][1] + q[3][1]) / 2);
+      slopes.sort((p1, p2) => centre(p1) - centre(p2));
+      const tone = (q: RoofVertex[]) => rotateLit(camera, q[0], q[1]) ? shade(roofColor, 0.08) : shade(roofColor, -0.1);
       if (glr && ctx === target) {
-        // On the GPU: the band of marble, the pediment and its tympanum (just in front of it).
-        capturing = glr; box(ctx, camera, bx, by, alongX ? length : 0.6, alongX ? 0.6 : length, E, ...marble, H, INK, null); capturing = null;
-        const tri = [pt(min + 0.05, 0.6, base), pt(max - 0.05, 0.6, base), pt(mid, 0.6, base + rise)], c3 = tri.reduce((sum, v) => [sum[0] + v[0] / 3, sum[1] + v[1] / 3, sum[2] + v[2] / 3], [0, 0, 0]);
-        const towards = (v: RoofVertex, k: number): RoofVertex => [v[0] + (c3[0] - v[0]) * k + nx * 0.02, v[1] + (c3[1] - v[1]) * k + ny * 0.02, v[2] + (c3[2] - v[2]) * k];
-        gpuFace(ctx, camera, tri, marble[1], 1, -1);
-        gpuFace(ctx, camera, [towards(tri[0], 0.22), towards(tri[1], 0.22), towards(tri[2], 0.3)], marble[2], 1, -1, NO_UV, 0);
+        capturing = glr; box(ctx, camera, bx, by, alongX ? length : front - back, alongX ? front - back : length, E, ...marble, H, INK, null); capturing = null;
+        for (const q of slopes) gpuFace(ctx, camera, q, tone(q), 1, -1);
+        if (facing) {
+          const tri = [L, Rr, A] as RoofVertex[], c3 = tri.reduce((sum, v) => [sum[0] + v[0] / 3, sum[1] + v[1] / 3, sum[2] + v[2] / 3], [0, 0, 0]);
+          const towards = (v: RoofVertex, k: number): RoofVertex => [v[0] + (c3[0] - v[0]) * k + nx * 0.02, v[1] + (c3[1] - v[1]) * k + ny * 0.02, v[2] + (c3[2] - v[2]) * k];
+          gpuFace(ctx, camera, tri, marble[1], 1, -1);
+          gpuFace(ctx, camera, [towards(tri[0], 0.22), towards(tri[1], 0.22), towards(tri[2], 0.3)], marble[2], 1, -1, NO_UV, 0);
+        }
       } else {
-        box(ctx, camera, bx, by, alongX ? length : 0.6, alongX ? 0.6 : length, E, ...marble, H, INK, null);
-        poly(ctx, [left, right, apex], marble[1], INK, 1.4);
-        const inset = (p: readonly [number, number], k: number) => [p[0] + ((left[0] + right[0] + apex[0]) / 3 - p[0]) * k, p[1] + ((left[1] + right[1] + apex[1]) / 3 - p[1]) * k] as [number, number];
-        poly(ctx, [inset(left, 0.22), inset(right, 0.22), inset(apex, 0.3)], marble[2], "rgba(22,22,22,0.4)", 1);
+        box(ctx, camera, bx, by, alongX ? length : front - back, alongX ? front - back : length, E, ...marble, H, INK, null);
+        for (const q of slopes) { poly(ctx, q.map(P), tone(q), INK, 1.2); const [s0, s1] = [P(q[0]), P(q[1])]; ctx.strokeStyle = "rgba(22,22,22,0.25)"; ctx.lineWidth = 1; for (let k = 1; k < 4; k++) { const f = k / 4, a0 = P([q[0][0] + (q[3][0] - q[0][0]) * f, q[0][1] + (q[3][1] - q[0][1]) * f, q[0][2]]), a1 = P([q[1][0] + (q[2][0] - q[1][0]) * f, q[1][1] + (q[2][1] - q[1][1]) * f, q[1][2]]); ctx.beginPath(); ctx.moveTo(a0[0], a0[1]); ctx.lineTo(a1[0], a1[1]); ctx.stroke(); } void s0; void s1; }
+        if (facing) {
+          const left = P(L), right = P(Rr), apex = P(A);
+          poly(ctx, [left, right, apex], marble[1], INK, 1.4);
+          const inset = (q: readonly [number, number], k: number) => [q[0] + ((left[0] + right[0] + apex[0]) / 3 - q[0]) * k, q[1] + ((left[1] + right[1] + apex[1]) / 3 - q[1]) * k] as [number, number];
+          poly(ctx, [inset(left, 0.22), inset(right, 0.22), inset(apex, 0.3)], marble[2], "rgba(22,22,22,0.4)", 1);
+        }
       }
-      const cxs = (left[0] + right[0] + apex[0]) / 3, cys = (left[1] + right[1] + apex[1]) / 3 + 2 * z, r = Math.min(9, rise * 0.22) * z;
+      if (!facing) return;
+      const left = P(L), right = P(Rr), apex = P(A), cxs = (left[0] + right[0] + apex[0]) / 3, cys = (left[1] + right[1] + apex[1]) / 3 + 2 * z, r = Math.min(8, rise * 0.24) * z;
       if (building.facade === "bank") {
-        ellipse(ctx, cxs, cys, r, r, "#e2b84a", INK, 1.2); ellipse(ctx, cxs, cys, r * 0.62, r * 0.62, null, "#9a7424", 1.2);
+        ellipse(ctx, cxs, cys, r, r, "#e2b84a", INK, 1.2); ellipse(ctx, cxs, cys, r * 0.62, r * 0.62, null, "#9a7424", 1.2); ellipse(ctx, cxs - r * 0.3, cys - r * 0.3, r * 0.18, r * 0.18, "#fff3c0", null);
       } else {
         ctx.strokeStyle = "#c9a24a"; ctx.lineWidth = Math.max(1, 1.4 * z); ctx.beginPath();
         for (let i = 0; i < 12; i++) { const t = i / 12 * Math.PI * 2; ctx.moveTo(cxs + Math.cos(t) * r * 0.7, cys + Math.sin(t) * r * 0.7); ctx.lineTo(cxs + Math.cos(t) * r * 1.3, cys + Math.sin(t) * r * 1.3); }
         ctx.stroke(); ellipse(ctx, cxs, cys, r * 0.62, r * 0.62, "#e2b84a", INK, 1);
       }
     } });
+    // The step the columns stand on, along the front.
+    { const [sx2, sy2] = alongX ? [mid, face + ny * 0.3] : [face + nx * 0.3, mid];
+      drawables.push({ depth: depth(sx2, sy2) - 0.3, at: { x: sx2, y: sy2 }, size: [12, 40, 20], draw: () => box(ctx, camera, sx2, sy2, alongX ? length : 0.6, alongX ? 0.6 : length, 2.5, marble[0], marble[1], marble[2], 0, INK, "cap") }); }
   }
   const veilTarget = veiled(game) ? 1 : 0;
   veilShown = scene.reducedMotion ? veilTarget : veilShown + (veilTarget - veilShown) * Math.min(1, dt * (veilTarget ? 1.4 : 8));

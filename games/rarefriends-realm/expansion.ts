@@ -20,7 +20,7 @@ import { ECO_REGIONS, HERBS } from "./apothecary.ts";
 import { buildVillages } from "./villages.ts";
 import { buildWest } from "./west.ts";
 // REGIONS is read only inside buildExpansion (called from createWorld), never at load, since world.ts imports this module.
-import { ARENA_LEGACY as ARENA, MAINLAND_RECT, GEN_OVERWORLD_H as OVERWORLD_H, REGIONS, T, isWater, legacyMainlandToWorld as mainlandToWorld, type DecorKind, type GenContext, type RegionId, type worldTools } from "./world.ts";
+import { ARENA_LEGACY as ARENA, MAINLAND_RECT, ruinPiece, GEN_OVERWORLD_H as OVERWORLD_H, REGIONS, T, isWater, legacyMainlandToWorld as mainlandToWorld, type DecorKind, type GenContext, type RegionId, type worldTools } from "./world.ts";
 import { ORDERS, ORDER_IDS } from "./knights.ts";
 
 export type Tools = ReturnType<typeof worldTools>;
@@ -331,15 +331,16 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
     for (let y = y0 + 1; y < y1; y++) { rail(x0, y); rail(x1, y); }
     const cx = x0 + Math.floor(w / 2), cy = y0 + Math.floor(h / 2);
     if (random() < 0.5) decor(cx, cy, random() < 0.5 ? "obelisk" : "tomb", true, random() < 0.5 ? "A family's obelisk, the names running out of room" : pick(TOMB_NAMES));
-    for (let y = y0 + 1; y < y1; y++) for (let x = x0 + 1; x < x1; x++) if ((x + y) % 2 === 0 && random() < 0.75 && free(x, y)) decor(x, y, random() < 0.2 ? "tomb" : "grave", true, epitaph() ?? (random() < 0.5 ? undefined : "A grave in the family plot"));
+    for (let y = y0 + 1; y < y1; y++) for (let x = x0 + 1; x < x1; x++) if ((x + y) % 2 === 0 && random() < 0.75 && free(x, y)) decor(x, y, (r => r < 0.11 ? "tomb" : r < 0.2 ? "sarcophagus" : "grave")(random()), true, epitaph() ?? (random() < 0.5 ? undefined : "A grave in the family plot"));
   }
   // Loose in the trees: graves of every kind, tombs, little crypts, bone-heaps, obelisks, and the walls of houses that didn't even leave a floor.
   scatter(150, 0, 520, 185, 20, (x, y) => decor(x, y, "crypt", true, pick(CRYPT_NAMES)), (x, y) => openGround(x - 1, y - 1, x + 1, y + 1));
   scatter(150, 0, 520, 185, 14, (x, y) => decor(x, y, "obelisk", true, "An obelisk, carved all over with the symbol from the stones"), (x, y) => openGround(x, y, x, y));
   scatter(150, 0, 520, 185, 70, (x, y) => decor(x, y, "tomb", true, pick(TOMB_NAMES)), inRegion("deadwood"));
   scatter(150, 0, 520, 185, 60, (x, y) => decor(x, y, "bones", false, pick(BONE_NAMES)), inRegion("deadwood"));
-  scatter(150, 0, 520, 185, 260, (x, y) => decor(x, y, "grave", true, epitaph()), inRegion("deadwood"));
-  scatter(150, 0, 520, 185, 160, (x, y) => decor(x, y, random() > 0.5 ? "rubble" : "ruin_wall"), inRegion("deadwood"));
+  // (One grave in a dozen is a stone coffin, by where it lies, so the stream is as it was.)
+  scatter(150, 0, 520, 185, 260, (x, y) => { const name = epitaph(), coffin = (Math.imul(x, 31) + Math.imul(y, 17)) % 12 === 0; decor(x, y, coffin ? "sarcophagus" : "grave", true, coffin ? undefined : name); }, inRegion("deadwood"));
+  scatter(150, 0, 520, 185, 160, (x, y) => decor(x, y, ruinPiece(random())), inRegion("deadwood"));
   // The Deadwood: dense dead trees, a few hardy yews; thicker the deeper north you go.
   scatter(150, 0, 520, 185, 1700, (x, y) => tree(x, y, "deadwood"), (x, y) => inRegion("deadwood")(x, y) && random() < 0.35 + (1 - y / 185) * 0.6);
   scatter(150, 0, 520, 185, 60, (x, y) => tree(x, y, "yew"), inRegion("deadwood"));
@@ -354,7 +355,7 @@ export function buildExpansion(ctx: GenContext, t: Tools, seed: number) {
   scatter(30, 110, 130, 280, 14, (x, y) => rock(x, y, "inkcoal"), inRegion("drakespine"));
   scatter(30, 110, 130, 280, 8, (x, y) => rock(x, y, "glimmer"), inRegion("drakespine"));
   // Ashfall: ruins of whoever lived here before the dragons, and bones.
-  scatter(10, 30, 130, 150, 60, (x, y) => decor(x, y, random() > 0.4 ? "pillar" : "ruin_wall"), inRegion("ashfall"));
+  scatter(10, 30, 130, 150, 60, (x, y) => decor(x, y, ruinPiece(random())), inRegion("ashfall"));
   scatter(10, 30, 130, 150, 40, (x, y) => decor(x, y, "rubble"), inRegion("ashfall"));
   scatter(10, 30, 130, 150, 24, (x, y) => tree(x, y, "deadwood"), inRegion("ashfall"));
   scatter(10, 30, 130, 150, 10, (x, y) => rock(x, y, "rarite"), inRegion("ashfall"));

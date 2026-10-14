@@ -5393,3 +5393,22 @@ test("Lava lies level, like water: every pool at one height with its flat shore,
   assert.equal(world.tiles[edge[1] * W + edge[0] + 2], T.LAVA);
   for (const pool of pools(world)) if (pool.includes(edge[1] * W + edge[0] + 2)) for (const i of pool) assert.equal(Math.round(low(world, i % W, Math.floor(i / W))), level, "the painted lava lies at its pool's level");
 });
+
+test("Sigil shrines: every sigil has its altar; the first ones near Friendhollow, the deeper ones out where they belong; each altar in the open stands in a domed shrine of its sigil's stone (some old and broken), with room to stand at it", async () => {
+  const { generateWorld, WORLD_SEED, W, regionAt, objectAtTile, WALKABLE } = await import("../games/rarefriends-realm/world.ts");
+  const { SHRINE_HOMES, SHRINE_R, shrineOf, shrineBroken } = await import("../games/rarefriends-realm/sigilshrines.ts");
+  const { SIGILCRAFT } = await import("../games/rarefriends-realm/data.ts");
+  const { world } = generateWorld(WORLD_SEED, { overlays: false }), spawn = world.places.spawn;
+  const altars = world.objects.filter(o => o.kind === "sigil_altar" && o.name !== "__removed");
+  for (const { sigil } of SIGILCRAFT) assert.ok(altars.some(a => a.sigil === sigil), `an altar for ${sigil}`);
+  for (const [sigil, , home] of SHRINE_HOMES) { const a = altars.filter(o => o.sigil === sigil); assert.equal(a.length, 1, `one ${sigil} altar`); assert.equal(regionAt(world, a[0].x, a[0].y).id, home, `the ${sigil} altar is in ${home}`); }
+  for (const sigil of ["breeze_sigil", "tide_sigil"]) { const a = altars.find(o => o.sigil === sigil); assert.ok(Math.hypot(a.x - spawn.x, a.y - spawn.y) < 70, `the ${sigil} altar is near Friendhollow`); }
+  const at = (x, y) => objectAtTile(world, x, y), shrines = altars.filter(a => shrineOf(at, a.x, a.y, a.sigil));
+  assert.ok(shrines.length >= 10, `most altars stand in shrines (${shrines.length})`);
+  for (const a of shrines) {
+    // The columns at the corners, a broken one in an old shrine; paving and room to stand at the altar on every side.
+    const heights = [[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([dx, dy]) => at(a.x + dx * SHRINE_R, a.y + dy * SHRINE_R).height);
+    assert.equal(heights.some(h => h < 40), shrineBroken(a.sigil), `${a.name}: ${shrineBroken(a.sigil) ? "an old shrine, a column broken" : "every column whole"}`);
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const i = (a.y + dy) * W + a.x + dx; assert.ok(WALKABLE.has(world.tiles[i]) && (world.objectAt[i] < 0 || !world.objects[world.objectAt[i]].blocks), `${a.name}: room to stand at it`); }
+  }
+});
