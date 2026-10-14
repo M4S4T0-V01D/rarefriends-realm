@@ -31,11 +31,11 @@ import { Trades } from "./trade.ts";
 import { FELLOW_RANGE, PARTY_RANGE, Party, nearby } from "./party.ts";
 import { makeSaveCode, restoreSaveCode } from "./savecode.ts";
 import { strikeAt, weatherAt, type Weather } from "./weather.ts";
-import { DEV_CATALOG, DEV_COMMAND, DEV_FIND, DEV_MAP, DEV_MODE, DEV_PICK, DEV_REPORT, DEV_STATE, DEV_TELEPORT, DEV_WORLD } from "./roster.ts";
+import { DEV_ASK, DEV_CATALOG, DEV_COMMAND, DEV_FIND, DEV_GHOST, DEV_MAP, DEV_MODE, DEV_PICK, DEV_REPORT, DEV_STATE, DEV_TELEPORT, DEV_WORLD } from "./roster.ts";
 import { devCommand, devFind, devMapImage, devState } from "./devtools.ts";
 import { devFlags } from "./devflags.ts";
 import { ExchangeModal } from "./exchange.tsx";
-import { catalog as devCatalog, isDevFrame, keepPristine, pick as devPick, rebuildWorld } from "./devlayer.ts";
+import { catalog as devCatalog, devAnswer, isDevFrame, keepPristine, pick as devPick, rebuildWorld } from "./devlayer.ts";
 import { cleanOverlay } from "./overlay.ts";
 import { SETTINGS_STATE, SETTINGS_WRITE, parseRenderer, type RendererMode, CLOUD_ACTION, CLOUD_STATE, FEEDBACK_REQUEST, FEEDBACK_RESULT, FULLSCREEN_REQUEST, FULLSCREEN_STATE, JOIN_INVITE, TEXT_COPY, TEXT_COPY_RESULT, HOST_HELLO, HOST_STATE, SAVE_ELSEWHERE, SAVE_EXPORT, SAVE_EXPORT_RESULT, SAVE_WRITE, SHARE_REQUEST, SHARE_RESULT, parseCloudState, parseRoster, type CloudAction, type CloudState, type ShareAction, type ShareOutcome } from "./roster.ts";
 import { CloudControls, CloudDialogs, type SaveSummary } from "./cloudui.tsx";
@@ -189,7 +189,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
   const lastMinimapPoint = useRef<React.MouseEvent<HTMLCanvasElement> | null>(null);
   const [snapshot, setSnapshot] = useState<GameSnapshot | null>(null), [busy, setBusy] = useState(false), [casketError, setCasketError] = useState(""), [reveal, setReveal] = useState<CasketResult[] | null>(null);
   const [size, setSize] = useState({ width: 960, height: 640, scale: 1 }), [sideOpen, setSideOpen] = useState(true), [fullscreen, setFullscreen] = useState(false), [pip, setPip] = useState(false), [shareStatus, setShareStatus] = useState(""), [feedbackStatus, setFeedbackStatus] = useState(""), [cardUrl, setCardUrl] = useState<string | null>(null), [collectibleUrl, setCollectibleUrl] = useState<string | null>(null);
-  const devFrame = isDevFrame(), devEdit = useRef(false), devOverlay = useRef(cleanOverlay(null, [])), devRebuild = useRef<number | null>(null), devDrag = useRef<string | null>(null);
+  const devFrame = isDevFrame(), devEdit = useRef(false), devOverlay = useRef(cleanOverlay(null, [])), devRebuild = useRef<number | null>(null), devDrag = useRef<string | null>(null), devDropped = useRef<string[]>([]), devGhost = useRef<{ w: number; h: number } | { ax: number; ay: number } | null>(null);
   const pendingSave = useRef<unknown>(null), cardBlob = useRef<Blob | null>(null), collectibleBlob = useRef<Blob | null>(null), generation = useRef<number | null>(null), resizeRef = useRef<() => void>(() => {}), saveNow = useRef<(claim?: boolean, importHash?: string) => void>(() => {});
   const [cloud, setCloud] = useState<CloudState | null>(null), cloudWas = useRef<CloudState["status"] | null>(null), milestone = useRef("");
   /** Logged out: back on the title screen with the adventure saved. */
@@ -441,14 +441,16 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         const state = game.current;
         if (event.data?.type === DEV_WORLD && state) {
           // (A burst of edits is one rebuild: the newest overlay, once the messages queued behind it are in.)
-          devOverlay.current = cleanOverlay(event.data.overlay, []);
+          devDropped.current = []; devOverlay.current = cleanOverlay(event.data.overlay, devDropped.current);
           if (!devRebuild.current) devRebuild.current = window.setTimeout(() => {
             devRebuild.current = null; const overlay = devOverlay.current, now = game.current; if (!overlay || !now) return;
-            const report = rebuildWorld(now, overlay); refresh(); window.parent.postMessage({ type: DEV_REPORT, ...report, ops: overlay.ops.length }, "*");
+            const report = rebuildWorld(now, overlay); refresh(); window.parent.postMessage({ type: DEV_REPORT, ...report, problems: [...devDropped.current, ...report.problems], ops: overlay.ops.length }, "*");
           }, 0);
           return;
         }
         if (event.data?.type === DEV_MODE) { devEdit.current = event.data.edit === true; return; }
+        if (event.data?.type === DEV_GHOST) { const g = event.data.ghost as { w?: unknown; h?: unknown; ax?: unknown; ay?: unknown } | null; devGhost.current = g && typeof g.w === "number" && typeof g.h === "number" ? { w: Math.max(1, Math.min(64, Math.round(g.w))), h: Math.max(1, Math.min(64, Math.round(g.h))) } : g && typeof g.ax === "number" && typeof g.ay === "number" ? { ax: Math.round(g.ax), ay: Math.round(g.ay) } : null; return; }
+        if (event.data?.type === DEV_ASK && state) { window.parent.postMessage({ type: DEV_ASK, nonce: event.data.nonce, answer: devAnswer(state, (event.data.ask ?? {}) as Record<string, unknown>) }, "*"); return; }
         // The dashboard's commands (devtools.ts): what they did goes back to its log; the time and the weather are the page's.
         if (event.data?.type === DEV_COMMAND && state) {
           const done = devCommand(state, event.data.command);
@@ -725,7 +727,7 @@ export default function RareFriendsRealm({ friendId, client, paused }: GameCompo
         low: isLow(live.current.settings), nameplates: live.current.settings.nameplates ?? "full",
         game: state, now, tickAt: tickAt.current, camera: camera.current, friend: friend.current,
         follower: player.follower !== null ? followerSprites.current.get(player.follower) ?? null : null, canonical: CANONICAL,
-        hoverTile: current === "playing" ? hoverTile.current : null, marker: marker.current, reducedMotion, hits: hits.current, fireworks: fireworks.current, chat: chat.current,
+        hoverTile: current === "playing" ? hoverTile.current : null, ghost: current === "playing" && devEdit.current ? ghostAt(devGhost.current, hoverTile.current) : null, marker: marker.current, reducedMotion, hits: hits.current, fireworks: fireworks.current, chat: chat.current,
         projectiles: projectiles.current, sfx: (name, gain) => audio.current?.sfx(name as SfxName, gain),
         time: current === "playing" && live.current.settings.dayNight !== false ? timeOfDay() : null,
         ...(() => {
@@ -1561,4 +1563,11 @@ function heldDirection(keys: ReadonlySet<string>, angle: number) {
   if (!sx && !sy) return null;
   const rx = (sx + sy) / 2, ry = (sy - sx) / 2, c = Math.cos(-angle), s = Math.sin(-angle);
   return { dx: rx * c - ry * s, dy: rx * s + ry * c };
+}
+
+/** The development editor's footprint under the pointer: a size from the pointer, or a rectangle from an anchor to it. */
+function ghostAt(ghost: { w: number; h: number } | { ax: number; ay: number } | null, hover: { x: number; y: number } | null) {
+  if (!ghost || !hover) return null;
+  if ("w" in ghost) return { x0: hover.x, y0: hover.y, x1: hover.x + ghost.w - 1, y1: hover.y + ghost.h - 1 };
+  return { x0: Math.min(ghost.ax, hover.x), y0: Math.min(ghost.ay, hover.y), x1: Math.max(ghost.ax, hover.x), y1: Math.max(ghost.ay, hover.y) };
 }

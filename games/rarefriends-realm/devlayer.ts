@@ -9,11 +9,12 @@ import { NPCS, QUESTS, registerDevQuest } from "./content.ts";
 import { applyCamp, setDevCampZones } from "./camping.ts";
 import { applyVessels } from "./seafaring.ts";
 import { DECOR_NAMES, REGIONS, T, W, WORLD_SEED, cornerHeight, groundHeights, regionAt, type World } from "./world.ts";
-import { applyOverlay, registerDefinitions, validatePlacements, type Overlay, type Placed } from "./overlay.ts";
+import { applyOverlay, originalMonster, registerDefinitions, resetOverrides, validatePlacements, type Overlay, type Placed } from "./overlay.ts";
+import { extractPrefab, type Prefab } from "./overlaybuild.ts";
 import { realmWorld, setSharedWorld, spawnCreatures, type Game } from "./state.ts";
 import { applyHome } from "./housing.ts";
 import { resetLighting } from "./lighting.ts";
-import type { DevCatalog, DevPick } from "./roster.ts";
+import type { DevBuilding, DevCatalog, DevPick } from "./roster.ts";
 
 export const isDevFrame = () => typeof location !== "undefined" && new URLSearchParams(location.search).get("dev") === "1";
 let pristine: World | null = null;
@@ -35,6 +36,8 @@ export let placed: Placed = { objects: new Map(), buildings: new Map(), spawns: 
 export function rebuildWorld(game: Game, overlay: Overlay): { problems: string[]; unreachable: string[] } {
   keepPristine();
   const world = cloneWorld(pristine!), problems: string[] = [];
+  // (The game's own creatures and talk first, then this overlay's changes to them: the deployed world's are replaced, not stacked.)
+  resetOverrides();
   registerDefinitions(overlay, NPCS as Record<string, unknown>, problems);
   for (const op of overlay.ops) if (op.op === "quest") registerDevQuest(op.def, problems);
   // (A quest taken out of the overlay is taken out of the list, and out of the player's log.)
@@ -55,7 +58,7 @@ export function catalog(game: Game): DevCatalog {
     npcs: Object.values(NPCS).map(n => ({ id: n.id, name: n.name })), monsters: Object.values(MONSTERS).map(m => ({ id: m.id, name: m.name, level: m.level, art: m.art })),
     items: ITEM_LIST.map(i => ({ id: i.id, name: i.name })), skills: [...SKILLS], quests: QUESTS.map(q => ({ id: q.id, name: q.name })),
     kinds: uniq(["decor", "tree", "rock", "spot", "furnace", "anvil", "range", "altar", "bank", "ladder", "sign", "well", "chest", ...game.world.objects.map(o => o.kind)]),
-    spawn: { ...game.world.places.spawn }, regions: REGIONS.map(r => ({ id: r.id, name: r.name })),
+    spawn: { ...game.world.places.spawn }, regions: REGIONS.map(r => ({ id: r.id, name: r.name })), buildings: buildingList(game.world),
   };
 }
 /** What's under a tile, for the editor's inspector. */
@@ -63,9 +66,21 @@ export function pick(game: Game, x: number, y: number, overlay: Overlay): DevPic
   const world = game.world, i = y * W + x, id = world.objectAt[i], object = id >= 0 ? world.objects[id] : null;
   const uid = object ? [...placed.objects.entries()].find(([, index]) => index === id)?.[0] : undefined;
   const b = world.buildingAt[i] ? world.buildings[world.buildingAt[i] - 1] : null, bindex = world.buildingAt[i] - 1;
+  const buid = b ? [...placed.buildings.entries()].find(([, index]) => index === bindex)?.[0] : undefined;
   // (The lift shown is the editor's raise on the tile, in steps.)
   const raised = [...overlay.ops].reverse().find(op => op.op === "lift" && op.x === x && op.y === y);
   // (The height is the tile's, the average of its corners; the floor is the land's own under it, which the ground ops move.)
   const height = (cornerHeight(world, x, y) + cornerHeight(world, x + 1, y) + cornerHeight(world, x, y + 1) + cornerHeight(world, x + 1, y + 1)) / 4;
-  return { x, y, tile: world.tiles[i], lift: raised?.op === "lift" ? raised.v : 0, height, base: world.base?.[i] ?? 0, object: object ? { id, kind: object.kind, name: object.name, ...(uid ? { uid } : {}) } : null, building: b ? { index: bindex, name: b.name } : null, region: regionAt(world, x, y).name };
+  return { x, y, tile: world.tiles[i], lift: raised?.op === "lift" ? raised.v : 0, height, base: world.base?.[i] ?? 0, object: object ? { id, kind: object.kind, name: object.name, ...(uid ? { uid } : {}) } : null, building: b ? { index: bindex, name: b.name, ...(buid ? { uid: buid } : {}) } : null, region: regionAt(world, x, y).name };
+}
+/** The world's buildings, to copy one from: named first, then the rest by where they are. */
+export function buildingList(world: World): DevBuilding[] {
+  return world.buildings.map((b, index) => ({ index, name: b.name, x: b.x0, y: b.y0, w: b.x1 - b.x0 + 1, h: b.y1 - b.y0 + 1, walls: b.walls ?? "stone", roof: b.roof, region: regionAt(world, (b.x0 + b.x1) >> 1, (b.y0 + b.y1) >> 1).name }))
+    .filter(b => b.w <= 48 && b.h <= 48).sort((a, b) => (a.name ? 0 : 1) - (b.name ? 0 : 1) || a.region.localeCompare(b.region) || a.name.localeCompare(b.name));
+}
+/** The dashboard's questions: a creature as it was and as it is now; a copy of one of the world's buildings. */
+export function devAnswer(game: Game, ask: Record<string, unknown>): unknown {
+  if (ask.ask === "monster" && typeof ask.id === "string" && MONSTERS[ask.id]) return { original: originalMonster(ask.id), current: { ...MONSTERS[ask.id] } };
+  if (ask.ask === "prefab" && typeof ask.index === "number") return extractPrefab(game.world, ask.index) satisfies Prefab | null;
+  return null;
 }

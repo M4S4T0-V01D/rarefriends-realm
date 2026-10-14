@@ -182,5 +182,10 @@ export const DEV_STATE = "rarefriends-realm:dev-state";
 export const DEV_FIND = "rarefriends-realm:dev-find";
 /** The whole map, as a picture. */
 export const DEV_MAP = "rarefriends-realm:dev-map";
-export type DevPick = { x: number; y: number; tile: number; lift: number; height: number; base: number; object: { id: number; kind: string; name: string; uid?: string } | null; building: { index: number; name: string } | null; region: string };
-export type DevCatalog = { tiles: Record<string, number>; decor: string[]; trees: string[]; rocks: string[]; spots: string[]; npcs: { id: string; name: string }[]; monsters: { id: string; name: string; level: number; art: number }[]; items: { id: string; name: string }[]; skills: string[]; quests: { id: string; name: string }[]; kinds: string[]; spawn: { x: number; y: number }; regions: { id: string; name: string }[] };
+/** A question the dashboard asks the game (a creature's definition as it was and as it is; a copy of a building), and its answer, matched by `nonce`. */
+export const DEV_ASK = "rarefriends-realm:dev-ask";
+/** The footprint to outline under the pointer in edit mode (a building about to be placed), or none. */
+export const DEV_GHOST = "rarefriends-realm:dev-ghost";
+export type DevBuilding = { index: number; name: string; x: number; y: number; w: number; h: number; walls: string; roof: string; region: string };
+export type DevPick = { x: number; y: number; tile: number; lift: number; height: number; base: number; object: { id: number; kind: string; name: string; uid?: string } | null; building: { index: number; name: string; uid?: string } | null; region: string };
+export type DevCatalog = { tiles: Record<string, number>; decor: string[]; trees: string[]; rocks: string[]; spots: string[]; npcs: { id: string; name: string }[]; monsters: { id: string; name: string; level: number; art: number }[]; items: { id: string; name: string }[]; skills: string[]; quests: { id: string; name: string }[]; kinds: string[]; spawn: { x: number; y: number }; regions: { id: string; name: string }[]; buildings: DevBuilding[] };

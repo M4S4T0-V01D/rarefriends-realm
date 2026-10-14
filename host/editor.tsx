@@ -11,8 +11,10 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { DEV_CATALOG, DEV_COMMAND, DEV_FIND, DEV_MAP, DEV_MODE, DEV_PICK, DEV_REPORT, DEV_STATE, DEV_WORLD, type DevCatalog, type DevPick } from "../games/rarefriends-realm/roster.ts";
+import { DEV_ASK, DEV_CATALOG, DEV_COMMAND, DEV_FIND, DEV_GHOST, DEV_MAP, DEV_MODE, DEV_PICK, DEV_REPORT, DEV_STATE, DEV_WORLD, type DevBuilding, type DevCatalog, type DevPick } from "../games/rarefriends-realm/roster.ts";
 import type { Op, Overlay, TerrainMode } from "../games/rarefriends-realm/overlay.ts";
+import type { Furnish, Prefab, Side } from "../games/rarefriends-realm/overlaybuild.ts";
+import { DropTable, MonsterEditor, SearchList, TalkEditor, type Kit } from "./editor-panels.tsx";
 import type { DevFound, DevState } from "../games/rarefriends-realm/devtools.ts";
 import { northOverlay } from "../games/rarefriends-realm/northframe.ts";
 import { devApi, type Deploy, type Revision } from "./dev.ts";
@@ -22,8 +24,8 @@ const WORLD = "main";
 type DefKind = "npc" | "monster" | "item" | "quest";
 type Field = { key: string; label: string; type?: "text" | "number" | "textarea" | "check" | "select"; options?: readonly (readonly [string, string])[]; hint?: string };
 const DEF_FIELDS: Record<DefKind, Field[]> = {
-  npc: [{ key: "id", label: "Id (dev_…)" }, { key: "name", label: "Name" }, { key: "examine", label: "Examine" }, { key: "artMode", label: "Drawn as", type: "select", options: [["friend", "a Friend (family and seed)"], ["7730", "Friend #7730"], ["3412", "Friend #3412"]] }, { key: "family", label: "Family (0–9)", type: "number" }, { key: "seed", label: "Seed", type: "number" }, { key: "lines", label: "What they say (a line each, in turn)", type: "textarea" }],
-  monster: [{ key: "base", label: "Start from", type: "select" }, { key: "id", label: "Id (dev_…)" }, { key: "name", label: "Name" }, { key: "examine", label: "Examine" }, { key: "level", label: "Level", type: "number" }, { key: "hp", label: "Hitpoints", type: "number" }, { key: "attack", label: "Attack", type: "number" }, { key: "strength", label: "Strength", type: "number" }, { key: "defence", label: "Defence", type: "number" }, { key: "attackBonus", label: "Attack bonus", type: "number" }, { key: "defenceBonus", label: "Defence bonus", type: "number" }, { key: "maxHit", label: "Max hit", type: "number" }, { key: "speed", label: "Speed (ticks a swing)", type: "number" }, { key: "respawn", label: "Respawn (ticks)", type: "number" }, { key: "wander", label: "Wander (tiles)", type: "number" }, { key: "art", label: "Art (the base's, or another's)", type: "number" }, { key: "aggressive", label: "Aggressive", type: "check" }, { key: "drops", label: "Drops (JSON: [{item, min, max, chance}])", type: "textarea" }],
+  npc: [{ key: "id", label: "Id (dev_…)" }, { key: "name", label: "Name" }, { key: "examine", label: "Examine" }, { key: "artMode", label: "Drawn as", type: "select", options: [["friend", "a Friend (family and seed)"], ["7730", "Friend #7730"], ["3412", "Friend #3412"]] }, { key: "family", label: "Family (0–9)", type: "number" }, { key: "seed", label: "Seed", type: "number" }, { key: "lines", label: "What they say (a line each, in turn; for choices, write a conversation in the talk tab)", type: "textarea" }],
+  monster: [{ key: "base", label: "Start from", type: "select" }, { key: "id", label: "Id (dev_…)" }, { key: "name", label: "Name" }, { key: "examine", label: "Examine" }, { key: "level", label: "Level", type: "number" }, { key: "hp", label: "Hitpoints", type: "number" }, { key: "attack", label: "Attack", type: "number" }, { key: "strength", label: "Strength", type: "number" }, { key: "defence", label: "Defence", type: "number" }, { key: "attackBonus", label: "Attack bonus", type: "number" }, { key: "defenceBonus", label: "Defence bonus", type: "number" }, { key: "maxHit", label: "Max hit", type: "number" }, { key: "speed", label: "Speed (ticks a swing)", type: "number" }, { key: "respawn", label: "Respawn (ticks)", type: "number" }, { key: "wander", label: "Wander (tiles)", type: "number" }, { key: "art", label: "Art (the base's, or another's)", type: "number" }, { key: "aggressive", label: "Aggressive", type: "check" }, { key: "drops", label: "Drops", type: "textarea" }],
   item: [{ key: "id", label: "Id (dev_…)" }, { key: "name", label: "Name" }, { key: "examine", label: "Examine" }, { key: "value", label: "Value (Frens)", type: "number" }, { key: "shape", label: "Icon shape", hint: "pot, bottle, Frens, log, ore, bar, sword, shield, amulet, orb, fish, egg, flour, bones, sigil, staff, gem, key, book" }, { key: "color", label: "Icon colour", hint: "#8a6a3a" }, { key: "stackable", label: "Stackable", type: "check" }, { key: "tradeable", label: "Tradeable", type: "check" }, { key: "heal", label: "Heals (0: not food)", type: "number" }, { key: "weight", label: "Weight (kg)", type: "number" }],
   quest: [{ key: "id", label: "Id (dev_…)" }, { key: "name", label: "Name" }, { key: "giver", label: "Given by", type: "select" }, { key: "item", label: "Wants", type: "select" }, { key: "count", label: "How many", type: "number" }, { key: "offer", label: "The ask (a line each)", type: "textarea" }, { key: "accept", label: "When you say yes" }, { key: "progress", label: "While you're at it" }, { key: "done", label: "When you deliver (a line each)", type: "textarea" }, { key: "coins", label: "Reward: Frens", type: "number" }, { key: "xpSkill", label: "Reward: skill", type: "select" }, { key: "xpAmount", label: "Reward: XP", type: "number" }, { key: "items", label: "Reward: items (id:n, id:n)" }, { key: "points", label: "Quest points (0–5)", type: "number" }, { key: "difficulty", label: "Difficulty" }],
 };
@@ -66,17 +68,20 @@ const when = (at: number | null) => at ? new Date(at).toLocaleString() : "";
 
 /** The tools, in the palette's groups: what each does on a click in the game (edit mode). */
 type Tool = "inspect" | "raise" | "lower" | "flatten" | "level" | "smooth" | "roughen" | "slope" | "height-dropper" | "paint" | "fill" | "flood" | "line" | "region" | "tile-dropper"
-  | "place" | "scatter" | "remove" | "clear" | "building" | "spawn" | "campzone" | "erase" | "teleport" | "measure";
+  | "place" | "scatter" | "remove" | "clear" | "building" | "stamp" | "spawn" | "campzone" | "erase" | "teleport" | "measure";
 const TOOL_GROUPS: readonly (readonly [string, readonly (readonly [Tool, string, string])[]])[] = [
   ["Terrain", [["raise", "Raise", "Raise the ground (shift: lower)"], ["lower", "Lower", "Lower the ground (shift: raise)"], ["flatten", "Flatten", "Flatten to the height clicked"], ["level", "Level to", "Set the ground to a height"],
     ["smooth", "Smooth", "Smooth bumps away"], ["roughen", "Roughen", "Add natural noise"], ["slope", "Slope", "A ramp between two clicks"], ["height-dropper", "Pick height", "Take the height under the pointer"]]],
   ["Paint", [["paint", "Brush", "Paint ground with the brush"], ["fill", "Rectangle", "Fill a rectangle (two clicks)"], ["flood", "Flood", "Fill the connected ground of one kind"], ["line", "Line", "A line of ground (two clicks): roads, rivers"],
     ["region", "Region", "Set the region of a rectangle (two clicks)"], ["tile-dropper", "Pick ground", "Take the ground kind under the pointer"]]],
   ["Things", [["place", "Place", "Place one thing"], ["scatter", "Scatter", "Scatter things in the brush (forests, rocks)"], ["remove", "Remove", "Remove the thing clicked"], ["clear", "Clear area", "Remove every thing in a rectangle"],
-    ["building", "Building", "A building (two corners)"], ["spawn", "Spawn", "A person or a creature"], ["campzone", "Camp zone", "Allow or forbid camping (two corners)"]]],
+    ["spawn", "Spawn", "Place a person or a creature"], ["campzone", "Camp zone", "Allow or forbid camping (two corners)"]]],
+  ["Buildings", [["building", "Draw building", "A new building from two corners: roof, walls, doors, furniture"], ["stamp", "Copy building", "Place a copy of one of the world's buildings (R turns it)"]]],
   ["Utility", [["inspect", "Inspect", "Just look"], ["erase", "Erase op", "Take back my ops here"], ["teleport", "Teleport", "Go there"], ["measure", "Measure", "Distance and height between two clicks"]]],
 ];
 const TWO_CLICK: ReadonlySet<Tool> = new Set(["fill", "line", "region", "slope", "clear", "building", "campzone", "measure"]);
+/** The two-click tools that make a rectangle: outlined from the first corner to the pointer. */
+const RECTANGLES: ReadonlySet<Tool> = new Set(["fill", "region", "clear", "building", "campzone"]);
 const BRUSHED: ReadonlySet<Tool> = new Set(["raise", "lower", "flatten", "level", "smooth", "roughen", "paint", "scatter", "erase"]);
 /** Where an op is (its centre), for the ops list, the map and erasing. */
 function opAt(op: Op): { x: number; y: number; x0?: number; y0?: number; x1?: number; y1?: number } | null {
@@ -92,13 +97,22 @@ function Editor() {
   const [edit, setEdit] = useState(false), [tool, setTool] = useState<Tool>("inspect"), [catalog, setCatalog] = useState<DevCatalog | null>(null);
   const [pickInfo, setPick] = useState<DevPick | null>(null), [report, setReport] = useState<{ problems: string[]; unreachable: string[]; ops: number } | null>(null);
   const [revisions, setRevisions] = useState<Revision[] | null>(null), [rightTab, setRightTab] = useState<"inspect" | "ops" | "define" | "world" | "history">("inspect");
-  const [bottomTab, setBottomTab] = useState<"map" | "player" | "quests" | "items" | "find" | "console" | "keys">("map");
+  const [bottomTab, setBottomTab] = useState<"map" | "player" | "talk" | "monsters" | "quests" | "items" | "find" | "console" | "keys">("map");
   // Tool settings.
   const [radius, setRadius] = useState(2), [shape, setShape] = useState<"circle" | "square">("circle"), [strength, setStrength] = useState(1), [falloff, setFalloff] = useState(0.6), [target, setTarget] = useState(40);
   const [tile, setTile] = useState(1), [regionId, setRegionId] = useState(""), [lineWidth, setLineWidth] = useState(3), [density, setDensity] = useState(0.25);
   const [kind, setKind] = useState("decor"), [sub, setSub] = useState("bush"), [name, setName] = useState("");
   const [door, setDoor] = useState<"n" | "s" | "e" | "w">("s"), [floor, setFloor] = useState(11), [walls, setWalls] = useState("timber"), [spawnKind, setSpawnKind] = useState<"npc" | "monster">("npc"), [spawnId, setSpawnId] = useState(""), [wander, setWander] = useState(3);
   const [allow, setAllow] = useState(false), [why, setWhy] = useState(""), [defKind, setDefKind] = useState<DefKind>("npc"), [form, setForm] = useState<Record<string, string>>(DEF_DEFAULTS.npc), [defError, setDefError] = useState("");
+  // The building tools: a drawn building's roof, doors, storeys and furniture; a copied one, turned; the building being changed.
+  const [roof, setRoof] = useState<"gable" | "hip" | "flat" | "cone" | "round" | "none">("gable"), [roofColor, setRoofColor] = useState(""), [chimney, setChimney] = useState(true), [storeys, setStoreys] = useState(1);
+  const [extraDoors, setExtraDoors] = useState<Side[]>([]), [furnish, setFurnish] = useState<Furnish | "">(""), [facade, setFacade] = useState("");
+  const [prefab, setPrefab] = useState<Prefab | null>(null), [rot, setRot] = useState(0), [withPeople, setWithPeople] = useState(false), [changing, setChanging] = useState<string | null>(null);
+  // The bigger editors (editor-panels.tsx): who the conversation editor opens on.
+  const [talkWho, setTalkWho] = useState<string | undefined>(undefined);
+  // Keep the development character maxed (remembered in this browser): every time the game starts, every skill 99.
+  const [keepMax, setKeepMax] = useState(() => { try { return localStorage.getItem("realm-dev-keep-max") === "1"; } catch { return false; } });
+  const keepMaxRef = useRef(keepMax); keepMaxRef.current = keepMax;
   // The game's side: its state, the map, a search, the log.
   const [gameState, setGameState] = useState<DevState | null>(null), [mapUrl, setMapUrl] = useState<string | null>(null), [found, setFound] = useState<DevFound[]>([]), [query, setQuery] = useState("");
   const [log, setLog] = useState<string[]>([]), [opFilter, setOpFilter] = useState(""), [giveId, setGiveId] = useState(""), [giveN, setGiveN] = useState(1), [questFilter, setQuestFilter] = useState("");
@@ -128,6 +142,12 @@ function Editor() {
   current.current = overlay;
   const say = (text: string) => { setStatus(text); setLog(l => [...l.slice(-299), `${new Date().toLocaleTimeString()}  ${text}`]); };
   const command = (cmd: Record<string, unknown>) => send({ type: DEV_COMMAND, command: cmd });
+  // Questions to the game (a creature's definition, a copy of a building), answered by nonce.
+  const asking = useRef(new Map<string, (answer: unknown) => void>());
+  const ask = (question: Record<string, unknown>) => new Promise<unknown>(resolve => { const nonce = uid(); asking.current.set(nonce, resolve); send({ type: DEV_ASK, nonce, ask: question }); window.setTimeout(() => { if (asking.current.delete(nonce)) resolve(null); }, 5000); });
+  const ghost = (g: { w: number; h: number } | { ax: number; ay: number } | null) => send({ type: DEV_GHOST, ghost: g });
+  /** A building to copy: asked of the game, then the Copy building tool holds it. */
+  const copyBuilding = (index: number) => void ask({ ask: "prefab", index }).then(answer => { const p = answer as Prefab | null; if (!p) { say("That building can't be copied (too big, or not on the land)."); return; } setPrefab(p); setRot(0); setTool("stamp"); say(`Copying ${p.name} (${p.w}×${p.h}): click where its top-left corner goes; R turns it.`); });
 
   const push = (ops: Op[], note?: string) => {
     past.current.push(current.current.ops); if (past.current.length > 200) past.current.shift(); future.current = [];
@@ -149,7 +169,8 @@ function Editor() {
     const receive = (event: MessageEvent) => {
       if (!frames().includes(event.source as Window)) return;
       const d = event.data;
-      if (d?.type === DEV_CATALOG) { setCatalog(d.catalog as DevCatalog); send({ type: DEV_WORLD, overlay: current.current }); send({ type: DEV_MODE, edit }); send({ type: DEV_MAP }); }
+      if (d?.type === DEV_CATALOG) { setCatalog(d.catalog as DevCatalog); send({ type: DEV_WORLD, overlay: current.current }); send({ type: DEV_MODE, edit }); send({ type: DEV_MAP }); if (keepMaxRef.current) command({ cmd: "max" }); }
+      if (d?.type === DEV_ASK && typeof d.nonce === "string") { const resolve = asking.current.get(d.nonce); if (resolve) { asking.current.delete(d.nonce); resolve(d.answer); } }
       if (d?.type === DEV_REPORT) { setReport({ problems: d.problems ?? [], unreachable: d.unreachable ?? [], ops: d.ops ?? 0 }); if (bottomTab === "map") send({ type: DEV_MAP }); }
       if (d?.type === DEV_PICK) onPick(d.pick as DevPick, d.button as number, d.shift === true, d.drag === true);
       if (d?.type === DEV_STATE) setGameState(d.state as DevState);
@@ -166,14 +187,17 @@ function Editor() {
       else if (event.key === "F2") { event.preventDefault(); toggleEdit(); }
       else if (!typing && event.key === "[") setRadius(r => Math.max(0, r - 1));
       else if (!typing && event.key === "]") setRadius(r => Math.min(16, r + 1));
-      else if (!typing && event.key === "Escape") { corner.current = null; say("Cancelled."); }
+      else if (!typing && event.key === "Escape") { corner.current = null; if (tool !== "stamp") ghost(null); say("Cancelled."); }
+      else if (!typing && (event.key === "r" || event.key === "R") && tool === "stamp") setRot(r => (r + (event.shiftKey ? 3 : 1)) % 4);
     };
     window.addEventListener("keydown", keys);
     const leaving = (event: BeforeUnloadEvent) => { if (dirty) { event.preventDefault(); } };
     window.addEventListener("beforeunload", leaving);
     return () => { window.removeEventListener("message", receive); window.removeEventListener("keydown", keys); window.removeEventListener("beforeunload", leaving); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [edit, tool, tile, radius, shape, strength, falloff, target, regionId, lineWidth, density, kind, sub, name, door, floor, walls, spawnKind, spawnId, wander, allow, why, dirty, bottomTab, version]);
+  }, [edit, tool, tile, radius, shape, strength, falloff, target, regionId, lineWidth, density, kind, sub, name, door, floor, walls, spawnKind, spawnId, wander, allow, why, dirty, bottomTab, version, roof, roofColor, chimney, storeys, extraDoors, furnish, facade, prefab, rot, withPeople, changing]);
+  // The footprint under the pointer: a copied building's (turned), or none (a drawn one shows from its first corner).
+  useEffect(() => { ghost(tool === "stamp" && prefab ? (rot % 2 ? { w: prefab.h, h: prefab.w } : { w: prefab.w, h: prefab.h }) : null); corner.current = null; }, [tool, prefab, rot]);
 
   const toggleEdit = () => { setEdit(value => { send({ type: DEV_MODE, edit: !value }); return !value; }); corner.current = null; };
   /** A click (or a drag, for the brushes) in the game, in edit mode: the tool's operation. The right button inspects whatever the tool. */
@@ -208,10 +232,14 @@ function Editor() {
         if (kept.length !== before) push(kept, `Erased ${before - kept.length} op${before - kept.length === 1 ? "" : "s"} round ${p.x},${p.y}.`); else say("None of my ops there."); return;
       }
       case "teleport": command({ cmd: "teleport", x: p.x, y: p.y }); return;
+      case "stamp": {
+        if (!prefab) { say("Choose a building to copy first."); return; }
+        ops.push({ op: "stamp", uid: uid(), x: p.x, y: p.y, rot, prefab, ...(withPeople ? { people: true } : {}) }); push(ops, `Placed a copy of ${prefab.name} at ${p.x},${p.y}.`); return;
+      }
     }
     if (TWO_CLICK.has(tool)) {
-      if (!corner.current) { corner.current = { x: p.x, y: p.y, height: p.height }; say(`First point ${p.x},${p.y}: click the second (Esc cancels).`); return; }
-      const a = corner.current; corner.current = null;
+      if (!corner.current) { corner.current = { x: p.x, y: p.y, height: p.height }; if (RECTANGLES.has(tool)) ghost({ ax: p.x, ay: p.y }); say(`First point ${p.x},${p.y}: click the second (Esc cancels).`); return; }
+      const a = corner.current; corner.current = null; ghost(null);
       const r = { x0: Math.min(a.x, p.x), y0: Math.min(a.y, p.y), x1: Math.max(a.x, p.x), y1: Math.max(a.y, p.y) };
       switch (tool) {
         case "fill": ops.push({ op: "fill", x0: a.x, y0: a.y, x1: p.x, y1: p.y, t: tile }); push(ops, `Filled ${a.x},${a.y} to ${p.x},${p.y} with ${tileName(tile)}.`); break;
@@ -220,11 +248,35 @@ function Editor() {
         case "slope": ops.push({ op: "slope", x0: a.x, y0: a.y, x1: p.x, y1: p.y, w: lineWidth, h0: a.height, h1: p.height }); push(ops, `A slope from ${a.height.toFixed(1)} to ${p.height.toFixed(1)}.`); break;
         case "clear": ops.push({ op: "clear", ...r }); push(ops, `Cleared ${r.x0},${r.y0} to ${r.x1},${r.y1}.`); break;
         case "campzone": ops.push({ op: "campzone", uid: uid(), ...r, allow, ...(why.trim() ? { why: why.trim() } : {}) }); push(ops, `Camping ${allow ? "allowed" : "forbidden"} from ${r.x0},${r.y0} to ${r.x1},${r.y1}.`); break;
-        case "building": ops.push({ op: "building", uid: uid(), x0: a.x, y0: a.y, x1: p.x, y1: p.y, door, floor, walls: walls as "timber", ...(name ? { name } : {}) }); push(ops, `Building ${a.x},${a.y} to ${p.x},${p.y} (door ${door}).`); break;
+        case "building": {
+          if (r.x1 - r.x0 < 2 || r.y1 - r.y0 < 2) { say("A building needs three tiles each way (walls round a room)."); break; }
+          ops.push(buildingOp(uid(), r)); push(ops, `${name || "A building"}, ${r.x1 - r.x0 + 1}×${r.y1 - r.y0 + 1} at ${r.x0},${r.y0} (door ${door}${furnish ? `, ${furnish}` : ""}).`); break;
+        }
         case "measure": { const dx = p.x - a.x, dy = p.y - a.y; say(`Measure: ${dx}, ${dy} (${Math.hypot(dx, dy).toFixed(1)} tiles; ${Math.max(Math.abs(dx), Math.abs(dy))} steps), height ${a.height.toFixed(1)} → ${p.height.toFixed(1)} (${(p.height - a.height).toFixed(1)}).`); break; }
       }
     }
   };
+  /** The drawn building the tool's settings make, in a rectangle. */
+  const buildingOp = (id: string, r: { x0: number; y0: number; x1: number; y1: number }): Op => ({ op: "building", uid: id, ...r, door, floor, walls: walls as "timber",
+    roof: roof === "hip" || roof === "round" ? (roof === "round" ? "cone" : "gable") : roof, ...(roof === "hip" ? { hip: true } : {}), ...(roof === "round" ? { round: true } : {}),
+    chimney, ...(storeys > 1 ? { storeys } : {}), ...(roofColor ? { color: roofColor } : {}), ...(extraDoors.filter(d => d !== door).length ? { doors: extraDoors.filter(d => d !== door) } : {}),
+    ...(furnish ? { furnish } : {}), ...(facade ? { facade: facade as "shop" } : {}), ...(name ? { name } : {}) });
+  /** A drawn building's settings into the tool, to change it. */
+  const changeBuilding = (id: string) => {
+    const op = current.current.ops.find(entry => entry.op === "building" && entry.uid === id) as Extract<Op, { op: "building" }> | undefined; if (!op) return;
+    setTool("building"); setChanging(id); setDoor(op.door); setFloor(op.floor ?? 11); setWalls(op.walls ?? "timber"); setName(op.name ?? ""); setChimney(op.chimney ?? false); setStoreys(op.storeys ?? 1);
+    setRoof(op.round ? "round" : op.hip ? "hip" : (op.roof ?? "gable") as "gable"); setRoofColor(op.color ?? ""); setExtraDoors(op.doors ?? []); setFurnish(op.furnish ?? ""); setFacade(op.facade ?? "");
+    say(`Changing ${op.name || "the building"}: set it up on the left, then Update.`);
+  };
+  const updateBuilding = () => {
+    const at = current.current.ops.findIndex(entry => entry.op === "building" && entry.uid === changing); if (at < 0 || !changing) { setChanging(null); return; }
+    const old = current.current.ops[at] as Extract<Op, { op: "building" }>, ops = [...current.current.ops];
+    ops[at] = buildingOp(changing, { x0: old.x0, y0: old.y0, x1: old.x1, y1: old.y1 }); push(ops, `Updated ${name || "the building"}.`); setChanging(null);
+  };
+  const takeOut = (id: string) => push(current.current.ops.filter(op => !((op.op === "building" || op.op === "stamp") && op.uid === id)), "Building taken out.");
+  const turnStamp = (id: string) => push(current.current.ops.map(op => op.op === "stamp" && op.uid === id ? { ...op, rot: (op.rot + 1) % 4 } : op), "Turned.");
+  /** Switch to the Spawn tool with someone chosen. */
+  const placeSpawn = (k: "npc" | "monster", id: string) => { setSpawnKind(k); setSpawnId(id); setTool("spawn"); if (!edit) toggleEdit(); say(`Spawn tool: click where ${id} goes.`); };
   const tileName = (t: number) => Object.entries(catalog?.tiles ?? {}).find(([, v]) => v === t)?.[0].toLowerCase() ?? String(t);
   const loadRevisions = () => devApi.revisions(WORLD).then(r => setRevisions(r.revisions)).catch(error => say(`Couldn't list revisions: ${(error as Error).message}`));
   const take = (raw: { version: number; overlay: Overlay }, what: string) => { const loaded = { ...raw, overlay: northOverlay(raw.overlay) }; past.current = []; future.current = []; setOverlay(loaded.overlay); setVersion(loaded.version); setDirty(false); send({ type: DEV_WORLD, overlay: loaded.overlay }); say(`${what}: now v${loaded.version}.`); void loadRevisions(); };
@@ -285,6 +337,7 @@ function Editor() {
   const shownOps = overlay.ops.map((op, i) => ({ op, i })).filter(({ op }) => !opFilter || opLabel(op).includes(opFilter)).slice(-400).reverse();
   const quests = (catalog?.quests ?? []).filter(q => !questFilter || q.name.toLowerCase().includes(questFilter.toLowerCase()) || q.id.includes(questFilter));
 
+  const kit: Kit = { S, warn: C.warn, catalog, ops: overlay.ops, people, wares, push, say, command, ask, here: gameState ? { x: gameState.x, y: gameState.y } : null, place: placeSpawn };
   return (<>
     <header style={S.bar} aria-label="Development dashboard">
       <b style={{ color: C.gold }}>Realm dev</b><span style={S.muted}>{overlay.name}</span><span>{dirty ? "● unsaved" : `v${version}`}</span>
@@ -292,6 +345,10 @@ function Editor() {
       <button type="button" style={S.btn()} onClick={undo} disabled={!past.current.length}>Undo</button><button type="button" style={S.btn()} onClick={redo} disabled={!future.current.length}>Redo</button>
       <button type="button" style={S.btn(dirty)} onClick={() => void save()}>Save</button>
       <button type="button" style={S.btn(deployOpen)} aria-expanded={deployOpen} onClick={() => setDeployOpen(open => !open)}>Deploy…</button>
+      <span style={{ width: 1, height: 22, background: C.line, margin: "0 4px" }} />
+      <button type="button" style={S.btn()} title="Every skill 99, and healed (this session only: the development game never saves your character)" onClick={() => command({ cmd: "max" })}>Max me</button>
+      <label title="Max the character every time the game starts" style={{ display: "flex", alignItems: "center", gap: 3 }}><input type="checkbox" checked={keepMax} onChange={e => { const on = e.target.checked; setKeepMax(on); try { localStorage.setItem("realm-dev-keep-max", on ? "1" : "0"); } catch { /* (a private window) */ } if (on) command({ cmd: "max" }); }} />keep maxed</label>
+      <button type="button" style={S.btn(gameState?.flags.god)} title="Nothing hurts you" onClick={() => command({ cmd: "god", on: !gameState?.flags.god })}>God</button>
       <span style={{ flex: 1, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", marginLeft: 8 }} role="status">{status}</span>
       {gameState?.flags.sandbox && <span style={{ color: C.warn }} title="Something was changed by hand: this session isn't saved, and other players don't see you.">SANDBOX</span>}
       {gameState && <span style={S.muted}>{gameState.x},{gameState.y} · {gameState.region} · h {gameState.height}</span>}
@@ -337,15 +394,37 @@ function Editor() {
         {tool === "scatter" && slider("Density", density, setDensity, 0.02, 1, 0.02)}
       </>}
       {tool === "building" && <>
-        <h4 style={S.h}>Door side</h4><div style={S.row}>{(["n", "s", "e", "w"] as const).map(d => <button key={d} type="button" style={S.btn(door === d)} onClick={() => setDoor(d)}>{d}</button>)}</div>
-        <h4 style={S.h}>Floor</h4><select style={S.input} value={floor} onChange={e => setFloor(Number(e.target.value))}>{Object.entries(catalog?.tiles ?? {}).filter(([n]) => ["WOOD", "STONE", "CARPET", "COBBLE", "BRICK", "DUNGEON"].includes(n)).map(([n, v]) => <option key={n} value={v}>{n.toLowerCase()}</option>)}</select>
-        <h4 style={S.h}>Walls</h4><select style={S.input} value={walls} onChange={e => setWalls(e.target.value)}>{["timber", "stone", "plank", "marble"].map(w => <option key={w} value={w}>{w}</option>)}</select>
+        {changing && <div style={{ ...S.row, color: C.gold }}>Changing a building <button type="button" style={S.btn(true)} onClick={updateBuilding}>Update</button><button type="button" style={S.btn()} onClick={() => setChanging(null)}>Stop</button></div>}
+        <p style={S.muted}>Click one corner, then the opposite one: the outline follows the pointer. Walls go round the edge; the room is inside.</p>
         <h4 style={S.h}>Name</h4><input style={S.input} value={name} onChange={e => setName(e.target.value)} placeholder="The sign over the door" />
+        <h4 style={S.h}>Front door</h4><div style={S.row}>{(["n", "s", "e", "w"] as const).map(d => <button key={d} type="button" style={S.btn(door === d)} onClick={() => setDoor(d)}>{({ n: "north", s: "south", e: "east", w: "west" })[d]}</button>)}</div>
+        <h4 style={S.h}>More doors</h4><div style={S.row}>{(["n", "s", "e", "w"] as const).filter(d => d !== door).map(d => <button key={d} type="button" style={S.btn(extraDoors.includes(d))} onClick={() => setExtraDoors(list => list.includes(d) ? list.filter(x => x !== d) : [...list, d])}>{({ n: "north", s: "south", e: "east", w: "west" })[d]}</button>)}</div>
+        <h4 style={S.h}>Walls</h4><div style={S.row}>{["timber", "stone", "plank", "marble", "sandstone", "mudbrick", "mizukai", "lacquer"].map(w => <button key={w} type="button" style={S.btn(walls === w)} onClick={() => setWalls(w)}>{w}</button>)}</div>
+        <h4 style={S.h}>Roof</h4><div style={S.row}>{([["gable", "pitched"], ["hip", "hipped"], ["flat", "flat"], ["cone", "cone"], ["round", "round tower"], ["none", "none"]] as const).map(([r, label]) => <button key={r} type="button" style={S.btn(roof === r)} onClick={() => setRoof(r)}>{label}</button>)}</div>
+        <div style={S.row}><label>Roof colour <input type="color" value={roofColor || "#8a4a3a"} onChange={e => setRoofColor(e.target.value)} /></label><button type="button" style={S.btn(!roofColor)} onClick={() => setRoofColor("")}>town's own</button><label><input type="checkbox" checked={chimney} onChange={e => setChimney(e.target.checked)} /> chimney</label></div>
+        {slider("Storeys", storeys, setStoreys, 1, 4, 1)}
+        <h4 style={S.h}>Floor</h4><select style={S.input} value={floor} onChange={e => setFloor(Number(e.target.value))}>{Object.entries(catalog?.tiles ?? {}).filter(([n]) => ["WOOD", "STONE", "CARPET", "COBBLE", "BRICK", "DUNGEON"].includes(n)).map(([n, v]) => <option key={n} value={v}>{n.toLowerCase()}</option>)}</select>
+        <h4 style={S.h}>Furnished as</h4><div style={S.row}>{(["", "home", "shop", "smithy", "inn", "bank", "chapel", "store"] as const).map(f => <button key={f || "none"} type="button" style={S.btn(furnish === f)} onClick={() => setFurnish(f)}>{f || "empty"}</button>)}</div>
+        <p style={S.muted}>A smithy has a working furnace and anvil, an inn a range, a bank its booths, a chapel an altar. Furniture keeps clear of the doors.</p>
+        <h4 style={S.h}>Front</h4><div style={S.row}>{([["", "plain"], ["shop", "shop awning"], ["inn", "inn sign"], ["bank", "bank columns"], ["civic", "hall columns"]] as const).map(([f, label]) => <button key={f || "plain"} type="button" style={S.btn(facade === f)} onClick={() => setFacade(f)}>{label}</button>)}</div>
+      </>}
+      {tool === "stamp" && <>
+        {prefab ? <div style={{ border: `1px solid ${C.gold}`, padding: 6, borderRadius: 3, margin: "6px 0" }}>
+          <b>{prefab.name}</b> <span style={S.muted}>{rot % 2 ? prefab.h : prefab.w}×{rot % 2 ? prefab.w : prefab.h} · {prefab.objects.length} things{prefab.people.length ? ` · ${prefab.people.length} people` : ""}</span>
+          <div style={S.row}><button type="button" style={S.btn()} onClick={() => setRot(r => (r + 3) % 4)}>⟲ turn</button><button type="button" style={S.btn()} onClick={() => setRot(r => (r + 1) % 4)}>turn ⟳</button><span style={S.muted}>{rot * 90}° (R)</span></div>
+          {prefab.people.length > 0 && <label><input type="checkbox" checked={withPeople} onChange={e => setWithPeople(e.target.checked)} /> bring its people too</label>}
+          <p style={S.muted}>Click where its top-left corner goes: the gold outline shows where it lands.</p>
+        </div> : <p style={S.muted}>Choose a building to copy, or right-click one in the game and Copy it from the inspector.</p>}
+        <h4 style={S.h}>The world's buildings</h4>
+        <SearchList S={S} items={(catalog?.buildings ?? []).map(b => ({ ...b, id: String(b.index) }))} placeholder="Find a building (name, town)…" height={360}
+          label={(b: DevBuilding & { id: string }) => `${b.name || "unnamed"} · ${b.region} · ${b.w}×${b.h} ${b.walls}`} onPick={b => copyBuilding(b.index)} />
       </>}
       {tool === "spawn" && <>
-        <div style={S.row}>{(["npc", "monster"] as const).map(k => <button key={k} type="button" style={S.btn(spawnKind === k)} onClick={() => { setSpawnKind(k); setSpawnId(""); }}>{k}</button>)}</div>
-        <select style={S.input} value={spawnId} onChange={e => setSpawnId(e.target.value)}><option value="">—</option>{spawnable.map(p => <option key={p.id} value={p.id}>{p.name} · {p.id}</option>)}</select>
+        <div style={S.row}>{(["npc", "monster"] as const).map(k => <button key={k} type="button" style={S.btn(spawnKind === k)} onClick={() => { setSpawnKind(k); setSpawnId(""); }}>{k === "npc" ? "a person" : "a creature"}</button>)}</div>
+        {spawnId && <div style={{ color: C.gold }}>Placing: {spawnable.find(p => p.id === spawnId)?.name ?? spawnId}</div>}
+        <SearchList S={S} items={spawnable} chosen={spawnId} placeholder={spawnKind === "npc" ? "Find a person…" : "Find a creature…"} height={300} label={p => p.name} onPick={p => setSpawnId(p.id)} />
         {slider("Wander (tiles)", wander, setWander, 0, 40, 1)}
+        <p style={S.muted}>New people are made in the define tab; what they say in the talk tab (bottom).</p>
       </>}
       {tool === "campzone" && <>
         <div style={S.row}>{([[true, "Allow camping"], [false, "Forbid camping"]] as const).map(([v, label]) => <button key={label} type="button" style={S.btn(allow === v)} onClick={() => setAllow(v)}>{label}</button>)}</div>
@@ -362,7 +441,13 @@ function Editor() {
           <div>{pickInfo.x},{pickInfo.y} · {pickInfo.region}</div>
           <div>ground <b>{tileName(pickInfo.tile)}</b> · height <b>{pickInfo.height.toFixed(1)}</b> · floor {pickInfo.base.toFixed(1)}</div>
           {pickInfo.object && <div>{pickInfo.object.kind}: <b>{pickInfo.object.name}</b>{pickInfo.object.uid ? " (mine)" : ""}</div>}
-          {pickInfo.building && <div>building: <b>{pickInfo.building.name || "unnamed"}</b></div>}
+          {pickInfo.building && <div>building: <b>{pickInfo.building.name || "unnamed"}</b>{pickInfo.building.uid ? " (mine)" : ""}
+            <div style={S.row}>
+              <button type="button" style={S.btn()} onClick={() => copyBuilding(pickInfo.building!.index)}>Copy it</button>
+              {pickInfo.building.uid && overlay.ops.some(op => op.op === "building" && op.uid === pickInfo.building!.uid) && <button type="button" style={S.btn()} onClick={() => changeBuilding(pickInfo.building!.uid!)}>Change it</button>}
+              {pickInfo.building.uid && overlay.ops.some(op => op.op === "stamp" && op.uid === pickInfo.building!.uid) && <button type="button" style={S.btn()} onClick={() => turnStamp(pickInfo.building!.uid!)}>Turn it</button>}
+              {pickInfo.building.uid && <button type="button" style={S.btn()} onClick={() => takeOut(pickInfo.building!.uid!)}>Take it out</button>}
+            </div></div>}
           <div style={S.row}><button type="button" style={S.btn()} onClick={() => command({ cmd: "teleport", x: pickInfo.x, y: pickInfo.y })}>Go there</button><button type="button" style={S.btn()} onClick={() => { setTarget(Math.round(pickInfo.height * 10) / 10); setTool("level"); }}>Level to this height</button><button type="button" style={S.btn()} onClick={() => { setTile(pickInfo.tile); setTool("paint"); }}>Paint this ground</button></div>
         </div> : <div style={S.muted}>Click in the game in edit mode (right-click with any tool).</div>}
         <h4 style={S.h}>The game</h4>
@@ -387,7 +472,8 @@ function Editor() {
         <div style={S.row}>{(["npc", "monster", "item", "quest"] as const).map(k => <button key={k} type="button" style={S.btn(defKind === k)} onClick={() => chooseDef(k)}>{k}</button>)}</div>
         {DEF_FIELDS[defKind].filter(field => defKind !== "npc" || field.key !== "family" && field.key !== "seed" || form.artMode === "friend").map(field => <div key={field.key}>
           <h4 style={S.h}>{field.label}</h4>
-          {field.type === "textarea" ? <textarea style={{ ...S.input, minHeight: 56 }} value={form[field.key] ?? ""} onChange={e => setField(field.key, e.target.value)} />
+          {field.key === "drops" ? <DropTable S={S} drops={(() => { try { return JSON.parse(form.drops || "[]"); } catch { return []; } })()} onChange={drops => setField("drops", JSON.stringify(drops))} wares={wares} listId="dev-def-drops" />
+            : field.type === "textarea" ? <textarea style={{ ...S.input, minHeight: 56 }} value={form[field.key] ?? ""} onChange={e => setField(field.key, e.target.value)} />
             : field.type === "check" ? <label><input type="checkbox" checked={!!form[field.key]} onChange={e => setField(field.key, e.target.checked ? "1" : "")} /> yes</label>
             : field.type === "select" ? <select style={S.input} value={form[field.key] ?? ""} onChange={e => setField(field.key, e.target.value)}>{optionsFor(field).map(([v, label]) => <option key={v} value={v}>{label}</option>)}</select>
             : <input style={S.input} type={field.type === "number" ? "number" : "text"} value={form[field.key] ?? ""} placeholder={field.hint} onChange={e => setField(field.key, e.target.value)} />}
@@ -398,6 +484,8 @@ function Editor() {
         <h4 style={S.h}>Defined ({defs.length})</h4>
         {defs.map(op => <div key={`${op.op}:${op.def.id}`} style={S.item}>
           <span style={{ flex: 1 }}>{op.op} <b>{(op.def as { name?: string }).name ?? op.def.id}</b> <span style={S.muted}>{op.def.id}</span></span>
+          {op.op === "npc" && <><button type="button" style={S.btn()} onClick={() => placeSpawn("npc", op.def.id)}>Place</button><button type="button" style={S.btn()} onClick={() => { setTalkWho(op.def.id); setBottomTab("talk"); }}>Talk…</button></>}
+          {op.op === "monster" && <button type="button" style={S.btn()} onClick={() => placeSpawn("monster", op.def.id)}>Place</button>}
           <button type="button" style={S.btn()} onClick={() => editDef(op)}>Edit</button><button type="button" style={S.btn()} onClick={() => dropDef(op)}>Remove</button>
         </div>)}
       </>}
@@ -422,7 +510,7 @@ function Editor() {
     </aside>
 
     <section style={S.bottom} aria-label="Development tools">
-      <div style={{ ...S.row, margin: 0, padding: "6px 10px", borderBottom: `1px solid ${C.line}` }}>{(["map", "player", "quests", "items", "find", "console", "keys"] as const).map(tab => <button key={tab} type="button" style={S.btn(bottomTab === tab)} onClick={() => { setBottomTab(tab); if (tab === "map") send({ type: DEV_MAP }); }}>{tab}</button>)}</div>
+      <div style={{ ...S.row, margin: 0, padding: "6px 10px", borderBottom: `1px solid ${C.line}` }}>{(["map", "player", "talk", "monsters", "quests", "items", "find", "console", "keys"] as const).map(tab => <button key={tab} type="button" style={S.btn(bottomTab === tab)} onClick={() => { setBottomTab(tab); if (tab === "map") send({ type: DEV_MAP }); }}>{tab}</button>)}</div>
       <div style={{ flex: 1, overflow: "auto", padding: bottomTab === "map" ? 0 : 10, position: "relative" }}>
         {bottomTab === "map" && <>
           <canvas ref={mapCanvas} style={{ width: "100%", height: "100%", display: "block", cursor: "crosshair" }}
@@ -460,6 +548,8 @@ function Editor() {
             {["oathsworn", "hearthwardens", "farwake", "freeholds"].map(f => <label key={f} style={{ display: "flex", justifyContent: "space-between", gap: 4 }}>{f}<input style={S.small} type="number" min={0} defaultValue={gameState?.standing[f] ?? 0} key={`${f}:${gameState?.standing[f]}`} onKeyDown={e => { if (e.key === "Enter") command({ cmd: "standing", faction: f, n: Number((e.target as HTMLInputElement).value) }); }} /></label>)}
           </div>
         </div>}
+        {bottomTab === "talk" && <TalkEditor kit={kit} initial={talkWho} />}
+        {bottomTab === "monsters" && <MonsterEditor kit={kit} />}
         {bottomTab === "quests" && <>
           <div style={S.row}><input style={{ ...S.input, width: 280 }} placeholder="Filter quests" value={questFilter} onChange={e => setQuestFilter(e.target.value)} /><span style={S.muted}>{quests.length} quests</span></div>
           {quests.map(q => { const st = gameState?.quests[q.id] ?? 0; return <div key={q.id} style={S.item}>

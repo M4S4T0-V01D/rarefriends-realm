@@ -13,7 +13,9 @@
  * isn't shown to other players. Building the world (the overlay) doesn't: that changes the map, not the player.
  */
 import { ITEM_LIST, MONSTERS, SKILLS, XP_TABLE, isItem, item, type Skill } from "./data.ts";
-import { NPCS, QUESTS, completeQuest, finalStage, stage } from "./content.ts";
+import { NPCS, QUESTS, completeQuest, finalStage, questDone, stage, talk } from "./content.ts";
+import { OVERLAY_TALK } from "./overlay.ts";
+import { runTalk } from "./talktree.ts";
 import { give, maxHp, maxPrayer, message, type Game } from "./state.ts";
 import { H, OVERWORLD_H, T, W, cornerHeight, regionAt, type World } from "./world.ts";
 import { devFlags } from "./devflags.ts";
@@ -24,6 +26,8 @@ export type DevCommand =
   | { cmd: "give"; id: string; n: number }
   | { cmd: "level"; skill: string; level: number }
   | { cmd: "levels"; level: number }
+  | { cmd: "max" }
+  | { cmd: "talk"; id: string }
   | { cmd: "frens"; n: number }
   | { cmd: "quest"; id: string; to: "start" | "finish" | "reset" }
   | { cmd: "standing"; faction: string; n: number }
@@ -61,6 +65,19 @@ export function devCommand(game: Game, raw: unknown): { said: string; effect?: D
       const level = int(c.level, 1, 99); if (level === null) return { said: "Levels: what level?" };
       sandbox(game); for (const skill of SKILLS) p.xp[skill] = XP_TABLE[skill === "hitpoints" ? Math.max(10, level) : level] ?? 0; p.hp = maxHp(p); p.prayer = maxPrayer(p);
       return { said: `Every skill set to ${level}.` };
+    }
+    case "max": {
+      // Every skill 99 and everything full: the development character stops dying to whatever's about.
+      sandbox(game); for (const skill of SKILLS) p.xp[skill] = XP_TABLE[99]; p.hp = maxHp(p); p.prayer = maxPrayer(p); p.energy = 100; p.poison = null;
+      return { said: "Maxed: every skill 99, and healed." };
+    }
+    case "talk": {
+      // A conversation opened straight away, wherever they are (to try what the editor wrote).
+      const id = String(c.id ?? ""); if (!NPCS[id]) return { said: `No one called ${id}.` };
+      // (A conversation that's all they say is opened as written, ahead of any errand they have to give.)
+      const scripted = OVERLAY_TALK.get(id);
+      game.dialogue = scripted?.mode === "replace" ? runTalk(game, scripted, id, NPCS[id].name, scripted.start, quest => questDone(game, quest)) : talk(game, id);
+      return { said: `Talking to ${NPCS[id].name}.` };
     }
     case "frens": { const n = int(c.n, 1, 1_000_000_000); if (n === null) return { said: "Frens: how many?" }; sandbox(game); give(p, "coins", n); return { said: `Given ${n.toLocaleString()} Frens.` }; }
     case "quest": {

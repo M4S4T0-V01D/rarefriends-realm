@@ -1108,6 +1108,8 @@ function dyedItem(id: string): Item | undefined {
 }
 export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...DYE_POTS, ...CARVING_ITEMS, ...BAR_ITEMS, ...metalGear(), ...fieldGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...ORDER_ARMOUR, ...orderGear(), ...slayerGear(), ...heartguardGear(), ...REGIONAL_ITEMS, ...APOTHECARY_ITEMS, ...factionGear(), ...mizukaiGear(), ...MIZUKAI_ITEMS, ...KHARAVETH_ITEMS, ...KHARAVETH_GEAR, ...STEPPE_CLOTHES, ...HEARTLAND_ITEMS, ...HEARTLAND_GEAR, ...ORASHAI_ITEMS, ...ORASHAI_GEAR, ...ORASHAI_QUEST_ITEMS, ...MEGHAVAN_ITEMS, ...MEGHAVAN_GEAR, ...MEGHAVAN_QUEST_ITEMS, ...PYRAMID_ITEMS, ...PORTS_ITEMS, ...PYRAMID_GEAR, ...PORTS_GEAR, ...NORTH_FACTION_ITEMS]);
 const ITEM_MAP = new Map(ITEM_LIST.map(item => [item.id, item]));
+/** An item the development world defines (overlay.ts): listed, and looked up, like the game's own. */
+export function registerItem(def: Item) { if (!ITEM_MAP.has(def.id)) (ITEM_LIST as unknown as Item[]).push(def); ITEM_MAP.set(def.id, def); }
 export function item(id: string): Item {
   const found = ITEM_MAP.get(id) ?? dyedItem(id);
   if (!found) throw new Error(`Unknown item ${id}`);

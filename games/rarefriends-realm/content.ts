@@ -3,7 +3,8 @@
  */
 import { northShift } from "./world.ts";
 import { COURSES, FAMILY_NAMES, FAMILY_PERKS, ITEM_LIST, SLAYER_REWARDS, SKILLS, WAYFARER_MARK, WAYFARER_REWARDS, item , REGIONAL_CLOTHING, SKILL_NAMES, type Skill, SHOP_SELL } from "./data.ts";
-import type { OverlayQuest } from "./overlay.ts";
+import { OVERLAY_TALK, registerDefinitions, type OverlayQuest } from "./overlay.ts";
+import { runTalk } from "./talktree.ts";
 import { OVERLAYS } from "./overlays/index.ts";
 import { assignTask, buySlayerReward, currentTask, eligibleTasks, slayerPoints, slayerStreak, taskText } from "./slayer.ts";
 import { TROPHY_POINTS, research, researchCost, researchable } from "./pursuance.ts";
@@ -616,6 +617,8 @@ export function registerDevQuest(def: OverlayQuest, why: string[] = []): boolean
 }
 // The promoted overlays' quests are part of the public game.
 for (const overlay of OVERLAYS) for (const op of overlay.ops) if (op.op === "quest") registerDevQuest(op.def);
+// …and their people, creatures, things, changes to creatures and conversations (the development frame lays its own over these).
+for (const overlay of OVERLAYS) registerDefinitions(overlay, NPCS as Record<string, unknown>);
 /** An overlay's errand, run from its words: offered, taken, delivered, paid. */
 function talkDevQuest(game: Game, giver: string, name: string): Dialogue | null {
   const quest = QUESTS.find(entry => entry.dev?.giver === giver); if (!quest?.dev) return null;
@@ -842,6 +845,12 @@ export function talk(game: Game, npcId: string): Dialogue {
     const option = { label: "Heard any rumours?", then: () => chat(name, npcSays(name, rumourAt(game, here?.x ?? player.x, here?.y ?? player.y))) };
     dialogue.options = [...(dialogue.options ?? []).filter(entry => !/^(Goodbye|Not today|Just|Maybe later|Nothing)/.test(entry.label)), option, { label: "Goodbye.", then: () => null }];
   }
+  // …or one more thing to ask them about.
+  const added = OVERLAY_TALK.get(base);
+  if (added?.mode === "add" && added.label && !dialogue.onEnd) {
+    const option = { label: added.label, then: () => runTalk(game, added, npcId, name, added.start, quest => questDone(game, quest)) };
+    dialogue.options = [...(dialogue.options ?? []).filter(entry => !/^(Goodbye|Not today|Just|Maybe later|Nothing)/.test(entry.label)), option, { label: "Goodbye.", then: () => null }];
+  }
   return dialogue;
 }
 function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
@@ -850,6 +859,9 @@ function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
   const made = def as NpcDef & { dev?: boolean; lines?: string[] };
   // An overlay's errand, from whoever gives it (the game's own people too), until it's done; then their usual talk.
   if (!everyday && !npcId.includes(":")) { const errand = QUESTS.find(entry => entry.dev?.giver === def.id); if (errand && !questDone(game, errand.id)) { const dialogue = talkDevQuest(game, def.id, name); if (dialogue) return dialogue; } }
+  // A conversation the development world wrote for them (overlay.ts, talktree.ts): all they say.
+  const scripted = OVERLAY_TALK.get(def.id);
+  if (scripted?.mode === "replace" && !npcId.includes(":")) { const said = runTalk(game, scripted, npcId, name, scripted.start, quest => questDone(game, quest)); if (said) return said; }
   if (made.dev) { const lines = made.lines?.length ? made.lines : ["…"]; const said = player.questData[`dev_said_${def.id}`] ?? 0; player.questData[`dev_said_${def.id}`] = (said + 1) % lines.length; return { npc: npcId, lines: npcSays(name, lines[said % lines.length]), index: 0 }; }
   // The bars' people: barkeeps with their quests (until they're done), the quiet traders.
   if (!everyday) { const bar = talkBar(game, npcId, name, () => talkInner(game, npcId, true)); if (bar) return bar; }

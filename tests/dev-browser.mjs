@@ -162,10 +162,56 @@ try {
   assert.deepEqual(deployed, { revision: 7 }, "the chosen save is what's deployed");
   await deployPanel.getByText("checking…").waitFor();
   await deployPanel.getByRole("button", { name: "Close" }).click();
+  // Max me: every skill 99 in one press (the session is a sandbox already: nothing of it is saved).
+  await page.getByRole("button", { name: "Max me", exact: true }).click();
+  await page.getByText(/Maxed: every skill 99/).waitFor();
+  assert.ok(await frame().evaluate(() => Object.values(window.__realm.game().player.xp).every(xp => xp >= 13_034_431)), "every skill at 99");
+  // A conversation, written in the talk tab for the person defined above, then tried: the game opens it.
+  const bottom = page.getByRole("region", { name: "Development tools" });
+  await page.getByRole("button", { name: "talk", exact: true }).click();
+  await bottom.getByPlaceholder("Find a person…").fill("Tess");
+  await bottom.getByRole("option", { name: "Tess", exact: true }).click();
+  await bottom.getByRole("button", { name: "Write it and try it" }).click();
+  await page.getByText(/Conversation for dev_tess written/).waitFor();
+  await frame().waitForFunction(() => window.__realm.game().dialogue?.lines?.[0]?.text === "Hello there, traveller.");
+  assert.deepEqual(await frame().evaluate(() => window.__realm.game().dialogue.options.map(o => o.label)), ["Who are you?", "Goodbye."], "its options");
+  // (Closed, and the game drawn again so its dialogue box goes: a command makes it refresh.)
+  await frame().evaluate(() => { window.__realm.game().dialogue = null; });
+  await page.evaluate(() => { for (const fr of document.querySelectorAll("iframe")) fr.contentWindow.postMessage({ type: "rarefriends-realm:dev-command", command: { cmd: "heal" } }, "*"); });
+  await game.locator(".realm-dialogue").waitFor({ state: "detached" }).catch(() => {});
+  // A creature's drops changed in the monsters tab: one more row, applied, and in the overlay.
+  const beast = await frame().evaluate(() => window.__realm.game().monsters.find(entry => entry.def.drops.length).def.id);
+  await page.getByRole("button", { name: "monsters", exact: true }).click();
+  await bottom.getByPlaceholder("Find a creature…").fill(beast);
+  await bottom.getByRole("option").first().click();
+  await bottom.getByRole("button", { name: "Apply", exact: true }).waitFor();
+  await bottom.getByRole("button", { name: "+ drop", exact: true }).click();
+  await bottom.getByRole("button", { name: "Apply", exact: true }).click();
+  await page.getByText(/changed \(drops\); save to keep it/).waitFor();
+  // A copy of one of the world's buildings, placed with a click; then a drawn building, furnished as a smithy.
+  await editor.getByRole("button", { name: "Copy building", exact: true }).click();
+  await editor.getByPlaceholder("Find a building (name, town)…").fill("bank");
+  await editor.getByRole("option").first().click();
+  await page.getByText(/Copying .*: click where its top-left corner goes/).waitFor();
+  const buildingsBefore = await frame().evaluate(() => window.__realm.game().world.buildings.length);
+  await page.mouse.click(box.x + box.width / 2 + 120, box.y + box.height / 2 - 120);
+  await page.getByText(/Placed a copy of/).waitFor();
+  await frame().waitForFunction(n => window.__realm.game().world.buildings.length > n, buildingsBefore);
+  await editor.getByRole("button", { name: "Draw building", exact: true }).click();
+  await editor.getByRole("button", { name: "smithy", exact: true }).click();
+  // (Clear of the game's own panels: the first-steps guide top left, the chat below, the pack to the right.)
+  await page.mouse.click(box.x + box.width / 2 + 30, box.y + box.height / 2 - 110);
+  await page.mouse.click(box.x + box.width / 2 + 170, box.y + box.height / 2 + 30);
+  await page.getByText(/, smithy\)/).waitFor();
+  await page.getByRole("button", { name: "Save", exact: true }).click(); await page.getByText(/Saved v7/).waitFor();
+  assert.ok(saved.overlay.ops.some(op => op.op === "talk" && op.def.id === "dev_tess" && op.def.nodes.length === 2), "the conversation is saved");
+  assert.ok(saved.overlay.ops.some(op => op.op === "monsteredit" && op.def.id === beast && op.def.drops), "the creature's drops are saved");
+  assert.ok(saved.overlay.ops.some(op => op.op === "stamp" && op.prefab.tiles.length === op.prefab.w * op.prefab.h), "the copied building is saved, whole");
+  assert.ok(saved.overlay.ops.some(op => op.op === "building" && op.furnish === "smithy"), "the smithy is saved");
   // The map: the whole world comes over as a picture.
   await page.getByRole("button", { name: "map", exact: true }).click();
   await page.getByRole("button", { name: "Centre on me" }).waitFor();
-  console.log("PASS development game: the dashboard round the public build, overlays applied and saved, edit mode picking, undo, definitions (a person, an errand), a camp zone, raising ground, a dragged paint brush, the search, the sandbox (no saves), deploying a save");
+  console.log("PASS development game: the dashboard round the public build, overlays applied and saved, edit mode picking, undo, definitions (a person, an errand), a camp zone, raising ground, a dragged paint brush, the search, the sandbox (no saves), deploying a save, Max me, a conversation written and tried, a creature's drops, a copied building, a furnished smithy");
   assert.deepEqual(errors, [], "no page errors");
   // The public build: nothing of the editor in it.
   execFileSync("node", ["scripts/build.mjs", "--outdir", join(outdir, "public")], { stdio: "ignore" });

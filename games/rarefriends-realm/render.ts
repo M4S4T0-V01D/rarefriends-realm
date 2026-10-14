@@ -98,6 +98,8 @@ export type Scene = {
    */
   gl?: RealmGL | null; ui?: CanvasRenderingContext2D;
   canonical: ReadonlyMap<number, GenerationSprites>; hoverTile: { x: number; y: number } | null; marker: ClickMarker | null;
+  /** The development editor's footprint under the pointer (a building about to be placed): its outline, in gold. */
+  ghost?: { x0: number; y0: number; x1: number; y1: number } | null;
   /** First steps: where the guide's arrow points. */
   guideTarget?: { x: number; y: number; lift?: number } | null;
   /** Low graphics: no pixel textures, ambient life, cloud shadows, footprints or fog, lighter rain, a shorter view. */
@@ -2953,6 +2955,8 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     } });
   }
   if (scene.hoverTile && floor) { const hover = scene.hoverTile; drawables.push({ depth: depth(hover.x, hover.y) - 0.4, draw: () => tileOutline(hover.x, hover.y, "rgba(22,22,22,0.35)") }); }
+  const ghost = scene.ghost, ghostDraw = () => { if (!ghost) return; for (let y = ghost.y0; y <= ghost.y1; y++) for (let x = ghost.x0; x <= ghost.x1; x++) if (x === ghost.x0 || x === ghost.x1 || y === ghost.y0 || y === ghost.y1) tileOutline(x, y, "rgba(226,196,106,0.95)"); };
+  if (ghost && floor) drawables.push({ depth: depth(ghost.x1, ghost.y1) + 0.4, draw: ghostDraw });
   // Roofs are lit from the open sky above, whatever is at their foot.
   const roofRect = (building: Building): [number, number, number, number] => {
     const hull = roofHull(camera, building), xs = hull.map(p => p[0]), ys = hull.map(p => p[1]);
@@ -3255,6 +3259,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     return [s.x - side * z, s.y - up * z * Math.max(1, ls), s.x + side * z, s.y + down * z];
   };
   // The hover outline is UI: never dimmed.
+  if (ghost && !floor) drawables.unshift({ depth: -Infinity, light: [1, 1, 1], rect: () => [0, 0, VIEW.width, VIEW.height], draw: ghostDraw });
   if (scene.hoverTile && !floor) { const hover = scene.hoverTile, s = toScreen(camera, hover.x, hover.y);
     drawables.unshift({ depth: -Infinity, light: [1, 1, 1], rect: () => [s.x - 50 * z, s.y - 30 * z, s.x + 50 * z, s.y + 30 * z], draw: () => tileOutline(hover.x, hover.y, "rgba(22,22,22,0.35)") }); }
   uiQueue = []; uiTarget = scene.ui ?? target;

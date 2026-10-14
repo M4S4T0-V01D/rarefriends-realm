@@ -5292,3 +5292,64 @@ test("Commerce: the Frenderal Exchange's market (prices the same for everyone, b
   const low = newGame(); assert.match(talk(low, "investor_bear").lines.map(l => l.text).join(" "), /Commerce 10/);
   assert.ok(talk(g, "investor_fox").options.some(x => x.label === "Have you a question for me?"));
 });
+
+test("Development world tools: a conversation written for anyone (all they say, or one more thing to ask), its needs, deeds and notes; any creature's numbers and drops changed and put back; a drawn building furnished with more doors; a copy of one of the world's buildings, turned; the dashboard's Max", async () => {
+  const { applyOverlay, cleanOverlay, registerDefinitions, resetOverrides, originalMonster, OVERLAY_TALK } = await import("../games/rarefriends-realm/overlay.ts");
+  const { extractPrefab, turned } = await import("../games/rarefriends-realm/overlaybuild.ts");
+  const { devCommand } = await import("../games/rarefriends-realm/devtools.ts");
+  const { WORLD_SEED } = await import("../games/rarefriends-realm/world.ts");
+  const { give, count } = await import("../games/rarefriends-realm/state.ts");
+  try {
+    // Conversations: checked (a dangling way on, a missing label, a bad skill are refused), then run as the game's own talk.
+    const why = [], tree = { id: "guide", mode: "replace", start: "hi", nodes: [
+      { id: "hi", lines: [{ who: "npc", text: "Well met." }], options: [{ label: "Trade a log for a bar.", to: "deal", need: [{ kind: "level", id: "woodcutting", n: 1 }], do: [{ kind: "take", id: "logs", n: 1 }, { kind: "give", id: "pewter_bar", n: 1 }, { kind: "flag", id: "traded" }] }, { label: "A gift, once.", to: "", once: true, do: [{ kind: "frens", n: 50 }] }, { label: "Only after trading.", to: "", need: [{ kind: "flag", id: "traded" }] }, { label: "Bye.", to: "" }] },
+      { id: "deal", lines: [{ who: "player", text: "Here." }, { who: "npc", text: "Done." }] }] };
+    const checked = cleanOverlay({ v: 1, ops: [{ op: "talk", def: tree }, { op: "talk", def: { ...tree, nodes: [{ id: "a", lines: [{ who: "npc", text: "x" }], options: [{ label: "go", to: "nowhere" }] }] } }, { op: "talk", def: { ...tree, mode: "add" } },
+      { op: "talk", def: { ...tree, nodes: [{ id: "a", lines: [{ who: "npc", text: "x" }], options: [{ label: "go", to: "", need: [{ kind: "level", id: "basketry", n: 2 }] }] }] } }] }, why);
+    assert.equal(checked.ops.length, 1, "only the good conversation is kept"); assert.ok(why.some(w => /nowhere/.test(w)) && why.some(w => /needs its option's words/.test(w)) && why.some(w => /no skill basketry/.test(w)));
+    resetOverrides(); registerDefinitions(checked, NPCS);
+    const g = newGame(), p = g.player; p.inventory.fill(null);
+    let d = talk(g, "guide"); assert.equal(d.lines[0].text, "Well met.");
+    assert.deepEqual(d.options.map(o => o.label), ["A gift, once.", "Bye."], "no logs: the trade isn't offered; no note: nor is what needs it");
+    d.options[0].then(); assert.equal(count(p, "coins"), 50); assert.ok(!talk(g, "guide").options.some(o => o.label === "A gift, once."), "a once option goes once chosen");
+    give(p, "logs", 1); d = talk(g, "guide"); const deal = d.options.find(o => o.label === "Trade a log for a bar.").then();
+    assert.equal(count(p, "logs"), 0); assert.equal(count(p, "pewter_bar"), 1); assert.deepEqual(deal.lines.map(l => l.who), ["player", "npc"]);
+    assert.ok(talk(g, "guide").options.some(o => o.label === "Only after trading."), "the note is made, and kept in the save's questData"); assert.equal(p.questData.talk_traded, 1);
+    // One more thing to ask: hung on their own talk, before the goodbye.
+    resetOverrides(); registerDefinitions(cleanOverlay({ v: 1, ops: [{ op: "talk", def: { ...tree, mode: "add", label: "About the trade…" } }] }), NPCS);
+    const added = talk(newGame(), "guide"); assert.notEqual(added.lines[0].text, "Well met."); assert.ok(added.options.some(o => o.label === "About the trade…") && added.options.at(-1).label === "Goodbye.");
+    resetOverrides(); assert.equal(OVERLAY_TALK.size, 0); assert.notEqual(talk(newGame(), "guide").lines[0]?.text, "Well met.", "taken out: their own talk again");
+    // Creatures: any one's numbers and drops, on its own definition; refused for an unknown item; put back exactly.
+    const id = Object.keys(MONSTERS).find(k => MONSTERS[k].drops.length > 1), before = JSON.stringify(MONSTERS[id]), held = MONSTERS[id];
+    const edit = cleanOverlay({ v: 1, ops: [{ op: "monsteredit", def: { id, name: "Big One", aggressive: true, stats: { hp: 999, maxHit: 12 }, drops: [{ item: "pewter_bar", min: 1, max: 3, chance: 0.5 }] } }, { op: "monsteredit", def: { id, stats: { hp: 0 } } }, { op: "monsteredit", def: { id, drops: [{ item: "logs", min: 1, max: 1, chance: 2 }] } }] }, []);
+    assert.equal(edit.ops.length, 1, "a creature can't have no health, nor a drop more than certain");
+    const problems = []; registerDefinitions(cleanOverlay({ v: 1, ops: [{ op: "monsteredit", def: { id, drops: [{ item: "no_such_thing", min: 1, max: 1, chance: 0.1 }] } }] }), NPCS, problems); assert.ok(problems.some(w => /no item called no_such_thing/.test(w)));
+    registerDefinitions(edit, NPCS);
+    assert.equal(MONSTERS[id], held, "changed in place: everything holding the definition sees it"); assert.equal(MONSTERS[id].hp, 999); assert.equal(MONSTERS[id].name, "Big One"); assert.deepEqual(MONSTERS[id].drops, [{ item: "pewter_bar", min: 1, max: 3, chance: 0.5 }]);
+    assert.equal(JSON.stringify(originalMonster(id)), before, "the original is kept");
+    resetOverrides(); assert.equal(JSON.stringify(MONSTERS[id]), before, "and put back");
+    // A drawn building: a smithy with a working furnace and anvil, a second door, a hipped roof two storeys up; the doorways clear.
+    const w = newGame({ world: createWorld() }).world, b = cleanOverlay({ v: 1, ops: [{ op: "building", uid: "forge", x0: 20, y0: 20, x1: 28, y1: 26, door: "s", doors: ["n", "s", "x"], furnish: "smithy", hip: true, storeys: 2, walls: "stone", floor: T.STONE, name: "Forge" }] }, []);
+    assert.deepEqual(b.ops[0].doors, ["n", "s"]);
+    const placed = applyOverlay(w, b, WORLD_SEED, [], NPCS), forge = w.buildings[placed.buildings.get("forge")];
+    assert.ok(forge.hip && forge.storeys === 2 && forge.walls === "stone");
+    assert.equal(w.tiles[26 * W + 24], T.STONE, "the south door"); assert.equal(w.tiles[20 * W + 24], T.STONE, "the north door");
+    const inside = w.objects.filter(o => o.x > 20 && o.x < 28 && o.y > 20 && o.y < 26 && o.name !== "__removed");
+    assert.ok(inside.some(o => o.kind === "furnace") && inside.some(o => o.kind === "anvil"), "a smithy's furnace and anvil");
+    for (const [x, y] of [[24, 25], [25, 25], [24, 21], [25, 21]]) assert.equal(w.objectAt[y * W + x], -1, `inside the doorway at ${x},${y} is clear`);
+    // A copy of one of the world's buildings: its tiles, its record and its things, turned a quarter.
+    const world = createWorld(), at = world.buildings.findIndex(x => x.name && x.x1 - x.x0 !== x.y1 - x.y0 && x.x1 - x.x0 < 20 && x.y1 - x.y0 < 20 && world.objects.some(o => o.kind !== "ladder" && o.x >= x.x0 && o.x <= x.x1 && o.y >= x.y0 && o.y <= x.y1));
+    const prefab = extractPrefab(world, at), src = world.buildings[at];
+    assert.equal(prefab.w, src.x1 - src.x0 + 1); assert.ok(prefab.objects.length > 0 && prefab.objects.every(o => !("to" in o) && !("clue" in o)), "its things, never what leads elsewhere");
+    const quarter = turned(prefab, 1); assert.equal(quarter.w, prefab.h); assert.equal(quarter.tiles[0], prefab.tiles[(prefab.h - 1) * prefab.w], "turned clockwise: the bottom-left corner comes to the top-left");
+    assert.deepEqual(turned(turned(quarter, 1), 2).tiles, prefab.tiles, "four quarters, round again");
+    const stamp = cleanOverlay({ v: 1, ops: [{ op: "stamp", uid: "copy", x: 40, y: 40, rot: 1, prefab }, { op: "stamp", uid: "bad", x: 40, y: 40, rot: 0, prefab: { ...prefab, tiles: [1, 2] } }] }, []);
+    assert.equal(stamp.ops.length, 1, "a prefab whose tiles don't fill it is refused");
+    const sw = createWorld(), sp = applyOverlay(sw, stamp, WORLD_SEED, [], NPCS), copy = sw.buildings[sp.buildings.get("copy")];
+    assert.equal(copy.x1 - copy.x0 + 1, prefab.h); assert.equal(copy.walls, src.walls); assert.equal(copy.roof, src.roof); assert.equal(copy.name, src.name);
+    assert.equal(sw.objects.filter(o => o.x >= copy.x0 && o.x <= copy.x1 && o.y >= copy.y0 && o.y <= copy.y1 && o.name !== "__removed").length, prefab.objects.length);
+    // The dashboard's Max: every skill 99, healed, and the session a sandbox (never saved).
+    const m = newGame(); m.player.hp = 1; devCommand(m, { cmd: "max" });
+    assert.ok(SKILLS.every(s => levelForXp(m.player.xp[s]) === 99)); assert.ok(m.player.hp > 90);
+  } finally { resetOverrides(); const { devFlags } = await import("../games/rarefriends-realm/devflags.ts"); devFlags.sandbox = false; }
+});
