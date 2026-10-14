@@ -176,8 +176,8 @@ export function setGround(world: World | null) { ground = world; }
 /** The ground under a point as drawn: on water, its surface (WATER_DROP below the land's corners), so whatever floats or stands in it (a boat, a lily, a fishing spot) sits on the water. */
 const groundAt = (x: number, y: number) => {
   if (!ground) return 0;
-  const tx = Math.round(x), ty = Math.round(y), wet = inBounds(tx, ty) && isWaterTerrain(ground.tiles[ty * W + tx]);
-  return groundHeight(ground, x, y) - (wet ? WATER_DROP : 0);
+  const tx = Math.round(x), ty = Math.round(y);
+  return inBounds(tx, ty) && isWaterTerrain(ground.tiles[ty * W + tx]) ? waterSurface(ground, tx, ty) : groundHeight(ground, x, y);
 };
 /** The storey you're on (set each frame): clicks land on its floor. */
 let viewFloor: Floor | null = null;
@@ -395,13 +395,20 @@ function groundChunkMesh(glr: RealmGL, world: World, cx: number, cy: number): Fl
     if (kind === 1 || kind === 2) {
       // Water: below the land (WATER_DROP), its shade the distance to the shore at each corner (10 + tiles, for the
       // shader's shallows, depths and foam), and a bank (kind 4, the land's own texture) down to it from each shore.
-      const corners = [[-0.5, -0.5, hA, 0, 0], [0.5, -0.5, hB, 1, 0], [0.5, 0.5, hC, 1, 1], [-0.5, 0.5, hD, 0, 1]] as const;
-      corners.forEach(([dx, dy, h, u, v], k) => out.push(x + dx, y + dy, h - WATER_DROP, u, v, layer, 10 + shoreAt(x + (k === 1 || k === 2 ? 1 : 0), y + (k >= 2 ? 1 : 0)), edges, kind, -1, -1, -1, -1));
+      // (Flat at its surface, whatever its corners; a bank up to higher land, a fall (kind 5) from higher water beside.)
+      const surface = waterSurface(world, x, y), corners = [[-0.5, -0.5, hA, 0, 0], [0.5, -0.5, hB, 1, 0], [0.5, 0.5, hC, 1, 1], [-0.5, 0.5, hD, 0, 1]] as const;
+      corners.forEach(([dx, dy, , u, v], k) => out.push(x + dx, y + dy, surface, u, v, layer, 10 + shoreAt(x + (k === 1 || k === 2 ? 1 : 0), y + (k >= 2 ? 1 : 0)), edges, kind, -1, -1, -1, -1));
       for (const [ox, oy, i, j] of TILE_EDGES) {
-        const nx = x + ox, ny = y + oy, o = other(nx, ny); if (!bankedBy(o)) continue;
-        const bank = groundLayer(glr, lookOf(world, nx, ny, o), Math.floor(hash(ny, nx) * 4)), a = corners[i], b = corners[j];
-        out.push(x + a[0], y + a[1], a[2], 0, 0, bank, -0.18, 0, 4, -1, -1, -1, -1, x + b[0], y + b[1], b[2], 1, 0, bank, -0.18, 0, 4, -1, -1, -1, -1,
-          x + b[0], y + b[1], b[2] - WATER_DROP, 1, 1, bank, -0.18, 0, 4, -1, -1, -1, -1, x + a[0], y + a[1], a[2] - WATER_DROP, 0, 1, bank, -0.18, 0, 4, -1, -1, -1, -1);
+        const nx = x + ox, ny = y + oy, o = other(nx, ny), a = corners[i], b = corners[j];
+        if (bankedBy(o)) {
+          const bank = groundLayer(glr, lookOf(world, nx, ny, o), Math.floor(hash(ny, nx) * 4));
+          out.push(x + a[0], y + a[1], a[2], 0, 0, bank, -0.18, 0, 4, -1, -1, -1, -1, x + b[0], y + b[1], b[2], 1, 0, bank, -0.18, 0, 4, -1, -1, -1, -1,
+            x + b[0], y + b[1], surface, 1, 1, bank, -0.18, 0, 4, -1, -1, -1, -1, x + a[0], y + a[1], surface, 0, 1, bank, -0.18, 0, 4, -1, -1, -1, -1);
+        } else if (isWaterTerrain(o)) {
+          const top = waterSurface(world, nx, ny); if (top - surface < 1) continue;
+          out.push(x + a[0], y + a[1], top, 0, 0, layer, 0, 0, 5, -1, -1, -1, -1, x + b[0], y + b[1], top, 1, 0, layer, 0, 0, 5, -1, -1, -1, -1,
+            x + b[0], y + b[1], surface, 1, 1, layer, 0, 0, 5, -1, -1, -1, -1, x + a[0], y + a[1], surface, 0, 1, layer, 0, 0, 5, -1, -1, -1, -1);
+        }
       }
       continue;
     }
@@ -613,6 +620,8 @@ const isWaterTerrain = (terrain: number) => terrain === T.WATER || terrain === T
  * it meets land (both renderers), so a shore reads as land ending and water beginning, not one sheet in two colours.
  */
 export const WATER_DROP = 7;
+/** The water's surface on a water tile: flat, WATER_DROP under its lowest corner (whatever stands higher round it gets a bank, or a fall from higher water). */
+export function waterSurface(world: World, x: number, y: number) { return Math.min(cornerHeight(world, x, y), cornerHeight(world, x + 1, y), cornerHeight(world, x, y + 1), cornerHeight(world, x + 1, y + 1)) - WATER_DROP; }
 /** Whether a tile is land a bank stands for (anything but water and the void). */
 const bankedBy = (terrain: number) => terrain !== T.VOID && !isWaterTerrain(terrain);
 /** The four edges of a tile: the neighbour across each, and its two corners (0 a, 1 b, 2 c, 3 d: north-west, north-east, south-east, south-west). */
@@ -707,7 +716,9 @@ function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, camera: Camera
     const wet = isWaterTerrain(terrain), { x: sx, y: sy } = toScreen(camera, x, y);
     if (sx < -hw * 2 - pad || sx > VIEW.width + hw * 2 + pad || sy < -hh * 2 - pad || sy > VIEW.height + hh * 4 + pad) continue;
     // Corner heights lift each corner off the tile centre; slopes facing the north-west light are brighter.
-    const hA = cornerHeight(world, x, y), hB = cornerHeight(world, x + 1, y), hC = cornerHeight(world, x + 1, y + 1), hD = cornerHeight(world, x, y + 1), hMid = (hA + hB + hC + hD) / 4;
+    // (Water is drawn flat at its surface: its corners all at the tile's centre height.)
+    const surface = wet ? waterSurface(world, x, y) : 0, flatAt = (h: number) => wet ? surface : h;
+    const hA = flatAt(cornerHeight(world, x, y)), hB = flatAt(cornerHeight(world, x + 1, y)), hC = flatAt(cornerHeight(world, x + 1, y + 1)), hD = flatAt(cornerHeight(world, x, y + 1)), hMid = (hA + hB + hC + hD) / 4;
     const slope = Math.max(-0.22, Math.min(0.22, ((hA + hD) - (hB + hC) + (hA + hB) - (hD + hC)) * 0.011));
     // The Deadwood's ground is darker than anywhere: the wood's own earth, and no sun has reached it in an age.
     const variation = (hash(x, y) - 0.5) * 0.035 + slope - (inDeadwood(world, x, y) ? 0.3 : 0), lifted = ls * z;
@@ -716,16 +727,28 @@ function drawTerrain(ctx: CanvasRenderingContext2D, scene: Scene, camera: Camera
     if (mode !== "motion") {
       ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.lineTo(cx, cy); ctx.lineTo(dx, dy); ctx.closePath();
       ctx.fillStyle = terrainFill(lookOf(world, x, y, terrain), variation); ctx.fill();
-      // The banks: earth from the land's edge down to the water, darker and wet at the foot, a line of foam where it meets the water.
+      // The banks: earth from the land's edge (its own corners) down to the water, darker and wet at the foot, a line of
+      // foam where it meets the water; and a fall from higher water beside, white water down to this.
       if (wet) {
-        const foot: [number, number][] = [[ax, ay], [bx, by], [cx, cy], [dx, dy]], up = WATER_DROP * lifted;
+        const foot: [number, number][] = [[ax, ay], [bx, by], [cx, cy], [dx, dy]], heightAt = [cornerHeight(world, x, y), cornerHeight(world, x + 1, y), cornerHeight(world, x + 1, y + 1), cornerHeight(world, x, y + 1)];
         for (const [ox, oy, i, j] of TILE_EDGES) {
-          const nx = x + ox, ny = y + oy, other = inBounds(nx, ny) ? world.tiles[ny * W + nx] : T.VOID; if (!bankedBy(other)) continue;
-          const [x0, y0] = foot[i], [x1, y1] = foot[j];
-          ctx.beginPath(); ctx.moveTo(x0, y0 - up); ctx.lineTo(x1, y1 - up); ctx.lineTo(x1, y1); ctx.lineTo(x0, y0); ctx.closePath();
-          ctx.fillStyle = terrainFill(lookOf(world, nx, ny, other), -0.32); ctx.fill();
-          ctx.fillStyle = "rgba(20,30,40,0.28)"; ctx.beginPath(); ctx.moveTo(x0, y0 - up * 0.45); ctx.lineTo(x1, y1 - up * 0.45); ctx.lineTo(x1, y1); ctx.lineTo(x0, y0); ctx.closePath(); ctx.fill();
-          ctx.strokeStyle = "rgba(236,244,248,0.7)"; ctx.lineWidth = Math.max(0.8, z * 1.2); ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+          const nx = x + ox, ny = y + oy, other = inBounds(nx, ny) ? world.tiles[ny * W + nx] : T.VOID, [x0, y0] = foot[i], [x1, y1] = foot[j];
+          if (bankedBy(other)) {
+            const up0 = (heightAt[i] - surface) * lifted, up1 = (heightAt[j] - surface) * lifted;
+            ctx.beginPath(); ctx.moveTo(x0, y0 - up0); ctx.lineTo(x1, y1 - up1); ctx.lineTo(x1, y1); ctx.lineTo(x0, y0); ctx.closePath();
+            ctx.fillStyle = terrainFill(lookOf(world, nx, ny, other), -0.32); ctx.fill();
+            const wet0 = Math.min(up0, WATER_DROP * lifted) * 0.45, wet1 = Math.min(up1, WATER_DROP * lifted) * 0.45;
+            ctx.fillStyle = "rgba(20,30,40,0.28)"; ctx.beginPath(); ctx.moveTo(x0, y0 - wet0); ctx.lineTo(x1, y1 - wet1); ctx.lineTo(x1, y1); ctx.lineTo(x0, y0); ctx.closePath(); ctx.fill();
+            ctx.strokeStyle = "rgba(236,244,248,0.7)"; ctx.lineWidth = Math.max(0.8, z * 1.2); ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+          } else if (isWaterTerrain(other)) {
+            const above = waterSurface(world, nx, ny) - surface; if (above < 1) continue;
+            const up = above * lifted;
+            ctx.beginPath(); ctx.moveTo(x0, y0 - up); ctx.lineTo(x1, y1 - up); ctx.lineTo(x1, y1); ctx.lineTo(x0, y0); ctx.closePath();
+            ctx.fillStyle = "rgba(196,224,236,0.92)"; ctx.fill();
+            ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = Math.max(0.8, z); ctx.beginPath();
+            for (let k = 1; k < 4; k++) { const f = k / 4, px = x0 + (x1 - x0) * f, py = y0 + (y1 - y0) * f; ctx.moveTo(px, py - up); ctx.lineTo(px, py); }
+            ctx.stroke();
+          }
         }
       }
     }

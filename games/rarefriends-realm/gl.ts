@@ -48,7 +48,7 @@ export type Lighting = {
 };
 /**
  * Floats per ground vertex: x, y, h; u, v; layer; shade; edges; kind (0 ground, 1 water, 2 deep water, 3 lava, 4 a
- * bank down to the water); and the texture layers of the ground it blends into to the north, east, south and west (−1:
+ * bank down to the water, 5 a fall from higher water); and the texture layers of the ground it blends into to the north, east, south and west (−1:
  * an inked edge, or none). On water the shade is 10 plus the distance to the shore, in tiles.
  */
 export const GROUND_FLOATS = 13;
@@ -128,6 +128,11 @@ void main() {
     float lap = 0.5 + 0.28 * sin(t * 1.15 + vWorld.x * 0.7 + vWorld.y * 0.9), speck = fract(sin(dot(cell + floor(t * 2.0), vec2(39.3, 11.7))) * 9137.1);
     float foam = (1.0 - smoothstep(lap * 0.55, lap, shore)) * (0.5 + 0.5 * step(0.45, speck));
     color = mix(color, vec3(0.93, 0.96, 0.98), foam * 0.75);
+  } else if (vKind == 5) {
+    // A fall: white water pouring down from the reach above, in streaks a texel wide, foaming at its foot.
+    vec2 cell = floor(vec2(vUv.x * 16.0, vUv.y * 16.0));
+    float n = fract(sin(cell.x * 12.9898) * 43758.5453), run = fract(vUv.y * 2.0 - uTime * (1.2 + n) + n);
+    color = mix(vec3(0.55, 0.76, 0.86), vec3(0.95, 0.98, 1.0), step(0.55, run) * 0.7 + smoothstep(0.75, 1.0, vUv.y) * 0.5);
   } else if (vKind == 4) {
     // A bank: the land's own ground turned down to the water, in its shadow, darker and wet towards its foot, a lap of foam at it.
     float wet = smoothstep(0.4, 1.0, vUv.y), lap = 0.86 + 0.06 * sin(uTime * 1.6 + (vWorld.x + vWorld.y) * 2.7);
@@ -138,7 +143,7 @@ void main() {
     color = mix(color, vec3(0.98, 0.78 + glow * 0.15, 0.47), 0.25 + glow * 0.25);
   }
   // Contour lines every 10 px of height, like a map's (not on water, nor down a bank).
-  if (vKind != 1 && vKind != 2 && vKind != 4) {
+  if (vKind != 1 && vKind != 2 && vKind != 4 && vKind != 5) {
     float level = vHeight / 10.0, band = abs(fract(level + 0.5) - 0.5) / max(fwidth(level), 1e-4);
     if (vHeight > 0.5) color = mix(color, vec3(0.086), (1.0 - smoothstep(0.0, 1.0, band)) * 0.16);
   }

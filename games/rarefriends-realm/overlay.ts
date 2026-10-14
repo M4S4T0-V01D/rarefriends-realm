@@ -10,7 +10,7 @@
  * module has no DOM: the engine, the bake and the tests all load it.
  */
 import { ITEM_LIST, MONSTERS, type MonsterDef, type RockKind, type SpotKind, type TreeKind } from "./data.ts";
-import { BRUSH_MAX, FLOOD_MAX, LINE_WIDTH_MAX, REGION_TILES_MAX, scatterable, applyPaint, applyTerrain, tileHash, type PaintOp, type TerrainMode, type TerrainOp } from "./terrainops.ts";
+import { BRUSH_MAX, FLOOD_MAX, LINE_WIDTH_MAX, REGION_TILES_MAX, scatterable, applyPaint, levelPaintedWater, onShore, applyTerrain, tileHash, type PaintOp, type TerrainMode, type TerrainOp } from "./terrainops.ts";
 import { DECOR_NAMES, FLOOR_Y, H, OVERWORLD_H, ROOF_COLORS, T, TREE_NAMES, W, WALKABLE, groundHeights, indexBuildings, levelBuildings, indexObjects, type Building, type DecorKind, type ObjectKind, type World, type WorldObject } from "./world.ts";
 
 /** An NPC an overlay defines: who they are, and what they say (plain lines; the game's own people have scripted talk). */
@@ -152,7 +152,7 @@ export function applyOverlay(world: World, overlay: Overlay, seed: number, why: 
   let tilesChanged = false, objectsChanged = false, buildingsChanged = false;
   // The rectangle of tiles changed (so the development frame rebuilds just the ground round it), and the raises by tile.
   const box = { x0: W, y0: H, x1: -1, y1: -1 }, touch = (x0: number, y0: number, x1: number, y1: number) => { box.x0 = Math.min(box.x0, x0, x1); box.y0 = Math.min(box.y0, y0, y1); box.x1 = Math.max(box.x1, x0, x1); box.y1 = Math.max(box.y1, y0, y1); };
-  const heave = new Map<number, number>(), terrain: TerrainOp[] = [];
+  const heave = new Map<number, number>(), terrain: TerrainOp[] = [], painted = { x0: W, y0: H, x1: -1, y1: -1 };
   const removeAt = (x: number, y: number) => {
     const id = world.objectAt[index(x, y)];
     if (id >= 0) { world.objects[id] = { ...world.objects[id], kind: "decor", decor: "flowers", blocks: false, name: "__removed" }; world.objectAt[index(x, y)] = -1; objectsChanged = true; }
@@ -162,7 +162,10 @@ export function applyOverlay(world: World, overlay: Overlay, seed: number, why: 
     else if (op.op === "fill") { for (let y = Math.min(op.y0, op.y1); y <= Math.max(op.y0, op.y1); y++) for (let x = Math.min(op.x0, op.x1); x <= Math.max(op.x0, op.x1); x++) world.tiles[index(x, y)] = op.t; tilesChanged = true; touch(op.x0, op.y0, op.x1, op.y1); }
     else if (op.op === "lift") { if (op.v > 0) heave.set(index(op.x, op.y), op.v); else heave.delete(index(op.x, op.y)); tilesChanged = true; touch(op.x - 2, op.y - 2, op.x + 2, op.y + 2); }
     else if (op.op === "remove") removeAt(op.x, op.y);
-    else if (op.op === "paint" || op.op === "flood" || op.op === "line" || op.op === "region") { applyPaint(world, op, touch, why); if (op.op !== "region") tilesChanged = true; }
+    else if (op.op === "paint" || op.op === "flood" || op.op === "line" || op.op === "region") {
+      applyPaint(world, op, (x0, y0, x1, y1) => { touch(x0, y0, x1, y1); painted.x0 = Math.min(painted.x0, x0, x1); painted.y0 = Math.min(painted.y0, y0, y1); painted.x1 = Math.max(painted.x1, x0, x1); painted.y1 = Math.max(painted.y1, y0, y1); }, why);
+      if (op.op !== "region") tilesChanged = true;
+    }
     else if (op.op === "terrain" || op.op === "slope") terrain.push(op);
     else if (op.op === "clear") { for (let y = op.y0; y <= op.y1; y++) for (let x = op.x0; x <= op.x1; x++) removeAt(x, y); }
     else if (op.op === "scatter") {
@@ -202,13 +205,15 @@ export function applyOverlay(world: World, overlay: Overlay, seed: number, why: 
   }
   if (objectsChanged) world.objectAt = indexObjects(world.objects);
   if (buildingsChanged) world.buildingAt = indexBuildings(world.buildings);
-  // Raised ground: the steps, softened over the five by five round each tile, on the land's own floor.
+  // Painted water lies level with the water it joins (its shore flat, the land easing back).
+  if (painted.x1 >= 0) { const moved = levelPaintedWater(world, { x0: Math.max(0, painted.x0), y0: Math.max(0, painted.y0), x1: Math.min(W - 1, painted.x1), y1: Math.min(H - 1, painted.y1) }); if (moved) touch(moved.x0, moved.y0, moved.x1, moved.y1); }
+  // Raised ground: the steps, softened over the five by five round each tile, on the land's own floor (never water or its shore).
   if (heave.size) {
     const floor = world.base = world.base ? new Float32Array(world.base) : new Float32Array(W * H);
     for (let y = Math.max(0, box.y0); y <= Math.min(H - 1, box.y1); y++) for (let x = Math.max(0, box.x0); x <= Math.min(W - 1, box.x1); x++) {
       let total = 0;
       for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) total += heave.get(index(x + dx, y + dy)) ?? 0;
-      if (total) floor[index(x, y)] += total / 25 * HEAVE_STEP;
+      if (total && !onShore(world.tiles, x, y)) floor[index(x, y)] += total / 25 * HEAVE_STEP;
     }
   }
   const clip = (b: { x0: number; y0: number; x1: number; y1: number }) => ({ x0: Math.max(0, b.x0), y0: Math.max(0, b.y0), x1: Math.min(W - 1, b.x1), y1: Math.min(H - 1, b.y1) });
@@ -220,7 +225,7 @@ export function applyOverlay(world: World, overlay: Overlay, seed: number, why: 
     const moved = applyTerrain(world, ground, terrain);
     if (moved) ground = groundHeights(world.tiles, seed, lift, raise, world.base, clip(moved), ground);
     if (world.ground) world.ground = ground;
-    world.heights = world.ground ? new Float32Array(ground) : ground; levelBuildings(world.heights, world.buildings);
+    world.heights = world.ground ? new Float32Array(ground) : ground; levelBuildings(world.heights, world.buildings, world.tiles);
   }
   return placed;
 }

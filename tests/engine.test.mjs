@@ -3857,7 +3857,7 @@ test("World overlays: a layer over the baked world, applied deterministically; b
   // On worlds of their own: the shared world stays as it is for every other test.
   const g = newGame({ world: createWorld() }), world = g.world, problems = [];
   const placed = applyOverlay(world, overlay, WORLD_SEED, problems, NPCS);
-  assert.equal(world.tiles[5 * W + 5], T.GRASS); assert.equal(world.tiles[11 * W + 12], T.STONE); assert.ok(world.base[11 * W + 12] > createWorld().base[11 * W + 12], "a raise lifts the land's own floor");
+  assert.equal(world.tiles[5 * W + 5], T.GRASS); assert.equal(world.tiles[11 * W + 12], T.STONE); assert.equal(world.base[11 * W + 12], createWorld().base[11 * W + 12], "a raise in the sea at the world's corner leaves it (water lies level; raising land is checked below)");
   assert.ok(placed.objects.has("tree-1")); assert.equal(world.objects[placed.objects.get("tree-1")].tree, "oak"); assert.equal(world.objectAt[11 * W + 12], placed.objects.get("tree-1"));
   assert.ok(placed.buildings.has("hut")); const hut = world.buildings[placed.buildings.get("hut")]; assert.equal(hut.name, "The hut"); assert.equal(world.tiles[20 * W + 20], T.WALL); assert.equal(world.tiles[22 * W + 23], T.WOOD); assert.equal(world.tiles[25 * W + 23], T.WOOD, "the door gap"); assert.equal(world.buildingAt[22 * W + 23], placed.buildings.get("hut") + 1);
   assert.ok(placed.spawns.has("guide-2")); assert.ok(!placed.spawns.has("nobody")); assert.ok(problems.some(p => /no monster called no_such_monster/.test(p)));
@@ -3926,6 +3926,38 @@ test("The dashboard's ground and paint ops: checked, deterministic, the quick re
   assert.ok(quick.heights.every((v, i) => v === plain.heights[i]), "the quick rebuild matches the full one");
   const baked = buildHeights(plain.tiles, WORLD_SEED, plain.lift, plain.raise, plain.base, plain.buildings);
   assert.ok(baked.every((v, i) => v === plain.heights[i]), "built again from its tiles and its floor (what the bake keeps), the world stands exactly as it was seen");
+});
+
+test("Water lies level: the sea and the low water joined to it at sea level, each lake at one height, mountain rivers in level reaches with falls between; the shore flat; the ground tools leave it alone, and painted water takes the level of the water it joins", async () => {
+  const { applyOverlay } = await import("../games/rarefriends-realm/overlay.ts");
+  const { WORLD_SEED, groundHeights } = await import("../games/rarefriends-realm/world.ts");
+  const w = createWorld(), CW = W + 1, wet = t => t === T.WATER || t === T.DEEP || t === T.BRIDGE;
+  // (The renderers draw every water tile flat at its lowest corner, so here it's the ground under the water: a tile of
+  // water sloping is a fall on a river, or water at the foot of a building standing above it on a bank, and rare.)
+  const nearBuilding = new Uint8Array(W * H); for (const b of w.buildings) for (let y = Math.max(0, b.y0 - 2); y <= Math.min(H - 1, b.y1 + 2); y++) for (let x = Math.max(0, b.x0 - 2); x <= Math.min(W - 1, b.x1 + 2); x++) nearBuilding[y * W + x] = 1;
+  let water = 0, sloped = 0; const wrong = [];
+  for (let y = 2; y < OVERWORLD_H - 2; y++) for (let x = 2; x < W - 2; x++) {
+    if (!wet(w.tiles[y * W + x])) continue; water++;
+    const c = [w.heights[y * CW + x], w.heights[y * CW + x + 1], w.heights[(y + 1) * CW + x], w.heights[(y + 1) * CW + x + 1]]; if (Math.max(...c) - Math.min(...c) <= 1) continue;
+    sloped++; let around = 0, beside = 0; for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (wet(w.tiles[(y + dy) * W + x + dx])) { around++; if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) beside++; }
+    // (Open water inside a lake or the sea, away from its shore: a stream may fall into a lake right at its edge.)
+    if (around >= 19 && beside === 9 && !nearBuilding[y * W + x] && wrong.length < 12) wrong.push(`${x},${y} ${regionAt(w, x, y).id}: ${Math.min(...c).toFixed(1)}–${Math.max(...c).toFixed(1)}`);
+  }
+  assert.ok(water > 100_000 && sloped < water / 100, `water slopes only at falls and banks (${sloped} of ${water} tiles)`);
+  assert.deepEqual(wrong, [], "open water (a lake, the sea) never slopes away from its shore, except below a building");
+  // The ground tools on the water and its shore do nothing there; painted water lies at its neighbour's level.
+  let sx = 0, sy = 0;
+  for (let y = 200; y < OVERWORLD_H - 40 && !sx; y += 3) for (let x = 200; x < W - 40 && !sx; x += 3) if (w.tiles[y * W + x] === T.WATER && w.tiles[y * W + x + 6] === T.GRASS && w.tiles[y * W + x + 12] === T.GRASS && w.buildings.every(b => b.x1 < x - 12 || b.x0 > x + 24 || b.y1 < y - 12 || b.y0 > y + 12)) { sx = x; sy = y; }
+  assert.ok(sx, "a lakeshore to try the tools on");
+  const level = w.heights[sy * CW + sx], world = createWorld(); world.ground = groundHeights(world.tiles, WORLD_SEED, world.lift, world.raise, world.base);
+  applyOverlay(world, { v: 1, ops: [
+    { op: "terrain", x: sx, y: sy, r: 3, shape: "circle", mode: "raise", amount: 8, falloff: 0 }, { op: "lift", x: sx, y: sy, v: 8 },
+    { op: "line", x0: sx, y0: sy, x1: sx + 9, y1: sy, w: 1, t: T.WATER },
+  ] }, WORLD_SEED);
+  for (let dy = -1; dy <= 2; dy++) for (let dx = -1; dx <= 2; dx++) assert.ok(Math.abs(world.heights[(sy + dy) * CW + sx + dx] - level) < 0.01, `the water round ${sx},${sy} is where it was`);
+  assert.equal(world.tiles[sy * W + sx + 8], T.WATER);
+  const painted = [5, 6, 7, 8, 9].flatMap(dx => [world.heights[sy * CW + sx + dx], world.heights[(sy + 1) * CW + sx + dx]]);
+  assert.ok(painted.every(h => Math.abs(h - level) < 0.01), `a channel painted out of the lake lies at its level (${painted.map(h => h.toFixed(1))} vs ${level.toFixed(1)})`);
 });
 
 test("The four smithed families: recipes at the anvil from the ordinary metals; a prospector's pick mines surer and doubles ore; hardware cuts the boatmen's fares; a resonance fitting makes a carving stand longer, once", async () => {

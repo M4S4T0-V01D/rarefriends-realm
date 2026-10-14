@@ -1892,6 +1892,10 @@ export function walkable(world: World, x: number, y: number) {
 const RELIEF: Record<number, number> = {
   [T.ASH]: 62, [T.GRASS]: 46, [T.DARK_GRASS]: 58, [T.PATH]: 26, [T.SAND]: 38, [T.SWAMP]: 10, [T.SNOW]: 84, [T.GRAVEL]: 60, [T.CLIFF]: 90, [T.FARMLAND]: 6,
 };
+/** Water, as the shore's flat apron reckons it (elevation.ts): water, deep water and bridges over it. */
+const WATERLIKE = new Set<number>([T.WATER, T.DEEP, T.BRIDGE]);
+/** How far a river falls between its level reaches (elevation.ts FALL): a town nearer its water than this comes down to it. */
+const FALL_STEP = 30;
 const FLAT = new Set<number>([T.LAVA, T.VOID, T.WATER, T.DEEP, T.BRIDGE, T.COBBLE, T.WOOD, T.STONE, T.CARPET, T.WALL, T.DUNGEON, T.ICE, T.BRICK]);
 /**
  * Rolling hills from two noise octaves, scaled by each terrain's relief, eased to flat ground near water, towns,
@@ -1899,7 +1903,7 @@ const FLAT = new Set<number>([T.LAVA, T.VOID, T.WATER, T.DEEP, T.BRIDGE, T.COBBL
  */
 export function buildHeights(tiles: Uint8Array, seed: number, lift?: Float32Array, raise?: Float32Array, base?: Float32Array, buildings?: readonly Building[]): Float32Array {
   const heights = groundHeights(tiles, seed, lift, raise, base);
-  if (buildings) levelBuildings(heights, buildings);
+  if (buildings) levelBuildings(heights, buildings, tiles);
   return heights;
 }
 /** The heights before the buildings are levelled: the whole map, or (with `into`, the ground as it was) just the corners round a changed rectangle of tiles. */
@@ -1923,20 +1927,27 @@ export function groundHeights(tiles: Uint8Array, seed: number, lift?: Float32Arr
     if (y + 1 < TH) visit(index + TW, d);
     if (y > 0) visit(index - TW, d);
   }
+  // And from every tile to the water (eight ways): the hills keep off its flat shore (elevation.ts WATER_FLAT), easing in beyond it.
+  const wet = new Uint8Array(TW * TH).fill(255); tail = 0;
+  for (let y = ty0; y <= ty1; y++) for (let x = tx0; x <= tx1; x++) if (WATERLIKE.has(tiles[y * W + x])) { const l = (y - ty0) * TW + x - tx0; wet[l] = 0; queue[tail++] = l; }
+  for (let head = 0; head < tail; head++) {
+    const index = queue[head], x = index % TW, y = (index - x) / TW, d = wet[index]; if (d >= 6) continue;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const nx = x + dx, ny = y + dy; if ((!dx && !dy) || nx < 0 || ny < 0 || nx >= TW || ny >= TH) continue; const k = ny * TW + nx; if (wet[k] > d + 1) { wet[k] = d + 1; queue[tail++] = k; } }
+  }
   // Relief per tile (its terrain's, raised by the lift), so each corner below just sums its four tiles.
   // The raise is relief too, but it stands clear of the hill noise below: a mountain is where it was put, not where the noise allows.
   const RW = ri1 - ri0 + 1, raw = new Float32Array(RW * (rj1 - rj0 + 1));
   for (let j = rj0; j <= rj1; j++) for (let i = ri0; i <= ri1; i++) {
-    let sum = 0, up = 0, near = 255, count = 0;
+    let sum = 0, up = 0, near = 255, count = 0, water = 255;
     // The four tiles round the corner, in the same order as ever (so the sums, and the heights, come out the same).
     for (let k = 0; k < 4; k++) {
       const tx = k & 1 ? i : i - 1, ty = k & 2 ? j : j - 1;
       if (tx < 0 || ty < 0 || tx >= W || ty >= H) { near = 0; continue; }
       const t = ty * W + tx, r = RELIEF[tiles[t]] ?? 0, dt = distance[(ty - ty0) * TW + tx - tx0];
-      sum += r * (1 + (lift?.[t] ?? 0)); up += r * (raise?.[t] ?? 0); count++; if (dt < near) near = dt;
+      sum += r * (1 + (lift?.[t] ?? 0)); up += r * (raise?.[t] ?? 0); count++; if (dt < near) near = dt; const dw = wet[(ty - ty0) * TW + tx - tx0]; if (dw < water) water = dw;
     }
-    if (!count || (sum === 0 && up === 0) || near === 0) continue;
-    const ease = Math.min(1, near / 4), smooth = ease * ease * (3 - 2 * ease);
+    if (!count || (sum === 0 && up === 0) || near === 0 || water <= 2) continue;
+    const ease = Math.min(1, near / 4, (water - 2) / 4), smooth = ease * ease * (3 - 2 * ease);
     // The hill noise is sampled in the mainland's own coordinates (and the frame's rows: the north moved everything down), so its relief is exactly what it always was (the wider world sees the same field, shifted).
     const fj = northUnshift(j) - MAINLAND.y, shape = broad(i - MAINLAND.x, fj) * 0.75 + fine(i - MAINLAND.x, fj) * 0.25;
     raw[(j - rj0) * RW + i - ri0] = ((sum / count) * (0.12 + 0.88 * Math.pow(Math.max(0, shape), 1.6)) + up / count) * smooth;
@@ -1962,8 +1973,9 @@ export function groundHeights(tiles: Uint8Array, seed: number, lift?: Float32Arr
  * one height, the height of the land round it (a shelf, a terrace, the hill it's dug into), easing back a few tiles
  * out. Buildings close enough to share that ground share one level, so a town stands level. (In place.)
  */
-export function levelBuildings(heights: Float32Array, buildings: readonly Building[]) {
+export function levelBuildings(heights: Float32Array, buildings: readonly Building[], tiles?: Uint8Array) {
   const CW = W + 1;
+  const wetCorner = (i: number, j: number) => { if (!tiles) return false; for (let k = 0; k < 4; k++) { const tx = k & 1 ? i : i - 1, ty = k & 2 ? j : j - 1; if (tx >= 0 && ty >= 0 && tx < W && ty < H && WATERLIKE.has(tiles[ty * W + tx])) return true; } return false; };
   const list = buildings.filter(b => b.y0 < OVERWORLD_H), parent = list.map((_, k) => k), find = (k: number): number => parent[k] === k ? k : (parent[k] = find(parent[k]));
   const gap = 10;
   for (let a = 0; a < list.length; a++) for (let c = a + 1; c < list.length; c++) { const A = list[a], C = list[c]; if (A.x0 - gap <= C.x1 && C.x0 - gap <= A.x1 && A.y0 - gap <= C.y1 && C.y0 - gap <= A.y1) parent[find(a)] = find(c); }
@@ -1971,12 +1983,21 @@ export function levelBuildings(heights: Float32Array, buildings: readonly Buildi
   // The land round each group: the ring of corners three to five out from its buildings, as it lies.
   const sums = new Map<number, { total: number; n: number }>();
   list.forEach((b, k) => { const root = find(k), e = sums.get(root) ?? { total: 0, n: 0 };
-    for (let j = Math.max(0, b.y0 - 5); j <= Math.min(H, b.y1 + 6); j++) for (let i = Math.max(0, b.x0 - 5); i <= Math.min(W, b.x1 + 6); i++) { const d = dOf(b, i, j); if (d >= 3 && d <= 5) { e.total += heights[j * CW + i]; e.n++; } }
+    for (let j = Math.max(0, b.y0 - 5); j <= Math.min(H, b.y1 + 6); j++) for (let i = Math.max(0, b.x0 - 5); i <= Math.min(W, b.x1 + 6); i++) { const d = dOf(b, i, j); if (d >= 3 && d <= 5 && !wetCorner(i, j)) { e.total += heights[j * CW + i]; e.n++; } }
     sums.set(root, e); });
   const nearest = new Float32Array(CW * (H + 1)).fill(Infinity), levelAt = new Float32Array(CW * (H + 1));
-  list.forEach((b, k) => { const e = sums.get(find(k))!, level = e.n ? e.total / e.n : 0;
+  // Each group at the mean of the land round it; a group by water within a fall of it (elevation.ts FALL) comes down to
+  // the water's level, so its quays meet it. (Higher, it stands above the water on a bank: the renderers draw water flat
+  // at its lowest corner, with a bank up to whatever stands higher, Dawnhold's sea cliff.)
+  const wetOf = list.map(b => { let low = Infinity; for (let j = Math.max(0, b.y0 - 1); j <= Math.min(H, b.y1 + 2); j++) for (let i = Math.max(0, b.x0 - 1); i <= Math.min(W, b.x1 + 2); i++) if (dOf(b, i, j) <= 1 && wetCorner(i, j)) low = Math.min(low, heights[j * CW + i]); return low; });
+  const groupLevel = new Map<number, number>();
+  for (const [root, e] of sums) groupLevel.set(root, e.n ? e.total / e.n : 0);
+  const mean = new Map(groupLevel);
+  list.forEach((_, k) => { const root = find(k); if (wetOf[k] !== Infinity && Math.abs(wetOf[k] - mean.get(root)!) <= FALL_STEP) groupLevel.set(root, Math.min(groupLevel.get(root)!, wetOf[k])); });
+  list.forEach((b, k) => { const level = groupLevel.get(find(k))!;
     for (let j = Math.max(0, b.y0 - 5); j <= Math.min(H, b.y1 + 6); j++) for (let i = Math.max(0, b.x0 - 5); i <= Math.min(W, b.x1 + 6); i++) { const d = dOf(b, i, j), k2 = j * CW + i; if (d < nearest[k2]) { nearest[k2] = d; levelAt[k2] = level; } } });
-  for (let k = 0; k < nearest.length; k++) if (nearest[k] !== Infinity) { const t = Math.max(0, Math.min(1, (nearest[k] - 2) / 3)), e = t * t * (3 - 2 * t); heights[k] = levelAt[k] + (heights[k] - levelAt[k]) * e; }
+  // (Water's corners move only right against a building, where it stands over the water on a bank; further out the water stays level.)
+  for (let k = 0; k < nearest.length; k++) if (nearest[k] !== Infinity && (nearest[k] <= 1 || !wetCorner(k % CW, Math.floor(k / CW)))) { const t = Math.max(0, Math.min(1, (nearest[k] - 2) / 3)), e = t * t * (3 - 2 * t); heights[k] = levelAt[k] + (heights[k] - levelAt[k]) * e; }
 }
 /** Which building (1 + its index, 0 for none) covers each tile: the last one listed wins where they overlap. */
 export function indexBuildings(buildings: readonly Building[]): Uint16Array {

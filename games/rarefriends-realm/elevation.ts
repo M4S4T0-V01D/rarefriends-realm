@@ -48,6 +48,10 @@ const ANCHORS: readonly { x: number; y: number; r: number; height: number }[] = 
 const SHORE = 18;
 /** How far round a building its terrace is level, and how far it eases out from there (tiles). */
 export const TERRACE = 3, TERRACE_EASE = 5;
+/** How far round the water the shore lies flat at the water's level (tiles), and how far the land can take to come back to its own height. */
+export const WATER_FLAT = 2, SHORE_REACH = 32;
+/** How far a river's floor falls before it's a new reach, a fall below the last (world pixels). */
+export const FALL = 30;   // (world.ts FALL_STEP is the same)
 
 const isWet = (t: number) => t === T.WATER || t === T.DEEP || t === T.BRIDGE;
 const smoothstep = (v: number) => { const t = Math.max(0, Math.min(1, v)); return t * t * (3 - 2 * t); };
@@ -93,32 +97,94 @@ export function buildElevation(ctx: GenContext, buildings: readonly Building[]):
   for (const a of ANCHORS) { const at = mainlandAt(a.x, a.y);
     for (let y = Math.max(0, at.y - a.r); y <= Math.min(R - 1, at.y + a.r); y++) for (let x = Math.max(0, at.x - a.r); x <= Math.min(W - 1, at.x + a.r); x++) {
       const i = y * W + x, d = Math.hypot(x - at.x, y - at.y); if (d > a.r || sea[i]) continue; const t = smoothstep(1 - d / a.r) ; base[i] += (a.height - base[i]) * t; } }
-  // ---------- Every inland lake lies level, at its lowest shore's height (a river, mostly narrow, keeps the slope) ----------
-  const seen = new Uint8Array(W * R);
+  // ---------- Every body of water lies level: the sea and the low water joined to it at sea level; a mountain river in
+  // level reaches, a fall between each and the next ----------
+  // (A body: water joined by water and bridges, eight ways (water touching at a corner shares that corner). A reach:
+  // a body's water whose floor lies in the same FALL step, joined, open water (a lake, the sea) never split; the sea's reach is at 0, any other at its middle
+  // height, the median of the floor under it, so the land comes down to some of it and up to the rest.)
+  const connOf = new Int32Array(W * R).fill(-1), around = (x: number, y: number, visit: (j: number) => void) => {
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const nx = x + dx, ny = y + dy; if ((!dx && !dy) || nx < 0 || ny < 0 || nx >= W || ny >= R) continue; visit(ny * W + nx); } };
+  let bodies = 0;
   for (let s = 0; s < W * R; s++) {
-    if (seen[s] || sea[s] || !isWet(tiles[s])) continue;
-    const body: number[] = [s]; seen[s] = 1; let low = Infinity, wide = 0;
-    for (let k = 0; k < body.length; k++) { const i = body[k], x = i % W, y = (i - x) / W; low = Math.min(low, base[i]); wide += open[i];
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= W || ny >= R) continue; const j = ny * W + nx; if (!seen[j] && !sea[j] && isWet(tiles[j])) { seen[j] = 1; body.push(j); } } }
-    if (wide * 2 >= body.length) for (const i of body) base[i] = low;
+    if (connOf[s] >= 0 || !isWet(tiles[s])) continue;
+    const id = bodies++, list = [s]; connOf[s] = id;
+    for (let k = 0; k < list.length; k++) { const i = list[k], x = i % W; around(x, (i - x) / W, j => { if (connOf[j] < 0 && isWet(tiles[j])) { connOf[j] = id; list.push(j); } }); }
   }
-  // ---------- A terrace for every building: level over it and round it, easing out into the slope ----------
-  // Buildings whose terraces would touch share one (a town's square is level), at their mean height; each tile takes the
-  // nearest terrace's. (A castle on a shore stands on its own sea cliff: Dawnhold.)
+  const step = (i: number) => sea[i] ? 0 : Math.floor(base[i] / FALL);
+  const bodyOf = new Int32Array(W * R).fill(-1), levels: number[] = [], sizes: number[] = [], conn: number[] = [], members: number[][] = [], seaReach: boolean[] = [];
+  for (let s = 0; s < W * R; s++) {
+    if (bodyOf[s] >= 0 || connOf[s] < 0) continue;
+    const id = levels.length, reach = [s], st = step(s); bodyOf[s] = id; let isSea = false;
+    for (let k = 0; k < reach.length; k++) { const i = reach[k], x = i % W; if (sea[i]) isSea = true; around(x, (i - x) / W, j => { if (bodyOf[j] < 0 && connOf[j] >= 0 && (step(j) === st || open[i] || open[j])) { bodyOf[j] = id; reach.push(j); } }); }
+    if (isSea) levels.push(0); else { const under = reach.map(i => base[i]).sort((p, q) => p - q); levels.push(under[under.length >> 1]); }
+    sizes.push(isSea ? Infinity : reach.length); conn.push(connOf[s]); members.push(reach); seaReach.push(isSea);
+  }
+  const join = levels.map((_, k) => k), top = (k: number): number => join[k] === k ? k : (join[k] = top(join[k]));
+  const unite = (p: number, q: number) => { p = top(p); q = top(q); if (p === q) return; const keep = sizes[p] >= sizes[q] ? p : q, gone = keep === p ? q : p; join[gone] = keep; sizes[keep] += sizes[gone]; seaReach[keep] ||= seaReach[gone]; };
+  // (A reach of a few tiles isn't a reach: it lies with the biggest reach beside it.)
+  for (let k = 0; k < members.length; k++) if (sizes[k] < 12) { let best = -1; for (const i of members[k]) { const x = i % W; around(x, (i - x) / W, j => { const r = bodyOf[j]; if (r >= 0 && top(r) !== top(k) && (best < 0 || sizes[top(r)] > sizes[top(best)])) best = r; }); } if (best >= 0) unite(best, k); }
+  // (Two waters with a single tile of land between them would share its corners: they lie at one level, the bigger one's, the sea's above all.)
+  for (let i = 0; i < W * R; i++) {
+    if (connOf[i] >= 0) continue;
+    const x = i % W; let first = -1;
+    around(x, (i - x) / W, j => { const r = bodyOf[j]; if (r < 0) return; if (first < 0) first = r; else if (conn[r] !== conn[first]) unite(first, r); });
+  }
+  // ---------- The towns: buildings whose terraces would touch share one level (a town's square is level), their mean
+  // height; a town at the sea comes down to it, and water in a town (a moat, a canal, a pond by a house) lies at the
+  // town's level, so walls, quays and water all meet ----------
   const list = buildings.filter(b => b.y0 < R), parent = list.map((_, k) => k), find = (k: number): number => parent[k] === k ? k : (parent[k] = find(parent[k]));
   const gap = 2 * TERRACE + 2;
   for (let a = 0; a < list.length; a++) for (let c = a + 1; c < list.length; c++) {
     const A = list[a], C = list[c];
     if (A.x0 - gap <= C.x1 && C.x0 - gap <= A.x1 && A.y0 - gap <= C.y1 && C.y0 - gap <= A.y1) parent[find(a)] = find(c);
   }
-  const sums = new Map<number, { total: number; n: number }>();
-  list.forEach((b, k) => { const cx = Math.round((b.x0 + b.x1) / 2), cy = Math.min(R - 1, Math.round((b.y0 + b.y1) / 2)), root = find(k), e = sums.get(root) ?? { total: 0, n: 0 }; e.total += base[cy * W + cx]; e.n++; sums.set(root, e); });
+  // The water each building stands beside (its reaches), and each town's mean height.
+  const besides = list.map(b => { const at = new Set<number>(); for (let y = Math.max(0, b.y0 - 1); y <= Math.min(R - 1, b.y1 + 1); y++) for (let x = Math.max(0, b.x0 - 1); x <= Math.min(W - 1, b.x1 + 1); x++) { const r = bodyOf[y * W + x]; if (r >= 0) at.add(top(r)); } return [...at]; });
+  const means = new Map<number, { total: number; n: number }>();
+  list.forEach((b, k) => { const cx = Math.round((b.x0 + b.x1) / 2), cy = Math.min(R - 1, Math.round((b.y0 + b.y1) / 2)), e = means.get(find(k)) ?? { total: 0, n: 0 }; e.total += base[cy * W + cx]; e.n++; means.set(find(k), e); });
+  const townLevel = new Map<number, number>(); for (const [root, e] of means) townLevel.set(root, e.total / e.n);
+  // A low town by the sea comes down to it (its quays meet the water); a high one keeps its height and stands over the
+  // sea on a bank (the renderers draw the bank). Any other water by a town lies at the town's level: a moat, a canal.
+  const rootLevel = levels.map((_, k) => levels[top(k)]);
+  list.forEach((_, k) => { if (besides[k].some(t => seaReach[t]) && townLevel.get(find(k))! <= FALL) townLevel.set(find(k), 0); });
+  list.forEach((_, k) => { for (const t of besides[k]) if (!seaReach[t]) rootLevel[t] = townLevel.get(find(k))!; });
+  for (let k = 0; k < levels.length; k++) levels[k] = rootLevel[top(k)];
+  // How far every tile is from the water (tiles, eight ways, up to SHORE_REACH) and which body is nearest.
+  const near = new Uint8Array(W * R).fill(255), nearBody = new Int32Array(W * R).fill(-1);
+  head = tail = 0;
+  for (let i = 0; i < W * R; i++) if (bodyOf[i] >= 0) { near[i] = 0; nearBody[i] = bodyOf[i]; queue[tail++] = i; }
+  while (head < tail) { const i = queue[head++], x = i % W, y = (i - x) / W, d = near[i]; if (d >= SHORE_REACH) continue;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const nx = x + dx, ny = y + dy; if ((!dx && !dy) || nx < 0 || ny < 0 || nx >= W || ny >= R) continue; const k = ny * W + nx; if (near[k] > d + 1) { near[k] = d + 1; nearBody[k] = nearBody[i]; queue[tail++] = k; } } }
+  // The water and its shore (WATER_FLAT tiles) at the water's level; beyond, the land eases back to its own height.
+  const toWater = (i: number) => {
+    if (nearBody[i] < 0) return;
+    const level = levels[nearBody[i]], d = near[i];
+    if (d <= WATER_FLAT) { base[i] = level; return; }
+    // (As at the sea: low land comes down to the water in a long shore, high land in a steep one, a cliff, Dawnhold's way.)
+    const span = Math.max(3, SHORE * (1 - Math.min(1, Math.abs(base[i] - level) / 300))), t = smoothstep((d - WATER_FLAT) / span);
+    base[i] = level + (base[i] - level) * t;
+  };
+  for (let i = 0; i < W * R; i++) toWater(i);
+  // (Where the shores of two waters overlap, a tile beside water stands at that water's level, the higher of two: the
+  // corners round every water tile are then all at its level, and a strip of land between a tarn and the sea drops
+  // from the one to the other.)
+  for (let i = 0; i < W * R; i++) {
+    if (bodyOf[i] >= 0 || near[i] > WATER_FLAT) continue;
+    const x = i % W, y = (i - x) / W; let beside = -Infinity, within = -Infinity;
+    for (let dy = -WATER_FLAT; dy <= WATER_FLAT; dy++) for (let dx = -WATER_FLAT; dx <= WATER_FLAT; dx++) {
+      const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= W || ny >= R) continue; const body = bodyOf[ny * W + nx]; if (body < 0) continue;
+      if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) beside = Math.max(beside, levels[body]); else within = Math.max(within, levels[body]);
+    }
+    base[i] = beside !== -Infinity ? beside : within;
+  }
+  // ---------- A terrace for every building: level over it and round it at its town's level, easing out into the slope
+  // (neither the water nor its flat shore moved; a castle on a shore stands on its own sea cliff: Dawnhold) ----------
   const nearest = new Float32Array(W * R).fill(Infinity), levelAt = new Float32Array(W * R), reach = TERRACE + TERRACE_EASE;
-  list.forEach((b, k) => { const e = sums.get(find(k))!, level = e.total / e.n;
+  list.forEach((b, k) => { const level = townLevel.get(find(k))!;
     for (let y = Math.max(0, b.y0 - reach); y <= Math.min(R - 1, b.y1 + reach); y++) for (let x = Math.max(0, b.x0 - reach); x <= Math.min(W - 1, b.x1 + reach); x++) {
       const i = y * W + x, d = Math.max(b.x0 - x, x - b.x1, b.y0 - y, y - b.y1, 0);
       if (d < nearest[i]) { nearest[i] = d; levelAt[i] = level; } } });
-  for (let i = 0; i < W * R; i++) if (nearest[i] !== Infinity && !sea[i]) { const t = smoothstep((nearest[i] - TERRACE) / TERRACE_EASE); base[i] = levelAt[i] + (base[i] - levelAt[i]) * t; }
+  for (let i = 0; i < W * R; i++) if (nearest[i] !== Infinity && !sea[i] && near[i] > WATER_FLAT) { const t = smoothstep((nearest[i] - TERRACE) / TERRACE_EASE); base[i] = levelAt[i] + (base[i] - levelAt[i]) * t; }
   // (Kept to the bake's steps, so the baked world's heights come out exactly the same.)
   for (let i = 0; i < W * R; i++) base[i] = Math.round(Math.max(0, base[i]) * 64) / 64;
   return base;

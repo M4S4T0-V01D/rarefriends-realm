@@ -4,6 +4,10 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 135, date: "2026-10-14", title: "Level water", items: [
+    "Water lies level everywhere: the sea and the low water joined to it at sea level, every lake at one height, and mountain rivers in level reaches with a waterfall between each and the next. Water never runs up or down a hill any more.",
+    "The shore round all water is flat for two tiles; beyond it, low land comes back in a long slope and high land in a steep bank, a cliff where a castle or a town stands over the sea.",
+  ] },
   { id: 134, date: "2026-10-13", title: "Water and land", items: [
     "Water now lies below the land: every shore has a bank of earth down to the water, so lakes, rivers and seas read as water, not as ground of another colour.",
     "In the WebGL rendering mode the water is new: pale shallows by the shore deepening to dark water, a swell with light running along it, the odd glint, and foam washing along the banks.",

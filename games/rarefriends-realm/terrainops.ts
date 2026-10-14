@@ -23,6 +23,43 @@ export const TERRAIN_STEP = 16;
 export const FLOOR_MAX = 1000;
 export const BRUSH_MAX = 32, LINE_WIDTH_MAX = 15, FLOOD_MAX = 40_000, REGION_TILES_MAX = 250_000;
 const quantize = (v: number) => Math.round(Math.max(0, Math.min(FLOOR_MAX, v)) * 64) / 64;
+/** Water as the shore reckons it (elevation.ts): water, deep water, bridges over it. (Asked for lazily: T isn't there while modules load.) */
+export const isWaterlike = (t: number) => t === T.WATER || t === T.DEEP || t === T.BRIDGE;
+/** How far round water the shore lies flat at the water's level (elevation.ts WATER_FLAT): the ground tools leave it alone. */
+export const SHORE_FLAT = 2;
+/** Whether a tile is water or on its flat shore (within SHORE_FLAT of water, eight ways). */
+export function onShore(tiles: Uint8Array, x: number, y: number) {
+  for (let dy = -SHORE_FLAT; dy <= SHORE_FLAT; dy++) for (let dx = -SHORE_FLAT; dx <= SHORE_FLAT; dx++) { const nx = x + dx, ny = y + dy; if (nx >= 0 && ny >= 0 && nx < W && ny < H && isWaterlike(tiles[ny * W + nx])) return true; }
+  return false;
+}
+/**
+ * Painted water lies level: every body of water the painted rectangle touches takes the level of the water it was
+ * already (the median floor under its tiles outside the rectangle; a new pond, its own), its new tiles and their flat
+ * shore set to it, the land easing back beyond. Returns the rectangle of tiles whose floor changed, or null.
+ */
+export function levelPaintedWater(world: World, box: { x0: number; y0: number; x1: number; y1: number }): { x0: number; y0: number; x1: number; y1: number } | null {
+  const tiles = world.tiles, CAP = 20_000, EASE = 6, base = world.base = world.base ? new Float32Array(world.base) : new Float32Array(W * H);
+  const seen = new Set<number>(), inBox = (x: number, y: number) => x >= box.x0 && x <= box.x1 && y >= box.y0 && y <= box.y1;
+  const out = { x0: W, y0: H, x1: -1, y1: -1 };
+  for (let y = Math.max(0, box.y0); y <= Math.min(H - 1, box.y1); y++) for (let x = Math.max(0, box.x0); x <= Math.min(W - 1, box.x1); x++) {
+    const s = y * W + x; if (seen.has(s) || !isWaterlike(tiles[s])) continue;
+    const body = [s], outside: number[] = [], inside: number[] = []; seen.add(s);
+    for (let k = 0; k < body.length && body.length < CAP; k++) { const i = body[k], bx = i % W, by = (i - bx) / W; (inBox(bx, by) ? inside : outside).push(base[i]);
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const nx = bx + dx, ny = by + dy; if ((!dx && !dy) || nx < 0 || ny < 0 || nx >= W || ny >= H) continue; const j = ny * W + nx; if (!seen.has(j) && isWaterlike(tiles[j])) { seen.add(j); body.push(j); } } }
+    const from = (outside.length ? outside : inside).sort((p, q) => p - q), level = from[from.length >> 1];
+    // The body's tiles in the rectangle, then their shore and the slope back, by distance from them.
+    const dist = new Map<number, number>(), queue: number[] = [];
+    for (const i of body) { const bx = i % W, by = (i - bx) / W; if (inBox(bx, by)) { dist.set(i, 0); queue.push(i); } }
+    for (let h = 0; h < queue.length; h++) { const i = queue[h], bx = i % W, by = (i - bx) / W, d = dist.get(i)!; if (d >= SHORE_FLAT + EASE) continue;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const nx = bx + dx, ny = by + dy; if ((!dx && !dy) || nx < 0 || ny < 0 || nx >= W || ny >= H) continue; const j = ny * W + nx; if (!dist.has(j)) { dist.set(j, d + 1); queue.push(j); } } }
+    for (const [i, d] of dist) {
+      const bx = i % W, by = (i - bx) / W, t = d <= SHORE_FLAT || isWaterlike(tiles[i]) ? 0 : (() => { const v = (d - SHORE_FLAT) / EASE; return v * v * (3 - 2 * v); })();
+      const v = quantize(level + (base[i] - level) * t); if (v === base[i]) continue;
+      base[i] = v; out.x0 = Math.min(out.x0, bx); out.y0 = Math.min(out.y0, by); out.x1 = Math.max(out.x1, bx); out.y1 = Math.max(out.y1, by);
+    }
+  }
+  return out.x1 >= 0 ? out : null;
+}
 /** A number from a tile and a seed, in [0, 1): the same every time. */
 export const tileHash = (x: number, y: number, seed: number) => { let h = (x * 374761393 + y * 668265263 + seed * 2147483647) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967296; };
 
@@ -90,7 +127,8 @@ export function applyTerrain(world: World, ground: Float32Array, ops: readonly T
   /** A tile's height now: the average of its four corners. */
   const height = (x: number, y: number) => (corner(x, y) + corner(x + 1, y) + corner(x, y + 1) + corner(x + 1, y + 1)) / 4;
   const box = { x0: W, y0: H, x1: -1, y1: -1 };
-  const set = (x: number, y: number, v: number) => { base[y * W + x] = quantize(v); box.x0 = Math.min(box.x0, x); box.y0 = Math.min(box.y0, y); box.x1 = Math.max(box.x1, x); box.y1 = Math.max(box.y1, y); };
+  // (Water and its flat shore aren't the ground tools' to move: water lies level.)
+  const set = (x: number, y: number, v: number) => { if (onShore(world.tiles, x, y)) return; base[y * W + x] = quantize(v); box.x0 = Math.min(box.x0, x); box.y0 = Math.min(box.y0, y); box.x1 = Math.max(box.x1, x); box.y1 = Math.max(box.y1, y); };
   for (const op of ops) {
     if (op.op === "slope") {
       const changes: [number, number, number][] = [];
