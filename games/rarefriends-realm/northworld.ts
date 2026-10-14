@@ -386,6 +386,13 @@ export function buildNorth(ctx: GenContext, labels: World["labels"]) {
     for (let y = P.y - 7; y <= P.y + 7; y++) { const i = idx(gx, y); if (WALKABLE.has(tiles[i])) { t.clearAt(gx, y); tiles[i] = y === P.y ? T.PATH : T.WALL; } }
     for (const dir of [-1, 1]) for (let y = P.y + dir * 8; Math.abs(y - P.y) < 48 && !inSpine(y); y += dir) { const i = idx(gx, y); if (!isWater(tiles[i])) { t.clearAt(gx, y); tiles[i] = T.CLIFF; raise[i] = Math.max(raise[i], 3.2); } }
     t.add({ kind: "gate", axis: "ns", x: gx, y: P.y, blocks: true, name: "The Oathgate bar", action: "Open", to: { x: gx + 1, y: P.y }, clue: "oa_gate" });
+    // The wall itself is a great wall (render.ts): its top almost as high as the ridge it stands between, a gateway five
+    // tiles wide with its arch in the middle and great doors, a tower either side, and the wall running on up the crag
+    // (its reach) until it meets rock near its own height. (The tiles are as they were: one row of wall, the bar in the
+    // middle, crag beyond; only how it stands is new.)
+    { let y0 = P.y, y1 = P.y; while (tiles[idx(gx, y0 - 1)] === T.WALL) y0--; while (tiles[idx(gx, y1 + 1)] === T.WALL) y1++;
+      for (let y = P.y - 2; y <= P.y + 2; y++) if (y !== P.y) { t.clearAt(gx, y); tiles[idx(gx, y)] = T.WALL; }
+      (ctx.ramparts ??= []).push({ x0: gx, y0, x1: gx, y1, storeys: 1, great: { top: 400, depth: 1.9, towers: 70, reach: 30, arch: { y0: P.y - 2, y1: P.y + 2, spring: 190, crown: 262 } } }); }
   }
 
   // ---------- The Wolfsback: a goat-track over the ridge's spine, snow underfoot, for those who climb ----------

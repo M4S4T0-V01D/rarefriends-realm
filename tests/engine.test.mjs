@@ -5464,3 +5464,19 @@ test("Creature designer, building designs and biome scatter: specials set and ta
     assert.equal(cleanOverlay({ v: 1, ops: [{ ...fill.ops[0], x1: s.x + 400, y1: s.y + 400 }] }).ops.length, 0, "a fill too big is refused");
   } finally { resetOverrides(); }
 });
+
+test("The Oathgate is a great wall: its top near the crags' height, the whole width of the pass, a five-tile gateway with the bar in the middle, still walled shut but for the bar", async () => {
+  const { RIDGE } = await import("../games/rarefriends-realm/northworld.ts");
+  const { W, T, groundHeight } = await import("../games/rarefriends-realm/world.ts");
+  const world = createWorld(), P = RIDGE.oathgate, wall = (world.ramparts ?? []).find(r => r.great);
+  assert.ok(wall, "a great wall"); assert.equal(wall.x0, wall.x1, "one tile thick on the ground");
+  const gx = wall.x0, road = groundHeight(world, gx, P.y), crags = Math.max(groundHeight(world, gx, wall.y0 - 3), groundHeight(world, gx, wall.y1 + 3));
+  assert.ok(wall.great.top - road > 200, `it stands ${Math.round(wall.great.top - road)} over the road`); assert.ok(wall.great.top > crags * 0.75, "near the crags' own height");
+  for (let y = wall.y0; y <= wall.y1; y++) assert.equal(world.tiles[y * W + gx], y === P.y ? T.PATH : T.WALL, `${y}: walled but for the bar`);
+  assert.ok(world.objects.some(o => o.kind === "gate" && o.x === gx && o.y === P.y), "the bar in the gateway");
+  assert.ok(wall.great.arch.y0 < P.y && wall.great.arch.y1 > P.y && wall.great.arch.crown > road + 100, "the arch over it, high");
+  // It runs on up the crag either way until the rock comes near its top (render.ts stands it on the crag's column).
+  assert.ok(wall.great.reach >= 10, "it runs on up the crag");
+  const meets = dir => { for (let k = 1; k <= wall.great.reach; k++) { const y = (dir < 0 ? wall.y0 : wall.y1) + dir * k; if (groundHeight(world, gx, y) >= wall.great.top - 60) return k; } return 0; };
+  assert.ok(meets(-1) > 0 && meets(1) > 0, `it meets rock near its own height both ways (${meets(-1)}, ${meets(1)} rows on)`);
+});

@@ -15,7 +15,7 @@ import { TICK_MS, attackSpeed, riding, type Facing, type Game, type Monster, typ
 import { npcOverhead, veiled, type Pick } from "./engine.ts";
 import { knows, maxHpOf as creatureMaxHp } from "./pursuance.ts";
 import { FAMILIES, dungeonTheme } from "./dungeontheme.ts";
-import { gloomAt, inDeadwood, UNDER_Y, FLOOR_Y, OVERWORLD_H, REGIONS, STOREY, floorLift, storeyHeight, T, W, H, isStorey, complexAt, cornerHeight, floorAt, groundHeight, inBounds, isUnderground, objectAtTile, onLevel, realPoint, type Building, type DecorKind, type Floor, type World, type WorldObject } from "./world.ts";
+import { type Rampart, gloomAt, inDeadwood, UNDER_Y, FLOOR_Y, OVERWORLD_H, REGIONS, STOREY, floorLift, storeyHeight, T, W, H, isStorey, complexAt, cornerHeight, floorAt, groundHeight, inBounds, isUnderground, objectAtTile, onLevel, realPoint, type Building, type DecorKind, type Floor, type World, type WorldObject } from "./world.ts";
 import { itemArt } from "./icons.ts";
 import type { PeerView } from "./social.ts";
 import type { Strike, Weather } from "./weather.ts";
@@ -177,9 +177,12 @@ const liftScale = (camera: Camera) => Math.sqrt(1 - camera.pitch * camera.pitch)
 /** The ground under the scene (set each frame), so everything stands on the hills. */
 let ground: World | null = null;
 export function setGround(world: World | null) { ground = world; }
+/** While set, every point stands on this one height: a level box (the great wall's rows) on a slope. */
+let levelGround: number | null = null;
 /** The ground under a point as drawn: on water, its surface (WATER_DROP below the land's corners), so whatever floats or stands in it (a boat, a lily, a fishing spot) sits on the water. */
 const groundAt = (x: number, y: number) => {
   if (!ground) return 0;
+  if (levelGround !== null) return levelGround;
   const tx = Math.round(x), ty = Math.round(y);
   return inBounds(tx, ty) && isLiquid(ground.tiles[ty * W + tx]) ? waterSurface(ground, tx, ty) : groundHeight(ground, x, y);
 };
@@ -344,7 +347,7 @@ function captureBox(ctx: CanvasRenderingContext2D, camera: Camera, x: number, y:
   const ink = !stroke ? 0 : stroke === INK ? 1 : (rgbaOf(stroke)[3] ?? 1);
   // In the light of the thing it belongs to; a lit window's glass glows in the shader.
   const glow = pattern === "window_lit" || pattern === "sandstone_window_lit" || pattern === "mudbrick_window_lit" ? 1 : pattern === "timber_window_lit" || pattern === "mizukai_window_lit" ? 2 : 0;
-  gl.addBox(rx, ry, w, d, rlift, h, face(left), face(right), lid, rgbOf(top), rgbOf(left), rgbOf(right), ink, spriteState.light, spriteState.clear, glow);
+  gl.addBox(rx, ry, w, d, rlift, h, face(left), face(right), lid, rgbOf(top), rgbOf(left), rgbOf(right), ink, spriteState.light, spriteState.clear, levelGround !== null ? -1 : glow);
   spriteState.sent = true;
   punch(ctx, boxHull(camera, x, y, w, d, h, lift));
 }
@@ -579,6 +582,7 @@ function glDepth(camera: Camera, x: number, y: number, lift = 0) {
 /** An isometric box on a tile footprint (w, d in tiles) and height h (world px). With a `pattern`, its faces are pixel-art textured. */
 /** The patterns a box's top takes too (a wall's cap of stone; boards, a quilt, linen, carving, a coffin lid). */
 const LID_PATTERNS: ReadonlySet<string> = new Set(["cap", "planks", "quilt", "linen", "carved", "lid"]);
+const drawBox = (...args: Parameters<typeof box>) => box(...args);
 function box(ctx: CanvasRenderingContext2D, camera: Camera, x: number, y: number, w: number, d: number, h: number, top: string, left: string, right: string, lift = 0, stroke: string | null = INK, pattern: WallStyle | null = null, hidden?: (nx: number, ny: number) => boolean) {
   if (capturing) { captureBox(ctx, camera, x, y, w, d, h, top, left, right, lift, pattern, stroke); return; }
   const p = (px: number, py: number, z: number) => { const s = toScreen(camera, px, py, z); return [s.x, s.y] as const; };
@@ -2305,6 +2309,21 @@ const rampartAt = (world: World, x: number, y: number) => {
   for (const r of world.ramparts ?? []) if (x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1 && (x === r.x0 || x === r.x1 || y === r.y0 || y === r.y1)) return r.storeys;
   return 0;
 };
+/** The great wall (a rampart with `great`) a wall tile belongs to, if any: every tile of its rectangle is its wall. */
+const greatWallAt = (world: World, x: number, y: number) => { for (const r of world.ramparts ?? []) { const run = r.great && greatRun(world, r); if (run && x >= r.x0 && x <= r.x1 && y >= run.y0 && y <= run.y1) return r; } return null; };
+/** How far a great wall runs: its own tiles, then on up the crag either way (its reach) until the ground comes within 60 of its top. */
+const greatRuns = new WeakMap<Rampart, { y0: number; y1: number }>();
+function greatRun(world: World, r: Rampart) {
+  let run = greatRuns.get(r);
+  if (!run) {
+    const g = r.great!, reach = g.reach ?? 0, cx = (r.x0 + r.x1) / 2, low = (y: number) => groundHeight(world, cx, y) < g.top - 60;
+    let y0 = r.y0, y1 = r.y1;
+    while (y0 > r.y0 - reach && low(y0 - 1)) y0--;
+    while (y1 < r.y1 + reach && low(y1 + 1)) y1++;
+    greatRuns.set(r, run = { y0, y1 });
+  }
+  return run;
+}
 /** What a rampart's wall at a tile is built of. */
 const rampartWalls = (world: World, x: number, y: number): Building["walls"] => {
   for (const r of world.ramparts ?? []) if (x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1 && (x === r.x0 || x === r.x1 || y === r.y0 || y === r.y1)) return r.walls ?? "stone";
@@ -2851,6 +2870,56 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   // Hover highlight and click marker.
   const tileOutline = (tx: number, ty: number, color: string) => { const c = (dx: number, dy: number) => { const s = toScreen(camera, tx + dx, ty + dy); return [s.x, s.y] as const; }; poly(ctx, [c(-0.5, -0.5), c(0.5, -0.5), c(0.5, 0.5), c(-0.5, 0.5)], null, color, 1.5); };
   /** A wall tile: storeys of brick (with windows on buildings), cut low when it stands between you and the camera inside. */
+  /**
+   * A tile of a great wall (the Oathgate): dressed stone from the ground to the wall's one top, deep, a coping and merlons
+   * along it; in the gateway the stone stands over an arch, great iron-bound doors under it; either side of the gateway a
+   * tower, deeper and taller, battlemented. Seen from behind it fades like any wall you're behind.
+   */
+  const greatWall = (x: number, y: number, r: Rampart, near: boolean) => {
+    const g = r.great!, a = g.arch, mid = (a.y0 + a.y1) / 2, half = (a.y1 - a.y0) / 2 + 0.5, run = greatRun(world, r), cx = (r.x0 + r.x1) / 2;
+    if (x !== Math.round(cx)) return;   // (drawn once per row, across its depth)
+    // A tower either side of the gateway, two tiles long (drawn once, from the row next to the arch).
+    const towerRow = y === a.y0 - 1 || y === a.y0 - 2 || y === a.y1 + 1 || y === a.y1 + 2, inArch = y >= a.y0 && y <= a.y1;
+    if (y === a.y0 - 2 || y === a.y1 + 2) { blockers.push([cx, y, g.top + g.towers - groundHeight(world, cx, y)]); return; }
+    const cy = y === a.y0 - 1 ? y - 0.5 : y === a.y1 + 1 ? y + 0.5 : y, len = towerRow ? 2 : 1;
+    // Each row stands level (its top flat however the crag slopes under it), from its lowest corner up.
+    const g0 = groundHeight(world, cx, cy), reachX = (D0: number) => [cx - D0 / 2, cx + D0 / 2], D0 = (towerRow ? g.depth + 1.1 : g.depth) + 0.36;
+    const ground = Math.min(...reachX(D0).flatMap(px => [cy - len / 2, cy + len / 2].map(py => groundHeight(world, px, py)))), drop = ground - g0, H = Math.max(60, g.top - ground);
+    const archAt = (yy: number) => a.spring + (a.crown - a.spring) * Math.sqrt(Math.max(0, 1 - ((yy - mid) / half) ** 2)) - ground;
+    const lift = inArch ? Math.max(8, archAt(y)) : 0, D = towerRow ? g.depth + 1.1 : g.depth, top = H + (towerRow ? g.towers : 0);
+    const STONE = ["#c3beb4", "#aba69c", "#958f86"] as const, SEAM = "#6f6a63", SLIT = "#2a2724";
+    // (The curtain's rows meet without a face between them, and its seams are drawn soft: one wall, not a row of towers.)
+    const joined = (nx: number, ny: number) => !towerRow && nx === 0 && y + ny >= run.y0 && y + ny <= run.y1 && !(y + ny >= a.y0 - 2 && y + ny <= a.y1 + 2 && !inArch);
+    const buttress = !towerRow && !inArch && ((y - a.y0) % 4 + 4) % 4 === 2 && y > run.y0 && y < run.y1;
+    drawables.push({ depth: depth(cx, cy), at: { x: cx, y: cy, h: top / 2 }, size: [top + 40, 60 + D * 30 + len * 30, 30], exact: true, hull: () => { if (near) return null; levelGround = g0; const hull = boxHull(camera, cx, cy, D, len, top - lift, lift + drop); levelGround = null; return hull; }, draw: () => {
+      capturing = glr && !near && ctx === target ? glr : null; levelGround = g0;
+      const box = (c: CanvasRenderingContext2D, cam: Camera, bx: number, by: number, bw: number, bd: number, bh: number, t: string, l: string, rr: string, bl = 0, stroke: string | null = INK, pattern: WallStyle | null = null, hidden?: (nx: number, ny: number) => boolean) => drawBox(c, cam, bx, by, bw, bd, bh, t, l, rr, bl + drop, stroke, pattern, hidden);
+      ctx.globalAlpha = near ? 0.3 : 1;
+      if (inArch) {
+        // The doors: oak, iron-banded, filling the arch to its curve; the stone over the arch, its voussoirs a shade lighter.
+        box(ctx, camera, cx, y, 0.3, 1, lift, "#5a4030", "#7a5a40", "#5a4030", 0, INK, "planks");
+        for (const k of [0.22, 0.5, 0.78]) box(ctx, camera, cx, y, 0.34, 1, 3, "#5b5e66", "#5b5e66", "#4a4d55", lift * k, INK);
+        box(ctx, camera, cx, y, D, 1, 12, "#d6d1c6", "#bdb8ae", "#a39e95", lift, SEAM, "carved", joined);
+        box(ctx, camera, cx, y, D, 1, top - lift - 12, ...STONE, lift + 12, SEAM, "brick", joined);
+      } else {
+        // A battered foot, the wall, and a buttress every fourth row.
+        box(ctx, camera, cx, cy, D + 0.36, len, Math.min(34, top * 0.3), "#a39e95", "#958f86", "#827d75", 0, SEAM, "brick", joined);
+        box(ctx, camera, cx, cy, D, len, top, ...STONE, 0, towerRow ? INK : SEAM, "brick", joined);
+        if (buttress) for (const side of [-1, 1]) {
+          box(ctx, camera, cx + side * (D / 2 + 0.22), y, 0.44, 0.8, top * 0.72, ...STONE, 0, SEAM, "brick");
+          box(ctx, camera, cx + side * (D / 2 + 0.16), y, 0.32, 0.8, 5, "#d6d1c6", "#bdb8ae", "#a39e95", top * 0.72, SEAM, "cap");
+        }
+      }
+      // Arrow slits high in its faces (and two tiers in a tower).
+      if (!buttress) for (const side of [-1, 1]) for (const k of towerRow ? [0.62, 0.86] : [0.84]) if (top * k > lift + 24) box(ctx, camera, cx + side * (D / 2 + 0.01), cy, 0.03, 0.16, 16, SLIT, SLIT, SLIT, top * k - 16, null);
+      // The wall-walk's coping, and a merlon on every other tile (four to a tower's side).
+      box(ctx, camera, cx, cy, D + 0.12, len + (towerRow ? 0.12 : 0.02), 6, "#d6d1c6", "#bdb8ae", "#a39e95", top, towerRow ? INK : SEAM, "cap", joined);
+      if (towerRow) for (const side of [-1, 1]) for (const k of [-0.75, -0.25, 0.25, 0.75]) box(ctx, camera, cx + side * (D / 2 - 0.18), cy + k, 0.34, 0.3, 16, ...STONE, top + 6, INK, "brick");
+      else if (Math.round(y) % 2 === 0) for (const side of [-1, 1]) box(ctx, camera, cx + side * (D / 2 - 0.16), y, 0.3, 0.6, 14, ...STONE, top + 6, SEAM, "brick");
+      capturing = null; levelGround = null; ctx.globalAlpha = 1;
+    } });
+    blockers.push([cx, y, top + drop]);
+  };
   const wall = (x: number, y: number, storeys: number, cut: boolean, near: boolean, windows: boolean, battlement = false, style: Building["walls"] = "stone", tall = 0, joined?: (nx: number, ny: number) => boolean, crown = false, plinth = false) => {
     if (crown) tall += 17;
     // A pyramid stands on a low plinth of dressed stone (its faces are its roof).
@@ -2996,6 +3065,8 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       };
       // Tall buildings show every storey from outside; inside, only the storey you're on (and the ones below).
       // A city's rampart stands storeys high, battlemented, wherever no building owns the wall.
+      const great = building || mine ? null : greatWallAt(world, x, y);
+      if (great) { greatWall(x, y, great, near); continue; }
       const rampart = building || mine ? 0 : rampartAt(world, x, y);
       wall(x, y, mine ? 1 : building?.storeys ?? (rampart || 1), cut, near, !!owner && !cut && !building?.pyramid, false, building?.walls ?? (rampart > 0 ? rampartWalls(world, x, y) : "stone"), mine ? 0 : building?.tall ?? 0, joined, rampart > 0, !!building?.pyramid && !mine);
       // Walls not under a roof cast their own shadows (a building's are cast whole).
@@ -3010,7 +3081,8 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
         box(ctx, camera, x, y, 1, 1, h - 6, "#b9b4ab", "#a39e95", "#8f8a82", per + 6, INK, hash(x, y + 5) < 0.4 ? (windowGlow > 0.02 ? "window_lit" : "window") : "brick");
         capturing = null;
       } });
-    } else if (terrain === T.CLIFF) {
+    } else if (terrain === T.CLIFF && greatWallAt(world, x, y)) greatWall(x, y, greatWallAt(world, x, y)!, Math.abs(x - pp.x) + Math.abs(y - pp.y) < 7 && depth(x, y) > playerDepth + 0.5 && !floor);
+    else if (terrain === T.CLIFF) {
       // Kharaveth's rock is its own: the Sunteeth's towering sandstone, the desert's lower sandstone, the Black Range's basalt.
       const [h, top, left, right] = cliffLook(x, y);
       drawables.push({ depth: depth(x, y), at: { x, y }, size: [h + 38, 52, 30], exact: true, hull: () => boxHull(camera, x, y, 1, 1, h), draw: () => { capturing = glr && ctx === target ? glr : null; box(ctx, camera, x, y, 1, 1, h, top, left, right); capturing = null; } }); blockers.push([x, y, h + 6]);

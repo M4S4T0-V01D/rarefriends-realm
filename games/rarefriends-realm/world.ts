@@ -422,7 +422,13 @@ export type Building = {
 /** An upper storey: the real rectangle it covers and where its tiles are stored (real + (dx, dy)). */
 export type Floor = { complex: string; level: number; x0: number; y0: number; x1: number; y1: number; dx: number; dy: number; /** Pixels up, when not `level` storeys (on taller walls). */ lift?: number };
 /** A city wall standing taller than a storey: the outline of the rectangle, `storeys` high, battlemented. */
-export type Rampart = { x0: number; y0: number; x1: number; y1: number; storeys: number; /** What it's built of (stone unless said). */ walls?: Building["walls"] };
+export type Rampart = { x0: number; y0: number; x1: number; y1: number; storeys: number; /** What it's built of (stone unless said). */ walls?: Building["walls"];
+  /**
+   * A great wall (the Oathgate): every tile of the rectangle is wall, its top at one height (world pixels) however the
+   * ground falls under it, `depth` tiles thick as drawn; across the tiles y0..y1 of `arch` a gateway, its arch rising from
+   * `spring` to `crown` (world pixels), great doors in it, and a tower either side rising `towers` above the wall.
+   */
+  great?: { top: number; depth: number; towers: number; reach?: number; arch: { y0: number; y1: number; spring: number; crown: number } } };
 export type World = {
   tiles: Uint8Array; region: Uint8Array; objects: WorldObject[]; objectAt: Int32Array; spawns: SpawnDef[];
   buildings: Building[];

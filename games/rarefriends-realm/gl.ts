@@ -226,8 +226,9 @@ float groundAt(vec2 p) {
 void main() {
   vec2 xy = iCentre + aCorner.xy * iSize;
   float z = iLift + aCorner.z * iHeight;
-  gl_Position = project(vec3(xy, z + groundAt(xy)));
-  vFace = aFace; vInk = iInk; vLight = iLight; vGlow = aNormal.z > 0.5 ? 0.0 : iGlow;
+  // (A glow below zero marks a level box: it stands on the ground at its centre, not on the slope under each corner.)
+  gl_Position = project(vec3(xy, z + groundAt(iGlow < -0.5 ? iCentre : xy)));
+  vFace = aFace; vInk = iInk; vLight = iLight; vGlow = aNormal.z > 0.5 ? 0.0 : max(iGlow, 0.0);
   if (aNormal.z > 0.5) {
     // The lid: plain, or a cap texture laid across it.
     vColor = iTop; vSide = 0; vTex = vec3((aCorner.xy + 0.5) * iSize * 16.0, iLayers.z);
