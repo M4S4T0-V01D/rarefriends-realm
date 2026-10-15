@@ -42,9 +42,9 @@ export function buildCrownstones(ctx: GenContext, labels: World["labels"]) {
   for (let y = H.y - H.bank - 4; y <= H.y + H.bank + 4; y++) for (let x = H.x - H.bank - 4; x <= H.x + H.bank + 4; x++) {
     const r = Math.hypot(x - H.x, y - H.y), i = idx(x, y);
     if (r > H.bank + 3.5 || tiles[i] === T.WALL || tiles[i] === T.VOID) continue;
-    t.clearAt(x, y); t.setRegion(x, y, "crownstones"); raise[i] = 0.1;
+    t.clearAt(x, y); t.setRegion(x, y, "crownstones"); raise[i] = 6 / 64;
     const bank = Math.max(0, 1 - Math.abs(r - H.bank) / 1.6), ditch = Math.max(0, 1 - Math.abs(r - (H.bank - 2.6)) / 1.1);
-    lift[i] = 0.3 + bank * 0.9 - ditch * 0.25;
+    lift[i] = Math.round((0.3 + bank * 0.9 - ditch * 0.25) * 64) / 64;   // (on the bake's own steps, so it bakes exactly)
     tiles[i] = ditch > 0.3 ? T.DARK_GRASS : noise2(x * 0.25, y * 0.25 + 30) > 0.62 ? T.DARK_GRASS : T.GRASS;
   }
   // The avenue's ground, west from the gap, and the downs either side of it.

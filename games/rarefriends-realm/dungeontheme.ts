@@ -71,6 +71,7 @@ export const DUNGEON_THEMES: Partial<Record<RegionId, DungeonTheme>> = {
   sunken_halls: FAMILIES.tomb,
   sorrowmere_catacombs: FAMILIES.ossuary,
   crownstones_undercroft: FAMILIES.henge,
+  labyrinth_of_azhur: FAMILIES.tomb,
 };
 
 /** The theme under a tile, or null above ground and where none is set. */

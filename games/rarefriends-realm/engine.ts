@@ -44,6 +44,7 @@ import { cleanCommerce } from "./commerce.ts";
 import { cleanLabyrinth, endMazeRun, labyrinthTick } from "./labyrinth.ts";
 import { sorrowmereDoor } from "./necropolis.ts";
 import { crownstonesDoor } from "./crownstones.ts";
+import { azhurDoor } from "./azhur.ts";
 import { PRISMWEAVE, PRISM_STAFF_SIGILS } from "./prismgear.ts";
 import { blessingFood, blessingHerb, blessingRegen, blessingTaken, blessingTick, cleanBlessing, rememberedName, saveBlessing } from "./northfaith.ts";
 import { allyOf, callNext, cleanCompanions, cleanHatchery, cleanTrust, findsHerbs, canSpare, companionFell, companionMenu, companionOut, companionTick, drawsFire, freeSnared, homeOnDeath, placeCompanion, sendHome, spare, speciesOfWild, useOnCreature } from "./beasts.ts";
@@ -351,7 +352,7 @@ const DECOR_EXAMINE: Partial<Record<string, string>> = {
   prism_giant: "A crystal as tall as a tower, grown out of the ground over who knows how long. The light inside it moves.", fae_tree: "A tree with pale twisted bark and leaves the colour of evening. Little lights hang in it.",
   fae_ring: "A ring of tiny pale mushrooms. The fae dance in them, the Collegium says. Step in at your own risk.", lumen_lamp: "A crystal hung in a silver cage on a post of white stone, lit from inside.",
   maze_door: "A crystal door.", maze_glyph: "A glyph.", hourglass: "Fennick's hourglass.",
-  menhir: "A standing stone three times a house's height, lichen on its north face, a name worn off its south.", trilithon: "Two great stones standing and a third laid across their tops, dressed square. A doorway into nothing; or into something.", crown_stone: "A trilithon of grey stone with a carved disc in its lintel that turns.", altar_stone: "A great flat stone at the heart of the horseshoe, a crown cut in it.", dolmen: "Two great stones standing, and a third laid across them. A grave, once. A door, the old songs say.", brazier: "A brazier of black iron.",
+  menhir: "A standing stone three times a house's height, lichen on its north face, a name worn off its south.", trilithon: "Two great stones standing and a third laid across their tops, dressed square. A doorway into nothing; or into something.", crown_stone: "A trilithon of grey stone with a carved disc in its lintel that turns.", altar_stone: "A great flat stone at the heart of the horseshoe, a crown cut in it.", azhur_gate: "Two pillars and a lintel taller than a temple, glyphs cut down them, a stair going down into the dark between.", dolmen: "Two great stones standing, and a third laid across them. A grave, once. A door, the old songs say.", brazier: "A brazier of black iron.",
   teapot_house: "A house in a teapot as big as a cottage. The spout steams when someone's home.", mushroom_house: "A house in the stem of a mushroom, with a door and a round window. The cap keeps the rain off.",
   crooked_house: "Three storeys stacked askew, each leaning its own way. It has stood like that for two hundred years, out of spite.", topsy_tower: "A tower stood on its head: roof in the ground, foundations in the air, door at the top. The wizard who lives there says it's the right way up.",
   floating_isle: "A market stall on a lump of rock hanging in the air at head height. You reach up to pay.", giant_candle: "A candle the height of a lamp post. It never burns down, and nobody remembers lighting it.",
@@ -1111,6 +1112,7 @@ function interactObject(game: Game, object: WorldObject, option: string, use?: n
   if (object.clue === "maze_thread" && option === "Pull" && game.player.maze) { endMazeRun(game, travel, "thread"); return; }
   if (sorrowmereDoor(game, object, travel)) return;
   if (crownstonesDoor(game, object, travel)) return;
+  if (azhurDoor(game, object, travel)) return;
   const clue = useClue(game, object, option);
   if (clue !== undefined) {
     if (clue?.to) travel(game, clue.to, clue.text ?? "");

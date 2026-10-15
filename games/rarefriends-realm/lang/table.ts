@@ -30,8 +30,9 @@ import { PRISMWILD_TALK } from "./prismwild2.ts";
 import { MEGALITHS } from "./megaliths.ts";
 import { BEASTS_GROWN } from "./beastsgrown.ts";
 import { CROWNSTONES_TR } from "./crownstones.ts";
+import { AZHUR_TR } from "./azhur.ts";
 
 export const TABLE_LANGUAGES = ["ja", "ko", "zh-CN", "zh-TW", "vi", "id", "th", "tr", "es", "pt-BR", "ru", "uk"] as const;
 export type Row = readonly [ja: string, ko: string, zhCN: string, zhTW: string, vi: string, id: string, th: string, tr: string, es: string, ptBR: string, ru: string, uk: string];
 // The soundtrack and the panels' words first, so a title or a name that is also something else keeps that row.
-export const TABLE: Readonly<Record<string, Row>> = { ...CROWNSTONES_TR, ...BEASTS_GROWN, ...MEGALITHS, ...PRISMWILD_TALK, ...PRISMWILD_NAMES, ...PORTS_TALK, ...PORTS_NAMES, ...PYRAMIDS_TALK, ...PYRAMIDS_NAMES, ...MEGHAVAN_TALK, ...MEGHAVAN_NAMES, ...HEARTLANDS_TALK, ...HEARTLANDS_NAMES, ...KHARAVETH_TALK, ...KHARAVETH_NAMES, ...MIZUKAI_MORE, ...MIZUKAI_TALK, ...MIZUKAI_NAMES, ...TRACKS, ...PANELS, ...PURSUANCE, ...CLOUD, ...RENDERER, ...NAMES, ...GUIDE, ...TIPS, ...DIALOGUE, ...UPDATE_LOG };
+export const TABLE: Readonly<Record<string, Row>> = { ...AZHUR_TR, ...CROWNSTONES_TR, ...BEASTS_GROWN, ...MEGALITHS, ...PRISMWILD_TALK, ...PRISMWILD_NAMES, ...PORTS_TALK, ...PORTS_NAMES, ...PYRAMIDS_TALK, ...PYRAMIDS_NAMES, ...MEGHAVAN_TALK, ...MEGHAVAN_NAMES, ...HEARTLANDS_TALK, ...HEARTLANDS_NAMES, ...KHARAVETH_TALK, ...KHARAVETH_NAMES, ...MIZUKAI_MORE, ...MIZUKAI_TALK, ...MIZUKAI_NAMES, ...TRACKS, ...PANELS, ...PURSUANCE, ...CLOUD, ...RENDERER, ...NAMES, ...GUIDE, ...TIPS, ...DIALOGUE, ...UPDATE_LOG };

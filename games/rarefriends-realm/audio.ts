@@ -803,7 +803,7 @@ const NORTH_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { vargskeld: "nor
   skarnholm: "north_skarnholm", ravnsvik: "north_skarnholm", skarnholm_bay: "north_skarnholm", vargskeld_sea: "north_skarnholm", oathsworn_hall: "north_oath", oathgate_pass: "north_oath",
   redwake_camp: "north_redwake", zoryavik: "north_zoryavik", sokol_hills: "north_zoryavik", zoryavik_coast: "north_zoryavik", hearthwatch: "north_zoryavik",
   krasnogor: "north_krasnogor", bereslav: "north_krasnogor", zlatna_gora: "north_krasnogor", svetloye: "north_old_bough", old_bough: "north_old_bough", outer_sea: "coast" };
-const DRAGON_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { sorrowmere: "deadwood", sorrowmere_catacombs: "crypt", crownstones: "crownlands", crownstones_undercroft: "crypt", bonefield: "deadwood", cragmaw_heights: "ironreach", qeshet: "kharaveth_dunes", sunken_halls: "kharaveth_underway" };
+const DRAGON_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { sorrowmere: "deadwood", sorrowmere_catacombs: "crypt", crownstones: "crownlands", crownstones_undercroft: "crypt", gate_of_azhur: "kharaveth_azhurak", labyrinth_of_azhur: "kharaveth_underway", bonefield: "deadwood", cragmaw_heights: "ironreach", qeshet: "kharaveth_dunes", sunken_halls: "kharaveth_underway" };
 const PORTS_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { gullwick: "saltmarrow", saltreach: "crownlands", merrab: "kharaveth_sefrah", tel_ashun: "kharaveth_azhurak", ennus_well: "kharaveth_dunes" };
 /** Which Mizukai piece plays where. */
 const MIZUKAI_REGION_TRACK: Partial<Record<RegionId, TrackId>> = {

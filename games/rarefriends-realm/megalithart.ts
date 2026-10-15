@@ -87,3 +87,20 @@ export function altarStoneArt(open: boolean): HTMLCanvasElement {
     p.poly([[22, 18], [24, 12], [28, 15], [32, 10], [36, 15], [40, 12], [40, 18]], null, shadeHex(stone, -0.4));
   });
 }
+/** The Gate of Azhur: two sandstone pillars banded with glyphs and a lintel with a winged eye, a stair going down into the dark between them. */
+export function azhurGateArt(): HTMLCanvasElement {
+  return pixelArt("azhur_gate", 140, 232, p => {
+    const stone = "#c9a87a", L = shadeHex(stone, 0.16), D = shadeHex(stone, -0.24), G = "#5a4a38";
+    p.rect(38, 48, 64, 183, "#141210");
+    for (let k = 0; k < 6; k++) p.line(40 + k * 2, 230 - k * 9, 100 - k * 2, 230 - k * 9, "#3a3026");
+    for (const x0 of [8, 102]) {
+      p.poly([[x0, 231], [x0 + 2, 46], [x0 + 18, 46], [x0 + 18, 231]], L, null); p.poly([[x0 + 18, 231], [x0 + 18, 46], [x0 + 30, 46], [x0 + 30, 231]], D, null);
+      p.poly([[x0, 231], [x0 + 2, 46], [x0 + 30, 46], [x0 + 30, 231]], null, INK);
+      for (let y = 64; y < 220; y += 14) for (let k = 0; k < 3; k++) { const gx = x0 + 6 + k * 7, kind = (y + k * 5 + x0) % 4; if (kind === 0) p.rect(gx, y, 4, 2, G); else if (kind === 1) p.disc(gx + 2, y + 1, 1.6, 1.6, G, null); else if (kind === 2) p.line(gx, y, gx + 3, y + 4, G); else p.rect(gx + 1, y - 1, 2, 5, G); }
+    }
+    p.poly([[0, 50], [2, 22], [138, 20], [140, 48]], L, INK); p.rect(4, 16, 132, 6, shadeHex(stone, 0.28)); p.line(2, 49, 138, 47, D);
+    // The winged eye.
+    p.poly([[44, 34], [60, 26], [70, 30], [60, 40]], "#2f3f66", null); p.poly([[96, 34], [80, 26], [70, 30], [80, 40]], "#2f3f66", null);
+    p.poly([[58, 33], [70, 26], [82, 33], [70, 40]], "#e6dcc6", INK); p.disc(70, 33, 4, 4, "#2f3f66", null); p.disc(70, 33, 1.6, 1.6, "#c9a050", null);
+  });
+}

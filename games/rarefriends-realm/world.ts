@@ -27,6 +27,7 @@ import { buildNorth } from "./northworld.ts";
 import { buildPrismwild } from "./prismworld.ts";
 import { buildSorrowmere } from "./necropolis.ts";
 import { buildCrownstones } from "./crownstones.ts";
+import { buildAzhur } from "./azhur.ts";
 import { openSeas } from "./seaways.ts";
 import { buildElevation } from "./elevation.ts";
 import { buildSigilShrines } from "./sigilshrines.ts";
@@ -147,6 +148,8 @@ export type DecorKind =
   | "menhir" | "dolmen" | "brazier"
   // The Crownstones' (megalithart.ts): a trilithon of the great ring, a Crown Stone with its turning disc, and the altar stone over the stair.
   | "trilithon" | "crown_stone" | "altar_stone"
+  // The Gate of Azhur (megalithart.ts): two pillars and a lintel taller than a temple.
+  | "azhur_gate"
   // The Prismwild's towns and villages (prismart.ts): what wizards build when nobody stops them. A footing is the unseen rest of a big one's ground.
   | "teapot_house" | "mushroom_house" | "crooked_house" | "topsy_tower" | "floating_isle" | "giant_candle" | "backwards_clock" | "footing"
   | "god_diamond" | "god_ink" | "god_sol" | "god_hood" | "god_ember"
@@ -245,6 +248,8 @@ export type RegionId =
   | "sorrowmere" | "sorrowmere_catacombs"
   // The Crownstones (crownstones.ts): the henge on the Greyfields and the Undercroft of Crowns.
   | "crownstones" | "crownstones_undercroft"
+  // The Labyrinth of Azhur (azhur.ts): the Gate of Azhur in the Sea of Dunes, and the labyrinth under it.
+  | "gate_of_azhur" | "labyrinth_of_azhur"
   // The seaways (seaways.ts): the ocean all the way round the map.
   | "outer_sea"
   // The sea ports: Gullwick on the mainland, Saltreach below Raria, and Merrab, Tel Ashun and Ennu's Well in Kharaveth's east.
@@ -385,9 +390,12 @@ export const REGIONS: readonly Region[] = [
     ["sorrowmere", "Sorrowmere", 7],
     // The Crownstones (crownstones.ts sets their labels).
     ["crownstones", "The Crownstones", 2],
+    // The Gate of Azhur (azhur.ts sets their labels).
+    ["gate_of_azhur", "The Gate of Azhur", 4],
   ] as const).map(([id, name, danger]) => ({ id, name, label: { x: 0, y: 0 }, danger, far: true }) as Region),
   { id: "sorrowmere_catacombs", name: "The Sorrowmere Catacombs", label: { x: 0, y: 0 }, danger: 9, underground: true, far: true },
   { id: "crownstones_undercroft", name: "The Undercroft of Crowns", label: { x: 0, y: 0 }, danger: 8, underground: true, far: true },
+  { id: "labyrinth_of_azhur", name: "The Labyrinth of Azhur", label: { x: 0, y: 0 }, danger: 9, underground: true, far: true },
 ];
 export const regionIndex = (id: RegionId) => REGIONS.findIndex(region => region.id === id);
 /** The mainland regions' labels were written in the mainland's own coordinates: move them with it (once, at load). */
@@ -1678,6 +1686,8 @@ export function generateWorld(seed = WORLD_SEED, { overlays = true }: { overlays
   buildSorrowmere({ ...grownCtx, random: mulberry(seed + 1019), noise2: makeNoise(seed + 1021, 4) }, labels);
   // The Crownstones on Raria's Greyfields, and the Undercroft of Crowns under them (crownstones.ts).
   buildCrownstones({ ...grownCtx, random: mulberry(seed + 1031), noise2: makeNoise(seed + 1033, 4) }, labels);
+  // The Gate of Azhur in Kharaveth's Sea of Dunes, and the Labyrinth of Azhur under it (azhur.ts).
+  buildAzhur({ ...grownCtx, random: mulberry(seed + 1039), noise2: makeNoise(seed + 1041, 4) }, labels);
   // The Frenderal Exchange at the top of Gullwick's harbour street (commerceworld.ts, Commerce).
   buildExchange(grownCtx, places);
   // The sigil altars' shrines, and the deeper altars out across the Realm (sigilshrines.ts).
@@ -1918,7 +1928,7 @@ export const ruinPiece = (r: number): DecorKind => r < 0.26 ? "ruin_wall" : r < 
 export const DECOR_NAMES: Record<DecorKind, string> = {
   trough: "Water trough", vessel: "Vessel", hitching_post: "Hitching post",
   strong_friend: "The Strong Friend", crystal: "Crystal", prism_crystal: "Crystals", prism_spire: "Crystal spire", prism_giant: "Great crystal", fae_tree: "Fae tree", fae_ring: "Fairy ring", lumen_lamp: "Lumen lamp",
-  maze_door: "Crystal door", maze_glyph: "Glyph", hourglass: "Fennick's hourglass", menhir: "Standing stone", dolmen: "Dolmen", brazier: "Brazier", trilithon: "Trilithon", crown_stone: "Crown Stone", altar_stone: "Altar stone",
+  maze_door: "Crystal door", maze_glyph: "Glyph", hourglass: "Fennick's hourglass", menhir: "Standing stone", dolmen: "Dolmen", brazier: "Brazier", trilithon: "Trilithon", crown_stone: "Crown Stone", altar_stone: "Altar stone", azhur_gate: "The Gate of Azhur",
   teapot_house: "Teapot house", mushroom_house: "Mushroom house", crooked_house: "Crooked house", topsy_tower: "Upside-down tower", floating_isle: "Floating stall", giant_candle: "Giant candle", backwards_clock: "The Backwards Clock", footing: "Footing", rune_circle: "Sigil circle", monument: "Statue", god_diamond: "Statue of the Good Friend", god_ink: "Statue of the Squid Friend", god_sol: "Statue of the Weird Friend", god_hood: "Statue of the Hood Friend", god_ember: "The Ember, in its brazier",
   god_dusk: "Statue of the Wise Friend, blindfolded", wise_friend: "The Wise Friend", bell: "Great bell", canopy: "Old roofing", cannon: "Magical cannon", device: "Federation device", wagon: "Supply wagon", watchtower: "Watchtower", stake: "Stake wall", plaque: "Inscribed plaque", banner_fff: "The Federation's banner", banner_rrr: "The Regiment's banner", banner_hollowmere: "Hollowmere's banner", banner_diamond: "The Order of the Diamond's banner", banner_ink: "The Order of the Ink's banner", banner_sol: "The Order of the Sol's banner", banner_hood: "The Order of the Hood's banner", banner_ember: "The Order of the Ember's banner", banner_dusk: "The Order of Dusk's banner",
   flowers: "Flowers", bush: "Bush", boulder: "Boulder", lamp: "Lamp post", bench: "Bench", crate: "Crate", barrel: "Water barrel", tent: "Tent",

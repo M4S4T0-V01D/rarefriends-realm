@@ -23,7 +23,9 @@ const TIER: Partial<Record<RegionId, Tier>> = { root_cellars: "shallow", mossy_u
   // The catacombs under Sorrowmere (necropolis.ts).
   sorrowmere_catacombs: "dread",
   // The Undercroft of Crowns under the Crownstones (crownstones.ts).
-  crownstones_undercroft: "dread" };
+  crownstones_undercroft: "dread",
+  // The Labyrinth of Azhur under the Sea of Dunes (azhur.ts).
+  labyrinth_of_azhur: "dread" };
 /** The key a dungeon's coffers can hold. */
 const KEYS: Partial<Record<RegionId, string>> = { sorrowmere_catacombs: "sorrowmere_key", mossy_undercroft: "moss_key", deepglass: "deepglass_key", drowned_archive: "archive_key", howling_vault: "vault_key", kumo_hollow: "kumo_seal_key", ashigane_deeps: "ogre_key", bone_shrine: "bone_shrine_key" };
 /** Ticks before a coffer fills again for the one who searched it (an hour: coffers and hoards are not a living). */

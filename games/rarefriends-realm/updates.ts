@@ -4,6 +4,12 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 144, date: "2026-10-15", title: "The Labyrinth of Azhur", items: [
+    "The Gate of Azhur, in Kharaveth's Sea of Dunes west of the desert road: a sunken court of flagstones, an avenue of obelisks, colossal heads to the chin in sand, and the gate itself, two pillars and a lintel taller than a temple, a stair going down.",
+    "Under it, the Labyrinth of Azhur: a true labyrinth, thirty-three passages by thirty-three, few loops, a long way to anywhere, hunted by the Hounds of Azhur and walked by grit wraiths.",
+    "Three shrines stand at its farthest ends, Measure, Water and the Name, each with its keeper and its key. The Heart in the middle wants all three, once; it knows you after.",
+    "In the Heart: the Keeper of the Measure, a colossus of black bronze, on its hoard, with the Rod of the Measure and the Cloak of the Labyrinth to be had.",
+  ] },
   { id: 143, date: "2026-10-15", title: "The Crownstones", items: [
     "The Crownstones, Raria's great henge, on the Greyfields between the Crownlands' farms and the old fort: a bank and a ditch round a ring of trilithons and standing stones, an avenue of paired stones from the west, barrows on the downs, and the fort road running straight through.",
     "Kings of Raria were crowned here. Five Crown Stones stand in a horseshoe round the altar stone, each with a carved disc that turns: the Sun, the Moon, the Star, the Crown, the Eye. The four station stones round the ring say how they were set. Set them, and the altar stone slides aside.",

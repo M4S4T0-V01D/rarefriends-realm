@@ -5737,6 +5737,35 @@ test("The Crownstones: Raria's henge on the Greyfields with the fort road throug
   assert.equal(cofferTier(g, world.objects.find(o => o.name === "Crownstones coffer")), "dread");
 });
 
+test("The Labyrinth of Azhur: the Gate of Azhur's court in the Sea of Dunes, a true labyrinth under it with three shrines at its far ends, each with a key, and the Heart in the middle that wants all three (once) and keeps the Keeper of the Measure", async () => {
+  const A = await import("../games/rarefriends-realm/azhur.ts");
+  const g = newGame(), p = g.player, world = g.world;
+  g.monsters = [];   // (the keys and the doors are the test here)
+  assert.equal(regionAt(world, A.AZHUR_GATE.x, A.AZHUR_GATE.y + 2).id, "gate_of_azhur");
+  const camp = world.spawns.find(s => s.kind === "npc" && regionAt(world, s.x, s.y).id === "ouresh_camp"), seen = reachable(g, camp);
+  assert.ok(seen[(A.AZHUR_GATE.y + 1) * W + A.AZHUR_GATE.x], "the gate court is reached on foot from the Ouresh salt camp, across the dunes");
+  const clue = id => world.objects.find(o => o.clue === id), use = (object, option) => { standBy(g, object); setTarget(g, { kind: "object", id: object.id, option }); run(g, 3); };
+  use(clue("az_gate"), "Enter"); assert.equal(regionAt(world, p.x, p.y).id, "labyrinth_of_azhur", "down the stair into the labyrinth");
+  // A true labyrinth: every shrine is reached along the passages from the stair, and a long way in; the Heart isn't, without its door.
+  const below = reachable(g, { x: p.x, y: p.y }), M = A.azhurMaze();
+  for (const id of ["measure", "water", "name"]) { const s = clue(`az_shrine_${id}`); assert.ok([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => below[(s.y + dy) * W + s.x + dx]), `the shrine of ${id} is reached`); }
+  assert.ok(M.shrines.every(c => M.dist[c] >= 40), "and each is far from the stair, along the passages");
+  const door = clue("az_heart_door");
+  assert.ok(below[(door.y + 1) * W + door.x] && !below[(door.y - 2) * W + door.x], "the Heart is walled but for its door");
+  // The keys: one from each shrine (not two), and the door wants all three; once turned, it knows you.
+  const knock = () => { teleport(g, door.x, door.y + 1); setTarget(g, { kind: "object", id: door.id, option: "Open" }); run(g, 3); };
+  use(clue("az_shrine_measure"), "Take-key"); use(clue("az_shrine_measure"), "Take-key"); assert.equal(count(p, "key_of_measure"), 1, "one key a shrine");
+  use(clue("az_shrine_water"), "Take-key");
+  knock(); assert.ok(p.y > door.y && has(p, "key_of_water"), "two keys won't do, and nothing's taken");
+  use(clue("az_shrine_name"), "Take-key"); knock();
+  assert.ok(p.y < door.y && !has(p, "key_of_measure") && !has(p, "key_of_water") && !has(p, "key_of_the_name") && p.questData.az_heart, "the three keys turned, and the Heart opens");
+  setTarget(g, { kind: "object", id: door.id, option: "Open" }); run(g, 3); assert.ok(p.y > door.y, "back out");
+  knock(); assert.ok(p.y < door.y, "and in again: the door knows you");
+  assert.ok(world.spawns.some(s => s.id === "keeper_of_the_measure") && world.objects.some(o => o.name === "The Keeper's hoard"), "the Keeper of the Measure on its hoard");
+  const { cofferTier } = await import("../games/rarefriends-realm/dungeons.ts");
+  assert.equal(cofferTier(g, world.objects.find(o => o.name === "Labyrinth coffer")), "dread");
+});
+
 test("The Prismwild's wizards live in towns: Spirehollow's hat-roofed towers and Bellwhistle's market, and the villages of Mothwick, Shardstead and Tumbledown, each with its own wizard-folk; Sorrowmere keeps the Deadwood's night", async () => {
   const P = await import("../games/rarefriends-realm/prismworld.ts");
   const { gloomAt, inDeadwood } = await import("../games/rarefriends-realm/world.ts");

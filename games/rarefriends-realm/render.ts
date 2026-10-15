@@ -39,7 +39,7 @@ import { homeRect } from "./housing.ts";
 import { backwardsClockArt, crookedHouseArt, floatingIsleArt, giantCandleArt, mushroomHouseArt, teapotHouseArt, topsyTowerArt, CRYSTAL_COLORS, crystalArt, faeRingArt, faeTreeArt, glyphArt, hourglassArt, lumenLampArt, mazeDoorArt } from "./prismart.ts";
 import { LABYRINTH, cofferLit, inLabyrinth, mazeDoorOpen } from "./labyrinth.ts";
 import { PRISM_REGION_IDS } from "./prismworld.ts";
-import { altarStoneArt, brazierArt, crownStoneArt, dolmenArt, menhirArt, trilithonArt } from "./megalithart.ts";
+import { altarStoneArt, azhurGateArt, brazierArt, crownStoneArt, dolmenArt, menhirArt, trilithonArt } from "./megalithart.ts";
 import { crownFace, crownstonesOpen } from "./crownstones.ts";
 import { brazierLit } from "./necropolis.ts";
 import { STRONG_FRIEND_MASK, creatureSprite, friendSprite, type Mask } from "./sprites.ts";
@@ -1881,6 +1881,7 @@ function prismArt(scene: Scene, object: WorldObject, h: number): { art: HTMLCanv
     case "trilithon": return { art: trilithonArt(Math.floor(h * 3 * 7)) };
     case "crown_stone": return { art: crownStoneArt(crownFace(scene.game, Number((object.clue ?? "").replace("cs_crown_", "")) || 1)) };
     case "altar_stone": return { art: altarStoneArt(crownstonesOpen(scene.game)) };
+    case "azhur_gate": return { art: azhurGateArt() };
     default: return null;
   }
 }
