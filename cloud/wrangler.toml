@@ -15,8 +15,10 @@ RPC_URL = "https://rpc.mainnet.chain.robinhood.com"
 CHAIN_ID = "4663"
 # The Generations collection (GENERATION_SPRITE_MANIFEST.generations in FriendSDK v0.1.4).
 COLLECTION = "0x14C49e6118F46525dE9ab41a51cBAA3c6EBF181D"
-# Only the Realm's own pages may sign in and save (both renderers are on this origin).
-ORIGINS = "https://m4s4t0-v01d.github.io"
+# Only the Realm's own pages may sign in and save (both renderers are on this origin), and the Android app
+# (github.com/M4S4T0-V01D/realm-apk), which serves the same build from https://realm.localhost: a .localhost name can't be
+# hosted on the public web, so no other site can claim it.
+ORIGINS = "https://m4s4t0-v01d.github.io,https://realm.localhost"
 # Adventurer Cards (src/cards.ts): the contract on Robinhood Chain (testnet while it's being tried; empty = cards closed),
 # its chain, and the game's address for the cards' metadata. The signing key is a secret: npx wrangler secret put MINTER_KEY
 CARDS_CONTRACT = "0xf8514176591d98a6739f724971e41fb333167ce4"
