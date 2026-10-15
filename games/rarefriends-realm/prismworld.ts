@@ -171,7 +171,8 @@ export function buildPrismwild(ctx: GenContext, labels: World["labels"], places:
   /** A big decor house: the picture on one tile, its unseen footings round it so you walk round the whole thing. */
   const big = (x: number, y: number, kind: Parameters<typeof t.decor>[2], name?: string) => {
     t.clearAt(x, y); t.decor(x, y, kind, true, name);
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, -1], [1, -1], [-1, -1]] as const) { t.clearAt(x + dx, y + dy); t.decor(x + dx, y + dy, "footing", true); }
+    const o = ctx.objects[ctx.objectAt[idx(x, y)]];
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, -1], [1, -1], [-1, -1]] as const) { t.clearAt(x + dx, y + dy); t.decor(x + dx, y + dy, "footing", true, o?.name); }
   };
   const candle = (x: number, y: number) => { t.clearAt(x, y); t.decor(x, y, "giant_candle", true); };
   // Spirehollow, the town of hats: wizards' towers round a square, the Mayor's the tallest, Hattie's hat shop, the bank, the Tilted Toad.

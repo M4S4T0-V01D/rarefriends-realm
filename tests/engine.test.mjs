@@ -4963,9 +4963,14 @@ test("Beastkeeping: each species won its own way (fed, earned, haltered, spared,
   tick(g); const ally = B.allyOf(g); assert.ok(ally && ally.ally === salC.id && Math.max(Math.abs(ally.x - p.x), Math.abs(ally.y - p.y)) <= 3, "it's out beside you");
   assert.ok(!menuFor(g, [{ kind: "monster", id: ally.uid }], null).some(o => o.verb === "Attack"), "you can't attack your own"); assert.ok(menuFor(g, [{ kind: "monster", id: ally.uid }], null).some(o => o.verb === "Send-home"));
   // It fights what you fight, with the real rolls, and earns Beastkeeping.
-  const foe = g.monsters.find(m => !m.dead && m.ally === undefined && m.def.id === "ink_rat") ?? g.monsters.find(m => !m.dead && m.ally === undefined && !m.def.boss && m.def.level < 20);
-  teleport(g, foe.x + 1, foe.y); tick(g); p.combat = foe.uid; foe.target = true; const bk0 = p.xp.beastkeeping ?? 0, hp0 = foe.hp + 0;
-  for (let t = 0; t < 60 && !foe.dead && (p.xp.beastkeeping ?? 0) === bk0; t++) { p.stunned = 5; p.combat = foe.dead ? null : foe.uid; tick(g); }
+  // (A guard or a miss can finish a two-hit rat first: then the next small creature, as a player would.)
+  const bk0 = p.xp.beastkeeping ?? 0, tried = new Set();
+  let foe = null, hp0 = 0;
+  for (let attempt = 0; attempt < 5 && (p.xp.beastkeeping ?? 0) === bk0; attempt++) {
+    foe = g.monsters.find(m => !m.dead && m.ally === undefined && m.def.id === "ink_rat" && !tried.has(m.uid)) ?? g.monsters.find(m => !m.dead && m.ally === undefined && !m.def.boss && m.def.level < 20 && !tried.has(m.uid));
+    tried.add(foe.uid); teleport(g, foe.x + 1, foe.y); tick(g); p.combat = foe.uid; foe.target = true; hp0 = foe.hp + 0;
+    for (let t = 0; t < 60 && !foe.dead && (p.xp.beastkeeping ?? 0) === bk0; t++) { p.stunned = 5; p.combat = foe.dead ? null : foe.uid; tick(g); }
+  }
   assert.ok((p.xp.beastkeeping ?? 0) > bk0, "it bit what you fought (you stood stunned), and Beastkeeping paid for it"); p.stunned = 0;
   // Frightened, a skittish one runs home; a beastkeeper settles it, later, for a fee.
   const m1 = B.allyOf(g) ?? B.placeCompanion(g); m1.hp = Math.floor(m1.def.hp * 0.3); m1.foe = foe.uid; B.companionTick(g, m1, { strike: () => {}, step: () => {} });

@@ -4211,6 +4211,15 @@ function personFigure(ctx: CanvasRenderingContext2D, scene: Scene, id: string, u
 }
 /** What some NPCs wear, composited into their sprite like your own gear: the King's regalia, and the guards' helms, battleaxes and red capes. */
 const NPC_WEAR: Record<string, readonly string[]> = {
+  // The Prismwild's wizards, dressed as only they would (prismgear.ts PRISM_CLOTHING, Fennick's curios).
+  mayor_hatterly: ["towering_hat", "patchwork_robe", "starry_cloak", "curly_slippers"], hattie_pennyfeather: ["candle_hat", "clashing_robe", "stripy_stockings", "feather_boa"],
+  uncle_bartlemy: ["boot_hat", "pyjama_robe", "odd_boots", "bedsheet_cape"], clockwarden_tibbet: ["propeller_cap", "pocket_robe", "polkadot_pantaloons", "odd_boots"],
+  mother_fizzwig: ["teapot_hat", "starry_robe", "stripy_stockings", "curly_slippers"], gideon_wickerbottom: ["lampshade_hat", "clashing_robe", "polkadot_pantaloons", "feather_boa"],
+  mrs_kettleby: ["pink_boot_hat", "pyjama_robe", "curly_slippers"], old_mossy: ["mushroom_cap", "patchwork_robe", "odd_boots"], foreman_glint: ["crystal_antlers", "pocket_robe", "polkadot_pantaloons"],
+  wilhelmina_crooke: ["towering_hat", "starry_robe", "bedsheet_cape", "odd_boots"], fennick: ["fishbowl_hat", "patchwork_robe", "stripy_stockings", "odd_boots", "feather_boa"],
+  archmagister_vey: ["spiral_wizard_hat", "prismweave_robe", "starry_cloak"], tutor_quill: ["candle_hat", "starry_robe", "curly_slippers"], librarian_osk: ["lampshade_hat", "pocket_robe", "bedsheet_cape"],
+  collegium_student: ["propeller_cap", "pyjama_robe", "odd_boots"], pell_ashby: ["spiral_wizard_hat", "pyjama_robe", "curly_slippers"], pell_ashby_lost: ["spiral_wizard_hat", "pyjama_robe", "curly_slippers"],
+  shard_warden: ["crystal_antlers", "clashing_robe", "odd_boots"],
   // A Place to the North: the Vargskeld in wool and fur, the Zoryavik in embroidered linen and red (northgear.ts).
   jarl_hallveig: ["apron_dress", "fur_mantle", "turnshoes"], lawspeaker_signy: ["vargskeld_hood", "apron_dress", "turnshoes"], farwake_master: ["wolf_fur_hat", "vargskeld_tunic", "wrapped_trousers", "fur_mantle", "turnshoes"],
   shipwright_bersi: ["vargskeld_tunic", "wrapped_trousers", "turnshoes"], skarnholm_innkeeper: ["apron_dress", "turnshoes"], skarnholm_trader: ["vargskeld_hood", "vargskeld_tunic", "wrapped_trousers"],
@@ -4362,7 +4371,10 @@ function regionalLook(region: string, uid: number): readonly string[] {
   const set = regionalSetOf(WEAR_AS[region] ?? region), roll = (salt: number) => hash(uid * 13 + salt, uid * 7 + salt * 3);
   if (!set) return [];
   const piece = (slot: string) => set.pieces.find(entry => entry.slot === slot)?.id;
-  look = [...(roll(1) < 0.75 ? [piece("head")] : []), ...(roll(3) < 0.9 ? [piece("body")] : []), ...(roll(5) < 0.7 ? [piece("legs")] : []), ...(roll(7) < 0.4 ? [piece("cape")] : [])].filter((id): id is string => !!id);
+  // The Prismwild's wizard-folk wear whatever they grabbed: any of the set's pieces in each slot, everything at once, nearly always.
+  const any = (slot: string, salt: number) => { const all = set.pieces.filter(entry => entry.slot === slot); return all[Math.floor(roll(salt) * all.length)]?.id; };
+  if (set.region === "prismwild") look = [any("head", 11), any("body", 13), ...(roll(5) < 0.85 ? [any("legs", 15)] : []), any("feet", 17), ...(roll(7) < 0.65 ? [any("cape", 19)] : [])].filter((id): id is string => !!id);
+  else look = [...(roll(1) < 0.75 ? [piece("head")] : []), ...(roll(3) < 0.9 ? [piece("body")] : []), ...(roll(5) < 0.7 ? [piece("legs")] : []), ...(roll(7) < 0.4 ? [piece("cape")] : [])].filter((id): id is string => !!id);
   regionalWear.set(uid, look);
   return look;
 }

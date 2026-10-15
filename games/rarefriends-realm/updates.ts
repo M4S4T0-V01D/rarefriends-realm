@@ -9,6 +9,7 @@ export const UPDATES: readonly Update[] = [
     "Bellwhistle, the market town: the Backwards Clock, the Fizzing Fountain, a floating market on rocks hanging in the air, Mother Fizzwig's Fizzing Kettle, the Moot, a bank, and a house in a teapot.",
     "Three villages: Mothwick's mushroom houses by the Fae Hollows, Shardstead's crystal-miners by the Shardfields, and Tumbledown on the north coast, where every house leans its own way.",
     "New: the Prismwild's own clothes at Hattie's (spiral hats, moon-and-star and patchwork robes, stripy stockings, curly-toed slippers, a starry cloak), fizzing tonic and starlight biscuits, and a dozen wizards with opinions.",
+    "Every wizard there dresses as they please: boots, teapots, fishbowls, lampshades and birthday candles on their heads, pyjamas, polka dots, feather boas and bedsheets on the rest. Hattie sells all of it.",
     "Sorrowmere now lies under the Deadwood's endless night, its ground as dark as the wood's, dead trees all round its walls.",
   ] },
   { id: 140, date: "2026-10-15", title: "Sorrowmere", items: [

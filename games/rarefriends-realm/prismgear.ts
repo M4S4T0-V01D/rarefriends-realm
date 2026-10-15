@@ -58,12 +58,32 @@ export const PRISM_CLOTHING: readonly RegionalSet[] = [
     { id: "stripy_stockings", name: "Stripy stockings", slot: "legs", shape: "legs", kind: "trousers", color: "#e47ac4", accent: "#fbf6ee", examine: "Long stockings in pink and white stripes, worn under a robe by people who'd rather you didn't see them, and over one by people who would.", value: 180 },
     { id: "curly_slippers", name: "Curly-toed slippers", slot: "feet", shape: "boots", color: "#9a72e8", accent: "#ecd27a", examine: "Velvet slippers whose toes curl up and round. A bell on each toe, for finding them in the morning.", value: 220 },
     { id: "starry_cloak", name: "Starry cloak", slot: "cape", shape: "cape", color: "#2a2a5a", accent: "#ecd27a", examine: "A night-blue cloak with stars that are slowly, very slowly, moving across it.", value: 600 },
+    // What wizards wear on their heads when nobody stops them.
+    { id: "boot_hat", name: "Boot hat", slot: "head", shape: "hat", kind: "boot", color: "#7a4a2a", accent: "#ecd27a", examine: "A boot, worn on the head, sole to the sky. The other one's on a foot somewhere. Hattie says boots are very in.", value: 150 },
+    { id: "pink_boot_hat", name: "Pink boot hat", slot: "head", shape: "hat", kind: "boot", color: "#e47ac4", accent: "#fbf6ee", examine: "A pink boot, worn on the head. It's laced, for safety.", value: 150 },
+    { id: "teapot_hat", name: "Teapot hat", slot: "head", shape: "hat", kind: "teapot", color: "#5fc8c0", accent: "#ecd27a", examine: "A teapot, worn on the head. Mrs Kettleby disapproves. Mrs Kettleby lives in one.", value: 240 },
+    { id: "fishbowl_hat", name: "Fishbowl helm", slot: "head", shape: "hat", kind: "fishbowl", color: "#cfe8f8", accent: "#ec8a3a", examine: "A glass fishbowl, worn over the head, with a fish in it. The fish was consulted. The fish said yes.", value: 300 },
+    { id: "candle_hat", name: "Birthday hat", slot: "head", shape: "hat", kind: "candles", color: "#e47ac4", accent: "#fbf6ee", examine: "A round cap with three lit candles stood in it. Every day is somebody's birthday, and in Spirehollow it's usually the hat's.", value: 220 },
+    { id: "propeller_cap", name: "Propeller cap", slot: "head", shape: "hat", kind: "propeller", color: "#ecb45a", accent: "#9a72e8", examine: "A segmented cap with a little propeller on top that turns whether or not there's any wind.", value: 180 },
+    { id: "lampshade_hat", name: "Lampshade", slot: "head", shape: "hat", kind: "lampshade", color: "#f0d8a0", accent: "#c94a5a", examine: "A fringed lampshade, worn as a hat. Uncle Bartlemy started it. Nobody has finished it.", value: 120 },
+    { id: "mushroom_cap", name: "Mushroom cap", slot: "head", shape: "hat", kind: "mushroom", color: "#c94a5a", accent: "#fbf6ee", examine: "A great red cap with white spots, from Mothwick. It is, they promise, not a mushroom. Mostly.", value: 200 },
+    { id: "crystal_antlers", name: "Crystal antlers", slot: "head", shape: "hat", kind: "antlers", color: "#6a4a8a", accent: "#cbb8f0", examine: "A circlet with antlers of violet crystal growing out of it. They grow a little more every full moon.", value: 420 },
+    { id: "towering_hat", name: "Towering hat", slot: "head", shape: "hat", kind: "tower", color: "#3a7a7a", accent: "#ecd27a", examine: "A wizard's hat three times taller than a wizard's hat should be, bent twice on the way up. Doorways are a problem.", value: 360 },
+    // And on the rest of them.
+    { id: "pyjama_robe", name: "Pyjama robe", slot: "body", shape: "body", kind: "robe", color: "#8ad0e8", accent: "#e47ac4", examine: "Striped pyjamas, worn as a robe, all day, to lectures. In the Prismwild nobody notices.", value: 160 },
+    { id: "clashing_robe", name: "Clashing robe", slot: "body", shape: "body", kind: "robe", color: "#ec8a3a", accent: "#4ac860", examine: "Orange and green, with a purple sash. It's said to be the most powerful colour combination in magic, by the people who wear it.", value: 380 },
+    { id: "pocket_robe", name: "Robe of many pockets", slot: "body", shape: "body", kind: "robe", color: "#8a6a4a", accent: "#ecd27a", examine: "Sixty-one pockets. Its owner knows what's in fifty of them. The others have opinions.", value: 440 },
+    { id: "polkadot_pantaloons", name: "Polka-dot pantaloons", slot: "legs", shape: "legs", kind: "trousers", color: "#ecd27a", accent: "#c94a5a", examine: "Big yellow pantaloons with red spots. They swish.", value: 200 },
+    { id: "odd_boots", name: "Odd boots", slot: "feet", shape: "boots", color: "#5fc8c0", accent: "#e47ac4", examine: "Two boots that aren't a pair, and never were. They get along.", value: 160 },
+    { id: "bedsheet_cape", name: "Bedsheet cape", slot: "cape", shape: "cape", color: "#f4f0e8", accent: "#8ad0e8", examine: "A bedsheet, tied at the neck. Several wizards insist it is the cloak of a forgotten order. It has a laundry mark.", value: 90 },
+    { id: "feather_boa", name: "Feather boa", slot: "cape", shape: "cape", color: "#e47ac4", accent: "#ecd27a", examine: "A boa of pink feathers, long enough to wear as a cloak if you wind it right. Moults.", value: 260 },
   ] },
 ];
 
 export const PRISM_SHOPS: Record<string, ShopDef> = {
   // Hattie Pennyfeather's in Spirehollow: the Prismwild's own clothes, and every wizard hat there is.
-  spire_hats: { id: "spire_hats", name: "Hattie's Hats", buys: ["other"], rate: 0.5, stock: ["spiral_wizard_hat", "starry_robe", "patchwork_robe", "stripy_stockings", "curly_slippers", "starry_cloak", "crimson_wizard_hat", "emerald_wizard_hat", "midnight_wizard_hat", "plum_wizard_hat", "ashen_wizard_hat", "golden_wizard_hat"] },
+  spire_hats: { id: "spire_hats", name: "Hattie's Hats", buys: ["other"], rate: 0.5, stock: ["spiral_wizard_hat", "boot_hat", "pink_boot_hat", "teapot_hat", "fishbowl_hat", "candle_hat", "propeller_cap", "lampshade_hat", "mushroom_cap", "crystal_antlers", "towering_hat",
+    "starry_robe", "patchwork_robe", "pyjama_robe", "clashing_robe", "pocket_robe", "stripy_stockings", "polkadot_pantaloons", "curly_slippers", "odd_boots", "starry_cloak", "bedsheet_cape", "feather_boa", "crimson_wizard_hat", "emerald_wizard_hat", "midnight_wizard_hat", "plum_wizard_hat", "ashen_wizard_hat", "golden_wizard_hat"] },
   // Mother Fizzwig's kettle in Bellwhistle: tea, tonic and biscuits.
   fizzing_kettle: { id: "fizzing_kettle", name: "The Fizzing Kettle", buys: ["food"], rate: 0.5, stock: ["lilac_tea", "fizzing_tonic", "starlight_biscuit"] },
   // Gideon Wickerbottom's floating market in Bellwhistle: a stall in the air, selling what a wizard runs out of.

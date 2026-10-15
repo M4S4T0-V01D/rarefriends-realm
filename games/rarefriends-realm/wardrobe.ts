@@ -547,6 +547,75 @@ export function figureArt(rows: Mask, worn: readonly string[], facing: Facing, p
           if (side || back) p.poly([[tx - 1, brimY - 1], [tx + 1, brimY - 1], [tx + sway + (side ? -side : 0), neckY + 6], [tx - 1 + sway + (side ? -side : 0), neckY + 6]], tail, null);
           break;
         }
+        // The Prismwild's wizards wear whatever they like on their heads, and they like strange things.
+        if (piece.style === "boot") {
+          // A boot, worn on the head, sole to the sky, the toe pointing the way you face.
+          const dir = side || 1, x0 = Math.round(cx) - 3;
+          p.rect(x0, top - 9, 7, 11, color); p.rect(x0 - 1, top + 1, 9, 2, dark);
+          p.rect(dir > 0 ? x0 : x0 - 5, top - 13, 12, 4, color); p.rect(dir > 0 ? x0 : x0 - 5, top - 14, 12, 1, dark);
+          for (let y = top - 7; y <= top - 1; y += 2) p.set(x0 + 3, y, piece.trim ?? light);
+          p.line(x0 + 1, top - 8, x0 + 1, top, light);
+          break;
+        }
+        if (piece.style === "teapot") {
+          // A teapot sat on the head: round belly, a spout one way, a handle the other, a lid with a knob.
+          const dir = side || 1;
+          p.disc(cx, top - 3, headHalf + 1, 4, color, null); p.disc(cx, top - 8, 3, 1.5, dark, null); p.set(Math.round(cx), top - 10, piece.trim ?? "#ecd27a");
+          p.polyline([[cx + dir * (headHalf + 1), top - 2], [cx + dir * (headHalf + 4), top - 6], [cx + dir * (headHalf + 5), top - 8]], color, 2);
+          p.polyline([[cx - dir * (headHalf + 1), top - 5], [cx - dir * (headHalf + 3), top - 4], [cx - dir * (headHalf + 1), top - 1]], dark, 1);
+          p.line(Math.round(cx) - 3, top - 5, Math.round(cx) + 1, top - 5, light);
+          break;
+        }
+        if (piece.style === "fishbowl") {
+          // A fishbowl over the head, a waterline, and a fish going round above your ears.
+          const bowl = "#cfe8f8", fx = Math.round(cx) + Math.round(sway * 3);
+          for (let k = 0; k < 28; k++) { const a = (k / 28) * Math.PI * 2; p.set(cx + Math.cos(a) * (headHalf + 3), top + 1 + Math.sin(a) * (headHalf + 4), bowl); }
+          p.line(l - 2, top - 3, r + 2, top - 3, "#7ab8e0"); p.rect(fx - 1, top - 6, 3, 2, "#ec8a3a"); p.set(fx + 2, top - 5, "#ec8a3a"); p.set(fx - 1, top - 6, INK);
+          p.set(Math.round(cx) - headHalf, top - 4, "#ffffff");
+          break;
+        }
+        if (piece.style === "candles") {
+          // A round cap with candles stood in it, lit, like a cake.
+          p.poly([[l, top + 1], [l, top - 3], [r, top - 3], [r, top + 1]], color, null); p.line(l, top - 3, r, top - 3, light); p.line(l, top + 1, r, top + 1, dark);
+          for (const dx of [-3, 0, 3]) { const x = Math.round(cx) + dx; p.rect(x, top - 8, 1, 5, piece.trim ?? "#fbf6ee"); p.set(x, top - 9 - (Math.abs(Math.round(sway * 2 + dx)) % 2), "#ecb45a"); p.set(x, top - 10, "#fff8d0"); }
+          break;
+        }
+        if (piece.style === "propeller") {
+          // A beanie in segments, a little propeller on top, turning.
+          p.disc(cx, top, headHalf + 1, 4, color, null); p.line(Math.round(cx), top - 4, Math.round(cx), top, piece.trim ?? dark);
+          p.rect(Math.round(cx), top - 6, 1, 2, dark); const blade = 2 + Math.round(Math.abs(sway) * 3);
+          p.line(Math.round(cx) - blade, top - 7, Math.round(cx) + blade, top - 7, piece.trim ?? "#e47ac4");
+          break;
+        }
+        if (piece.style === "lampshade") {
+          // A fringed lampshade, worn with dignity.
+          p.poly([[l - 3, top + 2], [l + 1, top - 7], [r - 1, top - 7], [r + 3, top + 2]], color, null); p.line(l + 1, top - 7, r - 1, top - 7, light);
+          for (let x = l - 3; x <= r + 3; x += 2) p.set(x, top + 3, piece.trim ?? "#ecd27a");
+          break;
+        }
+        if (piece.style === "mushroom") {
+          // A great spotted mushroom cap, wider than the shoulders.
+          p.disc(cx, top - 1, headHalf + 6, 5, color, null); p.rect(Math.round(cx) - headHalf - 6, top, (headHalf + 6) * 2 + 1, 5, "#00000000");
+          p.line(Math.round(cx) - headHalf - 5, top, Math.round(cx) + headHalf + 5, top, dark);
+          for (const [dx, dy] of [[-4, -3], [2, -4], [5, -1], [-1, -1]] as const) p.set(Math.round(cx) + dx, top + dy, piece.trim ?? "#fbf6ee");
+          break;
+        }
+        if (piece.style === "antlers") {
+          // Antlers of crystal growing up out of a circlet.
+          const crystal = piece.trim ?? "#cbb8f0"; p.line(l, top, r, top, color);
+          for (const dir of [-1, 1]) { const bx = Math.round(cx) + dir * (headHalf - 1); p.polyline([[bx, top], [bx + dir * 2, top - 6], [bx + dir * 4, top - 10]], crystal, 1); p.line(bx + dir * 2, top - 6, bx + dir * 5, top - 7, crystal); p.set(bx + dir * 4, top - 11, "#ffffff"); }
+          break;
+        }
+        if (piece.style === "tower") {
+          // A wizard's hat three times too tall, bent twice on its way up, stars on it.
+          const brimY = top + 1, lean = side ? -side : 1;
+          p.disc(cx, brimY, headHalf + 4, 2.2, dark, null);
+          p.poly([[cx - headHalf + 1, brimY], [cx + headHalf - 1, brimY], [cx + 2, brimY - 10], [cx - 2, brimY - 10]], color, null);
+          p.poly([[cx - 2, brimY - 10], [cx + 2, brimY - 10], [cx + 3 * lean + 1, brimY - 18], [cx + 3 * lean - 1, brimY - 18]], color, null);
+          p.polyline([[cx + 3 * lean, brimY - 18], [cx + lean + sway * 2, brimY - 24], [cx + 4 * lean + sway * 3, brimY - 27]], color, 1);
+          for (const [dx, dy] of [[-1, -4], [1, -12], [3 * lean, -20]] as const) p.set(Math.round(cx) + dx, brimY + dy, piece.trim ?? "#ecd27a");
+          break;
+        }
         // A pointed wizard's hat with a brim and a band.
         const brimY = top + 1, tipX = Math.round(cx) + 3 + sway * 2 - side * 2;
         p.disc(cx, brimY, headHalf + 4, 2.2, dark, null);

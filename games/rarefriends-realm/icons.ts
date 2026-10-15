@@ -289,6 +289,16 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
         part(p, disc(16, 17, 5.5, 6), "#2e2c2a", "flat");
         line(p, [[9, 27], [14, 24]], dark); line(p, [[23, 27], [18, 24]], dark); break;
       case "hat":
+        // The Prismwild's: what its wizards wear on their heads.
+        if (icon.kind === "boot") { part(p, poly([[11, 28], [11, 9], [19, 9], [19, 18], [29, 20], [29, 28]]), color, "cloth"); part(p, box(10, 26, 20, 3), shadeHex(color, -0.25)); for (const y of [12, 15, 18]) line(p, [[13, y], [17, y]], accent ?? WHITE); break; }
+        if (icon.kind === "teapot") { part(p, disc(15, 19, 10, 8), color, "cloth"); part(p, poly([[24, 18], [30, 10], [31, 12], [26, 21]]), color, "cloth"); part(p, disc(15, 10, 4, 2), shadeHex(color, -0.15)); part(p, disc(15, 7, 1.5), accent ?? WHITE); break; }
+        if (icon.kind === "fishbowl") { part(p, disc(16, 17, 12, 12), color, "cloth"); part(p, disc(16, 22, 10, 6), "#7ab8e0", "flat", false); part(p, disc(17, 14, 3, 2), accent ?? "#ec8a3a"); part(p, poly([[20, 14], [23, 12], [23, 16]]), accent ?? "#ec8a3a"); break; }
+        if (icon.kind === "candles") { part(p, box(5, 18, 22, 9), color, "cloth"); for (const x of [9, 15, 21]) { part(p, box(x, 9, 3, 9), accent ?? WHITE); part(p, disc(x + 1, 6, 1.5, 2), "#ecb45a"); } break; }
+        if (icon.kind === "propeller") { part(p, disc(16, 24, 12, 9), color, "cloth"); part(p, box(15, 9, 2, 7), DARK_WOOD); part(p, poly([[5, 8], [16, 6], [27, 8], [16, 10]]), accent ?? "#e47ac4"); break; }
+        if (icon.kind === "lampshade") { part(p, poly([[3, 26], [9, 7], [23, 7], [29, 26]]), color, "cloth"); for (let x = 4; x <= 28; x += 3) part(p, box(x, 27, 1, 3), accent ?? "#ecd27a"); break; }
+        if (icon.kind === "mushroom") { part(p, disc(16, 20, 14, 10), color, "cloth"); part(p, box(4, 21, 24, 3), shadeHex(color, -0.3), "flat", false); for (const [x, y] of [[10, 14], [18, 12], [23, 17]] as const) part(p, disc(x, y, 2, 1.5), accent ?? WHITE); break; }
+        if (icon.kind === "antlers") { part(p, box(6, 24, 20, 4), color, "metal"); for (const d of [-1, 1]) { line(p, [[16 + d * 7, 24], [16 + d * 9, 13], [16 + d * 12, 4]], accent ?? "#cbb8f0", 2); line(p, [[16 + d * 9, 13], [16 + d * 14, 11]], accent ?? "#cbb8f0", 2); } break; }
+        if (icon.kind === "tower") { part(p, disc(16, 28, 13, 3), shadeHex(color, -0.2), "cloth"); part(p, poly([[9, 28], [23, 28], [18, 16], [22, 6], [17, 1], [14, 2], [18, 7], [14, 16]]), color, "cloth"); part(p, disc(15, 22, 1.2), accent ?? "#ecd27a"); break; }
         if (icon.kind === "feathered") {
           // A soft round cap with a turned-up brim and a long feather sweeping back.
           part(p, poly([[4, 26], [5, 17], [10, 11], [18, 10], [25, 13], [28, 20], [28, 26]]), color, "cloth");
