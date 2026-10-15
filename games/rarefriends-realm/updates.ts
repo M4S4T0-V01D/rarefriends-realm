@@ -4,6 +4,20 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 139, date: "2026-10-15", title: "The Prismwild", items: [
+    "A new land past the north: the Prismwild, over the Glass Causeway from the Zoryavik's north-east coast. Lilac downs, crystals of every size and colour, fae trees hung with lights, the Starwood, the Fae Hollows, and the Shardfields with their great crystals and shard golems.",
+    "The Collegium of the Seventh Lamp, the wizards' college, where they live and learn: the Great Hall, the Library, the Seventh Lamp's tower, a bank and the Collegium Stores. A new quest, The Seventh Lamp, enrols you there.",
+    "Fennick's Labyrinth, a hedge maze run against the clock: eight minutes, fifteen rings, crystal doors that turn, glyphs that send you back, and coffers. Every ring nearer the heart pays mazeglass.",
+    "Spend mazeglass at Fennick's Curios: the Prismweave robes (each piece keeps a spell's sigils now and then, the whole set often), the twisting staff (never short of breeze or tide sigils), the prism focus and lilac tea.",
+    "New creatures: glimmer moths, thistle pixies, prism wisps, glimmer stags and shard golems. New music for the Prismwild and for the Labyrinth.",
+  ] },
+  { id: 138, date: "2026-10-14", title: "The world redrawn", items: [
+    "Hills hide what's behind them: ruins, pillars and statues no longer show through a raised hillside.",
+    "Lava lies level, like water: each pool flat, its glowing surface sunk below its banks with a slow churn of its own, and pools pouring into each other.",
+    "The sigil altars stand in domed shrines in their sigils' colours, some of them broken, each with its emblem on the altar and a glowing orb above it; the deeper altars have moved out across the Realm.",
+    "New ruins and stone coffins; suits of armour, beds and bank fronts redrawn; the Orders' gods carved again.",
+    "The Oathgate is a great wall now, almost as tall as the Varn Ridge it closes, with a great arched gate, a tower either side, and its wall running up the crags.",
+  ] },
   { id: 137, date: "2026-10-14", title: "Commerce and the Frenderal Exchange", items: [
     "A new skill, Commerce, at the Frenderal Exchange: a marble hall at the top of Gullwick's harbour street, with a broker, a market board, the company ledgers, an order board and the Realm's price lists.",
     "Merchant orders: the order board asks for goods, and the broker pays more than they'd fetch in a shop, with Commerce XP. Three at a time, new ones every four hours; from Commerce 20 one is a bulk order.",

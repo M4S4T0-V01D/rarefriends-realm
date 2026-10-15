@@ -33,6 +33,8 @@ import { COMPANY_CLUES } from "./northcompanies.ts";
 import { COMMERCE_CLUES } from "./commercetalk.ts";
 import { VESSEL_CLUES } from "./seafaring.ts";
 import { WAYMARK_CLUES } from "./wayfinding.ts";
+import { LABYRINTH_CLUES } from "./labyrinth.ts";
+import { PRISM_CLUES } from "./prismtalk.ts";
 
 const art = (family: number, seed: number) => ({ family, seed });
 const person = (id: string, name: string, examine: string, seed: number, extra: Partial<NpcDef> = {}): NpcDef => ({ id, name, examine, options: ["Talk-to"], art: art(9, seed), ...extra });
@@ -203,6 +205,10 @@ export const CLUES: Record<string, Clue> = {
   ...VESSEL_CLUES,
   // The north's trails' waymarks (wayfinding.ts).
   ...WAYMARK_CLUES,
+  // Fennick's Labyrinth: its doors, glyphs, coffers and thread (labyrinth.ts).
+  ...LABYRINTH_CLUES,
+  // The Prismwild's (prismtalk.ts).
+  ...PRISM_CLUES,
 };
 
 /** A clue's options, examine text and use (null if the object isn't one). */

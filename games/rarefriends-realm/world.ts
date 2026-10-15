@@ -24,6 +24,7 @@ import { buildWyrmreach } from "./wyrmreachworld.ts";
 import { buildDragons } from "./dragonsworld.ts";
 import { buildQuestMounts } from "./questmountsworld.ts";
 import { buildNorth } from "./northworld.ts";
+import { buildPrismwild } from "./prismworld.ts";
 import { openSeas } from "./seaways.ts";
 import { buildElevation } from "./elevation.ts";
 import { buildSigilShrines } from "./sigilshrines.ts";
@@ -138,6 +139,8 @@ export type DecorKind =
   | "throne" | "armour" | "logpile" | "stump" | "target" | "ruin_wall" | "old_friend" | "tomb" | "crypt" | "obelisk" | "bones" | "hearth" | "monument"
   // The ruins' other stones (render.ts drawStonework, props.ts), and a stone coffin.
   | "broken_pillar" | "fallen_pillar" | "column_base" | "ruin_arch" | "carved_block" | "stone_head" | "sarcophagus"
+  // The Prismwild (prismart.ts): its crystals (a cluster, a spire, a giant), fae trees, fairy rings and lumen lamps; Fennick's Labyrinth's doors, glyphs and hourglass.
+  | "prism_crystal" | "prism_spire" | "prism_giant" | "fae_tree" | "fae_ring" | "lumen_lamp" | "maze_door" | "maze_glyph" | "hourglass"
   | "god_diamond" | "god_ink" | "god_sol" | "god_hood" | "god_ember"
   // Return of Raria: the Wise Friend and the Order of Dusk's god, and the things factions leave about.
   | "god_dusk" | "wise_friend" | "bell" | "canopy" | "cannon" | "device" | "wagon" | "watchtower" | "stake" | "plaque" | "banner_fff" | "banner_rrr" | "banner_hollowmere"
@@ -227,6 +230,8 @@ export type RegionId =
   | "vargskeld" | "vargskeld_sea" | "skarnholm" | "ravnsvik" | "oathsworn_hall" | "embermoot" | "redwake_camp" | "varn_ridge" | "oathgate_pass"
   | "zoryavik" | "zoryavik_coast" | "hearthwatch" | "krasnogor" | "bereslav" | "zlatna_gora" | "svetloye" | "old_bough"
   | "skarnholm_bay" | "grimfell" | "sokol_hills"
+  // The Prismwild (prismworld.ts): the magical land past the north's north-east, over the Glass Causeway.
+  | "prismwild" | "glass_causeway" | "collegium" | "starwood" | "fae_hollows" | "shardfields" | "fennicks_labyrinth"
   // The seaways (seaways.ts): the ocean all the way round the map.
   | "outer_sea"
   // The sea ports: Gullwick on the mainland, Saltreach below Raria, and Merrab, Tel Ashun and Ennu's Well in Kharaveth's east.
@@ -359,6 +364,9 @@ export const REGIONS: readonly Region[] = [
     ["zlatna_gora", "Zlatna Gora", 1], ["svetloye", "Svetloye", 0], ["old_bough", "The Old Bough", 1],
     ["skarnholm_bay", "Skarnholm Bay", 3], ["grimfell", "The Grimfell", 4], ["sokol_hills", "The Sokol Hills", 4],
     ["outer_sea", "The Outer Sea", 3],
+    // The Prismwild (prismworld.ts sets their labels too).
+    ["prismwild", "The Prismwild", 3], ["glass_causeway", "The Glass Causeway", 1], ["collegium", "The Collegium of the Seventh Lamp", 0], ["starwood", "The Starwood", 4],
+    ["fae_hollows", "The Fae Hollows", 2], ["shardfields", "The Shardfields", 6], ["fennicks_labyrinth", "Fennick's Labyrinth", 0],
   ] as const).map(([id, name, danger]) => ({ id, name, label: { x: 0, y: 0 }, danger, far: true }) as Region),
 ];
 export const regionIndex = (id: RegionId) => REGIONS.findIndex(region => region.id === id);
@@ -451,7 +459,7 @@ export type World = {
   labels: Partial<Record<RegionId, { x: number; y: number }>>;
   places: Record<"spawn" | "hollow_square" | "emberforge" | "oasis" | "frostpeak" | "pier" | "crypt" | "depths" | "king" | "fernwick" | "highcairn" | "dawnhold" | "gravesend" | "saltmarrow" | "hollyhock" | "dyemoor" | "tallgrass" | "cragmaw" | "quillhaven" | "raria" | "fff_fortress" | "barkreach" | "ashfall" | "ring"
     | "kurohama" | "takamori" | "kumoyama" | "tanabe" | "yumoto" | "foothold" | "sefrah" | "tamesh" | "khetmar" | "zuri" | "ouresh" | "first_names"
-    | "tirthali" | "sarovan" | "shailagarh" | "mandapur" | "suvarnatira" | "kanthar" | "gullwick" | "saltreach" | "merrab" | "tel_ashun" | "ennus_well" | "exchange", { x: number; y: number }>;
+    | "tirthali" | "sarovan" | "shailagarh" | "mandapur" | "suvarnatira" | "kanthar" | "gullwick" | "saltreach" | "merrab" | "tel_ashun" | "ennus_well" | "exchange" | "collegium", { x: number; y: number }>;
 };
 
 function mulberry(seed: number) {
@@ -1644,6 +1652,8 @@ export function generateWorld(seed = WORLD_SEED, { overlays = true }: { overlays
   // The north itself, in the rows made for it (northworld.ts: it sets its own regions' labels, in the grown world).
   const grownCtx: GenContext = { ...ctx, H: FINAL_H, tiles: grown.tiles, region: grown.region, objectAt: grown.objectAt, lift: grown.lift, raise: grown.raise, random: mulberry(seed + 969), noise: makeNoise(seed + 971, 11), noise2: makeNoise(seed + 977, 4) };
   buildNorth(grownCtx, labels);
+  // The Prismwild, past the north's north-east, over the Glass Causeway (prismworld.ts).
+  buildPrismwild({ ...grownCtx, random: mulberry(seed + 1009), noise2: makeNoise(seed + 1013, 4) }, labels, places);
   // The Frenderal Exchange at the top of Gullwick's harbour street (commerceworld.ts, Commerce).
   buildExchange(grownCtx, places);
   // The sigil altars' shrines, and the deeper altars out across the Realm (sigilshrines.ts).
@@ -1883,7 +1893,8 @@ export const TREE_NAMES: Record<TreeKind, string> = { tree: "Tree", oak: "Oak", 
 export const ruinPiece = (r: number): DecorKind => r < 0.26 ? "ruin_wall" : r < 0.46 ? "rubble" : r < 0.58 ? "broken_pillar" : r < 0.68 ? "fallen_pillar" : r < 0.78 ? "column_base" : r < 0.88 ? "carved_block" : r < 0.96 ? "ruin_arch" : "stone_head";
 export const DECOR_NAMES: Record<DecorKind, string> = {
   trough: "Water trough", vessel: "Vessel", hitching_post: "Hitching post",
-  strong_friend: "The Strong Friend", crystal: "Crystal", rune_circle: "Sigil circle", monument: "Statue", god_diamond: "Statue of the Good Friend", god_ink: "Statue of the Squid Friend", god_sol: "Statue of the Weird Friend", god_hood: "Statue of the Hood Friend", god_ember: "The Ember, in its brazier",
+  strong_friend: "The Strong Friend", crystal: "Crystal", prism_crystal: "Crystals", prism_spire: "Crystal spire", prism_giant: "Great crystal", fae_tree: "Fae tree", fae_ring: "Fairy ring", lumen_lamp: "Lumen lamp",
+  maze_door: "Crystal door", maze_glyph: "Glyph", hourglass: "Fennick's hourglass", rune_circle: "Sigil circle", monument: "Statue", god_diamond: "Statue of the Good Friend", god_ink: "Statue of the Squid Friend", god_sol: "Statue of the Weird Friend", god_hood: "Statue of the Hood Friend", god_ember: "The Ember, in its brazier",
   god_dusk: "Statue of the Wise Friend, blindfolded", wise_friend: "The Wise Friend", bell: "Great bell", canopy: "Old roofing", cannon: "Magical cannon", device: "Federation device", wagon: "Supply wagon", watchtower: "Watchtower", stake: "Stake wall", plaque: "Inscribed plaque", banner_fff: "The Federation's banner", banner_rrr: "The Regiment's banner", banner_hollowmere: "Hollowmere's banner", banner_diamond: "The Order of the Diamond's banner", banner_ink: "The Order of the Ink's banner", banner_sol: "The Order of the Sol's banner", banner_hood: "The Order of the Hood's banner", banner_ember: "The Order of the Ember's banner", banner_dusk: "The Order of Dusk's banner",
   flowers: "Flowers", bush: "Bush", boulder: "Boulder", lamp: "Lamp post", bench: "Bench", crate: "Crate", barrel: "Water barrel", tent: "Tent",
   cactus: "Cactus", pine: "Pine tree", dead_tree: "Dead tree", statue: "Statue", grave: "Grave", fence: "Fence", reeds: "Reeds", table: "Table",

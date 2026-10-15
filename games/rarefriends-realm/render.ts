@@ -15,7 +15,7 @@ import { TICK_MS, attackSpeed, riding, type Facing, type Game, type Monster, typ
 import { npcOverhead, veiled, type Pick } from "./engine.ts";
 import { knows, maxHpOf as creatureMaxHp } from "./pursuance.ts";
 import { FAMILIES, dungeonTheme } from "./dungeontheme.ts";
-import { type Rampart, gloomAt, inDeadwood, UNDER_Y, FLOOR_Y, OVERWORLD_H, REGIONS, STOREY, floorLift, storeyHeight, T, W, H, isStorey, complexAt, cornerHeight, floorAt, groundHeight, inBounds, isUnderground, objectAtTile, onLevel, realPoint, type Building, type DecorKind, type Floor, type World, type WorldObject } from "./world.ts";
+import { type Rampart, regionIndex, gloomAt, inDeadwood, UNDER_Y, FLOOR_Y, OVERWORLD_H, REGIONS, STOREY, floorLift, storeyHeight, T, W, H, isStorey, complexAt, cornerHeight, floorAt, groundHeight, inBounds, isUnderground, objectAtTile, onLevel, realPoint, type Building, type DecorKind, type Floor, type World, type WorldObject } from "./world.ts";
 import { itemArt } from "./icons.ts";
 import type { PeerView } from "./social.ts";
 import type { Strike, Weather } from "./weather.ts";
@@ -35,6 +35,9 @@ import { burst, cloudShadows, drawCloudShadows, drawEffects, hush, playerPose, p
 import { gloomSky, LightField, hexRgb, rgbCss, skyFor, type PointLight, type RGB , resetLighting } from "./lighting.ts";
 import { FIGURE_K, drawAuras, drawFigure, figureArt, heldTip, type Held } from "./wardrobe.ts";
 import { homeRect } from "./housing.ts";
+import { CRYSTAL_COLORS, crystalArt, faeRingArt, faeTreeArt, glyphArt, hourglassArt, lumenLampArt, mazeDoorArt } from "./prismart.ts";
+import { LABYRINTH, cofferLit, inLabyrinth, mazeDoorOpen } from "./labyrinth.ts";
+import { PRISM_REGION_IDS } from "./prismworld.ts";
 import { STRONG_FRIEND_MASK, creatureSprite, friendSprite, type Mask } from "./sprites.ts";
 
 /** The logical view size; the game sets it to match the frame (960 × 640 is the reference). */
@@ -63,7 +66,12 @@ const GROUND_STYLE: Partial<Record<number, GroundStyle>> = {
  */
 const THEME_BASE = 100, THEME_LIST = Object.values(FAMILIES);
 THEME_LIST.forEach((family, i) => { TERRAIN_COLORS[THEME_BASE + i] = family.floor.color; GROUND_STYLE[THEME_BASE + i] = family.floor.style as GroundStyle; });
-const lookOf = (world: World, x: number, y: number, terrain: number) => { if (terrain !== T.DUNGEON || !isUnderground(y)) return terrain; const theme = dungeonTheme(world, x, y); return theme ? THEME_BASE + THEME_LIST.indexOf(theme) : terrain; };
+/** The Prismwild's grass (prismworld.ts): lilac, and darker lilac where it's lush (looked up like a terrain of its own, as the dungeon floors are). */
+const PRISM_BASE = 90;
+TERRAIN_COLORS[PRISM_BASE] = "#cdbfe0"; GROUND_STYLE[PRISM_BASE] = "grass"; TERRAIN_COLORS[PRISM_BASE + 1] = "#b9a6d8"; GROUND_STYLE[PRISM_BASE + 1] = "lush";
+let prismRegions: Set<number> | null = null;
+export const inPrismwild = (world: World, x: number, y: number) => (prismRegions ??= new Set(PRISM_REGION_IDS.map(regionIndex))).has(world.region[y * W + x]);
+const lookOf = (world: World, x: number, y: number, terrain: number) => { if ((terrain === T.GRASS || terrain === T.DARK_GRASS) && inBounds(x, y) && inPrismwild(world, x, y)) return PRISM_BASE + (terrain === T.DARK_GRASS ? 1 : 0); if (terrain !== T.DUNGEON || !isUnderground(y)) return terrain; const theme = dungeonTheme(world, x, y); return theme ? THEME_BASE + THEME_LIST.indexOf(theme) : terrain; };
 /** Terrain classes for inked edges: a line is drawn where the class changes. */
 const EDGE_CLASS: Record<number, number> = {
   [T.GRASS]: 1, [T.DARK_GRASS]: 1, [T.PATH]: 2, [T.COBBLE]: 3, [T.SAND]: 4, [T.WATER]: 5, [T.DEEP]: 5, [T.SWAMP]: 6, [T.SNOW]: 7,
@@ -987,7 +995,7 @@ function drawPrints(ctx: CanvasRenderingContext2D, camera: Camera, now: number, 
 /** How far from the camera (tiles) sprites cast their own shadows; beyond it the haze hides them. */
 const SHADOW_REACH = 30;
 /** Decorations lying flat on the ground: they cast no shadow. */
-const FLAT_DECOR = new Set(["flowers", "lily", "rubble", "reeds", "grave", "bones", "scuffs", "bedroll", "campfire_cold"]);
+const FLAT_DECOR = new Set(["flowers", "lily", "rubble", "reeds", "grave", "bones", "scuffs", "bedroll", "campfire_cold", "fae_ring", "maze_glyph"]);
 /** Pixel art scale: two world pixels per art pixel. */
 const ART = 2;
 /** Trees drawn as scenery was: palms, pines and dead trees keep their old look, and show a stump when they're cut. */
@@ -1836,6 +1844,22 @@ function drawFallenTorii(ctx: CanvasRenderingContext2D, camera: Camera, plan: To
   lying(cx - 0.1, cy - 0.5, cx + 0.2, cy + 0.6, 0.12, 5, c.post);
   lying(cx + 1.55, cy - 1.7, cx + 1.85, cy + 1.8, 0.3, 9, c.cap);
 }
+/** The Prismwild's decor's picture, or null for anything else (`flat`: it lies on the ground). */
+function prismArt(scene: Scene, object: WorldObject, h: number): { art: HTMLCanvasElement; flat?: boolean } | null {
+  const t = scene.reducedMotion ? 0 : scene.now, glint = Math.floor(t / 260 + h * 40);
+  switch (object.decor) {
+    case "prism_crystal": return { art: crystalArt(h < 0.5 ? 0 : 1, Math.floor(h * 6 * 7), glint) };
+    case "prism_spire": return { art: crystalArt(2, Math.floor(h * 6 * 7), glint) };
+    case "prism_giant": return { art: crystalArt(3, Math.floor(h * 6 * 7), Math.floor(t / 330 + h * 40)) };
+    case "fae_tree": return { art: faeTreeArt(Math.floor(h * 4 * 5), Math.floor(t / 700 + h * 9)) };
+    case "fae_ring": return { art: faeRingArt(Math.floor(h * 3 * 5)), flat: true };
+    case "lumen_lamp": return { art: lumenLampArt(Math.floor(t / 400 + h * 9)) };
+    case "maze_door": return { art: mazeDoorArt(mazeDoorOpen(scene.game, object), object.clue === "maze_door_b" ? 1 : 0) };
+    case "maze_glyph": return { art: glyphArt(Math.floor(t / 300 + h * 9)), flat: true };
+    case "hourglass": return { art: hourglassArt(Math.floor(t / 500)) };
+    default: return null;
+  }
+}
 function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObject, alpha: number) {
   const { camera, now } = scene, z = camera.zoom, { x: sx, y: sy } = toScreen(camera, object.x, object.y), ox = object.x, oy = object.y, h = hash(ox, oy);
   const hit = (height: number, w = 36) => ({ x: sx - w / 2 * z, y: sy - height * z, w: w * z, h: (height + 10) * z });
@@ -1846,6 +1870,12 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
     const kind = object.ship as VesselKind, facing = screenFacing(camera, object.heading ?? { x: 0, y: 1 }), art = shipArt(kind, facing === "down" ? "front" : facing === "up" ? "back" : "side", -1);
     drawShip(ctx, kind, facing, false, now + ox * 97, sx, sy, z, "all", scene.reducedMotion, alpha, sailColor(object.sail));
     return hit(art.height * ART * SHIP_SCALE, art.width * ART * SHIP_SCALE);
+  }
+  // The Prismwild's things (prismart.ts): crystals (their colour by where they stand, their glint by the clock), fae trees, rings, lamps, and the Labyrinth's doors, glyphs and hourglass.
+  const prism = prismArt(scene, object, h);
+  if (prism) {
+    if (!prism.flat) ellipse(ctx, sx, sy + 1 * z, prism.art.width * z * 0.7, 4 * z, "rgba(22,22,22,0.12)", null);
+    return drawPixels(ctx, prism.art, sx, sy + (prism.flat ? 6 : 2) * z, ART * z, alpha);
   }
   // (The Wise Friend's statue is carved in the world, below, not stood up as a picture.)
   const carvedStatue = object.decor === "wise_friend";
@@ -2114,7 +2144,14 @@ function drawDecor(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldObj
         ctx.strokeStyle = "#c9b77f"; ctx.lineWidth = 1.2 * z; ctx.beginPath(); ctx.moveTo(sx + 5 * z, sy - 15 * z); ctx.quadraticCurveTo(sx + 9 * z, sy - 9 * z, sx + 6 * z, sy - 4 * z); ctx.stroke(); return hit(20, 18); }
       case "ruin_wall": return hit(drawStonework(ctx, scene, object), 40);
       case "windmill": return drawWindmill(ctx, scene, ox, oy);
-      case "chest": box(ctx, camera, ox, oy, 0.6, 0.45, 14, "#9c8672", "#8a7563", "#7a6553"); return hit(20);
+      case "chest": {
+        // One of Fennick's coffers that's full on your run shines (labyrinth.ts).
+        const lit = object.clue === "maze_coffer" && cofferLit(scene.game, object);
+        if (lit) ellipse(ctx, sx, sy - 8 * z, 22 * z, 14 * z, `rgba(228,122,196,${0.28 + Math.sin(now / 200 + ox) * 0.1})`, null);
+        box(ctx, camera, ox, oy, 0.6, 0.45, 14, lit ? "#c9a0e8" : "#9c8672", lit ? "#a87ad0" : "#8a7563", lit ? "#8a5ab8" : "#7a6553");
+        if (lit) { ctx.fillStyle = "#fff0fa"; const k = Math.floor(now / 160) % 3; for (let i = 0; i < 3; i++) if (i !== k) ctx.fillRect(sx + (i - 1) * 7 * z, sy - (24 + ((i * 5 + k * 3) % 8)) * z, 2 * z, 2 * z); }
+        return hit(20);
+      }
       case "bed": drawBed(ctx, scene, object); return hit(30);
       case "throne": {
         // A throne on a dais: carved dark wood gilded at its edges, a rose cushion, arms ending in gold, and a tall back
@@ -2875,6 +2912,18 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
    * along it; in the gateway the stone stands over an arch, great iron-bound doors under it; either side of the gateway a
    * tower, deeper and taller, battlemented. Seen from behind it fades like any wall you're behind.
    */
+  const hedge = (x: number, y: number) => {
+    const H = 26, post = (x - LABYRINTH.x0) % LABYRINTH.cell === 0 && (y - LABYRINTH.y0) % LABYRINTH.cell === 0, flower = hash(x * 3, y * 5);
+    const joined = (nx: number, ny: number) => inBounds(x + nx, y + ny) && world.tiles[(y + ny) * W + x + nx] === T.WALL && inLabyrinth(x + nx, y + ny);
+    drawables.push({ depth: depth(x, y), at: { x, y, h: H / 2 }, size: [H + 40, 52, 30], exact: true, hull: () => boxHull(camera, x, y, 1, 1, H), draw: () => {
+      capturing = glr && ctx === target ? glr : null;
+      box(ctx, camera, x, y, 1, 1, H, "#6f8f78", "#557560", "#45614f", 0, "#2c3a30", null, joined);
+      if (flower < 0.45) box(ctx, camera, x + (flower - 0.22) * 1.4, y + 0.2, 0.16, 0.16, 3, "#e47ac4", "#c45aa4", "#a4488a", H, null);
+      if (post) box(ctx, camera, x, y, 0.3, 0.3, 12, "#d8c8f8", "#9a72e8", "#7a52c8", H, INK);
+      capturing = null;
+    } });
+    blockers.push([x, y, H]);
+  };
   const greatWall = (x: number, y: number, r: Rampart, near: boolean) => {
     const g = r.great!, a = g.arch, mid = (a.y0 + a.y1) / 2, half = (a.y1 - a.y0) / 2 + 0.5, run = greatRun(world, r), cx = (r.x0 + r.x1) / 2;
     if (x !== Math.round(cx)) return;   // (drawn once per row, across its depth)
@@ -3002,7 +3051,10 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     if (!object || object.name === "__removed") return;
     if (object.kind === "decor" && SMALL_DECOR.has(object.decor!) && Math.abs(x - camera.x) + Math.abs(y - camera.y) > HAZE_START) return;
     if (object.kind === "sigil_altar") glow(x, y, 34, 90, object.sigil && isItem(object.sigil) ? item(object.sigil).icon.color : "#c7d3dc", 0.8, true);
-    if (object.decor === "crystal") glow(x, y, 14, 70, "#bff4ff", 0.55); else if (object.decor === "rune_circle") glow(x, y, 2, 90, "#a48cf0", 0.6);
+    // The Prismwild's crystals and lamps light the dark in their own colours.
+    if (object.decor === "prism_crystal" || object.decor === "prism_spire" || object.decor === "prism_giant") { const big = object.decor === "prism_giant" ? 2 : object.decor === "prism_spire" ? 1 : 0; glow(x, y, [8, 30, 90][big], [50, 90, 200][big], CRYSTAL_COLORS[Math.floor(hash(x, y) * 6)], [0.35, 0.55, 0.9][big]); }
+    else if (object.decor === "lumen_lamp") glow(x, y, 36, 140, "#e8d8ff", 0.9); else if (object.decor === "fae_tree") glow(x, y, 40, 90, "#ffe7a8", 0.4, true); else if (object.decor === "hourglass") glow(x, y, 30, 120, "#ecb45a", 0.8);
+    else if (object.decor === "crystal") glow(x, y, 14, 70, "#bff4ff", 0.55); else if (object.decor === "rune_circle") glow(x, y, 2, 90, "#a48cf0", 0.6);
     else if (object.decor === "lamp") glow(x, y, 48, 150, "#f2b261", 0.9); else if (object.decor === "stone_lantern" || object.decor === "paper_lantern") glow(x, y, object.decor === "stone_lantern" ? 30 : 50, 110, "#f2b261", 0.75); else if (object.decor === "torch") glow(x, y, 32, 130, (isUnderground(y) && dungeonTheme(world, x, y)?.torch) || "#ef9a4c", 1, true); else if (object.decor === "hearth" || object.decor === "campfire") glow(x, y, 14, 170, "#f0a050", 1, true);
     else if (object.kind === "furnace" || object.kind === "range") glow(x, y, 16, 110); else if (object.kind === "altar") glow(x, y, 26, 70); else if (object.kind === "fountain" && objectAtTile(world, x - 1, y)?.kind !== "fountain" && objectAtTile(world, x, y - 1)?.kind !== "fountain") glow(x + 0.5, y + 0.5, 12, 110, "#a9d4f2", 0.55); else if (object.kind === "sigil_altar") glow(x, y, 30, 90);
     // The fountain is 2 × 2: sorted by its centre (a little forward, for its rim), not its back tile, so Friends beside it
@@ -3034,9 +3086,9 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     const d = fountainMaster ? depth(x + 0.5, y + 0.5) + 0.3 : depth(x, y) + (object.kind === "wheat" || object.kind === "spot" ? -0.4 : 0);
     const flat = object.kind === "spot" || (object.kind === "decor" && FLAT_DECOR.has(object.decor!));
     const sprite = object.kind === "tree" || object.kind === "rock" || object.kind === "dock" || (object.kind === "decor" && object.decor !== "banner");
-    drawables.push({ depth: d, at: { x, y }, cast: !flat, flat, sprite, scenery: object.kind === "tree" || object.kind === "rock" || object.kind === "decor" || object.kind === "spot", size: object.decor === "pagoda" || object.decor === "castle_keep" ? [520, 200, 60] : object.decor === "windmill" ? [320, 140, 40] : object.kind === "tree" ? [260, 110, 40] : [200, 110, 40], draw: () => {
+    drawables.push({ depth: d, at: { x, y }, cast: !flat, flat, sprite, scenery: object.kind === "tree" || object.kind === "rock" || object.kind === "decor" || object.kind === "spot", size: object.decor === "pagoda" || object.decor === "castle_keep" || object.decor === "prism_giant" ? [520, 200, 60] : object.decor === "windmill" ? [320, 140, 40] : object.kind === "tree" ? [260, 110, 40] : [200, 110, 40], draw: () => {
       let rect: { x: number; y: number; w: number; h: number };
-      const tall = object.kind === "tree" || (object.kind === "decor" && (["pine", "windmill", "palm", "pillar", "tent", "crypt", "obelisk", "canopy", "wise_friend", "god_dusk", "torii", "rock_spire", "pagoda", "castle_keep"].includes(object.decor!) || (object.decor === "ruin_wall" && (object.height ?? 0) > 34)));
+      const tall = object.kind === "tree" || (object.kind === "decor" && (["pine", "windmill", "palm", "pillar", "tent", "crypt", "obelisk", "canopy", "wise_friend", "god_dusk", "torii", "rock_spire", "pagoda", "castle_keep", "prism_spire", "prism_giant", "fae_tree", "lumen_lamp", "hourglass"].includes(object.decor!) || (object.decor === "ruin_wall" && (object.height ?? 0) > 34)));
       // Anything tall in front of your Friend that covers it on screen turns see-through (works at any angle and zoom).
       const fade = tall && d > playerDepth + 0.3 && coversPlayer(x, y) ? 0.35 : 1;
       if (object.kind === "tree") rect = drawTree(ctx, scene, object, game.depleted.has(object.id), fade, scene.reducedMotion ? 0 : treeShake(game, object.id, now));
@@ -3065,6 +3117,8 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
       };
       // Tall buildings show every storey from outside; inside, only the storey you're on (and the ones below).
       // A city's rampart stands storeys high, battlemented, wherever no building owns the wall.
+      // Fennick's Labyrinth: a low hedge of crystal-thorn, seen over, its posts tipped with crystal (labyrinth.ts).
+      if (!building && !mine && inLabyrinth(x, y)) { hedge(x, y); continue; }
       const great = building || mine ? null : greatWallAt(world, x, y);
       if (great) { greatWall(x, y, great, near); continue; }
       const rampart = building || mine ? 0 : rampartAt(world, x, y);
@@ -4478,8 +4532,13 @@ export function worldImage(world: World): HTMLCanvasElement {
   for (let i = 0; i < W * H; i++) {
     if (i >= W * FLOOR_Y && i < W * UNDER_Y) { image.data.set([...MAP_COLORS[T.VOID], 255], i * 4); continue; }
     let [r, g, b] = MAP_COLORS[world.tiles[i]] ?? [128, 128, 128];
+    // The Prismwild's grass is lilac on the map too, its fae trees violet, its crystals bright.
+    const prism = (world.tiles[i] === T.GRASS || world.tiles[i] === T.DARK_GRASS) && inPrismwild(world, i % W, Math.floor(i / W));
+    if (prism) [r, g, b] = world.tiles[i] === T.GRASS ? [178, 160, 206] : [150, 128, 186];
     const object = world.objects[world.objectAt[i]];
-    if (object?.kind === "tree") [r, g, b] = [78, 116, 70];
+    if (object?.kind === "decor" && object.decor === "fae_tree") [r, g, b] = [126, 92, 168];
+    else if (object?.kind === "decor" && (object.decor === "prism_giant" || object.decor === "prism_spire")) [r, g, b] = [222, 200, 250];
+    else if (object?.kind === "tree") [r, g, b] = [78, 116, 70];
     else if (object?.kind === "rock") [r, g, b] = [128, 112, 98];
     image.data.set([r, g, b, 255], i * 4);
   }

@@ -21,7 +21,7 @@ import { cleanPresence } from "../games/rarefriends-realm/net.ts";
 import { buySlayerReward, longTasks, slayerXpBoost, eligibleTasks } from "../games/rarefriends-realm/slayer.ts";
 import { currentTask, slayerPoints } from "../games/rarefriends-realm/slayer.ts";
 import { COURSES, EQUIP_SLOTS, HEARTGUARD, ITEM_LIST, METALS, MONSTERS, ROCKS, SMITH_PIECES, SPELL_TABS, FIREMAKING, REGIONAL_CLOTHING, WARDROBE, MOUNTS, SHOPS, SKILLS, SKILL_NAMES, SLAYER_SETS, SLAYER_TASKS, SPELLS, TREES, WAYFARER_MARK, WAYFARER_REWARDS, XP_RATE, XP_TABLE, heavyStrength, isItem, item, levelForXp } from "../games/rarefriends-realm/data.ts";
-import { NPCS, QUESTS, MAX_QUEST_POINTS, PILGRIM_ALTARS, questPoints, onMonsterKilled, shopProblem, readJobBoard } from "../games/rarefriends-realm/content.ts";
+import { NPCS, QUESTS, MAX_QUEST_POINTS, PILGRIM_ALTARS, questPoints, onMonsterKilled, shopProblem, readJobBoard, questDone } from "../games/rarefriends-realm/content.ts";
 import { ORDERS, ORDER_IDS, orderOf, orderPieces } from "../games/rarefriends-realm/knights.ts";
 import { signetCharges, signetTeleport } from "../games/rarefriends-realm/engine.ts";
 import { COFFER_TICKS } from "../games/rarefriends-realm/dungeons.ts";
@@ -622,7 +622,7 @@ test("A Friend's Feast from start to finish", () => {
   assert.equal(g.player.quests.friends_feast, 2);
   assert.equal(questPoints(g), 1);
   assert(level(g, "cooking") >= 10, "Quest XP");
-  assert.equal(QUESTS.length, 117); assert.equal(MAX_QUEST_POINTS, 205);
+  assert.equal(QUESTS.length, 118); assert.equal(MAX_QUEST_POINTS, 207);
 });
 
 test("Grumblin Trouble counts kills and pays out", () => {
@@ -1968,7 +1968,7 @@ test("The Order's later quests: The Pilgrim's Road, The Restless Crypt and Dawn 
   assert.equal(p.quests.dawn_against_hollow, 2); assert(has(p, "dawnplate_cuirass"));
   assert.equal(count(p, "hollow_essence"), 0);
   assert.equal(capeProblem(g, "dawnplate_cuirass"), null, "the armoury sells Dawnplate once earned");
-  assert.equal(QUESTS.length, 117); assert.equal(MAX_QUEST_POINTS, 205);
+  assert.equal(QUESTS.length, 118); assert.equal(MAX_QUEST_POINTS, 207);
 });
 
 test("Boots and gauntlets in every metal, smithed at the anvil; the clothier's shirts, dresses, trousers and skirts", () => {
@@ -3318,7 +3318,7 @@ test("Meghavan's music: tanpura, sitar, bansuri, shehnai and santoor, tabla and 
   assert.equal(ensembles.size, 5, "each its own ensemble");
   for (const [region, id] of [["rain_pass", "meghavan_rains"], ["ilavati_valley", "meghavan_rains"], ["sarovan", "meghavan_sarovan"], ["tirthali", "meghavan_sarovan"], ["shailagarh", "meghavan_shailagarh"],
     ["shaila_highlands", "meghavan_shailagarh"], ["suvarnatira", "meghavan_suvarnatira"], ["mandapur", "meghavan_suvarnatira"], ["deepgreen", "meghavan_deepgreen"], ["kanthar", "meghavan_deepgreen"]]) assert.equal(trackFor(region, false), id);
-  assert.equal(TRACKS.length, 88, "the jukebox's count (the north's seven among them)");
+  assert.equal(TRACKS.length, 90, "the jukebox's count (the north's seven and the Prismwild's two among them)");
 });
 
 test("The Rain Country rains more than anywhere else, and the Deepgreen is misty", async () => {
@@ -5479,4 +5479,109 @@ test("The Oathgate is a great wall: its top near the crags' height, the whole wi
   assert.ok(wall.great.reach >= 10, "it runs on up the crag");
   const meets = dir => { for (let k = 1; k <= wall.great.reach; k++) { const y = (dir < 0 ? wall.y0 : wall.y1) + dir * k; if (groundHeight(world, gx, y) >= wall.great.top - 60) return k; } return 0; };
   assert.ok(meets(-1) > 0 && meets(1) > 0, `it meets rock near its own height both ways (${meets(-1)}, ${meets(1)} rows on)`);
+});
+
+test("The Prismwild: a land past the north's north-east over the Glass Causeway, reached on foot; lilac downs, crystals of every size, the Starwood, the Fae Hollows, the Shardfields, the Collegium and its people", async () => {
+  const { PRISMWILD, PRISM_REGION_IDS, COLLEGIUM, CAUSEWAY_Y } = await import("../games/rarefriends-realm/prismworld.ts");
+  const g = newGame(), world = g.world;
+  for (const id of PRISM_REGION_IDS) assert.ok(world.region.includes(REGIONS.findIndex(region => region.id === id)), `${id} exists`);
+  // On foot from the spawn: over the Causeway to the Collegium's courtyard, and to the Labyrinth's gate.
+  const { MAZE_GATE } = await import("../games/rarefriends-realm/labyrinth.ts");
+  const seen = reachable(g, world.places.spawn);
+  assert.ok(seen[world.places.collegium.y * W + world.places.collegium.x], "the Collegium is reached on foot from the spawn");
+  assert.ok([[0, 1], [1, 0], [0, -1], [-1, 0], [0, 2]].some(([dx, dy]) => seen[(MAZE_GATE.y + dy) * W + MAZE_GATE.x + dx]), "and the Labyrinth's gate");
+  assert.equal(regionAt(world, world.places.collegium.x, world.places.collegium.y).id, "collegium");
+  assert.ok(world.tiles[CAUSEWAY_Y * W + PRISMWILD.x0 - 20] !== T.DEEP, "the Causeway crosses the strait");
+  const decor = kind => world.objects.filter(o => o.kind === "decor" && o.decor === kind).length;
+  assert.ok(decor("prism_giant") >= 20, `great crystals (${decor("prism_giant")})`); assert.ok(decor("prism_crystal") > 600, `crystals (${decor("prism_crystal")})`);
+  assert.ok(decor("prism_spire") > 150, "crystal spires"); assert.ok(decor("fae_tree") > 1000, `fae trees (${decor("fae_tree")})`); assert.ok(decor("fae_ring") > 40, "fairy rings");
+  for (const id of ["archmagister_vey", "tutor_quill", "librarian_osk", "pell_ashby", "pell_ashby_lost", "lady_hawthorn", "fennick", "shard_warden"]) assert.ok(world.spawns.some(s => s.kind === "npc" && s.id === id), `${id} is placed`);
+  for (const id of ["glimmer_moth", "thistle_pixie", "prism_wisp", "glimmer_stag", "shard_golem"]) assert.ok(world.spawns.filter(s => s.kind === "monster" && s.id === id).length >= 8, `${id}s roam`);
+  // The Collegium's walls, gates and halls; a bank; the Collegium tablet goes there.
+  assert.ok(world.buildings.some(b => b.name === "The Great Hall") && world.buildings.some(b => b.name === "The Seventh Lamp" && b.round), "the Great Hall and the Seventh Lamp's tower");
+  assert.ok(world.objects.some(o => o.kind === "bank" && o.x > COLLEGIUM.x0 && o.x < COLLEGIUM.x1 && o.y > COLLEGIUM.y0 && o.y < COLLEGIUM.y1), "a bank in the Collegium");
+  give(g.player, "tablet_collegium", 1); const slot = g.player.inventory.findIndex(s => s?.id === "tablet_collegium"); breakTablet(g, slot); run(g, 4);
+  assert.ok(Math.hypot(g.player.x - world.places.collegium.x, g.player.y - world.places.collegium.y) < 4, "the tablet takes you to the Collegium");
+});
+
+test("Fennick's Labyrinth: the maze is whole, the doors turn, every ring nearer the heart pays, glyphs send you out, coffers shine and pay once, the thread and the clock end a run, the heart pays most, a reload puts you outside", async () => {
+  const L = await import("../games/rarefriends-realm/labyrinth.ts");
+  const { LABYRINTH, MAX_RING, mazeLayout, cellTile, ringOf, ringPay, fullCoffers, mazeDoorOpen, MAZE_GATE, RUN_TICKS, TURN, HEART_BONUS } = L;
+  const N = LABYRINTH.n, layout = mazeLayout();
+  // With every door open, every cell is reached from the start, the heart among them.
+  const seen = new Uint8Array(N * N), queue = [(N - 1) * N + (N - 1) / 2]; seen[queue[0]] = 1;
+  while (queue.length) { const c = queue.shift(), i = c % N, j = Math.floor(c / N); for (const [d, e] of [[c + 1, c * 2], [c - 1, (c - 1) * 2], [c + N, c * 2 + 1], [c - N, (c - N) * 2 + 1]]) { if (d < 0 || d >= N * N || (Math.abs((d % N) - i) > 1) || !layout.open[e] || seen[d]) continue; seen[d] = 1; queue.push(d); } void j; }
+  assert.equal(seen.reduce((a, b) => a + b, 0), N * N, "the whole maze is one");
+  assert.ok(layout.doors.size > 60 && [...layout.doors.values()].includes(0) && [...layout.doors.values()].includes(1), `doors in two sets (${layout.doors.size})`);
+  assert.ok(layout.coffers.length >= 30 && layout.glyphs.length >= 20, `coffers (${layout.coffers.length}) and glyphs (${layout.glyphs.length})`);
+  const g = newGame(), p = g.player, world = g.world, glass = () => count(p, "mazeglass");
+  // A door of each set: one open, the other shut, and a turn later the other way round.
+  const doorA = world.objects.find(o => o.clue === "maze_door_a"), doorB = world.objects.find(o => o.clue === "maze_door_b");
+  g.tick = TURN * 10; assert.ok(mazeDoorOpen(g, doorA) && !mazeDoorOpen(g, doorB)); g.tick += TURN; assert.ok(!mazeDoorOpen(g, doorA) && mazeDoorOpen(g, doorB), "the maze turns");
+  // Fennick starts a run: into the south cell, eight minutes.
+  const fennick = world.spawns.find(s => s.id === "fennick"); teleport(g, fennick.x, fennick.y + 1);
+  talk(g, "fennick").options.find(o => o.label === "Run the maze.").then();
+  assert.ok(p.maze && p.maze.until - p.maze.start === RUN_TICKS, "a run of eight minutes"); assert.equal(L.ringAt(p.x, p.y), MAX_RING, "starting in the outermost ring");
+  // Rings nearer the heart pay, each once.
+  const at = (ring) => { const c = cellTile((N - 1) / 2, (N - 1) / 2 + ring); teleport(g, c.x, c.y); };
+  at(10); tick(g); let want = 0; for (let r = MAX_RING - 1; r >= 10; r--) want += ringPay(r); assert.equal(glass(), want, "rings 14 to 10 pay");
+  at(12); tick(g); assert.equal(glass(), want, "going back out pays nothing");
+  // A glyph sends you back out to the edge.
+  const glyph = world.objects.find(o => o.clue === "maze_glyph"); teleport(g, glyph.x, glyph.y); tick(g);
+  assert.equal(L.ringAt(p.x, p.y), MAX_RING, "a glyph puts you in the outermost ring");
+  // The coffers: a full one pays once (and shines), an empty one says so.
+  const full = fullCoffers(p.maze), cofferAt = c => world.objects.find(o => o.clue === "maze_coffer" && L.cellAt(o.x, o.y)?.i === c % N && L.cellAt(o.x, o.y)?.j === Math.floor(c / N));
+  const coffer = cofferAt(full[0]), before = glass();
+  standBy(g, coffer); setTarget(g, { kind: "object", id: coffer.id, option: "Search" }); run(g, 3);
+  assert.ok(glass() > before, "a full coffer pays"); const after = glass();
+  setTarget(g, { kind: "object", id: coffer.id, option: "Search" }); run(g, 3); assert.equal(glass(), after, "and only once");
+  const empty = world.objects.find(o => o.clue === "maze_coffer" && !full.some(c => cofferAt(c) === o)); standBy(g, empty); setTarget(g, { kind: "object", id: empty.id, option: "Search" }); run(g, 3);
+  assert.equal(glass(), after, "an empty coffer pays nothing");
+  // The heart: its ring and the bonus, and the run ends in triumph at the gate.
+  const heart = cellTile((N - 1) / 2, (N - 1) / 2), beforeHeart = glass(), reached = p.maze.deepest; teleport(g, heart.x, heart.y); tick(g);
+  let rest = 0; for (let r = reached - 1; r >= 0; r--) rest += ringPay(r);
+  assert.equal(glass() - beforeHeart, rest + HEART_BONUS, "the heart pays its rings and the bonus"); assert.equal(p.maze, null); assert.equal(p.labyrinth.hearts, 1); assert.equal(p.labyrinth.best, 0);
+  assert.ok(Math.abs(p.x - MAZE_GATE.x) + Math.abs(p.y - MAZE_GATE.y) <= 1, "back at the gate");
+  // The clock: a run that runs out ends at the gate; the thread ends one early.
+  talk(g, "fennick").options.find(o => o.label === "Run the maze.").then(); p.maze.until = g.tick + 1; run(g, 2); assert.equal(p.maze, null, "time's up"); assert.equal(p.labyrinth.runs, 2);
+  talk(g, "fennick").options.find(o => o.label === "Run the maze.").then(); const thread = world.objects.find(o => o.clue === "maze_thread");
+  standBy(g, thread); setTarget(g, { kind: "object", id: thread.id, option: "Pull" }); run(g, 3); assert.equal(p.maze, null, "the thread pulls you out"); assert.equal(p.labyrinth.runs, 3);
+  // A reload: the record kept, the run not; a runner found inside is put out at the gate.
+  talk(g, "fennick").options.find(o => o.label === "Run the maze.").then(); at(5);
+  const g2 = newGame(); restore(g2, JSON.parse(JSON.stringify(serialize(g))));
+  assert.equal(g2.player.maze, null); assert.equal(g2.player.labyrinth.hearts, 1); assert.equal(g2.player.labyrinth.runs, 3);
+  teleport(g2, p.x, p.y); tick(g2); assert.ok(!L.inLabyrinth(g2.player.x, g2.player.y), "put outside after a reload");
+  void ringOf;
+});
+
+test("The Seventh Lamp: glimmer dust, Pell's satchel, Lady Hawthorn's riddle, and enrolment; Fennick's curios for mazeglass; the Prismweave robes keep sigils and the twisting staff never runs short", async () => {
+  const { DUST_WANTED, SEVENTH_LAMP } = await import("../games/rarefriends-realm/prismtalk.ts");
+  const { PRISMWEAVE } = await import("../games/rarefriends-realm/prismgear.ts");
+  const g = newGame(), p = g.player, world = g.world;
+  talk(g, "archmagister_vey").options.find(o => o.label === "What do you need?").then().onEnd?.();
+  assert.equal(p.quests[SEVENTH_LAMP], 1, "the quest begins");
+  assert.match(talk(g, "lady_hawthorn").lines.map(l => l.text).join(" "), /lawn/, "the Lady has nothing to trade before the satchel");
+  const satchel = world.objects.find(o => o.clue === "pell_satchel"); standBy(g, satchel); setTarget(g, { kind: "object", id: satchel.id, option: "Search" }); run(g, 3);
+  assert.ok(has(p, "student_satchel"), "Pell's satchel");
+  let d = talk(g, "lady_hawthorn"); d.options.find(o => o.label === "Time.").then(); assert.equal(p.questData.sl_pell ?? 0, 0, "a wrong answer frees nobody");
+  d = talk(g, "lady_hawthorn"); d.options.find(o => o.label === "Footsteps.").then(); assert.equal(p.questData.sl_pell, 1, "the right one does");
+  assert.ok(NPCS.pell_ashby.present(g) && !NPCS.pell_ashby_lost.present(g), "Pell is home, and no longer dancing");
+  give(p, "glimmer_dust", DUST_WANTED - 1);
+  assert.ok(!talk(g, "archmagister_vey").options, "not enough dust, no enrolment");
+  give(p, "glimmer_dust", 1); const magic = p.xp.magic;
+  talk(g, "archmagister_vey").options.find(o => o.label === "Here: ten pinches of glimmer dust.").then();
+  assert.ok(questDone(g, SEVENTH_LAMP) && p.xp.magic > magic && count(p, "tablet_collegium") === 2 && count(p, "glimmer_dust") === 0, "enrolled, with Magic XP and two tablets");
+  talk(g, "fennick").options.find(o => o.label === "The Archmagister sent me.").then(); assert.equal(count(p, "mazeglass"), 30, "thirty mazeglass on account");
+  assert.ok(!talk(g, "fennick").options.some(o => o.label === "The Archmagister sent me."), "once");
+  // Fennick's curios take mazeglass, not Frens.
+  assert.equal(SHOPS.fennicks_curios.currency, "mazeglass"); give(p, "mazeglass", 5000); const frens = count(p, "coins");
+  for (const id of [...PRISMWEAVE, "twisting_staff"]) buy(g, "fennicks_curios", id, 1);
+  assert.ok(PRISMWEAVE.every(id => has(p, id)) && has(p, "twisting_staff"), "the robes and the staff"); assert.equal(count(p, "coins"), frens, "no Frens spent");
+  // The robes: 4% a piece, the set 25%; the staff: no breeze or tide sigils.
+  for (const skill of ["magic", "defence"]) p.xp[skill] = 13_100_000;
+  const base = sigilSave(p, g); equip(g, p.inventory.findIndex(s => s?.id === "prismweave_hood")); assert.ok(Math.abs(sigilSave(p, g) - base - 0.04) < 1e-9, "a piece keeps 4%");
+  for (const id of PRISMWEAVE.slice(1)) equip(g, p.inventory.findIndex(s => s?.id === id)); assert.ok(Math.abs(sigilSave(p, g) - base - 0.25) < 1e-9, "the set keeps 25%");
+  equip(g, p.inventory.findIndex(s => s?.id === "twisting_staff"));
+  const spell = SPELLS.find(s => s.sigils && "breeze_sigil" in s.sigils && Object.keys(s.sigils).length === 2 && "thought_sigil" in s.sigils);
+  if (spell) { for (const id of Object.keys(spell.sigils)) take(p, id, count(p, id)); give(p, "thought_sigil", 100); assert.equal(canCast(g, spell), null, "the staff gives the breeze sigils"); }
 });

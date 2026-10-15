@@ -41,6 +41,8 @@ import { dyeSails, hasFitout } from "./shipfit.ts";
 import { cleanStanding } from "./northfactions.ts";
 import { devFlags } from "./devflags.ts";
 import { cleanCommerce } from "./commerce.ts";
+import { cleanLabyrinth, endMazeRun, labyrinthTick } from "./labyrinth.ts";
+import { PRISMWEAVE, PRISM_STAFF_SIGILS } from "./prismgear.ts";
 import { blessingFood, blessingHerb, blessingRegen, blessingTaken, blessingTick, cleanBlessing, rememberedName, saveBlessing } from "./northfaith.ts";
 import { allyOf, callNext, cleanCompanions, cleanTrust, findsHerbs, canSpare, companionFell, companionMenu, companionOut, companionTick, drawsFire, freeSnared, homeOnDeath, placeCompanion, sendHome, spare, speciesOfWild, useOnCreature } from "./beasts.ts";
 import { launchCarried, VESSELS, aboard, applyVessels, berthRespawn, canStow, cleanVessels, fitToVessel, goAshore, holdAt, nearestLanding, ringBell, sailable, sailed, settleAboard, stowInHold, vesselTick } from "./seafaring.ts";
@@ -343,6 +345,10 @@ const DECOR_EXAMINE: Partial<Record<string, string>> = {
   column_base: "The foot of a column, square-cut, and nothing standing on it any more.", ruin_arch: "Two posts and the stones of an arch between them. The wall it went through is gone.",
   carved_block: "A dressed block with a pattern cut into it, worn almost smooth. It meant something to somebody.", stone_head: "A great carved head, sunk to the chin. Whoever it was, they were looking that way.",
   sarcophagus: "A stone coffin, its lid carved with a long cross. Whoever's in it has been there a long time.",
+  prism_crystal: "Crystals, growing out of the ground the way stones don't. They hum if you put an ear to them.", prism_spire: "A spire of crystal taller than a house, humming, a glint running up it.",
+  prism_giant: "A crystal as tall as a tower, grown out of the ground over who knows how long. The light inside it moves.", fae_tree: "A tree with pale twisted bark and leaves the colour of evening. Little lights hang in it.",
+  fae_ring: "A ring of tiny pale mushrooms. The fae dance in them, the Collegium says. Step in at your own risk.", lumen_lamp: "A crystal hung in a silver cage on a post of white stone, lit from inside.",
+  maze_door: "A crystal door.", maze_glyph: "A glyph.", hourglass: "Fennick's hourglass.",
   throne: "Carved oak, gilded, and a cushion somebody sat on too long.", armour: "An empty suit of ashsteel armour. Probably empty.", bed: "Very soft. No time for naps.",
 };
 
@@ -1095,6 +1101,7 @@ function interactObject(game: Game, object: WorldObject, option: string, use?: n
   if (galley && option === "Cook-in-galley") { startCooking(game, "range", object.id, firstRaw(game)); return; }
   if (use !== undefined) { useItemOnObject(game, object, use); return; }
   // Something to look into (The Land Before Stone): it decides what happens, and where you go if anywhere.
+  if (object.clue === "maze_thread" && option === "Pull" && game.player.maze) { endMazeRun(game, travel, "thread"); return; }
   const clue = useClue(game, object, option);
   if (clue !== undefined) {
     if (clue?.to) travel(game, clue.to, clue.text ?? "");
@@ -1289,7 +1296,7 @@ function pickpocket(game: Game, npc: Npc, pick: NonNullable<ReturnType<typeof np
 }
 export function npcOverhead(game: Game, uid: number) { const entry = game.overheads.get(uid); return entry && entry.until > game.tick ? entry.text : null; }
 function npcSay(game: Game, npc: Npc, text: string) { game.overheads.set(npc.uid, { text, until: game.tick + 5 }); }
-function travel(game: Game, to: { x: number; y: number }, text: string) {
+export function travel(game: Game, to: { x: number; y: number }, text: string) {
   const player = game.player;
   stopAll(game);
   player.prev = { x: to.x, y: to.y }; player.x = to.x; player.y = to.y; player.moved = game.tick - 10;
@@ -1331,6 +1338,8 @@ export function tick(game: Game) {
   movePlayer(game);
   vesselTick(game);
   rideUpkeep(game);
+  // Fennick's Labyrinth: the rings, the glyphs, the clock (labyrinth.ts).
+  labyrinthTick(game, game.world, travel);
   if (player.boostTicks > 0) { player.boostTicks--; if (player.boostTicks === 0) message(game, "Your referral XP boost has run out. Refer another friend for more!"); }
   if (player.restedTicks > 0) { player.restedTicks--; if (player.restedTicks === 0) message(game, "You no longer feel well rested."); }
   if (player.ward && game.tick >= player.wardUntil) { player.ward = null; message(game, "Your ward fades."); }
@@ -1706,7 +1715,9 @@ function obstacleTick(game: Game, activity: Extract<Activity, { kind: "obstacle"
 }
 
 /** Hollowthread robes: an 8% chance a piece that a spell keeps its sigils, 30% in the full set. */
-export const sigilSave = (player: Player, game?: Game) => Math.min(0.9, Math.max(fullSlayerSet(player, "hollowthread") ? 0.3 : 0.08 * setPieces(player, "hollowthread"), game && mixtureOn(game, 8) ? 0.5 : 0) + 0.05 * orderPieces(player.equipment, "ink"));
+/** Prismweave pieces worn (the Prismwild: Fennick's curios): 4% a piece, the whole set 25%. */
+const prismweaveSave = (player: Player) => { const n = PRISMWEAVE.filter(id => Object.values(player.equipment).includes(id)).length; return n === PRISMWEAVE.length ? 0.25 : 0.04 * n; };
+export const sigilSave = (player: Player, game?: Game) => Math.min(0.9, Math.max(fullSlayerSet(player, "hollowthread") ? 0.3 : 0.08 * setPieces(player, "hollowthread"), game && mixtureOn(game, 8) ? 0.5 : 0) + 0.05 * orderPieces(player.equipment, "ink") + prismweaveSave(player));
 // ---------- Combat ----------
 const STYLE_BONUS: Record<CombatStyle, { attack: number; strength: number; defence: number }> = {
   accurate: { attack: 3, strength: 0, defence: 0 }, aggressive: { attack: 0, strength: 3, defence: 0 },
@@ -1732,6 +1743,7 @@ function spellCost(game: Game, spell: Spell) {
   const sigils = { ...spell.sigils } as Record<string, number>;
   const staff = STAFF_SIGILS[game.player.equipment.weapon ?? ""];
   if (staff) delete sigils[staff];
+  for (const free of PRISM_STAFF_SIGILS[game.player.equipment.weapon ?? ""] ?? []) delete sigils[free];
   return sigils;
 }
 export function canCast(game: Game, spell: Spell) {
@@ -2701,7 +2713,7 @@ export function sell(game: Game, shopId: string, slotIndex: number, n: number) {
 }
 
 // ---------- Tablets and lamps ----------
-const TABLET_PLACES = { hollow_square: "hollow_square", emberforge: "emberforge", oasis: "oasis", frostpeak: "frostpeak", pier: "pier" } as const;
+const TABLET_PLACES = { hollow_square: "hollow_square", emberforge: "emberforge", oasis: "oasis", frostpeak: "frostpeak", pier: "pier", collegium: "collegium" } as const;
 export function breakTablet(game: Game, slotIndex: number) {
   const player = game.player, slot = player.inventory[slotIndex], place = slot ? item(slot.id).tablet : undefined;
   if (!slot || !place) return;
@@ -2974,6 +2986,7 @@ export type SaveData = {
   name?: string | null; fellowship?: { name: string; tag: string; logo?: string; banner?: string; colors?: string[] } | null; title?: string | null; visited?: Record<string, number>; regionTicks?: Record<string, number>; talked?: Record<string, 1>; emotesUsed?: Record<string, 1>; outfits?: Record<string, 1>; friendTicks?: number; mounts?: string[]; mount?: string | null; daily?: unknown; seenUpdate?: number;
   lastMount?: string | null; saddlebags?: unknown; mountReady?: number;
   camps?: Record<string, number>; campTendAt?: number; campSleptAt?: number; waystoneAt?: number;
+  labyrinth?: unknown;
   vessels?: unknown; aboard?: number | null; landfalls?: Record<string, number>; trails?: Record<string, number>; companions?: unknown; companionSeq?: number; trust?: unknown; blessing?: unknown; standing?: unknown; commerce?: unknown;
 };
 export function serialize(game: Game): SaveData {
@@ -2986,7 +2999,7 @@ export function serialize(game: Game): SaveData {
     playTicks: game.playTicks, retaliate: game.autoRetaliate, music: [...player.music],
     referredBy: player.referredBy, referrals: [...player.referrals], referralTimes: [...player.referralTimes], boostTicks: player.boostTicks, coalBag: player.coalBag, stoneBoxGrades: { ...player.stoneBoxGrades }, stoneBox: player.stoneBox, boneBag: { ...player.boneBag }, boosts: { ...player.boosts }, poison: player.poison ? { ...player.poison } : null, weaponPoison: player.weaponPoison ? { ...player.weaponPoison } : null,
     antidoteUntil: Math.max(0, player.antidoteUntil - game.tick), antifireUntil: Math.max(0, player.antifireUntil - game.tick), stealthUntil: Math.max(0, player.stealthUntil - game.tick), tonicUntil: Math.max(0, player.tonicUntil - game.tick), mixture: player.mixture ? { family: player.mixture.family, until: Math.max(0, player.mixture.until - game.tick) } : null,
-    firsts: { ...player.firsts } as Record<string, number>, friendKinds: { ...player.friendKinds } as Record<string, 1>, rumours: { ...player.rumours } as Record<string, 1>, orders: { ...player.orders }, activities: { run: player.activities.run ? { ...player.activities.run, target: { ...player.activities.run.target }, marks: { ...player.activities.run.marks } } : null, records: { ...player.activities.records } }, card: { ...player.card }, collectible: { layout: player.collectible.layout, show: [...player.collectible.show] }, lockbox: player.lockbox.map(slot => ({ ...slot })), settled: [...player.settled], notices: [...player.notices], camp: player.camp ? { ...player.camp, cache: player.camp.cache ? player.camp.cache.map(slot => slot ? { ...slot } : null) : null } : null, campXpAt: player.campXpAt, camps: { ...player.camps }, vessels: player.vessels.map(v => ({ ...v, heading: { ...v.heading }, hold: v.hold.map(slot => slot ? { ...slot } : null) })), aboard: player.aboard, landfalls: { ...player.landfalls }, companions: player.companions.map(c => ({ ...c, pack: c.pack.map(slot => slot ? { ...slot } : null) })), companionSeq: player.companionSeq, blessing: saveBlessing(game), standing: { ...player.standing }, commerce: JSON.parse(JSON.stringify(player.commerce)), trust: Object.fromEntries(Object.entries(player.trust).map(([k, v]) => [k, { n: v.n }])), trails: { ...player.trails }, campTendAt: player.campTendAt, campSleptAt: player.campSleptAt, waystoneAt: Math.min(0, player.waystoneAt - game.tick), cards: { ...player.cards }, rarian: player.rarian, mizukai: player.mizukai, orashai: player.orashai, mana: player.mana, mysteries: { found: { ...player.mysteries.found }, glyphs: { ...player.mysteries.glyphs }, read: { ...player.mysteries.read } }, spiritWardUntil: Math.max(0, player.spiritWardUntil - game.tick), home: player.home ? { ...player.home, furniture: { ...player.home.furniture } } : null, restedTicks: player.restedTicks, sigilBag: { ...player.sigilBag }, ward: player.ward ? { ...player.ward } : null, wardUntil: Math.max(0, player.wardUntil - game.tick), renew: player.renew, renewUntil: Math.max(0, player.renewUntil - game.tick), belts: Object.fromEntries(Object.entries(player.belts).map(([id, contents]) => [id, { ...contents }])), followerWorn: [...player.followerWorn],
+    firsts: { ...player.firsts } as Record<string, number>, friendKinds: { ...player.friendKinds } as Record<string, 1>, rumours: { ...player.rumours } as Record<string, 1>, orders: { ...player.orders }, activities: { run: player.activities.run ? { ...player.activities.run, target: { ...player.activities.run.target }, marks: { ...player.activities.run.marks } } : null, records: { ...player.activities.records } }, card: { ...player.card }, collectible: { layout: player.collectible.layout, show: [...player.collectible.show] }, lockbox: player.lockbox.map(slot => ({ ...slot })), settled: [...player.settled], notices: [...player.notices], camp: player.camp ? { ...player.camp, cache: player.camp.cache ? player.camp.cache.map(slot => slot ? { ...slot } : null) : null } : null, campXpAt: player.campXpAt, camps: { ...player.camps }, vessels: player.vessels.map(v => ({ ...v, heading: { ...v.heading }, hold: v.hold.map(slot => slot ? { ...slot } : null) })), aboard: player.aboard, landfalls: { ...player.landfalls }, companions: player.companions.map(c => ({ ...c, pack: c.pack.map(slot => slot ? { ...slot } : null) })), companionSeq: player.companionSeq, blessing: saveBlessing(game), standing: { ...player.standing }, labyrinth: { ...player.labyrinth }, commerce: JSON.parse(JSON.stringify(player.commerce)), trust: Object.fromEntries(Object.entries(player.trust).map(([k, v]) => [k, { n: v.n }])), trails: { ...player.trails }, campTendAt: player.campTendAt, campSleptAt: player.campSleptAt, waystoneAt: Math.min(0, player.waystoneAt - game.tick), cards: { ...player.cards }, rarian: player.rarian, mizukai: player.mizukai, orashai: player.orashai, mana: player.mana, mysteries: { found: { ...player.mysteries.found }, glyphs: { ...player.mysteries.glyphs }, read: { ...player.mysteries.read } }, spiritWardUntil: Math.max(0, player.spiritWardUntil - game.tick), home: player.home ? { ...player.home, furniture: { ...player.home.furniture } } : null, restedTicks: player.restedTicks, sigilBag: { ...player.sigilBag }, ward: player.ward ? { ...player.ward } : null, wardUntil: Math.max(0, player.wardUntil - game.tick), renew: player.renew, renewUntil: Math.max(0, player.renewUntil - game.tick), belts: Object.fromEntries(Object.entries(player.belts).map(([id, contents]) => [id, { ...contents }])), followerWorn: [...player.followerWorn],
     lastMount: player.lastMount ?? null, saddlebags: Object.fromEntries(Object.entries(player.saddlebags).map(([id, bags]) => [id, bags.map(slot => slot ? { ...slot } : null)])), mountReady: Math.max(0, player.mountReady - game.tick),
     name: player.name, fellowship: player.fellowship ? { ...player.fellowship } : null, title: player.title, visited: { ...player.visited } as Record<string, number>, regionTicks: { ...player.regionTicks } as Record<string, number>, talked: { ...player.talked } as Record<string, 1>, emotesUsed: { ...player.emotesUsed } as Record<string, 1>, outfits: { ...player.outfits } as Record<string, 1>, friendTicks: player.friendTicks, mounts: [...player.mounts], mount: player.mount, met: JSON.parse(JSON.stringify(player.met)), achievements: { ...player.achievements }, pets: [...player.pets], petOut: player.petOut, killLog: { ...player.killLog }, lore: Object.fromEntries(Object.entries(player.lore).map(([id, entry]) => [id, { ...entry, d: [...entry.d] }])), stats: { ...player.stats }, daily: JSON.parse(JSON.stringify(player.daily)), seenUpdate: player.seenUpdate,
   };
@@ -3134,7 +3147,7 @@ export function restore(game: Game, raw: unknown): boolean {
   player.notices = []; player.cards = Object.fromEntries(Object.entries(save.cards && typeof save.cards === "object" ? save.cards : {}).filter(([id, day]) => /^[a-z0-9_]{1,40}$/.test(id) && typeof day === "number" && Number.isFinite(day)).slice(0, 2000).map(([id, day]) => [id, Math.max(0, Math.floor(day))])); player.rarian = save.rarian === true; player.mizukai = !player.rarian && save.mizukai === true; player.orashai = !player.rarian && !player.mizukai && save.orashai === true; player.mana = typeof save.mana === "number" && Number.isFinite(save.mana) ? Math.max(0, Math.min(maxMana(player), save.mana)) : maxMana(player); player.mysteries = cleanMysteries(save.mysteries); player.spiritWardUntil = game.tick + int(save.spiritWardUntil, 0, 1000, 0); player.home = cleanHome(save.home); player.restedTicks = int(save.restedTicks, 0, 100000, 0); applyHome(game); player.camp = cleanCamp(save.camp); if (player.camp && save.world !== 6) Object.assign(player.camp, movedPoint(game.world, player.camp.x, player.camp.y)); player.campXpAt = int(save.campXpAt, -100000, 1e9, -100000); applyCamp(game);
   // Seafaring: the vessels, where they're moored (older worlds' coordinates moved like everything else), whether you're aboard one.
   player.vessels = cleanVessels(save.vessels, isItem); if (save.world !== 6) for (const v of player.vessels) Object.assign(v, movedPoint(game.world, v.x, v.y));
-  player.aboard = typeof save.aboard === "number" && player.vessels.some(v => v.id === save.aboard) ? save.aboard : null; player.landing = null; player.bellAt = -1e9; player.trails = cleanTrails(save.trails); player.companions = cleanCompanions(save.companions, isItem); player.companionSeq = Number.isInteger(save.companionSeq) ? Math.max(0, save.companionSeq as number) : 0; player.trust = cleanTrust(save.trust); player.blessing = cleanBlessing(save.blessing, game.tick); player.standing = cleanStanding(save.standing); player.commerce = cleanCommerce(save.commerce);
+  player.aboard = typeof save.aboard === "number" && player.vessels.some(v => v.id === save.aboard) ? save.aboard : null; player.landing = null; player.bellAt = -1e9; player.trails = cleanTrails(save.trails); player.companions = cleanCompanions(save.companions, isItem); player.companionSeq = Number.isInteger(save.companionSeq) ? Math.max(0, save.companionSeq as number) : 0; player.trust = cleanTrust(save.trust); player.blessing = cleanBlessing(save.blessing, game.tick); player.standing = cleanStanding(save.standing); player.labyrinth = cleanLabyrinth(save.labyrinth); player.maze = null; player.commerce = cleanCommerce(save.commerce);
   player.landfalls = Object.fromEntries(Object.keys(save.landfalls && typeof save.landfalls === "object" ? save.landfalls : {}).filter(id => /^[a-z0-9_]{1,40}$/.test(id)).slice(0, 400).map(id => [id, 1])) as Record<string, 1>;
   settleAboard(game);
   player.sigilBag = {}; for (const [id, n] of Object.entries(save.sigilBag ?? {})) if (isItem(id) && isSigil(id)) { const v = int(n, 0, SIGIL_BAG_SIZE, 0); if (v) player.sigilBag[id] = v; }

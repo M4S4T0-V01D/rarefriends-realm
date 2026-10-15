@@ -31,6 +31,7 @@ import { NORTH_QUESTS, onNorthKill, talkNorthQuest } from "./northquest.ts";
 import { FAITH_NPCS, FAITH_QUESTS, talkNorthFaith } from "./northfaith.ts";
 import { FACTION_NPCS, FACTION_QUESTS, onFactionKill, talkNorthFactions } from "./northfactions.ts";
 import { GUILD_NPCS, GUILD_QUESTS, talkNorthGuilds } from "./northguilds.ts";
+import { PRISM_NPCS, PRISM_QUESTS, talkPrismwild } from "./prismtalk.ts";
 import { COMPANY_NPCS, COMPANY_QUESTS, talkNorthCompanies } from "./northcompanies.ts";
 import { COMMERCE_NPCS, talkCommerce } from "./commercetalk.ts";
 import { talkShipwright } from "./seafaring.ts";
@@ -104,6 +105,7 @@ export const NPCS: Record<string, NpcDef> = {
   ...FAITH_NPCS,
   ...FACTION_NPCS,
   ...GUILD_NPCS,
+  ...PRISM_NPCS,
   ...COMPANY_NPCS,
   ...COMMERCE_NPCS,
   ...BAR_NPCS,
@@ -524,6 +526,7 @@ export const QUESTS: readonly QuestDef[] = [
   ...FAITH_QUESTS,
   ...FACTION_QUESTS,
   ...GUILD_QUESTS,
+  ...PRISM_QUESTS,
   ...COMPANY_QUESTS,
   ...MEGHAVAN_QUESTS,
   ...MEGHAVAN_SCHOOL_QUESTS,
@@ -873,6 +876,7 @@ function talkInner(game: Game, npcId: string, everyday = false): Dialogue {
   const hearthkin = talkHearthkin(game, npcId, name); if (hearthkin) return hearthkin;
   const settlements = talkSettlements(game, npcId, name); if (settlements) return settlements;
   const beasts = talkBeastkeepers(game, npcId, name); if (beasts) return beasts;
+  const prism = talkPrismwild(game, npcId, name); if (prism) return prism;   // the Prismwild (prismtalk.ts)
   const commerce = talkCommerce(game, npcId, name); if (commerce) return commerce;   // the Frenderal Exchange (commercetalk.ts)   // Beastkeeping (beastfolk.ts)
   const shipwright = talkShipwright(game, npcId, name, () => talkNorthQuest(game, npcId, name, () => talkNorth(game, npcId, name)) ?? talkNorth(game, npcId, name) ?? talkPorts(game, npcId, name)); if (shipwright) return shipwright;   // Seafaring (seafaring.ts)
   // The north: the Old Agreement first, then the factions (northfactions.ts), the guilds (northguilds.ts), the companies and the Archive

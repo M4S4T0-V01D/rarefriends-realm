@@ -14,6 +14,8 @@ export type TrackId = RegionId | "theme" | "boss"
   | "kharaveth_sefrah" | "kharaveth_tamesh" | "kharaveth_khetmar" | "kharaveth_dunes" | "kharaveth_azhurak"
   // A Place to the North's (the Vargskeld's fiddle, lyre and horn; the Zoryavik's gusli, pipe and bells).
   | "north_vargskeld" | "north_skarnholm" | "north_oath" | "north_redwake" | "north_zoryavik" | "north_krasnogor" | "north_old_bough"
+  // The Prismwild's (the magical land past the north): its meadows, and Fennick's Labyrinth.
+  | "prism_meadow" | "prism_labyrinth"
   // Meghavan's (the Rain Country).
   | "meghavan_rains" | "meghavan_sarovan" | "meghavan_shailagarh" | "meghavan_suvarnatira" | "meghavan_deepgreen";
 export type SfxName = SoundName | "slash" | "stab" | "crush" | "punch" | "step_grass" | "step_stone" | "step_wood" | "step_sand" | "step_snow" | "step_swamp"
@@ -761,6 +763,33 @@ const NORTH_PIECES: readonly MizukaiPiece[] = [
     },
     hits: () => [...deepOn(Array.from({ length: 12 }, (_, k) => [k * 4, k * 4 + 0.6]).flat(), 0.38), ...strokes("wind:24 wind:24", 0, 0.3)] },
 ];
+/**
+ * The Prismwild (prismworld.ts): its meadows in F lydian (the raised fourth that makes it sound like a fairy tale), the
+ * harp turning over, the glockenspiel singing over a held pad, a choir far off; and Fennick's Labyrinth, a clockwork
+ * scamper in D harmonic minor, pizzicato and glockenspiel, the riq ticking like his hourglass.
+ */
+const PRISM_PIECES: readonly MizukaiPiece[] = [
+  { id: "prism_meadow", name: "The Prismwild", bpm: 76, beats: 64, tonic: 65, scale: YAMAN,
+    notes: () => {
+      const chords = [[53, 57, 60, 64], [55, 59, 62, 65], [57, 60, 64, 67], [55, 59, 62, 65]];
+      const harp = Array.from({ length: 16 }, (_, bar) => { const c = chords[bar % 4]; return [0, 1, 2, 3, 2, 1, 3, 2].map((k, i) => ({ beat: bar * 4 + i * 0.5, voice: "harp" as Voice, midi: c[k] + (i >= 4 ? 12 : 0), length: 1, velocity: 0.34 })); }).flat();
+      const glock = phrase(`C6:2 B5:1 A5:1 | G5:3 E5:1 | F5:1 G5:1 A5:1 B5:1 | C6:4 | E6:2 D6:1 C6:1 | B5:2 G5:2 | A5:1 B5:1 C6:1 D6:1 | E6:4 |
+        D6:2 C6:1 B5:1 | A5:3 F5:1 | G5:1 A5:1 B5:1 G5:1 | A5:4 | C6:2 B5:1 A5:1 | G5:2 E5:2 | F5:4 | F5:4`, "glock", 0, 0.42);
+      const pad = chords.flatMap((c, k) => [0, 16, 32, 48].map(b0 => c.slice(0, 3).map(midi => ({ beat: b0 + k * 4, voice: "pad" as Voice, midi, length: 3.6, velocity: 0.22 })))).flat();
+      const choir = phrase(`F4:8 | E4:8 | F4:8 | A4:8`, "choir", 32, 0.26);
+      return [held("drone", 41, 64, 0.2), ...harp, ...glock, ...pad, ...choir];
+    },
+    hits: () => [...everyBar(16, 4, b0 => strokes("zill:2 r:2", b0, 0.18)), ...strokes("wind:32 wind:32", 0, 0.2), ...deepOn(Array.from({ length: 8 }, (_, k) => k * 8), 0.25)] },
+  { id: "prism_labyrinth", name: "Fennick's Labyrinth", bpm: 126, beats: 64, tonic: 62, scale: HARMONIC,
+    notes: () => {
+      const run = `D5:0.5 A4:0.5 F5:0.5 A4:0.5 E5:0.5 A4:0.5 C#5:0.5 A4:0.5 | D5:0.5 F5:0.5 A5:0.5 F5:0.5 G5:1 E5:1 | F5:0.5 E5:0.5 D5:0.5 C#5:0.5 D5:0.5 E5:0.5 F5:0.5 G5:0.5 | A5:2 r:2 |
+        Bb5:0.5 A5:0.5 G5:0.5 F5:0.5 E5:0.5 F5:0.5 G5:0.5 E5:0.5 | F5:0.5 E5:0.5 D5:0.5 C#5:0.5 D5:1 A4:1 | Bb4:0.5 C#5:0.5 E5:0.5 G5:0.5 F5:0.5 E5:0.5 D5:0.5 C#5:0.5 | D5:2 r:2`;
+      const bass = Array.from({ length: 16 }, (_, bar) => phrase(["D3:1 A3:1 D3:1 A3:1", "D3:1 A3:1 C#3:1 A3:1", "Bb2:1 F3:1 A2:1 E3:1", "D3:1 A3:1 D3:2"][bar % 4], "pizz", bar * 4, 0.42)).flat();
+      return [held("drone", 50, 64, 0.2), ...phrase(run, "pizz", 0, 0.5), ...phrase(run, "glock", 32, 0.4), ...phrase(run, "pizz", 32, 0.32, -12), ...bass];
+    },
+    hits: () => [...everyBar(16, 4, (b0, bar) => strokes(bar % 4 === 3 ? "riq:0.25 riq:0.25 riq:0.5 riq:0.5 riq:0.5 zill:2" : "riq:0.5 r:0.5 riq:0.5 r:0.5 riq:0.5 r:0.5 riq:0.5 r:0.5", b0, 0.3)), ...deepOn(Array.from({ length: 16 }, (_, k) => k * 4), 0.35)] },
+];
+const PRISM_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { prismwild: "prism_meadow", starwood: "prism_meadow", fae_hollows: "prism_meadow", shardfields: "prism_meadow", collegium: "prism_meadow", glass_causeway: "prism_meadow", fennicks_labyrinth: "prism_labyrinth" };
 /** Which Kharaveth piece plays where. */
 const KHARAVETH_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { sunteeth: "kharaveth_sunteeth", foothold: "kharaveth_foothold", underway: "kharaveth_underway", ochre_steppe: "kharaveth_steppe", sunward_strait: "kharaveth_steppe",
   ashar_valley: "kharaveth_steppe", ochre_spine: "kharaveth_steppe", khetmar_pass: "kharaveth_khetmar", zuri_camp: "kharaveth_steppe", ouresh_camp: "kharaveth_dunes", sea_of_dunes: "kharaveth_dunes",
@@ -786,7 +815,7 @@ const MIZUKAI_REGION_TRACK: Partial<Record<RegionId, TrackId>> = {
   mizukai_sea: "mizukai_sea", three_stones: "mizukai_sea", turtle_rock: "mizukai_sea",
 };
 
-export const TRACKS: readonly Track[] = [themeTrack(), ...STYLES.map(composeTrack), ...MIZUKAI_PIECES.map(composeMizukai), ...KHARAVETH_PIECES.map(composeMizukai), ...MEGHAVAN_PIECES.map(composeMizukai), ...NORTH_PIECES.map(composeMizukai)];
+export const TRACKS: readonly Track[] = [themeTrack(), ...STYLES.map(composeTrack), ...MIZUKAI_PIECES.map(composeMizukai), ...KHARAVETH_PIECES.map(composeMizukai), ...MEGHAVAN_PIECES.map(composeMizukai), ...NORTH_PIECES.map(composeMizukai), ...PRISM_PIECES.map(composeMizukai)];
 /** The Mizukai pieces (for tests). */
 export const MIZUKAI_TRACKS: readonly TrackId[] = MIZUKAI_PIECES.map(piece => piece.id);
 export const KHARAVETH_TRACKS: readonly TrackId[] = KHARAVETH_PIECES.map(piece => piece.id);
@@ -798,7 +827,7 @@ export function trackFor(region: RegionId, nearBoss: boolean, mizukai: { sea?: b
   if (nearBoss) return "boss";
   // The Mizukai Isles: the place's own piece, the sea's on a crossing, and in a fight the battle (or, against one of the great spirits, theirs).
   if (mizukai.sea) return "mizukai_sea";
-  const south = KHARAVETH_REGION_TRACK[region] ?? MEGHAVAN_REGION_TRACK[region] ?? PORTS_REGION_TRACK[region] ?? DRAGON_REGION_TRACK[region] ?? NORTH_REGION_TRACK[region];
+  const south = KHARAVETH_REGION_TRACK[region] ?? MEGHAVAN_REGION_TRACK[region] ?? PORTS_REGION_TRACK[region] ?? DRAGON_REGION_TRACK[region] ?? NORTH_REGION_TRACK[region] ?? PRISM_REGION_TRACK[region];
   if (south) return south;
   const isles = MIZUKAI_REGION_TRACK[region];
   if (isles) return mizukai.spirit ? "mizukai_spirit" : mizukai.fight ? "mizukai_battle" : isles;
