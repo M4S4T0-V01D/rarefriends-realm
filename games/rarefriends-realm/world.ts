@@ -26,6 +26,7 @@ import { buildQuestMounts } from "./questmountsworld.ts";
 import { buildNorth } from "./northworld.ts";
 import { buildPrismwild } from "./prismworld.ts";
 import { buildSorrowmere } from "./necropolis.ts";
+import { buildCrownstones } from "./crownstones.ts";
 import { openSeas } from "./seaways.ts";
 import { buildElevation } from "./elevation.ts";
 import { buildSigilShrines } from "./sigilshrines.ts";
@@ -144,6 +145,8 @@ export type DecorKind =
   | "prism_crystal" | "prism_spire" | "prism_giant" | "fae_tree" | "fae_ring" | "lumen_lamp" | "maze_door" | "maze_glyph" | "hourglass"
   // The megaliths (megalithart.ts): a standing stone three times a house's height, a dolmen, and a brazier that burns for whoever lit it.
   | "menhir" | "dolmen" | "brazier"
+  // The Crownstones' (megalithart.ts): a trilithon of the great ring, a Crown Stone with its turning disc, and the altar stone over the stair.
+  | "trilithon" | "crown_stone" | "altar_stone"
   // The Prismwild's towns and villages (prismart.ts): what wizards build when nobody stops them. A footing is the unseen rest of a big one's ground.
   | "teapot_house" | "mushroom_house" | "crooked_house" | "topsy_tower" | "floating_isle" | "giant_candle" | "backwards_clock" | "footing"
   | "god_diamond" | "god_ink" | "god_sol" | "god_hood" | "god_ember"
@@ -240,6 +243,8 @@ export type RegionId =
   | "spirehollow" | "bellwhistle" | "mothwick" | "shardstead" | "tumbledown"
   // Sorrowmere, the old kings' necropolis east of the Deadwood, and its catacombs (necropolis.ts).
   | "sorrowmere" | "sorrowmere_catacombs"
+  // The Crownstones (crownstones.ts): the henge on the Greyfields and the Undercroft of Crowns.
+  | "crownstones" | "crownstones_undercroft"
   // The seaways (seaways.ts): the ocean all the way round the map.
   | "outer_sea"
   // The sea ports: Gullwick on the mainland, Saltreach below Raria, and Merrab, Tel Ashun and Ennu's Well in Kharaveth's east.
@@ -378,8 +383,11 @@ export const REGIONS: readonly Region[] = [
     ["spirehollow", "Spirehollow", 0], ["bellwhistle", "Bellwhistle", 0], ["mothwick", "Mothwick", 0], ["shardstead", "Shardstead", 1], ["tumbledown", "Tumbledown", 0],
     // Sorrowmere (necropolis.ts sets their labels).
     ["sorrowmere", "Sorrowmere", 7],
+    // The Crownstones (crownstones.ts sets their labels).
+    ["crownstones", "The Crownstones", 2],
   ] as const).map(([id, name, danger]) => ({ id, name, label: { x: 0, y: 0 }, danger, far: true }) as Region),
   { id: "sorrowmere_catacombs", name: "The Sorrowmere Catacombs", label: { x: 0, y: 0 }, danger: 9, underground: true, far: true },
+  { id: "crownstones_undercroft", name: "The Undercroft of Crowns", label: { x: 0, y: 0 }, danger: 8, underground: true, far: true },
 ];
 export const regionIndex = (id: RegionId) => REGIONS.findIndex(region => region.id === id);
 /** The mainland regions' labels were written in the mainland's own coordinates: move them with it (once, at load). */
@@ -1668,6 +1676,8 @@ export function generateWorld(seed = WORLD_SEED, { overlays = true }: { overlays
   buildPrismwild({ ...grownCtx, random: mulberry(seed + 1009), noise2: makeNoise(seed + 1013, 4) }, labels, places);
   // Sorrowmere, the old kings' necropolis on the headland east of the Deadwood, and the catacombs under it (necropolis.ts).
   buildSorrowmere({ ...grownCtx, random: mulberry(seed + 1019), noise2: makeNoise(seed + 1021, 4) }, labels);
+  // The Crownstones on Raria's Greyfields, and the Undercroft of Crowns under them (crownstones.ts).
+  buildCrownstones({ ...grownCtx, random: mulberry(seed + 1031), noise2: makeNoise(seed + 1033, 4) }, labels);
   // The Frenderal Exchange at the top of Gullwick's harbour street (commerceworld.ts, Commerce).
   buildExchange(grownCtx, places);
   // The sigil altars' shrines, and the deeper altars out across the Realm (sigilshrines.ts).
@@ -1908,7 +1918,7 @@ export const ruinPiece = (r: number): DecorKind => r < 0.26 ? "ruin_wall" : r < 
 export const DECOR_NAMES: Record<DecorKind, string> = {
   trough: "Water trough", vessel: "Vessel", hitching_post: "Hitching post",
   strong_friend: "The Strong Friend", crystal: "Crystal", prism_crystal: "Crystals", prism_spire: "Crystal spire", prism_giant: "Great crystal", fae_tree: "Fae tree", fae_ring: "Fairy ring", lumen_lamp: "Lumen lamp",
-  maze_door: "Crystal door", maze_glyph: "Glyph", hourglass: "Fennick's hourglass", menhir: "Standing stone", dolmen: "Dolmen", brazier: "Brazier",
+  maze_door: "Crystal door", maze_glyph: "Glyph", hourglass: "Fennick's hourglass", menhir: "Standing stone", dolmen: "Dolmen", brazier: "Brazier", trilithon: "Trilithon", crown_stone: "Crown Stone", altar_stone: "Altar stone",
   teapot_house: "Teapot house", mushroom_house: "Mushroom house", crooked_house: "Crooked house", topsy_tower: "Upside-down tower", floating_isle: "Floating stall", giant_candle: "Giant candle", backwards_clock: "The Backwards Clock", footing: "Footing", rune_circle: "Sigil circle", monument: "Statue", god_diamond: "Statue of the Good Friend", god_ink: "Statue of the Squid Friend", god_sol: "Statue of the Weird Friend", god_hood: "Statue of the Hood Friend", god_ember: "The Ember, in its brazier",
   god_dusk: "Statue of the Wise Friend, blindfolded", wise_friend: "The Wise Friend", bell: "Great bell", canopy: "Old roofing", cannon: "Magical cannon", device: "Federation device", wagon: "Supply wagon", watchtower: "Watchtower", stake: "Stake wall", plaque: "Inscribed plaque", banner_fff: "The Federation's banner", banner_rrr: "The Regiment's banner", banner_hollowmere: "Hollowmere's banner", banner_diamond: "The Order of the Diamond's banner", banner_ink: "The Order of the Ink's banner", banner_sol: "The Order of the Sol's banner", banner_hood: "The Order of the Hood's banner", banner_ember: "The Order of the Ember's banner", banner_dusk: "The Order of Dusk's banner",
   flowers: "Flowers", bush: "Bush", boulder: "Boulder", lamp: "Lamp post", bench: "Bench", crate: "Crate", barrel: "Water barrel", tent: "Tent",

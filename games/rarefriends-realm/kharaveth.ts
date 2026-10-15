@@ -36,6 +36,7 @@ import { WAYMARK_CLUES } from "./wayfinding.ts";
 import { LABYRINTH_CLUES } from "./labyrinth.ts";
 import { PRISM_CLUES } from "./prismtalk.ts";
 import { SORROWMERE_CLUES } from "./necropolis.ts";
+import { CROWNSTONES_CLUES } from "./crownstones.ts";
 
 const art = (family: number, seed: number) => ({ family, seed });
 const person = (id: string, name: string, examine: string, seed: number, extra: Partial<NpcDef> = {}): NpcDef => ({ id, name, examine, options: ["Talk-to"], art: art(9, seed), ...extra });
@@ -212,6 +213,7 @@ export const CLUES: Record<string, Clue> = {
   ...PRISM_CLUES,
   // Sorrowmere's (necropolis.ts).
   ...SORROWMERE_CLUES,
+  ...CROWNSTONES_CLUES,
 };
 
 /** A clue's options, examine text and use (null if the object isn't one). */

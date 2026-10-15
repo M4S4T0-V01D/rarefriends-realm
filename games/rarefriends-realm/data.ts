@@ -79,6 +79,7 @@ import { KHARAVETH_GEAR, KHARAVETH_ITEMS, KHARAVETH_MONSTERS, KHARAVETH_SHOPS, S
 import { NORTH_FACTION_ITEMS, NORTH_FACTION_MONSTERS, NORTH_FACTION_SHOPS } from "./northfactiongear.ts";
 import { PRISM_CLOTHING, PRISM_ITEMS, PRISM_MONSTERS, PRISM_SHOPS } from "./prismgear.ts";
 import { NECROPOLIS_ITEMS, NECROPOLIS_MONSTERS } from "./necropolisgear.ts";
+import { CROWNSTONES_ITEMS, CROWNSTONES_MONSTERS } from "./crownstonesgear.ts";
 import { HEARTLAND_GEAR, HEARTLAND_ITEMS, HEARTLAND_MONSTERS, HEARTLAND_SHOPS, OURESH_GOODS, ZURI_GOODS } from "./heartlandsgear.ts";
 import { MEGHAVAN_CLOTHING, MEGHAVAN_GEAR, MEGHAVAN_ITEMS, MEGHAVAN_MONSTERS, MEGHAVAN_QUEST_ITEMS, MEGHAVAN_SHOPS } from "./meghavangear.ts";
 import { PYRAMID_GEAR, PYRAMID_ITEMS, PYRAMID_MONSTERS } from "./pyramidsgear.ts";
@@ -1113,7 +1114,7 @@ function dyedItem(id: string): Item | undefined {
   DYED.set(id, made);
   return made;
 }
-export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...DYE_POTS, ...CARVING_ITEMS, ...BAR_ITEMS, ...metalGear(), ...fieldGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...ORDER_ARMOUR, ...orderGear(), ...slayerGear(), ...heartguardGear(), ...REGIONAL_ITEMS, ...APOTHECARY_ITEMS, ...factionGear(), ...mizukaiGear(), ...MIZUKAI_ITEMS, ...KHARAVETH_ITEMS, ...KHARAVETH_GEAR, ...STEPPE_CLOTHES, ...HEARTLAND_ITEMS, ...HEARTLAND_GEAR, ...ORASHAI_ITEMS, ...ORASHAI_GEAR, ...ORASHAI_QUEST_ITEMS, ...MEGHAVAN_ITEMS, ...MEGHAVAN_GEAR, ...MEGHAVAN_QUEST_ITEMS, ...PYRAMID_ITEMS, ...PORTS_ITEMS, ...PYRAMID_GEAR, ...PORTS_GEAR, ...NORTH_FACTION_ITEMS, ...PRISM_ITEMS, ...NECROPOLIS_ITEMS]);
+export const ITEM_LIST: readonly Item[] = Object.freeze([...ITEMS, ...DYE_POTS, ...CARVING_ITEMS, ...BAR_ITEMS, ...metalGear(), ...fieldGear(), ...OTHER_GEAR, ...RANGED_GEAR, ...OTHER_ITEMS, ...TAILORING, ...CLOTHING, ...FAITH_GEAR, ...ORDER_ARMOUR, ...orderGear(), ...slayerGear(), ...heartguardGear(), ...REGIONAL_ITEMS, ...APOTHECARY_ITEMS, ...factionGear(), ...mizukaiGear(), ...MIZUKAI_ITEMS, ...KHARAVETH_ITEMS, ...KHARAVETH_GEAR, ...STEPPE_CLOTHES, ...HEARTLAND_ITEMS, ...HEARTLAND_GEAR, ...ORASHAI_ITEMS, ...ORASHAI_GEAR, ...ORASHAI_QUEST_ITEMS, ...MEGHAVAN_ITEMS, ...MEGHAVAN_GEAR, ...MEGHAVAN_QUEST_ITEMS, ...PYRAMID_ITEMS, ...PORTS_ITEMS, ...PYRAMID_GEAR, ...PORTS_GEAR, ...NORTH_FACTION_ITEMS, ...PRISM_ITEMS, ...NECROPOLIS_ITEMS, ...CROWNSTONES_ITEMS]);
 const ITEM_MAP = new Map(ITEM_LIST.map(item => [item.id, item]));
 /** An item the development world defines (overlay.ts): listed, and looked up, like the game's own. */
 export function registerItem(def: Item) { if (!ITEM_MAP.has(def.id)) (ITEM_LIST as unknown as Item[]).push(def); ITEM_MAP.set(def.id, def); }
@@ -1553,6 +1554,7 @@ export const MONSTERS: Record<string, MonsterDef> = {
   ...NORTH_FACTION_MONSTERS,
   ...PRISM_MONSTERS,
   ...NECROPOLIS_MONSTERS,
+  ...CROWNSTONES_MONSTERS,
   ...ORASHAI_MONSTERS,
   ...MEGHAVAN_MONSTERS,
   // The Land Before Stone: the two pyramids by Kharaveth's south coast, and the deeps under them.

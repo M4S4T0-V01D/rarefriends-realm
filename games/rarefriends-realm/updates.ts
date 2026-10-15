@@ -4,6 +4,12 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 143, date: "2026-10-15", title: "The Crownstones", items: [
+    "The Crownstones, Raria's great henge, on the Greyfields between the Crownlands' farms and the old fort: a bank and a ditch round a ring of trilithons and standing stones, an avenue of paired stones from the west, barrows on the downs, and the fort road running straight through.",
+    "Kings of Raria were crowned here. Five Crown Stones stand in a horseshoe round the altar stone, each with a carved disc that turns: the Sun, the Moon, the Star, the Crown, the Eye. The four station stones round the ring say how they were set. Set them, and the altar stone slides aside.",
+    "Under it, the Undercroft of Crowns: a ring gallery of kings in their niches, walked by stone sentinels, and four chambers for the old regalia (the Sceptre, the Orb, the Ring, the Mantle), each with a warden who carries its stone.",
+    "The Crown Vault takes all four stones, and remembers you after. The Uncrowned King sits the Throne of Crowns inside, on a hoard, with the old Crown of the Greyfields and a Kingstone shield to be had.",
+  ] },
   { id: 142, date: "2026-10-15", title: "Beastkeeping, grown", items: [
     "Fourteen new companions: a hen, a sheep and a milk cow, a silk spider, a glimmer moth, a jewelled peafowl, a marsh adder, a thistle pixie, a prism wisp, a tomb beetle, a hooded serpent, a glimmer stag, a shard golem and a drake.",
     "Produce: a hen lays eggs while she's out with you, a sheep gives wool, a cow milk (carry a bucket), a spider silk, a moth glimmer dust, a peafowl jewelled feathers, a tomb beetle gold scarabs.",

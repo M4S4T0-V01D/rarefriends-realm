@@ -54,6 +54,7 @@ export const FAMILIES: Record<string, DungeonTheme> = {
   mossy: theme("mossy", "cellar", ["#4f5a48", "#404a3a", "#34402f", "cave"], ["#4c5546", "mossy"], [0.096, 0.128, 0.096], "#e8c070", { kind: "spore", color: "#c8e080", rate: 0.25 }),
   sandstone: theme("sandstone", "sandstone", ["#8a6f4e", "#75603f", "#5f4d32", "sandstone"], ["#7a6a52", "flag"], [0.16, 0.136, 0.096], "#ffb860", { kind: "dust", color: "#d9c9a3", rate: 0.2 }),
   tomb: theme("tomb", "sandstone", ["#7a6648", "#64533a", "#4f4230", "sandstone"], ["#6e5f48", "flag"], [0.136, 0.112, 0.08], "#ffcf7a", { kind: "dust", color: "#e2c46a", rate: 0.1 }),
+  henge: theme("henge", "cave", ["#6a6c6e", "#56585b", "#46484b", "cave"], ["#5f6163", "flag"], [0.12, 0.12, 0.136], "#f2d27a", { kind: "glow", color: "#f2d27a", rate: 0.12 }),
   stepwell: theme("stepwell", "sandstone", ["#6f6a5c", "#5c574b", "#4a463c", "sandstone"], ["#66604f", "flag"], [0.128, 0.136, 0.128], "#ffd080", { kind: "glow", color: "#cfe8ff", rate: 0.15 }),
 };
 
@@ -69,6 +70,7 @@ export const DUNGEON_THEMES: Partial<Record<RegionId, DungeonTheme>> = {
   underway: FAMILIES.sandstone, black_stair: FAMILIES.sandstone, first_names_hall: FAMILIES.sandstone, uncounted_deep: FAMILIES.tomb, measured_vault: FAMILIES.tomb, great_stepwell: FAMILIES.stepwell,
   sunken_halls: FAMILIES.tomb,
   sorrowmere_catacombs: FAMILIES.ossuary,
+  crownstones_undercroft: FAMILIES.henge,
 };
 
 /** The theme under a tile, or null above ground and where none is set. */

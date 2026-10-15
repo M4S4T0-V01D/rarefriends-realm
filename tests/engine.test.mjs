@@ -5704,6 +5704,39 @@ test("Sorrowmere: the necropolis east of the Deadwood, its braziers lit in the L
   const coffer = world.objects.find(o => o.name === "Sorrowmere coffer"); assert.equal(cofferTier(g, coffer), "dread");
 });
 
+test("The Crownstones: Raria's henge on the Greyfields with the fort road through it, its five Crown Stones turned as the station stones say to open the altar stone, and the Undercroft of Crowns, where four wardens carry the regalia stones the Vault door wants and the Uncrowned King keeps the hoard", async () => {
+  const C = await import("../games/rarefriends-realm/crownstones.ts");
+  const g = newGame(), p = g.player, world = g.world;
+  g.monsters = [];   // (the stones and the doors are the test here)
+  assert.equal(regionAt(world, C.HENGE.x, C.HENGE.y).id, "crownstones");
+  const seen = reachable(g, world.places.spawn);
+  assert.ok(seen[C.HENGE.y * W + C.HENGE.x], "the henge is reached on foot from the spawn");
+  assert.ok(seen[(C.HENGE.y + C.HENGE.bank + 8) * W + C.HENGE.x] && seen[(C.HENGE.y - C.HENGE.bank - 8) * W + C.HENGE.x], "the fort road still runs through it");
+  const clue = id => world.objects.find(o => o.clue === id), use = (object, option) => { standBy(g, object); setTarget(g, { kind: "object", id: object.id, option }); run(g, 3); };
+  assert.ok(world.objects.filter(o => o.decor === "trilithon").length >= 10 && world.objects.filter(o => o.decor === "menhir").length >= 20, "a great ring and an avenue");
+  for (const k of [1, 2, 3, 4, 5]) assert.ok(clue(`cs_crown_${k}`), `the ${k}th Crown Stone`);
+  for (const w of ["nw", "ne", "se", "sw"]) assert.ok(clue(`cs_station_${w}`) && clue("cs_heel"));
+  // The altar won't move until the stones are set; the stations' order sets them.
+  const altar = clue("cs_altar"); use(altar, "Inspect"); assert.ok(!C.crownstonesOpen(g) && p.y < 1300, "the altar stone doesn't move");
+  for (let k = 1; k <= 5; k++) while (C.crownFace(g, k) !== C.CROWN_SOLUTION[k - 1]) { use(clue(`cs_crown_${k}`), "Turn"); if (C.crownstonesOpen(g)) break; }
+  assert.ok(C.crownstonesOpen(g), "set as the stations say, the altar stone slides aside");
+  assert.deepEqual(C.CROWN_SOLUTION.map(f => C.FACES[f]), ["Sun", "Star", "Crown", "Eye", "Moon"]);
+  use(altar, "Climb-down"); assert.equal(regionAt(world, p.x, p.y).id, "crownstones_undercroft", "down into the Undercroft of Crowns");
+  // The Vault door wants the four regalia stones, each carried by its warden; set once, it knows you.
+  const door = clue("cs_vault_door"), knock = () => { teleport(g, door.x, door.y + 1); setTarget(g, { kind: "object", id: door.id, option: "Open" }); run(g, 3); };
+  knock(); assert.ok(p.y > door.y, "the Vault is shut without the regalia");
+  for (const id of ["sceptre", "orb", "ring", "mantle"]) { assert.ok(MONSTERS[`${id}_warden`].always.some(d => d.item === `${id}_stone`), `the ${id}'s warden carries its stone`); assert.ok(world.spawns.some(s => s.id === `${id}_warden`)); }
+  for (const id of ["sceptre", "orb", "ring"]) give(p, `${id}_stone`, 1);
+  knock(); assert.ok(p.y > door.y && has(p, "orb_stone"), "three won't do, and nothing's taken");
+  give(p, "mantle_stone", 1); knock();
+  assert.ok(p.y < door.y && !["sceptre", "orb", "ring", "mantle"].some(id => has(p, `${id}_stone`)) && p.questData.cs_vault, "all four set in their sockets, and the Vault opens");
+  setTarget(g, { kind: "object", id: door.id, option: "Open" }); run(g, 3); assert.ok(p.y > door.y, "back out");
+  knock(); assert.ok(p.y < door.y, "and in again: the door knows you");
+  assert.ok(world.spawns.some(s => s.id === "uncrowned_king") && world.objects.some(o => o.name === "The Uncrowned King's hoard"), "the Uncrowned King on his hoard");
+  const { cofferTier } = await import("../games/rarefriends-realm/dungeons.ts");
+  assert.equal(cofferTier(g, world.objects.find(o => o.name === "Crownstones coffer")), "dread");
+});
+
 test("The Prismwild's wizards live in towns: Spirehollow's hat-roofed towers and Bellwhistle's market, and the villages of Mothwick, Shardstead and Tumbledown, each with its own wizard-folk; Sorrowmere keeps the Deadwood's night", async () => {
   const P = await import("../games/rarefriends-realm/prismworld.ts");
   const { gloomAt, inDeadwood } = await import("../games/rarefriends-realm/world.ts");
