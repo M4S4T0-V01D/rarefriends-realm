@@ -117,3 +117,92 @@ export function hourglassArt(frame: number): HTMLCanvasElement {
     p.outline(INK);
   });
 }
+
+// ---------- The Prismwild's towns and villages: the wizards build as they please ----------
+/** A house in a teapot the size of a cottage, steam from its spout, a door in its belly (four glazes). */
+export function teapotHouseArt(variant: number, frame: number): HTMLCanvasElement {
+  const v = ((variant % 4) + 4) % 4, f = ((frame % 4) + 4) % 4, glaze = (["#e47ac4", "#5fc8c0", "#9a72e8", "#ecb45a"] as const)[v];
+  return pixelArt(`teapot:${v}:${f}`, 76, 72, p => {
+    p.disc(11, 46, 7, 10, glaze, INK); p.disc(11, 46, 4, 7, "#00000000", null);   // the handle, behind the pot
+    p.disc(38, 46, 26, 22, glaze, INK, shadeHex(glaze, -0.25));
+    p.dither(shadeHex(glaze, 0.35), (x, y) => (Math.hypot(x - 28, y - 36) < 10 ? 0.5 : 0), glaze);
+    p.poly([[62, 44], [72, 30], [75, 31], [66, 50]], glaze, INK);                     // the spout
+    p.poly([[26, 26], [50, 26], [46, 20], [30, 20]], shadeHex(glaze, -0.15), INK); p.disc(38, 17, 4, 3, "#ecd27a", INK);  // lid and knob
+    p.rect(33, 52, 10, 15, "#5a3a2a"); p.disc(38, 52, 5, 4, "#5a3a2a", null); p.set(41, 60, "#ecd27a");   // the door
+    for (const [x, y] of [[22, 42], [50, 42]] as const) { p.disc(x, y, 4, 4, "#fff0b0", INK); p.line(x - 3, y, x + 3, y, INK); }
+    for (let k = 0; k < 3; k++) { const y = 26 - k * 7 - f * 2, x = 73 + Math.sin(k + f) * 2; p.disc(x, y, 2 + k * 0.6, 2 + k * 0.6, "#f4f4f8", null); }
+    p.rect(14, 66, 48, 3, shadeHex(glaze, -0.4));
+  });
+}
+/** A mushroom house: a stem with a door and a round window, under a spotted cap (four caps). */
+export function mushroomHouseArt(variant: number): HTMLCanvasElement {
+  const v = ((variant % 4) + 4) % 4, cap = (["#c94a5a", "#9a72e8", "#e47ac4", "#5fa8d8"] as const)[v];
+  return pixelArt(`mushroomhouse:${v}`, 64, 74, p => {
+    p.poly([[18, 73], [20, 34], [44, 34], [46, 73]], "#efe6d6", INK); p.dither("#d8ccb8", (x, y) => (x > 34 && y > 34 ? 0.6 : 0), "#efe6d6");
+    p.rect(27, 54, 10, 19, "#7a5a3a"); p.disc(32, 54, 5, 4, "#7a5a3a", null); p.set(35, 63, "#ecd27a");
+    p.disc(32, 42, 4, 4, "#fff0b0", INK); p.line(28, 42, 36, 42, INK); p.line(32, 38, 32, 46, INK);
+    p.disc(32, 26, 31, 18, cap, INK, shadeHex(cap, -0.25)); p.rect(1, 26, 63, 10, "#00000000");
+    p.poly([[1, 28], [63, 28], [58, 36], [6, 36]], shadeHex(cap, -0.3), INK);
+    for (const [x, y, r] of [[18, 16, 4], [36, 10, 5], [50, 20, 3], [26, 26, 3], [44, 28, 2]] as const) p.disc(x, y, r, r * 0.8, "#fbf6ee", null);
+  });
+}
+/** A crooked house: three storeys stacked askew, each leaning its own way, a chimney with a kink in it. */
+export function crookedHouseArt(variant: number, frame: number): HTMLCanvasElement {
+  const v = ((variant % 3) + 3) % 3, f = ((frame % 4) + 4) % 4, wall = (["#d8c8a8", "#c8d8e0", "#e0c8d8"] as const)[v], roof = (["#6a4a8a", "#3a7a7a", "#8a3a5a"] as const)[v];
+  return pixelArt(`crooked:${v}:${f}`, 52, 84, p => {
+    const storey = (x: number, y: number, w: number, h: number, lean: number) => { p.poly([[x, y + h], [x + w, y + h], [x + w + lean, y], [x + lean, y]], wall, INK); p.rect(x + lean / 2 + 4, y + 5, 5, 6, "#fff0b0"); p.rect(x + lean / 2 + w - 10, y + 5, 5, 6, "#fff0b0"); };
+    storey(10, 58, 30, 24, 3); storey(8, 36, 32, 22, -5); storey(14, 16, 26, 20, 6);
+    p.rect(22, 70, 7, 12, "#5a3a2a");
+    p.poly([[12, 16], [26, 0], [46, 14], [42, 18], [26, 6], [16, 19]], roof, INK);
+    p.poly([[36, 8], [38, 2], [42, 3], [41, 10]], "#8a6a5a", INK);
+    for (let k = 0; k < 2; k++) p.disc(41 + k * 2 + (f % 2), 0 - k * 3 + f, 1.6, 1.6, "#e8e8f0", null);
+  });
+}
+/** A tower stood on its head: its cone roof in the ground, its foundations at the top, a few stones floating off them. */
+export function topsyTowerArt(frame: number): HTMLCanvasElement {
+  const f = ((frame % 6) + 6) % 6;
+  return pixelArt(`topsy:${f}`, 44, 112, p => {
+    p.poly([[22, 111], [8, 86], [36, 86]], "#6a4a8a", INK);                          // the roof, point down
+    p.poly([[9, 86], [9, 30], [35, 30], [35, 86]], "#d8d0c8", INK); p.dither("#b8b0a8", (x, y) => (x > 24 && y > 30 && y < 86 ? 0.55 : 0), "#d8d0c8");
+    for (const y of [40, 56, 72]) { p.rect(14, y, 5, 7, "#fff0b0"); p.rect(26, y + 4, 5, 7, "#fff0b0"); }
+    p.poly([[5, 30], [39, 30], [36, 22], [8, 22]], "#9a948a", INK);                  // the foundations, at the top
+    p.rect(19, 22, 6, 4, "#5a3a2a");                                                  // the door, up there
+    for (let k = 0; k < 4; k++) { const y = 16 - k * 4 - Math.round(Math.sin((f + k) * 1.05) * 2), x = 10 + k * 7; p.rect(x, y, 4, 3, "#9a948a"); p.set(x, y, "#c8c2b8"); }
+  });
+}
+/** One of the floating market's isles: a hump of rock hanging in the air with a striped stall on it, bobbing (its shadow stays). */
+export function floatingIsleArt(variant: number, frame: number): HTMLCanvasElement {
+  const v = ((variant % 3) + 3) % 3, f = ((frame % 8) + 8) % 8, stripe = (["#e47ac4", "#5fc8c0", "#ecb45a"] as const)[v], bob = Math.round(Math.sin(f / 8 * Math.PI * 2) * 3);
+  return pixelArt(`isle:${v}:${f}`, 56, 96, p => {
+    p.disc(28, 92, 16, 3, "#00000033", null);
+    const y = 46 + bob;
+    p.poly([[6, y], [50, y], [40, y + 14], [30, y + 26], [22, y + 22], [12, y + 12]], "#8a7a6a", INK);
+    p.rect(6, y - 3, 44, 4, "#7aa86a");
+    p.poly([[10, y - 3], [10, y - 20], [46, y - 20], [46, y - 3]], "#c8a878", INK);
+    for (let k = 0; k < 6; k++) p.poly([[10 + k * 6, y - 20], [16 + k * 6, y - 20], [16 + k * 6, y - 27], [10 + k * 6, y - 27]], k % 2 ? "#fbf6ee" : stripe, INK);
+    for (const [x, c] of [[16, "#9a72e8"], [24, "#5fc8c0"], [32, "#ecb45a"], [40, "#e47ac4"]] as const) p.rect(x, y - 9, 4, 5, c);
+    for (let k = 0; k < 3; k++) p.set(30 + k * 4, y + 26 + ((f + k) % 4) * 2, "#9a948a");
+  });
+}
+/** A candle the height of a lamp post, dripping, its flame never quite still. */
+export function giantCandleArt(frame: number): HTMLCanvasElement {
+  const f = ((frame % 4) + 4) % 4;
+  return pixelArt(`candle:${f}`, 16, 60, p => {
+    p.rect(3, 54, 10, 5, "#9a948a"); p.rect(4, 14, 8, 41, "#f4ecd8"); p.rect(10, 14, 2, 41, "#d8ccb0");
+    for (const [x, y, l] of [[4, 14, 9], [7, 14, 5], [11, 14, 12]] as const) p.rect(x, y, 1, l, "#fbf6ee");
+    p.outline(INK);
+    const h = [7, 9, 6, 8][f]; p.poly([[8, 13], [5, 13 - h * 0.5], [8, 13 - h], [11, 13 - h * 0.5]], "#ecb45a", null); p.poly([[8, 12], [7, 11 - h * 0.3], [8, 10 - h * 0.6], [9, 11 - h * 0.3]], "#fff8d0", null);
+  });
+}
+/** The backwards clock: a tall tower with a clock face whose hands go the wrong way round. */
+export function backwardsClockArt(frame: number): HTMLCanvasElement {
+  const f = ((frame % 12) + 12) % 12;
+  return pixelArt(`bclock:${f}`, 40, 120, p => {
+    p.poly([[8, 119], [8, 34], [32, 34], [32, 119]], "#c8bfd8", INK); p.dither("#a89ec0", (x, y) => (x > 21 && y > 34 ? 0.5 : 0), "#c8bfd8");
+    p.poly([[4, 34], [20, 2], [36, 34]], "#5a3a8a", INK); p.set(20, 1, "#ecb45a");
+    p.disc(20, 50, 10, 10, "#fbf6ee", INK); for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2; p.set(20 + Math.cos(a) * 8, 50 + Math.sin(a) * 8, INK); }
+    const a = -f / 12 * Math.PI * 2 - Math.PI / 2, b = -f / 3 * Math.PI * 2 - Math.PI / 2;
+    p.line(20, 50, 20 + Math.cos(a) * 5, 50 + Math.sin(a) * 5, "#2a2a30"); p.line(20, 50, 20 + Math.cos(b) * 8, 50 + Math.sin(b) * 8, "#c94a5a");
+    for (const y of [72, 90]) p.rect(17, y, 6, 8, "#fff0b0"); p.rect(16, 106, 8, 13, "#5a3a2a");
+  });
+}

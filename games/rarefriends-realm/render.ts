@@ -35,7 +35,7 @@ import { burst, cloudShadows, drawCloudShadows, drawEffects, hush, playerPose, p
 import { gloomSky, LightField, hexRgb, rgbCss, skyFor, type PointLight, type RGB , resetLighting } from "./lighting.ts";
 import { FIGURE_K, drawAuras, drawFigure, figureArt, heldTip, type Held } from "./wardrobe.ts";
 import { homeRect } from "./housing.ts";
-import { CRYSTAL_COLORS, crystalArt, faeRingArt, faeTreeArt, glyphArt, hourglassArt, lumenLampArt, mazeDoorArt } from "./prismart.ts";
+import { backwardsClockArt, crookedHouseArt, floatingIsleArt, giantCandleArt, mushroomHouseArt, teapotHouseArt, topsyTowerArt, CRYSTAL_COLORS, crystalArt, faeRingArt, faeTreeArt, glyphArt, hourglassArt, lumenLampArt, mazeDoorArt } from "./prismart.ts";
 import { LABYRINTH, cofferLit, inLabyrinth, mazeDoorOpen } from "./labyrinth.ts";
 import { PRISM_REGION_IDS } from "./prismworld.ts";
 import { brazierArt, dolmenArt, menhirArt } from "./megalithart.ts";
@@ -1458,11 +1458,14 @@ function drawBankBooth(ctx: CanvasRenderingContext2D, scene: Scene, object: Worl
 }
 // ---------- The fountain in Hollow Square ----------
 /** Pixel water for the fountain, 32 × 32 in four frames: rippling blues, light caustics that drift, and wishing coins on the bottom. */
-const fountainWater = (frame: number, red = false) => pixelArt(`fountain-water:${frame}:${red ? "red" : ""}`, 32, 32, p => {
+/** A fountain's water: clear, blood (the Ring's), or fizz (the Prismwild's: violet, and it sparkles). */
+type FountainTint = "water" | "blood" | "fizz";
+const fountainWater = (frame: number, tint: FountainTint = "water") => pixelArt(`fountain-water:${frame}:${tint}`, 32, 32, p => {
+  const red = tint === "blood", fizz = tint === "fizz";
   const n = (x: number, y: number, s: number) => { let h = Math.imul(x * 374761393 + y * 668265263 + s * 1442695041, 1274126177); h ^= h >>> 13; return ((Math.imul(h, 1103515245) >>> 0) % 1000) / 1000; };
   for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
     const d = Math.hypot(x - 15.5, y - 15.5), wave = Math.sin(d * 0.9 - frame * Math.PI / 2) + Math.sin((x + y) * 0.35 + frame * 0.8) * 0.5;
-    p.set(x, y, red ? (wave > 1.05 ? "#d4625a" : wave > 0.45 ? "#a8342e" : wave > -0.6 ? "#8a2f2b" : "#6e2320") : (wave > 1.05 ? "#bcd6ec" : wave > 0.45 ? "#8fb5d6" : wave > -0.6 ? "#7aa3c9" : "#6a93bc"));
+    p.set(x, y, fizz ? (wave > 1.05 ? "#f0d8ff" : wave > 0.45 ? "#c9a0e8" : wave > -0.6 ? "#a87ad8" : "#8a5ac0") : red ? (wave > 1.05 ? "#d4625a" : wave > 0.45 ? "#a8342e" : wave > -0.6 ? "#8a2f2b" : "#6e2320") : (wave > 1.05 ? "#bcd6ec" : wave > 0.45 ? "#8fb5d6" : wave > -0.6 ? "#7aa3c9" : "#6a93bc"));
   }
   // Coins tossed in for luck, and a glint or two on the surface.
   for (const [x, y] of [[7, 20], [22, 9], [24, 23], [11, 8], [18, 26]] as const) { p.set(x, y, "#d9a93f"); p.set(x + 1, y, "#f2d27a"); }
@@ -1501,18 +1504,19 @@ function rimTop(ctx: CanvasRenderingContext2D, camera: Camera, outer: [number, n
  * coins), a column carrying a bowl that spills over its lip in falling streams, and a jet at the top whose droplets arc
  * down into the bowl. Everything turns with the camera, and the moving water stills with reduced motion.
  */
-function drawFountain(ctx: CanvasRenderingContext2D, scene: Scene, cx: number, cy: number, red = false) {
+function drawFountain(ctx: CanvasRenderingContext2D, scene: Scene, cx: number, cy: number, tint: FountainTint = "water") {
+  const red = tint === "blood", fizz = tint === "fizz";
   const { camera } = scene, z = camera.zoom, now = scene.reducedMotion ? 0 : scene.now, S = (x: number, y: number, h: number) => toScreen(camera, x, y, h);
   const STONE_L = "#cfcbc3", STONE_R = "#b7b2aa", RIM = "#e2ded5", WATER_H = 7, RIM_H = 13;
   // Water, or blood: the pools, the streams, the drops, the splashes, the jet and the rings.
-  const POOL = red ? "#8a2f2b" : "#9cc0de", STREAM = red ? "rgba(176,52,46,0.9)" : "rgba(214,232,246,0.85)", DROP = red ? "#e07a72" : "#ffffff", DROP2 = red ? "#b8463f" : "#cfe4f5", SPLASH = red ? "rgba(224,122,114,0.9)" : "rgba(255,255,255,0.9)", JET = red ? "rgba(196,66,60,0.95)" : "rgba(230,242,251,0.95)", RING = red ? "212,98,90" : "255,255,255";
+  const POOL = fizz ? "#b890e0" : red ? "#8a2f2b" : "#9cc0de", STREAM = fizz ? "rgba(214,176,246,0.9)" : red ? "rgba(176,52,46,0.9)" : "rgba(214,232,246,0.85)", DROP = fizz ? "#fff0ff" : red ? "#e07a72" : "#ffffff", DROP2 = fizz ? "#e0b8ff" : red ? "#b8463f" : "#cfe4f5", SPLASH = red ? "rgba(224,122,114,0.9)" : "rgba(255,255,255,0.9)", JET = red ? "rgba(196,66,60,0.95)" : "rgba(230,242,251,0.95)", RING = red ? "212,98,90" : "255,255,255";
   const outer = octagonAt(cx, cy, 0.98), inner = octagonAt(cx, cy, 0.8), dim = (hex: string) => shadeHex(hex, -0.1);
   // The water, clipped to the basin, with its pixels laid across it.
   const surface = inner.map(([px, py]) => S(px, py, WATER_H));
   ctx.save(); ctx.beginPath(); surface.forEach((s, i) => i ? ctx.lineTo(s.x, s.y) : ctx.moveTo(s.x, s.y)); ctx.closePath(); ctx.clip();
   const frame = Math.floor(now / 260) % 4;
-  if (texturesOn) texturedQuad(ctx, fountainWater(frame, red), S(cx - 0.8, cy - 0.8, WATER_H), S(cx + 0.8, cy - 0.8, WATER_H), S(cx - 0.8, cy + 0.8, WATER_H), 32, 32);
-  else { ctx.fillStyle = red ? "#8a2f2b" : "#7aa3c9"; ctx.fill(); }
+  if (texturesOn) texturedQuad(ctx, fountainWater(frame, tint), S(cx - 0.8, cy - 0.8, WATER_H), S(cx + 0.8, cy - 0.8, WATER_H), S(cx - 0.8, cy + 0.8, WATER_H), 32, 32);
+  else { ctx.fillStyle = fizz ? "#a87ad8" : red ? "#8a2f2b" : "#7aa3c9"; ctx.fill(); }
   // Rings spreading from where the streams land.
   if (!bare) for (let k = 0; k < 3; k++) {
     const t = ((now / 1400 + k / 3) % 1), r = 0.42 + t * 0.36;
@@ -1677,7 +1681,7 @@ function drawStation(ctx: CanvasRenderingContext2D, scene: Scene, object: WorldO
     case "fountain": {
       const master = objectAtTile(game.world, ox - 1, oy)?.kind !== "fountain" && objectAtTile(game.world, ox, oy - 1)?.kind !== "fountain";
       if (!master) return hit(0, 0);
-      return drawFountain(ctx, scene, ox + 0.5, oy + 0.5, /blood/i.test(object.name));
+      return drawFountain(ctx, scene, ox + 0.5, oy + 0.5, /blood/i.test(object.name) ? "blood" : /fizz|lamp fountain/i.test(object.name) ? "fizz" : "water");
     }
     case "mill": box(ctx, camera, ox, oy, 0.7, 0.7, 12, "#cdb9a0", "#9c8672", "#8a7563"); poly(ctx, [[sx - 12 * z, sy - 30 * z], [sx + 12 * z, sy - 30 * z], [sx + 4 * z, sy - 14 * z], [sx - 4 * z, sy - 14 * z]], "#b89c86"); return hit(34);
     case "dairy_cow": {
@@ -1846,6 +1850,8 @@ function drawFallenTorii(ctx: CanvasRenderingContext2D, camera: Camera, plan: To
   lying(cx - 0.1, cy - 0.5, cx + 0.2, cy + 0.6, 0.12, 5, c.post);
   lying(cx + 1.55, cy - 1.7, cx + 1.85, cy + 1.8, 0.3, 9, c.cap);
 }
+/** Nothing to see: the unseen ground under a big decor house. */
+const FOOTING = pixelArt("footing", 1, 1, () => {});
 /** The Prismwild's decor's picture, or null for anything else (`flat`: it lies on the ground). */
 function prismArt(scene: Scene, object: WorldObject, h: number): { art: HTMLCanvasElement; flat?: boolean } | null {
   const t = scene.reducedMotion ? 0 : scene.now, glint = Math.floor(t / 260 + h * 40);
@@ -1860,6 +1866,14 @@ function prismArt(scene: Scene, object: WorldObject, h: number): { art: HTMLCanv
     case "maze_glyph": return { art: glyphArt(Math.floor(t / 300 + h * 9)), flat: true };
     case "hourglass": return { art: hourglassArt(Math.floor(t / 500)) };
     case "menhir": return { art: menhirArt(Math.floor(h * 4 * 7)) };
+    case "teapot_house": return { art: teapotHouseArt(Math.floor(h * 4 * 7), Math.floor(t / 300)) };
+    case "mushroom_house": return { art: mushroomHouseArt(Math.floor(h * 4 * 7)) };
+    case "crooked_house": return { art: crookedHouseArt(Math.floor(h * 3 * 7), Math.floor(t / 400)) };
+    case "topsy_tower": return { art: topsyTowerArt(Math.floor(t / 350)) };
+    case "floating_isle": return { art: floatingIsleArt(Math.floor(h * 3 * 7), Math.floor(t / 180 + h * 8)) };
+    case "giant_candle": return { art: giantCandleArt(Math.floor(t / 140 + h * 5)) };
+    case "backwards_clock": return { art: backwardsClockArt(Math.floor(t / 1000)) };
+    case "footing": return { art: FOOTING, flat: true };
     case "dolmen": return { art: dolmenArt(Math.floor(h * 2 * 7)) };
     case "brazier": return { art: brazierArt(brazierLit(scene.game, object), Math.floor(t / 150 + h * 9)) };
     default: return null;
@@ -3058,7 +3072,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     if (object.kind === "sigil_altar") glow(x, y, 34, 90, object.sigil && isItem(object.sigil) ? item(object.sigil).icon.color : "#c7d3dc", 0.8, true);
     // The Prismwild's crystals and lamps light the dark in their own colours.
     if (object.decor === "prism_crystal" || object.decor === "prism_spire" || object.decor === "prism_giant") { const big = object.decor === "prism_giant" ? 2 : object.decor === "prism_spire" ? 1 : 0; glow(x, y, [8, 30, 90][big], [50, 90, 200][big], CRYSTAL_COLORS[Math.floor(hash(x, y) * 6)], [0.35, 0.55, 0.9][big]); }
-    else if (object.decor === "lumen_lamp") glow(x, y, 36, 140, "#e8d8ff", 0.9); else if (object.decor === "brazier" && brazierLit(game, object)) glow(x, y, 20, 120, "#6a9af0", 1, true); else if (object.decor === "fae_tree") glow(x, y, 40, 90, "#ffe7a8", 0.4, true); else if (object.decor === "hourglass") glow(x, y, 30, 120, "#ecb45a", 0.8);
+    else if (object.decor === "lumen_lamp") glow(x, y, 36, 140, "#e8d8ff", 0.9); else if (object.decor === "giant_candle") glow(x, y, 50, 130, "#f2c070", 0.9, true); else if (object.decor === "brazier" && brazierLit(game, object)) glow(x, y, 20, 120, "#6a9af0", 1, true); else if (object.decor === "fae_tree") glow(x, y, 40, 90, "#ffe7a8", 0.4, true); else if (object.decor === "hourglass") glow(x, y, 30, 120, "#ecb45a", 0.8);
     else if (object.decor === "crystal") glow(x, y, 14, 70, "#bff4ff", 0.55); else if (object.decor === "rune_circle") glow(x, y, 2, 90, "#a48cf0", 0.6);
     else if (object.decor === "lamp") glow(x, y, 48, 150, "#f2b261", 0.9); else if (object.decor === "stone_lantern" || object.decor === "paper_lantern") glow(x, y, object.decor === "stone_lantern" ? 30 : 50, 110, "#f2b261", 0.75); else if (object.decor === "torch") glow(x, y, 32, 130, (isUnderground(y) && dungeonTheme(world, x, y)?.torch) || "#ef9a4c", 1, true); else if (object.decor === "hearth" || object.decor === "campfire") glow(x, y, 14, 170, "#f0a050", 1, true);
     else if (object.kind === "furnace" || object.kind === "range") glow(x, y, 16, 110); else if (object.kind === "altar") glow(x, y, 26, 70); else if (object.kind === "fountain" && objectAtTile(world, x - 1, y)?.kind !== "fountain" && objectAtTile(world, x, y - 1)?.kind !== "fountain") glow(x + 0.5, y + 0.5, 12, 110, "#a9d4f2", 0.55); else if (object.kind === "sigil_altar") glow(x, y, 30, 90);
@@ -3091,9 +3105,9 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     const d = fountainMaster ? depth(x + 0.5, y + 0.5) + 0.3 : depth(x, y) + (object.kind === "wheat" || object.kind === "spot" ? -0.4 : 0);
     const flat = object.kind === "spot" || (object.kind === "decor" && FLAT_DECOR.has(object.decor!));
     const sprite = object.kind === "tree" || object.kind === "rock" || object.kind === "dock" || (object.kind === "decor" && object.decor !== "banner");
-    drawables.push({ depth: d, at: { x, y }, cast: !flat, flat, sprite, scenery: object.kind === "tree" || object.kind === "rock" || object.kind === "decor" || object.kind === "spot", size: object.decor === "pagoda" || object.decor === "castle_keep" || object.decor === "prism_giant" || object.decor === "menhir" ? [520, 200, 60] : object.decor === "windmill" ? [320, 140, 40] : object.kind === "tree" ? [260, 110, 40] : [200, 110, 40], draw: () => {
+    drawables.push({ depth: d, at: { x, y }, cast: !flat, flat, sprite, scenery: object.kind === "tree" || object.kind === "rock" || object.kind === "decor" || object.kind === "spot", size: object.decor === "pagoda" || object.decor === "castle_keep" || object.decor === "prism_giant" || object.decor === "menhir" || object.decor === "topsy_tower" || object.decor === "backwards_clock" || object.decor === "crooked_house" ? [520, 200, 60] : object.decor === "windmill" ? [320, 140, 40] : object.kind === "tree" ? [260, 110, 40] : [200, 110, 40], draw: () => {
       let rect: { x: number; y: number; w: number; h: number };
-      const tall = object.kind === "tree" || (object.kind === "decor" && (["pine", "windmill", "palm", "pillar", "tent", "crypt", "obelisk", "canopy", "wise_friend", "god_dusk", "torii", "rock_spire", "pagoda", "castle_keep", "prism_spire", "prism_giant", "fae_tree", "lumen_lamp", "hourglass", "menhir"].includes(object.decor!) || (object.decor === "ruin_wall" && (object.height ?? 0) > 34)));
+      const tall = object.kind === "tree" || (object.kind === "decor" && (["pine", "windmill", "palm", "pillar", "tent", "crypt", "obelisk", "canopy", "wise_friend", "god_dusk", "torii", "rock_spire", "pagoda", "castle_keep", "prism_spire", "prism_giant", "fae_tree", "lumen_lamp", "hourglass", "menhir", "teapot_house", "mushroom_house", "crooked_house", "topsy_tower", "floating_isle", "backwards_clock", "giant_candle"].includes(object.decor!) || (object.decor === "ruin_wall" && (object.height ?? 0) > 34)));
       // Anything tall in front of your Friend that covers it on screen turns see-through (works at any angle and zoom).
       const fade = tall && d > playerDepth + 0.3 && coversPlayer(x, y) ? 0.35 : 1;
       if (object.kind === "tree") rect = drawTree(ctx, scene, object, game.depleted.has(object.id), fade, scene.reducedMotion ? 0 : treeShake(game, object.id, now));

@@ -35,6 +35,18 @@ export const PRISM_NPCS: Record<string, NpcDef> = {
   lady_hawthorn: person("lady_hawthorn", "Lady Hawthorn", "A lady of the fae, crowned with hawthorn, as old as the Hollows and as polite as a knife.", 5, 2306),
   fae_folk: person("fae_folk", "Fae", "One of the fair folk of the Hollows, small, quick and glowing faintly. It's laughing at something, possibly you.", 5, 2307),
   shard_warden: person("shard_warden", "Warden Brannoc", "Keeps watch at the Shardfields' edge for the Collegium, and keeps students out of them, mostly.", 6, 2308),
+  // The towns and villages (prismworld.ts): Spirehollow, Bellwhistle, Mothwick, Shardstead, Tumbledown.
+  mayor_hatterly: person("mayor_hatterly", "Mayor Oswin Hatterly", "Spirehollow's mayor, in this hour's hat. He changes it on the hour, every hour, by law: his own law.", 5, 2310),
+  hattie_pennyfeather: person("hattie_pennyfeather", "Hattie Pennyfeather", "Spirehollow's hatter, pins in her mouth and three hats on her head, measuring you with her eyes.", 9, 2311, { options: ["Talk-to", "Trade"], shop: "spire_hats" }),
+  uncle_bartlemy: person("uncle_bartlemy", "Uncle Bartlemy", "Lives in the upside-down tower. Everyone in Spirehollow calls him Uncle. Nobody is related to him.", 5, 2312),
+  clockwarden_tibbet: person("clockwarden_tibbet", "Clockwarden Tibbet", "Keeps the Backwards Clock wound, oiled and going the wrong way round, as it always has.", 4, 2313),
+  mother_fizzwig: person("mother_fizzwig", "Mother Fizzwig", "Runs the Fizzing Kettle. Her apron fizzes. Her hair fizzes. She swears she doesn't.", 9, 2314, { options: ["Talk-to", "Trade"], shop: "fizzing_kettle" }),
+  gideon_wickerbottom: person("gideon_wickerbottom", "Gideon Wickerbottom", "Keeps the floating market. His stalls hang at head height; his prices hang somewhat higher.", 6, 2315, { options: ["Talk-to", "Trade"], shop: "floating_market" }),
+  mrs_kettleby: person("mrs_kettleby", "Mrs Kettleby", "Lives in a teapot, and is tired of being asked about it.", 9, 2316),
+  old_mossy: person("old_mossy", "Old Mossy", "Mothwick's mushroom-keeper, small and round and slightly damp, with a cap not unlike the houses'.", 5, 2317),
+  foreman_glint: person("foreman_glint", "Foreman Glint", "Runs Shardstead's sorting shed. There's crystal dust in his beard, his ears and his tea.", 6, 2318),
+  wilhelmina_crooke: person("wilhelmina_crooke", "Wilhelmina Crooke", "Tumbledown's eldest, who leans at the same angle as her house, and says she straightens nothing.", 9, 2319),
+  prismwild_villager: person("prismwild_villager", "Prismwild wizard", "A wizard of the Prismwild, in a hat that's too tall and a robe that's too starry, on some errand that makes sense to them.", 9, 2320),
   fennick: person("fennick", "Fennick", "The Collegium's least respectable wizard: hat askew, robes mismatched, an hourglass on a chain. He built the Labyrinth for fun. Mostly his.", 5, 2309, { options: ["Talk-to", "Trade"], shop: "fennicks_curios" }),
 };
 
@@ -125,6 +137,39 @@ export function talkPrismwild(game: Game, npcId: string, name: string): Dialogue
     ].slice(game.tick % 4, game.tick % 4 + 1));
     case "fae_folk": return says(...["Lights in the ring at dusk! Come and dance!", "Mortal! You're very big. Are you lost? Everyone's lost.", "The Lady likes riddles. Do you like riddles? We like you. So far."].slice(game.tick % 3, game.tick % 3 + 1));
     case "shard_warden": return says("The Shardfields, past me: crystals as tall as towers, and golems that grow out of them. They're slow, they're stubborn and they hit like a falling wall. Earth spells crack them best. I'd stay on the downs, myself.");
+    case "mayor_hatterly": return says(...[
+      "Welcome to Spirehollow! Hats are compulsory. That one will do, I suppose. Hattie's will do better.",
+      "Every hour, a new hat. It's the law. I wrote the law. I regret the law. It's still the law.",
+      "Bellwhistle says its clock is the finest in the Prismwild. It goes backwards! Ours don't go at all. Much more restful.",
+    ].slice(game.tick % 3, game.tick % 3 + 1));
+    case "hattie_pennyfeather": return says("A hat is a wizard's second head, and usually the better one. Spirals, stars, patchwork, stockings to match. Trade with me, dear.");
+    case "uncle_bartlemy": return says(...[
+      "It's not upside down. Everyone else's is upside down. I'm the only one who climbs up to go to bed and down to go out.",
+      "The roof's in the ground. Keeps the rain off the worms. You'd be surprised how grateful worms are.",
+    ].slice(game.tick % 2, game.tick % 2 + 1));
+    case "clockwarden_tibbet": return says(...[
+      "The Backwards Clock has kept perfect time for three hundred years. Backwards. You just read it in a mirror. Or upside down. Or both, on Grumpsdays.",
+      "Bellwhistle's market's every day but Grumpsday. Nobody knows when Grumpsday is. The clock knows. It won't say.",
+    ].slice(game.tick % 2, game.tick % 2 + 1));
+    case "mother_fizzwig": return says("Tea, tonic and starlight biscuits! The tonic fizzes. The tea fizzes. The biscuits only fizz if you're sad. Trade with me, love.");
+    case "gideon_wickerbottom": return says("The floating market! Sigils, staffs, tablets home. Reach up and point. Don't jump; it's undignified, and the stalls dodge.");
+    case "mrs_kettleby": return says(...[
+      "Yes, it's a teapot. Yes, I live in it. No, I don't know what happens if somebody pours.",
+      "My late husband built it. He liked tea. I liked him. Now I've got a teapot and a lot of opinions about spouts.",
+    ].slice(game.tick % 2, game.tick % 2 + 1));
+    case "old_mossy": return says("Mothwick's houses grow, you know. Ask nicely and they'll grow you a new room. Ask rudely and they grow you a toadstool on the doorstep.");
+    case "foreman_glint": return says("Shardstead sorts what the Shardfields shed. Violet to the Collegium, rose to the jewellers, the white ones to anyone who'll stop them singing at night.");
+    case "wilhelmina_crooke": return says(...[
+      "Tumbledown's been falling down for two hundred years. Hasn't fallen yet. That's the trick of it: never finish.",
+      "A straight house is a house that's given up. Mine still has ambitions.",
+    ].slice(game.tick % 2, game.tick % 2 + 1));
+    case "prismwild_villager": return says(...[
+      "Mind the candles. They don't burn down, but they do burn.",
+      "I'm late for a lecture. I'm always late for a lecture. I've been late for this one for six years.",
+      "Have you seen my familiar? He's a newt. Or he was. It's a long story and he's not proud of it.",
+      "Bellwhistle for shopping, Spirehollow for hats, the Collegium for headaches.",
+      "The fountain in Bellwhistle fizzes. Don't drink it. It's lovely.",
+    ].slice(game.tick % 5, game.tick % 5 + 1));
     case "fennick": {
       const hearts = p.labyrinth.hearts, best = p.labyrinth.best <= MAX_RING ? `Your best: ring ${MAX_RING - p.labyrinth.best} of ${MAX_RING}.${hearts === 1 ? " You've reached the heart once." : hearts > 1 ? ` You've reached the heart ${hearts} times.` : ""}` : "You haven't run it yet.";
       const opts: Dialogue["options"] = [

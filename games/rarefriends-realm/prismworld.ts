@@ -16,7 +16,11 @@ import { REGIONS, T, W, WALKABLE, isWater, worldTools, type GenContext, type Reg
 import { LABYRINTH, MAZE_GATE, MAZE_SIZE, cellTile, layLabyrinth } from "./labyrinth.ts";
 
 /** The Prismwild's regions (render.ts paints their grass lilac). */
-export const PRISM_REGION_IDS: readonly RegionId[] = ["prismwild", "glass_causeway", "collegium", "starwood", "fae_hollows", "shardfields", "fennicks_labyrinth"];
+export const PRISM_REGION_IDS: readonly RegionId[] = ["prismwild", "glass_causeway", "collegium", "starwood", "fae_hollows", "shardfields", "fennicks_labyrinth", "spirehollow", "bellwhistle", "mothwick", "shardstead", "tumbledown"];
+/** The wizards' towns and villages. */
+export const SPIREHOLLOW = { x0: 1206, y0: 102, x1: 1274, y1: 158 } as const, BELLWHISTLE = { x0: 1404, y0: 276, x1: 1474, y1: 328 } as const;
+export const MOTHWICK = { x0: 1314, y0: 286, x1: 1348, y1: 316 } as const, SHARDSTEAD = { x0: 1480, y0: 124, x1: 1510, y1: 154 } as const, TUMBLEDOWN = { x0: 1284, y0: 44, x1: 1322, y1: 70 } as const;
+const SETTLEMENTS = [SPIREHOLLOW, BELLWHISTLE, MOTHWICK, SHARDSTEAD, TUMBLEDOWN];
 /** The land's bounds, and its places. */
 export const PRISMWILD = { x0: 1186, y0: 30, x1: 1694, y1: 350 } as const;
 export const COLLEGIUM = { x0: 1366, y0: 50, x1: 1446, y1: 118 } as const;
@@ -47,7 +51,7 @@ export function buildPrismwild(ctx: GenContext, labels: World["labels"], places:
 
   // ---------- The land: a broad rounded island, its coast wandering, firm where the Collegium, the maze and the Causeway's landing are ----------
   const R = 56, cx = (P.x0 + P.x1) / 2, cy = (P.y0 + P.y1) / 2, hx = (P.x1 - P.x0) / 2 - R, hy = (P.y1 - P.y0) / 2 - R;
-  const firm = [[LABYRINTH.x0 - 10, LABYRINTH.y0 - 8, LABYRINTH.x0 + MAZE_SIZE + 8, LABYRINTH.y0 + MAZE_SIZE + 14], [COLLEGIUM.x0 - 10, COLLEGIUM.y0 - 8, COLLEGIUM.x1 + 10, COLLEGIUM.y1 + 10]] as const;
+  const firm = [[LABYRINTH.x0 - 10, LABYRINTH.y0 - 8, LABYRINTH.x0 + MAZE_SIZE + 8, LABYRINTH.y0 + MAZE_SIZE + 14], [COLLEGIUM.x0 - 10, COLLEGIUM.y0 - 8, COLLEGIUM.x1 + 10, COLLEGIUM.y1 + 10], ...SETTLEMENTS.map(r => [r.x0 - 3, r.y0 - 3, r.x1 + 3, r.y1 + 3] as const)] as const;
   const coast = (x: number, y: number) => {
     const qx = Math.abs(x - cx) - hx, qy = Math.abs(y - cy) - hy;
     let d = Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - R + (broad(x, y) - 0.5) * 30 + (mid(x, y) - 0.5) * 9;
@@ -150,6 +154,79 @@ export function buildPrismwild(ctx: GenContext, labels: World["labels"], places:
   t.npc("pell_ashby", 1430, 98, 2);
   places.collegium = { x: 1405, y: 90 };
 
+  // ---------- The wizards' towns and villages: Spirehollow, Bellwhistle, Mothwick, Shardstead, Tumbledown ----------
+  // Wizards build as they please: towers in hats, a clock that runs backwards, a market in the air, houses in teapots,
+  // mushrooms and each other's way.
+  const settle = (r: { x0: number; y0: number; x1: number; y1: number }, id: RegionId) => {
+    for (let y = r.y0; y <= r.y1; y++) for (let x = r.x0; x <= r.x1; x++) {
+      const i = idx(x, y); t.clearAt(x, y); t.setRegion(x, y, id); lift[i] = 0.15; raise[i] = 0;
+      if (isWater(tiles[i]) || tiles[i] === T.SAND) tiles[i] = T.GRASS;
+    }
+  };
+  const paint = (x0: number, y0: number, x1: number, y1: number, terrain: number) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) tiles[idx(x, y)] = terrain; };
+  const COLOURS = ["#9a72e8", "#e47ac4", "#5fc8c0", "#ecb45a", "#6a4a8a", "#3a7a7a", "#c94a5a"] as const;
+  /** A wizard's tower: round, its cone roof drawn up into a tall hat with a spire, in whatever colour its wizard likes. */
+  const tower = (x0: number, y0: number, door: "n" | "s" | "e" | "w", colour: number, storeys: number, name = "A wizard's tower") =>
+    t.building(x0, y0, x0 + 6, y0 + 6, door, T.WOOD, undefined, { name, walls: storeys % 2 ? "timber" : "plank", roof: "cone", round: true, color: COLOURS[colour % COLOURS.length], storeys, spire: 120 + storeys * 24 + (colour % 3) * 14 });
+  /** A big decor house: the picture on one tile, its unseen footings round it so you walk round the whole thing. */
+  const big = (x: number, y: number, kind: Parameters<typeof t.decor>[2], name?: string) => {
+    t.clearAt(x, y); t.decor(x, y, kind, true, name);
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, -1], [1, -1], [-1, -1]] as const) { t.clearAt(x + dx, y + dy); t.decor(x + dx, y + dy, "footing", true); }
+  };
+  const candle = (x: number, y: number) => { t.clearAt(x, y); t.decor(x, y, "giant_candle", true); };
+  // Spirehollow, the town of hats: wizards' towers round a square, the Mayor's the tallest, Hattie's hat shop, the bank, the Tilted Toad.
+  { const S = SPIREHOLLOW; settle(S, "spirehollow");
+    paint(S.x0 + 2, 130, S.x1 - 2, 131, T.PATH); paint(1239, S.y0 + 10, 1241, 138, T.PATH); paint(1228, 122, 1252, 137, T.COBBLE);
+    tower(1210, 106, "s", 0, 5, "The Mayor's Spire"); tower(1222, 106, "s", 1, 3); tower(1264, 106, "s", 2, 4);
+    t.building(1250, 106, 1258, 112, "s", T.WOOD, undefined, { name: "Hattie's Hats", walls: "timber", roof: "gable", hip: true, color: "#ecb45a", facade: "shop", sign: "spiral_wizard_hat" });
+    tower(1210, 141, "n", 6, 3); tower(1222, 143, "n", 4, 2); tower(1266, 141, "n", 5, 3);
+    t.building(1254, 141, 1262, 147, "n", T.STONE, undefined, { name: "The Spirehollow Bank", walls: "marble", roof: "gable", hip: true, color: "#6a4a8a", facade: "bank" });
+    t.building(1234, 141, 1246, 149, "n", T.WOOD, undefined, { name: "The Tilted Toad", walls: "plank", roof: "gable", color: "#7a4a9a", facade: "inn", storeys: 2 });
+    for (const x of [1256, 1258, 1260]) t.add({ kind: "bank", x, y: 143, blocks: true, name: "Bank booth" });
+    big(1214, 126, "topsy_tower", "Uncle Bartlemy's tower");
+    for (const [x, y] of [[1228, 122], [1252, 122], [1228, 137], [1252, 137], [1236, 126], [1244, 126]] as const) candle(x, y);
+    t.npc("mayor_hatterly", 1213, 109, 0); t.npc("hattie_pennyfeather", 1254, 109, 0); t.npc("uncle_bartlemy", 1214, 129, 2); t.npc("banker", 1258, 142, 0);
+    for (const [x, y] of [[1232, 126], [1248, 132], [1240, 134], [1230, 133], [1220, 130], [1262, 130]] as const) t.npc("prismwild_villager", x, y, 5);
+    t.add({ kind: "sign", x: 1238, y: 120, blocks: true, name: "Spirehollow", text: "SPIREHOLLOW. Population: wizards. Hats are not optional. The Mayor's Spire is the tall one. They're all tall ones." }); }
+  // Bellwhistle, the market town: the Backwards Clock, the Fizzing Fountain, the floating market, the Moot, the Kettle, houses in teapots.
+  { const B = BELLWHISTLE; settle(B, "bellwhistle");
+    paint(1420, 290, 1458, 310, T.COBBLE); paint(B.x0 + 2, 300, B.x1 - 2, 301, T.PATH); paint(1438, B.y0 + 2, 1440, B.y1 - 2, T.PATH);
+    big(1439, 288, "backwards_clock", "The Backwards Clock");
+    for (const [x, y] of [[1437, 299], [1438, 299], [1437, 300], [1438, 300]] as const) { t.clearAt(x, y); t.add({ kind: "fountain", x, y, blocks: true, name: "The Fizzing Fountain" }); }
+    for (const [x, y] of [[1450, 295], [1455, 302], [1450, 308]] as const) { t.clearAt(x, y); t.decor(x, y, "floating_isle", true, "A floating stall"); }
+    t.building(1407, 279, 1417, 287, "e", T.STONE, undefined, { name: "The Bellwhistle Moot", walls: "marble", roof: "gable", hip: true, color: "#e47ac4", facade: "civic", storeys: 2 });
+    t.building(1461, 279, 1469, 287, "w", T.WOOD, undefined, { name: "The Fizzing Kettle", walls: "timber", roof: "gable", hip: true, color: "#5fc8c0", facade: "shop", sign: "fizzing_tonic" });
+    t.building(1407, 313, 1415, 321, "e", T.STONE, undefined, { name: "The Bellwhistle Bank", walls: "marble", roof: "gable", hip: true, color: "#9a72e8", facade: "bank" });
+    for (const y of [315, 317, 319]) t.add({ kind: "bank", x: 1410, y, blocks: true, name: "Bank booth" });
+    t.building(1461, 313, 1469, 321, "w", T.WOOD, undefined, { name: "A wizard's house", walls: "plank", roof: "gable", hip: true, color: "#ecb45a", storeys: 2 });
+    tower(1422, 314, "n", 3, 3); tower(1446, 314, "n", 0, 4); tower(1428, 279, "s", 1, 2); tower(1448, 279, "s", 5, 3);
+    big(1415, 301, "teapot_house", "Mrs Kettleby's teapot"); big(1467, 301, "teapot_house", "A teapot house");
+    for (const [x, y] of [[1420, 290], [1458, 290], [1420, 310], [1458, 310], [1430, 296], [1446, 304]] as const) candle(x, y);
+    t.npc("clockwarden_tibbet", 1441, 291, 0); t.npc("mother_fizzwig", 1465, 283, 0); t.npc("gideon_wickerbottom", 1452, 302, 0); t.npc("mrs_kettleby", 1417, 304, 1); t.npc("banker", 1409, 317, 0);
+    for (const [x, y] of [[1426, 294], [1434, 306], [1444, 294], [1428, 304], [1452, 292], [1440, 308], [1424, 300], [1456, 306]] as const) t.npc("prismwild_villager", x, y, 6);
+    t.add({ kind: "sign", x: 1436, y: 312, blocks: true, name: "Bellwhistle", text: "BELLWHISTLE. Market every day but Grumpsday. The clock is right; it's going the other way, that's all. Do not drink from the fountain. (Everyone does.)" }); }
+  // Mothwick: mushroom houses at the edge of the Fae Hollows, and Old Mossy who tends them.
+  { const M = MOTHWICK; settle(M, "mothwick"); paint(M.x0 + 2, 300, M.x1 - 2, 300, T.PATH);
+    for (const [x, y] of [[1320, 293], [1330, 291], [1341, 295], [1322, 309], [1333, 310], [1343, 307]] as const) big(x, y, "mushroom_house");
+    for (const [x, y] of [[1326, 300], [1338, 302]] as const) { t.clearAt(x, y); t.decor(x, y, "fae_ring", false); }
+    candle(1316, 300); candle(1346, 300);
+    t.npc("old_mossy", 1331, 299, 1); for (const [x, y] of [[1324, 303], [1336, 297], [1342, 301]] as const) t.npc("prismwild_villager", x, y, 3); t.npc("fae_folk", 1328, 305, 4); }
+  // Shardstead: the crystal-miners' village at the Shardfields' edge.
+  { const H = SHARDSTEAD; settle(H, "shardstead"); paint(H.x0 + 2, 137, H.x1 - 2, 138, T.PATH); paint(1494, H.y0 + 1, 1495, H.y1 - 1, T.PATH);
+    t.building(1482, 126, 1488, 132, "s", T.STONE, undefined, { name: "A miner's house", walls: "stone", roof: "gable", color: "#b8a2d6" });
+    t.building(1498, 126, 1504, 132, "s", T.STONE, undefined, { name: "A miner's house", walls: "stone", roof: "gable", color: "#9a72e8" });
+    t.building(1482, 143, 1488, 149, "n", T.STONE, undefined, { name: "A miner's house", walls: "stone", roof: "gable", color: "#cbb8f0" });
+    t.building(1498, 142, 1507, 150, "n", T.STONE, undefined, { name: "The Sorting Shed", walls: "plank", roof: "gable", color: "#6a4a8a" });
+    for (const [x, y] of [[1490, 134], [1506, 136], [1490, 141], [1484, 136]] as const) { t.clearAt(x, y); t.decor(x, y, "prism_crystal", true); }
+    for (const [x, y] of [[1500, 140], [1502, 140], [1504, 140]] as const) { t.clearAt(x, y); t.decor(x, y, "crate", true, "A crate of sorted crystal"); }
+    t.npc("foreman_glint", 1496, 136, 1); for (const [x, y] of [[1488, 138], [1500, 135], [1492, 141]] as const) t.npc("prismwild_villager", x, y, 3); }
+  // Tumbledown: crooked houses on the north coast, and the Leaning Larder.
+  { const D = TUMBLEDOWN; settle(D, "tumbledown"); paint(D.x0 + 2, 57, D.x1 - 4, 58, T.PATH);
+    for (const [x, y] of [[1290, 52], [1300, 50], [1311, 53], [1294, 65], [1306, 66]] as const) big(x, y, "crooked_house");
+    t.building(1314, 60, 1320, 66, "w", T.WOOD, undefined, { name: "The Leaning Larder", walls: "plank", roof: "gable", color: "#8a3a5a" });
+    candle(1288, 58); candle(1318, 56);
+    t.npc("wilhelmina_crooke", 1302, 59, 2); for (const [x, y] of [[1296, 57], [1310, 58], [1290, 60]] as const) t.npc("prismwild_villager", x, y, 3); }
+
   // ---------- Roads, lit by lumen lamps ----------
   const roadLine = (points: readonly (readonly [number, number])[]) => {
     t.line(points, 3, (x, y, terrain) => {
@@ -165,6 +242,9 @@ export function buildPrismwild(ctx: GenContext, labels: World["labels"], places:
   roadLine([[southGate, C.y1], [southGate, 128], [1470, 152], [1530, 200], [LABYRINTH.x0 - 8, 250], [LABYRINTH.x0 - 8, MAZE_GATE.y + 6], [MAZE_GATE.x, MAZE_GATE.y + 6], [MAZE_GATE.x, MAZE_GATE.y + 2]]);
   roadLine([[1320, 86], [1300, 150], [1272, 214], [1256, 244]]);
   roadLine([[C.x1, 84], [1470, 92], [1530, 108]]);
+  roadLine([[1240, SPIREHOLLOW.y0], [1246, 66]]); roadLine([[SPIREHOLLOW.x1, 130], [1300, 140]]);
+  roadLine([[BELLWHISTLE.x1, 300], [LABYRINTH.x0 - 8, 300]]); roadLine([[BELLWHISTLE.x0, 300], [MOTHWICK.x1, 300]]);
+  roadLine([[MOTHWICK.x0, 300], [1290, 270], [1262, 248]]); roadLine([[1494, SHARDSTEAD.y0], [1500, 100]]); roadLine([[1303, TUMBLEDOWN.y1], [1300, 80]]);
 
   // ---------- The Glass Causeway: a spit of shardstone from the Zoryavik's north coast, and a way cleared in from it ----------
   let coastX = PRISMWILD.x0 - 1;
@@ -211,7 +291,8 @@ export function buildPrismwild(ctx: GenContext, labels: World["labels"], places:
     if (random() < 0.42) t.decor(x, y, "fae_tree", true); else if (random() < 0.03) t.decor(x, y, "prism_crystal", true);
   }
   // ---------- Crystals, everywhere; the Shardfields thick with them, the giants among them ----------
-  const land = (x: number, y: number) => t.free(x, y) && (tiles[idx(x, y)] === T.GRASS || tiles[idx(x, y)] === T.DARK_GRASS || tiles[idx(x, y)] === T.GRAVEL || tiles[idx(x, y)] === T.STONE) && !(x >= C.x0 - 2 && x <= C.x1 + 2 && y >= C.y0 - 2 && y <= C.y1 + 2) && !(x >= LABYRINTH.x0 - 4 && y >= LABYRINTH.y0 - 4 && x <= LABYRINTH.x0 + MAZE_SIZE + 3 && y <= LABYRINTH.y0 + MAZE_SIZE + 8);
+  const inSettlement = (x: number, y: number) => SETTLEMENTS.some(r => x >= r.x0 - 3 && x <= r.x1 + 3 && y >= r.y0 - 3 && y <= r.y1 + 3);
+  const land = (x: number, y: number) => t.free(x, y) && !inSettlement(x, y) && (tiles[idx(x, y)] === T.GRASS || tiles[idx(x, y)] === T.DARK_GRASS || tiles[idx(x, y)] === T.GRAVEL || tiles[idx(x, y)] === T.STONE) && !(x >= C.x0 - 2 && x <= C.x1 + 2 && y >= C.y0 - 2 && y <= C.y1 + 2) && !(x >= LABYRINTH.x0 - 4 && y >= LABYRINTH.y0 - 4 && x <= LABYRINTH.x0 + MAZE_SIZE + 3 && y <= LABYRINTH.y0 + MAZE_SIZE + 8);
   const inShards = (x: number, y: number) => inEllipse(SHARDFIELDS, x, y, 0.95);
   let giants = 0;
   for (let k = 0; k < 400 && giants < 22; k++) { const a = random() * Math.PI * 2, r = Math.sqrt(random()) * 0.85, x = Math.round(SHARDFIELDS.x + Math.cos(a) * r * SHARDFIELDS.rx), y = Math.round(SHARDFIELDS.y + Math.sin(a) * r * SHARDFIELDS.ry); if (land(x, y) && [[2, 0], [-2, 0], [0, 2], [0, -2]].every(([dx, dy]) => land(x + dx, y + dy)) && giant(x, y)) giants++; }
@@ -239,4 +320,5 @@ export function buildPrismwild(ctx: GenContext, labels: World["labels"], places:
   label("prismwild", 1300, 150); label("glass_causeway", Math.round((coastX + landing) / 2), CAUSEWAY_Y - 6); label("collegium", 1406, 46);
   label("starwood", STARWOOD.x, STARWOOD.y); label("fae_hollows", FAE_HOLLOWS.x, FAE_HOLLOWS.y); label("shardfields", SHARDFIELDS.x, SHARDFIELDS.y - 20);
   label("fennicks_labyrinth", LABYRINTH.x0 + (MAZE_SIZE >> 1), LABYRINTH.y0 - 6);
+  for (const [id, r] of [["spirehollow", SPIREHOLLOW], ["bellwhistle", BELLWHISTLE], ["mothwick", MOTHWICK], ["shardstead", SHARDSTEAD], ["tumbledown", TUMBLEDOWN]] as const) label(id, Math.round((r.x0 + r.x1) / 2), r.y0 - 2);
 }

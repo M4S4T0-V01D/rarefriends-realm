@@ -5,7 +5,7 @@
  * prism wisps in the Starwood, glimmer stags (who mind their own business), and the shard golems of the Shardfields.
  * A leaf (types only), so data.ts can list them.
  */
-import type { Drop, Item, MonsterDef, ShopDef } from "./data.ts";
+import type { Drop, Item, MonsterDef, RegionalSet, ShopDef } from "./data.ts";
 
 const coins = (min: number, max: number, chance: number): Drop => ({ item: "coins", min, max, chance });
 const one = (id: string, chance: number, min = 1, max = min): Drop => ({ item: id, min, max, chance });
@@ -41,11 +41,33 @@ export const PRISM_ITEMS: readonly Item[] = [
     icon: { shape: "satchel", color: "#6a5a8a", accent: "#e2c46a" } },
   { id: "glimmer_dust", name: "Glimmer dust", examine: "Dust from a glimmer moth's wings, shining faintly violet. The Collegium's tutors want it for their lessons.", value: 40, stackable: true,
     icon: { shape: "material", color: "#cbb8f0", accent: ROSE } },
+  { id: "fizzing_tonic", name: "Fizzing tonic", examine: "A tonic from Mother Fizzwig's kettle. It fizzes in the bottle, in your mouth and, briefly, in your ears.", value: 140, heal: 16,
+    icon: { shape: "bottle", color: "#5fc8c0", accent: "#fbf6ee" } },
+  { id: "starlight_biscuit", name: "Starlight biscuit", examine: "A biscuit shaped like a star, baked in Bellwhistle. It's still faintly warm, and nobody can say why.", value: 30, heal: 6,
+    icon: { shape: "bread", color: "#ecd27a", accent: "#9a72e8" } },
   { id: "shard_heart", name: "Shard heart", examine: "The prism at a shard golem's core, still humming. Worth a great deal to the Collegium.", value: 2500,
     icon: { shape: "gem", color: "#9a7ae8", accent: "#f0e6ff" } },
 ];
 
+/** What the Prismwild's wizard-folk wear (data.ts puts it into REGIONAL_CLOTHING): Hattie Pennyfeather makes it in Spirehollow. */
+export const PRISM_CLOTHING: readonly RegionalSet[] = [
+  { region: "prismwild", shop: "spire_hats", pieces: [
+    { id: "spiral_wizard_hat", name: "Spiral wizard hat", slot: "head", shape: "hat", color: "#6a4a8a", accent: "#ecd27a", examine: "A pointed hat that curls round on itself twice before it gets to the point. Hattie says it's how the magic gets in.", value: 260 },
+    { id: "starry_robe", name: "Moon-and-star robe", slot: "body", shape: "body", kind: "robe", color: "#3a3a7a", accent: "#ecd27a", examine: "A long blue robe sewn with yellow moons and stars, a few of them upside down. Every wizard in the Prismwild owns one; none of them will admit it.", value: 520 },
+    { id: "patchwork_robe", name: "Patchwork robe", slot: "body", shape: "body", kind: "robe", color: "#c94a5a", accent: "#5fc8c0", examine: "A robe made of every other robe its owner wore out, patched together in no order at all. Spirehollow's favourite.", value: 400 },
+    { id: "stripy_stockings", name: "Stripy stockings", slot: "legs", shape: "legs", kind: "trousers", color: "#e47ac4", accent: "#fbf6ee", examine: "Long stockings in pink and white stripes, worn under a robe by people who'd rather you didn't see them, and over one by people who would.", value: 180 },
+    { id: "curly_slippers", name: "Curly-toed slippers", slot: "feet", shape: "boots", color: "#9a72e8", accent: "#ecd27a", examine: "Velvet slippers whose toes curl up and round. A bell on each toe, for finding them in the morning.", value: 220 },
+    { id: "starry_cloak", name: "Starry cloak", slot: "cape", shape: "cape", color: "#2a2a5a", accent: "#ecd27a", examine: "A night-blue cloak with stars that are slowly, very slowly, moving across it.", value: 600 },
+  ] },
+];
+
 export const PRISM_SHOPS: Record<string, ShopDef> = {
+  // Hattie Pennyfeather's in Spirehollow: the Prismwild's own clothes, and every wizard hat there is.
+  spire_hats: { id: "spire_hats", name: "Hattie's Hats", buys: ["other"], rate: 0.5, stock: ["spiral_wizard_hat", "starry_robe", "patchwork_robe", "stripy_stockings", "curly_slippers", "starry_cloak", "crimson_wizard_hat", "emerald_wizard_hat", "midnight_wizard_hat", "plum_wizard_hat", "ashen_wizard_hat", "golden_wizard_hat"] },
+  // Mother Fizzwig's kettle in Bellwhistle: tea, tonic and biscuits.
+  fizzing_kettle: { id: "fizzing_kettle", name: "The Fizzing Kettle", buys: ["food"], rate: 0.5, stock: ["lilac_tea", "fizzing_tonic", "starlight_biscuit"] },
+  // Gideon Wickerbottom's floating market in Bellwhistle: a stall in the air, selling what a wizard runs out of.
+  floating_market: { id: "floating_market", name: "The Floating Market", buys: ["sigil", "magic"], rate: 0.55, stock: ["breeze_sigil", "tide_sigil", "stone_sigil", "ember_sigil", "thought_sigil", "star_sigil", "staff", "tablet_collegium", "glimmer_dust"] },
   // Fennick's curio stall at the Labyrinth's gate: mazeglass only.
   fennicks_curios: { id: "fennicks_curios", name: "Fennick's Curios", currency: "mazeglass", stock: ["prismweave_hood", "prismweave_robe", "prismweave_skirt", "prismweave_gloves", "prismweave_boots", "twisting_staff", "prism_focus", "lilac_tea"] },
   // The Collegium's stores: the sigils its students burn through, tea and a tablet home.

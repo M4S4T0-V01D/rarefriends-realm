@@ -83,7 +83,9 @@ export function buildSorrowmere(ctx: GenContext, labels: World["labels"]) {
   const free = (x: number, y: number) => t.free(x, y) && tiles[idx(x, y)] !== T.STONE && Math.abs(y - MID) > 5;
   t.scatter(N.x0 + 2, N.y0 + 2, INNER_X - 2, N.y1 - 2, 70, (x, y) => { t.decor(x, y, "grave", true); }, free);
   t.scatter(N.x0 + 2, N.y0 + 2, INNER_X - 2, N.y1 - 2, 8, (x, y) => { t.decor(x, y, "dolmen", true); }, (x, y) => free(x, y) && free(x + 1, y) && free(x - 1, y));
-  t.scatter(N.x0 + 2, N.y0 + 2, INNER_X - 2, N.y1 - 2, 14, (x, y) => { t.decor(x, y, "dead_tree", true); }, free);
+  // The Deadwood's own dead trees, in the courts and thick round the walls outside (it's the Deadwood's night here too: world.ts gloomAt).
+  t.scatter(N.x0 + 2, N.y0 + 2, INNER_X - 2, N.y1 - 2, 18, (x, y) => { t.tree(x, y, "deadwood"); }, free);
+  t.scatter(N.x0 - 12, N.y0 - 12, N.x1 + 12, N.y1 + 12, 140, (x, y) => { t.tree(x, y, "deadwood"); }, (x, y) => t.free(x, y) && (x < N.x0 - 1 || x > N.x1 + 1 || y < N.y0 - 1 || y > N.y1 + 1) && Math.abs(y - MID) > 3 && ctx.region[idx(x, y)] === ctx.region[idx(N.x0 + 1, N.y0 + 1)]);
   t.scatter(N.x0 + 2, N.y0 + 2, INNER_X - 2, N.y1 - 2, 10, (x, y) => { t.decor(x, y, "bones", false); }, free);
   t.monsters("skeleton", N.x0 + 2, N.y0 + 2, INNER_X - 2, N.y1 - 2, 8); t.monsters("cairn_wight", N.x0 + 2, N.y0 + 2, INNER_X - 2, N.y1 - 2, 5);
   t.monsters("barrow_shade", N.x0 + 2, N.y0 + 2, INNER_X - 2, N.y1 - 2, 6);

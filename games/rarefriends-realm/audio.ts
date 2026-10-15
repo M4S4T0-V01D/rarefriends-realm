@@ -789,7 +789,7 @@ const PRISM_PIECES: readonly MizukaiPiece[] = [
     },
     hits: () => [...everyBar(16, 4, (b0, bar) => strokes(bar % 4 === 3 ? "riq:0.25 riq:0.25 riq:0.5 riq:0.5 riq:0.5 zill:2" : "riq:0.5 r:0.5 riq:0.5 r:0.5 riq:0.5 r:0.5 riq:0.5 r:0.5", b0, 0.3)), ...deepOn(Array.from({ length: 16 }, (_, k) => k * 4), 0.35)] },
 ];
-const PRISM_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { prismwild: "prism_meadow", starwood: "prism_meadow", fae_hollows: "prism_meadow", shardfields: "prism_meadow", collegium: "prism_meadow", glass_causeway: "prism_meadow", fennicks_labyrinth: "prism_labyrinth" };
+const PRISM_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { prismwild: "prism_meadow", starwood: "prism_meadow", fae_hollows: "prism_meadow", shardfields: "prism_meadow", collegium: "prism_meadow", glass_causeway: "prism_meadow", fennicks_labyrinth: "prism_labyrinth", spirehollow: "prism_meadow", bellwhistle: "prism_meadow", mothwick: "prism_meadow", shardstead: "prism_meadow", tumbledown: "prism_meadow" };
 /** Which Kharaveth piece plays where. */
 const KHARAVETH_REGION_TRACK: Partial<Record<RegionId, TrackId>> = { sunteeth: "kharaveth_sunteeth", foothold: "kharaveth_foothold", underway: "kharaveth_underway", ochre_steppe: "kharaveth_steppe", sunward_strait: "kharaveth_steppe",
   ashar_valley: "kharaveth_steppe", ochre_spine: "kharaveth_steppe", khetmar_pass: "kharaveth_khetmar", zuri_camp: "kharaveth_steppe", ouresh_camp: "kharaveth_dunes", sea_of_dunes: "kharaveth_dunes",

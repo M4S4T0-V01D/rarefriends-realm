@@ -68,6 +68,7 @@ export const DUNGEON_THEMES: Partial<Record<RegionId, DungeonTheme>> = {
   root_cellars: FAMILIES.cellar, mossy_undercroft: FAMILIES.mossy,
   underway: FAMILIES.sandstone, black_stair: FAMILIES.sandstone, first_names_hall: FAMILIES.sandstone, uncounted_deep: FAMILIES.tomb, measured_vault: FAMILIES.tomb, great_stepwell: FAMILIES.stepwell,
   sunken_halls: FAMILIES.tomb,
+  sorrowmere_catacombs: FAMILIES.ossuary,
 };
 
 /** The theme under a tile, or null above ground and where none is set. */

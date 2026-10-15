@@ -351,6 +351,10 @@ const DECOR_EXAMINE: Partial<Record<string, string>> = {
   fae_ring: "A ring of tiny pale mushrooms. The fae dance in them, the Collegium says. Step in at your own risk.", lumen_lamp: "A crystal hung in a silver cage on a post of white stone, lit from inside.",
   maze_door: "A crystal door.", maze_glyph: "A glyph.", hourglass: "Fennick's hourglass.",
   menhir: "A standing stone three times a house's height, lichen on its north face, a name worn off its south.", dolmen: "Two great stones standing, and a third laid across them. A grave, once. A door, the old songs say.", brazier: "A brazier of black iron.",
+  teapot_house: "A house in a teapot as big as a cottage. The spout steams when someone's home.", mushroom_house: "A house in the stem of a mushroom, with a door and a round window. The cap keeps the rain off.",
+  crooked_house: "Three storeys stacked askew, each leaning its own way. It has stood like that for two hundred years, out of spite.", topsy_tower: "A tower stood on its head: roof in the ground, foundations in the air, door at the top. The wizard who lives there says it's the right way up.",
+  floating_isle: "A market stall on a lump of rock hanging in the air at head height. You reach up to pay.", giant_candle: "A candle the height of a lamp post. It never burns down, and nobody remembers lighting it.",
+  backwards_clock: "Bellwhistle's clock tower. Its hands go the wrong way round, and it keeps perfect time.", footing: "",
   throne: "Carved oak, gilded, and a cushion somebody sat on too long.", armour: "An empty suit of ashsteel armour. Probably empty.", bed: "Very soft. No time for naps.",
 };
 

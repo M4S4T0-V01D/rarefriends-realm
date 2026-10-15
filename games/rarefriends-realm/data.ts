@@ -77,7 +77,7 @@ import { FACTION_MONSTERS, factionGear } from "./factions.ts";
 import { MIZUKAI_ITEMS, MIZUKAI_MONSTERS, mizukaiGear } from "./mizukaigear.ts";
 import { KHARAVETH_GEAR, KHARAVETH_ITEMS, KHARAVETH_MONSTERS, KHARAVETH_SHOPS, STEPPE_CLOTHES } from "./kharavethgear.ts";
 import { NORTH_FACTION_ITEMS, NORTH_FACTION_MONSTERS, NORTH_FACTION_SHOPS } from "./northfactiongear.ts";
-import { PRISM_ITEMS, PRISM_MONSTERS, PRISM_SHOPS } from "./prismgear.ts";
+import { PRISM_CLOTHING, PRISM_ITEMS, PRISM_MONSTERS, PRISM_SHOPS } from "./prismgear.ts";
 import { NECROPOLIS_ITEMS, NECROPOLIS_MONSTERS } from "./necropolisgear.ts";
 import { HEARTLAND_GEAR, HEARTLAND_ITEMS, HEARTLAND_MONSTERS, HEARTLAND_SHOPS, OURESH_GOODS, ZURI_GOODS } from "./heartlandsgear.ts";
 import { MEGHAVAN_CLOTHING, MEGHAVAN_GEAR, MEGHAVAN_ITEMS, MEGHAVAN_MONSTERS, MEGHAVAN_QUEST_ITEMS, MEGHAVAN_SHOPS } from "./meghavangear.ts";
@@ -933,6 +933,7 @@ export const REGIONAL_CLOTHING: readonly RegionalSet[] = [
   ...PORTS_CLOTHING,
   // A Place to the North: the Vargskeld's wool and the Zoryavik's embroidered linen (northgear.ts).
   ...NORTH_CLOTHING,
+  ...PRISM_CLOTHING,
 ];
 const REGIONAL_ITEMS: Item[] = REGIONAL_CLOTHING.flatMap(set => set.pieces.map((piece): Item => ({
   id: piece.id, name: piece.name, examine: piece.examine, value: piece.value, icon: { shape: piece.shape, color: piece.color, accent: piece.accent, ...(piece.kind ? { kind: piece.kind } : {}) },

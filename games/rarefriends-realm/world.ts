@@ -144,6 +144,8 @@ export type DecorKind =
   | "prism_crystal" | "prism_spire" | "prism_giant" | "fae_tree" | "fae_ring" | "lumen_lamp" | "maze_door" | "maze_glyph" | "hourglass"
   // The megaliths (megalithart.ts): a standing stone three times a house's height, a dolmen, and a brazier that burns for whoever lit it.
   | "menhir" | "dolmen" | "brazier"
+  // The Prismwild's towns and villages (prismart.ts): what wizards build when nobody stops them. A footing is the unseen rest of a big one's ground.
+  | "teapot_house" | "mushroom_house" | "crooked_house" | "topsy_tower" | "floating_isle" | "giant_candle" | "backwards_clock" | "footing"
   | "god_diamond" | "god_ink" | "god_sol" | "god_hood" | "god_ember"
   // Return of Raria: the Wise Friend and the Order of Dusk's god, and the things factions leave about.
   | "god_dusk" | "wise_friend" | "bell" | "canopy" | "cannon" | "device" | "wagon" | "watchtower" | "stake" | "plaque" | "banner_fff" | "banner_rrr" | "banner_hollowmere"
@@ -235,6 +237,7 @@ export type RegionId =
   | "skarnholm_bay" | "grimfell" | "sokol_hills"
   // The Prismwild (prismworld.ts): the magical land past the north's north-east, over the Glass Causeway.
   | "prismwild" | "glass_causeway" | "collegium" | "starwood" | "fae_hollows" | "shardfields" | "fennicks_labyrinth"
+  | "spirehollow" | "bellwhistle" | "mothwick" | "shardstead" | "tumbledown"
   // Sorrowmere, the old kings' necropolis east of the Deadwood, and its catacombs (necropolis.ts).
   | "sorrowmere" | "sorrowmere_catacombs"
   // The seaways (seaways.ts): the ocean all the way round the map.
@@ -372,6 +375,7 @@ export const REGIONS: readonly Region[] = [
     // The Prismwild (prismworld.ts sets their labels too).
     ["prismwild", "The Prismwild", 3], ["glass_causeway", "The Glass Causeway", 1], ["collegium", "The Collegium of the Seventh Lamp", 0], ["starwood", "The Starwood", 4],
     ["fae_hollows", "The Fae Hollows", 2], ["shardfields", "The Shardfields", 6], ["fennicks_labyrinth", "Fennick's Labyrinth", 0],
+    ["spirehollow", "Spirehollow", 0], ["bellwhistle", "Bellwhistle", 0], ["mothwick", "Mothwick", 0], ["shardstead", "Shardstead", 1], ["tumbledown", "Tumbledown", 0],
     // Sorrowmere (necropolis.ts sets their labels).
     ["sorrowmere", "Sorrowmere", 7],
   ] as const).map(([id, name, danger]) => ({ id, name, label: { x: 0, y: 0 }, danger, far: true }) as Region),
@@ -1904,7 +1908,8 @@ export const ruinPiece = (r: number): DecorKind => r < 0.26 ? "ruin_wall" : r < 
 export const DECOR_NAMES: Record<DecorKind, string> = {
   trough: "Water trough", vessel: "Vessel", hitching_post: "Hitching post",
   strong_friend: "The Strong Friend", crystal: "Crystal", prism_crystal: "Crystals", prism_spire: "Crystal spire", prism_giant: "Great crystal", fae_tree: "Fae tree", fae_ring: "Fairy ring", lumen_lamp: "Lumen lamp",
-  maze_door: "Crystal door", maze_glyph: "Glyph", hourglass: "Fennick's hourglass", menhir: "Standing stone", dolmen: "Dolmen", brazier: "Brazier", rune_circle: "Sigil circle", monument: "Statue", god_diamond: "Statue of the Good Friend", god_ink: "Statue of the Squid Friend", god_sol: "Statue of the Weird Friend", god_hood: "Statue of the Hood Friend", god_ember: "The Ember, in its brazier",
+  maze_door: "Crystal door", maze_glyph: "Glyph", hourglass: "Fennick's hourglass", menhir: "Standing stone", dolmen: "Dolmen", brazier: "Brazier",
+  teapot_house: "Teapot house", mushroom_house: "Mushroom house", crooked_house: "Crooked house", topsy_tower: "Upside-down tower", floating_isle: "Floating stall", giant_candle: "Giant candle", backwards_clock: "The Backwards Clock", footing: "__footing", rune_circle: "Sigil circle", monument: "Statue", god_diamond: "Statue of the Good Friend", god_ink: "Statue of the Squid Friend", god_sol: "Statue of the Weird Friend", god_hood: "Statue of the Hood Friend", god_ember: "The Ember, in its brazier",
   god_dusk: "Statue of the Wise Friend, blindfolded", wise_friend: "The Wise Friend", bell: "Great bell", canopy: "Old roofing", cannon: "Magical cannon", device: "Federation device", wagon: "Supply wagon", watchtower: "Watchtower", stake: "Stake wall", plaque: "Inscribed plaque", banner_fff: "The Federation's banner", banner_rrr: "The Regiment's banner", banner_hollowmere: "Hollowmere's banner", banner_diamond: "The Order of the Diamond's banner", banner_ink: "The Order of the Ink's banner", banner_sol: "The Order of the Sol's banner", banner_hood: "The Order of the Hood's banner", banner_ember: "The Order of the Ember's banner", banner_dusk: "The Order of Dusk's banner",
   flowers: "Flowers", bush: "Bush", boulder: "Boulder", lamp: "Lamp post", bench: "Bench", crate: "Crate", barrel: "Water barrel", tent: "Tent",
   cactus: "Cactus", pine: "Pine tree", dead_tree: "Dead tree", statue: "Statue", grave: "Grave", fence: "Fence", reeds: "Reeds", table: "Table",
@@ -2096,19 +2101,20 @@ export function complexAt(world: World, x: number, y: number) {
  * in it a point is, 0 to 1, softened over a few tiles at the wood's edge so the dark comes on as you walk in.
  */
 export function gloomAt(world: World, x: number, y: number): number {
-  const deadwood = DEADWOOD_INDEX;
-  if (deadwood < 0 || y >= OVERWORLD_H) return 0;
+  if (DEADWOOD_INDEX < 0 || y >= OVERWORLD_H) return 0;
   let inside = 0, total = 0;
   for (let dy = -6; dy <= 6; dy += 3) for (let dx = -6; dx <= 6; dx += 3) {
     const tx = Math.round(x) + dx, ty = Math.round(y) + dy;
     if (!inBounds(tx, ty)) continue;
-    total++; if (world.region[ty * W + tx] === deadwood) inside++;
+    total++; if (GLOOMY.has(world.region[ty * W + tx])) inside++;
   }
   return total ? inside / total : 0;
 }
 const DEADWOOD_INDEX = REGIONS.findIndex(region => region.id === "deadwood");
-/** Whether a tile lies in the Deadwood (its ground is darker, and it's always night there). */
-export const inDeadwood = (world: World, x: number, y: number) => DEADWOOD_INDEX >= 0 && world.region[y * W + x] === DEADWOOD_INDEX;
+/** The Deadwood, and the places that share its night: Sorrowmere, the necropolis on its eastern headland (necropolis.ts). */
+const GLOOMY = new Set([DEADWOOD_INDEX, REGIONS.findIndex(region => region.id === "sorrowmere")].filter(index => index >= 0));
+/** Whether a tile lies in the Deadwood or under its night (its ground is darker, and it's always night there). */
+export const inDeadwood = (world: World, x: number, y: number) => GLOOMY.has(world.region[y * W + x]);
 export function regionAt(world: World, x: number, y: number): Region {
   return REGIONS[inBounds(x, y) ? world.region[tileIndex(x, y)] : 0] ?? REGIONS[0];
 }

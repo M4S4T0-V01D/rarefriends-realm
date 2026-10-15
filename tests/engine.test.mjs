@@ -5589,6 +5589,7 @@ test("The Seventh Lamp: glimmer dust, Pell's satchel, Lady Hawthorn's riddle, an
 test("Sorrowmere: the necropolis east of the Deadwood, its braziers lit in the Litany's order to open the inner gate, the Gravewarden's seal for the Great Barrow, and the catacombs with an ossuary maze, a key for the Regent's door and the Bone Regent", async () => {
   const S = await import("../games/rarefriends-realm/necropolis.ts");
   const g = newGame(), p = g.player, world = g.world;
+  g.monsters = [];   // (the doors and the braziers are the test here, not a fight with the dead)
   const seen = reachable(g, world.places.spawn);
   assert.ok(seen[S.INNER_GATE.y * W + S.INNER_GATE.x - 1], "the outer court is reached on foot from the spawn");
   assert.ok(!seen[S.INNER_GATE.y * W + S.INNER_GATE.x + 1], "but not the inner court");
@@ -5616,4 +5617,29 @@ test("Sorrowmere: the necropolis east of the Deadwood, its braziers lit in the L
   // The coffers are a dread dungeon's, and can hold an ossuary key.
   const { cofferTier } = await import("../games/rarefriends-realm/dungeons.ts");
   const coffer = world.objects.find(o => o.name === "Sorrowmere coffer"); assert.equal(cofferTier(g, coffer), "dread");
+});
+
+test("The Prismwild's wizards live in towns: Spirehollow's hat-roofed towers and Bellwhistle's market, and the villages of Mothwick, Shardstead and Tumbledown, each with its own wizard-folk; Sorrowmere keeps the Deadwood's night", async () => {
+  const P = await import("../games/rarefriends-realm/prismworld.ts");
+  const { gloomAt, inDeadwood } = await import("../games/rarefriends-realm/world.ts");
+  const S = await import("../games/rarefriends-realm/necropolis.ts");
+  const g = newGame(), world = g.world, seen = reachable(g, world.places.spawn);
+  for (const [id, r] of [["spirehollow", P.SPIREHOLLOW], ["bellwhistle", P.BELLWHISTLE], ["mothwick", P.MOTHWICK], ["shardstead", P.SHARDSTEAD], ["tumbledown", P.TUMBLEDOWN]]) {
+    const cx = Math.round((r.x0 + r.x1) / 2), cy = Math.round((r.y0 + r.y1) / 2);
+    assert.equal(regionAt(world, cx, cy).id, id, `${id} is there`);
+    let reached = false; for (let y = r.y0; y <= r.y1 && !reached; y++) for (let x = r.x0; x <= r.x1 && !reached; x++) if (seen[y * W + x]) reached = true;
+    assert.ok(reached, `${id} is reached on foot`);
+    assert.ok(world.spawns.filter(s => s.kind === "npc" && s.x >= r.x0 && s.x <= r.x1 && s.y >= r.y0 && s.y <= r.y1).length >= 4, `${id} has its folk`);
+  }
+  const inside = (o, r) => o.x >= r.x0 && o.x <= r.x1 && o.y >= r.y0 && o.y <= r.y1;
+  assert.ok(world.buildings.filter(b => b.round && b.roof === "cone" && (b.spire ?? 0) >= 140 && inside({ x: b.x0, y: b.y0 }, P.SPIREHOLLOW)).length >= 6, "Spirehollow's towers wear tall hats");
+  for (const r of [P.SPIREHOLLOW, P.BELLWHISTLE]) assert.ok(world.objects.some(o => o.kind === "bank" && inside(o, r)), "a bank in each town");
+  const decor = (kind, r) => world.objects.filter(o => o.decor === kind && inside(o, r)).length;
+  assert.equal(decor("backwards_clock", P.BELLWHISTLE), 1); assert.ok(decor("floating_isle", P.BELLWHISTLE) >= 3 && decor("teapot_house", P.BELLWHISTLE) >= 2, "a floating market and teapots");
+  assert.ok(decor("mushroom_house", P.MOTHWICK) >= 5 && decor("crooked_house", P.TUMBLEDOWN) >= 5 && decor("topsy_tower", P.SPIREHOLLOW) === 1, "mushrooms, crooked houses, and a tower on its head");
+  for (const shop of ["spire_hats", "fizzing_kettle", "floating_market"]) assert.ok(SHOPS[shop].stock.length >= 3, `${shop} sells`);
+  assert.ok(NPCS.prismwild_villager && REGIONAL_CLOTHING.some(set => set.region === "prismwild"), "the wizard-folk dress the Prismwild way");
+  // Sorrowmere under the Deadwood's night.
+  const mid = Math.round((S.SORROWMERE.y0 + S.SORROWMERE.y1) / 2);
+  assert.ok(gloomAt(world, S.SORROWMERE.x0 + 30, mid) > 0.9 && inDeadwood(world, S.SORROWMERE.x0 + 30, mid), "always night in Sorrowmere, its ground the Deadwood's");
 });

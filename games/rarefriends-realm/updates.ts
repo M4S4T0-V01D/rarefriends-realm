@@ -4,6 +4,13 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 141, date: "2026-10-15", title: "The wizards' towns", items: [
+    "The Prismwild's wizards have towns of their own now. Spirehollow, the town of hats: towers in tall wizard-hat roofs round a square of giant candles, Hattie's Hats, a bank and the Tilted Toad.",
+    "Bellwhistle, the market town: the Backwards Clock, the Fizzing Fountain, a floating market on rocks hanging in the air, Mother Fizzwig's Fizzing Kettle, the Moot, a bank, and a house in a teapot.",
+    "Three villages: Mothwick's mushroom houses by the Fae Hollows, Shardstead's crystal-miners by the Shardfields, and Tumbledown on the north coast, where every house leans its own way.",
+    "New: the Prismwild's own clothes at Hattie's (spiral hats, moon-and-star and patchwork robes, stripy stockings, curly-toed slippers, a starry cloak), fizzing tonic and starlight biscuits, and a dozen wizards with opinions.",
+    "Sorrowmere now lies under the Deadwood's endless night, its ground as dark as the wood's, dead trees all round its walls.",
+  ] },
   { id: 140, date: "2026-10-15", title: "Sorrowmere", items: [
     "Sorrowmere, the old kings' necropolis, on the headland east of the Deadwood: a walled precinct with an avenue of standing stones three times a house's height, dolmens, graves and four mausoleums.",
     "To get in, read the Litany at the gate and light the four mausoleums' braziers in its order (bring a tinderbox). Light one out of turn and they all go out. Lit in order, the inner gate opens.",
