@@ -38,6 +38,8 @@ import { homeRect } from "./housing.ts";
 import { CRYSTAL_COLORS, crystalArt, faeRingArt, faeTreeArt, glyphArt, hourglassArt, lumenLampArt, mazeDoorArt } from "./prismart.ts";
 import { LABYRINTH, cofferLit, inLabyrinth, mazeDoorOpen } from "./labyrinth.ts";
 import { PRISM_REGION_IDS } from "./prismworld.ts";
+import { brazierArt, dolmenArt, menhirArt } from "./megalithart.ts";
+import { brazierLit } from "./necropolis.ts";
 import { STRONG_FRIEND_MASK, creatureSprite, friendSprite, type Mask } from "./sprites.ts";
 
 /** The logical view size; the game sets it to match the frame (960 × 640 is the reference). */
@@ -1857,6 +1859,9 @@ function prismArt(scene: Scene, object: WorldObject, h: number): { art: HTMLCanv
     case "maze_door": return { art: mazeDoorArt(mazeDoorOpen(scene.game, object), object.clue === "maze_door_b" ? 1 : 0) };
     case "maze_glyph": return { art: glyphArt(Math.floor(t / 300 + h * 9)), flat: true };
     case "hourglass": return { art: hourglassArt(Math.floor(t / 500)) };
+    case "menhir": return { art: menhirArt(Math.floor(h * 4 * 7)) };
+    case "dolmen": return { art: dolmenArt(Math.floor(h * 2 * 7)) };
+    case "brazier": return { art: brazierArt(brazierLit(scene.game, object), Math.floor(t / 150 + h * 9)) };
     default: return null;
   }
 }
@@ -3053,7 +3058,7 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     if (object.kind === "sigil_altar") glow(x, y, 34, 90, object.sigil && isItem(object.sigil) ? item(object.sigil).icon.color : "#c7d3dc", 0.8, true);
     // The Prismwild's crystals and lamps light the dark in their own colours.
     if (object.decor === "prism_crystal" || object.decor === "prism_spire" || object.decor === "prism_giant") { const big = object.decor === "prism_giant" ? 2 : object.decor === "prism_spire" ? 1 : 0; glow(x, y, [8, 30, 90][big], [50, 90, 200][big], CRYSTAL_COLORS[Math.floor(hash(x, y) * 6)], [0.35, 0.55, 0.9][big]); }
-    else if (object.decor === "lumen_lamp") glow(x, y, 36, 140, "#e8d8ff", 0.9); else if (object.decor === "fae_tree") glow(x, y, 40, 90, "#ffe7a8", 0.4, true); else if (object.decor === "hourglass") glow(x, y, 30, 120, "#ecb45a", 0.8);
+    else if (object.decor === "lumen_lamp") glow(x, y, 36, 140, "#e8d8ff", 0.9); else if (object.decor === "brazier" && brazierLit(game, object)) glow(x, y, 20, 120, "#6a9af0", 1, true); else if (object.decor === "fae_tree") glow(x, y, 40, 90, "#ffe7a8", 0.4, true); else if (object.decor === "hourglass") glow(x, y, 30, 120, "#ecb45a", 0.8);
     else if (object.decor === "crystal") glow(x, y, 14, 70, "#bff4ff", 0.55); else if (object.decor === "rune_circle") glow(x, y, 2, 90, "#a48cf0", 0.6);
     else if (object.decor === "lamp") glow(x, y, 48, 150, "#f2b261", 0.9); else if (object.decor === "stone_lantern" || object.decor === "paper_lantern") glow(x, y, object.decor === "stone_lantern" ? 30 : 50, 110, "#f2b261", 0.75); else if (object.decor === "torch") glow(x, y, 32, 130, (isUnderground(y) && dungeonTheme(world, x, y)?.torch) || "#ef9a4c", 1, true); else if (object.decor === "hearth" || object.decor === "campfire") glow(x, y, 14, 170, "#f0a050", 1, true);
     else if (object.kind === "furnace" || object.kind === "range") glow(x, y, 16, 110); else if (object.kind === "altar") glow(x, y, 26, 70); else if (object.kind === "fountain" && objectAtTile(world, x - 1, y)?.kind !== "fountain" && objectAtTile(world, x, y - 1)?.kind !== "fountain") glow(x + 0.5, y + 0.5, 12, 110, "#a9d4f2", 0.55); else if (object.kind === "sigil_altar") glow(x, y, 30, 90);
@@ -3086,9 +3091,9 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
     const d = fountainMaster ? depth(x + 0.5, y + 0.5) + 0.3 : depth(x, y) + (object.kind === "wheat" || object.kind === "spot" ? -0.4 : 0);
     const flat = object.kind === "spot" || (object.kind === "decor" && FLAT_DECOR.has(object.decor!));
     const sprite = object.kind === "tree" || object.kind === "rock" || object.kind === "dock" || (object.kind === "decor" && object.decor !== "banner");
-    drawables.push({ depth: d, at: { x, y }, cast: !flat, flat, sprite, scenery: object.kind === "tree" || object.kind === "rock" || object.kind === "decor" || object.kind === "spot", size: object.decor === "pagoda" || object.decor === "castle_keep" || object.decor === "prism_giant" ? [520, 200, 60] : object.decor === "windmill" ? [320, 140, 40] : object.kind === "tree" ? [260, 110, 40] : [200, 110, 40], draw: () => {
+    drawables.push({ depth: d, at: { x, y }, cast: !flat, flat, sprite, scenery: object.kind === "tree" || object.kind === "rock" || object.kind === "decor" || object.kind === "spot", size: object.decor === "pagoda" || object.decor === "castle_keep" || object.decor === "prism_giant" || object.decor === "menhir" ? [520, 200, 60] : object.decor === "windmill" ? [320, 140, 40] : object.kind === "tree" ? [260, 110, 40] : [200, 110, 40], draw: () => {
       let rect: { x: number; y: number; w: number; h: number };
-      const tall = object.kind === "tree" || (object.kind === "decor" && (["pine", "windmill", "palm", "pillar", "tent", "crypt", "obelisk", "canopy", "wise_friend", "god_dusk", "torii", "rock_spire", "pagoda", "castle_keep", "prism_spire", "prism_giant", "fae_tree", "lumen_lamp", "hourglass"].includes(object.decor!) || (object.decor === "ruin_wall" && (object.height ?? 0) > 34)));
+      const tall = object.kind === "tree" || (object.kind === "decor" && (["pine", "windmill", "palm", "pillar", "tent", "crypt", "obelisk", "canopy", "wise_friend", "god_dusk", "torii", "rock_spire", "pagoda", "castle_keep", "prism_spire", "prism_giant", "fae_tree", "lumen_lamp", "hourglass", "menhir"].includes(object.decor!) || (object.decor === "ruin_wall" && (object.height ?? 0) > 34)));
       // Anything tall in front of your Friend that covers it on screen turns see-through (works at any angle and zoom).
       const fade = tall && d > playerDepth + 0.3 && coversPlayer(x, y) ? 0.35 : 1;
       if (object.kind === "tree") rect = drawTree(ctx, scene, object, game.depleted.has(object.id), fade, scene.reducedMotion ? 0 : treeShake(game, object.id, now));

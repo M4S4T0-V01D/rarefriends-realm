@@ -4,6 +4,12 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 140, date: "2026-10-15", title: "Sorrowmere", items: [
+    "Sorrowmere, the old kings' necropolis, on the headland east of the Deadwood: a walled precinct with an avenue of standing stones three times a house's height, dolmens, graves and four mausoleums.",
+    "To get in, read the Litany at the gate and light the four mausoleums' braziers in its order (bring a tinderbox). Light one out of turn and they all go out. Lit in order, the inner gate opens.",
+    "Beyond it, the Gravewarden keeps the Great Barrow, and the Barrow's door wants the seal it carries. Under the Barrow: the Sorrowmere Catacombs, an ossuary maze with crypts either side, the half-flooded Drowned Vault, and the Regent's door.",
+    "The Regent's door takes an ossuary key (the catacombs' coffers and dead carry them), and behind it the Bone Regent sits on his hoard. New creatures, new coffers, and the Regent's circlet and the ossuary flail to win.",
+  ] },
   { id: 139, date: "2026-10-15", title: "The Prismwild", items: [
     "A new land past the north: the Prismwild, over the Glass Causeway from the Zoryavik's north-east coast. Lilac downs, crystals of every size and colour, fae trees hung with lights, the Starwood, the Fae Hollows, and the Shardfields with their great crystals and shard golems.",
     "The Collegium of the Seventh Lamp, the wizards' college, where they live and learn: the Great Hall, the Library, the Seventh Lamp's tower, a bank and the Collegium Stores. A new quest, The Seventh Lamp, enrols you there.",

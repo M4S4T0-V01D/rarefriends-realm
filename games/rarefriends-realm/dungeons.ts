@@ -19,9 +19,11 @@ const TIER: Partial<Record<RegionId, Tier>> = { root_cellars: "shallow", mossy_u
   // The pyramids by Kharaveth's south coast: their storeys are dread; the deeps under them are royal, the richest of all.
   unfinished_pyramid: "dread", siruvet_pyramid: "dread", uncounted_deep: "royal", measured_vault: "royal",
   // The Sunken Halls under Qeshet (dragonsworld.ts): the old kings' grave-goods.
-  sunken_halls: "dread" };
+  sunken_halls: "dread",
+  // The catacombs under Sorrowmere (necropolis.ts).
+  sorrowmere_catacombs: "dread" };
 /** The key a dungeon's coffers can hold. */
-const KEYS: Partial<Record<RegionId, string>> = { mossy_undercroft: "moss_key", deepglass: "deepglass_key", drowned_archive: "archive_key", howling_vault: "vault_key", kumo_hollow: "kumo_seal_key", ashigane_deeps: "ogre_key", bone_shrine: "bone_shrine_key" };
+const KEYS: Partial<Record<RegionId, string>> = { sorrowmere_catacombs: "sorrowmere_key", mossy_undercroft: "moss_key", deepglass: "deepglass_key", drowned_archive: "archive_key", howling_vault: "vault_key", kumo_hollow: "kumo_seal_key", ashigane_deeps: "ogre_key", bone_shrine: "bone_shrine_key" };
 /** Ticks before a coffer fills again for the one who searched it (an hour: coffers and hoards are not a living). */
 export const COFFER_TICKS = 6000;
 /** `chance` here is a weight, not a probability: the commons are drawn by weight. */

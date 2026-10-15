@@ -25,6 +25,7 @@ import { buildDragons } from "./dragonsworld.ts";
 import { buildQuestMounts } from "./questmountsworld.ts";
 import { buildNorth } from "./northworld.ts";
 import { buildPrismwild } from "./prismworld.ts";
+import { buildSorrowmere } from "./necropolis.ts";
 import { openSeas } from "./seaways.ts";
 import { buildElevation } from "./elevation.ts";
 import { buildSigilShrines } from "./sigilshrines.ts";
@@ -141,6 +142,8 @@ export type DecorKind =
   | "broken_pillar" | "fallen_pillar" | "column_base" | "ruin_arch" | "carved_block" | "stone_head" | "sarcophagus"
   // The Prismwild (prismart.ts): its crystals (a cluster, a spire, a giant), fae trees, fairy rings and lumen lamps; Fennick's Labyrinth's doors, glyphs and hourglass.
   | "prism_crystal" | "prism_spire" | "prism_giant" | "fae_tree" | "fae_ring" | "lumen_lamp" | "maze_door" | "maze_glyph" | "hourglass"
+  // The megaliths (megalithart.ts): a standing stone three times a house's height, a dolmen, and a brazier that burns for whoever lit it.
+  | "menhir" | "dolmen" | "brazier"
   | "god_diamond" | "god_ink" | "god_sol" | "god_hood" | "god_ember"
   // Return of Raria: the Wise Friend and the Order of Dusk's god, and the things factions leave about.
   | "god_dusk" | "wise_friend" | "bell" | "canopy" | "cannon" | "device" | "wagon" | "watchtower" | "stake" | "plaque" | "banner_fff" | "banner_rrr" | "banner_hollowmere"
@@ -232,6 +235,8 @@ export type RegionId =
   | "skarnholm_bay" | "grimfell" | "sokol_hills"
   // The Prismwild (prismworld.ts): the magical land past the north's north-east, over the Glass Causeway.
   | "prismwild" | "glass_causeway" | "collegium" | "starwood" | "fae_hollows" | "shardfields" | "fennicks_labyrinth"
+  // Sorrowmere, the old kings' necropolis east of the Deadwood, and its catacombs (necropolis.ts).
+  | "sorrowmere" | "sorrowmere_catacombs"
   // The seaways (seaways.ts): the ocean all the way round the map.
   | "outer_sea"
   // The sea ports: Gullwick on the mainland, Saltreach below Raria, and Merrab, Tel Ashun and Ennu's Well in Kharaveth's east.
@@ -367,7 +372,10 @@ export const REGIONS: readonly Region[] = [
     // The Prismwild (prismworld.ts sets their labels too).
     ["prismwild", "The Prismwild", 3], ["glass_causeway", "The Glass Causeway", 1], ["collegium", "The Collegium of the Seventh Lamp", 0], ["starwood", "The Starwood", 4],
     ["fae_hollows", "The Fae Hollows", 2], ["shardfields", "The Shardfields", 6], ["fennicks_labyrinth", "Fennick's Labyrinth", 0],
+    // Sorrowmere (necropolis.ts sets their labels).
+    ["sorrowmere", "Sorrowmere", 7],
   ] as const).map(([id, name, danger]) => ({ id, name, label: { x: 0, y: 0 }, danger, far: true }) as Region),
+  { id: "sorrowmere_catacombs", name: "The Sorrowmere Catacombs", label: { x: 0, y: 0 }, danger: 9, underground: true, far: true },
 ];
 export const regionIndex = (id: RegionId) => REGIONS.findIndex(region => region.id === id);
 /** The mainland regions' labels were written in the mainland's own coordinates: move them with it (once, at load). */
@@ -1654,6 +1662,8 @@ export function generateWorld(seed = WORLD_SEED, { overlays = true }: { overlays
   buildNorth(grownCtx, labels);
   // The Prismwild, past the north's north-east, over the Glass Causeway (prismworld.ts).
   buildPrismwild({ ...grownCtx, random: mulberry(seed + 1009), noise2: makeNoise(seed + 1013, 4) }, labels, places);
+  // Sorrowmere, the old kings' necropolis on the headland east of the Deadwood, and the catacombs under it (necropolis.ts).
+  buildSorrowmere({ ...grownCtx, random: mulberry(seed + 1019), noise2: makeNoise(seed + 1021, 4) }, labels);
   // The Frenderal Exchange at the top of Gullwick's harbour street (commerceworld.ts, Commerce).
   buildExchange(grownCtx, places);
   // The sigil altars' shrines, and the deeper altars out across the Realm (sigilshrines.ts).
@@ -1894,7 +1904,7 @@ export const ruinPiece = (r: number): DecorKind => r < 0.26 ? "ruin_wall" : r < 
 export const DECOR_NAMES: Record<DecorKind, string> = {
   trough: "Water trough", vessel: "Vessel", hitching_post: "Hitching post",
   strong_friend: "The Strong Friend", crystal: "Crystal", prism_crystal: "Crystals", prism_spire: "Crystal spire", prism_giant: "Great crystal", fae_tree: "Fae tree", fae_ring: "Fairy ring", lumen_lamp: "Lumen lamp",
-  maze_door: "Crystal door", maze_glyph: "Glyph", hourglass: "Fennick's hourglass", rune_circle: "Sigil circle", monument: "Statue", god_diamond: "Statue of the Good Friend", god_ink: "Statue of the Squid Friend", god_sol: "Statue of the Weird Friend", god_hood: "Statue of the Hood Friend", god_ember: "The Ember, in its brazier",
+  maze_door: "Crystal door", maze_glyph: "Glyph", hourglass: "Fennick's hourglass", menhir: "Standing stone", dolmen: "Dolmen", brazier: "Brazier", rune_circle: "Sigil circle", monument: "Statue", god_diamond: "Statue of the Good Friend", god_ink: "Statue of the Squid Friend", god_sol: "Statue of the Weird Friend", god_hood: "Statue of the Hood Friend", god_ember: "The Ember, in its brazier",
   god_dusk: "Statue of the Wise Friend, blindfolded", wise_friend: "The Wise Friend", bell: "Great bell", canopy: "Old roofing", cannon: "Magical cannon", device: "Federation device", wagon: "Supply wagon", watchtower: "Watchtower", stake: "Stake wall", plaque: "Inscribed plaque", banner_fff: "The Federation's banner", banner_rrr: "The Regiment's banner", banner_hollowmere: "Hollowmere's banner", banner_diamond: "The Order of the Diamond's banner", banner_ink: "The Order of the Ink's banner", banner_sol: "The Order of the Sol's banner", banner_hood: "The Order of the Hood's banner", banner_ember: "The Order of the Ember's banner", banner_dusk: "The Order of Dusk's banner",
   flowers: "Flowers", bush: "Bush", boulder: "Boulder", lamp: "Lamp post", bench: "Bench", crate: "Crate", barrel: "Water barrel", tent: "Tent",
   cactus: "Cactus", pine: "Pine tree", dead_tree: "Dead tree", statue: "Statue", grave: "Grave", fence: "Fence", reeds: "Reeds", table: "Table",

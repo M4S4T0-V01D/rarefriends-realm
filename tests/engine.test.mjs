@@ -5585,3 +5585,35 @@ test("The Seventh Lamp: glimmer dust, Pell's satchel, Lady Hawthorn's riddle, an
   const spell = SPELLS.find(s => s.sigils && "breeze_sigil" in s.sigils && Object.keys(s.sigils).length === 2 && "thought_sigil" in s.sigils);
   if (spell) { for (const id of Object.keys(spell.sigils)) take(p, id, count(p, id)); give(p, "thought_sigil", 100); assert.equal(canCast(g, spell), null, "the staff gives the breeze sigils"); }
 });
+
+test("Sorrowmere: the necropolis east of the Deadwood, its braziers lit in the Litany's order to open the inner gate, the Gravewarden's seal for the Great Barrow, and the catacombs with an ossuary maze, a key for the Regent's door and the Bone Regent", async () => {
+  const S = await import("../games/rarefriends-realm/necropolis.ts");
+  const g = newGame(), p = g.player, world = g.world;
+  const seen = reachable(g, world.places.spawn);
+  assert.ok(seen[S.INNER_GATE.y * W + S.INNER_GATE.x - 1], "the outer court is reached on foot from the spawn");
+  assert.ok(!seen[S.INNER_GATE.y * W + S.INNER_GATE.x + 1], "but not the inner court");
+  const clue = id => world.objects.find(o => o.clue === id), use = (object, option) => { standBy(g, object); setTarget(g, { kind: "object", id: object.id, option }); run(g, 3); };
+  assert.ok(world.objects.filter(o => o.decor === "menhir").length >= 14, "an avenue of standing stones");
+  // The inner gate is shut; a brazier out of turn puts them all out; the Litany's order opens the gate.
+  const gate = clue("sm_inner_gate"), knock = () => { teleport(g, gate.x - 1, gate.y); setTarget(g, { kind: "object", id: gate.id, option: "Open" }); run(g, 3); };
+  knock(); assert.ok(p.x < gate.x, "the inner gate is shut");
+  give(p, "tinderbox", 1);
+  use(clue("sm_brazier_crowned"), "Light"); use(clue("sm_brazier_drowned"), "Light"); assert.equal(p.questData.sm_lit, 2);
+  use(clue("sm_brazier_dawn"), "Light"); assert.equal(p.questData.sm_lit, 0, "out of turn, they all go out");
+  for (const which of S.LITANY) use(clue(`sm_brazier_${which}`), "Light");
+  assert.ok(S.sorrowmereOpen(g), "lit in order, the gate opens");
+  knock(); assert.ok(p.x > gate.x, "through the inner gate");
+  // The Barrow wants the Gravewarden's seal.
+  const door = clue("sm_barrow_door"); teleport(g, door.x - 1, door.y); setTarget(g, { kind: "object", id: door.id, option: "Enter" }); run(g, 3); assert.ok(p.y < 1300, "no seal, no way in");
+  assert.ok(MONSTERS.gravewarden.always.some(d => d.item === "sorrowmere_seal"), "the Gravewarden carries the seal");
+  give(p, "sorrowmere_seal", 1); setTarget(g, { kind: "object", id: door.id, option: "Enter" }); run(g, 3); assert.equal(regionAt(world, p.x, p.y).id, "sorrowmere_catacombs", "down into the catacombs");
+  // The Regent's door: a key, broken in the lock; back out for nothing.
+  const regent = clue("sm_regent_door"); teleport(g, regent.x, regent.y - 1); setTarget(g, { kind: "object", id: regent.id, option: "Open" }); run(g, 3); assert.ok(p.y < regent.y, "locked without a key");
+  give(p, "sorrowmere_key", 2); teleport(g, regent.x, regent.y - 1); setTarget(g, { kind: "object", id: regent.id, option: "Open" }); run(g, 3);
+  assert.ok(p.y > regent.y && count(p, "sorrowmere_key") === 1, "a key opens it, and breaks");
+  setTarget(g, { kind: "object", id: regent.id, option: "Open" }); run(g, 3); assert.ok(p.y < regent.y && count(p, "sorrowmere_key") === 1, "back out free");
+  assert.ok(world.spawns.some(s => s.id === "bone_regent") && world.objects.some(o => o.name === "The Bone Regent's hoard"), "the Regent on his hoard");
+  // The coffers are a dread dungeon's, and can hold an ossuary key.
+  const { cofferTier } = await import("../games/rarefriends-realm/dungeons.ts");
+  const coffer = world.objects.find(o => o.name === "Sorrowmere coffer"); assert.equal(cofferTier(g, coffer), "dread");
+});

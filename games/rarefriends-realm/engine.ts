@@ -42,6 +42,7 @@ import { cleanStanding } from "./northfactions.ts";
 import { devFlags } from "./devflags.ts";
 import { cleanCommerce } from "./commerce.ts";
 import { cleanLabyrinth, endMazeRun, labyrinthTick } from "./labyrinth.ts";
+import { sorrowmereDoor } from "./necropolis.ts";
 import { PRISMWEAVE, PRISM_STAFF_SIGILS } from "./prismgear.ts";
 import { blessingFood, blessingHerb, blessingRegen, blessingTaken, blessingTick, cleanBlessing, rememberedName, saveBlessing } from "./northfaith.ts";
 import { allyOf, callNext, cleanCompanions, cleanTrust, findsHerbs, canSpare, companionFell, companionMenu, companionOut, companionTick, drawsFire, freeSnared, homeOnDeath, placeCompanion, sendHome, spare, speciesOfWild, useOnCreature } from "./beasts.ts";
@@ -349,6 +350,7 @@ const DECOR_EXAMINE: Partial<Record<string, string>> = {
   prism_giant: "A crystal as tall as a tower, grown out of the ground over who knows how long. The light inside it moves.", fae_tree: "A tree with pale twisted bark and leaves the colour of evening. Little lights hang in it.",
   fae_ring: "A ring of tiny pale mushrooms. The fae dance in them, the Collegium says. Step in at your own risk.", lumen_lamp: "A crystal hung in a silver cage on a post of white stone, lit from inside.",
   maze_door: "A crystal door.", maze_glyph: "A glyph.", hourglass: "Fennick's hourglass.",
+  menhir: "A standing stone three times a house's height, lichen on its north face, a name worn off its south.", dolmen: "Two great stones standing, and a third laid across them. A grave, once. A door, the old songs say.", brazier: "A brazier of black iron.",
   throne: "Carved oak, gilded, and a cushion somebody sat on too long.", armour: "An empty suit of ashsteel armour. Probably empty.", bed: "Very soft. No time for naps.",
 };
 
@@ -1102,6 +1104,7 @@ function interactObject(game: Game, object: WorldObject, option: string, use?: n
   if (use !== undefined) { useItemOnObject(game, object, use); return; }
   // Something to look into (The Land Before Stone): it decides what happens, and where you go if anywhere.
   if (object.clue === "maze_thread" && option === "Pull" && game.player.maze) { endMazeRun(game, travel, "thread"); return; }
+  if (sorrowmereDoor(game, object, travel)) return;
   const clue = useClue(game, object, option);
   if (clue !== undefined) {
     if (clue?.to) travel(game, clue.to, clue.text ?? "");
