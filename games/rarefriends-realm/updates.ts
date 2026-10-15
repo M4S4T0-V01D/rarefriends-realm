@@ -4,6 +4,15 @@
  */
 export type Update = { id: number; date: string; title: string; items: readonly string[] };
 export const UPDATES: readonly Update[] = [
+  { id: 142, date: "2026-10-15", title: "Beastkeeping, grown", items: [
+    "Fourteen new companions: a hen, a sheep and a milk cow, a silk spider, a glimmer moth, a jewelled peafowl, a marsh adder, a thistle pixie, a prism wisp, a tomb beetle, a hooded serpent, a glimmer stag, a shard golem and a drake.",
+    "Produce: a hen lays eggs while she's out with you, a sheep gives wool, a cow milk (carry a bucket), a spider silk, a moth glimmer dust, a peafowl jewelled feathers, a tomb beetle gold scarabs.",
+    "Knacks: every fighter has its own now. A salamander's bite burns, a bear mauls, an adder or a serpent poisons, a pixie throws sparks, a golem draws the blows meant for you, and a drake breathes fire on what you fight and whatever's beside it.",
+    "Training: a beastkeeper sets a companion its training (Beastkeeping 15, 30, 50, 70 and 90), and you do it together out there. Each tier makes it stronger, quicker to bring things in and easier on the road.",
+    "Grooming brushes, halters for sheep and cows, a charmer's flute for the serpents, and the speckled drake egg: the drakes drop one, rarely, and a beastkeeper hatches it. Be there when it does.",
+    "Keep more: one more companion at Beastkeeping 25, 50 and 75, six in all. A wisp lights the dark underground. A glimmer stag eases the road more than a stag does.",
+    "The Keeper's Trial: Bramble's challenge for you and your companion. And Pip Featherstone has opened a menagerie in Bellwhistle.",
+  ] },
   { id: 141, date: "2026-10-15", title: "The wizards' towns", items: [
     "The Prismwild's wizards have towns of their own now. Spirehollow, the town of hats: towers in tall wizard-hat roofs round a square of giant candles, Hattie's Hats, a bank and the Tilted Toad.",
     "Bellwhistle, the market town: the Backwards Clock, the Fizzing Fountain, a floating market on rocks hanging in the air, Mother Fizzwig's Fizzing Kettle, the Moot, a bank, and a house in a teapot.",

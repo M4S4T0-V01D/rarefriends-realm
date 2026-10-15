@@ -204,6 +204,8 @@ export function buildPrismwild(ctx: GenContext, labels: World["labels"], places:
     big(1415, 301, "teapot_house", "Mrs Kettleby's teapot"); big(1467, 301, "teapot_house", "A teapot house");
     for (const [x, y] of [[1420, 290], [1458, 290], [1420, 310], [1458, 310], [1430, 296], [1446, 304]] as const) candle(x, y);
     t.npc("clockwarden_tibbet", 1441, 291, 0); t.npc("mother_fizzwig", 1465, 283, 0); t.npc("gideon_wickerbottom", 1452, 302, 0); t.npc("mrs_kettleby", 1417, 304, 1); t.npc("banker", 1409, 317, 0);
+    // Pip's menagerie (beastfolk.ts): a trough and a hutch on the square, and Pip among them.
+    t.decor(1423, 296, "trough", true, "Pip's trough, for whatever's thirsty"); t.decor(1425, 296, "trough", true, "A hutch with something purple in it"); t.npc("menagerist_pip", 1424, 298, 0);
     for (const [x, y] of [[1426, 294], [1434, 306], [1444, 294], [1428, 304], [1452, 292], [1440, 308], [1424, 300], [1456, 306]] as const) t.npc("prismwild_villager", x, y, 6);
     t.add({ kind: "sign", x: 1436, y: 312, blocks: true, name: "Bellwhistle", text: "BELLWHISTLE. Market every day but Grumpsday. The clock is right; it's going the other way, that's all. Do not drink from the fountain. (Everyone does.)" }); }
   // Mothwick: mushroom houses at the edge of the Fae Hollows, and Old Mossy who tends them.

@@ -32,6 +32,7 @@ import { sailColor } from "./shipfit.ts";
 import { VESSEL_KINDS, aboard, type VesselKind } from "./seafaring.ts";
 import { petArt } from "./petart.ts";
 import { burst, cloudShadows, drawCloudShadows, drawEffects, hush, playerPose, puff, treeShake, updateEffects, type Pose } from "./effects.ts";
+import { allyOf, lightsTheWay } from "./beasts.ts";
 import { gloomSky, LightField, hexRgb, rgbCss, skyFor, type PointLight, type RGB , resetLighting } from "./lighting.ts";
 import { FIGURE_K, drawAuras, drawFigure, figureArt, heldTip, type Held } from "./wardrobe.ts";
 import { homeRect } from "./housing.ts";
@@ -3564,6 +3565,8 @@ export function renderScene(target: CanvasRenderingContext2D, scene: Scene) {
   // Your own small light (a lantern familiar or a lantern-bearing mount carries a bigger one), and spells in flight.
   const lantern = player.worn.includes("lantern_familiar") || !!riding(player)?.light;
   glow(pp.x, pp.y, 26, lantern ? 130 : underground ? 80 : 64, "#f2c690", lantern ? 0.8 : 0.5);
+  // A wisp at your side (beasts.ts) lights the dark round it, shifting colour.
+  if (lightsTheWay(player)) { const wisp = allyOf(game); if (wisp) glow(wisp.x, wisp.y, 30, underground ? 170 : 90, ["#b48cff", "#8ce0ff", "#ff9ad8"][Math.floor(now / 1400) % 3], underground ? 1 : 0.6); }
   for (const projectile of scene.projectiles) {
     const flight = projectileFlight(projectile, game.tick, alpha);
     if (!flight || projectile.style === "arrow" || projectile.style === "bolt") continue;

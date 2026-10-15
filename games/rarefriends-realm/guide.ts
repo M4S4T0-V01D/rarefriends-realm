@@ -14,7 +14,7 @@ import { NPCS } from "./content.ts";
 import { TECHNIQUES } from "./techniques.ts";
 import { SEA, SHIPWRIGHTS, VESSELS, VESSEL_KINDS } from "./seafaring.ts";
 import { FITOUTS, FITOUT_IDS, LOADOUT_NAMES } from "./shipfit.ts";
-import { SPECIES, SPECIES_IDS } from "./beasts.ts";
+import { KEEP, SPECIES, SPECIES_IDS, TRAINING } from "./beasts.ts";
 import { COMMERCE } from "./commerce.ts";
 /** Which quest teaches a tradition's techniques (the common ones need only the level). */
 const TAUGHT_BY: Partial<Record<string, string>> = { orashai: " (The Orashai Mysteries)", mizukai: " (The Hidden Road)", inner_measure: " (The Counted Breath)", living_patterns: " (Patterns in the Water)", thresholds: " (The Keepers' Door)", unfinished: " (The Unfinished Page)" };
@@ -253,11 +253,17 @@ export function skillGuide(skill: Skill): GuideEntry[] {
       add(1, "Hulls", `Deep water wears a hull a point every ${SEA.wearEvery} tiles. A stove-in hull keeps to the shallows until a shipwright mends it with planks and pewter rivets.`, undefined, T("ability"));
       break;
     case "beastkeeping":
-      add(1, "Beastkeeping", "Creatures won one way each and kept beside you: fed until they trust you, rescued, spared, haltered, earned. One out at a time, the rest kept by the beastkeepers (Bramble on the Friendhollow farm, Halla in Skarnholm, Mstislav in Krasnogor). Trained by bonding, by caring for them, and by what they do beside you.", undefined, T("ability"));
+      add(1, "Beastkeeping", "Creatures won one way each and kept beside you: fed until they trust you, rescued, spared, haltered, earned. One out at a time, the rest kept by the beastkeepers (Bramble on the Friendhollow farm, Halla in Skarnholm, Mstislav in Krasnogor, Pip in Bellwhistle). Trained by bonding, by caring for them, and by what they do beside you.", undefined, T("ability"));
       for (const id of SPECIES_IDS) { const sp = SPECIES[id]; add(sp.level, sp.name, `${sp.how} ${sp.examine}`, undefined, T("ability")); }
       add(1, "Fighting beside you", "A companion fights what you fight, with its own health and its own blows; what it bites turns on it, and what's at you may turn on it instead. Use food it eats on it to heal it and deepen the bond. Hold-back keeps it out of your fights.", undefined, T("ability"));
       add(1, "When it's hurt", "A skittish one runs home early, a steady one later, a fierce one never. A beastkeeper settles one that ran, for a fee. A steady one bonded deep (80) can be told to hold fast: then it fights to the end. One that falls is gone for good: you keep a keepsake.", "companion_keepsake", T("ability"));
       add(1, "The whistle", "Whistle for the next companion waiting at the beastkeepers, or send the one that's out home. A vessel takes companions only with room for them: a skiff a small one, a barge or a longship two.", "companion_whistle", T("ability"));
+      add(1, "Grooming", "Use a grooming brush on your companion now and then: it deepens the bond, it's worth Beastkeeping XP, and it counts toward its training.", "grooming_brush", T("ability"));
+      add(1, "Produce", "A hen, a sheep, a milk cow, a silk spider, a glimmer moth, a jewelled peafowl or a tomb beetle brings you something while it's out with you: eggs, wool, milk (carry a bucket), silk, glimmer dust, feathers, gold scarabs.", "egg", T("ability"));
+      for (const tier of TRAINING) add(tier.level, `Training: ${tier.name.toLowerCase()}`, `A beastkeeper sets a companion its training for ${tier.fee.toLocaleString()} Frens, and you do it together: ${tier.need} deeds (fights won beside you, what it brings in, brushing it down, time on the road). Each tier makes it stronger, quicker to bring things in, deeper in the panniers and easier on the road.`, undefined, T("ability"));
+      add(20, "The Keeper's Trial", "Bramble's challenge: your fighting companion brings down creatures against the clock, for Beastkeeping XP, a deeper bond and a deed toward its training.", undefined, T("ability"));
+      for (const n of [25, 50, 75]) add(n, "Another companion", `You can keep ${KEEP.most + n / 25} companions now.`, undefined, T("ability"));
+      add(SPECIES.drake.level, "A speckled drake egg", `The drakes drop an egg, rarely. A beastkeeper keeps it warm for ${KEEP.hatchFee.toLocaleString()} Frens; be there when it hatches, and the drake is yours.`, "wild_drake_egg", T("ability"));
       break;
     case "presence":
       add(1, "Presence", "The mark you leave on the world. Earned by discovering regions, finishing quests, felling bosses, rare finds, people met, rumours heard, work orders filled, your Friend, your name and the clothes you're seen in. The slowest skill in the Realm.", undefined, T("ability"));

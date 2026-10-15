@@ -17,14 +17,18 @@
  */
 import { MONSTERS, item, type MonsterDef } from "./data.ts";
 import { addXp, count, dropItem, give, has, level, message, sound, take, type Game, type Monster, type Player, type Slot } from "./state.ts";
+import { activityEvent } from "./activities.ts";
 import { W, H, isUnderground, realPoint, walkable } from "./world.ts";
 import { knows } from "./pursuance.ts";
 
-export type SpeciesId = "salamander" | "hound" | "goat" | "boar" | "wolf" | "stag" | "vixen" | "bear";
-export type Role = "combat" | "pack" | "travel" | "gathering";
+export type SpeciesId = "salamander" | "hound" | "goat" | "boar" | "wolf" | "stag" | "vixen" | "bear"
+  // Beastkeeping, expanded: the farm's beasts, the silk spider, the Prismwild's creatures, the south's and Meghavan's, and the drakes.
+  | "hen" | "sheep" | "cow" | "spider" | "moth" | "peafowl" | "adder" | "pixie" | "wisp" | "beetle" | "serpent" | "glimmerstag" | "golem" | "drake";
+/** What it's for: fighting, carrying, the road, finding things, bringing in produce, lighting the dark. */
+export type Role = "combat" | "pack" | "travel" | "gathering" | "produce" | "light";
 /** How it takes danger: runs early, holds to a point (to the end when bonded deep and told), or never runs. */
 export type Temper = "skittish" | "steady" | "fierce";
-export type Bonding = "feeding" | "pup" | "halter" | "spare" | "rescue" | "lore" | "rite";
+export type Bonding = "feeding" | "pup" | "halter" | "spare" | "rescue" | "lore" | "rite" | "charm" | "hatch";
 export type SpeciesDef = {
   id: SpeciesId; name: string; level: number; role: Role; temper: Temper; bonding: Bonding;
   /** The creature it's drawn as and fights as (its stats, scaled), and the wild ones it's won from. */
@@ -35,32 +39,72 @@ export type SpeciesDef = {
   small: boolean;
   /** How it's won, said plainly. */
   how: string; examine: string;
+  /** What it brings in while it's out (a hen's eggs, a sheep's wool): the item, every so many ticks, and what it takes (a cow fills a bucket you carry). */
+  produce?: { item: string; every: number; needs?: string };
+  /** Its own way of fighting, beyond its bite: a chance of more damage (a burn, a spark, a maul), poison, a breath that catches what stands beside. */
+  special?: { chance: number; extra?: readonly [number, number]; poison?: number; splash?: boolean; line: string };
+  /** How often a creature at you turns on it instead (the golem stands in the way of everything). */
+  draws?: number;
+  /** The rite's skill and level (a wisp answers Magic, the vixen Mysteries). */
+  rite?: { skill: "magic" | "mysteries"; level: number };
 };
 export const SPECIES: Record<SpeciesId, SpeciesDef> = {
   salamander: { id: "salamander", name: "Ember salamander", level: 1, role: "combat", temper: "skittish", bonding: "feeding", base: "ember_salamander_young", wild: ["ember_salamander_young"], diet: ["inkcoal"], small: true,
-    how: "Feed a young one inkcoal, visit after visit, until it trusts you.", examine: "A young ember salamander, warm as a hearthstone. It follows you, and it bites what you fight." },
+    how: "Feed a young one inkcoal, visit after visit, until it trusts you.", examine: "A young ember salamander, warm as a hearthstone. It follows you, and it bites what you fight.", special: { chance: 0.25, extra: [1, 3], line: "Your salamander's bite burns!" } },
   hound: { id: "hound", name: "Vargskeld hound", level: 10, role: "combat", temper: "steady", bonding: "pup", base: "wolf", wild: [], diet: ["cooked_meat", "raw_beef", "raw_chicken"], small: true,
-    how: "Halla the houndmaster in Skarnholm gives a pup to a keeper she trusts: bring her five cooked meat.", examine: "A grey Vargskeld hound, rough-coated and broad in the chest. It goes where you go and stands where you stand." },
-  goat: { id: "goat", name: "Highland goat", level: 15, role: "pack", temper: "skittish", bonding: "halter", base: "highland_goat", wild: ["highland_goat"], diet: ["bread", "wheat"], small: false,
+    how: "Halla the houndmaster in Skarnholm gives a pup to a keeper she trusts: bring her five cooked meat.", examine: "A grey Vargskeld hound, rough-coated and broad in the chest. It goes where you go and stands where you stand.", special: { chance: 0.2, extra: [1, 3], line: "Your hound worries at it!" } },
+  goat: { id: "goat", name: "Highland goat", level: 15, role: "pack", temper: "skittish", bonding: "halter", base: "highland_goat", wild: ["highland_goat"], diet: ["bread", "grain"], small: false,
     how: "Put a goat halter on a highland goat (the beastkeepers sell them).", examine: "A highland goat in a halter, panniers on its back. It carries what you load on it." },
-  boar: { id: "boar", name: "Boar", level: 20, role: "combat", temper: "fierce", bonding: "spare", base: "boar", wild: ["boar", "mountain_boar"], diet: ["bread", "wheat", "raw_beef"], small: false,
-    how: "Beat a boar to its knees and spare it: it respects that.", examine: "A boar that decided you were worth following. It never runs." },
+  boar: { id: "boar", name: "Boar", level: 20, role: "combat", temper: "fierce", bonding: "spare", base: "boar", wild: ["boar", "mountain_boar"], diet: ["bread", "grain", "raw_beef"], small: false,
+    how: "Beat a boar to its knees and spare it: it respects that.", examine: "A boar that decided you were worth following. It never runs.", special: { chance: 0.2, extra: [2, 4], line: "Your boar gores it!" } },
   wolf: { id: "wolf", name: "Wolf", level: 30, role: "combat", temper: "steady", bonding: "rescue", base: "wolf", wild: ["snared_wolf"], diet: ["raw_beef", "raw_chicken", "cooked_meat"], small: false,
-    how: "Free a wolf from a hunter's snare and treat it with a healing tonic.", examine: "A wolf you freed from a snare. It remembers, and it fights for you." },
-  stag: { id: "stag", name: "Great stag", level: 40, role: "travel", temper: "skittish", bonding: "lore", base: "greatstag", wild: ["greatstag"], diet: ["bread", "wheat"], small: false,
+    how: "Free a wolf from a hunter's snare and treat it with a healing tonic.", examine: "A wolf you freed from a snare. It remembers, and it fights for you.", special: { chance: 0.2, extra: [1, 4], line: "Your wolf savages it!" } },
+  stag: { id: "stag", name: "Great stag", level: 40, role: "travel", temper: "skittish", bonding: "lore", base: "greatstag", wild: ["greatstag"], diet: ["bread", "grain"], small: false,
     how: "Know the great stag's habitat and its temper (Pursuance), then feed one bread.", examine: "A great stag that walks with you. The road goes easier beside it: running tires you less." },
   vixen: { id: "vixen", name: "Foxfire vixen", level: 45, role: "gathering", temper: "skittish", bonding: "rite", base: "foxfire_vixen", wild: ["foxfire_vixen"], diet: ["raw_chicken", "cooked_meat"], small: true,
-    how: "With Mysteries 30, offer a foxfire vixen raw chicken: she knows who knows the old rites.", examine: "A foxfire vixen, her tail lit at the tip. Where you pick herbs she finds another now and then." },
+    rite: { skill: "mysteries", level: 30 }, how: "With Mysteries 30, offer a foxfire vixen raw chicken: she knows who knows the old rites.", examine: "A foxfire vixen, her tail lit at the tip. Where you pick herbs she finds another now and then." },
   bear: { id: "bear", name: "Crag bear", level: 55, role: "combat", temper: "steady", bonding: "spare", base: "crag_bear", wild: ["crag_bear"], diet: ["raw_beef", "cooked_meat", "bread"], small: false,
-    how: "Beat a crag bear to its knees and spare it.", examine: "A crag bear that chose to follow you. Heavy, patient, and very hard to stop." },
+    how: "Beat a crag bear to its knees and spare it.", examine: "A crag bear that chose to follow you. Heavy, patient, and very hard to stop.", special: { chance: 0.15, extra: [2, 6], line: "Your bear mauls it!" } },
+  hen: { id: "hen", name: "Hen", level: 1, role: "produce", temper: "skittish", bonding: "feeding", base: "chicken", wild: ["chicken"], diet: ["grain"], small: true, produce: { item: "egg", every: 300 },
+    how: "Scatter grain for a farm hen, visit after visit, until she follows you.", examine: "A brown hen with opinions. She lays where she likes, which is wherever you are." },
+  sheep: { id: "sheep", name: "Sheep", level: 5, role: "produce", temper: "skittish", bonding: "halter", base: "sheep", wild: ["sheep"], diet: ["grain", "bread"], small: false, produce: { item: "wool", every: 420 },
+    how: "Put a halter on a sheep (the beastkeepers sell them).", examine: "A woolly sheep on a halter. Every so often it's woolly enough to shear, and you do." },
+  cow: { id: "cow", name: "Milk cow", level: 8, role: "produce", temper: "skittish", bonding: "halter", base: "cow", wild: ["cow"], diet: ["grain", "bread"], small: false, produce: { item: "bucket_of_milk", every: 360, needs: "bucket" },
+    how: "Put a halter on a cow (the beastkeepers sell them).", examine: "A patient milk cow on a halter. Carry a bucket, and now and then it's full." },
+  spider: { id: "spider", name: "Silk spider", level: 12, role: "produce", temper: "skittish", bonding: "feeding", base: "forest_spider", wild: ["forest_spider"], diet: ["raw_chicken"], small: true, produce: { item: "silk", every: 380 },
+    how: "Feed a forest spider raw chicken, visit after visit, until it rides on your shoulder.", examine: "A forest spider the size of your hand, spinning as it walks. It leaves you the silk." },
+  moth: { id: "moth", name: "Glimmer moth", level: 18, role: "produce", temper: "skittish", bonding: "feeding", base: "glimmer_moth", wild: ["glimmer_moth"], diet: ["starlight_biscuit"], small: true, produce: { item: "glimmer_dust", every: 300 },
+    how: "Feed a glimmer moth starlight biscuits, visit after visit, in the Prismwild.", examine: "A glimmer moth that circles your head and dusts your shoulders violet. The dust is worth keeping." },
+  peafowl: { id: "peafowl", name: "Jewelled peafowl", level: 22, role: "produce", temper: "skittish", bonding: "feeding", base: "jewelled_peafowl", wild: ["jewelled_peafowl"], diet: ["grain", "bread"], small: false, produce: { item: "jewelled_feather", every: 520 },
+    how: "Feed a jewelled peafowl grain, visit after visit, in Meghavan.", examine: "A peafowl whose tail glitters like a merchant's tray. Now and then it drops a feather, and lets you keep it." },
+  adder: { id: "adder", name: "Marsh adder", level: 26, role: "combat", temper: "steady", bonding: "feeding", base: "marsh_adder", wild: ["marsh_adder"], diet: ["raw_chicken", "egg"], small: true, special: { chance: 0.35, poison: 2, line: "Your adder's bite poisons it." },
+    how: "Feed a marsh adder eggs or raw chicken, visit after visit.", examine: "A marsh adder that winds round your boot when it's cold. Its bite poisons what you fight." },
+  pixie: { id: "pixie", name: "Thistle pixie", level: 30, role: "combat", temper: "skittish", bonding: "spare", base: "thistle_pixie", wild: ["thistle_pixie"], diet: ["starlight_biscuit", "lilac_tea"], small: true, special: { chance: 0.3, extra: [2, 5], line: "Your pixie throws sparks!" },
+    how: "Beat a thistle pixie to its knees and spare it: it decides you're funny.", examine: "A thistle pixie who has decided you're funny. Mostly it throws sparks at what you fight. Mostly." },
+  wisp: { id: "wisp", name: "Prism wisp", level: 36, role: "light", temper: "skittish", bonding: "rite", base: "prism_wisp", wild: ["prism_wisp", "frost_wisp"], diet: ["glimmer_dust"], small: true, special: { chance: 0.3, extra: [3, 6], line: "Your wisp flares!" }, rite: { skill: "magic", level: 40 },
+    how: "With Magic 40, offer a wisp glimmer dust: it comes to whoever can speak its light.", examine: "A wisp that drifts at your shoulder, changing colour. Underground, it lights the way; in a fight, it flares." },
+  beetle: { id: "beetle", name: "Tomb beetle", level: 42, role: "produce", temper: "steady", bonding: "feeding", base: "tomb_beetle", wild: ["tomb_beetle"], diet: ["bread", "raw_beef"], small: true, produce: { item: "gold_scarab", every: 1500 },
+    how: "Feed a tomb beetle bread or raw beef, visit after visit, in Kharaveth.", examine: "A tomb beetle as big as a loaf, shell like old bronze. It digs, and sometimes what it digs up is gold." },
+  serpent: { id: "serpent", name: "Hooded serpent", level: 48, role: "combat", temper: "steady", bonding: "charm", base: "hooded_serpent", wild: ["hooded_serpent"], diet: ["raw_chicken", "egg"], small: true, special: { chance: 0.4, poison: 4, line: "Your serpent's bite poisons it." },
+    how: "Play a charmer's flute to a hooded serpent, in Meghavan.", examine: "A hooded serpent that rises when you play and sways when you stop. Its bite is far worse than an adder's." },
+  glimmerstag: { id: "glimmerstag", name: "Glimmer stag", level: 58, role: "travel", temper: "skittish", bonding: "lore", base: "glimmer_stag", wild: ["glimmer_stag"], diet: ["bread", "starlight_biscuit"], small: false,
+    how: "Know the glimmer stag's habitat and its temper (Pursuance), then feed one a starlight biscuit.", examine: "A white stag with antlers of violet crystal, walking at your side. The road all but runs itself." },
+  golem: { id: "golem", name: "Shard golem", level: 72, role: "combat", temper: "fierce", bonding: "spare", base: "shard_golem", wild: ["shard_golem"], diet: ["crystal_shard"], small: false, draws: 0.6, special: { chance: 0.15, extra: [4, 8], line: "Your golem crushes it!" },
+    how: "Beat a shard golem to its knees and spare it: it follows whatever beat it.", examine: "A heap of violet crystal that walks where you walk and stands in front of whatever's at you." },
+  drake: { id: "drake", name: "Drake", level: 88, role: "combat", temper: "steady", bonding: "hatch", base: "ash_drake", wild: [], diet: ["raw_beef", "cooked_meat"], small: false, special: { chance: 0.35, extra: [4, 10], splash: true, line: "Your drake breathes fire!" },
+    how: "Find a speckled drake egg (the drakes drop them, rarely) and have a beastkeeper keep it warm for half an hour. Whoever's waiting when it hatches is its mother.", examine: "A drake you raised from the egg. It breathes fire on what you fight, and on whatever's standing next to it." },
 };
 export const SPECIES_IDS = Object.keys(SPECIES) as SpeciesId[];
 export type CompanionState = "out" | "kennel" | "aboard" | "fled";
 export type Companion = { id: number; species: SpeciesId; name: string; bond: number; hp: number; state: CompanionState;
   /** Told to hold fast (fight to the end), or to hold back (not fight at all). */ order: "fight" | "hold-back"; fast: boolean;
-  /** A pack animal's panniers. */ pack: (Slot | null)[]; fledAt?: number; fedAt?: number };
+  /** A pack animal's panniers. */ pack: (Slot | null)[]; fledAt?: number; fedAt?: number;
+  /** Training (the beastkeepers set it, you do it together): the tiers it's finished, and the one it's working through. */
+  trained?: number; training?: { tier: number; got: number };
+  /** When it last brought something in, was last brushed down, and how long it's been out with you (ticks; not saved). */
+  producedAt?: number; groomedAt?: number; outFor?: number; kills?: number };
 export const KEEP = {
-  /** Companions kept at once (out and kenneled); one out at a time. */ most: 3,
+  /** Companions kept at once (out and kenneled); one out at a time. One more every 25 levels, up to six. */ most: 3, max: 6,
   /** Feeding a wild one: trust it takes, and the gap between feeds (ticks). */ trustNeeded: 3, trustGap: 50,
   /** A creature is spared below this share of its health. */ spareBelow: 0.25,
   /** A skittish one runs below this share; a steady one below this (unless holding fast). */ skittishAt: 0.4, steadyAt: 0.2,
@@ -69,19 +113,47 @@ export const KEEP = {
   /** A turned creature hits your companion instead of you this often, when it stands beside both. */ drawsFire: 0.35,
   /** Bond: by feeding (once in a while), by a kill shared. */ bondFeed: 5, bondKill: 1, feedGap: 100,
   /** Ally uids sit above every other creature's. */ uidBase: 9_000_000,
+  /** Grooming: the bond it builds, and the gap between brushings (ticks). */ bondGroom: 3, groomGap: 100,
+  /** A charmer's flute: the chance a serpent comes, each time it's played. */ charmChance: 0.4,
+  /** A drake egg: the beastkeeper's fee, and how long it takes to hatch (ticks: half an hour). */ hatchFee: 5000, hatchTicks: 3000,
+  /** Time out together that counts as a deed done (pack, road and finding beasts). */ outDeed: 600,
 } as const;
 /** The beastkeepers: they keep what you don't have out, settle a frightened one, and sell feed and halters. */
-export const BEASTKEEPERS = ["beastkeeper_bramble", "houndmaster_halla", "beastward_mstislav"] as const;
+export const BEASTKEEPERS = ["beastkeeper_bramble", "houndmaster_halla", "beastward_mstislav", "menagerist_pip"] as const;
+/** How many a keeper can keep: three, and one more at Beastkeeping 25, 50 and 75. */
+export const keepsAt = (game: Game) => Math.min(KEEP.max, KEEP.most + Math.floor(level(game, "beastkeeping") / 25));
+/** Training, tier by tier: the Beastkeeping it takes, the beastkeeper's fee, the deeds done together, and what finishing it is worth. Each tier makes it a
+ *  little stronger (its numbers, its knack, its produce sooner, its panniers deeper, the road easier). */
+export const TRAINING = [
+  { name: "Trained", level: 15, fee: 500, need: 8, xp: 2_000 },
+  { name: "Well trained", level: 30, fee: 2_500, need: 14, xp: 8_000 },
+  { name: "Seasoned", level: 50, fee: 8_000, need: 20, xp: 25_000 },
+  { name: "Masterful", level: 70, fee: 20_000, need: 28, xp: 70_000 },
+  { name: "Legendary", level: 90, fee: 50_000, need: 36, xp: 160_000 },
+] as const;
+/** Whether it fights beside you (a fighter, or a wisp: its light burns). */
+export const fights = (sp: SpeciesDef) => sp.role === "combat" || sp.role === "light";
+/** What a produce animal brings you, said. */
+const BROUGHT: Partial<Record<SpeciesId, string>> = {
+  hen: "Your hen has laid an egg. You pocket it.",
+  sheep: "Your sheep is woolly enough to shear: you take the wool.",
+  cow: "Your milk cow lets you fill a bucket.",
+  spider: "Your silk spider has spun a sheet of silk.",
+  moth: "Your glimmer moth has dusted you violet: you shake it into a pouch.",
+  peafowl: "Your peafowl drops a jewelled feather, and lets you keep it.",
+  beetle: "Your tomb beetle has dug up a gold scarab.",
+};
 
 // ---------- The companion's own numbers ----------
 const defCache = new Map<string, MonsterDef>();
 /** A companion's creature: its base species' numbers, and up to a quarter more with a deep bond. */
 export function companionDef(c: Companion): MonsterDef {
-  const sp = SPECIES[c.species], base = MONSTERS[sp.base], key = `${c.id}:${c.species}:${c.name}:${Math.floor(c.bond / 25)}`, kept = defCache.get(key);
+  const sp = SPECIES[c.species], base = MONSTERS[sp.base], key = `${c.id}:${c.species}:${c.name}:${Math.floor(c.bond / 25)}:${c.trained ?? 0}`, kept = defCache.get(key);
   if (kept) return kept;
-  const k = 1 + Math.floor(c.bond / 25) * 0.0625;
+  const k = 1 + Math.floor(c.bond / 25) * 0.0625 + (c.trained ?? 0) * 0.05;
+  // (A companion takes one tile, whatever it's drawn from: a drake you raised is a young one, and breathes only on what you fight.)
   const def: MonsterDef = { ...base, id: `companion_${c.species}`, name: c.name, hp: Math.round(base.hp * k), attack: Math.round(base.attack * k), strength: Math.round(base.strength * k), defence: Math.round(base.defence * k),
-    aggressive: false, boss: false, worldBoss: false, drops: [], always: [], respawn: 1e9 } as MonsterDef;
+    maxHit: Math.round(base.maxHit * (1 + (c.trained ?? 0) * 0.05)), size: undefined, breath: undefined, aggressive: false, boss: false, worldBoss: false, drops: [], always: [], respawn: 1e9 } as MonsterDef;
   defCache.set(key, def);
   return def;
 }
@@ -114,13 +186,18 @@ export function placeCompanion(game: Game): Monster | null {
   else { m.def = def; m.x = at.x; m.y = at.y; m.prev = { ...at }; m.dead = false; m.foe = null; }
   return m;
 }
-type Engine = { strike: (game: Game, a: Monster, b: Monster) => void; step: (game: Game, m: Monster, to: { x: number; y: number }) => void };
+type Engine = { strike: (game: Game, a: Monster, b: Monster) => void; step: (game: Game, m: Monster, to: { x: number; y: number }) => void;
+  /** Damage beyond the bite (a special): lands as the bite's would. */ hurt: (game: Game, a: Monster, b: Monster, damage: number) => void };
 /** A companion's turn: fight what you fight (unless held back), keep close otherwise, follow you anywhere you go. */
 export function companionTick(game: Game, m: Monster, engine: Engine) {
   const player = game.player, c = player.companions.find(x => x.id === m.ally);
   if (!c || c.state !== "out" || player.aboard !== null) { m.dead = true; return; }
   c.hp = m.hp;
   if (m.attackTimer > 0) m.attackTimer--;
+  const kind = SPECIES[c.species];
+  if (kind.produce) produce(game, m, c, kind);
+  c.outFor = (c.outFor ?? 0) + 1;
+  if ((kind.role === "pack" || kind.role === "travel" || kind.role === "gathering") && c.outFor % KEEP.outDeed === 0) deed(game, c);
   const sameLayer = isUnderground(m.y) === isUnderground(player.y) && realPoint(game.world, m.x, m.y).level === realPoint(game.world, player.x, player.y).level;
   const far = Math.max(Math.abs(m.x - player.x), Math.abs(m.y - player.y));
   if (!sameLayer || far > 12) { const at = freeBeside(game, player.x, player.y); if (at) { m.x = at.x; m.y = at.y; m.prev = { ...at }; m.foe = null; } return; }
@@ -131,7 +208,7 @@ export function companionTick(game: Game, m: Monster, engine: Engine) {
   // Fighting: what you're fighting, or what turned on it.
   const yours = player.combat !== null ? game.monsters.find(x => x.uid === player.combat && !x.dead) ?? null : null;
   let foe = m.foe != null ? game.monsters.find(x => x.uid === m.foe && !x.dead) ?? null : null;
-  if (c.order === "fight" && sp.role === "combat" && yours && yours.ally === undefined) foe = yours;
+  if (c.order === "fight" && fights(sp) && yours && yours.ally === undefined) foe = yours;
   if (foe && Math.max(Math.abs(foe.x - player.x), Math.abs(foe.y - player.y)) > 10) foe = null;
   m.foe = foe ? foe.uid : null;
   if (foe) {
@@ -141,13 +218,67 @@ export function companionTick(game: Game, m: Monster, engine: Engine) {
         const before = foe.hp; engine.strike(game, m, foe);
         const dealt = Math.max(0, before - (foe.dead ? 0 : foe.hp));
         if (dealt > 0) addXp(game, "beastkeeping", dealt * 2, { raw: true });
-        if (foe.dead || foe.hp <= 0) { c.bond = Math.min(100, c.bond + KEEP.bondKill); m.foe = null; }
+        if (dealt > 0 && sp.special && !foe.dead && foe.hp > 0 && game.rng() < sp.special.chance + 0.03 * (c.trained ?? 0)) special(game, m, sp, foe, engine);
+        if (foe.dead || foe.hp <= 0) { c.bond = Math.min(100, c.bond + KEEP.bondKill); m.foe = null; c.kills = (c.kills ?? 0) + 1; deed(game, c); activityEvent(game, { kind: "companion_kill", monster: foe.def.id }); }
       }
     } else engine.step(game, m, foe);
     return;
   }
   // Otherwise keep close.
   if (far > 2) engine.step(game, m, player);
+}
+/** Its knack (a burn, a spark, poison, a drake's breath that catches what's beside). */
+function special(game: Game, m: Monster, sp: SpeciesDef, foe: Monster, engine: Engine) {
+  const s = sp.special!, roll = () => s.extra ? s.extra[0] + Math.floor(game.rng() * (s.extra[1] - s.extra[0] + 1)) : 0;
+  if (s.poison && !foe.poison) foe.poison = { damage: s.poison, left: 4, timer: 8 };
+  if (s.extra) {
+    const near = s.splash ? game.monsters.filter(x => x !== foe && !x.dead && x.ally === undefined && (x.target || x.foe === m.uid) && Math.max(Math.abs(x.x - foe.x), Math.abs(x.y - foe.y)) <= 1) : [];
+    const dealt = roll(); engine.hurt(game, m, foe, dealt); addXp(game, "beastkeeping", dealt * 2, { raw: true });
+    for (const x of near) { const more = roll(); engine.hurt(game, m, x, more); addXp(game, "beastkeeping", more * 2, { raw: true }); }
+  }
+  message(game, s.line);
+}
+/** A produce animal: now and then it brings you something (sooner the better it's trained). */
+function produce(game: Game, m: Monster, c: Companion, sp: SpeciesDef) {
+  const p = sp.produce!;
+  c.producedAt ??= game.tick;
+  if (game.tick - c.producedAt < Math.round(p.every * (1 - 0.1 * (c.trained ?? 0)))) return;
+  c.producedAt = game.tick;
+  if (p.needs && !take(game.player, p.needs, 1)) { message(game, `${c.name} could give you more, if you'd something to put it in (${item(p.needs).name.toLowerCase()}).`, "info"); return; }
+  if (give(game.player, p.item, 1)) dropItem(game, p.item, 1, m.x, m.y, 600);
+  addXp(game, "beastkeeping", 20 + sp.level * 2, { raw: true });
+  message(game, BROUGHT[sp.id] ?? `${c.name} brings you something.`);
+  deed(game, c);
+}
+/** Something done together counts toward its training; the last deed finishes the tier. */
+export function deed(game: Game, c: Companion) {
+  const t = c.training; if (!t) return;
+  const tier = TRAINING[t.tier - 1];
+  if (++t.got < tier.need) return;
+  c.trained = t.tier; c.training = undefined;
+  if (SPECIES[c.species].role === "pack") while (c.pack.length < KEEP.pack + 2 * c.trained) c.pack.push(null);
+  addXp(game, "beastkeeping", tier.xp, { raw: true }); sound(game, "quest");
+  message(game, `${c.name} has learnt all you were teaching it: ${tier.name.toLowerCase()} now.`, "quest");
+  const m = allyOf(game); if (m && m.ally === c.id) m.def = companionDef(c);
+}
+/** Begin a tier of training at a beastkeeper (the fee now, the work out there). */
+export function startTraining(game: Game, c: Companion): boolean {
+  const tier = (c.trained ?? 0) + 1, def = TRAINING[tier - 1];
+  if (!def || c.training) return false;
+  if (level(game, "beastkeeping") < def.level) { message(game, `You need a Beastkeeping level of ${def.level} to train a companion that far.`, "warn"); return false; }
+  if (count(game.player, "coins") < def.fee) { message(game, `That training costs ${def.fee.toLocaleString()} Frens.`, "warn"); return false; }
+  take(game.player, "coins", def.fee); c.training = { tier, got: 0 };
+  message(game, `${c.name} begins its training. Work with it: ${def.need} deeds done together (fights won, what it brings in, brushing it down, the road).`, "quest");
+  return true;
+}
+/** Brushing one down: the bond, and a deed toward its training. */
+function groom(game: Game, c: Companion, m: Monster): boolean {
+  if (game.tick - (c.groomedAt ?? -1e9) < KEEP.groomGap) { message(game, `${c.name}'s coat is as good as it'll get. Later.`, "warn"); return true; }
+  c.groomedAt = game.tick; c.bond = Math.min(100, c.bond + KEEP.bondGroom);
+  addXp(game, "beastkeeping", 25 + SPECIES[c.species].level, { raw: true }); deed(game, c);
+  m.heading = { x: game.player.x - m.x || 1, y: game.player.y - m.y || 1 };
+  message(game, `You brush ${c.name} down. It leans into the brush.`); sound(game, "click");
+  return true;
 }
 /** It ran: home to the beastkeeper, frightened, until one settles it. */
 function flee(game: Game, m: Monster, c: Companion) {
@@ -171,15 +302,15 @@ export function companionFell(game: Game, m: Monster) {
 /** Should a creature at you turn on your companion instead (it's beside both, and it's fighting)? */
 export function drawsFire(game: Game, monster: Monster): Monster | null {
   const m = allyOf(game), c = companionOut(game.player);
-  if (!m || !c || c.order !== "fight" || SPECIES[c.species].role !== "combat") return null;
+  if (!m || !c || c.order !== "fight" || !fights(SPECIES[c.species])) return null;
   if (Math.max(Math.abs(m.x - monster.x), Math.abs(m.y - monster.y)) > 1) return null;
-  return game.rng() < KEEP.drawsFire ? m : null;
+  return game.rng() < (SPECIES[c.species].draws ?? KEEP.drawsFire) ? m : null;
 }
 
 // ---------- Winning one ----------
 const bondWith = (game: Game, sp: SpeciesDef): Companion | null => {
   const player = game.player;
-  if (player.companions.length >= KEEP.most) { message(game, `You keep ${KEEP.most} companions at most: leave one with a beastkeeper for good first.`, "warn"); return null; }
+  if (player.companions.length >= keepsAt(game)) { message(game, `You keep ${keepsAt(game)} companions at most: leave one with a beastkeeper for good first.`, "warn"); return null; }
   const id = Math.max(0, ...player.companions.map(c => c.id), player.companionSeq ?? 0) + 1; player.companionSeq = id;
   const out = companionOut(player);
   const c: Companion = { id, species: sp.id, name: sp.name, bond: 10, hp: MONSTERS[sp.base].hp, state: out ? "kennel" : "out", order: "fight", fast: false, pack: sp.role === "pack" ? Array(KEEP.pack).fill(null) : [] };
@@ -200,6 +331,7 @@ export function useOnCreature(game: Game, monster: Monster, slotIndex: number): 
   if (monster.ally !== undefined) {
     const c = player.companions.find(x => x.id === monster.ally); if (!c) return false;
     const sp = SPECIES[c.species];
+    if (slot.id === "grooming_brush") return groom(game, c, monster);
     if (sp.role === "pack" && !sp.diet.includes(slot.id)) return loadPack(game, c, slotIndex);
     if (!sp.diet.includes(slot.id)) { message(game, `${c.name} won't eat that.`, "warn"); return true; }
     take(player, slot.id, 1); monster.hp = Math.min(monster.def.hp, monster.hp + Math.max(4, Math.round(monster.def.hp / 4))); c.hp = monster.hp;
@@ -219,9 +351,9 @@ export function useOnCreature(game: Game, monster: Monster, slotIndex: number): 
     else message(game, `It takes the ${item(slot.id).name.toLowerCase()} from your hand and doesn't back away. (Trust ${t.n}/${KEEP.trustNeeded}.)`);
     return true;
   }
-  if (sp.bonding === "halter" && slot.id === "goat_halter") {
+  if (sp.bonding === "halter" && (slot.id === "beast_halter" || (slot.id === "goat_halter" && sp.id === "goat"))) {
     if (why) { message(game, why, "warn"); return true; }
-    take(player, "goat_halter", 1); monster.dead = true; monster.respawnAt = game.tick + monster.def.respawn; bondWith(game, sp); return true;
+    take(player, slot.id, 1); monster.dead = true; monster.respawnAt = game.tick + monster.def.respawn; bondWith(game, sp); return true;
   }
   if (sp.bonding === "lore" && sp.diet.includes(slot.id)) {
     if (why) { message(game, why, "warn"); return true; }
@@ -230,10 +362,21 @@ export function useOnCreature(game: Game, monster: Monster, slotIndex: number): 
   }
   if (sp.bonding === "rite" && sp.diet.includes(slot.id)) {
     if (why) { message(game, why, "warn"); return true; }
-    if (level(game, "mysteries") < 30) { message(game, "She looks at you a long moment, and goes. (Mysteries 30: she knows who knows the old rites.)", "warn"); return true; }
+    const rite = sp.rite ?? { skill: "mysteries", level: 30 };
+    if (level(game, rite.skill) < rite.level) { message(game, rite.skill === "magic" ? `It flickers, and drifts away. (Magic ${rite.level}: it comes to whoever can speak its light.)` : `She looks at you a long moment, and goes. (Mysteries ${rite.level}: she knows who knows the old rites.)`, "warn"); return true; }
     take(player, slot.id, 1); monster.dead = true; monster.respawnAt = game.tick + monster.def.respawn; bondWith(game, sp); return true;
   }
   if (sp.bonding === "rescue" && slot.id === "healing_tonic") return freeSnared(game, monster);
+  if (sp.bonding === "charm" && slot.id === "charmers_flute") {
+    if (why) { message(game, why, "warn"); return true; }
+    const t = player.trust[sp.id] ?? { n: 0, at: -1e9 };
+    if (game.tick - t.at < KEEP.trustGap) { message(game, "It's watching the flute, not you. Let it settle a while.", "warn"); return true; }
+    t.at = game.tick; player.trust[sp.id] = t; addXp(game, "beastkeeping", 30, { raw: true }); sound(game, "click");
+    if (game.player.combat === monster.uid) game.player.combat = null;
+    if (game.rng() < KEEP.charmChance) { monster.dead = true; monster.target = false; monster.foe = null; monster.respawnAt = game.tick + monster.def.respawn; bondWith(game, sp); }
+    else { monster.target = false; monster.foe = null; message(game, "It rises and sways to the tune, then sinks back, unsure. Play again in a while."); }
+    return true;
+  }
   message(game, sp.how, "info");
   return true;
 }
@@ -265,11 +408,11 @@ export function companionMenu(game: Game, m: Monster, using: number | null): Men
   const c = game.player.companions.find(x => x.id === m.ally); if (!c) return [];
   const sp = SPECIES[c.species], noun = c.name, out: MenuEntry[] = [];
   if (using !== null && using >= 0) return [{ verb: `Use ${item(game.player.inventory[using]?.id ?? "coins").name} ->`, noun, tone: "monster", run: g => { useOnCreature(g, m, using); } }];
-  if (sp.role === "combat") out.push(c.order === "fight" ? { verb: "Hold-back", noun, tone: "monster", run: g => setOrder(g, c, { order: "hold-back" }) } : { verb: "Fight-beside-me", noun, tone: "monster", run: g => setOrder(g, c, { order: "fight" }) });
+  if (fights(sp)) out.push(c.order === "fight" ? { verb: "Hold-back", noun, tone: "monster", run: g => setOrder(g, c, { order: "hold-back" }) } : { verb: "Fight-beside-me", noun, tone: "monster", run: g => setOrder(g, c, { order: "fight" }) });
   if (sp.temper === "steady") out.push(c.fast ? { verb: "Ease-off", noun, tone: "monster", run: g => setOrder(g, c, { fast: false }) } : { verb: "Hold-fast", noun, tone: "monster", run: g => setOrder(g, c, { fast: true }) });
   if (sp.role === "pack") out.push({ verb: "Unload", noun, tone: "monster", run: g => { unloadPack(g, c); } });
   out.push({ verb: "Send-home", noun, tone: "monster", run: g => { sendHome(g); } });
-  out.push({ verb: "Examine", noun, tone: "monster", run: g => message(g, `${sp.examine} Bond ${c.bond}/100. Health ${m.hp}/${m.def.hp}.${sp.temper === "fierce" ? " It never runs." : c.fast ? " It holds fast: if it falls, it's gone." : ""}`) });
+  out.push({ verb: "Examine", noun, tone: "monster", run: g => message(g, `${sp.examine} Bond ${c.bond}/100. Health ${m.hp}/${m.def.hp}.${c.trained ? ` ${TRAINING[c.trained - 1].name}.` : ""}${sp.temper === "fierce" ? " It never runs." : c.fast ? " It holds fast: if it falls, it's gone." : ""}`) });
   return out;
 }
 export function setOrder(game: Game, c: Companion, change: Partial<Pick<Companion, "order" | "fast">>) {
@@ -322,10 +465,17 @@ export function unloadPack(game: Game, c: Companion): number {
   message(game, moved ? `You unload ${c.name}'s panniers.` : "There's nothing in the panniers, or no room in your pack.");
   return moved;
 }
-/** A stag at your side: running costs a fifth less. */
-export const easesTheRoad = (player: Player) => companionOut(player)?.species === "stag";
-/** A vixen at your side: now and then another herb where you pick one. */
-export const findsHerbs = (game: Game) => companionOut(game.player)?.species === "vixen" && game.rng() < 0.2;
+/** A stag at your side: running costs a fifth less (a glimmer stag's, a third); a little less again for each tier of training. */
+export const roadEase = (player: Player) => { const c = companionOut(player), t = (c?.trained ?? 0) * 0.02; return c?.species === "stag" ? 0.8 - t : c?.species === "glimmerstag" ? 0.65 - t : 1; };
+export const easesTheRoad = (player: Player) => roadEase(player) < 1;
+/** A vixen at your side: now and then another herb where you pick one (more often the better she's trained). */
+export function findsHerbs(game: Game): boolean {
+  const c = companionOut(game.player);
+  if (c?.species !== "vixen" || game.rng() >= 0.2 + 0.04 * (c.trained ?? 0)) return false;
+  deed(game, c); return true;
+}
+/** A wisp at your side lights the dark (the underground's gloom lifts round you). */
+export const lightsTheWay = (player: Player) => SPECIES[companionOut(player)?.species ?? "hound"].role === "light";
 
 // ---------- The beastkeepers ----------
 /** Settle a frightened one (fled): its fee by its level, once it's had time to calm down. */
@@ -351,10 +501,32 @@ export function houndPup(game: Game): boolean {
   const sp = SPECIES.hound, why = levelProblem(game, sp);
   if (why) { message(game, why, "warn"); return false; }
   if (count(game.player, "cooked_meat") < 5) { message(game, "Five cooked meat for the litter, and a pup's yours.", "warn"); return false; }
-  if (game.player.companions.length >= KEEP.most) { message(game, `You keep ${KEEP.most} companions at most.`, "warn"); return false; }
+  if (game.player.companions.length >= keepsAt(game)) { message(game, `You keep ${keepsAt(game)} companions at most.`, "warn"); return false; }
   take(game.player, "cooked_meat", 5);
   return !!bondWith(game, sp);
 }
+/** A speckled drake egg, left with a beastkeeper to hatch (Beastkeeping 88, and a fee for the warmth). */
+export function incubate(game: Game): boolean {
+  const player = game.player, why = levelProblem(game, SPECIES.drake);
+  if (player.hatchery) { message(game, "There's an egg in the warm already.", "warn"); return false; }
+  if (why) { message(game, why, "warn"); return false; }
+  if (!has(player, "wild_drake_egg")) { message(game, "You haven't a speckled drake egg. The drakes drop them, rarely.", "warn"); return false; }
+  if (count(player, "coins") < KEEP.hatchFee) { message(game, `Keeping an egg warm that long costs ${KEEP.hatchFee.toLocaleString()} Frens.`, "warn"); return false; }
+  take(player, "wild_drake_egg", 1); take(player, "coins", KEEP.hatchFee); player.hatchery = { readyAt: game.tick + KEEP.hatchTicks };
+  message(game, "The egg goes into the warm, among the coals. Come back in half an hour, and be the first thing it sees.", "quest");
+  return true;
+}
+export const hatched = (game: Game) => !!game.player.hatchery && game.tick >= game.player.hatchery.readyAt;
+/** Be there when it hatches: the drake is yours. */
+export function hatch(game: Game): boolean {
+  if (!hatched(game)) { message(game, "Not yet. You'll hear it.", "warn"); return false; }
+  const c = bondWith(game, SPECIES.drake); if (!c) return false;
+  game.player.hatchery = null;
+  message(game, "The shell splits, and a wet, furious drake looks straight at you. It's decided who its mother is.", "quest");
+  return true;
+}
+export const cleanHatchery = (raw: unknown, tick: number): { readyAt: number } | null => raw && typeof raw === "object" && typeof (raw as { left?: unknown }).left === "number"
+  ? { readyAt: tick + Math.max(0, Math.min(KEEP.hatchTicks, Math.floor((raw as { left: number }).left))) } : null;
 
 // ---------- Aboard ----------
 /** A vessel's room for companions: a skiff a small one, a barge or a longship two. */
@@ -379,15 +551,19 @@ export function homeOnDeath(game: Game) { for (const c of game.player.companions
 export function cleanCompanions(raw: unknown, isItem: (id: string) => boolean): Companion[] {
   if (!Array.isArray(raw)) return [];
   const out: Companion[] = [];
-  for (const entry of raw.slice(0, KEEP.most)) {
+  for (const entry of raw.slice(0, KEEP.max)) {
     const r = entry && typeof entry === "object" ? entry as Record<string, unknown> : {};
     const species = r.species as SpeciesId;
     if (!SPECIES[species] || typeof r.id !== "number" || !Number.isInteger(r.id) || out.some(o => o.id === r.id)) continue;
     const name = typeof r.name === "string" && r.name.length <= 24 ? r.name : SPECIES[species].name;
     const state = (["out", "kennel", "aboard", "fled"] as const).includes(r.state as CompanionState) ? r.state as CompanionState : "kennel";
-    const pack = SPECIES[species].role === "pack" ? Array.from({ length: KEEP.pack }, (_, i) => { const s = Array.isArray(r.pack) ? r.pack[i] as Record<string, unknown> | null : null; return s && typeof s.id === "string" && isItem(s.id) && typeof s.n === "number" && s.n > 0 ? { id: s.id, n: Math.floor(s.n) } : null; }) : [];
+    const trained = Math.max(0, Math.min(TRAINING.length, Math.floor(Number(r.trained) || 0)));
+    const tr = r.training && typeof r.training === "object" ? r.training as Record<string, unknown> : null, tier = trained + 1;
+    const training = tr && Number(tr.tier) === tier && tier <= TRAINING.length ? { tier, got: Math.max(0, Math.min(TRAINING[tier - 1].need - 1, Math.floor(Number(tr.got) || 0))) } : undefined;
+    const pack = SPECIES[species].role === "pack" ? Array.from({ length: KEEP.pack + 2 * trained }, (_, i) => { const s = Array.isArray(r.pack) ? r.pack[i] as Record<string, unknown> | null : null; return s && typeof s.id === "string" && isItem(s.id) && typeof s.n === "number" && s.n > 0 ? { id: s.id, n: Math.floor(s.n) } : null; }) : [];
     out.push({ id: r.id, species, name, bond: Math.max(0, Math.min(100, Math.floor(Number(r.bond) || 0))), hp: Math.max(1, Math.floor(Number(r.hp) || 1)), state: state === "out" && out.some(o => o.state === "out") ? "kennel" : state,
-      order: r.order === "hold-back" ? "hold-back" : "fight", fast: r.fast === true, pack, fledAt: typeof r.fledAt === "number" ? r.fledAt : undefined });
+      order: r.order === "hold-back" ? "hold-back" : "fight", fast: r.fast === true, pack, fledAt: typeof r.fledAt === "number" ? r.fledAt : undefined,
+      trained: trained || undefined, training, kills: Math.max(0, Math.floor(Number(r.kills) || 0)) || undefined });
   }
   return out;
 }

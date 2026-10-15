@@ -529,7 +529,18 @@ export function itemArt(icon: Icon): HTMLCanvasElement {
       case "flour":
         part(p, poly([[7, 13], [25, 13], [28, 21], [23, 29], [9, 29], [4, 21]]), "#b89c86", "stone");
         part(p, disc(16, 12, 9, 4.5), color, "food"); break;
-      case "egg": part(p, disc(16, 17, 8, 10.5), color, "food"); dot(p, 13, 11, "#ffffff"); dot(p, 12, 12, "#ffffff"); break;
+      case "egg": part(p, disc(16, 17, 8, 10.5), color, "food"); dot(p, 13, 11, "#ffffff"); dot(p, 12, 12, "#ffffff"); if (accent) for (const [sx, sy] of [[18, 13], [13, 19], [19, 22], [15, 25], [20, 18]] as Pt[]) dot(p, sx, sy, accent); break;
+      case "brush":
+        for (let i = 0; i < 7; i++) line(p, [[8 + i * 2.6, 19], [7 + i * 2.8, 27]], accent ?? "#3b3a38");
+        part(p, box(6, 12, 20, 8), color, "wood"); part(p, box(6, 12, 20, 2.5), shadeHex(color, 0.15), "wood"); break;
+      case "flute":
+        part(p, stroke([[7, 27], [25, 6]], 3.2), color, "wood");
+        part(p, disc(8, 25, 4.5, 5), accent ?? "#6b4a2c", "wood");
+        for (let i = 0; i < 4; i++) dot(p, 14 + i * 2.6, 18 - i * 3, shadeHex(color, -0.45)); break;
+      case "scarab":
+        for (const s of [-1, 1]) for (let i = 0; i < 3; i++) line(p, [[16 + s * 5, 14 + i * 5], [16 + s * 11, 12 + i * 6]], shadeHex(color, -0.35));
+        part(p, disc(16, 9, 4, 3), accent ?? shadeHex(color, -0.25), "metal");
+        part(p, disc(16, 19, 7, 9), color, "metal"); line(p, [[16, 11], [16, 28]], shadeHex(color, -0.3)); dot(p, 13, 15, "#ffffff"); break;
       case "wheat":
         for (let i = -1; i <= 1; i++) { line(p, [[16 + i * 3, 30], [16 + i * 6, 9]], "#9c8a5c"); part(p, disc(16 + i * 6, 9, 3, 6.5), color, "food"); }
         break;

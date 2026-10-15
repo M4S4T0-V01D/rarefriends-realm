@@ -4237,7 +4237,7 @@ test("Activities: a challenge set by its host runs on the game's own mechanics, 
   const { GUILD_FURNACE } = await import("../games/rarefriends-realm/hearthkinnames.ts");
   const { regionAt } = await import("../games/rarefriends-realm/world.ts");
   const g = newGame(), p = g.player;
-  assert.deepEqual(Object.keys(ACTIVITIES), ["quarry_call", "assay_run", "hot_tunnel", "pass_run", "barrow_watch", "road_patrol", "farwake_survey", "redwake_contract", "archive_rubbings", "compact_order"]); assert.deepEqual(ACTIVITY_HOSTS.quarry_master, ["quarry_call", "hot_tunnel"]);
+  assert.deepEqual(Object.keys(ACTIVITIES), ["quarry_call", "assay_run", "hot_tunnel", "pass_run", "keepers_trial", "barrow_watch", "road_patrol", "farwake_survey", "redwake_contract", "archive_rubbings", "compact_order"]); assert.deepEqual(ACTIVITY_HOSTS.quarry_master, ["quarry_call", "hot_tunnel"]);
   // The host offers it in talk; the level gates it.
   let d = talk(g, "quarry_master"); assert.ok(d.options?.some(o => /Quarry Call/.test(o.label)), "the quarrymaster offers the Quarry Call");
   p.xp.mining = 0; assert.match(activityProblem(g, "quarry_call"), /Mining level of 10/);
@@ -4979,9 +4979,11 @@ test("Beastkeeping: each species won its own way (fed, earned, haltered, spared,
   p.xp.beastkeeping = XP_TABLE[60]; give(p, "cooked_meat", 5); assert.ok(B.houndPup(g)); const hound = p.companions.find(c => c.species === "hound"); assert.equal(hound.state, "out");
   const goat = wild("highland_goat"); near(goat); assert.ok(use(goat, "goat_halter")); assert.equal(p.companions.length, 3);
   const g2 = newGame(); assert.ok(restore(g2, JSON.parse(JSON.stringify(serialize(g))))); assert.deepEqual(g2.player.companions.map(c => [c.species, c.state]), p.companions.map(c => [c.species, c.state]));
-  // Three at most: the fourth waits until one's left with a keeper for good.
+  // Three at most (below Beastkeeping 25): the fourth waits until one's left with a keeper for good.
+  p.xp.beastkeeping = XP_TABLE[24]; assert.equal(B.keepsAt(g), 3);
   const boar = wild("boar"); boar.hp = 1; assert.ok(B.canSpare(g, boar)); assert.ok(!B.spare(g, boar), "no room for a fourth");
   B.release(g, p.companions.find(c => c.species === "goat")); boar.dead = false; boar.hp = 1; assert.ok(B.spare(g, boar)); assert.ok(p.companions.some(c => c.species === "boar"));
+  p.xp.beastkeeping = XP_TABLE[60];
   // A steady hound holds fast only when bonded deep; a fierce boar never runs.
   B.setOrder(g, hound, { fast: true }); assert.equal(hound.fast, false); hound.bond = 85; B.setOrder(g, hound, { fast: true }); assert.equal(hound.fast, true);
   // Falling: gone for good, a keepsake kept.
@@ -5002,6 +5004,84 @@ test("Beastkeeping: each species won its own way (fed, earned, haltered, spared,
   const stag = wild("greatstag"); near(stag); assert.ok(use(stag, "bread")); assert.ok(!p.companions.some(c => c.species === "stag"), "not without knowing its ways");
   p.lore.greatstag = { k: 0xff, a: 0 }; assert.ok(use(stag, "bread")); assert.ok(p.companions.some(c => c.species === "stag"));
   B.bringOut(g, p.companions.find(c => c.species === "stag")); const easy = runDrain(g); B.sendHome(g); assert.ok(Math.abs(easy / runDrain(g) - 0.8) < 1e-9, "a stag eases the road");
+});
+
+test("Beastkeeping, grown: twenty-two species, each won its own way and found in the world; produce (a cow wants a bucket), knacks (a burn, poison, a drake's breath that catches what's beside), grooming, training set by a beastkeeper and done together, more kept with the levels, a charmer's flute, a wisp by rite and its light, a drake egg hatched by a keeper (through a save), the Keeper's Trial, and Pip's menagerie", async () => {
+  const B = await import("../games/rarefriends-realm/beasts.ts");
+  const A = await import("../games/rarefriends-realm/activities.ts");
+  const g = newGame(), p = g.player;
+  assert.equal(B.SPECIES_IDS.length, 22);
+  for (const id of B.SPECIES_IDS) {
+    const sp = B.SPECIES[id]; assert.ok(MONSTERS[sp.base], `${id} is drawn from a creature`);
+    for (const w of sp.wild) { assert.ok(MONSTERS[w], `${id}: ${w}`); assert.ok(g.monsters.some(m => m.def.id === w), `${id}: some ${w} live in the world`); }
+    for (const food of sp.diet) assert.ok(isItem(food), `${id} eats ${food}`);
+    if (sp.produce) { assert.ok(isItem(sp.produce.item)); if (sp.produce.needs) assert.ok(isItem(sp.produce.needs)); }
+  }
+  for (const d of ["ash_drake", "frost_drake", "dune_drake", "cinder_drake"]) assert.ok(MONSTERS[d].drops.some(x => x.item === "wild_drake_egg"), `${d} drops an egg, rarely`);
+  for (const id of ["beast_halter", "grooming_brush", "charmers_flute", "wild_drake_egg", "jewelled_feather", "gold_scarab"]) assert.ok(isItem(id));
+  assert.ok(SHOPS.menagerie.stock.every(isItem) && SHOPS.beastkeeper.stock.includes("grooming_brush"));
+  assert.ok(g.world.spawns.some(s => s.kind === "npc" && s.id === "menagerist_pip"), "Pip keeps a menagerie in Bellwhistle");
+  // More kept with the levels.
+  for (const [lv, n] of [[1, 3], [25, 4], [50, 5], [75, 6], [99, 6]]) { p.xp.beastkeeping = XP_TABLE[lv]; assert.equal(B.keepsAt(g), n); }
+  const wild = (id) => g.monsters.find(m => m.def.id === id && !m.dead);
+  const use = (m, id, n = 1) => { give(p, id, n); const at = p.inventory.findIndex(s => s?.id === id); return B.useOnCreature(g, m, at); };
+  const stub = { strike: (_g, _a, b) => { b.hp -= 1; }, step: () => {}, hurt: (_g, _a, b, d) => { b.hp -= d; hurt.push([b.uid, d]); } }, hurt = [];
+  // A hen: fed grain, visit after visit; she lays while she's out.
+  p.xp.beastkeeping = XP_TABLE[1]; const hen = wild("chicken");
+  for (let k = 0; k < B.KEEP.trustNeeded; k++) { g.tick += B.KEEP.trustGap; assert.ok(use(hen, "grain")); }
+  const henC = p.companions.find(c => c.species === "hen"); assert.ok(henC, "a hen of your own"); tick(g);
+  let m = B.allyOf(g); assert.ok(m); henC.producedAt = g.tick - B.SPECIES.hen.produce.every; const xp0 = p.xp.beastkeeping;
+  B.companionTick(g, m, stub); assert.ok(has(p, "egg") && p.xp.beastkeeping > xp0, "an egg, and Beastkeeping for it");
+  // Grooming: the bond, XP, not too often.
+  const bond0 = henC.bond; assert.ok(use(m, "grooming_brush")); assert.equal(henC.bond, bond0 + B.KEEP.bondGroom); assert.ok(use(m, "grooming_brush")); assert.equal(henC.bond, bond0 + B.KEEP.bondGroom, "not again so soon");
+  // Training: set at a keeper (the level, the fee), done together, stronger after.
+  assert.ok(!B.startTraining(g, henC), "Beastkeeping 15 first"); p.xp.beastkeeping = XP_TABLE[15]; assert.ok(!B.startTraining(g, henC), "the fee");
+  give(p, "coins", 100_000); const hp0 = B.companionDef(henC).hp; assert.ok(B.startTraining(g, henC)); assert.equal(henC.training.tier, 1);
+  for (let k = 0; k < B.TRAINING[0].need; k++) B.deed(g, henC);
+  assert.equal(henC.trained, 1); assert.equal(henC.training, undefined); assert.ok(B.companionDef(henC).hp >= hp0);
+  // A cow fills only a bucket you carry.
+  p.xp.beastkeeping = XP_TABLE[30]; const cow = wild("cow"); assert.ok(use(cow, "beast_halter")); const cowC = p.companions.find(c => c.species === "cow");
+  B.bringOut(g, cowC); tick(g); m = B.allyOf(g); cowC.producedAt = g.tick - 10_000; while (has(p, "bucket")) take(p, "bucket", 1);
+  B.companionTick(g, m, stub); assert.ok(!has(p, "bucket_of_milk"), "no bucket, no milk");
+  give(p, "bucket", 1); cowC.producedAt = g.tick - 10_000; B.companionTick(g, m, stub); assert.ok(has(p, "bucket_of_milk") && !has(p, "bucket"));
+  // Through a save: trained, training, and the hen's tier.
+  B.startTraining(g, cowC); B.deed(g, cowC);
+  const back = B.cleanCompanions(JSON.parse(JSON.stringify(p.companions)), isItem);
+  assert.equal(back.find(c => c.species === "hen").trained, 1); assert.deepEqual(back.find(c => c.species === "cow").training, { tier: 1, got: 1 });
+  assert.equal(B.cleanCompanions(Array.from({ length: 9 }, (_, i) => ({ id: i + 1, species: "hen", state: "kennel" })), isItem).length, B.KEEP.max);
+  // A charmer's flute: Beastkeeping 48, played until it comes.
+  for (const c of [...p.companions]) B.release(g, c);
+  const serpent = wild("hooded_serpent"); assert.ok(use(serpent, "charmers_flute")); assert.ok(!p.companions.length, "Beastkeeping 48 first");
+  p.xp.beastkeeping = XP_TABLE[99]; const rng = g.rng; g.rng = () => 0; g.tick += B.KEEP.trustGap; assert.ok(use(serpent, "charmers_flute")); g.rng = rng;
+  const serpC = p.companions.find(c => c.species === "serpent"); assert.ok(serpC && has(p, "charmers_flute"), "it comes, and the flute isn't used up");
+  // A knack: the serpent's bite poisons what you fight.
+  B.bringOut(g, serpC); tick(g); m = B.allyOf(g);
+  const foe = g.monsters.find(x => !x.dead && x.ally === undefined && !x.def.boss && x.def.hp > 20 && x.def.level < 60);
+  foe.x = m.x + 1; foe.y = m.y; foe.poison = null; teleport(g, m.x - 1, m.y); p.combat = foe.uid; m.attackTimer = 0; m.x = foe.x - 1; m.y = foe.y;
+  g.rng = () => 0; B.companionTick(g, m, stub); g.rng = rng; assert.ok(foe.poison && foe.poison.damage === 4, "poisoned");
+  // A drake's breath: the foe, and whatever's beside it that's at you.
+  serpC.species = "drake"; m.def = B.companionDef(serpC); const other = g.monsters.find(x => !x.dead && x.ally === undefined && x !== foe && !x.def.boss && x.def.hp > 20);
+  other.x = foe.x + 1; other.y = foe.y; other.target = true; foe.hp = foe.def.hp; other.hp = other.def.hp; m.attackTimer = 0; hurt.length = 0;
+  g.rng = () => 0; B.companionTick(g, m, stub); g.rng = rng; assert.ok(hurt.some(([u]) => u === foe.uid) && hurt.some(([u]) => u === other.uid), "the breath catches what's beside");
+  other.target = false; serpC.species = "serpent";
+  // A golem draws what's at you more often.
+  assert.ok((B.SPECIES.golem.draws ?? 0) > B.KEEP.drawsFire);
+  // A wisp, by rite (Magic 40): its light.
+  for (const c of [...p.companions]) B.release(g, c);
+  const wisp = wild("prism_wisp") ?? wild("frost_wisp"); p.xp.magic = XP_TABLE[10]; assert.ok(use(wisp, "glimmer_dust")); assert.ok(!p.companions.length, "Magic 40 first");
+  p.xp.magic = XP_TABLE[40]; assert.ok(use(wisp, "glimmer_dust")); assert.ok(p.companions.some(c => c.species === "wisp")); assert.ok(B.lightsTheWay(p));
+  // A glimmer stag eases the road more than a stag.
+  assert.ok(B.roadEase({ ...p, companions: [{ species: "glimmerstag", state: "out" }] }) < B.roadEase({ ...p, companions: [{ species: "stag", state: "out" }] }));
+  // A drake egg: a keeper keeps it warm, it hatches in its own time, through a save, and it's yours.
+  for (const c of [...p.companions]) B.release(g, c);
+  assert.ok(!B.incubate(g), "no egg"); give(p, "wild_drake_egg", 1); assert.ok(B.incubate(g)); assert.ok(!has(p, "wild_drake_egg")); assert.ok(!B.hatch(g), "not yet");
+  const g2 = newGame(); assert.ok(restore(g2, JSON.parse(JSON.stringify(serialize(g))))); assert.ok(g2.player.hatchery && g2.player.hatchery.readyAt - g2.tick <= B.KEEP.hatchTicks);
+  g.tick += B.KEEP.hatchTicks; assert.ok(B.hatched(g)); assert.ok(B.hatch(g)); assert.ok(p.companions.some(c => c.species === "drake")); assert.equal(p.hatchery, null);
+  // The Keeper's Trial: a fighter out with you, and its own kills count.
+  B.bringOut(g, p.companions.find(c => c.species === "drake")); tick(g); p.activities.records = {};
+  assert.ok(A.startActivity(g, "keepers_trial")); const need = Number(p.activities.run.target.count);
+  for (let k = 0; k < need; k++) A.activityEvent(g, { kind: "companion_kill", monster: "ink_rat" });
+  assert.equal(p.activities.run, null, "done"); assert.equal(A.activityRecord(g, "keepers_trial").done, 1);
 });
 
 test("Heal Other: two tiers of faith (24 and 62) that heal your companion or another player within reach; never someone unhurt (so never XP for nothing), never in the ring; what another player's game sends is checked (near, capped by the spell, not too often)", async () => {

@@ -18,11 +18,13 @@ import { METALS, ROCKS, SKILL_NAMES, SMELTING, WAYFARER_MARK, item, type Skill }
 import { addXp, give, giveOrDrop, level, message, sound, type Game } from "./state.ts";
 import { regionAt } from "./world.ts";
 import { GUILD_FURNACE } from "./hearthkinnames.ts";
+import { SPECIES, companionOut, deed, fights } from "./beasts.ts";
 
 export type ActivityEvent =
   | { kind: "mine"; rock: string; x: number; y: number }
   | { kind: "produce"; station: string | null; metal: string | null; failed: boolean }
   | { kind: "kill"; monster: string; x: number; y: number }
+  | { kind: "companion_kill"; monster: string }
   | { kind: "death" };
 export type ActivityRun = { id: string; startedAt: number; until: number; target: Record<string, number | string>; progress: number; failed: number; marks: Record<string, number> };
 export type ActivityRecord = { done: number; best: number; lastAt: number };
@@ -98,6 +100,17 @@ export const ACTIVITIES: Record<string, ActivityDef> = {
     score: (game, run) => 0.4 + 0.6 * timeLeft(game, run),
     reward: (game, _run, score) => { const xp = Math.round(900 * (0.5 + score)); addXp(game, "agility", xp, { raw: true }); if (score > 0.7) giveOrDrop(game, WAYFARER_MARK, 1); return `${xp} Wayfaring XP${score > 0.7 ? " and a Wayfarer's mark" : ""}`; },
     promise: "Wayfaring XP, and a Wayfarer's mark for a fast one.",
+  },
+  keepers_trial: {
+    id: "keepers_trial", name: "The Keeper's Trial", skill: "beastkeeping", host: "beastkeeper_bramble", requires: { level: 20 }, limit: 1200, cooldown: 3000,
+    unlocked: game => { const c = companionOut(game.player); return c && fights(SPECIES[c.species]) ? null : "Bring a companion that fights, out with you. I'm trying it, not you."; },
+    roll: game => ({ count: level(game, "beastkeeping") >= 60 ? 10 : level(game, "beastkeeping") >= 40 ? 8 : 6 }),
+    brief: (_game, target) => `Out you go with your companion, and it brings down ${target.count} creatures inside a quarter of an hour: its own blow the last one each time. I'll know by the look of it when you come back.`,
+    goal: (_game, run) => Math.min(1, run.progress / n(run.target.count)),
+    status: (_game, run) => `${run.progress} of ${run.target.count} brought down by your companion.`,
+    score: (game, run) => 0.5 + 0.5 * timeLeft(game, run),
+    reward: (game, run, score) => { const xp = Math.round(120 * n(run.target.count) * (1 + level(game, "beastkeeping") / 20) * (0.5 + score)), c = companionOut(game.player); addXp(game, "beastkeeping", xp, { raw: true }); if (c) { c.bond = Math.min(100, c.bond + 5); deed(game, c); } return `${xp} Beastkeeping XP and a deeper bond`; },
+    promise: "Beastkeeping XP, a deeper bond, and a deed toward its training.",
   },
   barrow_watch: {
     id: "barrow_watch", name: "The Barrow Watch", skill: "attack", host: "oathmaster_brand", requires: { level: 40 }, limit: 1200, cooldown: 3000,
@@ -216,6 +229,7 @@ export function activityEvent(game: Game, event: ActivityEvent) {
   if (run.id === "hot_tunnel" && event.kind === "mine" && event.rock === "gem" && regionAt(game.world, event.x, event.y).id === "ashen_shaft" && !run.marks.gem) { run.marks.gem = 1; message(game, `${def.name}. ${def.status(game, run)}`, "quest"); }
   // (The Redwake's contract: the raiders in the hills along the Oathgate road, northworld.ts OATH_ROAD.hills.)
   if (run.id === "redwake_contract" && event.kind === "kill" && event.monster === "bandit" && event.x >= 440 && event.x <= 545 && event.y >= 196 && event.y <= 262) { run.progress++; if (run.progress < n(run.target.count)) message(game, `${def.name}. ${def.status(game, run)}`); }
+  if (run.id === "keepers_trial" && event.kind === "companion_kill") { run.progress++; if (run.progress < n(run.target.count)) message(game, `${def.name}. ${def.status(game, run)}`); }
   if (run.id === "barrow_watch" && event.kind === "kill" && event.monster === "draugr") { run.progress++; if (run.progress < n(run.target.count)) message(game, `${def.name}. ${def.status(game, run)}`); }
   if (run.id === "road_patrol" && event.kind === "kill" && ["wolf", "bandit", "rusalka", "leshy", "boar"].includes(event.monster) && event.x >= 690 && event.x <= 900 && event.y >= 160 && event.y <= 280) { run.progress++; message(game, `${def.name}. ${def.status(game, run)}`); }
   if (def.goal(game, run) >= 1) finishActivity(game);
