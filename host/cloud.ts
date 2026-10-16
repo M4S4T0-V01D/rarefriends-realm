@@ -43,6 +43,30 @@ const SESSION_KEY = (account: string) => `rarefriends-realm:cloud:v1:session:${a
 const META_KEY = (account: string, friend: string) => `rarefriends-realm:save:v1:${account.toLowerCase()}:${friend}:cloud`;
 const BACKUP_KEY = (account: string, friend: string) => `rarefriends-realm:save:v1:${account.toLowerCase()}:${friend}:backup`;
 const AUTO_MS = 90_000, EVENT_MS = 12_000, LOAD_TIMEOUT_MS = 7_000;
+/** How long a sign-in waits for the wallet: two minutes in all, or 25 seconds once the player is back from the wallet app. */
+const SIGN_MS = 120_000, BACK_MS = 25_000;
+/** On a phone, a signature can be lost on the way back from the wallet app: wait for it, but not for ever. */
+function answered<T>(work: Promise<T>, still: () => boolean): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    let done = false, back: ReturnType<typeof setTimeout> | null = null;
+    const timeout = () => finish(() => reject(Object.assign(new Error("timeout"), { code: "timeout" })));
+    const all = setTimeout(timeout, SIGN_MS);
+    const seen = () => { if (typeof document !== "undefined" && document.visibilityState === "visible" && !back) back = setTimeout(timeout, BACK_MS); };
+    const hidden = () => { if (typeof document !== "undefined" && document.visibilityState === "hidden" && back) { clearTimeout(back); back = null; } };
+    const watch = () => { hidden(); seen(); };
+    function finish(then: () => void) { if (done) return; done = true; clearTimeout(all); if (back) clearTimeout(back); if (typeof document !== "undefined") document.removeEventListener("visibilitychange", watch); then(); }
+    if (typeof document !== "undefined") document.addEventListener("visibilitychange", watch);
+    work.then(value => finish(() => still() ? resolve(value) : reject(Object.assign(new Error("stopped"), { code: "stopped" }))), error => finish(() => reject(error)));
+  });
+}
+/** What a wallet's error said, short and plain (shown so a failure on a phone can be told apart). */
+const walletSaid = (error: unknown) => {
+  const e = error as { code?: unknown; message?: unknown; shortMessage?: unknown } | null;
+  const text = typeof e?.shortMessage === "string" ? e.shortMessage : typeof e?.message === "string" ? e.message : "";
+  return `${e && e.code !== undefined && e.code !== "timeout" ? `${String(e.code)}: ` : ""}${text}`.replace(/\s+/g, " ").trim().slice(0, 150);
+};
+/** A phone's ordinary browser (no wallet inside it): signing works best in the wallet app's own browser. */
+const onPhoneBrowser = () => typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) && !/MetaMaskMobile|Trust|CoinbaseWallet|Rainbow|wv\)/i.test(navigator.userAgent);
 
 const store = {
   get<T>(key: string): T | null { try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) as T : null; } catch { return null; } },
@@ -264,15 +288,17 @@ export class CloudSync {
   /** Where the cards live, learned from the service's answers (a held card's redeem needs it even with no card of our own out). */
   private cardContract: string | null = null; private cardChainId: number | null = null;
   /** Sign in: the server's message, signed by the wallet (no transaction), for a session token. */
+  private signAttempt = 0;
   async signIn() {
     const provider = this.io.provider();
-    if (!provider) { this.set({ status: "unverified", error: "no-wallet" }); return; }
+    if (!provider) { this.set({ status: "unverified", error: "no-wallet", ...(onPhoneBrowser() ? { mobile: true } : {}) }); return; }
+    const attempt = ++this.signAttempt, current = () => attempt === this.signAttempt && !this.disposed;
     this.set({ status: "signing" });
     try {
       const challenge = await this.api("POST", "/v1/auth/challenge", { json: { address: this.account } });
       if (challenge.status !== 200 || typeof challenge.data.message !== "string") throw new Error("challenge");
       if (!isSignInMessage(challenge.data.message, this.io.origin(), this.account)) throw new Error("unexpected message");
-      const signature = await provider.request({ method: "personal_sign", params: [stringToHex(challenge.data.message), this.account] });
+      const signature = await answered(provider.request({ method: "personal_sign", params: [stringToHex(challenge.data.message), this.account] }), current);
       const verified = await this.api("POST", "/v1/auth/verify", { json: { message: challenge.data.message, signature } });
       if (verified.status !== 200 || typeof verified.data.token !== "string") throw new Error("verify");
       this.session = { token: verified.data.token, address: String(verified.data.address), expiresAt: Number(verified.data.expiresAt) };
@@ -280,9 +306,17 @@ export class CloudSync {
       this.delivered = true; // the game is already running: what's loaded now arrives as a resolution, not a start
       await this.reopenAfterSignIn();
     } catch (error) {
-      const rejected = typeof error === "object" && error !== null && (error as { code?: unknown }).code === 4001;
-      this.set({ status: "unverified", error: rejected ? "cancelled" : "failed" });
+      if (!current()) return;   // (stopped by the player, who has already been told)
+      const code = typeof error === "object" && error !== null ? (error as { code?: unknown }).code : undefined;
+      const said = code === 4001 || code === "timeout" ? "" : walletSaid(error);
+      this.set({ status: "unverified", error: code === 4001 ? "cancelled" : code === "timeout" ? "timeout" : "failed", ...(said ? { detail: said } : {}), ...(onPhoneBrowser() ? { mobile: true } : {}) });
     }
+  }
+  /** The player gave up waiting for the wallet: stop, and let them try again (a late answer is ignored). */
+  cancelSignIn() {
+    if (this.status.status !== "signing") return;
+    this.signAttempt++;
+    this.set({ status: "unverified", error: "stopped" });
   }
   private async reopenAfterSignIn() {
     const result = await this.api("GET", `/v1/characters/${this.friend}`).catch(() => null);

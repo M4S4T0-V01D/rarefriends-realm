@@ -192,6 +192,9 @@ function RealmHost() {
         // The player's choices about cloud saves, from the game's buttons.
         const action = event.data.action as CloudAction;
         if (action === "verify") void cloud.signIn();
+        else if (action === "cancel-verify") cloud.cancelSignIn();
+        // On a phone's ordinary browser: the same page, opened in the MetaMask app's own browser (where signing works).
+        else if (action === "open-in-wallet") window.location.href = `https://metamask.app.link/dapp/${window.location.host}${window.location.pathname}${window.location.search}`;
         else if (action === "sign-out") cloud.signOut();
         else if (action === "import") void cloud.importLocal(event.data.replacing === true);
         else if (action === "skip-import") cloud.skipImport();

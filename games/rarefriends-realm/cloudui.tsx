@@ -22,6 +22,8 @@ export function cloudLine(cloud: CloudState | null): string {
       return cloud.error === "cancelled" ? "You cancelled the signature. Your adventure is still saved in this browser."
         : cloud.error === "expired" ? "Your cloud sign-in has expired: verify your wallet again to keep saving online."
         : cloud.error === "failed" ? "Couldn't sign in just now. Your adventure is still saved in this browser."
+        : cloud.error === "timeout" ? "Your wallet didn't answer. If you signed, the answer didn't make it back: try again. Your adventure is still saved here."
+        : cloud.error === "stopped" ? "Stopped waiting for your wallet. Try again whenever you like."
         : cloud.error === "no-wallet" ? "Connect your wallet to turn on cloud saves."
         : "Cloud saves are off for this wallet. Verify your wallet once and your adventure saves online automatically, on any device.";
     case "signing": return "Check your wallet: sign the message to turn on cloud saves. It isn't a transaction and costs nothing.";
@@ -49,10 +51,13 @@ export function CloudControls({ cloud, onAction, compact }: { cloud: CloudState 
       <p className="realm-cloud-line" role="status">{cloudLine(cloud)}</p>
       <div className="realm-buttons">
         {cloud.status === "unverified" && <button type="button" className="realm-primary" onClick={() => onAction("verify")}>☁ Verify wallet</button>}
+        {cloud.status === "signing" && <button type="button" onClick={() => onAction("cancel-verify")}>Stop waiting</button>}
+        {cloud.status === "unverified" && cloud.mobile && <button type="button" onClick={() => onAction("open-in-wallet")}>Open in the MetaMask app</button>}
         {(cloud.status === "import" || cloud.status === "local-only") && <button type="button" className="realm-primary" onClick={() => onAction("import")}>☁ Import to the cloud</button>}
         {(cloud.status === "offline" || cloud.status === "error") && <button type="button" onClick={() => onAction("retry")}>Try again</button>}
         {!compact && signedIn && cloud.status !== "loading" && <button type="button" className="realm-dark" onClick={() => onAction("sign-out")}>Sign out of cloud saves</button>}
       </div>
+      {cloud.status === "unverified" && cloud.detail && <p className="realm-muted">Your wallet said: <code>{cloud.detail}</code></p>}
       {!compact && signedIn && cloud.address && <p className="realm-muted">Signed in with wallet <code>{short(cloud.address)}</code></p>}
       {!compact && !signedIn && <p className="realm-muted">Verifying asks your wallet to sign a message. It only proves the wallet is yours: it's never a transaction and costs nothing.</p>}
     </div>

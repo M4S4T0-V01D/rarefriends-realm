@@ -181,6 +181,27 @@ test("each wallet keeps its own sign-in: switching wallets never reuses another'
   const b2 = device(srv, phone, bob, "3412"); await b2.sync.open(); assert.equal(b2.last().status, "unverified");
 });
 
+test("a phone wallet that never answers: the player can stop waiting and try again, a late answer is ignored, and a wallet's own error is shown", async () => {
+  const srv = server(), phone = storage(), a = device(srv, phone);
+  await a.sync.open();
+  // A signature lost on the way back from the wallet app: the sign-in waits, and the player stops it.
+  let late = null;
+  const provider = { request: () => new Promise(resolve => { late = resolve; }) };
+  const stuck = new CloudSync(alice.address, "7730", { readSave: () => null, writeSave() {}, deliver() {}, state() {}, reload() {}, origin: () => ORIGIN, provider: () => provider }, BASE, srv.http);
+  const signing = stuck.signIn(); await settle();
+  assert.equal(stuck.current().status, "signing", "waiting for the wallet");
+  stuck.cancelSignIn(); assert.equal(stuck.current().status, "unverified"); assert.equal(stuck.current().error, "stopped");
+  late(await alice.signMessage({ message: "anything" })); await signing; await settle();
+  assert.equal(stuck.current().status, "unverified", "a late answer doesn't sign in behind the player's back");
+  // A wallet that says no with a reason: the reason is shown.
+  const refusing = new CloudSync(alice.address, "7730", { readSave: () => null, writeSave() {}, deliver() {}, state() {}, reload() {}, origin: () => ORIGIN,
+    provider: () => ({ request: async () => { throw Object.assign(new Error("Internal JSON-RPC error."), { code: -32603 }); } }) }, BASE, srv.http);
+  await refusing.signIn();
+  assert.equal(refusing.current().error, "failed"); assert.match(refusing.current().detail ?? "", /-32603: Internal JSON-RPC error/);
+  // And trying again with a wallet that answers signs in.
+  await a.sync.signIn(); assert.notEqual(a.last().status, "unverified");
+});
+
 test("the wallet is only ever asked to sign the Realm's own sign-in message", async () => {
   const { isSignInMessage } = await import("../host/cloud.ts");
   const { challengeMessage } = await import("../cloud/src/worker.ts");

@@ -77,7 +77,7 @@ export type ShareOutcome = "shared" | "copied-and-opened" | "saved-and-opened" |
  */
 export const CLOUD_STATE = "rarefriends-realm:cloud-state";
 export const CLOUD_ACTION = "rarefriends-realm:cloud-action";
-export type CloudAction = "verify" | "sign-out" | "import" | "skip-import" | "keep-cloud" | "keep-local" | "retry" | "reload" | "flush" | "mint-card" | "card-status" | "cancel-card" | "held-cards" | "redeem-card";
+export type CloudAction = "verify" | "cancel-verify" | "open-in-wallet" | "sign-out" | "import" | "skip-import" | "keep-cloud" | "keep-local" | "retry" | "reload" | "flush" | "mint-card" | "card-status" | "cancel-card" | "held-cards" | "redeem-card";
 /**
  * An Adventurer Card (cloud/src/cards.ts) this character has out, as the host reports it: the card's token, where it
  * is in its life (reserved → submitted → active → redeemed; or cancelled), and what the host is doing about it now.
@@ -99,8 +99,12 @@ export type CloudConflict = {
 export type CloudState = {
   status: "off" | "unverified" | "signing" | "loading" | "saved" | "saving" | "offline" | "conflict" | "import" | "local-only" | "not-owner" | "error";
   address?: string; version?: number; savedAt?: number;
-  /** Why it isn't signed in, or what went wrong: "cancelled", "failed", "expired", "no-wallet", or the server's reason. */
+  /** Why it isn't signed in, or what went wrong: "cancelled", "failed", "timeout", "expired", "no-wallet", or the server's reason. */
   error?: string;
+  /** What the wallet itself said, when it said something (shown so a failure on a phone can be told apart). */
+  detail?: string;
+  /** The page is on a phone outside a wallet's own browser: signing works best opened in the wallet app. */
+  mobile?: boolean;
   conflict?: CloudConflict;
   importable?: Record<string, unknown>;
   /** The cloud had no save even though this browser had synced one (it was reset): offered back as an import. */
@@ -141,6 +145,7 @@ export function parseCloudState(raw: unknown): CloudState | null {
     status: s.status as CloudState["status"],
     address: typeof s.address === "string" && /^0x[0-9a-fA-F]{40}$/.test(s.address) ? s.address : undefined,
     version: num(s.version), savedAt: num(s.savedAt), error: typeof s.error === "string" ? s.error.slice(0, 200) : undefined,
+    ...(typeof s.detail === "string" && s.detail ? { detail: s.detail.replace(/[\u0000-\u001f]/g, " ").slice(0, 160) } : {}), ...(s.mobile === true ? { mobile: true } : {}),
     conflict: conflict && save(conflict.cloud) ? { cloud: save(conflict.cloud)!, cloudAt: num(conflict.cloudAt) ?? 0, cloudVersion: num(conflict.cloudVersion) ?? 0, local: save(conflict.local) ?? null, localAt: num(conflict.localAt) ?? null, where: conflict.where === "play" ? "play" : "start" } : undefined,
     importable: save(s.importable), lost: s.lost === true, imported: s.imported === true, duplicate: s.duplicate === true,
     ...(s.card === null ? { card: null } : parseCardState(s.card) ? { card: parseCardState(s.card)! } : {}),
