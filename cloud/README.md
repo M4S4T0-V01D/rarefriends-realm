@@ -169,7 +169,7 @@ npx wrangler tail                                       # live logs
 
 Configuration is in `wrangler.toml` `[vars]`:
 
-- `ORIGINS`: the pages allowed to sign in. Both renderers share `https://m4s4t0-v01d.github.io`.
+- `ORIGINS`: the pages allowed to sign in: `https://m4s4t0-v01d.github.io` and the organisation copy's `https://rare-friends-realm.github.io` (both renderers share each), and the Android app's `https://realm.localhost`.
 - `RPC_URL`, `CHAIN_ID`, `COLLECTION`
 - `CARDS_CONTRACT`, `CARDS_CHAIN_ID`, `CARDS_RPC_URL`, `GAME_URL`: the Adventurer Cards contract and its chain (testnet 46630 while it's being tried); an empty contract keeps cards closed
 
